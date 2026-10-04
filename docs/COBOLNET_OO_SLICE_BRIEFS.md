@@ -1178,9 +1178,10 @@ remains readable);
 (2) the sending/receiving classifier is **`Binding/Bound/BoundStores.StoreKindOf`** — a TOTAL explicit
 taxonomy over every BoundStatement returning None/Write/ReadWrite (GR1/GR2/GR3 selection), built from the
 15-agent emitter-verified survey (scratchpad `bound_stores_classification.md`: 119 nodes, polarity per
-store position — in-place arithmetic = ReadWrite, GIVING/MOVE = Write, STRING Into = ReadWrite per GR7,
-CALL BY REFERENCE = ReadWrite, etc.); an unclassified node → 0843 LOUD, never a guess about whether a
-side-effecting accessor runs;
+store position — in-place arithmetic = ReadWrite, GIVING/MOVE = Write, STRING Into = Write (§14.9.43.3 SR10
+names it the receiving operand; kb/Work PB1275), CALL BY REFERENCE = ReadWrite, etc.); the answer is non-nullable
+and the visitor exhaustive, so no node is unclassified and nothing guesses whether a side-effecting accessor runs
+(kb/Work PB1275 classified the thirteen pointer / object / carrier leaves that used to answer "unclassified → 0843");
 (3) the hook lives at ReferenceResolver's resolution-failure exit and returns the TEMP ITEM into the
 normal resolve tail (so reference-modification on the property value rides the existing RefModPlace path,
 and subscripts reject on the OCCURS-less temp);

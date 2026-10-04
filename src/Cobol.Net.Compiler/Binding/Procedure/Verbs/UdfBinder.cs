@@ -394,8 +394,10 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
     }
 
     /// <summary>Drain one per-evaluation window's suffix of BOTH lists (<see cref="Mark"/>): the object-property
-    /// GETs first — the statement-level order, where the property wrap is the OUTER sequence, so a property
-    /// argument's GET precedes the activation that consumes its temp — then the pre-ops, in registration order.
+    /// GETs first — the statement-level order, where the property wrap is the OUTER sequence — then the pre-ops, in
+    /// registration order. A property written in a FUNCTION ARGUMENT is not among those GETs: ArgumentOrder moved its
+    /// GET onto the pre-op list at the argument's position (kb/Work PB1932), so it precedes the activation that
+    /// consumes its temp and follows every argument to its left (§8.4.3.2.4 GR2).
     /// Every property reference a window drains is a SENDING operand (a condition or an arithmetic expression
     /// has no receiving operand), so each one is a §8.4.3.9.4 GR1 GET (<c>OoBinder.OoDrainPropertyGets</c>).</summary>
     private List<BoundStatement>? DrainPerEvaluation(PendingMark mark) =>
@@ -404,9 +406,10 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
     /// <summary>Drain THIS statement's pending function activations (registered while the statement bound)
     /// into the hoisted <see cref="BoundSequence"/>: every activation is a PRE-op — a function-identifier
     /// is never a receiving operand (§8.4.3.2.3 SR1), so unlike property references there is no polarity
-    /// classification and no post-ops. Runs INSIDE the property-op wrap at the BindStatement chokepoint, so
-    /// a property-reference argument's GET (a pre-op of the OUTER wrap) still precedes the activation that
-    /// consumes its temp. The hoist is EXACT here: every conditionally- or repeatedly-evaluated window
+    /// classification and no post-ops. Runs INSIDE the property-op wrap at the BindStatement chokepoint; a
+    /// property-reference ARGUMENT's GET is not in that wrap but on this list, at its argument's position
+    /// (ArgumentOrder, kb/Work PB1932), so it precedes the activation that consumes its temp and follows the
+    /// arguments to its left. The hoist is EXACT here: every conditionally- or repeatedly-evaluated window
     /// already drained its own suffix into a per-evaluation <see cref="BoundUdfEvaluated"/> wrapper BEFORE the
     /// statement completed
     /// binding, so what remains pending is evaluated exactly once per statement execution (a plain operand,

@@ -309,7 +309,12 @@ override/0829/implements machinery applies to accessors UNCHANGED. The 0842 band
 SR5 clause+explicit duplicate, §13.18.42.3 SR4 superclass property collision, no-OCCURS subject, no-FILLER
 subject. Property REFERENCES (`P OF obj` — the §8.4.3.9.4 GR1–GR3 implicit-INVOKE desugar with
 BoundSequence + temps; detected at the ReferenceResolver resolution-failure chokepoint by the
-single-qualifier + roster-property shape) are live. The GET's PLACEMENT follows the reference's evaluation
+single-qualifier + roster-property shape) are live. Each reference's POLARITY (GR1 sending / GR2 receiving / GR3
+both) is `BoundStores.StoreKindOf`, a TOTAL classification — a non-nullable answer from the exhaustive bound-statement
+visitor — so every statement that can carry a property classifies it, the SET formats for object references,
+pointers, program- and function-pointers and saved locales, ALLOCATE and FREE included (kb/Work PB1275: those
+answered "outside the taxonomy" and the property was refused 0843 in every one, against §8.4.3.9.3 SR5/SR6); STRING
+INTO is receiving-only (§14.9.43.3 SR10), so a WITH NO GET property is legal there. The GET's PLACEMENT follows the reference's evaluation
 window exactly as a function activation's does (kb/Work PB987; §8.8.4.13 2)): a reference evaluated once per
 statement is a statement-level pre-op, but one written in a per-evaluation window — a PERFORM UNTIL / VARYING
 condition, a SEARCH WHEN, an EVALUATE object, a non-first AND/OR operand, a VARYING BY / AFTER FROM operand — is

@@ -35,8 +35,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// GR1 (pure sending) = prepend the get-invoke; GR2 (write-only receiving) = append the set-invoke, get
     /// NOT invoked; GR3 (read-modify-write) = both around ONE temp. SR3/SR4 (:7380/:7382 — the needed
     /// accessor must exist, on the instance or factory roster per the reference form) check HERE, against
-    /// the classified need, both COBOLNET0843. An unclassifiable statement (a taxonomy hole) stages LOUD —
-    /// never a silent guess about whether a side-effecting accessor runs.</summary>
+    /// the classified need, both COBOLNET0843. The taxonomy is TOTAL — a non-nullable answer from an exhaustive
+    /// visitor, so a new bound statement cannot compile without deciding each Place's polarity, and nothing here
+    /// guesses whether a side-effecting accessor runs (kb/Work PB1275).</summary>
     public BoundStatement OoWrapPropertyOps(BoundStatement core, int mark)
     {
         var ops = ctx.Data.OoPendingPropertyOps;
@@ -47,16 +48,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         List<BoundStatement> pre = [], post = [];
         foreach (var op in taken)
         {
+            // TOTAL over every bound statement (kb/Work PB1275): §8.4.3.9.3 SR5/SR6 admit a property wherever a
+            // data item of its description may send or receive, so every statement that can carry one classifies it.
             var kind = BoundStores.StoreKindOf(core, op.Temp);
-            if (kind is null)
-            {
-                ctx.Edition.Error("COBOLNET0843",
-                    $"the object-property reference '{op.PropName}' OF '{op.ReceiverName}' occurs in a "
-                    + $"statement ({core.GetType().Name}) outside the classified store taxonomy — the "
-                    + "sending/receiving polarity (ISO §8.4.3.9.4 GR1–GR3) cannot be established; extend "
-                    + "BoundStores before accepting this shape");
-                continue;
-            }
             bool needGet = kind == StoreKind.None || kind == StoreKind.ReadWrite;
             bool needSet = kind == StoreKind.Write || kind == StoreKind.ReadWrite;
             string where = $"'{op.PropName}' OF '{op.ReceiverName}'";
@@ -161,6 +155,17 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // (§14.9.23.3 SR7) — the D10 dynamic path, live as of the universal wave.
         if (inv.invokeMethodName().dataReference() is { } mref)
         {
+            // §14.9.23.3 SR3: "If object-class-name-1 is specified, literal-1 shall be specified" — asked BEFORE the
+            // receiver resolves as identifier-1, because a class-name is not a data item and resolving it as one
+            // drew the resolver's false "is not defined" (kb/Work PB1136). A data-name shadows a class-name, so the
+            // class-name reading is taken only for a name that is not a data item (the OoBindByReceiver partition).
+            if (target.dataReference() is { } cref && ctx.Refs.Probe(cref) is null
+                && Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, cref, cref.GetText(),
+                    Compiler.Oo.OoNameResolution.Want.Class).Class is { } namedClass)
+                return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
+                    $"INVOKE {namedClass.Name} {mref.GetText()}: when object-class-name-1 is specified, literal-1 "
+                    + "shall be specified (ISO §14.9.23.3 SR3) — identifier-2 may be specified only when identifier-1 "
+                    + "is a universal object reference (SR7)");
             // kb/Work PB1030: a reference that did not resolve is the resolver's diagnostic, never SR7's.
             Place? urecv = null;
             if (target.dataReference() is { } uref
@@ -176,21 +181,23 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // a second "not resolvable to storage" error on top named no rule (kb/Work PB1030).
             if (host.Expr.ResolveSending(mref).PlaceOrReported(ctx.Edition) is not { } msrc)
                 return BoundRejected.Reported(ctx.Edition);
-            if (msrc.Item.Pic?.Category is not PicCategory.Alphanumeric && !msrc.Item.IsGroup)
+            // §14.9.23.3 SR8: "Identifier-2 shall reference an alphanumeric or national data item". The operand
+            // category is the ONE reader's (DataItem.OperandPic): an alphanumeric group has none and is "class and
+            // category alphanumeric" (§8.5.2.1); a national group is national and a bit group boolean (GR2b/GR1b of
+            // §13.18.29.4). The run-time selector (CobolObject.NormalizeMethodName) takes the item's character
+            // value whichever of the two classes it is (kb/Work PB1136).
+            bool selectorAdmitted = msrc.Item.OperandPic is { } selectorPic
+                ? selectorPic.Category is PicCategory.Alphanumeric or PicCategory.National
+                : msrc.Item.IsGroup;
+            if (!selectorAdmitted)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
-                    $"INVOKE: identifier-2 ('{mref.GetText()}') shall be of class alphanumeric "
-                    + "(ISO §14.9.23.3 SR8; national identifier-2 is a later refinement)");
+                    $"INVOKE: identifier-2 ('{mref.GetText()}') shall reference an alphanumeric or national data "
+                    + "item (ISO §14.9.23.3 SR8)");
             }
             return OoBindUniversalInvoke(site, urecv!, methodLiteral: null, methodSource: msrc);
         }
-        // §8.8.3.3 GR3: an alphanumeric/national concatenation expression stands anywhere a literal of that
-        // class may — including INVOKE literal-1 (§14.9.23.3 SR2); a boolean-class concat stays null → 0823.
-        var mnLit = inv.invokeMethodName().literal();
-        string? methodName = mnLit?.nonNumericLiteral()?.concatenationExpression() is { } mce
-            ? ConcatFolder.ClassOf(mce, ctx.Data.LiteralEnv) is not PicCategory.Boolean
-                ? ConcatFolder.Fold(mce, ctx.Edition, ctx.Data.LiteralEnv).Value : null
-            : OoDecodeMethodNameLiteral(mnLit);
+        string? methodName = OoMethodNameOf(inv.invokeMethodName().literal());
         if (methodName is null)
         {
             return BoundRejected.Report(ctx.Edition, "COBOLNET0823",
@@ -270,18 +277,26 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             var sm = host.OoInFactory ? searchRoot.FindFactoryMethod(methodName) : searchRoot.FindMethod(methodName);
             if (sm is null)
             {
+                // §14.9.23.3 SR4 f)–i): SELF or SUPER × a factory or an instance method — the same two facts the
+                // roster selection above used, so the printed rule is derived, never chosen per arm (kb/Work PB1136).
+                string selfRule = (isSuper, host.OoInFactory) switch
+                {
+                    (false, true) => "§14.9.23.3 SR4 f) — literal-1 shall name a method contained in the factory "
+                                     + "interface of the class containing the INVOKE statement",
+                    (false, false) => "§14.9.23.3 SR4 g) — literal-1 shall name a method contained in the instance "
+                                      + "interface of the class containing the INVOKE statement",
+                    (true, true) => "§14.9.23.3 SR4 h) — literal-1 shall name a method contained in the factory "
+                                    + "interface of a class inherited by the class containing the INVOKE statement",
+                    (true, false) => "§14.9.23.3 SR4 i) — literal-1 shall name a method contained in the instance "
+                                     + "interface of a class inherited by the class containing the INVOKE statement",
+                };
                 if (host.OoInFactory && IsStandardNew(methodName))
                     return NewWithoutBase($"INVOKE {(isSuper ? "SUPER" : "SELF")} \"{methodName}\"", searchRoot,
-                        isSuper
-                            ? "§14.9.23.3 SR4 h) — literal-1 shall name a method contained in the factory interface "
-                              + "of a class inherited by the class containing the INVOKE statement"
-                            : "§14.9.23.3 SR4 f) — literal-1 shall name a method contained in the factory interface "
-                              + "of the class containing the INVOKE statement");
+                        selfRule);
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0825",
                     $"INVOKE {(isSuper ? "SUPER" : "SELF")} \"{methodName}\": class '{searchRoot.Name}' (and "
                     + $"its inheritance chain) does not define a{(host.OoInFactory ? " factory" : "n instance")} "
-                    + "method named '" + methodName + "' "
-                    + "(ISO §14.9.23.3 SR4f–SR4i — the SELF/SUPER method-name placement rules)");
+                    + "method named '" + methodName + $"' (ISO {selfRule})");
             }
             var selfForm = isSuper ? InvokeForm.Super : InvokeForm.Self;
             // §14.8.3.3 rule 2 b) 2.: a method invoked with SELF or SUPER is invoked through ACTIVE-CLASS — the
@@ -297,11 +312,13 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             return OoBindResolvedInvoke(site, sm, selfForm, null, selfView);
         }
         if (target.dataReference() is not { } dref)
-        {
-            return BoundRejected.Report(ctx.Edition, "COBOLNET0823",
-                "INVOKE NULL: the receiver shall be an object-reference identifier or a class-name "
-                + "(ISO §14.9.23.3 — the predefined NULL object reference cannot be a receiver)");
-        }
+            // INVOKE NULL is LEGAL source: §14.9.23.3 SR1 asks only for an object reference, which NULL is
+            // (§8.4.3.7.3 SR2 — class object, category object reference, not universal), and §14.9.23.4 GR5 gives
+            // its meaning — EC-OO-NULL at run time. Until the receiver half of kb/Work PB1136 lands with the
+            // object-reference identifier tier (kb/Work PB1782 step 2 / PB1425) this is a DEFERRAL, never a
+            // refusal: it used to be refused under a §14.9.23.3 rule that does not exist.
+            return new BoundUnsupported("INVOKE through the predefined object reference NULL (the run-time "
+                + "EC-OO-NULL of ISO §14.9.23.4 GR5; kb/Work PB1136)");
 
         // identifier-1 vs class-name-1 (§14.9.23.2): resolve as a data item first (a data-name shadows);
         // an unresolved SIMPLE name is then a class-name candidate in the pass-1 table — a LEGAL alternative,
@@ -422,8 +439,8 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         if (receiver.Item.Pic is not { Category: PicCategory.ObjectReference } pic)
         {
             return BoundRejected.Report(ctx.Edition, "COBOLNET0824",
-                $"INVOKE '{receiver.Item.CobolName}': identifier-1 shall be a USAGE OBJECT REFERENCE data "
-                + "item (ISO §14.9.23.3 SR3)");
+                $"INVOKE '{receiver.Item.CobolName}': identifier-1 shall be an object reference — a USAGE OBJECT "
+                + "REFERENCE data item (ISO §14.9.23.3 SR1)");
         }
         // The receiver's §13.18.60.2 DESCRIPTION picks the roster (kb/Work PB389): universal → the dynamic
         // path; interface-name → the interface's prototype closure; object-class-name or ACTIVE-CLASS → the
@@ -445,7 +462,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0825",
                     $"INVOKE '{receiver.Item.CobolName}' \"{method}\": interface '{recvIface.Name}' (and "
                     + "its INHERITS closure) does not declare a method named '" + method + "' "
-                    + "(ISO §14.9.23.3 SR4e)");
+                    + "(ISO §14.9.23.3 SR4 e))");
             }
             var ibound = OoBindResolvedInvoke(site, proto, InvokeForm.Instance, receiver, rdesc);
             return ibound is BoundInvoke ibi ? ibi with { OwnerCsName = recvIface.CsName } : ibound;
@@ -461,13 +478,22 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // axis of its own description — a FACTORY-OF reference holds the factory object (§13.18.60.4 GR22 d)1.a.)
         // and therefore resolves the FACTORY roster (§14.9.23.3 SR4b/SR4c). Both arms of ONE dispatch.
         var m = rdesc.Factory ? cls.FindFactoryMethod(method) : cls.FindMethod(method);
+        // §14.9.23.3 SR4 a)–d): the rule a typed receiver's method name answers to is chosen by its description's
+        // two axes — object-class-name or ACTIVE-CLASS, with or without FACTORY — so the citation is derived from
+        // the same two facts the roster lookup above used, never written per arm (kb/Work PB1136).
+        string typedRule = (rdesc.Kind is ObjectRefKind.ActiveClass, rdesc.Factory) switch
+        {
+            (false, true) => "§14.9.23.3 SR4 a) — literal-1 shall name a method contained in the factory interface of "
+                             + "that object-class-name",
+            (false, false) => "§14.9.23.3 SR4 b) — literal-1 shall name a method contained in the instance interface "
+                              + "of that object-class-name",
+            (true, true) => "§14.9.23.3 SR4 c) — literal-1 shall name a method contained in the factory interface of "
+                            + "the class containing the INVOKE statement",
+            (true, false) => "§14.9.23.3 SR4 d) — literal-1 shall name a method contained in the instance interface "
+                             + "of the class containing the INVOKE statement",
+        };
         if (m is null && rdesc.Factory && IsStandardNew(method))
-            return NewWithoutBase($"INVOKE '{receiver.Item.CobolName}' \"{method}\"", cls,
-                rdesc.Kind is ObjectRefKind.ActiveClass
-                    ? "§14.9.23.3 SR4 c) — literal-1 shall name a method contained in the factory interface of the "
-                      + "class containing the INVOKE statement"
-                    : "§14.9.23.3 SR4 a) — literal-1 shall name a method contained in the factory interface of that "
-                      + "object-class-name");
+            return NewWithoutBase($"INVOKE '{receiver.Item.CobolName}' \"{method}\"", cls, typedRule);
         if (m is null)
         {
             string other = rdesc.Factory ? "an INSTANCE" : "a FACTORY";
@@ -479,8 +505,8 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             return BoundRejected.Report(ctx.Edition, "COBOLNET0825",
                 $"INVOKE '{receiver.Item.CobolName}' \"{method}\": class '{cls.Name}' (and its inheritance "
                 + $"chain) does not define {(rdesc.Factory ? "a factory" : "an instance")} method named '"
-                + method + $"' (ISO §14.9.23.3 SR4 {(rdesc.Factory ? "a)" : "b)")} — compile-time "
-                + $"for a typed receiver; the runtime analog is EC-OO-METHOD, §14.9.23.4 GR7b){hint}");
+                + method + $"' (ISO {typedRule}; compile-time for a typed receiver — the runtime analog is "
+                + $"EC-OO-METHOD, §14.9.23.4 GR7b){hint}");
         }
         // A method of the standard class BASE through a typed reference: the object it runs on is described by the
         // receiver itself (its class, ONLY or not, or ACTIVE-CLASS), which is what §16.2's `active-class` means for
@@ -1195,7 +1221,10 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         InvocationSite site, Place receiver, string? methodLiteral, Place? methodSource)
     {
         // §8.4.3.4.3 SR2 bars a universal receiver from the INLINE form outright, and OoBindInlineInvocation
-        // reports it there — so this path is reached only by the INVOKE statement.
+        // reports it there for EVERY segment's receiver (kb/Work PB1429) — so this path is reached only by the
+        // INVOKE statement, and an inline site here would end in the internal-error refusal.
+        System.Diagnostics.Debug.Assert(!site.ReturningImplicit,
+            "a universal receiver reached the inline-invocation path past the §8.4.3.4.3 SR2 screen");
         var argCtxs = site.Args;
         var args = new List<BoundUniversalArg>(argCtxs.Count);
         foreach (var a in argCtxs)
@@ -1596,18 +1625,23 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         return only is not null && only.GetText() == e.GetText() ? only : null;
     }
 
-    private static string? OoDecodeMethodNameLiteral(Core.LiteralContext? lit)
+    /// <summary>The VALUE of literal-1, the method name — for the INVOKE statement (§14.9.23.3 SR2: "Literal-1 shall
+    /// be of class alphanumeric or national and shall not be a zero-length literal") and for every segment of the
+    /// inline form, whose literal-1 §8.4.3.4.3 SR3 holds to the same rule. Null when the literal is of neither class
+    /// (a boolean literal or concatenation, a figurative constant), so the caller reports it under its own code.
+    /// <para>ONE decoder, the literal codec's (kb/Work PB1136): an alphanumeric, national, hexadecimal-alphanumeric or
+    /// hexadecimal-national token decodes through <see cref="CobolLiteral.Decode"/>, so <c>NX"0047…"</c> has one
+    /// national character per four-digit group (§8.3.3.5.4 GR4) exactly as it does in a MOVE or a DISPLAY — a private
+    /// copy here stripped the N and ran the ALPHANUMERIC hex codec, making every digit pair a character. An
+    /// alphanumeric or national concatenation expression stands wherever a literal of that class may (§8.8.3.3 GR3),
+    /// in BOTH spellings — the inline form used to refuse one.</para></summary>
+    private string? OoMethodNameOf(Core.LiteralContext? lit)
     {
-        var nn = lit?.nonNumericLiteral();
-        if (nn is null) return null;
-        if (nn.STRINGLIT() is { } sl) return CobolLiteral.Decode(sl.GetText());
-        if (nn.NATLIT() is { } nat)
-        {
-            string t = nat.GetText();
-            return t.Length >= 3 ? CobolLiteral.Decode(t[1..]) : "";   // strip the N prefix, decode the body
-        }
-        if (nn.HEXLIT() is { } hex) return CobolLiteral.DecodeHex(hex.GetText());   // §8.3.3.2 — the ONE hex codec
-        return null;
+        if (lit?.nonNumericLiteral() is not { } nn) return null;
+        if (nn.concatenationExpression() is { } concat)
+            return ConcatFolder.ClassOf(concat, ctx.Data.LiteralEnv) is not PicCategory.Boolean
+                ? ConcatFolder.Fold(concat, ctx.Edition, ctx.Data.LiteralEnv).Value : null;
+        return (nn.STRINGLIT() ?? nn.NATLIT() ?? nn.HEXLIT()) is { } token ? CobolLiteral.Decode(token.GetText()) : null;
     }
 
     /// <summary>The significant-digit count of a numeric literal rescaled to <paramref name="scale"/> (the

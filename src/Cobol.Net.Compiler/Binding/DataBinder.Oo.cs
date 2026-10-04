@@ -501,12 +501,14 @@ public sealed partial class DataBinder
     internal List<OoPendingPropertyOp> OoPendingPropertyOps { get; } = [];
 
     /// <summary>⛔ THE ONE statement-scoped pending PRE-OP list — every activation that must run BEFORE the
-    /// carrying statement, in REGISTRATION order. Two clients register here:
+    /// carrying statement, in REGISTRATION order. Its clients register here:
     /// <list type="bullet">
     ///   <item>a user-defined function activation (<c>UdfBinder</c>, ISO §8.4.3.2.4 GR1 — the caller-side
-    ///         <c>BoundCallProgram</c> into the result temp);</item>
+    ///         <c>BoundCallProgram</c> into the result temp), and an inline method invocation (§8.4.3.4.4 GR1);</item>
     ///   <item>a D18 function-bearing subscript / ref-mod segment's §15.4 temporary store
-    ///         (<c>StatementBinder.MaterializeSubscriptSegment</c>, fix-queue PB17).</item>
+    ///         (<c>StatementBinder.MaterializeSubscriptSegment</c>, fix-queue PB17);</item>
+    ///   <item>a function argument's held value and its object-property GETs, placed at the argument's position by
+    ///         <c>ArgumentOrder</c> (§8.4.3.2.4 GR2; kb/Work PB1423, PB1932).</item>
     /// </list>
     /// <para>⛔ ONE LIST, NOT TWO, AND THAT IS A CORRECTNESS REQUIREMENT rather than tidiness: the two kinds
     /// INTERLEAVE. A function subscript inside a user-function argument — <c>FUNCTION F(W-E(FUNCTION INTEGER(3)))</c>

@@ -27,6 +27,15 @@ namespace CobolNet.Binding.Procedure;
 /// and the store is placed on the pending list at the position its argument finished binding — i.e. before the
 /// later argument's pre-ops. The list order IS the evaluation order, so no argument can observe a later one.</para>
 ///
+/// <para><b>An object property is an argument evaluated IN ITS PLACE (kb/Work PB1932).</b> Its value is temp-1,
+/// "determined as though the associated get property method were invoked" (§8.4.3.9.4 GR1), so the GET IS the
+/// argument's evaluation. Every property reference in a function argument is SENDING — an intrinsic argument always
+/// is, and a user function's identifier argument is BY REFERENCE "other than an object property" (§8.4.3.2.4 GR5 a))
+/// — so <see cref="Record"/> moves the GETs the argument registered from the statement-level property list (whose
+/// wrap runs them ahead of EVERY pre-op of the statement) onto the pending pre-op list at the argument's position.
+/// The argument then counts as one that registered pre-ops, an earlier argument it could change is frozen before it,
+/// and the activation consuming its temp still follows it.</para>
+///
 /// <para><b>What is not frozen, and why.</b> A literal or figurative constant cannot change
 /// (<see cref="SendingValueTemp.Materialize"/> answers null). A compiler temporary — a user function's result, an
 /// earlier snapshot, an object-property or inline-invocation value — is written once, at its own position in the
@@ -37,14 +46,16 @@ namespace CobolNet.Binding.Procedure;
 /// (<see cref="SendingValueTemp.MaterializeBoolean"/>); the one shape left alone is a boolean expression whose
 /// length is a run-time value, which no intermediate item can describe.</para>
 /// </summary>
-internal sealed class ArgumentOrder(BinderContext ctx, SendingValueTemp temps)
+internal sealed class ArgumentOrder(BinderContext ctx, SendingValueTemp temps,
+    Func<int, List<BoundStatement>> drainPropertyGets)
 {
     private readonly Stack<Window> _open = new();
 
     private List<BoundStatement> Pending => ctx.Data.PendingPreOps;
 
-    /// <summary>The pending pre-op count now — the position a pre-op registered next would take.</summary>
-    internal int Mark => Pending.Count;
+    /// <summary>The pending counts now — the position a pre-op registered next would take, and the count of the
+    /// statement's un-drained object-property references.</summary>
+    internal (int PreOps, int Properties) Mark => (Pending.Count, ctx.Data.OoPendingPropertyOps.Count);
 
     /// <summary>Open the window of one function's argument list. Windows nest like the function references do (an
     /// argument may itself be a function-identifier); dispose the window when the argument list is done.</summary>
@@ -55,12 +66,15 @@ internal sealed class ArgumentOrder(BinderContext ctx, SendingValueTemp temps)
         return window;
     }
 
-    /// <summary>Record an argument operand just bound in the innermost open window, with the pending count from
-    /// before it bound (<paramref name="before"/>) to now. Outside any window — nothing evaluates arguments — it is
-    /// ignored.</summary>
-    internal void Record(BoundOperand operand, int before)
+    /// <summary>Record an argument operand just bound in the innermost open window, with the pending counts from
+    /// before it bound (<paramref name="before"/>) to now. The GETs of the object properties the argument named move
+    /// onto the pending list here, at the argument's position (§8.4.3.9.4 GR1 with §8.4.3.2.4 GR2 — see the class
+    /// summary). Outside any window — nothing evaluates arguments — it is ignored.</summary>
+    internal void Record(BoundOperand operand, (int PreOps, int Properties) before)
     {
-        if (_open.Count > 0) _open.Peek().Entries.Add(new Entry(operand, before, Mark));
+        if (_open.Count == 0) return;
+        Pending.AddRange(drainPropertyGets(before.Properties));
+        _open.Peek().Entries.Add(new Entry(operand, before.PreOps, Pending.Count));
     }
 
     internal readonly record struct Entry(BoundOperand Operand, int Before, int After);

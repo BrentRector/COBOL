@@ -731,7 +731,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             : $"CobolInvokeArg? __ur{id} = null;");
         string selector = u.MethodLiteral is { } lit
             ? Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(lit, quote: true)
-            : RuntimeApi.ObjNormalizeMethodName(PlaceRenderer.Read(u.MethodSource!));
+            // identifier-2's CHARACTER VALUE through the one operand-image reader (§14.9.23.4 GR2 a): "the content
+            // of the data item referenced by identifier-2"), so an alphanumeric or national GROUP sends its
+            // positions as an elementary item does — PlaceRenderer.Read handed the group's struct to a string
+            // parameter (CS1503; kb/Work PB1136).
+            : RuntimeApi.ObjNormalizeMethodName(OperandText.FieldImage(u.MethodSource!));
         w.Line($"{RuntimeApi.ObjRequireNonNull(PlaceRenderer.Read(u.Receiver))}.__CobolInvoke({selector}, __ua{id}, __ur{id});");
         for (int i = 0; i < u.Args.Count; i++)
         {

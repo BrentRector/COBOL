@@ -83,7 +83,7 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
     private ArgumentOrder? _argumentOrder;
     /// <summary>The ONE §8.4.3.2.4 GR2 left-to-right argument order (kb/Work PB1423) — shared by the intrinsic
     /// call and the user-defined activation.</summary>
-    internal ArgumentOrder ArgOrder => _argumentOrder ??= new ArgumentOrder(Ctx, SendingValue);
+    internal ArgumentOrder ArgOrder => _argumentOrder ??= new ArgumentOrder(Ctx, SendingValue, Oo.OoDrainPropertyGets);
 
     private ConditionBinder? _conditionBinder;
     internal ConditionBinder Cond => _conditionBinder ??= new ConditionBinder(Ctx, this);

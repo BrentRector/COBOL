@@ -5001,13 +5001,13 @@
   "ordinal": 4,
   "subject": "National literals",
   "rule-digest": "a025abb028ac",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#Decode; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#DecodeHexGroups",
-  "test-ref": "conformance:2023/r03_hexadecimal_national_and_boolean_literals",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#Decode; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#DecodeHexGroups; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoMethodNameOf",
+  "test-ref": "conformance:2023/r03_hexadecimal_national_and_boolean_literals; conformance:2002/pb1136_invoke_selector_forms",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1136 (registrar 15c). cite.py --check 8.3.3.5.4 \"each of which has the bit configuration specified by one occurrence of hex-character-sequence-1\" -> OK (rule 4). Decode's NX arm -> DecodeHexGroups(body, 4): zero digits -> \"\" (zero-length half), else one UTF-16 code unit per 4-digit group with that bit configuration. §8.1.2 exempts the hexadecimal-national format from conversion (cite.py --check 8.1.2 \"except that the hexadecimal-alphanumeric format and the hexadecimal-national format literals shall not be converted\" -> OK) and none is applied. r03 golden rows 1-2, 7 (NX\"00410042\" -> AB, LENGTH 2, NX'00610062' -> ab) and 14 (LENGTH(NX\"\")=0) cover both halves; probe p1 VALUE NX\"00410042\" -> [AB  ]. || REFUTED: PARTIAL — The rule gives an NX literal's value as one national character per hex-character-sequence (4 digits under D-N1) in EVERY context. The main codec (CobolLiteral.Decode -> DecodeHexGroups(body,4)) does this. But the INVOKE / inline-invocation method-name path OoBinder.OoDecodeMethodNameLiteral does not route an NX literal through Decode: it strips the first character and decodes the remaining X\"...\" with 2-digit (alphanumeric) groups. So NX\"00530048004F0057\" becomes NUL,S,NUL,H,NUL,O,NUL,W instead of SHOW. Â§14.9.23.3 SR2 makes a national literal legal there, so legal source is refused because of the wrong value. This is a sibling-copy (two-arm dispatch) defect of the codec this row cites. [editions as adjudicated: COBOL-2002, COBOL-2014, COBOL-2023 (national literals are a COBOL-2002 introduction; absent from COBOL-85, where the construct is rejected COBOLNET0900 via Constructs.NationalData2002)]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1136 LANDED (w1014u). cite.py --check 8.3.3.5.4 'each of which has the bit configuration specified by one occurrence of hex-character-sequence-1' OK 4). The sibling copy that refuted this row (OoBinder.OoDecodeMethodNameLiteral, which stripped the N and ran the 2-digit alphanumeric hex codec) is deleted; the INVOKE / inline method name decodes through CobolLiteral.Decode's NX arm (DecodeHexGroups(body, 4)) like every other consumer. NX\"00470052004500450054\" names GREET (golden line 3) and NX\"004700450054004E0041004D0045\" names GETNAME inline (line 4).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.3.3.5.4-5",
@@ -6187,8 +6187,8 @@
   "subject": "Function-identifier",
   "rule-digest": "2b4feebb414b",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ArgumentOrder.cs#Freeze; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindIntrinsicCore; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#DrainPending; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindArgOperand",
-  "test-ref": "conformance:2002/udf_arg_order; unit:ArgumentOrderDriftTests.TheIntrinsicCallPoint_OpensAndSettlesTheWindow",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/ArgumentOrder.cs#Freeze; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindIntrinsicCore; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#DrainPending; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindArgOperand; src/Cobol.Net.Compiler/Binding/Procedure/ArgumentOrder.cs#Record",
+  "test-ref": "conformance:2002/udf_arg_order; unit:ArgumentOrderDriftTests.TheIntrinsicCallPoint_OpensAndSettlesTheWindow; conformance:2002/pb1932_property_argument_order",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
   "notes": "kb/Work PB1423 (wave 1005 C). GR2 (cite.py --check 8.4.3.2.4 'its arguments are evaluated individually in the order specified in the list of arguments, from left to right' -> OK 8.4.3.2.4 2)). One ArgumentOrder window per function argument list (intrinsic: BindIntrinsicCore; user-defined: UdfActivate) stores every earlier argument that a later argument's activation would overtake into the SendingValueTemp intermediate at its own position. Golden udf_arg_order legs EXPR/INTR/NEST/REF/VAL/SUB/ORD/BOOL. Residual (not a divergence of the printed rule): a boolean expression of run-time length is left in place; object-property GET order against argument order is a separate mechanism (lead).",
@@ -6471,13 +6471,13 @@
   "ordinal": 2,
   "subject": "Inline method invocation",
   "rule-digest": "323c718fb0dd",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.InlineInvocation.cs#OoBindInlineInvocation; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInstanceInvoke",
-  "test-ref": "conformance:negative/pb428-inline-invocation-null-receiver",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.InlineInvocation.cs#OoBindInlineInvocation; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.InlineInvocation.cs#RefuseUniversalInlineReceiver",
+  "test-ref": "conformance:negative/pb428-inline-invocation-null-receiver; conformance:negative/pb1429-inline-chained-universal; conformance:2002/pb428_inline_method_invocation",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1429 (registrar 15b). cite.py --check 8.4.3.4.3 'neither the predefined object reference NULL nor a universal object reference shall be specified' OK. NULL receiver -> COBOLNET2138 (negative fixture); a directly written universal receiver -> COBOLNET2138 (probe p4_univrecv); non-object identifier -> COBOLNET0824 via the shared path. DEFECT: the SR2 screen runs only on the FIRST segment's written receiver. In a chain the identifier-1 of the next segment is the previous invocation (§8.4.3.1.3 recursion), and when that temp is UNIVERSAL the loop calls OoBindInstanceInvoke -> OoBindUniversalInvoke, which never sets ImplicitReturningPlace, so the compile ends with COBOLNET2362 'refused without a diagnostic ... internal error' (probe p3_chainuniv: MOVE A1 :: \"UNIV\" :: \"GETNAME\" TO W, UNIV RETURNING USAGE OBJECT REFERENCE). Expected: COBOLNET2138 naming SR2. || editions as written by the adjudicator: 2002, 2014, 2023 (OO facility; §8.4.3.4 absent from 85)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1429 LANDED (w1014u). cite.py --check 8.4.3.4.3 'neither the predefined object reference NULL nor a universal object reference shall be specified' OK 2). The SR2 universal screen is ONE predicate (OoBinder.RefuseUniversalInlineReceiver) asked of the written first receiver AND of every chained segment's receiver (the previous segment's temporary, which is identifier-1 of the next by the recursive identifier definition, 8.4.3.1.3 SR1). NULL receiver -> COBOLNET2138 (pb428 negative); written universal -> COBOLNET2138 (pb428 negative); chained universal temp (A1 :: \"UNIV\" :: \"GETNAME\", UNIV RETURNING a universal reference) -> COBOLNET2138 (pb1429 negative; was the COBOLNET2362 internal error); chained class-typed temp still runs (pb428 case 6 -> ACCOUNT). OoBindUniversalInvoke asserts it is never reached from an inline site.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.4.3-3",
@@ -6760,8 +6760,8 @@
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver",
   "test-ref": "conformance:2002/pb1137_invoke_argument_forms",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "Remaining halves: (c) `INVOKE NULL \"TAKE\"` is still refused COBOLNET0823 - the receiver screen is kb/Work PB1136's; (b) BY VALUE NULL now PARSES and reaches kb/Work PB1051's BY VALUE formal refusal. 'NULL is implicitly described as class object and category object reference' (cite.py --check 8.4.3.7.3 OK, SR2). kb/Work PB1137 (landed w61j) fixed (a): `USING [BY CONTENT] NULL` into an OBJECT REFERENCE formal crosses as the null reference (BoundInvokeArg.NullObject; golden NULL LO=NULL twice). NULL at a data-POINTER formal (8.4.3.10.3 SR1 a)) stays kb/Work PB1427's.",
+  "editions": "2002, 2014, 2023",
+  "notes": "OWNED BY kb/Work PB1136 (open). cite.py --check 8.4.3.7.3 'NULL is implicitly described as class object and category object reference' OK 2). The argument half is PB1137's (USING [BY CONTENT] NULL crosses as the null reference, pb1137_invoke_argument_forms). Remaining: INVOKE NULL \"TAKE\" - legal (an object reference, not universal) with the run-time EC-OO-NULL of 14.9.23.4 GR5 - is a deferral (BoundUnsupported, COBOLNET1756) at OoBindByReceiver since w1014u, no longer the COBOLNET0823 refusal citing a non-existent rule; it lands with the object-reference identifier tier (kb/Work PB1782 step 2 / PB1425).",
   "state": "GAP"
  },
  {
@@ -6981,13 +6981,13 @@
   "ordinal": 3,
   "subject": "Object property",
   "rule-digest": "27494936e43f",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#PropertyGet; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
-  "test-ref": "conformance-test:OoSpineTests.PropertyReference_SendingWithNoGet_0843",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#PropertyGet; src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs#StoreKindOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "test-ref": "conformance-test:OoSpineTests.PropertyReference_SendingWithNoGet_0843; conformance:2002/pb1275_property_set_formats",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1275 (registrar 15c). cite.py --check 8.4.3.9.3 'a get property method shall exist for property-name-1 in the object referenced by identifier-1 or in the factory object' OK. The accessor lookup selects the FACTORY roster for a class-name receiver or a FACTORY-OF typed receiver (PB389) and the instance roster otherwise; OoBinder.PropertyGet raises COBOLNET0843 (SR3) when a SENDING occurrence (StoreKind None/ReadWrite) has no GET; a receiver with neither accessor falls to 1639 (rejected). OoSpineTests.PropertyReference_SendingWithNoGet_0843 (WITH NO GET, sending use -> 0843) is spec-derived. Receiver forms the binder cannot reach at all are the FMT finding, not this rule. || REFUTED: PARTIAL — SR3 requires a GET only when the property is 'used as a sending item'. BoundStores classifies a STRING INTO receiver (and the Into-only case) as ReadWrite, so OoWrapPropertyOps demands a GET for an occurrence that §14.9.43.3 SR10 names as 'the receiving operand' and nothing else. A WITH NO GET property used as the STRING INTO target is legal source: it is a receiving-only use, which §8.4.3.9.4 GR2 serves with temp-2 and no GET. The compiler rejects it with COBOLNET0843 citing SR3. The true sending half is enforced: MOVE, DISPLAY, IF (including a non-first OR operand), PERFORM UNTIL, EVALUATE subject, INSPECT TALLYING and REPLACING, ADD TO, SUBTRACT FROM and COMPUTE all raise 0843. The other write-only uses of a NO-GET property are accepted and run (MOVE TO, ACCEPT FROM DATE, INITIALIZE, UNSTRING INTO, ADD GIVING, COMPUTE =). The rule's sending condition is therefore over-applied on the STRING arm, which rejects legal source. [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1275 LANDED (w1014u). cite.py --check 8.4.3.9.3 'If the object property is used as a sending item, a get property method shall exist' OK 3). The refuted over-application is fixed: STRING's identifier-3 is classified WRITE-only (14.9.43.3 SR10 'The data item referenced by identifier-3 is the receiving operand'), so a WITH NO GET property as the STRING INTO target no longer demands a GET - it compiles and its SET stores the transferred characters (golden line 8, ABCDEFGH); identifier-4 (POINTER) stays read-modify-write. Every true sending use without a GET still raises COBOLNET0843 naming SR3 (OoSpineTests.PropertyReference_SendingWithNoGet_0843).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.9.3-4",
@@ -7011,13 +7011,13 @@
   "ordinal": 5,
   "subject": "Object property",
   "rule-digest": "15e2de6df6fc",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs#StoreKindOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs#StoreKindOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "test-ref": "conformance:2002/pb1275_property_set_formats; conformance:2002/oo_property_explicit_ref",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1448 (also PB1275) (registrar 15c). cite.py --check 8.4.3.9.3 'This object property may be specified wherever a data item with that description would be valid as a sending item' OK. Elementary alphanumeric/numeric properties work as senders across MOVE/DISPLAY/COMPUTE/IF/SUBTRACT GIVING/DIVIDE GIVING/INSPECT TALLYING (probe p9, all values correct). But (a) a GROUP-valued property is refused COBOLNET0899 'later refinement' (p10: GET PROPERTY GRP RETURNING a group; `MOVE GRP OF A TO W` -> 0899 + 1639) although a group item is a valid MOVE sender; (b) an OBJECT-REFERENCE-valued property as the SET sender (`SET A TO INNER OF B`, p12) is refused COBOLNET0843 'BoundSetObjectRef outside the classified store taxonomy' (BoundStores.cs Visit(BoundSetObjectRef) => null); (c) as identifier-1 of another property (p8) -> 1639. Legal source rejected -> DIVERGES. [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1275 LANDED (w1014u). cite.py --check 8.4.3.9.3 'This object property may be specified wherever a data item with that description would be valid as a sending item' OK 5). BoundStores.StoreKindOf is now TOTAL (non-nullable, exhaustive visitor): the SET Format 5/7/8/9/10/12 receivers are stores and their senders sending, ALLOCATE RETURNING a store, FREE read-and-write, RAISE and SET LOCALE sending, the universal INVOKE's identifier-3 a crossing - so OoWrapPropertyOps no longer stages the 'outside the classified store taxonomy' COBOLNET0843. A property sends in every SET: SET B TO R OF A (object reference, golden line 2), SET P2 TO Q OF A (pointer, line 3), SET D2 TO INNER OF A (typed, line 4); the relation sender R OF A = A (line 1). The group-valued half was kb/Work PB1448 (landed). A property as identifier-1 of another property (X OF INNER OF B) is the identifier-1 FORMAT (FMT-8.4.3.9.2, kb/Work PB1449), not this description rule.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.9.3-6",
@@ -7026,13 +7026,13 @@
   "ordinal": 6,
   "subject": "Object property",
   "rule-digest": "d92532a82da5",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs#StoreKindOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs#StoreKindOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "test-ref": "conformance:2002/pb1275_property_set_formats; conformance:negative/pb1275-set-property-no-set",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1448 (also PB1450, PB1275) (registrar 15c). cite.py --check 8.4.3.9.3 'The description of an object property used as a receiving item is the same as the description of the USING parameter of the set property method' OK. Elementary receivers work in MOVE/STRING INTO/UNSTRING INTO/INSPECT REPLACING/INITIALIZE/COMPUTE/ADD (p9, oo_property_ref). But a group-valued property as a receiver is refused 0899 (same site as SR5), and an object-reference property as the SET Format 5 receiver (`SET INNER OF B TO A`, p8) is refused 0843 (BoundSetObjectRef taxonomy hole). Also the temp is modelled on the GET's RETURNING item whenever a GET exists (`model = get?.Binding!.Returning ?? set...`), not on the SET's USING parameter as SR6 says — identical only because SR7 would require it, and SR7 is not enforced (see SR7). DIVERGES (rejects-legal-source). [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1275 LANDED (w1014u). cite.py --check 8.4.3.9.3 'may be specified wherever a data item with that description would be valid as a receiving item' OK 6). With the store taxonomy total, a property receives in every statement that stores its description: SET R OF A TO A and SET INNER OF A TO D (Format 5, golden lines 1/4), SET Q OF A TO ADDRESS OF W (Format 7, line 3), SET Q OF A UP BY 2 (Format 10, read-modify-write, line 5), ALLOCATE ... RETURNING Q OF A (line 6), FREE Q OF A (line 7), STRING ... INTO S OF A (receiving only, line 8). A receiving use without a SET accessor is refused under SR4 by name (negative pb1275-set-property-no-set). The group-valued half and the temp's description (SR7) were kb/Work PB1448 / PB1450 (landed).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.9.3-7",
@@ -11586,13 +11586,13 @@
   "ordinal": 6,
   "subject": "Objects",
   "rule-digest": "d3b7ee30865c",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindResolvedInvoke; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ObjectRefAssignmentMismatch",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindResolvedInvoke; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ObjectRefAssignmentMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ReturningSender",
+  "test-ref": "conformance:2002/pb1165_active_class_returning_subclass",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1165: Rule (§9.3.6 match rule 6, cite.py OK §9.3.6 6)): an OBJECT REFERENCE/POINTER/INDEX returning item needs a method returning item that 'may be a sending item in a SET statement with the returning item as the receiving item'. Code: OoBindResolvedInvoke asks ObjectRefAssignmentMismatch (the §14.9.39.3 SR10/SR12/SR14 table) for object references, strict identity otherwise. Verified by probe (gen2.py): S1 subclass-typed returning into a base-typed receiver runs; S6 into a universal receiver runs; S2 universal returning into a class-typed receiver refused (correct - SR12 closed sender list); S3 POINTER and S4 INDEX returning accepted; S8 factory method RETURNING ACTIVE-CLASS invoked on its own class runs. DEFECTIVE (rejects legal source): an ACTIVE-CLASS returning item is typed as its DECLARING class instead of by §14.8.3.3 rule 2's substitution (cite.py OK §14.8.3.3 2) b) 1. and 2) b) 4.). S5 `INVOKE SBS5 \"MK\" RETURNING OS` (MK inherited factory method of BAS5, OS OBJECT REFERENCE SBS5) and S7 `INVOKE OS \"MA\" RETURNING OS` (instance method inherited from BAS7) both draw COBOLNET0828 'the class containing the ACTIVE-CLASS sender (BAS5) is not SBS5 or one of its subclasses'. Spec: invoked with object-class-name SBS5 the sender is `OBJECT REFERENCE SBS5 ONLY` (rule 2 b) 1.), invoked through OS the sender has OS's description (rule 2 b) 4.) - both conform to an SBS5 receiver; both programs must compile and run. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (OO method invocation, §9.3.6, is introduced by ISO 2002; absent from X3.23-1985)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1165 LANDED (w1014u, verdict-only). cite.py --check 9.3.6 'may be a sending item in a SET statement' OK 6). An inherited factory or instance method returning ACTIVE-CLASS invoked on the SUBCLASS delivers into a subclass-typed receiver: the sender is re-described by 14.8.3.3 rule 2 b) (OoConformance.ReturningSender) before the SET conformance (ObjectRefAssignmentMismatch), so the batch-15d shapes S5 (INVOKE SB \"MK\" RETURNING OS) and S7 (INVOKE OS \"MA\" RETURNING OS) compile and run - golden pb1165_active_class_returning_subclass lines 1-3 print DERIVED.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.6-L3.7",
@@ -25941,12 +25941,12 @@
   "ordinal": 1,
   "subject": "PROPERTY clause",
   "rule-digest": "aed0936f7840",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitMethod; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#MarkRoster",
-  "test-ref": "",
+  "verdict": "PARTIAL",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#MarkRoster; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitMethod",
+  "test-ref": "conformance:2002/pb1275_property_set_formats",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1274 + PB1275. Rule: \"If the GET phrase is not specified, the PROPERTY clause causes a method to be defined for the containing object.\" (cite.py --check 13.18.42.4 -> OK, GR 1). VERIFIED: OoBindPropertyClauses adds a GET accessor unless WITH NO GET (noGet), and the emitter renders a direct read of the subject, which is observably the implicit MOVE/SET because the LS item is the subject's own description: probe gr1_numedit_get (PIC ZZ9.99 VALUE 3.5) -> `T=  3.50|` (no re-editing, NOTE 1), gr1_objref_get (object reference, SET R TO SELF then IF R OF A = A) -> SAME, gr_positive (JUSTIFIED X(5)) -> `Z=  XYZ|`; WITH NO GET suppresses it (gr1_noget_read -> COBOLNET0843; conformance-test:OoSpineTests.PropertyReference_SendingWithNoGet_0843). DEFECT: the synthesized method is NOT a method for §11.7.3 override purposes. OoClassTable.Build's MarkRoster resolves OVERRIDE/FINAL against the base rosters BEFORE OoDriver runs OoBindPropertyClauses, so a subclass `METHOD-ID. GET PROPERTY N OVERRIDE.` over a base `01 N PIC 9 PROPERTY.` is refused COBOLNET0838 'no superclass defines a method with that name' (probe gr3_nonfinal_override) -- legal source rejected (§11.7.3 SR3 is satisfied: the superclass DOES define the method, per §8.4.3.9.1 'a method implicitly generated for a data item described with the PROPERTY clause'). Also: the class-level branch (index/message-tag/object/pointer) is reachable only through a SENDING operand outside SET: `SET B TO R OF A` (object property as the SET sender, legal per §8.4.3.9.3 SR5) is refused COBOLNET0843 'outside the classified store taxonomy' (probe gr1_objref_get_set). Expected: both programs compile; the override returns 9. Harm: rejects-legal-source. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (the PROPERTY clause is part of the OO facility; not in 1985)",
+  "editions": "2002, 2014, 2023",
+  "notes": "Owned by kb/Work PB1274 (open). cite.py --check 13.18.42.4 'If the GET phrase is not specified, the PROPERTY clause causes a method to be defined for the containing object' OK 1). The PB1275 half LANDED (w1014u): the class object/pointer branch of the implicit GET is reachable as a SET sender (SET B TO R OF A, SET P2 TO Q OF A, SET D2 TO INNER OF A - golden pb1275_property_set_formats lines 2-4). Still open (PB1274): the clause-synthesized accessor is created after OoClassTable.Build's MarkRoster resolves OVERRIDE/FINAL, so a subclass GET PROPERTY N OVERRIDE over a base clause accessor is refused COBOLNET0838.",
   "state": "GAP"
  },
  {
@@ -25956,12 +25956,12 @@
   "ordinal": 2,
   "subject": "PROPERTY clause",
   "rule-digest": "4793487fcfe2",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitMethod; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#MarkRoster; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs",
-  "test-ref": "",
+  "verdict": "PARTIAL",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#MarkRoster; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitMethod; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs",
+  "test-ref": "conformance:2002/pb1275_property_set_formats",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1274 + PB1275. Rule: \"If the SET phrase is not specified, the PROPERTY clause causes a method to be defined for the containing object.\" (cite.py --check 13.18.42.4 -> OK, GR 2). VERIFIED: a SET accessor with one formal of the subject's description is synthesized unless WITH NO SET, emitted as a direct store through the subject's place: gr_positive `MOVE 3 TO N OF A` with N `PROPERTY WITH NO GET` -> method SHOW displays N=3; `MOVE 12.5 TO E OF A` (ZZ9.99) -> ` 12.50` (edited once in temp-2, copied without re-editing, NOTE 2); WITH NO SET suppresses it (gr2_noset_write -> COBOLNET0843; conformance-test:OoSpineTests.PropertyReference_ReceivingWithNoSet_0843). DEFECTS: (1) the class index/message-tag/object/pointer branch (`SET data-name TO LS-data-name`) is UNREACHABLE from legal source: `SET R OF A TO A` (object reference property) and `SET Q OF A TO ADDRESS OF W` (pointer property) are both refused COBOLNET0843 '... (BoundSetObjectRef / BoundSetPointer) outside the classified store taxonomy' (probes gr1_objref, gr1_pointer) although §8.4.3.9.3 SR6 says the property 'may be specified wherever a data item with that description would be valid as a receiving item' and SET is the only statement that stores into an object reference or pointer. (2) the same MarkRoster-before-synthesis ordering as GR1: a subclass `SET PROPERTY N OVERRIDE` over a clause-generated setter draws COBOLNET0838. Expected: SET R OF A TO A then IF R OF A = A -> SAME. Harm: rejects-legal-source. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (the PROPERTY clause is part of the OO facility; not in 1985)",
+  "editions": "2002, 2014, 2023",
+  "notes": "Owned by kb/Work PB1274 (open). cite.py --check 13.18.42.4 'If the SET phrase is not specified, the PROPERTY clause causes a method to be defined for the containing object' OK 2). The PB1275 half LANDED (w1014u): the class index/message-tag/object/pointer branch of the implicit SET method ('SET data-name TO LS-data-name') is reachable from legal source - SET R OF A TO A then R OF A = A -> SAME, SET Q OF A TO ADDRESS OF W -> SAME (golden pb1275_property_set_formats lines 1, 3, 4). Still open (PB1274): MarkRoster runs before the clause accessors exist, so a subclass SET PROPERTY N OVERRIDE over a clause-generated setter draws COBOLNET0838.",
   "state": "GAP"
  },
  {
@@ -33711,13 +33711,13 @@
   "ordinal": 2,
   "subject": "Returning items",
   "rule-digest": "a7f044b91587",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindResolvedInvoke; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ObjectRefAssignmentMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch",
-  "test-ref": "conformance:negative/w61b-pb1166-invoke-currency-dpc; unit:PictureClauseIdentityDriftTests.AlphabeticAndAlphanumeric_AreDifferentPictureClauses_AndRepetitionIsNot",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#ReturningSender; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindResolvedInvoke; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ObjectRefAssignmentMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch",
+  "test-ref": "conformance:negative/w61b-pb1166-invoke-currency-dpc; unit:PictureClauseIdentityDriftTests.AlphabeticAndAlphanumeric_AreDifferentPictureClauses_AndRepetitionIsNot; conformance:2002/pb1165_active_class_returning_subclass; conformance:2002/pb1112_active_class_invocation",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1165 (also PB1166) (registrar 14c). Rule 2) (cite.py --check 14.8.3.3 'If the activated method is invoked with any other object reference, the sending operand has the same description as that object reference' -> OK §14.8.3.3 2) b) 4.; b) 1. 'described with that same object-class-name and an ONLY phrase' -> OK). An ACTIVE-CLASS returning item is NOT a sender description by itself: the sending operand is RE-DESCRIBED from how the method was invoked (class-name -> that class ONLY; SELF/SUPER -> ACTIVE-CLASS; interface-typed ref -> universal; otherwise the invoking reference's description), with FACTORY presence copied from the returning item. OoBindResolvedInvoke passes m.Binding.Returning.Pic (ObjectRefDescriptor.ActiveClass(<declaring class>)) straight to ObjectRefAssignmentMismatch; no code re-describes it (grep ActiveClass in OoBinder.cs: only the NEW/SELF delivery at :253 and the inline-invocation screen at :499). Probe p2.cob: RIB2 method MK 'RETURNING R' R 'OBJECT REFERENCE ACTIVE-CLASS'; main 'INVOKE D \"MK\" RETURNING D2' with D and D2 'OBJECT REFERENCE RID2' (RID2 INHERITS FROM RIB2) -> COBOLNET0828 'the class containing the ACTIVE-CLASS sender (RIB2) is not RID2 or one of its subclasses (SR12 b)2.)'. Spec: rule 2 b) 4. makes the sender RID2-typed, SR12 a)2. admits it; expected run output DERIVED. Probe p3.cob: RIB3 FACTORY method MAKE returning ACTIVE-CLASS, 'INVOKE RID3 \"MAKE\" RETURNING DO' with DO 'OBJECT REFERENCE RID3 ONLY' -> COBOLNET0828 'the receiver is described with the ONLY phrase, so an ACTIVE-CLASS sender is not permitted (SR12 b)1.)'. Spec: rule 2 b) 1. makes the sender 'RID3 ONLY', SR12 a)1. admits it; expected DERIVED. The interface-typed leg (b)3.) is not statically reachable (an interface prototype cannot carry ACTIVE-CLASS, §13.18.60.3 SR16) and the SELF/SUPER leg coincides with the code's behavior. The row's trailing lead-in sentence ('the receiving operand shall have the same ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses' - cite OK) also under-rejects: probe p13.cob, nested SA13 returning 'PIC A(5)' into caller 'PIC X(5)' compiles and prints [ABCDE] - DescriptionMismatch's Alphanumeric arm treats alphabetic and alphanumeric as one category with a null EditMask, so two different PICTURE clauses pass; ALIGN and DYNAMIC LENGTH are never compared (not probed). Rejects legal source (ACTIVE-CLASS legs) and under-rejects (PICTURE A vs X). [editions as adjudicated: 2002, 2014, 2023 (clause 14.8.3 Returning items exists from ISO/IEC 1989:2002, where RETURNING on CALL/INVOKE/functions was introduced; not applicable to 1985)]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1165 LANDED (w1014u, verdict-only: the mechanism was fixed by kb/Work PB1112's activation half, OoConformance.ReturningSender). cite.py --check 14.8.3.3 'If the activated method is invoked with any other object reference, the sending operand has the same description as that object reference' OK 2) b) 4.; b) 1. 'described with that same object-class-name and an ONLY phrase' OK. ReturningSender re-describes an ACTIVE-CLASS returning item from the invocation: class-name -> that class ONLY (b 1.), SELF/SUPER -> ACTIVE-CLASS (b 2.), any other typed reference -> its own description (b 4.), FACTORY copied from the returning item; an interface-typed receiver yields universal (b 3.) - statically that arm cannot carry an ACTIVE-CLASS returning item, because 13.18.60.3 SR16 admits ACTIVE-CLASS only in a factory, instance or method definition, never a prototype. Re-probed on 59ef8b01b: the note's p2 (INVOKE D \"MK\" RETURNING D2 through the subclass) and p3 (INVOKE RID3 \"MAKE\" RETURNING DO, DO RID3 ONLY) print DERIVED. Golden pb1165_active_class_returning_subclass: an INHERITED factory method invoked on the subclass into a subclass-typed and a subclass-ONLY receiver, and an inherited instance method through a subclass-typed reference - DERIVED x3.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.8.3.3-L2.1",
@@ -39173,10 +39173,10 @@
   "rule-digest": "2eaf193034d8",
   "verdict": "PARTIAL",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInstanceInvoke; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1136-invoke-receiver-not-object-reference",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1136 (open). Rule: 'Identifier-1 shall be an object reference.' (cite.py --check 14.9.23.3 -> OK §14.9.23.3 1)). The data-item half is enforced: OoBindInstanceInvoke rejects a non-OBJECT-REFERENCE receiver (probe pa2: INVOKE X5 \"GREET\" with X5 PIC X(5) -> COBOLNET0824) - but the message cites 'ISO §14.9.23.3 SR3' (SR3 is the class-name-1/factory rule; the rule is SR1). The other half - which IDENTIFIERS may be identifier-1 - is not met: invokeTarget -> objectReference admits only dataReference | NULL | SELF | SUPER, and NULL is refused. (1) INVOKE NULL \"GREET\" -> COBOLNET0823 'the predefined NULL object reference cannot be a receiver (ISO §14.9.23.3 -)', a rule with no number because none exists: §8.4.3.1.3 7) makes NULL an identifier (predefined-object reference), §8.4.3.7.3 2) (OK) makes it 'class object and category object reference ... not a universal object reference', so SR1 holds and SR4 applies vacuously; §14.9.23.4 5) (OK) is the runtime answer (EC-OO-NULL); and §8.4.3.4.3 2) (OK) bans NULL as identifier-1 of the INLINE form only - the statement form has no such ban. (2) An object-view (§8.4.3.1.3 6), identifier Format 5) has no grammar anywhere: INVOKE U AS CP2 \"GREET\" -> COBOLNET0901 'AS is a reserved word' + COBOL0301 (probe pc1). (3) An inline method invocation (Format 4) returning an object reference: INVOKE O :: \"ME\" \"GREET\" -> COBOL0001 unexpected '::' (probe pc4). EXCEPTION-OBJECT works (probe pc2 -> EC-OO-NULL at run time, correct). The qualified [object-class-name-1 OF] SUPER spelling is also a parse error (probe pb1) - owned by the §8.4.3.8 rows (PB285 measured it; SR-8.4.3.8.3-4/-6 open NOT-IMPLEMENTED). No spec-derived test for SR1. Finding F1 + F9 (citation). || editions as adjudicated: 2002, 2014, 2023 (INVOKE and the OO module are a COBOL-2002 introduction; Annex E lists no 2014->2023 change to this rule, so the 2023 text is also the 2014 text)",
+  "notes": "OWNED BY kb/Work PB1136 (open; its receiver half rides the object-reference identifier tier, kb/Work PB1782 step 2 / PB1425). cite.py --check 14.9.23.3 'Identifier-1 shall be an object reference' OK 1). The data-item half CONFORMS since w1014u: a non-object identifier-1 is refused COBOLNET0824 naming SR1 (negative pb1136-invoke-receiver-not-object-reference; it printed SR3 before). Still open: three identifier formats that ARE object references cannot be the receiver - the predefined NULL (now an honest deferral COBOLNET1756 instead of a refusal citing a non-existent rule; 14.9.23.4 GR5 gives it the run-time EC-OO-NULL), an object-view (no grammar) and an inline method invocation (no '::' arm in invokeTarget).",
   "state": "GAP"
  },
  {
@@ -39186,13 +39186,13 @@
   "ordinal": 2,
   "subject": "INVOKE statement",
   "rule-digest": "2d0fe3b043bf",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvoke; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoDecodeMethodNameLiteral",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvoke; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoMethodNameOf",
+  "test-ref": "conformance:2002/pb1136_invoke_selector_forms",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1136 (open). Rule: 'Literal-1 shall be of class alphanumeric or national and shall not be a zero-length literal.' (--check OK §14.9.23.3 2)). OoBindInvoke decodes literal-1 (STRINGLIT, N\"..\", X\"..\", or an alphanumeric/national concatenation folded per §8.8.3.3) and reports COBOLNET0823 for a non-alphanumeric/national class and for a zero-length value. Probes: \"\" -> 0823 zero-length (pa7); N\"\" -> 0823 (pa16); X\"\" -> 0823 (pa18); 12 -> 0823 class (pa9); B\"1\" -> 0823 class (pa15); N\"GREET\" runs HI (pa8); X\"4752454554\" runs HI (pa10); \"GR\" & \"EET\" runs HI (pa17); \"greet\" runs HI (pa12, §8.3.2.2 case-insensitivity). Both halves verified; no spec-derived negative golden for 0823 on literal-1 exists (test-needed). || REFUTED: PARTIAL — The zero-length and wrong-class checks are right, but the national half is wrong for the hexadecimal-national format. OoDecodeMethodNameLiteral decodes NX\"...\" by stripping the N and running the ALPHANUMERIC hex codec, so every hex digit pair becomes one character. A legal national literal-1 whose value is GREET is refused. Per §8.3.3.5.4 GR4 the value is one national character for each hex-character-sequence. The same literal DISPLAYs as GREET elsewhere in the compiler. || editions as adjudicated: 2002, 2014, 2023 (INVOKE and the OO module are a COBOL-2002 introduction; Annex E lists no 2014->2023 change to this rule, so the 2023 text is also the 2014 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1136 selector half LANDED (w1014u). cite.py --check 14.9.23.3 'Literal-1 shall be of class alphanumeric or national' OK 2). ONE method-name decoder (OoBinder.OoMethodNameOf) for the INVOKE statement and every inline segment: STRINGLIT / NATLIT / HEXLIT through CobolLiteral.Decode, so NX\"0047...\" is one national character per 4-digit group (8.3.3.5.4 GR4) - the private copy read NX as alphanumeric hex and refused GREET; an alphanumeric/national concatenation (8.8.3.3 GR3) now serves the inline form too. Golden pb1136_invoke_selector_forms lines 3-6 (NX literal-1 INVOKE -> HI; NX inline -> ACCOUNT; concat inline -> ACCOUNT; concat INVOKE -> HI). Zero-length and wrong-class refusals unchanged (COBOLNET0823).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.23.3-3",
@@ -39201,13 +39201,13 @@
   "ordinal": 3,
   "subject": "INVOKE statement",
   "rule-digest": "7813447cfa0a",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindClassInvoke",
-  "test-ref": "conformance:2002/oo_factory; conformance:negative/pb1548-new-without-base",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindClassInvoke; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvoke",
+  "test-ref": "conformance:2002/oo_factory; conformance:negative/pb1548-new-without-base; conformance:negative/pb1136-invoke-class-name-identifier-2",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1136 (open). Rule: 'If object-class-name-1 is specified, literal-1 shall be specified. The value of literal-1 shall be the name of a method defined in the factory interface of object-class-name-1.' (--check OK §14.9.23.3 3)). OoBindClassInvoke resolves non-NEW literal-1 via cls.FindFactoryMethod (walks INHERITS); a miss is COBOLNET0825 citing SR3 (probe pbn7: INVOKE BASEC \"FRUN\" where FRUN is a SUBC factory method -> 0825). Positive: INVOKE SUBC \"FRUN\" runs (probe pb2), predefined NEW binds the ctor. First half: INVOKE CP2 MA (identifier-2 with a class-name) is rejected (probe pa5) - but by the resolver's COBOLNET1639 \"'CP2' is not defined\", which is false (CP2 is in the REPOSITORY); the program is correctly refused, the diagnostic misnames the cause (recorded in finding F9). oo_factory golden exercises the factory-interface resolution positively. || REFUTED: PARTIAL — Neither half of the rule is enforced as a rule. (1) 'Literal-1 shall be specified' with class-name-1: INVOKE CP2 MA is refused only because the identifier-2 branch resolves CP2 as a data item. The resolver's COBOLNET1639 then falsely says 'CP2' is not defined, although CP2 is in the REPOSITORY and is a class. No code tests the class-name-1 plus identifier-2 shape. (2) 'The value of literal-1 shall be the name of a method defined in the factory interface': OoBindClassInvoke short-circuits \"NEW\" before any factory-interface lookup. A class with no INHERITS clause has no BaseFactoryInterface New (§11.3.4 GR2, §16.2), yet INVOKE CQ \"NEW\" is accepted. The same compiler's SR4 a) arm (INVOKE F \"NEW\" through FACTORY OF CQ) says CQ's factory interface has no NEW. So the two arms disagree about one interface, and INHERITS BASE itself fails (COBOLNET0821). The FindFactoryMethod path for non-NEW names is correct, and the oo_factory golden pins it. || editions as adjudicated: 2002, 2014, 2023 (INVOKE and the OO module are a COBOL-2002 introduction; Annex E lists no 2014->2023 change to this rule, so the 2023 text is also the 2014 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1136 LANDED (w1014u). cite.py --check 14.9.23.3 'If object-class-name-1 is specified, literal-1 shall be specified' OK 3). OoBindInvoke's identifier-2 arm now asks whether the target names a class (a name that is not a data item, through OoNameResolution) BEFORE resolving it as identifier-1, and refuses INVOKE class-name identifier-2 with COBOLNET0866 naming SR3 (and SR7) - it drew the resolver's false COBOLNET1639 'is not defined'. The literal half (method in the factory interface) is OoBindClassInvoke's COBOLNET0825/2448 (oo_factory, pb1548-new-without-base).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.23.3-4",
@@ -39216,13 +39216,13 @@
   "ordinal": 4,
   "subject": "INVOKE statement",
   "rule-digest": "fddb43f88ef6",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInstanceInvoke; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver",
-  "test-ref": "conformance-test:OoSpineTests.InvokeUnknownMethod_0825",
+  "test-ref": "conformance-test:OoSpineTests.InvokeUnknownMethod_0825; conformance:negative/pb1136-invoke-active-class-method; conformance:negative/pb1136-invoke-self-method",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1136 (open). Rule: SR4 a)-i) method-name placement by receiver description (--check 14.9.23.3 on the b) text -> OK §14.9.23.3 4) b)). Verified every arm by probe (pb2 / pbn1-6): a) FACTORY OF SUBC receiver resolves the factory roster, instance name 'HELLO' refused 0825; b) typed SUBC receiver resolves instance roster incl. inherited, factory name refused; c) FACTORY OF ACTIVE-CLASS (method LS) resolves factory roster of the containing class, instance name refused; d) ACTIVE-CLASS resolves instance roster, factory name refused; e) interface receiver resolves the prototype closure (code path + oo_interface_conformance golden); f)/g) SELF in factory/instance method selects factory/instance roster (SELF \"RUNALL\" in a factory method refused); h)/i) SUPER starts at the base, factory/instance by context (SUPER \"RUNALL\" refused, BASE HELLO / BASE FHELLO printed). Universal receivers bypass (correct - SR4 is non-universal only). Behaviour conforms; the COBOLNET0825 message cites 'SR4d' for EVERY typed receiver (SR4d is the ACTIVE-CLASS arm; a class-name receiver is SR4b, FACTORY OF is SR4a) - finding F9. The [class OF] SUPER spelling is owned by §8.4.3.8 rows. Covering test pins arm b) only. || REFUTED: PARTIAL — Arm a) (FACTORY OF object-class-name → the factory interface) disagrees with SR3's arm about the SAME factory interface. INVOKE F \"NEW\", with F FACTORY OF CQ, is refused with 0825 because FindFactoryMethod never sees the predefined New. Yet INVOKE CQ \"NEW\" and SELF \"NEW\" in a factory method (oo_factory golden) treat NEW as a member of that factory interface. Under the compiler's own model this rejects legal source, and the same gap exists for arm c) FACTORY OF ACTIVE-CLASS, which uses the same FindFactoryMethod call. This is a two-arm dispatch: the NEW special case exists in OoBindClassInvoke and OoBindByReceiver but not in OoBindInstanceInvoke. Arms b) and d)-i) look correct for ordinary method names. The diagnostic also cites SR4d for every typed receiver. The covering test pins arm b) only. || editions as adjudicated: 2002, 2014, 2023 (INVOKE and the OO module are a COBOL-2002 introduction; Annex E lists no 2014->2023 change to this rule, so the 2023 text is also the 2014 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1136 LANDED (w1014u). cite.py --check 14.9.23.3 on SR4 a)-i) OK 4). The printed rule is DERIVED from the same two facts the roster lookup uses: a typed receiver's (object-class-name | ACTIVE-CLASS) x (FACTORY | not) picks a)/b)/c)/d) (an ACTIVE-CLASS receiver printed b) before); SELF|SUPER x factory|instance method picks f)/g)/h)/i) (printed the range 'SR4f-SR4i' before); the interface arm prints e). Negatives pin d) (INVOKE R \"NOPE\", R ACTIVE-CLASS) and g) (INVOKE SELF \"NOPE\"). Every arm's refusal is compile-time COBOLNET0825 / COBOLNET2448 for New.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.23.3-5",
@@ -39261,13 +39261,13 @@
   "ordinal": 7,
   "subject": "INVOKE statement",
   "rule-digest": "01cee4790bf1",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvoke",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1136-invoke-identifier-2-typed-receiver; conformance:negative/pb1136-invoke-class-name-identifier-2; conformance:2002/pb1136_invoke_selector_forms",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1136 (open). Rule: 'Identifier-2 may be specified only when identifier-1 is a universal object reference.' (--check OK §14.9.23.3 7)). OoBindInvoke's dataReference-selector arm rejects a non-universal receiver with COBOLNET0866 citing SR7: typed O (pa4), SELF (pa14). Universal U with identifier-2 runs, value normalized case-insensitively and space-trimmed (pa13 'greet' in PIC X(8) -> HI). Class-name-1 with identifier-2 is refused too (pa5) but through the resolver's misleading COBOLNET1639 \"'CP2' is not defined\" (finding F9, diagnostic only). No spec-derived test. || REFUTED: PARTIAL — Typed and SELF receivers get a correct 0866 citing SR7, and universal receivers are accepted. For the class-name-1 receiver, which SR7 forbids with identifier-2 because a class-name is not a universal identifier-1, no SR7 check exists. The identifier-2 branch calls ResolveSending on the class-name, and the resolver emits COBOLNET1639 claiming the declared class 'CP2' is not defined. The violation is flagged with a false diagnostic that names the wrong rule (finding F9). That half is unimplemented as SR7 and is only rejected by accident. || editions as adjudicated: 2002, 2014, 2023 (INVOKE and the OO module are a COBOL-2002 introduction; Annex E lists no 2014->2023 change to this rule, so the 2023 text is also the 2014 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1136 LANDED (w1014u). cite.py --check 14.9.23.3 'Identifier-2 may be specified only when identifier-1 is a universal object reference' OK 7). Typed receiver + identifier-2 -> COBOLNET0866 naming SR7 (negative); class-name + identifier-2 -> COBOLNET0866 naming SR3 and SR7 (negative); universal U + identifier-2 runs (golden lines 1, 2, 7).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.23.3-8",
@@ -39276,13 +39276,13 @@
   "ordinal": 8,
   "subject": "INVOKE statement",
   "rule-digest": "21a4843694f8",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvoke",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvoke; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitUniversalInvoke",
+  "test-ref": "conformance:2002/pb1136_invoke_selector_forms; conformance:negative/pb1136-invoke-identifier-2-boolean",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1136 (open). Rule: 'Identifier-2 shall reference an alphanumeric or national data item.' (--check OK §14.9.23.3 8)). The check admits only Pic.Category Alphanumeric or a group; a NATIONAL identifier-2 is refused COBOLNET0866 '(ISO §14.9.23.3 SR8; national identifier-2 is a later refinement)' - the code itself names the legal source it refuses (probe pa3: 01 MN PIC N(5) VALUE N\"GREET\" / INVOKE U MN -> 0866). The prohibition half holds (PIC 9(5) -> 0866, pa6). Harm: rejects legal source. Finding F4. || editions as adjudicated: 2002, 2014, 2023 (INVOKE and the OO module are a COBOL-2002 introduction; Annex E lists no 2014->2023 change to this rule, so the 2023 text is also the 2014 text)",
-  "state": "GAP"
+  "notes": "kb/Work PB1136 LANDED (w1014u). cite.py --check 14.9.23.3 'Identifier-2 shall reference an alphanumeric or national data item' OK 8). The screen reads the ONE operand category (DataItem.OperandPic): elementary alphanumeric or national, an alphanumeric group (8.5.2.1) or a national group (13.18.29.4 GR2 b)) are admitted; a boolean item or bit group is refused COBOLNET0866 naming SR8. The emitter reads identifier-2's content through OperandText.FieldImage, so a GROUP selector no longer emits a struct into a string parameter (CS1503 - an alphanumeric group was admitted and never compiled). Golden: PIC N(5) -> HI, national group -> HI, alphanumeric group -> HI.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.23.3-9",

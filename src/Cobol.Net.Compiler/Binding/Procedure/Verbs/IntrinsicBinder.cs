@@ -2714,7 +2714,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// function-prototype-name-1), so every intrinsic keeps the ONE SR1 refusal, COBOLNET2576 (kb/Work PB1427).</para></summary>
     internal BoundOperand BindArgOperand(Core.FunctionArgumentContext a, bool nullAdmitting = false)
     {
-        int before = host.ArgOrder.Mark;
+        var before = host.ArgOrder.Mark;
         var operand = BindArgOperandCore(a, nullAdmitting);
         host.ArgOrder.Record(operand, before);   // §8.4.3.2.4 GR2 — the window settles the order (ArgumentOrder)
         return operand;

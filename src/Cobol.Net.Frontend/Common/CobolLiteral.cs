@@ -339,8 +339,9 @@ public static class CobolLiteral
     /// <summary>Decode an <c>X"…"</c>/<c>X'…'</c> hexadecimal-format alphanumeric literal (ISO §8.3.3.2 —
     /// each pair of hexadecimal digits is one character) to its character value; an odd digit count or a non-hexadecimal
     /// digit (both reported by the literal screen) yields the empty string. The
-    /// ONE hex decoder (P10 Step 14) — the former <c>OoBinder.OoDecodeMethodNameLiteral</c> inline copy now
-    /// routes here, as does the §8.8.3 concatenation fold.</summary>
+    /// ONE hex decoder (P10 Step 14), reached through <see cref="Decode"/> by every literal consumer — the INVOKE
+    /// method name (<c>OoBinder.OoMethodNameOf</c>, which once kept a private copy that read NX"…" as alphanumeric
+    /// hex, kb/Work PB1136) included — and by the §8.8.3 concatenation fold.</summary>
     public static string DecodeHex(string raw)
         => SplitLiteral(raw) is { Prefix: "X" } lit ? DecodeHexGroups(lit.Body[1..^1], 2) : "";
 

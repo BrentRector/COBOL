@@ -205,21 +205,22 @@ internal sealed partial class OoBinder
         }
         if (target.dataReference() is { } dr0 && ctx.Refs.Probe(dr0) is not null
             && host.Expr.ResolveSending(dr0).Place is { } r0   // a non-place answer is bound (and answered) below
-            && r0.Item.Pic is { Category: PicCategory.ObjectReference } p0
-            && (p0.ObjectRef ?? ObjectRefDescriptor.Universal).IsUniversal)
-        {
-            ctx.Edition.Error(DiagnosticCatalog.InlineInvocationReceiver,
-                $"the inline method invocation through '{dr0.GetText()}': a UNIVERSAL object reference shall "
-                + "not be specified as identifier-1 (ISO §8.4.3.4.3 SR2) — use an INVOKE statement, whose "
-                + "§14.9.23.4 GR7c dynamic path carries the runtime conformance check");
-            return BoundExprError.Refused(ctx.Edition, "inline method invocation through a universal object reference");
-        }
+            && RefuseUniversalInlineReceiver(r0, dr0.GetText()) is { } refusedFirst)
+            return refusedFirst;
 
         // §8.4.3.1.3 SR1 recursion: each segment invokes on the temporary the previous one produced.
         Place? chained = null;
+        string written = target.GetText();
         foreach (var seg in imi.inlineInvocationSegment())
         {
-            if (OoDecodeMethodNameLiteral(seg.literal()) is not { Length: > 0 } methodName)
+            // §8.4.3.4.3 SR2 binds EVERY segment's identifier-1, not only the written first one: identifier is
+            // defined recursively (§8.4.3.1.3 SR1), so `A1 :: "UNIV"` IS identifier-1 of `… :: "GETNAME"`, and a
+            // universal temp there is the same excluded receiver (kb/Work PB1429 — it fell into the universal
+            // dynamic path, which never sets an implicit returning place, and ended in COBOLNET2362).
+            if (chained is { } recv && RefuseUniversalInlineReceiver(recv, written) is { } refusedChained)
+                return refusedChained;
+            written += seg.GetText();
+            if (OoMethodNameOf(seg.literal()) is not { Length: > 0 } methodName)
             {
                 ctx.Edition.Error(DiagnosticCatalog.InlineInvocationReceiver,
                     $"the inline method invocation '{seg.GetText()}': literal-1 (the method name) shall be a "
@@ -251,6 +252,22 @@ internal sealed partial class OoBinder
             place = modified;
         }
         return new BoundNumRef(place);
+    }
+
+    /// <summary>The universal half of §8.4.3.4.3 SR2 — "Identifier-1 shall be of class object; neither the predefined
+    /// object reference NULL nor a universal object reference shall be specified" — asked of ONE receiver, the
+    /// written first one or a chained segment's temporary alike (kb/Work PB1429), so the two can never disagree.
+    /// Null when the receiver is not a universal object reference; otherwise the reported refusal.</summary>
+    private BoundExpr? RefuseUniversalInlineReceiver(Place receiver, string written)
+    {
+        if (receiver.Item.Pic is not { Category: PicCategory.ObjectReference } pic
+            || !(pic.ObjectRef ?? ObjectRefDescriptor.Universal).IsUniversal)
+            return null;
+        ctx.Edition.Error(DiagnosticCatalog.InlineInvocationReceiver,
+            $"the inline method invocation through '{written}': a UNIVERSAL object reference shall "
+            + "not be specified as identifier-1 (ISO §8.4.3.4.3 SR2) — use an INVOKE statement, whose "
+            + "§14.9.23.4 GR7c dynamic path carries the runtime conformance check");
+        return BoundExprError.Refused(ctx.Edition, "inline method invocation through a universal object reference");
     }
 
     /// <summary>The operand form of <see cref="OoBindInlineInvocation"/> — the MOVE/DISPLAY/INSPECT/FROM
