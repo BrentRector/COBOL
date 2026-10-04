@@ -108,7 +108,7 @@ public sealed class ReportRepeatingEntryDriftTests
         string binder = BinderText();
         // Population: both placement builders exist and this scan can see them.
         Assert.Contains("private static IReadOnlyList<ReportColumnSpec> RepeatedPlacements(", binder, StringComparison.Ordinal);
-        Assert.Contains("private static ReportLineModel RepeatedLine(", binder, StringComparison.Ordinal);
+        Assert.Contains("private ReportLineModel RepeatedLine(", binder, StringComparison.Ordinal);
         Assert.Contains("st.Shift(ReportRepetitionAxis.Horizontal)", binder, StringComparison.Ordinal);
         Assert.Contains("st.Shift(ReportRepetitionAxis.Vertical)", binder, StringComparison.Ordinal);
         // The ONE place a frame's integer-3 is turned into a displacement.

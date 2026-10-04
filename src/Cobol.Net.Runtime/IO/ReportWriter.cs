@@ -172,6 +172,20 @@ public sealed class ReportGroup(ReportGroupKind kind, string name, int controlLe
     /// it; a non-detail group never holds it, since §13.18.28.3 SR1 admits the clause only in a detail group.</summary>
     internal bool GroupIndicatePending { get; set; }
 
+    /// <summary>⛔ THE ADDITIONS THIS GROUP'S PROCESSING PERFORMS — ROLLED TOTALS (ISO §13.18.54.4 GR7 a)/b), kb/Work
+    /// PB1294). A SUM clause whose addend is data-name-1, an entry of THIS group, is added into its sum counter "when
+    /// the report group description containing data-name-1 is processed" (a), or "during the processing of the current
+    /// report group before any of the report group's lines are printed" (b) — one event, the start of the group's
+    /// processing. The counter belongs to ANOTHER engine when the SUM entry is in a different report description
+    /// (SR4 g)), so each addition carries its target engine; <see cref="CobolReport.AddRolled"/> registers it here and
+    /// <see cref="CobolReport"/>'s group prologue performs it.</summary>
+    internal List<RolledAddition> Rolled { get; } = [];
+
+    /// <summary>One rolled addition: add <paramref name="Apply"/>'s result into counter <paramref name="SumId"/> of
+    /// <paramref name="Target"/> when the group is processed — unless the addend entry is absent in this
+    /// presentation's snapshot at <paramref name="PresentSlot"/> (§13.18.54.4 GR11; −1 = always present).</summary>
+    internal readonly record struct RolledAddition(CobolReport Target, int SumId, int PresentSlot, Func<Int128, Int128> Apply);
+
     /// <summary>The group's NEXT GROUP clause (ISO §13.18.37; §13.15.3 SR6 — level 1 only), null when none.</summary>
     public ReportNextGroup? NextGroup { get; set; }
 
@@ -540,6 +554,52 @@ public sealed class CobolReport(
     public void AddSumTerm(int id, Func<Int128, Int128> apply, string[]? uponDetails) =>
         _sums[id].Terms.Add(new SumTerm(apply, uponDetails));
 
+    /// <summary>⛔ A ROLLED TOTAL (ISO §13.18.54.3 SR4, §13.18.54.4 GR6/GR7 a)/b), kb/Work PB1294): register, on the
+    /// report <paramref name="source"/> group that contains data-name-1, the addition of its value into counter
+    /// <paramref name="sumId"/> of THIS report — "adding takes place when the report group description containing
+    /// data-name-1 is processed" (a), "during the processing of the current report group before any of the report
+    /// group's lines are printed" (b). <paramref name="apply"/> is the ADD-consistent addition of the addend's CURRENT
+    /// value into the counter's content (GR3), exactly as <see cref="AddSumTerm"/>'s is; <paramref name="presentSlot"/>
+    /// is the addend entry's slot in <paramref name="source"/>'s presence snapshot — an entry "declared to be absent as
+    /// a result of a PRESENT WHEN clause or an OCCURS clause with the DEPENDING phrase … is not added into the sum
+    /// counter during the processing of that instance of the report group" (GR11); −1 = unconditional. The source group
+    /// may belong to ANOTHER report's engine (SR4 g)): the group carries its target.</summary>
+    public void AddRolled(ReportGroup source, int sumId, int presentSlot, Func<Int128, Int128> apply) =>
+        source.Rolled.Add(new ReportGroup.RolledAddition(this, sumId, presentSlot, apply));
+
+    /// <summary>One SUM group's UPON on a detail of ANOTHER report (ISO §13.18.54.4 GR7 c) 2) — "whenever any GENERATE
+    /// statement is executed for a detail referenced by the UPON phrase", the detail being of a different report
+    /// description, SR7 permits only the report-name qualifier to say so): register, on THIS report's engine, whose
+    /// GENERATE of <paramref name="detailName"/> is the event, the addition into counter <paramref name="sumId"/> of
+    /// <paramref name="target"/>. A detail named n times in the phrase registers n times — "the adding takes place as
+    /// many times as data-name-2 appears" (GR7).</summary>
+    public void AddGenerateTrigger(string detailName, CobolReport target, int sumId, Func<Int128, Int128> apply) =>
+        _generateTriggers.Add((detailName, target, sumId, apply));
+
+    private readonly List<(string Detail, CobolReport Target, int SumId, Func<Int128, Int128> Apply)> _generateTriggers = [];
+
+    /// <summary>The ONE ADDITION INTO A SUM COUNTER THAT IS NOT THIS REPORT'S OWN GENERATE LOOP (§13.18.54.4 GR3 — "Each
+    /// addition is tested for size error; if a size error occurs, the EC-REPORT-SUM-SIZE exception condition is set to
+    /// exist"): the same <see cref="SumEntry.Add"/> the GENERATE accumulation calls, so a rolled addition and a
+    /// GENERATE-driven one fail identically.</summary>
+    private void Accumulate(int sumId, Func<Int128, Int128> apply)
+    {
+        if (!_sums[sumId].Add(apply))
+            ExceptionState.ReportSumSizeError($"report {Name}: an addition into sum counter {sumId + 1} is a size "
+                + "error (ISO §13.18.54.4 GR3)");
+    }
+
+    /// <summary>Perform the additions <paramref name="group"/> owes when it is processed — its rolled totals — in the
+    /// order they were registered (the binder orders a chain of rolled totals so a counter's own additions precede
+    /// its being read, §13.18.54.4 GR6: "The additions necessary to compute its value are completed before the adding
+    /// of the operand into the current sum counter"). An entry absent in THIS presentation's snapshot adds nothing.</summary>
+    private static void ApplyRolled(ReportGroup group)
+    {
+        foreach (var r in group.Rolled)
+            if (group.IsPresent(r.PresentSlot))
+                r.Target.Accumulate(r.SumId, r.Apply);
+    }
+
     /// <summary>A SUM counter's current value (unscaled, at the counter's scale) — read by the generated compose
     /// of the printable item the counter is the source of (ISO §13.18.54.4 GR4), and by a procedure division
     /// statement that names the counter (GR5 + GR12). The compiler's read narrows it to the counter's own CLR
@@ -802,10 +862,14 @@ public sealed class CobolReport(
                 // its extra digits only when the SUM is stored — never one addend at a time (kb/Work PB1686). A
                 // size error anywhere in that evaluation leaves the counter unchanged (§14.7.5 1)).
                 for (int n = 0; n < times; n++)
-                    if (!_sums[k].Add(t.Apply))
-                        ExceptionState.ReportSumSizeError($"report {Name}: an addition into sum counter {k + 1} is a "
-                            + "size error (ISO §13.18.54.4 GR3)");
+                    Accumulate(k, t.Apply);
             }
+        // …and for a SUM group whose UPON names THIS report's detail while its counter belongs to ANOTHER report
+        // (§13.18.54.4 GR7 c) 2), SR4 g)'s twin for UPON): the event is this GENERATE, the counter the target's.
+        if (detailName is not null)
+            foreach (var (triggerDetail, target, sumId, apply) in _generateTriggers)
+                if (triggerDetail.Equals(detailName, StringComparison.OrdinalIgnoreCase))
+                    target.Accumulate(sumId, apply);
 
         // GR4d / GR5b: the specified detail — unless summary reporting (GR2).
         if (detailName is not null && _details.TryGetValue(detailName, out var detail))
@@ -1014,7 +1078,7 @@ public sealed class CobolReport(
     /// its NEXT GROUP clause nor resets the SUM counters it prints.</summary>
     private void PresentBody(ReportGroup group, bool applyNextGroup = true, bool reprint = false)
     {
-        if (!BeginGroup(group, out int first)) return;
+        if (!BeginGroup(group, out int first, reprint)) return;
         var lines = group.Lines;
 
         // The first line's position when the preceding body group's absolute NEXT GROUP filled the save location
@@ -1235,10 +1299,17 @@ public sealed class CobolReport(
     /// It used to return before the reset in the first case (and the page heading, page footing and report
     /// heading/footing paths never reset at all), so a control footing whose every line was absent left its
     /// ended group's total standing, and a page footing's page total never restarted.</summary>
-    private bool BeginGroup(ReportGroup group, out int first)
+    private bool BeginGroup(ReportGroup group, out int first, bool reprint = false)
     {
         bool suppressed = RunBeforeReporting(group);   // §14.9.49 GR8; true ⇒ a §14.9.45 SUPPRESS executed
         first = BeginPresentation(group);
+        // §13.18.54.4 GR7 a)/b) — a rolled total is added when the group is PROCESSED, before any of its lines is
+        // printed, whether or not anything prints (a SUPPRESSed group and a dummy group are still processed, and
+        // SUPPRESS inhibits only printing, page advance, NEXT GROUP and LINE-COUNTER changes — see SuppressPrinting).
+        // The snapshot §13.18.54.4 GR11 reads was just taken.
+        // An OR PAGE reprint of a control heading is the same instance printed again, not a second processing
+        // (the reset it skips, `PresentBody`), so it adds nothing.
+        if (!reprint) ApplyRolled(group);
         if (first >= 0 && !suppressed) return true;
         EndOfGroupSumReset(group);
         return false;

@@ -725,13 +725,13 @@ binarySign
     | UNSIGNED
     ;
 
-// OCCURS Clause. Each fixed bound (integer-1/integer-2) is an occursBound: an integer literal OR — COBOL-2002
+// OCCURS Clause. Each fixed bound (integer-1/integer-2) is an integerOperand: an integer literal OR — COBOL-2002
 // §13.10.3 SR2 — an integer CONSTANT-NAME ("if constant-name-1 is an integer, it may also be used to specify …
 // repetition"; the OCCURS format's integer positions are literal positions, so a constant substitutes there per
 // §13.10.4 GR1/GR3). The constant is resolved at BIND time from the compile-time constant table
 // (DataBinder.Constants.cs) — a cobolWord bound in a program with no such constant rejects loud (COBOLNET1547).
 occursClause
-    : OCCURS occursBound (TO occursBound)? timesKeyword?
+    : OCCURS integerOperand (TO integerOperand)? timesKeyword?
       (DEPENDING ON? dataReference)?
       occursStepPhrase?
       occursKeyClause*
@@ -752,20 +752,14 @@ occursClause
 // entry, which the binder enforces (§13.18.38.3 — the TO/DEPENDING/STEP shape is Format 3), and no other clause
 // can begin with a user word here, so there is no earlier-edition reading to protect.
 occursStepPhrase
-    : {occursStepAhead()}? cobolWord integerLiteral
+    : {occursStepAhead()}? cobolWord integerOperand
     ;
 
 occursDynamicPhrase
     : CAPACITY IN? dataReference   // CAPACITY IN data-name-3 (the current-capacity register, §13.18.38 GR15)
-    | FROM integerLiteral         // integer-4 — the minimum / initial capacity (GR16)
-    | TO integerLiteral           // integer-5 — the expected capacity (GR17)
+    | FROM integerOperand         // integer-4 — the minimum / initial capacity (GR16)
+    | TO integerOperand           // integer-5 — the expected capacity (GR17)
     | INITIALIZED                 // seed new occurrences per §8.5.1.9.5
-    ;
-
-// A fixed OCCURS bound: integer-1/integer-2 (§13.18.38), or an integer constant-name (§13.10.3 SR2).
-occursBound
-    : integerLiteral
-    | cobolWord
     ;
 
 occursKeyClause

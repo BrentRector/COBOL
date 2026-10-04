@@ -26,8 +26,8 @@ using Core = CobolParserCore;
 /// mappings every verb consumes (MOVE/DISPLAY sources, relations, PERFORM TIMES, arithmetic);</item>
 /// <item><c>ReferenceResolver.ResolveSubscriptName</c> — subscript positions (§13.10.3 SR2: an integer
 /// constant-name stands where the format specifies an integer);</item>
-/// <item><see cref="OccursBoundValue"/> — the OCCURS integer-1/integer-2 bounds (SR2, via the
-/// <c>occursBound</c> grammar alternative);</item>
+/// <item><see cref="IntegerOperandValue"/> — every integer-n position (the OCCURS bounds and the report-writer LINE, COLUMN, NEXT GROUP, PAGE and STEP integers; SR2, via the
+/// <c>integerOperand</c> grammar rule);</item>
 /// <item><see cref="ExpandPicConstants"/> — PICTURE repetition <c>X(K)</c> (SR2 second sentence);</item>
 /// <item><c>ExtractValue</c> — a VALUE-clause constant-name operand substitutes its raw literal text (the
 /// text-plumbed data path, the ConcatFolder RawText precedent);</item>
@@ -132,7 +132,7 @@ public sealed partial class DataBinder
     /// through <see cref="BindDeclaredConstant"/>; so a reference may precede the entry it names (§13.10.3 SR4 and SR5
     /// forbid only a CIRCULAR dependence, which that bind reports). Every reader goes through this method: the
     /// arithmetic operand (<see cref="ResolveConstantName"/>), <see cref="ConstantOf"/>, <see cref="IsIntegerConstant"/>,
-    /// <see cref="OccursBoundValue"/>, <see cref="ExpandPicConstants"/> and <c>LiteralEnvironment.Constant</c>.</summary>
+    /// <see cref="IntegerOperandValue"/>, <see cref="ExpandPicConstants"/> and <c>LiteralEnvironment.Constant</c>.</summary>
     internal ConstantDef? FindConstant(string name)
     {
         if (_declaredConstants.TryGetValue(name, out var declared))
@@ -826,15 +826,47 @@ public sealed partial class DataBinder
 
     // ── The data-division substitution chokepoints (§13.10.3 SR2) ────────────────────────────────────────────
 
-    /// <summary>The value of one OCCURS fixed bound (the <c>occursBound</c> grammar alternative): integer-1/
-    /// integer-2 as written, or an INTEGER constant-name substituting one (ISO §13.10.3 SR2 — "if
-    /// constant-name-1 is an integer, it may also be used to specify … repetition"; §13.10.4 GR1/GR3). Null
-    /// (reported) for a non-integer or unknown constant-name.</summary>
-    private int? OccursBoundValue(Core.OccursBoundContext bound, string where)
+    /// <summary>The constants' substituted <c>integer-n</c> values, by operand node — so an operand the report binder
+    /// reads once per REPETITION of its entry (§13.18.38.4 GR10 replays the subtree) is judged, and reported, once.
+    /// A null value is a refusal already reported.</summary>
+    private readonly Dictionary<Core.IntegerOperandContext, int?> _integerOperandValues = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>What a binder site that cannot proceed without a number reads for an <c>integer-n</c> operand
+    /// <see cref="IntegerOperandValue"/> refused (and reported): the smallest nonzero integer, which no later range
+    /// rule of the clause objects to, so one bad constant is one diagnostic and not a cascade. The compile has failed
+    /// by then; the value reaches no output.</summary>
+    internal const int RecoveredIntegerOperand = 1;
+
+    /// <summary>⛔ THE ONE READER OF AN <c>integer-n</c> POSITION THAT ADMITS A CONSTANT-NAME (the <c>integerOperand</c>
+    /// grammar rule; kb/Work PB1947, from the OCCURS-only bound reader of kb/Work PB459): the integer as
+    /// written, or an INTEGER constant-name substituting it (ISO §13.10.3 SR2 — "constant-name-1 may be used anywhere
+    /// that a format specifies a literal of the class and category of constant-name-1"; §13.10.4 GR1/GR3 — "as if
+    /// literal-1 … were written where constant-name-1 is written"). Because the constant stands for the literal, the
+    /// substituted value meets what the WRITTEN literal meets: §5.5 1)'s "unsigned and nonzero unless otherwise
+    /// specified in the associated rules" (the clause's own exception, <see cref="CobolNet.Validation.IntegerOperandRules.Classify"/>)
+    /// and the host limit (COBOLNET2427, which <c>IntegerOperandPass</c> raises for a literal pre-bind and which a
+    /// constant can only meet here, where its value is known). Null (reported) for a non-integer, a negative or zero-
+    /// where-nonzero, an over-limit or an unknown constant-name.</summary>
+    /// <param name="operand">The operand node of the clause that prints the <c>integer-n</c>.</param>
+    /// <param name="where">The construct as the calling site names it, for a diagnostic.</param>
+    private int? IntegerOperandValue(Core.IntegerOperandContext operand, string where)
     {
-        if (bound.integerLiteral() is { } il)
+        if (operand.integerLiteral() is { } il)
             return CobolNet.Validation.IntegerOperandRules.HostValue(il);
-        string word = bound.cobolWord().GetText();
+        if (_integerOperandValues.TryGetValue(operand, out var known)) return known;
+        return _integerOperandValues[operand] = ConstantIntegerOperand(operand, where);
+    }
+
+    private int? ConstantIntegerOperand(Core.IntegerOperandContext operand, string where)
+    {
+        string word = operand.cobolWord().GetText();
+        string what = "the OCCURS bound";
+        if (CobolNet.Validation.IntegerOperandRules.OwnerOf(operand) is not Core.OccursClauseContext)
+        {
+            // The clause is named once, in the construct position of the sentence, so the operand reads as itself.
+            what = "the integer operand";
+            where = $"{where} ({CobolNet.Validation.IntegerOperandRules.ConstructName(operand)})";
+        }
         if (FindConstant(word) is { } k)
         {
             // THE ONE integer-literal reader (kb/Work PB1579): an integer constant beyond the host range is still an
@@ -845,21 +877,42 @@ public sealed partial class DataBinder
             if (k is { Category: PicCategory.Numeric, IntegerText: { } it }
                 && CobolNet.Validation.IntegerOperandRules.TryHostValue(it, out int kv, out bool beyondLimit))
             {
-                if (!beyondLimit) return kv;
-                Edition.Error(DiagnosticCatalog.IntegerOperandBeyondLimit,
-                    CobolNet.Validation.IntegerOperandRules.BeyondLimitMessage(where,
-                        $"the OCCURS bound '{word}', the integer {it},"));
-                return null;
+                if (beyondLimit)
+                {
+                    Edition.Error(DiagnosticCatalog.IntegerOperandBeyondLimit,
+                        CobolNet.Validation.IntegerOperandRules.BeyondLimitMessage(where, $"{what} '{word}', the integer {it},"));
+                    return null;
+                }
+                // §5.5 1) — "unsigned": a negative literal is not an integer-n, so a constant that is one is not the
+                // literal this position names; "nonzero unless otherwise specified in the associated rules" — the
+                // clause's own exception is the ONE table IntegerOperandPass asks of a written literal.
+                if (kv < 0)
+                {
+                    Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {what} '{word}' is the negative integer "
+                        + $"{it}: an integer-n shall be unsigned (ISO §5.5 1), with §13.10.4 GR1's substitution as if the "
+                        + "literal were written)");
+                    return null;
+                }
+                if (kv == 0 && CobolNet.Validation.IntegerOperandRules.Classify(operand).Kind
+                        == CobolNet.Validation.IntegerSlotKind.NonZero)
+                {
+                    Edition.Error(DiagnosticCatalog.IntegerOperandZero, $"{where}: {what} '{word}' is the integer 0, and "
+                        + "the integer operand shall be nonzero — ISO §5.5 1): an integer-n \"shall be unsigned and "
+                        + "nonzero unless otherwise specified in the associated rules\", and no rule of this format "
+                        + "permits zero here (§13.10.4 GR1: the constant stands as if its literal were written)");
+                    return null;
+                }
+                return kv;
             }
-            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the OCCURS bound '{word}' shall be "
-                + "an INTEGER constant-name (ISO §13.10.3 SR2 — only an integer constant may specify an OCCURS "
-                + "integer position)");
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {what} '{word}' shall be "
+                + "an INTEGER constant-name (ISO §13.10.3 SR2 — only an integer constant may specify an integer-n "
+                + "position)");
             return null;
         }
         if (IsFailedConstant(word)) return null;   // its own entry was reported
-        Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the OCCURS bound '{word}' is not a "
-            + "defined constant-name — the OCCURS integer positions admit an integer literal or an integer "
-            + "constant-name (ISO §13.18.38 / §13.10.3 SR2)");
+        Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {what} '{word}' is not a "
+            + "defined constant-name — an integer-n position admits an integer literal or an integer "
+            + "constant-name (ISO §5.5 1) / §13.10.3 SR2)");
         return null;
     }
 

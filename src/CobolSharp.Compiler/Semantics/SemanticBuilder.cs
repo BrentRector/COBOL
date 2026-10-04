@@ -991,11 +991,11 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
             }
             if (clause.reportPageClause() is { } pc)
             {
-                if (pc.integerLiteral() is { } pl && int.TryParse(pl.GetText(), out int lines))
+                if (pc.integerOperand() is { } pl && int.TryParse(pl.GetText(), out int lines))
                     report.PageLimitLines = lines;
                 foreach (var sub in pc.reportPageSubclause())
                 {
-                    if (sub.integerLiteral() is not { } si || !int.TryParse(si.GetText(), out int v)) continue;
+                    if (sub.integerOperand() is not { } si || !int.TryParse(si.GetText(), out int v)) continue;
                     if (sub.HEADING() != null && sub.LAST() == null) report.HeadingLine = v;
                     else if (sub.FIRST() != null) report.FirstDetailLine = v;
                     else if (sub.LAST() != null && sub.CONTROL() == null && sub.CH() == null) report.LastDetailLine = v;
@@ -1047,13 +1047,13 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
                 group.HasLine = true;
                 var lop = lc.reportLineOperand(0);
                 if (lop.NEXT() != null && lop.PAGE() != null) group.LineNextPage = true;
-                else if (lop.integerLiteral() is { } li && int.TryParse(li.GetText(), out int lv))
+                else if (lop.integerOperand() is { } li && int.TryParse(li.GetText(), out int lv))
                 {
                     group.LineValue = lv;
                     group.LineRelative = lop.reportRelativeSign() != null;
                 }
             }
-            if (clause.reportColumnClause()?.reportColumnOperand(0)?.integerLiteral() is { } colLit
+            if (clause.reportColumnClause()?.reportColumnOperand(0)?.integerOperand() is { } colLit
                 && int.TryParse(colLit.GetText(), out int col))
             {
                 group.HasColumn = true;
@@ -1501,10 +1501,10 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
                 var occClause = clause.occursClause();
                 if (occClause != null)
                 {
-                    // Each occursBound is an integer literal or (2002+, greenfield-only) a constant-name;
+                    // Each integerOperand is an integer literal or (2002+, greenfield-only) a constant-name;
                     // GetText() on the bound context is the literal text, and a constant-name simply fails
                     // TryParse below — COBOL-85 legacy input never carries one.
-                    var intLits = occClause.occursBound();
+                    var intLits = occClause.integerOperand();
                     int maxOccurs = 1;
                     int minOccurs = 0;
                     string? dependingOn = null;

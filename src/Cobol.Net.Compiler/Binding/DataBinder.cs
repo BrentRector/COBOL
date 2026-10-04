@@ -4897,10 +4897,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     // Allocate at the table's MAXIMUM occurrence count — the last fixed bound (integer-2 for a
                     // Format-2 `n TO m` table, the sole bound for a fixed table) — per ISO §8.5.1.8 (physical
                     // capacity fixed at compile time). Each bound is an integer literal or an integer
-                    // constant-name (§13.10.3 SR2) — OccursBoundValue resolves both (DataBinder.Constants.cs).
+                    // constant-name (§13.10.3 SR2) — IntegerOperandValue resolves both (DataBinder.Constants.cs).
                     // The min/DEPENDING/KEY surface is captured in the OccursSpec.
                     string occWhere = $"data item '{cobolName ?? "FILLER"}'";
-                    if (occ.occursBound() is { Length: > 0 } bnds && OccursBoundValue(bnds[^1], occWhere) is { } n)
+                    if (occ.integerOperand() is { Length: > 0 } bnds && IntegerOperandValue(bnds[^1], occWhere) is { } n)
                         occurs = n;
                     occursSpec = OdoBindOccursSpec(occ, occWhere, occurs);
                     if (occ.INDEXED() is not null)

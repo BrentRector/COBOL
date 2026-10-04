@@ -99,6 +99,15 @@ public sealed class ReportModel
     /// (ISO §13.18.54.4 GR1), in the order their counter-id blocks were reserved.</summary>
     public List<ReportSumFamily> SumFamilies { get; } = [];
 
+    /// <summary>EVERY entry of this report that carries a value a rolled total can add (ISO §13.18.54.4 GR6): the
+    /// SUM entries (<see cref="SumFamilies"/>' families, the same objects) and the entries with a SOURCE or VALUE
+    /// clause, printable or not. The one list SUM data-name-1 (§13.18.54.3 SR4) is resolved against.</summary>
+    public List<ReportEntryFamily> EntryFamilies { get; } = [];
+
+    /// <summary>The occurrences of those entries, report-wide in binding order — the rows the procedure-phase binder
+    /// gives a value and the emitter a presence slot (<see cref="ReportItemOccurrence"/>).</summary>
+    public List<ReportItemOccurrence> ItemOccurrences { get; } = [];
+
     /// <summary>The data-names the report's VARYING clauses define (§13.18.64.3 SR2), once per WRITTEN entry — a
     /// repeating entry's replays share one declaration. Filled by <c>ScreenReportVaryingClauses</c>, which asks SR2's
     /// "not defined elsewhere in the source element" of each name once the whole source element is described;
@@ -647,6 +656,19 @@ public sealed class ReportSumAddend
     /// same route a procedure-division identifier takes, so subscripts (literal, index-name or expression) and
     /// qualification are resolved by the ONE machinery. Null when a screen already rejected the operand.</summary>
     public BoundExpr? Value { get; set; }
+
+    /// <summary>⛔ THIS ADDEND IS DATA-NAME-1 — A ROLLED TOTAL (ISO §13.18.54.3 SR4, kb/Work PB1294): the name of an
+    /// entry in the report section, whose value §13.18.54.4 GR6 adds when ITS group is processed (GR7 a)/b)) rather
+    /// than when a GENERATE is executed, so it has no <see cref="Value"/> of its own to bind and the emitter's
+    /// GENERATE-driven addition leaves it out. Set by the one resolution (<c>ResolveSumAddend</c>).</summary>
+    public bool Rolled { get; set; }
+
+    /// <summary>The occurrences of data-name-1 this addend adds into THE COUNTER OCCURRENCE THAT OWNS IT — §13.18.54.4
+    /// GR8: "each occurrence of the addend is added into the corresponding occurrence of the sum counter" when both
+    /// have the same number of levels of repetition, and when the addend has more, "forming the total of a complete
+    /// table of occurrences of the addend at one or more levels into each occurrence of the sum counter". One
+    /// addition per occurrence listed; a non-repeating addend is the one occurrence of every counter occurrence.</summary>
+    public List<ReportItemOccurrence> RolledFrom { get; } = [];
 }
 
 /// <summary>ONE <c>SUM OF addend… [UPON data-name-2…]</c> group of a SUM clause (ISO §13.18.54.2 — the general
@@ -672,8 +694,155 @@ public sealed record ReportDetailRef(string Name, string? Qualifier)
 {
     public ReportGroupModel? Detail { get; set; }
 
+    /// <summary>The report description the resolved <see cref="Detail"/> belongs to — the RD of the SUM entry itself
+    /// for an unqualified operand, ANOTHER report's when SR7's report-name qualifier says so (§13.18.54.4 GR7 c) 2):
+    /// the GENERATE that adds is then executed against that report's engine).</summary>
+    public ReportModel? Owner { get; set; }
+
     /// <summary>The operand as written — the form every diagnostic about it quotes.</summary>
     public override string ToString() => Qualifier is null ? Name : $"{Name} OF {Qualifier}";
+}
+
+/// <summary>
+/// ⛔ ONE WRITTEN REPORT ENTRY THAT CARRIES A VALUE, AND THE GEOMETRY OF ITS REPETITION (kb/Work PB1294). ISO
+/// §13.18.54.4 GR6 gives the three kinds of entry a SUM clause's data-name-1 can name one value each — an entry that
+/// contains a SUM clause is "the corresponding sum counter", and one that has a SOURCE or VALUE clause is "the operand
+/// of the SOURCE or VALUE clause" — so the entry is the unit a rolled total is resolved against, whether it prints
+/// (a COLUMN clause) or not (§13.18.53.4 GR3: "the SOURCE clause causes no action, except where the entry is referred
+/// to by means of a SUM clause").
+/// <para>Its REPETITION geometry is the one a sum counter always had (<see cref="ReportSumFamily"/>, kb/Work PB1271):
+/// §13.15.4 GR3's three vehicles — an OCCURS clause, a multiple LINE clause (§13.18.35.4 GR9) and a multiple COLUMN
+/// clause (§13.18.14.4 GR12) — are all OCCURS levels, so an entry's occurrences form a table of
+/// <see cref="Extents"/>, outermost level first. §13.18.54.4 GR8 maps an addend's occurrences onto a counter's by
+/// those levels, which is why both kinds of entry carry them.</para>
+/// </summary>
+public abstract class ReportEntryFamily
+{
+    /// <summary>The entry's data-name — for a SUM entry GR5's name of the counter, "not the name of the associated
+    /// printable item, if any" — or null for an unnamed entry (such an entry can be named by no clause).</summary>
+    public string? Name { get; init; }
+
+    /// <summary>The report description the entry is written in.</summary>
+    public required ReportModel Report { get; init; }
+
+    /// <summary>The report group description (the 01-level entry and everything under it) the entry is part of —
+    /// §13.18.54.3 SR4 b)/c) ask whether data-name-1 and the subject share one, and SR4 f) asks its TYPE.</summary>
+    public required ReportGroupModel Group { get; init; }
+
+    /// <summary>The enclosing repeating entries' OCCURS clauses, outermost first (§13.18.38 Format 3, or a multiple
+    /// LINE clause's §13.18.35.4 GR9 equivalent) — one table level each. They also answer what a table(ALL)
+    /// argument asks of a level's CURRENT range: §15.3, "If the ALL subscript is associated with a data item
+    /// described with an OCCURS DEPENDING ON clause, the range of values is determined by the object of the OCCURS
+    /// DEPENDING ON clause", read by §13.18.38.4 GR13's own count (<see cref="Model.AllCount.ReportDepending"/>).</summary>
+    public required IReadOnlyList<ReportOccursSpec> Repetitions { get; init; }
+
+    /// <summary>The operand count of the entry's own multiple COLUMN clause — the innermost level — or 1 when the
+    /// entry has no multiple COLUMN clause (§13.18.14.3 SR10 a) keeps an OCCURS clause out of such an entry).</summary>
+    public required int Columns { get; init; }
+
+    /// <summary>The occurrence count of each level, outermost first: each of <see cref="Repetitions"/>' integer-2,
+    /// then <see cref="Columns"/> when it is a level. Empty for a non-repeating entry: one occurrence. Derived, so the
+    /// levels, a sum register's synthetic OCCURS chain and the occurrence arithmetic read one answer.</summary>
+    public IReadOnlyList<int> Extents =>
+        _extents ??= [.. Repetitions.Select(r => r.Max), .. Columns > 1 ? [Columns] : (int[])[]];
+    private IReadOnlyList<int>? _extents;
+
+    /// <summary>How many occurrences the entry has — the product of <see cref="Extents"/> (1 for none).</summary>
+    public int Count => Extents.Aggregate(1, (n, e) => n * e);
+
+    /// <summary>⛔ THE ENTRY'S QUALIFICATION HIERARCHY (kb/Work PB1454): the data-names of the report group
+    /// description entries it is subordinate to, INNERMOST FIRST and ending at the 01 report group, a null for an
+    /// entry without a data-name (FILLER). ISO §8.4.2.2.3 SR4 — "Each data-name-2 shall be the name associated with a
+    /// level number to which the item being qualified is subordinate" — so an entry is qualifiable by every named
+    /// level above it, and by its REPORT as the outermost container (§8.4.2.2.2 Format 1's file-report-qualifier).
+    /// Read by <see cref="DataBinder.QualifierWalk"/>, the ONE qualifier walk a data item's own ancestors go through.</summary>
+    public IReadOnlyList<string?> Qualification { get; init; } = [];
+
+    /// <summary>The entry's occurrences, one per replay of it and per operand of its own multiple COLUMN clause, in
+    /// binding order (which is NOT row-major order: the replay binds siblings between repetitions).</summary>
+    public List<ReportItemOccurrence> Occurrences { get; } = [];
+
+    /// <summary>The row-major linear coordinate of <paramref name="coordinates"/> (zero-based, one per
+    /// <see cref="Extents"/> level, outermost first) — the order a subscript list is written in (§8.4.2.3.3 SR3,
+    /// "successively less inclusive dimensions"), and the arithmetic the engine's <c>CobolReport.SumOccurrence</c>
+    /// does for a run-time subscript.</summary>
+    public int Linear(IReadOnlyList<int> coordinates)
+    {
+        int linear = 0;
+        for (int k = 0; k < Extents.Count; k++) linear = linear * Extents[k] + coordinates[k];
+        return linear;
+    }
+
+    /// <summary>The inverse of <see cref="Linear"/>: the zero-based coordinates of occurrence <paramref name="linear"/>.</summary>
+    public int[] CoordinatesOf(int linear)
+    {
+        var coordinates = new int[Extents.Count];
+        for (int k = Extents.Count - 1; k >= 0; k--)
+        {
+            coordinates[k] = linear % Extents[k];
+            linear /= Extents[k];
+        }
+        return coordinates;
+    }
+}
+
+/// <summary>An entry that carries a SOURCE or VALUE clause and no SUM clause (ISO §13.18.54.4 GR6 — "the value added
+/// is that of the operand of the SOURCE or VALUE clause"), printable or not.
+/// <see cref="Category"/> is its PICTURE's category, which SR4's "numeric data item" asks.</summary>
+public sealed class ReportSourceFamily : ReportEntryFamily
+{
+    /// <summary>The category of the entry's PICTURE; null when it has none or none that analyzed.</summary>
+    public PicCategory? Category { get; set; }
+}
+
+/// <summary>
+/// ⛔ ONE OCCURRENCE OF A VALUE-CARRYING REPORT ENTRY — what one rolled addition adds (kb/Work PB1294). It is the
+/// entry's counter occurrence (<see cref="Sum"/>), or the operand of its SOURCE or VALUE clause for this occurrence
+/// (<see cref="Source"/> — §13.18.63.4 GR23 / §13.18.53.4 GR4: successive operands to successive repeating items, so
+/// occurrence n takes operand n mod count), and it carries the FULL presence chain §13.18.54.4 GR11 asks ("declared
+/// to be absent as a result of a PRESENT WHEN clause or an OCCURS clause with the DEPENDING phrase"): every condition
+/// from the 01 entry down to the entry, and this replay's DEPENDING tests.
+/// </summary>
+public sealed class ReportItemOccurrence
+{
+    public required ReportEntryFamily Family { get; init; }
+
+    /// <summary>Zero-based, one per <see cref="ReportEntryFamily.Extents"/> level, outermost first.</summary>
+    public required IReadOnlyList<int> Coordinates { get; init; }
+
+    /// <summary>The counter occurrence, when the entry contains a SUM clause.</summary>
+    public ReportSumModel? Sum { get; init; }
+
+    /// <summary>The operand of the entry's SOURCE or VALUE clause for this occurrence, bound in the procedure phase
+    /// with the rest of the report's clause operands; null for a SUM entry.</summary>
+    public ReportFieldSource? Source { get; init; }
+
+    /// <summary>The VARYING counters in scope at the entry (§13.18.64.3 SR2) — what its SOURCE operand may name.</summary>
+    public List<ReportVaryingUse> Varyings { get; } = [];
+
+    /// <summary>The SOURCE operand names one of those counters — whose value is the entry's own occurrence's
+    /// (§13.18.64.4 GR3: FROM for the first, BY added for each later one), a compose-local when the entry prints. The
+    /// emitter gives a rolled addition of such an operand the same locals for the occurrence it adds.</summary>
+    public bool VaryingDependent { get; set; }
+
+    // A SUM entry's chain IS its counter occurrence's (the same lists, so the engine's reset and a rolled addition
+    // read one answer); a SOURCE / VALUE entry owns its own.
+    private readonly List<CobolParserCore.ConditionContext> _presentWhenCtxs = [];
+    private readonly List<BoundCondition> _presentWhen = [];
+    private readonly List<ReportRepetitionGuard> _guards = [];
+
+    /// <summary>The PRESENT WHEN conditions 01 → entry as captured parse contexts (§13.18.41.4 GR2b).</summary>
+    public List<CobolParserCore.ConditionContext> PresentWhenCtxs => Sum?.PresentWhenCtxs ?? _presentWhenCtxs;
+
+    /// <summary>The same chain bound in the procedure phase.</summary>
+    public List<BoundCondition> PresentWhen => Sum?.PresentWhen ?? _presentWhen;
+
+    /// <summary>This replay's OCCURS … DEPENDING presence tests (§13.18.38.4 GR13), outermost repeating entry first.</summary>
+    public List<ReportRepetitionGuard> RepetitionGuards => Sum?.RepetitionGuards ?? _guards;
+
+    /// <summary>The value one rolled addition adds, bound in the procedure phase: the counter occurrence's content, or
+    /// the SOURCE / VALUE operand as a number. Null when the operand was refused (reported where it was).</summary>
+    public BoundExpr? Value { get; set; }
 }
 
 /// <summary>
@@ -697,38 +866,10 @@ public sealed record ReportDetailRef(string Name, string? Qualifier)
 /// what lets a run-time subscript select the counter by arithmetic — the replay binds sibling entries between the
 /// repetitions (A0 B0 A1 B1), so the ids could not be contiguous in binding order.</para>
 /// </summary>
-public sealed class ReportSumFamily
+public sealed class ReportSumFamily : ReportEntryFamily
 {
-    /// <summary>The data-name that NAMES THE COUNTER (ISO §13.18.54.4 GR5 — "If a data-name immediately follows
-    /// the level number in the entry containing the SUM clause, the data-name is the name of the sum counter, not
-    /// the name of the associated printable item, if any"), or null for an unnamed entry. It is what a procedure
-    /// division statement writes to read or alter the counter (GR12) — <b>not</b> its identity, which is the
-    /// entry (kb/Work PB882).</summary>
-    public string? Name { get; init; }
-
     /// <summary>The id of occurrence (1, 1, …): the first counter of this family's block.</summary>
     public required int BaseId { get; init; }
-
-    /// <summary>The enclosing repeating entries' OCCURS clauses, outermost first (§13.18.38 Format 3, or a multiple
-    /// LINE clause's §13.18.35.4 GR9 equivalent) — one table level each. They also answer what a table(ALL)
-    /// argument asks of a level's CURRENT range: §15.3, "If the ALL subscript is associated with a data item
-    /// described with an OCCURS DEPENDING ON clause, the range of values is determined by the object of the OCCURS
-    /// DEPENDING ON clause", read by §13.18.38.4 GR13's own count (<see cref="Model.AllCount.ReportDepending"/>).</summary>
-    public required IReadOnlyList<ReportOccursSpec> Repetitions { get; init; }
-
-    /// <summary>The operand count of the entry's own multiple COLUMN clause — the innermost level — or 1 when the
-    /// entry has no multiple COLUMN clause (§13.18.14.3 SR10 a) keeps an OCCURS clause out of such an entry).</summary>
-    public required int Columns { get; init; }
-
-    /// <summary>The occurrence count of each level, outermost first: each of <see cref="Repetitions"/>' integer-2,
-    /// then <see cref="Columns"/> when it is a level. Empty for a non-repeating entry: one counter. Derived, so the
-    /// levels, the register's synthetic OCCURS chain and the id arithmetic read one answer.</summary>
-    public IReadOnlyList<int> Extents =>
-        _extents ??= [.. Repetitions.Select(r => r.Max), .. Columns > 1 ? [Columns] : (int[])[]];
-    private IReadOnlyList<int>? _extents;
-
-    /// <summary>How many counters the family holds — the product of <see cref="Extents"/> (1 for none).</summary>
-    public int Count => Extents.Aggregate(1, (n, e) => n * e);
 
     /// <summary>The IMPLICITLY-DEFINED data item the counter is (ISO §13.18.54.4 GR1 — "a conceptual data item
     /// that behaves as a data item of the category numeric"), carrying the GR1 profile
@@ -741,15 +882,6 @@ public sealed class ReportSumFamily
 
     /// <summary>The counter's scale — the fractional digit count GR1 derives from the entry's PICTURE.</summary>
     public int Scale { get; init; }
-
-    /// <summary>⛔ THE COUNTER'S QUALIFICATION HIERARCHY (kb/Work PB1454): the data-names of the report group
-    /// description entries the SUM entry is subordinate to, INNERMOST FIRST and ending at the 01 report group, a
-    /// null for an entry without a data-name (FILLER). ISO §8.4.2.2.3 SR4 — "Each data-name-2 shall be the name
-    /// associated with a level number to which the item being qualified is subordinate" — so a counter is
-    /// qualifiable by every named level above it, and by its REPORT as the outermost container
-    /// (§8.4.2.2.2 Format 1's file-report-qualifier). Read by <see cref="DataBinder.QualifierWalk"/>, the ONE
-    /// qualifier walk a data item's own ancestors go through.</summary>
-    public IReadOnlyList<string?> Qualification { get; init; } = [];
 
     /// <summary>The COBOL-2002 PICTURE-shape introduction gate (a <c>Constructs.*</c> id) this counter's PICTURE
     /// carries — a floating-point numeric-edited (symbol E) or national-edited picture, from the ONE
@@ -766,17 +898,13 @@ public sealed class ReportSumFamily
     /// <see cref="Extents"/> level): <see cref="BaseId"/> + the row-major linear coordinate — the same order a
     /// subscript list is written in (§8.4.2.3.3 SR3, "successively less inclusive dimensions"), and the same
     /// arithmetic the engine's <c>CobolReport.SumOccurrence</c> does for a run-time subscript.</summary>
-    public int IdAt(IReadOnlyList<int> coordinates)
-    {
-        int linear = 0;
-        for (int k = 0; k < Extents.Count; k++) linear = linear * Extents[k] + coordinates[k];
-        return BaseId + linear;
-    }
+    public int IdAt(IReadOnlyList<int> coordinates) => BaseId + Linear(coordinates);
 }
 
 /// <summary>One SUM counter — one OCCURRENCE of a <see cref="ReportSumFamily"/> (ISO §13.18.54): its identity
-/// (GR1 — see <see cref="Id"/>), the addend TERMS (SR5 — items OUTSIDE the report section; report-section
-/// addends/rolled totals are staged loud), each carrying its own UPON detail names (GR7c2), the RESET operand
+/// (GR1 — see <see cref="Id"/>), the addend TERMS (SR5's items OUTSIDE the report section, and SR4's data-name-1
+/// rolled totals, which register with their addend's own group — <see cref="ReportSumAddend.RolledFrom"/>), each
+/// carrying its own UPON detail names (GR7c2), the RESET operand
 /// (GR2), and the presence tests that suppress its print and reset (GR10).</summary>
 public sealed class ReportSumModel
 {
@@ -1038,14 +1166,17 @@ public sealed partial class DataBinder
                 // consists of a single page of indefinite length": a PAGE clause that gives only integer-2 (the page
                 // width, GR2b) leaves the report UNPAGED. GR5 — "If integer-2 is omitted, a value of 999 is assumed
                 // for the page width": ReportModel.PageWidth already holds that default.
-                if (page.integerLiteral() is { } limit)
+                // Every integer of the clause is a literal position, so an integer constant-name stands there
+                // (§13.10.3 SR2) — read through the ONE reader (kb/Work PB1947); a refused constant reads as 1, the
+                // recovery value no range rule below trips on (the compile has already failed).
+                if (page.integerOperand() is { } limit)
                 {
                     model.Paged = true;
-                    model.PageLimit = CobolNet.Validation.IntegerOperandRules.HostValue(limit);
+                    model.PageLimit = IntegerOperandValue(limit, rdWhere) ?? RecoveredIntegerOperand;
                 }
                 if (page.reportPageWidth() is { } width)
                 {
-                    model.PageWidth = CobolNet.Validation.IntegerOperandRules.HostValue(width.integerLiteral());
+                    model.PageWidth = IntegerOperandValue(width.integerOperand(), rdWhere) ?? RecoveredIntegerOperand;
                     model.PageWidthWritten = true;
                 }
                 // §13.18.39.2 prints each phrase in its own bracket with no ellipsis; SR4 licenses any ORDER,
@@ -1057,14 +1188,14 @@ public sealed partial class DataBinder
                 // §13.18.39.3 SR3 — "The HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL, or FOOTING
                 // phrase may be specified only if integer-1 is specified." Each phrase subdivides the page
                 // (GR2c–GR2g) and a report with no page limit has no page to subdivide.
-                if (page.integerLiteral() is null && subs.Length > 0)
+                if (page.integerOperand() is null && subs.Length > 0)
                     Edition.Error(DiagnosticCatalog.ReportPagePhraseWithoutLimit, $"{rdWhere}: the PAGE clause "
                         + $"specifies {string.Join(", ", subs.Select(s => PagePhraseWords(PagePhraseOf(s))).Distinct())} "
                         + "but no integer-1 (the page limit): those phrases may be specified only if integer-1 is "
                         + "specified (ISO §13.18.39.3 SR3)");
                 foreach (var sub in subs)
                 {
-                    int v = CobolNet.Validation.IntegerOperandRules.HostValue(sub.integerLiteral());
+                    int v = IntegerOperandValue(sub.integerOperand(), rdWhere) ?? RecoveredIntegerOperand;
                     switch (PagePhraseOf(sub))
                     {
                         case PagePhrase.Heading: model.Heading = v; heading = true; break;
@@ -1390,7 +1521,7 @@ public sealed partial class DataBinder
                 ? new ReportNextGroup(ReportNextGroupKind.NextPage, 0, ngc.RESET() is not null)
                 : new ReportNextGroup(ngc.reportRelativeSign() is not null
                     ? ReportNextGroupKind.Relative : ReportNextGroupKind.Absolute,
-                    CobolNet.Validation.IntegerOperandRules.HostValue(ngc.integerLiteral()));
+                    IntegerOperandValue(ngc.integerOperand(), $"RD '{model.Name}' group '{g.Name ?? "FILLER"}'") ?? RecoveredIntegerOperand);
             g.NextGroup = ng;
             string where = $"RD '{model.Name}' group '{g.Name ?? "FILLER"}' ({ReportGroupTypeWords(g.Kind)})";
             void Violation(string rule) =>
@@ -1413,7 +1544,7 @@ public sealed partial class DataBinder
             }
             bool absolute = ng.Kind == ReportNextGroupKind.Absolute;
             if (ng.Value > model.VerticalLimit)
-                Violation($"{(absolute ? "integer-1" : "integer-2")} {ngc.integerLiteral().GetText()} exceeds {model.VerticalLimitWords}"
+                Violation($"{(absolute ? "integer-1" : "integer-2")} {ngc.integerOperand().GetText()} exceeds {model.VerticalLimitWords}"
                     + "; integer-1 and integer-2 shall not exceed the page limit, or 9999 if the report is not "
                     + "divided into pages (ISO §13.18.37.3 SR1)");
             if (!model.Paged)
@@ -1522,17 +1653,17 @@ public sealed partial class DataBinder
                 for (int k = 0; k < ops.Length; k++)
                 {
                     var op = ops[k];
-                    bool absolute = op.integerLiteral() is not null && op.reportRelativeSign() is null;
-                    if (op.integerLiteral() is { } lit)
+                    bool absolute = op.integerOperand() is not null && op.reportRelativeSign() is null;
+                    if (op.integerOperand() is { } lit)
                     {
-                        if (CobolNet.Validation.IntegerOperandRules.HostValue(lit) > model.VerticalLimit)
+                        if ((IntegerOperandValue(lit, $"RD '{model.Name}' entry") ?? RecoveredIntegerOperand) > model.VerticalLimit)
                             Violation($"{(absolute ? "integer-1" : "integer-2")} {lit.GetText()} exceeds {model.VerticalLimitWords}"
                                 + "; neither integer-1 nor integer-2 shall exceed the page limit, or 9999 if the report "
                                 + "is not divided into pages (ISO §13.18.35.3 SR3)");
                     }
                     if (!model.Paged && (absolute || op.NEXT() is not null))
                         Violation($"the report is not divided into pages, so all its LINE clauses shall be relative — "
-                            + (absolute ? $"LINE {op.integerLiteral()!.GetText()}{(op.NEXT() is not null ? " ON NEXT PAGE" : "")} is absolute"
+                            + (absolute ? $"LINE {op.integerOperand()!.GetText()}{(op.NEXT() is not null ? " ON NEXT PAGE" : "")} is absolute"
                                         : "the ON NEXT PAGE operand is not the relative form {PLUS|+} integer-2")
                             + " (ISO §13.18.35.3 SR5)");
                     // SR9 — "If the current report group is a control heading with the OR PAGE phrase, all the LINE
@@ -1540,7 +1671,7 @@ public sealed partial class DataBinder
                     // relative form either, exactly as SR5 reads it (kb/Work PB1248).
                     if (orPageHeading && (absolute || op.NEXT() is not null))
                         Violation("a control heading with the OR PAGE phrase shall have only relative LINE clauses — "
-                            + (absolute ? $"LINE {op.integerLiteral()!.GetText()}{(op.NEXT() is not null ? " ON NEXT PAGE" : "")} is absolute"
+                            + (absolute ? $"LINE {op.integerOperand()!.GetText()}{(op.NEXT() is not null ? " ON NEXT PAGE" : "")} is absolute"
                                         : "the ON NEXT PAGE operand is not the relative form {PLUS|+} integer-2")
                             + " (ISO §13.18.35.3 SR9)");
                     if (op.NEXT() is null) continue;
@@ -1720,6 +1851,9 @@ public sealed partial class DataBinder
         /// <summary>The <see cref="ReportSumFamily"/> of each SUM entry, created at the entry's FIRST replay (when its
         /// counter-id block is reserved) and found again by every later one (kb/Work PB1271).</summary>
         public readonly Dictionary<Core.ReportGroupEntryContext, ReportSumFamily> SumFamilies = [];
+        /// <summary>The <see cref="ReportSourceFamily"/> of each SOURCE / VALUE entry, found again by every replay
+        /// (kb/Work PB1294) — the twin of <see cref="SumFamilies"/> for the entries a rolled total may name.</summary>
+        public readonly Dictionary<Core.ReportGroupEntryContext, ReportSourceFamily> SourceFamilies = [];
         /// <summary>The bind-time EXPECTED vertical offset of the last relative line placed in the group under
         /// construction, measured from the group's own start. It is the §13.18.35.4 GR4c trial sum read
         /// forwards: each line's <see cref="ReportLineModel.TrialInterval"/> is its expected offset minus this
@@ -1915,7 +2049,7 @@ public sealed partial class DataBinder
             if (k > 0 && ops[k].NEXT() is not null)
                 Edition.Error(DiagnosticCatalog.ReportLineClauseRule, $"RD '{model.Name}': in a multiple LINE clause the "
                     + "NEXT PAGE phrase shall appear only with the first operand (ISO §13.18.35.3 SR10a)");
-            if (ops[k].integerLiteral() is not { } lit) continue;   // a bare `ON NEXT PAGE` operand
+            if (ops[k].integerOperand() is not { } lit) continue;   // a bare `ON NEXT PAGE` operand
             if (ops[k].reportRelativeSign() is not null) { relativeSeen = true; continue; }
             // b) "All absolute operands, if present, shall precede all relative operands, if present."
             if (relativeSeen)
@@ -1925,7 +2059,7 @@ public sealed partial class DataBinder
                 continue;
             }
             // c) "The occurrences of integer-1, if present, shall be in ascending numerical order."
-            int v = CobolNet.Validation.IntegerOperandRules.HostValue(lit);
+            int v = IntegerOperandValue(lit, $"RD '{model.Name}' entry") ?? RecoveredIntegerOperand;
             if (lastAbsolute > int.MinValue && v <= lastAbsolute)
                 Edition.Error(DiagnosticCatalog.ReportLineClauseRule, $"RD '{model.Name}': in a multiple LINE clause the "
                     + $"occurrences of integer-1 shall be in ascending numerical order — {v} follows "
@@ -1973,12 +2107,12 @@ public sealed partial class DataBinder
             return null;
         }
 
-        var bounds = oc.occursBound();
+        var bounds = oc.integerOperand();
         bool hasTo = oc.TO() is not null;
         var depending = oc.dataReference();
-        int? step = oc.occursStepPhrase() is { } sp ? CobolNet.Validation.IntegerOperandRules.HostValue(sp.integerLiteral()) : null;
-        int max = OccursBoundValue(bounds[^1], where) ?? 0;
-        int min = hasTo ? OccursBoundValue(bounds[0], where) ?? 0 : 0;
+        int? step = oc.occursStepPhrase() is { } sp ? IntegerOperandValue(sp.integerOperand(), where) ?? RecoveredIntegerOperand : null;
+        int max = IntegerOperandValue(bounds[^1], where) ?? 0;
+        int min = hasTo ? IntegerOperandValue(bounds[0], where) ?? 0 : 0;
 
         // SR24 — "The TO and DEPENDING phrases shall either be both absent or both present."
         if (hasTo != (depending is not null))
@@ -2243,7 +2377,8 @@ public sealed partial class DataBinder
                     foreach (var op in cc.reportColumnOperand())
                     {
                         bool relative = op.reportRelativeSign() is not null;
-                        int column = CobolNet.Validation.IntegerOperandRules.HostValue(op.integerLiteral());
+                        int column = IntegerOperandValue(op.integerOperand(), $"RD '{model.Name}' entry '{entryName ?? "FILLER"}'")
+                            ?? RecoveredIntegerOperand;
                         // §13.18.14.3 SR6 — "Neither integer-1 nor integer-2 shall exceed the page width": the
                         // absolute column and the relative offset are both written integers, so the rule is
                         // decidable here against ReportModel.PageWidth (the PAGE clause's integer-2, else GR5's 999).
@@ -2436,7 +2571,29 @@ public sealed partial class DataBinder
                     if (ownCond is not null) sum.PresentWhenCtxs.Add(ownCond);
                     sum.RepetitionGuards.AddRange(st.GuardsHere());
                     sums.Add(sum);
+                    // §13.18.54.4 GR6 — the counter occurrence is what a SUM clause's data-name-1 adds when it names
+                    // this entry; its presence chain IS the counter's (kb/Work PB1294).
+                    var counterOccurrence = new ReportItemOccurrence
+                    {
+                        Family = family, Coordinates = family.CoordinatesOf(sum.Id - family.BaseId), Sum = sum,
+                    };
+                    family.Occurrences.Add(counterOccurrence);
+                    model.ItemOccurrences.Add(counterOccurrence);
                 }
+            }
+
+            // ⛔ AN UNPRINTABLE SOURCE ENTRY IS STILL AN ENTRY (kb/Work PB1294). §13.18.53.4 GR3: "If the entry
+            // containing the SOURCE clause contains no COLUMN clause and therefore defines an unprintable item, the
+            // SOURCE clause causes no action, except where the entry is referred to by means of a SUM clause" — so
+            // it prints nothing and has no printable field, but §13.18.54.4 GR6 gives a SUM clause's data-name-1 "the
+            // operand of the SOURCE … clause" of it to add. (A printable entry's occurrences are recorded where its
+            // field is made, below, beside the operands that field cycles through.)
+            if (columns.Count == 0 && sums.Count == 0 && sourceOps.Count > 0)
+            {
+                var sourceFamily = SourceFamilyOf(ge, entryName, 0, chain, model, st);
+                sourceFamily.Category ??= UnprintablePictureCategory(picText, usageText ?? inheritedUsage, ownSign,
+                    reportEditing, reportLocale, $"RD '{model.Name}' entry '{entryName ?? "FILLER"}'");
+                RecordSourceOccurrences(sourceFamily, sourceOps, 1, ownCond, st, VaryingUsesOf(ge, 0, st), model);
             }
 
             if (columns.Count > 0)
@@ -2596,16 +2753,19 @@ public sealed partial class DataBinder
                 // occurrence of its declaring entry this placement lies in (GR3). An enclosing entry's occurrence is its
                 // replay's ordinal; this entry's own, when it repeats through a multiple COLUMN clause as well, is
                 // counted per placement (the emitter adds the placement index), after the replay ordinal's columns.
-                foreach (var (declaring, counters, frame) in st.Varying)
-                {
-                    bool own = ReferenceEquals(declaring, ge);
-                    int perReplay = own ? Math.Max(columns.Count, 1) : 1;
-                    foreach (var counter in counters)
-                        field.Varyings.Add(new ReportVaryingUse(counter, (frame?.Ordinal ?? 0) * perReplay,
-                            PerPlacement: own && columns.Count > 1));
-                }
+                field.Varyings.AddRange(VaryingUsesOf(ge, columns.Count, st));
                 field.RepetitionGuards.AddRange(st.GuardsHere());
                 line.Fields.Add(field);
+                // The entry's occurrences as a rolled total's addends (§13.18.54.4 GR6 — the operand of its SOURCE or
+                // VALUE clause), one per placement, each taking the operand the field's own cycling gives it. A SUM
+                // entry's occurrences were recorded with its counters above.
+                if (sums.Count == 0)
+                {
+                    var sourceFamily = SourceFamilyOf(ge, entryName, columns.Count, chain, model, st);
+                    sourceFamily.Category ??= pic.Category;
+                    RecordSourceOccurrences(sourceFamily, srcs, columns.Count, ownCond, st, field.Varyings, model,
+                        field.RepetitionOrdinal);
+                }
             }
 
             chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
@@ -2684,13 +2844,13 @@ public sealed partial class DataBinder
     /// FIRST DETAIL integer whatever integer-2 says, and a report footing on a page by itself starts at its
     /// §13.18.57.4 GR7f upper limit, the HEADING integer. The only place an integer-2 IS read is a LATER
     /// occurrence of a repeated bare clause, which advances one line (<see cref="BareNextPageInterval"/>).</para>
-    private static ReportLineModel RepeatedLine(
+    private ReportLineModel RepeatedLine(
         Core.ReportLineOperandContext op, int operand, bool groupFirstLine, Core.ReportGroupEntryContext anchorKey,
         ReportGroupBuild st)
     {
         bool nextPage = groupFirstLine && op.NEXT() is not null;
-        bool relative = op.reportRelativeSign() is not null || op.integerLiteral() is null;
-        int value = op.integerLiteral() is { } lit ? CobolNet.Validation.IntegerOperandRules.HostValue(lit) : BareNextPageInterval;
+        bool relative = op.reportRelativeSign() is not null || op.integerOperand() is null;
+        int value = op.integerOperand() is { } lit ? IntegerOperandValue(lit, "a report group description entry") ?? RecoveredIntegerOperand : BareNextPageInterval;
         int shift = st.Shift(ReportRepetitionAxis.Vertical);
         bool anchored = st.Repetitions.Exists(
             r => r.Spec.Axis == ReportRepetitionAxis.Vertical && r.Spec.Step is not null);
@@ -2732,7 +2892,7 @@ public sealed partial class DataBinder
         for (int k = start; k < end; k++)
             foreach (var clause in entries[k].reportGroupClause())
                 if (clause.reportLineClause() is { } lc
-                    && lc.reportLineOperand().Any(o => o.reportRelativeSign() is null && o.integerLiteral() is not null))
+                    && lc.reportLineOperand().Any(o => o.reportRelativeSign() is null && o.integerOperand() is not null))
                     return true;
         return false;
     }
@@ -2770,7 +2930,7 @@ public sealed partial class DataBinder
     /// 1 + Σ integer-2 over every line but the first; all-absolute lines span max − min + 1. A MIXED entry
     /// returns 0 (not measurable at bind): §13.18.35.3 SR6e already confines that shape to lines under
     /// different PRESENT WHEN clauses, whose overlap the standard leaves to GR3's EC-REPORT-LINE-OVERLAP.</summary>
-    private static int ReportEntryLineSpan(Core.ReportGroupEntryContext[] entries, int self, int subtreeEnd)
+    private int ReportEntryLineSpan(Core.ReportGroupEntryContext[] entries, int self, int subtreeEnd)
     {
         int relativeSpan = 1, absoluteLow = int.MaxValue, absoluteHigh = int.MinValue, lines = 0;
         bool anyRelative = false, anyAbsolute = false;
@@ -2780,8 +2940,8 @@ public sealed partial class DataBinder
                 if (clause.reportLineClause() is not { } lc) continue;
                 foreach (var op in lc.reportLineOperand())
                 {
-                    if (op.integerLiteral() is not { } lit) continue;
-                    int v = CobolNet.Validation.IntegerOperandRules.HostValue(lit);
+                    if (op.integerOperand() is not { } lit) continue;
+                    int v = IntegerOperandValue(lit, "a report group description entry") ?? RecoveredIntegerOperand;
                     if (op.reportRelativeSign() is not null)
                     {
                         anyRelative = true;
@@ -3106,6 +3266,8 @@ public sealed partial class DataBinder
         var family = new ReportSumFamily
         {
             Name = entryName,
+            Report = model,
+            Group = st.Group!,
             BaseId = baseId,
             Repetitions = [.. st.Repetitions.Select(f => f.Spec)],
             Columns = Math.Max(1, columnCount),
@@ -3133,6 +3295,7 @@ public sealed partial class DataBinder
         };
         st.SumFamilies[ge] = family;
         model.SumFamilies.Add(family);
+        model.EntryFamilies.Add(family);
         // §13.18.54.4 GR5 — a data-name immediately after the level number names THE COUNTER. Publish it into
         // the source element's name space so GR12's permission to read or alter it can be exercised; the entry
         // keeps its own counter whether or not another entry spells its name the same way (GR1, kb/Work PB882).
@@ -3143,6 +3306,98 @@ public sealed partial class DataBinder
             homonyms.Add((model, family));
         }
         return family;
+    }
+
+    /// <summary>The <see cref="ReportSourceFamily"/> of SOURCE / VALUE entry <paramref name="ge"/> — created at the
+    /// entry's FIRST replay and found again by every later one (kb/Work PB1294), the twin of
+    /// <see cref="SumFamilyOf"/>: the same repetition geometry, so a rolled total maps an addend's occurrences onto a
+    /// counter's by one arithmetic (§13.18.54.4 GR8).</summary>
+    private ReportSourceFamily SourceFamilyOf(Core.ReportGroupEntryContext ge, string? entryName, int columnCount,
+        List<(int Level, Core.ConditionContext? Cond, int Reps, string? Usage, string? Name)> chain,
+        ReportModel model, ReportGroupBuild st)
+    {
+        if (st.SourceFamilies.TryGetValue(ge, out var known)) return known;
+        var family = new ReportSourceFamily
+        {
+            Name = entryName,
+            Report = model,
+            Group = st.Group!,
+            Repetitions = [.. st.Repetitions.Select(f => f.Spec)],
+            Columns = Math.Max(1, columnCount),
+            // §8.4.2.2.3 SR4 — the entry is subordinate to every level above it (kb/Work PB1454).
+            Qualification = [.. Enumerable.Reverse(chain).Select(f => f.Name)],
+        };
+        st.SourceFamilies[ge] = family;
+        model.EntryFamilies.Add(family);
+        return family;
+    }
+
+    /// <summary>Record the occurrences of a SOURCE / VALUE entry for THIS replay (kb/Work PB1294): <paramref name="placements"/>
+    /// of them — one per COLUMN operand of a multiple COLUMN clause, else one — each taking operand
+    /// <c>(first ordinal + j) mod count</c> of <paramref name="operands"/> (§13.18.53.4 GR4 / §13.18.63.4 GR23:
+    /// "successive operands are assigned to successive repeating printable items … If no further operands remain,
+    /// assignment begins again from the first operand"), and each carrying the FULL presence chain §13.18.54.4 GR11
+    /// asks of data-name-1 — the conditions of every enclosing entry and of its own, and this replay's OCCURS …
+    /// DEPENDING tests — exactly as a SUM entry's counter carries them (GR10).</summary>
+    private void RecordSourceOccurrences(ReportSourceFamily family, IReadOnlyList<ReportFieldSource> operands,
+        int placements, Core.ConditionContext? ownCond, ReportGroupBuild st, IReadOnlyList<ReportVaryingUse> varyings,
+        ReportModel model, int? firstOrdinal = null)
+    {
+        for (int j = 0; j < Math.Max(1, placements); j++)
+        {
+            var coordinates = new List<int>(st.Repetitions.Count + 1);
+            foreach (var frame in st.Repetitions) coordinates.Add(frame.Ordinal);
+            if (family.Columns > 1) coordinates.Add(j);
+            int ordinal = firstOrdinal is { } first ? first + j : family.Linear(coordinates);
+            var occurrence = new ReportItemOccurrence
+            {
+                Family = family, Coordinates = coordinates, Source = operands[ordinal % operands.Count],
+            };
+            foreach (var (_, cond, _, _, _) in st.Chain) if (cond is not null) occurrence.PresentWhenCtxs.Add(cond);
+            if (ownCond is not null) occurrence.PresentWhenCtxs.Add(ownCond);
+            occurrence.RepetitionGuards.AddRange(st.GuardsHere());
+            occurrence.Varyings.AddRange(varyings);
+            occurrence.VaryingDependent = occurrence.Source switch
+            {
+                FieldReferenceSource rs => varyings.Any(u => HasWord(rs.Ref, u.Counter.Name)),
+                FieldComputeSource cs => varyings.Any(u => HasWord(cs.Ctx, u.Counter.Name)),
+                _ => false,
+            };
+            family.Occurrences.Add(occurrence);
+            model.ItemOccurrences.Add(occurrence);
+        }
+    }
+
+    /// <summary>The VARYING counters in scope at entry <paramref name="ge"/> (§13.18.64.3 SR2): its own and every
+    /// enclosing entry's, outermost first, each with the occurrence of its declaring entry the placement lies in
+    /// (GR3). An enclosing entry's occurrence is its replay's ordinal; this entry's own, when it repeats through a
+    /// multiple COLUMN clause as well, is counted per placement (the emitter adds the placement index), after the
+    /// replay ordinal's columns. The ONE reader a printable field and an unprintable SOURCE entry share.</summary>
+    private static List<ReportVaryingUse> VaryingUsesOf(Core.ReportGroupEntryContext ge, int columnCount, ReportGroupBuild st)
+    {
+        var uses = new List<ReportVaryingUse>();
+        foreach (var (declaring, counters, frame) in st.Varying)
+        {
+            bool own = ReferenceEquals(declaring, ge);
+            int perReplay = own ? Math.Max(columnCount, 1) : 1;
+            foreach (var counter in counters)
+                uses.Add(new ReportVaryingUse(counter, (frame?.Ordinal ?? 0) * perReplay,
+                    PerPlacement: own && columnCount > 1));
+        }
+        return uses;
+    }
+
+    /// <summary>The category of an UNPRINTABLE SOURCE entry's PICTURE — what §13.18.54.3 SR4's "numeric data item"
+    /// asks of data-name-1 when no printable item was analysed for it (kb/Work PB1294). Null for an entry with no
+    /// PICTURE. The analysis is the printable item's own, so an entry's PICTURE is judged by one analyzer; it is run
+    /// ONLY for the unprintable entry, whose printable twin does not exist, so no diagnostic is raised twice.</summary>
+    private PicCategory? UnprintablePictureCategory(string? picText, string? usageText, SignSpec? ownSign,
+        List<EditingPhraseSpec>? editing, LocaleEditSpec? locale, string where)
+    {
+        if (picText is null) return null;
+        var usage = PictureAnalyzer.ParseUsage(usageText, Edition, where);
+        return PictureAnalyzer.Analyze(picText, usage, Edition, where, ownSign, currencies: CurrencySigns,
+            editing: editing, localeFormat2: locale, decimalPointIsComma: DecimalPointIsComma)?.Category;
     }
 
     /// <summary>Bind ONE OCCURRENCE of an entry's SUM clause (ISO §13.18.54) into the <see cref="ReportSumModel"/>
@@ -3456,7 +3711,7 @@ public sealed partial class DataBinder
             {
                 foreach (var term in sum.Terms)
                 {
-                    foreach (var addend in term.Addends) ResolveSumAddend(addend, model);
+                    foreach (var addend in term.Addends) ResolveSumAddend(addend, term, sum, model);
                     foreach (var det in term.Upon) ResolveUponDetail(det, model);
                 }
                 // A SUM entry with no printable item still carries its occurrence's DEPENDING tests (§13.18.54.4
@@ -3526,6 +3781,9 @@ public sealed partial class DataBinder
             model.LineWidth = model.File?.RecordContains is { } record
                 ? Math.Max(1, record - (model.Code?.Length ?? 0)) : widest;
         }
+        // SR4 e) is asked of the references of EVERY report at once: a chain may leave one report description and
+        // come back (SR4 g) lets data-name-1 name an entry of a different one).
+        ScreenRolledChains();
     }
 
     /// <summary>⛔ THE ONE ARM CHOICE FOR A SUM ADDEND (kb/Work PB482). ISO §13.18.54.3 SR1 admits three addend
@@ -3533,8 +3791,9 @@ public sealed partial class DataBinder
     /// whole storage forest and every report description exist:
     /// <list type="number">
     /// <item>SR4's <c>data-name-1</c> — "the name of a numeric data item IN THE REPORT SECTION" (a rolled total,
-    /// §13.18.54.4 GR6). The accumulation chain it needs is staged loud, never silently dropped.</item>
-    /// <item>SR4 g)'s cross-report form — the operand qualified by a REPORT-name; also staged.</item>
+    /// §13.18.54.4 GR6), resolved by <see cref="ResolveRolledAddend"/>.</item>
+    /// <item>SR4 g)'s cross-report form — the operand qualified by a REPORT-name: the same arm, the report-name being
+    /// the outermost qualifier of the entry (§8.4.2.2.2 Format 1).</item>
     /// <item>SR5's <c>identifier-1</c> — "it shall specify a numeric data item NOT defined in the report
     /// section". Both halves of that sentence are screened: resolution against ordinary storage (report-section
     /// names never enter <see cref="DataBinder.ByName"/>) and the CATEGORY, which nothing checked before —
@@ -3542,7 +3801,7 @@ public sealed partial class DataBinder
     /// </list>
     /// The SUBSCRIPT is deliberately absent from this method: the arm choice is about the base name, and the
     /// subscript is evaluated by <c>ExpressionBinder</c> in the procedure phase off <see cref="ReportSumAddend.Ctx"/>.</summary>
-    private void ResolveSumAddend(ReportSumAddend addend, ReportModel model)
+    private void ResolveSumAddend(ReportSumAddend addend, ReportSumTerm term, ReportSumModel sum, ReportModel model)
     {
         if (addend.Rejected) return;
         addend.Rejected = true;   // cleared only by the one success path at the end
@@ -3564,26 +3823,16 @@ public sealed partial class DataBinder
             addend.Rejected = false;
             return;
         }
-        // SR4's data-name-1 — a report-section item. `IsReportSectionOnlyName` is the SAME set §13.18.16.3 SR2
-        // and §13.15.3 SR16 use (built once, kb/Work PB205): a name ALSO declared in ordinary storage resolves
-        // THERE (§8.4.2.1) and is an SR5 identifier-1, not an SR4 data-name-1.
-        if (IsReportSectionOnlyName(addend.Name))
-        {
-            Edition.Error(DiagnosticCatalog.ReportSumRolledTotal, $"RD '{model.Name}': SUM addend '{addend.Written}' names a report "
-                + "section data item (data-name-1 — a rolled total, ISO §13.18.54.3 SR4 / §13.18.54.4 GR6) — "
-                + "not yet implemented");
-            return;
-        }
+        // SR4's data-name-1 — a report-section item: a name ALSO declared in ordinary storage resolves THERE
+        // (§8.4.2.1) and is an SR5 identifier-1 (`IsRolledAddendName`).
         // SR4 g) — "If data-name-1 specifies an entry in a different report description". The qualifier that
         // says so is a REPORT-name (§8.4.2.2.2 Format 1), and `dataReference` swallows it as an ordinary IN/OF
         // qualification, so the spelling is recognised HERE rather than at `sumOperand`'s own `OF reportName`
-        // alternative, which the qualification tail makes unreachable.
-        if (addend.Qualifiers.Count == 1
-            && Reports.Any(r => r.Name.Equals(addend.Qualifiers[0], StringComparison.OrdinalIgnoreCase)))
+        // alternative, which the qualification tail makes unreachable — it is the same arm, the report-name being
+        // the outermost qualifier of the entry.
+        if (IsRolledAddendName(addend))
         {
-            Edition.Error(DiagnosticCatalog.ReportSumCrossReport, $"RD '{model.Name}': SUM addend '{addend.Written}' names an entry of "
-                + $"report '{addend.Qualifiers[0]}' (a cross-report sum, ISO §13.18.54.3 SR4 g) — not yet "
-                + "implemented");
+            ResolveRolledAddend(addend, term, sum, model);
             return;
         }
         if (LookupQualified(addend.Name, addend.Qualifiers, $"RD '{model.Name}': SUM addend", out bool sumAmbiguous) is not { } item)
@@ -3609,6 +3858,228 @@ public sealed partial class DataBinder
         addend.Rejected = false;
     }
 
+    /// <summary>Is this addend SR4's <c>data-name-1</c> (a report section item) rather than SR5's identifier-1? A name
+    /// declared in the report section AND NOWHERE ELSE is (<see cref="IsReportSectionOnlyName"/> — the set §13.18.16.3
+    /// SR2 and §13.15.3 SR16 use: a name ALSO declared in ordinary storage resolves THERE, §8.4.2.1); so is one a
+    /// REPORT-name qualifier points at an entry of (SR4 g) — the report-name says which report description's entry
+    /// is meant, whatever else the word names).</summary>
+    private bool IsRolledAddendName(ReportSumAddend addend) =>
+        IsReportSectionOnlyName(addend.Name)
+        || (addend.Qualifiers.Any(q => Reports.Any(r => r.Name.Equals(q, StringComparison.OrdinalIgnoreCase)))
+            && Reports.Any(r => r.EntryFamilies.Any(f => f.Name?.Equals(addend.Name, StringComparison.OrdinalIgnoreCase) == true)));
+
+    /// <summary>Per WRITTEN addend (its parse node), the entry its data-name-1 names — null when it was refused. A
+    /// repeating SUM entry binds its clause once per occurrence of the counter, and each occurrence meets the same
+    /// written addend, so the rules over the WRITTEN clause are asked and reported once.</summary>
+    private readonly Dictionary<Core.ReportValueOperandContext, ReportEntryFamily?> _rolledAddendEntries =
+        new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>⛔ SR4's DATA-NAME-1 — A ROLLED TOTAL (ISO §13.18.54.3 SR4; kb/Work PB1294). The addend names an entry
+    /// of the report section whose VALUE §13.18.54.4 GR6 adds: the sum counter of an entry that contains a SUM clause,
+    /// else "the operand of the SOURCE or VALUE clause". Resolved once per written addend against every entry of every
+    /// report description of the source element (a report-name qualifier picks the description, SR4 g)), then screened
+    /// by the rules that govern it —
+    /// <list type="bullet">
+    /// <item>SR4: a NUMERIC data item with a value, "specified without the subscripting normally required";</item>
+    /// <item>SR4 a): no UPON phrase in the SUM clause;</item>
+    /// <item>SR4 b)/c)/d): the repetition levels — see <see cref="RolledRepetitionFault"/>;</item>
+    /// <item>SR4 f): the combination of report group TYPEs, within one report description (g lifts it across two);</item>
+    /// <item>SR4 e): the chain of references terminates — <see cref="ScreenRolledChains"/>, once every report is resolved.</item>
+    /// </list>
+    /// and finally mapped per COUNTER OCCURRENCE (§13.18.54.4 GR8): this addend object belongs to ONE occurrence of the
+    /// counter, and takes every occurrence of data-name-1 that corresponds to it. The additions themselves are
+    /// registered with the engine whose group contains data-name-1 (GR7 a)/b)), which is why the addend carries
+    /// OCCURRENCES and not a value.</summary>
+    private void ResolveRolledAddend(ReportSumAddend addend, ReportSumTerm term, ReportSumModel sum, ReportModel model)
+    {
+        var target = sum.Family;
+        if (!_rolledAddendEntries.TryGetValue(addend.Ctx, out var data))
+        {
+            using var at = Edition.At(addend.Ctx);
+            _rolledAddendEntries[addend.Ctx] = data = ScreenRolledAddend(addend, term, target, model);
+        }
+        if (data is null) return;   // refused, and said so once
+        var targetCoordinates = target.CoordinatesOf(sum.Id - target.BaseId);
+        int levels = data.Extents.Count, targetLevels = targetCoordinates.Length;
+        foreach (var occurrence in data.Occurrences)
+        {
+            // GR8 a)/b): the levels correspond "in order beginning with the lowest level of nesting" (SR4 d) — the
+            // INNERMOST levels of the two tables are the same levels — and the addend's remaining, outer levels are
+            // the ones "the total of a complete table of occurrences" is formed over. A non-repeating addend (c)
+            // is the one addend of every occurrence of the counter.
+            bool corresponds = true;
+            for (int k = 0; k < targetLevels && levels > 0; k++)
+                corresponds &= occurrence.Coordinates[levels - 1 - k] == targetCoordinates[targetLevels - 1 - k];
+            if (corresponds) addend.RolledFrom.Add(occurrence);
+        }
+        addend.Rolled = true;
+        addend.Rejected = false;
+    }
+
+    /// <summary>The rules over a WRITTEN rolled addend (see <see cref="ResolveRolledAddend"/>) — null after reporting
+    /// the first that fails, else the entry data-name-1 names. First-failure, like every other screen of this
+    /// clause: one wrong word is one diagnostic.</summary>
+    private ReportEntryFamily? ScreenRolledAddend(ReportSumAddend addend, ReportSumTerm term, ReportSumFamily target, ReportModel model)
+    {
+        string where = $"RD '{model.Name}': SUM addend '{addend.Written}'";
+        // The entry the word names — the qualifiers are consumed against each entry's own hierarchy, the REPORT-name
+        // last (§8.4.2.2.3 SR4, §8.4.2.2.2 Format 1), exactly as a sum counter's reference is (kb/Work PB1454).
+        var candidates = Reports.SelectMany(r => r.EntryFamilies)
+            .Where(f => f.Name?.Equals(addend.Name, StringComparison.OrdinalIgnoreCase) == true
+                && QualifierWalk(f.Qualification, addend.Qualifiers,
+                    q => q.Equals(f.Report.Name, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        if (candidates.Count > 1)
+        {
+            Edition.Error(DiagnosticCatalog.ReportSumDataNameRule, $"{where} is ambiguous — {candidates.Count} entries of the report "
+                + "section carry that name. A reference shall uniquely identify one resource (ISO §8.4.2.2.1); qualify it "
+                + "by report group entry or report-name (§8.4.2.2.3 SR4, §8.4.2.2.2 Format 1).");
+            return null;
+        }
+        if (candidates.Count == 0)
+        {
+            // (A report GROUP, an entry with no SUM, SOURCE or VALUE clause and a name no entry carries are one answer
+            // here: none is an elementary entry with a value, and telling them apart would search the groups by name
+            // outside the one funnel, `ReportGroupResolution` — kb/Work PB365.)
+            Edition.Error(DiagnosticCatalog.ReportSumDataNameRule, $"{where} names no entry of the report section that carries "
+                + "a value (a report group is not an elementary item, and an entry with no SUM, SOURCE or VALUE clause has "
+                + "nothing to add): data-name-1 shall be the name of a numeric data item in the report section (ISO §13.18.54.3 SR4), and "
+                + "§13.18.54.4 GR6 adds the sum counter of an entry containing a SUM clause or the operand of its SOURCE or "
+                + "VALUE clause — an entry with none of them has no value to add.");
+            return null;
+        }
+        var data = candidates[0];
+        // SR4 — "a numeric data item". A SUM entry's counter is one by definition (§13.18.54.4 GR1: "a conceptual data
+        // item that behaves as a data item of the category numeric"); a SOURCE / VALUE entry's PICTURE says.
+        if (data is ReportSourceFamily { Category: not PicCategory.Numeric } source)
+        {
+            Edition.Error(DiagnosticCatalog.ReportSumDataNameRule, $"{where} names the entry '{data.Name}', whose PICTURE is "
+                + $"{(source.Category is { } cat ? $"of category {cat.ToString().ToLowerInvariant()}" : "absent")}: "
+                + "data-name-1 shall be the name of a numeric data item in the report section (ISO §13.18.54.3 SR4).");
+            return null;
+        }
+        // SR4 — "If it is associated with an OCCURS clause, it shall be specified without the subscripting normally
+        // required": the reference names the WHOLE repeating item, and GR8 says how its occurrences are added.
+        if (addend.Reference is { } reference && ReferenceResolver.ReadOperandSuffixes(reference).Subscripts > 0)
+        {
+            Edition.Error(DiagnosticCatalog.ReportSumDataNameRule, $"{where} is subscripted: if data-name-1 is associated with an "
+                + "OCCURS clause, it shall be specified without the subscripting normally required (ISO §13.18.54.3 SR4) — "
+                + "§13.18.54.4 GR8 adds each occurrence of a repeating addend into the corresponding occurrence of the counter.");
+            return null;
+        }
+        // SR4 a)
+        if (term.Upon.Count > 0)
+        {
+            Edition.Error(DiagnosticCatalog.ReportSumDataNameRule, $"{where} is data-name-1, and the SUM clause also writes an UPON "
+                + "phrase: when data-name-1 is specified the UPON phrase shall not be specified (ISO §13.18.54.3 SR4 a)) — a "
+                + "rolled total is added when the group that contains it is processed, not on a GENERATE.");
+            return null;
+        }
+        if (RolledRepetitionFault(data, target) is { } fault)
+        {
+            Edition.Error(DiagnosticCatalog.ReportSumDataNameRule, $"{where} names '{data.Name}': {fault}");
+            return null;
+        }
+        // SR4 f)/g)
+        if (ReferenceEquals(data.Report, target.Report) && !ReferenceEquals(data.Group, target.Group)
+            && !GroupCombinationPermitted(target.Group, data.Group))
+        {
+            Edition.Error(DiagnosticCatalog.ReportSumDataNameGroups, $"{where} names the entry '{data.Name}' of a "
+                + $"{ReportGroupTypeWords(data.Group.Kind)} report group, and the SUM entry is in a "
+                + $"{ReportGroupTypeWords(target.Group.Kind)} report group: that combination of report types is not one SR4 f) permits "
+                + "(a control footing: a detail or a control footing of a lower level of control; a detail: a different detail; "
+                + "a report footing: any other group but the report heading; a page footing: any body group — ISO §13.18.54.3 SR4 f)).");
+            return null;
+        }
+        return data;
+    }
+
+    /// <summary>SR4 b)/c)/d) — what a rolled addend's repetition may be against its counter's, or null when it fits.
+    /// "Levels of repetition" are <see cref="ReportEntryFamily.Extents"/> (§13.15.4 GR3's three vehicles, all OCCURS
+    /// levels). b) data-name-1 in the SAME report group description as the subject "shall be a repeating item … and
+    /// subject to at least one more level of repetition than the subject of the entry"; c) in a DIFFERENT one it
+    /// "either shall not reference a repeating item or shall reference a repeating item that is subject to at least
+    /// the same number of levels of repetition as the subject of the entry"; d) "The maximum number of repetitions of
+    /// data-name-1 and the subject of the entry shall be equal at each corresponding level taken in order beginning
+    /// with the lowest level of nesting. Levels superordinate to those corresponding levels may specify any number of
+    /// repetitions."</summary>
+    private static string? RolledRepetitionFault(ReportEntryFamily data, ReportSumFamily target)
+    {
+        int d = data.Extents.Count, t = target.Extents.Count;
+        if (ReferenceEquals(data.Group, target.Group))
+        {
+            if (d == 0)
+                return "it is in the same report group description as the SUM entry, so it shall be a repeating item "
+                    + "(ISO §13.18.54.3 SR4 b))";
+            if (d < t + 1)
+                return $"it is in the same report group description as the SUM entry, so it shall be subject to at least one more "
+                    + $"level of repetition than the subject of the entry ({d} against {t}) (ISO §13.18.54.3 SR4 b))";
+        }
+        else if (d > 0 && d < t)
+            return $"it is in a different report group description and is a repeating item, so it shall be subject to at least "
+                + $"the same number of levels of repetition as the subject of the entry ({d} against {t}) (ISO §13.18.54.3 SR4 c))";
+        for (int k = 0; k < Math.Min(d, t); k++)
+            if (data.Extents[d - 1 - k] != target.Extents[t - 1 - k])
+                return $"its maximum number of repetitions at level {k + 1} counted from the innermost "
+                    + $"({data.Extents[d - 1 - k]}) differs from the subject's ({target.Extents[t - 1 - k]}): the maximum number of "
+                    + "repetitions shall be equal at each corresponding level taken in order beginning with the lowest level of "
+                    + "nesting (ISO §13.18.54.3 SR4 d))";
+        return null;
+    }
+
+    /// <summary>SR4 f) — within ONE report description, the report types of the SUM entry's group (<paramref name="current"/>)
+    /// and of the group that defines data-name-1 (<paramref name="defining"/>) that are permitted together.
+    /// "Associated with a lower level of control" is a LARGER index in the control hierarchy, which runs major → minor
+    /// (§13.18.16.4 GR1); a body group is a detail, a control heading or a control footing (§13.18.57.3 SR15).</summary>
+    private static bool GroupCombinationPermitted(ReportGroupModel current, ReportGroupModel defining) => current.Kind switch
+    {
+        ReportGroupKindModel.ControlFooting => defining.Kind == ReportGroupKindModel.Detail
+            || (defining.Kind == ReportGroupKindModel.ControlFooting && defining.ControlLevel > current.ControlLevel),
+        ReportGroupKindModel.Detail => defining.Kind == ReportGroupKindModel.Detail,
+        ReportGroupKindModel.ReportFooting => defining.Kind != ReportGroupKindModel.ReportHeading,
+        ReportGroupKindModel.PageFooting => defining.Kind is ReportGroupKindModel.Detail
+            or ReportGroupKindModel.ControlHeading or ReportGroupKindModel.ControlFooting,
+        _ => false,
+    };
+
+    /// <summary>⛔ SR4 e) — "Any chain of reference shall terminate at an entry that does not contain a SUM clause
+    /// referring to a data-name-1 defined in the report section." A SUM entry that rolls up a counter that rolls up
+    /// the first is a cycle no addition order resolves (GR6 asks "the additions necessary to compute its value are
+    /// completed before the adding of the operand"), so it is refused, once per cycle, naming the entries on it.
+    /// Edges are only those of counter → counter: a SOURCE or VALUE entry contains no SUM clause, so it ends a chain.</summary>
+    private void ScreenRolledChains()
+    {
+        var edges = new Dictionary<ReportSumFamily, List<ReportSumFamily>>(ReferenceEqualityComparer.Instance);
+        foreach (var r in Reports)
+            foreach (var sum in r.Sums)
+                foreach (var a in sum.Terms.SelectMany(t => t.Addends).Where(a => a.Rolled))
+                    foreach (var o in a.RolledFrom)
+                        if (o.Sum is { } s)
+                        {
+                            if (!edges.TryGetValue(sum.Family, out var outgoing)) edges[sum.Family] = outgoing = [];
+                            if (!outgoing.Contains(s.Family)) outgoing.Add(s.Family);
+                        }
+        var done = new HashSet<ReportSumFamily>(ReferenceEqualityComparer.Instance);
+        var path = new List<ReportSumFamily>();
+        void Visit(ReportSumFamily f)
+        {
+            int at = path.IndexOf(f);
+            if (at >= 0)
+            {
+                var cycle = path.Skip(at).Append(f).Select(x => $"'{x.Name ?? "FILLER"}' of report '{x.Report.Name}'");
+                Edition.Error(DiagnosticCatalog.ReportSumDataNameRule, "a chain of SUM data-name-1 references never terminates: "
+                    + $"{string.Join(" → ", cycle)} — any chain of reference shall terminate at an entry that does not contain a SUM "
+                    + "clause referring to a data-name-1 defined in the report section (ISO §13.18.54.3 SR4 e))");
+                return;
+            }
+            if (!done.Add(f)) return;
+            path.Add(f);
+            if (edges.TryGetValue(f, out var next)) foreach (var n in next) Visit(n);
+            path.RemoveAt(path.Count - 1);
+        }
+        foreach (var f in edges.Keys.ToList()) Visit(f);
+    }
+
     /// <summary>Resolve one <c>UPON data-name-2</c> operand (ISO §13.18.54.3 SR7 — "Data-name-2 shall be the name
     /// of a detail. It may be qualified only by a report-name") through the ONE report-group funnel, which owns
     /// the §8.4.2.2.3 SR1 ambiguity rule as well (kb/Work PB365). The TYPE test is SR7's own sentence: a
@@ -3632,15 +4103,11 @@ public sealed partial class DataBinder
                 + "which is the event §13.18.54.4 GR7 c) 2) accumulates on.");
             return;
         }
-        // A detail of ANOTHER report: GR7 c) 2) accumulates on a GENERATE of that detail, which runs on the
-        // other report's engine — a cross-report wiring this backend does not have. Staged with the family.
-        if (!ReferenceEquals(owner, model))
-        {
-            Edition.Error(DiagnosticCatalog.ReportSumUponCrossReport, $"{where} names a detail of report '{owner!.Name}' (ISO "
-                + "§13.18.54.4 GR7 c) 2) — a cross-report UPON) — not yet implemented");
-            return;
-        }
+        // A detail of ANOTHER report (SR7's report-name qualifier): GR7 c) 2) accumulates on a GENERATE of that detail,
+        // which runs on THAT report's engine, so the emitter registers the addition with it (`AddGenerateTrigger`) —
+        // the owner travels with the operand (kb/Work PB1294).
         det.Detail = group;
+        det.Owner = owner;
     }
 
     /// <summary>A report group's TYPE in the standard's own words, for a diagnostic (ISO §13.18.57.2).</summary>
@@ -3780,6 +4247,11 @@ public sealed partial class DataBinder
         // A sum counter contributes the name GR5 gives it (its identity is the ENTRY — kb/Work PB882 — but this
         // set is about NAMES: the §13.18.16.3 SR2 / §13.15.3 SR16 "declared in the report section" question).
         foreach (var s in model.SumFamilies) if (s.Name is { } sn && !ByName.ContainsKey(sn)) names.Add(sn);
+        // …and every entry that carries a value a rolled total can add (kb/Work PB1294): an UNPRINTABLE SOURCE entry
+        // (§13.18.53.4 GR3) has no printable item, so neither loop above sees its name.
+        foreach (var f in model.EntryFamilies)
+            if (f is ReportSourceFamily && f.Name is { } en && !ByName.ContainsKey(en)
+                && !names.Contains(en, StringComparer.OrdinalIgnoreCase)) names.Add(en);
         return names;
     }
 

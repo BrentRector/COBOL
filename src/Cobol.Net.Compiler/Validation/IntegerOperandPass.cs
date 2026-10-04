@@ -90,7 +90,7 @@ internal static class IntegerOperandRules
 {
     /// <summary>A classifier for the operands of ONE grammar rule: given the rule's context and the operand,
     /// the operand's slot.</summary>
-    internal delegate IntegerSlot Classifier(ParserRuleContext owner, Core.IntegerLiteralContext operand);
+    internal delegate IntegerSlot Classifier(ParserRuleContext owner, ParserRuleContext operand);
 
     private static Classifier All(IntegerSlot slot) => (_, _) => slot;
     private static readonly Classifier Nonzero = All(IntegerSlot.Default);
@@ -134,7 +134,7 @@ internal static class IntegerOperandRules
         [typeof(Core.LinageLinesAtBottomPhraseContext)] = All(IntegerSlot.Zero("ISO §13.18.34.3 SR4")),
         [typeof(Core.DynamicLengthClauseContext)] = Nonzero,   // §13.18.19 LIMIT IS integer-1
         [typeof(Core.PictureLocalePhraseContext)] = Nonzero,   // §13.18.40 PICTURE … LOCALE … SIZE integer-1
-        [typeof(Core.OccursBoundContext)] = OccursBound,
+        [typeof(Core.OccursClauseContext)] = OccursBound,      // integer-1 / integer-2: a literal or a constant-name (§13.10.3 SR2)
         [typeof(Core.OccursStepPhraseContext)] = Nonzero,      // §13.18.38 Format 3 STEP integer-3
         [typeof(Core.OccursDynamicPhraseContext)] = OccursDynamic,
 
@@ -163,7 +163,7 @@ internal static class IntegerOperandRules
     /// <summary>§13.18.43.2's three formats: Format 1 <c>RECORD CONTAINS integer-1</c>; Format 2 <c>RECORD IS
     /// VARYING … [FROM integer-2] [TO integer-3]</c>; Format 3 <c>RECORD CONTAINS integer-4 TO integer-5</c>.
     /// Integer-2 (SR7) and integer-4 (SR8) "shall be greater than or equal to zero".</summary>
-    private static IntegerSlot RecordClause(ParserRuleContext owner, Core.IntegerLiteralContext op)
+    private static IntegerSlot RecordClause(ParserRuleContext owner, ParserRuleContext op)
     {
         var rc = (Core.RecordClauseContext)owner;
         if (PrecededBy(owner, op, Core.TO)) return IntegerSlot.Default;              // integer-3 / integer-5
@@ -174,21 +174,21 @@ internal static class IntegerOperandRules
 
     /// <summary>§13.18.38 OCCURS: in <c>integer-1 TO integer-2</c> integer-1 "shall be greater than or equal to
     /// zero" (SR16); a lone bound is integer-2 and keeps the default.</summary>
-    private static IntegerSlot OccursBound(ParserRuleContext owner, Core.IntegerLiteralContext op) =>
-        owner.Parent is Core.OccursClauseContext oc && oc.TO() is not null && oc.occursBound(0) == owner
+    private static IntegerSlot OccursBound(ParserRuleContext owner, ParserRuleContext op) =>
+        owner is Core.OccursClauseContext oc && oc.TO() is not null && oc.integerOperand(0) == OperandOf(op)
             ? IntegerSlot.Zero("ISO §13.18.38.3 SR16")
             : IntegerSlot.Default;
 
     /// <summary>§13.18.38 Format 4 (DYNAMIC): FROM integer-4 "shall be nonnegative" (SR28); TO integer-5 keeps the
     /// default.</summary>
-    private static IntegerSlot OccursDynamic(ParserRuleContext owner, Core.IntegerLiteralContext op) =>
+    private static IntegerSlot OccursDynamic(ParserRuleContext owner, ParserRuleContext op) =>
         ((Core.OccursDynamicPhraseContext)owner).FROM() is not null
             ? IntegerSlot.Zero("ISO §13.18.38.3 SR28")
             : IntegerSlot.Default;
 
     /// <summary>§13.18.35 LINE: integer-1 is an absolute line number (default); integer-2, written after PLUS, is a
     /// relative one and "may be zero" (SR3).</summary>
-    private static IntegerSlot ReportLine(ParserRuleContext owner, Core.IntegerLiteralContext op) =>
+    private static IntegerSlot ReportLine(ParserRuleContext owner, ParserRuleContext op) =>
         ((Core.ReportLineOperandContext)owner).reportRelativeSign() is not null
             ? IntegerSlot.Zero("ISO §13.18.35.3 SR3")
             : IntegerSlot.Default;
@@ -220,8 +220,19 @@ internal static class IntegerOperandRules
     /// <see cref="FullValueSlots"/>) and its value exceeds <see cref="HostLimit"/> — the one question
     /// <see cref="IntegerOperandPass"/> asks before any binder reads the value (kb/Work PB1058).</summary>
     internal static bool BeyondHostLimit(Core.IntegerLiteralContext operand) =>
-        !(operand.Parent is ParserRuleContext owner && FullValueSlots.Contains(owner.GetType()))
+        !(OwnerOf(operand) is { } owner && FullValueSlots.Contains(owner.GetType()))
         && TryHostValue(operand.GetText(), out _, out bool saturated) && saturated;
+
+    /// <summary>The <c>integerOperand</c> node an operand sits in — the operand itself when it is one, its parent
+    /// when it is the <c>integerLiteral</c> arm of one, and the operand unchanged when the clause writes a bare
+    /// <c>integerLiteral</c> (kb/Work PB1947).</summary>
+    internal static ParserRuleContext OperandOf(ParserRuleContext operand) =>
+        operand is Core.IntegerLiteralContext && operand.Parent is Core.IntegerOperandContext wrapper ? wrapper : operand;
+
+    /// <summary>The grammar rule that OWNS an <c>integer-n</c> operand — the clause whose general format prints it,
+    /// which is what <see cref="Slots"/> classifies. An <c>integerOperand</c> is only the shared carrier of "a literal or
+    /// a constant-name" (§13.10.3 SR2) and never a clause of its own, so it is looked through.</summary>
+    internal static ParserRuleContext? OwnerOf(ParserRuleContext operand) => OperandOf(operand).Parent as ParserRuleContext;
 
     /// <summary>⛔ THE ONE READER of an <c>integer-n</c> the binder keeps in its model (kb/Work PB1058). A value
     /// beyond <see cref="HostLimit"/> has already been reported by <see cref="IntegerOperandPass"/> (it runs
@@ -297,18 +308,18 @@ internal static class IntegerOperandRules
 
     /// <summary>The slot of <paramref name="operand"/>, from the grammar rule that spells it. A rule the table
     /// does not name takes §5.5 1)'s default — the drift test keeps that from being silent.</summary>
-    internal static IntegerSlot Classify(Core.IntegerLiteralContext operand) =>
-        operand.Parent is ParserRuleContext owner && Slots.TryGetValue(owner.GetType(), out var classify)
+    internal static IntegerSlot Classify(ParserRuleContext operand) =>
+        OwnerOf(operand) is { } owner && Slots.TryGetValue(owner.GetType(), out var classify)
             ? classify(owner, operand)
             : IntegerSlot.Default;
 
     /// <summary>The construct named in the diagnostic: the source text of the clause or phrase that spells the
     /// operand (an OCCURS bound names its whole OCCURS clause).</summary>
-    internal static string ConstructName(Core.IntegerLiteralContext operand)
+    internal static string ConstructName(ParserRuleContext operand)
     {
-        var owner = operand.Parent as ParserRuleContext;
-        // An OCCURS bound, a report LINE or COLUMN operand is one operand of a larger clause: name the clause.
-        if (owner is Core.OccursBoundContext or Core.ReportLineOperandContext or Core.ReportColumnOperandContext)
+        var owner = OwnerOf(operand);
+        // A report LINE or COLUMN operand is one operand of a larger clause: name the clause.
+        if (owner is Core.ReportLineOperandContext or Core.ReportColumnOperandContext)
             owner = owner.Parent as ParserRuleContext;
         if (owner is null) return "integer operand";
         string text = string.Join(' ', Tokens(owner));

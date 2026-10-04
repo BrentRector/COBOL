@@ -18232,11 +18232,11 @@
   "subject": "Constant entry",
   "rule-digest": "97b3e0478ff5",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#OccursBoundValue; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ExpandPicConstants; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ConstantValueRawText; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ConstantOperand; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveSubscriptName; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#FindConstant; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#DeclareDataEntries",
-  "test-ref": "conformance:2002/pb1231_constant_forward_references",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ExpandPicConstants; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ConstantValueRawText; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ConstantOperand; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveSubscriptName; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#FindConstant; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#DeclareDataEntries; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#IntegerOperandValue",
+  "test-ref": "conformance:2002/pb1231_constant_forward_references; conformance:2002/pb1947_report_constant_operands; conformance:negative/pb1947-report-column-constant-zero; conformance:negative/pb1947-report-line-constant-noninteger",
   "derivation": "",
   "editions": "2002",
-  "notes": "(kb/Work PB1231, 14d). SR2 (cite OK). kb/Work PB780 (open) owns this row: a whole-language admission rule whose verdict above PARTIAL needs a generated check. Verified here: the 'except in a compiler directive' exclusion (`>>IF K = 5` with K a constant -> COBOLNET1619 'not a previously-defined compilation variable'); PIC repetition X(K1) and OCCURS K-MAX with integer constants, non-integer refused (negative/constant-occurs-noninteger); VALUE / 88 / subscript / ref-mod / EVALUATE / DISPLAY positions. Additional defects found: a constant-name as a SUBSCRIPT of a LENGTH OF operand is rejected (F-SR3-CONST-SUB) and any reference preceding the constant's entry is rejected (F-FORWARD-REF). PB614 (open) owns the comment sites that cite SR2 for substitution. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
+  "notes": "(kb/Work PB1231, 14d). SR2 (cite OK). kb/Work PB780 (open) owns this row: a whole-language admission rule whose verdict above PARTIAL needs a generated check. Verified here: the 'except in a compiler directive' exclusion (`>>IF K = 5` with K a constant -> COBOLNET1619 'not a previously-defined compilation variable'); PIC repetition X(K1) and OCCURS K-MAX with integer constants, non-integer refused (negative/constant-occurs-noninteger); VALUE / 88 / subscript / ref-mod / EVALUATE / DISPLAY positions. Additional defects found: a constant-name as a SUBSCRIPT of a LENGTH OF operand is rejected (F-SR3-CONST-SUB) and any reference preceding the constant's entry is rejected (F-FORWARD-REF). PB614 (open) owns the comment sites that cite SR2 for substitution. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap) retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#OccursBoundValue (OccursBoundValue was generalised into IntegerOperandValue (kb/Work PB1947): the one reader of every integer-n position that admits a constant-name, the OCCURS bounds included)",
   "state": "GAP"
  },
  {
@@ -18427,11 +18427,11 @@
   "subject": "Constant entry",
   "rule-digest": "a4be894fb380",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantArithmetic; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ExpandPicConstants; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#OccursBoundValue",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantLength; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantArithmetic; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#ExpandPicConstants; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#IntegerOperandValue",
   "test-ref": "conformance:2002/constant_entry; conformance:2002/pb1227_constant_byte_length; conformance:2002/l1c05_constant_expr_truncated_integer; conformance:2002/pb1016_constant_length_subscripts",
   "derivation": "",
   "editions": "2002",
-  "notes": "kb/Work PB1227 (w1006c). cite.py --check 13.10.4 \"If arithmetic-expression-1, data-name-1, or data-name-2 is specified, the effect of\" -> OK GR3. All three arms now yield an integer literal: arithmetic-expression-1 (GR4, the 7.3.6.3 GR3 truncation), data-name-2 (LENGTH OF) and data-name-1 (BYTE-LENGTH OF, previously staged loud). Each is an integer constant usable where the format specifies an integer: golden BUF PIC X(K2) with K2 = BYTE-LENGTH OF WN = 6 measures 6, and LK2 = LK - 3 (LK a BYTE-LENGTH constant) is a PICTURE repetition in LOCAL-STORAGE.",
+  "notes": "kb/Work PB1227 (w1006c). cite.py --check 13.10.4 \"If arithmetic-expression-1, data-name-1, or data-name-2 is specified, the effect of\" -> OK GR3. All three arms now yield an integer literal: arithmetic-expression-1 (GR4, the 7.3.6.3 GR3 truncation), data-name-2 (LENGTH OF) and data-name-1 (BYTE-LENGTH OF, previously staged loud). Each is an integer constant usable where the format specifies an integer: golden BUF PIC X(K2) with K2 = BYTE-LENGTH OF WN = 6 measures 6, and LK2 = LK - 3 (LK a BYTE-LENGTH constant) is a PICTURE repetition in LOCAL-STORAGE. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#OccursBoundValue (OccursBoundValue was generalised into IntegerOperandValue (kb/Work PB1947), which still substitutes the constant's integer as if the literal were written)",
   "state": "OK"
  },
  {
@@ -27861,13 +27861,13 @@
   "ordinal": 3,
   "subject": "SOURCE clause",
   "rule-digest": "298b4bcb74f7",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs; src/Cobol.Net.Runtime/IO/ReportWriter.cs#PresentLine; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveSumAddend",
-  "test-ref": "conformance-test:ReportWriterConformanceTests.Source_Gr6_LineCounterComposesAfterCounterUpdate",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#RecordSourceOccurrences; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveRolledAddend",
+  "test-ref": "conformance-test:ReportWriterConformanceTests.Source_Gr6_LineCounterComposesAfterCounterUpdate; conformance:85/pb1294_report_rolled_unprintable_source; conformance:2002/pb1294_report_rolled_totals",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1294. \"If the entry containing the SOURCE clause contains no COLUMN clause and therefore defines an unprintable item, the SOURCE clause causes no action, except where the entry is referred to by means of a SUM clause. In all other cases, a MOVE or COMPUTE statement is implicitly executed before the associated report line is printed...\" (cite.py --check 13.18.53.4 OK GR3). VERIFIED: an unprintable `05 UNP PIC 9(3) SOURCE WS-AMT.` causes no action (p6); the MOVE/COMPUTE executes at compose time just before the line is printed (ReportWriter.PresentLine -> line.Compose(); the cited test pins LINE-COUNTER ordering; p7 shows the COMPUTE arm `SOURCE (WS-AMT * 2)` -> 014). UNREACHABLE HALF: the 'except where the entry is referred to by means of a SUM clause' leg (with §13.18.54.4 GR6 'If data-name-1 specifies an item whose entry has a SOURCE or VALUE clause, the value added is that of the operand of the SOURCE or VALUE clause', cite.py OK) - `SUM UNP` over the unprintable entry is refused 'SUM addend 'UNP' does not resolve to a data item outside the report section (ISO §13.18.54.3 SR5)' (p3), i.e. the unprintable entry is not even recognized as a report-section data-name-1, and over a printable SOURCE entry `SUM PRN` is staged COBOLNET0899 'rolled total ... not yet implemented' (p4). Finding F4. PARTIAL. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (Report Writer: 85 optional module, 2023 optional element A.4.11; the 2023 Annex E lists no SOURCE-clause change; the multi-operand / SOURCES / arithmetic-expression forms are 2002 introductions per docs/VERSION_CHANGE_REFERENCE - not derivable from the 2023 text itself) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportGroup (printable/unprintable entry split ~L1833) || Code-location witnesses adjusted by registrar 14e: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportGroup (symbol not in the file at 071ff04ea; path kept)",
-  "state": "GAP"
+  "notes": "kb/Work PB1294 landed. An entry with a SOURCE clause and no COLUMN clause prints nothing and has no printable field, but it IS a ReportSourceFamily with an occurrence (RecordSourceOccurrences), so the exception 'except where the entry is referred to by means of a SUM clause' is reachable: a SUM clause naming it adds the operand of its SOURCE clause (GR6) when its group is processed (GR7 a)). The rest of GR3, the implicit MOVE or COMPUTE before the line prints, was verified under the earlier verdict and is unchanged. Witness 85/pb1294_report_rolled_unprintable_source prints 00012 00012 for UNP and PRN summed over SOURCE values 5 and 7.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.53.4-4",
@@ -27936,13 +27936,13 @@
   "ordinal": 4,
   "subject": "SUM clause",
   "rule-digest": "20da11e6490f",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveSumAddend",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenRolledAddend; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#RolledRepetitionFault; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupCombinationPermitted; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenRolledChains",
+  "test-ref": "conformance:2002/pb1294_report_rolled_totals; conformance:2002/pb1294_report_rolled_repeating; conformance:2002/pb1294_report_rolled_cross_report; conformance:negative/pb1294-sum-data-name-not-numeric; conformance:negative/pb1294-sum-data-name-group; conformance:negative/pb1294-sum-data-name-subscripted; conformance:negative/pb1294-sum-data-name-with-upon; conformance:negative/pb1294-sum-data-name-same-group-not-repeating; conformance:negative/pb1294-sum-data-name-fewer-levels; conformance:negative/pb1294-sum-data-name-repetition-maximum; conformance:negative/pb1294-sum-data-name-chain-cycle; conformance:negative/pb1294-sum-data-name-group-types",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1294. SR4 'Data-name-1 shall be the name of a numeric data item in the report section' (cite.py --check 13.18.54.3 OK) plus a)-g). ResolveSumAddend stages EVERY report-section addend loud: IsReportSectionOnlyName -> COBOLNET0899 report-sum-rolled-total ('not yet implemented'), and a report-name-qualified addend (SR4 g) -> report-sum-cross-report. So the data-name-1 form (rolled totals) is rejected as legal source and none of the sub-rules a)-g) is screened. docs/CONFORMANCE.md A.4.11 is 'Partial' and the RW design doc lists rolled/cross-report SUM as staged; no open kb/Work note owns these rows (searched kb/Work for rolled/report-sum-rolled: only landed PB482). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "kb/Work PB1294 landed. SR4 and its sub-rules are each a named screen, once per WRITTEN addend: numeric data item with a value, unsubscripted (COBOLNET2730), a) no UPON, b)/c)/d) the levels of repetition (RolledRepetitionFault), e) the chain of references terminates (ScreenRolledChains, over every report), f) the pairing of report types within one report (COBOLNET2731) and g) no restriction across reports. The negatives are one per rule; the positives are the three legal shapes (same group, different group, different report).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.54.3-5",
@@ -28101,13 +28101,13 @@
   "ordinal": 6,
   "subject": "SUM clause",
   "rule-digest": "879741da53ad",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveSumAddend",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#BindRolledValues; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#SumAddition",
+  "test-ref": "conformance:2002/pb1294_report_rolled_totals; conformance:2002/pb1294_report_rolled_varying; conformance:85/pb1294_report_rolled_unprintable_source",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1294. GR6 'If data-name-1 specifies an item whose entry contains a SUM clause, the value added is that of the corresponding sum counter' (cite.py --check OK). data-name-1 addends are staged loud (COBOLNET0899 report-sum-rolled-total) - no rolled-total chain exists in the engine. Same mechanism as SR-13.18.54.3-4; no open kb/Work note owns it. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "kb/Work PB1294 landed. The value a rolled addition adds is the entry's sum counter occurrence (a ReportSumCounterPlace read) or the operand of its SOURCE or VALUE clause as a number (BindRolledValues); a counter's additions precede its being read because registrations on one group are put in dependency order (RegisterCrossEngineAdditions). Witnessed by a detail -> control footing -> FINAL footing chain, a VALUE entry, an unprintable SOURCE entry and a SOURCE operand that is a VARYING counter (4+6+8 = 18).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.54.4-7",
@@ -28117,8 +28117,8 @@
   "subject": "SUM clause",
   "rule-digest": "0090a48bcc09",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Fires; src/Cobol.Net.Runtime/IO/ReportWriter.cs#GenerateCore; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveUponDetail",
-  "test-ref": "conformance:85/pb1297_sum_reset_level_upon_85; conformance:85/pb883_report_sum_expression",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#Fires; src/Cobol.Net.Runtime/IO/ReportWriter.cs#GenerateCore; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveUponDetail; src/Cobol.Net.Runtime/IO/ReportWriter.cs#ApplyRolled; src/Cobol.Net.Runtime/IO/ReportWriter.cs#AddGenerateTrigger",
+  "test-ref": "conformance:85/pb1297_sum_reset_level_upon_85; conformance:85/pb883_report_sum_expression; conformance:2002/pb1294_report_rolled_totals; conformance:2002/pb1294_report_rolled_cross_report; conformance:2002/pb1294_report_rolled_repeating",
   "derivation": "",
   "editions": "85,2002,2014,2023",
   "notes": "kb/Work PB1297: a detail named n times in a term UPON phrase adds n times, each addition its own GR3 size error test (SumTerm.Fires returns the count): UPON DE-A DE-A prints 02 04 06 08 for K = 1..4. No UPON: every GENERATE; identifier-1 repeated: added per reference.",
@@ -28131,13 +28131,13 @@
   "ordinal": 8,
   "subject": "SUM clause",
   "rule-digest": "f082fc132252",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveSumAddend",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveRolledAddend; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#CoordinatesOf",
+  "test-ref": "conformance:2002/pb1294_report_rolled_repeating; conformance:2002/pb1294_report_rolled_varying",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1294. GR8 (repeating data-name-1 addend -> corresponding occurrence / table total; cite.py --check 13.18.54.4 8) a) OK). Only reachable with data-name-1, which is staged loud (report-sum-rolled-total); the engine keeps ONE counter per entry (List<SumEntry>), no occurrence-indexed counters. No open kb/Work note owns it. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "kb/Work PB1294 landed. GR8 a): CELL (OCCURS 3) of a detail into COLT (OCCURS 3) of the final footing, occurrence to corresponding occurrence (11 22 33 over rows 1,2,3 and 10,20,30). GR8 b): CELL into ROWT of its own group, the complete table into one counter (6 and 60). The mapping is the INNERMOST levels of the two tables being the same levels (SR4 d)), the addend's outer levels the table that is totalled.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.54.4-9",
@@ -28146,13 +28146,13 @@
   "ordinal": 9,
   "subject": "SUM clause",
   "rule-digest": "c63a6c52a2a9",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#SumTerm; src/Cobol.Net.Runtime/IO/ReportWriter.cs#Generate",
-  "test-ref": "conformance:85/pb883_report_sum_expression",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#RegisterCrossEngineAdditions",
+  "test-ref": "conformance:85/pb883_report_sum_expression; conformance:2002/pb1294_report_rolled_totals",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1294. GR9 'the result is the same as when all the addends were summed separately according to the above rules and the results added together' (cite.py --check OK). For identifier-1 / arithmetic-expression-1 addends verified: pb883 golden SUM WS-K * WS-M WS-K -> 0040, probe p6 005. The data-name-1 half cannot be exercised (staged loud), so PARTIAL. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "kb/Work PB1294 landed. GR9 for an addend list that mixes the two kinds: T5 SUM DA WS-AMT adds the data-name-1 DA when its group is processed and the identifier WS-AMT on every GENERATE, each as its own addition, so each record contributes its value twice (024 and 022). A term's rolled addends leave its GENERATE-driven addition.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.54.4-10",
@@ -28176,13 +28176,13 @@
   "ordinal": 11,
   "subject": "SUM clause",
   "rule-digest": "ec7ae4e9b045",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveSumAddend",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs#ApplyRolled; src/Cobol.Net.Compiler/CodeGen/Verbs/ReportWriterEmitter.cs#PlanOf",
+  "test-ref": "conformance:2002/pb1294_report_rolled_totals",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1294. GR11 (absent data-name-1 not added; cite.py --check 13.18.54.4 OK). data-name-1 addends are staged loud (COBOLNET0899 report-sum-rolled-total); nothing implements this. No open kb/Work note owns it. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "kb/Work PB1294 landed. Every occurrence of an entry carries its full presence chain (PRESENT WHEN from the 01 entry down, and its OCCURS ... DEPENDING tests) as a slot of its group's presence snapshot, which the rolled addition reads (ReportGroup.IsPresent): DP, PRESENT WHEN WS-AMT > 5, adds nothing for the records 4 and 2 (T4 = 8 and 9).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.54.4-12",

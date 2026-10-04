@@ -151,6 +151,21 @@ off-by-one through every later counter check.
   clause OPENS a new report line (**LINE is legal at ANY level** — RW101A puts `LINE PLUS 1` on an 03; a
   binder that reads LINE only at the 01 produces a lineless group and a never-moving LINE-COUNTER); an entry
   with a COLUMN clause appends a printable field to the CURRENT line. TYPE abbreviations per §13.18.57.3 SR9.
+- **EVERY integer-n OF THE REPORT WRITER IS A LITERAL POSITION, AND ONE RULE SAYS SO** (kb/Work PB1947). §5.5 1) calls
+  an `integer-n` "a fixed-point integer literal" and §13.10.3 SR2 lets a constant-name stand "anywhere that a format
+  specifies a literal of the class and category of constant-name-1", so `LINE PLUS KL`, `COLUMN KC`, `COLUMN PLUS KR`,
+  `NEXT GROUP PLUS KG`, every integer of the PAGE clause (LIMIT, the COLUMNS width, HEADING, FIRST DETAIL, LAST
+  CONTROL HEADING, LAST DETAIL, FOOTING) and `OCCURS … STEP KS` are legal. The grammar spells each of them
+  `integerOperand : integerLiteral | cobolWord` (`CobolExpressions.g4`, beside `integerLiteral`) — the rule the OCCURS
+  bounds wrote privately as `occursBound` before — and `IntegerOperandSlotDriftTests.ReportWriterGrammar_SpellsNoBareIntegerLiteral`
+  keeps a bare `integerLiteral` out of `CobolReportWriter.g4`, so the clause added next admits a constant without anyone
+  remembering to. The binder reads every one through the ONE `DataBinder.IntegerOperandValue` (the OCCURS reader,
+  generalised): the integer as written, or the integer constant's value, which §13.10.4 GR1 makes "as if the literal
+  were written" and therefore meets what the written literal meets — §5.5 1)'s unsigned/nonzero default with each
+  clause's own zero permission (`IntegerOperandRules.Slots`, classified by the CLAUSE that owns the operand, not by
+  the carrier rule) and the host limit (COBOLNET2427). A constant that is not an integer is COBOLNET1547, a zero one
+  COBOLNET2386. The value is memoised per operand node because the report binder replays a repeating entry's
+  subtree (§13.18.38.4 GR10) and one bad constant is one diagnostic.
 - **PLUS and + are ONE grammar fragment** (kb/Work PB951): `reportRelativeSign : PLUSWORD | PLUS` is the only
   spelling of a relative operand in `CobolReportWriter.g4`, referenced by the LINE, COLUMN and NEXT GROUP
   productions (§13.18.35.3 SR1 / §13.18.14.3 SR2 / §13.18.37.3 SR2 each print "PLUS and + are synonyms"), and
@@ -279,13 +294,15 @@ off-by-one through every later counter check.
   through the ONE `ExpressionBinder.BindExpr` (the `PRESENT WHEN` / `VARYING` precedent) and rendered by the ONE
   `NumericRenderer`; `ReferenceResolver` does the subscript arithmetic exactly as it does for a procedure-division
   reference. The arm choice is made once, in `ResolveSumAddend`: SR4's *data-name-1* (a report-section item —
-  a rolled total, GR6) and SR4 g)'s cross-report form stage loud, and SR5's *identifier-1* is screened for BOTH
+  a rolled total, GR6 — and SR4 g)'s cross-report spelling of it) is resolved by `ResolveRolledAddend` (the
+  "ROLLED TOTAL" bullet below), and SR5's *identifier-1* is screened for BOTH
   halves of its sentence — resolution outside the report section AND the CATEGORY (**COBOLNET2045**), which
   also refuses every reference-modified spelling, since §8.4.3.3.4 GR6 c) makes a ref-mod's unique data item
   alphanumeric and SR5 requires a numeric one. `UPON data-name-2` (SR7) is captured by `UponDetailRef` and
   resolved through the report-group funnel — it "shall be the name of a detail" and "may be qualified only by a
-  report-name" (**COBOLNET2046**); a detail of ANOTHER report stages loud, because GR7 c) 2) accumulates on a
-  GENERATE run against that report's engine. **ONE counter per ENTRY** (GR1) however many times the SUM keyword
+  report-name" (**COBOLNET2046**); a detail of ANOTHER report is legal, and because GR7 c) 2) accumulates on a
+  GENERATE run against THAT report's engine the addition registers there (`ReportDetailRef.Owner`,
+  `CobolReport.AddGenerateTrigger`). **ONE counter per ENTRY** (GR1) however many times the SUM keyword
   appears (SR1): the entry binder collects every `reportSumClause` and each becomes a `ReportSumTerm` with its
   OWN UPON list, emitted as one `AddSumTerm` call. (Before PB482 the addend went through `KeyReference` — the
   FILE STATUS key helper — so `SUM WS-CELL(2)` compiled and ABORTED at the first GENERATE, `SUM WS-TXT(1:2)`
@@ -373,8 +390,42 @@ off-by-one through every later counter check.
   `CobolReport.SumOccurrence` turns them into the occurrence's id, testing each level on its own and raising
   §8.4.2.3.4 GR2's EC-BOUND-SUBSCRIPT for one out of range (checking off: the read is zero and the store is
   discarded, the twin of an ordinary table's scratch occurrence). The printable face and the engine's
-  registrations keep addressing a counter by its id. ⚠ An addend that is itself a repeating REPORT item (GR8 a)/b),
-  the rolled total) is still staged loud by `ResolveSumAddend`; the occurrence structure it needs now exists.
+  registrations keep addressing a counter by its id. An addend that is itself a repeating REPORT item (GR8 a)/b),
+  the rolled total) maps its occurrences onto the counter's by those same levels — the next bullet.
+- **A ROLLED TOTAL — a SUM clause's data-name-1 — IS AN ADDITION REGISTERED WITH THE GROUP THAT CONTAINS ITS ADDEND**
+  (kb/Work PB1294). §13.18.54.4 GR6 gives data-name-1 one value, by what its entry carries — "the corresponding sum
+  counter" for an entry that contains a SUM clause, else "the operand of the SOURCE or VALUE clause" — and GR7 a)/b)
+  say WHEN it is added: "when the report group description containing data-name-1 is processed", i.e. before the
+  group's lines are printed, whether or not anything prints (a SUPPRESSed or dummy group is still processed:
+  `BeginGroup` is the one prologue, §14.9.45.4 — SUPPRESS "does not inhibit sum accumulation"). The ENTRY is therefore
+  the unit: `ReportEntryFamily` (the written entry — name, qualification hierarchy, group, report and the repetition
+  geometry a sum counter always had; `ReportSumFamily` and the new `ReportSourceFamily` derive from it) with one
+  `ReportItemOccurrence` per replay and per operand of its own multiple COLUMN clause, each carrying its coordinates,
+  its SUM counter occurrence or its SOURCE/VALUE operand, and the FULL presence chain GR11 asks ("declared to be absent
+  as a result of a PRESENT WHEN clause or an OCCURS clause with the DEPENDING phrase"). An UNPRINTABLE SOURCE entry
+  (no COLUMN, §13.18.53.4 GR3) has an occurrence too — it prints nothing, but a SUM clause may still name it.
+  `ResolveRolledAddend` resolves the written name once (the qualifiers consumed against each entry's hierarchy, the
+  report-name last — SR4 g) is the same arm, not a second one), screens it once per WRITTEN addend (SR4: a numeric item
+  with a value, unsubscripted — COBOLNET2730; a) no UPON; b)/c)/d) the levels of repetition, `RolledRepetitionFault`;
+  f) the report-type pairing, COBOLNET2731, within one report only; e) the chain terminates, `ScreenRolledChains` over
+  every report) and then maps per COUNTER OCCURRENCE (GR8): the INNERMOST levels of the addend and the counter are the
+  same levels (SR4 d) — "in order beginning with the lowest level of nesting"), so an addend occurrence belongs to the
+  counter occurrence whose coordinates equal its own innermost ones, and its outer levels are the "complete table"
+  GR8 b) totals; a non-repeating addend belongs to every counter occurrence. The addition is registered, once per
+  (counter occurrence, addend occurrence), with the report GROUP that contains the addend — `CobolReport.AddRolled`
+  on the counter's engine, stored on the source group (`ReportGroup.Rolled`), because the two may belong to
+  DIFFERENT reports — and performed by that group's prologue (`BeginGroup` → `ApplyRolled`, skipped on an OR PAGE
+  reprint, which is the same instance printed again). It is the SAME closure a GENERATE-driven term builds
+  (`ReportWriterEmitter.SumAddition` — GR3's ADD with ON SIZE ERROR), over a value bound once every report's
+  operands are (`ReportWriterBinder.BindRolledValues`: the counter occurrence's content as a `ReportSumCounterPlace`
+  read, or the SOURCE/VALUE operand as a number). Registrations are emitted after EVERY engine is constructed
+  (`RegisterCrossEngineAdditions`), and the ones on one group are put in dependency order, because GR6 requires "the
+  additions necessary to compute its value are completed before the adding of the operand". The same list registers
+  an UPON on a detail of another report. A term's rolled addends leave its GENERATE-driven addition (GR9 sums addends
+  "separately according to the above rules"); the UPON phrase is refused with data-name-1 (SR4 a)). A SOURCE operand
+  that names a VARYING counter (§13.18.64.4 GR3) is that occurrence's value, a compose-local when the entry prints,
+  so such an addition's closure is a BLOCK that declares the same counter locals for the occurrence it adds, by the
+  one `EmitVaryingCounters` the compose uses (`ReportItemOccurrence.VaryingDependent`).
 - **The FD side**: `FileModel.ReportNames` (the §13.18.46 REPORT clause, captured in `BindFileSection`);
   a report file is an FD with a non-empty list — legally record-less (§9.1.22). `FileModel.RecordContains`
   captures the fixed Format-1 RECORD CONTAINS for the line width; otherwise the width is the widest field
@@ -538,9 +589,8 @@ correspondence rules — a name with no RD (§13.18.46.3 SR1), a name in two REP
 
 **Staged LOUD at bind (`COBOLNET0899`, Edition.Error — legal-but-unimplemented, never silent):**
 **FUNCTION inside a PRESENT WHEN condition
-(`report-condition-function` — the UDF activation-hoist is statement-context machinery)**; rolled SUM totals (§13.18.54.3 SR4 / §13.18.54.4 GR6 — a
-report-section addend); cross-report SUM (a SUM addend qualified by a report-name, SR4 g); a cross-report
-`UPON` detail (GR7 c 2); an arithmetic-expression-1 SUM addend written with a LEADING PARENTHESIS
+(`report-condition-function` — the UDF activation-hoist is statement-context machinery)**; an
+arithmetic-expression-1 SUM addend written with a LEADING PARENTHESIS
 (`SUM (A * B)` — the lexer's §8.4.3.2.3 SR2 keyword-omitted-intrinsic trigger on the SUM token pushes
 SUBSCRIPT mode at that `(`, against §13.18.54.3 SR9's "Otherwise, SUM refers to the report writer SUM
 clause"; every OTHER spelling of the expression addend is LIVE, and §13.18.54.3 states no parenthesization

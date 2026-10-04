@@ -36,8 +36,10 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
         }
         try
         {
-            foreach (var r in ctx.Data.Reports)
+            var reports = ctx.Data.Reports;
+            foreach (var r in reports)
                 BindReportClauses(r, Bind);
+            BindRolledValues(reports);   // after EVERY report's operands are bound: SR4 g) lets a total roll up another report's entry
         }
         finally
         {
@@ -89,36 +91,23 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
                     }
                     // The field's operands see every counter in scope at the field (SR2).
                     ctx.Refs.VaryingScope = ScopeOf(f.Varyings.Select(u => u.Counter));
-                    // A SOURCE identifier-1 is §13.18.53.4 GR1's implicit MOVE sender: bound HERE through the ONE operand
-                    // binder a MOVE's sending operand takes, which is what knows a subscript, a reference modification,
-                    // a counter of this or another report, a sum counter of the current report, a VARYING counter and a
-                    // constant-name (kb/Work PB1292 × PB1306 × PB1316 × PB1456).
-                    foreach (var rs in f.Sources.OfType<FieldReferenceSource>())
-                    {
-                        if (rs.Rejected) continue;
-                        using var at = ctx.Edition.At(rs.Ref);
-                        var operand = host.Expr.FieldOperand(rs.Ref);
-                        // identifier-1 is a data item, so an index-name is no sender (§13.18.53.3 SR2 — a MOVE shall be
-                        // valid, and §13.18.38.3 r7 admits an index-name in no MOVE).
-                        if (host.Expr.ScreenIndexNameOperand(operand, rs.Written, $"RD '{r.Name}': SOURCE")) rs.Rejected = true;
-                        else rs.Value = operand;
-                    }
-                    // A SOURCE operand written as arithmetic-expression-1, or as identifier-1 under the
-                    // clause's ROUNDED phrase (§13.18.53.3 SR5) — §13.18.53.4 GR2's implicit COMPUTE. The
-                    // expression binds HERE through the same BindExpr a procedure-division reference takes
-                    // (the kb/Work PB482 argument: a subscript may be an index-name or an expression and has
-                    // no value at data bind), and the ROUNDED phrase resolves through the ONE §14.7.4
-                    // rounding-mode reader (kb/Work PB852).
-                    foreach (var cs in f.Sources.OfType<FieldComputeSource>())
-                    {
-                        if (cs.Rejected) continue;
-                        using var at = ctx.Edition.At(cs.Ctx);
-                        cs.Value = host.Expr.BindExpr(cs.Ctx);
-                        cs.Rounding = host.Expr.RoundingOf(cs.Rounded);
-                    }
+                    BindSourceOperands(r, f.Sources);
                     ctx.Refs.VaryingScope = null;
                 }
             }
+        // The SOURCE operand of an entry with NO printable item has no field to be bound by, and a rolled total still adds
+        // it (§13.18.54.4 GR6; §13.18.53.4 GR3 — "the SOURCE clause causes no action, except where the entry is referred
+        // to by means of a SUM clause"), so every recorded occurrence binds its own (kb/Work PB1294). Each entry's
+        // PRESENT WHEN chain binds here too: GR11 asks whether data-name-1 is "declared to be absent". (A SUM entry's
+        // occurrence shares its counter's chain, bound below.)
+        foreach (var o in r.ItemOccurrences)
+        {
+            if (o.Sum is not null) continue;
+            foreach (var c in o.PresentWhenCtxs) o.PresentWhen.Add(Bind(c));
+            ctx.Refs.VaryingScope = ScopeOf(o.Varyings.Select(u => u.Counter));
+            if (o.Source is not null) BindSourceOperands(r, [o.Source]);
+            ctx.Refs.VaryingScope = null;
+        }
         foreach (var s in r.Sums)
         {
             foreach (var c in s.PresentWhenCtxs) s.PresentWhen.Add(Bind(c));
@@ -131,7 +120,7 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
             // report the same words twice under a second clause.
             foreach (var t in s.Terms)
                 foreach (var a in t.Addends)
-                    if (!a.Rejected)
+                    if (!a.Rejected && !a.Rolled)   // a rolled total's value is its entry's (RolledValues), not an expression of its own
                     {
                         using var at = ctx.Edition.At(a.Ctx);
                         a.Value = host.Expr.BindExpr(a.Ctx);
@@ -141,6 +130,100 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
             // COMPUTE statement with the ROUNDED phrase". Same §14.7.4 reader as SOURCE's (kb/Work PB852).
             s.Rounding = host.Expr.RoundingOf(s.Rounded);
         }
+    }
+
+    /// <summary>Bind the SOURCE operands of one report entry, each ONCE (an operand an earlier pass bound is left alone —
+    /// a printable entry's field binds them first, a rolled total's unprintable entry here; kb/Work PB1294).
+    /// <para>A SOURCE identifier-1 is §13.18.53.4 GR1's implicit MOVE sender: bound through the ONE operand binder a
+    /// MOVE's sending operand takes, which is what knows a subscript, a reference modification, a counter of this or
+    /// another report, a sum counter of the current report, a VARYING counter and a constant-name (kb/Work PB1292 ×
+    /// PB1306 × PB1316 × PB1456).</para>
+    /// <para>A SOURCE operand written as arithmetic-expression-1, or as identifier-1 under the clause's ROUNDED phrase
+    /// (§13.18.53.3 SR5) — §13.18.53.4 GR2's implicit COMPUTE — binds through the same <c>BindExpr</c> a
+    /// procedure-division reference takes (the kb/Work PB482 argument: a subscript may be an index-name or an
+    /// expression and has no value at data bind), and the ROUNDED phrase resolves through the ONE §14.7.4
+    /// rounding-mode reader (kb/Work PB852).</para></summary>
+    private void BindSourceOperands(ReportModel r, IEnumerable<ReportFieldSource> sources)
+    {
+        foreach (var source in sources)
+            switch (source)
+            {
+                case FieldReferenceSource { Rejected: false, Value: null } rs:
+                {
+                    using var at = ctx.Edition.At(rs.Ref);
+                    var operand = host.Expr.FieldOperand(rs.Ref);
+                    // identifier-1 is a data item, so an index-name is no sender (§13.18.53.3 SR2 — a MOVE shall be
+                    // valid, and §13.18.38.3 r7 admits an index-name in no MOVE).
+                    if (host.Expr.ScreenIndexNameOperand(operand, rs.Written, $"RD '{r.Name}': SOURCE")) rs.Rejected = true;
+                    else rs.Value = operand;
+                    break;
+                }
+                case FieldComputeSource { Rejected: false, Value: null } cs:
+                {
+                    using var at = ctx.Edition.At(cs.Ctx);
+                    cs.Value = host.Expr.BindExpr(cs.Ctx);
+                    cs.Rounding = host.Expr.RoundingOf(cs.Rounded);
+                    break;
+                }
+            }
+    }
+
+    /// <summary>⛔ THE VALUE EACH ROLLED ADDITION ADDS (ISO §13.18.54.4 GR6; kb/Work PB1294) — bound once every
+    /// report's own clauses are, because a rolled total may name an entry of ANOTHER report (§13.18.54.3 SR4 g)).
+    /// "If data-name-1 specifies an item whose entry contains a SUM clause, the value added is that of the
+    /// corresponding sum counter. … If data-name-1 specifies an item whose entry has a SOURCE or VALUE clause, the
+    /// value added is that of the operand of the SOURCE or VALUE clause" — as a number, because GR3 adds it
+    /// ("consistent with the general rules of the ADD statement"). Only occurrences some addend actually names are
+    /// asked: an entry whose SOURCE feeds an alphanumeric printable item is no error until a SUM wants to add it.</summary>
+    private void BindRolledValues(IEnumerable<ReportModel> reports)
+    {
+        var asked = new HashSet<ReportItemOccurrence>(ReferenceEqualityComparer.Instance);
+        foreach (var report in reports)
+            foreach (var sum in report.Sums)
+                foreach (var addend in sum.Terms.SelectMany(t => t.Addends).Where(a => a.Rolled))
+                    foreach (var occurrence in addend.RolledFrom)
+                        if (asked.Add(occurrence)) occurrence.Value = RolledValueOf(occurrence);
+    }
+
+    private BoundExpr? RolledValueOf(ReportItemOccurrence o)
+    {
+        var report = o.Family.Report;
+        if (o.Sum is { } counter)
+            return new BoundNumRef(new ReportSumCounterPlace(
+                report.CsIndex, counter.Id, counter.Family.Register, ctx.Data.ReportDepth(report)));
+        BoundExpr? value = o.Source switch
+        {
+            FieldComputeSource { Value: { } expression } => expression,
+            FieldReferenceSource { Value: { } operand } => NumberOf(operand),
+            FieldValueSource { Raw: var raw } => RawNumber(raw),
+            _ => null,   // rejected where it was bound
+        };
+        if (value is null && o.Source is not (FieldComputeSource { Rejected: true } or FieldReferenceSource { Rejected: true }))
+            ctx.Edition.Error(DiagnosticCatalog.ReportSumDataNameRule, $"RD '{report.Name}': the entry '{o.Family.Name}' is the data-name-1 of "
+                + "a SUM clause, but the operand of its SOURCE or VALUE clause is not a number a sum counter can add "
+                + "(ISO §13.18.54.4 GR6 — the value added is that of the operand; GR3 — added by the ADD statement's rules)");
+        return value;
+    }
+
+    /// <summary>A bound SOURCE operand as the number an ADD adds, or null when it is no number — a numeric item, a numeric
+    /// literal, a computed value or the figurative ZERO (§8.8.1.1's list of what an arithmetic operand may be).</summary>
+    private static BoundExpr? NumberOf(BoundOperand operand) => operand switch
+    {
+        BoundFieldOperand { Place: var place } when IntrinsicArgumentRules.IsArithmeticOperandClass(operand) => new BoundNumRef(place),
+        BoundNumericLiteral literal => new BoundNumLiteral(literal.Text),
+        BoundComputedOperand computed => computed.Expr,
+        BoundFigurative { Kind: 'Z' } => new BoundNumLiteral("0"),
+        _ => null,
+    };
+
+    /// <summary>The number a VALUE clause operand's raw text writes — a numeric literal as written, or the figurative
+    /// ZERO — else null (a numeric item's VALUE is numeric, §13.18.63.3 SR4/SR5, so null means a refused operand).</summary>
+    private static BoundExpr? RawNumber(string raw)
+    {
+        string text = raw.Trim();
+        if (text.Equals("ZERO", StringComparison.OrdinalIgnoreCase) || text.Equals("ZEROS", StringComparison.OrdinalIgnoreCase)
+            || text.Equals("ZEROES", StringComparison.OrdinalIgnoreCase)) return new BoundNumLiteral("0");
+        return text.Length > 0 && text.All(c => char.IsAsciiDigit(c) || c is '.' or '+' or '-') ? new BoundNumLiteral(text) : null;
     }
 
     /// <summary>The scope a report entry's clause expression binds in (<see cref="ReferenceResolver.VaryingScope"/>).</summary>

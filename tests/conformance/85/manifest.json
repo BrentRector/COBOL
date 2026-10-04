@@ -2,6 +2,7 @@
  "enabled": [
  "pb1054_renames_thru_binary_packed_span",
  "pb1226_report_filler_entry_name",
+ "pb1294_report_rolled_unprintable_source",
   "pb1173_sort_key_second_record",
   "pb1139_same_clauses_legal",
   "pb994_sort_merge_keyed_using_giving",

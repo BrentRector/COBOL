@@ -1,0 +1,27 @@
+*> reject-at: 2002 2014 2023
+*> kb/Work PB1294 - ISO 13.18.54.3 SR4 d): "The maximum number of repetitions of data-name-1 and the subject of the
+*>   entry shall be equal at each corresponding level taken in order beginning with the lowest level of nesting."
+*>   CELL repeats 3 times and its total COLT repeats 4 times.
+*>   cite.py: OK  13.18.54.3 4)  (Syntax rules)
+IDENTIFICATION DIVISION.
+PROGRAM-ID. PB1294N6.
+ENVIRONMENT DIVISION.
+INPUT-OUTPUT SECTION.
+FILE-CONTROL.
+    SELECT PRT ASSIGN TO "PB1294N6.TXT".
+DATA DIVISION.
+FILE SECTION.
+FD  PRT REPORT IS R.
+WORKING-STORAGE SECTION.
+01  WS-A PIC 99 VALUE 0.
+01  WS-B PIC 99 VALUE 0.
+01  WS-C PIC 99 VALUE 0.
+REPORT SECTION.
+RD  R CONTROL IS FINAL.
+01  DET TYPE DE LINE PLUS 1.
+    05  CELL COLUMN 1 PIC 99 OCCURS 3 TIMES STEP 3 SOURCE WS-A WS-B WS-C.
+01  CFF TYPE CF FINAL LINE PLUS 1.
+    05  COLT COLUMN 1 PIC 999 OCCURS 4 TIMES STEP 4 SUM CELL.
+PROCEDURE DIVISION.
+MAIN-PARA.
+    STOP RUN.

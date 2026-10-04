@@ -81,15 +81,15 @@ reportControlClause
 // alternative preceded a repeated phrase list without duplicating it.
 reportPageClause
     : PAGE (LIMIT IS? | LIMITS ARE?)?
-      ( integerLiteral (LINE | LINES) reportPageWidth?
-      | integerLiteral
+      ( integerOperand (LINE | LINES) reportPageWidth?
+      | integerOperand
       | reportPageWidth )
       reportPageSubclause*
     ;
 
 // integer-2 {COLS | COLUMNS} — the page width (§13.18.39.4 GR2b).
 reportPageWidth
-    : integerLiteral (COLS | COLUMNS)
+    : integerOperand (COLS | COLUMNS)
     ;
 
 // The five trailing phrases, each its own bracket with no ellipsis (SR4 gives the order licence; §5.2.7 the
@@ -97,11 +97,11 @@ reportPageWidth
 // ⚠ HEADING is a terminal of TWO alternatives (the HEADING phrase and LAST CONTROL HEADING): a reader classifies
 // a phrase by DataBinder.PagePhraseOf (its first token and the one after it), never by `HEADING()`.
 reportPageSubclause
-    : HEADING IS? integerLiteral
-    | FIRST (DETAIL | DE) IS? integerLiteral
-    | LAST (CONTROL HEADING | CH) IS? integerLiteral
-    | LAST (DETAIL | DE) IS? integerLiteral
-    | FOOTING IS? integerLiteral
+    : HEADING IS? integerOperand
+    | FIRST (DETAIL | DE) IS? integerOperand
+    | LAST (CONTROL HEADING | CH) IS? integerOperand
+    | LAST (DETAIL | DE) IS? integerOperand
+    | FOOTING IS? integerOperand
     ;
 
 // ==========================================
@@ -173,8 +173,8 @@ reportLineClause
     ;
 
 reportLineOperand
-    : reportRelativeSign integerLiteral
-    | integerLiteral (ON? NEXT PAGE)?
+    : reportRelativeSign integerOperand
+    | integerOperand (ON? NEXT PAGE)?
     | ON? NEXT PAGE
     ;
 
@@ -192,7 +192,7 @@ reportRelativeSign
 // NEXT GROUP IS {integer-1 | {PLUS|+} integer-2 | NEXT PAGE [WITH RESET]}  (§13.18.37.2, PDF p427 rendered — both
 // the outer and the inner delimiters are braces). Bound by DataBinder.Reports BindNextGroupClauses (kb/Work PB957).
 reportNextGroupClause
-    : NEXT GROUP IS? (reportRelativeSign integerLiteral | integerLiteral | NEXT PAGE (WITH? RESET)?)
+    : NEXT GROUP IS? (reportRelativeSign integerOperand | integerOperand | NEXT PAGE (WITH? RESET)?)
     ;
 
 // {COLUMN|COLUMNS|COL|COLS} [NUMBER|NUMBERS] [LEFT|CENTER|RIGHT] [IS|ARE] {integer | {PLUS|+} integer}...  (§13.18.14 F1)
@@ -209,7 +209,7 @@ reportColumnClause
     ;
 
 reportColumnOperand
-    : reportRelativeSign? integerLiteral
+    : reportRelativeSign? integerOperand
     ;
 
 // {SOURCE|SOURCES} [IS|ARE] {identifier-1}...  (§13.18.53 Format)

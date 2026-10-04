@@ -4,6 +4,7 @@
 using System;
 using System.Linq;
 using CobolNet.Frontend.Generated;
+using CobolNet.Tests.Shared;
 using CobolNet.Validation;
 using Xunit;
 
@@ -20,11 +21,34 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class IntegerOperandSlotDriftTests
 {
+    /// <summary>Every rule that spells an <c>integer-n</c>: with the bare <c>integerLiteral</c> or with the shared
+    /// <c>integerOperand</c> (a literal OR a constant-name, ISO §13.10.3 SR2 — kb/Work PB1947). The
+    /// <c>integerOperand</c> rule is the carrier, never a clause, so it is the one rule left out: its OWNER is what
+    /// <see cref="IntegerOperandRules.Slots"/> classifies.</summary>
     private static Type[] RulesThatWriteIntegerLiteral() =>
         typeof(CobolParserCore).GetNestedTypes()
-            .Where(t => t.GetMethods().Any(m => m.Name == "integerLiteral" && m.DeclaringType == t))
+            .Where(t => t != typeof(CobolParserCore.IntegerOperandContext)
+                && t.GetMethods().Any(m => m.Name is "integerLiteral" or "integerOperand" && m.DeclaringType == t))
             .OrderBy(t => t.Name, StringComparer.Ordinal)
             .ToArray();
+
+    /// <summary>⛔ THE REPORT WRITER'S integer-n POSITIONS ARE ALL LITERAL POSITIONS (kb/Work PB1947). ISO §13.10.3
+    /// SR2 — "constant-name-1 may be used anywhere that a format specifies a literal of the class and category of
+    /// constant-name-1" — and §5.5 1) calls every <c>integer-n</c> "a fixed-point integer literal", so a constant-name
+    /// stands at every integer position of the PAGE, LINE, COLUMN and NEXT GROUP clauses and of OCCURS … STEP. The
+    /// report-writer grammar therefore spells NONE of them with the bare <c>integerLiteral</c>: it writes
+    /// <c>integerOperand</c>, so the clause that is added next admits a constant-name without anyone remembering to.
+    /// (A <c>COBOL0309 "A literal value is expected here, not a data-name"</c> on <c>LINE PLUS KL</c> was the defect.)
+    /// </summary>
+    [Fact]
+    public void ReportWriterGrammar_SpellsNoBareIntegerLiteral()
+    {
+        string path = System.IO.Path.Combine(TestRepo.Src("Cobol.Net.Frontend", "Grammar"), "Core", "CobolReportWriter.g4");
+        string body = System.Text.RegularExpressions.Regex.Replace(
+            System.IO.File.ReadAllText(path), @"//[^\r\n]*", string.Empty);
+        Assert.Contains("integerOperand", body);   // a ZERO-population "clean" result is the failure this prevents
+        Assert.DoesNotMatch(@"\bintegerLiteral\b", body);
+    }
 
     [Fact]
     public void EveryGrammarRuleWritingIntegerLiteral_IsClassified()

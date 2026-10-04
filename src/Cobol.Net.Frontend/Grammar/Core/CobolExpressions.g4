@@ -850,6 +850,22 @@ integerLiteral
     : INTEGERLIT
     ;
 
+// ⛔ THE ONE SPELLING OF AN `integer-n` POSITION THAT MAY BE WRITTEN AS AN INTEGER CONSTANT-NAME (kb/Work PB1947).
+// ISO §13.10.3 SR2 — "constant-name-1 may be used anywhere that a format specifies a literal of the class and
+// category of constant-name-1" — and §5.5 1) makes every `integer-n` of a general format "a fixed-point integer
+// literal", so each such position is a literal position a constant-name stands in (§13.10.4 GR1: "as if literal-1 …
+// were written where constant-name-1 is written"). The grammar cannot tell a constant-name from any other user
+// word, so the alternative is `cobolWord` and the BINDER substitutes (DataBinder.IntegerOperandValue — the ONE
+// reader, which also asks the §5.5 1) unsigned and nonzero questions of the value the constant substitutes). A clause
+// whose integer position takes this rule is classified by the CLAUSE that owns it (IntegerOperandRules.Slots), never
+// by this rule, so the zero permissions stay per clause. The OCCURS bounds, the report-writer LINE / COLUMN / NEXT
+// GROUP / PAGE operands and the OCCURS STEP integer are the sites so far; the next clause whose format prints an
+// `integer-n` writes `integerOperand`, not `integerLiteral` (IntegerOperandSlotDriftTests holds the inventory).
+integerOperand
+    : integerLiteral
+    | cobolWord
+    ;
+
 signedIntegerLiteral
     : (PLUS | MINUS)? INTEGERLIT
     ;

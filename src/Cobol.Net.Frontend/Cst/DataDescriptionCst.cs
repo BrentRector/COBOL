@@ -121,9 +121,9 @@ public readonly struct DataDescriptionClauseCst(Core.DataDescriptionClauseContex
     // NOT fork a second copy of that computation. This clause façade exposes only the leaf text reads BindEntry
     // migrated in Group C; the report-writer partial migrates in P7.)
 
-    // (The OCCURS fixed bounds are no longer a pure text read: each `occursBound` is an integer literal OR an
+    // (The OCCURS fixed bounds are no longer a pure text read: each `integerOperand` is an integer literal OR an
     // integer constant-name (ISO §13.10.3 SR2), and resolving the latter needs the binder's compile-time
-    // constant table — so the max-occurrence read lives in DataBinder.Constants.OccursBoundValue, not here.)
+    // constant table — so the max-occurrence read lives in DataBinder.Constants.IntegerOperandValue, not here.)
 
     /// <summary>The OCCURS INDEXED BY index-name texts, in order (empty when absent). The caller keeps the
     /// <c>INDEXED()</c> presence guard raw.</summary>

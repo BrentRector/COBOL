@@ -234,10 +234,13 @@ public abstract class CobolParserCoreBase : Parser
     /// generated <c>_dataNameTokens</c> set to keep <c>STEP (1)</c> subscripting a user item named STEP, and that
     /// set is derived from the §8.9 RESERVED word table, which STEP is not in.</para>
     /// <para>The integer lookahead is what makes the predicate safe: nothing else in an OCCURS clause is a bare
-    /// user word followed by an integer literal, so a data item legitimately named STEP can still be the
-    /// DEPENDING operand or an ASCENDING KEY.</para></summary>
+    /// user word followed by an integer literal or by a constant-name (§13.10.3 SR2 — integer-3 is an integer-n
+    /// position, kb/Work PB1947), so a data item legitimately named STEP can still be the DEPENDING operand or an
+    /// ASCENDING KEY: the phrase is attempted only after the bound, TIMES and DEPENDING operand, and every
+    /// clause that can follow it opens with a reserved word.</para></summary>
     protected bool occursStepAhead()
-        => Word(TokenStream.LT(1), "STEP") && TokenStream.LT(2) is { } n && IsIntegerToken(n);
+        => Word(TokenStream.LT(1), "STEP")
+           && TokenStream.LT(2) is { } n && (IsIntegerToken(n) || n.Type == CobolLexer.IDENTIFIER);
 
     /// <summary>True when the token is an unsigned integer literal — the STEP-phrase lookahead's second half.</summary>
     private static bool IsIntegerToken(IToken t)

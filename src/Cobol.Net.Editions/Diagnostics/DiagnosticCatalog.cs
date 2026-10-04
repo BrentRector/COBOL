@@ -1254,18 +1254,51 @@ public static class DiagnosticCatalog
     // / PAGE-COUNTER (§8.4.2.2.3 SR9/SR10) and a subscripted or reference-modified identifier (§8.4.3.1.2) — because
     // the identifier arm looked a NAME up in storage. identifier-1 is now bound in the procedure phase by the one
     // operand binder a MOVE's sending operand takes, which knows both.
-    public static readonly DiagnosticDescriptor ReportSumCrossReport = new(
-        NotImplemented, "report-sum-cross-report", EditionSeverity.Error,
-        "SUM … OF report-name (a cross-report sum) is not yet implemented.", "ISO §13.18.54.3 SR4g", RecognizedNotImplemented);
-    public static readonly DiagnosticDescriptor ReportSumRolledTotal = new(
-        NotImplemented, "report-sum-rolled-total", EditionSeverity.Error,
-        "A SUM addend naming a report section data item (data-name-1 — a rolled total) is not yet implemented.",
-        "ISO §13.18.54.3 SR4 / §13.18.54.4 GR6", RecognizedNotImplemented);
-    public static readonly DiagnosticDescriptor ReportSumUponCrossReport = new(
-        NotImplemented, "report-sum-upon-cross-report", EditionSeverity.Error,
-        "An UPON operand naming a detail of another report description entry is not yet implemented: the "
-        + "accumulation fires on a GENERATE executed against that report's engine.",
-        "ISO §13.18.54.4 GR7 c) 2)", RecognizedNotImplemented);
+    // ⛔ `ReportSumRolledTotal` (`report-sum-rolled-total`), `ReportSumCrossReport` (`report-sum-cross-report`) AND
+    // `ReportSumUponCrossReport` (`report-sum-upon-cross-report`) LIVED HERE AND ARE GONE (kb/Work PB1294): all three
+    // staged one mechanism — a sum counter fed by something that is not a GENERATE of its own report. A SUM data-name-1
+    // (a rolled total, §13.18.54.4 GR6), its report-name-qualified spelling (SR4 g)) and an UPON naming a detail of
+    // another report (GR7 c) 2)) are now registered with the engine whose group or GENERATE triggers the addition
+    // (`CobolReport.AddRolled`, `AddGenerateTrigger`), so the report that owns the counter and the report that fires it
+    // may be different. The ids are retired, never reallocated.
+
+    /// <summary>COBOLNET2730 — a SUM addend written as data-name-1 (a report section item, §13.18.54.3 SR4) breaks the
+    /// rule that governs it: it shall name ONE numeric data item with a value (a SUM, SOURCE or VALUE entry) in the
+    /// report section, written without subscripting; the UPON phrase shall not be written with it (SR4 a)); and its
+    /// repetition shall fit the subject's — a repeating item when it shares the subject's report group description
+    /// with at least one more level (SR4 b)), at least the subject's levels when it does not (SR4 c)), equal maximum
+    /// repetitions at each corresponding level (SR4 d)) — and the chain of references shall terminate (SR4 e)).</summary>
+    public static readonly DiagnosticDescriptor ReportSumDataNameRule = new(
+        "COBOLNET2730", "report-sum-data-name-rule", EditionSeverity.Error,
+        "§13.18.54.3 SR4: \"Data-name-1 shall be the name of a numeric data item in the report section. If it is "
+        + "associated with an OCCURS clause, it shall be specified without the subscripting normally required. When "
+        + "data-name-1 is specified, the following rules also apply: a) The UPON phrase shall not be specified. b) If "
+        + "data-name-1 is specified in the same report group description as the subject of the entry, data-name-1 "
+        + "shall be a repeating item … and subject to at least one more level of repetition than the subject of the "
+        + "entry. c) If data-name-1 is specified in a different report group description than the subject of the "
+        + "entry, data-name-1 either shall not reference a repeating item or shall reference a repeating item that "
+        + "is subject to at least the same number of levels of repetition as the subject of the entry. d) The "
+        + "maximum number of repetitions of data-name-1 and the subject of the entry shall be equal at each "
+        + "corresponding level taken in order beginning with the lowest level of nesting. e) Any chain of reference "
+        + "shall terminate at an entry that does not contain a SUM clause referring to a data-name-1 defined in the "
+        + "report section.\" The value added is that of the entry's sum counter, or of the operand of its SOURCE or "
+        + "VALUE clause (§13.18.54.4 GR6), so an entry with none of the three has no value to add.",
+        "ISO §13.18.54.3 SR4");
+
+    /// <summary>COBOLNET2731 — the combination of report group TYPEs of a SUM entry and the entry its data-name-1
+    /// names is not one §13.18.54.3 SR4 f) permits within a report description (SR4 g) lifts the restriction across
+    /// report descriptions).</summary>
+    public static readonly DiagnosticDescriptor ReportSumDataNameGroups = new(
+        "COBOLNET2731", "report-sum-data-name-groups", EditionSeverity.Error,
+        "§13.18.54.3 SR4 f): \"If data-name-1 specifies an entry in a report group description other than the current "
+        + "report group description, only the following combinations of report types of each report group are "
+        + "permitted: The current report group may be a control footing and data-name-1 may be defined in a detail or "
+        + "in a control footing associated with a lower level of control. The current report group may be a detail "
+        + "and data-name-1 may be defined in a different detail. The current report group may be a report footing and "
+        + "data-name-1 may be defined in any other report group other than a report heading. The current report "
+        + "group may be a page footing and data-name-1 may be defined in any body group.\" SR4 g) — \"If data-name-1 "
+        + "specifies an entry in a different report description, there are no restrictions\" — is the exception.",
+        "ISO §13.18.54.3 SR4 f)");
     // ⛔ `ReportMultipleOnFile` (`report-multiple-on-file`) LIVED HERE AND IS GONE (kb/Work PB1050): a file description
     // entry may name several reports (§13.18.46.2 `REPORTS ARE report-name-1 …`; GR1 "more than one report may be
     // written to the file"); each report has its own engine over the one file connector.

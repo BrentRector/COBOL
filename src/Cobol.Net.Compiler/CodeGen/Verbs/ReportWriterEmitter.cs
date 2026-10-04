@@ -95,6 +95,11 @@ internal sealed class ReportWriterEmitter(
         public Dictionary<ReportFieldModel, int> Fields { get; } = new(ReferenceEqualityComparer.Instance);
         public Dictionary<ReportSumModel, int> Sums { get; } = new(ReferenceEqualityComparer.Instance);
 
+        /// <summary>The slot of each conditioned SOURCE / VALUE entry occurrence of the group — what §13.18.54.4 GR11
+        /// asks of a rolled total's data-name-1 ("declared to be absent as a result of a PRESENT WHEN clause or an
+        /// OCCURS clause with the DEPENDING phrase"). A SUM entry's occurrence reads its counter's slot (<see cref="Sums"/>).</summary>
+        public Dictionary<ReportItemOccurrence, int> Items { get; } = new(ReferenceEqualityComparer.Instance);
+
         /// <summary>The slot of a conditioned entry, −1 for an unconditional one.</summary>
         public static int SlotOf<T>(Dictionary<T, int> slots, T entry) where T : notnull =>
             slots.TryGetValue(entry, out int k) ? k : -1;
@@ -127,6 +132,17 @@ internal sealed class ReportWriterEmitter(
                 plan.Sums[s] = plan.Tests.Count;
                 List<string> terms = [.. s.PresentWhen.Count > 0 ? [PresentExpr(s.PresentWhen)] : (string[])[],
                                       .. s.RepetitionGuards.Select(RepetitionTest)];
+                plan.Tests.Add(string.Join(" && ", terms));
+            }
+        // A SOURCE / VALUE entry's occurrence is absent exactly when its full chain or its OCCURS … DEPENDING count says
+        // so (§13.18.54.4 GR11) — the SUM entry's twin above, and read in the same snapshot, by the rolled addition.
+        foreach (var o in r.ItemOccurrences)
+            if (o.Sum is null && ReferenceEquals(o.Family.Group, group)
+                && (o.PresentWhen.Count > 0 || o.RepetitionGuards.Count > 0))
+            {
+                plan.Items[o] = plan.Tests.Count;
+                List<string> terms = [.. o.PresentWhen.Count > 0 ? [PresentExpr(o.PresentWhen)] : (string[])[],
+                                      .. o.RepetitionGuards.Select(RepetitionTest)];
                 plan.Tests.Add(string.Join(" && ", terms));
             }
         _plans[group] = plan;
@@ -207,7 +223,7 @@ internal sealed class ReportWriterEmitter(
             // expression names a counter by its one compose-local variable whichever placement of whichever field reads it.
             using IDisposable? occurrence = f.Varyings.Count > 0
                 ? w.Block($"// VARYING counters at placement {rep + 1} (§13.18.64.4 GR3)") : null;
-            EmitVaryingCounters(r, f, rep, w);
+            EmitVaryingCounters(r, f.Varyings, rep, w);
             var spec = f.Columns[rep];
             // The operand this repetition takes (§13.18.63.4 GR23 / §13.18.53.4 GR4 — the ONE cycling reader is
             // ReportFieldModel.SourceAt). The index is the repetition ORDINAL, so a PRESENT WHEN that suppresses
@@ -292,9 +308,9 @@ internal sealed class ReportWriterEmitter(
     /// backend crash on conforming source.</para>
     /// <para>Counters are declared one DECLARING ENTRY at a time, outermost first, because a counter's FROM and BY may
     /// name the counters of the entries above it (§13.18.64.3 SR3).</para></summary>
-    private void EmitVaryingCounters(ReportModel r, ReportFieldModel f, int rep, CodeWriter w)
+    private void EmitVaryingCounters(ReportModel r, IReadOnlyList<ReportVaryingUse> varyings, int rep, CodeWriter w)
     {
-        foreach (var entryUses in f.Varyings.GroupBy(u => u.Counter.Group))
+        foreach (var entryUses in varyings.GroupBy(u => u.Counter.Group))
         {
             var uses = entryUses.ToList();
             int n = uses[0].Ordinal + (uses[0].PerPlacement ? rep : 0);
@@ -611,37 +627,143 @@ internal sealed class ReportWriterEmitter(
                     // an addend finer than the counter lost its extra digits one addend at a time: a 9V99 counter fed
                     // 1.000 then −0.005 held 1.00, where ADD of the same two values gives 0.99 (1.000 − 0.005 =
                     // 0.995, truncated). The SUM clause's own rounded-phrase (§13.18.54.2) is the mode of that store (kb/Work PB852's determination; GR4 speaks of the SOURCE clause's phrase).
-                    var family = sum.Family;
-                    var rcv = new ReceiverContext(family.Scale, Real: false, sum.Rounding, InSizeError: true,
-                        IntegerDigits: Math.Max(0, (family.Register.Pic?.DigitPositions ?? 0) - family.Scale));
-                    var addendExprs = term.Addends.Where(a => a.Value is not null).Select(a => a.Value!).ToList();
-                    string apply = term.Addends.Any(a => a.Value is null)
-                        ? LoudValue("Int128", $"report {r.Name}: SUM addend was rejected at bind (ISO §13.18.54.3 SR5)")
-                        : addendExprs.Count == 0
-                            ? "__c"
-                            : NumericRenderer.StoreExpr(
-                                num.Combine(new NumX("__c", family.Scale), "+", num.Fold(addendExprs, rcv), rcv),
-                                family.Scale, family.Register.ProfileName, sum.Rounding, raiseOnSizeError: true);
-                    string addend = $"(Int128 __c) => {apply}";
+                    // ⛔ A ROLLED TOTAL IS NOT THIS TERM'S GENERATE-DRIVEN ADDITION (kb/Work PB1294): GR9 sums a clause's
+                    // addends "separately according to the above rules", and a data-name-1 addend's rule is GR7 a)/b) —
+                    // added when ITS group is processed — so it registers with that group (RegisterRolledAdditions) and
+                    // this term keeps only the addends a GENERATE adds. A term of rolled addends alone adds nothing here.
+                    var driven = term.Addends.Where(a => !a.Rolled).ToList();
+                    if (driven.Count == 0) continue;
+                    string addend = SumAddition(r, sum, driven.Select(a => a.Value),
+                        $"report {r.Name}: SUM addend was rejected at bind (ISO §13.18.54.3 SR5)");
                     // null = no UPON phrase (GR7 c) 1) — every GENERATE for this report). An UPON phrase whose
                     // operands were ALL rejected emits the EMPTY filter instead, so a suppressed COBOLNET2046
                     // accumulates on NOTHING rather than on everything: the absence of the phrase and the
                     // failure to resolve it are opposite answers, and the fallback has to be the narrow one.
+                    // A detail of ANOTHER report fires on that report's GENERATE, so it registers with that report's
+                    // engine (RegisterRemoteUpon); only the details of THIS report stay in the local filter.
                     var upon = term.Upon.Where(d => d.Detail is not null).ToList();
-                    string uponArg = term.Upon.Count == 0
-                        ? "null"
-                        : upon.Count == 0
-                            ? "System.Array.Empty<string>()"
-                            : "new[] { " + string.Join(", ", upon.Select(d => CsLiteral(d.Detail!.Name!))) + " }";
-                    w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, {addend}, {uponArg});");
+                    var local = upon.Where(d => ReferenceEquals(d.Owner, r)).ToList();
+                    if (term.Upon.Count == 0)
+                        w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, {addend}, null);");
+                    else if (upon.Count == 0)
+                        w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, {addend}, System.Array.Empty<string>());");
+                    else if (local.Count > 0)
+                        w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, {addend}, "
+                            + "new[] { " + string.Join(", ", local.Select(d => CsLiteral(d.Detail!.Name!))) + " });");
                 }
             }
         }
+        RegisterCrossEngineAdditions(w, reports);
         // ⛔ NO USE BEFORE REPORTING HOOK IS INSTALLED HERE (kb/Work PB369). The declarative run before a group is
         // produced is selected per STATEMENT (§14.9.49.4 GR4 — "FORMATS 1 AND 2"), so it travels with the GENERATE /
         // TERMINATE call as the selector EmitBeforeReportingSelectors writes; an engine-wide hook installed by the
         // declaring program would run the declaring program's NON-global declaratives for a contained program's
         // GENERATE of a GLOBAL report, and could never run the contained program's own.
+    }
+
+    /// <summary>⛔ ONE ADDITION INTO A SUM COUNTER, AS A CLOSURE — the generate-driven term and the rolled addition both
+    /// are this (kb/Work PB1294; the rule is kb/Work PB1686's). ISO §13.18.54.4 GR3: "The adding is consistent with the
+    /// general rules of the ADD statement with the ON SIZE ERROR phrase or, in the case of an arithmetic expression,
+    /// the COMPUTE statement with the ON SIZE ERROR phrase", and GR9 sums the addends together — so ONE addition is
+    /// <c>ADD addend-1 … addend-n TO counter</c>: the addends' sum is the one initial evaluation
+    /// (<c>ArithmeticEmitter.EmitInPlace</c>'s Fold), combined with the counter's content at the WIDER of the two scales
+    /// and stored ONCE at the counter's scale with its capacity, its ROUNDED mode and its size-error test (the
+    /// receiver's profile — GR1). The counter's content arrives as the closure's argument and the stored content is the
+    /// closure's value. A null addend was refused at bind, and the closure then fails loudly rather than add nothing.</summary>
+    private string SumAddition(ReportModel r, ReportSumModel sum, IEnumerable<BoundExpr?> addends, string rejected,
+        CodeWriter? w = null, ReportItemOccurrence? source = null)
+    {
+        var family = sum.Family;
+        var rcv = new ReceiverContext(family.Scale, Real: false, sum.Rounding, InSizeError: true,
+            IntegerDigits: Math.Max(0, (family.Register.Pic?.DigitPositions ?? 0) - family.Scale));
+        var list = addends.ToList();
+        var addendExprs = list.OfType<BoundExpr>().ToList();
+        string apply = list.Any(a => a is null)
+            ? LoudValue("Int128", rejected)
+            : addendExprs.Count == 0
+                ? "__c"
+                : NumericRenderer.StoreExpr(
+                    num.Combine(new NumX("__c", family.Scale), "+", num.Fold(addendExprs, rcv), rcv),
+                    family.Scale, family.Register.ProfileName, sum.Rounding, raiseOnSizeError: true);
+        // ⛔ A ROLLED ADDEND'S OWN VARYING COUNTERS (§13.18.64.4 GR3): the SOURCE operand of the entry a rolled total
+        // adds may name a VARYING counter in scope at that entry, whose value is the entry's own occurrence's — a
+        // compose-local when the entry PRINTS. The addition runs when the entry's group is processed, so it declares the
+        // same locals for the occurrence it adds, by the ONE emission the compose uses (EmitVaryingCounters), and the
+        // closure becomes a block (kb/Work PB1294).
+        if (w is not null && source is { VaryingDependent: true })
+        {
+            int rep = source.Family.Columns > 1 ? source.Coordinates[^1] : 0;
+            string declarations = w.CaptureText(() => EmitVaryingCounters(source.Family.Report, source.Varyings, rep, w));
+            return $"(Int128 __c) => {{ {declarations} return {apply}; }}";
+        }
+        return $"(Int128 __c) => {apply}";
+    }
+
+    /// <summary>⛔ THE ADDITIONS A COUNTER RECEIVES FROM SOMETHING THAT IS NOT ITS OWN REPORT'S GENERATE LOOP, registered
+    /// once EVERY report's engine and groups exist (kb/Work PB1294) — a registration names the OTHER engine's object, so
+    /// it cannot be written while that engine is still unconstructed:
+    /// <list type="bullet">
+    /// <item><b>UPON on a detail of another report</b> (§13.18.54.4 GR7 c) 2), SR7's report-name qualifier): the event is
+    /// that detail's GENERATE, executed against ITS report's engine, so the addition registers there
+    /// (<c>AddGenerateTrigger</c>), once per appearance of the detail in the phrase.</item>
+    /// <item><b>A rolled total</b> (GR6/GR7 a)/b)): the addition registers with the report GROUP that contains data-name-1
+    /// (<c>AddRolled</c>) and happens when that group is processed — in a counter's own report or another's (SR4 g)).
+    /// Additions on one group run in the order registered, and an addition that READS a counter follows the additions
+    /// INTO it — GR6: "The additions necessary to compute its value are completed before the adding of the operand into
+    /// the current sum counter" — so the registrations of a group are put in dependency order, written order
+    /// otherwise.</item>
+    /// </list></summary>
+    private void RegisterCrossEngineAdditions(CodeWriter w, IReadOnlyList<ReportModel> reports)
+    {
+        var live = reports.Where(rr => rr.File is not null).ToList();   // an RD with no file failed at bind
+        foreach (var target in live)
+            foreach (var sum in target.Sums)
+                foreach (var term in sum.Terms)
+                {
+                    var driven = term.Addends.Where(a => !a.Rolled).ToList();
+                    var remote = term.Upon.Where(d => d.Detail is not null && !ReferenceEquals(d.Owner, target)).ToList();
+                    if (driven.Count == 0 || remote.Count == 0) continue;
+                    string addend = SumAddition(target, sum, driven.Select(a => a.Value),
+                        $"report {target.Name}: SUM addend was rejected at bind (ISO §13.18.54.3 SR5)");
+                    foreach (var d in remote)
+                        w.Line($"__RPT_{d.Owner!.CsIndex}.AddGenerateTrigger({CsLiteral(d.Detail!.Name!)}, "
+                            + $"__RPT_{target.CsIndex}, {sum.Id}, {addend});   // UPON a detail of report {d.Owner.Name} (ISO §13.18.54.4 GR7 c) 2))");
+                }
+
+        var pending = new List<(ReportModel Target, ReportSumModel Sum, ReportItemOccurrence Source)>();
+        foreach (var target in live)
+            foreach (var sum in target.Sums)
+                foreach (var a in sum.Terms.SelectMany(t => t.Addends).Where(a => a.Rolled))
+                    foreach (var o in a.RolledFrom)
+                        pending.Add((target, sum, o));
+        while (pending.Count > 0)
+        {
+            // The first registration no still-pending one feeds: a registration R reads counter C when its source IS C's
+            // occurrence, and is fed by every pending registration of the SAME group that adds into C.
+            int next = -1;
+            for (int i = 0; i < pending.Count && next < 0; i++)
+            {
+                bool fed = false;
+                for (int j = 0; j < pending.Count && !fed; j++)
+                    fed = j != i && ReferenceEquals(pending[j].Source.Family.Group, pending[i].Source.Family.Group)
+                        && pending[i].Source.Sum is { } read && ReferenceEquals(pending[j].Sum, read);
+                if (!fed) next = i;
+            }
+            if (next < 0) next = 0;   // a cycle (SR4 e), already refused at bind): written order
+            var (rolledTarget, rolledSum, source) = pending[next];
+            pending.RemoveAt(next);
+            var sourceReport = source.Family.Report;
+            int gi = sourceReport.Groups.IndexOf(source.Family.Group);
+            // GR11 — the slot of the addend entry in its group's presence snapshot; −1 is unconditional.
+            int slot = source.Sum is { } counter
+                ? PresencePlan.SlotOf(PlanOf(sourceReport, counter.PrintedIn).Sums, counter)
+                : PresencePlan.SlotOf(PlanOf(sourceReport, source.Family.Group).Items, source);
+            string addend = SumAddition(rolledTarget, rolledSum, [source.Value],
+                $"report {rolledTarget.Name}: the value of data-name-1 '{source.Family.Name}' is not a number a sum counter can add (ISO §13.18.54.4 GR6)",
+                w, source);
+            w.Line($"__RPT_{rolledTarget.CsIndex}.AddRolled(__rg{sourceReport.CsIndex}_{gi}, {rolledSum.Id}, {slot}, {addend});"
+                + $"   // rolled total of '{source.Family.Name}' (ISO §13.18.54.4 GR6/GR7)");
+        }
     }
 
     // ── The §14.9.49.4 GR4 Format-2 selector (kb/Work PB369) ─────────────────────────────────────────────────

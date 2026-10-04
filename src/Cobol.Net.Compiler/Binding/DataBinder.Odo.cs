@@ -62,10 +62,14 @@ public sealed partial class DataBinder
                 if (ph.CAPACITY() is not null && ph.dataReference() is { } capRef)
                     capName = CapacityRegisterName(capRef, where);
                 else if (ph.INITIALIZED() is not null) initialized = true;
-                else if (ph.FROM() is not null && ph.integerLiteral() is { } fl)
-                    fromCap = DynamicBoundWithinMaximum(ph, "FROM", CobolNet.Validation.IntegerOperandRules.HostValue(fl));
-                else if (ph.TO() is not null && ph.integerLiteral() is { } tl)
-                    toCap = DynamicBoundWithinMaximum(ph, "TO", CobolNet.Validation.IntegerOperandRules.HostValue(tl));
+                else if (ph.FROM() is not null && ph.integerOperand() is { } fl)
+                {
+                    if (IntegerOperandValue(fl, where) is { } from) fromCap = DynamicBoundWithinMaximum(ph, "FROM", from);
+                }
+                else if (ph.TO() is not null && ph.integerOperand() is { } tl)
+                {
+                    if (IntegerOperandValue(tl, where) is { } to) toCap = DynamicBoundWithinMaximum(ph, "TO", to);
+                }
             }
             var dyn = new OccursSpec
             {
@@ -78,15 +82,15 @@ public sealed partial class DataBinder
         if (!depending && keys.Count == 0) return null;
 
         // Each fixed bound is an integer literal or an integer constant-name (§13.10.3 SR2); the caller already
-        // resolved the LAST bound (the maximum) via OccursBoundValue — <paramref name="maxBound"/> — so an
+        // resolved the LAST bound (the maximum) via IntegerOperandValue — <paramref name="maxBound"/> — so an
         // unresolvable bound reports exactly once. Only integer-1 of a Format-2 pair resolves here.
-        var bounds = occ.occursBound();
+        var bounds = occ.integerOperand();
         int max = maxBound ?? 0;
         // Format 2 is `OCCURS integer-1 TO integer-2 … DEPENDING …` (§13.18.38 general formats); `OCCURS n
         // DEPENDING` without TO (a widespread dialect shorthand the grammar tolerates) takes minimum 1. Min
         // feeds only the SR16 check and the later EC-BOUND-ODO bounds — allocation is ALWAYS Max (§8.5.1.8).
         int min = !depending ? max
-            : bounds.Length > 1 ? OccursBoundValue(bounds[0], where) ?? 1
+            : bounds.Length > 1 ? IntegerOperandValue(bounds[0], where) ?? 1
             : 1;
         // data-name-1 — a QUALIFIED-DATA-NAME through the ONE data-name-n capture (kb/Work PB885). The whole
         // reference's GetText() stood here: `DEPENDING ON CNT OF G1` became the undefined name `CNTOFG1` (legal
