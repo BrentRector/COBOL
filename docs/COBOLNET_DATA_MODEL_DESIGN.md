@@ -1168,7 +1168,7 @@ length — not a constant — says how many occurrences it holds. Still outside:
 DEPENDING or dynamic-capacity table's element (a run-time multiplicity of components) and a cell-backed group
 holding both a dynamic-length item and the table.
 
-**CORE ships whole:** declaration (all phrases, order-independent) · out-of-line growable storage · CAPACITY
+**CORE ships whole:** declaration (all phrases, each once and in the printed order — §13.18.38.2 with §5.2.1, refused otherwise by `DataBinder.NarrowToDataDivisionFormats`, **COBOLNET2789**, kb/Work PB1265) · out-of-line growable storage · CAPACITY
 read + SET Format 14 write · implicit + explicit growth · INITIALIZED seeding · bounds/capacity ECs
 (EC-BOUND-SUBSCRIPT/-OVERFLOW/-TABLE-LIMIT/-SET, EC-FLOW-SEARCH via a per-table `_inSearch` guard) · SEARCH/SEARCH
 ALL over current capacity · `INITIALIZE <dynamic-table>` · **`INITIALIZE` of a group CONTAINING one** (§14.9.20.4
@@ -1187,7 +1187,7 @@ dynamic-length item or dynamic-capacity table SUBORDINATE (**1698**, §13.18.44.
 
 **Grammar (SHARED .g4 → FULL legacy guard; additive).** A new `CAPACITY` lexer token; a DYNAMIC alt on
 `occursClause` (LL-disjoint — DYNAMIC is not an integerLiteral; superset parse — no edition predicate) with an
-order-independent `occursDynamicPhrase*`; the COBOL-2014 introduction gate is the bind-time
+SUPERSET `occursDynamicPhrase*` (any order and number, narrowed at bind time — see above); the COBOL-2014 introduction gate is the bind-time
 `ConstructRegistry.Check(OccursDynamic2014)` at `OdoModel.OdoBindOccursSpec` → **COBOLNET0900** (the
 `VersionConformancePass` funnel at end state — `docs/rearchitecture/DESIGN-version-conformance-pipeline.md`).
 NO SET grammar change (Format 14 is the

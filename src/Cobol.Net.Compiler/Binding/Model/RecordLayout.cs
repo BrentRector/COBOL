@@ -135,9 +135,15 @@ internal static class RecordLayout
     /// class-max backing width at a Tier-B canonical (matching the emitted record layout), the plain image extent
     /// elsewhere. Null when the item or any ancestor carries OCCURS (no single fixed position — §12.4.5.12 SR1 /
     /// §14.9.40.3 SR6b ban OCCURS subjects; mirrors the Sort walk's bail).</summary>
-    public static int? OffsetOf(DataItem item)
+    public static int? OffsetOf(DataItem item) => item.Occurs is null ? FirstOccurrenceOffsetOf(item) : null;
+
+    /// <summary>The offset of <paramref name="item"/>'s FIRST occurrence within its record area — <see cref="OffsetOf"/>
+    /// for an item that may itself carry the OCCURS clause, whose first byte position §13.18.38.3 SR20 measures from
+    /// ("the first byte position defined by the data description entry containing the OCCURS clause"; kb/Work
+    /// PB1261). Null when an ANCESTOR carries OCCURS.</summary>
+    public static int? FirstOccurrenceOffsetOf(DataItem item)
     {
-        for (var p = item; p is not null; p = p.Parent)
+        for (var p = item.Parent; p is not null; p = p.Parent)
             if (p.Occurs is not null) return null;   // subject to OCCURS ⇒ no single fixed position
         DataItem root = item;
         while (root.Parent is { } parent) root = parent;

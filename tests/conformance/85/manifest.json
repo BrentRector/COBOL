@@ -378,7 +378,10 @@
   "pb1474_report_subscripts_legal",
   "pb1246_level_hierarchy_legal",
   "pb917_clause_lists_repeat_where_printed",
-  "pb1217_block_contains_ordered_range"
+  "pb1217_block_contains_ordered_range",
+  "pb1263_occurs_key_items_admitted",
+  "pb1263_occurs_key_is_table_in_outer_table",
+  "pb1261_depending_attributes_and_area"
  ],
  "pending": []
 }

@@ -253,7 +253,11 @@ public sealed partial class DataBinder
     /// (§8.4.6.2.2: "All data-names and screen-names subordinate to a global name are global names"), every
     /// condition-name associated with one ("All condition-names associated with a global name are global names"),
     /// every level-66 RENAMES of the record, and — by §8.4.6.2.3, "the scope of an index-name is identical to that
-    /// of the data-name that names the table" — every index-name (kb/Work PB919). Each item carries its depth, so
+    /// of the data-name that names the table" — every index-name (kb/Work PB919), and every named OCCURS DYNAMIC
+    /// CAPACITY register, which §13.18.38.3 SR30 treats "as though implicitly defined at the same level as the entry
+    /// containing the OCCURS clause" — subordinate to the global record, so a global name (kb/Work PB1674). ⛔ THESE
+    /// ARE EVERY NAME CLASS A DATA DESCRIPTION ENTRY DECLARES, and <c>GlobalNameClassDriftTests</c> keeps the list
+    /// total: a name index this binder gains is inherited here or excluded there with its reason. Each item carries its depth, so
     /// a nearer declaration of the same spelling wins by §8.4.6.2.1 3) at REFERENCE time
     /// (<see cref="Model.SymbolTable.NearestDeclaring{T}"/>), not by being left out here. Called nearest container
     /// first, after this unit's own data division has bound, so each name list stays in nearest-first order. The
@@ -273,6 +277,10 @@ public sealed partial class DataBinder
             conds.Add(cond);
         }
         foreach (var idx in item.Indexes) IndexNames.Inherit(idx, depth);
+        // Appended after this element's own register and each nearer container's (nearest first, as called), the
+        // order ReferenceResolver.CapacityRegisterFor reads. A register the container refused (SR30's COBOLNET1523)
+        // failed that compile and has no CapacityRegister view to inherit.
+        if (item.OccursSpec is { CapacityName: { } cap, CapacityRegister: not null }) AddCapacityRegister(cap, item);
         foreach (var child in item.Children) InheritGlobalSubtree(child, depth);
         foreach (var ren in item.Renames66) InheritGlobalSubtree(ren, depth);
     }

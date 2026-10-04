@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-269 drift tests.
+270 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -129,6 +129,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [GateLegDriftTests](../tests/Cobol.Net.Tests.Unit/GateLegDriftTests.cs) | ⛔ THE ORDERED GATE IS SOUND BY CONSTRUCTION ONLY IF EVERY WHOLE-ASSEMBLY RUN PROVES ITS POPULATION AND NO RUN BUT THE GATE'S LEGS CAN BE NARROWED (kb/Work PB1708, PB1718; DESIGN-test-build-ci.md §3.14.3–3.14.4): the one population check (scripts/test_population.py) fires on a dropped, a duplicated and a foreign case, and every dotnet test caller under scripts/ or .github/workflows/ scrubs the leg … | `scripts`, `tests/Directory.Build.props`, `tests/_shared/GateLegs.cs`, `tests`, `scripts/battery.sh`, `scripts/run_gate_legs.py` … |
 | [GateSlotDriftTests](../tests/Cobol.Net.Tests.Unit/GateSlotDriftTests.cs) | ⛔ THE GATE CAP IS FIFO AND NEVER LEAKS A SLOT (kb/Work PB1720; DESIGN-test-build-ci.md §3.14.6): scripts/gate_slot.py --self-test drives all five arms — FIFO order (a later waiter never overtakes a live earlier ticket, and a re-gate queues last), a killed holder releases its slot, a dead waiter leaves the queue, an orphaned tree is killed on Windows or keeps its slot until it exits on Linux, and t… | `scripts/gate_slot.py` |
 | [GlobalBridgeResidenceDriftTests](../tests/Cobol.Net.Tests.Unit/GlobalBridgeResidenceDriftTests.cs) | ⛔ EVERY RESIDENCE A GLOBAL NAME CAN HAVE IS REACHABLE FROM A CONTAINED PROGRAM (kb/Work PB1009). | — |
+| [GlobalNameClassDriftTests](../tests/Cobol.Net.Tests.Unit/GlobalNameClassDriftTests.cs) | ⛔ EVERY NAME CLASS A DATA DESCRIPTION ENTRY DECLARES REACHES A CONTAINED PROGRAM (kb/Work PB1674, PB1243). | — |
 | [GobackPhraseDecodeDriftTests](../tests/Cobol.Net.Tests.Unit/GobackPhraseDecodeDriftTests.cs) | ⛔ A STATEMENT WHOSE PARSE NODE IS DECODED TWICE, ONCE PER DISPATCH ARM, LOSES A PHRASE ON ONE OF THEM. | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs`, `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs` |
 | [Gr4GroupDecisionDriftTests](../tests/Cobol.Net.Tests.Unit/Gr4GroupDecisionDriftTests.cs) | ⛔ ISO §14.9.25.4 GR4 IS ONE RULE OVER BOTH OPERANDS, AND ONE CODEC IN BOTH DIRECTIONS (kb/Work PB430). | `src/Cobol.Net.Compiler/Binding/Bound/MoveClassifier.cs`, `src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs` |
 | [GrammarDiagramGeneratorDriftTests](../tests/Cobol.Net.Tests.Unit/GrammarDiagramGeneratorDriftTests.cs) | "Generator runs clean" check for scripts/gen-grammar-diagrams.ps1 — the Obsidian grammar railroad-diagram layer (kb/Grammar/), which renders one syntax diagram per rule for each ANTLR parser fragment via the vendored bottlecaps tools/rr/rr.war. | `scripts/gen-grammar-diagrams.ps1` |

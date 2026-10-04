@@ -6564,31 +6564,45 @@ public static class DiagnosticCatalog
         + "boundary (ISO §8.4.3.11.3 syntax rule 4) — the address a pointer holds is a byte's.",
         "ISO §8.4.3.11.3 SR4");
 
-    /// <summary>COBOLNET2796 — a conditional statement (a statement whose conditional phrase is written and whose
-    /// explicit scope terminator is not) is written as the operand of a phrase whose general format prints
-    /// imperative-statement-n (kb/Work PB351): `READ F AT END IF X = 1 DISPLAY "A" NOT AT END …`. Refused by
-    /// <c>ProcedureFormatPass</c> at every edition; IF's statement-1 / statement-2 are the one operand that admits
-    /// a trailing conditional statement (§14.9.19.3 SR1).</summary>
-    public static readonly DiagnosticDescriptor ConditionalStatementAsImperative = new(
-        "COBOLNET2796", "conditional-statement-as-imperative", EditionSeverity.Error,
-        "A conditional statement is written where the general format requires an imperative-statement. Any statement "
-        + "with a conditional phrase that is not terminated by its explicit scope terminator is a conditional "
-        + "statement, and an imperative statement may be a conditional statement only when it is delimited by its "
-        + "explicit scope terminator (Table 12). Close the inner statement with its END- terminator (END-IF, "
-        + "END-READ, END-SEARCH, …).",
-        "ISO §14.5.1; Table 12; §14.9.19.3 SR1");
+    /// <summary>COBOLNET2787 — an OCCURS KEY data-name-2 resolves within the table but is an item the KEY phrase may
+    /// not name (kb/Work PB1263): under a nested table (SR4), itself a table (SR6), of class boolean, message-tag,
+    /// object or pointer (SR8), or a variable-length group (SR9). Bound in <c>DataBinder.OccursKeyResolve</c>, beside
+    /// SR3's COBOLNET2353.</summary>
+    public static readonly DiagnosticDescriptor OccursKeyItemNotAdmitted = new(
+        "COBOLNET2787", "occurs-key-item-not-admitted", EditionSeverity.Error,
+        "A data-name of an OCCURS clause's ASCENDING / DESCENDING KEY phrase names an item the KEY phrase may not "
+        + "name. A key needs exactly one ordered value per table element, so ISO §13.18.38.3 forbids a key under a "
+        + "group within the table that contains an OCCURS clause (SR4), a key whose own entry contains an OCCURS "
+        + "clause unless it is the subject of the entry (SR6), a key of class boolean, message-tag, object, or "
+        + "pointer (SR8), and a key that is a variable-length group (SR9).",
+        "ISO §13.18.38.3 SR4, SR6, SR8, SR9");
 
-    /// <summary>COBOLNET2797 — the procedure division body mixes §14.2.1 Format 1 (with sections) and Format 2
-    /// (without sections) (kb/Work PB1146): a sentence or a paragraph outside every section in a division that has
-    /// sections or DECLARATIVES, or a second DECLARATIVES portion. Refused by <c>ProcedureFormatPass</c> at every
-    /// edition.</summary>
-    public static readonly DiagnosticDescriptor ProcedureDivisionFormatMixed = new(
-        "COBOLNET2797", "procedure-division-format-mixed", EditionSeverity.Error,
-        "The procedure division body is neither §14.2.1 Format 1 (with-sections) nor Format 2 (without-sections). "
-        + "Format 1 prints nothing between the procedure division header (or END DECLARATIVES) and the first section "
-        + "header and one DECLARATIVES portion; §14.4.1: 'If one paragraph is in a section, all paragraphs shall be in "
-        + "sections.' Put the leading sentences and paragraphs in a section, or remove the sections and DECLARATIVES.",
-        "ISO §14.2.1; §14.4.1");
+    /// <summary>COBOLNET2788 — an OCCURS DEPENDING ON data-name-1 lacks the GLOBAL or EXTERNAL attribute the table's
+    /// record has (kb/Work PB1261; §13.18.38.3 SR18 / SR21). Bound in <c>DataBinder.OdoResolve</c>.</summary>
+    public static readonly DiagnosticDescriptor OccursDependingAttributeMismatch = new(
+        "COBOLNET2788", "occurs-depending-attribute-mismatch", EditionSeverity.Error,
+        "The object of an OCCURS DEPENDING ON phrase does not share its table record's GLOBAL or EXTERNAL attribute. "
+        + "ISO §13.18.38.3 SR18: under an entry containing the GLOBAL clause, data-name-1 \"shall be a global name and "
+        + "shall reference a data item that is described in the same data division\"; SR21: in a record description "
+        + "entry containing the EXTERNAL clause, data-name-1 \"shall reference a data item possessing the external "
+        + "attribute that is described in the same data division\". Otherwise a contained program, or another "
+        + "program of the run unit sharing the record, would see a table whose extent depends on a counter it "
+        + "cannot see or does not share.",
+        "ISO §13.18.38.3 SR18, SR21");
+
+    /// <summary>COBOLNET2789 — a data description entry's OCCURS clause matches none of the data division's general
+    /// formats (kb/Work PB1265): TO without DEPENDING or DEPENDING without TO, a STEP phrase (report writer only), or a
+    /// Format 4 phrase repeated or out of order. Bound in <c>DataBinder.NarrowToDataDivisionFormats</c>; the report
+    /// section's Format 3 arm is COBOLNET2021's.</summary>
+    public static readonly DiagnosticDescriptor OccursFormatNotPrinted = new(
+        "COBOLNET2789", "occurs-format-not-printed", EditionSeverity.Error,
+        "An OCCURS clause in a data description entry is in none of ISO §13.18.38.2's formats for one: Format 1 "
+        + "`OCCURS integer-2 TIMES`, Format 2 `OCCURS integer-1 TO integer-2 TIMES DEPENDING ON data-name-1` (no part "
+        + "of it optional), or Format 4 `OCCURS DYNAMIC [ CAPACITY IN data-name-3 ] [ FROM integer-4 ] [ TO integer-5 ] "
+        + "[ INITIALIZED ]` (each phrase once, in that order, §5.2.1), each followed by its KEY and INDEXED BY phrases. "
+        + "The optional TO, the optional DEPENDING and the STEP phrase belong to Format 3, the report writer's.",
+        "ISO §13.18.38.2; §5.2.1");
+
     /// <summary>COBOLNET2790 — a GET or SET PROPERTY method (an explicit METHOD-ID, or an interface's prototype) breaks
     /// one of §11.7.3's property-method syntax rules (kb/Work PB1503): SR5, an explicit accessor for a data-name of the
     /// containing object's working storage that carries a PROPERTY clause (ANY PROPERTY clause, WITH NO GET / WITH NO SET
@@ -6634,6 +6648,33 @@ public static class DiagnosticCatalog
         + "marker of the program that contains it; SR5 — method-name-1 shall be identical to the METHOD-ID's "
         + "method-name, and shall be omitted for a GET or SET PROPERTY method. The site names the rule it caught.",
         "ISO §10.7.3 SR1/SR2/SR3/SR4/SR5/SR6/SR7/SR8/SR9");
+
+    /// <summary>COBOLNET2796 — a conditional statement (a statement whose conditional phrase is written and whose
+    /// explicit scope terminator is not) is written as the operand of a phrase whose general format prints
+    /// imperative-statement-n (kb/Work PB351): `READ F AT END IF X = 1 DISPLAY "A" NOT AT END …`. Refused by
+    /// <c>ProcedureFormatPass</c> at every edition; IF's statement-1 / statement-2 are the one operand that admits
+    /// a trailing conditional statement (§14.9.19.3 SR1).</summary>
+    public static readonly DiagnosticDescriptor ConditionalStatementAsImperative = new(
+        "COBOLNET2796", "conditional-statement-as-imperative", EditionSeverity.Error,
+        "A conditional statement is written where the general format requires an imperative-statement. Any statement "
+        + "with a conditional phrase that is not terminated by its explicit scope terminator is a conditional "
+        + "statement, and an imperative statement may be a conditional statement only when it is delimited by its "
+        + "explicit scope terminator (Table 12). Close the inner statement with its END- terminator (END-IF, "
+        + "END-READ, END-SEARCH, …).",
+        "ISO §14.5.1; Table 12; §14.9.19.3 SR1");
+
+    /// <summary>COBOLNET2797 — the procedure division body mixes §14.2.1 Format 1 (with sections) and Format 2
+    /// (without sections) (kb/Work PB1146): a sentence or a paragraph outside every section in a division that has
+    /// sections or DECLARATIVES, or a second DECLARATIVES portion. Refused by <c>ProcedureFormatPass</c> at every
+    /// edition.</summary>
+    public static readonly DiagnosticDescriptor ProcedureDivisionFormatMixed = new(
+        "COBOLNET2797", "procedure-division-format-mixed", EditionSeverity.Error,
+        "The procedure division body is neither §14.2.1 Format 1 (with-sections) nor Format 2 (without-sections). "
+        + "Format 1 prints nothing between the procedure division header (or END DECLARATIVES) and the first section "
+        + "header and one DECLARATIVES portion; §14.4.1: 'If one paragraph is in a section, all paragraphs shall be in "
+        + "sections.' Put the leading sentences and paragraphs in a section, or remove the sections and DECLARATIVES.",
+        "ISO §14.2.1; §14.4.1");
+
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

@@ -2312,7 +2312,20 @@
   "pb1212-based-type-of-class-object",
   "pb1212-external-type-of-class-pointer",
   "pb1212-external-type-of-class-object",
-  "pb1212-external-file-record-strong-type"
+  "pb1212-external-file-record-strong-type",
+  "pb1263-occurs-key-under-nested-table",
+  "pb1263-occurs-key-is-table",
+  "pb1263-occurs-key-boolean",
+  "pb1263-occurs-key-variable-length-group",
+  "pb1261-depending-not-global",
+  "pb1261-depending-not-external",
+  "pb1261-depending-in-sibling-fd-record",
+  "pb1261-report-depending-not-global",
+  "pb1265-occurs-depending-without-to",
+  "pb1265-occurs-to-without-depending",
+  "pb1265-occurs-step-in-working-storage",
+  "pb1265-occurs-dynamic-phrase-repeated",
+  "pb1265-occurs-dynamic-phrases-reordered"
  ],
  "pending": []
 }

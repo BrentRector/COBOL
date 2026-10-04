@@ -80,7 +80,7 @@ public sealed class OccursDynamicGuardTests
     public void ValueOnElementaryDynamicEntry_CapacityIsMinimum_EveryOccurrenceTakesTheValue()
     {
         var (ok, diag) = EditionHarness.Compile(Prog(
-            "01 WS-TABLE.\n   05 WS-E PIC 9(3) OCCURS DYNAMIC FROM 3 CAPACITY IN WS-CAP VALUE 7."), 2014);
+            "01 WS-TABLE.\n   05 WS-E PIC 9(3) OCCURS DYNAMIC CAPACITY IN WS-CAP FROM 3 VALUE 7."), 2014);
         Assert.True(ok, $"a Format 1 VALUE on an elementary dynamic entry is conforming source "
             + $"(§13.18.38.3 forbids it nowhere; §13.18.63.4 GR16 is FORMAT 2): {string.Join("; ", diag)}");
     }
@@ -122,7 +122,7 @@ public sealed class OccursDynamicGuardTests
             FILE SECTION.
             FD  F.
             01  REC.
-                05  DT OCCURS DYNAMIC FROM 2 CAPACITY IN CP PIC 9(3).
+                05  DT OCCURS DYNAMIC CAPACITY IN CP FROM 2 PIC 9(3).
             PROCEDURE DIVISION.
             MAIN-PARA.
                 DISPLAY "X".

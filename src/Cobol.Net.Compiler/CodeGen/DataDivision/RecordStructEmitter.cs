@@ -22,7 +22,7 @@ internal sealed class RecordStructEmitter(EmitContext ctx, PhysicalModel phys, G
         // An OCCURS DYNAMIC CAPACITY register is an implicit VIEW over the table's Capacity — it has NO storage
         // field, but DISPLAY / MOVE-to-alphanumeric of the register formats through its own NumProfile (ISO
         // §13.18.38 GR15 / §8.5.1.9.1; data-model D9), so emit those profiles (not fields) too.
-        foreach (var tbl in ctx.Data.CapacityRegisters.Values)
+        foreach (var tbl in ctx.Data.DeclaredCapacityRegisterTables)
             if (tbl.OccursSpec?.CapacityRegister is { } reg) EmitProfiles(reg, w);
         // Programs are instantiable classes (interprogram design D3): root + index fields are INSTANCE fields —
         // a fresh instance IS the §14.6.2.3.2 initial state; the registry's cached singleton IS last-used state.

@@ -26,6 +26,7 @@ public sealed partial class DataBinder
     /// alone carries those (the dominant case stays allocation-free).</summary>
     private OccursSpec? OdoBindOccursSpec(Core.OccursClauseContext occ, string where, int? maxBound)
     {
+        NarrowToDataDivisionFormats(occ, where);
         bool depending = occ.DEPENDING() is not null;
         // ONE list in PHRASE ORDER — ISO §13.18.38.4 GR3 "If more than one data-name-2 is specified, they are
         // specified in descending order of significance", which is what §14.9.37.3 SR11 is a rule about. Splitting
@@ -50,7 +51,8 @@ public sealed partial class DataBinder
         }
 
         // Format 4 — a DYNAMIC-capacity table (§13.18.38 Format 4, D9): capture CAPACITY IN / FROM / TO / INITIALIZED
-        // (phrases order-independent). ALWAYS returns a spec (a keyless dynamic table still needs IsDynamic recorded,
+        // (each at most once and in the printed order — NarrowToDataDivisionFormats has refused anything else, so a
+        // phrase here is the only one of its kind). ALWAYS returns a spec (a keyless dynamic table still needs IsDynamic recorded,
         // unlike a keyless fixed table where DataItem.Occurs alone suffices). DataItem.Occurs stays null — a dynamic
         // table has no fixed physical capacity; its storage is the out-of-line CobolDynTable.
         if (occ.DYNAMIC() is not null)
@@ -88,8 +90,9 @@ public sealed partial class DataBinder
         var bounds = occ.integerOperand();
         int max = maxBound ?? 0;
         // Format 2 is `OCCURS integer-1 TO integer-2 … DEPENDING …` (§13.18.38 general formats); `OCCURS n
-        // DEPENDING` without TO (a widespread dialect shorthand the grammar tolerates) takes minimum 1. Min
-        // feeds only the SR16 check and the later EC-BOUND-ODO bounds — allocation is ALWAYS Max (§8.5.1.8).
+        // DEPENDING` without TO was REFUSED by NarrowToDataDivisionFormats (kb/Work PB1265) and binds here, under
+        // that failed compile, with minimum 1 only so the rest of the entry still binds. Min feeds only the SR16
+        // check and the later EC-BOUND-ODO bounds — allocation is ALWAYS Max (§8.5.1.8).
         int min = !depending ? max
             : bounds.Length > 1 ? IntegerOperandValue(bounds[0], where) ?? 1
             : 1;
@@ -109,6 +112,67 @@ public sealed partial class DataBinder
         };
         spec.Keys.AddRange(keys);
         return spec;
+    }
+
+    /// <summary>⛔ THE DATA DIVISION'S OCCURS CLAUSE IS FORMAT 1, 2 OR 4 — NARROWED HERE FROM THE GRAMMAR'S SUPERSET
+    /// (kb/Work PB1265). <c>occursClause</c> parses every phrase of every format optionally and Format 4's phrases in
+    /// any order and number, so that the refusal can name the rule; the report section narrows the same parse to
+    /// Format 3 (<c>DataBinder.Reports.cs#ReportOccursOf</c>), and this is the other arm. ISO §13.18.38.2:
+    /// <list type="bullet">
+    /// <item>Format 2 prints <c>integer-1 TO integer-2 TIMES DEPENDING ON data-name-1</c> with nothing bracketed, so a
+    /// TO without DEPENDING and a DEPENDING without TO are each in no data-division format (the bracketed
+    /// <c>[ integer-1 TO ]</c> and <c>[ DEPENDING … ]</c> are Format 3's, the report writer's).</item>
+    /// <item>STEP integer-3 exists only in Format 3.</item>
+    /// <item>Format 4 prints <c>[ CAPACITY IN data-name-3 ] [ FROM integer-4 ] [ TO integer-5 ] [ INITIALIZED ]</c>:
+    /// each phrase at most once, and — §5.2.1, "The words, phrases, clauses, punctuation, and operands in each
+    /// general format shall be written in the compilation group in the sequence given in the general format, unless
+    /// otherwise specified by the rules of that format" — in that order. A repeated FROM used to bind its last value
+    /// in silence.</item>
+    /// </list>
+    /// Each violation is COBOLNET2789; the entry still binds (under the failed compile) so its other clauses are
+    /// checked.</summary>
+    private static readonly string[] Format4PhraseNames = ["CAPACITY IN", "FROM", "TO", "INITIALIZED"];
+
+    private void NarrowToDataDivisionFormats(Core.OccursClauseContext occ, string where)
+    {
+        void Refuse(Antlr4.Runtime.ParserRuleContext at, string what)
+        {
+            using var _ = Edition.At(at);
+            Edition.Error(DiagnosticCatalog.OccursFormatNotPrinted, $"{where}: OCCURS clause — {what}");
+        }
+        if (occ.DYNAMIC() is not null)
+        {
+            static int Rank(Core.OccursDynamicPhraseContext p) =>
+                p.CAPACITY() is not null ? 0 : p.FROM() is not null ? 1 : p.TO() is not null ? 2 : 3;
+            var names = Format4PhraseNames;
+            int last = -1;
+            foreach (var ph in occ.occursDynamicPhrase())
+            {
+                int r = Rank(ph);
+                if (r == last)
+                    Refuse(ph, $"the {names[r]} phrase is written twice; Format 4 prints each of its phrases once "
+                        + "(ISO §13.18.38.2: OCCURS DYNAMIC [ CAPACITY IN data-name-3 ] [ FROM integer-4 ] "
+                        + "[ TO integer-5 ] [ INITIALIZED ])");
+                else if (r < last)
+                    Refuse(ph, $"the {names[r]} phrase is written after the {names[last]} phrase; Format 4 prints "
+                        + "CAPACITY IN, FROM, TO, INITIALIZED in that order (ISO §13.18.38.2), and \"The words, "
+                        + "phrases, clauses, punctuation, and operands in each general format shall be written in the "
+                        + "compilation group in the sequence given in the general format\" (ISO §5.2.1)");
+                last = Math.Max(last, r);
+            }
+            return;
+        }
+        if (occ.occursStepPhrase() is { } step)
+            Refuse(step, "the STEP phrase belongs only to the report-writer format, which a report group "
+                + "description entry uses (ISO §13.18.38.2 Format 3: OCCURS [ integer-1 TO ] integer-2 TIMES "
+                + "[ DEPENDING ON data-name-1 ] [ STEP integer-3 ])");
+        bool hasTo = occ.TO() is not null, depending = occ.DEPENDING() is not null;
+        if (hasTo != depending)
+            Refuse(occ, (hasTo ? "integer-1 TO integer-2 is written without DEPENDING ON data-name-1"
+                               : "DEPENDING ON data-name-1 is written without integer-1 TO")
+                + "; a data description entry's occurs-depending table is Format 2, which prints "
+                + "\"OCCURS integer-1 TO integer-2 TIMES DEPENDING ON data-name-1\" with no part optional, and a fixed "
+                + "table is Format 1, \"OCCURS integer-2 TIMES\" (ISO §13.18.38.2)");
     }
 
     /// <summary>⛔ §13.18.38.3 SR29 (kb/Work PB1264): "The implementor shall specify a maximum permissible value for
@@ -189,9 +253,57 @@ public sealed partial class DataBinder
                         + "entry containing the OCCURS clause\" (ISO §13.18.38.3 SR3)");
                     item = null;
                 }
+                else if (item is not null && OccursKeyItemFault(table, item) is { } fault)
+                {
+                    Edition.Error(DiagnosticCatalog.OccursKeyItemNotAdmitted,
+                        $"OCCURS … KEY IS '{written}' on '{subject}': {fault}");
+                    item = null;
+                }
                 spec.ResolvedKeys.Add(item);
             }
         }
+    }
+
+    /// <summary>⛔ WHAT a resolved KEY data-name-2 may BE (kb/Work PB1263) — §13.18.38.3's four constraints on the item,
+    /// asked once the name has resolved within the table (SR3, above). Null when the key is admitted; otherwise the
+    /// broken rule, quoted. Each one exists because a key must have exactly ONE ordered value per table element for
+    /// SEARCH ALL and the table SORT to mean anything:
+    /// <list type="bullet">
+    /// <item>SR4 — "If data-name-2 is subordinate to an alphanumeric group item, bit group item, national group item,
+    /// or strongly-typed group item that is subordinate to the entry containing the OCCURS clause, that group item
+    /// shall not contain an OCCURS clause": no table may sit BETWEEN the table and its key. The rule's own list of
+    /// group kinds is asked (<see cref="ItemCategory.GroupKindsOf"/>), so a group that is ONLY a variable-length
+    /// group is not named by it.</item>
+    /// <item>SR6 — "The data item identified by data-name-2 shall not contain an OCCURS clause except when
+    /// data-name-2 is the subject of the entry".</item>
+    /// <item>SR8 — "The KEY phrase shall not be specified for a data item of class boolean, message-tag, object, or
+    /// pointer" (<see cref="ItemCategory.IsBooleanMessageTagObjectOrPointer"/>).</item>
+    /// <item>SR9 — "Data-name-2 shall not reference a variable-length group", §8.5.1.12.1's "group item whose data
+    /// description has at least one dynamic-length elementary item or dynamic-capacity table as a subordinate
+    /// item".</item>
+    /// </list></summary>
+    private static string? OccursKeyItemFault(DataItem table, DataItem key)
+    {
+        const GroupKinds Sr4Kinds = GroupKinds.Alphanumeric | GroupKinds.Bit | GroupKinds.National | GroupKinds.StronglyTyped;
+        // SR4 asks about a group BETWEEN the table entry and its key. When the key IS the table (SR6 admits that), no group
+        // lies between them: key.Parent is already above the table, so the walk below would never meet it and would
+        // charge the key with any OCCURS group that merely ENCLOSES the table (a table inside OUTER OCCURS 2).
+        for (DataItem? g = ReferenceEquals(key, table) ? null : key.Parent; g is not null && !ReferenceEquals(g, table); g = g.Parent)
+            if (g.IsTable && (ItemCategory.GroupKindsOf(g) & Sr4Kinds) != 0)
+                return $"the key is subordinate to '{g.CobolName ?? g.CsName}', a group within the table that contains an "
+                    + "OCCURS clause — \"If data-name-2 is subordinate to an alphanumeric group item, bit group item, "
+                    + "national group item, or strongly-typed group item that is subordinate to the entry containing the "
+                    + "OCCURS clause, that group item shall not contain an OCCURS clause\" (ISO §13.18.38.3 SR4)";
+        if (!ReferenceEquals(key, table) && key.IsTable)
+            return "the key's own entry contains an OCCURS clause — \"The data item identified by data-name-2 shall not "
+                + "contain an OCCURS clause except when data-name-2 is the subject of the entry\" (ISO §13.18.38.3 SR6)";
+        if (ItemCategory.IsBooleanMessageTagObjectOrPointer(key))
+            return "the key is a data item of class boolean, message-tag, object or pointer — \"The KEY phrase shall not "
+                + "be specified for a data item of class boolean, message-tag, object, or pointer\" (ISO §13.18.38.3 SR8)";
+        if (ItemCategory.GroupKindsOf(key).HasFlag(GroupKinds.VariableLength))
+            return "the key is a variable-length group (ISO §8.5.1.12.1) — \"Data-name-2 shall not reference a "
+                + "variable-length group\" (ISO §13.18.38.3 SR9)";
+        return null;
     }
 
     /// <summary>
@@ -265,6 +377,16 @@ public sealed partial class DataBinder
                 Edition.Error("COBOLNET0852", $"OCCURS … DEPENDING ON '{depName}' on '{subject}': data-name-1 "
                     + "shall describe an integer (ISO §13.18.38.3 SR17)");
 
+            // SR18 / SR21 (kb/Work PB1261): data-name-1 must share the table record's SCOPE and RESIDENCE attributes,
+            // or the table's current extent would depend on a counter that a program sharing the record cannot see
+            // (GLOBAL) or that is not shared with it (EXTERNAL — two run-unit programs would disagree about the
+            // record's length). "Described in the same data division" holds by construction: this pass runs inside
+            // Bind, before a contained program inherits any container's names, so data-name-1 resolved among this
+            // element's own items.
+            if (DependingAttributeFault(item, dep) is { } attributeFault)
+                Edition.Error(DiagnosticCatalog.OccursDependingAttributeMismatch,
+                    $"OCCURS … DEPENDING ON '{writtenDep}' on '{subject}': {attributeFault}");
+
             // SR2: data-name-1 shall not be subscripted (it cannot lie within any table). A TABLE is any OCCURS — a
             // Format-4 DYNAMIC one leaves Occurs null (kb/Work PB1260) — and "lies within a table" is the ONE arity
             // answer, DataItem.SubscriptArity (a walk written nowhere else: SubscriptAdmissionDriftTests).
@@ -311,22 +433,83 @@ public sealed partial class DataBinder
                 }
             }
 
-            // SR20: data-name-1 shall not occupy a character position within the range delineated by the
-            // table's first character position and the record's last — within the SAME record it must lie
-            // strictly BEFORE the table (record leaf order IS character order for the canonical storage).
-            if (ReferenceEquals(dep.Root, item.Root))
-            {
-                var leaves = LeavesOf(item.Root).ToList();
-                int tableStart = leaves.FindIndex(l => OdoModel.IsWithin(l, item));
-                int depIdx = leaves.FindIndex(l => ReferenceEquals(l, dep));
-                if (tableStart >= 0 && depIdx >= tableStart)
-                    Edition.Error("COBOLNET0857", $"OCCURS … DEPENDING ON '{depName}' on '{subject}': "
-                        + "data-name-1 shall not occupy a character position within the range from the table's "
-                        + "first character position to the last character position of the record "
-                        + "(ISO §13.18.38.3 SR20)");
-            }
+            // SR20: "The data item defined by data-name-1 shall not occupy a byte position within the range of the
+            // first byte position defined by the data description entry containing the OCCURS clause and the last
+            // byte position defined by the record description entry containing that OCCURS clause."
+            if (DependingInsideTableRange(item, dep))
+                Edition.Error("COBOLNET0857", $"OCCURS … DEPENDING ON '{depName}' on '{subject}': "
+                    + "data-name-1 shall not occupy a byte position within the range from the table's first byte "
+                    + "position to the last byte position of its record (ISO §13.18.38.3 SR20)"
+                    + (ReferenceEquals(dep.Root, item.Root) ? ""
+                        : $" — '{dep.Root.CobolName}' and '{item.Root.CobolName}' are one storage area"));
         }
     }
+
+    /// <summary>⛔ §13.18.38.3 SR20 over the record's STORAGE AREA, not its entry (kb/Work PB1261). The range is
+    /// byte positions — from the table's first to its record's last — and a byte position belongs to an AREA, which
+    /// more than one record description can describe: §13.18.33.4 GR3, "Multiple level 1 entries subordinate to a FD
+    /// or SD entry represent implicit redefinitions of the same area", and a level-1 REDEFINES. Such records share
+    /// one <see cref="RedefinesClass"/> and each begins at the area's first byte, so a counter in a sibling record
+    /// sits at its own record offset in the same area. The test compared record ROOTS and so let that counter
+    /// through, though it overlays the table's bytes.
+    /// <para>Within ONE record, leaf order IS byte order for the canonical storage, so the counter must lie strictly
+    /// before the table. Across the records of one area the counter's byte window is compared with the table's:
+    /// its offset in its own record against the table's offset and its record's extent (the table at its maximum,
+    /// §8.5.1.8 — the allocation every record of the area is described against).</para></summary>
+    private static bool DependingInsideTableRange(DataItem table, DataItem dep)
+    {
+        if (ReferenceEquals(dep.Root, table.Root))
+        {
+            var leaves = LeavesOf(table.Root).ToList();
+            int tableStart = leaves.FindIndex(l => OdoModel.IsWithin(l, table));
+            int depIdx = leaves.FindIndex(l => ReferenceEquals(l, dep));
+            return tableStart >= 0 && depIdx >= tableStart;
+        }
+        if (dep.Root.Class is not { } area || !ReferenceEquals(table.Root.Class, area)) return false;
+        if (RecordLayout.FirstOccurrenceOffsetOf(table) is not { } first || RecordLayout.OffsetOf(dep) is not { } at)
+            return false;
+        int recordEnd = RecordLayout.PhysicalWidth(table.Root);
+        return at < recordEnd && at + RecordLayout.PhysicalOccurrenceWidth(dep) > first;
+    }
+
+    /// <summary>The §13.18.38.3 SR18 / SR21 screen of data-name-1's ATTRIBUTES against the table's record (kb/Work
+    /// PB1261); null when they agree.
+    /// <para>SR18 — "If the OCCURS clause is specified in an entry subordinate to one containing the GLOBAL clause,
+    /// data-name-1, if specified, shall be a global name and shall reference a data item that is described in the
+    /// same data division". The entry containing the OCCURS clause is never level 1 (SR1 a)), so it is subordinate to
+    /// its record, and to the FD of a file-section record: §13.18.27.3 SR1 admits GLOBAL on both.
+    /// <see cref="IsGlobalRecord"/> is "a global name" for data-name-1 (§8.4.6.2.2).</para>
+    /// <para>SR21 — "If the OCCURS clause is specified in a data description entry included in a record description
+    /// entry containing the EXTERNAL clause, data-name-1 shall reference a data item possessing the external
+    /// attribute that is described in the same data division". The TABLE's side is the record entry's own clause
+    /// (or the EXTERNAL type it is "subject to the same rules" as, §13.18.22.4 GR3); data-name-1's is the
+    /// <see cref="HasExternalAttribute"/> attribute.</para></summary>
+    private string? DependingAttributeFault(DataItem table, DataItem dep)
+    {
+        if (IsGlobalRecord(table.Root) && !IsGlobalRecord(dep.Root))
+            return $"the table's record '{table.Root.CobolName}' is global and data-name-1 is not a global name — \"If "
+                + "the OCCURS clause is specified in an entry subordinate to one containing the GLOBAL clause, "
+                + "data-name-1, if specified, shall be a global name\" (ISO §13.18.38.3 SR18)";
+        if ((table.Root.HasExternalClause || table.Root.ExternalFromType) && !HasExternalAttribute(dep.Root))
+            return $"the table's record '{table.Root.CobolName}' is EXTERNAL and data-name-1 does not possess the "
+                + "external attribute — \"data-name-1 shall reference a data item possessing the external attribute "
+                + "that is described in the same data division\" (ISO §13.18.38.3 SR21)";
+        return null;
+    }
+
+    /// <summary>Is <paramref name="record"/> — and so every data-name subordinate to it — a global name? ISO
+    /// §8.4.6.2.2: "A constant-name, file-name, record-name, report-name, screen-name, or type-name described with a
+    /// GLOBAL clause is a global name. All data-names and screen-names subordinate to a global name are global
+    /// names" — the record's own GLOBAL clause, or its file description's (§13.18.27.3 SR1 b) and d)).</summary>
+    private bool IsGlobalRecord(DataItem record) =>
+        record.HasGlobalClause || Files.Any(f => f.IsGlobal && f.Records.Contains(record));
+
+    /// <summary>Does <paramref name="record"/> possess the external attribute? ISO §8.6.3: a working-storage record
+    /// "is given the external attribute by the presence of the EXTERNAL clause in its data description entry" (or
+    /// by an EXTERNAL type, §13.18.22.4 GR3), and "If the EXTERNAL clause is included in the file description entry,
+    /// its records and their subordinate data items attain the external attribute".</summary>
+    private bool HasExternalAttribute(DataItem record) =>
+        record.HasExternalClause || record.ExternalFromType || Files.Any(f => f.IsExternal && f.Records.Contains(record));
 
     /// <summary>
     /// Post-build OCCURS DYNAMIC pass (ISO §13.18.38 Format 4 / §8.5.1.9; data-model D9): for each dynamic-capacity
@@ -452,6 +635,8 @@ public sealed partial class DataBinder
             // used as only one type of user-defined word"), so a FILE-NAME counts (kb/Work PB1264) — the check used to
             // consult the data-name index and the other registers only. A paragraph-name is declared later, by the
             // procedure-division binder, and is not asked here.
+            // (This pass runs inside Bind, before a contained program inherits its containers' globals, so the
+            // map holds only this element's own registers here — the "elsewhere in the source element" SR30 means.)
             if (ByName.ContainsKey(capName) || _capacityRegisters.ContainsKey(capName)
                 || Files.Any(f => CobolNames.Same(f.CobolName, capName)))
             {
@@ -460,7 +645,17 @@ public sealed partial class DataBinder
                     + "CAPACITY register (ISO §13.18.38.3 SR30)");
                 continue;
             }
-            _capacityRegisters[capName] = item;
+            AddCapacityRegister(capName, item);
         }
+    }
+
+    /// <summary>The ONE insert into <see cref="CapacityRegisters"/>: this element's own register (from
+    /// <see cref="DynamicResolve"/>, first) and each container's GLOBAL one (from <see cref="InheritGlobalSubtree"/>,
+    /// nearest container first) — appended, so each name's list stays in nearest-declaring-element order (kb/Work
+    /// PB1674).</summary>
+    private void AddCapacityRegister(string name, DataItem table)
+    {
+        if (!_capacityRegisters.TryGetValue(name, out var tables)) _capacityRegisters[name] = tables = [];
+        tables.Add(table);
     }
 }

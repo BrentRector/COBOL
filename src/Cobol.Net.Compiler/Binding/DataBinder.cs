@@ -166,12 +166,26 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// this map to build a <see cref="CapacityRegisterPlace"/> (a view over the table's <c>Capacity</c>). Populated
     /// by the post-build <see cref="DynamicResolve"/> pass. (READ-ONLY view — P6 Step 5; the getter carries the
     /// P6 Step-6 watermark gate — a read before <see cref="Passes.PassPhase.OccursResolved"/> throws loud, the
-    /// "read a null CapacityRegister" silent-miscompile class made structural.)</summary>
-    public IReadOnlyDictionary<string, DataItem> CapacityRegisters
+    /// "read a null CapacityRegister" silent-miscompile class made structural.)
+    /// <para>⛔ A LIST PER NAME, NEAREST DECLARING SOURCE ELEMENT FIRST (kb/Work PB1674). The register of a dynamic
+    /// table in a GLOBAL record is subordinate to a global name — SR30 places it "at the same level as the entry
+    /// containing the OCCURS clause" — so it is a global name too (§8.4.6.2.2: "All data-names and screen-names
+    /// subordinate to a global name are global names"), and a contained program inherits it with the rest of the
+    /// record (<see cref="InheritGlobalSubtree"/>). This element's own register (at most one per spelling: SR30's
+    /// "shall not be defined elsewhere in the source element") comes first, then each container's, so
+    /// <c>ReferenceResolver.CapacityRegisterFor</c> can apply §8.4.6.2.1 3)'s nearest-element rule. The OWN registers alone are
+    /// <see cref="DeclaredCapacityRegisterTables"/>.</para></summary>
+    public IReadOnlyDictionary<string, List<DataItem>> CapacityRegisters
     {
         get { Require(PassPhase.OccursResolved, "CapacityRegisters"); return _capacityRegisters; }
     }
-    private readonly Dictionary<string, DataItem> _capacityRegisters = new(CobolNames.Comparer);
+    private readonly Dictionary<string, List<DataItem>> _capacityRegisters = new(CobolNames.Comparer);
+
+    /// <summary>The dynamic tables whose named CAPACITY register THIS source element declares — the registers its
+    /// own class emits a profile for. An inherited register's profile is its container's (the contained class is
+    /// nested in the container's and reads it there).</summary>
+    public IEnumerable<DataItem> DeclaredCapacityRegisterTables =>
+        CapacityRegisters.Values.SelectMany(static t => t).Where(t => DeclaringDepth(t) == 0);
 
     /// <summary>REPORT SECTION <b>sum counter</b> names (case-insensitive) → every SUM ENTRY that carries the name —
     /// its <see cref="ReportSumFamily"/>, whose occurrences a subscript selects (kb/Work PB1271) — with its owning

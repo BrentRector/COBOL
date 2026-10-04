@@ -254,6 +254,19 @@ public static class ItemCategory
     public static bool IsIndexMessageTagObjectOrPointer(DataItem item) =>
         Sr4PhraseOf(item.OwnUsage) is not null || Sr4PhraseOf(item.Pic?.Usage) is not null;
 
+    /// <summary>
+    /// ⛔ CLASS boolean, message-tag, object or pointer (ISO §8.5.2) — the set §13.18.38.3 SR8 names: "The KEY phrase
+    /// shall not be specified for a data item of class boolean, message-tag, object, or pointer" (kb/Work PB1263).
+    /// <para>The three PICTURE-less classes are exactly the population of <see cref="Sr14PhraseOf"/>: MESSAGE-TAG is
+    /// class message-tag, OBJECT REFERENCE class object, and POINTER, FUNCTION-POINTER and PROGRAM-POINTER class
+    /// pointer — read through BOTH the written clause and the resolved one, for the reason
+    /// <see cref="IsIndexMessageTagObjectOrPointer"/> states. Class BOOLEAN is the operand PICTURE's category: an
+    /// elementary <c>PIC 1</c> item, or a bit group through its §13.18.29.4 GR1 as-if PICTURE
+    /// (<see cref="DataItem.OperandPic"/>). Class INDEX is deliberately absent — SR8 does not name it.</para></summary>
+    public static bool IsBooleanMessageTagObjectOrPointer(DataItem item) =>
+        item.OperandPic is { Category: PicCategory.Boolean }
+        || Sr14PhraseOf(item.OwnUsage) is not null || Sr14PhraseOf(item.Pic?.Usage) is not null;
+
     /// <summary>Is this a MESSAGE-TAG data item? ISO §13.18.60.4 GR9 — <i>"The class and category of a
     /// message-tag data item are message-tag"</i> (<c>cite.py --check 13.18.60.4</c> OK).
     /// <para>⛔ BOTH ARMS, for the reason <see cref="IsIndexMessageTagObjectOrPointer"/> states: the WRITTEN

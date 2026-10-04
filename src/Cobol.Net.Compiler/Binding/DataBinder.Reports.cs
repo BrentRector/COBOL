@@ -2685,6 +2685,17 @@ public sealed partial class DataBinder
         if (spec.DependingItem.Pic is not { Category: PicCategory.Numeric, IsFloat: false, Scale: 0 })
             Edition.Error(DiagnosticCatalog.ReportOccursFormat3Rule, $"RD '{model.Name}': OCCURS … DEPENDING ON "
                 + $"'{spec.DependingName}' — data-name-1 shall describe an integer (ISO §13.18.38.3 SR17)");
+        // SR18 is a FORMATS 2 AND 3 rule (kb/Work PB1261): a report group entry is subordinate to its report
+        // description entry, which §13.18.27.3 SR1 e) lets carry the GLOBAL clause — the data-division twin is
+        // DataBinder.Odo.cs#DependingAttributeFault, over the same global-name answer (IsGlobalRecord).
+        if (model.IsGlobal && !IsGlobalRecord(spec.DependingItem.Root))
+        {
+            using var _ = Editions.DiagnosticCursorExtensions.At(Edition, spec.DependingAt);
+            Edition.Error(DiagnosticCatalog.OccursDependingAttributeMismatch, $"RD '{model.Name}': OCCURS … DEPENDING ON "
+                + $"'{spec.DependingName}' — the report is global and data-name-1 is not a global name: \"If the OCCURS "
+                + "clause is specified in an entry subordinate to one containing the GLOBAL clause, data-name-1, if "
+                + "specified, shall be a global name\" (ISO §13.18.38.3 SR18)");
+        }
     }
 
     /// <summary>The display width of one report group entry's PICTURE, or null when it has none (a group entry).

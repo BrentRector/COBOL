@@ -1947,15 +1947,25 @@ public sealed class ReferenceResolver(DataBinder data)
     /// <para>The qualifier test is the ONE §8.4.2.2 matcher (<see cref="DataBinder.QualifierChainMatches"/>), read
     /// off the register's real <see cref="DataItem.Parent"/> — SR30's "treated as though implicitly defined at the
     /// same level as the entry containing the OCCURS clause", set where the register is minted
-    /// (<c>DataBinder.Odo.cs</c>). The candidate SET has exactly one member by SR30's first sentence, so there is
-    /// no survivor count to take.</para></summary>
+    /// (<c>DataBinder.Odo.cs</c>). Within ONE source element the candidate set has at most one member, by SR30's
+    /// first sentence, so there is no survivor count to take.</para>
+    /// <para>⛔ ACROSS SOURCE ELEMENTS IT IS §8.4.6.2.1 (kb/Work PB1674). A contained program also sees every
+    /// container's GLOBAL record's registers, nearest container first after its own (<see cref="DataBinder.CapacityRegisters"/>),
+    /// and rule 1 applies "the normal rules for qualification" over that whole set before rule 3 picks the nearest
+    /// declaring element: the first register the written qualifiers reach is the candidate (the nearest one when
+    /// none does, so the qualifier fault is stated about it), and an ordinary data-name of the spelling in a NEARER
+    /// element takes the reference instead (<see cref="Model.SymbolTable.NearerDataNameHides"/> — the rule the
+    /// index-name class already obeys), handing it back to the ordinary lookup.</para></summary>
     internal CapacityRef? CapacityRegisterFor(Core.DataReferenceContext dref)
     {
         DataReferenceCst r = dref;
-        if (r.BaseName is not { } name
-            || !data.CapacityRegisters.TryGetValue(name, out var table)
-            || table.OccursSpec?.CapacityRegister is not { } reg) return null;
+        if (r.BaseName is not { } name || !data.CapacityRegisters.TryGetValue(name, out var tables)) return null;
         var written = ReadWritten(dref);
+        DataItem table = tables.Find(t => t.OccursSpec?.CapacityRegister is { } cand
+                                          && data.QualifierChainMatches(cand, written.Qualifiers))
+            ?? tables[0];
+        if (table.OccursSpec?.CapacityRegister is not { } reg
+            || data.Symbols.NearerDataNameHides(name, written.Qualifiers, data.DeclaringDepth(table))) return null;
         var path = BuildTablePath(table);
         var fault =
               written.SubscriptGroup is not null                     ? CapacityRefFault.Subscripted

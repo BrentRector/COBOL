@@ -17,6 +17,8 @@ namespace CobolNet.Tests.Unit.Collation;
 /// (§14.6.6 r5 — <c>CobolCollation.Snapshot</c>). The goldens under tests/conformance/2002/pb64t1_* prove the same
 /// through compiled COBOL; this pins the runtime's contract directly.
 /// </summary>
+[Collection("process-globals")]   // reads the process-global locale configuration (the site tailoring directory variable a
+                                  // CobolLocaleTests / LocaleManagerTests case points at a temp directory it then deletes; kb/Work PB126)
 public sealed class LocaleStateTests
 {
     [Fact]

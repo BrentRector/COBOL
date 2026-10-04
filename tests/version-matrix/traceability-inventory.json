@@ -23766,13 +23766,13 @@
   "ordinal": 4,
   "subject": "OCCURS clause",
   "rule-digest": "cbed69f76063",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#OccursKeyItemFault",
+  "test-ref": "conformance:negative/pb1263-occurs-key-under-nested-table; conformance:85/pb1263_occurs_key_items_admitted",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1263. cite.py --check 13.18.38.3 \"that group item shall not contain an OCCURS clause\" -> OK. The KEY data-names are resolved in DataBinder.Odo.cs#OccursKeyResolve (SR3's subtree, COBOLNET2353), but nothing tests the groups between the table and the key. Probe probe/occurs-p1/sr4_group_occurs: `05 T OCCURS 3 ASCENDING KEY K INDEXED BY IX. 10 G OCCURS 2. 15 K PIC 9.` compiles clean. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (bit/national/strongly-typed group kinds: 2002+)",
-  "state": "GAP"
+  "notes": "kb/Work PB1263 (wave 1015 Y). cite.py --check 13.18.38.3 \"that group item shall not contain an OCCURS clause\" -> OK 4). OccursKeyResolve asks OccursKeyItemFault of every resolved key: a group strictly between the table and the key whose entry contains an OCCURS clause and is one of SR4's four group kinds (ItemCategory.GroupKindsOf) draws COBOLNET2787. The admitted half (a key under a group with no OCCURS, a sibling table beside the key) is the positive golden.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-5",
@@ -23796,13 +23796,13 @@
   "ordinal": 6,
   "subject": "OCCURS clause",
   "rule-digest": "aea825ca5dd8",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#OccursKeyItemFault",
+  "test-ref": "conformance:negative/pb1263-occurs-key-is-table; conformance:85/pb1263_occurs_key_items_admitted",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1263. cite.py --check 13.18.38.3 \"shall not contain an OCCURS clause except when data-name-2 is the subject of the entry\" -> OK. OccursKeyResolve checks only that the key lies within the table (SR3). Probe probe/occurs-p1/sr6_key_occurs: `05 T OCCURS 3 ASCENDING KEY K INDEXED BY IX. 10 K PIC 9 OCCURS 2.` compiles clean. The permitted subject case compiles (sr6_key_subject_ok).",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1263 (wave 1015 Y). cite.py --check 13.18.38.3 \"shall not contain an OCCURS clause except when data-name-2 is the subject of the entry\" -> OK 6). A key other than the subject whose own entry is a table (IsTable: fixed, occurs-depending or dynamic) draws COBOLNET2787; the subject as its own key is admitted (positive golden, E DESCENDING KEY E).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-7",
@@ -23826,13 +23826,13 @@
   "ordinal": 8,
   "subject": "OCCURS clause",
   "rule-digest": "c8f844c1d216",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#OccursKeyItemFault; src/Cobol.Net.Compiler/Binding/Model/ItemCategory.cs#IsBooleanMessageTagObjectOrPointer",
+  "test-ref": "conformance:negative/pb1263-occurs-key-boolean",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1263. cite.py --check 13.18.38.3 \"The KEY phrase shall not be specified for a data item of class boolean, message-tag, object, or pointer\" -> OK. No class screen on data-name-2 located (OccursKeyResolve resolves the name only). Probe probe/occurs-p1/sr8_key_boolean (`10 K PIC 1.` as KEY) compiles clean at 2023 and at 2002 (sr8_boolean_2002), and so does a boolean table keyed on itself (sr8_boolean_self). A POINTER key under a TYPEDEF STRONG, the one legal place for a subordinate USAGE POINTER, compiles clean (sr8_pointer_strong). Pointer/object keys at an ordinary level are refused only by the unrelated level rule COBOLNET1724, and MESSAGE-TAG by the facility refusal COBOLNET1943. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (the boolean, object and pointer classes are 2002 additions)",
-  "state": "GAP"
+  "notes": "kb/Work PB1263 (wave 1015 Y). cite.py --check 13.18.38.3 \"The KEY phrase shall not be specified for a data item of class boolean, message-tag, object, or pointer\" -> OK 8). ItemCategory.IsBooleanMessageTagObjectOrPointer: class boolean through the operand PICTURE (PIC 1, a bit group's as-if PICTURE), and message-tag / object / pointer through the SR14 usage population (MESSAGE-TAG, OBJECT REFERENCE, POINTER, FUNCTION-POINTER, PROGRAM-POINTER). Probed also: a POINTER key under TYPEDEF STRONG draws COBOLNET2787.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-9",
@@ -23841,13 +23841,13 @@
   "ordinal": 9,
   "subject": "OCCURS clause",
   "rule-digest": "f90fdee2eddf",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#OccursKeyItemFault",
+  "test-ref": "conformance:negative/pb1263-occurs-key-variable-length-group",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "Owned by kb/Work PB1263. cite.py --check 13.18.38.3 \"Data-name-2 shall not reference a variable-length group\" -> OK; §8.5.1.12.1 (--check OK): 'A variable-length group is a group item whose data description has at least one dynamic-length elementary item or dynamic-capacity table as a subordinate item'. No screen located. Probe probe/occurs-p1/sr9_key_dynlen: `05 T OCCURS 3 ASCENDING KEY G INDEXED BY IX. 10 G. 15 D PIC X DYNAMIC LENGTH.` compiles clean. || Editions (adjudicator's statement, normalized to 2014,2023 by registrar 14e): 2014, 2023 (variable-length groups arrive with dynamic-length items and dynamic-capacity tables)",
-  "state": "GAP"
+  "notes": "kb/Work PB1263 (wave 1015 Y). cite.py --check 13.18.38.3 \"Data-name-2 shall not reference a variable-length group\" -> OK 9); 8.5.1.12.1 defines the group (--check OK). A key whose GroupKindsOf carries VariableLength draws COBOLNET2787.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-10",
@@ -23976,13 +23976,13 @@
   "ordinal": 18,
   "subject": "OCCURS clause",
   "rule-digest": "f0c10260932e",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#DependingAttributeFault; src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#IsGlobalRecord; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReportOccursDepending",
+  "test-ref": "conformance:negative/pb1261-depending-not-global; conformance:negative/pb1261-report-depending-not-global; conformance:85/pb1261_depending_attributes_and_area",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1261. cite.py --check 13.18.38.3 \"data-name-1, if specified, shall be a global name\" -> OK. No check located (searched src/Cobol.Net.Compiler for GLOBAL/External near Depending; OdoResolve has none). Probe probe/occurs-p1/sr18_global_bad: `01 N PIC 9 VALUE 2.` (not GLOBAL) + `01 G GLOBAL. 05 T PIC X OCCURS 1 TO 5 DEPENDING ON N.` compiles clean and runs. The legal control sr18_global_ok also compiles.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1261 (wave 1015 Y). cite.py --check 13.18.38.3 \"If the OCCURS clause is specified in an entry subordinate to one containing the GLOBAL clause, data-name-1, if specified, shall be a global name\" -> OK 18). Format 2: OdoResolve asks DependingAttributeFault; a table in a global record (its own GLOBAL clause or a GLOBAL FD's, 8.4.6.2.2) whose data-name-1 is not in a global record draws COBOLNET2788. Format 3: ResolveReportOccursDepending applies the same answer under a GLOBAL RD (13.18.27.3 SR1 e)). 'Described in the same data division' holds by construction (OdoResolve runs inside Bind, before a contained program inherits container names).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-19",
@@ -24006,13 +24006,13 @@
   "ordinal": 20,
   "subject": "OCCURS clause",
   "rule-digest": "74caea2267de",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#OdoResolve",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#DependingInsideTableRange; src/Cobol.Net.Compiler/Binding/Model/RecordLayout.cs#FirstOccurrenceOffsetOf",
+  "test-ref": "conformance:negative/pb1261-depending-in-sibling-fd-record; conformance:85/pb1261_depending_attributes_and_area",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1261. cite.py --check 13.18.38.3 \"The data item defined by data-name-1 shall not occupy a byte position within the range of the first byte position\" -> OK. Same-record half conforms: a counter after the table in its record draws COBOLNET0857 (with SR22's 0856) -> probe/occurs-p1/sr20_inrec_after; a counter before it compiles and runs correctly (sr20_inrec_before_ok -> '3Q'). Divergence: the check runs only `if (ReferenceEquals(RootOf(dep), RootOf(item)))`, so the FD case escapes. §13.18.33.4 GR3 (--check OK): 'Multiple level 1 entries subordinate to a FD or SD entry represent implicit redefinitions of the same area'. `FD F. 01 R1. 05 T PIC X OCCURS 1 TO 5 DEPENDING ON N. 01 R2. 05 N PIC 9.` puts N on byte 1 of the shared area, which is T's first byte, and compiles clean (sr20_fd_shared).",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1261 (wave 1015 Y). cite.py --check 13.18.38.3 \"The data item defined by data-name-1 shall not occupy a byte position within the range of the first byte position\" -> OK 20); 13.18.33.4 GR3 \"Multiple level 1 entries subordinate to a FD or SD entry represent implicit redefinitions of the same area\" -> OK. The test compared record ROOTS; DependingInsideTableRange now also compares across the records of one storage AREA (the shared RedefinesClass): the counter's byte window in its record against [table's first byte, table record's last byte] draws COBOLNET0857. The positive golden pins the two admitted shapes (counter before the table's first byte, counter past the record's last).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-21",
@@ -24021,13 +24021,13 @@
   "ordinal": 21,
   "subject": "OCCURS clause",
   "rule-digest": "61e7dc1f00f7",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#DependingAttributeFault; src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#HasExternalAttribute",
+  "test-ref": "conformance:negative/pb1261-depending-not-external; conformance:85/pb1261_depending_attributes_and_area",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1261. cite.py --check 13.18.38.3 \"data-name-1 shall reference a data item possessing the external attribute\" -> OK. No check located. Probe probe/occurs-p1/sr21_external_bad: `01 N PIC 9 VALUE 2.` (not EXTERNAL) + `01 E EXTERNAL. 05 T PIC X OCCURS 1 TO 5 DEPENDING ON N.` compiles clean and runs. Control sr21_external_ok compiles.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1261 (wave 1015 Y). cite.py --check 13.18.38.3 \"If the OCCURS clause is specified in a data description entry included in a record description entry containing the EXTERNAL clause\" -> OK 21). A table whose record carries the EXTERNAL clause (or an EXTERNAL type, 13.18.22.4 GR3) and whose data-name-1 lacks the external attribute (8.6.3: an EXTERNAL record, or a record of an EXTERNAL FD) draws COBOLNET2788.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-22",
@@ -59271,13 +59271,13 @@
   "ordinal": 0,
   "subject": "OCCURS clause",
   "rule-digest": "362c91cc86eb",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#occursClause; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#occursDynamicPhrase; src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#OdoBindOccursSpec",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#NarrowToDataDivisionFormats; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportOccursOf",
+  "test-ref": "conformance:2014/pb1265_occurs_printed_formats; conformance:negative/pb1265-occurs-depending-without-to; conformance:negative/pb1265-occurs-to-without-depending; conformance:negative/pb1265-occurs-step-in-working-storage; conformance:negative/pb1265-occurs-dynamic-phrase-repeated; conformance:negative/pb1265-occurs-dynamic-phrases-reordered",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1265 + PB1266. Rule: four general formats; Format 2 prints `integer-1 TO integer-2 TIMES DEPENDING ON data-name-1` all required (cite.py --check 13.18.38.2 \"In this format `integer-1 TO integer-2 TIMES DEPENDING ON data-name-1` is required\" -> OK); Format 4 prints `OCCURS DYNAMIC [CAPACITY IN data-name-3] [FROM integer-4] [TO integer-5] [INITIALIZED]` each once, in that order (--check OK). Conforming shapes all compile and run (probe/occurs-p1/fmt_f1_multi: three KEY phrases, INDEXED without BY, two index-names; fmt_f2_full: OCCURS 0 TO 5 TIMES DEPENDING ... ASCENDING T INDEXED BY IX -> '70'; fmt_f4_full: every Format 4 phrase + KEY + INDEXED -> capacity 1). KEY after INDEXED is rejected (correct), and Format 4 is gated below 2014 (fmt_f4_2002 -> COBOLNET0900). UNDER-REJECTS, pinned tree, --std 2023, WORKING-STORAGE: (1) `05 T PIC X OCCURS 5 DEPENDING ON N.` (no TO; in no data-division format) compiles clean, bound as an ODO with minimum 1 (OdoBindOccursSpec comment calls it 'a widespread dialect shorthand the grammar tolerates'; docs/CONFORMANCE.md documents no such extension) -> fmt_dep_no_to_run; (2) `05 T PIC X OCCURS 2 TO 5.` (TO without DEPENDING: a Format 3 shape outside a report) compiles as a FIXED 5-occurrence table, LENGTH 5 -> fmt_to_no_dep_run; (3) `05 T PIC X OCCURS 5 STEP 2.` compiles clean though the grammar comment on occursStepPhrase says the binder refuses STEP outside a report group entry -> fmt_step_ws; (4) Format 4 phrases repeated/reordered: `OCCURS DYNAMIC CAPACITY IN C FROM 1 FROM 4` compiles and the LAST wins (C = 4) -> fmt_f4_dup_run; `OCCURS DYNAMIC TO 5 FROM 1` compiles -> fmt_f4_reorder (occursDynamicPhrase* is order-free and unbounded). Also: the KEY-after-INDEXED rejection reads COBOL0100 'ASCENDING/DESCENDING KEY clause in OCCURS is not yet supported. Table created without sort key.' -- false on both counts (the clause is supported, and no table is created because compilation fails) -> fmt_indexed_before_key. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): Formats 1-2: 85, 2002, 2014, 2023; Format 3: the report-writer editions; Format 4: 2014, 2023 (Annex E.2 lists no OCCURS change 2014->2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1265 (wave 1015 Y). cite.py --check 13.18.38.2 \"integer-1 TO integer-2 TIMES DEPENDING ON data-name-1\" -> OK; 5.2.1 \"shall be written in the compilation group in the sequence given in the general format\" -> OK. The grammar's occursClause stays a superset parse; the data-description arm (OdoBindOccursSpec -> NarrowToDataDivisionFormats) narrows it to Formats 1, 2 and 4: TO without DEPENDING, DEPENDING without TO, STEP, and a Format 4 phrase repeated or out of the printed CAPACITY-FROM-TO-INITIALIZED order each draw COBOLNET2789. The report arm (ReportOccursOf) already narrows to Format 3 (COBOLNET2021, SR24 pairing). KEY before INDEXED BY is the grammar's own order.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.39.2",

@@ -15,6 +15,8 @@ namespace CobolNet.Tests.Unit;
 /// PLACEMENT SHAPE as <c>value.ToString("C", culture)</c> — the "make the next case automatic" guarantee: a
 /// future ICU release that adds a currency pattern fails here instead of silently mis-editing.
 /// </summary>
+[Collection("process-globals")]   // reads the process-global locale configuration (the site tailoring directory variable a
+                                  // CobolLocaleTests / LocaleManagerTests case points at a temp directory it then deletes; kb/Work PB126)
 public sealed class MonetaryFactsTests
 {
     // ── The derived tables (MonetaryPlacement) ─────────────────────────────────────────────────────────────────

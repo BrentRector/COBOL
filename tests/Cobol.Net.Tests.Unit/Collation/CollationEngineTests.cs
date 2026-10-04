@@ -13,6 +13,8 @@ namespace CobolNet.Tests.Unit.Collation;
 /// comparison and the materialized key, and a cross-check of the root order against the host's ICU (the CLDR root
 /// order .NET exposes) on a Latin/Greek/Cyrillic corpus.
 /// </summary>
+[Collection("process-globals")]   // reads the process-global locale configuration (the site tailoring directory variable a
+                                  // CobolLocaleTests / LocaleManagerTests case points at a temp directory it then deletes; kb/Work PB126)
 public sealed class CollationEngineTests
 {
     private static readonly Collator Root = CollationEngine.Root;

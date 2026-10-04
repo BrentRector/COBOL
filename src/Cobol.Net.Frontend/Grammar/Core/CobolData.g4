@@ -737,8 +737,12 @@ occursClause
       occursKeyClause*
       (INDEXED BY? dataReferenceList)?
     // Format 4 — a DYNAMIC-capacity table (ISO §13.18.38 Format 4, COBOL-2014; D9). LL-disjoint from Format 1/2
-    // on the token after OCCURS (DYNAMIC is not an integerLiteral). Phrases are order-independent (occursDynamicPhrase*);
-    // duplicate/SR28 checks are bind-time (COBOLNET1522). Edition-gated so a pre-2014 probe upgrades to COBOLNET0900.
+    // on the token after OCCURS (DYNAMIC is not an integerLiteral). occursDynamicPhrase* is a SUPERSET parse: the
+    // printed once-each, CAPACITY-FROM-TO-INITIALIZED order (§13.18.38.2 with §5.2.1) is enforced at bind time
+    // (DataBinder.Odo.cs#NarrowToDataDivisionFormats, COBOLNET2789; kb/Work PB1265), as is SR28 (COBOLNET1522).
+    // The Format 1/2 alternative above is likewise the union of Formats 1, 2 and 3; the same binder site narrows a
+    // data description entry to Formats 1 and 2, and DataBinder.Reports.cs#ReportOccursOf a report group entry to
+    // Format 3. Edition-gated so a pre-2014 probe upgrades to COBOLNET0900.
     | OCCURS DYNAMIC occursDynamicPhrase* occursKeyClause* (INDEXED BY? dataReferenceList)?   // introduction-gated post-bind by VersionConformancePass ParseArm.VisitOccursClause (rearch 14g.3)
     ;
 
@@ -749,7 +753,8 @@ occursClause
 // token — a token would have to join `_dataNameTokens` to keep `STEP (1)` subscripting a user item named STEP, and
 // that set is generated from the §8.9 RESERVED word table. It is therefore read as TEXT, the LOCALE / ATTRIBUTE
 // precedent (`pictureLocaleAhead`). Not edition-gated: the phrase is legal only in a report group description
-// entry, which the binder enforces (§13.18.38.3 — the TO/DEPENDING/STEP shape is Format 3), and no other clause
+// entry, which the binder enforces (DataBinder.Odo.cs#NarrowToDataDivisionFormats refuses it in a data description
+// entry, COBOLNET2789; §13.18.38.2 — the TO/DEPENDING/STEP shape is Format 3), and no other clause
 // can begin with a user word here, so there is no earlier-edition reading to protect.
 occursStepPhrase
     : {occursStepAhead()}? cobolWord integerOperand

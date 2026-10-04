@@ -158,10 +158,24 @@ public sealed class SymbolTable
         // qualifiers reach, declared in a NEARER source element than every such index-name, is the referenced item —
         // a contained program's `01 IX` hides its container's GLOBAL table's `INDEXED BY IX`, exactly as its
         // `01 X` hides the container's global `X`. At EQUAL depth the index-name keeps the reference, as before.
-        if (indexes.Count > 0 && _data.InheritsGlobalData && _data.ByName.TryGetValue(name, out var dataNames))
-            foreach (var item in dataNames)
-                if (_data.DeclaringDepth(item) < indexDepth && _data.QualifierChainMatches(item, qualifiers))
-                    return null;
+        if (indexes.Count > 0 && NearerDataNameHides(name, qualifiers, indexDepth)) return null;
         return indexes;
+    }
+
+    /// <summary>⛔ ISO §8.4.6.2.1 3) ACROSS NAME CLASSES — the ONE answer to "does an ordinary DATA-name of this spelling,
+    /// reached by the written <paramref name="qualifiers"/>, sit in a source element NEARER than
+    /// <paramref name="depth"/>?" A name class resolved BEFORE the ordinary data-name lookup — an index-name
+    /// (kb/Work PB1047), a named OCCURS DYNAMIC CAPACITY register (kb/Work PB1674) — asks it of its own nearest
+    /// candidate, and yields the reference to the data-name when the answer is yes: a contained program's `01 IX` or
+    /// `01 CAP` hides its container's global table's index-name or register exactly as its `01 X` hides the
+    /// container's global `X`. At EQUAL depth the other class keeps the reference. Free for a unit that inherits
+    /// nothing (every candidate is then depth 0).</summary>
+    public bool NearerDataNameHides(string name, IReadOnlyList<string> qualifiers, int depth)
+    {
+        if (depth == 0 || !_data.InheritsGlobalData || !_data.ByName.TryGetValue(name, out var dataNames)) return false;
+        foreach (var item in dataNames)
+            if (_data.DeclaringDepth(item) < depth && _data.QualifierChainMatches(item, qualifiers))
+                return true;
+        return false;
     }
 }
