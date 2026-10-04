@@ -16,27 +16,11 @@ if ($dirty) { Write-Host "⚠ DIRTY TREE ($(@($dirty).Count) paths) — commit o
 $unpushed = git log --oneline '@{u}..HEAD' 2>$null
 if ($unpushed) { Write-Host "⚠ UNPUSHED commits: $(@($unpushed).Count)" } else { Write-Host "push   : up to date" }
 
-# 2. Diagnostic band — the next-free claim is the CEILING of BOTH scans (the 1573/1518 collision lesson).
-#    Scan EVERY four-digit COBOLNET code, pinned to no band at all — this regex was once decade-pinned, was
-#    widened to the whole COBOLNET1xxx band when diagnostics crossed 1600 (PERFORM Format 3 et al.), and then
-#    silently capped out AGAIN the moment they crossed 2000: on 2026-09-13 it reported `catalog max
-#    COBOLNET1999 → next free = COBOLNET2000` on a tree whose catalogue already held COBOLNET2096/2097, which
-#    is a code COLLISION waiting to be allocated by the very probe plan §0 tells everyone to allocate from.
-#    A band in this pattern is a hand-maintained list where a structure belongs; there is no band. Two channels
-#    legitimately diverge: the compiler-channel raw Edition.Error codes are NOT catalog descriptors (ledger
-#    V11 queues folding them in), so src-max >= catalog-max is the EXPECTED steady state, not drift. The one
-#    real anomaly the cross-check still catches is catalog-max > src-max: a catalog descriptor above every
-#    emitted code = an orphan (reserved-but-never-emitted at the ceiling) worth reconciling before allocating.
-$grepCodes = Select-String -Path (Get-ChildItem src -Recurse -Filter *.cs | Where-Object FullName -notmatch '\\(bin|obj)\\') `
-    -Pattern 'COBOLNET[0-9][0-9][0-9][0-9]' -AllMatches | ForEach-Object { $_.Matches.Value } | Sort-Object -Unique
-$maxGrep = ($grepCodes | Measure-Object -Maximum).Maximum
-$catalog = Select-String -Path 'src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs' -Pattern '"(COBOLNET\d\d\d\d)"' -AllMatches |
-    ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
-$maxCat = ($catalog | Measure-Object -Maximum).Maximum
-$grepNum = [int]($maxGrep -replace 'COBOLNET', '')
-$catNum = [int]($maxCat -replace 'COBOLNET', '')
-$nextFree = ([Math]::Max($grepNum, $catNum)) + 1
-Write-Host "diag   : src-grep max $maxGrep · catalog max $maxCat $(if ($catNum -gt $grepNum) { "⚠ CATALOG ABOVE SRC (orphan descriptor $maxCat never emitted) — reconcile before allocating; next free = COBOLNET$nextFree" } else { "→ next free = COBOLNET$nextFree" })"
+# 2. Diagnostic band — the next-free rule (the CEILING of the src scan, the catalog scan and every code already
+#    reserved for an in-flight worktree) lives ONCE, in scripts/orchestrator/alloc.py (`code_scans`, which carries
+#    the 1573/1518 and 1999/2096 collision history). The probe prints its line and never recomputes it.
+$diag = & python scripts/orchestrator/alloc.py peek code --probe 2>&1
+Write-Host "diag   : $diag"
 
 # 3. VCR todo count (the P14 burn-down instrument)
 $todo = (Select-String -Path 'docs/VERSION_CHANGE_REFERENCE.md' -Pattern '<!-- todo -->' -AllMatches | ForEach-Object { $_.Matches }).Count
