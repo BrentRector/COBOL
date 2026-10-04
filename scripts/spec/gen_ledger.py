@@ -343,6 +343,41 @@ def measure_corpus() -> dict:
 # the trend series — the ONLY thing on this page the current tree cannot recompute
 # ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+def inventory_counts_at(sha: str) -> dict | None:
+    """GAP, closed and documented-non-support counts of the inventory AS COMMITTED at `sha`."""
+    r = subprocess.run(["git", "show", f"{sha}:{INVENTORY.relative_to(REPO).as_posix()}"], cwd=REPO,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode != 0:
+        return None
+    rows = json.loads(r.stdout)
+    return {"gap": sum(1 for x in rows if x["state"] == "GAP"), "closed": sum(1 for x in rows if x["state"] == "OK"),
+            "dns": sum(1 for x in rows if x["verdict"] == "DOCUMENTED-NON-SUPPORT")}
+
+
+def missed_points(pts: list[dict]) -> list[dict]:
+    """The inventory-moving commits since the series' last point that no generator run recorded.
+
+    ⛔ A generator run measures ONE tree, so a session that landed three trains between runs recorded one point
+    for three landings (2026-10-04: trains 1011 and 1012 were missing until the owner noticed the page stale).
+    Every commit that touched the inventory file after the last recorded sha is measured from its own tree here,
+    so the series is one point per GAP-moving landing no matter how rarely the generator runs."""
+    last = pts[-1] if pts else None
+    if last is None or not git("rev-parse", "--verify", "--quiet", last["sha"]):
+        return []
+    log = git("log", "--reverse", "--format=%h|%cI", "--abbrev=8", f"{last['sha']}..HEAD", "--",
+              INVENTORY.relative_to(REPO).as_posix())
+    out: list[dict] = []
+    for line in filter(None, log.splitlines()):
+        sha, _, iso = line.partition("|")
+        counts = inventory_counts_at(sha)
+        prev = out[-1] if out else last
+        if counts is None or all(counts[k] == prev.get(k) for k in ("gap", "closed", "dns")):
+            continue
+        out.append({"sha": sha, "date": iso[:10], **counts,
+                    "label": git("log", "-1", "--format=%s", sha)[:28].rstrip(), "battery": None})
+    return out
+
+
 def trend_series(inv: dict, head: dict, battery: dict) -> tuple[list[dict], bool]:
     """Return (series to render, whether the current point is new).
 
@@ -351,6 +386,8 @@ def trend_series(inv: dict, head: dict, battery: dict) -> tuple[list[dict], bool
     moved-but-unrecorded measurement renders differently from the file on disk and reports as stale."""
     doc = json.loads(TREND.read_text(encoding="utf-8")) if TREND.exists() else {"points": []}
     pts = doc.get("points", [])
+    missed = missed_points(pts)
+    pts = [*pts, *missed]
     cur = {"sha": head["sha"], "date": head["date"], "gap": inv["gap"], "closed": inv["closed"],
            "dns": inv["verdict"]["DOCUMENTED-NON-SUPPORT"],
            "label": git("log", "-1", "--format=%s", head["sha"])[:28].rstrip(),
@@ -362,10 +399,8 @@ def trend_series(inv: dict, head: dict, battery: dict) -> tuple[list[dict], bool
     # is the normal case — a test run closes no rows) would otherwise never appear, leaving the mark on some
     # earlier commit. That is precisely the "ungated number read as gated" failure the mark exists to prevent.
     is_battery = cur["battery"] is not None and not any(p.get("battery") == cur["battery"] for p in pts)
-    if not (moved or is_battery):
-        return pts, False
-    if last is not None and last.get("sha") == cur["sha"]:
-        return pts, False
+    if not (moved or is_battery) or (last is not None and last.get("sha") == cur["sha"]):
+        return pts, bool(missed)
     return [*pts, cur], True
 
 
