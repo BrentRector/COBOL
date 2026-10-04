@@ -68,14 +68,14 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
                 w.Line(ObjectComputerEmit.ClassificationPrologue(cls));
             // Register this program's SELECTed files at FIRST ACTIVATION (the IC114A lesson: connectors
             // belong to the program's entry, not the run-unit Main; a fresh instance after CANCEL / an
-            // INITIAL activation re-registers — ISO §14.6.2.3.2). For a UnitStaticFiles unit the guard is
+            // INITIAL activation re-registers — ISO §14.6.2.3.2). For a UnitStaticWs unit the guard is
             // STATIC — one registration per run unit, §14.6.2.3.3 last-used across recursive activations,
             // reset only on the initial-state cases via __ResetStatics (kb/Work PB168). Run-unit CloseAll
             // lives in the runtime RunMain boundary.
             if (ctx.Data.Files.Count > 0)
             {
                 // ⛔ ONE GUARD PER SCOPE (kb/Work PB168 — the review fleet caught all three riding one flag):
-                // connector REGISTRATION is run-unit-scoped for a UnitStaticFiles unit (the flag is static
+                // connector REGISTRATION is run-unit-scoped for a UnitStaticWs unit (the flag is static
                 // there); report-engine CONSTRUCTION assigns per-INSTANCE fields and takes its own instance
                 // guard below. There is no THIRD thing to guard any more: the LINAGE operand values and the
                 // ASSIGN … USING association are arguments of the OPEN/WRITE statements that read them, so

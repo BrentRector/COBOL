@@ -102,7 +102,7 @@ internal sealed class RecordStructEmitter(EmitContext ctx, PhysicalModel phys, G
         // The unit-scoped file-registration guard returns to false on the initial-state cases so the next
         // activation re-registers — §14.6.2.3.2 action 3's "not ... in any open mode" realized as fresh
         // connectors; FileRegistry.Register closes anything it displaces (kb/Work PB168).
-        if (ctx.Data.UnitStaticFiles && ctx.Data.Files.Count > 0)
+        if (ctx.Data.UnitStaticWs && ctx.Data.Files.Count > 0)
             stmts.Add("__filesRegistered = false;   // internal file connectors → no open mode via re-registration (§14.6.2.3.2 #3; kb/Work PB168)");
         w.Line();
         using (w.Block("internal static void __ResetStatics()   // static WS → initial state (ISO §14.6.2.3.2; §14.9.5.4 GR3)"))

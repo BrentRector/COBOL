@@ -53,6 +53,21 @@ public sealed record LinkageFormal(DataItem Item, int Position, string CarrierFi
 public sealed record CallExternalBacking(string BackingCsName, string CellCsName, string ExternalName, int Width,
                                          DataItem Record);
 
+/// <summary>The kind of thing an EXTERNAL entry externalizes (ISO §8.3.2.2 list item 2: "data-names, file-names, and
+/// record-names of items described with the EXTERNAL attribute"). A record is a data item, so a data-name and a
+/// record-name are ONE kind; a file connector is the other. §8.3.2.2 requires "all instances of a given name that
+/// is externalized to the operating environment" to "identify the same kind of entity or item", so these two kinds
+/// and the definition kinds (program, function, class, interface) are all distinct kinds of one namespace
+/// (<c>BinderDriver.CheckDefinitionNameUniqueness</c>; kb/Work PB1404).</summary>
+internal enum ExternalizedSubjectKind { DataItem, File }
+
+/// <summary>One EXTERNAL file connector or record of a source element, as the externalized-name namespace sees it
+/// (<see cref="DataBinder.ExternalizedSubjects"/>). <paramref name="Name"/> is the externalized name (§13.18.22.4
+/// GR5); <paramref name="Word"/> the entry's own user-defined word; <paramref name="Spelling"/> how a diagnostic
+/// names the entry back to the user.</summary>
+internal readonly record struct ExternalizedSubject(
+    ExternalizedSubjectKind Kind, string Name, string Word, string Spelling, DiagnosticCursor At);
+
 /// <summary>One FUNCTION-ID unit's activation signature (ISO §9.4 user-defined functions; M2-UDF-1): the
 /// registered function name, its PROCEDURE DIVISION RETURNING item (whose description the caller-side result
 /// temporary clones — §8.4.3.2.4 GR1), and its positional USING formals (§14.8.2). Built by the run-unit
@@ -158,10 +173,11 @@ public sealed partial class DataBinder
     private readonly List<DataItem> _callGlobalRoots = [];
 
     /// <summary>⛔ THE ONE LIST OF THIS UNIT'S MEMBERS THAT A REFERENCE TO GLOBAL ROOT <paramref name="g"/> CAN
-    /// RENDER (kb/Work PB1009) — each becomes a bridge in a contained program, re-anchored behind
-    /// <paramref name="outer"/> (ISO §13.18.27.4 GR2: "A statement in a program contained directly or indirectly
-    /// within a program that describes a global name may reference that name without describing it again" — the
-    /// storage stays the container's). A reference renders the root's STORAGE member and, for the residences that
+    /// RENDER (kb/Work PB1009) — each becomes a bridge in a contained program, re-anchored by
+    /// <paramref name="anchorOf"/> (<c>BoundUnit.AnchorOf</c>: the <c>__outer</c> chain for an instance member, the
+    /// container's class name for a static one — kb/Work PB1133) (ISO §13.18.27.4 GR2: "A statement in a program
+    /// contained directly or indirectly within a program that describes a global name may reference that name
+    /// without describing it again" — the storage stays the container's). A reference renders the root's STORAGE member and, for the residences that
     /// have them, the members around it, so every residence §13.18.27.3 SR1 b) admits (file, working-storage,
     /// local-storage, linkage) is answered here:
     /// <list type="bullet">
@@ -175,15 +191,15 @@ public sealed partial class DataBinder
     /// <item>a guarded formal → its omitted-presence member (kb/Work PB971); a table → its index fields.</item>
     /// </list>
     /// ⛔ A new residence adds its member HERE, and <c>GlobalBridgeResidenceDriftTests</c> is red until it does.</summary>
-    internal IEnumerable<CallBridge> GlobalBridgesOf(DataItem g, string outer)
+    internal IEnumerable<CallBridge> GlobalBridgesOf(DataItem g, Func<string, string> anchorOf)
     {
         if (g.Class is { Tier: RedefinesTier.StringCanonical } cls)
         {
-            yield return new CallBridge(cls.BackingCsName, outer + cls.BackingCsName, CallBridgeKind.Backing, null);
+            yield return new CallBridge(cls.BackingCsName, anchorOf(cls.BackingCsName) + cls.BackingCsName, CallBridgeKind.Backing, null);
             if (cls.IsCellBacked)
-                yield return new CallBridge(cls.BackingCellCsName, outer + cls.BackingCellCsName, CallBridgeKind.Cell, null);
+                yield return new CallBridge(cls.BackingCellCsName, anchorOf(cls.BackingCellCsName) + cls.BackingCellCsName, CallBridgeKind.Cell, null);
             if (cls.BasedPointerField is { } addr)
-                yield return new CallBridge(addr, outer + addr, CallBridgeKind.Address, null);
+                yield return new CallBridge(addr, anchorOf(addr) + addr, CallBridgeKind.Address, null);
         }
         else
         {
@@ -194,21 +210,21 @@ public sealed partial class DataBinder
             // itself; the storage it names is the one both entries share (§13.18.44.4 GR1).
             var anchor = AnchorOf(g);
             if (_linkageFormals.FirstOrDefault(f => f.CarrierResident && ReferenceEquals(f.Item, anchor)) is { } rf)
-                yield return new CallBridge(rf.CarrierField, outer + rf.CarrierField, CallBridgeKind.Carrier, anchor, rf);
+                yield return new CallBridge(rf.CarrierField, anchorOf(rf.CarrierField) + rf.CarrierField, CallBridgeKind.Carrier, anchor, rf);
             else
-                yield return new CallBridge(anchor.CsName, outer + anchor.CsName, CallBridgeKind.Field, anchor);
+                yield return new CallBridge(anchor.CsName, anchorOf(anchor.CsName) + anchor.CsName, CallBridgeKind.Field, anchor);
             if (!ReferenceEquals(anchor, g))
                 foreach (var idx in IndexDeclarationsUnder(anchor))
-                    yield return new CallBridge(idx.Cell, outer + idx.Cell, CallBridgeKind.Index, null);
+                    yield return new CallBridge(idx.Cell, anchorOf(idx.Cell) + idx.Cell, CallBridgeKind.Index, null);
             if (anchor.OmittedGuard is { } ag && !ReferenceEquals(anchor, g))
-                yield return new CallBridge(ag.Presence, outer + ag.Presence, CallBridgeKind.Presence, anchor);
+                yield return new CallBridge(ag.Presence, anchorOf(ag.Presence) + ag.Presence, CallBridgeKind.Presence, anchor);
         }
         // A GLOBAL FORMAL PARAMETER of the container: its guarded references in the contained program read the
         // container's presence member under the same Uid-keyed name (kb/Work PB971).
         if (g.OmittedGuard is { } og)
-            yield return new CallBridge(og.Presence, outer + og.Presence, CallBridgeKind.Presence, g);
+            yield return new CallBridge(og.Presence, anchorOf(og.Presence) + og.Presence, CallBridgeKind.Presence, g);
         foreach (var idx in IndexDeclarationsUnder(g))
-                yield return new CallBridge(idx.Cell, outer + idx.Cell, CallBridgeKind.Index, null);
+                yield return new CallBridge(idx.Cell, anchorOf(idx.Cell) + idx.Cell, CallBridgeKind.Index, null);
     }
 
     /// <summary>The item whose emitted member a reference to <paramref name="item"/> renders: itself, except a Tier-A
@@ -272,7 +288,7 @@ public sealed partial class DataBinder
     /// found by the train-68b review).</summary>
     internal IEnumerable<string> InheritedMemberNamesOf(DataItem g)
     {
-        foreach (var bridge in GlobalBridgesOf(g, "")) yield return bridge.Field;
+        foreach (var bridge in GlobalBridgesOf(g, static _ => "")) yield return bridge.Field;
         yield return g.CsName;
         if (g.Class is { } cls) yield return cls.Canonical.CsName;
     }
@@ -706,11 +722,11 @@ public sealed partial class DataBinder
         // so it costs nothing when there is nothing to compare.
         if (_callExternalBackings.Count == 0 && !Files.Any(f => f.IsExternal)) return;
         var seen = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);   // the ExternalTable's own comparer
-        void Claim(string externalized, string where, DiagnosticCursor? at)
+        void Claim(string externalized, string where, DiagnosticCursor at)
         {
             if (seen.TryGetValue(externalized, out var prior))
             {
-                using var _ = Edition.At(at ?? Edition.Cursor);
+                using var _ = Edition.At(at);   // an unset cursor leaves the current position standing
                 Edition.Error(DiagnosticCatalog.ExternalizedNameNotUnique,
                     $"{where}: the externalized name '{externalized}' is already the externalized name of "
                     + $"{prior} in this source element; \"In the same source element, the externalized name of "
@@ -724,12 +740,30 @@ public sealed partial class DataBinder
             seen[externalized] = where;
         }
 
+        foreach (var subject in ExternalizedSubjects())
+            Claim(subject.Name, subject.Spelling, subject.At);
+    }
+
+    /// <summary>⛔ THE ONE LIST OF THIS SOURCE ELEMENT'S EXTERNALIZED DATA-SIDE NAMES — ISO §8.3.2.2's list item 2,
+    /// "data-names, file-names, and record-names of items described with the EXTERNAL attribute" (kb/Work PB1404).
+    /// Each subject is a file connector or a record that §13.18.22.4 GR5 gives an externalized name: the AS literal
+    /// when the entry writes one, else the entry's own name, in the one case-insensitive spelling the run-unit
+    /// <c>ExternalStore</c> keys by. The FD-record cells ("FD::" keys) are the FILE's name, never a name of their
+    /// own, so they are not subjects. Two consumers read it and no one else builds the population: the
+    /// in-element uniqueness screen above (§13.18.22.3 SR2) and the group-wide externalized-name namespace
+    /// (<c>BinderDriver.CheckDefinitionNameUniqueness</c>, §8.3.2.2 — "all instances of a given name that is
+    /// externalized … shall identify the same kind of entity or item"), whose list item 1 already feeds it.</summary>
+    internal IEnumerable<ExternalizedSubject> ExternalizedSubjects()
+    {
         foreach (var file in Files)
             if (file is { IsExternal: true, ExternalName: { } extName })
-                Claim(extName, $"file '{file.CobolName}'", null);
+                yield return new ExternalizedSubject(ExternalizedSubjectKind.File, extName,
+                    file.CobolName ?? extName, $"file '{file.CobolName}'", file.EntryAt);
         foreach (var backing in _callExternalBackings)
             if (!backing.ExternalName.StartsWith("FD::", StringComparison.Ordinal))
-                Claim(backing.ExternalName, $"data item '{backing.Record.CobolName}'", backing.Record.DeclaredAt);
+                yield return new ExternalizedSubject(ExternalizedSubjectKind.DataItem, backing.ExternalName,
+                    backing.Record.CobolName ?? backing.ExternalName, $"data item '{backing.Record.CobolName}'",
+                    backing.Record.DeclaredAt);
     }
 
     /// <summary>Re-base one EXTERNAL record onto the run-unit external cell (see

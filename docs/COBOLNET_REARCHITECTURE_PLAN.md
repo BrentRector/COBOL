@@ -3107,8 +3107,9 @@ already-derivable coverage; none change the pipeline.
 ## §8 CONSOLIDATED FORWARD-RESIDUE LEDGER (absorbed from the retired phase docs; every named residue lives HERE now)
 
 - **P10 residues (by name):** ~~per-shape 1510 UDF RETURNING~~ (DISCHARGED, kb/Work PB1419 — every RETURNING category is carried) ·
-  ~~OPTIONAL formals (0899 `optional-formal`)~~ (DISCHARGED 2026-09-22, kb/Work PB757 — the method arm carries OPTIONAL through the `(ref T, bool)` ABI pair; the descriptor is deleted) · the recursive-WS stage (0899 `recursive-contained-working-
-  storage`; its twin `recursive-working-storage-pointer-backed` DISCHARGED 2026-09-22, kb/Work PB234 — static
+  ~~OPTIONAL formals (0899 `optional-formal`)~~ (DISCHARGED 2026-09-22, kb/Work PB757 — the method arm carries OPTIONAL through the `(ref T, bool)` ABI pair; the descriptor is deleted) · ~~the recursive-WS stage (0899 `recursive-contained-working-storage`)~~ (DISCHARGED 2026-10-04, kb/Work PB1133 — a
+  containee's GLOBAL bridge reaches a static container member through the container's class name, `BoundUnit.AnchorOf`;
+  the descriptor is deleted; its twin `recursive-working-storage-pointer-backed` DISCHARGED 2026-09-22, kb/Work PB234 — static
   addressable cells, the descriptor is deleted) · ~~OO class-unit BASED (`OoBasedInClass`)~~ (DISCHARGED 2026-09-22, kb/Work PB956 — the OO type-halves render the program path's cell/bridge members; the descriptor is deleted) ·
   INITIALIZE-over-pointer-categories · line-seq 06/09/71 + REWRITE + the LINE SEQUENTIAL gate · keyed GR10a FPI
   + keyed ADVANCING emission · cross-run-unit sharing · ~~SORT national-key carry~~ (DISCHARGED 2026-09-05, kb/Work PB678 — the GR5 sequence pair is resolved and carried, and each key takes the sequence its CLASS names) · multiple-LINE repetition (+

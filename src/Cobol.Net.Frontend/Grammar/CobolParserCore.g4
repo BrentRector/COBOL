@@ -190,11 +190,15 @@ programIdAttribute
     : commonProgramAttribute
     ;
 
+// ⛔ THE ATTRIBUTE ALTERNATIVES ARE EXACTLY §11.10.2 FORMAT 1's: COMMON, INITIAL, RECURSIVE (kb/Work PB1507). A
+// GLOBAL alternative used to ride here, which neither the figure nor any edition's PROGRAM-ID paragraph prints
+// (GLOBAL is a DATA DESCRIPTION clause, §13.18.27): `PROGRAM-ID. X IS GLOBAL.` compiled and MakeUnit dropped the
+// word in silence. The ONLY-ONCE half of the choice indicators (§5.2.6.4) is read in BinderDriver.MakeUnit
+// through ChoiceIndicators.AtMostOnce, as for every other format with such a group.
 commonProgramAttribute
     : INITIAL_
     | COMMON
     | RECURSIVE
-    | GLOBAL
     ;
 
 // ------------------------------------------

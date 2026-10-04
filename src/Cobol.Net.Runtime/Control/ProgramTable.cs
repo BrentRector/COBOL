@@ -315,13 +315,14 @@ public sealed class ProgramTable
             }
         }
 
-        if (n.Initial && n.Active == 0)
+        if (n.Initial)
         {
             // "If the program … is an initial program, an implicit CANCEL statement referencing that program is
             // executed upon return" (ISO §14.9.18 GR2): close its files (§14.9.5 GR9), cascade (GR4), drop state.
-            // Guarded on Active == 0 (kb/Work PB133): with 11.10.4 GR4 inheritance an INITIAL containee of a
-            // recursive container can return while an OUTER activation of itself is still running — cancelling
-            // the live activation's contained state would corrupt it (§14.9.5's CANCEL-of-active shape).
+            // No `Active == 0` guard (kb/Work PB1507): an INITIAL program is never recursive — §11.10.3 SR5 forbids
+            // the INITIAL clause under a recursive container, so the attribute §11.10.4 GR4 hands down never reaches
+            // one, and SR6/0886 keep the two attributes apart in a single program — hence it can never return
+            // while an outer activation of itself is running (the guard served that nonconforming shape).
             inst.CloseFiles();
             CancelContained(n);
             n.Instance = null;

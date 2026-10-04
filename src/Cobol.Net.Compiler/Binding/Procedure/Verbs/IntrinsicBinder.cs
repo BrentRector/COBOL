@@ -2164,10 +2164,13 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// <summary>A bare-word argument that names a TYPE (§15.50.3 r1 / §15.14.3 r1: "… a based entry, a type-name,
     /// or a data item of any class or category") — a level-1 TYPEDEF lives in <c>DataBinder.TypeDecls</c>, off the
     /// data-name namespace, so <c>BindArgOperand</c> would report it undefined (kb/Work PB61 / AR-15.50.3-1 /
-    /// AR-15.14.3-1). Returns the type's template item, or null when the word is not a type-name (a data-name
-    /// of the same spelling cannot exist beside it — one user-word namespace).</summary>
+    /// AR-15.14.3-1). Returns the type's template item, or null when the word is not a type-name. An own data-name
+    /// of the same spelling cannot exist beside an own type-name (one user-word namespace); but a data-name VISIBLE
+    /// here wins over an INHERITED global type-name (§8.4.6.2.1 3 a — a name declared in the referencing element is
+    /// the one referenced; kb/Work PB1303), which is why the guard asks <c>ByName</c> first.</summary>
     private DataItem? TypeNameArgument(Core.FunctionArgumentContext a) =>
-        KeywordWordOf(a) is { } w && a.fnArgPhraseWord() is null && ctx.Data.TypeDecls.TryGetValue(w, out var t) ? t : null;
+        KeywordWordOf(a) is { } w && a.fnArgPhraseWord() is null && !ctx.Data.ByName.ContainsKey(w)
+            && ctx.Data.TryFindTypeDecl(w, out var t) ? t : null;
 
     /// <summary>
     /// FUNCTION LENGTH (§15.50.2) — argument-1 plus the optional PHYSICAL keyword.

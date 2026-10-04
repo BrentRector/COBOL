@@ -66,8 +66,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     private readonly List<DataItem> _roots = [];
 
     /// <summary>True when this binder binds a RECURSIVE-and-not-INITIAL PROGRAM unit or a FUNCTION unit
-    /// (functions "are always recursive", ISO §8.6.6 :8821 / §9.4 :12529) that has NO contained programs — the
-    /// unit whose WORKING-STORAGE emits STATIC (set once by <c>BinderDriver.BindUnitData</c>, init-only).
+    /// (functions "are always recursive", ISO §8.6.6 :8821 / §9.4 :12529), contained programs or not — the
+    /// unit whose WORKING-STORAGE and FILE SECTION emit STATIC (set once by <c>BinderDriver.BindUnitData</c>,
+    /// init-only). The same flag scopes the unit's internal FILE CONNECTORS to the run unit: ONE registration,
+    /// LAST-USED across activations (§14.6.2.3.2 action 3 returns them to no open mode only on the initial-state
+    /// cases 1–3; §14.6.2.3.3 keeps them last-used otherwise) — a per-INSTANCE flag re-ran registration on every
+    /// fresh RECURSIVE activation and <c>FileRegistry.Register</c> silently REPLACED the live connector (the
+    /// depth-2 WRITE answered '42'; kb/Work PB168). A containee reaches this unit's static members through the
+    /// class name, never an instance (<c>BoundUnit.AnchorOf</c>, kb/Work PB1133).
     /// <para><b>The §-derivation this flag realizes</b> (storage class × unit kind → copy semantics):
     /// §13.5.4 GR1 — WS of "a program that does not have the initial attribute, a function, a factory, or an
     /// object" is STATIC data; §14.6.2.3.3 — "Static and external data are the only data that are in the
@@ -85,18 +91,6 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// state without statics, byte-identically to the pre-slice emission.</para></summary>
     public bool UnitStaticWs { get; init; }
 
-    /// <summary>True when this unit's internal FILE CONNECTORS are unit-scoped — ONE registration per run
-    /// unit, LAST-USED across activations: a RECURSIVE-and-not-INITIAL unit, every FUNCTION included
-    /// (§8.6.6). ISO §14.6.2.3.2 action 3 sets internal connectors "to not be in any open mode" only when
-    /// data is placed in the INITIAL state, which for a non-INITIAL unit's static data is cases 1–3 (run-unit
-    /// start / an INITIAL container's activation / after CANCEL); §14.6.2.3.3 keeps them last-used otherwise.
-    /// UNLIKE <see cref="UnitStaticWs"/> this carries NO childless conjunct: the static registration flag is
-    /// referenced only from the unit's OWN class (never through an <c>__outer</c> bridge), so contained
-    /// programs do not constrain it. kb/Work PB168 — the per-INSTANCE flag re-ran registration on every
-    /// fresh RECURSIVE activation and <c>FileRegistry.Register</c> silently REPLACED the live connector
-    /// (the depth-2 WRITE answered '42'; the displaced writer's buffer was lost, its handle leaked).</summary>
-    public bool UnitStaticFiles { get; init; }
-
     /// <summary>⛔ THE ONE condition for both EMITTING <c>__ResetStatics</c> (RecordStructEmitter) and
     /// REGISTERING it as the unit's initial-state hook (ProgramEmitter → ProgramTable): static WS storage
     /// exists, or the unit-scoped file-registration flag does — the flag must return to false on the
@@ -111,7 +105,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     public bool EmitsStaticReset =>
         StaticRootFields.Count > 0 || StaticBasedBridgeAddrs.Count > 0
         || StaticAddressableCells.Count > 0 || StaticIndexCells.Count > 0
-        || (UnitStaticFiles && Files.Count > 0);
+        || (UnitStaticWs && Files.Count > 0);
 
     /// <summary>The unit's WORKING-STORAGE SECTION roots, in source order — the subset of <see cref="Roots"/>
     /// whose storage class is decided by §13.5.4 (static/initial data), captured at bind so the static-WS
@@ -206,6 +200,33 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <see cref="ExpandTypes"/> pass — which runs before <see cref="BindResolve"/>, so every resolution pass sees the
     /// clone (the invariant the OO compiler-temp clone already relies on).</summary>
     public Dictionary<string, DataItem> TypeDecls { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The GLOBAL type declarations of every containing program, keyed by type-name (ISO §13.18.58.4 GR3 —
+    /// "The GLOBAL clause applies to the scope of the type-name" — and §8.4.6.2.2, "A type-name described with a
+    /// GLOBAL clause is a global name"; kb/Work PB1303). Kept APART from <see cref="TypeDecls"/>, which is this
+    /// source element's OWN declarations: an own declaration must neither collide with an inherited one (§8.4.6.2.1
+    /// 3 a — a name declared in the referencing element is the one referenced) nor be walked, emitted or re-validated
+    /// as this unit's. <see cref="FindTypeDecl"/> is the ONE lookup, own declarations first.</summary>
+    private readonly Dictionary<string, DataItem> _inheritedTypeDecls = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Make <paramref name="container"/>'s GLOBAL type declarations visible here (ISO §13.18.58.4 GR3;
+    /// §8.4.6.2.1 1 — "all global names that are defined in source element A and in any source elements that
+    /// directly or indirectly contain source element A"). The caller passes EVERY container, nearest first, and the
+    /// first declaration of a name wins (§8.4.6.2.1 3 — the nearest containing element's). It must run BEFORE
+    /// <see cref="Bind"/>, because <see cref="ExpandTypes"/> runs inside it. An inherited template is already fully
+    /// expanded (its container's bind finished first), and cloning it writes only to the referencing item.</summary>
+    internal void InheritGlobalTypeDecls(DataBinder container)
+    {
+        foreach (var (name, decl) in container.TypeDecls)
+            if (decl.HasGlobalClause)
+                _inheritedTypeDecls.TryAdd(name, decl);
+    }
+
+    /// <summary>⛔ THE ONE TYPE-NAME LOOKUP: this source element's own declaration, else the nearest containing
+    /// program's GLOBAL one (<see cref="InheritGlobalTypeDecls"/>). Every reader of a type-name (the TYPE clause, a
+    /// restricted pointer's <c>USAGE POINTER TO type-name</c>, an intrinsic function's type-name argument) asks here.</summary>
+    internal bool TryFindTypeDecl(string typeName, out DataItem decl) =>
+        TypeDecls.TryGetValue(typeName, out decl!) || _inheritedTypeDecls.TryGetValue(typeName, out decl!);
 
     /// <summary>
     /// Group items used as a WHOLE character-image operand (MOVE/DISPLAY/compare/ACCEPT/record I-O/whole-group
@@ -742,7 +763,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // THE FILE SECTION ROUTES WITH IT (kb/Work PB168 — the review fleet's §8.6.4 finding): "Data items
         // and file connectors defined in the working-storage or file section of a source element that is not
         // an initial program are static items … For static items that are not object data, there is one copy
-        // in a run unit." The connector half is UnitStaticFiles/the static registration guard; the RECORD
+        // in a run unit." The connector half is the static registration guard (same flag); the RECORD
         // AREA half is this — without it, the shared connector reads into a per-activation area and the
         // resumed outer activation sees stale record content (a silent wrong answer where the standard has
         // ONE area). EXTERNAL files stay off the channel (run-unit ExternalStore, §8.6.7); a REPORT FD has
@@ -3319,7 +3340,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         foreach (var item in AllItems())
             if (item.Pic is { Category: PicCategory.Pointer, RestrictedTypeName: { } tn, RestrictedTypeDecl: null }
-                && TypeDecls.TryGetValue(tn, out var decl))
+                && TryFindTypeDecl(tn, out var decl))
                 item.Pic = item.Pic with { RestrictedTypeDecl = decl };
     }
 
@@ -3334,7 +3355,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         string typeName = item.TypeRefName!;
         item.TypeRefName = null;   // mark expanded (idempotent; also stops a cloned nested ref being re-processed)
         string subject = item.CobolName ?? item.CsName;
-        if (!TypeDecls.TryGetValue(typeName, out var template))
+        if (!TryFindTypeDecl(typeName, out var template))
         {
             Edition.Error("COBOLNET1530", $"TYPE '{typeName}' on '{subject}': the type-name is not defined by any "
                 + "TYPEDEF entry (ISO §13.18.57 / §13.18.58)");

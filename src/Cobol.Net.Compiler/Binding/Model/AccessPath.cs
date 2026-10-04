@@ -24,14 +24,17 @@ public sealed record AccessPath(IReadOnlyList<AccessSegment> Segments)
     public AccessPath Add(AccessSegment seg) => new([.. Segments, seg]);
 
     /// <summary>Textually re-anchor the path behind a contained-program <c>__outer</c> chain (ISO §12.4.5.8.4 —
-    /// a FILE STATUS item is never subscripted, so the root is a plain field): prepend <paramref name="prefix"/> to
-    /// the ROOT field expression, byte-identical to the old <c>prefix + pathString</c>.</summary>
-    public AccessPath Reroot(string prefix)
+    /// a FILE STATUS item is never subscripted, so the root is a plain field): prepend
+    /// <paramref name="prefixOf"/>(the root field) to the ROOT field expression, byte-identical to the old
+    /// <c>prefix + pathString</c>. The prefix is asked PER ROOT because a container's static member is reached
+    /// through its class, an instance member through the <c>__outer</c> chain (<c>BoundUnit.AnchorOf</c>;
+    /// kb/Work PB1133).</summary>
+    public AccessPath Reroot(Func<string, string> prefixOf)
     {
         if (Segments.Count == 0 || Segments[0] is not RootFieldSegment root) return this;
         // The guard's presence member is Uid-keyed and bridged under the same name (kb/Work PB971), so only the
         // storage text is re-anchored; the guard travels unchanged.
-        var segs = new List<AccessSegment>(Segments.Count) { root with { CsField = prefix + root.CsField } };
+        var segs = new List<AccessSegment>(Segments.Count) { root with { CsField = prefixOf(root.CsField) + root.CsField } };
         for (int i = 1; i < Segments.Count; i++) segs.Add(Segments[i]);
         return new AccessPath(segs);
     }

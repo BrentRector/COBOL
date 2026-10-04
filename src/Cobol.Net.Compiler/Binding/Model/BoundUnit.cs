@@ -55,6 +55,16 @@ internal sealed class BoundUnit
 
     /// <summary>The C# nested-type reference from the top-level scope (factory construction).</summary>
     public string ClassRef => Parent is null ? ClassName : Parent.ClassRef + "." + ClassName;
+
+    /// <summary>⛔ THE ONE ANCHOR OF A CONTAINER MEMBER (kb/Work PB1133): the C# expression prefix by which a program
+    /// <paramref name="depth"/> containment levels INSIDE this unit reaches this unit's class member
+    /// <paramref name="csMember"/> — the <c>__outer</c> instance chain for an instance member, this unit's CLASS name
+    /// for a static one (<see cref="DataBinder.IsStaticMember"/>: ISO §13.5.4 GR1's one copy per run unit is a C#
+    /// static, which no instance expression may name). Every place a contained program's text reaches into a
+    /// container's data asks here: the GLOBAL bridges (<see cref="DataBinder.GlobalBridgesOf"/>) and the inherited
+    /// FILE STATUS places (<c>ProgramEmitter</c>).</summary>
+    public string AnchorOf(string csMember, int depth) =>
+        Data.IsStaticMember(csMember) ? ClassName + "." : CodeGen.RuntimeApi.OuterChain(depth);
 }
 
 /// <summary>One inherited-GLOBAL bridge a nested class emits: a property aliasing the containing instance's

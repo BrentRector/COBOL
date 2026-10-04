@@ -148,7 +148,7 @@ internal sealed class BinderDriver
         // bound and BEFORE the first body: a CLASS definition's REPOSITORY reaches its methods (§12.3.4 GR1 — "apply
         // to each directly or indirectly contained source unit"), and until kb/Work PB1100 the class bodies bound
         // first, against no table, so every user-function reference in a method drew COBOLNET1505.
-        session.Repository = BuildGroupRepository(units, session);
+        session.Repository = BuildGroupRepository(units, classes, session);
         foreach (var cls in classes) oo.BindClassBody(cls);
 
         // The whole-group middle-end (P6 Steps 3–4): the DECLARED manifest — ProcedureBinding →
@@ -425,23 +425,57 @@ internal sealed class BinderDriver
         // IsPrototype could never be true for a program. The COBOL-2002 introduction gates are
         // VersionConformancePass.Run (bound-arm over group.Units — BoundUnit.IsPrototype is drop-proof).
         bool isPrototype = (pid?.prototypePhrase() ?? fid?.prototypePhrase()) is not null;
+        string what = $"{(isFunction ? "FUNCTION-ID" : "PROGRAM-ID")} '{name}'{(isPrototype ? " IS PROTOTYPE" : "")}";
         if (isPrototype)
-        {
-            // §10.6.2 SR4 (the body) and §10.6.1 (the unit's shape) — ONE screen for every prototype kind.
-            string what = $"{(isFunction ? "FUNCTION-ID" : "PROGRAM-ID")} '{name}' IS PROTOTYPE";
+            // §10.6.2 SR4 — the BODY of a prototype, one screen for every prototype kind.
             PrototypeUnitRules.ScreenBody(what,
                 idBody?.identificationParagraph().Select(p => p.optionsParagraph()).FirstOrDefault(o => o is not null),
                 ctx.environmentDivision(), ctx.dataDivision(), ctx.procedureDivision(), edition);
-            PrototypeUnitRules.ScreenUnitShape(what, ctx, parent is not null, edition);
-        }
-        bool initial = false, common = false, recursive = false;
-        foreach (var attr in pid?.programIdAttributes()?.programIdAttribute() ?? [])
-        {
-            var cpa = attr.commonProgramAttribute();
-            if (cpa?.INITIAL_() is not null) initial = true;
-            else if (cpa?.COMMON() is not null) common = true;
-            else if (cpa?.RECURSIVE() is not null) recursive = true;
-        }
+        // §10.6.1 — the SHAPE of EVERY unit kind (containment, end marker, the procedure-division bracket), one
+        // table (kb/Work PB1507; it used to be asked of the prototype kinds alone).
+        SourceUnitShape.Screen(what, SourceUnitShape.KindOf(isFunction, isPrototype),
+            parent is null ? null : SourceUnitShape.KindOf(parent.IsFunction, parent.IsPrototype), ctx, edition);
+        // §11.10.2 Format 1's attribute group is a §5.2.6.4 choice-indicator group — any order, each alternative at
+        // most ONCE — and the grammar's `programIdAttribute+` is the superset the only-once half is read from.
+        var attributes = pid?.programIdAttributes()?.programIdAttribute() ?? [];
+        string group = $"PROGRAM-ID '{name}'";
+        using var attributePosition = edition.At(pid);   // the PROGRAM-ID paragraph, for the repeat / 0886 / 0887 messages
+        var initialAttr = ChoiceIndicators.AtMostOnce(edition,
+            attributes.Where(a => a.commonProgramAttribute().INITIAL_() is not null).ToArray(),
+            group, "the INITIAL attribute", "11.10.2");
+        var commonAttr = ChoiceIndicators.AtMostOnce(edition,
+            attributes.Where(a => a.commonProgramAttribute().COMMON() is not null).ToArray(),
+            group, "the COMMON attribute", "11.10.2");
+        var recursiveAttr = ChoiceIndicators.AtMostOnce(edition,
+            attributes.Where(a => a.commonProgramAttribute().RECURSIVE() is not null).ToArray(),
+            group, "the RECURSIVE attribute", "11.10.2");
+        bool initial = initialAttr is not null, common = commonAttr is not null, recursive = recursiveAttr is not null;
+
+        // §11.10.3 SR5 / SR6 — the CONTAINER chain ("directly or indirectly contains this program"). SR5 reads the
+        // container's EFFECTIVE recursive attribute (the one §11.10.4 GR4 hands down is still "a recursive program");
+        // SR6 reads a container's INITIAL clause, which is never inherited. The nearest offending container is named.
+        if (initialAttr is not null)
+            for (var anc = parent; anc is not null; anc = anc.Parent)
+                if (anc.Recursive)
+                {
+                    using var _ = edition.At(initialAttr);
+                    edition.Error(DiagnosticCatalog.ProgramAttributeContainment,
+                        $"program '{name}' is INITIAL but is contained in the recursive program '{anc.Name}': the "
+                        + "INITIAL clause shall not be specified if any program that directly or indirectly "
+                        + "contains this program is a recursive program (ISO §11.10.3 SR5)");
+                    break;
+                }
+        if (recursiveAttr is not null)
+            for (var anc = parent; anc is not null; anc = anc.Parent)
+                if (anc.Initial)
+                {
+                    using var _ = edition.At(recursiveAttr);
+                    edition.Error(DiagnosticCatalog.ProgramAttributeContainment,
+                        $"program '{name}' is RECURSIVE but is contained in the initial program '{anc.Name}': the "
+                        + "RECURSIVE clause shall not be specified if any program that directly or indirectly "
+                        + "contains this program is an initial program (ISO §11.10.3 SR6)");
+                    break;
+                }
 
         // §11.10.2 / §11.5.2's `[ AS literal-1 ]` — the externalized name (kb/Work PB303). Absent, §8.3.2.2 2)
         // externalizes the user-defined word itself, so the two names coincide.
@@ -469,7 +503,9 @@ internal sealed class BinderDriver
         // program-id-recursive-2002: the pass owns the edition gate (Exec Step E).
         if (initial && recursive)
             edition.Error("COBOLNET0886",
-                $"program '{name}': INITIAL and RECURSIVE are mutually exclusive (ISO §11.10.3 SR5–6)");
+                $"program '{name}': INITIAL and RECURSIVE are mutually exclusive — §11.10.2 Format 1 prints them as "
+                + "the alternatives of ONE brace (ISO §11.10.2); the containment conflicts of the two attributes are "
+                + "§11.10.3 SR5–6, checked above against the container chain");
         if (common && parent is null)
             edition.Error("COBOLNET0887",
                 $"program '{name}': COMMON may be specified only in a CONTAINED program (ISO §11.10.3 SR4)");
@@ -482,11 +518,12 @@ internal sealed class BinderDriver
         if (isFunction) recursive = true;
         // §11.10.4 GR4 (kb/Work PB133): "The RECURSIVE clause specifies that the program AND ANY PROGRAMS
         // CONTAINED WITHIN IT are recursive" — the attribute inherits down the containment tree (parents are
-        // built before their children, so one parent read cascades transitively). The §11.10.3 SR5–6
-        // exclusivity gate above sees only the WRITTEN clauses, so an INITIAL containee of a recursive
-        // container is legal and carries both attributes. This is what lets the legal R→C→R→C cycle
-        // through GR3f's re-entry check and lets a contained program call ITSELF (§8.4.6.3 r1's "in the
-        // program itself") — both drew EC-PROGRAM-RECURSIVE-CALL / NOT-FOUND before.
+        // built before their children, so one parent read cascades transitively). The inherited attribute is
+        // what SR5 reads of a container ("a recursive program"), so an INITIAL containee of a recursive
+        // container is the nonconforming source SR5 refuses above — never a legal program carrying both
+        // attributes (kb/Work PB1507; this comment used to call that shape legal). This is what lets the legal
+        // R→C→R→C cycle through GR3f's re-entry check and lets a contained program call ITSELF (§8.4.6.3 r1's "in
+        // the program itself") — both drew EC-PROGRAM-RECURSIVE-CALL / NOT-FOUND before.
         if (parent is { Recursive: true }) recursive = true;
 
         string baseName = "_PRG_" + DataItem.Sanitize(name).ToUpperInvariant();
@@ -549,22 +586,11 @@ internal sealed class BinderDriver
         // The static-WS discriminator (ISO §13.5.4 GR1 + §14.6.2.3.2/.3; the full derivation is on
         // DataBinder.UnitStaticWs): a RECURSIVE-and-not-INITIAL unit — including every FUNCTION-ID unit
         // (§8.6.6 :8821 / §9.4 :12529, the implicit attribute set in MakeUnit) — owns ONE last-used WS copy
-        // shared across activations, so its WS roots emit STATIC. Scoped to units WITHOUT contained programs:
-        // a containee's GLOBAL/__outer ref-bridges alias the CONTAINER INSTANCE's fields (§13.18.27 GR2), and
-        // C# forbids `instance.staticField` — the composition is staged LOUD below, never half-wired (§1.4).
-        // (A FUNCTION cannot contain programs, so every UDF takes the static leg.)
-        bool staticWs = unit.Recursive && !unit.Initial && unit.Children.Count == 0;
-        if (unit.Recursive && !unit.Initial && unit.Children.Count > 0
-            && unit.Ctx.dataDivision() is { } recDd
-            && (recDd.workingStorageSection() is not null || recDd.fileSection() is not null))
-            // The FILE SECTION joined the staged loud with kb/Work PB168: §8.6.4 puts its record areas in
-            // the SAME static one-copy sentence as WS, and the same GLOBAL/__outer bridge composition gap
-            // applies (an FD may be GLOBAL, §13.18.27).
-            edition.Error(DiagnosticCatalog.RecursiveContainedWs,
-                $"program '{unit.Name}': a RECURSIVE program that directly contains programs and declares "
-                + "WORKING-STORAGE or a FILE SECTION is recognized but not yet implemented — the "
-                + "shared-static storage model (ISO §13.5.4 GR1 / §8.6.4 / §14.6.2.3.3) does not yet "
-                + "compose with contained-program GLOBAL bridges (§13.18.27.4 GR2)");
+        // shared across activations, so its WS roots emit STATIC — with or without contained programs. A
+        // containee's GLOBAL bridges alias the container's members (§13.18.27 GR2): an INSTANCE member is reached
+        // through the `__outer` chain, a STATIC one through the container's class name, which C# requires
+        // (CS0176: `instance.staticField` is not a C# expression). BoundUnit.AnchorOf chooses per member, so the
+        // composition is one rule in one place (kb/Work PB1133; the staged COBOLNET0899 refusal is gone).
         var data = new DataBinder(edition)
         {
             OoClasses = session.OoClasses,
@@ -579,10 +605,7 @@ internal sealed class BinderDriver
             UnitIsFunction = unit.IsFunction,
             // §8.4.6.6 / §8.4.6.8 — the SELF leg of the two prototype-name scope rules (kb/Work PB452/PB817).
             UnitSelfName = unit.Name,
-            UnitStaticWs = staticWs,
-            // The FILE-CONNECTOR twin of staticWs, WITHOUT the childless conjunct (kb/Work PB168): the
-            // static registration flag never crosses an __outer bridge, so containees do not constrain it.
-            UnitStaticFiles = unit.Recursive && !unit.Initial,
+            UnitStaticWs = unit.Recursive && !unit.Initial,
         };
         data.CallSeedUids(session.TakeUidBand());
 
@@ -601,7 +624,13 @@ internal sealed class BinderDriver
         // declaration of the name hides nothing from the programs it contains.
         int constantDepth = 0;
         for (var anc = unit.Parent; anc is not null; anc = anc.Parent)
+        {
             data.InheritGlobalConstants(anc.Data, ++constantDepth);
+            // …and its GLOBAL type declarations (§13.18.58.4 GR3; §8.4.6.2.2 — a type-name described with a GLOBAL
+            // clause is a global name; kb/Work PB1303): the same BEFORE-Bind, nearest-first, local-shadows contract —
+            // ExpandTypes runs inside data.Bind, so a TYPE clause here already sees the container's type-name.
+            data.InheritGlobalTypeDecls(anc.Data);
+        }
         // The member names every container's GLOBAL root will occupy in this unit's class (kb/Work PB1047): the
         // bridges are emitted for every global root below, so a LOCAL root spelled like one (the §8.4.6.2.1 3) a)
         // shadowing case) must take another C# name — its stem too, or a member DERIVED from the stem (a REDEFINES
@@ -677,7 +706,6 @@ internal sealed class BinderDriver
         for (var anc = unit.Parent; anc is not null; anc = anc.Parent)
         {
             depth++;
-            string outer = string.Concat(Enumerable.Repeat("__outer.", depth));
             foreach (var g in anc.Data.CallGlobalRoots)
             {
                 if (g.CobolName is null) continue;
@@ -698,7 +726,7 @@ internal sealed class BinderDriver
                 // a GLOBAL FD share a Tier-B class's backing, a GLOBAL redefiner and its anchor share one field — and a
                 // member declared twice is CS0102. The member names are unique along the container chain
                 // (ReserveInheritedMemberNames), so equal names are the same member.
-                foreach (var bridge in anc.Data.GlobalBridgesOf(g, outer))
+                foreach (var bridge in anc.Data.GlobalBridgesOf(g, member => anc.AnchorOf(member, depth)))   // consumed here, within this iteration
                     if (bridgedMembers.Add(bridge.Field)) unit.Bridges.Add(bridge);
             }
         }
@@ -728,12 +756,13 @@ internal sealed class BinderDriver
 
     /// <summary>Build the group's REPOSITORY resolution tables (§12.3.8.4 GR10 / GR11) — once, between the DATA
     /// phase and the first procedure body.</summary>
-    private static GroupRepository BuildGroupRepository(IReadOnlyList<BoundUnit> units, BindSession session)
+    private static GroupRepository BuildGroupRepository(IReadOnlyList<BoundUnit> units,
+                                                        IReadOnlyList<OoClassUnit> classes, BindSession session)
     {
         // BEFORE either table is built (kb/Work PB660): a compilation group that DEFINES one name twice
         // is nonconforming source, and both tables below silently keep the first definition and drop the
         // second — the shape §8.3.2.2 exists to forbid.
-        CheckDefinitionNameUniqueness(units, session.OoClasses, session.Edition);
+        CheckDefinitionNameUniqueness(units, classes, session.OoClasses, session.Edition);
         CheckPrototypeSignaturePairs(units, session.Edition);
         // kb/Work PB237 — the compilation group's program definitions by EXTERNALIZED name, the search space
         // §12.3.8.4 GR10 a) names. Built once for the whole group, exactly like the user-function table beside it.
@@ -847,18 +876,20 @@ internal sealed class BinderDriver
     /// with the same externalized name, the signatures of these two compilation units shall be the same"</i> —
     /// and SR3, the function twin. A prototype sharing a definition's externalized name is the shape the
     /// standard legislates FOR, and §12.3.8.4 GR10 a) is what consumes it.</para></summary>
-    private static void CheckDefinitionNameUniqueness(IReadOnlyList<BoundUnit> units, OoClassTable oo,
-                                                      EditionContext edition)
+    private static void CheckDefinitionNameUniqueness(IReadOnlyList<BoundUnit> units, IReadOnlyList<OoClassUnit> classes,
+                                                      OoClassTable oo, EditionContext edition)
     {
-        // (1) The group-wide EXTERNALIZED namespace. Its population is §8.3.2.2's OWN list item 1 as far as
-        //     this compiler models it: outermost program definitions, function definitions, object-class
-        //     definitions and interface definitions. A FUNCTION-ID unit is never contained, so one containment
-        //     test covers both unit kinds; a class/interface definition is never a unit at all, which is why it
-        //     arrives from the OO table (and is why a CLASS-ID sharing a PROGRAM-ID's externalized name used to
-        //     compile clean — each namespace policed only ITSELF).
+        // (1) The group-wide EXTERNALIZED namespace. Its population is §8.3.2.2's list items 1 AND 2 as far as
+        //     this compiler models them: outermost program definitions, function definitions, object-class
+        //     definitions and interface definitions (item 1), and the EXTERNAL data items, records and file
+        //     connectors of every source element (item 2, kb/Work PB1404). A FUNCTION-ID unit is never
+        //     contained, so one containment test covers both unit kinds; a class/interface definition is never a
+        //     unit at all, which is why it arrives from the OO table (and is why a CLASS-ID sharing a PROGRAM-ID's
+        //     externalized name used to compile clean — each namespace policed only ITSELF; the EXTERNAL items
+        //     were the same hole, one list further down the same clause).
         var externalized =
             new Dictionary<string, (string Kind, string Spelling, string Word)>(CobolNet.Runtime.ExternalizedNames.Comparer);
-        foreach (var (kind, spelling, word, name, at) in ExternalizedDefinitions(units, oo))
+        foreach (var (kind, spelling, word, name, at, shared) in ExternalizedDefinitions(units, classes, oo))
         {
             if (externalized.TryGetValue(name, out var first))
             {
@@ -868,12 +899,16 @@ internal sealed class BinderDriver
                 // that pair: two class definitions whose words DIFFER and whose AS literals coincide are
                 // §8.3.2.2's business alone, and nothing else in the compiler looks at them.
                 if (IsOo(kind) && IsOo(first.Kind) && string.Equals(word, first.Word, StringComparison.OrdinalIgnoreCase)) continue;
+                // Two EXTERNAL items of ONE kind under one name are the SAME INSTANCE — that sharing is what the
+                // EXTERNAL clause is for ("they refer to the same instance"), and whether their descriptions agree is
+                // §13.18.22.4 / EC-EXTERNAL-*'s question. Only a pair of DIFFERENT kinds conflicts.
+                if (shared && first.Kind == kind) continue;
                 using var _ = edition.At(at);
                 string why = first.Kind == kind
                     ? $"two {kind} definitions cannot be one instance (§8.3.2.2: \"when two or more source "
                       + "elements identify something with the same externalized name, they refer to the same "
                       + "instance\")"
-                    : $"a {kind} definition and a {first.Kind} definition are not the same kind of entity "
+                    : $"{Noun(kind)} and {Noun(first.Kind)} are not the same kind of entity or item "
                       + "(§8.3.2.2: \"all instances of a given name that is externalized to the operating "
                       + "environment shall identify the same kind of entity or item\")";
                 edition.Error(DiagnosticCatalog.DuplicateExternalizedDefinition,
@@ -929,23 +964,39 @@ internal sealed class BinderDriver
         // report. The list's remaining members are not definitions in a compilation group: method-names and
         // property-names are the two §8.3.2.2 EXEMPTS from the same-instance sentence by name, and a
         // function-prototype-name / program-prototype-name names a definition elsewhere (§12.3.8.4 GR10).
-        static IEnumerable<(string Kind, string Spelling, string Word, string Name, ParserRuleContext? At)>
-            ExternalizedDefinitions(IReadOnlyList<BoundUnit> units, OoClassTable oo)
+        static IEnumerable<(string Kind, string Spelling, string Word, string Name, DiagnosticCursor At, bool Shared)>
+            ExternalizedDefinitions(IReadOnlyList<BoundUnit> units, IReadOnlyList<OoClassUnit> classes, OoClassTable oo)
         {
             foreach (var u in units)
             {
                 if (u.IsPrototype || u.Parent is not null) continue;
                 string kind = u.IsFunction ? "FUNCTION-ID" : "PROGRAM-ID";
                 yield return (kind, Spell(kind, u.Name, u.ExternalizedName), u.Name, u.ExternalizedName,
-                              NameCtx(u));
+                              CursorOf(NameCtx(u)), false);
             }
             foreach (var c in oo.Classes)
                 yield return ("CLASS-ID", Spell("CLASS-ID", c.Name, c.ExternalizedName), c.Name,
-                              c.ExternalizedName, c.Ctx);
+                              c.ExternalizedName, CursorOf(c.Ctx), false);
             foreach (var i in oo.Interfaces)
                 yield return ("INTERFACE-ID", Spell("INTERFACE-ID", i.Name, i.ExternalizedName), i.Name,
-                              i.ExternalizedName, i.Ctx);
+                              i.ExternalizedName, CursorOf(i.Ctx), false);
+            // §8.3.2.2 list item 2 — the EXTERNAL data items, records and files of EVERY source element: a
+            // contained program's and a class's (object and factory halves) included, since the clause names the
+            // item, not the unit that holds it (kb/Work PB1404). ONE producer per source element
+            // (DataBinder.ExternalizedSubjects), the same one its own §13.18.22.3 SR2 screen reads.
+            foreach (var data in units.Where(u => !u.IsPrototype).Select(u => u.Data)
+                         .Concat(classes.SelectMany(cu => new[] { cu.Data, cu.FactoryData })))
+                foreach (var s in data.ExternalizedSubjects())
+                    yield return (s.Kind == ExternalizedSubjectKind.File ? "EXTERNAL file" : "EXTERNAL data item",
+                                  $"EXTERNAL {s.Spelling}", s.Word, s.Name, s.At, true);
         }
+
+        // A parse node's first token as a diagnostic position (an unset cursor leaves the current one standing).
+        static DiagnosticCursor CursorOf(ParserRuleContext? ctx) =>
+            ctx?.Start is { } t ? new DiagnosticCursor(t.Line, t.Column) : default;
+
+        // How a KIND reads in the cross-kind sentence: a definition of the unit kinds, or the EXTERNAL item itself.
+        static string Noun(string kind) => kind.StartsWith("EXTERNAL", StringComparison.Ordinal) ? $"an {kind}" : $"a {kind} definition";
 
         // The two kinds §8.4.6.4 gives their own compilation-group uniqueness sentence, and whose check
         // therefore already exists elsewhere (OoClassTable).

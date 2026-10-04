@@ -206,6 +206,17 @@ public sealed partial class DataBinder
     public IReadOnlySet<string> StaticIndexCells => _staticIndexCells;
     private readonly HashSet<string> _staticIndexCells = new(StringComparer.Ordinal);
 
+    /// <summary>⛔ THE ONE QUESTION "IS THIS CLASS MEMBER STATIC?" — true when <paramref name="csMember"/> is on any of
+    /// the four static channels (<see cref="StaticRootFields"/>, <see cref="StaticBasedBridgeAddrs"/>,
+    /// <see cref="StaticAddressableCells"/>, <see cref="StaticIndexCells"/>), i.e. it is ONE copy per class
+    /// (§13.5.4 GR1) and C# reaches it through the CLASS name, never through an instance (CS0176). A contained
+    /// program's reference to a container's member asks it, through <c>BoundUnit.AnchorOf</c>, so a container with
+    /// static working-storage composes with its containees' GLOBAL bridges (kb/Work PB1133). A new static channel
+    /// joins THIS predicate and nothing else.</summary>
+    internal bool IsStaticMember(string csMember) =>
+        _staticRootFields.Contains(csMember) || _staticBasedBridgeAddrs.Contains(csMember)
+        || _staticAddressableCells.Contains(csMember) || _staticIndexCells.Contains(csMember);
+
     /// <summary>Every INDEX-NAME declaration under a root (its subtree's <c>INDEXED BY</c> declarations, each with
     /// its own cell — kb/Work PB919). The ONE subtree walk every cell router, bridge and emitter reads.</summary>
     internal static IEnumerable<IndexDeclaration> IndexDeclarationsUnder(DataItem root)

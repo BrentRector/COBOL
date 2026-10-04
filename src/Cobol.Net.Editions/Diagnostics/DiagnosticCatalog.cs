@@ -1871,13 +1871,10 @@ public static class DiagnosticCatalog
         + "refused by name on BOTH surfaces rather than on one (kb/Work PB231's collapse). A nonconforming "
         + "EXTERNAL pointer/object item is COBOLNET1796's (§13.18.22.3 SR4), not this.",
         "ISO §13.18.22", RecognizedNotImplemented);
-    public static readonly DiagnosticDescriptor RecursiveContainedWs = new(
-        NotImplemented, "recursive-contained-working-storage", EditionSeverity.Error,
-        "A RECURSIVE program that directly contains programs and declares WORKING-STORAGE or a FILE SECTION "
-        + "is recognized but not yet implemented — the shared-static storage model (one last-used copy "
-        + "across activations, §8.6.4 covering both sections; kb/Work PB168) does not yet compose with "
-        + "contained-program GLOBAL/__outer bridges.",
-        "ISO §13.5.4 GR1 / §8.6.4 / §14.6.2.3.3 / §13.18.27.4 GR2", RecognizedNotImplemented);
+    // (RecursiveContainedWs was DELETED by kb/Work PB1133, which implemented the composition it staged: a
+    // RECURSIVE program that contains programs now owns its static WORKING-STORAGE / FILE SECTION, and the
+    // containees' GLOBAL bridges reach a static member through the container's CLASS name
+    // (BoundUnit.AnchorOf). It carried the shared 0899 recognized-not-implemented code, so no number is freed.)
     // (RefModBitGroupSlice was DELETED by kb/Work PB173, which implemented the model it deferred: a bit group's
     // reference modification is a BitImagePlace over the UNPACKED boolean string, so the boolean channel's
     // BOOLEAN positions and the substrate's positions are the same positions — §8.4.3.3.4 GR5a. It carried the
@@ -5652,17 +5649,33 @@ public static class DiagnosticCatalog
         + "shall precede all other types of source units.\"",
         "ISO §10.6.2 SR1");
 
-    /// <summary>COBOLNET2274 — a program or function prototype is not written in its §10.6.1 source-unit format:
-    /// it is contained in a program, contains a source unit, or omits its end marker (kb/Work PB894).</summary>
-    public static readonly DiagnosticDescriptor PrototypeUnitFormat = new(
-        "COBOLNET2274", "prototype-unit-format", EditionSeverity.Error,
-        "A program prototype or function prototype does not follow its §10.6.1 source-unit format. ISO §10.6.1 "
-        + "prints the program-prototype and function-prototype formats with the end marker UNBRACKETED "
-        + "(`END PROGRAM program-prototype-name-1.` / `END FUNCTION function-prototype-name-1.`) and with no "
-        + "contained source-unit slot, and a program definition's format contains only program definitions — so "
-        + "a prototype is never contained, never contains another source unit, and always ends with its end "
-        + "marker.",
+    /// <summary>COBOLNET2274 — a program, function, program prototype or function prototype is not written in its
+    /// §10.6.1 source-unit format: it is contained where its format has no slot for it, contains a source unit its
+    /// format has no slot for, omits the end marker its format prints unbracketed, closes with the other kind's end
+    /// marker, or has contained programs without the procedure division that carries their slot (kb/Work PB894 for
+    /// the prototype kinds; PB1507 generalized the one screen to every kind).</summary>
+    public static readonly DiagnosticDescriptor SourceUnitFormat = new(
+        "COBOLNET2274", "source-unit-format", EditionSeverity.Error,
+        "A source unit does not follow its §10.6.1 format. ISO §10.6.1 prints four unit formats that differ in "
+        + "exactly three ways, and every one is checked once, from one table: a program-definition alone has the "
+        + "contained `[ procedure-division [ program-definition ] … ]` slot (so only a program definition "
+        + "contains source units, only a program definition is contained, and the contained slot sits INSIDE the "
+        + "procedure-division bracket); its end marker is `END PROGRAM`, where a function definition and a "
+        + "function prototype close with `END FUNCTION`; and the end marker is bracketed only in the "
+        + "program-definition format — a program prototype, a function prototype and a function definition always "
+        + "end with it.",
         "ISO §10.6.1");
+
+    /// <summary>COBOLNET2755 — a PROGRAM-ID attribute that §11.10.3 SR5 or SR6 forbids by the CONTAINER chain: an
+    /// INITIAL clause under a recursive program, or a RECURSIVE clause under an initial program (kb/Work PB1507).</summary>
+    public static readonly DiagnosticDescriptor ProgramAttributeContainment = new(
+        "COBOLNET2755", "program-attribute-containment", EditionSeverity.Error,
+        "A program's INITIAL or RECURSIVE clause conflicts with a program that contains it. ISO §11.10.3 SR5: \"The "
+        + "INITIAL clause shall not be specified if any program that directly or indirectly contains this program is "
+        + "a recursive program.\" SR6: \"The RECURSIVE clause shall not be specified if any program that directly or "
+        + "indirectly contains this program is an initial program.\" The recursive attribute a program inherits "
+        + "from its container (§11.10.4 GR4) counts as recursive for SR5.",
+        "ISO §11.10.3 SR5 / SR6");
 
     /// <summary>COBOLNET2256 — an ASSIGN clause whose TO-phrase list is not one this implementation allows (ISO
     /// §12.4.5.2 SR5, determination DOC-A.1-71; kb/Work PB829). The general format admits the list; the grammar used

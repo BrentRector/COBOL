@@ -267,10 +267,10 @@ internal sealed class ProgramEmitter
         for (var anc = unit.Parent; anc is not null; anc = anc.Parent)
         {
             statusDepth++;
-            string outerPrefix = RuntimeApi.OuterChain(statusDepth);
             foreach (var f in anc.Data.Files)
                 if (f.IsGlobal && f.FileStatusItem is { } si && !_callState.InheritedStatusPlace.ContainsKey(f)
-                    && anc.Refs.ResolveItem(si) is { } sp && PrefixPlace(sp, outerPrefix) is { } pp)
+                    && anc.Refs.ResolveItem(si) is { } sp
+                    && PrefixPlace(sp, member => anc.AnchorOf(member, statusDepth)) is { } pp)
                     _callState.InheritedStatusPlace[f] = pp;
         }
 
@@ -301,7 +301,7 @@ internal sealed class ProgramEmitter
                 // them LAST-USED otherwise. A RECURSIVE unit's fresh per-activation instances therefore
                 // share ONE registration (static; __ResetStatics returns it to false on the initial-state
                 // cases), while an INITIAL/canceled unit re-registers per fresh instance as before.
-                w.Line(data.UnitStaticFiles
+                w.Line(data.UnitStaticWs
                     ? "private static bool __filesRegistered;   // connectors register once per RUN UNIT — last-used across recursive activations (ISO §14.6.2.3.2 cases 1–3 / §14.6.2.3.3; kb/Work PB168); reset by __ResetStatics"
                     : "private bool __filesRegistered;   // connectors register once per INSTANCE — a canceled/INITIAL program gets fresh connectors (ISO §14.6.2.3.2)");
             // The report ENGINES are per-INSTANCE objects and get their own per-INSTANCE guard — the PB168
@@ -440,7 +440,7 @@ internal sealed class ProgramEmitter
     /// (the §12.4.5.8.4 GR1 NOTE 1 status routing). A FILE STATUS item is never subscripted (§12.4.5.8 SR1 — no
     /// OCCURS), so its member path / Tier-B backing prefix textually. An unexpected place shape returns null —
     /// the caller then falls back to the loud-guard path, never a silent wrong-storage store (§1.4).</summary>
-    private static Place? PrefixPlace(Place p, string prefix) => p switch
+    private static Place? PrefixPlace(Place p, Func<string, string> prefix) => p switch
     {
         MemberPlace m => new MemberPlace(m.Path.Reroot(prefix), m.MemberItem),
         // `with` rather than a fresh construction: the window's CODING (kb/Work PB203, PB231) is part of the

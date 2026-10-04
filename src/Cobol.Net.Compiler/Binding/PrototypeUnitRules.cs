@@ -19,10 +19,9 @@ using Core = CobolParserCore;
 /// the data division checked against three of its five non-linkage sections — and a FUNCTION prototype carrying
 /// WORKING-STORAGE or procedure statements compiled clean and the statements silently vanished (a prototype emits
 /// no body).</item>
-/// <item><b>§10.6.1's program-prototype and function-prototype formats</b> (<see cref="ScreenUnitShape"/>,
-/// COBOLNET2274): the end marker is printed UNBRACKETED in both, the procedure division has no
-/// <c>[ program-definition ]</c> slot, and a program definition's own format contains only program
-/// DEFINITIONS — so a prototype is never contained and never contains.</item>
+/// <item><b>§10.6.1's source-unit formats</b> are NOT here any more: every unit kind — the two prototype kinds and
+/// the program and function definitions — is screened by the ONE table in <see cref="SourceUnitShape"/>
+/// (COBOLNET2274; kb/Work PB1507).</item>
 /// <item><b>§10.6.2 SR1</b> — prototypes precede every other source unit of the compilation group
 /// (<see cref="ScreenOrder"/>, COBOLNET2273).</item>
 /// </list>
@@ -89,31 +88,6 @@ internal static class PrototypeUnitRules
         e.alphabetClause() is not null || e.currencySignClause() is not null || e.decimalPointClause() is not null
         || e.localeClause() is not null || e.symbolicCharactersClause() is not null
         || e.unrecognizedClause() is not null;
-
-    /// <summary>The §10.6.1 source-unit format of a PROGRAM-ID or FUNCTION-ID prototype: never contained, never
-    /// containing, and closed by its end marker.</summary>
-    internal static void ScreenUnitShape(string what, Core.ProgramUnitContext unit, bool contained,
-        EditionContext edition)
-    {
-        void Refuse(ParserRuleContext at, string requirement)
-        {
-            using var _ = edition.At(at);
-            edition.Error(DiagnosticCatalog.PrototypeUnitFormat, $"{what}: {requirement} (ISO §10.6.1)");
-        }
-
-        // Positioned on the identification division: a CONTAINED unit's context is the synthetic programUnit
-        // BinderDriver.Reparent builds, whose own Start token is null.
-        ParserRuleContext at = (ParserRuleContext?)unit.identificationDivision() ?? unit;
-        if (contained)
-            Refuse(at, "a prototype is a source unit of the compilation group itself; a program definition "
-                + "may contain only program definitions");
-        foreach (var nested in unit.nestedProgram())
-            Refuse(nested, "a prototype contains no other source unit — its format has no contained "
-                + "program-definition");
-        if (unit.endProgramHeader() is null)
-            Refuse(at, "the end marker is required — the prototype format prints END PROGRAM / END FUNCTION "
-                + "unbracketed");
-    }
 
     /// <summary>§10.6.2 SR1: "Within a compilation group, function-prototypes and program-prototypes shall precede
     /// all other types of source units." Walked over the group's children in source order, so a class or
