@@ -1,5 +1,7 @@
 {
  "enabled": [
+  "pb351_delimited_conditional_operand",
+  "pb1146_procedure_division_formats",
   "pb1455_qualified_subscripted_subscript",
   "pb1283_renames_legal",
  "pb1054_renames_thru_binary_packed_span",

@@ -5,8 +5,10 @@
       *> space (A= - an EMPTY field; before PB63 a display placeholder), b) a paragraph-name, plus " OF section"
       *> when within a section (B=), c) a section-name and no paragraph-name -> the section-name alone (C=).
       *> 3. the implementor-defined line identifier - COBOL.NET's is the resultant-text line (CONFORMANCE.md);
-      *> with no COPY it is the source line: the RAISE statements sit on lines 36, 39 and 42 of this file and
-      *> line 68 (the method's).
+      *> with no COPY it is the source line: the RAISE statements sit on lines 39 and 42 of this file and
+      *> lines 67 and 70 (the method's). Case a) is the METHOD's leading sentence: a procedure division with
+      *> sections is 14.2.1 Format 1, which admits no sentence before its first section (kb/Work PB1146), so a
+      *> statement with no paragraph-name and no section-name exists only in a Format 2 body like SHOWLOC's.
       *> Also pinned here (the FMT-15.30.2 / FMT-15.31.2 / FMT-15.32.2 / FMT-15.33.2 forms the sweep found
       *> fixed): keyword-omitted EXCEPTION-LOCATION under FUNCTION ALL INTRINSIC (8.4.3.2.3 SR2), a
       *> reference-modified EXCEPTION-LOCATION-N (1:7) - a zero-argument NATIONAL function, so 8.4.3.3.3 SR2
@@ -33,8 +35,6 @@
        01 WS-D PIC X(12).
        01 IREC PIC X(20).
        PROCEDURE DIVISION.
-           RAISE EXCEPTION EC-USER-L.
-           DISPLAY "A=[" FUNCTION EXCEPTION-LOCATION "]".
        ONLY-SECT SECTION.
            RAISE EXCEPTION EC-USER-L.
            DISPLAY "C=[" FUNCTION EXCEPTION-LOCATION "]".
@@ -64,6 +64,8 @@
        PROCEDURE DIVISION.
        METHOD-ID. SHOWLOC.
        PROCEDURE DIVISION.
+           RAISE EXCEPTION EC-USER-L.
+           DISPLAY "A=[" FUNCTION EXCEPTION-LOCATION "]".
        M-PARA.
            RAISE EXCEPTION EC-USER-L.
            DISPLAY "M=[" FUNCTION EXCEPTION-LOCATION "]".

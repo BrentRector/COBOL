@@ -53,7 +53,7 @@
            OPEN INPUT RBACK.
            MOVE SPACES TO RB-REC.
            PERFORM UNTIL RB-REC NOT = SPACES
-               READ RBACK AT END MOVE "NONE" TO RB-REC
+               READ RBACK AT END MOVE "NONE" TO RB-REC END-READ
            END-PERFORM.
            DISPLAY "R=" RB-REC(1:6).
            CLOSE RBACK.

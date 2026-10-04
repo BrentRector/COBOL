@@ -79,6 +79,7 @@
        01 RK PIC 9(2).
        01 MORE PIC X VALUE "Y".
        PROCEDURE DIVISION.
+       MAIN-SECTION SECTION.
        MAIN-PARA.
       *> INDEXED, variable-length records: the key follows D3.
            OPEN OUTPUT IX.

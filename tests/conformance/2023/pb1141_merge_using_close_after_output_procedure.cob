@@ -37,6 +37,7 @@
        01 FB-ST PIC XX VALUE "ZZ".
        01 MORE PIC X VALUE "Y".
        PROCEDURE DIVISION.
+       MAIN-SECTION SECTION.
        MAIN.
            OPEN OUTPUT FA
            MOVE "A1" TO FA-REC

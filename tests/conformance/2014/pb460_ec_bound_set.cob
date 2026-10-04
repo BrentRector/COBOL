@@ -37,6 +37,7 @@
        D-BS-P.
            DISPLAY "BS-DECL CAP=" WS-CAP.
        END DECLARATIVES.
+       MAIN-SECTION SECTION.
        MAIN-P.
            SET WS-CAP TO 4.
            DISPLAY "S1=" FUNCTION EXCEPTION-STATUS.

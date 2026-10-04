@@ -63,6 +63,10 @@ internal sealed class BinderDriver
         // for the level-number screen's reason: a pure syntax rule over the raw tree, and a zero OCCURS bound left to
         // the binder used to reach Roslyn as CS0029 in generated C#.
         global::CobolNet.Validation.IntegerOperandPass.Run(tree, edition);
+        // The procedure division's general-format screens the superset grammar leaves to a named refusal (kb/Work
+        // PB351, PB1146): a conditional statement as an imperative-statement operand (§14.5.1) and a body mixing
+        // §14.2.1 Format 1 and Format 2 (§14.4.1). Pre-bind for the same reason: pure syntax over the raw tree.
+        global::CobolNet.Validation.ProcedureFormatPass.Run(tree, edition);
         // WHERE a directive may be written, for the placement rules that need the parse tree (kb/Work PB1005, PB1065,
         // PB1377, PB1378): PUSH ALL / POP ALL (§7.3.22.3 SR3, §7.3.20.3 SR3), FLAG-02 / FLAG-14 (§7.3.14.3 SR1,
         // §7.3.15.3 SR1) between clauses and statements; LEAP-SECOND / PROPAGATE outside every compilation unit

@@ -227,7 +227,8 @@ public sealed class OoPortedTests
     /// fell OUTSIDE the method's dispatch range and were SILENTLY SKIPPED, so the legacy rejected loudly
     /// (COBOL0116) rather than emit wrong output. Greenfield: a section inside a method is a method-local pc
     /// range (StatementBinder — "the legacy COBOL0116 reject is superseded"), so the correct assertion is now
-    /// the POSITIVE one: MAIN falls through into DRIVE-SEC's paragraph and both DISPLAYs run.</summary>
+    /// the POSITIVE one: MAIN-SEC's paragraph MAIN falls through into DRIVE-SEC's paragraph and both DISPLAYs run.
+    /// (MAIN sits in a section of its own: §14.4.1 — once one paragraph is in a section all shall be, kb/Work PB1146.)</summary>
     [Fact]
     public void Ported_Method_WithSection_FailsLoudly()
     {
@@ -258,6 +259,7 @@ public sealed class OoPortedTests
        PROCEDURE DIVISION.
        METHOD-ID. DRIVE.
        PROCEDURE DIVISION.
+       MAIN-SEC SECTION.
        MAIN.
            DISPLAY ""DRIVE-MAIN"".
        DRIVE-SEC SECTION.

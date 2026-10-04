@@ -52,6 +52,7 @@
            DISPLAY "HANDLED " FUNCTION EXCEPTION-STATUS.
            RESUME AT NEXT STATEMENT.
        END DECLARATIVES.
+       MAIN-SECTION SECTION.
        MAIN-B.
            MOVE "...." TO W4.
            MOVE F TO W4.

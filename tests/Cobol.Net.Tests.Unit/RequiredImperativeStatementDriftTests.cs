@@ -182,6 +182,46 @@ public sealed class RequiredImperativeStatementDriftTests : CobolNetTestBase
         Assert.Equal(expected, stdout);
     }
 
+    // ── §14.5.1: an imperative-statement operand admits no CONDITIONAL statement (kb/Work PB351) ──────────
+
+    /// <summary>⛔ THE OPERAND IS AN IMPERATIVE-STATEMENT IN EVERY PHRASE BUT IF'S. §14.5.1: "Any statement with a
+    /// conditional phrase that is not terminated by its explicit scope terminator is a conditional statement", and an
+    /// imperative statement may be a conditional statement only "delimited by its explicit scope terminator". The
+    /// screen (<c>ProcedureFormatPass</c>) asks it of every <c>statementBlock</c> whose parent is not the IF statement,
+    /// so each phrase family below is refused COBOLNET2796 with no code of its own — the undelimited inner statement
+    /// is an IF in some rows and a conditional ADD in others, because the classification is Table 12's, not IF's.</summary>
+    [Theory]
+    [InlineData("PB351A", "           ADD 1 TO X ON SIZE ERROR IF X = 1 DISPLAY \"A\"\n           END-ADD")]
+    [InlineData("PB351B", "           EVALUATE X\n               WHEN 1 ADD 1 TO X ON SIZE ERROR DISPLAY \"S\"\n"
+                        + "               WHEN OTHER DISPLAY \"O\"\n           END-EVALUATE")]
+    [InlineData("PB351C", "           EVALUATE X\n               WHEN 7 DISPLAY \"S\"\n"
+                        + "               WHEN OTHER IF X = 1 DISPLAY \"O\"\n           END-EVALUATE")]
+    [InlineData("PB351D", "           PERFORM 2 TIMES\n               IF X = 1 DISPLAY \"P\"\n           END-PERFORM")]
+    [InlineData("PB351E", "           SET I TO 1\n           SEARCH R\n               AT END IF X = 1 DISPLAY \"NF\"\n"
+                        + "               WHEN R (I) = 7 DISPLAY \"F\"\n           END-SEARCH")]
+    public void AnUndelimitedConditionalStatement_AsAnImperativeOperand_IsRejected(string id, string body)
+    {
+        var (ok, _, detail) = CompileAndRun(Program(id, body));
+        Assert.False(ok, $"{id} compiled: a conditional statement was accepted as an imperative-statement (§14.5.1).");
+        Assert.Contains("COBOLNET2796", detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>The complement: the same inner statements DELIMITED by their END- terminators are imperative
+    /// statements and compile, and IF's statement-1 may END in an undelimited conditional statement (§14.9.19.3 SR1:
+    /// "either one or more imperative statements or a conditional statement optionally preceded by one or more
+    /// imperative statements"). X is 1, so ADD 9 TO X (PIC 9(4)) does not overflow and EVALUATE takes WHEN 1.</summary>
+    [Theory]
+    [InlineData("PB351K", "           EVALUATE X\n               WHEN 1 ADD 9 TO X ON SIZE ERROR DISPLAY \"S\" END-ADD\n"
+                        + "                      DISPLAY \"ONE\"\n           END-EVALUATE", "ONE")]
+    [InlineData("PB351L", "           IF X = 1\n               DISPLAY \"ONE\"\n"
+                        + "               ADD 1 TO X ON SIZE ERROR DISPLAY \"S\"\n           END-IF", "ONE")]
+    public void TheDelimitedForm_AndIfsOwnStatementOperand_StillCompile(string id, string body, string expected)
+    {
+        var (ok, stdout, detail) = CompileAndRun(Program(id, body));
+        Assert.True(ok, detail);
+        Assert.Equal(expected, stdout);
+    }
+
     // ── §14.9.13.4 GR3: the selection subject is evaluated at the BEGINNING of the statement ─────────────
 
     /// <summary>⛔ GR3 IS AN OBLIGATION OF THE STATEMENT, NOT OF WHICHEVER ARM READS THE SUBJECT. "At the

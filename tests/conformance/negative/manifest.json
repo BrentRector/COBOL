@@ -1,6 +1,12 @@
 {
  "_comment": "The NEGATIVE corpus (must-REJECT programs; VERSION_TEST_MATRIX_DESIGN P2.8/Phase-2): each enabled entry is <name>.cob + <name>.err (the expected diagnostic substring, e.g. an edition-band code). The editions that must reject are named by the SOURCE, not by this manifest: CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic reads them from the '*> reject-at: <year> ...' header on <name>.cob's FIRST line and throws when it is absent. (This comment used to promise an \"editions\" map; no entry ever carried one and the runner never looked for one.) Seeding: >=1 case per Wave-1 gate + the reserved-word interval witnesses (roadmap Phase 2 W2). The matrix reject cells already pin gate diagnostics; THIS corpus holds the free-form adversarial cases.",
  "enabled": [
+  "pb351-search-when-conditional",
+  "pb351-return-at-end-conditional",
+  "pb1146-paragraph-before-section",
+  "pb1146-sentence-before-section",
+  "pb1146-paragraph-after-declaratives",
+  "pb1146-second-declaratives",
   "pb1425-super-qualifier-not-inherited",
   "pb1455-subscript-before-qualifier",
   "pb1507-initial-in-recursive-program",

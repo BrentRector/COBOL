@@ -1425,6 +1425,33 @@ lowercase with Annex C. Three pieces, each in one place:
 
 ---
 
+### 3.14 Procedure-division general formats the superset grammar leaves to a named refusal (kb/Work PB351, PB1146)
+
+**The posture.** The grammar parses the UNION of what the procedure division's formats print, so a refusal can NAME
+the rule (the §3.11 posture, and `ExpressionFormationPass`'s for the suffix order). The screens live in ONE pre-bind
+parse-tree pass, `Compiler/Validation/ProcedureFormatPass.cs`, run right after `IntegerOperandPass` from
+`BinderDriver.Bind`, at every edition (each rule is the same in 1985, 2002, 2014 and 2023).
+
+**An imperative-statement operand holds no conditional statement (COBOLNET2796; §14.5.1, Table 12).** Every
+conditional phrase spells its operand `statementBlock`, which is `statement+`, so `READ F AT END IF X = 1 … NOT AT
+END …` compiled. §14.5.1: a conditional statement is "any statement with a conditional phrase that is not terminated
+by its explicit scope terminator", and an imperative statement may be one only "delimited by its explicit scope
+terminator". The classifier, `Binding/ConditionalStatements.IsConditional`, reads both halves off the parse — a
+conditional phrase is written when the statement's OWN syntax holds a `statementBlock`, and the terminator is the
+token `END_` + the statement's Table 12 name (`Table12StatementNames`) — so a new statement rule is classified with
+no edit. The pass screens every `statementBlock` whose parent is not `ifStatement`: IF's statement-1/statement-2 is
+the one operand that may END in a conditional statement (§14.9.19.3 SR1), so the strict reading is the default and
+a NEW phrase rule is screened automatically. `Table12StatementNameDriftTests` re-derives the terminator column from
+the scraped Table 12 and proves the proxy sound (only a row with a conditional phrase, or PERFORM with its REQUIRED
+END-PERFORM, reaches a `statementBlock`).
+
+**Format 1 (with sections) versus Format 2 (without sections) (COBOLNET2797; §14.2.1, §14.4.1).** The rule
+`declarativePart* sentence* procedureUnit*` is the union of the two formats. Rendered from PDF page 557: Format 1
+prints ONE bracketed DECLARATIVES portion and nothing between the header (or END DECLARATIVES) and the first section
+header; §14.4.1 adds "If one paragraph is in a section, all paragraphs shall be in sections". So once a division has
+a section or a DECLARATIVES portion, a leading sentence, a paragraph outside every section, or a second DECLARATIVES
+portion is refused — one diagnostic per violation kind, at its first occurrence.
+
 ## 4. Current → target module changes
 
 | Action | From | To | Why |

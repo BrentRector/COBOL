@@ -1571,6 +1571,10 @@ setEntryStatement
 // SET LAST EXCEPTION TO OFF (ISO §14.9.39 Format 13, saved-exception; 2002+ — binder-gated): the last
 // exception status indicates no exception condition exists (§14.6.13.1.1). Listed FIRST: LAST is a reserved
 // token (never a dataReference head), so no other SET form can claim the prefix.
+// EVERY WORD IS REQUIRED, MEASURED (kb/Work PB937): unlike the RAISING LAST [EXCEPTION] printings (PDF 653, 661, 756,
+// where the EXCEPTION after LAST is plain), the Format 13 figure on canonical PDF page 761 carries a vector underline
+// rule under each of SET, LAST, EXCEPTION, TO and OFF (y 530.9; x 82–98, 103–125, 131–184, 190–201, 207–223), so
+// `SET LAST TO OFF` is not a spelling of it and the rule needs no optional word.
 setLastExceptionStatement
     : SET LAST EXCEPTION TO OFF
     ;

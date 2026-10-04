@@ -27142,7 +27142,7 @@ Format 1 (to-message-server)
 <u>END-SEND</u>
 </pre>
 
-> **Figure notes (5.2.6.4 choice indicators).** The bars just inside the BRACKET enclosing `ON EXCEPTION` / `NOT ON EXCEPTION` mean **zero or more** of the alternatives, each **at most once**, **in any order** — both branches may appear in one SEND. Note also that `RETURNING data-name-1` and `END-SEND` are NOT bracketed in the printed figure: they are required in Format 1. Underlined (required) words: SEND, TO, FROM, RETURNING, EXCEPTION, NOT, END-SEND.
+> **Figure notes (5.2.6.4 choice indicators).** The bars just inside the BRACKET enclosing `ON EXCEPTION` / `NOT ON EXCEPTION` mean **zero or more** of the alternatives, each **at most once**, **in any order** — both branches may appear in one SEND. Note also that `RETURNING data-name-1` and `END-SEND` are NOT bracketed in the printed figure: they are required in Format 1. Underlined (required) words: SEND, FROM, RETURNING, EXCEPTION, NOT, END-SEND; TO carries no underline rule (measured on PDF page 756), so it is an optional word (§5.2.3).
 
 Format 2 (message-server-response)
 
@@ -27160,7 +27160,7 @@ Format 2 (message-server-response)
 <u>END-SEND</u>
 </pre>
 
-> **Figure notes (5.2.6.4 choice indicators).** The bars just inside the BRACKET enclosing `ON EXCEPTION` / `NOT ON EXCEPTION` mean **zero or more** of the alternatives, each **at most once**, **in any order** — both branches may appear in one SEND. The RAISING brace has NO bars: exactly one of `EXCEPTION exception-name-1` / `LAST EXCEPTION` when the optional RAISING phrase is written. `END-SEND` is not bracketed — it is required in Format 2. Underlined (required) words: SEND, TO, FROM, RAISING, EXCEPTION, LAST, NOT, END-SEND.
+> **Figure notes (5.2.6.4 choice indicators).** The bars just inside the BRACKET enclosing `ON EXCEPTION` / `NOT ON EXCEPTION` mean **zero or more** of the alternatives, each **at most once**, **in any order** — both branches may appear in one SEND. The RAISING brace has NO bars: exactly one of `EXCEPTION exception-name-1` / `LAST EXCEPTION` when the optional RAISING phrase is written. `END-SEND` is not bracketed — it is required in Format 2. Underlined (required) words: SEND, FROM, RAISING, EXCEPTION, LAST, NOT, END-SEND; TO carries no underline rule (measured on PDF page 756), so it is an optional word (§5.2.3).
 
 <a id="section-14-9-38-3"></a>
 ##### 14.9.38.3 Syntax rules
@@ -47418,7 +47418,7 @@ slip. It is not.
 | 661 | 14.9.18.2 GOBACK, raising-phrase | underlined | not underlined |
 | 756 | 14.9.38.2 SEND | underlined | not underlined |
 
-(A fourth site, page 731, prints `EXCEPTION` underlined — but it is the **SET statement**,
+(A fourth site, page 761, prints `EXCEPTION` underlined — but it is the **SET statement**,
 `SET LAST EXCEPTION TO OFF`, a different construct in which `EXCEPTION` is part of SET's own required syntax. It
 is not a counter-example.)
 

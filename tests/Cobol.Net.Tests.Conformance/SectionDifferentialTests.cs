@@ -10,6 +10,8 @@ namespace CobolNet.Tests.Conformance;
 /// and same-section implicit resolution of duplicated paragraph names), and the PERFORM … TIMES once-evaluated
 /// count (§14.9.28 GR7 — body modifications of the count item must not change the iteration count; zero/negative
 /// counts run zero times). Pinned to the legacy oracle (NIST-85 green across the whole PERFORM/GO TO series).
+/// Every program that has a section opens with one too (MAIN-SECT): ISO §14.4.1 — "If one paragraph is in a
+/// section, all paragraphs shall be in sections" (kb/Work PB1146, COBOLNET2797).
 /// </summary>
 public sealed class SectionDifferentialTests
 {
@@ -28,6 +30,7 @@ public sealed class SectionDifferentialTests
     [Fact]
     public void GoToSectionName_TransfersToFirstParagraph()
         => AssertSameAsLegacy(Program("01 WS-N PIC 9 VALUE 0.", """
+            MAIN-SECT SECTION.
             MAIN-PARA.
                 GO TO TARGET-SECT.
             SKIPPED-PARA.
@@ -44,6 +47,7 @@ public sealed class SectionDifferentialTests
     [Fact]
     public void PerformSection_RunsWholeRangeAndReturns()
         => AssertSameAsLegacy(Program("01 WS-N PIC 9 VALUE 0.", """
+            MAIN-SECT SECTION.
             MAIN-PARA.
                 PERFORM WORK-SECT.
                 DISPLAY "BACK".
@@ -58,6 +62,7 @@ public sealed class SectionDifferentialTests
     [Fact]
     public void PerformSectionThruParagraph_InvertedRange()
         => AssertSameAsLegacy(Program("01 WS-N PIC 9 VALUE 0.", """
+            MAIN-SECT SECTION.
             MAIN-PARA.
                 PERFORM GO-SECT THRU EXIT-PARA.
                 DISPLAY "RETURNED".
@@ -76,6 +81,7 @@ public sealed class SectionDifferentialTests
     [Fact]
     public void QualifiedParagraph_DuplicateNamesAcrossSections()
         => AssertSameAsLegacy(Program("01 WS-N PIC 9 VALUE 0.", """
+            MAIN-SECT SECTION.
             MAIN-PARA.
                 PERFORM DOIT OF SECT-ONE.
                 PERFORM DOIT IN SECT-TWO.
@@ -98,6 +104,7 @@ public sealed class SectionDifferentialTests
     public void UnqualifiedDuplicate_ResolvesWithinOwnSection()
     {
         var (ok, output, detail) = new CobolNetCompiler().CompileAndRun(Program("01 WS-N PIC 9 VALUE 0.", """
+            MAIN-SECT SECTION.
             MAIN-PARA.
                 PERFORM CALLER OF SECT-TWO.
                 STOP RUN.

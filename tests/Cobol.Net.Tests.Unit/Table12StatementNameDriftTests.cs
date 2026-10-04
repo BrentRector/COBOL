@@ -118,4 +118,100 @@ public sealed class Table12StatementNameDriftTests
     [Fact]   // The R04 pin: the row that exposed the token axis, resolved through the general mechanism.
     public void GoTo_ResolvesFromTheRule_NeverFromTokens()
         => Assert.Equal("GO TO", Table12StatementNames.NameOfRule("goToStatement"));
+
+    // ── The other two columns: conditional phrase and explicit scope terminator (kb/Work PB351) ─────────────
+
+    /// <summary>Table 12's three columns per row — (statement name, conditional phrase, explicit scope terminator) —
+    /// scraped the way <see cref="ScrapeTable12"/> scrapes the first.</summary>
+    private static List<(string Name, string Phrase, string Terminator)> ScrapeTable12Rows()
+    {
+        string spec = File.ReadAllText(Path.Combine(TestRepo.Root, "specs", "ISO_COBOL.md"));
+        int anchor = spec.IndexOf("<a id=\"table-12\">", StringComparison.Ordinal);
+        Assert.True(anchor >= 0, "the `table-12` anchor is gone from specs/ISO_COBOL.md");
+        var rows = spec[anchor..].Split('\n').Select(l => l.TrimEnd('\r'))
+            .SkipWhile(l => !l.StartsWith('|')).TakeWhile(l => l.StartsWith('|')).Skip(2)
+            .Select(l => l.Split('|'))
+            .Select(c => (c[1].Trim(), c[2].Trim(), c[3].Trim())).ToList();
+        Assert.Equal(50, rows.Count);
+        return rows;
+    }
+
+    /// <summary>⛔ THE TERMINATOR COLUMN IS WHAT <see cref="ConditionalStatements"/> ASKS, SO IT IS RE-DERIVED HERE.
+    /// §14.5.1 makes a statement conditional when a conditional phrase is written and "its explicit scope terminator"
+    /// is not; the classifier finds the terminator as the token <c>END_</c> + the statement name. That holds only if
+    /// every terminator Table 12 prints is spelled <c>END-</c> + the row's name and the lexer carries that token, and
+    /// only if every row with a conditional phrase HAS a terminator — each asserted from the scraped table, so a
+    /// transcription or lexer change that breaks the premise fails here instead of silently classifying a
+    /// conditional statement as imperative.</summary>
+    [Fact]
+    public void EveryTable12Terminator_IsEndNameAndIsTheTokenTheClassifierAsks()
+    {
+        var rows = ScrapeTable12Rows();
+        var withTerminator = rows.Where(r => r.Terminator.Length > 0).ToList();
+        Assert.True(withTerminator.Count >= 20, $"only {withTerminator.Count} terminators scraped — the scrape broke");
+        foreach (var (name, _, terminator) in withTerminator)
+        {
+            Assert.Equal("END-" + name, terminator);
+            int? token = ConditionalStatements.TerminatorFor(name);
+            Assert.True(token is not null, $"no END_ lexer token for Table 12's {terminator}");
+            Assert.Equal("END_" + name.Replace(' ', '_'),
+                CobolNet.Frontend.Generated.CobolParserCore.DefaultVocabulary.GetSymbolicName(token!.Value));
+        }
+        var phraseWithoutTerminator = rows.Where(r => r.Phrase.Length > 0 && r.Terminator.Length == 0).ToList();
+        Assert.True(phraseWithoutTerminator.Count == 0, "Table 12 row(s) with a conditional phrase but no explicit "
+            + "scope terminator: " + string.Join(", ", phraseWithoutTerminator.Select(r => r.Name)));
+    }
+
+    /// <summary>⛔ "A CONDITIONAL PHRASE IS WRITTEN" IS READ AS "THE STATEMENT'S OWN SYNTAX HOLDS A statementBlock",
+    /// AND THIS HOLDS THAT PROXY SOUND. Every grammar rule from which <c>statementBlock</c> is reachable (without
+    /// passing through another <c>statement</c>) must belong to a Table 12 row that HAS a conditional phrase — or be
+    /// PERFORM, whose inline imperative-statement-1 is not a conditional phrase but whose inline formats REQUIRE
+    /// END-PERFORM, so <see cref="ConditionalStatements.IsConditional"/> can never call it conditional. A new
+    /// statement rule that carries an imperative operand without a conditional phrase fails here until the
+    /// classifier is taught what it is.</summary>
+    [Fact]
+    public void OnlyARowWithAConditionalPhrase_OrTheTerminatedPerform_HoldsAStatementBlock()
+    {
+        var grammarRules = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string file in Directory.EnumerateFiles(
+            TestRepo.Src(Path.Combine("Cobol.Net.Frontend", "Grammar")), "*.g4", SearchOption.AllDirectories))
+        {
+            string text = Regex.Replace(File.ReadAllText(file), @"//[^\r\n]*", "");
+            foreach (Match r in Regex.Matches(text, @"^([a-z]\w*)\s*:(?<body>.*?);",
+                         RegexOptions.Multiline | RegexOptions.Singleline))
+                grammarRules[r.Groups[1].Value] = r.Groups["body"].Value;
+        }
+        Assert.True(grammarRules.ContainsKey("statementBlock") && grammarRules.Count > 300,
+            $"scraped {grammarRules.Count} parser rules — the grammar scrape broke");
+
+        bool Reaches(string rule)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal) { "statement", "sentence" };
+            var work = new Stack<string>([rule]);
+            while (work.Count > 0)
+            {
+                string r = work.Pop();
+                if (!seen.Add(r) || !grammarRules.TryGetValue(r, out string? body)) continue;
+                foreach (Match m in Regex.Matches(body, @"\b[a-z]\w*\b"))
+                {
+                    if (m.Value == "statementBlock") return true;
+                    work.Push(m.Value);
+                }
+            }
+            return false;
+        }
+
+        var phraseRows = ScrapeTable12Rows().Where(r => r.Phrase.Length > 0).Select(r => r.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var holders = ScrapeStatementAlternatives().Where(Reaches).ToList();
+        Assert.True(holders.Count >= 20, $"only {holders.Count} statement rules reach statementBlock — the walk broke");
+        var unexplained = holders.Select(r => (Rule: r, Name: Table12StatementNames.NameOfRule(r)))
+            .Where(x => !phraseRows.Contains(x.Name) && x.Name != "PERFORM").ToList();
+        Assert.True(unexplained.Count == 0, "statement rule(s) hold an imperative operand with no Table 12 conditional "
+            + "phrase: " + string.Join(", ", unexplained.Select(x => $"{x.Rule} → {x.Name}")));
+
+        // PERFORM's exemption is its REQUIRED terminator: no inline alternative may make END-PERFORM optional.
+        Assert.DoesNotMatch(@"END_PERFORM\s*\?", grammarRules["performStatement"]);
+        Assert.Contains("END_PERFORM", grammarRules["performStatement"], StringComparison.Ordinal);
+    }
 }

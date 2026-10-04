@@ -58,6 +58,7 @@
            DISPLAY "HANDLED " FUNCTION EXCEPTION-STATUS.
            RESUME AT NEXT STATEMENT.
        END DECLARATIVES.
+       MAIN-SECTION SECTION.
        MAIN-B.
            MOVE "..." TO W3
            MOVE D OF LG TO W3

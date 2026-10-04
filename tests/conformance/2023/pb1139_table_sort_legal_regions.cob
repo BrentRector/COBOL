@@ -25,6 +25,7 @@
           05 TE PIC 9 OCCURS 3.
        01 EOF-FLAG PIC X VALUE "N".
        PROCEDURE DIVISION.
+       MAIN-SECTION SECTION.
        MAIN.
            MOVE "312" TO TBL
            PERFORM

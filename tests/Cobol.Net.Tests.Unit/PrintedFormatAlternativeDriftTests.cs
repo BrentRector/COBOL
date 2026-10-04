@@ -194,7 +194,10 @@ public sealed class PrintedFormatAlternativeDriftTests
     /// grammar rule's authority rather than on its own page's
     /// (feedback_a_real_clause_can_answer_a_different_question). It is excluded HERE by spelling, not by
     /// judgement: the statement rule writes the two words with the statement keyword SET in front of them, and
-    /// this test pins that spelling so the exclusion is visible rather than accidental.</summary>
+    /// this test pins that spelling so the exclusion is visible rather than accidental. ⛔ MEASURED, not assumed
+    /// (kb/Work PB937): the Format 13 figure on canonical PDF page 761 carries a vector underline rule under EVERY
+    /// word — SET, LAST, EXCEPTION, TO and OFF — so its EXCEPTION is required and the rule's all-required spelling
+    /// is the printed one.</summary>
     [Fact]
     public void TheSetLastExceptionStatement_IsADistinctFigureAndIsNotSweptHere()
         => Assert.Matches(@"SET\s+LAST\s+EXCEPTION\s+TO\s+OFF", RuleBody("setLastExceptionStatement"));
