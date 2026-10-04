@@ -32,7 +32,7 @@ param(
     [int]$MaxContextTokens = 150000,
     [int]$MaxUnits = 0,
     [ValidateSet('acceptEdits', 'auto', 'bypassPermissions', 'dontAsk', 'plan', 'manual')]
-    [string]$PermissionMode = 'auto',
+    [string]$PermissionMode = 'bypassPermissions',   # owner 2026-10-04 (D1): allowed for the COBOL work; the repo's hooks are the guard
     [double]$GraceMinutes = 30,
     [int]$BorrowDays = 0,
     [ValidateSet('', 'wave', 'land', 'resume', 'meter')]

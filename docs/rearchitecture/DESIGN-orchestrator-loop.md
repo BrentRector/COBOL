@@ -119,7 +119,7 @@ Parameters: `-DryRun` (prints the budget decision, the unit it would run and the
 exits; it starts nothing and, past a hold, says what it would run after it), `-ClaudeExe` (the executable; a test
 seam pointing at a fake that emits canned stream-json, not a wrapper; a `.ps1` or `.cmd` is launched through its
 shell), `-CoordDir`, `-RepoDir` (default the repository containing the script), `-MaxContextTokens` (default
-150000), `-MaxUnits` (default unlimited), `-PermissionMode` (default `auto`), `-GraceMinutes` (default 30; a `wave`
+150000), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave`
 unit gets three times this, because a lander train must be allowed to finish), `-BorrowDays` (passed to
 `budget.py`), `-Unit` (the first unit, overriding `next_unit.py` once), `-Watch` (section 13), `-Python`, and the
 test seams `-TelemetryDir` (passed to `budget.py`), `-FastFailSeconds` (default 120) and `-BackoffBaseSeconds`
@@ -176,7 +176,9 @@ Each iteration, in this order:
 The repository's hooks stay the real guard under any `--permission-mode`: `forbidden_commands.py` refuses the
 forbidden git and shell shapes, `dispatch_guard.py` refuses an unchecked dispatch, `status_guard.py` refuses a
 commit with a stale `STATUS.md`. `--permission-prompts none` makes anything that would prompt a denial instead of
-a hang. The default mode is `auto`; open decision D1 asks whether the owner wants `bypassPermissions`.
+a hang. The default mode is `bypassPermissions` (decision D1, owner 2026-10-04: allowed for the COBOL work). With prompts
+gone, the hooks above are the only guard, which is why the WSL lifecycle commands are blocked by `forbidden_commands.py`
+(decision D4) and why a hook's block is the rule speaking, never something a unit routes around.
 
 ### 4.3 The context cap (graceful stop)
 
@@ -360,12 +362,32 @@ lifecycle commands (4.5), automatic refit of the calibration (8), an in-unit act
 and the terminals mode (13.2). The prototype has never run a real session; the owner's first run is `-DryRun`, then
 `-MaxUnits 1 -Unit meter`, then `-MaxUnits 1`.
 
+## 10a. Starting at logon
+
+The reboot path is one Startup entry, `cobolnet-autoresume.cmd`, written by `scripts/orchestrator/install-autostart.ps1` (run once
+by the owner; `-DryRun` shows the file, `-Uninstall` removes it). It opens a Windows Terminal window `cobol-supervisor` in the repo
+and runs `scripts/orchestrator/autostart.ps1`, which lives in git: wait 25 s for the desktop, honour a `STOP` file and a waiting
+`OWNER-QUESTIONS.md`, fast-forward the checkout when only the always-dirty settings file is modified (never stash or reset), then run
+`orchestrate.ps1 -Watch` in that window so the owner can watch it, and print what the exit code means.
+
+This replaces the old arrangement (a `%LOCALAPPDATA%\CobolNet` script that started an interactive `claude` session whose prompt had
+to re-create a session-only cron job at `5 3 * * *`). The supervisor needs no cron: `budget.py` returns `hold-day` until 03:05 and
+`hold-session` until the 5-hour reset, and every unit is a fresh session chained by `handoff.json`, so a reboot loses at most the unit
+that was running (a Workflow in flight dies with its process; its worktrees and checkpoints survive and the next `resume` unit
+picks them up). The installer moves the old script and the old `.cmd` to `%LOCALAPPDATA%\CobolNet\replaced\` as a rollback copy and
+nothing calls them. `test_autostart.ps1` proves the install, the idempotent re-install, the uninstall, and that STOP and a waiting
+owner question stop the start, all in temp directories.
+
 ## 11. Open decisions
 
-- **D1** Permission mode for unattended units: `auto` (default here) or `bypassPermissions`.
+- **D1** DECIDED (owner 2026-10-04): permission mode for unattended units is `bypassPermissions` for the COBOL work; the
+  hooks are the guard.
 - **D2** Register a Windows Task Scheduler task that starts the supervisor at logon.
 - **D3** Build the separate-process agent pool (section 3.1) once measurement justifies it.
-- **D4** Add the WSL lifecycle commands to `forbidden_commands.py` (today only the prompts forbid them).
+- **D9** Install the logon entry (`install-autostart.ps1`) once the supervisor has completed a supervised first run; until then
+  the old Startup entry keeps running (owner runs the installer; it changes a Startup file, so I do not).
+- **D4** DONE (2026-10-04): the WSL lifecycle commands are blocked by `forbidden_commands.py` (rule 6, with self-test cases);
+  the same change stopped the verdict-chain rule from firing on a command that merely names a gate script.
 - **D5** Wire the ratchet into the lander gate and CI's `audits` job.
 - **D6** Refit the token-to-point calibration automatically from consecutive meter readings, or by hand only.
 - **D7** The `session_pct_per_weekly_pct` constant (seeded at 5.0, i.e. one weekly point ≈ 5 % of a 5-hour window)

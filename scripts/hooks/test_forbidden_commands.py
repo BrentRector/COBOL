@@ -50,6 +50,26 @@ CASES = [
     ("timeout 580 bash -c 'tail -n +1 -f b.log | grep -m1 VERDICT' ; tail -3 b.log", False),
     ("git status --short && git log --oneline -3", False),
     ("bash -c 'dotnet test x.csproj > t.log && echo done'", False),
+    # 5b. a command that merely NAMES a gate or landing script is not a verdict command
+    ("git add -- scripts/push-main.sh DEVLOG.md && git commit -q -m x", False),
+    ("sed -n 17,20p scripts/push-main.sh && head -3 x.txt", False),
+    ("git add -- .github/workflows/build-and-test.yml && git commit -q -m x", False),
+    ("pwsh -NoProfile -File scripts/build-local.ps1 -Mode lander > b.log 2>&1; git status", True),
+    ("bash scripts/push-main.sh > p.log 2>&1 && git log -1", True),
+    # 6. WSL lifecycle commands are the owner's to run
+    ("wsl --terminate Ubuntu", True),
+    ("wsl.exe --export Ubuntu E:/x.tar", True),
+    ("wsl --shutdown", True),
+    ("wsl --update --web-download", True),
+    ("wsl -t Ubuntu", True),
+    ("wsl --unregister Ubuntu-26.04", True),
+    ("wsl --install Ubuntu-26.04 --no-launch", True),
+    ("wsl --terminate Ubuntu | Out-Null; wsl --export Ubuntu E:/x.tar", True),
+    ("wsl -d Ubuntu -e bash -lc 'ls ~'", False),
+    ("wsl -d Ubuntu --cd /mnt/e/COBOL -- bash -lc 'bash scripts/linux-gate.sh'", False),
+    ("wsl -l -v", False),
+    ("git commit -q -m 'document wsl --terminate and wsl --export for the owner'", False),
+    ("grep -n 'wsl --export' docs/x.md", False),
 ]
 
 

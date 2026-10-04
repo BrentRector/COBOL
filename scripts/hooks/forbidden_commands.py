@@ -22,6 +22,11 @@ fires inside subagents and Workflow agents too. Each rule below was written in a
                             targeted form: independent commands go as parallel tool calls in one turn, because a
                             blanket ban would add turns, and agent cost is quadratic in turns).
 
+  WSL lifecycle commands    `wsl --terminate/--shutdown/--update/--export/--import/--unregister/--install` (owner
+                            2026-10-04): they can end the owner's open session or burn tens of GB, so only the owner runs
+                            them. Commands inside a distro (`wsl -d Ubuntu -e ...`) stay allowed. This is the guard that
+                            matters most under an unattended `bypassPermissions` run, where prompts no longer protect.
+
 Exit 2 blocks the call and returns stderr to the agent. Anything unparseable passes (a hook must never wedge a session).
 """
 import json
@@ -105,8 +110,13 @@ if re.search(r"\bdotnet\s+test\b", commands) and "--filter" in commands:
               "`scripts/build-local.ps1 -Mode implementer`, never a filtered run.")
 
 # 5. chaining after a verdict command
-VERDICT = re.compile(r"\bdotnet\s+(?:test|build)\b|build-local\.(?:ps1|sh)\b|push-main\.sh\b|battery\.sh\b|"
-                     r"guard(?:-fast)?\.sh\b")
+# A verdict command is a command that RUNS one: `dotnet test|build`, or a gate / landing script invoked directly or through
+# an interpreter (`bash scripts/push-main.sh`, `pwsh -File scripts/build-local.ps1`). A command that merely NAMES one of
+# those files (`git add -- scripts/push-main.sh`, `sed -n 1,5p scripts/push-main.sh`) is not one: matching anywhere in the
+# segment blocked such harmless commands and cost extra turns (2026-10-04).
+_GATE_SCRIPT = r"(?:\./)?\S*(?:build-local\.(?:ps1|sh)|push-main\.sh|battery\.sh|guard(?:-fast)?\.sh)\b"
+VERDICT = re.compile(r"^(?:\w+=\S*\s+)*(?:dotnet\s+(?:test|build)\b|"
+                     r"(?:(?:bash|sh|pwsh|powershell)(?:\.exe)?\s+(?:-\S+\s+)*)?" + _GATE_SCRIPT + r")")
 READ_ONLY = re.compile(r"^\s*(?:grep|rg|tail|head|cat|sed\s+-n|wc|ls|Select-String|Get-Content|findstr|type)\b")
 
 
@@ -135,8 +145,21 @@ def _segments(text: str):
 
 
 segs = _segments(commands)
+
+# 6. WSL lifecycle commands (owner 2026-10-04): `wsl --terminate/--shutdown/--update/--export/--import/--unregister/--install`
+# can end the owner's open session, race a procedure they run by hand, or burn tens of GB of disk, so NO agent or unattended
+# unit runs them; the owner does. Reads and commands INSIDE a distro (`wsl -d Ubuntu -e ...`) stay allowed. Only a segment
+# whose command IS wsl is checked, so a commit message or a grep pattern that mentions the flags passes.
+WSL_LIFECYCLE = re.compile(r"^(?:\w+=\S*\s+)*(?:&\s+)?(?:\S*[\\/])?wsl(?:\.exe)?\s+(?:[^|;&]*\s)?"
+                           r"(?:--terminate|-t|--shutdown|--update|--export|--import|--unregister|--install)\b")
+for seg in segs:
+    if WSL_LIFECYCLE.match(seg):
+        block("WSL lifecycle commands (`--terminate`, `--shutdown`, `--update`, `--export`, `--import`, `--unregister`, "
+              "`--install`) are the OWNER's to run (owner 2026-10-04: they can end an open session or burn disk). Give the "
+              "owner the exact command and wait; commands inside a distro (`wsl -d Ubuntu -e ...`) are fine.")
+
 for i, seg in enumerate(segs[:-1]):
-    if not VERDICT.search(seg):
+    if not VERDICT.match(seg):
         continue
     captured = False
     for nxt in segs[i + 1:]:
