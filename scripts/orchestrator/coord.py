@@ -17,6 +17,20 @@ ENV = "COBOL_COORD_DIR"
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
 
+RULES_PATH = pathlib.Path(__file__).resolve().with_name("model_rules.json")
+
+
+def rules(path: pathlib.Path | None = None) -> dict[str, Any]:
+    """model_rules.json: the routing, cost and quota constants budget.py and plan_wave.py share."""
+    return json.loads((path or RULES_PATH).read_text(encoding="utf-8"))
+
+
+def family(model: str) -> str:
+    """A model id or alias ('claude-sonnet-5-5', 'sonnet', 'claude-opus-5-5[1m]') -> 'sonnet' | 'opus' | 'haiku' | ''."""
+    m = (model or "").lower()
+    return next((f for f in ("opus", "sonnet", "haiku", "fable") if f in m), "")
+
+
 def coord_dir(override: str | None = None) -> pathlib.Path:
     d = pathlib.Path(override or os.environ.get(ENV) or DEFAULT)
     d.mkdir(parents=True, exist_ok=True)

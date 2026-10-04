@@ -1,0 +1,51 @@
+{
+  "_doc": "Routing, cost and quota constants for the orchestrator loop (docs/rearchitecture/DESIGN-orchestrator-loop.md sections 8 and 9). Read by budget.py and plan_wave.py. A constant changes only by an explicit edit that restates its date and source.",
+  "calibration": {
+    "measured": "2026-10-04",
+    "source": "waves 1011-1015: weekly-meter movement against the subagent tokens the Workflow tool reported per wave (orchestrator session, 2026-10-04). The Workflow's token count and the telemetry sum below may not be the same measure: refit from units.jsonl and usage_report.py (kb/Work PB1981 item 9; design open decision D6).",
+    "counted_token_kinds": ["input_tokens", "output_tokens", "cache_creation_tokens"],
+    "tokens_per_point": {"sonnet": 1000000, "opus": 400000},
+    "unknown_model_rate": "opus",
+    "session_pct_per_weekly_pct": 5.0,
+    "session_pct_per_weekly_pct_source": "a guess (design open decision D7) until two readings inside one session window measure it"
+  },
+  "quota": {
+    "weekly_reset": {"weekday": 6, "hour": 3, "minute": 0, "tz": "America/Los_Angeles", "_weekday": "Python weekday(): Monday 0 ... Sunday 6"},
+    "daily_pct": 14.3,
+    "weekly_cap_pct": 98,
+    "weekly_cap_source": "owner 2026-10-02: may reach 98 % of the weekly quota",
+    "session_soft_stop_pct": 70,
+    "session_hard_stop_pct": 90,
+    "session_window_hours": 5,
+    "day_resume_minutes_after_reset": 5,
+    "meter_max_age_hours": 3
+  },
+  "routing": {
+    "default": "sonnet",
+    "allowed": ["sonnet", "opus"],
+    "opus_when": {
+      "file_patterns": ["/Oo/", ".g4", "Frontend/Grammar/"],
+      "area_patterns": ["^oo", "grammar", "frontend/grammar"],
+      "body_patterns": ["(?i)design question (is )?open", "(?i)NEEDS-OPUS", "(?i)needs a (re)?design", "(?i)redesign beyond"],
+      "failed_attempts_at_least": 2
+    },
+    "_why": "Opus where the work is design-heavy (OO, grammar), where a note says a design question is open, or where a note has already failed twice (a note that fails twice is a task-spec problem, kb/Work PB1981). Fable is never a value: it needs explicit owner approval per dispatch (owner 2026-10-02)."
+  },
+  "cost": {
+    "per_group_tokens": {"sonnet": 100000, "opus": 40000},
+    "per_note_tokens": {"sonnet": 60000, "opus": 24000},
+    "lander_tokens": 120000,
+    "lander_model": "opus",
+    "source": "seeded 2026-10-04 so that a five-note group costs about 0.4 weekly points on either model, a lander about 0.3, and a six-group wave of five-note groups about 3 points with its landers, matching waves 1011-1015 (kb/Work PB1981: a six-group wave already costs about 3 weekly points); refit from units.jsonl"
+  },
+  "wave": {
+    "max_notes_per_group": 5,
+    "codes_per_group": 3,
+    "lead_ids_per_train": 5,
+    "concurrency": 6,
+    "train_size": 5,
+    "min_final_train": 3,
+    "implementer_model": "sonnet",
+    "orchestrator_model": "opus"
+  }
+}
