@@ -2,7 +2,8 @@
 # Self-test for orchestrate.ps1, driven by a fake -ClaudeExe (testdata/fake-claude.ps1); no Pester, no real session.
 # Proves: one unit runs and is recorded; the handoff is validated (a missing one is a failure); the STOP file ends the
 # loop; the circuit breaker trips after three fast failures; a second instance is refused; -DryRun starts nothing;
-# the context cap sends STOP-UNIT and the unit hands off; an owner question stops the loop.
+# the context cap sends STOP-UNIT and the unit hands off; an owner question stops the loop; open-watchers.ps1 opens
+# one titled, model-coloured Windows Terminal tab per agent (against a fake wt.exe).
 # Run: pwsh -NoProfile -File scripts/orchestrator/test_orchestrate.ps1
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -96,6 +97,22 @@ $r = Run-Orch 'owner' 'owner' @('-Unit', 'resume', '-FastFailSeconds', '0')
 Check 'owner exit' $r.code 5
 Check 'owner ran once' $r.runs 1
 Check 'owner question written' ((Get-Content (Join-Path $r.coord 'OWNER-QUESTIONS.md') -Raw) -match 'reading A or reading B') $true
+
+# 9. open-watchers.ps1: one tab per agent whose meta.json exists, titled and coloured by model
+$wf = Join-Path $Root 'session/subagents/workflows/wf_test-1'
+New-Item -ItemType Directory -Force -Path $wf | Out-Null
+'{}' | Set-Content (Join-Path $wf 'agent-a1.jsonl'); '{"description":"impl-X-PB1407","model":"sonnet"}' | Set-Content (Join-Path $wf 'agent-a1.meta.json')
+'{}' | Set-Content (Join-Path $wf 'agent-a2.jsonl'); '{"description":"impl-Z2-PB988","model":"opus"}' | Set-Content (Join-Path $wf 'agent-a2.meta.json')
+'{}' | Set-Content (Join-Path $wf 'agent-a3.jsonl')     # no meta.json yet: waits for the next scan
+$env:FAKE_WT_MARK = Join-Path $Root 'wt.txt'
+$Watchers = Join-Path $Here 'open-watchers.ps1'
+& pwsh -NoProfile -File $Watchers -SessionDir (Join-Path $Root 'session') -WtExe (Join-Path $Here 'testdata/fake-wt.ps1') -Once | Out-Null
+$tabs = @(Get-Content $env:FAKE_WT_MARK)
+Check 'watchers: one tab per agent with a meta.json' $tabs.Count 2
+Check 'watchers: sonnet tab' ($tabs[0] -match '^-w \| cobol-agents \| new-tab \| --title \| X PB1407 \| --tabColor \| #1E66F5 \| pwsh .*watch-agent\.ps1 \| .*agent-a1\.jsonl$') $true
+Check 'watchers: opus tab' ($tabs[1] -match '--title \| Z2 PB988 \| --tabColor \| #FE640B') $true
+& python (Join-Path $Here 'watch_agent.py') (Join-Path $wf 'agent-a1.jsonl') --once | Out-Null
+Check 'watchers: the renderer reads a transcript' $LASTEXITCODE 0
 
 Remove-Item $Root -Recurse -Force -ErrorAction SilentlyContinue
 foreach ($f in $script:fails) { Write-Host "FAIL: $f" }
