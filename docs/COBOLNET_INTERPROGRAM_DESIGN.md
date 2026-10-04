@@ -860,6 +860,14 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   symbol, so falling to the fixed arm delivers a ONE-CHARACTER formal for every such crossing, in both passing
   modes. BY VALUE cannot reach the dynamic arm — §14.2.2 SR2 admits only class numeric, message-tag, object or
   pointer BY VALUE.
+- **An ANY LENGTH RETURNING item takes its length from the ACTIVATOR's receiver (kb/Work PB1167; §13.18.2.3 SR3 b),
+  §13.18.2.4 GR1 b)).** The RETURNING item is a plain callee field, so nothing in the argument adapters can size it;
+  `ProgramEmitter.EmitCallMethod` seeds it before `__Activate()` with `CobolArgAdapt.ReturningSeed(__ret, fill, declared)`
+  (n = the receiver's stated `CobolArg.Length`, else an ANY LENGTH / DYNAMIC LENGTH receiver's carrier length, else the
+  declared PICTURE length for an activation with no receiver — docs/CONFORMANCE.md D-ALR1). The delivery needs no
+  change: `FitToReceiver` already fits to the receiver's stated length (rule 5, "considered to match"), and an ANY LENGTH
+  receiver stores at its own length. The binder side is the existing activation-mode relaxation of
+  `OoConformance.DescriptionMismatch` (rule 4 stays: an ANY LENGTH receiver needs an ANY LENGTH sender).
 - SET ADDRESS OF on a LINKAGE item re-points the callee's formal mid-execution — the carrier field is reassigned; subsequent refs read the new target.
 
 ## Edition gating (G1 — four per-`--std` compilers in one executable)

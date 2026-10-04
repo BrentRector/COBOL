@@ -1832,6 +1832,17 @@ internal static class RuntimeApi
     public static string ArgAdaptStoreReturn(string ret, string value, string? description = null) =>
         $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.StoreReturn)}({ret}, {value}{(description is null ? "" : $", {description}")})";
 
+    /// <summary>The initial image of an ANY LENGTH RETURNING item (§13.18.2.4 GR1 b)) — <c>CobolArgAdapt.ReturningSeed</c>:
+    /// The initial character is <see cref="AnyLengthFill"/>; the PICTURE length is used when the activation has no
+    /// receiver (kb/Work PB1167).</summary>
+    public static string ArgAdaptReturningSeed(string ret, PicInfo pic) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.ReturningSeed)}({ret}, {AnyLengthFill(pic)}, {pic.Length})";
+
+    /// <summary>The C# char literal of an ANY LENGTH item's initial character — a clear bit for a boolean item, a
+    /// space otherwise (the alphanumeric and national initial state). ONE spelling for the program ABI's
+    /// <see cref="ArgAdaptReturningSeed"/> and the method ABI's <c>__retLen</c> seed (kb/Work PB1167).</summary>
+    public static string AnyLengthFill(PicInfo pic) => pic.Category is PicCategory.Boolean ? "'0'" : "' '";
+
     /// <summary>A fixed-length group returning item with a table — <c>CobolArgAdapt.StoreReturnGroup</c>: its
     /// image plus its §8.5.1.12 layout (kb/Work PB965).</summary>
     public static string ArgAdaptStoreReturnGroup(string ret, string image, string layout) =>

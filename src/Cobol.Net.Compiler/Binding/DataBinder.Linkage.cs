@@ -541,15 +541,9 @@ public sealed partial class DataBinder
                         : $"{where}: in a contained program the subject of an ANY LENGTH clause shall be "
                           + "referenced in the procedure division header as a BY REFERENCE formal parameter or "
                           + "as the RETURNING item (ISO §13.18.2.3 SR3)");
-                else if (returning && !formal)
-                    // SR3b-legal, staged LOUD (never a silently-wrong length): the return crossing delivers a
-                    // VALUE — it cannot carry the ACTIVATOR's receiver length that GR1 fixes n from. Deferred
-                    // with the ANY-LENGTH-RETURNING wave; the formal-parameter leg is fully implemented.
-                    Edition.Error(DiagnosticCatalog.AnyLengthReturning, $"{where}: ANY LENGTH on the PROCEDURE "
-                        + "DIVISION RETURNING item is recognized (ISO §13.18.2.3 SR3b) but not yet implemented "
-                        + "(the ANY-LENGTH-RETURNING wave); ANY LENGTH formal parameters are fully supported");
                 else
-                    continue;   // conformant — keep the flag
+                    continue;   // conformant — keep the flag. A RETURNING item (SR3 b)) is seeded with the
+                                // ACTIVATOR's receiver length at activation entry (§13.18.2.4 GR1 b); ProgramEmitter.EmitCallMethod).
             }
             root.IsAnyLength = false;
         }

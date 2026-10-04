@@ -134,6 +134,7 @@ internal sealed class BinderDriver
             cls.FactoryData.OdoReferenceChecking = odoReferenceChecking;
         }
 
+        OoConformance.ValidateInterfaceInheritance(table, edition);   // §11.6.3 SR5 — an inheriting interface conforms to all it inherits (kb/Work PB1502)
         OoConformance.ValidateOverrideSignatures(table, edition);   // §9.3.8.2 — after all formals resolve (slice 3a)
         OoConformance.ValidatePropertyAccessorPairs(table, edition);   // §8.4.3.9.3 SR7 — get RETURNING = set USING, over the formals just resolved
         var ooAdapters = OoConformance.ValidateImplements(table, edition);   // §9.3.11 via §9.3.8.2.3 (D-I1 — the binder is the authority; returns the covariant adapters)

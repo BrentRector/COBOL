@@ -927,6 +927,28 @@ public static class CobolArgAdapt
     internal static T PredefinedNull<T>() =>
         typeof(T) == typeof(ManagedPointer) ? (T)(object)ManagedPointer.Null : default!;
 
+    /// <summary>⛔ THE INITIAL IMAGE OF AN ANY LENGTH RETURNING ITEM (kb/Work PB1167) — ISO §13.18.2.4 GR1 b): the item is
+    /// "treated as though there were n repetitions of the picture symbol in the character-string in its PICTURE clause,
+    /// where n is the length of the corresponding argument or returning item of the activating runtime element", and
+    /// §14.8.3.3 rule 5 makes the sending returning item's length "considered to match" the receiver's. n is therefore
+    /// known to the activator and to nobody else, so it crosses with the receiver (<see cref="CobolArg"/>) and the
+    /// activated unit seeds the item at activation entry, before its first statement can examine or store into it:
+    /// <list type="number">
+    /// <item>the receiver states a fixed character length (<see cref="CobolArg.Length"/>) — that length;</item>
+    /// <item>the receiver is itself ANY LENGTH or DYNAMIC LENGTH (an unstated length over a string carrier) — its
+    ///   carrier's current length, which may be zero (§13.18.2.4 GR1 a));</item>
+    /// <item>the activation has no receiver (a CALL without a RETURNING phrase) — GR1 is silent, so the declared
+    ///   PICTURE's length (<paramref name="declared"/>; docs/CONFORMANCE.md records the determination).</item>
+    /// </list>
+    /// <paramref name="fill"/> is the item's initial character — a space, or '0' (a clear bit) for a boolean item.</summary>
+    public static string ReturningSeed(CobolArg? ret, char fill, int declared) =>
+        new(fill, ret switch
+        {
+            { Length: not CobolArg.Unstated } r => r.Length,
+            { Carrier: ManagedPointer<string> { Value: { } text } } => text.Length,
+            _ => declared,
+        });
+
     /// <summary>Deliver a RETURNING value to the caller's RETURNING item (ISO §14.6.5 — "the result is placed in
     /// the data item referenced by that RETURNING phrase of that activating statement"). Null-tolerant: a CALL
     /// without RETURNING discards the value (§14.9.4.4 GR4 has no receiver). <paramref name="ret"/> is the

@@ -66,7 +66,9 @@ collaborator `CodeGen/Verbs/OoEmitter.cs`. The former ambient flags are gone: `A
 via `BinderContext.EnterMethodScope`; `OoIsClassUnit`/`OoCurrentClass`/`OoInFactory` are `init`-only
 per-binder configuration set by `OoDriver` at construction. P9's feature closes: ANY LENGTH §13.18.2
 (all three unit-kind legs; `IsAnyLength` + the runtime-length store/LENGTH channels + the `CobolArgAdapt.Text`
-width −1 full-string mode; RETURNING leg staged loud); the §4.2.2 interface conformance leg proven
+width −1 full-string mode; the RETURNING leg — kb/Work PB1167 — takes n from the INVOKE receiver through the
+method's trailing `__retLen` parameter, which `OoEmitter.OoSignatureOf` appends for exactly the methods whose RETURNING
+item is ANY LENGTH: the class method, the interface member and the covariant adapter all read the one builder); the §4.2.2 interface conformance leg proven
 (`oo_interface_conformance` + the 0828 lossy-projection negative); and the class-level ENVIRONMENT DIVISION
 scoping fixed (`DataBinder.EnvDivisions`, outermost-first — a half's own env no longer shadows the class env;
 `oo_class_env` pins CURRENCY-through-shadow; the DEVLOG-738 latent bug).
@@ -272,7 +274,13 @@ because the C# projection is insufficient in BOTH directions: PIC 9(4) and 9(8) 
 `ref long` (Roslyn under-rejects — the identical-description rules 2/3 live only in DescriptionMismatch),
 and C# forbids the covariant interface-implementation returns that rules 5a/5c2 PERMIT (Roslyn
 over-rejects — cured by `AdapterPairs` → explicit interface implementations
-`PROTO_RET IFACE.M(…) => this.M(…);` as headerExtras on the instance half). EMISSION: `public interface
+`PROTO_RET IFACE.M(…) => (PROTO_RET)this.M(…);` as headerExtras on the instance half; the cast is what rule 5 a)
+needs when the implementation's RETURNING item is INTERFACE-typed and the prototype's universal — an interface type has
+no implicit conversion to the universal class, CS0266). The OVERRIDE of a universal-returning method by an
+INTERFACE-typed one has no C# covariant spelling either (CS0508), so `OoEmitter.OoReturnClrType` keeps the overridden
+method's projected return type and `OoReturnConversion` casts at the `return` (kb/Work PB1499; every
+`ObjectRefKind` has an IMPLEMENTS and an OVERRIDE leg in `pb1499_interface_return_covariance`, pinned by
+`ReturnCovarianceKindDriftTests`). EMISSION: `public interface
 IFOO [: BASES]` with FieldEmitter statics (numeric profiles + group structs — C# 8+ interface statics, so
 cross-unit CONTENT conversions qualify `{IFACE}._P_n`) + the prototypes' signatures through the ONE
 `OoSignatureOf` builder (shared with class methods and adapters — the no-drift rule); the instance base
@@ -280,6 +288,13 @@ list joins direct Implements (the closure arrives transitively at the C# level);
 FactoryImplements (the factory SINGLETON classes make factory IMPLEMENTS emittable, not validate-only).
 A REPEATED interface-name in either IMPLEMENTS clause is legal and absorbed into the set (kb/Work PB946):
 §11.8.3 / §11.4.3 carry no repetition rule, unlike §11.3.3 SR7 and §11.6.3 SR6 for the two INHERITS clauses.
+INTERFACE INHERITS (kb/Work PB1502, CONFORMANCE.md D-INH1): SR6 is keyed on the WRITTEN interface-name (two REPOSITORY aliases
+of one externalized interface are one base); §11.7.3 SR4 b) refuses a prototype that matches one anywhere in
+`OoInterfaceSymbol.InheritedClosure()` (pass-1, the roster key); §11.6.3 SR5 is `OoConformance.ValidateInterfaceInheritance`
+(after the formals bind): a name inherited from several interfaces needs ONE inherited prototype that conforms to the rest,
+recorded as the interface's presentation (`ChooseInheritedPrototype`) — `AllPrototypes()` and the IMPLEMENTS pass read it,
+and `EmitInterfaceUnit` declares it as a hiding `new` member of the C# interface (two base-interface members of one name
+are ambiguous at every call, CS0121).
 RECEIVERS: an interface-typed `USAGE OBJECT REFERENCE IFOO` is legal (0813 accepts interfaces,
 §13.18.60.2); INVOKE through it resolves over `AllPrototypes()` (§14.9.23.3 SR4e; 0825 on a miss) and emits
 static C# interface dispatch behind the same GR5 null guard; `ObjectRefAssignmentMismatch` (kb/Work PB389) carries the

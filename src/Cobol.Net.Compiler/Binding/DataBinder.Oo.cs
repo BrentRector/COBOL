@@ -433,14 +433,9 @@ public sealed partial class DataBinder
                 Edition.Error("COBOLNET1542", $"{rw}: the subject of an ANY LENGTH clause shall be referenced "
                     + "in the method's procedure division header as a BY REFERENCE formal parameter or as the "
                     + "RETURNING item (ISO §13.18.2.3 SR3)");
-            else if (ReferenceEquals(m.Binding!.Returning, root))
-                // SR3b-legal, staged LOUD: the C# return-value crossing cannot carry the INVOKE receiver's
-                // length that GR1 fixes n from (deferred with the ANY-LENGTH-RETURNING wave).
-                Edition.Error(DiagnosticCatalog.AnyLengthReturning, $"{rw}: ANY LENGTH on the method RETURNING "
-                    + "item is recognized (ISO §13.18.2.3 SR3b) but not yet implemented (the "
-                    + "ANY-LENGTH-RETURNING wave); ANY LENGTH formal parameters are fully supported");
             else
-                continue;   // conformant — keep the flag
+                continue;   // conformant — keep the flag. A RETURNING item (SR3 b)) receives the INVOKE receiver's length
+                            // through the method's trailing __retLen parameter (§13.18.2.4 GR1 b); OoEmitter.OoSignatureOf).
             root.IsAnyLength = false;
         }
     }

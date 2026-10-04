@@ -263,6 +263,13 @@ public sealed class OoClassTable
         }
         // Interface INHERITS resolution + cycle check (§11.6.3 SR2/SR3/SR6).
         foreach (var isym in table._interfaces)
+        {
+            // §11.6.3 SR6: "A given interface-name shall not appear more than once in an INHERITS clause" — the rule is
+            // about the WRITTEN NAME (uppercase and lowercase basic letters are equivalent, §8.1.3.2 GR3), not the interface it resolves to:
+            // two different REPOSITORY names for one externalized interface (§12.3.8.3 — INTERFACE R6X AS "E" and
+            // INTERFACE R6Y AS "E") are two interface-names, which no sentence of the standard forbids, so both are
+            // legal and name ONE base (docs/CONFORMANCE.md D-INH1; kb/Work PB1502, following the PB946 determination).
+            var writtenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var inhCtx in isym.Ctx.interfaceName().Skip(1).Take(isym.Ctx.interfaceName().Length - 2))
             {
                 string inh = inhCtx.GetText();
@@ -271,15 +278,15 @@ public sealed class OoClassTable
                 // paragraph of this source element" — the class-INHERITS rule's twin, same funnel (PB365).
                 if (OoNameResolution.Resolve(table, edition, isym.Ctx, inh, OoNameResolution.Want.Interface,
                         $"interface '{isym.Name}': INHERITS FROM", "COBOLNET0840",
-                        "ISO §11.6.3 SR2").Interface is { } b)
-                {
-                    if (isym.Inherits.Contains(b))
-                        edition.Error("COBOLNET0840",
-                            $"interface '{isym.Name}': duplicate INHERITS FROM '{inh}' (ISO §11.6.3 SR6)");
-                    else
-                        isym.Inherits.Add(b);
-                }
+                        "ISO §11.6.3 SR2").Interface is not { } b)
+                    continue;
+                if (!writtenNames.Add(inh))
+                    edition.Error("COBOLNET0840",
+                        $"interface '{isym.Name}': duplicate INHERITS FROM '{inh}' (ISO §11.6.3 SR6)");
+                else if (!isym.Inherits.Contains(b))
+                    isym.Inherits.Add(b);   // an alias of a base already inherited adds nothing (one C# base)
             }
+        }
         foreach (var isym in table._interfaces)
         {
             using var atInterface = edition.At(isym.Ctx.interfaceName(0));
@@ -301,6 +308,26 @@ public sealed class OoClassTable
                 }
             }
         }
+
+        // §11.7.3 SR4 b): "if this method definition is contained in an interface definition, no inherited method
+        // prototype shall have the same method resolution signature as the method prototype declared by this method
+        // definition" — the interface twin of the class arm's SR4 a) (the OVERRIDE marking below). Since SR2 forbids
+        // OVERRIDE in a prototype there is no legal way to redeclare an inherited prototype, so ANY inherited
+        // prototype of the same roster key (the v1 method resolution signature is the method-name, kb/Work PB1519) is a
+        // violation. Asked after the INHERITS graph resolved (it needs the closure) and before any formal binds (the
+        // key needs none); a cyclic graph is reported above and the closure walk terminates over it.
+        foreach (var isym in table._interfaces)
+            foreach (var own in isym.Prototypes)
+                foreach (var inherited in isym.InheritedClosure())
+                    if (inherited.FindOwnPrototype(own.ExternalizedName) is not null)
+                    {
+                        using var atPrototype = edition.At(own.Ctx);
+                        edition.Error(DiagnosticCatalog.InterfacePrototypeRedeclaresInherited,
+                            $"interface '{isym.Name}', method '{own.Name}': the method prototype has the same method "
+                            + $"resolution signature as one inherited from interface '{inherited.Name}' (ISO §11.7.3 SR4 b); "
+                            + "OVERRIDE, the only way to redeclare an inherited method, is forbidden in a prototype by SR2)");
+                        break;
+                    }
 
         foreach (var ctx in classes)
         {

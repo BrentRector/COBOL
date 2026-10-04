@@ -421,6 +421,54 @@ public static class OoConformance
         return true;
     }
 
+    /// <summary>⛔ ISO §11.6.3 SR5 — AN INTERFACE THAT INHERITS ONE METHOD-NAME FROM SEVERAL INTERFACES CONFORMS TO ALL OF
+    /// THEM (kb/Work PB1502): "If a given method-name is inherited from more than one interface, the method prototype in
+    /// each inherited interface shall be such that this interface conforms to all inherited interfaces", with §9.3.10's
+    /// "The inheriting interface shall always conform to each of the inherited interfaces". The inheriting interface
+    /// presents ONE method of that name (it may declare none of its own, §11.7.3 SR4 b)), so the rule is satisfied exactly
+    /// when ONE inherited prototype conforms (<see cref="MethodConformanceMismatches"/>, the §9.3.8.2.3 rule set every
+    /// asker shares) to every other — identical prototypes inherited twice trivially, and a covariant RETURNING pair
+    /// (rule 5) through the more specific one. That prototype is recorded as the interface's own presentation
+    /// (<see cref="OoInterfaceSymbol.ChooseInheritedPrototype"/>), so <see cref="OoInterfaceSymbol.AllPrototypes"/>, the
+    /// IMPLEMENTS pass and <see cref="InterfaceConformsTo"/> all read the conforming one. A violation is COBOLNET2762 on
+    /// the INHERITING interface — before this pass it surfaced only when some class implemented the interface (COBOLNET0841
+    /// at the class), and an unimplemented interface was accepted. Runs after every interface's prototype formals bound.</summary>
+    public static void ValidateInterfaceInheritance(OoClassTable table, EditionContext edition)
+    {
+        foreach (var isym in table.Interfaces)
+        {
+            var byName = new Dictionary<string, List<(OoInterfaceSymbol Iface, OoMethodSymbol Proto)>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var inherited in isym.InheritedClosure())
+                foreach (var proto in inherited.Prototypes)
+                {
+                    if (!byName.TryGetValue(proto.ExternalizedName, out var list))
+                        byName[proto.ExternalizedName] = list = [];
+                    list.Add((inherited, proto));
+                }
+            foreach (var (_, protos) in byName)
+            {
+                if (protos.Count < 2) continue;
+                IEnumerable<string> Mismatches((OoInterfaceSymbol Iface, OoMethodSymbol Proto) one,
+                    (OoInterfaceSymbol Iface, OoMethodSymbol Proto) other) =>
+                    MethodConformanceMismatches(table, one.Proto, other.Proto, $"the '{other.Iface.Name}' prototype",
+                        isym.Name, other.Iface.Name);
+                var chosen = protos.FirstOrDefault(c => protos.All(o => ReferenceEquals(o.Proto, c.Proto) || !Mismatches(c, o).Any()));
+                if (chosen.Proto is not null)
+                {
+                    isym.ChooseInheritedPrototype(chosen.Proto);
+                    continue;
+                }
+                var (first, second) = (protos[0], protos.Skip(1).First(o => Mismatches(protos[0], o).Any()));
+                using var atInterface = edition.At(isym.Ctx.interfaceName(0));
+                edition.Error(DiagnosticCatalog.InterfaceInheritedPrototypesConflict,
+                    $"interface '{isym.Name}': method '{first.Proto.Name}' is inherited from interfaces "
+                    + $"{string.Join(", ", protos.Select(p => $"'{p.Iface.Name}'"))} whose prototypes do not all conform "
+                    + $"to one another, so '{isym.Name}' cannot conform to all inherited interfaces — "
+                    + $"{string.Join("; ", Mismatches(first, second))} (ISO §11.6.3 SR5; §9.3.10)");
+            }
+        }
+    }
+
     /// <summary>The RUNTIME projection of the strict-conformance rule (D-U3 — the universal-dispatch
     /// wave): ONE descriptor string per description, computed at BIND time on both sides of a universal
     /// crossing; the generated <c>__CobolInvoke</c> switch compares for STRING EQUALITY — an argument mismatch

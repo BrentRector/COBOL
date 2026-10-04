@@ -591,6 +591,12 @@ internal sealed class ProgramEmitter
                         w.Line(PlaceRenderer.Write(place, $"{f.CarrierField}.Value"));
                 }
             }
+            // An ANY LENGTH RETURNING item (§13.18.2.3 SR3 b)) has no length of its own: §13.18.2.4 GR1 b) makes it
+            // "the length of the corresponding … returning item of the activating runtime element", which only the
+            // activator's receiver (__ret) states. The item is seeded with that length before the first statement runs,
+            // so FUNCTION LENGTH, a MOVE and the delivery below all see n (kb/Work PB1167).
+            if (_callState.ReturningPlace is { DenotedItem: { IsAnyLength: true, Pic: { } anyPic } } anyRet)
+                w.Line(PlaceRenderer.Write(anyRet, RuntimeApi.ArgAdaptReturningSeed("__ret", anyPic)));
             w.Line("__asCalled = true;");
             // The activation's LOCAL-STORAGE cells end with it (ISO §8.6.4 — "persists while that instance of the runtime
             // element is in active state"), for EVERY kind of unit: a fresh INITIAL / RECURSIVE instance and the cached

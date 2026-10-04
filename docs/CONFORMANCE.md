@@ -1274,6 +1274,52 @@ of an unsupported facility.
   asks. Witnesses: `conformance:2002/pb1498_self_referencing_returning`,
   `conformance:negative/pb1498-returning-circularity-direct`, `conformance:negative/pb1498-returning-circularity-indirect`.
 
+- **D-ALR1 — the length of an ANY LENGTH RETURNING item when the activation has no receiving item** (kb/Work PB1167;
+  ISO §13.18.2.3 SR3 b) and §13.18.2.4 GR1 b)). §13.18.2.3 SR3 admits the clause's subject as the RETURNING item of a
+  contained program or a method (cite-checked), and §13.18.2.4 GR1 b) fixes its length n as "the length of the
+  corresponding argument or returning item of the activating runtime element"; GR1 a) makes it a zero-length item when
+  that returning item is zero-length. With a receiver, n is the receiver's length and the standard decides it. The
+  standard is silent on the one activation that has NO receiver: a CALL or INVOKE whose RETURNING phrase is absent
+  (§14.8.3.1 requires the phrase exactly when the activated element declares a RETURNING item, so only an activation
+  the compiler cannot check statically, a dynamic CALL, can reach it). **WiseOwl COBOL gives the item the length its
+  PICTURE spells (one position for the one-symbol PICTURE §13.18.2.3 SR1 requires).** Rejected readings: zero length
+  (a MOVE into it would silently store nothing, and the value is discarded by GR4 anyway, so the choice cannot change
+  the activator's data) and a diagnostic (the activation is legal source). GnuCOBOL has no ANY LENGTH RETURNING item, so
+  no vendor behavior applies (rule 1 precedence: ISO, then GnuCOBOL, then IBM / Micro Focus). Written once on each ABI:
+  the program ABI seeds the item at activation entry from the receiver's `CobolArg` (`CobolArgAdapt.ReturningSeed`) and
+  the method ABI receives n as the trailing `__retLen` parameter that `OoEmitter.OoSignatureOf` appends for exactly the
+  methods whose RETURNING item is ANY LENGTH. A universal-receiver INVOKE of such a method sets EC-OO-UNIVERSAL
+  (§14.9.23.4 GR7 c)), an inline invocation of it is refused (§8.4.3.4.3 SR4, COBOLNET2140), and a PROPERTY method may
+  not carry it (§13.18.2.3 SR2). Witnesses: `conformance:2002/pb1167_any_length_returning`,
+  `unit:ReturningSeedTests.No_Receiver_Gives_The_Declared_Picture_Length`,
+  `unit:ReturningSeedTests.Zero_Length_Receiver_Gives_A_Zero_Length_Item`,
+  `conformance:negative/pb1167-inline-invocation-returning-any-length`,
+  `conformance:negative/pb1167-any-length-returning-property-method`,
+  `conformance:negative/pb1167-returning-fixed-sender-any-length-receiver`.
+
+- **D-INH1 — interface multiple inheritance: what SR5 asks of the inheriting interface, and what "the same interface-name"
+  means in SR6** (kb/Work PB1502; ISO §11.6.3 SR5 and SR6, §11.7.3 SR4 b), §9.3.10; all cite-checked). (1) **SR5.** "If a
+  given method-name is inherited from more than one interface, the method prototype in each inherited interface shall be
+  such that this interface conforms to all inherited interfaces." The inheriting interface has ONE method of that name
+  (SR4 b) leaves it no prototype of its own), so the rule holds exactly when ONE inherited prototype conforms to every
+  other, by the §9.3.8.2.3 rule set (`OoConformance.MethodConformanceMismatches`): identical prototypes inherited twice,
+  and a covariant RETURNING pair (rule 5) through the more specific one. WiseOwl COBOL reads it that way, reports a
+  violation on the INHERITING interface (COBOLNET2762) and records the conforming prototype as the interface's own
+  (`OoInterfaceSymbol.ChooseInheritedPrototype`), which the IMPLEMENTS pass, `InterfaceConformsTo` and the emitted C#
+  interface (a hiding `new` member, because C# member lookup over two base interfaces declaring one name is ambiguous)
+  all read. Rejected reading: pairwise conformance in BOTH directions, which refuses the covariant pair that rule 5 makes
+  legal. (2) **SR4 b).** A prototype whose roster key (the method-name; the v1 method resolution signature, kb/Work
+  PB1519) matches ANY prototype of the INHERITS closure is refused (COBOLNET2761): SR2 forbids OVERRIDE in a prototype, so there is no
+  legal way to redeclare. (3) **SR6.** The rule is about the WRITTEN interface-name (a case variant is the same
+  word, §8.1.3.2 GR3). Two different REPOSITORY names for one externalized interface (§12.3.8.3: `INTERFACE
+  ALX AS "EXT-ALI"` and `INTERFACE ALY AS "EXT-ALI"`) are two interface-names, no sentence of the standard forbids them,
+  and the inheriting interface has ONE base — the emitted C# base list carries it once. This follows the PB946
+  determination for IMPLEMENTS (ISO controls where it states the prohibition; SR6 names the NAME). Witnesses:
+  `conformance:2002/pb1502_interface_inherits_legal`, `conformance:negative/pb1502-interface-inherits-conflicting-prototypes`,
+  `conformance:negative/pb1502-interface-prototype-redeclares-inherited`,
+  `conformance:negative/pb1502-interface-prototype-contradicts-inherited`,
+  `conformance:negative/pb1502-interface-inherits-same-name-twice`.
+
 ### 3.1 Implementor behavior in Annex A.2 undefined cases (kb/Work PB1907)
 
 Annex A.2 lists situations whose results the standard leaves undefined, and §4.4 2) says that "A COBOL run unit that

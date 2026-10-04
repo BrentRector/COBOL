@@ -121,8 +121,20 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
     /// CONTAINING class: GR22 e) admits that class or, through inheritance of the method, a subclass — both of
     /// which are assignable to it, so the containing class is the sound static bound.</summary>
     public string ClrTypeName => Kind is ObjectRefKind.Universal || Name is null
-        ? "CobolObject"
+        ? UniversalClrName
         : DataItem.Sanitize(Name).ToUpperInvariant() + (Factory ? NamingConvention.FactorySuffix : "");
+
+    /// <summary>The emitted C# type of a universal object reference (D-U1) — the runtime root every emitted class derives
+    /// from. The ONE spelling <see cref="ClrTypeName"/> and the method ABI's return-type projection
+    /// (<c>OoEmitter.OoReturnClrType</c>, kb/Work PB1499) both read.</summary>
+    public const string UniversalClrName = "CobolObject";
+
+    /// <summary>True when the emitted C# type is an INTERFACE (<c>OoEmitter.EmitInterfaceUnit</c>) — the one description
+    /// kind C# cannot convert to <see cref="UniversalClrName"/> without a cast (a class type converts up implicitly; an
+    /// interface type to a class type does not, CS0266), and so the one a COVARIANT RETURN needs the explicit
+    /// conversion for: §9.3.8.2.3 rule 5 a) admits ANY object reference where interface-2's returning item is
+    /// universal (kb/Work PB1499).</summary>
+    public bool IsClrInterface => Kind is ObjectRefKind.Interface;
 
     /// <summary>ISO §9.3.8.2.3 rule 2 / §14.8.2.3.2 IDENTICAL-DESCRIPTION equality: the same kind, the same
     /// name (case-insensitively — COBOL words are, §8.3.2.2) and the same FACTORY and ONLY presence. Rule 2 c)

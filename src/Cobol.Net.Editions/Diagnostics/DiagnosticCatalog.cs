@@ -1850,11 +1850,11 @@ public static class DiagnosticCatalog
     // ⛔ `oo-group-valued-property` is DELETED, not disabled (kb/Work PB1448): §8.4.3.9.4 GR1-GR3 give the property's
     // temp the accessor's whole data description, and a group description is one — the temp is now built over it,
     // so no site can raise the name. Never reallocate the id.
-    public static readonly DiagnosticDescriptor AnyLengthReturning = new(
-        NotImplemented, "any-length-returning", EditionSeverity.Error,
-        "ANY LENGTH on a RETURNING item (legal per §13.18.2.3 SR3b) is recognized but not yet implemented — the "
-        + "return crossing cannot carry the activator's receiver length yet (the ANY LENGTH formal-parameter leg "
-        + "is fully implemented).", "ISO §13.18.2.3 SR3b / §13.18.2.4 GR1", RecognizedNotImplemented);
+    // ⛔ `any-length-returning` is DELETED, not disabled (kb/Work PB1167): §13.18.2.3 SR3 b) admits an ANY LENGTH
+    // RETURNING item of a contained program or a method, and §13.18.2.4 GR1 b) makes its length n "the length of the
+    // corresponding argument or returning item of the activating runtime element" — the activator's receiver length now
+    // reaches the activated element (CobolArgAdapt.ReturningSeed for a program, the method's trailing __retLen for an
+    // INVOKE), so no site can raise it. Never reallocate the name.
 
     // ── COBOLNET0899 — inter-program header-formal deferrals (P10 Step 10) ──────────────────────────
     // ⛔ `by-value-formal-carrier` (COBOLNET0899, "a method's BY VALUE formal is not yet implemented on the INVOKE
@@ -5086,12 +5086,8 @@ public static class DiagnosticCatalog
     /// phrase." Both would leave GR1 b)'s "same description, class, and category" temporary undescribable at
     /// the point of reference — an ANY LENGTH item has no length until activation, and an ACTIVE-CLASS
     /// reference has no class until the runtime class of the receiver is known.
-    /// <para>⚠ ONLY THE ACTIVE-CLASS ARM IS REACHABLE TODAY, and the negative golden says so rather than
-    /// pretending otherwise: an ANY LENGTH RETURNING item is staged loud at
-    /// <see cref="AnyLengthReturning"/> in the data binder before any invocation binds, so a fixture written
-    /// with ANY LENGTH would pin that STAGE and leave SR4's own arm untested (feedback
-    /// green_test_can_hold_a_gap_open). The check below covers both arms; the golden covers the one that
-    /// can be observed, and gains its twin when the ANY-LENGTH-RETURNING wave lands.</para></summary>
+    /// <para>Both arms have a negative golden (<c>pb428-inline-invocation-returning-active-class</c>, kb/Work PB428;
+    /// <c>pb1167-inline-invocation-returning-any-length</c>, kb/Work PB1167).</para></summary>
     public static readonly DiagnosticDescriptor InlineInvocationReturningShape = new(
         "COBOLNET2140", "inline-invocation-returning-shape", EditionSeverity.Error,
         "The RETURNING item of an inline-invoked method is ANY LENGTH or ACTIVE-CLASS.",
@@ -6371,6 +6367,27 @@ public static class DiagnosticCatalog
         + "RETURNING phrase of the get property method shall be the same as the data description of the item "
         + "specified as the USING parameter of the set property method.\"",
         "ISO §8.4.3.9.3 SR7");
+
+    /// <summary>COBOLNET2761 — an interface's method PROTOTYPE redeclares one it inherits (kb/Work PB1502). ISO §11.7.3
+    /// SR4 b): "if this method definition is contained in an interface definition, no inherited method prototype shall
+    /// have the same method resolution signature as the method prototype declared by this method definition". SR2 forbids
+    /// OVERRIDE in a prototype, so there is no legal spelling of a redeclaration. The interface twin of the class arm's
+    /// SR4 a) (COBOLNET0837).</summary>
+    public static readonly DiagnosticDescriptor InterfacePrototypeRedeclaresInherited = new(
+        "COBOLNET2761", "interface-prototype-redeclares-inherited", EditionSeverity.Error,
+        "An interface's method prototype has the same method resolution signature as a method prototype it inherits. "
+        + "ISO §11.7.3 SR4 b); the OVERRIDE phrase is forbidden in a prototype (SR2).",
+        "ISO §11.7.3 SR4 b)");
+
+    /// <summary>COBOLNET2762 — an interface inherits one method-name from several interfaces whose prototypes do not
+    /// all conform to one another (kb/Work PB1502). ISO §11.6.3 SR5: "the method prototype in each inherited interface
+    /// shall be such that this interface conforms to all inherited interfaces"; §9.3.10: "The inheriting interface
+    /// shall always conform to each of the inherited interfaces". Raised on the INHERITING interface.</summary>
+    public static readonly DiagnosticDescriptor InterfaceInheritedPrototypesConflict = new(
+        "COBOLNET2762", "interface-inherited-prototypes-conflict", EditionSeverity.Error,
+        "A method-name inherited from more than one interface has prototypes that do not all conform to one another, so "
+        + "the inheriting interface cannot conform to all of them. ISO §11.6.3 SR5; §9.3.10.",
+        "ISO §11.6.3 SR5");
 
     /// <summary>COBOLNET2728 — an INVOKE argument or RETURNING item is a group item with a subordinate object reference
     /// described with the ACTIVE-CLASS phrase (kb/Work PB1116). ISO §14.9.23.3 SR13: "If Identifier-3, identifier-4,

@@ -9,13 +9,8 @@
       *> runtime class of the receiver is known — which is why the same
       *> method is legal through an INVOKE statement with a written RETURNING
       *> identifier.  COBOLNET2140.
-      *> ⚠ THIS FIXTURE TAKES THE ACTIVE-CLASS ARM DELIBERATELY. The ANY
-      *> LENGTH arm is currently SHADOWED: an ANY LENGTH RETURNING item is
-      *> staged loud at COBOLNET0899 in the data binder (the
-      *> ANY-LENGTH-RETURNING wave) before any invocation binds, so a fixture
-      *> written that way would pin the STAGE and never exercise SR4 — a
-      *> green test holding the rule's own arm unverified.  When that wave
-      *> lands, add the ANY LENGTH twin here.  kb/Work PB428.
+      *> THIS FIXTURE TAKES THE ACTIVE-CLASS ARM; its ANY LENGTH twin is
+      *> pb1167-inline-invocation-returning-any-length.  kb/Work PB428, PB1167.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB428N4.
        ENVIRONMENT DIVISION.

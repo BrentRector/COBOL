@@ -369,8 +369,13 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             .Select(a =>
             {
                 var (protoRet, protoSig) = OoSignatureOf(a.Proto);
-                string args = string.Join(", ", a.Proto.Binding!.Formals.Select(f => OoArgPair(f.ParamName, f.OmittedFlag)));
-                return $"{protoRet} {a.Iface.CsName}.{a.Proto.CsName}({protoSig}) => this.{a.Impl.CsName}({args});   // covariant-return adapter (§9.3.8.2.3 5c2)";
+                string args = string.Join(", ", a.Proto.Binding!.Formals.Select(f => OoArgPair(f.ParamName, f.OmittedFlag))
+                    .Concat(OoReturnsAnyLength(a.Proto) ? [RetLenParam] : []));
+                // The conversion to the PROTOTYPE's type is explicit whenever the two return types differ: rule 5 c) 2. is a
+                // class (implicit upcast, the cast is redundant) but rule 5 a) admits an INTERFACE-typed return for a
+                // universal prototype, which C# converts to the universal class only by a cast (kb/Work PB1499).
+                string conv = protoRet == "void" ? "" : $"({protoRet})";
+                return $"{protoRet} {a.Iface.CsName}.{a.Proto.CsName}({protoSig}) => {conv}this.{a.Impl.CsName}({args});   // covariant-return adapter (§9.3.8.2.3 5a/5c2)";
             })
             .ToList();
         // §16.2.2.2 GR1 — FactoryObject "determines the class of the object": the runtime BASE reads it from this
@@ -978,7 +983,12 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 if (root.Class is { Tier: RedefinesTier.StringCanonical }) continue;
                 var (type, init) = fields.RootDecl(root);
                 var formal = m.Binding!.Formals.FirstOrDefault(f => ReferenceEquals(f.Item, root));
-                if (formal is null)
+                if (formal is null && root is { IsAnyLength: true, Pic: { } anyPic })
+                    // An ANY LENGTH RETURNING item starts as n repetitions of its picture symbol, n being the activator's
+                    // receiver length (§13.18.2.4 GR1 b)) — OoSignatureOf's trailing parameter.
+                    w.Line($"{type} {root.CsName} = new string({RuntimeApi.AnyLengthFill(anyPic)}, {RetLenParam});   "
+                        + $"// LINKAGE {root.CobolName} (ANY LENGTH RETURNING — n is the activator's, §13.18.2.4 GR1 b))");
+                else if (formal is null)
                     w.Line($"{type} {root.CsName} = {init};   // LINKAGE {root.CobolName} (§14.2.3 GR6)");
                 else if (root.IsGroup)
                 {
@@ -1144,7 +1154,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             if (m.Binding!.Returning is { } r)
             {
                 string src = MethodBoundaryValue(fields, r, "OO method RETURNING delivery");
-                w.Line($"return {src};   // the invocation result (§14.9.23.4 GR8)");
+                w.Line($"return {OoReturnConversion(m, r)}{src};   // the invocation result (§14.9.23.4 GR8)");
             }
             // Close the PB36 activation try. The finally must cover every exit — the RETURNING `return` above, a
             // GOBACK unwinding as MethodReturn, and an exception propagating to the invoker — or the stack leaks a
@@ -1173,11 +1183,49 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// (the same reasoning as the ONE DescriptionMismatch).</summary>
     private static (string RetType, string Sig) OoSignatureOf(OoMethodSymbol m)
     {
-        string retType = m.Binding!.Returning is { } ret ? OoCrossingType(ret) : "void";
-        string sig = string.Join(", ", m.Binding!.Formals.Select(f =>
-            $"ref {OoFormalCrossingType(f.Item)} {f.ParamName}, bool {f.OmittedFlag}"));
-        return (retType, sig);
+        string retType = OoReturnClrType(m);
+        var parameters = m.Binding!.Formals.Select(f =>
+            $"ref {OoFormalCrossingType(f.Item)} {f.ParamName}, bool {f.OmittedFlag}").ToList();
+        // ⛔ AN ANY LENGTH RETURNING ITEM'S LENGTH IS THE ACTIVATOR'S (kb/Work PB1167): §13.18.2.4 GR1 b) makes n "the
+        // length of the corresponding … returning item of the activating runtime element", and a C# return value
+        // carries no receiver length, so the activator passes it as one trailing parameter — only for a method whose
+        // returning item needs it, so every other signature is unchanged.
+        if (OoReturnsAnyLength(m)) parameters.Add($"int {RetLenParam}");
+        return (retType, string.Join(", ", parameters));
     }
+
+    /// <summary>⛔ THE C# RETURN TYPE OF A METHOD (kb/Work PB1499) — <see cref="OoCrossingType"/> of its RETURNING item,
+    /// except for the one rule-5 pair C# cannot override covariantly. §9.3.8.2.3 rule 5 a) admits ANY object reference
+    /// in interface-1 where interface-2's returning item is universal, and an OVERRIDE is such an interface-1 (§11.7.3
+    /// SR9): a method whose RETURNING item is described with an INTERFACE-name overriding a method that crosses as the
+    /// universal type has no C# spelling of its own — C# covariant returns need an implicit reference conversion to the
+    /// overridden type, and an interface type has none to a class (CS0508). So that override keeps the overridden
+    /// method's C# return type and converts at the <c>return</c> (<see cref="OoReturnConversion"/>); the question is
+    /// asked of the overridden method's PROJECTED type, so a chain of such overrides stays on one type. The covariant
+    /// adapters (IMPLEMENTS) take the same conversion.</summary>
+    private static string OoReturnClrType(OoMethodSymbol m)
+    {
+        if (m.Binding!.Returning is not { } ret) return "void";
+        if (m.OverrideOf is { Binding.Returning: not null } baseM
+            && ret.Pic is { ObjectRef: { IsClrInterface: true } }
+            && OoReturnClrType(baseM) is var baseClr && baseClr.TrimEnd('?') == ObjectRefDescriptor.UniversalClrName)
+            return baseClr;   // the crossing type spells its nullability ("CobolObject?"); keep the overridden method's spelling
+        return OoCrossingType(ret);
+    }
+
+    /// <summary>The C# conversion to the method's projected return type (<see cref="OoReturnClrType"/>) for a value of
+    /// the RETURNING item's own crossing type — the explicit cast exactly when the two differ (an interface-typed
+    /// value returned as the universal type, which is total for every emitted COBOL object), else nothing.</summary>
+    private static string OoReturnConversion(OoMethodSymbol m, DataItem ret) =>
+        OoReturnClrType(m) is var projected && projected != OoCrossingType(ret) ? $"({projected})" : "";
+
+    /// <summary>The trailing parameter that carries the INVOKE receiver's length to an ANY LENGTH RETURNING item
+    /// (<see cref="OoSignatureOf"/>; ISO §13.18.2.4 GR1 b)).</summary>
+    private const string RetLenParam = "__retLen";
+
+    /// <summary>True when the method's RETURNING item is described with ANY LENGTH — the one test that adds
+    /// <see cref="RetLenParam"/> to the signature, the typed INVOKE, the covariant adapter and the seed.</summary>
+    private static bool OoReturnsAnyLength(OoMethodSymbol m) => m.Binding!.Returning is { IsAnyLength: true };
 
     /// <summary>⛔ THE METHOD ABI'S ARGUMENT PAIR — one formal crosses as its typed <c>ref</c> value AND its
     /// omitted-presence flag (kb/Work PB757; COBOLNET_OO_DESIGN D6). ISO §14.9.23.4 GR9: "If an OMITTED phrase is
@@ -1207,6 +1255,15 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             {
                 var (retType, sig) = OoSignatureOf(proto);
                 w.Line($"{retType} {proto.CsName}({sig});   // METHOD-ID {proto.Name} (prototype, §10.6.2 SR4)");
+            }
+            // §11.6.3 SR5: a name inherited from SEVERAL interfaces is ONE method of this interface (the prototype the
+            // others conform to). C# sees two base-interface members and every call through this interface is ambiguous
+            // (CS0121), so the presented prototype is declared here, hiding both; a class's one public method still
+            // implements all three (kb/Work PB1502).
+            foreach (var presented in iface.PresentedInherited)
+            {
+                var (retType, sig) = OoSignatureOf(presented);
+                w.Line($"new {retType} {presented.CsName}({sig});   // METHOD-ID {presented.Name} inherited from several interfaces (§11.6.3 SR5)");
             }
         }
         w.Line();
@@ -1611,6 +1668,12 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     : PlaceRenderer.Write(src, tmp));
         }
 
+        // The trailing __retLen of an ANY LENGTH RETURNING item (OoSignatureOf; §13.18.2.4 GR1 b)): the length of the
+        // item the result is delivered to — and, when the statement has no RETURNING phrase, GR1 is silent, so the
+        // declared PICTURE length (docs/CONFORMANCE.md; the program ABI's CobolArgAdapt.ReturningSeed agrees).
+        if (inv.ReturningSource is { IsAnyLength: true, Pic: { } anyRetPic })
+            argExprs.Add(inv.Returning is { } anyRecv ? ReceiverLength(anyRecv) : $"{Math.Max(1, anyRetPic.Length)}");
+
         string target = inv.Form switch
         {
             InvokeForm.Self => "this",
@@ -1680,6 +1743,16 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         }
         EmitInvokePickup(inv);   // §14.6.13.1.5 / §14.9.18.4 GR1b — a method GOBACK … RAISING is consumed HERE (after GR8)
     }
+
+    /// <summary>A RETURNING receiver's length in character positions, as a C# int expression — the n of §13.18.2.4 GR1 b)
+    /// when the method's RETURNING item is ANY LENGTH. A varying receiver (ANY LENGTH, DYNAMIC LENGTH, a
+    /// reference-modified window) is read at run time; a group is its image width; any other elementary item is its
+    /// PICTURE's length.</summary>
+    private static string ReceiverLength(Place recv) =>
+        recv is RefModPlace || recv.Item is { IsAnyLength: true } or { IsDynamicLength: true }
+            ? $"{PlaceRenderer.Read(recv)}.Length"
+            : recv.Item.IsGroup ? $"{CallEmitter.BoundaryImageWidth(recv.Item)}"
+            : $"{CallEmitter.ElementaryFormalWindow(recv.Item)}";
 
     /// <summary>The copy-in read of an identifier argument for a STRING-CARRIED formal: a reference-modified
     /// place reads its window verbatim (§8.4.3.3.4 GR6 — the operand IS elementary alphanumeric); a string-stored

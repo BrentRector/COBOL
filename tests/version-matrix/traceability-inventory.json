@@ -8571,13 +8571,13 @@
   "ordinal": 3,
   "subject": "Data description and representation",
   "rule-digest": "74697e51b699",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/DataItem.cs#MinimumLengthIsZero; src/Cobol.Net.Compiler/Binding/Bound/MoveClassifier.cs#ZeroLengthItemRoute; src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs#Emit; src/Cobol.Net.Runtime/Values/Text/CobolClass.cs#CobolClass",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/DataItem.cs#MinimumLengthIsZero; src/Cobol.Net.Compiler/Binding/Bound/MoveClassifier.cs#ZeroLengthItemRoute; src/Cobol.Net.Runtime/Control/CallAbi.cs#ReturningSeed",
+  "test-ref": "conformance:2002/pb1167_any_length_returning_zero_length; unit:ReturningSeedTests.Zero_Length_Receiver_Gives_A_Zero_Length_Item",
   "derivation": "",
-  "editions": "2014, 2023, 2002",
-  "notes": "kb/Work PB1167 (registrar 15b). Stem: `OK  §8.5.4` \"A zero-length item is a data item or a literal whose minimum length is zero and whose length at runtime is zero.\" The compiler holds the stem's description half as ONE recurrence (DataItem.MinimumLengthIsZero) and the runtime half as the emitted current-length test; consumers read it (MoveClassifier.ZeroLengthItemRoute / MoveEmitter for §14.9.25.4 GR1, CobolClass for §8.8.4.4.4 GR1, STRING/UNSTRING/INSPECT runtime length). Item 3: MinimumLengthIsZero answers true for IsAnyLength and ZeroLengthItemRoute routes an ANY LENGTH elementary sender through its runtime length test. Probe p3: contained program with `LINKAGE 01 P PIC X ANY LENGTH`, CALL ... USING BY REFERENCE D (DYNAMIC LENGTH, current length 0) -> in the callee FUNCTION LENGTH(P)=0, IS ALPHABETIC false, MOVE P TO X(4)=spaces, INSPECT tally 0; control CALL USING S (\"XYZ\") -> L=3, ALPHABETIC true, [XYZ ]. No existing spec-derived golden passes a zero-length argument to an ANY LENGTH item (unit Items3And4 pins only the description half) -> test-needed. || REFUTED: PARTIAL — Item 3 has two halves: an ANY LENGTH item corresponding to a zero-length ARGUMENT or to a zero-length RETURNING ITEM (OK §8.5.4 3); §13.18.2.3 SR3b, OK, makes the returning item a legal ANY LENGTH subject in a contained program/method). The adjudicator verified only the argument half. The returning half is refused outright: a contained program with `LINKAGE 01 P PIC X ANY LENGTH` + `PROCEDURE DIVISION RETURNING P` is rejected with COBOLNET0899 'ANY LENGTH on the PROCEDURE DIVISION RETURNING item is recognized ... but not yet implemented (the ANY-LENGTH-RETURNING wave)'. One half verified, the other not implemented => PARTIAL. No kb/Work note found owning the ANY-LENGTH-RETURNING stage (grep of kb/Work for ANY-LENGTH-RETURNING found none) -- the registrar should file one (rejects legal source). || editions as written by the adjudicator: 2014, 2023 (ANY LENGTH exists from 2002, but an argument that IS a zero-length item needs the 2014 zero-length facilities; §13.18.2 GR1 links the length to the argument). §8.5.4 is not in Annex E's 2014->2023 delta, so the concept predates 2023; the repo holds no 2002/2014 text, so the 2002-vs-2014 introduction edge is not separately derivable (VERSION_CHANGE_REFERENCE ratified decision #1).",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1167 (w1013 L). cite.py --check 8.5.4 item 3 'A data item defined with the ANY LENGTH clause corresponding to an argument or returning item that is a zero-length item': the argument half was verified by registrar 15b; the returning half is now reachable and witnessed end to end (a zero-length literal argument -> an ANY LENGTH formal -> CALL AS NESTED RETURNING it -> the callee's ANY LENGTH returning item is zero-length: FUNCTION LENGTH = 0, a MOVE into it keeps nothing).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.4-4",
@@ -11721,13 +11721,13 @@
   "ordinal": 5,
   "subject": "Conformance for object orientation",
   "rule-digest": "2c6e2b74f071",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#MethodConformanceMismatches; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ObjectRefAssignmentMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidateImplements",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#MethodConformanceMismatches; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ObjectRefAssignmentMismatch; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidateImplements; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#OoReturnClrType",
+  "test-ref": "conformance:2002/pb1499_interface_return_covariance; unit:ReturnCovarianceKindDriftTests.OnlyAnInterfaceKind_NeedsTheExplicitConversionToTheUniversalType",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1499: Rule text (cite.py --check 9.3.8.2.3 OK for 5) b) 1. 'an object reference described with an interface-name that identifies int-r or an interface described with an INHERITS clause that references int-r'). This row carries 5 a), 5 b) and the lead-in of 5 c) (its sub-rules 1-3 and 5 d) are rows L2.1-L2.3). Code: MethodConformanceMismatches routes an object-reference RETURNING pair to ObjectRefAssignmentMismatch(table, impl, proto, activeClassSenderAdmitted:false) â€” the SET format-5 table with the interface-1 returning item as sender, interface-2's as receiver; ValidateImplements then emits a covariant-return adapter (AdapterPair) for conforming-but-different descriptions. Probes at --std 2023 (IMPLEMENTS, 0841), all as the rule demands: 5 a) universal prototype, class-typed implementation accepted (R5A); 5 b) 1. interface J prototype, K INHERITS J implementation accepted (R5B); 5 b) 2. b. class X whose OBJECT IMPLEMENTS J accepted (R5C), subclass Y of X accepted via the class-inherited IMPLEMENTS closure (R5C3), class Z implementing nothing refused (R5C2); 5 b) 2. a. FACTORY OF X whose FACTORY IMPLEMENTS J accepted (R5D); universal implementation vs interface prototype refused (R5E â€” not in 5 b)'s closed list); interface implementation vs class prototype refused (R5G5 â€” 5 c) requires an object-class-name description). Edge: 5 b) 1. is read transitively over INHERITS (InheritsClosure), the same reading as Â§14.9.39.3 SR10 a); the literal 'an interface described with an INHERITS clause that references int-r' names only a direct heir â€” a grandchild interface is accepted, noted, not probed as a defect. The diagnostic always labels itself 'ISO Â§9.3.8.2.3 rules 5a/5c2' whatever arm failed (e.g. R5C2 is a 5 b) failure) â€” message-quality only. oo_interface_covariant (2002) exercises 5 c) 2., not this row's arms; no spec-derived test for 5 a)/5 b) -> test-ref empty. || REFUTED: PARTIAL — Rule 5 a) admits ANY object reference in interface-1 when interface-2's returning item is universal. The binder accepts an INTERFACE-typed implementation return, but the program then fails in the Roslyn backend. The covariant-return adapter and the override emit CobolObject-typed signatures and never convert an interface-typed return to them. So a conforming program does not compile, on both the IMPLEMENTS path and the override path. The adjudicator probed 5 a) only with a class-typed return (R5A), which works. The other arms held: the 5 lead-in, 5 b) 1., 5 b) 2. a./b., and ACTIVE-CLASS refused under 5 b).",
-  "state": "GAP"
+  "notes": "kb/Work PB1499 (w1013 L). cite.py --check 9.3.8.2.3 5) a) 'If the returning item in interface-2 is a universal object reference, the corresponding returning item in interface-1 is an object reference': the binder accepted every kind and the BACKEND refused the INTERFACE-typed one (CS0266 in the covariant-return adapter, CS0508 on the override). The adapter now converts explicitly to the prototype's type and an override whose returning item is interface-typed keeps the overridden method's projected C# return type (OoEmitter.OoReturnClrType / OoReturnConversion); every ObjectRefKind (universal, class, interface, ACTIVE-CLASS) has an IMPLEMENTS and an OVERRIDE leg in the golden (ReturnCovarianceKindDriftTests pins the enumeration).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.8.2.3-L2.1",
@@ -12471,13 +12471,13 @@
   "ordinal": 5,
   "subject": "INTERFACE-ID paragraph",
   "rule-digest": "105f00eb8b2c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Oo/OoInterfaceSymbol.cs#AllPrototypes",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidateInterfaceInheritance; src/Cobol.Net.Compiler/Oo/OoInterfaceSymbol.cs#AllPrototypes; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitInterfaceUnit",
+  "test-ref": "conformance:negative/pb1502-interface-inherits-conflicting-prototypes; conformance:2002/pb1502_interface_inherits_legal",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1502: Rule (cite.py --check 11.6.3 OK, SR 5): 'If a given method-name is inherited from more than one interface, the method prototype in each inherited interface shall be such that this interface conforms to all inherited interfaces.' With §9.3.8.2.3 (--check OK): interface-1 conforms to interface-2 iff 'for every method in interface-2 there is a method in interface-1 with the same name' with the same number of parameters (rule 1), same RETURNING presence (rule 4), etc. No code enforces SR5: OoClassTable.Build checks SR2/SR3/SR6 only, and AllPrototypes' comment 'SR5 mutual-conformance across multi-inherit is validated at Build' is false -- AllPrototypes silently keeps the first declaration per name. Probe probe/interface-id-paragraph/sr5_conflict.cob (--std 2002): N5A has SPEAK USING X (1 formal), N5B has SPEAK (0 formals), N5C INHERITS FROM N5A N5B -> compiles rc=0, no diagnostic. Spec-derived expected: a compile-time error, since N5C has one SPEAK and it cannot have both 1 and 0 parameters, so N5C cannot conform to both. Control sr5_same.cob (identical SPEAK in both bases) compiles, correctly. Downstream: sr5_impl.cob, a class implementing N5C with SPEAK(), is rejected COBOLNET0841 citing the N5A prototype -- the defect surfaces only at the implementing class, never at the illegal interface, and an interface nothing implements is accepted outright. Harm: under-rejects. SR5 belongs to A.4.10 item 2 (INTERFACE-ID multiple inheritance), which CONFORMANCE.md §5 claims SUPPORTED (PB285, landed), so this is in scope; no register note owns it. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (the OO facility, introduced by ISO/IEC 1989:2002; interface definitions are rejected COBOLNET0900 at 85)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1502 (w1013 L). cite.py --check 11.6.3 SR5 'If a given method-name is inherited from more than one interface, the method prototype in each inherited interface shall be such that this interface conforms to all inherited interfaces': ValidateInterfaceInheritance (after the prototype formals bind) requires one inherited prototype to conform to every other through the ONE 9.3.8.2.3 rule set (docs/CONFORMANCE.md D-INH1), reports COBOLNET2762 on the inheriting interface, and records the conforming prototype as the interface's presentation (AllPrototypes, the IMPLEMENTS pass and the emitted hiding member read it). Identical prototypes inherited twice, a diamond and a covariant RETURNING pair are legal and run.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-11.6.3-6",
@@ -12486,13 +12486,13 @@
   "ordinal": 6,
   "subject": "INTERFACE-ID paragraph",
   "rule-digest": "3c54d5e7a108",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1502-interface-inherits-same-name-twice; conformance:2002/pb1502_interface_inherits_legal",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1502: Rule (cite.py --check 11.6.3 OK, SR 6): 'A given interface-name shall not appear more than once in an INHERITS clause.' Code: when a resolved base is already in isym.Inherits, COBOLNET0840 'duplicate INHERITS FROM ... (ISO §11.6.3 SR6)'. Probe probe/interface-id-paragraph/sr6_dup.cob (N6B INHERITS FROM N6A N6A) -> COBOLNET0840 at the second N6A. The comparison is on the resolved symbol, so a case-variant spelling of the same word is caught too (names resolve case-insensitively). Edge noted, not a defect: two DIFFERENT repository words aliasing one externalized interface would also be caught (symbol identity), which is the stricter reading. No existing spec-derived test -> test-needed. || REFUTED: PARTIAL — The literal-name half is correct. Repeating the same interface-name is rejected, including a case variant (R7A r7a is one COBOL word), at 2002 and 2023. But the duplicate test keys on the RESOLVED SYMBOL, not the written interface-name. Two DIFFERENT interface-names that are REPOSITORY aliases of one externalized interface (INTERFACE R6X AS \"EXT-R6A\" and INTERFACE R6Y AS \"EXT-R6A\") are rejected with a message citing SR6. SR6's text forbids only the same interface-name appearing twice, and §12.3.8.3 SR1 constrains only the same name specified twice, so nothing in the cited rule forbids that source. The code enforces a broader rule under SR6's name. Whether that source should be legal is arguable: C# forbids a repeated base, so the emitter would have to dedupe. That uncertainty is enough to deny CONFORMS. At fix time, either dedupe silently with a design-doc note or cite the rule that actually forbids it. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (the OO facility, introduced by ISO/IEC 1989:2002; interface definitions are rejected COBOLNET0900 at 85)",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1502 (w1013 L). cite.py --check 11.6.3 SR6 'A given interface-name shall not appear more than once in an INHERITS clause': keyed on the WRITTEN interface-name (a case variant is the same word, 8.1.3.2 GR3 - refused COBOLNET0840 as before); two different REPOSITORY names for one externalized interface are two interface-names, legal, and name one base (docs/CONFORMANCE.md D-INH1, following PB946).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-11.6.3-7",
@@ -12621,13 +12621,13 @@
   "ordinal": 4,
   "subject": "METHOD-ID paragraph",
   "rule-digest": "9e20f6fd7c74",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Oo/OoInterfaceSymbol.cs#AllPrototypes",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Oo/OoInterfaceSymbol.cs#InheritedClosure",
+  "test-ref": "conformance:negative/pb1502-interface-prototype-redeclares-inherited; conformance:negative/pb1502-interface-prototype-contradicts-inherited",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1502: cite.py --check 11.7.3 \"no inherited method shall have the same method resolution signature as the method declared by this method definition\" -> OK 4) a); cite.py --check 11.7.3 \"no inherited method prototype shall have the same method resolution signature\" -> OK 4) b). a) CONFORMS: redefinition without OVERRIDE -> COBOLNET0837 through EditionContext.Removed (error strict; warning under --permissive, the documented migration leniency); indirect ancestor probed p8_indirect_sr4a (2002/2023) -> 0837; asserted by conformance-test:OoSpineTests.Sr4a_RedefinitionWithoutOverride_0837Strict_InferredPermissive. b) DIVERGES (under-rejects): an interface that INHERITS another and redeclares an inherited prototype of the same signature is accepted — SR2 forbids OVERRIDE in a prototype, so SR4b makes every such redeclaration illegal. The interface loop checks duplicates only within ONE interface (TryAddPrototype) and OoInterfaceSymbol.AllPrototypes silently absorbs the repeat ('first declaration wins'). Probe p5_interface_redeclare_inherited_proto (INTERFACE-ID MQ5J INHERITS FROM MQ5I, both `METHOD-ID. PING.`) -> rc 0, no diagnostic, at 2002 and 2023; expected a compile-time error. Two halves, one defective -> PARTIAL. Test-ref left empty (the a-arm test does not cover b). || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985) || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (MarkRoster 0837 — arm a); src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (interface prototype loop — arm b absent); src/Cobol.Net.Compiler/Oo/OoInterfaceSymbol.cs#AllPrototypes",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1502 (w1013 L). cite.py --check 11.7.3 SR4 b) 'if this method definition is contained in an interface definition, no inherited method prototype shall have the same method resolution signature as the method prototype declared by this method definition': the interface arm now refuses a prototype whose roster key matches any prototype of the INHERITS closure (COBOLNET2761), the twin of the class arm's SR4 a) (COBOLNET0837); SR2 forbids OVERRIDE in a prototype, so there is no legal redeclaration.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-11.7.3-5",
@@ -19521,13 +19521,13 @@
   "ordinal": 3,
   "subject": "ANY LENGTH clause",
   "rule-digest": "344b74cef3ba",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#AnyLengthValidateUnit; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#AnyLengthReturning",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#AnyLengthValidateUnit; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData",
+  "test-ref": "conformance:2002/pb1167_any_length_returning; conformance:2002/any_length_contained; conformance:2002/oo_any_length",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1211, 14d). Rule: contained program or method - the subject 'shall be referenced in its procedure division header as either: a) a formal parameter with the BY REFERENCE phrase, or b) the returning item' (cite.py --check 13.18.2.3 OK for a) and b)). The restriction half is enforced: an unreferenced ANY LENGTH linkage item -> 1542 (p5 L2; p8 U in a method); a BY VALUE formal -> 1542 (p3.cob). Leg a) accepted and runs (any_length_contained, oo_any_length). Leg b) - the RETURNING item, which the rule expressly PERMITS - is refused with the named RecognizedNotImplemented COBOLNET0899 in BOTH arms: contained program `PROCEDURE DIVISION RETURNING L` with `01 L PIC X ANY LENGTH` (p2.cob) -> 'ANY LENGTH on the PROCEDURE DIVISION RETURNING item is recognized ... but not yet implemented'; method RETURNING (p8.cob method RET) -> the same. 8.4.3.4.3 SR4 forbids an ANY LENGTH returning item only for an INLINE method invocation, so INVOKE ... RETURNING / CALL ... RETURNING activations are legal. No open kb/Work note owns this leg (PB428, landed, only notes the 0899 staging). Expected for p2: compiles; per 13.18.2.4 GR1b L has n = 3 (the caller's A3), so it prints A3=ABC. Harm: rejects legal source. || Editions (adjudicator): 2002, 2014, 2023 (ISO 2023 Annex E lists no substantive change to 13.18.2, so the rule is unchanged from 2014; the 2002 introduction is the project's COBOL-2002 gate and is not derivable from the 2023 text alone - see dossier gap)",
-  "state": "GAP"
+  "notes": "kb/Work PB1167 (w1013 L). cite.py --check 13.18.2.3: SR3 'If the source element containing the ANY LENGTH clause is a contained program or is a method, the subject of the entry shall be referenced in its procedure division header as either: a) a formal parameter with the BY REFERENCE phrase, or b) the returning item' - both legs are accepted and run (the COBOLNET0899 'ANY-LENGTH-RETURNING' staging is deleted from AnyLengthValidateUnit and OoBindMethodData); a BY VALUE formal and an unreferenced item stay refused COBOLNET1542; a PROPERTY method stays refused (SR2, conformance:negative/pb1167-any-length-returning-property-method).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.2.3-4",
@@ -19551,13 +19551,13 @@
   "ordinal": 1,
   "subject": "ANY LENGTH clause",
   "rule-digest": "19286e982d55",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs; src/Cobol.Net.Runtime/Control/CallAbi.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/ReceivingStore.cs#CharacterPositions; src/Cobol.Net.Compiler/CodeGen/Verbs/MoveEmitter.cs; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs",
-  "test-ref": "conformance:2002/any_length_contained",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs#EmitCallMethod; src/Cobol.Net.Runtime/Control/CallAbi.cs#ReturningSeed; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#OoSignatureOf",
+  "test-ref": "conformance:2002/any_length_contained; conformance:2002/pb1167_any_length_returning; conformance:2002/pb1167_any_length_returning_zero_length; unit:ReturningSeedTests.Zero_Length_Receiver_Gives_A_Zero_Length_Item; unit:ReturningSeedTests.Any_Length_Receiver_Gives_Its_Current_Length",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1211, 14d). Rule: the subject shall be 'a) a zero-length item when the corresponding argument or returning item ... is a zero-length item, or b) treated as though there were n repetitions of the picture symbol ... where n is the length of the corresponding argument or returning item' (cite.py --check 13.18.2.4 OK both). ARGUMENT leg verified: b) X via contained CALL (golden LEN=03/LEN=08), function (any_length_function), method (oo_any_length); N via p4.cob (NLEN=03 VAL=ABC; MOVE N\"Z\" stores 'Z  ' padded to n=3); 1 via p4.cob (PIC 1 USAGE BIT over B\"10110\" -> BVAL=10110). a) zero-length argument: p7.cob passes a DYNAMIC LENGTH item of length 0 -> LEN=00 VAL=[], then 'HELLO' -> LEN=05. RETURNING-ITEM leg: NOT implemented - every ANY LENGTH returning item is refused at compile time with COBOLNET0899 (see SR-13.18.2.3-3), so n from the activator's returning item is never computed. Two halves, one verified => PARTIAL; the test-ref covers the argument leg only. || Editions (adjudicator): 2002, 2014, 2023 (ISO 2023 Annex E lists no substantive change to 13.18.2, so the rule is unchanged from 2014; the 2002 introduction is the project's COBOL-2002 gate and is not derivable from the 2023 text alone - see dossier gap)",
-  "state": "GAP"
+  "notes": "kb/Work PB1167 (w1013 L). The RETURNING leg of GR1 is implemented on both ABIs: n is the activator's receiver length (CobolArg.Length / an ANY LENGTH receiver's carrier on the program ABI; the method's trailing __retLen on the INVOKE ABI), n = 0 for a zero-length receiver (GR1 a), witnessed end to end by pb1167_any_length_returning_zero_length). The argument leg was already verified by registrar 14d.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.3.3-1",
@@ -33816,13 +33816,13 @@
   "ordinal": 4,
   "subject": "Returning items",
   "rule-digest": "c086e4369508",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#BindCall; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindResolvedInvoke",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1167-returning-fixed-sender-any-length-receiver; conformance:2002/pb1167_any_length_returning",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1167 (registrar 14c). 'If the receiving operand is described with the ANY LENGTH clause, the sending operand shall also be described with the ANY LENGTH clause.' (cite.py --check 14.8.3.3 -> OK §14.8.3.3 4)). The prohibition is enforced: DescriptionMismatch activation mode 'arg.IsAnyLength && !formal.IsAnyLength' (arg = receiver, formal = sender). Probe p8.cob: nested FW8 'USING BY REFERENCE LA' (LA PIC X ANY LENGTH) does 'CALL \"SRC8\" AS NESTED RETURNING LA' against SRC8's fixed PIC X(5) returning item -> COBOLNET1736 '...shall be described with ANY LENGTH too (§14.8.3.3 rule 4)' - correct. The rule's admitted case (sender ALSO ANY LENGTH) cannot be written: an ANY LENGTH returning item, legal per §13.18.2.3 SR3 b) (cite OK), is refused at declaration COBOLNET0899 'not yet implemented (the ANY-LENGTH-RETURNING wave)' (DataBinder.Linkage.cs AnyLengthValidateUnit / DataBinder.Oo.cs OoBindMethodData) - see the L3.5 finding. Enforcement verified, the conforming pairing unreachable -> PARTIAL. No negative golden targets the returning pair. [editions as adjudicated: 2002, 2014, 2023 (clause 14.8.3 Returning items exists from ISO/IEC 1989:2002, where RETURNING on CALL/INVOKE/functions was introduced; not applicable to 1985)]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1167 (w1013 L). cite.py --check 14.8.3.3 rule 4 'If the receiving operand is described with the ANY LENGTH clause, the sending operand shall also be described with the ANY LENGTH clause': the prohibition is enforced for INVOKE (negative golden: a fixed PIC X(5) method returning item into an ANY LENGTH formal receiver -> COBOLNET0828) and for CALL AS NESTED (COBOLNET1736); the conforming pairing, an ANY LENGTH sender into an ANY LENGTH receiver, now compiles and runs (pb1167_any_length_returning: NRET RETURNING AL, NRETLEN=5).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.8.3.3-L3.5",
@@ -33831,13 +33831,13 @@
   "ordinal": 5,
   "subject": "Returning items",
   "rule-digest": "da528fa49d06",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#AnyLengthValidateUnit; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindMethodData; src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#DescriptionMismatch; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitInstanceInvoke; src/Cobol.Net.Runtime/Control/CallAbi.cs#FitToReceiver",
+  "test-ref": "conformance:2002/pb1167_any_length_returning; conformance:2002/pb1167_any_length_returning_zero_length",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1167 (registrar 14c). 'If the sending operand is described with the ANY LENGTH clause, the length of the sending operand is considered to match the length of the receiving operand.' (cite.py --check 14.8.3.3 -> OK §14.8.3.3 5)). The comparator relaxation (anyLengthFormal skips the length compares) and an emitter width-fit (OoEmitter RETURNING delivery, 'rs.IsAnyLength') exist, but they are dead: the only sending operand that can carry ANY LENGTH is an activated contained program's or method's RETURNING item (§13.18.2.3 SR3 b) 'the returning item', cite OK), and both declarations are refused. Probe p7.cob: method GETV 'PROCEDURE DIVISION RETURNING R' with R 'PIC X ANY LENGTH', and nested NR7 likewise -> COBOLNET0899 'ANY LENGTH on the method RETURNING item is recognized (ISO §13.18.2.3 SR3b) but not yet implemented (the ANY-LENGTH-RETURNING wave)', followed by COBOLNET0828/1736 'length mismatch (formal X(1), argument X(5))'. Spec: accepted; §13.18.2.4 GR1 b) (cite OK) gives R n = 5 repetitions, so the method would print MLEN=5 / NLEN=5 and the receivers [ABCDE]. No kb/Work note owns the ANY-LENGTH-RETURNING wave. Rejects legal source. [editions as adjudicated: 2002, 2014, 2023 (clause 14.8.3 Returning items exists from ISO/IEC 1989:2002, where RETURNING on CALL/INVOKE/functions was introduced; not applicable to 1985)]",
-  "state": "GAP"
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work PB1167 (w1013 L). cite.py --check 14.8.3.3 rule 5 'If the sending operand is described with the ANY LENGTH clause, the length of the sending operand is considered to match the length of the receiving operand': the relaxation and the delivery that were dead code are live now that an ANY LENGTH returning item is declarable - a method / contained program RETURNING item is n positions (n = the receiver's), the comparator skips the length compare, and the delivery stores the n positions into the fixed, group, national, boolean and ANY LENGTH receivers the golden exercises.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.1.3-1",
