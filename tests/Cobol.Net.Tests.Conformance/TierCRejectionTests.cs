@@ -16,7 +16,7 @@ namespace CobolNet.Tests.Conformance;
 /// pointer/object categories had no image until kb/Work PB244 gave them the ONE-WAY transfer image —
 /// <c>DisplayPointerGroup_RendersPlaceholderPositions</c>/<c>MovePointerGroup_SendsPlaceholderPositions</c> pin it WORKING). DISPLAY of a COMPOSABLE variable-length group is NOT here: it renders the documented A.1 item-57
 /// format (<c>2023/pb164_vlg_display</c>); the DISPLAY loud lives on the UNCOMPOSABLE shape
-/// (<c>DisplayOdoGroupWithDynamicMember_FailsLoudNotCs1061</c>). ACCEPT/STRING receivers and INSPECT's identifier-1
+/// (<c>DisplayOdoTableOfDynamicElements_FailsLoudNotCs1061</c>). ACCEPT/STRING receivers and INSPECT's identifier-1
 /// are BIND-screened by their own syntax rules (§14.9.1.3 SR6 / §14.9.43.3 SR11 / §14.9.22.3 SR1) and pinned as such.
 /// </summary>
 public sealed class TierCRejectionTests
@@ -170,14 +170,17 @@ public sealed class TierCRejectionTests
         Assert.Equal('\a', stdout[4]);
     }
 
-    /// <summary>kb/Work PB176 — a group with BOTH an OCCURS DEPENDING table and a dynamic member must COMPILE
-    /// and stage the runtime Tier-C loud. Before the <c>PlaceRenderer.GroupImage</c> capability guard (the
+    /// <summary>kb/Work PB176 — a group whose OCCURS DEPENDING table holds a dynamic-length ELEMENT member must
+    /// COMPILE and stage the runtime Tier-C loud. Before the <c>PlaceRenderer.GroupImage</c> capability guard (the
     /// SEVENTH two-arm-dispatch instance — the write twin <c>WriteGroupImage</c> was guarded, the read side
     /// was not), the ODO sender path emitted <c>.AsImage()</c> on a struct that never receives one, and this
     /// legal source failed BACKEND compilation with CS1061 — the loud-failure rule violated in the worst
-    /// direction. The lock pins the restored posture: compiles, throws Tier-C, names the dynamic mechanism.</summary>
+    /// direction. The lock pins the restored posture: compiles, throws Tier-C, names the dynamic mechanism.
+    /// ⛔ The fixture is the ONE shape <c>DataItem.CurrentExtentImageCapable</c> still excludes (kb/Work PB244): an
+    /// ODO table whose element carries a dynamic-length item has a RUN-TIME multiplicity of components. A group
+    /// that merely holds an ODO table BESIDE a dynamic member composes — <c>DisplayOdoGroupWithDynamicMember_RendersCurrentExtent</c>.</summary>
     [Fact]
-    public void DisplayOdoGroupWithDynamicMember_FailsLoudNotCs1061()
+    public void DisplayOdoTableOfDynamicElements_FailsLoudNotCs1061()
     {
         var (ok, _, detail) = new CobolNetCompiler(2023).CompileAndRun("""
             IDENTIFICATION DIVISION.
@@ -186,15 +189,44 @@ public sealed class TierCRejectionTests
             WORKING-STORAGE SECTION.
             01 WS-GO.
                05 WS-GO-N PIC 9(1) VALUE 2.
-               05 WS-GO-D PIC X DYNAMIC LENGTH.
-               05 WS-GO-T PIC X(3) OCCURS 1 TO 5 DEPENDING ON WS-GO-N.
+               05 WS-GO-T OCCURS 1 TO 5 DEPENDING ON WS-GO-N.
+                  10 WS-GO-D PIC X DYNAMIC LENGTH.
+                  10 WS-GO-F PIC X(3).
             PROCEDURE DIVISION.
             MAIN.
                 DISPLAY WS-GO.
                 STOP RUN.
             """);
-        Assert.False(ok, "an ODO group with a dynamic member has no whole-group image — loud, never CS1061 (kb/Work PB176)");
+        Assert.False(ok, "an ODO table of dynamic elements has no whole-group image — loud, never CS1061 (kb/Work PB176)");
         Assert.Contains("Tier-C", detail);
         Assert.Contains("dynamic", detail);
+    }
+
+    /// <summary>kb/Work PB244 shape (b), ISO §14.9.11.4 GR7 (A.1 item 57): a group with BOTH an OCCURS DEPENDING
+    /// table and a dynamic member composes — the dynamic item at its current content, the table at its CURRENT
+    /// count (§13.18.38.4 GR8, here 2 of 5 occurrences of three characters). The pre-PB244 posture was the
+    /// Tier-C loud this fact replaces.</summary>
+    [Fact]
+    public void DisplayOdoGroupWithDynamicMember_RendersCurrentExtent()
+    {
+        var (ok, stdout, detail) = new CobolNetCompiler(2023).CompileAndRun("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. TIERCRE4.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 WS-GO.
+               05 WS-GO-N PIC 9(1) VALUE 2.
+               05 WS-GO-D PIC X DYNAMIC LENGTH.
+               05 WS-GO-T PIC X(3) OCCURS 1 TO 5 DEPENDING ON WS-GO-N.
+            PROCEDURE DIVISION.
+            MAIN.
+                MOVE "ab" TO WS-GO-D.
+                MOVE "xyz" TO WS-GO-T(1).
+                MOVE "uvw" TO WS-GO-T(2).
+                DISPLAY WS-GO.
+                STOP RUN.
+            """);
+        Assert.True(ok, detail);
+        Assert.Equal("2abxyzuvw", stdout.TrimEnd('\r', '\n'));
     }
 }

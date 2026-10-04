@@ -70,6 +70,37 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
         return new CobolVarGroup(f, d);
     }
 
+    /// <summary>The carrier of a fixed-OCCURS table of variable-length group elements (kb/Work PB244): each
+    /// occurrence's fixed run and components, in occurrence order — the same flattening a nested scalar group
+    /// gets, repeated. §8.5.1.12.2 puts each occurrence's dynamic-length items at their own relative byte
+    /// positions, so the multiplicity is the table's compile-time <c>OCCURS</c> count.</summary>
+    public static CobolVarGroup Concat(CobolVarGroup[] occurrences)
+    {
+        var fixedRun = new System.Text.StringBuilder();
+        var dyn = new List<string>();
+        foreach (var o in occurrences)
+        {
+            fixedRun.Append(o.Fixed);
+            dyn.AddRange(o.Dynamic);
+        }
+        return new CobolVarGroup(fixedRun.ToString(), [.. dyn]);
+    }
+
+    /// <summary>This carrier with the group's TRAILING fixed material cut off the fixed run and appended as one
+    /// more variable-length component (kb/Work PB244). The group's OCCURS DEPENDING table is the trailing storage
+    /// of its record (§13.18.38.3 SR22) and rides the fixed run of the activation-boundary carrier, where
+    /// §14.8.2.2 gives it the maximum length; in a RECORD's contiguous layout it is the last variable-length
+    /// component instead, because the record's own length — not a constant — says how many occurrences it holds.
+    /// <paramref name="tailAt"/> is where the table starts in the fixed run.</summary>
+    public CobolVarGroup SplitTail(int tailAt) =>
+        new(CobolString.Store(Fixed, tailAt), [.. Dynamic, Fixed.Length > tailAt ? Fixed[tailAt..] : ""]);
+
+    /// <summary>The inverse of <see cref="SplitTail"/>: the LAST component rejoins the fixed run at
+    /// <paramref name="tailAt"/>.</summary>
+    public CobolVarGroup JoinTail(int tailAt) =>
+        Dynamic.Length == 0 ? this
+        : new(CobolString.Store(Fixed, tailAt) + Dynamic[^1], Dynamic[..^1]);
+
     // ── The §8.5.1.12 LAYOUT of a group, and the correspondence between two of them (kb/Work PB965) ─────────────
     //
     // A group's layout is a FLAT sequence of (kind, chars, elementChars) triples in CHARACTER positions, left to

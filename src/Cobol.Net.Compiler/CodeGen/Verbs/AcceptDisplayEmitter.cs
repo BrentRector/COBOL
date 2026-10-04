@@ -25,7 +25,9 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
         // members by the record-image member law, dynamic members at their CURRENT extent, following the
         // §15.50.4 r7 LENGTH-sum geometry in character positions (a NATIONAL member displays one character
         // per position where LENGTH counts two bytes — the sanctioned D-N1/D-N3 divergence; row 57 names the
-        // shapes that stay loud instead: ODO members, in-element runtime lengths, INDEX leaves).
+        // shapes that stay loud instead: a runtime-length item inside an OCCURS DEPENDING or dynamic-capacity
+        // table's element, and a cell-backed group holding both a dynamic-length item and an ODO table — kb/Work
+        // PB244. An ODO table beside a dynamic member displays at its CURRENT count).
         // DISPLAY-ONLY by design: GR7 is a DISPLAY-statement determination, so the shared group-sender arm
         // (WRITE/RELEASE/compare) keeps its loud posture.
         // ⛔ `vp is not RedefViewPlace`: a Tier-B class-tier VIEW's Read() is its string WINDOW — spelling

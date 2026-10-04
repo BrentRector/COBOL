@@ -287,8 +287,10 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// DISPLAY format, documented as CONFORMANCE.md A.1 item 57 (kb/Work PB164): the members' images in
     /// declaration order, each FIXED member contributing exactly its <see cref="AsImageOf"/> recipe (the ONE
     /// member-image law — no second copy), each dynamic-length leaf its CURRENT content, each dynamic-capacity
-    /// table every occurrence at its CURRENT capacity, and each nested SCALAR variable-length group its own
-    /// <c>CurrentImage()</c>. The geometry follows the §15.50.4 r7 LENGTH sum in CHARACTER POSITIONS —
+    /// table every occurrence at its CURRENT capacity, each nested SCALAR variable-length group its own
+    /// <c>CurrentImage()</c>, each FIXED-OCCURS table of variable-length group elements the concatenation of its
+    /// occurrences' (kb/Work PB244), and the group's OCCURS DEPENDING table the prefix of its maximum image that its
+    /// CURRENT count names (the <c>__odo</c> parameter, §13.18.38.4 GR8). The geometry follows the §15.50.4 r7 LENGTH sum in CHARACTER POSITIONS —
     /// <c>FUNCTION LENGTH(G)</c> equals <c>CurrentImage().Length</c> except that a NATIONAL member displays
     /// one character per position while LENGTH counts its two bytes (the sanctioned D-N1/D-N3 divergence;
     /// the golden pins the relationship with a national member so it is observed, not assumed). DISPLAY-only:
@@ -296,17 +298,68 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// record window).</summary>
     public void EmitCurrentImageMethod(DataItem group, CodeWriter w)
     {
-        var dyn = group.Children
-            .Where(c => c.RedefinesTargetName is null && (c.IsGroup || c.IsElementary)
-                && (c.IsDynamicTable || c.IsDynamicLength || (c.IsGroup && !c.IsImageCapable)))
-            .ToDictionary(c => c.CsName, StringComparer.Ordinal);
-        var parts = phys.PhysicalChildrenOf(group)
-            .Select(f => dyn.TryGetValue(f.Name, out var d) ? CurrentMemberImage(d) : AsImageOf(f))
-            .ToList();
-        w.Line($"public readonly string CurrentImage() => {(parts.Count > 0 ? string.Join(" + ", parts) : "\"\"")};");
+        // ONE classification (VarParts) feeds this composer, the boundary carrier and the record layout, so the
+        // DISPLAY format, the crossing and the file image cannot disagree about what a member is.
+        var parts = VarParts(group).Select(CurrentPartImage).ToList();
+        w.Line($"public readonly string CurrentImage({OdoParameter(group)}) => "
+            + $"{(parts.Count > 0 ? string.Join(" + ", parts) : "\"\"")};");
     }
 
-    private string CurrentMemberImage(DataItem d) =>
+    /// <summary>The parameter list of a variable-length group's current-extent methods (<c>CurrentImage</c>,
+    /// <c>AsVarImage</c>, <c>CurrentExtents</c>): the occurrence count of the group's OCCURS DEPENDING table when
+    /// it holds one, else nothing. ⛔ The count is a PARAMETER because the composing method is a struct instance
+    /// method while data-name-1 may live outside the group entirely (the PB164 fleet's reason for refusing the
+    /// shape); the operand's access path supplies it (<c>PlaceRenderer</c>: the clamped current count for a
+    /// statement's operand, the maximum at an activation boundary — §14.8.2.2 "the maximum length is used").</summary>
+    internal static string OdoParameter(DataItem group) => DataItem.HasOdoOnOrBeneath(group) ? "int __odo" : "";
+
+    /// <summary>The argument that forwards <see cref="OdoParameter"/> to a nested group's method.</summary>
+    private static string OdoArgument(DataItem group) => DataItem.HasOdoOnOrBeneath(group) ? "__odo" : "";
+
+    /// <summary>Where the OCCURS DEPENDING table lies in a member that holds it as its TRAILING storage
+    /// (§13.18.38.3 SR22): the character offset of the table within the member's image, one occurrence's width
+    /// and the maximum count. The member's CURRENT image is a character prefix of its maximum image — the same
+    /// law <c>OdoGroupPlace</c> applies to a fixed-length group operand (§13.18.38.4 GR8).</summary>
+    private static (int TailStart, int Elem, int Max) OdoGeometry(DataItem member, int memberWidth)
+    {
+        var table = DataItem.OdoTableOnOrBeneath(member)!;
+        int elem = table.ImageWidth, max = table.Occurs ?? 1;
+        return (memberWidth - elem * max, elem, max);
+    }
+
+    /// <summary>The image of a member holding the OCCURS DEPENDING table, truncated to the table's current count.</summary>
+    private static string OdoPrefixImage(VarPart p)
+    {
+        var (tailStart, elem, _) = OdoGeometry(p.Item!, p.Field.Width);
+        return $"{AsImageOf(p.Field)}.Substring(0, {tailStart} + __odo * {elem})";
+    }
+
+    private string CurrentPartImage(VarPart p) => p.Kind switch
+    {
+        VarPartKind.Fixed => AsImageOf(p.Field),
+        VarPartKind.OdoFixed => OdoPrefixImage(p),
+        VarPartKind.DynLeaf or VarPartKind.DynTable => CurrentMemberImage(p.Item!, agree: "true"),
+        VarPartKind.Nested => $"{p.Field.Name}.CurrentImage({OdoArgument(p.Item!)})",
+        VarPartKind.NestedTable =>
+            $"string.Concat(System.Array.ConvertAll({p.Field.Name}, __e => __e.CurrentImage()))",
+        _ => throw new InvalidOperationException($"unknown variable-length part {p.Kind}"),
+    };
+
+    /// <summary>The parameters of <c>AsVarImage</c>: the OCCURS DEPENDING count when the group holds the table
+    /// (<see cref="OdoParameter"/>) and <c>__agree</c> — whether this is a STATEMENT's read of the group, which
+    /// asks a LINKAGE dynamic-length member to agree with its DYNAMIC LENGTH clause (ISO §14.6.13.2 rule 5; kb/Work
+    /// PB1937 / PB1118), as opposed to the activation boundary's own copy-out, which references nothing.</summary>
+    private static string AsVarImageParameters(DataItem group) =>
+        DataItem.HasOdoOnOrBeneath(group) ? "int __odo, bool __agree = false" : "bool __agree = false";
+
+    private static string AsVarImageArguments(DataItem group) =>
+        DataItem.HasOdoOnOrBeneath(group) ? "__odo, __agree" : "__agree";
+
+    /// <param name="agree">null: the plain field; <c>"true"</c>: a sending read that agrees with the maximum when
+    /// the member lies in the LINKAGE SECTION — storage the activating element wrote through ITS OWN description
+    /// (§14.2.3 GR8) and which <c>PlaceRenderer.Read</c> already agrees on an elementary reference
+    /// (<c>ReadsForeignDynamicLength</c>); <c>"__agree"</c>: the same, decided at run time by the caller.</param>
+    private string CurrentMemberImage(DataItem d, string? agree = null) =>
         d.IsDynamicTable
             ? d.IsGroup ? $"{d.CsName}.CurrentImage(static __e => __e.AsImage())"
             // The element lane mirrors PhysicalModel's numLeaf rule exactly: a NATIVE numeric element goes
@@ -317,8 +370,11 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                     ? $"{d.CsName}.CurrentImage(__e => {RuntimeApi.NumFormatImageFloat("__e", d.ProfileName, d.Pic.IsSingle)})"
                     : $"{d.CsName}.CurrentImage(__e => {RuntimeApi.NumFormatImage("__e", d.ProfileName)})")
                 : $"{d.CsName}.CurrentImage(static __e => __e)"
-        : d.IsDynamicLength ? d.CsName   // §15.50.4 r7b — the current content at its current length
-        : $"{d.CsName}.CurrentImage()";  // a nested variable-length group
+        // §15.50.4 r7b — a dynamic-length leaf's current content at its current length
+        : agree is not null && d.Section is EntrySection.Linkage
+            ? agree == "true" ? RuntimeApi.DynAgree(d.CsName, d.DynMaxSize)
+                              : $"({agree} ? {RuntimeApi.DynAgree(d.CsName, d.DynMaxSize)} : {d.CsName})"
+        : d.CsName;
 
     // ── The VARIABLE-LENGTH GROUP's ACTIVATION-BOUNDARY codec (ISO §14.8.2.2 / §14.8.3.2 via §14.9.4.3 SR25;
     //    kb/Work PB204) ─────────────────────────────────────────────────────────────────────────────────────
@@ -336,35 +392,57 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         /// components join ours in place, because §8.5.1.12 is stated over relative byte positions and is blind
         /// to the declaration tree.</summary>
         Nested,
+        /// <summary>A FIXED-OCCURS table of variable-length group elements — <c>Occurs</c> times <see cref="Nested"/>,
+        /// each occurrence flattened in place in order. The multiplicity is a COMPILE-TIME fact, so the carrier's
+        /// ordinal component list still describes it (§8.5.1.12.2 puts each occurrence's dynamic-length items at
+        /// their own relative byte positions).</summary>
+        NestedTable,
+        /// <summary>A member of FIXED image that holds the group's OCCURS DEPENDING table as its trailing storage
+        /// (§13.18.38.3 SR22). Its image is the same recipe as <see cref="Fixed"/>'s, cut to the table's CURRENT
+        /// count (<c>__odo</c>); its <see cref="VarPart.FixedWidth"/> is the MAXIMUM width, so every offset is the
+        /// one the maximum-length formal sees (§14.8.2.2: "the maximum length is used"). In the record layout the
+        /// table is the last variable-length component (<see cref="ContiguousLayout"/>).</summary>
+        OdoFixed,
     }
 
+    /// <param name="Occurs">For <see cref="VarPartKind.NestedTable"/>: the occurrence count; else 1.</param>
     private readonly record struct VarPart(
-        VarPartKind Kind, PhysicalModel.Physical Field, DataItem? Item, int FixedWidth, int DynCount);
+        VarPartKind Kind, PhysicalModel.Physical Field, DataItem? Item, int FixedWidth, int DynCount, int Occurs = 1);
 
-    /// <summary>A variable-length group's members classified for the boundary carrier, in PHYSICAL order — the
-    /// same <see cref="PhysicalModel.PhysicalChildrenOf"/> order and the same dynamic-member selection
-    /// <see cref="EmitCurrentImageMethod"/> uses, so the DISPLAY format and the crossing can never disagree
-    /// about what a member is.</summary>
+    /// <summary>A variable-length group's members classified, in PHYSICAL order — the ONE classification the
+    /// DISPLAY / WRITE composer (<see cref="EmitCurrentImageMethod"/>), the activation-boundary carrier
+    /// (<see cref="EmitVarImageMethods"/>) and the record layout (<see cref="ContiguousLayout"/>) all read, so the
+    /// format on screen, the crossing and the file image can never disagree about what a member is. The gate that
+    /// admits a group (<c>DataItem.CurrentExtentImageCapable</c>) has the same five member kinds.</summary>
     private List<VarPart> VarParts(DataItem group)
     {
-        var dyn = group.Children
+        var composite = group.Children
             .Where(c => c.RedefinesTargetName is null && (c.IsGroup || c.IsElementary)
-                && (c.IsDynamicTable || c.IsDynamicLength || (c.IsGroup && !c.IsImageCapable)))
+                && (c.IsDynamicTable || c.IsDynamicLength || (c.IsGroup && !c.IsImageCapable)
+                    || DataItem.HasOdoOnOrBeneath(c)))
             .ToDictionary(c => c.CsName, StringComparer.Ordinal);
         var parts = new List<VarPart>();
         foreach (var f in phys.PhysicalChildrenOf(group))
         {
-            if (!dyn.TryGetValue(f.Name, out var d))
+            if (!composite.TryGetValue(f.Name, out var d))
             {
                 parts.Add(new VarPart(VarPartKind.Fixed, f, null, f.Width, 0));
                 continue;
             }
             parts.Add(d.IsDynamicLength ? new VarPart(VarPartKind.DynLeaf, f, d, 0, 1)
                 : d.IsDynamicTable ? new VarPart(VarPartKind.DynTable, f, d, 0, 1)
+                : d.IsImageCapable ? new VarPart(VarPartKind.OdoFixed, f, d, f.Width, 0)
+                : d.Occurs is { } n ? new VarPart(VarPartKind.NestedTable, f, d, n * VarFixedWidth(d), n * VarComponentCount(d), n)
                 : new VarPart(VarPartKind.Nested, f, d, VarFixedWidth(d), VarComponentCount(d)));
         }
         return parts;
     }
+
+    /// <summary>The width, in the group's fixed run, of the OCCURS DEPENDING table it holds at its maximum
+    /// (zero for a group without one) — what the record layout takes out of the fixed run to make the table a
+    /// variable-length component.</summary>
+    private static int OdoTailWidth(DataItem group) =>
+        DataItem.OdoTableOnOrBeneath(group) is { } t ? t.ImageWidth * (t.Occurs ?? 1) : 0;
 
     /// <summary>The character width of a variable-length group's FIXED run — its image with every
     /// variable-length component collapsed to nothing. This is the §8.5.1.12.3 accounting the compatibility
@@ -387,7 +465,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     {
         var parts = VarParts(group);
         int totalFixed = parts.Sum(p => p.FixedWidth);
-        using (w.Block("public readonly CobolVarGroup AsVarImage()"))
+        using (w.Block($"public readonly CobolVarGroup AsVarImage({AsVarImageParameters(group)})"))
         {
             var fixedParts = new List<string>();
             var dynParts = new List<string>();
@@ -399,22 +477,31 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                     case VarPartKind.Fixed:
                         if (p.Field.Width > 0 || p.Field.BitRun is not null) fixedParts.Add(AsImageOf(p.Field));
                         break;
+                    case VarPartKind.OdoFixed:
+                        // Rides the fixed run at the table's CURRENT count (the maximum at a boundary — the
+                        // caller passes it): the carrier's fixed run is then as long as the sender's group is.
+                        fixedParts.Add(OdoPrefixImage(p));
+                        break;
                     case VarPartKind.DynLeaf:
                     case VarPartKind.DynTable:
-                        dynParts.Add(CurrentMemberImage(p.Item!));
+                        dynParts.Add(CurrentMemberImage(p.Item!, agree: "__agree"));
                         break;
                     case VarPartKind.Nested:
-                        // The nested group's own carrier, spliced in place: its fixed run extends ours and its
-                        // components take the next p.DynCount slots (the flattening §8.5.1.12 requires).
-                        w.Line($"var __n{n} = {p.Field.Name}.AsVarImage();");
+                    case VarPartKind.NestedTable:
+                        // The nested group's own carrier (every occurrence's, in order, for a table), spliced in
+                        // place: its fixed run extends ours and its components take the next p.DynCount slots
+                        // (the flattening §8.5.1.12 requires).
+                        w.Line(p.Kind is VarPartKind.Nested
+                            ? $"var __n{n} = {p.Field.Name}.AsVarImage({AsVarImageArguments(p.Item!)});"
+                            : $"var __n{n} = {RuntimeApi.VarGroupConcat($"System.Array.ConvertAll({p.Field.Name}, __e => __e.AsVarImage(__agree))")};");
                         fixedParts.Add($"__n{n}.Fixed");
-                        for (int k = 0; k < p.DynCount; k++) dynParts.Add($"__n{n}.Dyn({k})");
+                        dynParts.Add($".. __n{n}.Dynamic");
                         n++;
                         break;
                 }
             }
             w.Line($"return new CobolVarGroup({(fixedParts.Count > 0 ? string.Join(" + ", fixedParts) : "\"\"")}, "
-                + $"new string[] {{ {string.Join(", ", dynParts)} }});");
+                + $"[{string.Join(", ", dynParts)}]);");
         }
         // THE FILE-RECORD HALF (determination D-FRA; kb/Work PB981): a record read back as ONE contiguous image
         // (§8.5.1.11.2 — what CurrentImage() wrote) is decomposed into this same carrier by the ONE split rule,
@@ -428,16 +515,23 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // component's DYNAMIC LENGTH STRUCTURE (kb/Work PB1094), so the same object frames the record on the way out
         // (MediumImage) and unframes it on the way in (Decompose).
         w.Line($"private static readonly CobolContiguousLayout {RuntimeApi.ContiguousLayoutField} = "
-            + RuntimeApi.ContiguousLayoutNew(totalFixed, layout.Select(l => l.FixedAt),
-                layout.Select(l => l.Unit), layout.Select(l => l.MaxUnits), layout.Select(l => l.Structure)) + ";");
+            + RuntimeApi.ContiguousLayoutNew(totalFixed - OdoTailWidth(group), layout.Select(l => l.FixedAt),
+                layout.Select(l => l.Unit), layout.Select(l => l.MaxUnits), layout.Select(l => l.Structure),
+                odoTail: OdoTailWidth(group) > 0) + ";");
         w.Line($"public readonly CobolContiguousLayout {RuntimeApi.ContiguousLayoutProperty} => "
             + $"{RuntimeApi.ContiguousLayoutField};");
         // ⛔ THE EXTENT TABLE (D-FRA (v); kb/Work PB1053): the WRITE / REWRITE / RELEASE side sends where each
         // component of CurrentImage() ends, and the READ / RETURN side decomposes by it when it describes the record
         // received — so every layout round-trips, however many variable-length members flank a fixed one.
-        w.Line($"public readonly RecordExtents CurrentExtents() => {RuntimeApi.ContiguousLayoutField}.ExtentsOf(AsVarImage());");
+        w.Line($"public readonly RecordExtents CurrentExtents({OdoParameter(group)}) => "
+            + $"{RuntimeApi.ContiguousLayoutField}.ExtentsOf(AsVarImage({OdoArgument(group)}));");
         w.Line($"public void FromContiguousImage(string __r, RecordExtents? __e, bool __fixedForm = false) => FromVarImage({RuntimeApi.ContiguousLayoutField}.Decompose(__r, __e, __fixedForm));");
-        using (w.Block("public void FromVarImage(CobolVarGroup __v)"))
+        // ⛔ __storage (kb/Work PB1937) — the boundary copy-in of a LINKAGE formal: §14.2.3 GR8 makes the formal
+        // "occupy the same storage area as the argument", so a dynamic-length member keeps the argument's WHOLE
+        // content even when this description's LIMIT is smaller (the shortened copy was then written back over the
+        // caller's). A read through this description agrees with its maximum (CurrentMemberImage: §14.6.13.2 rule 5,
+        // kb/Work PB1118); every other store — a MOVE into the group — still truncates (§8.5.1.10.4).
+        using (w.Block("public void FromVarImage(CobolVarGroup __v, bool __storage = false)"))
         {
             w.Line($"string __s = {RuntimeApi.StrStore("__v.Fixed", $"{totalFixed}")};");
             int off = 0, dynAt = 0;
@@ -446,13 +540,22 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                 switch (p.Kind)
                 {
                     case VarPartKind.Fixed:
+                    case VarPartKind.OdoFixed:   // the whole maximum width: a carrier shorter than it pads (StrStore above)
                         EmitMemberFromImage(p.Field, off, w);
                         off += p.Field.Width;
+                        break;
+                    case VarPartKind.NestedTable:
+                        using (w.Block($"for (int __i = 0; __i < {p.Occurs}; __i++)"))
+                            w.Line($"{p.Field.Name}[__i].FromVarImage(__v.Slice({off} + __i * {p.FixedWidth / p.Occurs}, "
+                                + $"{p.FixedWidth / p.Occurs}, {dynAt} + __i * {p.DynCount / p.Occurs}, {p.DynCount / p.Occurs}), __storage);");
+                        off += p.FixedWidth;
+                        dynAt += p.DynCount;
                         break;
                     case VarPartKind.DynLeaf:
                         // §8.5.1.10.4 — the receiving store for a dynamic-length item: replace, truncate on the
                         // right to the LIMIT, never pad. The component IS the item's whole current content.
-                        w.Line($"{p.Field.Name} = {RuntimeApi.DynStore($"__v.Dyn({dynAt})", $"{p.Item!.DynMaxSize}")};");
+                        w.Line($"{p.Field.Name} = __storage ? __v.Dyn({dynAt}) : "
+                            + $"{RuntimeApi.DynStore($"__v.Dyn({dynAt})", $"{p.Item!.DynMaxSize}")};");
                         dynAt++;
                         break;
                     case VarPartKind.DynTable:
@@ -476,7 +579,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                         dynAt++;
                         break;
                     case VarPartKind.Nested:
-                        w.Line($"{p.Field.Name}.FromVarImage(__v.Slice({off}, {p.FixedWidth}, {dynAt}, {p.DynCount}));");
+                        w.Line($"{p.Field.Name}.FromVarImage(__v.Slice({off}, {p.FixedWidth}, {dynAt}, {p.DynCount}), __storage);");
                         off += p.FixedWidth;
                         dynAt += p.DynCount;
                         break;
@@ -503,6 +606,18 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                 case VarPartKind.DynLeaf: layout.Add((off, 1, p.Item!.DynMaxSize, FileModel.StructureOf(p.Item)?.Code ?? 0)); break;
                 case VarPartKind.DynTable: layout.Add((off, p.Field.Width, p.Item!.OccursSpec?.Max ?? 0, 0)); break;
                 case VarPartKind.Nested: ContiguousLayout(p.Item!, off, layout); off += p.FixedWidth; break;
+                case VarPartKind.NestedTable:
+                    for (int i = 0; i < p.Occurs; i++) ContiguousLayout(p.Item!, off + i * (p.FixedWidth / p.Occurs), layout);
+                    off += p.FixedWidth;
+                    break;
+                case VarPartKind.OdoFixed:
+                    // The OCCURS DEPENDING table is a variable-length COMPONENT of the record: one element per
+                    // unit, up to its maximum. §13.18.38.3 SR22 makes it the record's trailing storage, so it is
+                    // the last component and the record's own length says how many occurrences it holds.
+                    var (tailStart, elem, max) = OdoGeometry(p.Item!, p.Field.Width);
+                    layout.Add((off + tailStart, elem, max, 0));
+                    off += p.Field.Width - elem * max;   // the table itself leaves the FIXED run
+                    break;
             }
     }
 

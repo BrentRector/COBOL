@@ -624,7 +624,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // reference form does not. The guard also carries the omission on, per GR1c.
             string snapshot = CrossingOf(p) switch
             {
-                CallCrossing.VarGroup => RuntimeApi.VarGroupCell(PlaceRenderer.VarGroupImage(p, "CALL argument")),
+                CallCrossing.VarGroup => RuntimeApi.VarGroupCell(PlaceRenderer.VarGroupBoundaryImage(p, "CALL argument")),
                 CallCrossing.Text => $"ManagedPointer<string>.Cell({CallContentRead(p)})",
                 // Native and Managed both snapshot the storage's own value into a detached cell of its own
                 // carrier — §14.2.3 GR9/GR10's allocated record, whose filling is "a COMPUTE statement without
@@ -880,7 +880,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         // §14.8.2.2's variable-length sentence, realized (kb/Work PB204): the carrier is the group's
         // current-extent components, aliased through the SAME OverField shape every other form uses.
         CallCrossing.VarGroup => RuntimeApi.VarGroupOverField(
-            PlaceRenderer.VarGroupImage(p, "CALL argument"),
+            PlaceRenderer.VarGroupBoundaryImage(p, "CALL argument"),
             PlaceRenderer.WriteVarGroupImage(p, "__v", "CALL boundary copy into")),
         CallCrossing.Text =>
             $"ManagedPointer<string>.OverField(() => {CallStringRead(p)}, __v => {{ {CallStringWrite(p, "__v")} }})",

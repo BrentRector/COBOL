@@ -104,7 +104,8 @@ internal static class VariableLengthCompatibility
     /// <summary>The group's byte layout as a FLAT left-to-right atom sequence: REDEFINES subtrees dropped
     /// (§8.5.1.12.1), scalar subordinate groups flattened (relative byte position is nesting-blind), a table
     /// kept WHOLE (its element description is the recursion subject of §8.5.1.12.3 sentence 2, not something to
-    /// flatten through).</summary>
+    /// flatten through) — except a FIXED-OCCURS table whose element is itself a variable-length group, which is
+    /// unrolled occurrence by occurrence (each occurrence's dynamic-length items are items of the group).</summary>
     private static void Atoms(DataItem g, List<Atom> into)
     {
         foreach (var c in g.Children)
@@ -112,6 +113,13 @@ internal static class VariableLengthCompatibility
             if (c.RedefinesTargetName is not null || !(c.IsGroup || c.IsElementary)) continue;
             if (c.IsDynamicTable)
                 into.Add(new Atom(AtomKind.Table, c, c.ByteWidth, DynamicCapacity: true, c.ByteWidth, c.ImageWidth));
+            else if (c.Occurs is { } times && c.IsGroup && c.OccursSpec?.DependingName is null
+                     && ReferenceResolver.HasVariableLengthSubordinate(c))
+                // A FIXED-OCCURS table whose element is a variable-length group (kb/Work PB244): every occurrence
+                // holds its own dynamic-length items "at the same relative byte positions" (§8.5.1.12.2), so the
+                // table is not an atom — it is `times` flattened copies of its element, exactly as the emitted
+                // carrier flattens them (GroupImageCodec VarPartKind.NestedTable).
+                for (int i = 0; i < times; i++) Atoms(c, into);
             else if (c.Occurs is { } n)
                 // A fixed-OCCURS or OCCURS DEPENDING table takes its MAXIMUM length — §14.8.2.2's own sentence
                 // for an occurs-depending group passed by reference, and §8.5.1.12.3 sentence 3's "its fixed

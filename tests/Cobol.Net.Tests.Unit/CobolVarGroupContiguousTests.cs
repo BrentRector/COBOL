@@ -100,4 +100,54 @@ public sealed class CobolVarGroupContiguousTests
         Assert.Equal(8, layout.Position(record, 1));
         Assert.Equal("20", record.Substring(layout.Position(record, 1), 2));
     }
+
+    // ── kb/Work PB244 shape (b): the OCCURS DEPENDING table as the record's trailing component ─────────────────
+    // Record H X(1) · D dynamic (max 5) · T X(1) OCCURS 1 TO 3 DEPENDING: the activation-boundary carrier holds T in
+    // its fixed run (fixed "H" + T at its current count), the record layout makes T the LAST component.
+
+    [Fact]
+    public void SplitTail_MovesTheTrailingFixedMaterial_IntoOneMoreComponent()
+    {
+        var carrier = new CobolVarGroup("Hxy", ["abc"]);
+        var split = carrier.SplitTail(1);
+        Assert.Equal("H", split.Fixed);
+        Assert.Equal(["abc", "xy"], split.Dynamic);
+        var rejoined = split.JoinTail(1);
+        Assert.Equal(carrier.Fixed, rejoined.Fixed);
+        Assert.Equal(carrier.Dynamic, rejoined.Dynamic);
+    }
+
+    [Fact]
+    public void ATailCarrierShorterThanTheTailStart_IsPaddedNotFaulted()
+    {
+        var split = new CobolVarGroup("", []).SplitTail(2);
+        Assert.Equal("  ", split.Fixed);
+        Assert.Equal([""], split.Dynamic);
+    }
+
+    [Fact]
+    public void OdoTailLayout_DecomposesARecordByTheTablesCurrentCount_AndRoundTripsItsExtents()
+    {
+        // fixed run 1 ("H"); D at fixed offset 1 (unit 1, max 5); T at fixed offset 1 (unit 1, max 3, the tail).
+        var layout = new CobolContiguousLayout(1, [1, 1], [1, 1], [5L, 3L], OdoTail: true);
+        var sent = new CobolVarGroup("Hxy", ["abc"]);                // the carrier AsVarImage(2) composes
+        var extents = layout.ExtentsOf(sent);
+        Assert.Equal([3, 2], extents.Lengths);                        // D "abc", T "xy"
+        Assert.Equal([1], layout.ComponentOffsets);                  // the carrier has ONE component: D
+        var back = layout.Decompose("Habcxy", extents);
+        Assert.Equal("Hxy", back.Fixed);
+        Assert.Equal(["abc"], back.Dynamic);
+        // the take step, with no table: D (the EARLIER component) takes the whole excess up to its maximum
+        var taken = layout.Decompose("Habcde");
+        Assert.Equal("abcde", taken.Dyn(0));
+        Assert.Equal("H", taken.Fixed);
+    }
+
+    [Fact]
+    public void Concat_JoinsEveryOccurrencesFixedRunAndComponents_InOrder()
+    {
+        var joined = CobolVarGroup.Concat([new CobolVarGroup("a1", ["ab"]), new CobolVarGroup("c2", ["c"])]);
+        Assert.Equal("a1c2", joined.Fixed);
+        Assert.Equal(["ab", "c"], joined.Dynamic);
+    }
 }

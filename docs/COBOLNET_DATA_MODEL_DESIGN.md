@@ -1147,7 +1147,26 @@ variable side's component offsets — fixed material and component pairs in orde
 space extension (a dynamic-length item at its current length, a table element-wise with the larger table's remainder
 against spaces, §14.6.9.3). The relation is screened at bind by §8.5.1.12.1 through the MOVE's own reader
 (`VariableLengthCompatibility.PairRefusal`) → **COBOLNET2492**. Only the operations that genuinely need a FIXED record
-window (WRITE/RELEASE) and the two shapes the composer cannot reach (CONFORMANCE.md A.1 item 57) stay staged LOUD.
+window (WRITE/RELEASE) and the shapes the composer cannot reach (CONFORMANCE.md A.1 item 57) stay staged LOUD.
+
+**The component model of a variable-length group (kb/Work PB244 shape (b)).** `GroupImageCodec.VarParts` is the ONE
+classification of a variable-length group's members, read by the DISPLAY/WRITE composer (`CurrentImage`), the
+boundary carrier (`AsVarImage`/`FromVarImage`) and the record layout (`CobolContiguousLayout`), and
+`DataItem.CurrentExtentComposes` is the matching gate, so the format on screen, the crossing and the file image
+cannot disagree about a member. The member kinds: **Fixed** (the member-image law), **DynLeaf**, **DynTable**,
+**Nested** (a scalar variable-length group, flattened in place), **NestedTable** (a FIXED-OCCURS table of
+variable-length elements: `Occurs` flattened copies, a compile-time multiplicity — also `Atoms`' unrolling in the
+§8.5.1.12 correspondence and the per-occurrence `FUNCTION LENGTH` walk) and **OdoFixed** (a member of fixed image
+that holds the group's OCCURS DEPENDING table as its trailing storage, §13.18.38.3 SR22). The OCCURS DEPENDING count
+reaches the struct as the `__odo` parameter of `CurrentImage` / `AsVarImage` / `CurrentExtents` (a group that holds
+the table; `GroupImageCodec.OdoParameter`), supplied by `PlaceRenderer.PeelOdo` from the operand's `OdoGroupPlace`:
+the clamped CURRENT count for a statement's operand (§13.18.38.4 GR8), the MAXIMUM at an activation boundary
+(`VarGroupBoundaryImage`; §14.8.2.2). The boundary carrier holds the table in its fixed run (a shorter fixed run
+when the count is smaller); the record layout makes it the LAST variable-length component (`OdoTail`:
+`CobolContiguousLayout` converts at its two doors with `CobolVarGroup.SplitTail`/`JoinTail`), because the record's own
+length — not a constant — says how many occurrences it holds. Still outside: a runtime-length item inside an OCCURS
+DEPENDING or dynamic-capacity table's element (a run-time multiplicity of components) and a cell-backed group
+holding both a dynamic-length item and the table.
 
 **CORE ships whole:** declaration (all phrases, order-independent) · out-of-line growable storage · CAPACITY
 read + SET Format 14 write · implicit + explicit growth · INITIALIZED seeding · bounds/capacity ECs

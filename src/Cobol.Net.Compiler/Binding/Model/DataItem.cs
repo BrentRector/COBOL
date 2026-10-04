@@ -892,16 +892,18 @@ public sealed class DataItem
         || (IsElementary ? SlotWindow.CarriedBySlot(this) : IsGroup && Children.All(c => c.TransferImageCapable));
 
     /// <summary>True when this item is a VARIABLE-LENGTH GROUP (ISO §8.5.1.12.1) whose CURRENT-EXTENT image is
-    /// well defined: every member is <see cref="IsImageCapable"/>, a dynamic-length leaf (its current content IS
-    /// its image), a dynamic-capacity table of <see cref="ElementImageCapable"/> elements, or a nested SCALAR
-    /// variable-length group satisfying the same. This is the §14.9.11.4 GR7 documented DISPLAY format's gate
-    /// (kb/Work PB164 — A.1 item 57) AND the §14.8.2.2 / §14.8.3.2 activation-boundary crossing's gate
-    /// (kb/Work PB204): ONE capability, because both need exactly the same thing — every component's extent
-    /// known to the group's own struct.
-    /// <para>⚠ A runtime-length item INSIDE a table element stays OUT — deliberately the SAME boundary as the
-    /// §15.50.4 r7 LENGTH sum's named stage (<c>IntrinsicBinder.VariableLengthGroupSum</c>), so DISPLAY,
-    /// FUNCTION LENGTH and the boundary crossing agree about which groups have a defined current extent.
-    /// (Since the R40 INDEX pin no LEAF KIND excludes a group — only the shapes here do.)</para>
+    /// well defined: every member satisfies <see cref="CurrentExtentComposes"/> (a fixed image, with or without
+    /// the group's OCCURS DEPENDING table as its trailing storage; a dynamic-length leaf; a dynamic-capacity table;
+    /// a nested scalar variable-length group; a fixed-OCCURS table of variable-length group elements). This is
+    /// the §14.9.11.4 GR7 documented DISPLAY format's gate (kb/Work PB164 — A.1 item 57) AND the §14.8.2.2 /
+    /// §14.8.3.2 activation-boundary crossing's gate (kb/Work PB204): ONE capability, because both need exactly
+    /// the same thing — every component's extent known to the group's own struct (the OCCURS DEPENDING count
+    /// arrives as the <c>__odo</c> parameter of its methods).
+    /// <para>⚠ The one shape that stays OUT is a runtime-length item inside an OCCURS DEPENDING or dynamic-capacity
+    /// table's element (a run-time MULTIPLICITY of components) — deliberately the SAME boundary as the §15.50.4 r7
+    /// LENGTH sum's named stage (<c>IntrinsicBinder.VariableLengthGroupSum</c>), so DISPLAY, FUNCTION LENGTH and
+    /// the boundary crossing agree about which groups have a defined current extent. (Since the R40 INDEX pin no
+    /// LEAF KIND excludes a group — only the shapes here do.)</para>
     /// <para>⛔ MOVED HERE FROM <c>GroupImageCodec</c> at the PB204 landing. It was a CODEGEN predicate that a
     /// BIND-time screen now has to ask (§14.8.2.2's compatibility sentence admits the crossing, so the binder
     /// must know whether this compiler can carry it); a bind phase consulting a codegen class is the layering
@@ -910,25 +912,48 @@ public sealed class DataItem
     public bool CurrentExtentImageCapable =>
         IsGroup && CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(this)
         && Children.Where(c => c.RedefinesTargetName is null && (c.IsGroup || c.IsElementary))
-            .All(c =>
-                // ⛔ An OCCURS DEPENDING on or beneath a member stays OUT (the PB164 review fleet's repro: the
-                // fixed-member lane renders an ODO table at its MAXIMUM occurrences while the §15.50.4 r4b
-                // LENGTH sum counts the CURRENT count — and the composer CANNOT take the current extent,
-                // because the composing method is a struct instance method while data-name-1 may live outside
-                // the group entirely; the LENGTH sum reads it through the operand's access path, a mechanism a
-                // struct method does not have). Loud beats a wrong width.
-                !HasOdoOnOrBeneath(c)
-                && (c.IsImageCapable
-                    || (c.IsDynamicLength && c.IsElementary)
-                    || (c.IsDynamicTable && c.ElementImageCapable)
-                    // A nested variable-length group composes ONLY as a SCALAR member. ⛔ Discriminated by
-                    // !IsDynamicTable, NOT by `Occurs is null` alone — a Format-4 DYNAMIC-capacity table
-                    // also carries Occurs == null (the PB164 fleet's CRITICAL: the first cut re-admitted
-                    // through this arm the very dynamic-table-with-runtime-length-element shape arm 3
-                    // rejects, and the emission was uncompilable C# on legal source that never referenced the
-                    // group). Under a fixed OCCURS of its own it is the in-element runtime-length shape (the
-                    // pb62 corpus case).
-                    || (c.IsGroup && !c.IsDynamicTable && c.Occurs is null && c.CurrentExtentImageCapable)));
+            .All(CurrentExtentComposes);
+
+    /// <summary>⛔ THE ONE MEMBER LAW of <see cref="CurrentExtentImageCapable"/> (kb/Work PB244): can the group's
+    /// own struct compose <paramref name="c"/>'s CURRENT extent? The five arms are the five member kinds
+    /// <c>GroupImageCodec.VarParts</c> classifies, so the gate and the composer cannot disagree about a member.
+    /// <list type="number">
+    /// <item>A member with a fixed image (<see cref="IsImageCapable"/>), including one that holds the group's
+    /// OCCURS DEPENDING table as its trailing storage (<see cref="OdoTableOnOrBeneath"/>): the composer takes the
+    /// table's CURRENT count as a parameter of its methods (<c>__odo</c>), supplied from the operand's access path
+    /// by <c>PlaceRenderer</c> — the PB164 fleet's reason for refusing it (the composing method is a struct
+    /// instance method, and data-name-1 may live outside the group) is exactly the parameter.</item>
+    /// <item>A dynamic-length elementary item (its current content IS its image).</item>
+    /// <item>A dynamic-capacity table of image-capable elements.</item>
+    /// <item>A nested SCALAR variable-length group. ⛔ Discriminated by <c>!IsDynamicTable</c>, NOT by
+    /// <c>Occurs is null</c> alone — a Format-4 dynamic-capacity table also carries <c>Occurs == null</c> (the
+    /// PB164 fleet's CRITICAL: the first cut re-admitted through this arm the dynamic-table-with-runtime-length-
+    /// element shape arm 3 rejects, and the emission was uncompilable C# on legal source).</item>
+    /// <item>A FIXED-OCCURS table of variable-length group elements (§8.5.1.12.1 "has at least one dynamic-length
+    /// elementary item … as a subordinate item" does not exempt a table element): every occurrence is its own
+    /// variable-length group and carries its own components, so the table contributes <c>Occurs</c> times the
+    /// element's components — a count known at compile time. An OCCURS DEPENDING table of such elements has a
+    /// RUN-TIME multiplicity of components and stays outside (the SR22 trailing table would have to carry a
+    /// per-occurrence layout the carrier's ordinal component list cannot express).</item>
+    /// </list>
+    /// A group holding USAGE BIT items is outside the ODO arm: its extent is a §8.5.1.6.3 bit layout, not a
+    /// character prefix.</summary>
+    private static bool CurrentExtentComposes(DataItem c) =>
+        c.IsImageCapable ? !HasOdoOnOrBeneath(c) || (!c.HasBitDescendant && OdoTableOnOrBeneath(c) is not null)
+        : (c.IsDynamicLength && c.IsElementary)
+          || (c.IsDynamicTable && c.ElementImageCapable && !HasOdoOnOrBeneath(c))
+          || (c.IsGroup && !c.IsDynamicTable && c.Occurs is null && c.CurrentExtentImageCapable)
+          || (c.IsGroup && !c.IsDynamicTable && c.Occurs is not null && c.OccursSpec?.DependingName is null
+              && !HasOdoOnOrBeneath(c) && c.CurrentExtentImageCapable);
+
+    /// <summary>The OCCURS DEPENDING table that is <paramref name="c"/> itself or lies beneath it, or null.
+    /// §13.18.38.3 SR22 lets an occurs-depending subject be followed within its record only by entries
+    /// subordinate to it, so at most one such table lies on any group's chain and it is the TRAILING storage of
+    /// every group that contains it — the fact the current-extent composer's character-prefix law rests on.</summary>
+    internal static DataItem? OdoTableOnOrBeneath(DataItem c) =>
+        c.OccursSpec?.DependingName is not null ? c
+        : c.IsGroup ? c.Children.Where(m => m.RedefinesTargetName is null).Select(OdoTableOnOrBeneath).FirstOrDefault(t => t is not null)
+        : null;
 
     /// <summary>⛔ THE ONE "can this item cross an activation boundary as an image?" predicate (kb/Work PB204):
     /// a fixed-length group through its <c>AsImage</c>/<c>FromImage</c> record codec, a variable-length group

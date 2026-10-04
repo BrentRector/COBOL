@@ -582,7 +582,7 @@ internal sealed class ProgramEmitter
                         w.Line(LoudStmt($"LINKAGE formal '{f.Item.CobolName}' is not resolvable to storage"));
                     else if (crossing is CallCrossing.VarGroup)
                         w.Line(PlaceRenderer.WriteVarGroupImage(place, $"{f.CarrierField}.Value",
-                            "LINKAGE formal copy-in of"));
+                            "LINKAGE formal copy-in of", formalStorage: true));
                     else if (crossing is CallCrossing.Text)
                         w.Line(CallEmitter.CallStringWrite(place, $"{f.CarrierField}.Value"));
                     else
@@ -610,7 +610,7 @@ internal sealed class ProgramEmitter
                     w.Line(crossing switch
                     {
                         CallCrossing.VarGroup =>
-                            $"{f.CarrierField}.Value = {PlaceRenderer.VarGroupImage(place, "LINKAGE formal copy-out of")};",
+                            $"{f.CarrierField}.Value = {PlaceRenderer.VarGroupBoundaryImage(place, "LINKAGE formal copy-out of")};",
                         CallCrossing.Text => $"{f.CarrierField}.Value = {CallEmitter.CallStringRead(place)};",
                         _ => $"{f.CarrierField}.Value = {PlaceRenderer.Read(place)};",
                     });
@@ -638,7 +638,7 @@ internal sealed class ProgramEmitter
     {
         string? layout = CallEmitter.BoundaryLayout(ret);
         if (CallEmitter.CallPlaceIsVarGroup(ret))
-            return RuntimeApi.ArgAdaptStoreReturn("__ret", PlaceRenderer.VarGroupImage(ret, "RETURNING item"), layout!);
+            return RuntimeApi.ArgAdaptStoreReturn("__ret", PlaceRenderer.VarGroupBoundaryImage(ret, "RETURNING item"), layout!);
         string? profile = ret.DenotedItem is { Pic: { Category: PicCategory.Numeric, IsFloat: false, Usage: not Usage.Index } } item
             ? item.ProfileName : null;
         if (CallEmitter.CallPlaceIsString(ret))

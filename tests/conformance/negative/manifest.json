@@ -1811,6 +1811,8 @@
   "pb1025-sort-key-after-dynamic-beyond-minimum",
   "pb1025-alternate-key-beyond-minimum",
   "pb1053-dynamic-members-both-sides-at-2002",
+  "pb244-vlg-display-odo-at-2002",
+  "pb1937-vlg-formal-limit-at-2002",
   "pb361-use-outside-declaratives",
   "pb362-goto-into-declarative",
   "pb363-generate-in-before-reporting",

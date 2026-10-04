@@ -1699,11 +1699,17 @@ internal static class RuntimeApi
     /// a variable-length member precedes (D-KWV; kb/Work PB1025). Emitted once per record type as the static
     /// field <see cref="ContiguousLayoutField"/>.</summary>
     public static string ContiguousLayoutNew(int fixedTotal, IEnumerable<int> fixedAt,
-        IEnumerable<int> unit, IEnumerable<long> maxUnits, IEnumerable<int> structure) =>
+        IEnumerable<int> unit, IEnumerable<long> maxUnits, IEnumerable<int> structure, bool odoTail = false) =>
         $"new {nameof(CobolContiguousLayout)}({fixedTotal}, "
         + $"new int[] {{ {string.Join(", ", fixedAt)} }}, new int[] {{ {string.Join(", ", unit)} }}, "
         + $"new long[] {{ {string.Join(", ", maxUnits.Select(m => $"{m}L"))} }}"
-        + (structure.Any(c => c != 0) ? $", new int[] {{ {string.Join(", ", structure)} }}" : "") + ")";
+        + (structure.Any(c => c != 0) ? $", new int[] {{ {string.Join(", ", structure)} }}" : "")
+        + (odoTail ? ", OdoTail: true" : "") + ")";   // the constructor parameter of that name
+
+    /// <summary>The carrier of a fixed-OCCURS table of variable-length group elements: every occurrence's
+    /// <c>AsVarImage()</c> concatenated, fixed runs and components in occurrence order (<c>CobolVarGroup.Concat</c>).</summary>
+    public static string VarGroupConcat(string carriersExpr) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Concat)}({carriersExpr})";
 
     /// <summary>A dynamic-length ELEMENTARY RECORD's image framed by its DYNAMIC LENGTH STRUCTURE — ISO §12.3.7.4 GR18
     /// length field, data, GR19 delimiter (<c>CobolDynStructure.FrameWith</c>; kb/Work PB1094). A group record frames

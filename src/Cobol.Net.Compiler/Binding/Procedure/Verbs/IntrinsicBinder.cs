@@ -2355,10 +2355,23 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     Add(new BoundOdoExtent(odo.Depending, spec.Min, max, 0, elem)
                         { BasedAddress = group.Class?.BasedPointerField });   // null for a non-BASED class
                 }
-                else if (c.Occurs is not null)
+                else if (c.Occurs is { } times)
                 {
                     // A fixed table: wholly inside ByteWidth — unless an occurrence carries a runtime length.
-                    if (HasRuntimeLength(c) || c.IsDynamicLength)
+                    // Then each occurrence is its OWN variable-length group (§8.5.1.12.1: a dynamic-length item
+                    // "as a subordinate item" is not exempted by a table above it), and the table's length is the
+                    // sum of its occurrences' — the walk is repeated per occurrence, over the occurrence's own
+                    // access path, and ByteWidth already counted each occurrence's dynamic items as zero. The
+                    // SAME member kind the current-extent composer calls a NestedTable (GroupImageCodec), so
+                    // DISPLAY, LENGTH and the boundary agree about which groups have a current extent.
+                    bool perOccurrence = c.IsGroup && !HasOdoBeneath(c)
+                                         && HasRuntimeLength(c) && cPath is not null;
+                    if (perOccurrence)
+                    {
+                        for (int i = 1; i <= times && failure is null; i++)
+                            Walk(c, cPath!.Add(new FixedTableSegment(i.ToString())));
+                    }
+                    else if (HasRuntimeLength(c) || c.IsDynamicLength)
                     { failure = Stage($"the table '{c.CobolName ?? c.CsName}' has a runtime-length element — a per-occurrence sum"); return; }
                 }
                 else if (c.IsDynamicLength)

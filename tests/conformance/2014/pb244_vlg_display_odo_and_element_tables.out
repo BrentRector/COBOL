@@ -1,0 +1,10 @@
+A1=[Habcxy] 6
+A2=[Habcxyz] 7
+A3=[Habcx] 5
+B1=[hab1c2] 6
+B2=[hzzz1c2] 7
+B3=[hzzz1c2] 7
+B3 EQ
+B4 NE
+C1=[qPPm] 4
+C2=[qPPmno] 6

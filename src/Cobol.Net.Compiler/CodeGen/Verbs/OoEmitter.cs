@@ -51,7 +51,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     private string MethodBoundaryValue(DataEmitter fields, DataItem root, string what) =>
         fields.MethodRedefinesBackingDecl(root) is { } bk ? bk.Name
         : root.Class is { Tier: RedefinesTier.StringCanonical, IsCellBacked: true } ? MethodCellFormalLoad(root)
-        : OoVarGroupCarried(root) ? PlaceRenderer.VarGroupImage(MethodRootPlace(root), what + " of")
+        : OoVarGroupCarried(root) ? PlaceRenderer.VarGroupBoundaryImage(MethodRootPlace(root), what + " of")
         // A bit / national group hands back its ELEMENTARY value, an alphanumeric group its image — the CALL
         // boundary's ONE read (kb/Work PB1166), so the method ABI and the program ABI cannot speak two alphabets.
         : root.IsAsIfElementary ? CallEmitter.CallStringRead(MethodRootPlace(root))
@@ -812,7 +812,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// the pair together shape by shape.</summary>
     private static string OoUnivCallerRead(Place p) =>
         p is RefModPlace ? PlaceRenderer.Read(p)
-        : CallEmitter.CallPlaceIsVarGroup(p) ? PlaceRenderer.VarGroupImage(p, "INVOKE argument")
+        : CallEmitter.CallPlaceIsVarGroup(p) ? PlaceRenderer.VarGroupBoundaryImage(p, "INVOKE argument")
         : p.Item.IsGroup ? CallEmitter.CallStringRead(p)
         : OoUnivImageBridged(p.Item) ? PlaceRenderer.Read(new NumericImagePlace(p))
         : OoUnivNativeBoxOverImage(p.Item) ? $"(object?){NumericRenderer.CarrierOfImage(PlaceRenderer.Read(p), p.Item)}"   // kb/Work PB187
@@ -996,7 +996,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                         // §8.5.1.12's component carrier (kb/Work PB204) — the variable-length twin of the
                         // image distribution, through the SAME ONE channel.
                         ? PlaceRenderer.WriteVarGroupImage(MethodRootPlace(root), formal.ParamName,
-                            "OO method LINKAGE formal copy-in of")
+                            "OO method LINKAGE formal copy-in of", formalStorage: true)
                         // A bit / national group receives its ELEMENTARY value through the CALL boundary's ONE
                         // write (kb/Work PB1166 — the twin of MethodBoundaryValue's arm).
                         : root.IsAsIfElementary ? CallEmitter.CallStringWrite(MethodRootPlace(root), formal.ParamName)
@@ -1417,14 +1417,14 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 w.Line($"{RuntimeApi.VarGroupType} {tmp} = {(a.Source is { } vgp
                     ? FixedArgumentSpans(vgp, a.Formal) is { } fs
                         ? RuntimeApi.VarGroupFromFixedImage(CallEmitter.CallStringRead(vgp), CallEmitter.LayoutArray(fs))
-                        : PlaceRenderer.VarGroupImage(vgp, "INVOKE argument")
+                        : PlaceRenderer.VarGroupBoundaryImage(vgp, "INVOKE argument")
                     : RuntimeApi.VarGroupEmpty)};");
             }
             else if (a.Source is { } vsp && VarPlaceSpans(vsp, a.Formal) is { } vs)
                 // ⛔ A VARIABLE-length group argument into a FIXED-length group formal (§14.8.2.2; kb/Work PB965):
                 // the formal reads the argument's image through the pair's correspondence, each corresponding
                 // table fitted to the formal's occurrence count (§8.5.1.12.3 sentence 3).
-                w.Line($"string {tmp} = {RuntimeApi.VarGroupToFixedImage(PlaceRenderer.VarGroupImage(vsp, "INVOKE argument"), a.Formal.ImageWidth, CallEmitter.LayoutArray(vs))};");
+                w.Line($"string {tmp} = {RuntimeApi.VarGroupToFixedImage(PlaceRenderer.VarGroupBoundaryImage(vsp, "INVOKE argument"), a.Formal.ImageWidth, CallEmitter.LayoutArray(vs))};");
             // ⛔ A BY CONTENT VALUE INTO A FLOATING-POINT FORMAL OF ANOTHER DESCRIPTION (kb/Work PB1114). §14.8.2.3.3 2)
             // a) — "the same as for a COMPUTE statement" — and §14.2.3 GR9's "a COMPUTE statement without the ROUNDED
             // phrase" have no floating-point exemption, so a fixed-point or other-usage float sender, a literal-2 or an
@@ -1580,7 +1580,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // …and its write-back OVERLAYS the argument's storage (§14.2.3 GR8): the argument's tables keep
                 // their current capacities and its material past the formal survives (kb/Work PB965).
                 Post(PlaceRenderer.WriteVarGroupImage(src,
-                    RuntimeApi.VarGroupOverlayFixedImage(PlaceRenderer.VarGroupImage(src, "INVOKE copy-out into"), tmp,
+                    RuntimeApi.VarGroupOverlayFixedImage(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into"), tmp,
                         CallEmitter.LayoutArray(wv)),
                     "INVOKE copy-out into"));
             else if (OoClassTable.LeafCarried(a.Formal))

@@ -36,8 +36,13 @@ namespace CobolNet.Runtime;
 /// (<see cref="CobolDynStructure.Frame"/>). A WRITE / REWRITE / RELEASE converts once on the way out
 /// (<see cref="MediumImage"/> + <see cref="MediumExtents"/>); a READ / RETURN converts back once in
 /// <see cref="Decompose"/>. An unstructured layout's two forms are the same string, so nothing else changes.</para></param>
+/// <param name="OdoTail">True when the LAST component is the group's OCCURS DEPENDING table (kb/Work PB244): the
+/// record's trailing storage (§13.18.38.3 SR22), one element per unit up to the table's maximum. The group's
+/// activation-boundary carrier (<c>AsVarImage</c>) holds that table in its FIXED run, so this layout converts at its
+/// two doors — <see cref="ExtentsOf"/> and <see cref="Decompose"/> — and its <see cref="ComponentOffsets"/> list
+/// only the components the carrier has.</param>
 public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] Unit, long[] MaxUnits,
-    IReadOnlyList<int>? StructureCodes = null)
+    IReadOnlyList<int>? StructureCodes = null, bool OdoTail = false)
 {
     private readonly CobolDynStructure?[]? _structure = CobolDynStructure.FromCodes(StructureCodes);
 
@@ -93,7 +98,7 @@ public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] U
 
     /// <summary>Each variable-length component's offset in the FIXED run, in the carrier's flattened order — where
     /// <see cref="CobolVarGroup.Compare"/> interleaves the components with the fixed material (ISO §8.8.4.2.17).</summary>
-    public IReadOnlyList<int> ComponentOffsets => FixedAt;
+    public IReadOnlyList<int> ComponentOffsets => OdoTail ? FixedAt[..^1] : FixedAt;
 
     /// <summary>The EXTENT TABLE of a record of this type (D-FRA (v); kb/Work PB1053): each variable-length
     /// component's fixed-run offset and the length, in characters, of its content in <paramref name="current"/> —
@@ -102,6 +107,7 @@ public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] U
     /// contiguous image.</summary>
     public RecordExtents ExtentsOf(CobolVarGroup current)
     {
+        if (OdoTail) current = current.SplitTail(FixedAt[^1]);
         var lengths = new int[FixedAt.Length];
         for (int k = 0; k < lengths.Length; k++) lengths[k] = current.Dyn(k).Length;
         return new RecordExtents(FixedAt, lengths, this);
@@ -144,9 +150,12 @@ public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] U
     /// take step otherwise. <paramref name="fixedForm"/> says the record is the fixed form of a file of
     /// FIXED-LENGTH records (<see cref="ToFixedForm"/>): the members then take their maximum widths and each drops
     /// the space padding that fills its field.</summary>
-    public CobolVarGroup Decompose(string record, RecordExtents? extents = null, bool fixedForm = false) =>
-        CobolVarGroup.FromContiguous(record, FixedTotal, FixedAt, Unit, MaxUnits, Recorded(record, extents), fixedForm,
-            _structure);
+    public CobolVarGroup Decompose(string record, RecordExtents? extents = null, bool fixedForm = false)
+    {
+        var carrier = CobolVarGroup.FromContiguous(record, FixedTotal, FixedAt, Unit, MaxUnits,
+            Recorded(record, extents), fixedForm, _structure);
+        return OdoTail ? carrier.JoinTail(FixedAt[^1]) : carrier;
+    }
 
     /// <summary>The character position, in <paramref name="record"/> (the MEDIUM image — the record as the file holds
     /// it), of the fixed material at <paramref name="fixedOffset"/> of the FIXED run: that offset plus what every
