@@ -2766,13 +2766,13 @@
   "ordinal": 1,
   "subject": "FLAG-02 directive",
   "rule-digest": "b13ebf3b67a1",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#Run; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#Flag; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#Flag02Warning",
-  "test-ref": "unit:FlagDirectiveTests.Compile_Flag02IoStatus07On_EmitsCobolnet1620_OnEachPhraseSpelling",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagAtLine; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagEcProgramDirectives",
+  "test-ref": "unit:FlagDirectiveTests.Compile_Flag02IoStatus07On_EmitsCobolnet1620_OnEachPhraseSpelling; unit:FlagPopulationTests.EcProgram_EachQualifyingTurnIsFlaggedAtItsOwnLine; unit:FlagPopulationTests.EcProgram_ATurnBeforeTheIdentificationDivision_BelongsToTheUnitThatFollowsIt",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1376 (registrar 15a). cite.py --check 7.3.14.4 'The implementor shall provide a warning mechanism that flags the incompatibilities potentially affecting existing programs' OK (GR1). The mechanism exists: a separate parse-tree pass emits COBOLNET1620 (Warning, per-option message + citation) whenever an ON option matches; documented in docs/DIAGNOSTICS.md line 108 (the A-list item 79 documentation duty). Per-option completeness is judged on the GR4 rows (b/e/f defects are recorded there, not here). Doc defect: docs/CONFORMANCE.md line ~528 still says the FLAG-02/FLAG-14 flags 'are not yet emitted' — stale against the pass (dossier gap). || REFUTED: PARTIAL — GR1 requires a warning mechanism that FLAGS the incompatibility. The cited mechanism, FlagConformancePass.Flag(option, line, where), uses `line` only for the IsOnAt fold and never puts it into the EditionDiagnostic, so position comes from the walk cursor. The post-walk path (FlagEcProgramDirectives, option b) runs after the cursor is gone. Its warnings therefore carry NO source location, and identical unlocated warnings collapse: two flagged >>TURN directives yield ONE warning. The mechanism works for the walk-time options c/d/e/f. The test-ref pins only option c, so it cannot show the mechanism is sound for every selected option. || editions (adjudicator): 2014 (introduced: §7.3.14.1 — incompatibilities between ISO 1989:2002 and ISO/IEC 1989:2014); 2023 (obsolete element, §7.3.14.1 NOTE); not in 1985/2002",
-  "state": "GAP"
+  "notes": "kb/Work PB1376 (w1012k). cite.py --check 7.3.14.4 'The implementor shall provide a warning mechanism that flags the incompatibilities potentially affecting existing programs' OK (GR1). The mechanism is the parse-tree pass FlagConformancePass emitting COBOLNET1620 (Warning) per flagged construct, documented in docs/DIAGNOSTICS.md and docs/CONFORMANCE.md A.1 item 79. Every option's warning is located: the walk-time detectors by the walk cursor, and the one directive-keyed detector (b, a >>TURN known only by its line) through FlagAtLine, which positions the diagnostic at the directive's own line. Before PB1376 the b warning carried no location and two identical unlocated warnings collapsed into one. Per-option population completeness is judged on the GR4 rows.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.14.4-2",
@@ -2811,13 +2811,13 @@
   "ordinal": 4,
   "subject": "FLAG-02 directive",
   "rule-digest": "ed2f6c2770d4",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/FlagDirective.cs#OptionsOf; src/Cobol.Net.Compiler/Binding/FlagState.cs#IsOnAt; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#EcProgramFamily; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagEcProgramDirectives",
-  "test-ref": "unit:FlagDirectiveTests.Compile_EcProgramExceptionsOn_Flags_TurnForEcAll_WhenElementCallsAFunction",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/FlagDirective.cs#OptionsOf; src/Cobol.Net.Compiler/Binding/FlagState.cs#IsOnAt; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#EcProgramFamily; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagEcProgramDirectives; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#SourceElementOf",
+  "test-ref": "unit:FlagDirectiveTests.Compile_EcProgramExceptionsOn_Flags_TurnForEcAll_WhenElementCallsAFunction; unit:FlagPopulationTests.EcProgram_EachQualifyingTurnIsFlaggedAtItsOwnLine; unit:FlagPopulationTests.EcProgram_ATurnBeforeTheIdentificationDivision_BelongsToTheUnitThatFollowsIt; unit:FlagPopulationTests.EcProgram_ContainedProgramIsItsOwnSourceElement",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1376 (registrar 15a). cite.py --check 7.3.14.4 'ALL: All of the options apply' OK (GR4 a). a) ALL = empty option list fanned out to every FLAG-02 option at fold time (unit:FlagDirectiveTests.Fold_All_FansOutToEveryOptionOfThatDirectiveOnly; probe e.cbl `>>FLAG-02 ALL` flags the CLOSE). b) head: the TURN-name set is exactly EC-ALL, EC-PROGRAM, EC-PROGRAM-ARG-OMITTED, EC-PROGRAM-NOT-FOUND (EcProgramFamily); any TURN naming one, ON or OFF, is a candidate (probe b3.cbl: `>>TURN EC-PROGRAM-NOT-FOUND CHECKING OFF` flagged); a non-family TURN is not (unit:FlagDirectiveTests.Compile_EcProgramExceptions_NotFlagged_ForANonEcProgramExceptionTurn). The b) CONDITION (calls a function / invokes a method) is adjudicated on GR-7.3.14.4-L2.1 / -L2.2, where the defects live. cite.py resolves these lettered sub-items to the wrong printed path (kb/Work PB718). || REFUTED: PARTIAL — a) ALL fans out correctly: under one `>>FLAG-02 ALL`, options b/c/d/e all fire (p5). The b) head, 'A TURN directive for EC-ALL ... shall be flagged', fails, because the flag does not identify the TURN directive. The b warning carries no source line, and two qualifying TURN directives in one element produce ONE warning (p6 vs p7/p8), so one of the directives GR4 b says 'shall be flagged' is not flagged. The cited test uses `>>FLAG-02 EC-PROGRAM-EXCEPTIONS ON`, not ALL, so it does not pin a). Secondary, for the L2 rows: a TURN placed before IDENTIFICATION DIVISION is never flagged, because it has no containing unit (owner==null). || editions (adjudicator): 2014 (introduced: §7.3.14.1 — incompatibilities between ISO 1989:2002 and ISO/IEC 1989:2014); 2023 (obsolete element, §7.3.14.1 NOTE); not in 1985/2002",
-  "state": "GAP"
+  "notes": "kb/Work PB1376 (w1012k). cite.py --check 7.3.14.4 'ALL: All of the options apply' OK (GR4 a, sub-item path mispathed by cite.py, kb/Work PB718). a) ALL fans out to every FLAG-02 option at fold time. b) head: the TURN-name set is exactly EC-ALL, EC-PROGRAM, EC-PROGRAM-ARG-OMITTED, EC-PROGRAM-NOT-FOUND (EcProgramFamily); any TURN naming one, ON or OFF, is a candidate, and EACH is flagged at its own line: two qualifying directives in one source element are two located warnings (EcProgram_EachQualifyingTurnIsFlaggedAtItsOwnLine). A TURN written before an element's IDENTIFICATION DIVISION belongs to the element that follows it (SourceElementOf; 7.3.25.4 GR6). The b CONDITION (calls a function / invokes a method) is adjudicated on GR-7.3.14.4-L2.1 / -L2.2.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.14.4-L2.1",
@@ -2826,13 +2826,13 @@
   "ordinal": 1,
   "subject": "FLAG-02 directive",
   "rule-digest": "5dbe78af7511",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitFunctionCall; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagEcProgramDirectives",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitFunctionCall; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagEcProgramDirectives; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#KeywordOmittedFunction",
+  "test-ref": "unit:FlagDirectiveTests.Compile_EcProgramExceptionsOn_Flags_TurnForEcProgram_WhenElementCallsAFunction; unit:FlagPopulationTests.EcProgram_AFunctionWrittenWithoutTheKeyword_IsStillACall; unit:FlagPopulationTests.EcProgram_AFunctionInsideASubscript_IsACall; unit:FlagPopulationTests.EcProgram_AFunctionCalledInAMethod_FlagsThatMethodsTurn",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1375 (registrar 15a). cite.py --check 7.3.14.4 'the source element calls any function, or' OK (GR4 b 1). Code records a call only on a FunctionCallContext (the FUNCTION keyword form). But cite.py --check 12.3.8.4 'intrinsic-function-name-1 may be specified as a function-identifier without being preceded by the keyword FUNCTION' OK — under REPOSITORY `FUNCTION ALL INTRINSIC` (or a named intrinsic / user-defined function specifier) a function is called with no FUNCTION keyword; that reference parses as a dataReference and the binder resolves it, so the pass never sees it. Probe b1.cbl (REPOSITORY FUNCTION ALL INTRINSIC; `>>FLAG-02 EC-PROGRAM-EXCEPTIONS ON`; `>>TURN EC-PROGRAM CHECKING ON`; `MOVE UPPER-CASE(X) TO Y`): runs, prints ABC, NO COBOLNET1620; control b4.cbl (same with FUNCTION keyword) flags. Second miss: a function call inside a METHOD definition (a source element per §3.164 'source unit excluding any contained source units') is never attributed — _currentUnitCtx / the owner lookup cover ProgramUnitContext only (probe m1.cbl: class factory method with FUNCTION UPPER-CASE + TURN EC-PROGRAM: compiles clean, no warning). Expected: COBOLNET1620 on the TURN line in both. Verified correct: FUNCTION-keyword calls, innermost-program attribution, TURN placed after the call site (post-walk). || editions (adjudicator): 2014 (introduced: §7.3.14.1 — incompatibilities between ISO 1989:2002 and ISO/IEC 1989:2014); 2023 (obsolete element, §7.3.14.1 NOTE); not in 1985/2002",
-  "state": "GAP"
+  "notes": "kb/Work PB1375 (w1012k). cite.py --check 7.3.14.4 'the source element calls any function, or' OK (GR4 b 1); 12.3.8.4 GR13 'intrinsic-function-name-1 may be specified as a function-identifier without being preceded by the keyword FUNCTION'. A source element is a source unit excluding its contained source units (3.164): the pass opens one per program, function, contained program, class, interface and method. A call is a FunctionCall node, a keyword-omitted function-identifier (the binder records its decision in DataBinder.ActivationSites at IntrinsicBinder.KeywordOmittedFunction, so the pass reads the bound fact instead of re-deriving it from syntax), or a function written inside a subscript (ReferenceResolver.IsFunctionBearing records its head token). A call inside a method now flags that method's TURN.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.14.4-L2.2",
@@ -2841,13 +2841,13 @@
   "ordinal": 2,
   "subject": "FLAG-02 directive",
   "rule-digest": "f741958944bb",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitInvokeStatement; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitInlineMethodInvocation; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitCloseStatement; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitMoveStatement",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitInvokeStatement; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitInlineMethodInvocation; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitCloseStatement; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitMoveStatement; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitMethodDefinition",
+  "test-ref": "unit:FlagDirectiveTests.Compile_Flag02IoStatus07On_EmitsCobolnet1620_OnEachPhraseSpelling; unit:FlagPopulationTests.EcProgram_EachMethodIsItsOwnSourceElement; unit:FlagPopulationTests.EcProgram_AnObjectPropertyReference_InvokesTheAccessorMethod; unit:FlagPopulationTests.EcProgram_ContainedProgramIsItsOwnSourceElement; unit:FlagPopulationTests.MoveToSameName_InAContainedProgram_ResolvesInThatProgramsScope",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1375 (registrar 15a). Row carries three halves. (1) GR4 b 2 — cite.py --check 7.3.14.4 'the source element invokes any method' OK: INVOKE and inline method invocation mark the current ProgramUnitContext, but a METHOD definition is not a programUnit (Core/CobolOO.g4 methodDefinition), so a >>TURN EC-PROGRAM inside a method whose body invokes a method (or calls a function) is never flagged: FlagEcProgramDirectives searches group.Units only (probe m1.cbl shows the method-definition miss; same owner-lookup path). Unverified edge: an object PROPERTY reference (§8.4.3.9, bound by ReferenceResolver.OoTryBindPropertyReference as a dataReference) invokes a get/set method and is not visited either. (2) GR4 c I-O-STATUS-07: CLOSE with WITH NO REWIND or UNIT (REEL equivalent per §14.9.6.3 SR2) flagged once — CONFORMS, unit:FlagDirectiveTests.Compile_Flag02IoStatus07On_EmitsCobolnet1620_OnEachPhraseSpelling, probe d.cbl. Note the GR4 c label is printed 'IO-STATUS-07' while the format word is I-O-STATUS-07 — the code uses the format word (correct). (3) GR4 d head: same-DDE test by symbol identity across plain and CORRESPONDING MOVE — verified (probe d1.cbl `MOVE H OF G TO H` flagged). Verdict driven by (1). || editions (adjudicator): 2014 (introduced: §7.3.14.1 — incompatibilities between ISO 1989:2002 and ISO/IEC 1989:2014); 2023 (obsolete element, §7.3.14.1 NOTE); not in 1985/2002",
-  "state": "GAP"
+  "notes": "kb/Work PB1375 (w1012k). Row carries three halves. (1) GR4 b 2: cite.py --check 7.3.14.4 'the source element invokes any method' OK. INVOKE, an inline method invocation and an object-property reference (8.4.3.9.4 GR1: the occurrence invokes the get/set accessor; recorded by ReferenceResolver.OoTryBindPropertyReference in DataBinder.ActivationSites) mark the CURRENT source element, and a METHOD definition is a source element of its own (VisitMethodDefinition), so a TURN in a method that invokes is flagged and a TURN in a sibling method that invokes nothing is not. A contained program is its own element too: its calls do not count for its container. (2) GR4 c I-O-STATUS-07: CLOSE with WITH NO REWIND or UNIT (REEL equivalent per 14.9.6.3 SR2) flagged once. (3) GR4 d head: same-DDE test by symbol identity across plain and CORRESPONDING MOVE, resolved in the CONTAINED program's own scope (the unit map is keyed on the IDENTIFICATION DIVISION node a contained program shares with its synthetic programUnit).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.14.4-L3.1",
@@ -2856,13 +2856,13 @@
   "ordinal": 1,
   "subject": "FLAG-02 directive",
   "rule-digest": "18790ce0e836",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#MoveToSameNameFlaggable; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#ResolveItem",
-  "test-ref": "unit:FlagDirectiveTests.Compile_MoveToSameNameOn_Flags_AlphanumericEditedSelfMove",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#MoveToSameNameFlaggable; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#ResolveItem; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#IsRefModified",
+  "test-ref": "unit:FlagDirectiveTests.Compile_MoveToSameNameOn_Flags_AlphanumericEditedSelfMove; unit:FlagPopulationTests.MoveToSameName_ReferenceModifiedAlphanumericEditedOperands_AreCategoryAlphanumeric",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1375 (registrar 15a). cite.py --check 7.3.14.4 'the operands are of category alphanumeric-edited, or' OK (GR4 d 1). Alphanumeric-edited self-move flagged; plain alphanumeric not; national-edited deliberately excluded (matches the printed text). Over-flag edge: ResolveItem drops reference modification, but cite.py --check 8.4.3.3.4 'the category alphanumeric-edited is considered class and category alphanumeric' OK — a reference-modified operand is of category ALPHANUMERIC, so `MOVE AE(1:3) TO AE(5:3)` (AE PIC X(3)BX(3)) does not meet 'operands are of category alphanumeric-edited'; probe d1.cbl line 12 is flagged COBOLNET1620 anyway. The pass's own comment rejects widening the flag beyond the rule's text. PARTIAL (warning-only harm). || editions (adjudicator): 2014 (introduced: §7.3.14.1 — incompatibilities between ISO 1989:2002 and ISO/IEC 1989:2014); 2023 (obsolete element, §7.3.14.1 NOTE); not in 1985/2002",
-  "state": "GAP"
+  "notes": "kb/Work PB1375 (w1012k). cite.py --check 7.3.14.4 'the operands are of category alphanumeric-edited, or' OK (GR4 d 1); 8.4.3.3.4 GR6 a 'the category alphanumeric-edited is considered class and category alphanumeric'. An alphanumeric-edited self-move is flagged; a plain alphanumeric one is not; a reference-modified operand is category alphanumeric (IsRefModified, covering a refModPart, a captured depth-0-colon group and the qualified form), so it does not meet criterion 1. National-edited is deliberately excluded (the flag is narrower than 14.9.25.4 GR6 b by the printed text).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.14.4-L3.2",
@@ -2871,13 +2871,13 @@
   "ordinal": 2,
   "subject": "FLAG-02 directive",
   "rule-digest": "13ee89718a3a",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#MoveToSameNameFlaggable; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagIndexSet; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitTerminateStatement; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#Run",
-  "test-ref": "",
+  "test-ref": "unit:FlagDirectiveTests.Compile_MoveToSameNameOn_Flags_SubordinateOdoSelfMove; unit:FlagDirectiveTests.Compile_TerminateWithVaryingOn_Flags_ReportContainingVarying; unit:FlagPopulationTests.MoveToSameName_SubordinateOdo_IsAPropertyOfTheEntry_NotOfTheReferenceModification; unit:FlagPopulationTests.TerminateWithVarying_AVaryingClauseOnAGroupEntry_FlagsTheTerminate",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1375 (registrar 15a). Row carries d 2, e and f. d 2 (subordinate ODO whose DEPENDING item is inside the operand DDE): OdoModel.TableUnder + IsWithin — CONFORMS (unit:FlagDirectiveTests.Compile_MoveToSameNameOn_Flags_SubordinateOdoSelfMove, ..._NotFlagged_OdoDependingItemOutsideTheGroup; probe d1.cbl nested ODO two levels down flagged). e RANGE-EXCEPTION-FOR-INDEX: SET TO / SET UP|DOWN BY with an index-name receiver while TurnState says EC-RANGE-INDEX enabled (hierarchy-aware) — CONFORMS (unit tests ..._Flags_SetIndexNameTo_WhenEcOn, ..._ViaEcAllHierarchy, ..._NotFlagged_OnUsageIndexDataItemReceiver). f TERMINATE-WITH-VARYING — DIVERGES: cite.py --check 7.3.14.4 'A TERMINATE statement shall be flagged if the report being terminated contains a VARYING clause' OK; Run builds the VARYING-report set from report.Groups.Lines.Fields.Varyings only, and DataBinder.Reports copies an entry's VARYING list onto a ReportFieldModel only for a PRINTABLE entry; cite.py --check 13.18.64.3 'if the VARYING clause appears in a report group description entry, a multiple LINE or multiple COLUMN clause' OK — VARYING is legal on a non-printable group entry (with OCCURS). Probe g.cbl: `05 G1 OCCURS 3 VARYING K FROM 1 BY 1.` / `10 COLUMN + 2 PIC X(3) VALUE \"AB\".` then `>>FLAG-02 TERMINATE-WITH-VARYING ON` / `TERMINATE RPT.` compiles, runs (prints ' AB  AB  AB'), NO COBOLNET1620; control i.cbl (VARYING on the printable entry) flags. Expected: the TERMINATE flagged in both. cite.py mispaths this sub-item as '4) b)' (kb/Work PB718). || editions (adjudicator): 2014 (introduced: §7.3.14.1 — incompatibilities between ISO 1989:2002 and ISO/IEC 1989:2014); 2023 (obsolete element, §7.3.14.1 NOTE); not in 1985/2002",
-  "state": "GAP"
+  "notes": "kb/Work PB1375 (w1012k). Row carries d 2, e and f. d 2 (subordinate ODO whose DEPENDING item is inside the operand DDE): OdoModel.TableUnder + IsWithin, a property of the entry that a reference modification does not change. e RANGE-EXCEPTION-FOR-INDEX: SET TO / SET UP|DOWN BY with an index-name receiver while TurnState says EC-RANGE-INDEX enabled. f TERMINATE-WITH-VARYING: cite.py --check 7.3.14.4 'A TERMINATE statement shall be flagged if the report being terminated contains a VARYING clause' OK; the VARYING-report set is DataBinder.ReportModel.HasVarying, which kb/Work PB1306 (landed) made read every report group description entry, a group entry included (13.18.64.3 SR1), so the former DIVERGES (a VARYING on a group entry never reached the set) no longer reproduces.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.14.4-5",
@@ -2918,10 +2918,10 @@
   "rule-digest": "53acc3b946bf",
   "verdict": "PARTIAL",
   "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagConformancePass; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#FlagScanState; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#Flag14Warning",
-  "test-ref": "unit:FlagDirectiveTests.Compile_Flag14ReadPreviousOn_EmitsCobolnet1621",
+  "test-ref": "unit:FlagDirectiveTests.Compile_Flag14ReadPreviousOn_EmitsCobolnet1621; unit:FlagPopulationTests.IoStatus_FlagsEveryConditionThatTestsTheFileStatusItem",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1375 (registrar 15a). cite.py --check 7.3.15.4 'If ON is explicitly...' OK (GR1 text read from the clause). The warning mechanism exists: COBOLNET1621 (Warning, never fails the compile), one per flagged construct, and each message names the option and the 2014-to-2023 change with its GR4 sub-rule and Annex E.2 item. Two emitters, one message shape: FlagConformancePass for the bound options, and ConditionalCompilationProcessor.DirectiveDiag.FlagWarn for b/c. It is documented in docs/DIAGNOSTICS.md, which covers Annex B item 80 'shall be documented'. Probes IO/IO2/MX/BZ/GB show the mechanism firing for every one of b-m. Whether each option's COVERAGE is complete is GR4's question, and that rule is DIVERGES. || REFUTED: PARTIAL — GR1 has two halves: PROVIDE a warning mechanism, and have it FLAG the 2014-to-2023 incompatibilities for the selected option. The first half holds: COBOLNET1621 is a Warning with per-option messages from two emitters in one shape, it is documented, and it is gated per option. The second half does not hold. For options that are selected and ON, the mechanism misses incompatibilities that GR4 names. Numeric-edited items made so by BLANK WHEN ZERO (13.18.8.4 GR2) escape g and l, the constant entry escapes b, EVALUATE-subject FILE STATUS tests escape e and f, and a WRITE with only NOT AT END-OF-PAGE escapes m. It also over-flags d on ACCESS SEQUENTIAL relative/indexed files. The adjudicator split 'the mechanism exists' (GR1 CONFORMS) from 'coverage' (GR4 DIVERGES). But GR1's own text says the mechanism 'flags the incompatibilities ... for the selected option', so a coverage gap is a GR1 gap too. A rule with two halves where only one is verified is PARTIAL. Selection is also incomplete: the implicit-ON and implicit-ALL forms ('>>FLAG-14 VALUE-ZERO', '>>FLAG-14 ALL', '>>FLAG-14 OFF') are rejected with COBOLNET1622 (FMT-7.3.15.2 DIVERGES), so some legal ways to select an option cannot reach the mechanism at all. The test-ref Compile_Flag14ReadPreviousOn_EmitsCobolnet1621 pins only one working branch (h) and asserts only that the code appears.",
+  "notes": "kb/Work PB1374 (handed over from PB1375, w1012k). cite.py --check 7.3.15.4 'The implementor shall provide a warning mechanism that flags the incompatibilities potentially affecting existing programs' OK (GR1). The mechanism exists (COBOLNET1621, a Warning, one per flagged construct, per-option message naming its GR4 sub-rule and Annex E.2 item, documented in docs/DIAGNOSTICS.md and CONFORMANCE.md A.1 item 80) and, since kb/Work PB1375, flags every option's whole GR4 population (see GR-7.3.15.4-4). What remains is the SELECTION of an option: the implicit-ON / implicit-ALL forms ('>>FLAG-14 VALUE-ZERO', '>>FLAG-14 ALL', '>>FLAG-14 OFF') are refused with COBOLNET1622 (FMT-7.3.15.2; kb/Work PB1374), so some legal ways to select an option cannot reach the mechanism.",
   "state": "GAP"
  },
  {
@@ -2961,13 +2961,13 @@
   "ordinal": 4,
   "subject": "FLAG-14 directive",
   "rule-digest": "7a097cae6d79",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagConformancePass; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#FlagArithmetic; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/FlagDirective.cs#FlagOptions",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagConformancePass; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitConstantEntryBody; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#AdmitsInvalidKey; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#IsNumericEditedPicture; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#VisitWriteStatement; src/Cobol.Net.Compiler/Validation/FlagConformancePass.FileStatus.cs#VisitCondition; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#FlagArithmetic; src/Cobol.Net.Frontend/Preprocessor/FlagDirective.cs#FlagOptions",
+  "test-ref": "unit:FlagPopulationTests.CompileTimeArithmetic_ConstantEntryExpression_IsFlagged_ALiteralIsNot; unit:FlagPopulationTests.CompileTimeArithmetic_ConstantEntryExpression_IsNotFlagged_WhenTheOptionIsOff; unit:FlagPopulationTests.IoDeclarative_FlagsOnlyTheStatementsThatCanTakeAnInvalidKeyPhrase; unit:FlagPopulationTests.IoStatus_FlagsEveryConditionThatTestsTheFileStatusItem; unit:FlagPopulationTests.IoStatus_AbbreviatedObjectOnALaterLine_IsFlaggedAtItsOwnLine; unit:FlagPopulationTests.NumericEdited_ANumericPictureWithBlankWhenZero_IsNumericEdited; unit:FlagPopulationTests.NumericEdited_ANumericPictureWithoutBlankWhenZero_IsNotNumericEdited; unit:FlagPopulationTests.NumericEdited_AnEditingSymbolThatIsTheUnitsCurrencySign_IsNumericEdited; unit:FlagPopulationTests.WriteEndOfPage_IsFlaggedUnlessThePositivePhraseIsSpecified; unit:FlagPopulationTests.RefModZeroLength_FlagsAReferenceModificationOfADataItem_NotOfAFunctionResult",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1375 (registrar 15a). All twelve options (a-m) have a detector. Verified correct by probes: a ALL fan-out; c >>EVALUATE with WHEN + WHEN OTHER (MX:16); h READ PREVIOUS (IO:39); i ref-mod only while >>REF-MOD-ZERO-LENGTH is unspecified and EC-BOUND-REF-MOD is on (MX:26, and not after an explicit ON at MX:29); k figurative constant VALUE on a length-less item (BZ:8, BZ:10); m WRITE without END-OF-PAGE on a LINAGE file (IO:46, and not on a non-LINAGE file IO:47); e/f relation and level-88 forms (IO:48-51,53, IO2:36); g/l/j on a PICTURE-numeric-edited item. DEFECTS, each checked with cite.py: (1) b misses the constant entry. cite.py --check 7.3.6.1 'A compile-time arithmetic expression may be specified in the DEFINE and EVALUATE directives, in a constant conditional expression, and in a constant entry' OK, and --check 13.10.3 'Arithmetic-expression-1 shall be formed in accordance with 7.3.6' OK. Probe GB: '01 K1 CONSTANT AS 5 * 2.' under COMPILE-TIME-ARITHMETIC-EXPRESSIONS ON -> no warning, while the >>DEFINE on the line above IS flagged. (2) d over-flags statements that CANNOT be written with INVALID KEY. --check 14.9.10.3 'The INVALID KEY and the NOT INVALID KEY phrases shall not be specified for a DELETE RECORD statement that references a file that is in sequential access mode' OK; --check 14.9.35.3 'Neither the INVALID KEY phrase nor the NOT INVALID KEY phrase shall be specified for a REWRITE statement that references a file with sequential organization or a file with relative organization and sequential access mode' OK. Probe IO2: REWRITE on a RELATIVE ACCESS SEQUENTIAL file (32), DELETE RL (33) and DELETE on an INDEXED ACCESS SEQUENTIAL file (34) are all flagged, because IsKeyed tests organization only and ignores access mode. (3) e/f miss tests that are not a two-operand relation: 'EVALUATE FS WHEN \"04\"' (IO:52) and 'EVALUATE FS WHEN \"07\"' (IO2:37) are not flagged, and neither is the abbreviated combined relation 'IF FS = \"00\" OR \"04\"' (IO2:35). (4) g/l/j miss numeric-edited items made so by BLANK WHEN ZERO. --check 13.18.8.4 'If the subject of the entry is described by its picture character-string as category numeric, the BLANK WHEN ZERO clause defines the item as numeric-edited' OK. Probe BZ: '01 X PIC 999 BLANK WHEN ZERO VALUE ZERO.' raises no g/l warning, and '01 Y PIC 999 BLANK WHEN ZERO VALUE 12.' raises no j warning, because IsNumericEditedPicture classifies the PICTURE string alone. (5) m misses a WRITE carrying only NOT AT END-OF-PAGE (MX:25), yet 14.9.51.3 SR19 names the END-OF-PAGE and NOT END-OF-PAGE phrases separately. Minor: i also flags a FUNCTION reference modification (MX:27), which is not 'a reference modification of a data-item'. Unit tests FlagDirectiveTests.Compile_* cover the working branches only. test-ref is left empty because the rule DIVERGES.",
-  "state": "GAP"
+  "notes": "kb/Work PB1375 (w1012k). All twelve options (a-m) flag their GR4 population. (b) the CONSTANT entry's arithmetic-expression-1 is a compile-time arithmetic expression (7.3.6.1; 13.10.3 SR7) and is flagged through FlagOptions.IsFlaggableCompileTimeArithmetic, the one predicate the directive operands use. (d) AdmitsInvalidKey decides per statement: REWRITE on a relative file in sequential access (14.9.35.3 SR2) and DELETE RECORD on a file in sequential access (14.9.10.3 SR2) cannot carry the phrase and are not flagged; an indexed file REWRITE and every keyed WRITE are. (e/f) every condition that tests the FILE STATUS item: a relation, an abbreviated combined relation (8.8.4.12.4 GR1), a level-88 condition-name, an EVALUATE subject/object pair and partial expression (14.9.13.3 SR2/SR8). (g/j/l) 13.18.8.4 GR2: BLANK WHEN ZERO on a numeric picture makes the item numeric-edited, and the unit's CURRENCY SIGN set reaches the analyzer. (m) 14.9.51.3 SR19 names END-OF-PAGE and NOT END-OF-PAGE separately, so a WRITE with only NOT AT END-OF-PAGE is flagged. (i) a function result's reference modification is not a data item's. Known advisory edge: an OO method body's operands are not name-resolved.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.15.4-5",
@@ -63051,13 +63051,13 @@
   "ordinal": 79,
   "subject": "FLAG-02 directive (warning mechanism)",
   "rule-digest": "75557fcc1e15",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "docs/CONFORMANCE.md#DOC-A.1-79; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagConformancePass; src/Cobol.Net.Frontend/Preprocessor/FlagDirective.cs#TryParse; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#Flag02Warning",
-  "test-ref": "unit:FlagDirectiveTests.Compile_Flag02IoStatus07On_EmitsCobolnet1620_OnEachPhraseSpelling; unit:FlagDirectiveTests.Parse_Flag02_OnIsImplicit_WhenOnOffOmitted; unit:FlagDirectiveTests.Fold_DefaultsOff_AndIsStickyForwardStrictlyAfterTheDirective",
+  "test-ref": "unit:FlagDirectiveTests.Compile_Flag02IoStatus07On_EmitsCobolnet1620_OnEachPhraseSpelling; unit:FlagDirectiveTests.Parse_Flag02_OnIsImplicit_WhenOnOffOmitted; unit:FlagDirectiveTests.Fold_DefaultsOff_AndIsStickyForwardStrictlyAfterTheDirective; unit:FlagPopulationTests.EcProgram_EachQualifyingTurnIsFlaggedAtItsOwnLine",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "§7.3.14.4 1) (cite.py OK). Probe /tmp/adj/doc/doc-w1-s3/probe/fl.cob: '>>FLAG-02 I-O-STATUS-07' + CLOSE WITH NO REWIND -> warning COBOLNET1620 at (16,12); after '>>FLAG-02 I-O-STATUS-07 OFF' no warning; after '>>FLAG-02 ALL' -> COBOLNET1620 at (22,12); program runs (RAN, exit 0). --std 2002 -> COBOLNET0900 on each directive; --std 2023 -> COBOLNET0903 obsolete plus the same warnings. FlagDirectiveLine.TryParse: an omitted ON/OFF means ON for FLAG-02; unknown word or ALL plus options -> FlagDirectiveMalformed (COBOLNET1622). Refuter: '>>FLAG-02 ON', '>>FLAG-02 OFF' and bare '>>FLAG-02' -> COBOLNET1622 (refute-probe/fl.cob), the ALL-default defect of open kb/Work/PB1374, now named in the row. PARTIAL: the mechanism is verified, but the per-option populations are open under kb/Work/PB1375 and the EC-PROGRAM-EXCEPTIONS location/collapse under kb/Work/PB1376, and the row names both. INTEGRATOR: docs/CONFORMANCE.md lines 527-530 (§3 directive bullet) still say the FLAG-02/FLAG-14 flags 'are not yet emitted'. That sentence is wrong and has to be corrected in the same change set (kb/Work/PB1369).",
-  "state": "GAP"
+  "notes": "7.3.14.4 1) (cite.py OK). docs/CONFORMANCE.md section 7 DOC-A.1-79 documents the FLAG-02 warning mechanism: COBOLNET1620 per flagged construct, the five options and what each flags (EC-PROGRAM-EXCEPTIONS flags each qualifying >>TURN at its own line by source element), on/off semantics, defaults, edition gating, and the open defects it excludes (kb/Work PB1374 selection forms). The stale statement that the flags 'are not yet emitted' is gone.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-80",
@@ -63066,13 +63066,13 @@
   "ordinal": 80,
   "subject": "FLAG-14 directive (warning mechanism)",
   "rule-digest": "3f730f5c3b7d",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "docs/CONFORMANCE.md#DOC-A.1-80; src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagConformancePass; src/Cobol.Net.Frontend/Preprocessor/FlagDirective.cs#TryParse; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#Flag14Warning",
-  "test-ref": "unit:FlagDirectiveTests.Compile_Flag14ReadPreviousOn_EmitsCobolnet1621; unit:FlagDirectiveTests.Compile_Flag14ReadPreviousOff_EmitsNoFlagWarning; unit:FlagDirectiveTests.Fold_DefaultsOff_AndIsStickyForwardStrictlyAfterTheDirective",
+  "test-ref": "unit:FlagDirectiveTests.Compile_Flag14ReadPreviousOn_EmitsCobolnet1621; unit:FlagDirectiveTests.Compile_Flag14ReadPreviousOff_EmitsNoFlagWarning; unit:FlagDirectiveTests.Fold_DefaultsOff_AndIsStickyForwardStrictlyAfterTheDirective; unit:FlagPopulationTests.IoStatus_FlagsEveryConditionThatTestsTheFileStatusItem",
   "derivation": "",
   "editions": "2023",
-  "notes": "§7.3.15.4 1) (cite.py OK). Probe /tmp/adj/doc/doc-w1-s3/probe/fl14.cob at --std 2023: '>>FLAG-14 VALUE-ZERO ON' + 01 NE PIC ZZ9.99 VALUE ZERO -> COBOLNET1621 at (14,8); after 'VALUE-ZERO OFF' NE2 is not flagged; '>>FLAG-14 READ-PREVIOUS I-O-STATUS-04 ON' -> COBOLNET1621 for READ F PREVIOUS (20,12) and IF FS = \"04\" (21,15); RAN. --std 2014 -> COBOLNET0900. The original fl14.cob without ON -> COBOLNET1622 'the ON or OFF phrase is required'. That is the open defect kb/Work/PB1374 (ON is an un-underlined optional word, GR2 'explicitly or implicitly'), which the row names but does not state as the rule. The constant-entry miss is kb/Work/PB1375. PARTIAL because of those two open notes. INTEGRATOR: docs/CONFORMANCE.md lines 527-530 (§3 directive bullet) still say the FLAG-02/FLAG-14 flags 'are not yet emitted'. That sentence is wrong and has to be corrected in the same change set (kb/Work/PB1369).",
-  "state": "GAP"
+  "notes": "7.3.15.4 1) (cite.py OK). docs/CONFORMANCE.md section 7 DOC-A.1-80 documents the FLAG-14 warning mechanism: COBOLNET1621 per flagged construct, the twelve options and the population each flags, on/off semantics, defaults, edition gating, and the open defect it excludes (kb/Work PB1374 selection forms).",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-81",

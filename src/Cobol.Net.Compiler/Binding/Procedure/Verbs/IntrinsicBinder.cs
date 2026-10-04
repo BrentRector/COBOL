@@ -326,7 +326,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             var viaPointer = ReparseArgs(sp) is { } fpArgs
                 ? host.Udf.UdfBindPointerCall(fp, fpArgs)
                 : BoundExprError.Refused(ctx.Edition, $"FUNCTION {name} arguments");
-            return tailRefMod is null ? viaPointer : ResultRefMod(viaPointer, ctx.Refs.ReadRefMod(tailRefMod), name);
+            return Activated(tailRefMod is null ? viaPointer : ResultRefMod(viaPointer, ctx.Refs.ReadRefMod(tailRefMod), name));
         }
         // The word as an intrinsic-function-name OF THIS COMPILATION (>>COBOL-WORDS and the edition window —
         // DataBinder.TryIntrinsicOfThisCompilation), and the REPOSITORY half through DataBinder.IsRepositoryIntrinsic,
@@ -385,9 +385,9 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                 || name.Equals(host.UdfSelfName, StringComparison.OrdinalIgnoreCase))
             {
                 var udfBare = host.Udf.UdfBindCall(name, []);
-                return capturedRefMod is null
+                return Activated(capturedRefMod is null
                     ? udfBare
-                    : ResultRefMod(udfBare, ctx.Refs.ReadRefMod(capturedRefMod), name);
+                    : ResultRefMod(udfBare, ctx.Refs.ReadRefMod(capturedRefMod), name));
             }
             // A bare CATALOGUED name only becomes a function reference when the function genuinely admits
             // ZERO arguments (MinArgs 0 — CURRENT-DATE, PI, E, WHEN-COMPILED, and RANDOM's no-argument form,
@@ -400,16 +400,24 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             // modification of the RESULT, not an argument list: SR6 was answered above (a zero-argument
             // definition permits none), so the group is applied to the result exactly as the FUNCTION-keyword
             // form applies it, and the two reference forms cannot drift apart.
-            return capturedRefMod is null
+            return Activated(capturedRefMod is null
                 ? bare
-                : ResultRefMod(bare, ctx.Refs.ReadRefMod(capturedRefMod), name);
+                : ResultRefMod(bare, ctx.Refs.ReadRefMod(capturedRefMod), name));
         }
         var call = ReparseArgs(sp) is { } args
             ? BindIntrinsicCore(functionWord, args)
             : BoundExprError.Refused(ctx.Edition, $"FUNCTION {name} arguments");
-        return tailRefMod is null
+        return Activated(tailRefMod is null
             ? call
-            : ResultRefMod(call, ctx.Refs.ReadRefMod(tailRefMod), name);
+            : ResultRefMod(call, ctx.Refs.ReadRefMod(tailRefMod), name));
+
+        // Every non-null return of this method IS a function activation (§8.4.3.2.3 SR2); record the decision where it
+        // is made so the migration-flag pass (§7.3.14.4 GR4 b) need not re-derive it from syntax.
+        BoundExpr Activated(BoundExpr result)
+        {
+            ctx.Data.ActivationSites.Add(dref);
+            return result;
+        }
     }
 
 

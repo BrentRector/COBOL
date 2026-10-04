@@ -77,27 +77,27 @@ implementation increment. `[F]` = frontend-inline (no bound residue); `[B]` = bo
 | Opt | Construct (GR4) | Visible at | Incr | Notes |
 |-----|-----------------|-----------|------|-------|
 | a ALL | fan-out to b–m | directive parse | 0 | sets every FLAG-14 option; `ALL OFF` is the GR2 reset |
-| b COMPILE-TIME-ARITHMETIC-EXPRESSIONS | a compile-time arithmetic expr with a real operator | `[F]` `CompileTimeExpressionEvaluator` EvalArith (Add/Mul arm) | 2 | E.2 item 6. Guard on operator present (sole literal not flagged) |
+| b COMPILE-TIME-ARITHMETIC-EXPRESSIONS | a compile-time arithmetic expr with a real operator, at EVERY site §7.3.6.1 lists: the DEFINE / EVALUATE / DISPLAY directive operands, a constant conditional expression, and a CONSTANT entry's arithmetic-expression-1 | `[F]` `ConditionalCompilationProcessor` (the directive operands) + `[B]` `FlagConformancePass.VisitConstantEntryBody` (the constant entry) — both ask the ONE predicate `FlagOptions.IsFlaggableCompileTimeArithmetic` | 2 | E.2 item 6. Guard on operator present (sole literal not flagged) |
 | c EVALUATE | a `>>EVALUATE` directive with both a WHEN and a WHEN OTHER | `[F]` `ConditionalCompilationProcessor` Evaluate/When frames | 2 | E.2 item 8. NOT the EVALUATE statement |
-| d I-O-DECLARATIVE | an INVALID-KEY-capable I-O stmt (WRITE/REWRITE/DELETE/START/random-READ on a keyed file) without INVALID KEY, or a sequential READ without AT END, while a USE INPUT/OUTPUT/I-O/EXTEND declarative is present | `[B]` DONE — `VisitRead/Write/Rewrite/Delete/StartStatement` + `unit.Bound.Declaratives` modes + `_currentData.Files` org | 4 | E.2 item 19. ⚠ A FLAG, NOT A GATE: §7.3.15.4 GR4 d) is a normative FLAGGING obligation over Annex E.2's list, so the construct is flagged even though WiseOwl COBOL's own ANSWER for it does NOT vary by edition — the open-mode USE tier runs at 85/2002/2014/2023 alike (kb/Work PB344; VERSION_CHANGE_REFERENCE rows 25/26 are `ref-only`) |
-| e I-O-STATUS-04 | a reference testing a FILE STATUS item for `'04'` — a relation, or a level-88 whose VALUE is `'04'` | `[B]` DONE — `VisitComparisonExpression` + FILE-STATUS name/88 sets from `unit.Data.Files[]` | 4 | E.2 item 15 |
+| d I-O-DECLARATIVE | an INVALID-KEY-capable I-O stmt (WRITE/START/random-READ on a keyed file; REWRITE except on a sequential-organization file or a relative file in sequential access, §14.9.35.3 SR2; DELETE except on a file in sequential access mode, §14.9.10.3 SR2) without INVALID KEY, or a sequential READ without AT END, while a USE INPUT/OUTPUT/I-O/EXTEND declarative is present | `[B]` DONE — `VisitRead/Write/Rewrite/Delete/StartStatement` + `unit.Bound.Declaratives` modes + `_currentData.Files` org and access mode through `AdmitsInvalidKey` | 4 | E.2 item 19. ⚠ A FLAG, NOT A GATE: §7.3.15.4 GR4 d) is a normative FLAGGING obligation over Annex E.2's list, so the construct is flagged even though WiseOwl COBOL's own ANSWER for it does NOT vary by edition — the open-mode USE tier runs at 85/2002/2014/2023 alike (kb/Work PB344; VERSION_CHANGE_REFERENCE rows 25/26 are `ref-only`) |
+| e I-O-STATUS-04 | a reference testing a FILE STATUS item for `'04'` — a relation (including the abbreviated combined relation `FS = "00" OR "04"`), a level-88 whose VALUE is `'04'`, or an EVALUATE subject/object pair (value or partial-expression object) | `[B]` DONE — `FlagConformancePass.FileStatus.cs` (`VisitCondition` / `VisitEvaluateStatement`) + FILE-STATUS name/88 sets from `unit.Data.Files[]` | 4 | E.2 item 15 |
 | f I-O-STATUS-07 | a reference testing a FILE STATUS item for `'07'` — a relation, or a level-88 whose VALUE is `'07'` | `[B]` DONE — same detector as e (only the literal differs) | 4 | E.2 item 16 |
-| g NUM-ED-ZERO-FIGCONST | figurative ZERO in a VALUE clause of a numeric-edited item | `[B]` `GateData`/`DataItem` (DataBinder.cs:1104 `isZeroWord`) | 1 | E.2 item 28. **Same predicate as l** — one detector serves both |
+| g NUM-ED-ZERO-FIGCONST | figurative ZERO in a VALUE clause of a numeric-edited item (a numeric picture with BLANK WHEN ZERO is numeric-edited, §13.18.8.4 GR2) | `[B]` `FlagConformancePass.VisitDataDescriptionEntry` + `PictureAnalyzer` (BLANK WHEN ZERO and the unit's CURRENCY SIGN set threaded to it) | 1 | E.2 item 28. **Same predicate as l** — one detector serves both |
 | h READ-PREVIOUS | a `READ … PREVIOUS` | `[B]` `BoundKeyedRead` Previous (already matched VCP:200) | 0 | E.2 item 22. The first end-to-end slice |
 | i REF-MOD-ZERO-LENGTH | a ref-mod where the `>>REF-MOD-ZERO-LENGTH` directive is **not explicitly** ON/OFF **and** EC-BOUND-REF-MOD is on | `[B]` `RefModPlace` + `RefModZeroLengthState` (tri-state ext.) + TurnState | 3 | E.2 item 23. Needs tri-state `RefModZeroLengthState` + EC read |
 | j VALUE-EDITING | a numeric-edited item whose VALUE is a literal with no editing symbols | `[B]` `GateData`/`DataItem.RawValue` + Pic | 1 | E.2 item 29 |
 | k VALUE-FIG-CON-LENGTH | a figurative constant in a VALUE clause of an item with no specified length | `[B]` `GateData`/`DataItem` (fig word + length model) | 1 | E.2 item 11. GR4 spells it `VALUE-FIG-CON-NO-LENTH` (typo); the accepted word is the figure's `VALUE-FIG-CON-LENGTH` |
 | l VALUE-ZERO | a numeric-edited item whose VALUE specifies figurative ZERO | `[B]` = same as g | 1 | E.2 item 28. Deduped with g |
-| m WRITE-END-OF-PAGE | a WRITE that *allows* END-OF-PAGE (file has LINAGE) but omits the AT EOP phrase | `[B]` `BoundWrite` + File LINAGE, no AtEop | 1 | E.2 item 19 family (AT-EOP default); GR4 m normative |
+| m WRITE-END-OF-PAGE | a WRITE that *allows* END-OF-PAGE (file has LINAGE) but omits the AT EOP phrase — a WRITE with only NOT AT END-OF-PAGE omits it (§14.9.51.3 SR19 names the two phrases separately) | `[B]` `VisitWriteStatement` + File LINAGE, `PhraseBlocks.HasOnBranch` | 1 | E.2 item 19 family (AT-EOP default); GR4 m normative |
 
 ### 1.2 FLAG-02 (§7.3.14.4 GR4 a–f — ALL + 5 options)
 
 | Opt | Construct (GR4) | Visible at | Incr | Notes |
 |-----|-----------------|-----------|------|-------|
 | a ALL | fan-out to b–f | directive parse | 0 | |
-| b EC-PROGRAM-EXCEPTIONS | a `>>TURN` for EC-ALL/EC-PROGRAM/EC-PROGRAM-ARG-OMITTED/EC-PROGRAM-NOT-FOUND in an element that calls any function or invokes any method | `[B]` DONE — `TurnState.DirectiveLinesNaming` (post-walk) + `_unitsWithCall` from `VisitFunctionCall`/`VisitInvokeStatement`/`VisitInlineMethodInvocationStatement` | 4 | GR4 normative (no Annex-E re-item); CALL of a program is NOT a trigger |
+| b EC-PROGRAM-EXCEPTIONS | a `>>TURN` for EC-ALL/EC-PROGRAM/EC-PROGRAM-ARG-OMITTED/EC-PROGRAM-NOT-FOUND in a source element (§3.164) that calls any function or invokes any method | `[B]` DONE — `TurnState.DirectiveLinesNaming` (post-walk) + the SOURCE-ELEMENT model (`_elements`) with calls from `VisitFunctionCall`/`VisitInvokeStatement`/`VisitInlineMethodInvocation` and the binder-recorded `DataBinder.ActivationSites` | 4 | GR4 normative (no Annex-E re-item); CALL of a program is NOT a trigger |
 | c I-O-STATUS-07 | a CLOSE with WITH NO REWIND or the UNIT phrase | `[B]` `BoundClose` — **needs a NoRewind model bit** (`BoundCloseKind` has ReelUnit but not NoRewind) | 3 | E.2 item 16. `CobolIO.g4 closeOption` already parses both |
-| d MOVE-TO-SAME-NAME | a MOVE whose send/receive resolve to the SAME DDE, and (1) category alphanumeric-edited, or (2) a subordinate OCCURS…DEPENDING whose DEPENDING item is subordinate to that DDE | `[B]` parse-tree visitor + per-unit `ReferenceResolver.FindItem` (same-DDE = `ReferenceEquals`) | 3 | GR4 normative (no Annex-E re-item) |
+| d MOVE-TO-SAME-NAME | a MOVE whose send/receive resolve to the SAME DDE, and (1) the OPERANDS are category alphanumeric-edited (a reference-modified operand is alphanumeric, §8.4.3.3.4 GR6 a), or (2) a subordinate OCCURS…DEPENDING whose DEPENDING item is subordinate to that DDE | `[B]` parse-tree visitor + per-unit `ReferenceResolver.FindItem` (same-DDE = `ReferenceEquals`) | 3 | GR4 normative (no Annex-E re-item) |
 | e RANGE-EXCEPTION-FOR-INDEX | an index-assignment/arithmetic SET whose receiver is an **index-name** (NOT a class-index DATA item — §14.9.39.4 Format-1 GR2b copies it unchanged, no range check), when EC-RANGE-INDEX checking is enabled | `[B]` parse-tree visitor: `DataBinder.IndexFields` + `TurnState` | 3 | GR4 normative |
 | f TERMINATE-WITH-VARYING | a TERMINATE of a report whose RD contains a VARYING clause | `[B]` `ReportWriterBinder` BindTerminate + ReportModel `Varyings` | 1 | GR4 normative |
 
@@ -239,20 +239,30 @@ rows (98, 100–113) are directive-driven, not edition gates, so they carry `<!-
     (USAGE INDEX) receiver UNCHANGED (no EC-RANGE-INDEX), and Format-2 GR4a checks only index-name-3 — so a USAGE
     INDEX data-item receiver is **NOT** flagged (matching only `IndexFields` names realizes this exactly, and the
     shared SET grammar's pointer / capacity / dynamic-length / object receivers are intrinsically excluded).
-  * **Scope note (d/e):** an OO **METHOD body** MOVE/SET has no `ProgramUnitContext→BoundUnit` entry, so `_current*`
-    stays null and the operand is not resolved — a documented advisory **false-negative** (never a false-positive).
+  * **Scope note (d/e):** an OO **METHOD body** MOVE/SET has no `BoundUnit` entry, so `_current*` stays null and the
+    operand is not resolved — a documented advisory **false-negative** (never a false-positive). A contained program
+    DOES have one: `_unitByIdentification` keys every program unit (outermost and contained) on its IDENTIFICATION
+    DIVISION node, the one node a contained program shares with the synthetic `programUnit` its binder is built over
+    (`BinderDriver.Reparent` adopts the children).
 * **Incr 4 — the new-analysis options.**
-  * **e/f I-O-STATUS-04/07 (DONE)** — one shared `VisitComparisonExpression` detector flags a reference to a
-    FILE-STATUS item that tests for '04'/'07', in TWO forms: a **relation** (a `comparisonExpression` with 2
-    `comparisonOperand`s + a `comparisonOperator`, the FILE-STATUS item on either side and the nonnumeric literal
-    '04'/'07' on the other) and a bare **level-88 condition-name** whose singleton `Condition88.Values` strips to
-    '04'/'07' on the FILE-STATUS item. The FILE-STATUS name set + the two 88-name sets are built in `Run` from
+  * **e/f I-O-STATUS-04/07 (DONE)** — one shared detector (`FlagConformancePass.FileStatus.cs`) flags a reference to
+    a FILE-STATUS item that tests for '04'/'07', in every place a condition compares: a **relation** (a
+    `comparisonExpression` with 2 `comparisonOperand`s + a `comparisonOperator`, the FILE-STATUS item on either side
+    and the nonnumeric literal '04'/'07' on the other); an **abbreviated combined relation** (`FS = "00" OR "04"`,
+    `AND NOT = "04"` — §8.8.4.12.4 GR1 inserts the last preceding stated subject, so the scan of a `condition`'s tiers
+    carries the leftmost operand of the last relation in source order, and a parenthesised condition restarts it); a
+    bare **level-88 condition-name** whose singleton `Condition88.Values` strips to '04'/'07' on the FILE-STATUS
+    item; and an **EVALUATE** selection subject/object pair (§14.9.13.3 SR2 pairs them by position, SR8 reads a
+    partial expression as preceded by its subject). A range (`WHEN "00" THRU "09"`) is not a test FOR '04': its
+    membership depends on the collating sequence. The FILE-STATUS name set + the two 88-name sets are built in `Run` from
     `unit.Data.Files[]` (`FileModel.FileStatusItem.CobolName` + its `Own88s`) — the m/f global-name-set idiom (a
     role fact, collision-tolerant), NOT the scope-sensitive per-unit resolution d/e use. Operand navigation reuses
     the canonical `ConditionBinder.SoleDataRef` (a lone reference, not an expression) + `valueOperand()
     .nonNumericLiteral().STRINGLIT()` — no bespoke tree walk (`feedback_path_a_leverage_tooling`).
-  * **d I-O-DECLARATIVE (DONE)** — two rules: (1) an INVALID-KEY-capable statement (WRITE/REWRITE/DELETE/START, or a
-    random READ) on a KEYED file (Organization RELATIVE/INDEXED — the only ones that raise an invalid-key condition)
+  * **d I-O-DECLARATIVE (DONE)** — two rules: (1) a statement that CAN be specified with an INVALID KEY phrase
+    (`AdmitsInvalidKey`: WRITE/START or a random READ on a KEYED file — Organization RELATIVE/INDEXED, the only ones
+    that raise an invalid-key condition; REWRITE unless the file is relative in sequential access mode,
+    §14.9.35.3 SR2; DELETE unless the file is in sequential access mode, §14.9.10.3 SR2)
     lacking its INVALID KEY phrase, when the unit has ANY open-mode USE declarative; (2) an AT-END-capable READ (a
     sequential retrieval — a NEXT/PREVIOUS direction, or AccessMode Sequential) lacking AT END, when the unit has an
     INPUT or I-O declarative. Per-unit modes are read from the BOUND model (`unit.Bound.Declaratives` —
@@ -261,15 +271,22 @@ rows (98, 100–113) are directive-driven, not edition gates, so they carry `<!-
     preceding the body). Per-statement file classification is from `_currentData.Files` (WRITE/REWRITE map their
     record name to its file via `FileModel.Records`). A file that does not resolve stays unflagged.
   * **FLAG-02 b EC-PROGRAM-EXCEPTIONS (DONE)** — a `>>TURN` for an EC-PROGRAM-family exception (EC-ALL, EC-PROGRAM,
-    EC-PROGRAM-ARG-OMITTED, EC-PROGRAM-NOT-FOUND) is flagged when its source element **calls a function** (a
-    `functionCall` node) or **invokes a method** (an `invokeStatement` / `inlineMethodInvocation`) — a CALL
-    of a program is deliberately NOT a trigger (GR4 b names only function and method). Because it flags a DIRECTIVE
-    (a frontend `>>TURN`, not a parse node), it runs POST-walk: `TurnState.DirectiveLinesNaming` exposes the `>>TURN`
-    lines naming any family name (ON/OFF alike; the raw events store the canonical name as-written, so a level-2
-    `EC-PROGRAM` matches without expansion); the walk records each unit with a call/invoke in `_unitsWithCall` (keyed
-    on the `_currentUnitCtx` save/restored per `VisitProgramUnit`, so a call in a nested program is attributed to the
-    nested element); `FlagEcProgramDirectives` maps each directive line to its innermost containing unit and flags it
-    when that unit has a call/invoke.
+    EC-PROGRAM-ARG-OMITTED, EC-PROGRAM-NOT-FOUND) is flagged when its **source element** (§3.164: a source unit
+    excluding its contained source units — a program, a function, a contained program, a class, an interface, a
+    method) **calls a function** (a `functionCall` node, a keyword-omitted function-identifier §8.4.3.2.3 SR2, a
+    function inside a subscript) or **invokes a method** (an `invokeStatement` / `inlineMethodInvocation` / a property
+    reference §8.4.3.9, whose accessor is a method) — a CALL of a program is deliberately NOT a trigger (GR4 b names
+    only function and method). The activations with no syntactic marker are not re-derived from syntax: the BINDER
+    records them where it decides them (`DataBinder.ActivationSites`, identity-keyed parse nodes and subscript
+    tokens; sites `IntrinsicBinder.KeywordOmittedFunction`, `ReferenceResolver.IsFunctionBearing`,
+    `OoTryBindPropertyReference`) and the pass reads that fact back. Because it flags a DIRECTIVE (a frontend `>>TURN`,
+    not a parse node), it runs POST-walk: `TurnState.DirectiveLinesNaming` exposes the `>>TURN` lines naming any
+    family name (ON/OFF alike; the raw events store the canonical name as-written, so a level-2 `EC-PROGRAM` matches
+    without expansion); the walk opens a `SourceElement` (its own line span + whether it calls/invokes) per source unit
+    and `SourceElementOf` maps each directive line to the INNERMOST element whose span contains it — a directive before
+    an element's IDENTIFICATION DIVISION belongs to the element that follows (§7.3.25.4 GR6: a TURN governs the statements
+    that follow). Each qualifying directive is flagged AT ITS OWN LINE (`FlagAtLine`), so two directives are two
+    located warnings.
   All 17 option-detectors are landed — the subsystem is COMPLETE. Wave I merges with the rest of the Wave-D work.
 
 ## 5. Testing

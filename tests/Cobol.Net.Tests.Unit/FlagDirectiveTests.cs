@@ -151,7 +151,7 @@ public sealed class FlagDirectiveTests
         "           CLOSE F.\n" +
         "           STOP RUN.\n";
 
-    private static IReadOnlyList<string> CompileWarnings(string source)
+    internal static IReadOnlyList<string> CompileWarnings(string source)
     {
         string dir = Path.Combine(Path.GetTempPath(), "CobolNet_Flag_" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(dir);

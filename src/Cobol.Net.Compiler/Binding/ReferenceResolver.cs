@@ -150,6 +150,10 @@ public sealed class ReferenceResolver(DataBinder data)
         // prepend a GET that §8.4.3.9.4 GR2 says a write-only occurrence must not invoke.)
         if (_probing) return model;
 
+        // A property reference invokes the get / set accessor METHOD (§8.4.3.9.4 GR1/GR2): the source element
+        // "invokes any method" for ISO §7.3.14.4 GR4 b, though the text is a qualified data reference.
+        if (site is not null) data.ActivationSites.Add(site);
+
         if (!data.OoRepositoryProperties.ContainsKey(name))
             data.Edition.Error("COBOLNET0843",
                 $"the object-property reference '{name}' OF '{recv}' requires a PROPERTY specifier in the "
@@ -2647,7 +2651,7 @@ public sealed class ReferenceResolver(DataBinder data)
         {
             if (tokens[i].Type is not (Core.SUB_IDENTIFIER or Core.IDENTIFIER)) continue;
             string w = tokens[i].Text;
-            if (w.Equals("FUNCTION", StringComparison.OrdinalIgnoreCase)) return true;
+            if (w.Equals("FUNCTION", StringComparison.OrdinalIgnoreCase)) return Activation(tokens[i]);
             int k = i + 1;
             while (k < tokens.Count && tokens[k].Type == Core.SUB_WS) k++;
             // GROUPING-PAREN-ONLY (fix-queue PB48): this arm detects the KEYWORD-OMITTED form `name(args)`,
@@ -2662,9 +2666,17 @@ public sealed class ReferenceResolver(DataBinder data)
             // directive is applied to it once, here.
             if (data.UserFunctionNames.Contains(w)
                 || data.IsRepositoryIntrinsic(FunctionWord.OfWrittenWord(w, data.CobolWords)))
-                return true;
+                return Activation(tokens[i]);
         }
         return false;
+
+        // The function-identifier's head token IS an activation site (ISO §7.3.14.4 GR4 b reads it back from
+        // DataBinder.ActivationSites — the subscript has no FunctionCall parse node of its own).
+        bool Activation(IToken head)
+        {
+            data.ActivationSites.Add(head);
+            return true;
+        }
     }
 
     /// <summary>The D18 route (fix-queue PB17, widened by PB42): materialize ANY segment the token renderer

@@ -409,6 +409,18 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// — which the SR13 user-word prohibition (<see cref="DeclareUserWord"/>) asks too.</summary>
     internal bool RepositoryAllIntrinsic { get; set; }
 
+    /// <summary>The parse nodes (and subscript tokens) the binder RESOLVED to a function activation or an object-property
+    /// accessor invocation although the text carries no syntactic marker of one: a function-identifier written without
+    /// the word FUNCTION (§8.4.3.2.3 SR2 — <c>UPPER-CASE (X)</c> under <c>REPOSITORY. FUNCTION ALL INTRINSIC</c>, an
+    /// ordinary-looking <c>dataReference</c>) and a property reference (§8.4.3.9 — <c>prop OF obj</c>, textually a
+    /// qualified data reference, whose get/set accessor is a METHOD invocation). Only the binder can tell these from a
+    /// subscripted or qualified data item, so it records the decision here once, where it makes it
+    /// (<c>IntrinsicBinder.KeywordOmittedFunction</c>, <c>ReferenceResolver.IsFunctionBearing</c>,
+    /// <c>ReferenceResolver.OoTryBindPropertyReference</c>), and the migration-flag pass reads it back for ISO §7.3.14.4
+    /// GR4 b ("the source element calls any function, or invokes any method") instead of re-deriving the rule from
+    /// syntax. Identity-keyed: a node is a call site or it is not.</summary>
+    internal HashSet<object> ActivationSites { get; } = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>Bind a program unit's DATA DIVISION + the FILE-CONTROL paragraph: the OPTIONS paragraph, the SELECT
     /// clauses, the FILE SECTION records (which share storage with the WORKING-STORAGE roots — they emit as Program
     /// fields), and WORKING-STORAGE; then classify the shared-storage (REDEFINES) classes over the whole forest and

@@ -41,6 +41,13 @@ internal static class PhraseBlocks
         return notFirst ? (second, first) : (first, second);
     }
 
+    /// <summary>Whether the phrase pair WRITES its positive (ON-X) branch: a lone block is the positive branch unless
+    /// the phrase is NOT-led, and a pair always has both. The question <see cref="Split"/> answers with a non-null
+    /// <c>On</c>, asked without binding anything — the migration-flag pass's "END-OF-PAGE phrase specified"
+    /// (ISO §7.3.15.4 GR4 m, whose §14.9.51.3 SR19 names the AT END-OF-PAGE and NOT AT END-OF-PAGE phrases separately).</summary>
+    public static bool HasOnBranch(Core.StatementBlockContext[] blocks, bool notFirst) =>
+        blocks.Length >= 2 || (blocks.Length == 1 && !notFirst);
+
     /// <summary>True when the phrase context begins with a NOT token — the ONE discriminator of the NOT-first
     /// alternative every two-branch phrase rule shares.</summary>
     public static bool StartsWithNot(IParseTree ctx) =>

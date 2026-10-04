@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using Antlr4.Runtime;                // ParserRuleContext — the source-element walk
 using CobolNet.Binding;              // FlagState / PictureAnalyzer / EditionContext
 using CobolNet.Binding.Model;        // Usage / PicCategory / PicInfo
 using CobolNet.Binding.Passes;       // GroupBindContext
@@ -29,7 +30,7 @@ namespace CobolNet.Validation;
 /// Syntactic options decide from the parse node directly; options needing a resolved fact look it up by name in the
 /// models reachable from <see cref="GroupBindContext"/>. Design SSOT: <c>docs/rearchitecture/DESIGN-flag-directives.md</c>.
 /// </summary>
-internal sealed class FlagConformancePass : CursorFollowingVisitor   // the cursor follows the walk (kb/Work PB82)
+internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // the cursor follows the walk (kb/Work PB82)
 {
     private readonly FlagState _flag;
     private readonly IDiagnosticSink _sink;
@@ -50,12 +51,14 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
     private readonly RefModZeroLengthState _refModZl;
     private readonly TurnState _turn;
     // Per-unit name resolution for the NAME-RESOLVING detectors (d MOVE-TO-SAME-NAME, e RANGE-EXCEPTION-FOR-INDEX):
-    // the map from each program unit's parse subtree to its bound model, and the CURRENT unit's data + resolver —
-    // set by VisitProgramUnit as the walk enters each unit's subtree so an operand resolves in ITS OWN COBOL name
-    // scope (duplicate data-names across programs must not cross-resolve; an index-name is likewise unit-scoped).
+    // the map from each program unit (outermost AND contained) to its bound model, keyed by the unit's IDENTIFICATION
+    // DIVISION node — the one node a nested program shares with the synthetic programUnit context its binder is
+    // built over (BinderDriver.Reparent adopts the children) — and the CURRENT unit's data + resolver, set by
+    // VisitUnit as the walk enters each unit's subtree so an operand resolves in ITS OWN COBOL name scope (duplicate
+    // data-names across programs must not cross-resolve; an index-name is likewise unit-scoped).
     // Null outside any program unit (an OO METHOD body — a documented advisory false-NEGATIVE, never a false-positive:
     // the flag simply does not fire there, which is safe for a migration aid).
-    private readonly IReadOnlyDictionary<CobolParserCore.ProgramUnitContext, BoundUnit> _unitByCtx;
+    private readonly IReadOnlyDictionary<CobolParserCore.IdentificationDivisionContext, BoundUnit> _unitByIdentification;
     private DataBinder? _currentData;
     private ReferenceResolver? _currentRefs;
     // The current unit's USE-declarative open modes (FLAG-14 d I-O-DECLARATIVE), read from the bound model: whether
@@ -63,11 +66,24 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
     // an INPUT / I-O one (the AT-END rule). Reset per unit in VisitProgramUnit (a nested unit does not inherit).
     private bool _hasAnyModeDecl;
     private bool _hasReadModeDecl;
-    // FLAG-02 b EC-PROGRAM-EXCEPTIONS: the current program unit's parse subtree, and the set of units whose body
-    // calls a function or invokes a method (collected during the walk). A >>TURN directive for an EC-PROGRAM-family
-    // exception is flagged (post-walk) when its innermost containing unit is in this set.
-    private CobolParserCore.ProgramUnitContext? _currentUnitCtx;
-    private readonly HashSet<CobolParserCore.ProgramUnitContext> _unitsWithCall = [];
+    // FLAG-02 b EC-PROGRAM-EXCEPTIONS (§7.3.14.4 GR4 b): the SOURCE ELEMENTS of the compilation group (§3.164 — a source
+    // unit excluding any contained source units: a program, a function, a contained program, a class, an interface and
+    // a method definition each), in source order, each recording whether its own text calls a function or invokes a
+    // method. A >>TURN directive for an EC-PROGRAM-family exception is flagged (post-walk) when the source element it
+    // belongs to calls or invokes. _activationSites is the BINDER's record of the activations that carry no syntactic
+    // marker (DataBinder.ActivationSites).
+    private readonly List<SourceElement> _elements = [];
+    private SourceElement? _currentElement;
+    private readonly IReadOnlySet<object> _activationSites;
+
+    /// <summary>One source element's own line span (its contained source units' text is inside it but not part of it —
+    /// the innermost element containing a line owns that line) and whether it calls or invokes.</summary>
+    private sealed class SourceElement(int firstLine, int lastLine)
+    {
+        public int FirstLine { get; } = firstLine;
+        public int LastLine { get; } = lastLine;
+        public bool CallsOrInvokes { get; set; }
+    }
 
     /// <summary>The EC-PROGRAM-family exception-names whose <c>&gt;&gt;TURN</c> directive FLAG-02 b flags
     /// (§7.3.14.4 GR4 b) — EC-ALL plus the three EC-PROGRAM level-3 names.</summary>
@@ -83,7 +99,8 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
         IReadOnlySet<string> linageWriteTargets, IReadOnlySet<string> varyingReports,
         IReadOnlySet<string> fileStatusNames, IReadOnlySet<string> fileStatus88Is04, IReadOnlySet<string> fileStatus88Is07,
         RefModZeroLengthState refModZl, TurnState turn,
-        IReadOnlyDictionary<CobolParserCore.ProgramUnitContext, BoundUnit> unitByCtx) : base(sink)
+        IReadOnlyDictionary<CobolParserCore.IdentificationDivisionContext, BoundUnit> unitByIdentification,
+        IReadOnlySet<object> activationSites) : base(sink)
     {
         _flag = flag;
         _sink = sink;
@@ -94,7 +111,8 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
         _fileStatus88Is07 = fileStatus88Is07;
         _refModZl = refModZl;
         _turn = turn;
-        _unitByCtx = unitByCtx;
+        _unitByIdentification = unitByIdentification;
+        _activationSites = activationSites;
     }
 
     /// <summary>Flag every construct an active FLAG option covers. A no-op (no walk) when no FLAG directive is
@@ -141,47 +159,90 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
                     varying.Add(report.Name);
         }
 
-        // Map each program unit's parse subtree to its bound model so VisitProgramUnit can select the current
+        // Map each program unit (outermost AND contained) to its bound model so VisitUnit can select the current
         // unit's data + resolver for the name-resolving detectors (d/e). OO class method bodies have no entry —
         // their MOVE/SET operands are not resolved (the documented advisory edge; _current* stays null there).
-        var unitByCtx = new Dictionary<CobolParserCore.ProgramUnitContext, BoundUnit>();
-        foreach (var unit in group.Units) unitByCtx[unit.Ctx] = unit;
+        var unitByIdentification = new Dictionary<CobolParserCore.IdentificationDivisionContext, BoundUnit>();
+        foreach (var unit in group.Units)
+            if (unit.Ctx.identificationDivision() is { } identification) unitByIdentification[identification] = unit;
+
+        // The binder's record of the function activations and property references that look like data references
+        // (DataBinder.ActivationSites) — every forest of the group, class and program alike.
+        var activationSites = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        foreach (var binder in group.AllBindersAndInterfaces()) activationSites.UnionWith(binder.ActivationSites);
 
         var pass = new FlagConformancePass(flag, sink, linage, varying, fileStatus, fs88_04, fs88_07,
-            group.Session.RefModZeroLength, group.Session.Turn, unitByCtx);
+            group.Session.RefModZeroLength, group.Session.Turn, unitByIdentification, activationSites);
         pass.VisitPositioned(group.Tree);
-        pass.FlagEcProgramDirectives(group.Units);   // b EC-PROGRAM-EXCEPTIONS — cross-ref >>TURN lines with call/invoke units
+        pass.FlagEcProgramDirectives();   // b EC-PROGRAM-EXCEPTIONS — cross-ref >>TURN lines with the source elements that call/invoke
     }
 
-    /// <summary>FLAG-02 b EC-PROGRAM-EXCEPTIONS (§7.3.14.4 GR4 b) — flag every <c>&gt;&gt;TURN</c> directive that names
-    /// an EC-PROGRAM-family exception when the source element that contains it calls a function or invokes a method.
-    /// Runs after the walk: the directive lines come from <see cref="TurnState"/> (a frontend event, not a parse
-    /// node), and <see cref="_unitsWithCall"/> was populated during the walk.</summary>
-    private void FlagEcProgramDirectives(IReadOnlyList<BoundUnit> units)
+    /// <summary>FLAG-02 b EC-PROGRAM-EXCEPTIONS (§7.3.14.4 GR4 b) — flag EACH <c>&gt;&gt;TURN</c> directive that names an
+    /// EC-PROGRAM-family exception when the source element it belongs to calls a function or invokes a method. Runs
+    /// after the walk: the directive lines come from <see cref="TurnState"/> (a frontend event, not a parse node), and
+    /// the elements' call facts were collected during the walk. Each warning is positioned AT its directive's line, so
+    /// two qualifying directives in one element are two located warnings, never one that names neither.</summary>
+    private void FlagEcProgramDirectives()
     {
         foreach (int line in _turn.DirectiveLinesNaming(EcProgramFamily).Distinct())
-        {
-            // The INNERMOST program unit whose parse span contains the directive line (a nested program is its own
-            // source element; its call/invoke does not count for a containing program's directive, and vice versa).
-            BoundUnit? owner = null;
-            foreach (var u in units)
-                if (u.Ctx.Start.Line <= line && line <= u.Ctx.Stop.Line
-                    && (owner is null || u.Ctx.Start.Line > owner.Ctx.Start.Line))
-                    owner = u;
-            if (owner is not null && _unitsWithCall.Contains(owner.Ctx))
-                Flag(FlagOption.Flag02EcProgramExceptions, line,
+            if (SourceElementOf(line) is { CallsOrInvokes: true })
+                FlagAtLine(FlagOption.Flag02EcProgramExceptions, line,
                     "the >>TURN for an EC-PROGRAM-family exception in a source element that calls a function or invokes a method");
+    }
+
+    /// <summary>The source element a directive written on <paramref name="line"/> belongs to: the INNERMOST element whose
+    /// span contains the line (a contained program, a method, … is its own source element — §3.164 excludes it from
+    /// its container — so its call/invoke does not count for a containing element's directive, and vice versa); a
+    /// directive written BEFORE an element's IDENTIFICATION DIVISION (it is in no element's span yet) belongs to the
+    /// element that follows it, the one whose text it governs (§7.3.25.4 GR6: a TURN governs the statements that follow
+    /// it) — the earliest-starting element after the line, the OUTERMOST when a container and its first contained
+    /// element start together (they are recorded outermost first). Null after the last element.</summary>
+    private SourceElement? SourceElementOf(int line)
+    {
+        SourceElement? inner = null, next = null;
+        foreach (var e in _elements)
+        {
+            if (e.FirstLine <= line && line <= e.LastLine)
+            {
+                if (inner is null || e.LastLine - e.FirstLine <= inner.LastLine - inner.FirstLine) inner = e;
+            }
+            else if (e.FirstLine > line && next is null)
+                next = e;
         }
+        return inner ?? next;
+    }
+
+    // ── The source-element walk (§3.164). Every definition that is a source unit opens an element; a program unit
+    //    (outermost, contained, or a function) also selects its name-resolution scope. ──
+
+    public override object? VisitProgramUnit(CobolParserCore.ProgramUnitContext ctx) => VisitUnit(ctx, ctx.identificationDivision());
+
+    public override object? VisitNestedProgram(CobolParserCore.NestedProgramContext ctx) => VisitUnit(ctx, ctx.identificationDivision());
+
+    public override object? VisitClassDefinition(CobolParserCore.ClassDefinitionContext ctx) => VisitElement(ctx);
+
+    public override object? VisitInterfaceDefinition(CobolParserCore.InterfaceDefinitionContext ctx) => VisitElement(ctx);
+
+    public override object? VisitMethodDefinition(CobolParserCore.MethodDefinitionContext ctx) => VisitElement(ctx);
+
+    /// <summary>Open the source element <paramref name="ctx"/> for the walk of its subtree and close it on exit.</summary>
+    private object? VisitElement(ParserRuleContext ctx)
+    {
+        var element = new SourceElement(ctx.Start.Line, ctx.Stop?.Line ?? ctx.Start.Line);
+        _elements.Add(element);
+        var enclosing = _currentElement;
+        _currentElement = element;
+        try { return base.VisitChildren(ctx); }
+        finally { _currentElement = enclosing; }
     }
 
     /// <summary>Select the current program unit's data + resolver for the walk of its subtree (the name-resolving
     /// detectors d/e resolve operands in THIS unit's COBOL name scope), with save/restore so a nested program
     /// restores its container's scope on exit.</summary>
-    public override object? VisitProgramUnit(CobolParserCore.ProgramUnitContext ctx)
+    private object? VisitUnit(ParserRuleContext ctx, CobolParserCore.IdentificationDivisionContext? identification)
     {
-        var saved = (_currentData, _currentRefs, _hasAnyModeDecl, _hasReadModeDecl, _currentUnitCtx);
-        _currentUnitCtx = ctx;
-        if (_unitByCtx.TryGetValue(ctx, out var unit))
+        var saved = (_currentData, _currentRefs, _hasAnyModeDecl, _hasReadModeDecl);
+        if (identification is not null && _unitByIdentification.TryGetValue(identification, out var unit))
         {
             _currentData = unit.Data;
             _currentRefs = unit.Refs;
@@ -192,34 +253,48 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
             _hasReadModeDecl = modes is not null && modes.Any(d =>
                 d.ModeIndex == (int)FileOpenMode.Input || d.ModeIndex == (int)FileOpenMode.IO);
         }
-        try { return base.VisitChildren(ctx); }
-        finally { (_currentData, _currentRefs, _hasAnyModeDecl, _hasReadModeDecl, _currentUnitCtx) = saved; }
+        try { return VisitElement(ctx); }
+        finally { (_currentData, _currentRefs, _hasAnyModeDecl, _hasReadModeDecl) = saved; }
     }
 
     // ── FLAG-02 b EC-PROGRAM-EXCEPTIONS (§7.3.14.4 GR4 b) — record that the current source element calls a function
-    //    (a FUNCTION activation) or invokes a method (INVOKE, or the §8.4.3.4 inline method invocation). The >>TURN
-    //    directives are flagged post-walk (FlagEcProgramDirectives), keyed on the innermost containing unit. ──
+    //    (a FUNCTION activation, a keyword-omitted function-identifier §8.4.3.2.3 SR2) or invokes a method (INVOKE,
+    //    the §8.4.3.4 inline method invocation, or a §8.4.3.9 property reference, whose accessor is a method). The
+    //    >>TURN directives are flagged post-walk (FlagEcProgramDirectives), keyed on the source element they belong to. ──
     public override object? VisitFunctionCall(CobolParserCore.FunctionCallContext ctx)
     {
-        if (_currentUnitCtx is not null) _unitsWithCall.Add(_currentUnitCtx);
+        NoteActivation();
         return base.VisitChildren(ctx);
     }
 
     public override object? VisitInvokeStatement(CobolParserCore.InvokeStatementContext ctx)
     {
-        if (_currentUnitCtx is not null) _unitsWithCall.Add(_currentUnitCtx);
+        NoteActivation();
         return base.VisitChildren(ctx);
     }
 
     public override object? VisitInlineMethodInvocation(CobolParserCore.InlineMethodInvocationContext ctx)
     {
-        if (_currentUnitCtx is not null) _unitsWithCall.Add(_currentUnitCtx);
+        NoteActivation();
         return base.VisitChildren(ctx);
     }
 
-    /// <summary>Emit the option's Warning if it is flagging at <paramref name="line"/>. The Code is per-directive;
-    /// the ConstructId (suppress-key), Message, and Citation are per-option (spec-faithful — each names its own GR4
-    /// sub-rule + Annex-E item).</summary>
+    /// <summary>A data reference the BINDER resolved to a keyword-omitted function-identifier or a property reference
+    /// (<see cref="DataBinder.ActivationSites"/>): the two activations whose text looks like a data reference.</summary>
+    public override object? VisitDataReference(CobolParserCore.DataReferenceContext ctx)
+    {
+        if (_activationSites.Contains(ctx)) NoteActivation();
+        return base.VisitChildren(ctx);
+    }
+
+    private void NoteActivation()
+    {
+        if (_currentElement is not null) _currentElement.CallsOrInvokes = true;
+    }
+
+    /// <summary>Emit the option's Warning if it is flagging at <paramref name="line"/>, positioned where the sink's
+    /// cursor stands (the walk follows the construct). The Code is per-directive; the ConstructId (suppress-key),
+    /// Message, and Citation are per-option (spec-faithful — each names its own GR4 sub-rule + Annex-E item).</summary>
     private void Flag(FlagOption option, int line, string where)
     {
         if (!_flag.IsOnAt(line, option)) return;
@@ -230,6 +305,17 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
         _sink.Report(new EditionDiagnostic(code, EditionSeverity.Warning, constructId,
             $"{info.Change} — flagged by >>{FlagDirectiveLine.DirectiveWord(info.Directive)} {info.Word}",
             where, info.Citation));
+    }
+
+    /// <summary><see cref="Flag"/> for a construct that is NOT a parse node of the walk — a compiler directive (the
+    /// <c>&gt;&gt;TURN</c> of FLAG-02 b), known only by its resultant-text line: the warning is positioned AT that line
+    /// (column 0, the directive's own start — the form <c>TurnState.Build</c> positions its directive diagnostics
+    /// in). Without a position the warning carried no location and two identical unlocated warnings collapsed into one
+    /// (kb/Work PB1376).</summary>
+    private void FlagAtLine(FlagOption option, int line, string where)
+    {
+        using var _ = _sink.At(line, 0);
+        Flag(option, line, where);
     }
 
     // ── FLAG-14 h READ-PREVIOUS (§7.3.15.4 GR4 h) — a READ … PREVIOUS (sequential or keyed; the parse rule is
@@ -251,7 +337,7 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
                 FlagIoDeclarative(ctx.Start.Line, "a READ without an AT END phrase");
         }
         else
-            IoDeclarativeInvalidKey(ctx.readInvalidKey() is not null, file, ctx.Start.Line);
+            IoDeclarativeInvalidKey(InvalidKeyVerb.Read, ctx.readInvalidKey() is not null, file, ctx.Start.Line);
         return base.VisitChildren(ctx);
     }
 
@@ -281,18 +367,42 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
     //    the >>REF-MOD-ZERO-LENGTH directive is UNSPECIFIED (neither explicit ON nor OFF) at the site AND
     //    EC-BOUND-REF-MOD checking is on there (a zero-length result would then raise the exception). A ref-mod
     //    reaches the parser two ways: the default-mode `refModSpec`, and — for a data reference — a
-    //    `subscriptOrRefMod` carrying a SUB_COLON (the grammar leaves subscript-vs-refmod to the binder). ──
+    //    `subscriptOrRefMod` carrying a SUB_COLON (the grammar leaves subscript-vs-refmod to the binder). GR4 i
+    //    flags "a reference modification of a data-item" — the reference modification of a FUNCTION's result
+    //    (`FUNCTION UPPER-CASE (X) (1:2)`, or the keyword-omitted form) is not one. ──
     public override object? VisitRefModSpec(CobolParserCore.RefModSpecContext ctx)
     {
-        FlagRefMod(ctx.Start.Line);
+        if (!ModifiesAFunctionResult(ctx)) FlagRefMod(ctx.Start.Line);
         return base.VisitChildren(ctx);
     }
 
     public override object? VisitSubscriptOrRefMod(CobolParserCore.SubscriptOrRefModContext ctx)
     {
-        // A top-level SUB_COLON among the sub-tokens ⇒ a reference modification, not a subscript list.
-        if (ctx.subToken().Any(t => t.SUB_COLON() is not null)) FlagRefMod(ctx.Start.Line);
+        // A SUB_COLON among the sub-tokens ⇒ a reference modification, not a subscript list. On a function-identifier
+        // the colon that makes the group a reference modification OF THE RESULT is at depth 0; a colon only inside the
+        // argument parentheses is a data item's own reference modification (`UPPER-CASE (X (1:2))`).
+        if (ctx.subToken().Any(t => t.SUB_COLON() is not null)
+            && (!ModifiesAFunctionResult(ctx) || !ReferenceResolver.HasDepth0Colon(ctx)))
+            FlagRefMod(ctx.Start.Line);
+        // A function-identifier written INSIDE the captured group (`TBL (FUNCTION LENGTH (X))`, or keyword-omitted)
+        // has no FunctionCall node: the subscript renderer recorded its head token (ReferenceResolver.IsFunctionBearing).
+        if (ctx.subToken().Any(t => _activationSites.Contains(t.Start))) NoteActivation();
         return base.VisitChildren(ctx);
+    }
+
+    /// <summary>Whether the reference modification <paramref name="refMod"/> modifies the RESULT of a function rather
+    /// than a data item: its host — the nearest enclosing function call, or data reference — is a FUNCTION activation (an
+    /// explicit <c>functionCall</c>, or a data reference the binder resolved to a keyword-omitted function,
+    /// <see cref="DataBinder.ActivationSites"/>).</summary>
+    private bool ModifiesAFunctionResult(ParserRuleContext refMod)
+    {
+        for (var host = refMod.Parent; host is not null; host = host.Parent)
+            switch (host)
+            {
+                case CobolParserCore.FunctionCallContext: return true;
+                case CobolParserCore.DataReferenceContext dref: return _activationSites.Contains(dref);
+            }
+        return false;
     }
 
     private void FlagRefMod(int line)
@@ -307,7 +417,7 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
     //    ONE PictureAnalyzer). FILLER-safe (no name lookup). ──
     public override object? VisitDataDescriptionEntry(CobolParserCore.DataDescriptionEntryContext ctx)
     {
-        var (picture, value, usage) = Clauses(ctx);
+        var (picture, value, usage, blankWhenZero) = Clauses(ctx);
         if (value is not null)
         {
             int line = value.Start.Line;
@@ -324,7 +434,7 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
                     "a figurative constant in the VALUE clause of a data item with no specified length");
 
             // g/l/j — numeric-edited items only.
-            if (picture is not null && IsNumericEditedPicture(picture))
+            if (picture is not null && IsNumericEditedPicture(picture, blankWhenZero))
             {
                 if (fig is not null)
                 {
@@ -348,12 +458,29 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
         return base.VisitChildren(ctx);
     }
 
+    // ── FLAG-14 b COMPILE-TIME-ARITHMETIC-EXPRESSIONS (§7.3.15.4 GR4 b) at the CONSTANT entry — arithmetic-expression-1
+    //    of `CONSTANT AS …` is a compile-time arithmetic expression (§7.3.6.1; "may be specified in the DEFINE and
+    //    EVALUATE directives, in a constant conditional expression, and in a constant entry"). The directive operands
+    //    are flagged at the conditional-compilation stage; this is the one site that stage never sees. Both ask
+    //    FlagOptions.IsFlaggableCompileTimeArithmetic. ──
+    public override object? VisitConstantEntryBody(CobolParserCore.ConstantEntryBodyContext ctx)
+    {
+        if (ctx.constantValue()?.arithmeticExpression() is { } expression
+            && FlagOptions.IsFlaggableCompileTimeArithmetic(expression))
+            Flag(FlagOption.Flag14CompileTimeArithmeticExpressions, ctx.Start.Line,
+                "the arithmetic expression of a CONSTANT entry");
+        return base.VisitChildren(ctx);
+    }
+
     // ── FLAG-14 m WRITE-END-OF-PAGE (§7.3.15.4 GR4 m) — a WRITE that ALLOWS an END-OF-PAGE phrase (its file has a
-    //    LINAGE clause, §14.9.51) but does not specify it. The "allows EOP" fact is the file's LINAGE, resolved by
-    //    name from the model; anchored at the WRITE. ──
+    //    LINAGE clause, §14.9.51) but does not specify it. "The END-OF-PAGE phrase" is the positive AT END-OF-PAGE
+    //    phrase: §14.9.51.3 SR19 names it and the NOT END-OF-PAGE phrase separately, so a WRITE written with only the
+    //    NOT phrase does not specify it. The "allows EOP" fact is the file's LINAGE, resolved by name from the model;
+    //    anchored at the WRITE. ──
     public override object? VisitWriteStatement(CobolParserCore.WriteStatementContext ctx)
     {
-        if (ctx.writeAtEndOfPage() is null)
+        if (ctx.writeAtEndOfPage() is not { } eop
+            || !PhraseBlocks.HasOnBranch(eop.statementBlock(), PhraseBlocks.StartsWithNot(eop)))
         {
             // recordName (a dataReference — unqualified for a WRITE record in practice; a qualified record name is a
             // rare false-negative for this advisory flag) or the FILE fileName form.
@@ -363,7 +490,7 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
                     "the WRITE without an END-OF-PAGE phrase (the file has a LINAGE clause)");
         }
         // d I-O-DECLARATIVE — a WRITE to a keyed file (INVALID-KEY-capable) without an INVALID KEY phrase.
-        IoDeclarativeInvalidKey(ctx.writeInvalidKey() is not null,
+        IoDeclarativeInvalidKey(InvalidKeyVerb.Write, ctx.writeInvalidKey() is not null,
             FileByRecordOrName(ctx.recordName()?.GetText(), ctx.fileName()?.GetText()), ctx.Start.Line);
         return base.VisitChildren(ctx);
     }
@@ -373,42 +500,55 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
     //    has an INPUT/OUTPUT/I-O/EXTEND USE declarative (which now executes on the exception at 2023). ──
     public override object? VisitRewriteStatement(CobolParserCore.RewriteStatementContext ctx)
     {
-        IoDeclarativeInvalidKey(ctx.rewriteInvalidKeyPhrase() is not null,
+        IoDeclarativeInvalidKey(InvalidKeyVerb.Rewrite, ctx.rewriteInvalidKeyPhrase() is not null,
             FileByRecordOrName(ctx.recordName()?.GetText(), ctx.fileName()?.GetText()), ctx.Start.Line);
         return base.VisitChildren(ctx);
     }
 
     public override object? VisitDeleteStatement(CobolParserCore.DeleteStatementContext ctx)
     {
-        IoDeclarativeInvalidKey(ctx.deleteInvalidKeyPhrase() is not null,
+        IoDeclarativeInvalidKey(InvalidKeyVerb.Delete, ctx.deleteInvalidKeyPhrase() is not null,
             FileByName(ctx.fileName()?.GetText()), ctx.Start.Line);
         return base.VisitChildren(ctx);
     }
 
     public override object? VisitStartStatement(CobolParserCore.StartStatementContext ctx)
     {
-        IoDeclarativeInvalidKey(ctx.startInvalidKeyPhrase() is not null,
+        IoDeclarativeInvalidKey(InvalidKeyVerb.Start, ctx.startInvalidKeyPhrase() is not null,
             FileByName(ctx.fileName()?.GetText()), ctx.Start.Line);
         return base.VisitChildren(ctx);
     }
 
-    /// <summary>Rule 1 of GR4 d — flag an INVALID-KEY-capable statement (its file is RELATIVE or INDEXED, so an
-    /// invalid-key condition can occur, §14.9 / E.2 item 19a) that lacks its INVALID KEY phrase, when the unit has
-    /// ANY open-mode USE declarative.</summary>
-    private void IoDeclarativeInvalidKey(bool phrasePresent, FileModel? file, int line)
+    /// <summary>Rule 1 of GR4 d — flag a statement that CAN be specified with an INVALID KEY phrase
+    /// (<see cref="AdmitsInvalidKey"/>) but lacks it, when the unit has ANY open-mode USE declarative.</summary>
+    private void IoDeclarativeInvalidKey(InvalidKeyVerb verb, bool phrasePresent, FileModel? file, int line)
     {
-        if (!phrasePresent && _hasAnyModeDecl && IsKeyed(file))
+        if (!phrasePresent && _hasAnyModeDecl && AdmitsInvalidKey(verb, file))
             FlagIoDeclarative(line, "an I-O statement without an INVALID KEY phrase");
     }
+
+    /// <summary>The statements GR4 d reads for an INVALID KEY phrase.</summary>
+    private enum InvalidKeyVerb { Read, Write, Rewrite, Delete, Start }
 
     private void FlagIoDeclarative(int line, string what)
         => Flag(FlagOption.Flag14IoDeclarative, line,
             $"{what} while an INPUT/OUTPUT/I-O/EXTEND USE declarative is in effect (it now executes on the exception)");
 
-    /// <summary>Whether the file admits an invalid-key condition (ISO §12.4.5.10 — a RELATIVE or INDEXED, i.e.
-    /// keyed, organization). SEQUENTIAL / LINE SEQUENTIAL files never raise an invalid-key condition.</summary>
-    private static bool IsKeyed(FileModel? file)
-        => file?.Organization is FileOrganization.Relative or FileOrganization.Indexed;
+    /// <summary>Whether <paramref name="verb"/> on <paramref name="file"/> "can be specified with an INVALID KEY phrase"
+    /// (§7.3.15.4 GR4 d) — the syntax rules of each statement decide, not the file's organization alone. A file with
+    /// SEQUENTIAL / LINE SEQUENTIAL organization never raises an invalid-key condition (§12.4.5.10 — only a RELATIVE or
+    /// INDEXED, i.e. keyed, file does); then WRITE takes the phrase for every keyed file (§14.9.51.3 SR3: format 2),
+    /// START and a random READ likewise, but REWRITE shall not specify it "for a file with sequential organization or
+    /// a file with relative organization and sequential access mode" (§14.9.35.3 SR2) and DELETE RECORD shall not
+    /// when it "references a file that is in sequential access mode" (§14.9.10.3 SR2). Flagging a statement the
+    /// phrase cannot be written on is a false warning no source change can silence.</summary>
+    private static bool AdmitsInvalidKey(InvalidKeyVerb verb, FileModel? file)
+        => file is { Organization: FileOrganization.Relative or FileOrganization.Indexed } && verb switch
+        {
+            InvalidKeyVerb.Rewrite => !(file.Organization == FileOrganization.Relative && file.AccessMode == FileAccessMode.Sequential),
+            InvalidKeyVerb.Delete => file.AccessMode != FileAccessMode.Sequential,
+            _ => true,
+        };
 
     /// <summary>The current unit's <see cref="FileModel"/> named <paramref name="name"/> (source name; the flag pass
     /// runs before file-connector renaming), or null.</summary>
@@ -443,15 +583,16 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
     // ── FLAG-02 d MOVE-TO-SAME-NAME (§7.3.14.4 GR4 d) — a MOVE whose sending and a receiving operand are described
     //    by the SAME data description entry (symbol identity: both resolve to the one <see cref="DataItem"/>, so
     //    differing subscripts / ref-mod of one item still count — §14.9.39 "same data description entry"), when that
-    //    DDE is (1) category alphanumeric-edited, or (2) has a subordinate OCCURS…DEPENDING whose DEPENDING item is
-    //    subordinate to it. Resolved in the CURRENT unit's scope (VisitProgramUnit). ──
+    //    DDE is (1) of category alphanumeric-edited — the category of the OPERANDS, so a reference-modified operand
+    //    (alphanumeric, §8.4.3.3.4 GR6 a) does not meet it — or (2) has a subordinate OCCURS…DEPENDING whose DEPENDING
+    //    item is subordinate to it. Resolved in the CURRENT unit's scope (VisitUnit). ──
     public override object? VisitMoveStatement(CobolParserCore.MoveStatementContext ctx)
     {
         var (send, recvs) = MoveOperands(ctx);
         if (send is not null && ResolveItem(send) is { } sendItem)
             foreach (var recv in recvs)
                 if (ResolveItem(recv) is { } recvItem && ReferenceEquals(sendItem, recvItem)
-                    && MoveToSameNameFlaggable(sendItem))
+                    && MoveToSameNameFlaggable(sendItem, operandsRefModified: IsRefModified(send) || IsRefModified(recv)))
                 {
                     Flag(FlagOption.Flag02MoveToSameName, ctx.Start.Line,
                         "the MOVE whose sending and receiving operands are the same data description entry");
@@ -491,19 +632,34 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
         return _currentRefs.FindItem(name, quals);
     }
 
-    /// <summary>Whether a same-DDE MOVE operand triggers GR4 d: (1) the DDE is category alphanumeric-edited (the ONE
-    /// established test — <see cref="PicCategory.Alphanumeric"/> storage carrying an edit mask, §13.18.40), or (2) it
-    /// includes a subordinate OCCURS…DEPENDING clause whose DEPENDING item is subordinate to it (§13.18.38 — a group
-    /// moved to itself whose length depends on a count inside the moved region).
+    /// <summary>Whether a same-DDE MOVE operand triggers GR4 d: (1) the OPERANDS are category alphanumeric-edited (the
+    /// ONE established test — <see cref="PicCategory.Alphanumeric"/> storage carrying an edit mask, §13.18.40 — on an
+    /// operand that is not reference-modified: for a reference-modified unique data item "the category
+    /// alphanumeric-edited is considered class and category alphanumeric", §8.4.3.3.4 GR6 a, so the operand's category
+    /// is not the DDE's), or (2) the DDE includes a subordinate OCCURS…DEPENDING clause whose DEPENDING item is
+    /// subordinate to it (§13.18.38 — a group moved to itself whose length depends on a count inside the moved region;
+    /// a property of the entry, which a reference modification does not change).
     /// <para>⛔ NATIONAL-EDITED IS DELIBERATELY ABSENT, and it is not the PB492 oversight it looks like: §7.3.14.4
     /// GR4 d) 1. names "category alphanumeric-edited" and stops, while §14.9.25.4 GR6 b) 1. — the rule about the
     /// same overlap — names "alphanumeric-edited or national-edited". The FLAG is narrower than the undefined
     /// behaviour it flags, in the printed standard, so this reads <see cref="PicInfo.EditMask"/> beside the
     /// ALPHANUMERIC category rather than <c>PicInfo.IsCharacterEdited</c>. Widening it would flag conforming
     /// source under a directive whose own rule does not cover it.</para></summary>
-    private static bool MoveToSameNameFlaggable(DataItem item)
-        => item.Pic is { Category: PicCategory.Alphanumeric, EditMask: not null }
+    private static bool MoveToSameNameFlaggable(DataItem item, bool operandsRefModified)
+        => (!operandsRefModified && item.Pic is { Category: PicCategory.Alphanumeric, EditMask: not null })
         || (OdoModel.TableUnder(item) is { OccursSpec.Depending: { } dep } && OdoModel.IsWithin(dep, item));
+
+    /// <summary>Whether the reference carries a reference modification (§8.4.3.3): a <c>refModPart</c> suffix, or the
+    /// parenthesized group the lexer captured as a subscript list that holds a depth-0 colon (the grammar leaves
+    /// subscript-versus-reference-modification to the binder — <see cref="ReferenceResolver.HasDepth0Colon"/> is the
+    /// one test the resolver itself asks).</summary>
+    private static bool IsRefModified(CobolParserCore.DataReferenceContext dref)
+        => dref.dataReferenceSuffix().Any(s => s.refModPart() is not null
+            || IsRefModGroup(s.subscriptPart())
+            || (s.qualification() is { } q && (q.refModPart().Length > 0 || q.subscriptPart().Any(IsRefModGroup))));   // `X OF G (1:3)`
+
+    private static bool IsRefModGroup(CobolParserCore.SubscriptPartContext? group)
+        => group?.subscriptOrRefMod() is { } captured && ReferenceResolver.HasDepth0Colon(captured);
 
     // ── FLAG-02 e RANGE-EXCEPTION-FOR-INDEX (§7.3.14.4 GR4 e) — a Format-1 index-assignment (SET … TO) or Format-2
     //    index-arithmetic (SET … UP/DOWN BY) whose receiving field is an INDEX-NAME, flagged when EC-RANGE-INDEX
@@ -543,90 +699,38 @@ internal sealed class FlagConformancePass : CursorFollowingVisitor   // the curs
         }
     }
 
-    // ── FLAG-14 e I-O-STATUS-04 / f I-O-STATUS-07 (§7.3.15.4 GR4 e/f) — a reference to a FILE STATUS data item that
-    //    tests for '04' / '07'. Two forms: a RELATION comparing the FILE-STATUS item to the 2-character nonnumeric
-    //    literal '04'/'07' (either operand order, any relational operator), and a bare level-88 CONDITION-NAME
-    //    reference where that 88's singleton VALUE is '04'/'07' on the FILE-STATUS item. ──
-    public override object? VisitComparisonExpression(CobolParserCore.ComparisonExpressionContext ctx)
-    {
-        if (_fileStatusNames.Count > 0 || _fileStatus88Is04.Count > 0 || _fileStatus88Is07.Count > 0)
-        {
-            var ops = ctx.comparisonOperand();
-            if (ctx.comparisonOperator() is not null && ops.Length == 2)
-            {
-                // Relation form: one side the FILE-STATUS item, the other the literal '04' / '07' (either order).
-                IoStatusRelation(ops[0], ops[1], ctx.Start.Line);
-                IoStatusRelation(ops[1], ops[0], ctx.Start.Line);
-            }
-            else if (ctx.comparisonOperator() is null && ctx.className() is null && ctx.POSITIVE() is null
-                     && ctx.NEGATIVE() is null && ctx.ZERO() is null && ops.Length == 1
-                     && BareRefName(ops[0]) is { } cond)
-            {
-                // Condition-name form: a bare reference to an 88 on a FILE-STATUS item whose VALUE is '04' / '07'.
-                if (_fileStatus88Is04.Contains(cond)) Flag(FlagOption.Flag14IoStatus04, ctx.Start.Line,
-                    "a reference to a FILE STATUS condition-name that tests for '04'");
-                if (_fileStatus88Is07.Contains(cond)) Flag(FlagOption.Flag14IoStatus07, ctx.Start.Line,
-                    "a reference to a FILE STATUS condition-name that tests for '07'");
-            }
-        }
-        return base.VisitChildren(ctx);
-    }
-
-    /// <summary>Flag the relation when <paramref name="nameOp"/> is a bare reference to a FILE-STATUS item and
-    /// <paramref name="litOp"/> is the nonnumeric literal '04' (I-O-STATUS-04) or '07' (I-O-STATUS-07).</summary>
-    private void IoStatusRelation(CobolParserCore.ComparisonOperandContext nameOp,
-        CobolParserCore.ComparisonOperandContext litOp, int line)
-    {
-        if (BareRefName(nameOp) is not { } name || !_fileStatusNames.Contains(name)) return;
-        switch (OperandLiteral(litOp))
-        {
-            case "04": Flag(FlagOption.Flag14IoStatus04, line, "a relation testing a FILE STATUS item for '04'"); break;
-            case "07": Flag(FlagOption.Flag14IoStatus07, line, "a relation testing a FILE STATUS item for '07'"); break;
-        }
-    }
-
-    /// <summary>The base data-name when the operand is a SOLE data reference (the canonical
-    /// <see cref="ConditionBinder.SoleDataRef"/> unwrap — non-null only when the arithmetic operand is a lone
-    /// reference, not an expression), else null.</summary>
-    private static string? BareRefName(CobolParserCore.ComparisonOperandContext op)
-    {
-        if (op.valueOperand()?.arithmeticExpression() is not { } arith
-            || ConditionBinder.SoleDataRef(arith) is not { } dref) return null;
-        DataReferenceCst r = dref;
-        return r.Register == SpecialRegister.None ? r.BaseName : null;
-    }
-
-    /// <summary>The stripped text of a SOLE nonnumeric string-literal operand (§8.3.3.2), else null.</summary>
-    private static string? OperandLiteral(CobolParserCore.ComparisonOperandContext op)
-        => op.valueOperand()?.nonNumericLiteral()?.STRINGLIT() is { } s ? StripLiteral(s.GetText()) : null;
-
-    /// <summary>The entry's PICTURE string, VALUE clause, and USAGE clause (each null when absent) — read once from
-    /// the data-description clauses.</summary>
-    private static (string? Picture, CobolParserCore.ValueClauseContext? Value, CobolParserCore.UsageClauseContext? Usage)
-        Clauses(CobolParserCore.DataDescriptionEntryContext ctx)
+    /// <summary>The entry's PICTURE string, VALUE clause, and USAGE clause (each null when absent), and whether it
+    /// carries a BLANK WHEN ZERO clause — read once from the data-description clauses.</summary>
+    private static (string? Picture, CobolParserCore.ValueClauseContext? Value, CobolParserCore.UsageClauseContext? Usage,
+        bool BlankWhenZero) Clauses(CobolParserCore.DataDescriptionEntryContext ctx)
     {
         var list = ctx.dataDescriptionBody()?.dataDescriptionClauses()?.dataDescriptionClause();
         string? pic = null;
         CobolParserCore.ValueClauseContext? value = null;
         CobolParserCore.UsageClauseContext? usage = null;
+        bool blankWhenZero = false;
         if (list is not null)
             foreach (var c in list)
             {
                 if (c.pictureClause()?.PIC_STRING() is { } ps) pic = ps.GetText();
                 if (c.valueClause() is { } vc) value = vc;
                 if (c.usageClause() is { } uc) usage = uc;
+                if (c.blankWhenZeroClause() is not null) blankWhenZero = true;
             }
-        return (pic, value, usage);
+        return (pic, value, usage, blankWhenZero);
     }
 
-    /// <summary>Whether a PICTURE string classifies as <see cref="PicCategory.NumericEdited"/> via the ONE
-    /// <see cref="PictureAnalyzer"/> (discard sink; §13.18.40). A custom CURRENCY SIGN symbol is not threaded — a
-    /// numeric-edited picture using a non-default currency symbol is a rare false-negative, never a false-positive.
-    /// DECIMAL-POINT IS COMMA IS threaded, because the §13.18.40.3 composition validator reads it: without it a
-    /// grouped comma-mode picture (`9.999,99`) fails composition here and recovers to Alphanumeric, which would
-    /// turn this classifier's answer from a rare false-negative into a systematic one (ISO §13.18.40.3 SR13).</summary>
-    private bool IsNumericEditedPicture(string picture)
+    /// <summary>Whether the entry's PICTURE classifies as <see cref="PicCategory.NumericEdited"/> via the ONE
+    /// <see cref="PictureAnalyzer"/> (discard sink; §13.18.40) — the category of the ITEM, not of the character-string
+    /// alone: a BLANK WHEN ZERO clause on a numeric picture "defines the item as numeric-edited" (§13.18.8.4 GR2), so
+    /// the clause is threaded to the analyzer that applies that rule. The unit's CURRENCY SIGN set is threaded too
+    /// (a picture editing with a non-default currency symbol is numeric-edited all the same), and so is
+    /// DECIMAL-POINT IS COMMA, because the §13.18.40.3 composition validator reads it: without it a grouped
+    /// comma-mode picture (`9.999,99`) fails composition here and recovers to Alphanumeric, which would turn this
+    /// classifier's answer from a rare false-negative into a systematic one (ISO §13.18.40.3 SR13).</summary>
+    private bool IsNumericEditedPicture(string picture, bool blankWhenZero)
         => PictureAnalyzer.Analyze(picture, Usage.Display, _discard, "a flagged VALUE clause",
+                currencies: _currentData?.CurrencySigns, blankWhenZero: blankWhenZero,
                 decimalPointIsComma: _currentData?.DecimalPointIsComma ?? false).Category
             == PicCategory.NumericEdited;
 

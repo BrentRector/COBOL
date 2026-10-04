@@ -126,6 +126,24 @@ public static class FlagOptions
     public static FlagOption? TryOption(FlagDirective directive, string word) =>
         ByWord.TryGetValue((directive, word.ToUpperInvariant()), out var info) ? info.Option : null;
 
+    /// <summary>FLAG-14 b's construct test (ISO §7.3.15.4 GR4 b; Annex E.2 item 6): "a compile-time arithmetic
+    /// expression that could give a different result" — an expression that EVALUATES something, i.e. carries a binary
+    /// <c>addOp</c> or <c>mulOp</c> (a bare literal or a lone unary sign has one value in every arithmetic mode, so
+    /// nothing could differ). The ONE predicate every site of a compile-time arithmetic expression asks (§7.3.6.1: the
+    /// DEFINE, EVALUATE and DISPLAY directive operands and the constant conditional expression, read by the
+    /// conditional-compilation stage, and the CONSTANT entry's arithmetic-expression-1, read by
+    /// <c>FlagConformancePass</c>), so the sites cannot disagree about what a flaggable expression is.</summary>
+    public static bool IsFlaggableCompileTimeArithmetic(Antlr4.Runtime.Tree.IParseTree expression)
+    {
+        for (int k = 0; k < expression.ChildCount; k++)
+        {
+            var child = expression.GetChild(k);
+            if (child is Generated.CobolParserCore.AddOpContext or Generated.CobolParserCore.MulOpContext
+                || IsFlaggableCompileTimeArithmetic(child)) return true;
+        }
+        return false;
+    }
+
     private sealed class DirWordComparer : IEqualityComparer<(FlagDirective, string)>
     {
         public bool Equals((FlagDirective, string) x, (FlagDirective, string) y) =>

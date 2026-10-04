@@ -745,18 +745,6 @@ public static partial class ConditionalCompilationProcessor
         return evaluator.EvaluateCce(cce, where) ?? false;
     }
 
-    /// <summary>The first descendant of type <typeparamref name="T"/> in <paramref name="node"/>'s subtree — used
-    /// to detect an arithmetic OPERATOR (<c>addOp</c>/<c>mulOp</c>) inside a directive operand for FLAG-14 b.</summary>
-    private static bool HasDescendant<T>(Antlr4.Runtime.Tree.IParseTree node) where T : class
-    {
-        for (int k = 0; k < node.ChildCount; k++)
-        {
-            var child = node.GetChild(k);
-            if (child is T || HasDescendant<T>(child)) return true;
-        }
-        return false;
-    }
-
     /// <summary>Format-1 WHEN match (§7.3.13.4 GR4): subject == object, or (with THROUGH/THRU) the subject in the
     /// inclusive NUMERIC range [object, object3] (SR12 — a range requires numeric operands). Non-numeric equality
     /// is category-aware and length-sensitive (GR7).</summary>
@@ -855,7 +843,7 @@ public static partial class ConditionalCompilationProcessor
         public void FlagArithmetic(Antlr4.Runtime.Tree.IParseTree tree)
         {
             if (_flagScan.IsOn(FlagOption.Flag14CompileTimeArithmeticExpressions)
-                && (HasDescendant<CobolParserCore.AddOpContext>(tree) || HasDescendant<CobolParserCore.MulOpContext>(tree)))
+                && FlagOptions.IsFlaggableCompileTimeArithmetic(tree))
                 FlagWarn(FlagOption.Flag14CompileTimeArithmeticExpressions, At);
         }
 
