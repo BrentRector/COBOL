@@ -104,13 +104,16 @@ public sealed class ReportSumOperandCaptureDriftTests
         Assert.Contains("ReportGroupResolution.Resolve(", binder);
     }
 
-    [Fact]   // ONE counter per ENTRY (§13.18.54.4 GR1) however many times SUM appears (SR1): the entry binder
-             // collects the clauses, and a single-slot capture is what silently discarded every group but one.
-    public void SumClausesOfOneEntry_AreCollected_NotOverwritten()
+    [Fact]   // ONE counter per ENTRY (§13.18.54.4 GR1) however many times SUM appears (SR1): the grammar's one
+             // reportSumClause holds every SUM group (§13.18.54.2 — RESET and the rounded-phrase follow them, kb/Work
+             // PB1295), the binder makes each group a term, and a single-group capture is what silently discarded
+             // every group but one.
+    public void SumGroupsOfOneEntry_AreCollected_NotOverwritten()
     {
         string binder = File.ReadAllText(BinderPath);
-        Assert.Contains("sumClauses.Add(sm)", binder);
-        Assert.Contains("BindSumClause(sumClauses,", binder);
+        Assert.Contains("sumClause ??= sm", binder);   // the first clause wins; a second is refused once per written entry
+        Assert.Contains("BindSumClause(sumClause,", binder);
+        Assert.Contains("foreach (var sg in clause.reportSumGroup())", binder);
         Assert.DoesNotContain("sumClause = sm;", binder);
     }
 

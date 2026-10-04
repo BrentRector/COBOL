@@ -254,13 +254,20 @@ reportValueOperand
 // Without it `SUM OF WS-A` — conforming source — was a raw COBOL0001 parse error (kb/Work PB482).
 // The addend is `reportValueOperand`, the SAME production SOURCE uses: §13.18.54.3 SR1 — "Each data-name-1,
 // identifier-1 or arithmetic-expression-1 is an addend" — and §13.18.54.4 GR3 gives an expression addend the
-// COMPUTE-with-ON-SIZE-ERROR accumulation (kb/Work PB883). The RESET group and the rounded-phrase sit OUTSIDE
-// the repeated `SUM … [UPON …]` group (PDF p487 rendered), so at most one of each governs the whole clause,
-// however many times the SUM keyword appears (SR1) — the binder diagnoses a second one.
+// COMPUTE-with-ON-SIZE-ERROR accumulation (kb/Work PB883). ⛔ THE RESET GROUP AND THE ROUNDED-PHRASE SIT OUTSIDE
+// THE REPEATED `SUM … [UPON …]` GROUP (§13.18.54.2, PDF p487 rendered: "the large outer brace closes immediately
+// after the UPON phrase — the trailing ellipsis repeats only the SUM OF … [ UPON … ] group"), so the grammar says
+// exactly that and no more (kb/Work PB1295): the repeated `reportSumGroup`, then at most one RESET and at most one
+// rounded-phrase for the whole clause. A phrase written BETWEEN two SUM groups ends the clause, so the second group
+// is a SECOND `reportSumClause` in the entry, which the binder refuses (a SUM clause is written once, SR1's "whole
+// clause"). Before this the two phrases hung on EACH group and the binder could only count them.
 reportSumClause
+    : reportSumGroup+ reportSumReset? roundedPhrase?
+    ;
+
+reportSumGroup
     : SUM OF? reportValueOperand (COMMA? reportValueOperand)*
       (UPON dataReference (COMMA? dataReference)*)?
-      reportSumReset? roundedPhrase?
     ;
 // ⛔ `sumOperand : dataReference (OF reportName)?` IS GONE, and this comment stands where it was so the trailing
 // qualifier is not re-added. It was DEAD: `dataReference`'s own `dataReferenceSuffix*` swallows `OF word` as an

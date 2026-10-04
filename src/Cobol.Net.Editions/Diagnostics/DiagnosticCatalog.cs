@@ -1049,6 +1049,45 @@ public static class DiagnosticCatalog
         + "integer-1 shall be in increasing order of magnitude (b).",
         "ISO §13.18.14.3 SR7/SR8/SR10");
 
+    /// <summary>COBOLNET2749 — the report groups of one report description break a census rule of ISO §13.18.57.3: SR13
+    /// (a REPORT HEADING, PAGE HEADING, REPORT FOOTING or PAGE FOOTING written more than once), SR14 (more than one
+    /// CONTROL HEADING or CONTROL FOOTING for one control data item or FINAL) or SR15 (no body group). Each rule is
+    /// about the SET of groups, not any one group's clauses (kb/Work PB1299).</summary>
+    public static readonly DiagnosticDescriptor ReportGroupSetRule = new(
+        "COBOLNET2749", "report-group-set-rule", EditionSeverity.Error,
+        "The report groups of a report description break a rule on the set of groups. ISO §13.18.57.3 SR13: "
+        + "\"REPORT HEADING, PAGE HEADING, REPORT FOOTING, and PAGE FOOTING may each appear no more than once in any "
+        + "given report description.\" SR14: \"At most one CONTROL HEADING and at most one CONTROL FOOTING may be "
+        + "defined for each control data item or FINAL of the CONTROL clause for any given report.\" SR15: \"Each "
+        + "report description shall include at least one body group\", a DETAIL, CONTROL HEADING or CONTROL FOOTING "
+        + "group.",
+        "ISO §13.18.57.3 SR13/SR14/SR15");
+
+    /// <summary>COBOLNET2750 — a report group entry that contains a SUM clause whose PICTURE category cannot receive a
+    /// numeric sender. ISO §13.18.54.3 SR2: "The category of the subject of the entry shall be valid as the category
+    /// of a receiving operand in a MOVE statement for a sending operand of the category numeric." The question is
+    /// §14.9.25.3 SR10, Table 16: a numeric operand does not move to an alphabetic or a boolean item (kb/Work PB1295).</summary>
+    public static readonly DiagnosticDescriptor ReportSumEntryCategory = new(
+        "COBOLNET2750", "report-sum-entry-category", EditionSeverity.Error,
+        "A report group entry with a SUM clause has a PICTURE of a category that cannot receive a numeric sender. ISO "
+        + "§13.18.54.3 SR2: \"The category of the subject of the entry shall be valid as the category of a receiving "
+        + "operand in a MOVE statement for a sending operand of the category numeric.\" Table 16 (§14.9.25.3 SR10) "
+        + "makes a numeric to alphabetic move and a numeric to boolean move invalid. Describe the entry as numeric, "
+        + "numeric-edited, alphanumeric or national.",
+        "ISO §13.18.54.3 SR2");
+
+    /// <summary>COBOLNET2751 — a report section subscript that is a sum counter or the LINE-COUNTER or PAGE-COUNTER
+    /// identifier. ISO §8.4.2.3.3 SR8: "In the report section, neither a sum counter nor the LINE-COUNTER and
+    /// PAGE-COUNTER identifiers may be used as a subscript." Screened once per written report group entry, over
+    /// every clause that can carry a subscripted reference except PRESENT WHEN, whose §13.15.3 SR16 refuses every
+    /// report section reference (kb/Work PB1474).</summary>
+    public static readonly DiagnosticDescriptor ReportSubscriptCounter = new(
+        "COBOLNET2751", "report-subscript-counter", EditionSeverity.Error,
+        "A report group description entry uses a sum counter, LINE-COUNTER or PAGE-COUNTER as a subscript. ISO "
+        + "§8.4.2.3.3 SR8: \"In the report section, neither a sum counter nor the LINE-COUNTER and PAGE-COUNTER "
+        + "identifiers may be used as a subscript.\" Subscript with a data item described outside the report section.",
+        "ISO §8.4.2.3.3 SR8");
+
     /// <summary>COBOLNET2710 — a COLUMN clause operand larger than the page width. ISO §13.18.14.3 SR6: "Neither
     /// integer-1 nor integer-2 shall exceed the page width." The page width is the PAGE clause's integer-2, or 999
     /// when it is omitted (§13.18.39.4 GR5). The run-time twin for a printed item whose FINAL column passes the

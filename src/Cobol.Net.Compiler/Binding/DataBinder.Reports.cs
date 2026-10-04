@@ -252,6 +252,10 @@ public sealed class ReportGroupModel
     public string? Name { get; set; }
     public ReportGroupKindModel Kind { get; set; } = ReportGroupKindModel.Detail;
 
+    /// <summary>The level 1 entry that opened the group — where a diagnostic about the group as a whole stands
+    /// (§13.18.57.3 SR13–SR15, <c>ScreenReportGroupCensus</c>).</summary>
+    public CobolParserCore.ReportGroupEntryContext? Entry { get; init; }
+
     /// <summary>The CH/CF control operand as written (§13.18.57.3 SR10 — qualifiable AND reference-modifiable);
     /// null when omitted (legal only with a one-operand CONTROL clause, SR11), for FINAL, or for a non-control
     /// group.</summary>
@@ -1670,6 +1674,9 @@ public sealed partial class DataBinder
             if (present is null ? l.PresentWhenCtxs.Count > 0 || l.RepetitionGuards.Count > 0 : !present(l)) continue;   // may be absent
             int relative = l.Kind == ReportLineKindModel.Step ? l.RelativeBase : l.Value;
             int target = l.Kind == ReportLineKindModel.Absolute ? l.Value
+                // The bare ON NEXT PAGE of a report footing starts the footing on a page by itself, at the upper limit
+                // §13.18.57.4 GR7 f) gives it, the HEADING integer (the run-time engine's determination, docs/CONFORMANCE.md).
+                : pos is null && g.Kind == ReportGroupKindModel.ReportFooting && l.NextPage ? model.Heading
                 : pos is null ? g.Kind switch
                 {
                     ReportGroupKindModel.ReportHeading or ReportGroupKindModel.PageHeading => model.Heading + relative - 1,   // GR5b1, GR5b2
@@ -1759,6 +1766,61 @@ public sealed partial class DataBinder
         }
     }
 
+    /// <summary>⛔ THE CENSUS OF A REPORT'S GROUPS (ISO §13.18.57.3 SR13–SR15; kb/Work PB1299), asked once every CH/CF
+    /// has its control level (<see cref="ControlLevelOf"/>, SR10/SR11):
+    /// <list type="bullet">
+    /// <item>SR13 — "REPORT HEADING, PAGE HEADING, REPORT FOOTING, and PAGE FOOTING may each appear no more than once
+    /// in any given report description."</item>
+    /// <item>SR14 — "At most one CONTROL HEADING and at most one CONTROL FOOTING may be defined for each control data
+    /// item or FINAL of the CONTROL clause for any given report." Counted per RESOLVED level, so an omitted operand
+    /// (SR11) and a written one naming the same control collide. A CH or CF whose operand SR10/SR11 refused has no
+    /// level and is not counted twice.</item>
+    /// <item>SR15 — "Each report description shall include at least one body group", a DETAIL, CONTROL HEADING or
+    /// CONTROL FOOTING (SR15's own definition). SR16 only relaxes it to a CONTROL group alone (a summary report,
+    /// GENERATE report-name), so any one body group meets it.</item>
+    /// </list>
+    /// The run-time <c>CobolReport.AddGroup</c> keeps one slot per type (per control level), so an unscreened second
+    /// group silently REPLACED the first and its lines were never printed.</summary>
+    private void ScreenReportGroupCensus(ReportModel model)
+    {
+        var first = new Dictionary<(ReportGroupKindModel Kind, int Level), ReportGroupModel>();
+        foreach (var g in model.Groups)
+        {
+            if (g.Kind == ReportGroupKindModel.Detail) continue;
+            bool control = g.Kind is ReportGroupKindModel.ControlHeading or ReportGroupKindModel.ControlFooting;
+            if (control && g.ControlLevel < 0) continue;
+            if (first.TryAdd((g.Kind, control ? g.ControlLevel : -1), g)) continue;
+            using var at = Edition.At(g.Entry);
+            Edition.Error(DiagnosticCatalog.ReportGroupSetRule, $"RD '{model.Name}': report group '{g.Name ?? "FILLER"}' is a second "
+                + (control
+                    ? $"{ReportGroupTypeWords(g.Kind)} for control '{model.Controls[g.ControlLevel].Display}' ("
+                        + $"'{first[(g.Kind, g.ControlLevel)].Name ?? "FILLER"}' is the first); at most one CONTROL HEADING and at "
+                        + "most one CONTROL FOOTING may be defined for each control data item or FINAL of the CONTROL clause (ISO "
+                        + "§13.18.57.3 SR14)"
+                    : $"{ReportGroupTypeWords(g.Kind)} ('{first[(g.Kind, -1)].Name ?? "FILLER"}' is the first); REPORT HEADING, "
+                        + "PAGE HEADING, REPORT FOOTING, and PAGE FOOTING may each appear no more than once in any given report "
+                        + "description (ISO §13.18.57.3 SR13)"));
+        }
+        if (model.Groups.Count > 0 && !model.Groups.Exists(g => g.Kind is ReportGroupKindModel.Detail
+                or ReportGroupKindModel.ControlHeading or ReportGroupKindModel.ControlFooting))
+        {
+            using var at = Edition.At(model.Groups[0].Entry);
+            Edition.Error(DiagnosticCatalog.ReportGroupSetRule, $"RD '{model.Name}' describes no body group: each report "
+                + "description shall include at least one body group, a DETAIL, CONTROL HEADING or CONTROL FOOTING group "
+                + "(ISO §13.18.57.3 SR15)");
+        }
+    }
+
+    /// <summary>The upper limit a RELATIVE first line is held to (§13.18.57.4 GR7 a), b), e), f)): the HEADING integer for
+    /// a heading (and for a report footing on a page by itself); FOOTING + 1 for a page footing and a report footing
+    /// with no page footing before it. A report footing printed after the page footing has the longer reach — the line
+    /// after the page footing's last — but its first line is then that last line plus integer-2, so the question
+    /// "does integer-2 put the first line above the limit" is answered by the same difference against the lower seed
+    /// (<see cref="MinimumLastLine"/>), which <see cref="GroupLimits"/>'s reach-dependent upper limit would mis-state.</summary>
+    private static int RelativeFirstLineFloor(ReportGroupModel g, ReportModel model) =>
+        g.Kind is ReportGroupKindModel.ReportHeading or ReportGroupKindModel.PageHeading
+        || g.Lines is [{ NextPage: true }, ..] ? model.Heading : model.Footing + 1;
+
     /// <summary>⛔ THE LINE SET OF EACH REPORT GROUP (ISO §13.18.35.3 SR6 a)–e); kb/Work PB1222, PB1270), asked once
     /// the group is complete and the page regions are known:
     /// <list type="bullet">
@@ -1834,24 +1896,57 @@ public sealed partial class DataBinder
                     + "clause, §13.18.39.4)");
             }
 
-            // §13.18.39.4 GR1/GR2 d) — a report heading or page heading is confined to its region: "any report heading
-            // (when not on a page by itself) or page heading shall be defined so that it terminates before" FIRST DETAIL.
-            // A group of RELATIVE lines only has no absolute line for SR6 c) to bound; its first line is where
-            // §13.18.35.4 GR5 b 1./2. puts it (HEADING + integer-2 − 1, which MinimumLastLine seeds, and only ever from
-            // below: a page heading after a report heading starts lower), so a last line past the lower limit is past it
-            // on every page. A body group is confined by the page-fit test it takes at run time (GR4), and the
-            // relative placement of a page or report footing depends on the page footing and NEXT PAGE (GR5 b 4./5.,
-            // GR7 f), so neither is asked here.
+            // §13.18.39.4 GR1/GR2 — a heading or footing group is confined to its region. A group of RELATIVE lines
+            // only has no absolute line for SR6 c) to bound, but where §13.18.35.4 GR5 b puts its first line is a
+            // number the description fixes: HEADING + integer-2 − 1 (a report heading, a page heading with no report
+            // heading before it), FOOTING + integer-2 (a page footing, a report footing with no page footing before
+            // it) — the seeds MinimumLastLine walks, from below only: a page heading after a report heading, a report
+            // footing after a page footing, start LOWER (the previous line's number plus integer-2). So each of the two
+            // questions is answered on every page the group is printed on:
+            //   - its LAST line against the lower limit — GR2 d) "any report heading (when not on a page by itself) or
+            //     page heading shall be defined so that it terminates before" FIRST DETAIL; GR2 a) "No report line will
+            //     appear below" the page limit, which is the lower limit of a page or report footing (GR8 g);
+            //   - its FIRST line against the upper limit (RelativeFirstLine) — GR2 c) "No report line will appear
+            //     higher than" the HEADING integer; GR2 g) "Any page footing or report footing (when not on a page by
+            //     itself) shall be defined so that it begins after" the FOOTING integer.
+            // A body group is confined by the page-fit test it takes at run time (GR4), so it is not asked here.
             if (g.Kind is ReportGroupKindModel.ReportHeading or ReportGroupKindModel.PageHeading
-                && !g.Lines.Exists(l => l.Kind == ReportLineKindModel.Absolute)
-                && MinimumLastLine(g, model) is { } relativeEnd && relativeEnd > lower)
+                    or ReportGroupKindModel.PageFooting or ReportGroupKindModel.ReportFooting)
             {
-                var last = g.Lines[^1];
-                using var at = Edition.At(last.Entry);
-                Violation(last, $"the relative lines of {ReportGroupTypeWords(g.Kind).ToLowerInvariant()} report group "
-                    + $"'{g.Name ?? "FILLER"}' reach line {relativeEnd}, past the group's lower limit {lower}, on every page "
-                    + "(ISO §13.18.39.4 GR1, GR2 d): each report group shall be confined within its region of the page; "
-                    + "limits per §13.18.57.4 GR8)");
+                if (!g.Lines.Exists(l => l.Kind == ReportLineKindModel.Absolute)
+                    && MinimumLastLine(g, model) is { } relativeEnd && relativeEnd > lower)
+                {
+                    var last = g.Lines[^1];
+                    using var at = Edition.At(last.Entry);
+                    Violation(last, $"the relative lines of {ReportGroupTypeWords(g.Kind).ToLowerInvariant()} report group "
+                        + $"'{g.Name ?? "FILLER"}' reach line {relativeEnd}, past the group's lower limit {lower}, on every page "
+                        + (g.Kind is ReportGroupKindModel.PageFooting or ReportGroupKindModel.ReportFooting
+                            ? "(ISO §13.18.39.4 GR1, GR2 a): no report line will appear below the page limit"
+                            : "(ISO §13.18.39.4 GR1, GR2 d): each report group shall be confined within its region of the page")
+                        + "; limits per §13.18.57.4 GR8)");
+                }
+
+                // The candidates for the group's first line: a relative line is first when every line above it may be
+                // absent (PRESENT WHEN, or a repetition guard), so the walk stops at the first unconditional line.
+                foreach (var l in g.Lines)
+                {
+                    if (l.Kind != ReportLineKindModel.Absolute && !l.NextPage
+                        && MinimumLastLine(g, model, only => ReferenceEquals(only, l)) is { } first
+                        && first < RelativeFirstLineFloor(g, model))
+                    {
+                        using var at = Edition.At(l.Entry);
+                        bool heading = g.Kind is ReportGroupKindModel.ReportHeading or ReportGroupKindModel.PageHeading;
+                        Violation(l, $"the relative {LineWords(l)} can be the first line of "
+                            + $"{ReportGroupTypeWords(g.Kind).ToLowerInvariant()} report group '{g.Name ?? "FILLER"}', and "
+                            + $"§13.18.35.4 GR5 b) prints it on line {first}, "
+                            + (heading ? $"above the HEADING integer {model.Heading}, the first line position on which a heading "
+                                + "may be printed (ISO §13.18.39.4 GR2 c))"
+                                : $"not after the FOOTING integer {model.Footing}, after which a footing shall begin (ISO "
+                                + "§13.18.39.4 GR2 g))")
+                            + "; limits per §13.18.57.4 GR7)");
+                    }
+                    if (l.PresentWhenCtxs.Count == 0 && l.RepetitionGuards.Count == 0) break;
+                }
             }
 
             // d) — a group of unconditional absolute lines that ends in relative lines. The tail is every line after
@@ -2095,6 +2190,13 @@ public sealed partial class DataBinder
                 Edition.Error(DiagnosticCatalog.ReportEntryClausePresence, $"{where} has a {(sum ? "SUM" : "SOURCE")} clause "
                     + "but no PICTURE clause; a PICTURE clause shall be specified in every elementary entry that has a "
                     + "SOURCE or SUM clause (ISO §13.15.3 SR12)");
+            // §13.18.54.2 — the SUM clause is the repeated `SUM OF … [UPON …]` group followed by ONE RESET phrase and ONE
+            // rounded-phrase; the grammar's reportSumClause takes the groups together, so a SECOND clause in an entry
+            // means a RESET or ROUNDED phrase (or another clause) was written BETWEEN two SUM groups (kb/Work PB1295).
+            if (ge.reportGroupClause().Count(c => c.reportSumClause() is not null) > 1)
+                Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"{where} writes its SUM clause in more than one "
+                    + "piece: the RESET phrase and the rounded-phrase come once, after the whole repeated SUM … UPON "
+                    + "group, so neither of them, nor any other clause, may be written between two SUM groups (ISO §13.18.54.2)");
             if (!elementary)
             {
                 var written = new List<string>();
@@ -2621,7 +2723,7 @@ public sealed partial class DataBinder
             string? entryName = ge.dataName().NameOrNull();
             if (level == 1)
             {
-                st.Group = new ReportGroupModel { Name = entryName };
+                st.Group = new ReportGroupModel { Name = entryName, Entry = ge };
                 model.Groups.Add(st.Group);
                 st.Line = null;
                 st.VerticalCursor = 0;   // the §13.18.35.4 GR4c trial sum is measured per report group
@@ -2666,11 +2768,13 @@ public sealed partial class DataBinder
             // displacement is known.
             Core.ReportLineOperandContext? lineOperand = null;
             int lineOperandIndex = 0;
-            // ⛔ A LIST, NOT A SLOT (kb/Work PB482): ISO §13.18.54.3 SR1 — "The whole clause is referred to as a
-            // SUM clause even though the SUM keyword may appear more than once", and §13.18.54.4 GR1 gives the
-            // ENTRY one counter. A single slot silently DISCARDED every group but the last:
-            // `SUM WS-A UPON DET SUM WS-B UPON DET2` totalled WS-B alone.
-            var sumClauses = new List<Core.ReportSumClauseContext>();
+            // ⛔ ONE CLAUSE, MANY GROUPS (kb/Work PB482, PB1295): ISO §13.18.54.3 SR1 — "The whole clause is referred to as
+            // a SUM clause even though the SUM keyword may appear more than once", and §13.18.54.4 GR1 gives the
+            // ENTRY one counter. The grammar's reportSumClause holds every `SUM … [UPON …]` group of the clause
+            // (reportSumGroup) and its one RESET and one rounded-phrase, so each group becomes a term of the counter;
+            // keeping a single group silently DISCARDED the rest: `SUM WS-A UPON DET SUM WS-B UPON DET2` totalled
+            // WS-B alone.
+            Core.ReportSumClauseContext? sumClause = null;
             Core.ConditionContext? ownCond = null;
 
             foreach (var clause in ge.reportGroupClause())
@@ -2746,7 +2850,7 @@ public sealed partial class DataBinder
                     foreach (var op in sops) sourceOps.Add(BindSourceOperand(op, sc.roundedPhrase()));
                 }
                 else if (clause.reportSumClause() is { } sm)
-                    sumClauses.Add(sm);
+                    sumClause ??= sm;   // a second one is refused once per written entry (ScreenReportEntryClausePresence)
                 else if (clause.reportGroupIndicateClause() is not null)
                     groupIndicate = true;
                 else if (clause.reportPresentWhenClause() is { } pw)
@@ -2895,7 +2999,7 @@ public sealed partial class DataBinder
             // chain and this replay's OCCURS … DEPENDING tests govern the GR10 print/reset suppression
             // (§13.18.41.4 GR3g).
             var sums = new List<ReportSumModel>();
-            if (sumClauses.Count > 0)
+            if (sumClause is not null)
             {
                 var family = SumFamilyOf(ge, entryName, picText, columns.Count, chain, model, st);
                 int perReplay = columns.Count > 1 ? columns.Count : 1;
@@ -2905,7 +3009,7 @@ public sealed partial class DataBinder
                 for (int c = 0; c < perReplay; c++)
                 {
                     if (perReplay > 1) coordinates[^1] = c;
-                    var sum = BindSumClause(sumClauses, family, family.IdAt(coordinates), entryName, group, model,
+                    var sum = BindSumClause(sumClause, family, family.IdAt(coordinates), entryName, group, model,
                         columns.Count > 0);
                     foreach (var (_, cond, _, _, _) in chain) if (cond is not null) sum.PresentWhenCtxs.Add(cond);
                     if (ownCond is not null) sum.PresentWhenCtxs.Add(ownCond);
@@ -2931,7 +3035,7 @@ public sealed partial class DataBinder
             if (columns.Count == 0 && sums.Count == 0 && sourceOps.Count > 0)
             {
                 var sourceFamily = SourceFamilyOf(ge, entryName, 0, chain, model, st);
-                sourceFamily.Category ??= UnprintablePictureCategory(picText, usageText ?? inheritedUsage, ownSign,
+                sourceFamily.Category ??= UnprintablePictureCategory(ge, picText, usageText ?? inheritedUsage, ownSign,
                     reportEditing, reportLocale, $"RD '{model.Name}' entry '{entryName ?? "FILLER"}'");
                 RecordSourceOccurrences(sourceFamily, sourceOps, 1, ownCond, st, VaryingUsesOf(ge, 0, st), model);
             }
@@ -2953,7 +3057,7 @@ public sealed partial class DataBinder
                 // already refused, or one whose written operands were each refused at their own clause. A
                 // figurative SPACE sender used to be FABRICATED here in place of the missing operand — the
                 // compiler inventing source the programmer did not write — which printed `000` under PIC 999.
-                if (sumClauses.Count == 0 && sourceOps.Count == 0 && valueRaws.Count == 0)
+                if (sumClause is null && sourceOps.Count == 0 && valueRaws.Count == 0)
                 {
                     chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
                     return;
@@ -2990,12 +3094,13 @@ public sealed partial class DataBinder
                         && Sr9ImpliedFor(reportValue, itemUsage) is { } implied
                     ? ImpliedReportPicture(implied, itemUsage, usageText is not null, ownSign, itemWhere)
                     : null;
+                ScreenReportEntryPicture(ge, pic, picText, itemWhere, summed: sumClause is not null);   // once per written entry
                 if (pic is null)
                 {
                     // A SOURCE or SUM entry with no PICTURE is SR12's, refused once per written entry by
                     // ScreenReportEntryClausePresence; what is left here is the VALUE-only entry, whose PICTURE SR14
                     // implies only from an alphanumeric, boolean or national literal that is not zero-length.
-                    if (sourceOpsWritten == 0 && sumClauses.Count == 0)
+                    if (sourceOpsWritten == 0 && sumClause is null)
                         Edition.Error(DiagnosticCatalog.ReportEntryClausePresence, $"RD '{model.Name}': printable item at COLUMN {col} "
                             + "has a VALUE clause but no PICTURE clause, and none is implied: the PICTURE clause may be "
                             + "omitted only when an alphanumeric, boolean or national literal that is not a zero-length "
@@ -3606,6 +3711,7 @@ public sealed partial class DataBinder
             ? PictureAnalyzer.Analyze(picText, Usage.Display, Edition, sumWhere, currencies: CurrencySigns,
                 decimalPointIsComma: DecimalPointIsComma)
             : null;
+        ScreenReportEntryPicture(ge, pic, picText, sumWhere, summed: true);   // §13.18.40.3 SR14, §13.18.54.3 SR2
         // ⛔ THE COUNTER'S SCALE IS THE ENTRY PICTURE'S RECEIVER SCALE, NOT `pic.Scale` (kb/Work PB1685). §13.18.54.4 GR1
         // derives the counter's digits — integral AND fractional — from the entry's PICTURE excluding insertion editing
         // characters, and a NUMERIC-EDITED PicInfo carries Scale 0 (its fraction lives in the mask), so `PIC 99.99 SUM
@@ -3757,24 +3863,55 @@ public sealed partial class DataBinder
     /// asks of data-name-1 when no printable item was analysed for it (kb/Work PB1294). Null for an entry with no
     /// PICTURE. The analysis is the printable item's own, so an entry's PICTURE is judged by one analyzer; it is run
     /// ONLY for the unprintable entry, whose printable twin does not exist, so no diagnostic is raised twice.</summary>
-    private PicCategory? UnprintablePictureCategory(string? picText, string? usageText, SignSpec? ownSign,
-        List<EditingPhraseSpec>? editing, LocaleEditSpec? locale, string where)
+    private PicCategory? UnprintablePictureCategory(Core.ReportGroupEntryContext ge, string? picText, string? usageText,
+        SignSpec? ownSign, List<EditingPhraseSpec>? editing, LocaleEditSpec? locale, string where)
     {
         if (picText is null) return null;
         var usage = PictureAnalyzer.ParseUsage(usageText, Edition, where);
-        return PictureAnalyzer.Analyze(picText, usage, Edition, where, ownSign, currencies: CurrencySigns,
-            editing: editing, localeFormat2: locale, decimalPointIsComma: DecimalPointIsComma)?.Category;
+        var pic = PictureAnalyzer.Analyze(picText, usage, Edition, where, ownSign, currencies: CurrencySigns,
+            editing: editing, localeFormat2: locale, decimalPointIsComma: DecimalPointIsComma);
+        ScreenReportEntryPicture(ge, pic, picText, where, summed: false);
+        return pic?.Category;
+    }
+
+    /// <summary>The report entries whose analysed PICTURE has been screened by <see cref="ScreenReportEntryPicture"/>: a
+    /// repeating entry's replayed copies, and the entry's printable item and SUM counter (two analyses of one
+    /// PICTURE), report a fault once, at the written entry.</summary>
+    private readonly HashSet<Core.ReportGroupEntryContext> _reportPicturesScreened = [];
+
+    /// <summary>⛔ THE RULES THAT NEED A REPORT ENTRY'S ANALYSED PICTURE, asked once per written entry from every site
+    /// that analyses one (the printable item, the SUM counter, the unprintable SOURCE entry):
+    /// <list type="bullet">
+    /// <item>ISO §13.18.40.3 SR14 (kb/Work PB1687): §13.15.4 GR2 makes the PICTURE of a report group description entry
+    /// "the same clause" as a data description entry's, "obeying the syntax rules and general rules defined for" it,
+    /// so the digit-position limit — 31, and COBOL-85's 18 — is asked through the data division's own
+    /// <see cref="ScreenPictureDigitCapacity"/>.</item>
+    /// <item>ISO §13.18.54.3 SR2 (kb/Work PB1295), for an entry with a SUM clause (<paramref name="summed"/>): "The
+    /// category of the subject of the entry shall be valid as the category of a receiving operand in a MOVE
+    /// statement for a sending operand of the category numeric" — asked of the one MOVE validity chain
+    /// (<see cref="MoveTable16.NumericSenderRefusal"/>).</item>
+    /// </list></summary>
+    private void ScreenReportEntryPicture(Core.ReportGroupEntryContext ge, PicInfo? pic, string? picText, string where, bool summed)
+    {
+        if (picText is null || pic is null || !_reportPicturesScreened.Add(ge)) return;
+        ScreenPictureDigitCapacity(pic, $"{where} (PICTURE {picText})");
+        if (summed && MoveTable16.NumericSenderRefusal(Table16Operand.Of(pic)) is { } why)
+            Edition.Error(DiagnosticCatalog.ReportSumEntryCategory, $"{where}: its PICTURE {picText} is of a category that cannot "
+                + $"receive a numeric sum, and the entry contains a SUM clause: {why}. The category of the subject of the entry "
+                + "shall be valid as the category of a receiving operand in a MOVE statement for a sending operand of the "
+                + "category numeric (ISO §13.18.54.3 SR2)");
     }
 
     /// <summary>Bind ONE OCCURRENCE of an entry's SUM clause (ISO §13.18.54) into the <see cref="ReportSumModel"/>
     /// whose id is <paramref name="id"/> (<see cref="ReportSumFamily.IdAt"/>): the addend TERMS, their UPON
     /// operands, and the RESET operand. The counter's name, register and scale are the entry's
     /// (<paramref name="family"/>).
-    /// <para>⛔ IT TAKES EVERY <c>SUM …</c> GROUP OF THE ENTRY, not one (kb/Work PB482). §13.18.54.3 SR1 — "The
+    /// <para>⛔ IT TAKES EVERY <c>SUM …</c> GROUP OF THE CLAUSE, not one (kb/Work PB482). §13.18.54.3 SR1 — "The
     /// whole clause is referred to as a SUM clause even though the SUM keyword may appear more than once" — and
     /// §13.18.54.4 GR1 establishes ONE counter per ENTRY, so the groups are terms of a single counter and each
-    /// keeps its OWN UPON list (GR7c2 attaches the phrase to its group).</para></summary>
-    private ReportSumModel BindSumClause(IReadOnlyList<Core.ReportSumClauseContext> clauses, ReportSumFamily family,
+    /// keeps its OWN UPON list (GR7c2 attaches the phrase to its group). The clause's one RESET phrase and one
+    /// rounded-phrase follow the groups (§13.18.54.2; kb/Work PB1295), and the grammar says so.</para></summary>
+    private ReportSumModel BindSumClause(Core.ReportSumClauseContext clause, ReportSumFamily family,
         int id, string? entryName, ReportGroupModel group, ReportModel model, bool hasColumn)
     {
         var sum = new ReportSumModel
@@ -3785,49 +3922,35 @@ public sealed partial class DataBinder
             Family = family,
             PrintedIn = group,
         };
-        bool resetSeen = false, roundedSeen = false;
-        foreach (var sm in clauses)
+        foreach (var sg in clause.reportSumGroup())
         {
             var term = new ReportSumTerm();
-            foreach (var op in sm.reportValueOperand())
+            foreach (var op in sg.reportValueOperand())
                 term.Addends.Add(SumAddendRef(op, model));
             // UPON data-name-2 (SR7) — the WHOLE written reference: the one qualifier the rule allows is a
             // report-name, and §8.4.3.3.3 SR5's NOTE bars a ref-mod wherever a general format writes
             // data-name-n. Resolution waits for ResolveReports (a detail may be described after this entry).
-            foreach (var up in sm.dataReference())
+            foreach (var up in sg.dataReference())
                 if (UponDetailRef(up, model) is { } det) term.Upon.Add(det);
             sum.Terms.Add(term);
-            // §13.18.54.2 — the rounded-phrase sits OUTSIDE the repeated SUM … UPON group (PDF p487 rendered),
-            // so an entry has at most one, however many times the SUM keyword appears (SR1). It governs
-            // §13.18.54.4 GR4's delivery of the counter to the printable item, which is why SR3 requires the
-            // COLUMN clause that defines that item (kb/Work PB852's sibling sweep).
-            if (sm.roundedPhrase() is { } rnd)
-            {
-                if (roundedSeen)
-                    Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"RD '{model.Name}': the SUM clause of "
-                        + $"'{entryName ?? "FILLER"}' writes more than one ROUNDED phrase; the general format admits "
-                        + "one rounded-phrase for the whole clause (ISO §13.18.54.2)");
-                else if (!hasColumn)
-                    Edition.Error(DiagnosticCatalog.ReportSumRoundedWithoutColumn, $"RD '{model.Name}' entry "
-                        + $"'{entryName ?? "FILLER"}': the SUM clause writes a ROUNDED phrase, which is permitted "
-                        + "only if the COLUMN clause is specified for the subject of the entry (ISO §13.18.54.3 "
-                        + "SR3) — the phrase governs §13.18.54.4 GR4's transfer of the sum counter to the "
-                        + "printable item, and this entry defines none.");
-                else
-                    sum.Rounded = rnd;
-                roundedSeen = true;
-            }
-            if (sm.reportSumReset() is not { } reset) continue;
-            // §13.18.54.2 — the RESET phrase sits OUTSIDE the repeated SUM … UPON group, so an entry has at
-            // most one. (Reachable only once the SUM keyword repeats, which SR1 permits.)
-            if (resetSeen)
-            {
-                Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"RD '{model.Name}': the SUM clause of '{entryName ?? "FILLER"}' "
-                    + "writes more than one RESET phrase; the general format admits one RESET phrase for the "
-                    + "whole clause (ISO §13.18.54.2)");
-                continue;
-            }
-            resetSeen = true;
+        }
+        // §13.18.54.2 — the rounded-phrase sits OUTSIDE the repeated SUM … UPON group (PDF p487 rendered), so the
+        // clause has at most one. It governs §13.18.54.4 GR4's delivery of the counter to the printable item, which
+        // is why SR3 requires the COLUMN clause that defines that item (kb/Work PB852's sibling sweep).
+        if (clause.roundedPhrase() is { } rnd)
+        {
+            if (!hasColumn)
+                Edition.Error(DiagnosticCatalog.ReportSumRoundedWithoutColumn, $"RD '{model.Name}' entry "
+                    + $"'{entryName ?? "FILLER"}': the SUM clause writes a ROUNDED phrase, which is permitted "
+                    + "only if the COLUMN clause is specified for the subject of the entry (ISO §13.18.54.3 "
+                    + "SR3) — the phrase governs §13.18.54.4 GR4's transfer of the sum counter to the "
+                    + "printable item, and this entry defines none.");
+            else
+                sum.Rounded = rnd;
+        }
+        // §13.18.54.2 — the RESET phrase sits OUTSIDE the repeated SUM … UPON group, so the clause has at most one.
+        if (clause.reportSumReset() is { } reset)
+        {
             if (reset.FINAL() is not null) sum.ResetFinal = true;
             else if (reset.dataReference() is { } rref)
                 sum.ResetOperand = ControlOperandRef(rref, DiagnosticCatalog.ReportResetNotControlOperand,
@@ -4075,6 +4198,7 @@ public sealed partial class DataBinder
 
             // §13.18.35.3 SR6 — the line set of each group, asked once every group's control level is resolved (the
             // §13.18.57.4 GR7 d) limits of a body group read the OR PAGE control headings by level).
+            ScreenReportGroupCensus(model);   // §13.18.57.3 SR13–SR15, over the resolved control levels
             ScreenReportGroupLines(model);
 
             foreach (var sum in model.Sums)
@@ -4102,6 +4226,10 @@ public sealed partial class DataBinder
             // PAGE-COUNTER, or another report section data item. Scanned over each DISTINCT captured condition
             // (an entry's condition appears in every subordinate chain) against this RD's report-section names.
             CheckConditionOperands(model);
+
+            // §8.4.2.3.3 SR8 — no sum counter, LINE-COUNTER or PAGE-COUNTER as a report section subscript, asked once
+            // every report is described (a sum counter may belong to a later report description).
+            ScreenReportSubscripts(model);
 
             // VARYING SR2 (§13.18.64.3): data-name-1 shall not be defined elsewhere in the source element — the arm over
             // what ELSE defines the name (the two over other VARYING clauses are ScreenReportVaryingClauses'). A data
@@ -4675,7 +4803,10 @@ public sealed partial class DataBinder
         foreach (var cond in conds)
         {
             using var _ = Edition.At(cond);
-            if (HasToken(cond, CobolLexer.LINE_COUNTER) || HasToken(cond, CobolLexer.PAGE_COUNTER))
+            // The register is a LINE_COUNTER / PAGE_COUNTER token as an operand but a SUBSCRIPT-mode word inside the
+            // parentheses of a subscript (`TE(PAGE-COUNTER)`), which a token-type test never saw (kb/Work PB1474) —
+            // so the word is asked, which both spellings share.
+            if (HasWord(cond, "LINE-COUNTER") || HasWord(cond, "PAGE-COUNTER"))
                 Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"RD '{model.Name}': a PRESENT WHEN condition shall not "
                     + "reference LINE-COUNTER or PAGE-COUNTER (ISO §13.15.3 SR16)");
             foreach (var n in names)
@@ -4750,7 +4881,12 @@ public sealed partial class DataBinder
                 return ownCounter ? null : dref.GetText();
             }
             // identifier-1 is a qualified-data-name-with-subscripts (§8.4.3.1.2): a name inside a SUBSCRIPT or a
-            // reference-modification is an identifier of the clause too (SR4's "any identifier appearing in…").
+            // reference-modification is an identifier of the clause too (SR4's "any identifier appearing in…"). A
+            // subscript is CAPTURED as SUBSCRIPT-mode tokens, not as a nested dataReference (kb/Work PB1295), so its
+            // words are read here: a report section item other than a sum counter or a counter register — those are
+            // §8.4.2.3.3 SR8's, said once by ScreenReportSubscripts — is a report section name like any other.
+            foreach (var subscripted in SubscriptWordsOfReference(dref))
+                if (!IsReportSubscriptCounter(subscripted) && IsReportSectionOnlyName(subscripted)) return subscripted;
             for (int i = 0; i < dref.ChildCount; i++)
                 if (ReportSectionNameIn(dref.GetChild(i), countersOf) is { } inner) return inner;
             return null;
@@ -4758,6 +4894,86 @@ public sealed partial class DataBinder
         for (int i = 0; i < node.ChildCount; i++)
             if (ReportSectionNameIn(node.GetChild(i), countersOf) is { } bad) return bad;
         return null;
+    }
+
+    /// <summary>The words of the SUBSCRIPTS of one written reference (kb/Work PB1295, PB1474). A subscript is not a nested
+    /// <c>dataReference</c>: the lexer captures everything between the parentheses as SUBSCRIPT-mode tokens
+    /// (<c>subscriptPart</c>), so the tree walks that look for a <c>DataReferenceContext</c> or a LINE-COUNTER token
+    /// never reached a name written there. The reference counts only when its base word is a data item or a report
+    /// section entry — a keyword-omitted function call has the same parenthesised shape, and its arguments are
+    /// not subscripts (§8.4.3.2.3 SR2) — and a reference-modification (a colon at the top level of the parentheses)
+    /// has none.</summary>
+    private IEnumerable<string> SubscriptWordsOfReference(Core.DataReferenceContext dref)
+    {
+        if (dref.cobolWord()?.GetText() is not { } baseWord || !(ByName.ContainsKey(baseWord) || IsReportSectionOnlyName(baseWord)))
+            yield break;
+        foreach (var suffix in dref.dataReferenceSuffix())
+        {
+            var parts = suffix.subscriptPart() is { } direct ? [direct]
+                : suffix.qualification()?.subscriptPart() ?? [];
+            foreach (var part in parts)
+            {
+                var content = part.subscriptOrRefMod();
+                if (content.subToken().Any(t => t.SUB_COLON() is not null)) continue;   // reference modification
+                foreach (var word in SubscriptIdentifiers(content)) yield return word;
+            }
+        }
+    }
+
+    private static IEnumerable<string> SubscriptIdentifiers(Antlr4.Runtime.Tree.IParseTree node)
+    {
+        if (node is Antlr4.Runtime.Tree.ITerminalNode t)
+        {
+            if (t.Symbol.Type == Core.SUB_IDENTIFIER) yield return t.GetText();
+            yield break;
+        }
+        for (int i = 0; i < node.ChildCount; i++)
+            foreach (var w in SubscriptIdentifiers(node.GetChild(i))) yield return w;
+    }
+
+    /// <summary>Is <paramref name="word"/> one of the identifiers ISO §8.4.2.3.3 SR8 bars as a report section subscript:
+    /// the LINE-COUNTER or PAGE-COUNTER register, or a sum counter — the name of a report section entry (and of no
+    /// ordinary-storage item, §8.4.2.1) that contains a SUM clause.</summary>
+    private bool IsReportSubscriptCounter(string word) =>
+        word.Equals("LINE-COUNTER", StringComparison.OrdinalIgnoreCase)
+        || word.Equals("PAGE-COUNTER", StringComparison.OrdinalIgnoreCase)
+        || (!ByName.ContainsKey(word) && Reports.Any(r => r.WrittenEntries.Any(ge =>
+            ge.dataName().NameOrNull() is { } n && n.Equals(word, StringComparison.OrdinalIgnoreCase)
+            && ge.reportGroupClause().Any(c => c.reportSumClause() is not null))));
+
+    /// <summary>⛔ ISO §8.4.2.3.3 SR8 (kb/Work PB1474) — "In the report section, neither a sum counter nor the LINE-COUNTER
+    /// and PAGE-COUNTER identifiers may be used as a subscript." Asked ONCE per written entry, over every clause that
+    /// can carry a subscripted reference — SOURCE, SUM, VARYING, OCCURS … DEPENDING ON — because the rule is about the
+    /// SUBSCRIPT wherever it is written, not about one clause's operand: three arms each resolved the base name and
+    /// evaluated the subscript in the procedure phase, and none asked it. A PRESENT WHEN condition is §13.15.3 SR16's
+    /// (it refuses every sum counter, register and report section item the condition references, subscript or not),
+    /// so it is not asked twice. A report section item that is neither is the clause's own section rule
+    /// (<see cref="ReportSectionNameIn"/>, §13.18.53.3 SR4 / §13.18.54.3 SR6).</summary>
+    private void ScreenReportSubscripts(ReportModel model)
+    {
+        foreach (var ge in model.WrittenEntries)
+            foreach (var clause in ge.reportGroupClause())
+            {
+                if (clause.reportPresentWhenClause() is not null) continue;
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var word in SubscriptWordsOf(clause).Where(IsReportSubscriptCounter))
+                    if (seen.Add(word))
+                    {
+                        using var at = Edition.At(clause);
+                        Edition.Error(DiagnosticCatalog.ReportSubscriptCounter, $"RD '{model.Name}' entry "
+                            + $"'{ge.dataName().NameOrNull() ?? "FILLER"}': '{word}' is used as a subscript. In the report "
+                            + "section, neither a sum counter nor the LINE-COUNTER and PAGE-COUNTER identifiers may be used "
+                            + "as a subscript (ISO §8.4.2.3.3 SR8)");
+                    }
+            }
+    }
+
+    private IEnumerable<string> SubscriptWordsOf(Antlr4.Runtime.Tree.IParseTree node)
+    {
+        if (node is Core.DataReferenceContext dref)
+            foreach (var w in SubscriptWordsOfReference(dref)) yield return w;
+        for (int i = 0; i < node.ChildCount; i++)
+            foreach (var w in SubscriptWordsOf(node.GetChild(i))) yield return w;
     }
 
     /// <summary>The report-section-exclusive names of one report: the data-name of EVERY report group description

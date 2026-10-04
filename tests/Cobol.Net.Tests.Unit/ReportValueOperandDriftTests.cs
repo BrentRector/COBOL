@@ -54,7 +54,10 @@ public sealed class ReportValueOperandDriftTests
     {
         string g = Grammar;
         Assert.Contains("reportValueOperand", RuleBody(g, "reportSourceClause"));
-        Assert.Contains("reportValueOperand", RuleBody(g, "reportSumClause"));
+        // §13.18.54.2's repeated `SUM OF … [UPON …]` group is its own rule (kb/Work PB1295): the RESET phrase and the
+        // rounded-phrase follow the repetition, so the clause rule holds the groups and the group rule holds the operand.
+        Assert.Contains("reportSumGroup", RuleBody(g, "reportSumClause"));
+        Assert.Contains("reportValueOperand", RuleBody(g, "reportSumGroup"));
         // The operand IS an arithmetic expression: §8.4.3.1.2 Format 2 makes an identifier a primary of one, so
         // the identifier form is its degenerate case and the binder classifies which was written.
         Assert.Contains("arithmeticExpression", RuleBody(g, "reportValueOperand"));

@@ -2182,9 +2182,32 @@ reallocated).
 > unconditional, as its text says ("one or more absolute lines, not subject to any PRESENT WHEN clause"). (4) **The default FIRST DETAIL** (§13.18.39.4 GR3 b: the HEADING integer, 1 when HEADING is
 > omitted) is the integer the page heading's lower limit and the body groups' upper limit read, so `PAGE LIMIT 10 LINES`
 > with `TYPE PH LINE 1` is refused: the page heading must terminate before FIRST DETAIL (GR2 d), and with the default
-> there is no line before it. Pinned by `negative/pb1222-*`, `negative/pb1270-*`, `85/pb1270_report_page_region_boundaries`
+> there is no line before it. (5) **The FIRST line of a relative heading or footing, and the reach of a relative page or
+> report footing** (§13.18.39.4 GR2 a), c), g); kb/Work PB1270): where §13.18.35.4 GR5 b puts a relative first line is a
+> number the description fixes (HEADING + integer-2 − 1 for a report heading and a page heading with no report heading
+> before it; FOOTING + integer-2 for a page footing and a report footing with no page footing before it; the previous
+> line plus integer-2 otherwise, which only moves it LOWER), so a first line that GR5 b prints above the HEADING integer
+> or not after the FOOTING integer — in practice a `LINE PLUS 0` — and a relative page or report footing whose last line
+> is past the page limit are refused: they leave the region on every page. A report footing whose first LINE clause is
+> the bare `ON NEXT PAGE` is on a page by itself and starts at the HEADING integer (GR7 f), as the run-time engine
+> places it. Pinned by `negative/pb1270-*-relative-*`, `85/pb1270_report_relative_first_boundaries`,
+> `negative/pb1222-*`, `negative/pb1270-*`, `85/pb1270_report_page_region_boundaries`
 > and `2002/pb1222_report_arrangement_present_when`. The mechanism is in `docs/COBOLNET_REPORT_WRITER_DESIGN.md` (the
 > ARRANGEMENT rules bullet).
+
+> ⚖ **DETERMINATION — a SUM entry's category is judged against the INTEGER numeric row of Table 16 (§13.18.54.3 SR2)**
+> (2026-10-04; kb/Work PB1295). SR2 requires "the category of the subject of the entry" to be "valid as the category of a
+> receiving operand in a MOVE statement for a sending operand of the category numeric", and Table 16 (§14.9.25.3 SR10)
+> splits the numeric sender into an Integer and a Noninteger row. The category of the entry's PICTURE does not say
+> whether the sum has a decimal point, so the screen refuses only what the INTEGER row refuses — a numeric operand does
+> not move to an alphabetic or a boolean item — and admits the alphanumeric and national categories the integer row
+> allows; the noninteger row only adds "No" cells, and a compiler that rejected the alphanumeric entry would refuse a
+> program some sums fill legally. Neither ISO nor GnuCOBOL (which checks no such category) offers a narrower reading.
+> Pinned by `negative/pb1295-sum-entry-*`. In the same change §8.4.2.3.3 SR8 ("neither a sum counter nor the LINE-COUNTER
+> and PAGE-COUNTER identifiers may be used as a subscript") is screened once per written entry over every clause that
+> carries a subscript (COBOLNET2751), and a report section item that is neither is the clause's own rule
+> (§13.18.54.3 SR6, §13.18.53.3 SR4); a PRESENT WHEN condition is §13.15.3 SR16's. Pinned by `negative/pb1474-*` and
+> `85/pb1474_report_subscripts_legal`.
 
 > ⚖ **DETERMINATION — a sequential READ whose I-O status is '46' takes neither the AT END nor the NOT AT END
 > phrase (§14.9.30.4 GR21 → GR24)** (2026-09-22; kb/Work PB810). GR21 sets '46' when "the previous READ or START

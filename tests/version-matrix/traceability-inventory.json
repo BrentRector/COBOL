@@ -5721,13 +5721,13 @@
   "ordinal": 8,
   "subject": "Subscripts",
   "rule-digest": "fa54e30d14ec",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#SumAddendRef; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveSumAddend; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#PresentWhen",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportSubscripts; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#SubscriptWordsOfReference; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#IsReportSubscriptCounter; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#CheckConditionOperands",
+  "test-ref": "conformance:negative/pb1474-sum-addend-subscripted-by-line-counter; conformance:negative/pb1474-sum-addend-subscripted-by-sum-counter; conformance:negative/pb1474-source-expression-subscripted-by-page-counter; conformance:negative/pb1474-source-subscripted-by-line-counter; conformance:negative/pb1474-present-when-subscripted-by-page-counter; conformance:negative/pb1474-present-when-subscripted-by-line-counter; conformance:85/pb1474_report_subscripts_legal",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1474 (registrar 15c). Rule (cite.py --check 8.4.2.3.3 'In the report section, neither a sum counter nor the LINE-COUNTER and PAGE-COUNTER identifiers may be used as a subscript.' -> OK §8.4.2.3.3 8)). NOT ENFORCED: no binder asks whether a report-section subscript is a sum counter or a LINE-COUNTER/PAGE-COUNTER register (searched src/Cobol.Net.Compiler for the rule and for any such screen - none). Probes (pinned cobol.exe) scratchpad/adj-d2/out/probe/subscripts/sr8e.cob `05 COLUMN 20 PIC 99 SUM TE(LINE-COUNTER).` compiles clean and runs at 85, 2002 and 2023 (prints 00); sr8f `SUM TE(DSUM)` (DSUM a sum counter of the same group) compiles clean and runs; sr8g `PRESENT WHEN TE(LINE-COUNTER) = 1` and sr8j `PRESENT WHEN TE(PAGE-COUNTER) = 1` compile clean and run. Spec-derived expected: each is a compile-time syntax-rule violation. Only sr8h (`PRESENT WHEN TE(DSUM) = 1`) is refused, and by a DIFFERENT rule (COBOLNET1559, §13.15.3 SR16). The SOURCE leg is unobservable: DataBinder.Reports refuses ANY subscripted SOURCE operand as COBOLNET0899 ReportSourceSubscripted (sr8a-d, CONFORMANCE.md A.4.11 Partial 'several SOURCE/SUM legs' staged loud) - so SR8 there is rejected for the wrong reason, and the legal `SOURCE TE(AMT)` is refused too. [editions as adjudicated: 85, 2002, 2014, 2023 (PRESENT WHEN leg from 2002)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1474 landed 2026-10-04 (wave 1012 G): ScreenReportSubscripts (COBOLNET2751) asks every SOURCE, SUM, VARYING and OCCURS clause of a written entry once; a PRESENT WHEN condition is SR16's (COBOLNET1559), whose LINE-COUNTER and PAGE-COUNTER scan now reads the subscript's words too.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.2.3.4-1",
@@ -24576,13 +24576,13 @@
   "ordinal": 1,
   "subject": "PAGE clause",
   "rule-digest": "bfd4b4e2bdff",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupLines; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits",
-  "test-ref": "conformance:85/pb484_report_line_placement; conformance:negative/pb1270-page-heading-below-first-detail; conformance:negative/pb1270-page-heading-relative-past-first-detail; conformance:85/pb1270_report_page_region_boundaries",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupLines; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#RelativeFirstLineFloor; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#MinimumLastLine",
+  "test-ref": "conformance:85/pb484_report_line_placement; conformance:negative/pb1270-page-heading-below-first-detail; conformance:negative/pb1270-page-heading-relative-past-first-detail; conformance:85/pb1270_report_page_region_boundaries; conformance:negative/pb1270-page-footing-relative-past-page-limit; conformance:negative/pb1270-report-footing-relative-past-page-limit; conformance:negative/pb1270-report-heading-relative-zero-above-heading; conformance:negative/pb1270-page-heading-relative-zero-above-heading; conformance:85/pb1270_report_relative_first_boundaries",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1270 partly landed 2026-10-04: every ABSOLUTE line is confined (SR6 c), a relative report or page heading is confined to FIRST DETAIL - 1, a body group by the run-time page-fit test. Not screened: the relative extent of a page or report footing, and a relative FIRST line whose integer-2 puts it above its group's upper limit (RH or PF with PLUS 0).",
-  "state": "GAP"
+  "notes": "kb/Work PB1270 landed 2026-10-04 (wave 1012 G): every report group is confined to its region. Absolute lines by SR6 c) against GroupLimits, a relative heading by its last line against FIRST DETAIL - 1, a relative page or report footing by its last line against the page limit (GR2 a), the first line of a relative heading or footing against the HEADING integer / FOOTING + 1 (GR2 c, g), a body group by the run-time page-fit test.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.39.4-2",
@@ -24591,13 +24591,13 @@
   "ordinal": 2,
   "subject": "PAGE clause",
   "rule-digest": "e848559fd8d9",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportPageIntegers; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits",
-  "test-ref": "conformance:85/pb484_report_line_placement; conformance:negative/pb1270-page-heading-after-first-detail; conformance:negative/pb1270-report-heading-above-heading; conformance:negative/pb1270-page-heading-relative-past-first-detail; conformance:2002/pb1059_page_columns_width",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportPageIntegers; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupLines; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#RelativeFirstLineFloor",
+  "test-ref": "conformance:85/pb484_report_line_placement; conformance:negative/pb1270-page-heading-after-first-detail; conformance:negative/pb1270-report-heading-above-heading; conformance:negative/pb1270-page-heading-relative-past-first-detail; conformance:2002/pb1059_page_columns_width; conformance:negative/pb1270-page-footing-relative-zero-on-footing; conformance:negative/pb1270-report-footing-relative-zero-on-footing; conformance:85/pb1270_report_relative_first_boundaries",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1270 partly landed 2026-10-04: a) page limit and unpaged, b) page width (PB1059, SR8 b/c), c) HEADING and d) FIRST DETAIL for absolute lines and relative headings, e) LAST CONTROL HEADING (grammar and defaults landed), f) LAST DETAIL, g) FOOTING for absolute lines. Not screened: a page footing whose RELATIVE first line begins at FOOTING (integer-2 zero), which g) says shall begin after it.",
-  "state": "GAP"
+  "notes": "kb/Work PB1270 landed 2026-10-04 (wave 1012 G): the last open part of g), a page or report footing whose RELATIVE first line begins ON the FOOTING integer (integer-2 zero), is refused beside the absolute-line screens.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.39.4-3",
@@ -24621,13 +24621,13 @@
   "ordinal": 4,
   "subject": "PAGE clause",
   "rule-digest": "82ef257ca4e1",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Runtime/IO/ReportWriter.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportDescriptionClauses; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupLines",
-  "test-ref": "conformance:negative/pb1270-report-heading-above-heading; conformance:negative/pb1270-report-heading-after-page-heading; conformance:85/pb1270_report_page_region_boundaries",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#GroupLimits; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupLines; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#MinimumLastLine",
+  "test-ref": "conformance:negative/pb1270-report-heading-above-heading; conformance:negative/pb1270-report-heading-after-page-heading; conformance:85/pb1270_report_page_region_boundaries; conformance:negative/pb1270-report-footing-relative-past-page-limit; conformance:85/pb1270_report_relative_first_boundaries",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1270 partly landed 2026-10-04: a report heading by itself (its NEXT GROUP NEXT PAGE) may occupy HEADING through the page limit and one that is not is confined as a page heading is (GroupLimits). Not screened: the relative extent of a report footing on a page by itself.",
-  "state": "GAP"
+  "notes": "kb/Work PB1270 landed 2026-10-04 (wave 1012 G): a report footing on a page by itself (the bare ON NEXT PAGE, started at the HEADING integer, GR7 f) or not is confined to HEADING through the page limit, or as a page footing is, relative extents included.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.39.4-5",
@@ -27906,13 +27906,13 @@
   "ordinal": 2,
   "subject": "SUM clause",
   "rule-digest": "93274565c78b",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveSumAddend; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSumClause; src/Cobol.Net.Compiler/Binding/Model/PicInfo.cs#SumCounterItem",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportEntryPicture; src/Cobol.Net.Compiler/Binding/MoveTable16.cs#NumericSenderRefusal",
+  "test-ref": "conformance:negative/pb1295-sum-entry-alphabetic; conformance:negative/pb1295-sum-entry-boolean; conformance:negative/pb1295-sum-entry-unprintable-alphabetic",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1295. SR2 'The category of the subject of the entry shall be valid as the category of a receiving operand in a MOVE statement for a sending operand of the category numeric' (cite.py --check 13.18.54.3 OK); Table 16 (cite.py --check 14.9.25.3 'table 16, Validity of types of MOVE statements, specifies the validity of the move' OK) gives Numeric -> Alphabetic = No and Numeric -> Boolean = No. No screen exists (grep '13.18.54.3 SR2' in src: none). Probe p3: 'COLUMN 1 PIC A(4) SUM WS-K' and 'PIC 1(4) SUM WS-K' both compile and run (print '4' and '4000'); expected: compile-time rejection. Also PIC X(4)/N(4) SUM prints '4' - PicInfo.SumCounterItem clamps a 0-digit PICTURE to 1 digit, a value no reading of GR1 yields. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "kb/Work PB1295 landed 2026-10-04 (wave 1012 G): the SUM entry's PICTURE category is asked of the one MOVE validity chain with a numeric sender (COBOLNET2750). DETERMINATION (docs/CONFORMANCE.md): the sender is the INTEGER numeric row, so only what the integer row refuses (alphabetic, boolean) is refused.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.54.3-3",
@@ -27966,13 +27966,13 @@
   "ordinal": 6,
   "subject": "SUM clause",
   "rule-digest": "3cabf02c8d46",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveSumAddend; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportSectionNameIn",
-  "test-ref": "conformance:negative/pb883-sum-expression-report-section",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveSumAddend; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportSectionNameIn; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#SubscriptWordsOfReference; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportSubscripts",
+  "test-ref": "conformance:negative/pb883-sum-expression-report-section; conformance:negative/pb1295-sum-expression-subscripted-by-sum-counter; conformance:negative/pb1295-sum-expression-subscripted-by-report-item; conformance:85/pb883_report_sum_expression",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1295. SR6 'any identifiers it contains may reference entries in any section of the data division other than the report section' (cite.py --check 13.18.54.3 OK). ReportSectionNameIn walks the expression; a sum counter (negative golden) and LINE-COUNTER (probe p5: COBOLNET2144) are refused; WS identifiers are admitted (conformance:85/pb883_report_sum_expression). An unprintable NAMED report entry (DET-U, no COLUMN) is refused too but with COBOLNET1639 'not defined' rather than 2144 - rejection correct, diagnostic imprecise. || REFUTED: DIVERGES — ReportSectionNameIn returns as soon as it reaches a DataReferenceContext, so it never walks that reference's subscripts. A report-section identifier used as a subscript inside the expression addend passes the screen. SUM WS-K + WS-E(SC), where SC is a sum counter of the same report, compiles clean. SR6 bars every identifier the expression contains from the report section, and §8.4.2.3.3 SR8 separately forbids a sum counter as a subscript in the report section. Result: invalid source is accepted. The top-level cases (a bare sum counter, PAGE-COUNTER, LINE-COUNTER) are rejected correctly with COBOLNET2144. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "kb/Work PB1295 landed 2026-10-04 (wave 1012 G): the words of a subscript are read (they are SUBSCRIPT-mode tokens, not a nested dataReference), so a report section item in a subscript of an expression addend is refused: a sum counter or register by SR8 (COBOLNET2751), any other report section item by SR6 (COBOLNET2144). The unprintable NAMED entry is refused with COBOLNET2144 on this build.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.54.3-7",
@@ -28656,13 +28656,13 @@
   "ordinal": 13,
   "subject": "TYPE clause",
   "rule-digest": "70de0e5c3100",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindGroupType; src/Cobol.Net.Runtime/IO/ReportWriter.cs#AddGroup",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupCensus",
+  "test-ref": "conformance:negative/pb1299-two-report-headings; conformance:negative/pb1299-two-page-headings; conformance:negative/pb1299-two-page-footings; conformance:negative/pb1299-two-report-footings; conformance:85/pb1299_report_group_census_legal",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1299. 'REPORT HEADING, PAGE HEADING, REPORT FOOTING, and PAGE FOOTING may each appear no more than once in any given report description.' ReportWriter.AddGroup's doc says SR13/SR14 are 'diagnosed at bind' but no binder check exists (searched DataBinder.Reports.cs and the Compiler tree for a duplicate-type screen: none). AddGroup assigns the single slot, so the LAST declaration silently replaces the earlier one. Probes: two TYPE RH -> compiles, report shows only 'R22'; two PH -> only 'P22'; two PF -> only 'P22'; two RF -> only 'R22'. Expected: compile-time rejection (a syntax rule). cite.py --check OK. probes under out13/probe/type-clause-p1/ (pinned adj-d1 cobol.exe, --std 2023) || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): Format 2 (report writer): COBOL-85 optional Report Writer module; ISO 2023 optional language element A.4.11; 2002/2014 availability not derivable from the 2023 text (VERSION_CHANGE_REFERENCE row 130d); Annex E lists no 2014->2023 change to the TYPE clause",
-  "state": "GAP"
+  "notes": "kb/Work PB1299 landed 2026-10-04 (wave 1012 G): ScreenReportGroupCensus (COBOLNET2749) refuses a second REPORT HEADING, PAGE HEADING, REPORT FOOTING or PAGE FOOTING in one report description.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.57.3-14",
@@ -28671,13 +28671,13 @@
   "ordinal": 14,
   "subject": "TYPE clause",
   "rule-digest": "dbd0684be112",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Runtime/IO/ReportWriter.cs#AddGroup",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupCensus; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports",
+  "test-ref": "conformance:negative/pb1299-two-control-headings-same-control; conformance:negative/pb1299-two-control-footings-same-control; conformance:negative/pb1299-control-footing-final-and-omitted; conformance:negative/pb1299-control-heading-final-and-omitted; conformance:85/pb1299_report_group_census_legal",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1299. 'At most one CONTROL HEADING and at most one CONTROL FOOTING may be defined for each control data item or FINAL of the CONTROL clause for any given report. Either or both ... may be omitted for any given level of control.' Permissive half CONFORMS (a control level with no CH/CF compiles — sr14_distinct_ok, and every CF-only report). Prohibitive half NOT enforced: ResolveReports computes each group's ControlLevel but never checks two groups sharing (Kind, ControlLevel); runtime AddGroup writes _controlHeadings[level] / _controlFootings[level], so the later one silently replaces the earlier. Probes: two `TYPE CH CX` -> compiles, only 'C22' printed; `TYPE CF FINAL` + omitted-operand `TYPE CF` under CONTROL IS FINAL -> compiles, only 'C22' printed. Expected: compile-time rejection. cite.py --check OK. probes under out13/probe/type-clause-p1/ (pinned adj-d1 cobol.exe, --std 2023) || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): Format 2 (report writer): COBOL-85 optional Report Writer module; ISO 2023 optional language element A.4.11; 2002/2014 availability not derivable from the 2023 text (VERSION_CHANGE_REFERENCE row 130d); Annex E lists no 2014->2023 change to the TYPE clause",
-  "state": "GAP"
+  "notes": "kb/Work PB1299 landed 2026-10-04 (wave 1012 G): the census counts per RESOLVED control level, so an omitted operand (SR11) and a written one naming the same control collide; a control level with no CH or CF still compiles (the permissive half).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.57.3-15",
@@ -28686,13 +28686,13 @@
   "ordinal": 15,
   "subject": "TYPE clause",
   "rule-digest": "f09cc84d84d8",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Runtime/IO/ReportWriter.cs#ReportGroupKind",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportGroupCensus",
+  "test-ref": "conformance:negative/pb1299-no-body-group-report-heading-only; conformance:negative/pb1299-no-body-group-headings-and-footings; conformance:85/pb1299_report_summary_control_footing_only; conformance:85/pb1299_report_group_census_legal",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1299. 'Groups of type DETAIL, CONTROL HEADING, and CONTROL FOOTING are referred to as body groups. Each report description shall include at least one body group.' The definitional sentence is honored (ReportWriter's body-group presentation path treats DE/CH/CF as body groups). The requirement is not enforced: probe sr15_no_body_nogen (RD with only TYPE RH + TYPE PH, INITIATE/TERMINATE) compiles and runs clean. (sr15_no_body, with GENERATE R1, is rejected only by §14.9.16.3 SR2 — no CONTROL clause — i.e. for a different rule.) Expected: compile-time rejection of any RD with no DE/CH/CF group. Two halves, one violated -> DIVERGES. cite.py --check OK. probes under out13/probe/type-clause-p1/ (pinned adj-d1 cobol.exe, --std 2023) || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): Format 2 (report writer): COBOL-85 optional Report Writer module; ISO 2023 optional language element A.4.11; 2002/2014 availability not derivable from the 2023 text (VERSION_CHANGE_REFERENCE row 130d); Annex E lists no 2014->2023 change to the TYPE clause",
-  "state": "GAP"
+  "notes": "kb/Work PB1299 landed 2026-10-04 (wave 1012 G): a report description with no DETAIL, CONTROL HEADING or CONTROL FOOTING group is refused (COBOLNET2749); a summary report of one CONTROL FOOTING stays legal (SR16).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.57.3-16",
@@ -59511,13 +59511,13 @@
   "ordinal": 0,
   "subject": "SUM clause",
   "rule-digest": "692275d2f27c",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportSumClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportSumReset; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportValueOperand",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportSumClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportSumGroup; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ScreenReportEntryClausePresence; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSumClause",
+  "test-ref": "conformance:negative/pb1295-sum-reset-between-groups; conformance:negative/pb1295-sum-rounded-between-groups; conformance:85/pb1295_report_sum_groups_then_reset_rounded",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1295. Format: { SUM OF {data-name-1|identifier-1|arithmetic-expression-1}... [UPON {data-name-2}...] }... [RESET ON {data-name-3|FINAL}] [rounded-phrase] (cite.py --check 13.18.54.2 'where rounded-phrase is described in 14.7.4, ROUNDED phrase' OK). Grammar reportSumClause = SUM OF? reportValueOperand (COMMA? reportValueOperand)* (UPON dataReference (COMMA? dataReference)*)? reportSumReset? roundedPhrase?; the entry binder collects every reportSumClause as one repeated group. Probe p6 (--std 85 and 2023): 'SUM OF WS-A, WS-B UPON DET SUM WS-C UPON DET2 RESET ON FINAL ROUNDED' compiles and prints 005 (3 + ROUNDED 1.5=2) - correct. BUT because RESET/ROUNDED hang off EACH reportSumClause, 'SUM WS-A RESET ON FINAL SUM WS-B' and 'SUM WS-A ROUNDED SUM WS-B' are ACCEPTED (print 006) although the format places the RESET group and rounded-phrase only AFTER the whole repeated SUM...UPON group (under-rejects, minor). data-name-1 parses but is staged loud (COBOLNET0899 report-sum-rolled-total) - see SR-13.18.54.3-4. Edition gating of OF/expression/ROUNDED below 2002 cannot be derived from the 2023 text (dossier gap). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54)",
-  "state": "GAP"
+  "notes": "kb/Work PB1295 landed 2026-10-04 (wave 1012 G): reportSumClause is the repeated reportSumGroup followed by one RESET and one rounded-phrase, exactly the printed format; a phrase between two SUM groups ends the clause and the second clause is refused (COBOLNET1559).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.55.2",

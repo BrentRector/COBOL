@@ -22,10 +22,14 @@ public readonly record struct Table16Operand(
     /// picture (§13.18.29.4 GR1b/GR2b; D20/PB79: a national group is Table 16's NATIONAL row, never the GR4 group
     /// exemption); an alphanumeric group is the GR4 conversion-free copy.</summary>
     public static Table16Operand Of(DataItem item) =>
-        item.OperandPic is not { } p
-            ? new Table16Operand(PicCategory.Group)
-            : new Table16Operand(p.Category, p.IsAlphabetic, p.EditMask is not null || p.LocaleEdit is not null,
-                p.Category is PicCategory.Numeric && (p.IsFloat || p.Scale > 0));
+        item.OperandPic is not { } p ? new Table16Operand(PicCategory.Group) : Of(p);
+
+    /// <summary>The Table-16 position of a PICTURE — the one reading of its axes, for an item (<see cref="Of(DataItem)"/>)
+    /// and for the entry whose description exists only as an analysed PICTURE (a report group entry's subject,
+    /// <c>MoveTable16.NumericSenderRefusal</c>).</summary>
+    public static Table16Operand Of(PicInfo p) =>
+        new(p.Category, p.IsAlphabetic, p.EditMask is not null || p.LocaleEdit is not null,
+            p.Category is PicCategory.Numeric && (p.IsFloat || p.Scale > 0));
 
     /// <summary>The Table-16 position of a PLACE — the entry every MOVE/INVOKE crossing must use, because a
     /// REFERENCE-MODIFIED view carries only PART of the inner item's finer flags (kb/Work PB72 → PB73): §8.4.3.3.4
@@ -403,6 +407,17 @@ public static class MoveTable16
     /// "not a group" — exactly what such an item is).</summary>
     public static MoveRefusal? Validity(BoundOperand sender, Table16Operand receiver, DataItem? receiverItem) =>
         Chain(OperandItem(sender), ShapeRefusal(sender, receiver), SenderPosition(sender), receiver, receiverItem);
+
+    /// <summary>ISO §13.18.54.3 SR2 — "The category of the subject of the entry shall be valid as the category of a
+    /// receiving operand in a MOVE statement for a sending operand of the category numeric" — as the REASON the
+    /// category is refused, or null (kb/Work PB1295). The question is the MOVE chain's own, asked of a receiving
+    /// POSITION and a sender that is only "numeric": the sum counter is no data item the programmer wrote, and its
+    /// scale is the entry's own (§13.18.54.4 GR1), so the sender is read as the INTEGER numeric row — the one SR2's
+    /// "of the category numeric", which says nothing of a decimal point, cannot refuse more than (the NONINTEGER
+    /// row adds only "No" cells, among them the alphanumeric receivers an integer sum may legally fill).
+    /// ⛔ It rides <see cref="Chain"/> like every other asker, so a rule added to the chain reaches it.</summary>
+    public static string? NumericSenderRefusal(Table16Operand receiver) =>
+        Chain(null, null, new Table16Operand(PicCategory.Numeric), receiver, null)?.Reason;
 
     /// <summary>The ONE chain every composite entry runs, in SR order. SR2 first (it is a whole-group identity
     /// rule and pre-empts every per-category reading); SR8 (with SR6/SR7 for a bound operand) and SR9 next,

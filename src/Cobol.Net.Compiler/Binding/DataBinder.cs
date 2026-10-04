@@ -2554,6 +2554,22 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         return digit;
     }
 
+    /// <summary>⛔ THE ONE DIGIT-CAPACITY SCREEN OF A PICTURE (ISO §13.18.40.3 SR14, kb/Work PB1687): "For data items of
+    /// category numeric, and for fixed-point data items of category numeric-edited, the number of digit positions
+    /// described by character-string-1 shall range from 1 through 31" — and COBOL-85's own limit is 18
+    /// (<see cref="EditionContext.CheckDigitCapacity"/>). It is measured against DIGIT POSITIONS, not the '9' count (a
+    /// numeric-edited <c>Z(11)9(8)</c> is 19 positions and <c>Z(35)</c> is 35), and the floating-point form's
+    /// capacity is SR15's 1..36 significand digits, checked by the analyzer (kb/Work PB66 — DigitPositions is 0
+    /// there). A report group entry's PICTURE is "the same clause" as a data description entry's (§13.15.4 GR2), so
+    /// both binders ask it HERE (kb/Work PB1687: the report entry binder never asked, and `PIC 9(20) SUM …` compiled
+    /// at COBOL-85).</summary>
+    private void ScreenPictureDigitCapacity(PicInfo? pic, string what)
+    {
+        if (pic is { Category: PicCategory.Numeric or PicCategory.NumericEdited, IsFloat: false, IsFloatEdited: false }
+            && pic.DigitPositions > 0)
+            Edition.CheckDigitCapacity(pic.DigitPositions, what);
+    }
+
     /// <summary>⛔ THE ONE VALUE-CLAUSE LITERAL SCREEN — every literal of every VALUE format passes through here,
     /// and the raw text it returns is what gets STORED (unchanged, or the --permissive rewrite of a class-mismatched
     /// literal on a numeric subject).
@@ -5267,8 +5283,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // Digits check let slip past. DigitPositions == Digits for pure-numeric-without-P, so no regression. (CA33.)
         // §13.18.40.3 SR14 reaches category numeric and FIXED-POINT numeric-edited items; the floating-point form's
         // capacity is SR15's 1..36 significand digits, checked by the analyzer (kb/Work PB66 — DigitPositions is 0 there).
-        if (pic is { Category: PicCategory.Numeric or PicCategory.NumericEdited, IsFloat: false, IsFloatEdited: false } && pic.DigitPositions > 0)
-            Edition.CheckDigitCapacity(pic.DigitPositions, $"data item '{cobolName ?? "FILLER"}' (PICTURE {pictureText})");
+        ScreenPictureDigitCapacity(pic, $"data item '{cobolName ?? "FILLER"}' (PICTURE {pictureText})");
         // (§13.18.52.3 SR1/SR2 — the SIGN clause's subject — is CheckSignClauses, post-forest: the float-edited
         // special case that used to stand here is its numeric-edited arm, kb/Work PB537.)
         // §13.16.3 SR19 — the SIGN clause shall not be specified with a format-2 (LOCALE) PICTURE: the sign

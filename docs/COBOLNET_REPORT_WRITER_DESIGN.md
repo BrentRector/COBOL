@@ -303,8 +303,17 @@ off-by-one through every later counter check.
   report-name" (**COBOLNET2046**); a detail of ANOTHER report is legal, and because GR7 c) 2) accumulates on a
   GENERATE run against THAT report's engine the addition registers there (`ReportDetailRef.Owner`,
   `CobolReport.AddGenerateTrigger`). **ONE counter per ENTRY** (GR1) however many times the SUM keyword
-  appears (SR1): the entry binder collects every `reportSumClause` and each becomes a `ReportSumTerm` with its
-  OWN UPON list, emitted as one `AddSumTerm` call. (Before PB482 the addend went through `KeyReference` — the
+  appears (SR1): the grammar's `reportSumClause` is the repeated `reportSumGroup` followed by the clause's ONE RESET
+  phrase and ONE rounded-phrase (§13.18.54.2 — the outer brace closes after the UPON phrase; kb/Work PB1295), and
+  each group becomes a `ReportSumTerm` with its OWN UPON list, emitted as one `AddSumTerm` call. A phrase written
+  BETWEEN two SUM groups ends the clause, so the entry carries a second `reportSumClause`, which
+  `ScreenReportEntryClausePresence` refuses (COBOLNET1559). The entry's PICTURE is screened once, from the site that
+  analyses it (`ScreenReportEntryPicture`): the digit-position limit of §13.18.40.3 SR14 through the data division's
+  own `ScreenPictureDigitCapacity` (kb/Work PB1687) and §13.18.54.3 SR2 through `MoveTable16.NumericSenderRefusal`
+  (COBOLNET2750; docs/CONFORMANCE.md, the integer-row determination). A subscript in any report entry clause is asked
+  once per written entry by `ScreenReportSubscripts` (§8.4.2.3.3 SR8, COBOLNET2751): the lexer captures a subscript as
+  SUBSCRIPT-mode tokens, so `SubscriptWordsOfReference` reads its words, and a report section item that is not a
+  counter is the SUM expression's / SOURCE's own section rule (`ReportSectionNameIn`). (Before PB482 the addend went through `KeyReference` — the
   FILE STATUS key helper — so `SUM WS-CELL(2)` compiled and ABORTED at the first GENERATE, `SUM WS-TXT(1:2)`
   silently summed the whole item, `SUM WS-TXT` over a `PIC X(6)` summed its digits, `UPON <a control footing>`
   and `UPON <an undeclared word>` were accepted and totalled nothing, and a second `SUM … UPON …` group
@@ -669,7 +678,16 @@ standard states no outcome for — is COBOLNET2712 (CONFORMANCE §3). The phrase
   the last line past the lower limit — judged whole unless `EachDifferentPresentWhen`, then by the largest alone)
   through `MinimumLastLine`, the one placement walk the NEXT GROUP screen already read, asked for a chosen set of
   present lines. `GroupLimits` takes the WIDEST region each conditional limit allows (docs/CONFORMANCE.md, the
-  report group limits determination), so the screen never refuses a line some presentation may place there.
+  report group limits determination), so the screen never refuses a line some presentation may place there. The
+  RELATIVE halves of §13.18.39.4 GR1/GR2 are the same function's: a report or page heading, page footing or report
+  footing of relative lines is refused when `MinimumLastLine` carries its last line past its lower limit (the page
+  limit for the footings, GR2 a)) and when its candidate FIRST line — `MinimumLastLine` asked for that line alone,
+  every line above it absent — falls above `RelativeFirstLineFloor` (HEADING for the headings, FOOTING + 1 for the
+  footings, GR2 c)/g)); a report footing whose first line is the bare `ON NEXT PAGE` starts at HEADING (GR7 f).
+- *The set of groups* — `ScreenReportGroupCensus` (COBOLNET2749), once every CH/CF has its control level:
+  §13.18.57.3 SR13 (RH/PH/PF/RF at most once), SR14 (one CH and one CF per control level, counted per RESOLVED level so
+  an omitted operand and a written one collide) and SR15 (at least one body group). The run-time `AddGroup` holds one
+  slot per type and level, so an unscreened duplicate replaced the first group silently.
 The run-time conditions the screens cannot decide stay EC-REPORT-COLUMN-OVERLAP/-LINE-OVERLAP/-PAGE-WIDTH/-PAGE-LIMIT
 (default-off). EC-REPORT-* checking is default-off
 (SSOT §18.16). The engine raises, each bound PRECISELY to GENERATE and TERMINATE (`EcBinder`'s report-production

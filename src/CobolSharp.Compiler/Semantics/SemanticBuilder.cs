@@ -1068,7 +1068,7 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
             // the operand's TEXT exactly as before and has no opinion on an expression operand either.
             if (clause.reportSourceClause()?.reportValueOperand() is { Length: > 0 } src) group.SourceName = src[0].GetText();
             if (clause.reportSumClause() is { } sumc)
-                foreach (var op in sumc.reportValueOperand()) group.SumFields.Add(op.GetText());
+                foreach (var op in sumc.reportSumGroup().SelectMany(sg => sg.reportValueOperand())) group.SumFields.Add(op.GetText());
             if (clause.pictureClause()?.PIC_STRING() is { } pic)
             {
                 group.PicString = pic.GetText();
