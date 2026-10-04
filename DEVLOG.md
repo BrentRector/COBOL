@@ -13,6 +13,20 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1856 — 2026-10-03 18:20 PDT — Ledger refreshed after train 1010 (GAP 497); the last wave of the weekly quota
+
+Train 1010 (DEVLOG 1855) landed PB1412's EVALUATE half, PB1294 (report rolled totals) and PB1947 (a constant-name at every
+report-writer integer position), GAP 504 to 497, CI green. The owner asked to use the last of the weekly quota without losing
+work to a limit hit, so the wave was sized for about two points (two small Sonnet groups, 1.34 M subagent tokens in all) with a
+checkpoint commit and a stamped `STATUS.md` after every step, and no second wave. `ledger-trend.json` gained the point for train
+1010 (GAP 497, closed 3,850), `ledger-in-flight.md` now names eight trains since the last refresh, and the page was regenerated
+(`gen_ledger.py --check` clean) and republished to the same artifact (version 87). The first publish attempt was bounced by the
+server's classifier with instructions to repeat the identical call; the repeat succeeded. The lander used the Opus 5.5 trailer, as
+the earlier trains did.
+
+**Files:** `docs/rearchitecture/evidence/ledger-trend.json`, `docs/rearchitecture/evidence/ledger-in-flight.md`. No code changed,
+no diagnostic code used.
+
 ## Entry 1855 — 2026-10-03 17:51 PDT — Train 1010: wave 1010 groups B, A (the EVALUATE boolean-expression operands; SUM data-name-1 rolled totals and report-writer constants)
 
 **Group B — PB1412, the EVALUATE half.** The pending 2023 golden drew COBOLNET1511 and COBOLNET1634 three times on
