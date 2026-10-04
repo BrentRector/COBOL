@@ -8,7 +8,7 @@ Design: docs/rearchitecture/DESIGN-orchestrator-loop.md (kb/Work PB1981). Each i
   1. single instance (orchestrate.lock holds the PID; a dead PID's lock is stale and taken over)
   2. STOP file in the coordination directory ends the loop
   3. circuit breaker: three consecutive units that fail (nonzero exit, invalid or missing handoff, or under
-     -FastFailSeconds) stop the loop with an owner note; exponential backoff between failures
+     -FastFailSeconds without a `done` handoff) stop the loop with an owner note; exponential backoff between failures
   4. budget.py decides go / hold-session / hold-day / stop-week
   5. the next unit: -Unit for the first iteration, else next_unit.py (the handoff's next_unit, then the deterministic checks)
   6. run `claude -p` with the unit prompt, a fresh session id, stream-json to logs\; watch the context size and
@@ -294,7 +294,7 @@ try {
                 Copy-Item $Handoff $LastHandoff -Force
             } else { $outcome = 'invalid'; Copy-Item $Handoff "$logBase.handoff.invalid.json" -Force }
         }
-        $failed = ($r.exit -ne 0) -or (-not $valid) -or ($duration -lt $FastFailSeconds)
+        $failed = ($r.exit -ne 0) -or (-not $valid) -or (($duration -lt $FastFailSeconds) -and ($outcome -ne 'done'))
         $failures = if ($failed) { $failures + 1 } else { 0 }
         $lastFailed = $failed
         $lastStarted = $started

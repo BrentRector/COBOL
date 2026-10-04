@@ -122,7 +122,7 @@ shell), `-CoordDir`, `-RepoDir` (default the repository containing the script), 
 150000), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave`
 unit gets three times this, because a lander train must be allowed to finish), `-BorrowDays` (passed to
 `budget.py`), `-Unit` (the first unit, overriding `next_unit.py` once), `-Watch` (section 13), `-Python`, and the
-test seams `-TelemetryDir` (passed to `budget.py`), `-FastFailSeconds` (default 120) and `-BackoffBaseSeconds`
+test seams `-TelemetryDir` (passed to `budget.py`), `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
 (default 60). Exit codes: 0 stopped (`STOP`, `-MaxUnits`, `stop-week`, `-DryRun`), 3 another instance runs,
 4 circuit breaker, 5 an owner question is waiting.
 

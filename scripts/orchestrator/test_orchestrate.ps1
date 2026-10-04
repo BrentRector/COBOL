@@ -69,6 +69,10 @@ Check 'STOP exit' $r.code 0
 Check 'STOP started nothing' $r.runs 0
 Check 'STOP reported' ($r.out -match 'STOP file present') $true
 
+# 4b. a short unit that hands off `done` is not a fast failure (the meter unit takes about 40 s)
+$r = Run-Orch 'quickdone' 'good' @('-Unit', 'meter', '-MaxUnits', '1', '-FastFailSeconds', '120')
+Check 'quick done unit not failed' $r.units[0].failed $false
+
 # 5. the circuit breaker trips after three fast failures and leaves an owner note
 $r = Run-Orch 'breaker' 'fastfail' @('-Unit', 'wave', '-FastFailSeconds', '120')
 Check 'breaker exit' $r.code 4
