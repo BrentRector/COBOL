@@ -40,6 +40,8 @@
   },
   "wave": {
     "max_notes_per_group": 5,
+    "max_groups": 8,
+    "max_groups_source": "waves 1011-1015 ran 5 to 7 groups; the budget is the governor, this bounds the train count",
     "codes_per_group": 3,
     "lead_ids_per_train": 5,
     "concurrency": 6,

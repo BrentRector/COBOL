@@ -239,14 +239,16 @@ def finisher_pred(rep: Report | None, branch: str | None, cls: str, nid_list: li
             f"worktree still exists. {where}")
 
 
-def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], reports: list[Report],
-         classify: Callable[[str], str], unlanded: dict[str, list[str]], rules: dict[str, Any],
-         budget_points: float, max_groups: int | None = None) -> dict[str, Any]:
+def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: list[dict[str, Any]],
+         reports: list[Report], classify: Callable[[str], str], unlanded: dict[str, list[str]],
+         rules: dict[str, Any], budget_points: float, max_groups: int | None = None) -> dict[str, Any]:
+    """`clusters` and `half_clusters` are fix_clusters.py --json views of the open and the half notes; they also
+    define which notes are plannable at all (fix_clusters applies .agent-fleet.json's kind and skip flags)."""
     wave_rules = rules["wave"]
     cap = wave_rules["max_notes_per_group"]
-    open_ids = {i for i, n in notes.items() if n.status in ("open", "half")}
-    note_file = {n["id"]: c["file"] for c in clusters for n in c["notes"]}
-    note_files = {n["id"]: c.get("files", []) for c in clusters for n in c["notes"]}
+    open_ids = {n["id"] for c in clusters + half_clusters for n in c["notes"] if n["id"] in notes}
+    note_file = {n["id"]: c["file"] for c in clusters + half_clusters for n in c["notes"]}
+    note_files = {n["id"]: c.get("files", []) for c in clusters + half_clusters for n in c["notes"]}
 
     newest: dict[str, Report] = {}
     for r in reports:  # sorted oldest first, so the last write wins
@@ -275,14 +277,14 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], reports: list[R
                                 sorted({f for i in chunk for f in note_files.get(i, [])}),
                                 pred=finisher_pred(rep, rep.branch, classify(rep.branch) if rep.branch else "ABSENT", chunk)))
             taken |= set(chunk)
-    half = sorted((i for i in open_ids if notes[i].status == "half" and i not in taken), key=lambda s: int(s[2:]))
-    for k in range(0, len(half), cap):
-        chunk = half[k:k + cap]
-        groups.append(Group("finisher", chunk, note_file.get(chunk[0], ""),
-                            sorted({f for i in chunk for f in note_files.get(i, [])}),
-                            pred=("FINISH-FIRST: " + ", ".join(chunk) + " are `status: half`: read each note's landed-half "
-                                  "record and its kb/Work history before touching code; finish the open half at its root.")))
-        taken |= set(chunk)
+    for c in half_clusters:  # `status: half` notes, clustered by fix_clusters.py --open-status half
+        chunk = [n["id"] for n in c["notes"] if n["id"] not in taken][:cap]
+        if chunk:
+            groups.append(Group("finisher", chunk, c["file"], list(c.get("files", [])),
+                                pred=("FINISH-FIRST: " + ", ".join(chunk) + (" is" if len(chunk) == 1 else " are") +
+                                      " `status: half`: read each note's record of the landed half and its kb/Work "
+                                      "history before touching code; finish the open half at its root.")))
+            taken |= set(chunk)
     for branch, ids in sorted(unlanded.items()):
         ids = [i for i in ids if i not in taken and i not in newest]
         if ids:
@@ -403,7 +405,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--borrow-days", type=int, default=0, help="with --from-budget")
     ap.add_argument("--scratch", help="where groups.json, the specs and the args go (required without --dry-run)")
     ap.add_argument("--reports", help="the reports directory (default <scratch>/reports)")
-    ap.add_argument("--clusters-json", help="a fix_clusters.py --json output to use instead of running it")
+    ap.add_argument("--clusters-json", help="a fix_clusters.py --json output (open notes) to use instead of running it")
+    ap.add_argument("--half-clusters-json", help="the same for --open-status half")
     ap.add_argument("--no-branches", action="store_true", help="skip the UNLANDED-branch scan and treat every "
                     "report branch as landed (fast; for a planning preview only)")
     ap.add_argument("--max-groups", type=int)
@@ -430,23 +433,26 @@ def main(argv: list[str] | None = None) -> int:
     fleet = json.loads((REPO / ".agent-fleet.json").read_text(encoding="utf-8"))
     harm = {k: int(v) for k, v in (p.split("=") for p in fleet["harm"].split(","))}
     notes = load_notes(REPO / "kb" / "Work", harm)
-    if a.clusters_json:
-        clusters = json.loads(pathlib.Path(a.clusters_json).read_text(encoding="utf-8"))["clusters"]
-    else:
+    def fix_clusters(status: str, given: str | None) -> list[dict[str, Any]]:
+        if given:
+            return json.loads(pathlib.Path(given).read_text(encoding="utf-8"))["clusters"]
         if not FIX_CLUSTERS.exists():
             raise SystemExit(f"⛔ {FIX_CLUSTERS} is missing: run `git submodule update --init tools/claude-skills`")
-        tmp = cdir / "clusters.json"
+        tmp = cdir / f"clusters-{status}.json"
         subprocess.run([sys.executable, str(FIX_CLUSTERS), "--max", str(rules["wave"]["max_notes_per_group"]),
-                        "--json", str(tmp)], cwd=REPO, check=True, capture_output=True)
-        clusters = json.loads(tmp.read_text(encoding="utf-8"))["clusters"]
+                        "--open-status", status, "--json", str(tmp)], cwd=REPO, check=True, capture_output=True)
+        return json.loads(tmp.read_text(encoding="utf-8"))["clusters"]
+
+    clusters = fix_clusters("open", a.clusters_json)
+    half_clusters = fix_clusters("half", a.half_clusters_json)
     reports_dir = pathlib.Path(a.reports) if a.reports else (pathlib.Path(a.scratch) / "reports" if a.scratch else None)
     reports = load_reports(reports_dir)
-    open_ids = {i for i, n in notes.items() if n.status in ("open", "half")}
+    open_ids = {n["id"] for c in clusters + half_clusters for n in c["notes"]}
     if a.no_branches:
         classify, unlanded = (lambda _b: "ABSENT"), {}
     else:
         classify, unlanded = git_branch_classifier(), unlanded_branch_notes(open_ids)
-    p = plan(notes, clusters, reports, classify, unlanded, rules, budget_points, a.max_groups)
+    p = plan(notes, clusters, half_clusters, reports, classify, unlanded, rules, budget_points, a.max_groups or rules["wave"]["max_groups"])
 
     wave = str(a.wave)
     train = rules["wave"]["train_size"]
