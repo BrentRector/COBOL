@@ -105,9 +105,12 @@ Read `references/landing.md` before dispatching a lander, landing, pushing, runn
 ## 4. Central allocation
 
 The orchestrator allocates `kb/Work` ids and diagnostic-code ranges in the dispatch brief; agents never pick their own
-(five collisions in one day each cost a renumbering pass). DEVLOG numbers are read from the file at landing time
-(top entry + 1). `session-probe` reports the next free diagnostic code — it must end above ALL codes claimed by
-in-flight worktrees.
+(five collisions in one day each cost a renumbering pass). Every allocation goes through ONE locked allocator,
+`python scripts/orchestrator/alloc.py pb N | code N | devlog`, which keeps the reservations of in-flight worktrees
+outside every worktree, so two sessions never hand out the same value (`peek <kind>` reads without reserving;
+`scripts/orchestrator/plan_wave.py` allocates a wave's codes and lead-id blocks through it). DEVLOG numbers are read
+from the file at landing time (top entry + 1). `session-probe` prints `alloc.py peek code --probe`: the next free
+diagnostic code above every code in `src/`, the catalog and the reservations.
 
 ## 5. On restart after a cutoff
 

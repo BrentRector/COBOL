@@ -93,7 +93,8 @@ rules:
     message: >-
       A raw "COBOLNET####" string literal bypasses DiagnosticCatalog. Every emitted code must be a catalog
       descriptor (one code = one rule, ISO §, severity, suppress-key) so the drift test can prove the two channels
-      agree, and so session-probe's next-free calculation stays sound. Add the descriptor and reference it.
+      agree, and so the next-free calculation (scripts/orchestrator/alloc.py, printed by session-probe) stays sound.
+      Add the descriptor and reference it.
     # Match the BYPASS shape only: a bare code literal passed to an emit API. A plain regex over "COBOLNET####"
     # is far too broad (633 hits) — it swept up the generated ConstructRegistry, legitimate registry lookups, and
     # comments that merely DISCUSS a past code collision.
