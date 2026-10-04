@@ -62,7 +62,7 @@ jobs:
   # longer carries a second one for it to drift against (feedback_one_rule_one_place). ──
   changes:
     name: changes (does this commit need the matrix?)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       checks: read            # for the already-verified short-circuit below — read-only, nothing else
@@ -225,7 +225,7 @@ jobs:
   audits:
     name: audits (citations · evidence supersession · witness loss · work register)
     needs: changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -302,7 +302,7 @@ jobs:
     name: Guard (WiseOwl COBOL NIST + legacy unit + integration, parallel)
     needs: changes
     if: needs.changes.outputs.run_matrix == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -343,7 +343,7 @@ jobs:
     name: Greenfield conformance (Linux, sharded)
     needs: changes
     if: needs.changes.outputs.run_matrix == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
@@ -420,7 +420,7 @@ jobs:
     name: Greenfield unit + characterization (Linux)
     needs: changes
     if: needs.changes.outputs.run_matrix == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -556,7 +556,7 @@ jobs:
     name: Conformance shard population guard
     needs: [changes, greenfield-conformance, windows-conformance]
     if: needs.changes.outputs.run_matrix == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -591,7 +591,7 @@ jobs:
     name: INV-1-strong (golden battery byte-exact @ 2023 --permissive)
     needs: changes
     if: needs.changes.outputs.run_matrix == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -697,7 +697,7 @@ jobs:
     name: Legacy-oracle bake-verify cross-check (opt-in — nightly / manual)
     needs: changes
     if: needs.changes.outputs.run_matrix == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -752,7 +752,7 @@ jobs:
     name: ci-gate
     if: always()
     needs: [changes, audits, guard, greenfield-conformance, greenfield-unit, windows-conformance, conformance-population, inv1-strong-2023, windows-build-test, legacy-oracle]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Verdict
         shell: bash

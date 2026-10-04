@@ -1027,6 +1027,33 @@
       "dns": 457,
       "label": "PB917+PB1134+PB1212+PB1246+P",
       "battery": null
+    },
+    {
+      "sha": "86ed1ce2",
+      "date": "2026-10-04",
+      "gap": 354,
+      "closed": 3993,
+      "dns": 457,
+      "label": "PB1402+PB1944: extended lett",
+      "battery": null
+    },
+    {
+      "sha": "15bc8db9",
+      "date": "2026-10-04",
+      "gap": 348,
+      "closed": 3999,
+      "dns": 457,
+      "label": "PB1455+PB1426+PB1416+PB1425:",
+      "battery": null
+    },
+    {
+      "sha": "dfd45c9e",
+      "date": "2026-10-04",
+      "gap": 336,
+      "closed": 4011,
+      "dns": 457,
+      "label": "PB1429+PB1136+PB1165+PB1275+",
+      "battery": null
     }
   ]
 }

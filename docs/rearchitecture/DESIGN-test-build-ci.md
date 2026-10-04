@@ -1286,7 +1286,8 @@ every gate now writes into its run directory's `verdict.json` (`timings`, and ea
 
 ### 3.15 THE LOCAL LINUX GATE — CI's Linux legs under WSL before a push (kb/Work PB1732)
 
-CI runs most of its test jobs on `ubuntu-latest`, and every local gate runs on the Windows host, so without this a
+CI runs most of its test jobs on `ubuntu-26.04` (pinned, so the runner image moves only when the repository says so),
+and every local gate runs on the Windows host, so without this a
 change's first Linux run was CI's. Train 71b showed the cost: a Windows path literal in a new drift test was green
 on Windows and red in CI's Linux unit job. That was a ~30-minute round trip and a dropped cluster, for a failure a
 2.5-minute WSL run reproduces.
@@ -1334,8 +1335,10 @@ conformance leg only for flagged diffs, was built and deleted the same night. At
 misses (the rule of section 3.14.1, ORDER, DON'T SKIP).
 
 **Limits.**
-- WSL is not `ubuntu-latest`, and the gate runs Debug where CI also runs Release. It catches platform assumptions,
-  and CI through `push-main.sh` remains the proof.
+- The local WSL distro is the same Ubuntu release as the pinned `ubuntu-26.04` runner (upgraded in place 2026-10-04),
+  but it runs Microsoft's WSL kernel, not the runner's, and the gate runs Debug where CI also runs Release (kb/Work
+  PB1957 lists every remaining difference). It catches platform assumptions, and CI through `push-main.sh` remains
+  the proof.
 - The gate cap (section 3.14.6) does not span operating systems, so WSL legs are not counted against it.
 
 ---

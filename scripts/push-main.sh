@@ -16,7 +16,7 @@
 # ⚙ WHY IT EXISTS. PB796: `git push origin HEAD:main` was the LAST step of both lander briefs, so nothing in the
 # loop ever read the verdict the push triggered, and `main` stayed red for 29 hours across 16 consecutive
 # completed runs while eleven landings each reported a green LOCAL gate. The local battery runs on ONE host
-# (Windows, Debug); the workflow's `ubuntu-latest` jobs and its Release build are gated by CI and by nothing else.
+# (Windows, Debug); the workflow's `ubuntu-26.04` jobs and its Release build are gated by CI and by nothing else.
 # The brief-level fix ("wait for the run, report its conclusion") was prose in four places. This is the mechanism.
 #
 # ⭐ IT IS IDEMPOTENT AND SAFE TO RE-RUN. A full-matrix run is ~25–30 min, which is longer than an agent's command

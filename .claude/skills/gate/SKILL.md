@@ -68,7 +68,7 @@ never waits. Then `bash scripts/linux-gate.sh` (MANDATORY-PRACTICES L10) and `pu
 - `scripts/guard-fast.sh` (parallel) when a legacy-shared seam was touched — never the serial `guard.sh`
 
 - **CI's own Linux leg — comprehensive is not comprehensive without it.** Everything above runs on ONE host
-  (this Windows machine, Debug). The workflow's `ubuntu-latest` jobs — `guard-fast.sh`'s NIST loop, the Linux
+  (this Windows machine, Debug). The workflow's `ubuntu-26.04` jobs — `guard-fast.sh`'s NIST loop, the Linux
   conformance shards, Linux greenfield unit + characterization — and the Release build are verified by CI and by
   nothing else, so a test keyed on host ACL or file-lock semantics can be green here and red there. Read the
   verdict for the commit you pushed:

@@ -18,21 +18,21 @@
   Classes available: .flight (the accent panel), .cardgrid + .card, .pill.good/.warn/.crit, .mono, .num, .dim.
 -->
   <div class="flight">
-    <h3>In flight — Sunday 2026-10-04, morning</h3>
-    <p><strong>Wave 1014 is running</strong> (three implementers, then a lander train), with the model sized per group: the extended-letters lexer work dropped from train 1007, with the ANTLR grammar-encoding fix (Sonnet), and the parser-core grammar and the OO binder (Opus).</p>
-    <p><strong>Landed this morning</strong>, each CI-proven: <span class="pill good">1011</span> STRING and UNSTRING operand screens, the OO data-division placement table and method BY VALUE formals, the report-writer binder residues, constant-name integer positions and TYPEDEF RENAMES (GAP 497 to 426); <span class="pill good">1012</span> linkage rules for function formals, SORT and MERGE record-size screens, the FLAG-02 and FLAG-14 detectors, the binder driver (426 to 381); <span class="pill good">1013</span> ANY LENGTH RETURNING, interface covariance and inheritance rules, variable-length group display, and a DataBinder rule cluster (381 to 359).</p>
-    <p><strong>Dropped from train 1013:</strong> the file-sharing default and fatal-I-O-status work (PB322 parts A and E), because the CI NIST guard job reads two new rows in <span class="mono">tests/nist/corpus.tsv</span> as legacy divergences. The branch is finished and gated; PB1955 (the guard) blocks it.</p>
-    <p><strong>Partly done, by design:</strong> PB322 as above, the PB244 residues, PB1722 (a huge VALUE table compiles in 24 s and 2.5 GB), PB1042 (a dynamic-capacity table in an EXTERNAL record) and the OO universal-descriptor leg (PB480, PB1112).</p>
-    <p><strong>Pacing:</strong> a new weekly quota began at 03:00; the target is one seventh of it per day, with the model sized to each group.</p>
+    <h3>In flight — Sunday 2026-10-04, midday</h3>
+    <p><strong>Nothing is gated or landing right now.</strong> Four trains have landed since the weekly reset, each CI-proven: <span class="pill good">1011</span> STRING and UNSTRING operand screens, the OO data-division placement table, method BY VALUE formals, constant-name integer positions and TYPEDEF RENAMES (GAP 497 to 426); <span class="pill good">1012</span> linkage rules for function formals, SORT and MERGE record-size screens, the FLAG-02 and FLAG-14 detectors and the binder driver (426 to 381); <span class="pill good">1013</span> ANY LENGTH RETURNING, interface covariance and inheritance rules, variable-length group display and a DataBinder rule cluster (381 to 359); <span class="pill good">1014</span> extended letters in COBOL words with one Annex C name fold, the parser-core suffix-order and SUPER grammar, and the OO binder's receiver and selector rules (359 to 336).</p>
+    <p><strong>Dropped and waiting:</strong> the file-sharing default and fatal-I-O-status determinations of PB322 (the CI NIST guard job reads two new rows in <span class="mono">tests/nist/corpus.tsv</span> as legacy divergences; PB1955 blocks it).</p>
+    <p><strong>Tooling moved this morning:</strong> the local WSL distro is now Ubuntu 26.04.1 and passed its first Linux gate; CI is being pinned to the same <span class="mono">ubuntu-26.04</span> image so the two stop drifting apart. ANTLR is told to read grammars as UTF-8 (the cause of train 1007's CI-only red). PB1957 lists every other place CI and the local gates differ.</p>
+    <p><strong>Partly done, by design:</strong> PB322 as above, PB1425 (SELF and SUPER identifier positions), the PB1136 receiver half, the PB244 residues, PB1722, PB1042 and the OO universal-descriptor leg (PB480, PB1112).</p>
+    <p><strong>Pacing:</strong> one seventh of the weekly quota per day is the target; four waves have been spent on Sonnet and Opus implementers sized per group.</p>
   </div>
   <div class="cardgrid">
     <div class="card">
-      <h3>Measured this morning</h3>
-      <p>Three waves moved 138 rows (GAP 497 to 359) for about 8.5 M subagent tokens, on Sonnet implementers with Opus landers; the weekly meter read 8% at 09:48.</p>
+      <h3>Measured today</h3>
+      <p>Four trains moved 161 rows (GAP 497 to 336) for about 9.9 M subagent tokens: the Sonnet-led waves cost about 3 M each, the mixed Sonnet and Opus wave 1.4 M.</p>
     </div>
     <div class="card">
       <h3>Owner decisions</h3>
-      <p>Finish pending work first, then new work within the daily share of the weekly quota, keeping the five-hour session meter below its soft line. Fable is recommended where it would help and used only with the owner's explicit approval.</p>
+      <p>Finish pending work first, then new work inside the daily share of the weekly quota, keeping the five-hour session meter below its soft line. Make CI and the local gates the same build where possible, and reproduce each remaining difference locally. Fable only with explicit approval.</p>
     </div>
     <div class="card">
       <h3>History</h3>
