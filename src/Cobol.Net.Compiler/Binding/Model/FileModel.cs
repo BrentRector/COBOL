@@ -19,13 +19,16 @@ public enum SharingMode { None, AllOther, NoOther, ReadOnly }
 public enum LockKind { None, Manual, Automatic }
 public sealed record LockModeInfo(LockKind Kind, bool Multiple);
 
-/// <summary>Which I-O-CONTROL SAME clause format (ISO §12.4.6.2): Format 1 <c>SAME AREA</c>, Format 2
-/// <c>SAME RECORD AREA</c>, Format 3 <c>SAME SORT AREA</c> / <c>SAME SORT-MERGE AREA</c>.</summary>
-public enum SameClauseKind { Area, RecordArea, SortArea, SortMergeArea }
+/// <summary>Which I-O-CONTROL SAME clause format (ISO §12.4.6.4.2): Format 1 <c>SAME AREA</c> (file-area), Format 2
+/// <c>SAME RECORD AREA</c> (record-area), Format 3 <c>SAME SORT AREA</c> / <c>SAME SORT-MERGE AREA</c>
+/// (sort-merge-area). §12.4.6.4.3 SR1 makes SORT and SORT-MERGE equivalent, so the spellings are ONE format here;
+/// <see cref="SameClause.Written"/> keeps the words the program used for the messages that quote them.</summary>
+public enum SameClauseKind { Area, RecordArea, SortMergeArea }
 
-/// <summary>One SAME clause: its format and the files it names (those that resolve to a declared file; a name that
-/// does not is the clause's own error, reported where the clause is bound).</summary>
-public sealed record SameClause(SameClauseKind Kind, IReadOnlyList<FileModel> Members);
+/// <summary>One SAME clause: its format, the files it names (those that resolve to a declared file; a name that does
+/// not is the clause's own error, reported where the clause is bound) and its opening words as written
+/// (<c>SAME SORT AREA</c>).</summary>
+public sealed record SameClause(SameClauseKind Kind, IReadOnlyList<FileModel> Members, string Written);
 
 /// <summary>One ALTERNATE RECORD KEY clause of a file control entry, AS WRITTEN (ISO §12.4.5.6.2 — data-name-1,
 /// its IN/OF qualifiers, the WITH DUPLICATES and SUPPRESS WHEN phrases), plus the item data-name-1 resolved to
@@ -200,6 +203,18 @@ public sealed class FileModel
     /// <summary>The FD's record description(s), in declaration order. The first is the canonical storage area; every
     /// other shares it (synthesized REDEFINES).</summary>
     public List<DataItem> Records { get; } = [];
+
+    /// <summary>The record <c>DataBinder.MaterializeImpliedRecord</c> synthesized for an FD with NO record description
+    /// entries (ISO §14.9.30.4 GR6, kb/Work PB345), or null when the entry wrote its own. It is in
+    /// <see cref="Records"/> because it is real storage; it is NOT a record description entry, and a syntax rule whose
+    /// antecedent is "if there are record description entries associated with the file" (§13.18.13.3 SR3) asks
+    /// <see cref="WrittenRecords"/>, never <see cref="Records"/> (kb/Work PB1219).</summary>
+    public DataItem? ImpliedRecord { get; set; }
+
+    /// <summary>The record description entries the program WROTE under this FD — <see cref="Records"/> without the
+    /// <see cref="ImpliedRecord"/>. The one answer to "which records does a rule about record description entries
+    /// range over".</summary>
+    public IEnumerable<DataItem> WrittenRecords => Records.Where(r => !ReferenceEquals(r, ImpliedRecord));
 
     /// <summary>The source position of the file control entry itself — the cursor the entry's own syntax rules
     /// report at when the violation is the ABSENCE of a clause (ISO §12.4.5.1's required members and §12.4.5.2

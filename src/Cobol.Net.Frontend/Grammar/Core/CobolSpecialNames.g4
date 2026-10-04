@@ -242,8 +242,22 @@ symbolicCharactersClause
       symbolicCharacterEntry+ (IN cobolWord)? misplacedSpecialNamesForPhrase?
     ;
 
+// ⛔ integer-1 IS AN `integer-n` POSITION, so an integer constant-name stands there (ISO §13.10.3 SR2; kb/Work PB1948)
+// — but the format's own repeated group `{symbolic-character-1}… [IS|ARE] {integer-1}…` writes the names and the
+// ordinals as WORDS side by side, so a constant-name ordinal cannot be told from the next symbolic-character-1 by
+// the parser alone. THREE ordered alternatives admit every spelling and leave the decision where the information is:
+//   1. literal ordinals — the spelling every pre-constant program used, listed FIRST so a program with no constant
+//      parses exactly as it always did (an ambiguity resolves to the lowest alternative);
+//   2. `IS|ARE` then `integerOperand+` — the ordinals may be constant-names;
+//   3. words only — the optional IS/ARE omitted with constant-name ordinals: `SYMBOLIC CHARACTERS SOH K1`.
+// Whichever alternative parsed, the BINDER (DataBinder.SymbolicEntryGroups) re-reads the entry's tokens in source
+// order and decides each WORD by whether the compilation unit defines it as a constant — the only fact that
+// separates a name from an ordinal — so a greedy parse that folded a following IS-less group into the previous
+// group's ordinals (`SC-A IS K1 SC-B K2`) is regrouped correctly.
 symbolicCharacterEntry
     : cobolWord+ (IS | ARE)? integerLiteral+
+    | cobolWord+ (IS | ARE) integerOperand+
+    | cobolWord+
     ;
 
 // ALPHABET alphabet-name-1 [FOR ALPHANUMERIC] IS {NATIVE|STANDARD-1|STANDARD-2|literal-phrase…}

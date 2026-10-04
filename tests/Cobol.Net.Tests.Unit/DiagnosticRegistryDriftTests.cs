@@ -23,10 +23,11 @@ public sealed class DiagnosticRegistryDriftTests
     /// <c>.Error("&lt;code&gt;"</c> literal for these may survive in the compiler.</summary>
     private static readonly string[] SplitCodes = ["COBOLNET0899", "COBOLNET1533"];
 
-    /// <summary>Codes DELIBERATELY shared by multiple descriptors: the split families plus COBOLNET1535
-    /// (the catalog's own "reused across two rules (the 1533 disambiguation pattern; code byte-stable)"
-    /// note). Any other shared code is a collision.</summary>
-    private static readonly string[] SharedCodes = ["COBOLNET0899", "COBOLNET1533", "COBOLNET1535"];
+    /// <summary>Codes DELIBERATELY shared by multiple descriptors: the split families. Any other shared code is a
+    /// collision — COBOLNET1535 was once listed here, its second descriptor (the staged RENAMES-in-TYPEDEF stage) having
+    /// been a collision nobody had registered; the stage was implemented and the descriptor deleted (kb/Work PB1304,
+    /// PB608), so the code now has one meaning like every other.</summary>
+    private static readonly string[] SharedCodes = ["COBOLNET0899", "COBOLNET1533"];
 
     [Fact]
     public void EveryDescriptor_HasUniqueId()

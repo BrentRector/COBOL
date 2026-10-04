@@ -157,9 +157,9 @@ off-by-one through every later counter check.
   `NEXT GROUP PLUS KG`, every integer of the PAGE clause (LIMIT, the COLUMNS width, HEADING, FIRST DETAIL, LAST
   CONTROL HEADING, LAST DETAIL, FOOTING) and `OCCURS … STEP KS` are legal. The grammar spells each of them
   `integerOperand : integerLiteral | cobolWord` (`CobolExpressions.g4`, beside `integerLiteral`) — the rule the OCCURS
-  bounds wrote privately as `occursBound` before — and `IntegerOperandSlotDriftTests.ReportWriterGrammar_SpellsNoBareIntegerLiteral`
-  keeps a bare `integerLiteral` out of `CobolReportWriter.g4`, so the clause added next admits a constant without anyone
-  remembering to. The binder reads every one through the ONE `DataBinder.IntegerOperandValue` (the OCCURS reader,
+  bounds wrote privately as `occursBound` before — and `IntegerOperandSlotDriftTests.EveryRuleWritingABareIntegerLiteral_IsAnArguedLiteralOnlySlot`
+  keeps a bare `integerLiteral` out of the report-writer grammar (and every other), so the clause added next admits a
+  constant without anyone remembering to. The binder reads every one through the ONE `DataBinder.IntegerOperandValue` (the OCCURS reader,
   generalised): the integer as written, or the integer constant's value, which §13.10.4 GR1 makes "as if the literal
   were written" and therefore meets what the written literal meets — §5.5 1)'s unsigned/nonzero default with each
   clause's own zero permission (`IntegerOperandRules.Slots`, classified by the CLAUSE that owns the operand, not by

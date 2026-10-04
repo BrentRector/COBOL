@@ -811,6 +811,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         var newRoots = new List<DataItem>();
         var stack = new Stack<DataItem>();
         bool rootIsTemplate = false;   // true while the current level-1 subtree is a TYPEDEF template (D17)
+        DataItem? templateRoot = null; // that template's level-1 entry: its level-66 entries ride IT (ISO §13.18.58.4 GR1)
         // ⛔ THE ENTRY A LEVEL-88 ENTRY IMMEDIATELY FOLLOWS — ISO §13.16.3 SR24's own subject, and NOT
         // `stack.Peek()`. The two coincide for every entry that opens or extends the level hierarchy and DIVERGE
         // for the entries that never enter the stack: a level-66 RENAMES alias (SR24 exclusion b) and a CONSTANT
@@ -819,6 +820,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // `05 B` and answered about it (kb/Work PB488 — a wrong answer, not a permissiveness). Null = the 88
         // follows no entry describing a data item; the screen reports that instead of the old silent drop.
         DataItem? lastDescribed = null;
+        bool renamesBegun = false;   // the current record's level-66 entries have begun: §13.18.45.3 SR2 (kb/Work PB1283)
         foreach (var entry in entries)
         {
             // A record a constant's value already needed was bound ahead of this walk (kb/Work PB1231): its roots
@@ -833,6 +835,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 }
                 stack.Clear();
                 lastDescribed = null;
+                renamesBegun = false;
                 continue;
             }
             _entriesBound.Add(entry);
@@ -893,15 +896,19 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // A level-66 RENAMES entry is a re-grouping alias on the owning record — not a node in the storage tree.
             if (lvl == 66)
             {
-                // A RENAMES INSIDE a TYPEDEF template is part of the type (§13.18.58.4 GR1) but CloneItem does not
-                // carry Renames66 into a TYPE reference — so it would be silently dropped. Staged loud (D17 inc 4).
-                if (rootIsTemplate)
-                    Edition.Error(DiagnosticCatalog.TypedefRenamesStaged, "a level-66 RENAMES inside a TYPEDEF "
-                        + "(part of the type per ISO §13.18.58.4 GR1) is recognized but not yet cloned into TYPE "
-                        + "references (data-model D17 residue)");
+                // A RENAMES INSIDE a TYPEDEF template is part of the type (§13.18.58.4 GR1: "Subordinate data
+                // description entries, condition-name entries, and RENAMES clauses are part of the type declaration"),
+                // so it rides the TEMPLATE's root exactly as a record's level-66 entries ride the record, and
+                // ExpandType clones it onto every item the type is applied to (CloneRenamesOnto) — the level-88 arm's
+                // twin (kb/Work PB1304).
                 // The alias IS "the entry describing the item" for a level-88 entry written after it — and
                 // ISO §13.16.3 SR24 b) then excludes it. Recording it here is what replaces the silent steal.
-                lastDescribed = BindRenames(entry);
+                // The record it belongs to is the one this walk last opened (never `_lastRoot`, which outlives the walk and
+                // would hand a section's first 66 the previous section's record) — §13.18.45.3 SR2 (kb/Work PB1283).
+                var renamesOwner = rootIsTemplate ? templateRoot : newRoots.Count > 0 ? newRoots[^1] : null;
+                ScreenRenamesPlacement(renamesOwner, entry.dataName()?.GetText() ?? "FILLER");
+                renamesBegun = true;
+                lastDescribed = BindRenames(entry, renamesOwner);
                 continue;
             }
 
@@ -934,16 +941,19 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
             if (stack.Count == 0)
             {
+                renamesBegun = false;   // a new record (or 77): the previous record's RENAMES entries are over
                 // A TYPEDEF entry is a type DECLARATION (ISO §13.18.58; D17): a named level-01 template that
                 // allocates NO storage — registered in TypeDecls, kept OFF Roots (and, below, off ByName).
                 if (item.IsTypedef)
                 {
                     rootIsTemplate = true;
+                    templateRoot = item;
                     RegisterTypeDecl(item);
                 }
                 else
                 {
                     rootIsTemplate = false;
+                    templateRoot = null;
                     // A 01/77 emits as a Program-level static field — its C# name must be unique across every root
                     // (FILE SECTION records and WORKING-STORAGE alike), so record it in the shared scope.
                     item.CsName = Unique(item.CsName, rootNames);
@@ -959,6 +969,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     Edition.Error(DiagnosticCatalog.TypeDeclarationShape, $"TYPEDEF on '{item.CobolName ?? "FILLER"}': the TYPEDEF clause "
                         + "shall be specified only in a level-01 record-description entry (ISO §13.18.58)");
                 var parent = stack.Peek();
+                if (renamesBegun) ScreenEntryAfterRenames(item.CobolName);   // §13.18.45.3 SR2 (kb/Work PB1283)
                 // §13.18.57.3 SR2 (review DEVLOG 664 fix #2): a TYPE-clause entry shall not be followed immediately by
                 // a subordinate entry — the entry IS the whole type (§13.18.57.4 GR1). Without this the explicit
                 // subordinate merges ahead of the cloned members (a silent-wrong record image for a group type; a
@@ -972,28 +983,17 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 item.Parent = parent;
                 parent.Children.Add(item);
             }
-            // CONSTANT RECORD placement + subtree conflicts (P10 Step 15). §13.18.15.3 SR1: the clause may be
-            // specified only in the local-storage or working-storage sections. §13.16.3 SR13: BLANK WHEN ZERO /
-            // SYNCHRONIZED (and the level-checked BASED / ANY LENGTH / TYPEDEF) shall not appear in any entry
-            // subordinate to a CONSTANT RECORD entry. (The same-entry SR13/SR3/SR6 conflicts are checked in
+            // CONSTANT RECORD placement (P10 Step 15). §13.18.15.3 SR1: the clause may be specified only in the
+            // local-storage or working-storage sections. (The same-entry SR13/SR3/SR6 conflicts are checked in
             // BindEntry, where the flags are local — the IsBased discipline.)
             if (item.IsConstantRecord && section is not (EntrySection.WorkingStorage or EntrySection.LocalStorage))
                 Edition.Error(DiagnosticCatalog.ConstantRecordRule, $"'{item.CobolName ?? "FILLER"}': the "
                     + "CONSTANT RECORD clause may be specified only in the local-storage or working-storage "
                     + "sections (ISO §13.18.15.3 SR1)");
-            else if (!item.IsConstantRecord && IsConstantRecordItem(item)
-                && (item.BlankWhenZero || item.Synchronized || item.IsBased || item.IsAnyLength || item.IsTypedef))
-                Edition.Error(DiagnosticCatalog.ConstantRecordRule, $"'{item.CobolName ?? "FILLER"}': the "
-                    + "ANY LENGTH, BASED, BLANK WHEN ZERO, SYNCHRONIZED, and TYPEDEF clauses shall not be "
-                    + "specified in any entry subordinate to a CONSTANT RECORD entry (ISO §13.16.3 SR13)");
-            // §13.18.40.3 SR32 (subordinate half — the parent chain exists only here): a format 2 PICTURE clause
-            // shall not be specified in any data item subordinate to a CONSTANT RECORD item.
-            if (!item.IsConstantRecord && IsConstantRecordItem(item) && item.Pic is { LocaleEdit: not null })
-                Edition.Error(DiagnosticCatalog.PictureLocaleFormat2Violation, $"'{item.CobolName ?? "FILLER"}': a "
-                    + "format 2 PICTURE clause shall not be specified in any data item subordinate to a data item "
-                    + "described with the CONSTANT RECORD clause (ISO §13.18.40.3 SR32)");
-            // §13.18.63.3 SR12/SR16 — the VALUE clause's PLACEMENT, asked here for the same reason as the two
-            // screens above: the ancestor chain exists only once the entry is attached (DataBinder.ValuePlacement;
+            // (The subordinate halves — §13.16.3 SR13's excluded clauses, §13.18.40.3 SR32 and §13.18.38.3 SR19/SR23/SR33
+            // — are asked of the COMPOSED forest by CheckConstantRecordSubtrees, so a TYPE or SAME AS clone is asked too.)
+            // §13.18.63.3 SR12/SR16 — the VALUE clause's PLACEMENT, asked here because the ancestor chain exists
+            // only once the entry is attached (DataBinder.ValuePlacement;
             // its format-3 twin, SR25, is asked by BindCondition).
             ScreenItemValuePlacement(item);
             stack.Push(item);
@@ -1184,7 +1184,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // value for integer-1 in the RESERVE clause" part of an external file connector's entry identity
                 // (kb/Work PB1079): FileModel.ReserveAreas is read by the EC-EXTERNAL-FILE-MISMATCH fingerprint.
                 else if (clauses.fileReserveClause() is { } res)
-                    file.ReserveAreas = CobolNet.Validation.IntegerOperandRules.HostValue(res.integerLiteral());
+                {
+                    using var rsv = Edition.At(res);
+                    file.ReserveAreas = IntegerOperandValue(res.integerOperand(), $"file '{name}' RESERVE clause")
+                        ?? RecoveredIntegerOperand;
+                }
                 // RECORD DELIMITER clause (ISO §12.4.5.11) — DECLINED, ACCEPT-INERT, and diagnosed by name at
                 // EVERY edition on BOTH arms of its required choice (kb/Work PB292). STANDARD-1 is Annex A.3
                 // item 26, a processor-dependent element whose §12.4.5.11.4 GR2 medium is a tape drive; a
@@ -1766,6 +1770,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     continue;
                 else if (clause.recordClause() is { } rc)
                     BindRecordClause(rc, file);   // RECORD VARYING / m TO n → FileModel.Varying (ISO §13.18.43)
+                else if (clause.blockContainsClause() is { } bcc)
+                    BindBlockContainsClause(bcc, name);   // ISO §13.18.10 — the integers are screened, the clause models nothing
                 else if (clause.codeSetClause() is { } cs)
                     BindCodeSetClause(cs, file, records);   // ISO §13.18.13 (kb/Work PB110)
                 else if (clause.formatClause() is { } fmt)
@@ -1996,6 +2002,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         record.Children.Add(area);
         _roots.Add(record);
         file.Records.Add(record);
+        file.ImpliedRecord = record;   // real storage, but no record description entry: WrittenRecords leaves it out (kb/Work PB1219)
     }
 
     /// <summary>Bind a RECORD clause's variable-length forms into <see cref="FileModel.Varying"/> (ISO §13.18.43:
@@ -2012,19 +2019,22 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // because it is set HERE and not at the two call sites.
         using var _ = Edition.At(rc);
         file.RecordClauseAt = Edition.Cursor;
+        string recWhere = $"file '{file.CobolName}' RECORD clause";
         if (rc.VARYING() is null && rc.TO() is null)
         {
             // The fixed Format-1 RECORD CONTAINS integer-1 (ISO §13.18.43.2). It SIZES THE FILE — §13.18.43.4
             // GR6: "Integer-1 specifies the number of bytes contained in each record in the file" — through
             // FileModel.RecordWidth, for an FD and an SD alike (kb/Work PB1276), and a report file's line width
             // prefers it (COBOLNET_REPORT_WRITER_DESIGN §4).
-            if (rc.integerLiteral() is { Length: > 0 } fixedLits && CobolNet.Validation.IntegerOperandRules.HostValue(fixedLits[0]) is var n0)
-                file.RecordContains = n0;
+            // A constant-name stands for integer-1 (§13.10.3 SR2) and is read by the ONE integer-n reader; a refused
+            // one is reported there and leaves the width unset, so it cascades into no size diagnostic.
+            if (rc.integerOperand() is { Length: > 0 } fixedOps)
+                file.RecordContains = IntegerOperandValue(fixedOps[0], recWhere);
             return;
         }
-        var lits = rc.integerLiteral();
-        int? lo = lits.Length > 0 ? CobolNet.Validation.IntegerOperandRules.HostValue(lits[0]) : null;
-        int? hi = lits.Length > 1 ? CobolNet.Validation.IntegerOperandRules.HostValue(lits[1]) : null;
+        var lits = rc.integerOperand();
+        int? lo = lits.Length > 0 ? IntegerOperandValue(lits[0], recWhere) : null;
+        int? hi = lits.Length > 1 ? IntegerOperandValue(lits[1], recWhere) : null;
         if (rc.TO() is not null && lits.Length == 1) { hi = lo; lo = null; }
         string? dep = null;
         IReadOnlyList<string> depQuals = [];
@@ -2043,6 +2053,18 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         {
             DependingQualifiers = depQuals, DependingAt = depAt,
         };
+    }
+
+    /// <summary>Screen a BLOCK CONTAINS clause's integers (ISO §13.18.10.2: <c>BLOCK CONTAINS [integer-1 TO] integer-2
+    /// {CHARACTERS | RECORDS}</c>). The clause models nothing — the physical block is implementor-defined — but each
+    /// <c>integer-n</c> is an operand a constant-name may stand for (§13.10.3 SR2), and a constant that is not an integer,
+    /// is zero or is undefined is the program's error whether or not the clause changes the I-O, so each goes through
+    /// THE integer-n reader like every other position (kb/Work PB1948).</summary>
+    private void BindBlockContainsClause(Core.BlockContainsClauseContext bc, string fileName)
+    {
+        using var _ = Edition.At(bc);
+        foreach (var operand in bc.integerOperand())
+            IntegerOperandValue(operand, $"file '{fileName}' BLOCK CONTAINS clause");
     }
 
     /// <summary>Bind a LINAGE clause into <see cref="FileModel.Linage"/> (ISO §13.18.34: <c>LINAGE IS
@@ -2070,6 +2092,15 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 using var lit = Edition.At(i);
                 return new LinageOperand(CobolNet.Validation.IntegerOperandRules.HostValue(i), null) { At = Edition.Cursor };
             }
+            // "data-name-1 or integer-1": a bare word that names a CONSTANT is the integer-1 arm — the parse cannot tell
+            // it from a data-name (§13.10.3 SR2; kb/Work PB1948) — and the constant's integer is a literal operand
+            // from here on (§13.18.34.3 SR3 and GR6a read it as the written literal).
+            if (ConstantOf(d!) is not null)
+            {
+                using var cst = Edition.At(d!);
+                return new LinageOperand(
+                    ConstantOperandValue(d!, "LINAGE clause operand") ?? RecoveredIntegerOperand, null) { At = Edition.Cursor };
+            }
             var (name, quals) = ClauseDataName(d!, "LINAGE clause operand");
             using var _ = Edition.At(d!);
             return new LinageOperand(null, name) { Qualifiers = quals, At = Edition.Cursor };
@@ -2079,101 +2110,6 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             lc.linageFootingPhrase() is { } f ? Operand(f.dataReference(), f.integerLiteral()) : null,
             lc.linageLinesAtTopPhrase() is { } t ? Operand(t.dataReference(), t.integerLiteral()) : null,
             lc.linageLinesAtBottomPhrase() is { } b ? Operand(b.dataReference(), b.integerLiteral()) : null);
-    }
-
-    /// <summary>Bind the I-O-CONTROL paragraph (ISO §12.4.6). A record-area SAME clause (Format 2) makes the listed
-    /// files "share a memory area for processing the current logical record … equivalent to an implicit redefinition
-    /// of the area with records aligned on the leftmost byte position" (§12.4.6.4 GR2) — modeled by chaining each
-    /// listed file's FIRST record as a synthesized REDEFINES of the first LISTED file's first record, exactly the
-    /// multi-01-under-one-FD mechanism (the singular-pattern rule): the tier machinery then aliases every record of
-    /// every listed file over ONE backing, and READ/WRITE/RELEASE image distribution gives the
-    /// record-of-the-most-recently-read-file semantics for free. A sort/merge file may appear in a record-area
-    /// clause (SR6 — ST131A's <c>READ FILE3</c> then <c>RELEASE S3</c> with no FROM relies on it). The file-area
-    /// (Format 1) and sort-merge-area (Format 3) formats are storage-economy permissions (GR1/GR4 — shared/reusable
-    /// ALLOCATION plus open-mode constraints on the program, nothing a typed-native runtime must alias) — bound as
-    /// conformant no-ops; MULTIPLE FILE TAPE is obsolete and parsed-and-ignored (grammar note), and so is the
-    /// X3.23-1985 RERUN clause (a checkpoint HINT with no program-visible effect — a null rerun facility is
-    /// conforming; deleted by ISO 2002, 0902-gated ≥2002 by the version-conformance pass, VCR Table 7 row 7.15) —
-    /// both skip through the non-SAME `continue` below by design. The APPLY COMMIT clause (§12.4.6.3) is the one
-    /// other arm that is not a no-op here: the facility is declined (COBOLNET1709) but the clause still records
-    /// WHICH FILES the source made "subject to an APPLY COMMIT clause" on <see cref="FileModel.SubjectToApplyCommit"/>,
-    /// because §14.9.27.3 SR8's leading conjunct keys on exactly that and is reachable under <c>--permissive</c>
-    /// (kb/Work PB319). EVERY SAME format also records its MEMBERSHIP on its files
-    /// (<see cref="FileModel.SameClauses"/>, kb/Work PB1139), which the SORT and MERGE statements read for
-    /// §14.9.40.3 SR10 / §14.9.24.3 SR11 (<c>SortBinder.ScreenSameClauses</c>). The remaining SR2–SR11 static
-    /// legality checks of the clause itself (report/sort/file-area cross-membership consistency) are the
-    /// diagnose-correctly track — staged with the version-conformance pass phase, not silently absent by oversight.</summary>
-    private void BindIoControl(Core.ProgramUnitContext program)
-    {
-        foreach (var env in EnvDivisions(program)) BindIoControl(env);
-    }
-
-    private void BindIoControl(Core.EnvironmentDivisionContext env)
-    {
-        var io = env.inputOutputSection()?.ioControlParagraph();
-        if (io is null) return;
-        foreach (var clause in io.ioControlClause())
-        {
-            using var _ = Edition.At(clause);
-            // The APPLY COMMIT clause (ISO §12.4.6.3) — the facility is DECLINED by name (COBOLNET1709,
-            // DeclinedFacilityPass), but the clause still tells the binder WHICH FILES the source made "subject
-            // to an APPLY COMMIT clause", and two syntax rules key on exactly that: §14.9.27.3 SR8's leading
-            // conjunct (enforced at StatementValidation.CheckOpenSharingAllOther) and §12.4.5.9.3 SR1. The fact
-            // is LIVE, not speculative: COBOLNET1709 is PermissiveInert, so under --permissive the clause is
-            // accepted with a warning and the program compiles (kb/Work PB319). §12.4.6.3.2's operand list is a
-            // repetition of an all-optional [file-name-1][identifier-1] pair, so a name that resolves to a file
-            // IS file-name-1 and anything else is identifier-1 — the symbol table is the only discriminator.
-            if (clause.applyCommitClause() is { } apply)
-            {
-                foreach (var operand in apply.dataReference())
-                    if (FilesByName.TryGetValue(operand.GetText(), out var subject))
-                        subject.SubjectToApplyCommit = true;
-                continue;
-            }
-            if (clause.sameClause() is not { } same) continue;
-            // ⛔ EVERY SAME FORMAT IS RECORDED ON ITS FILES (kb/Work PB1139): the clause's membership is what
-            // §14.9.40.3 SR10 and §14.9.24.3 SR11 ask the SORT and MERGE statements about — "No pair of file-names in
-            // the same SORT statement may be specified in the same SAME SORT AREA or SAME SORT-MERGE AREA clause" —
-            // and until now only the RECORD AREA format was modelled (as a peer list), so those rules had nothing to read.
-            var kind = same.RECORD() is not null ? SameClauseKind.RecordArea
-                : same.SORT_MERGE() is not null ? SameClauseKind.SortMergeArea
-                : same.SORT() is not null ? SameClauseKind.SortArea
-                : SameClauseKind.Area;
-            var members = same.fileName()
-                .Select(fn => FilesByName.TryGetValue(fn.GetText(), out var named) ? named : null)
-                .OfType<FileModel>().Distinct().ToList();
-            var recorded = new SameClause(kind, members);
-            foreach (var m in members) m.SameClauses.Add(recorded);
-            // Only SAME RECORD AREA shares storage (Format 2) — SORT/SORT-MERGE AREA is Format 3, and SAME AREA
-            // (Format 1) gives no record-area effect either (docs/CONFORMANCE.md §7, A.1 items 168-169).
-            if (kind != SameClauseKind.RecordArea) continue;
-            // ⛔ THE GROUP IS ONE STORAGE AREA FOR THE WHOLE RUNTIME ELEMENT, and that is also §14.9.6.4 GR7's
-            // answer for CLOSE. GR7: "If file-name-1 is specified in a SAME RECORD AREA clause, the record area
-            // is available to the runtime element if any of the file connectors referenced by the other
-            // file-names in that SAME RECORD AREA clause are open." The area emitted here is a live typed field
-            // of the program class, so a CLOSE of one member cannot take it away from a still-open sibling —
-            // GR7's availability branch holds STRUCTURALLY, not by omission (pinned by
-            // conformance:85/pb235_same_record_area_close). GR7's other branch — a successful CLOSE with no open
-            // member left makes the area UNAVAILABLE — carries no obligation a conforming program can observe:
-            // the standard defines nothing about referencing an unavailable record area (and Annex A.2 item 5
-            // makes the unsuccessful case outright undefined), so WiseOwl COBOL's determination is that the storage
-            // KEEPS ITS LAST CONTENT, documented at docs/CONFORMANCE.md §7, A.1 item 24 (kb/Work PB235).
-            DataItem? anchor = null;
-            foreach (var f in members)
-            {
-                if (f.Records.Count == 0) continue;
-                // The area's CHARACTER half is linked here; an out-of-line record (FileModel.IsOutOfLineRecord —
-                // D-FRA, kb/Work PB981) has no window over it and reaches the shared area through
-                // FileModel.OutOfLineRecords, which is why every sharing file knows its peers
-                // (FileModel.SameRecordAreaPeers, derived from the clause just recorded).
-                if (f.CharacterAnchor is not { } fAnchor) continue;
-                if (anchor is null) { anchor = fAnchor; continue; }
-                // §12.4.6.4.4 GR2: "equivalent to an implicit redefinition of the area with records aligned on the
-                // leftmost byte position" — implicit, like the FD's own records (kb/Work PB836).
-                if (!ReferenceEquals(fAnchor, anchor) && fAnchor.RedefinesTarget is null)
-                    fAnchor.SetRedefinition(anchor, RedefinitionKind.SameRecordArea);
-            }
-        }
     }
 
     /// <summary>Post-build (once the forest is indexed), resolve every file's data-name clause operands — FILE
@@ -3497,6 +3433,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             ScreenTableValueLiterals(item, valueWhere);
         }
         foreach (var c88 in template.Own88s) CloneConditionOnto(item, c88);   // the type's ROOT-level 88s (GR1; D17 inc 3)
+        foreach (var ren in template.Renames66) CloneRenamesOnto(item, ren);   // and its RENAMES clauses (GR1; kb/Work PB1304)
         expanding.Remove(typeName);
     }
 
@@ -4046,7 +3983,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     + "part (ISO §13.18.57.3 SR4)");
             }
 
-        foreach (var owner in Roots)
+        foreach (var owner in RenamesOwners())
             foreach (var ren66 in owner.Renames66)
                 if (ren66.Renames is { } ri
                     && ((ri.From is { } f && StrongTypeModel.IsStronglyTyped(f))
@@ -4066,10 +4003,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <para>Returns the alias item, or null when the entry is too malformed to build one. The RETURN is what
     /// <c>BindEntries</c> hands a following level-88 entry as "the entry describing the item" (ISO §13.16.3
     /// SR24), so the alias reaches exclusion b) instead of being stepped over (kb/Work PB488).</para></summary>
-    private DataItem? BindRenames(Core.DataDescriptionEntryContext entry)
+    private DataItem? BindRenames(Core.DataDescriptionEntryContext entry, DataItem? owner)
     {
         var rc = entry.dataDescriptionBody().renamesClause();
-        if (rc is null || entry.dataName()?.GetText() is not { } name || _lastRoot is null) return null;
+        if (rc is null || entry.dataName()?.GetText() is not { } name || owner is null) return null;
         bool thru = rc.THRU() is not null || rc.THROUGH() is not null;
         // data-name-2 / data-name-3 through the ONE screened data-name-n capture: §13.18.45.3 SR7 — "Data-name-2 and
         // data-name-3 shall not be subscripted" — which the bare-word capture used to satisfy by dropping the
@@ -4097,11 +4034,44 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             },
         };
         item.Uid = _uidCounter++;
-        item.Parent = _lastRoot;        // owning record — an alias sibling, NOT a storage child
-        _lastRoot.Renames66.Add(item);
+        item.Parent = owner;        // owning record — an alias sibling, NOT a storage child
+        owner.Renames66.Add(item);
         DeclareUserWord(name, UserWordKind.DataName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
-        RegisterName(item);
+        // A TYPEDEF template's alias is NOT globally referenceable (§13.18.58.4 GR1 — its name "may be referenced only
+        // as [a] subordinate item of groups defined using the type-name"); the clone on each such group is.
+        if (!owner.IsTypedef) RegisterName(item);
         return item;
+    }
+
+    /// <summary>Clone one level-66 RENAMES entry from a TYPEDEF template onto <paramref name="target"/>, the item the
+    /// type is applied to (ISO §13.18.58.4 GR1 — "RENAMES clauses are part of the type declaration of that type", its
+    /// name referenceable "only as [a] subordinate item of groups defined using the type-name"): a fresh alias of the
+    /// target's own, whose operands are the SAME names and qualifiers and are resolved per clone, in the clone's own
+    /// scope, by the one post-build RENAMES pass (<see cref="ResolveRedefines"/>) — so two groups of one type get two
+    /// independent aliases over their own members, as the level-88 clones do (<see cref="CloneConditionOnto"/>).
+    /// The target is ANY item a TYPE clause applies to, so its aliases ride <c>target.Renames66</c> whether it is a
+    /// record or a group inside one (kb/Work PB1304).</summary>
+    private void CloneRenamesOnto(DataItem target, DataItem src)
+    {
+        var info = src.Renames!;
+        var clone = new DataItem
+        {
+            Level = 66,
+            DeclaredAt = src.DeclaredAt,
+            CobolName = src.CobolName,
+            CsName = Unique(src.CsName, target.Renames66.Select(r => r.CsName).Concat(target.Children.Select(c => c.CsName))),
+            Renames = new RenamesInfo
+            {
+                FromName = info.FromName,
+                FromQualifiers = info.FromQualifiers,
+                ThruName = info.ThruName,
+                ThruQualifiers = info.ThruQualifiers,
+            },
+        };
+        clone.Uid = _uidCounter++;
+        clone.Parent = target;
+        target.Renames66.Add(clone);
+        RegisterName(clone);
     }
 
     /// <summary>Bind a level-88 condition-name on its conditional variable <paramref name="parent"/>, capturing the
@@ -4669,6 +4639,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // author remembered. Read from the CST rather than reconstructed from those flags, because a syntax rule
         // asks what was SPECIFIED and several of the flags below are CLEARED by their own recovery paths.
         DataClauseKind written = e.WrittenClauses;
+        if ((written & DataClauseKind.Redefines) != 0) ScreenRedefinesPosition(e, cobolName);   // §13.18.44.3 SR1
 
         // The dataDescriptionClauses presence guard folds into e.Clauses (empty when the body has no clause list).
             foreach (var clause in e.Clauses)
@@ -4694,16 +4665,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                                 "ISO §13.18.40.3 SR37 — locale-name-1 shall be specified in the LOCALE clause in the SPECIAL-NAMES paragraph");
                             if (sym is not null) locale = new LocaleRef(sym);
                         }
-                        // A ZERO integer-1 is ISO §5.5 1)'s, reported by the one integer-n screen
-                        // (Validation/IntegerOperandPass, COBOLNET2386 — kb/Work PB859); only a value too large for
-                        // any character count is this clause's own to report.
-                        bool zero = lp.integerLiteral().GetText().AsSpan().Trim('0').IsEmpty;
-                        int size = CobolNet.Validation.IntegerOperandRules.HostValue(lp.integerLiteral());
-                        if (size == 0 && !zero)
-                            Edition.Error(DiagnosticCatalog.PictureLocaleFormat2Violation,
-                                $"data item '{cobolName ?? "FILLER"}': SIZE IS {lp.integerLiteral().GetText()} — "
-                                + "integer-1 gives the item's character positions and shall be a nonzero unsigned "
-                                + "integer (ISO §13.18.40.2 / §13.18.40.4 GR17)");
+                        // integer-1 is an integer-n, so a constant-name may stand for it (§13.10.3 SR2) and the ONE reader
+                        // asks the value the §5.5 1) questions: a ZERO or over-limit literal was reported pre-bind by
+                        // the one integer-n screen (Validation/IntegerOperandPass, COBOLNET2386 — kb/Work PB859), a
+                        // constant is judged here (kb/Work PB1948).
+                        int size = IntegerOperandValue(lp.integerOperand(),
+                            $"data item '{cobolName ?? "FILLER"}' PICTURE … LOCALE SIZE") ?? RecoveredIntegerOperand;
                         pictureLocale = new LocaleEditSpec(locale, Math.Max(1, size), "");
                     }
                 }
@@ -4732,10 +4699,18 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     // HERE is what let such a LIMIT fall through to -1 — "no bound at all" — and take the same
                     // wrapping path as an item with no LIMIT phrase (kb/Work PB463). A literal too wide even for
                     // Int128 is larger still; Int128.MaxValue carries it to the same clamp.
-                    if (dl.integerLiteral() is { } lim)
+                    // integer-1 is an integer-n, so an integer constant-name may stand for it (§13.10.3 SR2): the
+                    // ONE full-width reader returns the digits as the literal wrote them or as the constant holds them
+                    // (kb/Work PB1948). A refused constant is reported there and leaves the LIMIT unread, so the item
+                    // is not also judged against an invented bound.
+                    if (dl.integerOperand() is { } lim)
                     {
-                        dynLengthLimitText = lim.GetText();
-                        dynLengthLimit = Int128.TryParse(dynLengthLimitText, out Int128 lv) ? lv : Int128.MaxValue;
+                        string? limText = IntegerOperandText(lim, $"data item '{cobolName ?? "FILLER"}' DYNAMIC LENGTH LIMIT");
+                        if (limText is not null)
+                        {
+                            dynLengthLimitText = limText;
+                            dynLengthLimit = Int128.TryParse(dynLengthLimitText, out Int128 lv) ? lv : Int128.MaxValue;
+                        }
                     }
                 }
                 else if (clause.Context.externalClause() is { } extc)
@@ -5329,8 +5304,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // CONSTANT RECORD same-entry shape checks (P10 Step 15; the IsBased discipline — a violation reports and
         // clears the flag so the item binds as ordinary storage under an already-failed compile). §13.16.3 SR6:
         // level-01 entries only; SR3: REDEFINES excluded; SR13: ANY LENGTH / BASED / BLANK WHEN ZERO /
-        // SYNCHRONIZED / TYPEDEF excluded same-entry (the subordinate-entry half of SR13 checks in BindEntries,
-        // where the parent chain exists); SR13 ¶2: with EXTERNAL, a strongly-typed TYPE clause is required.
+        // SYNCHRONIZED / TYPEDEF excluded same-entry (the subordinate-entry half of SR13 is CheckConstantRecordSubtrees,
+        // where the parent chain and the TYPE clones exist); SR13 ¶2: with EXTERNAL, a strongly-typed TYPE clause is required.
         if (isConstantRecord)
         {
             string? crViolation =
@@ -6690,8 +6665,17 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // not unique "no ambiguity of reference exists because of the required placement" — the NEAREST preceding
                 // same-named sibling. The former whole-scope FirstOrDefault admitted a LATER sibling (illegal source, kb/Work
                 // PB93) and picked the FIRST of duplicates.
-                item.SetRedefinition(scope.TakeWhile(s => !ReferenceEquals(s, item))
-                    .LastOrDefault(s => string.Equals(s.CobolName, tname, StringComparison.OrdinalIgnoreCase)),
+                // ⛔ THE ORIGINAL DEFINITION, NOT THE NEAREST SAME-NAMED ENTRY (kb/Work PB1280; §13.18.44.3 SR7, SR10): a
+                // redefinition defines no storage of its own, so "the entry that originally defined the area" of
+                // `05 A. 05 A REDEFINES A. 05 C REDEFINES A.` is the FIRST A, and that is what NOTE 1's "required placement"
+                // makes unambiguous — the nearest same-named entry that is not itself a redefinition. Only when every
+                // candidate is a redefinition is the nearest one named (SR7's own violation, reported below). A top-level
+                // entry's candidates are the roots of ITS OWN section: SR10's "entries defining the area of data-name-2"
+                // do not cross a section boundary.
+                var preceding = scope.TakeWhile(s => !ReferenceEquals(s, item))
+                    .Where(s => string.Equals(s.CobolName, tname, StringComparison.OrdinalIgnoreCase)
+                        && (item.Parent is not null || s.Section == item.Section)).ToList();
+                item.SetRedefinition(preceding.LastOrDefault(s => s.RedefinesTargetName is null) ?? preceding.LastOrDefault(),
                     RedefinitionKind.Clause);
                 // A method 01 REDEFINES whose target isn't in the method's own roots is a scope error (never a
                 // silent cross-scope bind to an object/program item) — §13.18.44.3 SR.
@@ -6726,29 +6710,15 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     Edition.Error("COBOLNET1542", $"'{item.CobolName ?? "FILLER"}' REDEFINES "
                         + $"'{tname}': the redefined item is described with the ANY LENGTH clause "
                         + "(ISO §13.18.44.3 SR16 — data-name-2 shall not be ANY LENGTH)");
-                // §13.18.44.3 SR8 (the P5.8 spec find): the SUBJECT's storage area shall not be larger than
-                // data-name-2's, unless data-name-2 is a level-1 item (without the EXTERNAL clause — that
-                // residue is unmodeled; a level-1 FILE SECTION entry cannot carry REDEFINES at all, SR3, so
-                // the exception is a WORKING-STORAGE/LOCAL/LINKAGE 01). Previously accepted SILENTLY — the
-                // classifier took the class-max width, giving the overlay byte-position semantics NO edition
-                // defines. The extent is the full OCCURS allocation (the "storage area required").
-                // ⛔ MEASURED IN BYTES, WHICH IS WHAT "storage area" MEANS (kb/Work PB231). SR8 compares
-                // STORAGE AREAS and §13.18.44.4 GR1 states the association in bits; character positions are the
-                // same number for every leaf kind but NATIONAL, whose §13.18.60.4 GR8 size this implementation
-                // pins at two bytes per position (D-N1). Read in positions, `01 G. 05 A PIC X(4).
-                // 05 B REDEFINES A PIC N(4).` compared 4 against 4 and was ACCEPTED while B requires eight
-                // bytes over a four-byte A — an under-rejection that then handed the class a backing half the
-                // size of one of its own views.
-                if (item.RedefinesTarget is { } tgt && tgt.Level != 1
-                    && item.ByteWidth * (item.Occurs ?? 1) > tgt.ByteWidth * (tgt.Occurs ?? 1))
-                    Edition.Error("COBOLNET1539", $"'{item.CobolName ?? "FILLER"}' REDEFINES "
-                        + $"'{tgt.CobolName ?? "FILLER"}': the redefining storage area "
-                        + $"({item.ByteWidth * (item.Occurs ?? 1)} bytes) is larger than the redefined "
-                        + $"({tgt.ByteWidth * (tgt.Occurs ?? 1)}) — permitted only when the redefined item is "
-                        + "level 1 (ISO §13.18.44.3 SR8)");
+                // §13.18.44.3 SR1-SR3, SR8, SR13, SR15 — the entry-level rules over the resolved pair
+                // (DataBinder.RedefinesEntry.cs; kb/Work PB1280). SR8, which used to be written out here, is one of them.
+                if (item.RedefinesTarget is { } entryTarget) ScreenRedefinesEntry(item, entryTarget);
             }
 
-        foreach (var root in Roots)
+        // Each alias is resolved in the scope of its OWNER: the record whose level-66 entries it is, or — for an alias a
+        // TYPEDEF brought (CloneRenamesOnto, §13.18.58.4 GR1) — the item the type was applied to, which may be a group
+        // inside a record. Storage offsets are always measured from the record's own root (Offset below).
+        foreach (var root in RenamesOwners())
             foreach (var ren in root.Renames66)
             {
                 var info = ren.Renames!;
@@ -6778,6 +6748,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                         + $"'{missing}' does not name an item of the record (ISO §13.18.45.3 SR4; §8.4.2.1)");
                     continue;
                 }
+                // §13.18.45.3 SR5 / SR3 / SR6 — WHAT THE OPERANDS MAY BE (kb/Work PB1283, DataBinder.RenamesEntry.cs): the
+                // candidate set includes the record itself, so an operand is asked its level, its OCCURS and its record.
+                bool operandsOk = ScreenRenamesOperand(root, ren, info.From, "data-name-2");
+                if (info.Thru is { } thruOperand) operandsOk &= ScreenRenamesOperand(root, ren, thruOperand, "data-name-3");
+                if (!operandsOk) continue;
                 // §13.18.45.3 SR8 — WHAT THE RANGE MAY HOLD (kb/Work PB1284), asked before either form binds: a
                 // refused range never reaches the no-THRU forwarding or the tiler, which would otherwise model the
                 // alias as a fixed window over storage that has no fixed extent.
@@ -6818,14 +6793,15 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 }
                 int startOff = Offset(info.From);
                 int endOff = Offset(info.Thru) + Width(info.Thru) - 1;
-                if (endOff < startOff)
+                // §13.18.45.3 SR11 — data-name-3 neither begins before data-name-2 nor ends at or before its end.
+                (long Start, long End) ExtentOf(DataItem n)
                 {
-                    using var __o = Edition.At(ren);
-                    Edition.Error(DiagnosticCatalog.RenamesOperandUnresolved,
-                        $"'{ren.CobolName ?? "FILLER"}' RENAMES {info.FromName} THRU {info.ThruName}: data-name-3 ends before "
-                        + "data-name-2 begins — the THRU item shall follow the FROM item in the record (ISO §13.18.45.4 GR2)");
-                    continue;
+                    if (root.HasBitDescendant && BitLayout.StartBitOf(root, n) is var bitStart and >= 0)
+                        return (bitStart, bitStart + BitLayout.RunBits(n) - 1);
+                    int at = Offset(n);
+                    return (at, at + Width(n) - 1);
                 }
+                if (!ScreenRenamesWindowOrder(ren, info, ExtentOf)) continue;
                 // §13.18.45.3 SR10 — "The area described by data-name-2 THROUGH data-name-3 shall define an integral
                 // number of bytes" (kb/Work PB1284). Only a USAGE BIT item can make it fractional: §8.5.1.6.3 packs
                 // same-level bit items into shared bytes, so `A PIC 1(3) USAGE BIT` THRU `B PIC 1(2) USAGE BIT` is a
@@ -6849,13 +6825,47 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // storage it overlays exactly as the redefined entry does (NC252A's `RDF8-5 THRU RDF8-6` lies inside a
                 // double redefinition of an OCCURS 36 table, and only those two views tile that window). Views are
                 // never counted twice because the tiling below advances by what it covered.
-                var leaves = new List<(DataItem Leaf, int Off, int W, int Occ)>();
-                void Walk(DataItem n)
+                // ⛔ A LEAF UNDER AN OCCURS GROUP LIVES ONCE PER OCCURRENCE OF THAT GROUP (kb/Work PB986). §13.18.45.3 SR3
+                // bars an OCCURS only on the three NAMED operands, so a table may lie INSIDE the window, and its
+                // elementary items repeat at the GROUP's stride: S4 of `05 ST OCCURS 2. 10 S4 PIC X.` is two cells, one
+                // per ST. The walk therefore carries the enclosing table groups, and each leaf contributes one RUN per
+                // combination of their occurrences that the window reaches (a run = the leaf's own contiguous
+                // occurrences within one outer occurrence); only the occurrences the window intersects are visited, so a
+                // large table elsewhere in the record costs nothing. Counting the leaf `Occurs ?? 1` and ignoring the
+                // group — the former walk — left the second occurrence uncovered and refused the legal alias as one that
+                // "does not tile". A table whose extent is not fixed (dynamic-capacity) lies outside every legal window
+                // (SR8, RenamesRangeFault) and is not entered.
+                var leaves = new List<(DataItem Leaf, int Off, int W, int Occ, int[] Outer)>();
+                void AddRuns(DataItem leaf, List<DataItem> tables, int level, int delta, List<int> outer)
                 {
-                    if (n.IsElementary) { if (Width(n) > 0) leaves.Add((n, Offset(n), n.ByteWidth, n.Occurs ?? 1)); return; }
-                    foreach (var c in n.Children) Walk(c);
+                    if (level == tables.Count)
+                    {
+                        int off = Offset(leaf) + delta, total = Width(leaf);
+                        if (off + total - 1 >= startOff && off <= endOff)
+                            leaves.Add((leaf, off, leaf.ByteWidth, leaf.Occurs ?? 1, [.. outer]));
+                        return;
+                    }
+                    var table = tables[level];
+                    int stride = table.ByteWidth, groupOff = Offset(table) + delta;
+                    int first = startOff <= groupOff ? 1 : (startOff - groupOff) / stride + 1;
+                    int last = endOff < groupOff ? 0 : Math.Min(table.Occurs!.Value, (endOff - groupOff) / stride + 1);
+                    for (int k = first; k <= last; k++)
+                    {
+                        outer.Add(k);
+                        AddRuns(leaf, tables, level + 1, delta + (k - 1) * stride, outer);
+                        outer.RemoveAt(outer.Count - 1);
+                    }
                 }
-                Walk(root);
+                void Walk(DataItem n, List<DataItem> tables)
+                {
+                    if (n.IsElementary) { if (Width(n) > 0) AddRuns(n, tables, 0, 0, []); return; }
+                    if (n.IsDynamicTable) return;
+                    bool isTable = n.Occurs is not null;
+                    if (isTable) tables.Add(n);
+                    foreach (var c in n.Children) Walk(c, tables);
+                    if (isTable) tables.RemoveAt(tables.Count - 1);
+                }
+                Walk(root, []);
                 // GREEDY TILING of [startOff, endOff]: at each position take the LONGEST whole leaf (or whole table
                 // cell) that starts exactly there and fits inside the window; else the most specific (narrowest) leaf
                 // cell containing the position, as a partial slice up to the window's end or the cell's end.
@@ -6863,25 +6873,25 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 bool stuck = false;
                 while (pos <= endOff)
                 {
-                    (DataItem Leaf, int? Occ, int Start, int Len, int Cover)? best = null;
-                    foreach (var (leaf, off, w, occ) in leaves)
+                    (DataItem Leaf, int? Occ, int Start, int Len, int Cover, int[] Outer)? best = null;
+                    foreach (var (leaf, off, w, occ, outer) in leaves)
                     {
                         int total = w * occ;
                         if (pos < off || pos > off + total - 1) continue;          // the leaf does not contain pos
                         // the whole leaf (every occurrence) starting exactly here and fitting the window
                         if (off == pos && off + total - 1 <= endOff)
-                            Consider((leaf, null, 1, total, total));
+                            Consider((leaf, null, 1, total, total, outer));
                         int k = (pos - off) / w + 1;                                // the occurrence containing pos
                         int cellLo = off + (k - 1) * w, cellHi = cellLo + w - 1;
                         if (cellLo == pos && cellHi <= endOff)
-                            Consider((leaf, occ == 1 ? null : k, 1, w, w));       // a whole cell (or the whole 1-occurrence leaf)
+                            Consider((leaf, occ == 1 ? null : k, 1, w, w, outer));   // a whole cell (or the whole 1-occurrence leaf)
                         else
                         {
                             int to = Math.Min(endOff, cellHi);                     // a partial slice of the containing cell
-                            Consider((leaf, k, pos - cellLo + 1, to - pos + 1, to - pos + 1));
+                            Consider((leaf, k, pos - cellLo + 1, to - pos + 1, to - pos + 1, outer));
                         }
                     }
-                    void Consider((DataItem Leaf, int? Occ, int Start, int Len, int Cover) c)
+                    void Consider((DataItem Leaf, int? Occ, int Start, int Len, int Cover, int[] Outer) c)
                     {
                         // prefer: whole (non-partial) over partial; then the longest cover; then the narrowest leaf
                         bool cPartial = c.Occ is not null && (c.Start != 1 || c.Len != c.Leaf.ByteWidth);
@@ -6895,7 +6905,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     if (best is not { } chosen || chosen.Cover <= 0) { stuck = true; break; }
                     // The tiling ran in STORAGE bytes; a part is kept in its leaf's own positions. A national leaf's boundary
                     // inside a position (an odd byte) is no whole character of that item - nothing can address it.
-                    if (RenamesSpanPart.FromBytes(chosen.Leaf, chosen.Occ, chosen.Start, chosen.Len) is not { } spanPart)
+                    if (RenamesSpanPart.FromBytes(chosen.Leaf, chosen.Occ, chosen.Start, chosen.Len, chosen.Outer) is not { } spanPart)
                     { stuck = true; break; }
                     info.Span.Add(spanPart);
                     pos += chosen.Cover;
@@ -7571,6 +7581,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                         Edition.Error(DiagnosticCatalog.NationalData, $"a file record cannot be laid out — record "
                             + $"'{rec.CobolName}' has {residue} — recognized but not yet implemented");
     }
+
+    /// <summary>Every item that owns level-66 entries: a record's own, and the groups a TYPE clause applied a
+    /// TYPEDEF with RENAMES clauses to (<see cref="CloneRenamesOnto"/>, kb/Work PB1304). The ONE enumeration the
+    /// RENAMES passes walk, so an alias on a group inside a record is resolved and screened like a record's.</summary>
+    private List<DataItem> RenamesOwners() => AllItems().Where(i => i.Renames66.Count > 0).ToList();
 
     /// <summary>Every item in the WORKING-STORAGE forest, in declaration (pre-order DFS) order.</summary>
     private IEnumerable<DataItem> AllItems()

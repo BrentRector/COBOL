@@ -48,6 +48,10 @@ internal static class BindPipeline
         // screens, SIGN inheritance and every later pass apply to it through their existing single sites.
         new BindPass("SynthesizeImpliedPictures", PassPhase.None, PassPhase.None, d => d.SynthesizeImpliedPictures()),
         new BindPass("ExpandTypes", PassPhase.None, PassPhase.TypesExpanded, d => d.ExpandTypes()),
+        // What a CONSTANT RECORD's SUBTREE may not contain — §13.16.3 SR13, §13.18.40.3 SR32, §13.18.38.3 SR19/SR23/SR33
+        // (kb/Work PB1262). Rules about an item's POSITION, so they are asked of the COMPOSED forest: immediately after
+        // ExpandTypes, which supplies the TYPE / SAME AS clones, and before anything clears a flag the rule reads.
+        new BindPass("CheckConstantRecordSubtrees", PassPhase.TypesExpanded, PassPhase.TypesExpanded, d => d.CheckConstantRecordSubtrees()),
         new BindPass("UsageInheritancePass", PassPhase.TypesExpanded, PassPhase.UsageResolved, d => d.UsageInheritancePass()),
         // The §13.18.60.3 USAGE declaration-PLACEMENT screen — SR14/SR15/SR4 (kb/Work PB183). Placed HERE, and
         // not one pass earlier or later, for two reasons. It needs UsageInheritancePass to have settled

@@ -1133,7 +1133,7 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
         if (_currentFdFile != null && ctx.VARYING() != null)
         {
             _currentFdFile.IsRecordVarying = true;
-            var lits = ctx.integerLiteral();
+            var lits = ctx.integerOperand();
             // FROM m TO n → lits[0]=min, lits[1]=max; a lone literal is treated as the max.
             if (lits.Length >= 2)
             {
@@ -1156,7 +1156,7 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
         // min == max range (e.g. "100 TO 100") is fixed and left alone.
         else if (_currentFdFile != null && ctx.TO() != null)
         {
-            var lits = ctx.integerLiteral();
+            var lits = ctx.integerOperand();
             if (lits.Length >= 2
                 && int.TryParse(lits[0].GetText(), out int min)
                 && int.TryParse(lits[1].GetText(), out int max)

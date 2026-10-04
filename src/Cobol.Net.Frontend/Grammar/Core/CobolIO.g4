@@ -150,7 +150,7 @@ lockOnPhrase
     ;
 
 fileReserveClause
-    : RESERVE integerLiteral (AREA | AREAS)?
+    : RESERVE integerOperand (AREA | AREAS)?
     ;
 
 // PADDING CHARACTER: PADDING [CHARACTER] IS {data-name-1 | literal-1} — the ANSI X3.23-1985 Sequential I-O

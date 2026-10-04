@@ -52,7 +52,11 @@ public sealed partial class DataBinder
         foreach (var file in _files)
         {
             if (file.CodeSetRecordClass is not { } wantNational) continue;
-            foreach (var rec in file.Records) CheckCodeSetRecordItem(rec, wantNational);
+            // SR3's antecedent — "If there are record description entries associated with the file" — is about the
+            // entries the program WROTE: the implied record an FD without any receives (§14.9.30.4 GR6) is not one,
+            // so a file with none has nothing to screen and CODE-SET naming either alphabet (or both, which
+            // §13.18.13.4 GR4's second sentence expressly contemplates) is legal (kb/Work PB1219).
+            foreach (var rec in file.WrittenRecords) CheckCodeSetRecordItem(rec, wantNational);
         }
     }
 

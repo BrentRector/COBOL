@@ -2021,38 +2021,40 @@ public sealed partial class DataBinder
                 return;
             }
         }
-        foreach (var entry in sc.symbolicCharacterEntry())
+        foreach (var (names, ords) in sc.symbolicCharacterEntry().SelectMany(SymbolicEntryGroups))
         {
-            var names = entry.cobolWord();
-            var ords = entry.integerLiteral();
-            if (names.Length != ords.Length)
+            if (names.Count != ords.Count)
             {
-                Edition.Error(DiagnosticCatalog.SymbolicCharactersViolation, $"SYMBOLIC CHARACTERS: {names.Length} "
-                    + $"symbolic-character name(s) against {ords.Length} integer(s) — there shall be a one-to-one "
+                Edition.Error(DiagnosticCatalog.SymbolicCharactersViolation, $"SYMBOLIC CHARACTERS: {names.Count} "
+                    + $"symbolic-character name(s) against {ords.Count} integer(s) — there shall be a one-to-one "
                     + "correspondence, paired by position (ISO §12.3.7.3 SR16 b/c)");
                 continue;
             }
-            for (int i = 0; i < names.Length; i++)
+            for (int i = 0; i < names.Count; i++)
             {
                 string symName = names[i].GetText();
                 DeclareUserWord(symName, UserWordKind.SymbolicCharacter);   // §8.3.2.2 (kb/Work PB1083)
-                // integer-1 is an INTEGERLIT — unsigned digits by the grammar (§5.5 1)) — so only its magnitude can
-                // be wrong. ⛔ It used to be read with `int.TryParse` and a failure `continue`d: an ordinal too long
+                // integer-1 is an INTEGERLIT — unsigned digits by the grammar (§5.5 1)) — or an integer constant-name
+                // (§13.10.3 SR2, read by the same reader: kb/Work PB1948) — so only its magnitude can be wrong. ⛔ It used to be read with `int.TryParse` and a failure `continue`d: an ordinal too long
                 // for an int bound NOTHING and drew NO diagnostic, and the name then surfaced as "not defined" at
                 // its first use (kb/Work PB1557's sibling). It is an integer-n, so it is read by THE ONE integer-n
                 // reader — the very one the ALPHABET and CLASS literal phrases read their ordinals through
                 // (LiteralPhraseOperand; kb/Work PB1091) — which saturates at int.MaxValue: a saturated value is out
                 // of range of every character set, so the SR16 check below reports it.
-                string ordText = ords[i].GetText();
-                int ordinal = CobolNet.Validation.IntegerOperandRules.HostValue(ords[i]);
-                string? value = inSet is not null ? inSet.CharAt(ordinal)
+                var (ordText, ordValue) = ords[i];
+                int ordinal = ordValue.GetValueOrDefault();
+                string? value = ordValue is null ? null
+                    : inSet is not null ? inSet.CharAt(ordinal)
                     : ordinal is >= 1 and <= CollatingTable.Repertoire ? ((char)(ordinal - 1)).ToString() : null;
                 if (value is null)
                 {
-                    Edition.Error(DiagnosticCatalog.SymbolicCharactersViolation, $"SYMBOLIC CHARACTERS {symName} IS "
-                        + $"{ordText}: the ordinal position does not exist in the "
-                        + $"{(inSet is not null ? $"character set referenced by the IN alphabet ({inSet.Phrase}, {inSet.OrdinalCount} characters)" : $"native character set ({CollatingTable.Repertoire} characters)")}"
-                        + $" — ISO §12.3.7.3 SR16 {(national ? "f" : "e")}{(inSet is not null ? "1" : "2")}");
+                    // A null ordinal is a constant-name the integer-n reader REFUSED and reported; only a value that
+                    // read is out of range here.
+                    if (ordValue is not null)
+                        Edition.Error(DiagnosticCatalog.SymbolicCharactersViolation, $"SYMBOLIC CHARACTERS {symName} IS "
+                            + $"{ordText}: the ordinal position does not exist in the "
+                            + $"{(inSet is not null ? $"character set referenced by the IN alphabet ({inSet.Phrase}, {inSet.OrdinalCount} characters)" : $"native character set ({CollatingTable.Repertoire} characters)")}"
+                            + $" — ISO §12.3.7.3 SR16 {(national ? "f" : "e")}{(inSet is not null ? "1" : "2")}");
                     // RECOVERY, so one bad ordinal does not cascade: the name is DECLARED (DeclareUserWord above), and a
                     // statement that uses it must find it defined rather than draw a second, false diagnostic ("'BIG' is
                     // not defined") for a name the program did write. The placeholder value is never observed — the
@@ -2067,6 +2069,64 @@ public sealed partial class DataBinder
                         + "CHARACTER clauses of this SPECIAL-NAMES paragraph (ISO §12.3.7.3 SR16 a)");
             }
         }
+    }
+
+    /// <summary>⛔ THE GROUPS OF ONE SYMBOLIC CHARACTERS ENTRY, each a run of symbolic-character-1 names with the run of
+    /// ordinals it pairs with (ISO §12.3.7.2: <c>{symbolic-character-1}… [IS|ARE] {integer-1}…</c>; §12.3.7.3 SR16 b/c
+    /// — positional, one to one). An ordinal is an <c>integer-n</c>, so an integer CONSTANT-NAME may stand for it
+    /// (§13.10.3 SR2; kb/Work PB1948) and every ordinal is read through THE one integer-n reader.
+    /// <para>The names and the ordinals are written as WORDS side by side, and a constant-name is the same kind of token
+    /// as the next symbolic-character-1, so the parser cannot tell them apart (<c>symbolicCharacterEntry</c> parses the
+    /// entry as literals, as <c>IS|ARE</c> then operands, or as words only, and may fold a following IS-less group into
+    /// the ordinals of the one before it). This walk therefore reads the entry's tokens in SOURCE ORDER whatever the
+    /// parse called them and decides each WORD by the one fact only the binder has — whether the compilation unit defines
+    /// it as a constant (<see cref="FindConstant"/>): a literal is an ordinal; a word that names a constant is an ordinal;
+    /// the first word after IS/ARE is an ordinal whatever it names (so an undefined one is reported by the reader as
+    /// "not a defined constant-name"); any other word is a symbolic-character-1, and one that follows an ordinal opens
+    /// the next group. A group with names and no ordinals is reported by SR16 c). An ordinal whose value is null was
+    /// refused by the reader and is already reported.</para></summary>
+    private IEnumerable<(IReadOnlyList<Core.CobolWordContext> Names, IReadOnlyList<(string Text, int? Value)> Ordinals)>
+        SymbolicEntryGroups(Core.SymbolicCharacterEntryContext entry)
+    {
+        const string where = "SYMBOLIC CHARACTERS clause";
+        var names = new List<Core.CobolWordContext>();
+        var ordinals = new List<(string Text, int? Value)>();
+        bool afterIs = false;
+        foreach (var child in entry.children)
+        {
+            if (child is Antlr4.Runtime.Tree.ITerminalNode)   // the optional IS / ARE
+            {
+                afterIs = true;
+                continue;
+            }
+            Core.CobolWordContext? word = child switch
+            {
+                Core.CobolWordContext w => w,
+                Core.IntegerOperandContext io when io.integerLiteral() is null => io.cobolWord(),
+                _ => null,
+            };
+            if (word is not null && !afterIs && FindConstant(word.GetText()) is null && !IsFailedConstant(word.GetText()))
+            {
+                if (ordinals.Count > 0)
+                {
+                    yield return (names, ordinals);
+                    names = [];
+                    ordinals = [];
+                }
+                names.Add(word);
+                continue;
+            }
+            afterIs = false;
+            ordinals.Add(child switch
+            {
+                Core.IntegerLiteralContext il => (il.GetText(),
+                    (int?)CobolNet.Validation.IntegerOperandRules.HostValue(il)),
+                Core.IntegerOperandContext io => (io.GetText(), IntegerOperandValue(io, where)),
+                _ => (word!.GetText(), ConstantIntegerText(word, word.GetText(), where) is { } digits
+                    ? CobolNet.Validation.IntegerOperandRules.HostValue(digits) : null),
+            });
+        }
+        if (names.Count > 0 || ordinals.Count > 0) yield return (names, ordinals);
     }
 }
 

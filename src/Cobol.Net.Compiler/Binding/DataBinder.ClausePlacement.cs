@@ -137,7 +137,7 @@ internal static class ClausePlacementRules
         {
             [DataClauseKind.Usage] = "no placement rule — group or elementary (§13.18.60.4 GR1 inheritance)",
             [DataClauseKind.Occurs] = "§13.18.38.3 level rules — OdoBindOccursSpec / the OCCURS screens",
-            [DataClauseKind.Redefines] = "§13.18.44.3 — ResolveRedefines (level and position rules)",
+            [DataClauseKind.Redefines] = "§13.18.44.3 — ScreenRedefinesPosition / ScreenRedefinesEntry (DataBinder.RedefinesEntry.cs: position, level, file-section, size, alignment)",
             [DataClauseKind.Value] = "§13.18.63.3 — ScreenValueLiteral / CheckGroupValueDeclarations",
             [DataClauseKind.Sign] = "§13.18.52.3 — InheritSignClauses (group and elementary both legal)",
             [DataClauseKind.Synchronized] = "§13.18.55 — group legal at 2023 (UsageInheritanceGroup's edition gate)",

@@ -8,9 +8,9 @@ namespace CobolNet.Tests.Conformance;
 /// The TYPEDEF residue rules (Phase 6, data-model D17, increment 4; P10 Step 16 reworked the EXTERNAL leg):
 /// COBOLNET1558 — the EXTERNAL type-declaration conformance rules (§13.18.22 GR2 level-1 reference; SR5
 /// strong-external pairing — the former COBOLNET1534 stage is LIFTED, the accepted form is the
-/// <c>typedef_external</c> golden); COBOLNET1535 — a RENAMES inside a TYPEDEF (not cloned into references,
-/// §13.18.58.4 GR1, staged) and a strong group with a boolean/object/pointer element compared with an ordering
-/// operator (§8.8.4.2.3 SR4 — the complete spec rule: equality/inequality only — asked of the CLASS, so a
+/// <c>typedef_external</c> golden); COBOLNET1535 — a strong group with a boolean/object/pointer element compared
+/// with an ordering operator (a RENAMES inside a TYPEDEF is cloned into each reference, §13.18.58.4 GR1, kb/Work PB1304 —
+/// its staged refusal was this code's other meaning) (§8.8.4.2.3 SR4 — the complete spec rule: equality/inequality only — asked of the CLASS, so a
 /// program-pointer leaf is refused as a data-pointer one is). An ordering over same-type strong groups with a SIGNED
 /// numeric leaf is LEGAL and compiles (§8.8.4.2.12 element by element — kb/Work PB1469 retired the COBOLNET0899
 /// stage; the values are run-verified by the <c>strong_group_element_order</c> golden). A type whose OCCURS has an INDEXED BY
@@ -66,10 +66,11 @@ public sealed class TypedefResidueTests
         EditionHarness.AssertHasDiagnostic(diag, "COBOLNET1558");
     }
 
-    /// <summary>§13.18.58.4 GR1 — a level-66 RENAMES inside a TYPEDEF (part of the type, but not cloned into a TYPE
-    /// reference) is staged loud (COBOLNET1535).</summary>
+    /// <summary>§13.18.58.4 GR1 — a level-66 RENAMES inside a TYPEDEF is "part of the type declaration of that type", so a
+    /// TYPE reference compiles and owns its own alias (the staged COBOLNET1535 refusal is gone, kb/Work PB1304; the
+    /// values are run-verified by the <c>pb1304_typedef_renames</c> golden).</summary>
     [Fact]
-    public void RenamesInsideTypedef_Rejected1535()
+    public void RenamesInsideTypedef_IsPartOfTheType_AndCompiles()
     {
         var (ok, diag) = EditionHarness.Compile("""
             IDENTIFICATION DIVISION.
@@ -86,8 +87,8 @@ public sealed class TypedefResidueTests
                 DISPLAY "X".
                 STOP RUN.
             """, 2002);
-        Assert.False(ok, "a RENAMES inside a TYPEDEF must be staged loud (ISO §13.18.58.4 GR1)");
-        EditionHarness.AssertHasDiagnostic(diag, "COBOLNET1535");
+        Assert.True(ok, "a RENAMES inside a TYPEDEF is part of the type and compiles (ISO §13.18.58.4 GR1): " + string.Join("; ", diag));
+        Assert.DoesNotContain(diag, d => d.Contains("COBOLNET1535", StringComparison.Ordinal));
     }
 
     /// <summary>§8.8.4.2.3 SR4 — a strongly-typed group whose elements include class boolean / object / pointer may be

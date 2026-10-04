@@ -2791,7 +2791,8 @@ public sealed partial class DataBinder
                                 "ISO §13.18.40.3 SR37 — locale-name-1 shall be specified in the LOCALE clause in the SPECIAL-NAMES paragraph");
                             if (sym is not null) locale = new LocaleRef(sym);
                         }
-                        int size = Math.Max(1, CobolNet.Validation.IntegerOperandRules.HostValue(rlp.integerLiteral()));
+                        int size = Math.Max(1, IntegerOperandValue(rlp.integerOperand(),
+                            $"RD '{model.Name}' entry '{entryName ?? "FILLER"}' PICTURE … LOCALE SIZE") ?? RecoveredIntegerOperand);
                         reportLocale = new LocaleEditSpec(locale, size, "");
                     }
                 }

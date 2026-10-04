@@ -195,7 +195,9 @@ public static class DiagnosticCatalog
         "COBOLNET1549", "constant-record-rule", EditionSeverity.Error,
         "A CONSTANT RECORD clause violates a structural rule: WS/LS sections only (SR1); level-01 only, no "
         + "REDEFINES, and no ANY LENGTH / BASED / BLANK WHEN ZERO / SYNCHRONIZED / TYPEDEF on the record or any "
-        + "subordinate (§13.16.3 SR3/SR6/SR13).", "ISO §13.18.15.3 / §13.16.3");
+        + "subordinate (§13.16.3 SR3/SR6/SR13); no format 2 OCCURS or DEPENDING phrase in a subordinate item and no "
+        + "dynamic-capacity table on the record's items (§13.18.38.3 SR19/SR23/SR33).",
+        "ISO §13.18.15.3 / §13.16.3 / §13.18.38.3");
 
     // ── COBOLNET0895 — a numeric literal's decimal separator against the DECIMAL-POINT mode (§12.3.7.4 GR14a). It
     //    was a bare code at its three emit sites (the literal chokepoint and the constant-entry evaluator's router)
@@ -854,17 +856,13 @@ public static class DiagnosticCatalog
         StrongType, "strong-compare-mismatch", EditionSeverity.Error,
         "A strongly-typed group may be compared only with a group of the same type.", "ISO §8.8.4.2.3 SR1");
 
-    // ── COBOLNET1535 — reused across two rules (the 1533 disambiguation pattern; code byte-stable) ───
+    // ── COBOLNET1535 — the strong-group ordering rule (§8.8.4.2.3 SR4). It once also named the staged
+    //    RENAMES-in-TYPEDEF refusal; that stage is implemented and its descriptor deleted (kb/Work PB1304, PB608). ───
     public static readonly DiagnosticDescriptor StrongCompareOrdering = new(
         "COBOLNET1535", "strong-compare-ordering", EditionSeverity.Error,
         "A strongly-typed group whose elementary items include class boolean, message-tag, object, or pointer "
         + "may be compared only for equality or inequality — an ordering relation on such a group is a syntax "
         + "error.", "ISO §8.8.4.2.3 SR4");
-    public static readonly DiagnosticDescriptor TypedefRenamesStaged = new(
-        "COBOLNET1535", "typedef-renames-staged", EditionSeverity.Error,
-        "A level-66 RENAMES inside a TYPEDEF (part of the type per §13.18.58.4 GR1) is recognized but not yet "
-        + "cloned into TYPE references.", "ISO §13.18.58.4 GR1", RecognizedNotImplemented);
-
     // ── COBOLNET1555/1556/1557 — the SAME AS clause, one code per rule family (§13.18.49 / §13.16.3;
     //    P10 Step 16). 1555 = the SUBJECT-entry rules (what the SAME AS entry itself may look like);
     //    1556 = the REFERENCED-entry rules (what data-name-1 may be); 1557 = the cycle rules.
@@ -6300,6 +6298,55 @@ public static class DiagnosticCatalog
         + "group item, there shall not be an item subordinate to that group item that is an object reference described "
         + "with the ACTIVE-CLASS phrase.\"",
         "ISO §14.9.23.3 SR13");
+
+    /// <summary>COBOLNET2738 — an I-O-CONTROL SAME clause violates one of its syntax rules (kb/Work PB1087): fewer than
+    /// the two files its format prints (<c>file-name-1 { file-name-2 } …</c>), an operand that is no file of this
+    /// source element (§12.4.6.4.3 SR2) or an external file connector (SR3), a file named in more clauses of a format
+    /// than its kind allows (SR5 report file, SR6 sort or merge file, SR7 any other file), a sort-merge-area clause with
+    /// no sort or merge file (SR8), or a file-area clause that shares files with a record-area clause (SR9) or with a
+    /// sort-merge-area clause (SR10) without being contained in it, or a GLOBAL clause on the file or record description
+    /// entries of files sharing a record area (§13.18.27.3 SR2, kb/Work PB1242). One code for the rule family, the
+    /// message names the rule.</summary>
+    public static readonly DiagnosticDescriptor SameClauseRule = new(
+        "COBOLNET2738", "same-clause-rule", EditionSeverity.Error,
+        "A SAME clause of the I-O-CONTROL paragraph violates one of its syntax rules. Every format names two or more "
+        + "files (§12.4.6.4.2; §12.4.6.4.4 GR1, GR2); each shall be specified in the FILE-CONTROL paragraph of the "
+        + "source element (SR2) and shall not reference an external file connector (SR3); a report file may be named "
+        + "in one file-area clause only (SR5); a sort or merge file in at most one record-area and one sort-merge-area "
+        + "clause and no file-area clause (SR6); any other file in at most one file-area clause, one record-area clause "
+        + "and any number of sort-merge-area clauses (SR7); a sort-merge-area clause names at least one sort or merge "
+        + "file (SR8); a file-area clause that shares a file with a record-area clause (SR9), or a non-sort file with "
+        + "sort-merge-area clauses (SR10), is wholly contained in each. The file description entries and record "
+        + "description entries of files sharing a record area do not include the GLOBAL clause (§13.18.27.3 SR2).",
+        "ISO §12.4.6.4.3 SR2, SR3, SR5-SR10; §12.4.6.4.4 GR1, GR2; §13.18.27.3 SR2");
+
+    /// <summary>COBOLNET2739 — a REDEFINES clause violates one of its ENTRY-level syntax rules (kb/Work PB1280): not the
+    /// first clause of its entry (§13.18.44.3 SR1), a subject and data-name-2 of different level-numbers (SR2), a
+    /// level-1 file-section entry (SR3), a CONSTANT RECORD as data-name-2 (SR13), or a subject whose required alignment
+    /// differs from data-name-2's (SR15). The size screen (SR8) keeps COBOLNET1539. One code for the rule family; the
+    /// message names the rule.</summary>
+    public static readonly DiagnosticDescriptor RedefinesEntryRule = new(
+        "COBOLNET2739", "redefines-entry-rule", EditionSeverity.Error,
+        "A REDEFINES clause violates one of its entry-level syntax rules. It shall immediately follow the entry-name "
+        + "clause, or the level-number when there is none (SR1); the level-numbers of data-name-2 and the subject of the "
+        + "entry shall be identical (SR2); it shall not be specified in a level-1 entry in the file section (SR3); "
+        + "data-name-2 shall not be described with the CONSTANT RECORD clause (SR13); and the subject's required "
+        + "alignment shall be the same as the alignment of data-name-2 (SR15).",
+        "ISO §13.18.44.3 SR1, SR2, SR3, SR13, SR15");
+
+    /// <summary>COBOLNET2740 — a RENAMES entry violates one of its entry-level syntax rules (kb/Work PB1283): it does not
+    /// immediately follow the last entry of its record (§13.18.45.3 SR2), an operand is subject to an OCCURS clause
+    /// (SR3), is a level-1 or level-77 entry (SR5) or lies within a CONSTANT RECORD (SR6), or data-name-3 begins before
+    /// data-name-2 or does not end after it (SR11). SR4 (the operands name items of this record) is COBOLNET1655, SR8
+    /// the range content and SR10 the whole-byte area. One code for the rule family; the message names the rule.</summary>
+    public static readonly DiagnosticDescriptor RenamesEntryRule = new(
+        "COBOLNET2740", "renames-entry-rule", EditionSeverity.Error,
+        "A RENAMES entry violates one of its entry-level syntax rules. All RENAMES entries of a record immediately "
+        + "follow the last data description entry of that record (SR2); data-name-1, data-name-2 and data-name-3 are "
+        + "not subject to any OCCURS clause (SR3); data-name-2 and data-name-3 do not refer to a level-1, 66, 77 or 88 "
+        + "entry (SR5) nor to an entry within a CONSTANT RECORD (SR6); and data-name-3 does not begin before "
+        + "data-name-2 and ends after it (SR11).",
+        "ISO §13.18.45.3 SR2, SR3, SR5, SR6, SR11");
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

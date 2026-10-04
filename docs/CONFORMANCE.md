@@ -2210,8 +2210,12 @@ reallocated).
 > record's STORAGE WINDOW from the leftmost character position of data-name-2 to the rightmost character position
 > of data-name-3 — a REDEFINES view inside the range contributes nothing beyond the storage it overlays, a
 > data-name-2 / data-name-3 that is itself a redefinition maps to the area it overlays, and when data-name-3 is a
-> SHORTER redefinition of an earlier item the alias ends at data-name-3's last character (a partial view of the
-> underlying item), which is the offset arithmetic GnuCOBOL and IBM apply. Pinned by
+> SHORTER redefinition of a LATER item (its end still follows data-name-2's end) the alias ends at data-name-3's last
+> character, a partial view of the underlying leaf. A data-name-3 that is a shorter redefinition of an EARLIER item —
+> `RENAMES A THRU B`, B redefining A's first two characters — is not legal source: §13.18.45.3 SR11 says "the end of the
+> storage area described by data-name-3 shall follow the end of the storage area described by data-name-2" (`cite.py
+> --check` OK 11)), and the offset arithmetic GnuCOBOL and IBM apply there is a vendor leniency the standard's syntax
+> rule controls over (kb/Work PB1283; `negative/pb1283-renames-thru-redefinition`). Pinned by
 > `2023/pb96_renames_span_over_redefines`.
 
 ## 5. Annex A.4 optional-element disposition (§4.2.7)

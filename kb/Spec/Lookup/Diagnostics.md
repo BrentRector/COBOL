@@ -33,7 +33,7 @@ serves as the diagnostic→phase map). See [[kb/Semantics/Validation Rules]] and
 | `COBOLNET0902` | construct removed by the targeted edition (`edition-removed-construct`) | Error / Warn (permissive) | Annex E.2 | Validate | ALTER, STOP literal, LABEL RECORDS, OPEN REVERSED, … |
 | `COBOLNET0903` | obsolete / archaic element (`edition-obsolete-flag`) | Warning | §4.2.12/.13, Annex F.2 | Validate | NEXT SENTENCE, EXIT PROGRAM (archaic 2023), col-7 continuation |
 | `COBOLNET1533` | strong-type: class-condition / compare / MOVE mismatch (3 ids) | Error | §8.8.4.4.3 SR1 · §8.8.4.2.3 SR1 · §14.9.25.3 SR2 | Bind | strongly-typed group misuse |
-| `COBOLNET1535` | strong-group ordering illegal / TYPEDEF-RENAMES staged (2 ids) | Error | §8.8.4.2.3 SR4 · §13.18.58.4 GR1 | Bind | strong-type ordering |
+| `COBOLNET1535` | strong-group ordering illegal | Error | §8.8.4.2.3 SR4 | Bind | strong-type ordering |
 | `COBOLNET1560`* | §4.2.6 processor-dependent unsupported (band) | Warning | §4.2.6 ¶3 | Validate | documented non-support surface (see 1578–1580) |
 
 ## Documented non-support (recognized + warned/rejected)

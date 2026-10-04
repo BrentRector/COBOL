@@ -1,7 +1,7 @@
 AC=[abcdef] 6
-AB=[ab] 2
 BC=[abcdef] 6
 CG=[efgh] 4
 BG=[abcdefghij] 10
+CX=[efg] 3
 A=[1234] C=[56] G1=[78] G2=[  ]
-A=[XY34] AC=[XY3456]
+C=[XY] G1=[Z8] AC=[1234XY]

@@ -3113,7 +3113,7 @@ already-derivable coverage; none change the pipeline.
   INITIALIZE-over-pointer-categories · line-seq 06/09/71 + REWRITE + the LINE SEQUENTIAL gate · keyed GR10a FPI
   + keyed ADVANCING emission · cross-run-unit sharing · ~~SORT national-key carry~~ (DISCHARGED 2026-09-05, kb/Work PB678 — the GR5 sequence pair is resolved and carried, and each key takes the sequence its CLASS names) · multiple-LINE repetition (+
   report-OCCURS family) · narrowed-1509 shapes · signed-leaf strong ordering (0899 `strong-group-ordering-
-  signed-leaf`) · 1535 `typedef-renames-staged` · MAX/MIN-under-explicit-collating.
+  signed-leaf`) · MAX/MIN-under-explicit-collating.
 - **P12 residues:** external-float `E` PICTURE (staged 0899) · FUNCTION-POINTER runtime + restricted
   PROGRAM-POINTER + `ADDRESS OF` spellings (staged 0899) · >>PROPAGATE §7.3.21.3 SR1
   placement (kb/Work PB1378; the runtime semantics landed with kb/Work PB1119) · DYNAMIC LENGTH national FUNCTION LENGTH/BYTE-LENGTH runtime paths (staged

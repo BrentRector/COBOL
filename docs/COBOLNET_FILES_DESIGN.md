@@ -79,6 +79,17 @@ operation is applied to a group containing it"* (§8.5.1.11.2).
   pointer-class elementary record). `DataBinder.LinkImplicitRecordArea` — the ONE linker for the FD and SD arms —
   and the SAME RECORD AREA arm link only character-window records, anchored on `FileModel.CharacterAnchor`; each
   file of a record-area SAME clause learns its `SameRecordAreaPeers`.
+- **The SAME clause is ONE membership model, and its syntax rules are one screen** (`DataBinder.IoControl.cs`;
+  kb/Work PB1087, PB1242). `FileModel.SameClauses` records every clause as a `SameClause` — a `SameClauseKind` of
+  `Area` / `RecordArea` / `SortMergeArea` (SORT and SORT-MERGE are ONE format, §12.4.6.4.3 SR1; `Written` keeps the
+  spelling for messages), its resolved members and its words. `ScreenSameOperands` asks a clause its own questions
+  (two or more distinct files, §12.4.6.4.4 GR1/GR2; SR2 each is a file of THIS source element; SR3 none EXTERNAL);
+  `ScreenSameClauses` asks the paragraph's clauses together, from one occurrence table (file kind × format → how many
+  clauses, `SameOccurrenceRule`: SR5 report, SR6 sort or merge, SR7 any other file), SR8 (a sort-merge-area clause
+  names a sort or merge file), SR9 / SR10 (a file-area clause is wholly inside the record-area / sort-merge-area
+  clauses it shares a file with) and §13.18.27.3 SR2 (no GLOBAL on the FD or records of a record-area member). One
+  code, `COBOLNET2738`, names the rule in its message. The SORT and MERGE statements read the same model
+  (`SortBinder.ScreenSameClauses`, §14.9.40.3 SR10 / §14.9.24.3 SR11).
 - `FileModel.AreaRecord` is the largest CHARACTER-window record (the first record only when every record is out of
   line); `FileModel.OutOfLineRecords` is every other out-of-line record of the file and of its SAME peers.
 - **READ / RETURN** go through ONE store, `SequentialIoEmitter.EmitRecordAreaStore`: the character half takes the

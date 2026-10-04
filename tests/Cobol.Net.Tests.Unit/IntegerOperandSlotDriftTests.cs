@@ -32,22 +32,51 @@ public sealed class IntegerOperandSlotDriftTests
             .OrderBy(t => t.Name, StringComparer.Ordinal)
             .ToArray();
 
-    /// <summary>⛔ THE REPORT WRITER'S integer-n POSITIONS ARE ALL LITERAL POSITIONS (kb/Work PB1947). ISO §13.10.3
-    /// SR2 — "constant-name-1 may be used anywhere that a format specifies a literal of the class and category of
-    /// constant-name-1" — and §5.5 1) calls every <c>integer-n</c> "a fixed-point integer literal", so a constant-name
-    /// stands at every integer position of the PAGE, LINE, COLUMN and NEXT GROUP clauses and of OCCURS … STEP. The
-    /// report-writer grammar therefore spells NONE of them with the bare <c>integerLiteral</c>: it writes
-    /// <c>integerOperand</c>, so the clause that is added next admits a constant-name without anyone remembering to.
-    /// (A <c>COBOL0309 "A literal value is expected here, not a data-name"</c> on <c>LINE PLUS KL</c> was the defect.)
-    /// </summary>
+    /// <summary>Every rule that spells a BARE <c>integerLiteral</c> — an <c>integer-n</c> position that admits only a
+    /// written literal. The <c>integerOperand</c> carrier is the one rule left out (it is the SHARED spelling, whose
+    /// <c>integerLiteral</c> arm is the literal half of "a literal or a constant-name").</summary>
+    private static Type[] RulesThatWriteBareIntegerLiteral() =>
+        typeof(CobolParserCore).GetNestedTypes()
+            .Where(t => t != typeof(CobolParserCore.IntegerOperandContext)
+                && t.GetMethods().Any(m => m.Name == "integerLiteral" && m.DeclaringType == t))
+            .OrderBy(t => t.Name, StringComparer.Ordinal)
+            .ToArray();
+
+    /// <summary>⛔ EVERY integer-n POSITION OF THE GRAMMAR IS A LITERAL POSITION A CONSTANT-NAME STANDS IN (kb/Work
+    /// PB1947 for the report writer, PB1948 for the rest). ISO §13.10.3 SR2 — "constant-name-1 may be used anywhere that
+    /// a format specifies a literal of the class and category of constant-name-1" — and §5.5 1) calls every
+    /// <c>integer-n</c> "a fixed-point integer literal", so a clause that prints one writes <c>integerOperand</c>
+    /// (a literal or a constant-name), never the bare <c>integerLiteral</c>. The set of rules that still write the bare
+    /// one is DERIVED from the generated parser and must equal <see cref="IntegerOperandRules.LiteralOnlySlots"/>,
+    /// each row carrying the argument for why a constant-name does not stand there: the clause that is added next admits
+    /// a constant-name without anyone remembering to, or is red until it says why not. (A <c>COBOL0309 "A literal value
+    /// is expected here, not a data-name"</c> on <c>LINE PLUS KL</c>, <c>RESERVE KR AREAS</c> or <c>BLOCK CONTAINS KB
+    /// RECORDS</c> was the defect.)</summary>
     [Fact]
-    public void ReportWriterGrammar_SpellsNoBareIntegerLiteral()
+    public void EveryRuleWritingABareIntegerLiteral_IsAnArguedLiteralOnlySlot()
     {
-        string path = System.IO.Path.Combine(TestRepo.Src("Cobol.Net.Frontend", "Grammar"), "Core", "CobolReportWriter.g4");
-        string body = System.Text.RegularExpressions.Regex.Replace(
-            System.IO.File.ReadAllText(path), @"//[^\r\n]*", string.Empty);
-        Assert.Contains("integerOperand", body);   // a ZERO-population "clean" result is the failure this prevents
-        Assert.DoesNotMatch(@"\bintegerLiteral\b", body);
+        Assert.True(RulesThatWriteIntegerLiteral().Count(t => t.GetMethods().Any(m => m.Name == "integerOperand" && m.DeclaringType == t)) >= 15,
+            "fewer than 15 rules write integerOperand — the scrape is blind");
+        var unargued = RulesThatWriteBareIntegerLiteral().Where(t => !IntegerOperandRules.LiteralOnlySlots.ContainsKey(t))
+            .Select(t => t.Name).ToArray();
+        Assert.True(unargued.Length == 0,
+            "grammar rule(s) spell a bare integerLiteral — an integer-n position takes `integerOperand` so an integer "
+            + "constant-name stands there (ISO §13.10.3 SR2), or the rule is argued in IntegerOperandRules.LiteralOnlySlots: "
+            + string.Join(", ", unargued));
+    }
+
+    [Fact]
+    public void EveryLiteralOnlySlot_StillWritesABareIntegerLiteral_AndCarriesItsReason()
+    {
+        var bare = RulesThatWriteBareIntegerLiteral().ToHashSet();
+        var stale = IntegerOperandRules.LiteralOnlySlots.Keys.Where(t => !bare.Contains(t)).Select(t => t.Name).ToArray();
+        Assert.True(stale.Length == 0, "IntegerOperandRules.LiteralOnlySlots names rule(s) that no longer write a bare "
+            + "integerLiteral: " + string.Join(", ", stale));
+        Assert.All(IntegerOperandRules.LiteralOnlySlots, kv => Assert.False(string.IsNullOrWhiteSpace(kv.Value), kv.Key.Name));
+        // Every argued rule is also a classified one — the zero permission is asked of its operand all the same.
+        var unclassified = IntegerOperandRules.LiteralOnlySlots.Keys.Where(t => !IntegerOperandRules.Slots.ContainsKey(t))
+            .Select(t => t.Name).ToArray();
+        Assert.True(unclassified.Length == 0, "LiteralOnlySlots rule(s) missing from Slots: " + string.Join(", ", unclassified));
     }
 
     [Fact]

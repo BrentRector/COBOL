@@ -40,7 +40,7 @@
           05 SB PIC S9(4) COMP.
        FD RL.
        01 RREC PIC X(6).
-       01 RRECN REDEFINES RREC.
+       01 RRECN.
           05 RN PIC S9(4) COMP.
           05 FILLER PIC X(4).
        FD IX.

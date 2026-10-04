@@ -774,9 +774,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             if (named.Count < 2) continue;
             string? why = clause.Kind switch
             {
-                SameClauseKind.SortArea or SameClauseKind.SortMergeArea =>
-                    $"no pair of file-names in the {verb} statement may be specified in the same "
-                    + (clause.Kind == SameClauseKind.SortArea ? "SAME SORT AREA" : "SAME SORT-MERGE AREA") + " clause",
+                SameClauseKind.SortMergeArea =>
+                    $"no pair of file-names in the {verb} statement may be specified in the same {clause.Written} clause",
                 SameClauseKind.Area when merge =>
                     "no pair of file-names in the MERGE statement may be specified in the same SAME AREA clause",
                 SameClauseKind.Area when named.Count(givingFiles.Contains) > 1 =>

@@ -180,7 +180,8 @@
   "pb1305_report_varying_standard_decimal",
   "pb1716_table_value_element_count",
   "pb1417_function_address_identifier_operands",
-  "pb1929_set_function_pointer_function_sender"
+  "pb1929_set_function_pointer_function_sender",
+  "pb1948_dynamic_length_limit_constant"
  ],
  "pending": []
 }

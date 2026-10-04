@@ -1,5 +1,6 @@
 {
  "enabled": [
+  "pb1283_renames_legal",
  "pb1054_renames_thru_binary_packed_span",
  "pb1226_report_filler_entry_name",
  "pb1294_report_rolled_unprintable_source",

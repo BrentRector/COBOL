@@ -166,7 +166,7 @@ internal static class IntegerOperandRules
     private static IntegerSlot RecordClause(ParserRuleContext owner, ParserRuleContext op)
     {
         var rc = (Core.RecordClauseContext)owner;
-        if (PrecededBy(owner, op, Core.TO)) return IntegerSlot.Default;              // integer-3 / integer-5
+        if (PrecededBy(owner, OperandOf(op), Core.TO)) return IntegerSlot.Default;   // integer-3 / integer-5
         if (rc.VARYING() is not null) return IntegerSlot.Zero("ISO §13.18.43.3 SR7"); // integer-2
         return rc.TO() is not null ? IntegerSlot.Zero("ISO §13.18.43.3 SR8")         // integer-4
             : IntegerSlot.Default;                                                     // integer-1
@@ -192,6 +192,54 @@ internal static class IntegerOperandRules
         ((Core.ReportLineOperandContext)owner).reportRelativeSign() is not null
             ? IntegerSlot.Zero("ISO §13.18.35.3 SR3")
             : IntegerSlot.Default;
+
+    /// <summary>⛔ EVERY grammar rule that may still spell a BARE <c>integerLiteral</c>, each with the REASON a constant-name
+    /// does not need the <c>integerOperand</c> rule there (kb/Work PB1948, completing PB1947). ISO §13.10.3 SR2 —
+    /// "constant-name-1 may be used anywhere that a format specifies a literal of the class and category of
+    /// constant-name-1" — makes every <c>integer-n</c> (§5.5 1)) a position a constant-name stands in, so a clause that
+    /// prints an <c>integer-n</c> writes <c>integerOperand</c> and this table is where the exceptions are argued, never
+    /// the default. <c>IntegerOperandSlotDriftTests</c> derives the rules that write a bare <c>integerLiteral</c> from the
+    /// generated parser and holds them to THIS set in both directions: a new clause that forgets <c>integerOperand</c>
+    /// is red until it is either fixed or argued here.</summary>
+    internal static readonly IReadOnlyDictionary<Type, string> LiteralOnlySlots = new Dictionary<Type, string>
+    {
+        [typeof(Core.MemorySizeClauseContext)] = Removed85,
+        [typeof(Core.SegmentLimitClauseContext)] = Removed85,
+        [typeof(Core.MultipleFileTapeEntryContext)] = Removed85,
+        [typeof(Core.RerunEveryContext)] = Removed85,
+        [typeof(Core.SymbolicCharacterEntryContext)] =
+            "the entry's FIRST alternative, the literal ordinals every program wrote before constant entries existed, listed "
+            + "first so that such a program parses exactly as it did; its second and third alternatives write integerOperand "
+            + "and bare words (DataBinder.SymbolicEntryGroups), because a constant-name ordinal is the same kind of token as "
+            + "the next symbolic-character-1 and only the constant table tells them apart",
+        [typeof(Core.ChannelClauseContext)] = "a vendor extension, not an ISO general format (§5.5 governs general formats)",
+        [typeof(Core.ReserveClauseContext)] = "SPECIAL-NAMES RESERVE … CHANNELS is a vendor extension, not an ISO general format",
+        [typeof(Core.SectionDefinitionContext)] = "the 1985 Segmentation module's priority-number, not an integer-n; deleted at 2002",
+        [typeof(Core.DeclarativeSectionContext)] = "the 1985 Segmentation module's priority-number, not an integer-n; deleted at 2002",
+        [typeof(Core.ScreenLineClauseContext)] = ScreenDeclinedReason,
+        [typeof(Core.ScreenColumnClauseContext)] = ScreenDeclinedReason,
+        [typeof(Core.ScreenForegroundColorClauseContext)] = ScreenDeclinedReason,
+        [typeof(Core.ScreenBackgroundColorClauseContext)] = ScreenDeclinedReason,
+        [typeof(Core.ScreenPositionLegContext)] = ScreenDeclinedReason,
+        [typeof(Core.LinageClauseContext)] = DataNameOrInteger,
+        [typeof(Core.LinageFootingPhraseContext)] = DataNameOrInteger,
+        [typeof(Core.LinageLinesAtTopPhraseContext)] = DataNameOrInteger,
+        [typeof(Core.LinageLinesAtBottomPhraseContext)] = DataNameOrInteger,
+        [typeof(Core.PerformTimesContext)] = DataNameOrInteger,
+        [typeof(Core.WriteBeforeAfterContext)] = DataNameOrInteger,
+    };
+
+    private const string Removed85 =
+        "an X3.23-1985 element ISO 2002 deleted; CONSTANT entries first exist at 2002 (constant-entry-2002), so no edition "
+        + "holds both the clause and a constant-name to stand in it";
+
+    private const string ScreenDeclinedReason =
+        "the SCREEN SECTION is a declined optional module (Annex A.4.2) refused whole by COBOLNET1560; its clauses never bind";
+
+    private const string DataNameOrInteger =
+        "the format prints 'data-name-1 or integer-1': a constant-name parses as the dataReference arm and the binder reads "
+        + "the constant's integer there (LINAGE: DataBinder.ConstantOperandValue; PERFORM TIMES and WRITE ADVANCING: "
+        + "ExpressionBinder's constant substitution)";
 
     /// <summary>The largest <c>integer-n</c> value the compiler binds into its own model — an <see cref="int"/>,
     /// because every such operand sizes, counts or positions something the compiler lays out in a .NET object
@@ -220,8 +268,14 @@ internal static class IntegerOperandRules
     /// <see cref="FullValueSlots"/>) and its value exceeds <see cref="HostLimit"/> — the one question
     /// <see cref="IntegerOperandPass"/> asks before any binder reads the value (kb/Work PB1058).</summary>
     internal static bool BeyondHostLimit(Core.IntegerLiteralContext operand) =>
-        !(OwnerOf(operand) is { } owner && FullValueSlots.Contains(owner.GetType()))
+        !IsFullValueSlot(operand)
         && TryHostValue(operand.GetText(), out _, out bool saturated) && saturated;
+
+    /// <summary>True when <paramref name="operand"/> sits in one of the <see cref="FullValueSlots"/> — the written
+    /// literal and the integer constant-name that stands for it (ISO §13.10.3 SR2) are both exempt from the host limit
+    /// there.</summary>
+    internal static bool IsFullValueSlot(ParserRuleContext operand) =>
+        OwnerOf(operand) is { } owner && FullValueSlots.Contains(owner.GetType());
 
     /// <summary>The <c>integerOperand</c> node an operand sits in — the operand itself when it is one, its parent
     /// when it is the <c>integerLiteral</c> arm of one, and the operand unchanged when the clause writes a bare

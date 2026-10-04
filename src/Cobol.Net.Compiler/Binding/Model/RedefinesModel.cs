@@ -7,9 +7,19 @@ namespace CobolNet.Binding.Model;
 /// double redefinition of an OCCURS 36 table), <paramref name="Occurrence"/> = null for the WHOLE leaf (every
 /// occurrence of a table leaf, in order) or the 1-based occurrence the part lies in, and <paramref name="Start"/>
 /// (1-based) / <paramref name="Length"/> the character range of that occurrence the alias covers — the whole cell
-/// (the ordinary case) or a partial slice when a span boundary lands inside it.</summary>
-public sealed record RenamesSpanPart(DataItem Leaf, int? Occurrence, int Start, int Length)
+/// (the ordinary case) or a partial slice when a span boundary lands inside it.
+/// <para><paramref name="Outer"/> is the 1-based occurrence of each OCCURS GROUP the leaf sits under, outermost first
+/// (kb/Work PB986): §13.18.45.3 SR3 bars an OCCURS only on the three NAMED operands, so a table may lie INSIDE the
+/// range, and a leaf of such a table lives once per occurrence of its group — S4 of <c>ST OCCURS 2</c> is
+/// <c>S4 OF ST(1)</c> and <c>S4 OF ST(2)</c>, two parts, not one. Empty for a leaf under no table.</para></summary>
+public sealed record RenamesSpanPart(DataItem Leaf, int? Occurrence, int Start, int Length, IReadOnlyList<int> Outer)
 {
+    /// <summary>The subscript of each OCCURS level on the leaf's path, outermost first — the table groups' occurrences
+    /// (<see cref="Outer"/>) and then <paramref name="own"/> for the leaf's own OCCURS when it has one: the index list
+    /// <c>ReferenceResolver.PlaceForItem</c> takes for one cell of the leaf.</summary>
+    public IReadOnlyList<string> SubscriptsFor(int? own) =>
+        [.. Outer.Select(o => o.ToString()), .. own is { } k ? new[] { k.ToString() } : Array.Empty<string>()];
+
     /// <summary>The whole leaf — every occurrence, every character (the composed accessor's fast path).</summary>
     public bool IsWhole => Occurrence is null;
 
@@ -30,12 +40,13 @@ public sealed record RenamesSpanPart(DataItem Leaf, int? Occurrence, int Start, 
     /// <summary>A part from a tiling stated in storage BYTES (<paramref name="startByte"/> 1-based within the
     /// occurrence), expressed in the leaf's own positions; null when a boundary falls inside a character position
     /// (the odd byte of a national character), which is no range of that item.</summary>
-    public static RenamesSpanPart? FromBytes(DataItem leaf, int? occurrence, int startByte, int lengthBytes)
+    public static RenamesSpanPart? FromBytes(DataItem leaf, int? occurrence, int startByte, int lengthBytes,
+        IReadOnlyList<int> outer)
     {
         int u = BytesPerPosition(leaf);
         return (startByte - 1) % u != 0 || lengthBytes % u != 0
             ? null
-            : new RenamesSpanPart(leaf, occurrence, (startByte - 1) / u + 1, lengthBytes / u);
+            : new RenamesSpanPart(leaf, occurrence, (startByte - 1) / u + 1, lengthBytes / u, outer);
     }
 }
 

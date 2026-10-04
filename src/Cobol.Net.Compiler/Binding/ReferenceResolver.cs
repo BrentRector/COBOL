@@ -1115,7 +1115,7 @@ public sealed class ReferenceResolver(DataBinder data)
             {
                 // ONE occurrence (or the one-and-only cell) of the leaf, possibly a partial slice of it (kb/Work
                 // PB96): the cell's place, then its ref-mod view when the part does not cover the whole cell.
-                if (SpanLeafPlace(leaf, leaf.Occurs is null ? [] : [occIdx.ToString()], out gap) is not { } cell)
+                if (SpanLeafPlace(leaf, part.SubscriptsFor(leaf.Occurs is null ? null : occIdx), out gap) is not { } cell)
                     return null;
                 if (part.IsPartial) cell = new RefModPlace(cell, part.Start.ToString(), part.Length.ToString());
                 leafPlaces.Add(cell);
@@ -1123,11 +1123,13 @@ public sealed class ReferenceResolver(DataBinder data)
                 continue;
             }
             // An OCCURS leaf inside the span contributes EVERY occurrence in order (§13.18.45 — the alias covers
-            // the whole fixed-size area; NC252A's RENAME-7 over TABLE-ITEM-2 OCCURS 5).
+            // the whole fixed-size area; NC252A's RENAME-7 over TABLE-ITEM-2 OCCURS 5). A leaf under an OCCURS GROUP is
+            // one part per occurrence of the group (RenamesSpanPart.Outer, kb/Work PB986), so its cell is addressed by
+            // those subscripts first.
             int occ = leaf.Occurs ?? 1;
             for (int k = 1; k <= occ; k++)
             {
-                if (SpanLeafPlace(leaf, leaf.Occurs is null ? [] : [k.ToString()], out gap) is not { } lp) return null;
+                if (SpanLeafPlace(leaf, part.SubscriptsFor(leaf.Occurs is null ? null : k), out gap) is not { } lp) return null;
                 widths.Add(leaf.ByteWidth);   // a whole part: every occurrence, at the leaf's storage width (kb/Work PB96, PB1665)
                 leafPlaces.Add(lp);
             }

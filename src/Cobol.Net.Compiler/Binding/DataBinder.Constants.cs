@@ -26,8 +26,10 @@ using Core = CobolParserCore;
 /// mappings every verb consumes (MOVE/DISPLAY sources, relations, PERFORM TIMES, arithmetic);</item>
 /// <item><c>ReferenceResolver.ResolveSubscriptName</c> — subscript positions (§13.10.3 SR2: an integer
 /// constant-name stands where the format specifies an integer);</item>
-/// <item><see cref="IntegerOperandValue"/> — every integer-n position (the OCCURS bounds and the report-writer LINE, COLUMN, NEXT GROUP, PAGE and STEP integers; SR2, via the
-/// <c>integerOperand</c> grammar rule);</item>
+/// <item><see cref="IntegerOperandValue"/> — every integer-n position (the OCCURS bounds, the report-writer LINE, COLUMN,
+/// NEXT GROUP, PAGE and STEP integers, RESERVE, BLOCK CONTAINS, RECORD CONTAINS, DYNAMIC LENGTH LIMIT, PICTURE LOCALE
+/// SIZE and the SYMBOLIC CHARACTERS ordinals; SR2, via the <c>integerOperand</c> grammar rule — and LINAGE's
+/// "data-name-1 or integer-1" operands, whose constant-name parses as the data-name arm: <see cref="ConstantOperandValue"/>);</item>
 /// <item><see cref="ExpandPicConstants"/> — PICTURE repetition <c>X(K)</c> (SR2 second sentence);</item>
 /// <item><c>ExtractValue</c> — a VALUE-clause constant-name operand substitutes its raw literal text (the
 /// text-plumbed data path, the ConcatFolder RawText precedent);</item>
@@ -829,7 +831,7 @@ public sealed partial class DataBinder
     /// <summary>The constants' substituted <c>integer-n</c> values, by operand node — so an operand the report binder
     /// reads once per REPETITION of its entry (§13.18.38.4 GR10 replays the subtree) is judged, and reported, once.
     /// A null value is a refusal already reported.</summary>
-    private readonly Dictionary<Core.IntegerOperandContext, int?> _integerOperandValues = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<Antlr4.Runtime.ParserRuleContext, string?> _integerOperandTexts = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>What a binder site that cannot proceed without a number reads for an <c>integer-n</c> operand
     /// <see cref="IntegerOperandValue"/> refused (and reported): the smallest nonzero integer, which no later range
@@ -849,17 +851,37 @@ public sealed partial class DataBinder
     /// where-nonzero, an over-limit or an unknown constant-name.</summary>
     /// <param name="operand">The operand node of the clause that prints the <c>integer-n</c>.</param>
     /// <param name="where">The construct as the calling site names it, for a diagnostic.</param>
-    private int? IntegerOperandValue(Core.IntegerOperandContext operand, string where)
+    private int? IntegerOperandValue(Core.IntegerOperandContext operand, string where) =>
+        IntegerOperandText(operand, where) is { } text ? CobolNet.Validation.IntegerOperandRules.HostValue(text) : null;
+
+    /// <summary>The same reader for a clause whose <c>integer-n</c> is read at FULL width, not as an
+    /// <see cref="int"/> (<see cref="CobolNet.Validation.IntegerOperandRules.FullValueSlots"/>: the DYNAMIC LENGTH LIMIT):
+    /// the operand's integer as digits, the literal as written or the constant's canonical integer, with every refusal
+    /// of <see cref="IntegerOperandValue"/> except the host limit, which a full-width slot does not have.</summary>
+    private string? IntegerOperandText(Core.IntegerOperandContext operand, string where) =>
+        operand.integerLiteral() is { } il ? il.GetText() : ConstantIntegerText(operand, operand.cobolWord().GetText(), where);
+
+    /// <summary>The value of a BARE <c>dataReference</c> that names a constant (<see cref="ConstantOf"/>) where the
+    /// format prints "data-name-1 or integer-1" (LINAGE, ISO §13.18.34.2) — the grammar cannot tell the constant-name
+    /// from a data-name, so it parsed the word as the data-name arm and the binder, which knows the constant table,
+    /// reads it as the integer it substitutes (§13.10.3 SR2, §13.10.4 GR1) by the same reader as every
+    /// <c>integerOperand</c>. Null when refused (and reported).</summary>
+    private int? ConstantOperandValue(Core.DataReferenceContext dref, string where) =>
+        ConstantIntegerText(dref, dref.cobolWord().GetText(), where) is { } text
+            ? CobolNet.Validation.IntegerOperandRules.HostValue(text) : null;
+
+    /// <summary>⛔ A CONSTANT-NAME THAT STANDS FOR AN <c>integer-n</c> (ISO §13.10.3 SR2), asked once per operand node
+    /// — the <c>integerOperand</c> grammar rule's cobolWord arm, and the bare <c>dataReference</c> a clause that prints
+    /// "data-name-1 or integer-1" (LINAGE) parsed the word as. <paramref name="operand"/> is the node the diagnostic
+    /// anchors and the owning clause is read from; <paramref name="word"/> is the constant-name as written.</summary>
+    private string? ConstantIntegerText(Antlr4.Runtime.ParserRuleContext operand, string word, string where)
     {
-        if (operand.integerLiteral() is { } il)
-            return CobolNet.Validation.IntegerOperandRules.HostValue(il);
-        if (_integerOperandValues.TryGetValue(operand, out var known)) return known;
-        return _integerOperandValues[operand] = ConstantIntegerOperand(operand, where);
+        if (_integerOperandTexts.TryGetValue(operand, out var known)) return known;
+        return _integerOperandTexts[operand] = ConstantIntegerOperand(operand, word, where);
     }
 
-    private int? ConstantIntegerOperand(Core.IntegerOperandContext operand, string where)
+    private string? ConstantIntegerOperand(Antlr4.Runtime.ParserRuleContext operand, string word, string where)
     {
-        string word = operand.cobolWord().GetText();
         string what = "the OCCURS bound";
         if (CobolNet.Validation.IntegerOperandRules.OwnerOf(operand) is not Core.OccursClauseContext)
         {
@@ -877,7 +899,9 @@ public sealed partial class DataBinder
             if (k is { Category: PicCategory.Numeric, IntegerText: { } it }
                 && CobolNet.Validation.IntegerOperandRules.TryHostValue(it, out int kv, out bool beyondLimit))
             {
-                if (beyondLimit)
+                // A FULL-WIDTH slot (DYNAMIC LENGTH LIMIT, PERFORM … TIMES) has no host limit to pass — the same
+                // exemption IntegerOperandRules.BeyondHostLimit gives the written literal.
+                if (beyondLimit && !CobolNet.Validation.IntegerOperandRules.IsFullValueSlot(operand))
                 {
                     Edition.Error(DiagnosticCatalog.IntegerOperandBeyondLimit,
                         CobolNet.Validation.IntegerOperandRules.BeyondLimitMessage(where, $"{what} '{word}', the integer {it},"));
@@ -902,7 +926,7 @@ public sealed partial class DataBinder
                         + "permits zero here (§13.10.4 GR1: the constant stands as if its literal were written)");
                     return null;
                 }
-                return kv;
+                return it;
             }
             Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {what} '{word}' shall be "
                 + "an INTEGER constant-name (ISO §13.10.3 SR2 — only an integer constant may specify an integer-n "

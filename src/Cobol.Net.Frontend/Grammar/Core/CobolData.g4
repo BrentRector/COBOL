@@ -130,7 +130,7 @@ fileGlobalExternalClause
 
 // BLOCK CONTAINS clause (§13.18.10)
 blockContainsClause
-    : BLOCK CONTAINS? integerLiteral (TO integerLiteral)? (CHARACTERS | RECORDS)?
+    : BLOCK CONTAINS? integerOperand (TO integerOperand)? (CHARACTERS | RECORDS)?
     ;
 
 // RECORD clause (§13.18.43) — fixed-length, variable-length, or VARYING forms.
@@ -146,8 +146,8 @@ blockContainsClause
 // context-sensitive word outside its format "is treated as a user-defined word"), so `01 BYTES PIC X.`
 // stays legal COBOL-85 — the gate is on the CLAUSE, never on the word.
 recordClause
-    : RECORD CONTAINS? integerLiteral (TO integerLiteral)? (CHARACTERS | BYTES)?
-    | RECORD IS? VARYING IN? SIZE? (FROM? integerLiteral)? (TO integerLiteral)? (CHARACTERS | BYTES)? (DEPENDING ON? dataReference)?
+    : RECORD CONTAINS? integerOperand (TO integerOperand)? (CHARACTERS | BYTES)?
+    | RECORD IS? VARYING IN? SIZE? (FROM? integerOperand)? (TO integerOperand)? (CHARACTERS | BYTES)? (DEPENDING ON? dataReference)?
     ;
 
 // CODE-SET clause (§13.18.13.2 — the 2002 two-class format; kb/Work PB110): IS alphabet-name-1
@@ -482,7 +482,7 @@ anyLengthClause
 // conforming source. DYNAMIC stays the required anchor and heads no other data-description clause, so the
 // relaxation adds no ambiguity; the COBOL-2014 gate keys on the CLAUSE context, not on the word.
 dynamicLengthClause
-    : DYNAMIC LENGTH? cobolWord? (LIMIT IS? integerLiteral)?
+    : DYNAMIC LENGTH? cobolWord? (LIMIT IS? integerOperand)?
     ;
 
 // GLOBAL clause (§13.18.27) — visible to contained programs
@@ -540,7 +540,7 @@ pictureClause
 // required IS this rule used to demand before locale-name-1 rejected legal source (kb/Work PB114). A superset
 // parse admits editingPhrase* alongside; format 2 has no EDITING phrase and the binder diagnoses the pairing.
 pictureLocalePhrase
-    : {pictureLocaleAhead()}? formatWord (IS? cobolWord)? SIZE IS? integerLiteral   // LOCALE = formatWord (kb/Work PB764)
+    : {pictureLocaleAhead()}? formatWord (IS? cobolWord)? SIZE IS? integerOperand   // LOCALE = formatWord (kb/Work PB764)
     ;
 
 // EDITING character-1 { IS literal-1 | FOR { NEGATIVE/POSITIVE choice } } (ISO §13.18.40.2 Format 1). `IS` is
