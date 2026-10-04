@@ -80,8 +80,8 @@ internal static class LevelNumberRules
     }
 
     /// <summary>The §13.18.33.3 table. §13.18.33.3 SR3 ("A level-number in the range of 1 through 9 may be
-    /// specified as 01 through 09") needs no row: it is a SPELLING permission, and screening the parsed VALUE
-    /// honours it without a second mechanism.</summary>
+    /// specified as 01 through 09") needs no row: it is a SPELLING permission, honoured by the VALUE screen, and the
+    /// two-digit bound on the spelling (§8.3.2.2.13) is <see cref="LevelNumberPass.VisitLevelNumber"/>'s length test.</summary>
     private static readonly Dictionary<LevelNumberArm, Arm> Table = new()
     {
         [LevelNumberArm.FileRecord] = new("2",
@@ -266,6 +266,9 @@ internal static class LevelNumberRules
 /// </summary>
 internal sealed class LevelNumberPass(IDiagnosticSink sink) : CursorFollowingVisitor(sink)
 {
+    /// <summary>ISO §8.3.2.2.13 — "A level-number, expressed as a one-digit or two-digit number".</summary>
+    private const int MaxLevelNumberDigits = 2;
+
     /// <summary>Screen every level-number in the group's raw parse tree.</summary>
     internal static void Run(CobolParserCore.CompilationUnitContext tree, IDiagnosticSink sink) =>
         new LevelNumberPass(sink).VisitPositioned(tree);
@@ -282,7 +285,16 @@ internal sealed class LevelNumberPass(IDiagnosticSink sink) : CursorFollowingVis
             // unparseable case takes the same diagnostic rather than a second mechanism.
             bool known = int.TryParse(text, out int level);
             var arm = LevelNumberRules.For(armKind);
-            if (!known || !arm.Permits(level))
+            // ⛔ THE SPELLING IS PART OF THE RULE (kb/Work PB1246). §8.3.2.2.13: "A level-number, expressed as a
+            // one-digit or two-digit number" — and §13.18.33.3 SR3 grants exactly one leading-zero form, "A
+            // level-number in the range of 1 through 9 may be specified as 01 through 09". `001` has the VALUE 1
+            // and is no level-number at all, so the value test below cannot see it; the grammar's INTEGERLIT takes
+            // any digit run, which is why the length is asked here, in the one place every arm's level-number passes.
+            if (text.Length > MaxLevelNumberDigits)
+                Report(ctx, DiagnosticCatalog.LevelNumberOutOfRange, text,
+                    "a level-number is expressed as a one-digit or two-digit number, and a level-number in the "
+                    + "range of 1 through 9 may be specified as 01 through 09 (ISO §8.3.2.2.13, §13.18.33.3 SR3)");
+            else if (!known || !arm.Permits(level))
                 Report(ctx, DiagnosticCatalog.LevelNumberOutOfRange, text,
                     $"{arm.Requirement} (ISO §13.18.33.3 SR{arm.SyntaxRule})");
             else if (ctx.Parent is CobolParserCore.DataDescriptionEntryContext entry)

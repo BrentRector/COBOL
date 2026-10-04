@@ -134,15 +134,7 @@ public sealed partial class DataBinder
             // rule that actually bars it is enforced in the same change set, and it is the ITEM's own class the
             // rule names — a strongly-typed EXTERNAL group holding a pointer MEMBER is class alphanumeric and
             // stays legal (SR5 only requires its type declaration to be external too).
-            if (item.HasExternalClause && SlotWindow.CarriedBySlot(item))
-            {
-                Edition.Error(DiagnosticCatalog.ExternalPointerOrObjectItem, $"data item '{name}' is described "
-                    + $"with USAGE {Sr14PhraseNameOf(item)} — of class "
-                    + $"{(item.Pic!.Category is PicCategory.ObjectReference ? "object" : "pointer")} — and with "
-                    + "the EXTERNAL clause; the EXTERNAL clause shall not be specified for a data item of class "
-                    + "object or pointer (ISO §13.18.22.3 SR4)");
-                continue;
-            }
+            if (ScreenExternalClassItem(item, name)) continue;
 
             // ── §13.18.5.3 SR1 ───────────────────────────────────────────────────────────────────────────
             // "The subject of the entry shall not be of class object." The EXTERNAL twin's other half, and the
@@ -150,13 +142,7 @@ public sealed partial class DataBinder
             // BASED.` — class POINTER — is legal source and is exactly what kb/Work PB231's pointer third
             // implements. Same reason for the timing as SR4 above: COBOLNET1695 used to reject both, and this
             // one must keep being rejected after the gate opens.
-            if (item.IsBased && item.Pic is { Category: PicCategory.ObjectReference })
-            {
-                Edition.Error(DiagnosticCatalog.BasedSubjectOfClassObject, $"data item '{name}' is described "
-                    + "with USAGE OBJECT REFERENCE — of class object — and with the BASED clause; the subject "
-                    + "of a BASED entry shall not be of class object (ISO §13.18.5.3 SR1)");
-                continue;
-            }
+            if (ScreenBasedClassObjectItem(item, name)) continue;
 
             // ── §13.18.5.3 SR2 ───────────────────────────────────────────────────────────────────────────
             // "The subject of the entry shall not be a dynamic-length elementary item or a variable-length
@@ -210,6 +196,46 @@ public sealed partial class DataBinder
                 + "an elementary data item at level 1 or an elementary data item subordinate to a type "
                 + "declaration that includes the STRONG phrase (ISO §13.18.60.3 SR14)");
         }
+
+        // ── THE COMPOSED-ENTRY HALF OF §13.18.22.3 SR4 AND §13.18.5.3 SR1 (kb/Work PB1212) ──────────────────
+        // Both rules are about an entry whose CLASS comes from one place and whose clause from another: `01 A TYPE PT
+        // EXTERNAL.` writes the EXTERNAL clause at the site and takes class pointer from the type declaration PT
+        // (§13.18.57.4 GR1), and the first loop above never sees A — ConformanceForest PRUNES every entry that carries
+        // a TYPE clause, because the template was gated once. So the SAME two screens are asked, by the same code, of
+        // each entry that DIRECTLY carries a TYPE clause. Only a level-1 entry can write EXTERNAL or BASED, so the
+        // entries reached here are the site entries and nothing is reported twice (the templates were judged above).
+        foreach (var item in CompositionForest().Where(i => i.TypeName is not null))
+        {
+            using var _ = Edition.At(item);
+            string name = item.CobolName ?? "FILLER";
+            if (ScreenExternalClassItem(item, name)) continue;
+            ScreenBasedClassObjectItem(item, name);
+        }
+    }
+
+    /// <summary>§13.18.22.3 SR4 — "The EXTERNAL clause shall not be specified for a data item of class object or
+    /// pointer." True when it reported. One screen for the WRITTEN-entry loop and the TYPE-entry loop of
+    /// <see cref="CheckUsageDeclarations"/>: the class is the entry's COMPOSED one, however it was acquired.</summary>
+    private bool ScreenExternalClassItem(DataItem item, string name)
+    {
+        if (!(item.HasExternalClause && SlotWindow.CarriedBySlot(item))) return false;
+        Edition.Error(DiagnosticCatalog.ExternalPointerOrObjectItem, $"data item '{name}' is described "
+            + $"with USAGE {Sr14PhraseNameOf(item)} — of class "
+            + $"{(item.Pic!.Category is PicCategory.ObjectReference ? "object" : "pointer")} — and with "
+            + "the EXTERNAL clause; the EXTERNAL clause shall not be specified for a data item of class "
+            + "object or pointer (ISO §13.18.22.3 SR4)");
+        return true;
+    }
+
+    /// <summary>§13.18.5.3 SR1 — "The subject of the entry shall not be of class object." True when it reported;
+    /// the twin of <see cref="ScreenExternalClassItem"/>, shared by the same two loops.</summary>
+    private bool ScreenBasedClassObjectItem(DataItem item, string name)
+    {
+        if (!(item.IsBased && item.Pic is { Category: PicCategory.ObjectReference })) return false;
+        Edition.Error(DiagnosticCatalog.BasedSubjectOfClassObject, $"data item '{name}' is described "
+            + "with USAGE OBJECT REFERENCE — of class object — and with the BASED clause; the subject "
+            + "of a BASED entry shall not be of class object (ISO §13.18.5.3 SR1)");
+        return true;
     }
 
     /// <summary>SR14's subject test — "an ELEMENTARY data item", which §8.5.1.3.2 settles structurally: an entry

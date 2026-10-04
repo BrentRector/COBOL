@@ -64,6 +64,54 @@ internal sealed class ClosedFormatPass(EditionContext edition) : CursorFollowing
     /// method list with literal tokens rather than the <c>procedureDivision</c> rule.</summary>
     public override object? VisitProcedureDivision(CobolParserCore.ProcedureDivisionContext ctx) => null;
 
+    /// <summary>⛔ THE OTHER HALF OF A CLOSED FORMAT — an element the figure prints ONCE, written twice (kb/Work
+    /// PB917). Every rule node's clause children are screened against <see cref="ClauseCardinalities"/>: the
+    /// parse-tree walk reaches every written entry (level-88 and level-66 entries, which return from
+    /// <c>BindEntry</c> early, included), and a new clause list is one table row.</summary>
+    public override object? VisitChildren(Antlr4.Runtime.Tree.IRuleNode node)
+    {
+        if (node is ParserRuleContext container) ScreenClauseRepetition(container);
+        return base.VisitChildren(node);
+    }
+
+    /// <summary>Count the elements <paramref name="container"/>'s clause children fill and diagnose each that is
+    /// written more than once (ISO §5.2.6.2, §5.2.7), through the ONE <see cref="UnrepeatedElements"/> reader the
+    /// RD entry already uses. Reported at the SECOND occurrence — the one that makes the entry non-conforming.</summary>
+    private void ScreenClauseRepetition(ParserRuleContext container)
+    {
+        Dictionary<(string Clause, object Element), (ClauseList List, int Count, ParserRuleContext First, ParserRuleContext Second)>? seen = null;
+        for (int i = 0; i < container.ChildCount; i++)
+        {
+            if (container.GetChild(i) is not ParserRuleContext clause
+                || !ClauseCardinalities.ByClauseContext.TryGetValue(clause.GetType(), out var list)
+                || ClauseCardinalities.ElementOf(list, clause) is not { } element) continue;
+            seen ??= [];
+            var key = (list.Clause, element);
+            seen[key] = seen.TryGetValue(key, out var prior)
+                ? (list, prior.Count + 1, prior.First, prior.Count == 1 ? clause : prior.Second)
+                : (list, 1, clause, clause);
+        }
+        if (seen is null) return;
+        foreach (var (list, count, first, second) in seen.Values)
+        {
+            if (count < 2) continue;
+            using var at = _edition.At(second);
+            string owner = OwnerName(container) is { Length: > 0 } n ? $" '{n}'" : "";
+            UnrepeatedElements.AtMostOnce(_edition, count, $"{list.Subject}{owner}",
+                $"the clause '{WrittenOpening(first)}'", list.Clause);
+        }
+    }
+
+    /// <summary>The first words of a clause as the programmer wrote them (at most 32 characters), to name it in the message.</summary>
+    private static string WrittenOpening(ParserRuleContext clause)
+    {
+        string text = clause.Start?.InputStream is { } chars && clause.Stop is { } stop
+            ? chars.GetText(new Antlr4.Runtime.Misc.Interval(clause.Start.StartIndex, stop.StopIndex))
+            : clause.GetText();
+        text = string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return text.Length <= 32 ? text : text[..32] + "…";
+    }
+
     /// <summary>THE refusal. The format is identified by the PARENT context — the alternative list the error
     /// production was written into — so one visitor serves every closed format and a new one needs no arm.</summary>
     public override object? VisitUnrecognizedClause(CobolParserCore.UnrecognizedClauseContext ctx)
@@ -122,9 +170,10 @@ internal sealed class ClosedFormatPass(EditionContext edition) : CursorFollowing
     /// <c>fileDescriptionEntry</c> must report ITS data-name, not the file's.</para></summary>
     private static string? OwnerName(ParserRuleContext ctx)
     {
-        for (var p = ctx.Parent; p is not null; p = p.Parent)
+        for (RuleContext? p = ctx; p is not null; p = p.Parent)   // the nearest ancestor-or-self: a clause container asks for its own entry
             switch (p)
             {
+                case CobolParserCore.ReportGroupEntryContext r: return r.dataName()?.GetText();
                 case CobolParserCore.DataDescriptionEntryContext d: return d.dataName()?.GetText();
                 case CobolParserCore.FileDescriptionEntryContext f: return f.fileName()?.GetText();
                 case CobolParserCore.SortMergeDescriptionEntryContext s: return s.fileName()?.GetText();

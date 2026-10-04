@@ -1738,8 +1738,11 @@ IMAGE storage, the same promotion a group move's receiver gets, and `InitialStat
 a USAGE DISPLAY item holds the fill CHARACTERS, a BINARY / COMP-5 / PACKED item the fill BYTES (the fill character's
 byte by the storage-byte law — HIGH-VALUES is 0xFF), a Tier-B window the same, and a floating-point carrier the value
 its fill bytes encode. An item under a VALUE (its own or a group's) is not promoted: action 2 overwrites the
-background there. **Residual (kb/Work PB1134):** an INDEX cell, a NATIONAL-usage numeric item and an OO method's
-LOCAL-STORAGE numeric item still take their zero. Class object / message-tag / pointer take NULL, which §13.18.63.4
+background there. A USAGE INDEX item's eight bytes take the fill byte (`InitialStateBackground.Seed`), a NATIONAL-usage
+numeric item is promoted like any other (kb/Work PB1466), and an OO method's LOCAL-STORAGE is walked at bind time under
+the method's effective OPTIONS clause (`StorageFormPass` step 5b); `PhysicalModel`'s member memo is keyed by that
+initial-state context too (the OPTIONS model in force and the activation's LOCAL-STORAGE roots), so a method-local
+group is not answered from the class-level entry (kb/Work PB1134, no residual). Class object / message-tag / pointer take NULL, which §13.18.63.4
 GR4 c) states as a positive requirement; USAGE BIT keeps its packed ceil(n/8) zero seed (D19). **With NO clause the
 seed is byte-unchanged** — `PicInfo.DefaultInitializer`
 remains the §11.9.10.4 GR6 baseline it correctly is, which is the invariant covering the entire existing corpus.

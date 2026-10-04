@@ -373,7 +373,10 @@
   "pb1299_report_group_census_legal",
   "pb1299_report_summary_control_footing_only",
   "pb1295_report_sum_groups_then_reset_rounded",
-  "pb1474_report_subscripts_legal"
+  "pb1474_report_subscripts_legal",
+  "pb1246_level_hierarchy_legal",
+  "pb917_clause_lists_repeat_where_printed",
+  "pb1217_block_contains_ordered_range"
  ],
  "pending": []
 }

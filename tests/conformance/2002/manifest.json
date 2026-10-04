@@ -680,7 +680,8 @@
   "pb1292_source_operand_forms",
   "pb1456_counter_in_source_expression",
   "pb1222_report_arrangement_present_when",
-  "pb1270_report_or_page_upper_limit"
+  "pb1270_report_or_page_upper_limit",
+  "pb1212_composed_entry_class_rules_legal"
   ],
   "pending": []
 }

@@ -974,6 +974,20 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
             if (stack.Count == 0)
             {
+                // ⛔ A RECORD BEGINS AT LEVEL 1 (kb/Work PB1246). An entry that finds no open item to join is the first
+                // entry of a record description, and ISO §13.11.1 says what that is: "the first of which shall have
+                // level-number 1" (§13.18.33.4 GR1: "The level-number 1 identifies the first entry in each record
+                // description, type declaration, or report group"). A 77 is the one other entry that stands alone
+                // (§8.5.1.3.2 item 3, a noncontiguous item, "not subdivisions of other items, and … not themselves
+                // subdivided", assigned the special level-number 77) — and because it is
+                // pushed on this stack with its own number, a 02-49 entry written after it pops it and arrives HERE
+                // too, which is the "77 is not subdivided" half of the same rule. Before this the arm rooted the item
+                // at whatever level it carried, silently: `05 A PIC X.` as a section's first entry compiled and ran.
+                if (item.Level is not (1 or 77))
+                    Edition.Error(DiagnosticCatalog.LevelNumberHierarchy, $"'{item.CobolName ?? "FILLER"}': level-number "
+                        + $"{item.Level} opens no record — the first entry of a record description shall have level-number 1 "
+                        + "(ISO §13.11.1, §13.18.33.4 GR1), and a level-77 item is not itself subdivided "
+                        + "(ISO §8.5.1.3.2); a level-number 2 through 49 entry shall follow an entry it can be subordinate to");
                 renamesBegun = false;   // a new record (or 77): the previous record's RENAMES entries are over
                 // A TYPEDEF entry is a type DECLARATION (ISO §13.18.58; D17): a named level-01 template that
                 // allocates NO storage — registered in TypeDecls, kept OFF Roots (and, below, off ByName).
@@ -1002,6 +1016,17 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     Edition.Error(DiagnosticCatalog.TypeDeclarationShape, $"TYPEDEF on '{item.CobolName ?? "FILLER"}': the TYPEDEF clause "
                         + "shall be specified only in a level-01 record-description entry (ISO §13.18.58)");
                 var parent = stack.Peek();
+                // ⛔ ONE LEVEL-NUMBER FOR ALL OF A GROUP'S IMMEDIATE MEMBERS (kb/Work PB1246). ISO §8.5.1.3.2: "All items
+                // that are immediately subordinate to a given group item shall be described using numerically equal
+                // level-numbers greater than the level-number used to describe that group item." The pop loop above
+                // already guarantees "greater than"; this is the "numerically equal" half — `01 G. 05 A. 03 B.` bound B
+                // under G beside A, two members of one group at two levels. The first member sets the group's level.
+                if (parent.Children.Count > 0 && parent.Children[0].Level != item.Level)
+                    Edition.Error(DiagnosticCatalog.LevelNumberHierarchy, $"'{item.CobolName ?? "FILLER"}': level-number "
+                        + $"{item.Level} is not the level-number {parent.Children[0].Level} of the other items immediately "
+                        + $"subordinate to the group '{parent.CobolName ?? "FILLER"}' — all items immediately subordinate "
+                        + "to a given group item shall be described using numerically equal level-numbers "
+                        + "(ISO §8.5.1.3.2)");
                 if (renamesBegun) ScreenEntryAfterRenames(item.CobolName);   // §13.18.45.3 SR2 (kb/Work PB1283)
                 // §13.18.57.3 SR2 (review DEVLOG 664 fix #2): a TYPE-clause entry shall not be followed immediately by
                 // a subordinate entry — the entry IS the whole type (§13.18.57.4 GR1). Without this the explicit
@@ -2092,12 +2117,20 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// {CHARACTERS | RECORDS}</c>). The clause models nothing — the physical block is implementor-defined — but each
     /// <c>integer-n</c> is an operand a constant-name may stand for (§13.10.3 SR2), and a constant that is not an integer,
     /// is zero or is undefined is the program's error whether or not the clause changes the I-O, so each goes through
-    /// THE integer-n reader like every other position (kb/Work PB1948).</summary>
+    /// THE integer-n reader like every other position (kb/Work PB1948). The pair is ORDERED: §13.18.10.3 SR1 (kb/Work PB1217).</summary>
     private void BindBlockContainsClause(Core.BlockContainsClauseContext bc, string fileName)
     {
         using var _ = Edition.At(bc);
+        var values = new List<long?>();
         foreach (var operand in bc.integerOperand())
-            IntegerOperandValue(operand, $"file '{fileName}' BLOCK CONTAINS clause");
+            values.Add(IntegerOperandValue(operand, $"file '{fileName}' BLOCK CONTAINS clause"));
+        // ⛔ §13.18.10.3 SR1 — "If integer-1 is specified, integer-2 shall be greater than integer-1." The ORDERED-PAIR
+        // rule RECORD CONTAINS / RECORD IS VARYING already states for their pairs (RecordClauseRules, SR5 / SR9), under
+        // the same code: equal bounds break it as surely as inverted ones (kb/Work PB1217). An operand whose reading was
+        // refused (null) is already reported, so the pair is judged only when both are known.
+        if (values is [{ } integer1, { } integer2] && integer2 <= integer1)
+            Edition.Error(DiagnosticCatalog.FileClauseSizeRange, $"file '{fileName}': the BLOCK CONTAINS clause states "
+                + $"{integer1} TO {integer2}; integer-2 shall be greater than integer-1 (ISO §13.18.10.3 SR1)");
     }
 
     /// <summary>Bind a LINAGE clause into <see cref="FileModel.Linage"/> (ISO §13.18.34: <c>LINAGE IS
@@ -3405,12 +3438,17 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             else
                 item.ExternalFromType = true;   // §13.18.22 GR3
         }
-        // §13.18.22 SR5: when a record description is an external item, an associated type declaration that is
-        // strongly typed shall also be external.
-        if (item.HasExternalClause && template.TypedefStrong && !template.IsExternalTypedef)
-            Edition.Error(DiagnosticCatalog.ExternalTypeRule, $"'{subject}': an EXTERNAL record described with "
-                + $"STRONG type '{typeName}' requires that type declaration to be external too "
-                + "(ISO §13.18.22.3 SR5)");
+        // §13.18.22.3 SR5: "When a record description is an external item, any associated type declaration that is
+        // strongly typed shall also be external." ⛔ The predicate is "the record IS an external item" — its own EXTERNAL
+        // clause, OR the record of an EXTERNAL file (§13.18.22.4 GR4 b)), which carries no clause and is exactly the
+        // case the rule's NOTE names ("a file is declared as external and the associated record descriptions have TYPE
+        // clauses") — and "any associated type declaration" reaches a TYPE clause on a subordinate entry too, so it
+        // is asked of the item's RECORD, not of the item alone (kb/Work PB1212).
+        if (IsInExternalRecord(item) && template.TypedefStrong && !template.IsExternalTypedef)
+            Edition.Error(DiagnosticCatalog.ExternalTypeRule, $"'{subject}': a record that is an external item "
+                + $"(its own EXTERNAL clause, or the record of an EXTERNAL file) is described with STRONG type "
+                + $"'{typeName}', which requires that type declaration to be external too "
+                + "(ISO §13.18.22.3 SR5, §13.18.22.4 GR4 b))");
         // VCR 16, the STRENGTH half (§13.16.3 SR13 ¶2; Annex E.2 item 10; the P13 review finding C9): "If the
         // CONSTANT RECORD clause is specified with the EXTERNAL clause, there shall also be a TYPE clause that
         // specifies a STRONGLY typed definition." The declaration-site check (BindEntry) can verify only TYPE
@@ -3974,6 +4012,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         var root = item;
         while (root.Parent is { } p) root = p;
         return Files.Any(f => f.Records.Contains(root));
+    }
+
+    /// <summary>Whether the RECORD an item belongs to is an external item (ISO §13.18.22.3 SR5; §13.18.22.4 GR4 b)):
+    /// the record carries the EXTERNAL clause itself, takes it from an external type declaration (GR3), or is the
+    /// record of an <c>FD … IS EXTERNAL</c> file, whose record descriptions are external though they write no clause.</summary>
+    private bool IsInExternalRecord(DataItem item)
+    {
+        var root = item;
+        while (root.Parent is { } p) root = p;
+        return root.HasExternalClause || root.ExternalFromType || Files.Any(f => f.IsExternal && f.Records.Contains(root));
     }
 
     /// <summary>True when the item's description (subordinates included) contains a USAGE OBJECT REFERENCE

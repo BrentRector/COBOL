@@ -1409,9 +1409,14 @@ public static class DiagnosticCatalog
     // stage. The id is retired, never reallocated.
 
     // ── COBOLNET0899 — Report Writer, semantic validation (genuine errors on the shared code) ─────────
+    /// <summary>COBOLNET2772 — a report group description entry stands before any level-1 entry of its RD (kb/Work
+    /// PB1246). It sat on the shared not-implemented code, which read an illegal-source refusal as a staged feature.</summary>
     public static readonly DiagnosticDescriptor ReportGroupBefore01 = new(
-        NotImplemented, "report-group-before-01", EditionSeverity.Error,
-        "A report group entry appears before any 01-level entry.", "ISO §13.15");
+        "COBOLNET2772", "report-group-before-01", EditionSeverity.Error,
+        "A report group entry appears before any 01-level entry. \"The first entry that follows a report "
+        + "description entry shall be a level 1 entry.\" (§13.15.3 SR4); §13.18.33.4 GR1 says the same of the first "
+        + "entry in each report group.",
+        "ISO §13.15.3 SR4 / §13.18.33.4 GR1");
     public static readonly DiagnosticDescriptor ReportPageTypeRequiresPage = new(
         NotImplemented, "report-page-type-requires-page", EditionSeverity.Error,
         "A PAGE HEADING/FOOTING group, or a control heading with the OR PAGE phrase, requires a PAGE clause defining "
@@ -1719,13 +1724,15 @@ public static class DiagnosticCatalog
         + "SD entry, \"66, 88, or 1 through 49\"; SR4, report group description entries subordinate to an RD "
         + "entry, \"1 through 49\"; SR5, entries in the working-storage, local-storage and linkage sections, "
         + "\"66, 77, 88, or 1 through 49\"; SR6, screen description entries, \"1 through 49\". SR3 (\"A "
-        + "level-number in the range of 1 through 9 may be specified as 01 through 09\") is a spelling permission, "
-        + "so the screen tests the VALUE and the 01–09 forms pass. §4.2.2 is why this is a COMPILE-time "
+        + "level-number in the range of 1 through 9 may be specified as 01 through 09\") is a spelling permission "
+        + "and the only leading-zero form: §8.3.2.2.13 expresses a level-number \"as a one-digit or two-digit "
+        + "number\", so the screen tests the VALUE and the SPELLING (`001` is not a level-number; kb/Work PB1246). "
+        + "§4.2.2 is why this is a COMPILE-time "
         + "diagnostic: an implementation \"shall provide a warning mechanism that optionally may be invoked by the "
         + "user at compile time to indicate violations of the general formats and the explicit syntax rules\". "
         + "The common cause is the MicroFocus/GnuCOBOL level-78 constant, which ISO does not define — the "
         + "conforming spelling is the §13.10 CONSTANT entry, `01 name CONSTANT AS literal.`",
-        "ISO §13.18.33.3");
+        "ISO §13.18.33.3 / §8.3.2.2.13");
     // The SECOND level-number axis: the entry FORMAT. §13.18.33.3 above bounds the level-number by the SECTION;
     // §13.18.33.4 GR2 and §13.16.3 bound it by the general format the entry is WRITTEN in, and the two are
     // independent — 78 in working-storage is a section violation, `05 R RENAMES A THRU B.` is a format one and its
@@ -4387,17 +4394,20 @@ public static class DiagnosticCatalog
     /// <c>RECORD IS VARYING IN SIZE FROM 0</c> is legal COBOL and draws nothing. A NEGATIVE lower bound cannot be
     /// written at all: §5.5 1) makes every <c>integer-n</c> an unsigned literal and the general format spells it
     /// with the grammar's unsigned <c>integerLiteral</c>, so the minus sign is refused at parse.</para></summary>
-    public static readonly DiagnosticDescriptor RecordClauseSizeRange = new(
-        "COBOLNET2009", "record-clause-size-range", EditionSeverity.Error,
-        "A RECORD clause states a maximum record size that is not greater than its minimum. ISO §13.18.43.3 "
+    public static readonly DiagnosticDescriptor FileClauseSizeRange = new(
+        "COBOLNET2009", "file-clause-size-range", EditionSeverity.Error,
+        "A file description clause states an ordered integer pair whose upper bound is not greater than its lower. "
+        + "ISO §13.18.43.3 "
         + "syntax rule 5 requires \"Integer-3 shall be greater than integer-2\" of the Format 2 "
         + "(RECORD IS VARYING IN SIZE FROM integer-2 TO integer-3) clause, and syntax rule 9 requires "
         + "\"Integer-5 shall be greater than integer-4\" of the Format 3 (RECORD CONTAINS integer-4 TO "
-        + "integer-5) clause. Equal bounds break the rule as surely as inverted ones — the standard says "
+        + "integer-5) clause; §13.18.10.3 SR1 requires of BLOCK CONTAINS [integer-1 TO] integer-2 that "
+        + "\"If integer-1 is specified, integer-2 shall be greater than integer-1\" (kb/Work PB1217). Equal bounds "
+        + "break the rule as surely as inverted ones — the standard says "
         + "GREATER, not \"greater than or equal\", and a fixed-size file is written in Format 1. Until "
-        + "kb/Work PB721 an inverted range compiled clean and the program learned about it only as an I-O "
+        + "kb/Work PB721 an inverted RECORD range compiled clean and the program learned about it only as an I-O "
         + "status '44' from §13.18.43.4 GR14 a) at run time, on the first WRITE.",
-        "ISO §13.18.43.3 SR5 / SR9");
+        "ISO §13.18.43.3 SR5 / SR9; §13.18.10.3 SR1");
 
     /// <summary>COBOLNET2010 — a record description entry of the file describes a record whose size falls outside
     /// the range the FD's RECORD clause states: ISO §13.18.43.3 SR3 (Format 1) and SR4 (Format 2, whose single
@@ -6450,6 +6460,35 @@ public static class DiagnosticCatalog
         + "entry (SR5) nor to an entry within a CONSTANT RECORD (SR6); and data-name-3 does not begin before "
         + "data-name-2 and ends after it (SR11).",
         "ISO §13.18.45.3 SR2, SR3, SR5, SR6, SR11");
+
+    /// <summary>COBOLNET2771 — a data description entry stands at a position in the record hierarchy its level-number
+    /// cannot take (kb/Work PB1246): it opens a record at a level other than 1 (§13.11.1, §13.18.33.4 GR1) — a
+    /// section or FD whose first entry is level 2-49, or a level 2-49 entry written after a level-77 item, which is
+    /// not itself subdivided (§8.5.1.3.2) — or it joins a group whose other immediate members carry a different
+    /// level-number (§8.5.1.3.2: "numerically equal level-numbers"). The set of level-numbers a SECTION admits is
+    /// COBOLNET1746, the FORMAT axis is COBOLNET1747; this is the POSITION axis, which only the binder's nesting
+    /// walk can decide. One code for the family; the message names the rule.</summary>
+    public static readonly DiagnosticDescriptor LevelNumberHierarchy = new(
+        "COBOLNET2771", "level-number-hierarchy", EditionSeverity.Error,
+        "A level-number is out of position in the record hierarchy. A record description entry \"consists of a set of "
+        + "data description entries, the first of which shall have level-number 1\" (§13.11.1; §13.18.33.4 GR1: \"The "
+        + "level-number 1 identifies the first entry in each record description, type declaration, or report group\"), "
+        + "and a level-77 item is neither a subdivision of another item nor itself subdivided (§8.5.1.3.2), so a "
+        + "level 2 through 49 entry has to follow an entry it is subordinate to. \"All items that are immediately "
+        + "subordinate to a given group item shall be described using numerically equal level-numbers greater than "
+        + "the level-number used to describe that group item\" (§8.5.1.3.2).",
+        "ISO §13.11.1 / §13.18.33.4 GR1 / §8.5.1.3.2");
+
+    /// <summary>COBOLNET2770 — a SOURCE clause identifier-1 violates one of its operand syntax rules (kb/Work PB1293):
+    /// the implicit MOVE of §13.18.53.4 GR1 from identifier-1 to the printable item is not a valid MOVE (§13.18.53.3
+    /// SR2), or identifier-1 references a variable-length group (SR8). One code for the rule family; the message names
+    /// the rule and carries the §14.9.25.3 refusal that made the MOVE invalid.</summary>
+    public static readonly DiagnosticDescriptor ReportSourceOperandRule = new(
+        "COBOLNET2770", "report-source-operand-rule", EditionSeverity.Error,
+        "A SOURCE clause identifier-1 violates one of its operand syntax rules. Without the ROUNDED phrase it shall be "
+        + "described such that a MOVE statement is valid with identifier-1 as the sending operand and the printable item "
+        + "as the receiving operand (SR2), and it shall not reference a variable-length group (SR8).",
+        "ISO §13.18.53.3 SR2, SR8");
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

@@ -37,8 +37,9 @@ namespace CobolNet.CodeGen;
 /// move's receiver gets) and its image is the fill: a USAGE DISPLAY item holds the fill CHARACTERS, a BINARY /
 /// COMP-5 / PACKED item holds the fill BYTES (the fill character's byte by the storage-byte law — HIGH-VALUES is
 /// 0xFF), and a floating-point item's native carrier takes the value its fill bytes encode (it holds every IEEE bit
-/// pattern). The residuals, each documented on kb/Work PB1134: an INDEX cell, a NATIONAL-usage numeric item and an
-/// OO method's LOCAL-STORAGE numeric item keep their zero. Two carve-outs, each from a RULE rather than from
+/// pattern). A USAGE INDEX item's eight bytes take the fill byte, a NATIONAL-usage numeric item is promoted to its
+/// image like any other (kb/Work PB1466), and an OO method's LOCAL-STORAGE is walked under the method's own
+/// effective OPTIONS clause (<c>StorageFormPass</c> step 5b). Two carve-outs, each from a RULE rather than from
 /// convenience:</para>
 /// <list type="bullet">
 ///   <item><b>Class object / message-tag / pointer take NULL, never the fill.</b> §13.18.63.4 GR4 c) states this
@@ -122,6 +123,13 @@ internal sealed class InitialStateBackground(EmitContext ctx)
         if (FillFor(item) is not { } fill) return null;
         if (CharacterFormed(pic)) return FillRun(fill, pic.Length);
         if (pic.Category is not PicCategory.Numeric) return null;
+        // A USAGE INDEX data item holds EIGHT bytes — its value is the signed big-endian integer of those bytes (the INDEX
+        // byte form, PicInfo.StorageWidth) — so every one of them takes the fill character's BYTE (kb/Work PB1134).
+        if (pic.Usage is Usage.Index)
+        {
+            ulong bytes = CobolNet.Runtime.StorageByte.ToByte(fill) * 0x0101010101010101UL;
+            return $"unchecked((long)0x{bytes:X16}UL)";
+        }
         // A numeric item's storage takes the fill too (owner decision R53): DISPLAY storage holds the fill
         // CHARACTER, a byte form holds the fill character's BYTE (the storage-byte law — HIGH-VALUES is 0xFF).
         char unit = pic.Usage is Usage.Display ? fill : CobolNet.Runtime.StorageByte.ToChar(CobolNet.Runtime.StorageByte.ToByte(fill));
@@ -134,7 +142,7 @@ internal sealed class InitialStateBackground(EmitContext ctx)
             string image = FillRun(unit, item.ImageWidth);
             return item.Class is not null ? image : RuntimeApi.NumParseImageFloat(image, item.ProfileName, pic.IsSingle);
         }
-        return null;   // INDEX / national-usage numeric / method LOCAL-STORAGE: kb/Work PB1134's documented residual
+        return null;   // a Numeric shape with no image form and no native seed here
     }
 
     /// <summary>Whether this item's storage is a run of CHARACTER POSITIONS that a fill character can occupy —

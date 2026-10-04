@@ -89,6 +89,17 @@ internal static class StorageFormPass
                     if (init.Governs(root, workingStorageRoot: false, localStorageRoot: true))
                         AddBackgroundFilled(root, promoted);
             }
+        // (5b) THE SAME BACKGROUND OVER AN OO METHOD'S LOCAL-STORAGE (kb/Work PB1134, ISO §13.6.4 GR2 → §11.9.10): a
+        //      method binds its LOCAL-STORAGE into its OWN roots, which the program's LocalStorageRoots never list,
+        //      and it may carry its OWN OPTIONS paragraph, which overrides the class's (§11.9.4 GR1; kb/Work PB1215).
+        //      The method's EFFECTIVE clause is the one the emitter seeds with (OoEmitter: MethodOptions, else the
+        //      unit's), so the promotion decision and the seed read the same clause.
+        foreach (var d in ctx.AllBindersAndInterfaces())
+            foreach (var root in d.OoMethodScopedRoots)
+                if (root.RootSection == EntrySection.LocalStorage && d.OoRootOwner.TryGetValue(root, out var method)
+                    && (method.MethodOptions ?? d.Options).Initialize is { HasFill: true } methodInit
+                    && methodInit.Governs(root, workingStorageRoot: false, localStorageRoot: true))
+                    AddBackgroundFilled(root, promoted);
         return promoted;
 
         static void AddBackgroundFilled(DataItem item, HashSet<DataItem> promoted)

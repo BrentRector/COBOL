@@ -1962,8 +1962,9 @@ reallocated).
 > time and takes the fill as its storage — USAGE DISPLAY the fill characters, BINARY / COMP-5 / PACKED the fill
 > byte in every byte (HIGH-VALUES is the byte 0xFF, A.1 item 31), so `INITIALIZE ALL TO X"5A"` leaves a `PIC 9(4)`
 > item holding `ZZZZ` and a `PIC 9(4) COMP` item holding X'5A5A'; a floating-point item takes the value its fill
-> bytes encode. **Residual, documented on kb/Work PB1134:** an INDEX cell, a NATIONAL-usage numeric item and an
-> OO method's LOCAL-STORAGE numeric item still take their zero. **Two carve-outs, each from a RULE and not from convenience:** class
+> bytes encode; a USAGE INDEX item's eight bytes each take the fill byte, a NATIONAL-usage numeric item is promoted
+> like any other, and an OO method's LOCAL-STORAGE is walked under the method's own effective OPTIONS clause (kb/Work
+> PB1134 — no residual remains). **Two carve-outs, each from a RULE and not from convenience:** class
 > object / message-tag / pointer take NULL, because GR4 c) states that as a positive requirement in the same
 > sentence; and USAGE BIT keeps its packed ceil(n/8) zero seed (D19 / kb/Work PB43), because its storage is
 > packed bytes laid out by the §8.5.1.6.3 walk rather than a run of character positions.

@@ -167,7 +167,7 @@ internal static class RecordClauseRules
             (f, c, _) => $"{f.EntryFace} '{f.CobolName}': the RECORD IS VARYING IN SIZE clause states "
                 + $"FROM {c.Lower} TO {c.Upper}; {c.UpperName} shall be greater than {c.LowerName} "
                 + "(ISO §13.18.43.3 SR5)",
-            DiagnosticCatalog.RecordClauseSizeRange),
+            DiagnosticCatalog.FileClauseSizeRange),
 
         // SR4, arm 1 of 2 — "neither records that contain a LESSER number of bytes than that specified by
         // integer-2". A record description's SMALLEST size is GR8 a)'s: every occurs-depending table at its
@@ -204,7 +204,7 @@ internal static class RecordClauseRules
             (f, c, _) => $"{f.EntryFace} '{f.CobolName}': the RECORD CONTAINS clause states "
                 + $"{c.Lower} TO {c.Upper}; {c.UpperName} shall be greater than {c.LowerName} "
                 + "(ISO §13.18.43.3 SR9)",
-            DiagnosticCatalog.RecordClauseSizeRange),
+            DiagnosticCatalog.FileClauseSizeRange),
     ];
 
     /// <summary>The table, for <c>RecordClauseRuleDriftTests</c> — the only reason it is not private.</summary>

@@ -17,8 +17,25 @@ internal sealed class PhysicalModel(EmitContext ctx)
     /// <summary>Memoized physical-field list per group item — the cache that turns the otherwise-exponential
     /// nested-group emission (width and init recursively recomputing each other) into linear time. The root forest
     /// is cached separately in <see cref="_rootPhysCache"/>.</summary>
-    private readonly Dictionary<(DataItem Owner, Subscripts Subs, SeedRecipe Recipe), IReadOnlyList<Physical>> _physCache = [];
+    private readonly Dictionary<(DataItem Owner, Subscripts Subs, SeedRecipe Recipe, object? Options, object? Activation), IReadOnlyList<Physical>> _physCache = new(new PhysKeyComparer());
     private IReadOnlyList<Physical>? _rootPhysCache;
+
+    /// <summary>The memo key's equality: every reference member by IDENTITY (the OPTIONS model is a value-equal record, and
+    /// hashing it on every group lookup would put its structural hash on the emitter's hottest path), the occurrence
+    /// context and the recipe by value.</summary>
+    private sealed class PhysKeyComparer
+        : IEqualityComparer<(DataItem Owner, Subscripts Subs, SeedRecipe Recipe, object? Options, object? Activation)>
+    {
+        public bool Equals((DataItem Owner, Subscripts Subs, SeedRecipe Recipe, object? Options, object? Activation) a,
+                           (DataItem Owner, Subscripts Subs, SeedRecipe Recipe, object? Options, object? Activation) b) =>
+            ReferenceEquals(a.Owner, b.Owner) && a.Subs.Equals(b.Subs) && a.Recipe == b.Recipe
+            && ReferenceEquals(a.Options, b.Options) && ReferenceEquals(a.Activation, b.Activation);
+
+        public int GetHashCode((DataItem Owner, Subscripts Subs, SeedRecipe Recipe, object? Options, object? Activation) k) =>
+            HashCode.Combine(System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(k.Owner), k.Subs, k.Recipe,
+                k.Options is null ? 0 : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(k.Options),
+                k.Activation is null ? 0 : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(k.Activation));
+    }
 
     /// <summary>The composed-initializer back-edges (set once by <see cref="DataEmitter"/> — the physical
     /// model, the VALUE initializers, and the image codec are mutually recursive by design: a field's Init is
@@ -67,7 +84,12 @@ internal sealed class PhysicalModel(EmitContext ctx)
     /// linear (width and init otherwise recompute each other exponentially).</para></summary>
     /// <param name="recipe">The seed recipe the members' <see cref="Physical.Init"/> compose by — the OTHER input
     /// Init varies on (kb/Work PB1267), so it is part of the memo key; everything else in a Physical is still the
-    /// declaration's alone.</param>
+    /// declaration's alone. ⛔ A THIRD INPUT is the INITIAL-STATE CONTEXT (kb/Work PB1134): the OPTIONS clause in force
+    /// (<c>Data.Options</c>) and the LOCAL-STORAGE roots of the activation being emitted (<c>ActivationLocalRoots</c>)
+    /// decide what a VALUE-less item is filled with (<c>InitialStateBackground</c>). <c>OoEmitter</c> swaps both for an OO
+    /// method's LOCAL-STORAGE, so the key carries them: without that a method-local group's members were answered from the
+    /// entry the CLASS-level emission cached first, with no background, and a group under a method's
+    /// <c>INITIALIZE LOCAL-STORAGE</c> clause kept its zeros while the method's elementary roots took the fill.</param>
     public IReadOnlyList<Physical> PhysicalChildrenOf(DataItem owner, Subscripts subs = default,
         SeedRecipe recipe = SeedRecipe.InitialState)
     {
@@ -77,7 +99,7 @@ internal sealed class PhysicalModel(EmitContext ctx)
         // with it — one entry per group everywhere else, one per (group, occurrence tuple) on the spine, which
         // is proportional to the source the emitter writes for that table anyway. The recipe adds at most one
         // entry per group inside an INITIALIZED dynamic-capacity table's element.
-        var key = (owner, owner.ContainsTableValue ? subs : default, recipe);
+        var key = (owner, owner.ContainsTableValue ? subs : default, recipe, (object?)ctx.Data.Options, (object?)ctx.ActivationLocalRoots);
         if (_physCache.TryGetValue(key, out var cached)) return cached;
         ListBuilds++;
         var list = BuildPhysicals(owner.Children, subs, recipe).ToList();

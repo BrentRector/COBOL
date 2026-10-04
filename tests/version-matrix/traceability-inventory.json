@@ -7836,13 +7836,13 @@
   "ordinal": 1,
   "subject": "Levels",
   "rule-digest": "dff05847ffdd",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntries; src/Cobol.Net.Compiler/Validation/LevelNumberPass.cs#CheckEntryFormat",
-  "test-ref": "conformance:85/pb485_level_number_legal_forms",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntries; src/Cobol.Net.Compiler/Binding/DataBinder.RenamesEntry.cs#ScreenRenamesPlacement",
+  "test-ref": "conformance:85/pb485_level_number_legal_forms; conformance:negative/pb1283-renames-after-77; conformance:negative/pb1283-renames-entry-mid-record",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1246 (registrar 15b). Rule (cite.py --check 8.5.1.3.2 OK: 'Three types of entries exist for which there is no true concept of level' / '1) Entries that specify elementary items or groups introduced by a RENAMES clause.'). The binder's BindEntries walk handles lvl==66 BEFORE the nesting stack: BindRenames records the alias on the owning record and `continue`s, so a 66 entry neither opens nor closes a group and is never numerically compared to 1-49 levels (66 > 05 would otherwise nest it). The 66 is also the 'entry describing the item' for a following 88 (SR24 b exclusion) without entering the stack. Probe p1 (pinned cobol.exe, --std 2023): `01 G. 05 GA PIC X VALUE \"Y\". 88 GA-YES ... 05 GB PIC X VALUE \"Z\". 66 GR RENAMES GA THRU GB. 01 H. ...` -> FUNCTION LENGTH(G)=2, DISPLAY GR='YZ', following record H unaffected (LENGTH 2) - spec-expected. The level-66 <-> renames-format pairing is LevelNumberPass (§13.18.33.4 GR2b). Covering test pb485_level_number_legal_forms (COBOL-85) writes `66 R-ALL RENAMES H10 THRU H2.` after record H followed by 77/88/01 entries and asserts R-ALL='XYZPQ' and the later items intact - expected values derived from the spec. || REFUTED: PARTIAL — The levelless half holds. BindEntries takes lvl==66 before the nesting stack, so a 66 neither opens nor closes a group. But the adjudicator's evidence also leaned on the renames-format pairing (§13.18.33.4 GR2b: a 66 'may be used only as described by the renames format'), and the constraints that make a 66 legitimately levelless are not enforced. (1) SR2 placement: a 66 written in the middle of a record, followed by a further 05, compiles silently, and the 05 is re-attached to the still-open record (LENGTH(R)=2). (2) SR5: a 66 after a 77 attaches to the 77 as its 'owning record', because _lastRoot counts a 77 as a record. `66 RX RENAMES X` over a 77 compiles and runs. BindRenames' _lastRoot model treats a 77 as a record, and a 77 is exactly the entry that has no record. Those defects belong mainly to the sibling rules §13.18.45.3 SR2/SR5, but they show that the 66's 'no concept of level' is modelled as 'transparent to the stack', not as 'a trailing alias of the preceding 01 record'. The golden pins only the legal trailing-66 shape. [code-location note: (lvl == 66 arm: BindRenames, never pushed on the level stack); code-location note: (66 <-> renames format)] || editions as written by the adjudicator: 85,2002,2014,2023",
-  "state": "GAP"
+  "notes": "(kb/Work PB1246, PB1283) The level-less 66 is a trailing alias of the preceding record; a mid-record 66 followed by a data entry and a 66 after a 77 are refused COBOLNET2740 (PB1283), re-probed on this build. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Renames.cs (the file name was mistyped in this wave's own first batch; the placement screen lives in DataBinder.RenamesEntry.cs)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.3.2-2",
@@ -7851,13 +7851,13 @@
   "ordinal": 2,
   "subject": "Levels",
   "rule-digest": "6a67bde495c0",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntries; src/Cobol.Net.Compiler/Validation/LevelNumberPass.cs#LevelNumberRules.Classify",
-  "test-ref": "conformance:negative/pb485-level-77-file-section",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntries",
+  "test-ref": "conformance:negative/pb485-level-77-file-section; conformance:negative/pb1246-subdivided-level-77; conformance:negative/pb1246-unequal-sibling-levels",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1246 (registrar 15b). Rule (cite.py --check 8.5.1.3.2 OK: '2) Entries that specify noncontiguous working-storage, local storage, and linkage data items.'; with §13.18.33.4 GR2a OK and §13.18.33.3 SR2 OK). Two halves, both verified. (a) SECTION: LevelNumberRules.Table admits 77 only on the NoncontiguousCapable arm (WS / LS / linkage entry / linkage procedure parameter); an FD/SD record entry, report group and screen entry at 77 get COBOLNET1746 - negative golden pb485-level-77-file-section (+ pb485-level-77-screen-section). (b) NO LEVEL: BindEntries treats a 77 as nest level 1, so it always pops to a root and is never subordinate to an open item although 77 > every 1-49 level. Probes (pinned cobol.exe): p1 `01 R. 05 A PIC X. 77 X PIC 9 VALUE 7.` -> LENGTH(R)=1, MOVE \"ZZ\" TO R leaves X=7 (X is not part of R); p6 LOCAL-STORAGE `01 LR. 05 LA. 77 LX PIC 9. 88 LX-4` -> LENGTH(LR)=1, LX-4 true; LINKAGE `01 KR. 05 KA. 77 KX PIC X(3).` in a called program, USING KX KR -> KX='ABC', LENGTH(KR)=1. The 'not themselves subdivided' constraint on the 77 is stated in item 3's sentence and adjudicated there (GR-8.5.1.3.2-3). || REFUTED: PARTIAL — The section half is verified, and negative golden pb485-level-77-file-section pins it. The 'no level' half is not. The 77 is pushed on the nesting stack with Level=77, so a following 02-49 entry pops it by NUMERIC comparison (77 >= 5) and, finding the stack empty, silently becomes an independent ROOT at level 05. `77 X PIC 9. 05 Y PIC X.` compiles and runs at 85, 2002 and 2023 with no diagnostic. So does `01 R. 05 A. 77 X. 05 B.`, where B becomes a separate root and does not rejoin R (LENGTH(R)=1). Per §8.5.1.3.2 a 77 is 'not themselves subdivided', and per §13.18.33.4 GR1 level 1 identifies the first entry of each record, so a 02-49 entry after a 77 is nonconforming source that must be diagnosed. It is instead silently given a level-less root. The cited test-ref pins only the section arm. [code-location note: (nestLevel = item.Level == 77 ? 1 : item.Level); code-location note: / Table (SR5 NoncontiguousCapable admits 77; code-location note: do not)] || editions as written by the adjudicator: 85,2002,2014,2023 (the local-storage arm from 2002, where LOCAL-STORAGE exists) || code-location text dropped (not a repo path): SR2/SR4/SR6",
-  "state": "GAP"
+  "notes": "(kb/Work PB1246) The 77 is never subordinate (nestLevel 1) and nothing is subordinate to it (COBOLNET2771); the immediate members of a group carry numerically equal level-numbers (8.5.1.3.2), COBOLNET2771.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.3.2-3",
@@ -7866,13 +7866,13 @@
   "ordinal": 3,
   "subject": "Levels",
   "rule-digest": "2eaf9cbcc13e",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntries; src/Cobol.Net.Compiler/Validation/LevelNumberPass.cs#CheckEntryFormat",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntries",
+  "test-ref": "conformance:negative/pb1246-subdivided-level-77; conformance:negative/pb1246-section-first-entry-not-level-1",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1246 (registrar 15b). Rule: item 3 (condition-names have no true concept of level) plus the three level-number assignment sentences (cite.py --check 8.5.1.3.2 OK for each: '...for the purpose of re-grouping data items have been assigned the special level-number 66.'; 'Entries that specify noncontiguous data items that are not subdivisions of other items, and are not themselves subdivided, have been assigned the special level-number 77.'; '...condition-names to be associated with particular values of a conditional variable have been assigned the special level-number 88.'). VERIFIED: 88 is outside the hierarchy - BindEntries' lvl==88 arm records the association against lastDescribed and never touches the level stack; probe p1 `01 H. 88 H-AB VALUE \"AB\". 05 HA PIC X VALUE \"A\". 05 HB PIC X VALUE \"B\".` -> LENGTH(H)=2 and H-AB true; `05 GA ... 88 GA-YES ... 05 GB` -> LENGTH(G)=2, GA-YES true (the 88 neither made GA a group nor closed G). 66/88 format pairing enforced by LevelNumberPass (§13.18.33.4 GR2b/GR2c). 77 'not subdivisions of other items' verified (p1: 77 after an open 05 is a root). NOT VERIFIED / DIVERGES: 77 'are not themselves subdivided' has no failure branch. Probe p4 (pinned cobol.exe, --std 2023): `01 R. 05 A PIC X. 77 X PIC X VALUE \"X\". 05 B PIC X VALUE \"B\".` compiles clean and runs (LENGTH(R)=1, DISPLAY B='B'): the 05 entry written under the 77 is silently promoted to a standalone ROOT because BindEntries pops the stack to empty (77 >= 5) and an empty stack makes ANY entry a root, whatever its level. Probe p2 (`77 X PIC X. 05 Y PIC X.`) is identical at --std 85 and 2023. The spec leaves such an entry no legal reading: it is either a subdivision of the 77 (forbidden by this sentence and §13.13 'provided they do not need to be further subdivided', cite OK) or the first entry of a record description, which §13.11.1 requires to have level-number 1 (cite OK: 'the first of which shall have level-number 1'); §13.5.2's WS general format admits only 77-level, constant, record-description and type-declaration entries. Expected: a compile-time diagnostic. Only the p3 shape (`77 G.` with no PICTURE, then `05 A`) is rejected, and only incidentally by COBOLNET0881 (§13.16.3 SR8, no PICTURE on the now-elementary G). Two halves, one failing -> PARTIAL; finding 'levels-root-entry-level-unchecked'. No existing spec-derived test covers the subdivision half. [code-location note: (lvl == 88 arm; code-location note: pop for 77 and for a following 02-49 entry)] || editions as written by the adjudicator: 85,2002,2014,2023 || code-location text dropped (not a repo path): nestLevel/stack",
-  "state": "GAP"
+  "notes": "(kb/Work PB1246) A level 2-49 entry after a level-77 item pops the 77 and reaches the empty-stack root arm, which refuses a root that is not level 1 or 77 (COBOLNET2771); the 77 is not subdivided.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.4-1",
@@ -19731,13 +19731,13 @@
   "ordinal": 1,
   "subject": "BASED clause",
   "rule-digest": "c732f44ff623",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#CheckUsageDeclarations; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ConformanceForest",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#CheckUsageDeclarations; src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#ScreenBasedClassObjectItem",
+  "test-ref": "conformance:negative/pb1212-based-type-of-class-object; conformance:2002/pb1212_composed_entry_class_rules_legal",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1212, 14d). cite.py --check 13.18.5.3 'The subject of the entry shall not be of class object.' OK §13.18.5.3 1). The direct spelling is enforced: E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/based/sr1b.cob `01 O USAGE OBJECT REFERENCE BASED.` -> COBOLNET1797 (golden conformance:negative/pb231-based-object-reference). Pointer classes are correctly admitted (sr1e.cob POINTER/PROGRAM-POINTER BASED runs). UNDER-REJECTS the TYPE spelling: sr1c.cob / sr1f.cob `01 T USAGE OBJECT REFERENCE TYPEDEF. 01 O TYPE T BASED.` compiles clean and runs (prints 'O NULL'/'END'). §13.16.3 SR14 lists BASED among the clauses a TYPE entry may carry, and §13.18.57.4 GR1 makes the effect 'as though the data description identified by type-name-1 had been coded in place of the TYPE clause', so O is of class object and SR1 is violated. Mechanism: the SR1 screen lives in CheckUsageDeclarations, which walks ConformanceForest - the WRITTEN-entry forest that prunes TYPE-clone subtrees (TypeAnchor != null) - but SR1 is a COMPOSED-entry rule (BASED written at the reference site, class object from the template), exactly the class of rule the ConformanceForest doc says belongs on CompositionForest. The SAME AS spelling is rejected by §13.16.3 SR12 (correct). Expected: a COBOLNET1797 at O.",
-  "state": "GAP"
+  "notes": "(kb/Work PB1212) The class-object screen is asked of the entries that DIRECTLY carry a TYPE clause too (the composed-entry loop), by the same code as the written-entry loop.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.5.3-2",
@@ -20031,13 +20031,13 @@
   "ordinal": 1,
   "subject": "BLOCK CONTAINS clause",
   "rule-digest": "fcfef0a2e846",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#blockContainsClause; src/Cobol.Net.Compiler/Validation/IntegerOperandPass.cs#Slots",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindBlockContainsClause; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#FileClauseSizeRange",
+  "test-ref": "conformance:negative/pb1217-block-contains-inverted-range; conformance:negative/pb1217-block-contains-equal-bounds; conformance:85/pb1217_block_contains_ordered_range",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1217, 14d). cite.py --check 13.18.10.3 \"If integer-1 is specified, integer-2 shall be greater than integer-1.\" -> OK §13.18.10.3 1). Nothing checks it: IntegerOperandPass classifies BlockContainsClauseContext as Nonzero only (its comment 'SR1 orders them' names the rule but no code enforces it), and no other src site reads blockContainsClause. Probes (pinned cobol.exe, --std 85 and --std 2023): 'FD F1 BLOCK CONTAINS 10 TO 5 CHARACTERS.' and 'FD F1 BLOCK CONTAINS 5 TO 5 RECORDS.' both compile with NO diagnostic and run (display ABCDEFGHIJ). Expected from spec: a compile-time error for each (5 is not greater than 10; 5 is not greater than 5). Since CONFORMANCE A.3 row 5 CLAIMS the element, §4.2.6 requires 'all associated syntax' be implemented - inertness (A.3 item 5) excuses the runtime effect, not the syntax rule. harm: under-rejects. Sibling contrast: RECORD CONTAINS's inverted range is refused (negative pb721-record-contains-inverted-range). Probe sources: out13/probe/block-contains-clause/BCINV.cob, BCEQ.cob. || Editions (adjudicator): 1985, 2002, 2014, 2023 (clause present unchanged in every edition; Annex E records no change to 13.18.10)",
-  "state": "GAP"
+  "notes": "(kb/Work PB1217) BLOCK CONTAINS integer-1 TO integer-2 with integer-2 not greater than integer-1 is refused COBOLNET2009, the code the RECORD clause's ordered pairs (13.18.43.3 SR5/SR9) already share.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.10.4-1",
@@ -21621,13 +21621,13 @@
   "ordinal": 4,
   "subject": "EXTERNAL clause",
   "rule-digest": "f1a4663f029b",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs",
-  "test-ref": "conformance:negative/pb231-external-pointer-item; conformance:2014/pb1026_external_out_of_line_records",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#CheckUsageDeclarations; src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#ScreenExternalClassItem",
+  "test-ref": "conformance:negative/pb231-external-pointer-item; conformance:2014/pb1026_external_out_of_line_records; conformance:negative/pb1212-external-type-of-class-pointer; conformance:negative/pb1212-external-type-of-class-object; conformance:2002/pb1212_composed_entry_class_rules_legal",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1212, 14d). §13.18.22.3 SR4: \"The EXTERNAL clause shall not be specified for a data item of class object or pointer.\" (cite.py OK §13.18.22.3 4)). Enforced as COBOLNET1796 when the entry's OWN USAGE makes it class pointer/object: probes SR4P (USAGE POINTER EXTERNAL), SR4PP (PROGRAM-POINTER), SR4OR (OBJECT REFERENCE), SR4TYE (a USAGE POINTER TYPEDEF with EXTERNAL) all rejected. DEFECT (under-rejects): a data item that is class pointer BY ITS TYPE CLAUSE escapes - probe SR4TY `01 PT USAGE POINTER TYPEDEF.` + `01 A TYPE PT EXTERNAL.` compiles and runs (OK) with no diagnostic, though A is an elementary item of class pointer with the EXTERNAL clause specified. Expected: COBOLNET1796. Register: kb/Work PB1043 (open adjudication) claims this row for a DIFFERENT question (does SR4 reach a pointer-class record of an EXTERNAL FD, which carries no EXTERNAL clause of its own - this adjudicator's reading: the rule's words are 'the EXTERNAL clause shall not be specified for', so an FD record on which no EXTERNAL clause is specified is outside SR4; recorded for PB1043, not decided here). The TYPE-derived escape is a separate mechanism and is reported as its own finding. || Editions (adjudicator): 2002, 2014, 2023 (classes object and pointer arrive with USAGE POINTER / OBJECT REFERENCE at 2002) || Code sites (adjudicator detail): src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs (§13.18.22.3 SR4 block, SlotWindow.CarriedBySlot)",
-  "state": "GAP"
+  "notes": "(kb/Work PB1212) EXTERNAL on an entry whose class pointer/object comes from its TYPE clause is refused COBOLNET1796, as the direct spelling is.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.22.3-5",
@@ -21636,13 +21636,13 @@
   "ordinal": 5,
   "subject": "EXTERNAL clause",
   "rule-digest": "42030ccc9839",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ExpandType",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ExpandType; src/Cobol.Net.Compiler/Binding/DataBinder.cs#IsInExternalRecord",
+  "test-ref": "conformance:negative/pb1212-external-file-record-strong-type; conformance:2002/pb1212_composed_entry_class_rules_legal",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1212, 14d). §13.18.22.3 SR5: \"When a record description is an external item, any associated type declaration that is strongly typed shall also be external.\" + NOTE \"This covers the situation where a file is declared as external and the associated record descriptions have TYPE clauses.\" (cite.py OK §13.18.22.3 5) for both). The check keys on item.HasExternalClause - the record's OWN clause - so it covers the WS case (probe SR5WS `01 W TYPE ST EXTERNAL.` with ST TYPEDEF STRONG -> COBOLNET1558) but misses exactly the case the NOTE names: probe SR5FD `FD F IS EXTERNAL.` / `01 R TYPE ST.` with `01 ST TYPEDEF STRONG.` (non-external) compiles and runs clean at 2023. Expected: COBOLNET1558. The record of an EXTERNAL FD is an external item by §13.18.22.4 GR4 b) without carrying the clause. The existing conformance-test TypedefResidueTests.ExternalRecordWithNonExternalStrongType_Rejected1558 covers only the WS half, so the row cannot close on it (two halves, one verified and defective on the other). || Editions (adjudicator): 2002, 2014, 2023 (type declarations 2002+; external data items may be strongly typed from 2023, Annex E.3.3 20)) || Code sites (adjudicator detail): src/Cobol.Net.Compiler/Binding/DataBinder.cs#ExpandType (SR5 check: item.HasExternalClause && template.TypedefStrong && !template.IsExternalTypedef)",
-  "state": "GAP"
+  "notes": "(kb/Work PB1212) The predicate is 'the record is an external item': its own EXTERNAL clause, an external type, or the record of an EXTERNAL file (13.18.22.4 GR4 b)); asked of the item's record so a subordinate TYPE clause is reached too.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.22.4-1",
@@ -22806,13 +22806,13 @@
   "ordinal": 1,
   "subject": "Level-number",
   "rule-digest": "bf9296f45ce8",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntries; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ReportGroupBefore01; src/Cobol.Net.Compiler/Binding/DataBinder.cs#TypeDeclarationShape",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntries; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry",
+  "test-ref": "conformance:negative/pb1246-section-first-entry-not-level-1; conformance:negative/pb1246-fd-first-entry-not-level-1; conformance:negative/l1m8-report-first-entry-not-level-1; conformance:85/pb1246_level_hierarchy_legal",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1246, 14d). GR1: \"The level-number 1 identifies the first entry in each record description, type declaration, or report group.\" (cite.py --check 13.18.33.4 rule 1 -> OK); its obligation form is §13.11.1 \"A record description entry consists of a set of data description entries, the first of which shall have level-number 1\". Arms: (a) Level 1 STARTS a record: BindEntries pops the nesting stack on level <= open level, so each 01 opens a new root (probe p5: `01 G ... 01 H ...` -> two records, prints ABC) - conforms. (b) Type declaration: `05 T TYPEDEF.` is refused COBOLNET1529 (probe p7) - conforms. (c) Report group: an RD whose first entry is `02 DL TYPE DETAIL` is refused (probe p6), via ReportGroupBefore01 whose descriptor sits in the COBOLNET0899 NotImplemented band citing ISO §13.15 - the refusal is right, the code band says not-implemented. (d) Record description: DEFECT. BindEntries' `if (stack.Count == 0)` makes ANY first entry a root whatever its level, and no screen tests that the first entry of a record description is level 1. Probes: p2 WORKING-STORAGE `05 A PIC X VALUE \"A\". 05 B PIC X VALUE \"B\".` with no 01 compiles clean and prints AB at 85/2002/2014/2023; p3 `FD F. 05 R PIC X(4).` compiles clean. Expected: a compile-time diagnostic - the first data description entry of each record description shall have level-number 1 (§13.11.1, §13.18.33.4 GR1). Harm: under-rejects. || Editions (adjudicator): 85, 2002, 2014, 2023 (type declaration arm 2002+ with TYPEDEF; report group arm with Report Writer A.4.11)",
-  "state": "GAP"
+  "notes": "(kb/Work PB1246) A record description whose first entry is not level 1 is refused COBOLNET2771 at the binder's nesting walk (the empty-stack root arm); the report-group arm's refusal moved from the shared not-implemented code to COBOLNET2772.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.33.4-2",
@@ -27726,13 +27726,13 @@
   "ordinal": 2,
   "subject": "SOURCE clause",
   "rule-digest": "2b578ec97a81",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Compiler/Binding/MoveTable16.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#FieldReferenceSource",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#ScreenSourceIdentifier; src/Cobol.Net.Compiler/Binding/MoveTable16.cs#Validity",
+  "test-ref": "conformance:negative/pb1293-source-numeric-to-alphabetic; conformance:negative/pb1293-source-alphabetic-to-numeric; conformance:2023/pb1293_report_source_move_valid",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1293. \"If identifier-1 is specified without the ROUNDED phrase, identifier-1 shall be described such that a MOVE statement is valid with identifier-1 as the sending operand and the printable item as the receiving operand.\" (cite.py --check 13.18.53.3 OK SR2; validity per §14.9.25.3 SR10 Table 16, cite.py OK). MoveTable16.Validity - the one MOVE validity chain used by MoveBinder, INITIALIZE, CORRESPONDING, ACCEPT - has NO caller in the report lane. Probes: n4 `COLUMN 12 PIC A(2) SOURCE WS-NUM` (numeric integer -> alphabetic: Table 16 'No') compiles clean and prints `00`; n4b `PIC 9(2) SOURCE WS-AL` (alphabetic -> numeric: 'No') compiles clean and prints `00`. The control n4c `MOVE WS-NUM TO WS-R2` (PIC A) in the procedure division IS refused COBOLNET0819. Expected: a compile-time diagnostic. Under-rejects (finding F3). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (Report Writer: 85 optional module, 2023 optional element A.4.11; the 2023 Annex E lists no SOURCE-clause change; the multi-operand / SOURCES / arithmetic-expression forms are 2002 introductions per docs/VERSION_CHANGE_REFERENCE - not derivable from the 2023 text itself) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports (FieldDataSource arm) retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference (BindSourceReference is deleted (kb/Work PB1292); identifier-1 is FieldReferenceSource, bound by the one operand binder a MOVE's sending operand takes - the verdict and every other field of the row are untouched)",
-  "state": "GAP"
+  "notes": "(kb/Work PB1293) A SOURCE identifier-1 written without ROUNDED is asked of the ONE MOVE validity chain (MoveTable16.Validity: SR2, SR6-SR9, Table 16) with the entry's printable item as the receiver, COBOLNET2770; an entry with no COLUMN clause has no printable item and no receiving operand (GR3).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.53.3-3",
@@ -27816,13 +27816,13 @@
   "ordinal": 8,
   "subject": "SOURCE clause",
   "rule-digest": "cc90a5a90e8d",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#FieldReferenceSource",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ReportWriterBinder.cs#ScreenSourceIdentifier",
+  "test-ref": "conformance:negative/pb1293-source-variable-length-group",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "Owned by kb/Work PB1293. \"Identifier-1 shall not reference a variable-length group.\" (cite.py --check 13.18.53.3 OK SR8); definition §8.5.1.12.1 'A variable-length group is a group item whose data description has at least one dynamic-length elementary item or dynamic-capacity table as a subordinate item' (cite.py --check 8.5.1.12.1 OK - an ODO group is NOT one; probe n5 with an ODO group correctly compiles). Probe out13/probe/source-clause/n5b: `01 WS-VG2. 05 WS-VD PIC X DYNAMIC LENGTH.` with `COLUMN 12 PIC X(2) SOURCE WS-VG2` COMPILES CLEAN and then CRASHES at GENERATE: NotImplementedCobolFeatureException 'whole-group image of 'WS-VG2' with a dynamic-length / dynamic-capacity member ... deferred'. Control n5c: `MOVE WS-VG2 TO WS-R2` in the procedure division is refused COBOLNET1931 (§14.9.25.3 SR9). Expected: compile-time rejection. Under-rejects, with a run-time crash (finding F3). || Editions (adjudicator's statement, normalized to 2014,2023 by registrar 14e): 2014, 2023 (a variable-length group needs a dynamic-length elementary item or dynamic-capacity table, which do not exist before 2014) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ResolveReports (FieldDataSource arm) retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference (BindSourceReference is deleted (kb/Work PB1292); identifier-1 is FieldReferenceSource - the verdict and every other field of the row are untouched)",
-  "state": "GAP"
+  "notes": "(kb/Work PB1293) identifier-1 referencing a variable-length group is refused COBOLNET2770 (it used to abort at GENERATE with NotImplementedCobolFeatureException); asked of every SOURCE identifier, printable or not.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.53.4-1",
@@ -31806,13 +31806,13 @@
   "ordinal": 1,
   "subject": "Initial and last-used states of data",
   "rule-digest": "c37a5452a99d",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/DataDivision/InitialStateBackground.cs; src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs; src/Cobol.Net.Compiler/CodeGen/DataDivision/GroupImageCodec.cs; src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs#EmitCallMethod",
-  "test-ref": "conformance:2023/pb152_options_initialize_background",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/DataDivision/InitialStateBackground.cs#Seed; src/Cobol.Net.Compiler/Binding/Passes/StorageFormPass.cs#ComputePromotedSet; src/Cobol.Net.Compiler/CodeGen/DataDivision/PhysicalModel.cs#PhysicalChildrenOf",
+  "test-ref": "conformance:2023/pb152_options_initialize_background; conformance:2023/pb1134_options_initialize_index_and_national; conformance:2023/pb1134_method_local_storage_numeric_fill",
   "derivation": "",
   "editions": "2023",
-  "notes": "OWNED BY kb/Work PB1134 (open). Rule (cite.py --check 14.6.2.3.2 OK, action 1): 'If the INITIALIZE clause is specified in the OPTIONS paragraph, the storage allocated for the implied or associated sections is set to the specified-fill-character.' Landed by kb/Work PB152 (InitialStateBackground choke point). Re-verified on every initial-state OCCASION, not only first activation: probe/is1/p1.cob - RECURSIVE unit (static WS, __ResetStatics) and non-recursive unit (fresh instance) with INITIALIZE WORKING-STORAGE TO X\"41\"/X\"42\": VALUE-less A=AAA/BBB on first call, zzz after MOVE, back to AAA/BBB after CANCEL; group G=AA07 proves fill lies UNDER VALUE. probe/is2/p2.cob - INITIALIZE LOCAL-STORAGE TO X\"43\" re-applies on every activation of a cached-singleton program (LA=CCC each call). The SCREEN leg (§11.9.10.4 GR3) belongs to the declined A.4.2 screen facility (CONFORMANCE.md §5, COBOLNET1560 via negative/a42-options-initialize-screen; derived selector screen-handling-only covers it). || REFUTED: PARTIAL — Action 1 sets 'the storage allocated for the implied or associated sections' to the specified-fill-character. Annex E.3.3 item 33 says 'The content is explicitly defined when this clause is specified'. InitialStateBackground.Seed only fills CharacterFormed pictures (alphanumeric, national, numeric-edited, DISPLAY boolean). Every numeric item keeps its zero, including USAGE DISPLAY numeric, whose storage IS character positions. Measured: out/probe/refute-isl/f1.cob, with OPTIONS INITIALIZE WORKING-STORAGE SECTION TO X\"41\" and VALUE-less 01 G (05 N PIC 9(4), 05 X PIC X(2), 05 B PIC 9(4) COMP). DISPLAY G gives '0000AA' plus two NUL bytes; the spec requires every storage position to be X\"41\" ('AAAAAA' plus 0x41 0x41). N=[0000] where 'AAAA' is required, and NN PIC 9(3)=[000]. The CONFORMANCE.md D23 determination (PB152) justifies this with §13.18.63.4 GR4 c), which is the no-clause 'undefined' baseline. It answers a different question from action 1, and §11.9.10.4 GR6 limits that latitude to 'If the INITIALIZE clause is not specified'. The determination was self-chosen, not an owner decision. The alphanumeric, national and edited arms, the section selectivity and the fill-under-VALUE ordering do hold (probe/is1 G=AA07). || editions as adjudicated: 2023 (Annex E.3.3 item 33 'INITIALIZE clause of the OPTIONS paragraph' is new in this edition)",
-  "state": "GAP"
+  "notes": "(kb/Work PB1134) The three residuals are gone: a USAGE INDEX item's eight bytes take the fill byte, a NATIONAL numeric item is promoted like any other (PB1466), and an OO method's LOCAL-STORAGE is walked under the method's effective OPTIONS clause with the physical-field memo keyed by that initial-state context.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.2.3.2-L2.2",
@@ -58686,13 +58686,13 @@
   "ordinal": 0,
   "subject": "Data description entry",
   "rule-digest": "58ea2b8a6f10",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDescriptionClause; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#externalClause; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#unrecognizedClause; src/Cobol.Net.Compiler/Validation/ClosedFormatPass.cs#VisitUnrecognizedClause; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntry; src/Cobol.Net.Compiler/Validation/LevelNumberPass.cs#EntryNameObligation",
-  "test-ref": "conformance:negative/pb487-unrecognized-data-clause; conformance:2002/pb487_aligned_bit_layout; conformance:2002/pb511_external_as_name; conformance:negative/pb511-external-as-below-2002; conformance:negative/pb511-external-as-figurative; unit:DataClauseKindDriftTests.EveryGrammarAlternative_HasADataClauseKind; conformance:negative/pb849-renames-entry-has-no-name; conformance:negative/pb849-condition-name-entry-filler; conformance:negative/pb501-condition-name-entry-has-no-name",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Cst/ClauseCardinality.cs#ClauseCardinalities; src/Cobol.Net.Compiler/Validation/ClosedFormatPass.cs#ScreenClauseRepetition",
+  "test-ref": "conformance:negative/pb487-unrecognized-data-clause; conformance:2002/pb487_aligned_bit_layout; conformance:2002/pb511_external_as_name; conformance:negative/pb511-external-as-below-2002; conformance:negative/pb511-external-as-figurative; unit:DataClauseKindDriftTests.EveryGrammarAlternative_HasADataClauseKind; conformance:negative/pb849-renames-entry-has-no-name; conformance:negative/pb849-condition-name-entry-filler; conformance:negative/pb501-condition-name-entry-has-no-name; conformance:negative/pb917-data-usage-twice; conformance:negative/pb917-condition-value-twice; conformance:85/pb917_clause_lists_repeat_where_printed; unit:ClauseCardinalityDriftTests.EveryClosedFormat_IsARowOrAReviewedExemption",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work/PB917 (open) - registrar 14f re-verdict 2026-09-24 CONFORMS -> PARTIAL: a clause printed once in the general format may be written twice and the last wins silently: 01 A PIC X PIC 9. and 01 B PIC 9 VALUE 1 VALUE 2. compile clean; measured by registrar 14f on 071ff04ea (w58h/p/DUPC.cob). PRIOR CONFORMS notes: RE-VERDICTED, not re-adjudicated: kb/Work PB487's grounds stand -- Format 1 is a CLOSED list of clause slots, rendered from the printed page (PDF p393 / printed folio 363) and matching the transcription exactly, with the residue refused from the ONE ClosedFormatPass (kb/Work PB829). WHAT CHANGED: one of the format's own slots was TRANSCRIBED but not GRAMMARED. Format 1 prints `[ IS EXTERNAL [ AS literal-1 ] ]` and `externalClause` was `IS? EXTERNAL` -- the whole rule -- so a conforming entry that names its external record was `COBOLNET0901: 'AS' is a reserved word` at 2002, 2014 and 2023 alike (kb/Work PB511). The clause now spells the phrase with the SHARED `externalizedNamePhrase`, so it inherits PB303's ONE COBOL-2002 introduction gate (constructs.json externalized-name-as-2002, widened to name this site) and the ONE 13.18.22.3 SR3 literal screen (COBOLNET2156); 13.18.22.4 GR5 is applied at the ONE cell-keying site. ⛔ THE SIBLING ARM WAS FIXED IN THE SAME CHANGE: 13.4.5.2 Formats 1/2/3 print the SAME slot on the FILE description entry and `fileGlobalExternalClause` was `IS? (GLOBAL | EXTERNAL)`, which hid the asymmetry -- the AS phrase rides EXTERNAL only. A closed-format row is a claim about EVERY slot of the figure, so this row's verdict now rests on the slots being SPELT as well as LISTED.",
-  "state": "GAP"
+  "notes": "(kb/Work PB917) The repetition axis: Format 1 prints every clause once with no ellipsis, so a clause written twice is COBOLNET2423 at every level (88 entries included), through the one clause-cardinality table that also covers the report group, FD, SD and file control entries. retired-witness: unit:ClauseCardinalityDriftTests (a test-ref names <Class>.<Method>; the class alone does not resolve)",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.17.2",
@@ -59196,13 +59196,13 @@
   "ordinal": 0,
   "subject": "Level-number",
   "rule-digest": "b3952c0c356a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#levelNumber; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#INTEGERLIT; src/Cobol.Net.Compiler/Validation/LevelNumberPass.cs#VisitLevelNumber",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/LevelNumberPass.cs#VisitLevelNumber",
+  "test-ref": "conformance:negative/pb1246-level-number-three-digits; conformance:85/pb1246_level_hierarchy_legal",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1246, 14d). The general format is the single word `level-number`, whose shape §8.3.2.2.13 defines: \"A level-number, expressed as a one-digit or two-digit number, indicates the hierarchical position of a data item or the special properties of a data description entry.\" (cite.py --check 8.3.2.2.13 -> OK); §13.18.33.3 SR3 adds the 01-09 spelling (--check 13.18.33.3 rule 3 -> OK). The grammar takes levelNumber : INTEGERLIT, and INTEGERLIT is INT_BODY = [0-9]+ (any digit count). LevelNumberPass screens only the parsed VALUE (int.TryParse + Arm.Permits), never the digit COUNT, so a three-or-more-digit spelling whose value is in range is accepted. Probe (pinned cobol.exe, probe/level-number/p1.cob): `001 A PIC X VALUE \"A\".` in WORKING-STORAGE compiles clean and prints A at --std 85/2002/2014/2023. Expected per §8.3.2.2.13: `001` is not a level-number (three digits), so the entry lacks the level-number §13.18.33.3 SR1 requires and a compile-time diagnostic is owed (§4.2.2). The value half conforms: out-of-range values (50, 78, twelve digits) draw COBOLNET1746 and 01-09/1/49/66/77/88 compile (conformance:85/pb485_level_number_legal_forms, negative/pb485-level-number-unparseable). Test-ref left empty because the row diverges on the spelling half. || Editions (adjudicator): 85, 2002, 2014, 2023 (the general format carries no edition marker; §8.3.2.2.13 defines the word in every edition) || Code sites (adjudicator detail): src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#levelNumber; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#INTEGERLIT; src/Cobol.Net.Compiler/Validation/LevelNumberPass.cs#LevelNumberPass.VisitLevelNumber",
-  "state": "GAP"
+  "notes": "(kb/Work PB1246) A level-number is a one-digit or two-digit number (8.3.2.2.13), 01-09 being the only leading-zero spelling (13.18.33.3 SR3): a three-or-more-digit spelling such as 001 is refused COBOLNET1746 at every arm.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.34.2",

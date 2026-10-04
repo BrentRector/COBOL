@@ -91,7 +91,7 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
                     }
                     // The field's operands see every counter in scope at the field (SR2).
                     ctx.Refs.VaryingScope = ScopeOf(f.Varyings.Select(u => u.Counter));
-                    BindSourceOperands(r, f.Sources);
+                    BindSourceOperands(r, f.Sources, f.PrintItem);
                     ctx.Refs.VaryingScope = null;
                 }
             }
@@ -142,8 +142,11 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
     /// (§13.18.53.3 SR5) — §13.18.53.4 GR2's implicit COMPUTE — binds through the same <c>BindExpr</c> a
     /// procedure-division reference takes (the kb/Work PB482 argument: a subscript may be an index-name or an
     /// expression and has no value at data bind), and the ROUNDED phrase resolves through the ONE §14.7.4
-    /// rounding-mode reader (kb/Work PB852).</para></summary>
-    private void BindSourceOperands(ReportModel r, IEnumerable<ReportFieldSource> sources)
+    /// rounding-mode reader (kb/Work PB852).</para>
+    /// <para><paramref name="printable"/> is the entry's printable item — the implicit MOVE's receiving operand
+    /// (§13.18.53.4 GR1) — or null for an entry that defines none (no COLUMN clause: §13.18.53.4 GR3, "the SOURCE
+    /// clause causes no action", so SR2's "the printable item as the receiving operand" has no receiver).</para></summary>
+    private void BindSourceOperands(ReportModel r, IEnumerable<ReportFieldSource> sources, DataItem? printable = null)
     {
         foreach (var source in sources)
             switch (source)
@@ -154,7 +157,8 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
                     var operand = host.Expr.FieldOperand(rs.Ref);
                     // identifier-1 is a data item, so an index-name is no sender (§13.18.53.3 SR2 — a MOVE shall be
                     // valid, and §13.18.38.3 r7 admits an index-name in no MOVE).
-                    if (host.Expr.ScreenIndexNameOperand(operand, rs.Written, $"RD '{r.Name}': SOURCE")) rs.Rejected = true;
+                    if (host.Expr.ScreenIndexNameOperand(operand, rs.Written, $"RD '{r.Name}': SOURCE")
+                        || ScreenSourceIdentifier(r, rs, operand, printable)) rs.Rejected = true;
                     else rs.Value = operand;
                     break;
                 }
@@ -166,6 +170,36 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
                     break;
                 }
             }
+    }
+
+    /// <summary>⛔ THE SOURCE CLAUSE'S identifier-1 RULES THAT NEED ITS BOUND ITEM (kb/Work PB1293), reported under
+    /// COBOLNET2770 and returned as "refused" so the operand is neither bound nor reported twice.
+    /// <list type="bullet">
+    /// <item>ISO §13.18.53.3 SR8 — "Identifier-1 shall not reference a variable-length group", asked of every
+    /// identifier-1, printable entry or not.</item>
+    /// <item>ISO §13.18.53.3 SR2 — "If identifier-1 is specified without the ROUNDED phrase, identifier-1 shall be
+    /// described such that a MOVE statement is valid with identifier-1 as the sending operand and the printable item
+    /// as the receiving operand" (the ROUNDED spelling is a <see cref="FieldComputeSource"/>, SR5). It is §13.18.53.4
+    /// GR1's implicit MOVE, so it is the ONE §14.9.25.3 validity chain every other MOVE asker uses
+    /// (<see cref="MoveTable16.Validity(BoundOperand, Table16Operand, DataItem)"/>: SR2, SR6-SR9 and Table 16), asked
+    /// of the entry's printable item. An entry with no COLUMN clause has no printable item (<paramref name="printable"/>
+    /// null), hence no receiving operand and nothing to ask.</item>
+    /// </list></summary>
+    private bool ScreenSourceIdentifier(ReportModel r, FieldReferenceSource rs, BoundOperand operand, DataItem? printable)
+    {
+        string where = $"RD '{r.Name}': SOURCE {rs.Written}";
+        if (MoveTable16.OperandItem(operand) is { } item && VariableLengthCompatibility.IsVariableLength(item))
+        {
+            ctx.Edition.Error(DiagnosticCatalog.ReportSourceOperandRule, $"{where}: identifier-1 references the "
+                + $"variable-length group '{item.CobolName ?? item.CsName}', which a SOURCE clause shall not name "
+                + "(ISO §13.18.53.3 SR8)");
+            return true;
+        }
+        if (printable is null || MoveTable16.Validity(operand, Table16Operand.Of(printable), printable) is not { } refusal)
+            return false;
+        ctx.Edition.Error(DiagnosticCatalog.ReportSourceOperandRule, $"{where}: the implicit MOVE of §13.18.53.4 GR1 "
+            + $"from identifier-1 to the printable item is invalid — {refusal.Reason} (ISO §13.18.53.3 SR2)");
+        return true;
     }
 
     /// <summary>⛔ THE VALUE EACH ROLLED ADDITION ADDS (ISO §13.18.54.4 GR6; kb/Work PB1294) — bound once every

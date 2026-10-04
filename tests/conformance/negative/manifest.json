@@ -2240,7 +2240,26 @@
   "pb1474-source-subscripted-by-line-counter",
   "pb1474-present-when-subscripted-by-page-counter",
   "pb1474-present-when-subscripted-by-line-counter",
-  "pb1295-sum-expression-subscripted-by-report-item"
+  "pb1295-sum-expression-subscripted-by-report-item",
+  "pb1293-source-numeric-to-alphabetic",
+  "pb1293-source-alphabetic-to-numeric",
+  "pb1293-source-variable-length-group",
+  "pb1246-section-first-entry-not-level-1",
+  "pb1246-fd-first-entry-not-level-1",
+  "pb1246-subdivided-level-77",
+  "pb1246-unequal-sibling-levels",
+  "pb1246-level-number-three-digits",
+  "pb917-data-usage-twice",
+  "pb917-condition-value-twice",
+  "pb917-report-group-picture-twice",
+  "pb917-select-reserve-twice",
+  "pb917-fd-block-contains-twice",
+  "pb1217-block-contains-inverted-range",
+  "pb1217-block-contains-equal-bounds",
+  "pb1212-based-type-of-class-object",
+  "pb1212-external-type-of-class-pointer",
+  "pb1212-external-type-of-class-object",
+  "pb1212-external-file-record-strong-type"
  ],
  "pending": []
 }

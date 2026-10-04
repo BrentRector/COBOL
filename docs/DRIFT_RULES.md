@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-262 drift tests.
+263 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -52,6 +52,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [CheckingScopeDriftTests](../tests/Cobol.Net.Tests.Unit/CheckingScopeDriftTests.cs) | kb/Work PB891 + PB841 — the run-time checking flags are a SCOPE, never a set/reset pair. | `src/Cobol.Net.Compiler/CodeGen`, `src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs`, `src/Cobol.Net.Runtime/Control/ProgramTable.cs` |
 | [CitationAuditSelfTestDriftTests](../tests/Cobol.Net.Tests.Unit/CitationAuditSelfTestDriftTests.cs) | ⛔ THE GATE OVER THE TWO CITATION AUDITS' OWN FIXTURES — scripts/spec/audit_code_citations.py and scripts/spec/audit_doc_citations.py, each driven through its --self-test. | `scripts/spec` |
 | [ClassConditionTableDriftTests](../tests/Cobol.Net.Tests.Unit/ClassConditionTableDriftTests.cs) | ⛔ THE CLASS CONDITION'S ALTERNATIVES ARE ONE LIST, AND THIS TEST IS WHY "ONE" STAYS TRUE. | — |
+| [ClauseCardinalityDriftTests](../tests/Cobol.Net.Tests.Unit/ClauseCardinalityDriftTests.cs) | ⛔ EVERY CLOSED CLAUSE LIST DECIDES "EACH ELEMENT AT MOST ONCE" EXPLICITLY (kb/Work PB917; ISO §5.2.6.2, §5.2.7). | — |
 | [ClauseOperandCaptureDriftTests](../tests/Cobol.Net.Tests.Unit/ClauseOperandCaptureDriftTests.cs) | ⛔ THE STRUCTURAL CLAMP ON HOW A FILE CLAUSE'S data-name OPERAND IS CAPTURED AND RESOLVED (kb/Work PB489). | `src/Cobol.Net.Compiler/Binding/DataBinder.cs`, `src/Cobol.Net.Compiler` |
 | [ClockSeamDriftTests](../tests/Cobol.Net.Tests.Unit/ClockSeamDriftTests.cs) | Every temporal reading in the greenfield tree goes through ONE seam — RunUnit.Current.Clock (DESIGN-runtime-library §2.7). | `src` |
 | [ClosedFormatDriftTests](../tests/Cobol.Net.Tests.Unit/ClosedFormatDriftTests.cs) | ⛔ THE DRIFT GUARD FOR THE GRAMMAR'S LAST TOTAL SINK (kb/Work PB829). | `src/Cobol.Net.Frontend/Grammar` |

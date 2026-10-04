@@ -1179,6 +1179,17 @@ joined the table the same way, which is the table doing its job: a tenth format 
   the error production) AND reflects over the generated parser (every context type carrying an
   `unrecognizedClause()` accessor has a table row, and every row is still carried), so adding a closed format is
   `| unrecognizedClause` plus a table row, and forgetting the row fails the build.
+- **The other half of a closed format — an element printed ONCE, written twice (kb/Work PB917).** A bracket with no
+  ellipsis permits its element at most once (§5.2.6.2, §5.2.7), and the grammar writes only the order licence
+  (`clause*`). `Frontend/Cst/ClauseCardinality.cs` (`ClauseCardinalities.ByClauseContext`) keys the clause lists whose
+  figures were read for ellipses — the §13.16.2 data description entry, the §13.15.2 report group description entry,
+  the §13.4.5.2 file description entry, the §13.4.6.2 SD entry and the §12.4.5.1 file control entry — and names the
+  alternatives that DO repeat (the file control entry's ALTERNATE RECORD KEY and collating-sequence clauses, an
+  error production, the declined validation clauses); `ClosedFormatPass.VisitChildren` counts every clause list's
+  elements against it and reports COBOLNET2423 through the one `UnrepeatedElements` reader the RD entry already uses.
+  `ClauseCardinalityDriftTests` makes the table total: every closed format is a row or a reviewed exemption
+  (SPECIAL-NAMES, I-O-CONTROL, OBJECT-COMPUTER, SOURCE-COMPUTER and the paragraph lists repeat or are not clause
+  lists), so a new closed format cannot arrive without its figure being read for ellipses.
 - **Its second error production — a KNOWN phrase in the WRONG position.** `misplacedSpecialNamesForPhrase`
   (kb/Work PB977) parses a SPECIAL-NAMES `FOR {ALPHANUMERIC | NATIONAL}` phrase written AFTER the definition of an
   ALPHABET, CLASS or SYMBOLIC CHARACTERS clause — a position §12.3.7.2 never prints and no dialect owns — so

@@ -126,7 +126,7 @@ internal static class IntegerOperandRules
             "the declarative section header's segment-number is the 1985 Segmentation module's priority-number")),
 
         // ── DATA DIVISION ───────────────────────────────────────────────────────────────────────────────────
-        [typeof(Core.BlockContainsClauseContext)] = Nonzero,   // §13.18.10 — SR1 orders them; nothing permits 0
+        [typeof(Core.BlockContainsClauseContext)] = Nonzero,   // §13.18.10 — nothing permits 0; SR1 orders them (DataBinder.BindBlockContainsClause)
         [typeof(Core.RecordClauseContext)] = RecordClause,
         [typeof(Core.LinageClauseContext)] = Nonzero,          // §13.18.34 integer-1
         [typeof(Core.LinageFootingPhraseContext)] = Nonzero,   // §13.18.34 integer-2

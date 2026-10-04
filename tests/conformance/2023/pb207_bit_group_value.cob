@@ -32,8 +32,8 @@
       *>   6  BGG m=6  area B"110100"         -> H1(1)=11 H1(2)=01 H1(3)=00      (GR9, every occurrence)
       *>   7  BGH m=8  area B"11010010"       -> J1=1101 J2=0010; the PACKED byte is 0xD2 = 210, so
       *>                                         FUNCTION ORD of the REDEFINES view is 210 + 1 = 211
-      *>   8  BGJ m=10 area B"1100000011"     -> L1=11 L2=11; L2's level number differs from L1's, so it is NOT
-      *>                                         "of the same level" and starts at the next BYTE - bits 2..7 are
+      *>   8  BGJ m=10 area B"1100000011"     -> L1=11 L2=11; L2 is ALIGNED, so it is NOT at the
+      *>                                         next bit position and starts at the next BYTE - bits 2..7 are
       *>                                         8.5.1.6.3 implicit filler and LENGTH(BGJ) is 10, not 4.
       *>   9  NGA m=2  area N"AB"           -> M1=A M2=B        (13.18.29.4 GR2 b), as-if PICTURE N(m))
       *>  10  NGB m=2  area N"A" -> "A "     -> M3=A M4=space    (14.6.8.5 SPACE fill - the other GR7 arm)
@@ -100,14 +100,17 @@
           05 J1C PIC 1(4) VALUE B"1101".
           05 J2C PIC 1(4) VALUE B"0010".
        01 RVK REDEFINES KG PIC X(1).
-      *> 8 - a member whose LEVEL NUMBER differs from its predecessor's: 8.5.1.6.3's second bullet sends it to
-      *> "the first bit position of the first available byte", so the group is 10 bits, not 4.
+      *> 8 - a member that is NOT placed at the next bit position: an ALIGNED clause (13.18.1.4 GR1, "aligned on the
+      *> first bit of the first available byte boundary") sends it to 8.5.1.6.3's "first bit position of the first
+      *> available byte", so the group is 10 bits, not 4.  (This leg used to spell the same layout with members of
+      *> ONE group at two level-numbers, 05 and 03, which 8.5.1.3.2 forbids: "All items that are immediately
+      *> subordinate to a given group item shall be described using numerically equal level-numbers" - kb/Work PB1246.)
        01 BGJ GROUP-USAGE BIT VALUE B"1100000011".
           05 L1 PIC 1(2).
-          03 L2 PIC 1(2).
+          05 L2 PIC 1(2) ALIGNED.
        01 CTJ GROUP-USAGE BIT.
           05 L1C PIC 1(2) VALUE B"11".
-          03 L2C PIC 1(2) VALUE B"11".
+          05 L2C PIC 1(2) ALIGNED VALUE B"11".
       *> 9 / 10 - the OTHER arm of GR7's 14.6.8 dispatch, so the branch cannot drift: a NATIONAL group is
       *> 13.18.29.4 GR2 b)'s as-if PICTURE N(m), category national, and 14.6.8.5 gives it SPACE fill - not the
       *> boolean zero leg 3 pins.  One rule, two receiving categories, both measured.
@@ -126,11 +129,11 @@
       *> assumption the seed rests on - so it is asserted, not argued.
        01 TG GROUP-USAGE BIT VALUE B"1100000011".
           05 T1 PIC 1(2).
-          03 T2 PIC 1(2).
+          05 T2 PIC 1(2) ALIGNED.
        01 TV REDEFINES TG PIC X(2).
        01 TC GROUP-USAGE BIT.
           05 U1 PIC 1(2) VALUE B"11".
-          03 U2 PIC 1(2) VALUE B"11".
+          05 U2 PIC 1(2) ALIGNED VALUE B"11".
        01 UV REDEFINES TC PIC X(2).
        PROCEDURE DIVISION.
        MAIN.
