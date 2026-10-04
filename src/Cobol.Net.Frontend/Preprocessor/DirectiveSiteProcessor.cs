@@ -4,6 +4,7 @@ using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Common;
 using CobolNet.Frontend.Diagnostics;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -49,12 +50,12 @@ public static class DirectiveSiteProcessor
     /// <summary>The directive words whose syntax rules are about the directive's POSITION. ⛔ ONE set: a fourth
     /// such rule is one entry here, and the binder's predicate covers it with no new mechanism.</summary>
     public static readonly IReadOnlySet<string> PositionRuled =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "TURN", "PUSH", "POP" };
+        new HashSet<string>(CobolNames.Comparer) { "TURN", "PUSH", "POP" };
 
     /// <summary>Of those, the ones NO dedicated stage owns, so this stage consumes the line (blank, never
     /// delete — line-count preserving, hazard H3).</summary>
     private static readonly IReadOnlySet<string> Consumed =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "PUSH", "POP" };
+        new HashSet<string>(CobolNames.Comparer) { "PUSH", "POP" };
 
     /// <summary>The directive words whose row carries a PLACEMENT rule (<see cref="ConstructDialectStatus.Placement"/>
     /// — kb/Work PB1377, PB1378, PB1065), DERIVED from the catalog so a directive with a new placement restriction
@@ -62,7 +63,7 @@ public static class DirectiveSiteProcessor
     /// <c>DirectivePlacementPass</c> judges the rules that need the parse tree.</summary>
     private static readonly IReadOnlySet<string> PlacementRuled =
         CompilerDirectiveCatalog.Words.Where(w => CompilerDirectiveCatalog.Find(w)?.Placement is not null)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .ToHashSet(CobolNames.Comparer);
 
     /// <summary>Record the position-ruled directive sites on <paramref name="text"/>, record the PUSH/POP ops the
     /// later stages replay (<see cref="DirectiveStateStack"/>), warn for each unsuccessful named POP (§7.3.20.4

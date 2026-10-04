@@ -8,6 +8,7 @@ using CobolNet.Frontend.Generated;
 namespace CobolNet.Binding.Procedure;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// The ONE procedure table + its builders (P7 Step 10t — the plan's `ProcedureTableBuilder`, per-unit on
@@ -48,7 +49,7 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
     public void AddParagraph(string name, Core.SentenceContext[] sentences, SectionInfo? section, HashSet<string> used)
     {
         ctx.Data.DeclareUserWord(name, UserWordKind.ParagraphName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB65, PB1083)
-        string baseName = "P_" + name.Replace('-', '_').Replace('.', '_');
+        string baseName = "P_" + DataItem.IdentifierCharacters(name.Replace('.', '_'));   // extended letters too (PB1402)
         string method = baseName;
         for (int n = 2; !used.Add(method); n++) method = $"{baseName}_{n}";
         // ⛔ DECLARE, never TryAdd (kb/Work PB466): a repeated spelling is KEPT, so §8.4.2.2.1's "No other name
@@ -403,9 +404,9 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
     // CollectMethodDeclaratives re-makes these four for each method's declaratives: a file named in one
     // method's USE is not "more than one USE statement within the same procedure division" as another's.
     private ConstructOperandRegister<int> _useModes = new();                                      // SR7
-    private ConstructOperandRegister<string> _useFiles = new(StringComparer.OrdinalIgnoreCase);    // SR8
+    private ConstructOperandRegister<string> _useFiles = new(CobolNames.Comparer);    // SR8
     private ConstructOperandRegister<ReportGroupModel> _useReportGroups = new();                   // SR9
-    private ConstructOperandRegister<string> _useEcPairs = new(StringComparer.OrdinalIgnoreCase);  // SR14
+    private ConstructOperandRegister<string> _useEcPairs = new(CobolNames.Comparer);  // SR14
 
     /// <summary>Collect a METHOD's declaratives portion (kb/Work PB1010; ISO §14.2.2 SR10 — "Formats 1 and 2 may be
     /// specified in a source element if and only if that source element is a function definition, a function
@@ -418,9 +419,9 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
     public IReadOnlyList<BoundDeclarative> CollectMethodDeclaratives(Core.ProcedureDivisionContext pd, HashSet<string> used)
     {
         _useModes = new();
-        _useFiles = new(StringComparer.OrdinalIgnoreCase);
+        _useFiles = new(CobolNames.Comparer);
         _useReportGroups = new();
-        _useEcPairs = new(StringComparer.OrdinalIgnoreCase);
+        _useEcPairs = new(CobolNames.Comparer);
         int first = _declaratives.Count;
         foreach (var dp in pd.declarativePart())
             foreach (var sec in dp.declarativeSection())

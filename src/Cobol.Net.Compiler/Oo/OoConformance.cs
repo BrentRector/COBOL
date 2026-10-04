@@ -4,6 +4,7 @@ using CobolNet.Binding;
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
 using CobolNet.Editions.Diagnostics;
+using CobolNet.Runtime;
 
 namespace CobolNet.Compiler.Oo;
 
@@ -96,7 +97,7 @@ public static class OoConformance
 
         void Check(OoClassSymbol cls, IReadOnlyList<OoMethodSymbol> declared, Func<string, OoMethodSymbol?> find)
         {
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seen = new HashSet<string>(CobolNames.Comparer);
             foreach (var accessor in declared)
             {
                 if (accessor.PropertyName is not { } prop || !seen.Add(prop)) continue;
@@ -274,7 +275,7 @@ public static class OoConformance
             string? arm = t.Kind switch
             {
                 RaisingTargetKind.ExceptionName => m2.Raising.Any(u => u.Kind is RaisingTargetKind.ExceptionName
-                    && string.Equals(u.Name, t.Name, StringComparison.OrdinalIgnoreCase)) ? null : "a",
+                    && CobolNames.Same(u.Name, t.Name)) ? null : "a",
                 RaisingTargetKind.ObjectClass => ClassRaisingCovered(table, t, m2.Raising) ? null : "b",
                 _ => InterfaceRaisingCovered(table, t, m2.Raising) ? null : "c",
             };
@@ -302,12 +303,12 @@ public static class OoConformance
         var cls = table.Find(t.Name);
         for (var c = cls; c is not null; c = c.Base)
             if (other.Any(u => u.Kind is RaisingTargetKind.ObjectClass && u.Factory == t.Factory
-                    && string.Equals(u.Name, c.Name, StringComparison.OrdinalIgnoreCase)))
+                    && CobolNames.Same(u.Name, c.Name)))
                 return true;
         if (cls is null) return false;
         var implemented = table.ImplementsClosure(cls, factory: t.Factory);
         return other.Any(u => u.Kind is RaisingTargetKind.Interface
-            && implemented.Any(i => string.Equals(i.Name, u.Name, StringComparison.OrdinalIgnoreCase)));
+            && implemented.Any(i => CobolNames.Same(i.Name, u.Name)));
     }
 
     /// <summary>Rule 9 c) for one interface-name element <paramref name="t"/> of interface-1's phrase.</summary>
@@ -315,7 +316,7 @@ public static class OoConformance
     {
         var listed = other.Where(u => u.Kind is RaisingTargetKind.Interface).ToList();
         if (listed.Count == 0) return false;
-        if (listed.Any(u => string.Equals(u.Name, t.Name, StringComparison.OrdinalIgnoreCase))) return true;
+        if (listed.Any(u => CobolNames.Same(u.Name, t.Name))) return true;
         if (table.FindInterface(t.Name) is not { } iface) return false;
         var seen = new HashSet<OoInterfaceSymbol>();
         var stack = new Stack<OoInterfaceSymbol>(iface.Inherits);
@@ -323,7 +324,7 @@ public static class OoConformance
         {
             var b = stack.Pop();
             if (!seen.Add(b)) continue;
-            if (listed.Any(u => string.Equals(u.Name, b.Name, StringComparison.OrdinalIgnoreCase))) return true;
+            if (listed.Any(u => CobolNames.Same(u.Name, b.Name))) return true;
             foreach (var bb in b.Inherits) stack.Push(bb);
         }
         return false;
@@ -347,7 +348,7 @@ public static class OoConformance
     internal static string? ReturningCircularity(OoClassTable table, OoMethodSymbol m1, string interface1,
         OoMethodSymbol m2, string interface2)
     {
-        if (string.Equals(interface1, interface2, StringComparison.OrdinalIgnoreCase)) return null;
+        if (CobolNames.Same(interface1, interface2)) return null;
         if (ReturningReference(m1) is not { } r1 || ReturningReference(m2) is not { } r2) return null;
         return Reaches(table, r1, interface2) && Reaches(table, r2, interface1)
             ? $"the returning item of this method references '{interface2}' (through '{r1}') and the returning item of "
@@ -370,14 +371,14 @@ public static class OoConformance
     /// interface's INHERITS. Breadth-first with a visited set (kb/Work R63 3.).</summary>
     private static bool Reaches(OoClassTable table, string start, string target)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(CobolNames.Comparer);
         var queue = new Queue<string>();
         queue.Enqueue(start);
         while (queue.Count > 0)
         {
             string node = queue.Dequeue();
             if (!seen.Add(node)) continue;
-            if (string.Equals(node, target, StringComparison.OrdinalIgnoreCase)) return true;
+            if (CobolNames.Same(node, target)) return true;
             if (table.Find(node) is { } cls)
             {
                 foreach (var m in cls.Methods.Concat(cls.FactoryMethods))
@@ -411,7 +412,7 @@ public static class OoConformance
     public static bool InterfaceConformsTo(OoClassTable table, OoInterfaceSymbol interface1, OoInterfaceSymbol interface2)
     {
         if (ReferenceEquals(interface1, interface2)) return true;
-        var mine = new Dictionary<string, OoMethodSymbol>(StringComparer.OrdinalIgnoreCase);
+        var mine = new Dictionary<string, OoMethodSymbol>(CobolNames.Comparer);
         foreach (var p in interface1.AllPrototypes()) mine.TryAdd(p.ExternalizedName, p);   // first declaration wins
         foreach (var m2 in interface2.AllPrototypes())
             if (!mine.TryGetValue(m2.ExternalizedName, out var m1)
@@ -437,7 +438,7 @@ public static class OoConformance
     {
         foreach (var isym in table.Interfaces)
         {
-            var byName = new Dictionary<string, List<(OoInterfaceSymbol Iface, OoMethodSymbol Proto)>>(StringComparer.OrdinalIgnoreCase);
+            var byName = new Dictionary<string, List<(OoInterfaceSymbol Iface, OoMethodSymbol Proto)>>(CobolNames.Comparer);
             foreach (var inherited in isym.InheritedClosure())
                 foreach (var proto in inherited.Prototypes)
                 {
@@ -940,11 +941,11 @@ public static class OoConformance
             case PicCategory.Pointer:
             case PicCategory.ProgramPointer:
             case PicCategory.FunctionPointer:
-                if (!string.Equals(f.RestrictedTypeName, a.RestrictedTypeName, StringComparison.OrdinalIgnoreCase))
+                if (!CobolNames.Same(f.RestrictedTypeName, a.RestrictedTypeName))
                     return $"restricted data-pointer mismatch (formal {PointerRestrictionText(f.RestrictedTypeName, "type")}, "
                         + $"argument {PointerRestrictionText(a.RestrictedTypeName, "type")} — §14.8.2.3.2: if either is a "
                         + "restricted pointer, both shall be restricted and of the same type)";
-                if (!string.Equals(f.RestrictedPrototypeName, a.RestrictedPrototypeName, StringComparison.OrdinalIgnoreCase))
+                if (!CobolNames.Same(f.RestrictedPrototypeName, a.RestrictedPrototypeName))
                     return $"restricted pointer mismatch (formal {PointerRestrictionText(f.RestrictedPrototypeName, "prototype")}, "
                         + $"argument {PointerRestrictionText(a.RestrictedPrototypeName, "prototype")} — §14.8.2.3.2: if either "
                         + "is a restricted pointer, both shall be restricted and of the same type)";
@@ -1014,7 +1015,7 @@ public static class OoConformance
                 return null;
             if (arg is { Kind: ObjectRefKind.ObjectClass, Only: true } && arg.Factory == formal.Factory
                 && InvokedThroughOnlyClass(invokedWith)
-                && string.Equals(arg.Name, invokedWith.Name, StringComparison.OrdinalIgnoreCase))
+                && CobolNames.Same(arg.Name, invokedWith.Name))
                 return null;
             return $"the formal parameter is described ACTIVE-CLASS ({factory} FACTORY) and the argument is "
                 + $"{arg.Spelled}, invoked with {invokedWith.Spelled} — BY REFERENCE the argument shall be a) an "
@@ -1438,7 +1439,7 @@ public static class OoConformance
                                    + "— its presence or absence shall be the same (ISO §14.9.39.3 SR12 a)3.)";
                         // a)1. — an ONLY receiver takes an ONLY sender naming the SAME class, exactly.
                         if (recv.Only)
-                            return send.Only && string.Equals(send.Name, recv.Name, StringComparison.OrdinalIgnoreCase)
+                            return send.Only && CobolNames.Same(send.Name, recv.Name)
                                 ? null
                                 : $"the receiver is described with the ONLY phrase, so the sender shall also be "
                                   + $"described ONLY and with the same object-class-name '{recv.Name}' (the "

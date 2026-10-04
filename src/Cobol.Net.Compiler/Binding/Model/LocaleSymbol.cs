@@ -35,8 +35,9 @@ public sealed record LocaleSymbol(string Name, string External, bool FromLiteral
     /// involving one compares without regard to case. The locale-NAME never enters: two locale-names bound to the
     /// same identification match.</summary>
     public bool SameExternalIdentificationAs(LocaleSymbol other) =>
-        string.Equals(External, other.External,
-            FromLiteral && other.FromLiteral ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+        FromLiteral && other.FromLiteral
+            ? string.Equals(External, other.External, StringComparison.Ordinal)
+            : CobolNames.Same(External, other.External);
 
     public override string ToString() => $"LOCALE {Name} IS {(FromLiteral ? $"\"{External}\"" : External)} → {(Tag.Length == 0 ? "root" : Tag)}";
 }

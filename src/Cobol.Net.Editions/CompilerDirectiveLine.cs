@@ -57,7 +57,7 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
         while (i < s.Length && (s[i] == ' ' || s[i] == '\t')) i++;   // SR5: the space after the indicator is optional
 
         int wordStart = i;
-        while (i < s.Length && (char.IsAsciiLetterOrDigit(s[i]) || s[i] == '-' || s[i] == '_')) i++;
+        while (i < s.Length && CobolCharacterRepertoire.IsWordCharacter(s[i])) i++;   // the ONE lexical word class (PB1402)
         if (i == wordStart) return false;                            // ">>" with no word heads no directive
 
         string word = s[wordStart..i].ToString().ToUpperInvariant();

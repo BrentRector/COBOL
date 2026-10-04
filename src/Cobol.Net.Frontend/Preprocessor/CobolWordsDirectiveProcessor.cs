@@ -5,6 +5,7 @@ using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Common;
 using CobolNet.Frontend.Diagnostics;
 using CobolNet.Frontend.Expressions;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -48,7 +49,7 @@ public static class CobolWordsDirectiveProcessor
         var ops = new List<CobolWordsOp>();
         // SR5 (§7.3.10.3 / D.12.1): a COBOL word may be contained in a literal of at most ONE directive in the
         // group (the modified word AND its substitute both count). First occurrence wins; a repeat is the error.
-        var seenWords = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var seenWords = new Dictionary<string, int>(CobolNames.Comparer);
         bool sawFirstIdDivision = false;
         var state = new DirectiveStateStack(stackOps ?? []).Carry(Constructs.CobolWordsDirective2023,
             new DirectiveValueCarrier<int>(() => ops.Count, keep => ops.RemoveRange(keep, ops.Count - keep)));
@@ -233,13 +234,14 @@ public static class CobolWordsDirectiveProcessor
     }
 
     /// <summary>SR4 (frontend half): the fresh word (literal-2/5/6) is a well-formed user-defined word per
-    /// §8.3.2.2 — letters/digits/hyphens, at least one letter or digit, no leading/trailing hyphen. (Whether it is
-    /// nonetheless reserved/context/intrinsic — the SR4 category bar — is checked in the compiler.)</summary>
+    /// §8.3.2.1 / §8.3.2.2 — the word shape (word characters, the extended letters included, neither hyphen nor
+    /// underscore first or last) and at least one basic or extended letter (kb/Work PB1402 — this admitted only
+    /// letters, digits and hyphens, so the 2002 underscore was refused, and counted a digit as the letter §8.3.2.2
+    /// asks for). (Whether it is nonetheless reserved/context/intrinsic — the SR4 category bar — is checked in the
+    /// compiler.)</summary>
     private static bool UserWord(string word, DiagnosticBag diag, SourceLocation loc)
     {
-        bool ok = word.Length > 0 && word[0] != '-' && word[^1] != '-'
-            && word.All(c => char.IsLetterOrDigit(c) || c == '-')
-            && word.Any(char.IsLetterOrDigit);
+        bool ok = CobolCharacterRepertoire.IsWordShape(word) && word.Any(CobolCharacterRepertoire.IsLetter);
         if (!ok)
             Invalid(diag, loc,
                 $">>COBOL-WORDS: '{word}' is not a valid user-defined word (ISO §7.3.10.3 SR4 / §8.3.2.2)");
@@ -252,7 +254,7 @@ public static class CobolWordsDirectiveProcessor
     // ── operand tokenizer ────────────────────────────────────────────────────────────────────────────────────
     private readonly record struct Tok(string Text, bool IsLiteral, string Prefix)
     {
-        public bool IsKeyword(string kw) => !IsLiteral && Text.Equals(kw, StringComparison.OrdinalIgnoreCase);
+        public bool IsKeyword(string kw) => !IsLiteral && CobolNames.Same(Text, kw);
     }
 
     /// <summary>Split the operand into barewords and quoted literals. A letter run immediately followed by a quote

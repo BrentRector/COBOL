@@ -3,6 +3,7 @@
 using Antlr4.Runtime;
 using CobolNet.Editions;
 using CobolNet.Frontend.Expressions;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Generated;
 
@@ -186,7 +187,7 @@ public abstract class CobolParserCoreBase : Parser
         // receivers named LOCALE and USER-DEFAULT), so that shape keeps its '85 reading below 2002.
         // Keys on the WRITTEN spelling deliberately: the escape is about LEXICAL shape (an underscore is not an
         // '85 word character), so a >>COBOL-WORDS synonym spelled without one correctly falls to the edition test.
-        return cat.Text.StartsWith("LC_", StringComparison.OrdinalIgnoreCase) || Edition.Has(2002);
+        return CobolNames.StartsWith(cat.Text, "LC_") || Edition.Has(2002);
     }
 
     /// <summary>SET identifier-11 TO LOCALE {LC_ALL | USER-DEFAULT} (ISO §14.9.39 Format 12; kb/Work PB92) — a
@@ -709,7 +710,7 @@ public abstract class CobolParserCoreBase : Parser
     /// </summary>
     protected bool parameterPhraseAhead()
         => TokenStream.LT(1) is { Type: CobolLexer.IDENTIFIER } word
-           && word.Text.Equals("PARAMETER", StringComparison.OrdinalIgnoreCase)
+           && CobolNames.Same(word.Text, "PARAMETER")
            && TokenStream.LA(2) == CobolLexer.IDENTIFIER;
 
     /// <summary>

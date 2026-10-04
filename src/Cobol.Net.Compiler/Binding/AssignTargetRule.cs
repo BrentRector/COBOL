@@ -8,6 +8,7 @@ using CobolNet.Frontend.Generated;
 namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// ⛔ THE ONE READER OF THE ASSIGN CLAUSE'S TO-PHRASE LIST — ISO/IEC 1989:2023 §12.4.5.1 (every format writes
@@ -38,7 +39,7 @@ internal static class AssignTargetRule
     /// system named by the operand that follows. KEYBOARD / DISPLAY-style console devices are NOT provided: a
     /// file connector here is always a host file, so such a word would promise a device it cannot deliver.</summary>
     internal static readonly IReadOnlySet<string> DeviceClasses =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "DISK", "PRINTER" };
+        new HashSet<string>(CobolNames.Comparer) { "DISK", "PRINTER" };
 
     /// <summary>The target the TO phrase identifies — the text <c>FileModel.AssignTarget</c> carries to the
     /// runtime — reporting COBOLNET2256 for a list the determination does not allow. On a refused list the LAST

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Text;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding;
 
@@ -133,7 +134,7 @@ public static class ImplementorCodeNames
     public static ImplementorCodeName? Find(string word, bool national)
     {
         foreach (var row in All)
-            if (row.National == national && string.Equals(row.Name, word, StringComparison.OrdinalIgnoreCase))
+            if (row.National == national && CobolNames.Same(row.Name, word))
                 return row;
         return null;
     }

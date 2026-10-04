@@ -12,6 +12,7 @@ using CobolNet.Frontend.Generated;
 namespace CobolNet.Binding.Validation;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// ⛔ THE FORMAT-2 <c>SEARCH ALL</c> OPERAND MODEL and the seven syntax rules written over it (ISO §14.9.37.3
@@ -421,7 +422,7 @@ internal readonly struct SearchAllFormat2Rules(DataBinder data, ReferenceResolve
             next += 2;
         }
         if (toks[0].Type != Core.SUB_IDENTIFIER
-            || !string.Equals(toks[0].Text, firstIndex, StringComparison.OrdinalIgnoreCase)
+            || !CobolNames.Same(toks[0].Text, firstIndex)
             || (table.Indexes.Count > 0
                 && refs.ResolveIndexName(toks[0].Text, quals, toks[0]) is { Outcome: ReferenceResolver.IndexRefOutcome.Resolved } ix
                 && !ReferenceEquals(ix.Decl, table.Indexes[0])))

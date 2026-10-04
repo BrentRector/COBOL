@@ -115,7 +115,7 @@ internal sealed class RoslynBackend : ICodeGenBackend
     {
         string tpa = (string)(AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? "");   // not a compilation input: the host's own framework reference set
         var refs = tpa.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-            .Where(static p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            .Where(static p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))   // not a COBOL word: a file-system extension
             .Select(static p => (MetadataReference)MetadataReference.CreateFromFile(p))
             .ToList();
         // The WiseOwl COBOL runtime the generated program calls (CobolNum / CobolString).

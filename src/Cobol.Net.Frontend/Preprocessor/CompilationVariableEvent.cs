@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Frontend.Expressions;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -38,6 +39,6 @@ public static class CompilationVariableTimeline
     public static CompilationVariableEvent? DefinitionAt(
         this DirectiveTimeline<CompilationVariableEvent> timeline, string name, int siteLine) =>
         timeline.TryLastInEffectBefore(siteLine, ev => ev.Line, out var last,
-            ev => ev.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            ev => CobolNames.Same(ev.Name, name))
         && last.Value is not null ? last : null;
 }

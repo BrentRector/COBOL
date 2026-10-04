@@ -3,6 +3,7 @@
 using CobolNet.Editions;
 using CobolNet.Frontend.Common;
 using CobolNet.Frontend.Diagnostics;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -67,7 +68,7 @@ public static class TurnDirectiveProcessor
     {
         var words = body.SplitSpaces();
         var names = new List<(string Ec, string? File)>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(CobolNames.Comparer);
         bool? on = null;
         bool withLocation = false;
         int checkingEnd = -1;   // the index just past the last word the CHECKING phrase consumed
@@ -75,11 +76,10 @@ public static class TurnDirectiveProcessor
         // §8.3.2.1 applies to DIRECTIVE-carried words too — the tree-walk funnel never sees them, so this was
         // the hole through which a 44-character exception-name compiled at --std 2002 (CobolWordRule; the R05
         // fact that found it). One check per operand word, exception-names and file-names alike.
-        void CheckLength(string w)
+        void CheckWord(string w)
         {
-            if (Common.CobolWordRule.LengthViolation(w, dialectLevel) is { } violation)
-                diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.WordLengthExceeded.Code,
-                    violation, loc, default);
+            foreach (var (code, violation) in Common.CobolWordRule.DirectiveWordViolations(w, dialectLevel))
+                diagnostics.ReportError(code, violation, loc, default);
         }
 
         int k = 0;
@@ -105,7 +105,7 @@ public static class TurnDirectiveProcessor
         for (; k < words.Length; k++)
         {
             string w = words[k];
-            if (w.Equals("CHECKING", StringComparison.OrdinalIgnoreCase))
+            if (CobolNames.Same(w, "CHECKING"))
             {
                 Flush();
                 // { ON [ WITH LOCATION ] | OFF } — the printed diagram (PDF page 115) underlines OFF and LOCATION and
@@ -113,7 +113,7 @@ public static class TurnDirectiveProcessor
                 // and `CHECKING` alone, `CHECKING WITH LOCATION` and `CHECKING LOCATION` select ON, which §7.3.25.4 GR6
                 // says in as many words: "If the ON phrase is specified or implied" (kb/Work PB1365).
                 int q = k + 1;
-                if (q < words.Length && words[q].Equals("OFF", StringComparison.OrdinalIgnoreCase))
+                if (q < words.Length && CobolNames.Same(words[q], "OFF"))
                 {
                     on = false;
                     q++;
@@ -121,10 +121,10 @@ public static class TurnDirectiveProcessor
                 else
                 {
                     on = true;
-                    if (q < words.Length && words[q].Equals("ON", StringComparison.OrdinalIgnoreCase)) q++;
+                    if (q < words.Length && CobolNames.Same(words[q], "ON")) q++;
                     int r = q;
-                    if (r < words.Length && words[r].Equals("WITH", StringComparison.OrdinalIgnoreCase)) r++;
-                    if (r < words.Length && words[r].Equals("LOCATION", StringComparison.OrdinalIgnoreCase))
+                    if (r < words.Length && CobolNames.Same(words[r], "WITH")) r++;
+                    if (r < words.Length && CobolNames.Same(words[r], "LOCATION"))
                     {
                         withLocation = true;   // GR7
                         q = r + 1;
@@ -133,10 +133,10 @@ public static class TurnDirectiveProcessor
                 checkingEnd = q;
                 break;
             }
-            if (w.StartsWith("EC-", StringComparison.OrdinalIgnoreCase))   // SR1 — an EC- word is an exception-name
+            if (CobolNames.StartsWith(w, "EC-"))   // SR1 — an EC- word is an exception-name
             {
                 Flush();
-                CheckLength(w);
+                CheckWord(w);
                 currentEc = w;
             }
             else if (currentEc is not null)
@@ -153,13 +153,13 @@ public static class TurnDirectiveProcessor
                     return null;
                 }
                 // SR4 — a file-name only with an EC-I-O… name.
-                if (!currentEc.StartsWith("EC-I-O", StringComparison.OrdinalIgnoreCase))
+                if (!CobolNames.StartsWith(currentEc, "EC-I-O"))
                     diagnostics.ReportError("COBOLNET0719",
                         $">>TURN: file-name '{w}' specified with exception-name '{currentEc}', which does not begin "
                         + "with 'EC-I-O' (ISO §7.3.25.3 SR4)", loc, default);
                 else
                 {
-                    CheckLength(w);
+                    CheckWord(w);
                     AddPair(currentEc, w);
                     currentEcHasFiles = true;
                 }

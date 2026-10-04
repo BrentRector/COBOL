@@ -6,6 +6,7 @@ using CobolNet.Frontend.Diagnostics;
 using CobolNet.Frontend.Expressions;
 using CobolNet.Frontend.Generated;
 using CobolNet.Frontend.Parsing;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -76,7 +77,7 @@ public static partial class ConditionalCompilationProcessor
         foreach (var wordNode in upon.cobolWord())
         {
             string word = wordNode.GetText();
-            if (word.Equals("LISTING", StringComparison.OrdinalIgnoreCase))
+            if (CobolNames.Same(word, "LISTING"))
             {
                 if (listing) { diag.DisplayUpon("LISTING is written twice — the choice indicators of §5.2.6.4 admit each alternative at most once"); valid = false; }
                 listing = true;

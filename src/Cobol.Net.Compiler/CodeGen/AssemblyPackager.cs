@@ -31,7 +31,7 @@ internal static class AssemblyPackager
     private static string? DeployRuntime(string outputDllPath)
     {
         string dest = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(outputDllPath))!, "Cobol.Net.Runtime.dll");
-        if (string.Equals(RuntimePath, dest, StringComparison.OrdinalIgnoreCase)
+        if (string.Equals(RuntimePath, dest, StringComparison.OrdinalIgnoreCase)   // not a COBOL word: two file-system paths
             || !File.Exists(RuntimePath))   // not a compilation input: the runtime is part of the compiler's own deployment
             return null;
         File.Copy(RuntimePath, dest, overwrite: true);

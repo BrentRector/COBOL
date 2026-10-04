@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Runtime.Exceptions;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding;
 
@@ -131,7 +132,7 @@ internal static class EcNameResolution
     private static DeclinedEcFamily? DeclinedModuleOf(string name)
     {
         foreach (var f in DeclinedEcFamilies)
-            if (name.StartsWith(f.Prefix, StringComparison.OrdinalIgnoreCase)
+            if (CobolNames.StartsWith(name, f.Prefix)
                 && (name.Length == f.Prefix.Length || name[f.Prefix.Length] == '-'))
                 return f;
         return null;

@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 
+using CobolNet.Runtime;
+
 namespace CobolNet.Binding.Model;
 
 /// <summary>The clauses of the standard's identical-description lists that are properties of the ENTRY rather than
@@ -29,7 +31,7 @@ public static class DescriptionClauses
                 + "same DYNAMIC LENGTH clause)";
         // A name is unique in its source element and inherited by reference, so name equality is structure identity.
         if (x.IsDynamicLength && (x.DynMaxSize != y.DynMaxSize
-                || !string.Equals(x.DynStructure?.Name, y.DynStructure?.Name, StringComparison.OrdinalIgnoreCase)))
+                || !CobolNames.Same(x.DynStructure?.Name, y.DynStructure?.Name)))
             return $"DYNAMIC LENGTH mismatch (maximum size {x.DynMaxSize} vs {y.DynMaxSize}, structure "
                 + $"{x.DynStructure?.Name ?? "(implementor)"} vs {y.DynStructure?.Name ?? "(implementor)"} — the "
                 + "corresponding items shall have the same DYNAMIC LENGTH clause, its LIMIT and STRUCTURE phrases "

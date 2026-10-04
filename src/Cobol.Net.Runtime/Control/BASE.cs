@@ -38,7 +38,7 @@ public abstract class BASE : CobolObject
     /// switch falls through <c>default:</c> to here for a method no COBOL class of the hierarchy declares.</summary>
     public override void __CobolInvoke(string name, CobolInvokeArg[] args, CobolInvokeArg? returning)
     {
-        if (name == "FACTORYOBJECT")
+        if (CobolNames.Same(name, "FACTORYOBJECT"))   // the normalized key is the Annex C fold (PB1402)
         {
             StandardMethodCrossing.Check("FactoryObject", args, returning);
             returning!.Value = FACTORYOBJECT();
@@ -91,7 +91,7 @@ public abstract class BASE__FACTORY : CobolObject
     /// universal reference, <c>INVOKE u "New" RETURNING r</c>.</summary>
     public override void __CobolInvoke(string name, CobolInvokeArg[] args, CobolInvokeArg? returning)
     {
-        if (name == "NEW")
+        if (CobolNames.Same(name, "NEW"))   // the normalized key is the Annex C fold (PB1402)
         {
             StandardMethodCrossing.Check("New", args, returning);
             returning!.Value = __New();

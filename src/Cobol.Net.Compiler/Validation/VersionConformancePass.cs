@@ -11,6 +11,7 @@ using CobolNet.Frontend.Common;        // CobolWordRule — the ONE §8.3.2.1 wo
 using CobolNet.Frontend.Expressions;    // BooleanOperatorGate — the ONE boolean-operator introduction gate (both lanes)
 using CobolNet.Frontend.Generated;     // CobolParserCore / CobolLexer / CobolParserCoreBaseVisitor — the parse-tree arm
 using CobolNet.Frontend.Parsing;       // CobolKeywordTokens — the reverse vocab map (>>COBOL-WORDS SR3/SR4 category)
+using CobolNet.Runtime;                // CobolNames — the ONE Annex C word fold (kb/Work PB1402)
 
 using CobolNet.Compiler.Oo;
 
@@ -2478,9 +2479,27 @@ internal sealed class VersionConformancePass
             // every edition (superset-parse), so this is where a below-2002 use is named.
             // ⚠ Deduped per distinct word through the SAME set the length check uses: one diagnostic per word
             // per compilation, matching the §8.9 funnel's posture rather than one per occurrence.
-            if (raw.Contains('_') && (_overlongWords ??= []).Add("_" + raw.ToUpperInvariant()))
+            if (raw.Contains('_') && (_overlongWords ??= []).Add("_" + CobolNames.Fold(raw)))
                 _p.Check(Constructs.UserWordUnderscore2002, $"the underscore in the COBOL word '{raw}'");
-            if (raw.Length > max && (_overlongWords ??= []).Add(raw.ToUpperInvariant()))
+            // The EXTENDED LETTERS of the same sentence (kb/Work PB1402): a COBOL-2002 introduction (the '85 set is
+            // the basic letters, digits and hyphen), and from 2002 each character must be where the edition's Annex
+            // B.3 permits it. The lexer's word class is a superset, so both are named here.
+            if (CobolCharacterRepertoire.HasExtendedCharacter(raw) && (_overlongWords ??= []).Add("extended " + CobolNames.Fold(raw)))
+            {
+                _p.Check(Constructs.UserWordExtendedLetter2002, $"the extended letter in the COBOL word '{raw}'");
+                // A character the 2014 Annex B permitted here and 2023's does not (Annex E.2 item 4) is a REMOVED
+                // construct — error strict, warning and the 2014 rule under --permissive; every other one is 2773.
+                if (CobolWordRule.CharacterViolation(raw, _p._edition.Year) is { } character)
+                {
+                    if (CobolWordRule.RemovedAt2023(raw, _p._edition.Year))
+                        _p.Check(Constructs.UserWordCharacterRemoved2023, character);
+                    else
+                        _p._sink.Report(new EditionDiagnostic(DiagnosticCatalog.WordCharacterNotPermitted.Code,
+                            EditionSeverity.Error, DiagnosticCatalog.WordCharacterNotPermitted.Id, character, "",
+                            "ISO §8.3.2.1; Annex B.3"));
+                }
+            }
+            if (CobolCharacterRepertoire.LengthInCharacters(raw) > max && (_overlongWords ??= []).Add(CobolNames.Fold(raw)))
                 _p._sink.Report(new EditionDiagnostic(DiagnosticCatalog.WordLengthExceeded.Code,
                     EditionSeverity.Error, DiagnosticCatalog.WordLengthExceeded.Id,
                     CobolWordRule.LengthViolation(raw, _p._edition.Year)!, "", "ISO §8.3.2.1"));

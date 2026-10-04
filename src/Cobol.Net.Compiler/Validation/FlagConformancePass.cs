@@ -11,6 +11,7 @@ using CobolNet.Frontend.Cst;         // DataReferenceCst / SpecialRegister
 using CobolNet.Frontend.Generated;   // CobolParserCore / CobolParserCoreBaseVisitor
 using CobolNet.Frontend.Preprocessor;// FlagDirective / FlagOption / FlagOptions / FlagDirectiveLine
 using CobolNet.Runtime.IO;           // FileOpenMode (the USE-declarative open-mode ordinal, I-O-DECLARATIVE)
+using CobolNet.Runtime;
 
 namespace CobolNet.Validation;
 
@@ -88,7 +89,7 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     /// <summary>The EC-PROGRAM-family exception-names whose <c>&gt;&gt;TURN</c> directive FLAG-02 b flags
     /// (§7.3.14.4 GR4 b) — EC-ALL plus the three EC-PROGRAM level-3 names.</summary>
     private static readonly IReadOnlySet<string> EcProgramFamily =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        new HashSet<string>(CobolNames.Comparer)
         { "EC-ALL", "EC-PROGRAM", "EC-PROGRAM-ARG-OMITTED", "EC-PROGRAM-NOT-FOUND" };
     // A discard EditionContext so the reused PictureAnalyzer (the ONE picture-category mechanism) can classify a
     // parse-tree PICTURE string WITHOUT re-emitting its bind-time diagnostics to the real sink. At 2023 (the
@@ -124,13 +125,13 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
 
         // Build the two source-name lookups the statement detectors need (m WRITE-END-OF-PAGE / f
         // TERMINATE-WITH-VARYING). Files/reports live in program units (not OO class data), so units suffice.
-        var linage = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var varying = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var linage = new HashSet<string>(CobolNames.Comparer);
+        var varying = new HashSet<string>(CobolNames.Comparer);
         // FILE-STATUS reference tagging (I-O-STATUS-04/07): the FILE STATUS data-item names, and the level-88
         // condition-names on such an item whose singleton VALUE is '04' / '07'.
-        var fileStatus = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var fs88_04 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var fs88_07 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var fileStatus = new HashSet<string>(CobolNames.Comparer);
+        var fs88_04 = new HashSet<string>(CobolNames.Comparer);
+        var fs88_07 = new HashSet<string>(CobolNames.Comparer);
         foreach (var unit in group.Units)
         {
             foreach (var file in unit.Data.Files)
@@ -554,7 +555,7 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     /// runs before file-connector renaming), or null.</summary>
     private FileModel? FileByName(string? name)
         => name is null || _currentData is null ? null
-            : _currentData.Files.FirstOrDefault(f => string.Equals(f.CobolName, name, StringComparison.OrdinalIgnoreCase));
+            : _currentData.Files.FirstOrDefault(f => CobolNames.Same(f.CobolName, name));
 
     /// <summary>The <see cref="FileModel"/> a WRITE/REWRITE targets: the explicit <c>FILE file-name</c> when written,
     /// else the file whose record descriptions include <paramref name="recordName"/>.</summary>
@@ -563,7 +564,7 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
         if (fileName is not null) return FileByName(fileName);
         if (recordName is null || _currentData is null) return null;
         return _currentData.Files.FirstOrDefault(f =>
-            f.Records.Any(r => string.Equals(r.CobolName, recordName, StringComparison.OrdinalIgnoreCase)));
+            f.Records.Any(r => CobolNames.Same(r.CobolName, recordName)));
     }
 
     // ── FLAG-02 f TERMINATE-WITH-VARYING (§7.3.14.4 GR4 f) — a TERMINATE of a report whose description contains a
@@ -800,8 +801,8 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     {
         if (content.IndexOfAny(EditingChars) >= 0) return true;
         string trimmed = content.TrimEnd();   // the CR / DB trailing sign insertions
-        return trimmed.EndsWith("CR", StringComparison.OrdinalIgnoreCase)
-            || trimmed.EndsWith("DB", StringComparison.OrdinalIgnoreCase);
+        return CobolNames.EndsWith(trimmed, "CR")
+            || CobolNames.EndsWith(trimmed, "DB");
     }
 
     /// <summary>The content of a STRINGLIT / NATLIT token — a leading national <c>N</c> prefix and the surrounding

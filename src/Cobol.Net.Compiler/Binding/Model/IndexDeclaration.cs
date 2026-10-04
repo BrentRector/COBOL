@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Binding.Model;
 
 /// <summary>⛔ ONE INDEX-NAME DECLARATION — the identity an index-name reference resolves to (kb/Work PB919).
@@ -25,7 +27,7 @@ public sealed record IndexDeclaration(string Name, DataItem Table, string Cell);
 public sealed class IndexNameRegistry
 {
     private readonly Dictionary<string, List<(IndexDeclaration Decl, int Depth)>> _byName =
-        new(StringComparer.OrdinalIgnoreCase);
+        new(CobolNames.Comparer);
     private readonly List<IndexDeclaration> _own = [];
 
     /// <summary>The declarations this scope itself makes, in declaration order — the cells it emits.</summary>

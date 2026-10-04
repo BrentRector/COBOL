@@ -7,6 +7,7 @@ using CobolNet.Binding.Model;
 
 namespace CobolNet.Binding;
 
+using CobolNet.Runtime;
 using Core = CobolParserCore;
 
 /// <summary>
@@ -34,7 +35,7 @@ public sealed partial class DataBinder
 
     /// <summary>Every data-name a data description entry of this unit declares (levels 01-49, 66 and 77; never a
     /// constant or a condition-name), with each place it is declared.</summary>
-    private readonly Dictionary<string, List<DataEntryLocation>> _dataEntryLocations = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<DataEntryLocation>> _dataEntryLocations = new(CobolNames.Comparer);
 
     /// <summary>The entries whose bind has begun, in or out of source order — a record whose first entry is here is
     /// bound or being bound.</summary>
@@ -80,7 +81,7 @@ public sealed partial class DataBinder
         {
             var e = run[i];
             if (e.dataDescriptionBody()?.constantEntryBody() is not null || EntryLevel(e) == 88) continue;
-            if (e.dataName()?.GetText() is not { } name || name.Equals("FILLER", StringComparison.OrdinalIgnoreCase)) continue;
+            if (e.dataName()?.GetText() is not { } name || CobolNames.Same(name, "FILLER")) continue;
             if (!_dataEntryLocations.TryGetValue(name, out var list)) _dataEntryLocations[name] = list = [];
             if (!list.Any(l => ReferenceEquals(l.Run[l.Index], e)))   // a scope declared twice adds nothing
                 list.Add(new DataEntryLocation(run, i, section));
@@ -105,7 +106,7 @@ public sealed partial class DataBinder
 
     /// <summary>Is <paramref name="name"/> declared by an entry whose own description is being bound right now?</summary>
     private bool IsBeingDescribed(string name) =>
-        _openDescriptions.Any(d => string.Equals(d.Entry.dataName()?.GetText(), name, StringComparison.OrdinalIgnoreCase));
+        _openDescriptions.Any(d => CobolNames.Same(d.Entry.dataName()?.GetText(), name));
 
     /// <summary>Is <paramref name="item"/>'s description still open — an ancestor of an entry being bound, so a group
     /// whose subordinates are still being described?</summary>
@@ -174,7 +175,7 @@ public sealed partial class DataBinder
         int.TryParse(e.levelNumber()?.GetText(), out int level) ? level : -1;
 
     /// <summary>Every named report group description entry of this unit, by name.</summary>
-    private readonly Dictionary<string, List<ReportEntryLocation>> _reportEntryLocations = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<ReportEntryLocation>> _reportEntryLocations = new(CobolNames.Comparer);
 
     /// <summary>The report group description entries the report binder has reached.</summary>
     private readonly HashSet<Core.ReportGroupEntryContext> _reportEntriesBound = [];
@@ -205,7 +206,7 @@ public sealed partial class DataBinder
         {
             int q = 0;
             foreach (var outer in l.Qualification)
-                if (q < qualifiers.Count && outer.Equals(qualifiers[q], StringComparison.OrdinalIgnoreCase)) q++;
+                if (q < qualifiers.Count && CobolNames.Same(outer, qualifiers[q])) q++;
             return q == qualifiers.Count;
         })];
     }

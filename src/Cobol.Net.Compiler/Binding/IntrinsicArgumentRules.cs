@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding;
 
@@ -683,7 +684,7 @@ internal static class IntrinsicArgumentRules
             tail == '\0' ? null : new ArgRule(tail, clause), cross, crossClause);
 
     public static readonly IReadOnlyDictionary<string, ArgSchema> Verified =
-        new Dictionary<string, ArgSchema>(StringComparer.OrdinalIgnoreCase)
+        new Dictionary<string, ArgSchema>(CobolNames.Comparer)
         {
             ["ABS"] = Uniform('n', "§15.7.3 r1"),                            // shall be of class numeric
             // §15.70.3 r1 is ONE sentence with TWO halves — "shall be ONE CHARACTER POSITION IN LENGTH and shall
@@ -981,7 +982,7 @@ internal static class IntrinsicArgumentRules
     /// </list>
     /// </remarks>
     public static readonly IReadOnlyDictionary<string, string> DeliberatelyUnscreened =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        new Dictionary<string, string>(CobolNames.Comparer)
         {
             ["BYTE-LENGTH"] = "§15.14.3 r1 admits an argument of ANY class or category",
             ["BASECONVERT"] = "§15.12.3 r1 constrains USAGE (display or national), not class — an axis this "
@@ -1429,7 +1430,7 @@ internal static class IntrinsicArgumentRules
                 IntrinsicType.Numeric =>
                     $"is FUNCTION {ic.Sig.Name}, a numeric function, which ISO §8.4.3.2.3 SR11 bars from an integer "
                     + "operand position and so from one that requires an unsigned integer",
-                IntrinsicType.Integer when !ic.Sig.Name.Equals("ABS", StringComparison.OrdinalIgnoreCase) =>
+                IntrinsicType.Integer when !CobolNames.Same(ic.Sig.Name, "ABS") =>
                     $"is FUNCTION {ic.Sig.Name}, an integer function, which ISO §8.4.3.2.3 SR12 bars (all but the "
                     + "integer form of FUNCTION ABS) from a position that requires an unsigned integer",
                 _ => null,

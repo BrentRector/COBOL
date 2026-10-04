@@ -3,6 +3,7 @@
 using Antlr4.Runtime;
 using CobolNet.Editions;
 using CobolNet.Frontend.Generated;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Parsing;
 
@@ -63,7 +64,7 @@ public static class CobolWordsRewriter
     {
         if (tok is null) return false;
         if (map.IsEmpty || tok.Type != CobolKeywordTokens.IdentifierType)
-            return string.Equals(tok.Text, keyword, StringComparison.OrdinalIgnoreCase);
+            return CobolNames.Same(tok.Text, keyword);
         return map.Is(tok.Text, keyword);
     }
 
@@ -89,7 +90,7 @@ public static class CobolWordsRewriter
     public sealed class Plan
     {
         /// <summary>The no-directive plan — every token passes through unchanged.</summary>
-        public static readonly Plan Empty = new(new Dictionary<string, (int, string)>(StringComparer.OrdinalIgnoreCase),
+        public static readonly Plan Empty = new(new Dictionary<string, (int, string)>(CobolNames.Comparer),
             new HashSet<int>(), CobolWordsMap.Empty);
 
         private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<CobolWordsMap, Plan> Cache = new();
@@ -117,7 +118,7 @@ public static class CobolWordsRewriter
                 // SYNONYM: the synonym text → the canonical word's token type (only when the canonical is a
                 // reserved/context keyword; a canonical intrinsic-function name has no token type and is handled by
                 // the binder's by-name resolution).
-                var synonymToType = new Dictionary<string, (int Type, string Canonical)>(StringComparer.OrdinalIgnoreCase);
+                var synonymToType = new Dictionary<string, (int Type, string Canonical)>(CobolNames.Comparer);
                 foreach (var (synonym, canonical) in m.Synonyms)
                     if (CobolKeywordTokens.TryTokenType(canonical, out int kt))
                         synonymToType[synonym] = (kt, canonical);

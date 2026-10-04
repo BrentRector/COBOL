@@ -8,6 +8,7 @@ using CobolNet.Frontend.Generated;
 namespace CobolNet.Binding.Procedure;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// The Report Writer half of the statement binder (ISO/IEC 1989:2023 §14.9.21 INITIATE / §14.9.16 GENERATE /
@@ -255,15 +256,15 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
     private static BoundExpr? RawNumber(string raw)
     {
         string text = raw.Trim();
-        if (text.Equals("ZERO", StringComparison.OrdinalIgnoreCase) || text.Equals("ZEROS", StringComparison.OrdinalIgnoreCase)
-            || text.Equals("ZEROES", StringComparison.OrdinalIgnoreCase)) return new BoundNumLiteral("0");
+        if (CobolNames.Same(text, "ZERO") || CobolNames.Same(text, "ZEROS")
+            || CobolNames.Same(text, "ZEROES")) return new BoundNumLiteral("0");
         return text.Length > 0 && text.All(c => char.IsAsciiDigit(c) || c is '.' or '+' or '-') ? new BoundNumLiteral(text) : null;
     }
 
     /// <summary>The scope a report entry's clause expression binds in (<see cref="ReferenceResolver.VaryingScope"/>).</summary>
     private static Dictionary<string, ReportVaryingModel> ScopeOf(IEnumerable<ReportVaryingModel> counters)
     {
-        var scope = new Dictionary<string, ReportVaryingModel>(StringComparer.OrdinalIgnoreCase);
+        var scope = new Dictionary<string, ReportVaryingModel>(CobolNames.Comparer);
         foreach (var c in counters) scope[c.Name] = c;
         return scope;
     }
@@ -448,7 +449,7 @@ internal sealed class ReportWriterBinder(BinderContext ctx, StatementBinder host
     }
 
     private ReportModel? RwFindReport(string name) =>
-        ctx.Data.VisibleReports.FirstOrDefault(r => r.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        ctx.Data.VisibleReports.FirstOrDefault(r => CobolNames.Same(r.Name, name));
 
     /// <summary>Intercept a LINE-COUNTER / PAGE-COUNTER data reference (ISO §8.4.3.15) ahead of normal name
     /// resolution (the LINAGE-COUNTER idiom in <c>FieldOperand</c>/<c>RefExpr</c>). Returns null when the

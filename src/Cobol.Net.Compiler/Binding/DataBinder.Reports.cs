@@ -14,6 +14,7 @@ using Core = CobolParserCore;
 using CobolNet.Compiler.Oo;
 using ReportNextGroup = CobolNet.Runtime.IO.ReportNextGroup;
 using ReportNextGroupKind = CobolNet.Runtime.IO.ReportNextGroupKind;
+using CobolNet.Runtime;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 //  REPORT SECTION binding (ISO/IEC 1989:2023 §13.6 report section / §13.14 report description / §13.15 report
@@ -224,11 +225,11 @@ public sealed record ReportControlRef(
     /// case-insensitive (§8.2), so the test is spelled out.</summary>
     public bool SameOperandAs(ReportControlRef other)
     {
-        if (!Name.Equals(other.Name, StringComparison.OrdinalIgnoreCase)) return false;
+        if (!CobolNames.Same(Name, other.Name)) return false;
         if (RefModStart != other.RefModStart || RefModLength != other.RefModLength) return false;
         if (Qualifiers.Count != other.Qualifiers.Count) return false;
         for (int i = 0; i < Qualifiers.Count; i++)
-            if (!Qualifiers[i].Equals(other.Qualifiers[i], StringComparison.OrdinalIgnoreCase)) return false;
+            if (!CobolNames.Same(Qualifiers[i], other.Qualifiers[i])) return false;
         return true;
     }
 
@@ -1032,7 +1033,7 @@ public sealed partial class DataBinder
     /// supplied — hides the farther one (§8.4.6.2). Returns false when the report-name is hidden.</summary>
     internal bool InheritGlobalReport(ReportModel report, int depth)
     {
-        if (VisibleReports.Any(r => r.Name.Equals(report.Name, StringComparison.OrdinalIgnoreCase))) return false;
+        if (VisibleReports.Any(r => CobolNames.Same(r.Name, report.Name))) return false;
         if (_inheritedReports.Count == 0) _visibleReports.AddRange(_reports);
         _visibleReports.Add(report);
         _inheritedReports[report] = depth;
@@ -1467,16 +1468,16 @@ public sealed partial class DataBinder
             foreach (var spec in specs)
             {
                 string name = spec.cobolWord().GetText();
-                if (own.Contains(name, StringComparer.OrdinalIgnoreCase))
+                if (own.Contains(name, CobolNames.Comparer))
                     Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"{where} VARYING '{name}': the counter is defined twice in "
                         + "this entry; data-name-1 shall not be defined elsewhere in the source element, except as "
                         + "data-name-1 in another VARYING clause of an entry not subordinate to the subject of the "
                         + "current entry (ISO §13.18.64.3 SR2)");
-                else if (enclosing.Any(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                else if (enclosing.Any(c => CobolNames.Same(c.Name, name)))
                     Edition.Error(DiagnosticCatalog.ReportGroupClauseRule, $"{where} VARYING '{name}': an entry above this one already "
                         + "defines the counter in its VARYING clause; a reuse of the name is permitted only in an entry "
                         + "not subordinate to the subject of the current entry (ISO §13.18.64.3 SR2)");
-                else if (!model.VaryingNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+                else if (!model.VaryingNames.Contains(name, CobolNames.Comparer))
                     model.VaryingNames.Add(name);
                 own.Add(name);
             }
@@ -2969,7 +2970,7 @@ public sealed partial class DataBinder
             // description entry's clause rules into the report group description entry, so the pair is a rule
             // here too, and it is the only thing that makes GR1's inheritance unambiguous (kb/Work PB541).
             if (usageText is not null && inheritedUsage is not null
-                && !usageText.Equals(inheritedUsage, StringComparison.OrdinalIgnoreCase))
+                && !CobolNames.Same(usageText, inheritedUsage))
                 Edition.Error(DiagnosticCatalog.ReportUsageNotDisplayOrNational, $"RD '{model.Name}' entry "
                     + $"'{entryName ?? "FILLER"}': USAGE {usageText} contradicts the USAGE {inheritedUsage} "
                     + "written on the group entry above it — when a USAGE clause is written on a group item and "
@@ -3446,7 +3447,7 @@ public sealed partial class DataBinder
     private static bool HasWord(Antlr4.Runtime.Tree.IParseTree tree, string word)
     {
         if (tree is Antlr4.Runtime.Tree.ITerminalNode t)
-            return t.GetText().Equals(word, StringComparison.OrdinalIgnoreCase);
+            return CobolNames.Same(t.GetText(), word);
         for (int i = 0; i < tree.ChildCount; i++)
             if (HasWord(tree.GetChild(i), word)) return true;
         return false;
@@ -4041,8 +4042,8 @@ public sealed partial class DataBinder
     /// third arm of §13.14.3 SR1 and is reported where the file is resolved.</summary>
     private void ScreenReportClauseNames()
     {
-        var rdNames = new HashSet<string>(Reports.Select(r => r.Name), StringComparer.OrdinalIgnoreCase);
-        var firstClause = new Dictionary<string, FileModel>(StringComparer.OrdinalIgnoreCase);
+        var rdNames = new HashSet<string>(Reports.Select(r => r.Name), CobolNames.Comparer);
+        var firstClause = new Dictionary<string, FileModel>(CobolNames.Comparer);
         foreach (var file in Files)
             foreach (var name in file.ReportNames)
             {
@@ -4068,7 +4069,7 @@ public sealed partial class DataBinder
         foreach (var file in Files)
         {
             if (file.ReportNames.Count < 2) continue;
-            var members = Reports.Where(r => file.ReportNames.Any(n => n.Equals(r.Name, StringComparison.OrdinalIgnoreCase))).ToList();
+            var members = Reports.Where(r => file.ReportNames.Any(n => CobolNames.Same(n, r.Name))).ToList();
             if (members.Any(r => r.CodeWritten) && members.Any(r => !r.CodeWritten))
                 Edition.Error(DiagnosticCatalog.ReportCodeClauseRule, $"file '{file.CobolName}': the CODE clause is specified for "
                     + $"{string.Join(", ", members.Where(r => r.CodeWritten).Select(r => $"'{r.Name}'"))} but not for "
@@ -4091,7 +4092,7 @@ public sealed partial class DataBinder
             // clause; a name in none is reported here, a name in several by ScreenReportClauseNames). A report may
             // share its file with others (§13.18.46.4 GR1 — each has its own engine over the one connector).
             model.File = Files.FirstOrDefault(f =>
-                f.ReportNames.Any(rn => rn.Equals(model.Name, StringComparison.OrdinalIgnoreCase)));
+                f.ReportNames.Any(rn => CobolNames.Same(rn, model.Name)));
             if (model.File is null)
                 Edition.Error(DiagnosticCatalog.ReportClauseNameRule, $"RD '{model.Name}' is not named in any file description "
                     + "entry's REPORT clause: there shall be one and only one REPORT clause specifying report-name-1 "
@@ -4522,8 +4523,8 @@ public sealed partial class DataBinder
     /// is meant, whatever else the word names).</summary>
     private bool IsRolledAddendName(ReportSumAddend addend) =>
         IsReportSectionOnlyName(addend.Name)
-        || (addend.Qualifiers.Any(q => Reports.Any(r => r.Name.Equals(q, StringComparison.OrdinalIgnoreCase)))
-            && Reports.Any(r => r.EntryFamilies.Any(f => f.Name?.Equals(addend.Name, StringComparison.OrdinalIgnoreCase) == true)));
+        || (addend.Qualifiers.Any(q => Reports.Any(r => CobolNames.Same(r.Name, q)))
+            && Reports.Any(r => r.EntryFamilies.Any(f => CobolNames.Same(f.Name, addend.Name))));
 
     /// <summary>Per WRITTEN addend (its parse node), the entry its data-name-1 names — null when it was refused. A
     /// repeating SUM entry binds its clause once per occurrence of the counter, and each occurrence meets the same
@@ -4582,9 +4583,9 @@ public sealed partial class DataBinder
         // The entry the word names — the qualifiers are consumed against each entry's own hierarchy, the REPORT-name
         // last (§8.4.2.2.3 SR4, §8.4.2.2.2 Format 1), exactly as a sum counter's reference is (kb/Work PB1454).
         var candidates = Reports.SelectMany(r => r.EntryFamilies)
-            .Where(f => f.Name?.Equals(addend.Name, StringComparison.OrdinalIgnoreCase) == true
+            .Where(f => CobolNames.Same(f.Name, addend.Name)
                 && QualifierWalk(f.Qualification, addend.Qualifiers,
-                    q => q.Equals(f.Report.Name, StringComparison.OrdinalIgnoreCase)))
+                    q => CobolNames.Same(q, f.Report.Name)))
             .ToList();
         if (candidates.Count > 1)
         {
@@ -4798,7 +4799,7 @@ public sealed partial class DataBinder
         // A name also declared in ordinary storage resolves THERE (never to the report item), so it is not an
         // SR16 reference — only report-section-exclusive names are scanned (no textual false positives). The SAME
         // set answers §13.18.16.3 SR2 for a CONTROL operand, so it is built in ONE place (kb/Work PB205).
-        var names = Reports.SelectMany(r => ReportSectionOnlyNames(r)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var names = Reports.SelectMany(r => ReportSectionOnlyNames(r)).Distinct(CobolNames.Comparer).ToList();
 
         foreach (var cond in conds)
         {
@@ -4840,7 +4841,7 @@ public sealed partial class DataBinder
     {
         foreach (var r in Reports)
             foreach (var n in ReportSectionOnlyNames(r))
-                if (n.Equals(name, StringComparison.OrdinalIgnoreCase)) return true;
+                if (CobolNames.Same(n, name)) return true;
         return false;
     }
 
@@ -4877,7 +4878,7 @@ public sealed partial class DataBinder
             {
                 // A sum counter of the CURRENT report is SR4's other admitted report-section item.
                 bool ownCounter = countersOf is not null
-                    && countersOf.SumFamilies.Any(s => s.Name is { } sn && sn.Equals(w, StringComparison.OrdinalIgnoreCase));
+                    && countersOf.SumFamilies.Any(s => s.Name is { } sn && CobolNames.Same(sn, w));
                 return ownCounter ? null : dref.GetText();
             }
             // identifier-1 is a qualified-data-name-with-subscripts (§8.4.3.1.2): a name inside a SUBSCRIPT or a
@@ -4935,10 +4936,10 @@ public sealed partial class DataBinder
     /// the LINE-COUNTER or PAGE-COUNTER register, or a sum counter — the name of a report section entry (and of no
     /// ordinary-storage item, §8.4.2.1) that contains a SUM clause.</summary>
     private bool IsReportSubscriptCounter(string word) =>
-        word.Equals("LINE-COUNTER", StringComparison.OrdinalIgnoreCase)
-        || word.Equals("PAGE-COUNTER", StringComparison.OrdinalIgnoreCase)
+        CobolNames.Same(word, "LINE-COUNTER")
+        || CobolNames.Same(word, "PAGE-COUNTER")
         || (!ByName.ContainsKey(word) && Reports.Any(r => r.WrittenEntries.Any(ge =>
-            ge.dataName().NameOrNull() is { } n && n.Equals(word, StringComparison.OrdinalIgnoreCase)
+            ge.dataName().NameOrNull() is { } n && CobolNames.Same(n, word)
             && ge.reportGroupClause().Any(c => c.reportSumClause() is not null))));
 
     /// <summary>⛔ ISO §8.4.2.3.3 SR8 (kb/Work PB1474) — "In the report section, neither a sum counter nor the LINE-COUNTER
@@ -4955,7 +4956,7 @@ public sealed partial class DataBinder
             foreach (var clause in ge.reportGroupClause())
             {
                 if (clause.reportPresentWhenClause() is not null) continue;
-                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var seen = new HashSet<string>(CobolNames.Comparer);
                 foreach (var word in SubscriptWordsOf(clause).Where(IsReportSubscriptCounter))
                     if (seen.Add(word))
                     {
@@ -4988,7 +4989,7 @@ public sealed partial class DataBinder
         var names = new List<string>();
         foreach (var ge in model.WrittenEntries)
             if (ge.dataName().NameOrNull() is { } name && !ByName.ContainsKey(name)
-                && !names.Contains(name, StringComparer.OrdinalIgnoreCase))
+                && !names.Contains(name, CobolNames.Comparer))
                 names.Add(name);
         return names;
     }

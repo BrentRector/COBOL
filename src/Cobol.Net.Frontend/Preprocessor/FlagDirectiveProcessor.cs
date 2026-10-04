@@ -3,6 +3,7 @@
 using CobolNet.Editions;
 using CobolNet.Frontend.Common;
 using CobolNet.Frontend.Diagnostics;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -73,6 +74,6 @@ public static class FlagDirectiveProcessor
     /// <summary>Does the directive body begin with <paramref name="keyword"/> as a whole word (the next char is
     /// whitespace or end-of-line)?</summary>
     private static bool Matches(string body, string keyword) =>
-        body.StartsWith(keyword, StringComparison.OrdinalIgnoreCase)
+        CobolNames.StartsWith(body, keyword)
         && (body.Length == keyword.Length || CobolSpace.IsSeparator(body[keyword.Length]));
 }

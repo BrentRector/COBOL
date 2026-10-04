@@ -13,6 +13,7 @@ using CobolNet.Compiler.Oo;
 namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// Resolves a <c>dataReference</c> parse node to a <see cref="Place"/> — the single entry point every verb uses to
@@ -1512,7 +1513,7 @@ public sealed class ReferenceResolver(DataBinder data)
             {
                 var t = seg[i];
                 if (t.Type != Core.SUB_IDENTIFIER
-                    || !string.Equals(t.Text, index.Name, StringComparison.OrdinalIgnoreCase)) continue;
+                    || !CobolNames.Same(t.Text, index.Name)) continue;
                 List<string> quals = [];
                 for (int j = i + 1; ; )
                 {
@@ -2039,7 +2040,7 @@ public sealed class ReferenceResolver(DataBinder data)
         // container's GLOBAL report; only candidates of the NEAREST declaring element can be ambiguous.
         var matches = data.NearestInScope(
             homonyms.Where(h => DataBinder.QualifierWalk(h.Family.Qualification, qualifiers,
-                q => q.Equals(h.Report.Name, StringComparison.OrdinalIgnoreCase))),
+                q => CobolNames.Same(q, h.Report.Name))),
             h => h.Report);
         if (matches.Count == 0)
         {
@@ -2310,7 +2311,7 @@ public sealed class ReferenceResolver(DataBinder data)
                 // TABLE ELEMENT owns its paren as its own subscript list. Unknown → no split → the D18 loud
                 // names the operand.
                 Core.SUB_IDENTIFIER when parenSplitsAfterName is not null
-                    && !lastNonWs.Text.Equals("FUNCTION", StringComparison.OrdinalIgnoreCase)
+                    && !CobolNames.Same(lastNonWs.Text, "FUNCTION")
                     => parenSplitsAfterName(lastNonWs.Text),
                 _ => false,
             };
@@ -2352,7 +2353,7 @@ public sealed class ReferenceResolver(DataBinder data)
                         (lastNonWs.Type is Core.SUB_PLUS or Core.SUB_MINUS or Core.SUB_STAR or Core.SUB_SLASH
                             or Core.SUB_POWER or Core.SUB_OF or Core.SUB_IN
                          || (lastNonWs.Type == Core.SUB_IDENTIFIER
-                             && lastNonWs.Text.Equals("FUNCTION", StringComparison.OrdinalIgnoreCase)));
+                             && CobolNames.Same(lastNonWs.Text, "FUNCTION")));
                     int nextType = tokens[next].Type;
                     // The new-segment starters: every token that can BEGIN an operand — identifiers, all four
                     // numeric-literal shapes, string literals (intrinsic arguments may be space-separated,
@@ -2651,7 +2652,7 @@ public sealed class ReferenceResolver(DataBinder data)
         {
             if (tokens[i].Type is not (Core.SUB_IDENTIFIER or Core.IDENTIFIER)) continue;
             string w = tokens[i].Text;
-            if (w.Equals("FUNCTION", StringComparison.OrdinalIgnoreCase)) return Activation(tokens[i]);
+            if (CobolNames.Same(w, "FUNCTION")) return Activation(tokens[i]);
             int k = i + 1;
             while (k < tokens.Count && tokens[k].Type == Core.SUB_WS) k++;
             // GROUPING-PAREN-ONLY (fix-queue PB48): this arm detects the KEYWORD-OMITTED form `name(args)`,

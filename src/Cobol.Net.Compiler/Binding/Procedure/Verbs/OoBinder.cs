@@ -11,6 +11,7 @@ using CobolNet.Compiler.Oo;
 namespace CobolNet.Binding.Procedure;
 
 using Core = CobolParserCore;
+using CobolNames = CobolNet.Runtime.CobolNames;   // the namespace holds a CobolClass too, which would hide the compiler's own CobolClass enum
 
 /// <summary>
 /// The OO binder (P7 Step 10s — the OO half converts LAST, behind the OO goldens + method-scope tests):
@@ -331,7 +332,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// case-insensitively, §8.3.2.2) — the one name whose absence from a factory interface has its own diagnostic,
     /// because until kb/Work PB1548 this compiler treated New as predefined for every class.</summary>
     private static bool IsStandardNew(string method) =>
-        string.Equals(method, OoStandardClasses.NewMethodName, StringComparison.OrdinalIgnoreCase);
+        CobolNames.Same(method, OoStandardClasses.NewMethodName);
 
     /// <summary>COBOLNET2448: New named through a factory object whose class does not inherit the standard class
     /// BASE. <paramref name="rule"/> is the §14.9.23.3 rule the receiver form is governed by (SR3, SR4 a/c/f/h).</summary>
@@ -418,7 +419,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         if (rdesc.Kind is ObjectRefKind.Interface && host.OoClasses?.FindInterface(className) is { } recvIface)
         {
             var proto = recvIface.AllPrototypes()
-                .FirstOrDefault(pm => string.Equals(pm.Name, method, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(pm => CobolNames.Same(pm.Name, method));
             if (proto is null)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0825",
@@ -1552,7 +1553,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// how the compiler came to hold three different opinions about what this name is (kb/Work PB922,
     /// feedback_one_rule_one_place).</para></summary>
     public static bool OoIsExceptionObject(string? word) =>
-        string.Equals(word, "EXCEPTION-OBJECT", StringComparison.OrdinalIgnoreCase);
+        CobolNames.Same(word, "EXCEPTION-OBJECT");
 
     /// <summary>True when an arithmetic expression is EXACTLY one bare data reference (the Format-5
     /// re-route's sender shape) — its single dataReference descendant spans the whole expression text.</summary>

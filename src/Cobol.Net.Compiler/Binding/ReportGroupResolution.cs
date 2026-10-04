@@ -7,6 +7,7 @@ using CobolNet.Frontend.Generated;
 namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// ⛔ THE ONE FUNNEL FOR RESOLVING A WRITTEN REPORT-GROUP REFERENCE (kb/Work PB365). THREE sites name a
@@ -67,9 +68,9 @@ internal static class ReportGroupResolution
         var found = new List<(ReportModel Report, ReportGroupModel Group)>();
         foreach (var r in reports)
         {
-            if (qualifier is not null && !r.Name.Equals(qualifier, StringComparison.OrdinalIgnoreCase)) continue;
+            if (qualifier is not null && !CobolNames.Same(r.Name, qualifier)) continue;
             foreach (var g in r.Groups)
-                if (g.Name is not null && head.Equals(g.Name, StringComparison.OrdinalIgnoreCase))
+                if (g.Name is not null && CobolNames.Same(head, g.Name))
                     found.Add((r, g));
         }
         if (scope is not null) found = scope.NearestInScope(found, f => f.Report);

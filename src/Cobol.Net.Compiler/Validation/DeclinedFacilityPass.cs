@@ -4,6 +4,7 @@ using CobolNet.Binding;              // EditionContext
 using CobolNet.Binding.Passes;       // GroupBindContext
 using CobolNet.Editions.Diagnostics; // DiagnosticCatalog
 using CobolNet.Frontend.Generated;   // CobolParserCore
+using CobolNet.Runtime;
 
 namespace CobolNet.Validation;
 
@@ -52,7 +53,7 @@ internal sealed class DeclinedFacilityPass(EditionContext edition) : CursorFollo
     /// printed general formats. Dropped when composing the clause's name from its own leading keywords, so
     /// <c>DEFAULT IS "AB"</c> is reported as the DEFAULT clause rather than the "DEFAULT IS" clause.</summary>
     private static readonly HashSet<string> Connectives =
-        new(StringComparer.OrdinalIgnoreCase) { "IS", "ARE" };
+        new(CobolNames.Comparer) { "IS", "ARE" };
 
     public static void Run(GroupBindContext group, EditionContext edition)
     {

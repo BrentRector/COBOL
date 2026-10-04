@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Runtime.Exceptions;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Common;
 
@@ -46,7 +47,7 @@ public static class CompilerDirectiveWords
         "+", "-", "*", "/", "<=", ">=", "<", ">", "<>", "=", "(", ")",
     ];
 
-    private static readonly HashSet<string> Set = new(Table, StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> Set = new(Table, CobolNames.Comparer);
 
     /// <summary>The §8.12 table, in the order the standard prints its columns.</summary>
     public static IReadOnlyList<string> All => Table;

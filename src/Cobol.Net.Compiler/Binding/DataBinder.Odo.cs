@@ -10,6 +10,7 @@ namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
 using CobolNet.Compiler.Oo;
+using CobolNet.Runtime;
 
 /// <summary>
 /// The OCCURS DEPENDING ON half of the data binder (ISO/IEC 1989:2023 §13.18.38): Format-2 clause capture
@@ -452,7 +453,7 @@ public sealed partial class DataBinder
             // consult the data-name index and the other registers only. A paragraph-name is declared later, by the
             // procedure-division binder, and is not asked here.
             if (ByName.ContainsKey(capName) || _capacityRegisters.ContainsKey(capName)
-                || Files.Any(f => string.Equals(f.CobolName, capName, StringComparison.OrdinalIgnoreCase)))
+                || Files.Any(f => CobolNames.Same(f.CobolName, capName)))
             {
                 Edition.Error("COBOLNET1523", $"CAPACITY IN '{capName}' on '{subject}': data-name-3 is implicitly "
                     + "defined by the OCCURS DYNAMIC entry and shall not duplicate another data-name, a file-name or "

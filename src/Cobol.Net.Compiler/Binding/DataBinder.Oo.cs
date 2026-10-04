@@ -10,6 +10,7 @@ using CobolNet.Compiler.Oo;
 namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>The method-local NAME SCOPE of one METHOD's data (ISO §11.7 GR5 — a method-local name SHADOWS the
 /// same name in object data; and it is INVISIBLE to sibling methods, the legacy trap-#6 cross-wiring guard made
@@ -18,8 +19,8 @@ using Core = CobolParserCore;
 /// per-pc by <c>StatementBinder.BindClassBody</c> through <see cref="DataBinder.ActiveMethodScope"/>.</summary>
 public sealed class OoMethodDataScope
 {
-    public Dictionary<string, List<DataItem>> ByName { get; } = new(StringComparer.OrdinalIgnoreCase);
-    public Dictionary<string, List<Condition88>> Conditions { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, List<DataItem>> ByName { get; } = new(CobolNames.Comparer);
+    public Dictionary<string, List<Condition88>> Conditions { get; } = new(CobolNames.Comparer);
 
     /// <summary>The method's own INDEX-NAME declarations (M2-OO-1h step 4; §11.7.4 GR5 — index-names are
     /// method-private: two methods each with <c>INDEXED BY IX</c> get DISTINCT cells, and a method IX shadows an
@@ -371,7 +372,7 @@ public sealed partial class DataBinder
             else { dref = prm.dataReference(); optional = prm.OPTIONAL() is not null; }
             string pname = dref.GetText();
             var item = m.Binding!.LinkageRoots.FirstOrDefault(r =>
-                string.Equals(r.CobolName, pname, StringComparison.OrdinalIgnoreCase));
+                CobolNames.Same(r.CobolName, pname));
             if (item is null)
                 Edition.Error("COBOLNET0888", $"{where}: PROCEDURE DIVISION USING parameter '{pname}' is not "
                     + "a level-01/77 LINKAGE SECTION item of the method (ISO §14.2.2 SR1)");
@@ -386,7 +387,7 @@ public sealed partial class DataBinder
         if (pd?.returningClause()?.dataReference() is { } rref)
         {
             m.Binding!.Returning = m.Binding!.LinkageRoots.FirstOrDefault(r =>
-                string.Equals(r.CobolName, rref.GetText(), StringComparison.OrdinalIgnoreCase));
+                CobolNames.Same(r.CobolName, rref.GetText()));
             if (m.Binding!.Returning is null)
                 Edition.Error("COBOLNET0888", $"{where}: PROCEDURE DIVISION RETURNING item '{rref.GetText()}' "
                     + "is not a level-01/77 LINKAGE SECTION item of the method (ISO §14.2.2 SR1)");
@@ -664,7 +665,7 @@ public sealed partial class DataBinder
                     ? (ReferenceEquals(table, subject) ? "it is" : $"it is subordinate to '{table.CobolName ?? "FILLER"}', which is")
                       + " described with an OCCURS clause; the PROPERTY clause shall not be specified for data items "
                       + "subject to an OCCURS clause (ISO §13.18.42.3 SR2)"
-                : objectItems.Count(i => string.Equals(i.CobolName, subjName, StringComparison.OrdinalIgnoreCase)) > 1
+                : objectItems.Count(i => CobolNames.Same(i.CobolName, subjName)) > 1
                     ? $"the name '{subjName}' is not unique in the {(factory ? "factory" : "object")} data, so a "
                       + "reference to it requires qualification; the PROPERTY clause may be specified only for an "
                       + "elementary item whose name does not require qualification for uniqueness of reference "
@@ -688,7 +689,7 @@ public sealed partial class DataBinder
             // Superclass property-name collision (§13.18.42.3 SR4): walk the base chain's accessor rosters.
             for (var b = cls.Base; b is not null; b = b.Base)
                 if ((factory ? b.FactoryMethods : b.Methods).Any(bm =>
-                        string.Equals(bm.PropertyName, subjName, StringComparison.OrdinalIgnoreCase)))
+                        CobolNames.Same(bm.PropertyName, subjName)))
                     Edition.Error("COBOLNET0842", $"{where}: property '{subjName}' collides with a property "
                         + $"of superclass '{b.Name}' (ISO §13.18.42.3 SR4)");
 

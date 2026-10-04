@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Common;
 
 /// <summary>
@@ -114,7 +116,7 @@ public static class CobolLiteral
     public static string? AllLiteralRaw(string raw)
     {
         string t = raw.TrimStart();
-        if (t.Length < 3 || !t.StartsWith("ALL", StringComparison.OrdinalIgnoreCase)) return null;
+        if (t.Length < 3 || !CobolNames.StartsWith(t, "ALL")) return null;
         string rest = t[3..].TrimStart();
         return IsStringLiteral(rest) ? rest : null;
     }

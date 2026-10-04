@@ -17,8 +17,11 @@ namespace CobolNet.Runtime;
 /// the national space of this implementation's UTF-16 repertoire is the same U+0020 — never other white space,
 /// because a tab or a no-break space is a character of the name, not padding.</item>
 /// <item><b>Mapping</b> (<see cref="Same"/>, <see cref="Comparer"/>): two externalized names are the same name
-/// when they are equal ignoring case, so <c>CALL "sub-p"</c> reaches <c>PROGRAM-ID. SUB-P</c>. §8.3.2.2 2) then
-/// makes every source element that names the same externalized name refer to the same instance.</item>
+/// when they are the same COBOL word — equal under the ONE Annex C fold, <see cref="CobolNames"/> (§8.1.3.2 GR3 b)
+/// and GR4 b); DOC-A.1-219, kb/Work PB1402) — so <c>CALL "sub-p"</c> reaches <c>PROGRAM-ID. SUB-P</c> and
+/// <c>CALL "prüf"</c> reaches <c>PROGRAM-ID. PRÜF</c>, by the same equality the compiler's name tables use.
+/// §8.3.2.2 2) then makes every source element that names the same externalized name refer to the same
+/// instance.</item>
 /// </list>
 /// </summary>
 public static class ExternalizedNames
@@ -32,10 +35,10 @@ public static class ExternalizedNames
     public static bool HasFormationSpaces(string written) =>
         written.Length > 0 && (written[0] == ' ' || written[^1] == ' ');
 
-    /// <summary>The mapping rule as an equality: case is ignored. Two nulls (two NULL addresses) are the same; a
+    /// <summary>The mapping rule as an equality: the Annex C fold. Two nulls (two NULL addresses) are the same; a
     /// null and a name are not.</summary>
-    public static bool Same(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+    public static bool Same(string? a, string? b) => CobolNames.Same(a, b);
 
     /// <summary>The mapping rule as a key comparer, for every table keyed by an externalized name.</summary>
-    public static StringComparer Comparer => StringComparer.OrdinalIgnoreCase;
+    public static StringComparer Comparer => CobolNames.Comparer;
 }

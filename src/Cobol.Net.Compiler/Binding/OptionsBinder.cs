@@ -8,6 +8,7 @@ using CobolNet.Editions.Diagnostics;
 namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// Builds the <see cref="OptionsModel"/> from a source unit's OPTIONS paragraph (ISO/IEC 1989:2023 §11.9). The
@@ -100,7 +101,7 @@ internal static class OptionsBinder
                 + $"{element} — it may be specified only in a class, function, function-prototype, interface or "
                 + "program-prototype definition, or a program definition that is not contained within another "
                 + "program (ISO §11.9.7.3 SR1)");
-        if (!name.Equals("COBOL", StringComparison.OrdinalIgnoreCase))
+        if (!CobolNames.Same(name, "COBOL"))
             edition.Error(DiagnosticCatalog.EntryConventionViolation, $"ENTRY-CONVENTION IS {name}: this "
                 + "implementation defines no entry-convention-name — the meaning of one is implementor-defined "
                 + "(ISO §11.9.7.4 GR3) and the only convention provided is COBOL (Annex A.1 item 64)");

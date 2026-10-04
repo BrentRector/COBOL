@@ -6,6 +6,7 @@ using CobolNet.Frontend.Generated;
 
 namespace CobolNet.Binding;
 
+using CobolNet.Runtime;
 using Core = CobolParserCore;
 
 /// <summary>
@@ -135,7 +136,7 @@ public sealed partial class DataBinder
     private (List<FileModel> Members, bool Complete) ScreenSameOperands(Core.SameClauseContext same, string written)
     {
         var members = new List<FileModel>();
-        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seenNames = new HashSet<string>(CobolNames.Comparer);
         bool complete = true;
         foreach (var fn in same.fileName())
         {

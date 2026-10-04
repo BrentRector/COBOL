@@ -4,6 +4,7 @@ using Antlr4.Runtime;
 using Antlr4.Runtime.Misc;
 using CobolNet.Editions;
 using CobolNet.Frontend.Generated;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Parsing;
 
@@ -215,11 +216,8 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0303, "In a MOVE statement, did you forget TO before the target?", 10));
 
         // 4. Missing period after paragraph name (shows as qualified name)
-        if (token.Text?.Contains(".MOVE", StringComparison.OrdinalIgnoreCase) == true ||
-            token.Text?.Contains(".ADD", StringComparison.OrdinalIgnoreCase) == true ||
-            token.Text?.Contains(".SUBTRACT", StringComparison.OrdinalIgnoreCase) == true ||
-            token.Text?.Contains(".PERFORM", StringComparison.OrdinalIgnoreCase) == true ||
-            token.Text?.Contains(".IF", StringComparison.OrdinalIgnoreCase) == true)
+        if (token.Text is { } text && (CobolNames.Contains(text, ".MOVE") || CobolNames.Contains(text, ".ADD")
+            || CobolNames.Contains(text, ".SUBTRACT") || CobolNames.Contains(text, ".PERFORM") || CobolNames.Contains(text, ".IF")))
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0304, "Missing period after paragraph name — the parser is treating it as a qualified reference.", 5));
 
         // 5. STATUS where IDENTIFIER expected
@@ -580,12 +578,12 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
         => token.Type is CobolLexer.STRINGLIT or CobolLexer.INTEGERLIT or CobolLexer.DECIMALLIT;
 
     private static bool IsInRule(string[] ruleStack, string ruleName)
-        => ruleStack.Any(r => string.Equals(r, ruleName, StringComparison.OrdinalIgnoreCase));
+        => ruleStack.Any(r => CobolNames.Same(r, ruleName));
 
     private static bool IsInMatchingRule(string[] ruleStack, string stmtName)
     {
         string ruleName = stmtName.ToLowerInvariant() + "Statement";
-        return ruleStack.Any(r => r.Equals(ruleName, StringComparison.OrdinalIgnoreCase));
+        return ruleStack.Any(r => CobolNames.Same(r, ruleName));
     }
 
     private static string Truncate(string? text, int max)

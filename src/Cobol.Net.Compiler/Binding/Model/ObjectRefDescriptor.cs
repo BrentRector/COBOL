@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Compiler.Oo;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding.Model;
 
@@ -147,7 +148,7 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
     /// implementing an interface prototype's (owner-less) formal.</summary>
     public bool SameDescriptionAs(ObjectRefDescriptor other)
         => Kind == other.Kind && Factory == other.Factory && Only == other.Only
-           && (IsActiveClass || string.Equals(Name, other.Name, StringComparison.OrdinalIgnoreCase));
+           && (IsActiveClass || CobolNames.Same(Name, other.Name));
 
     /// <summary>An INJECTIVE string key for the description — the object-reference half of
     /// <c>OoConformance.ConformanceDescriptor</c>, the runtime universal-crossing signature. Injective over the

@@ -110,6 +110,31 @@ channels { ABSENT_DEBUG_LINE }
         CobolNet.Frontend.Parsing.CobolWordsRewriter.Plan.Empty;
     public void SetCobolWords(CobolNet.Frontend.Parsing.CobolWordsRewriter.Plan plan) => _cobolWords = plan;
 
+    // ⛔ A WORD IS EMITTED IN ITS EDITION'S ANNEX C SPELLING (kb/Work PB1402). Every word comparison downstream folds
+    // through the ONE comparer, CobolNames, whose table is COBOL 2023's Annex C. Below 2023 the edition's Annex C
+    // differs observably in one place — E.2 item 14 deleted (0131,0069) and (03C2,03C3) — so a COBOL 2002/2014 word
+    // is written here with those letters already folded (CobolNames.EditionSpelling), and from then on the one
+    // comparer gives that edition's answer. Default 2023: the spelling is the source's, unchanged.
+    private int _caseMappingEdition = 2023;
+    public void SetCaseMappingEdition(int dialectLevel) => _caseMappingEdition = dialectLevel;
+
+    private void ApplyEditionSpelling(Antlr4.Runtime.IToken token)
+    {
+        if (_caseMappingEdition >= 2023 || (token.Type != IDENTIFIER && token.Type != SUB_IDENTIFIER)
+            || token is not Antlr4.Runtime.CommonToken word) return;
+        // A word of basic characters has one spelling at every edition: look at the input, build no text.
+        bool basic = true;
+        for (int p = word.StartIndex; p <= word.StopIndex && basic; p++)
+        {
+            int offset = p - InputStream.Index;   // LA(k > 0) is the k-th character from the index, LA(-k) k before it
+            basic = InputStream.LA(offset >= 0 ? offset + 1 : offset) < 0x80;
+        }
+        if (basic) return;
+        string text = word.Text;
+        string spelled = CobolNet.Runtime.CobolNames.EditionSpelling(text, _caseMappingEdition);
+        if (!ReferenceEquals(spelled, text)) word.Text = spelled;
+    }
+
     // FUNCTION-ARGUMENT REGION (P7 Step 12). '(' after "FUNCTION functionName" is the function's argument-list
     // paren (ISO §8.4.3.2 SR6) — it stays in DEFAULT mode so the arguments parse through the ONE
     // arithmeticExpression grammar. The keyword-omitted form name(args) (§8.4.3.2 SR2, D2) has no FUNCTION
@@ -252,6 +277,7 @@ channels { ABSENT_DEBUG_LINE }
         var token = base.NextToken();
         // The group's >>COBOL-WORDS first, so everything below reads the EFFECTIVE word (see SetCobolWords).
         if (!_cobolWords.IsEmpty && token is Antlr4.Runtime.CommonToken word) _cobolWords.Apply(word);
+        ApplyEditionSpelling(token);
         // PIC / PICTURE opens PICMODE (the picture character-string is lexed as ONE token) — here, not as a lexer command
         // of the PIC rule, because whether this token IS the PIC keyword is the directive's answer (UNDEFINE "PICTURE"
         // makes a data-name of it; EQUATE "PIC" WITH "PX" makes PX the keyword).
@@ -1030,11 +1056,23 @@ fragment DEC_BODY  : [0-9]+ '.' [0-9]+ | '.' [0-9]+ ;                           
 // alternatives ended in `*` over the separator class, so `1A-` and `42-X-` were ACCEPTED — a pre-existing hole
 // for the hyphen that the underscore would have silently inherited. Factoring the tail into NAME_TAIL, which
 // cannot end on a separator, closes it for both characters in all three alternatives at once.
-fragment NAME_TAIL : [a-z0-9_-]* [a-z0-9] ;   // a word tail that cannot END on a separator (§8.3.2.1)
+// ⛔ EXTENDED LETTERS ARE WORD CHARACTERS (kb/Work PB1402; Annex A.4.6, claimed). §8.3.2.1 puts "extended letters"
+// in the same sentence as the basic ones, and §8.1.3.2 GR4 makes them the Annex B repertoire; this class used to be
+// [a-z0-9_-] alone, so `01 CAFÉ PIC X(3).` died as COBOL0001 at the É. EXT_CHAR is the LEXICAL class
+// CobolCharacterRepertoire.IsWordCharacter states — every character outside the basic repertoire except the
+// noncharacters the text stages use as markers (U+FDD0 is the debugging-line carrier) — a SUPERSET of Annex B on
+// purpose: which of those characters a word may hold, and where, is the edition's Annex B.3 (three position classes,
+// changed by Annex E between 2014 and 2023), asked of the finished word by CobolWordRule at bind time, where a
+// character outside it is NAMED (COBOLNET2773) instead of ending the word with an unexplained "unexpected". The
+// AntlrInputStream holds UTF-16 code units, so a supplementary-plane letter arrives as two surrogates — both in this
+// class, so the pair stays inside its word. A word may END on an extended character (a combining mark is B.3 item 2,
+// legal last); only hyphen and underscore are barred from the ends here.
+fragment EXT_CHAR  : ~[\u0000-\u007F\uFDD0-\uFDEF\uFFFE\uFFFF] ;
+fragment NAME_TAIL : ([a-z0-9_-] | EXT_CHAR)* ([a-z0-9] | EXT_CHAR) ;   // cannot END on a separator (§8.3.2.1)
 fragment NAME_BODY                                                                   // IDENTIFIER / SUB_IDENTIFIER
-    : [0-9]+ [-_] [a-z0-9] NAME_TAIL?   // digit-start with separator: 42-DATANAMES, 42_DATANAMES
-    | [0-9]+ [a-z] NAME_TAIL?           // digit-start with letter: 11A, 25COUNT, 80PARTS
-    | [a-z] NAME_TAIL?                  // alpha-start: A, WRK-DS-01V00, MY_NAME, MIXED_A-B
+    : [0-9]+ [-_] ([a-z0-9] | EXT_CHAR) NAME_TAIL?   // digit-start with separator: 42-DATANAMES, 42_DATANAMES
+    | [0-9]+ ([a-z] | EXT_CHAR) NAME_TAIL?           // digit-start with letter: 11A, 25COUNT, 80PARTS, 1É
+    | ([a-z] | EXT_CHAR) NAME_TAIL?                  // alpha-start: A, WRK-DS-01V00, MY_NAME, CAFÉ
     ;
 
 // ── Function-argument signed literals (P7 Step 12) ──

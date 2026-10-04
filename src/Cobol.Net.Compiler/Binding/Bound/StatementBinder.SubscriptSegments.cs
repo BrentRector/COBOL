@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Model;
 using CobolNet.Editions.Diagnostics;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding.Bound;
 
@@ -71,7 +72,7 @@ public sealed partial class StatementBinder
         position == SegmentPosition.RefMod
             ? $"'{segment}' is written as a reference-modification bound, but a leftmost-position and a length shall "
               + "be arithmetic expressions (ISO §8.4.3.3.3 SR4)."
-        : string.Equals(segment, "ALL", StringComparison.OrdinalIgnoreCase)
+        : CobolNames.Same(segment, "ALL")
             ? "the subscript ALL is written where it is not permitted: ISO §8.4.2.3.3 SR6 — \"The subscript ALL may "
               + "be used only\" when the subscripted identifier is an intrinsic function argument, or as the rightmost "
               + "or only subscript of a table in the table format of a SORT statement. Write the occurrence you mean."

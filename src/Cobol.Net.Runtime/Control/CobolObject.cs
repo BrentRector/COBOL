@@ -41,9 +41,11 @@ public abstract class CobolObject
     /// <summary>Normalize an identifier-2 method-name value (§14.9.23.4 GR2a): the content IS a
     /// user-defined word — formed by the one externalized-name rule (<see cref="ExternalizedNames.Form"/>: leading
     /// and trailing spaces, which include the PIC X padding, are not part of the name) and case-insensitive
-    /// (§8.3.2.2). The ONE word mapping: the INVOKE literal is normalized through it at bind time, and every
-    /// generated case label is the method's EXTERNALIZED name through it (<c>OoMethodSymbol.DispatchKey</c>).</summary>
-    public static string NormalizeMethodName(string raw) => ExternalizedNames.Form(raw).ToUpperInvariant();
+    /// (§8.3.2.2) by the ONE Annex C fold, <see cref="CobolNames.Fold(string)"/> (kb/Work PB1402 — this upper-cased by
+    /// the host's case mapping, which disagrees with Annex C on the extended letters). The ONE word mapping: the
+    /// INVOKE literal is normalized through it at bind time, and every generated case label is the method's
+    /// EXTERNALIZED name through it (<c>OoMethodSymbol.DispatchKey</c>).</summary>
+    public static string NormalizeMethodName(string raw) => CobolNames.Fold(ExternalizedNames.Form(raw));
 
     /// <summary>Adopt this object's CLASS static storage — every method's WORKING-STORAGE, OO deep-dive D3 — into
     /// <paramref name="runUnit"/> (<see cref="RunUnit.AdoptStaticStorage"/>, kb/Work PB1069). Called once, on the

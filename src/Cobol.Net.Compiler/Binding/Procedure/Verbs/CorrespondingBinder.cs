@@ -133,7 +133,7 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
         CorrAccess srcAcc, CorrAccess dstAcc, List<DataItem> sChain, List<DataItem> dChain,
         List<CorrespondingPair> pairs, CobolRounding rounding)
     {
-        var dstByName = new Dictionary<string, List<DataItem>>(StringComparer.OrdinalIgnoreCase);
+        var dstByName = new Dictionary<string, List<DataItem>>(CobolNames.Comparer);
         foreach (var d in CorrMembers(dst))
         {
             if (!dstByName.TryGetValue(d.CobolName!, out var list)) dstByName[d.CobolName!] = list = [];
@@ -267,7 +267,7 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
     /// operands, so the two sides of the rule answer alike.</summary>
     private static Dictionary<string, int> NamesakeCounts(DataItem group)
     {
-        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var counts = new Dictionary<string, int>(CobolNames.Comparer);
         void Count(IEnumerable<DataItem> items)
         {
             foreach (var item in items)

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Frontend.Common;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -170,7 +171,7 @@ public static partial class ReferenceFormatProcessor
                 _inCommentEntry = false;
                 return CommentEntryText.None;
             }
-            if (firstAreaAWord is not null && firstAreaAWord.EndsWith("-ID", StringComparison.OrdinalIgnoreCase))
+            if (firstAreaAWord is not null && CobolNames.EndsWith(firstAreaAWord, "-ID"))
                 _inIdentificationDivision = true;           // PROGRAM-ID / CLASS-ID / ... (the header is optional)
             if (_inIdentificationDivision && firstAreaAWord is not null && CommentEntryParagraphs.Contains(firstAreaAWord))
             {
@@ -246,7 +247,7 @@ public static partial class ReferenceFormatProcessor
     {
         int at = sourceArea.IndexOf(firstWord, StringComparison.Ordinal) + firstWord.Length;
         ReadOnlySpan<char> rest = sourceArea.AsSpan(at).TrimStart(' ');
-        return rest.StartsWith("DIVISION", StringComparison.OrdinalIgnoreCase)
+        return CobolNames.StartsWith(rest, "DIVISION")
                && (rest.Length == 8 || rest[8] is ' ' or '.')
             ? firstWord.ToUpperInvariant() : null;
     }

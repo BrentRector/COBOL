@@ -1148,13 +1148,38 @@ public sealed class DataItem
     // (The ClrType back-compat alias is DELETED — P5.10: zero readers, grep-proven by the topology audit.)
 
     /// <summary>
-    /// Convert a COBOL data-name to a valid, collision-safe C# identifier: hyphens → underscores, a leading digit
-    /// gets an underscore prefix, and C# keywords are escaped with <c>@</c>.
+    /// Convert a COBOL data-name to a valid, collision-safe C# identifier: <see cref="IdentifierCharacters"/>, then a
+    /// leading character C# cannot start an identifier with (a digit) gets an underscore prefix, and C# keywords are
+    /// escaped with <c>@</c>.
     /// </summary>
     public static string Sanitize(string cobolName)
     {
-        string s = cobolName.Replace('-', '_');
-        if (s.Length == 0 || char.IsDigit(s[0])) s = "_" + s;
+        string s = IdentifierCharacters(cobolName);
+        if (s.Length == 0 || !SyntaxFacts.IsIdentifierStartCharacter(s[0])) s = "_" + s;
         return SyntaxFacts.GetKeywordKind(s) != SyntaxKind.None ? "@" + s : s;
+    }
+
+    /// <summary>The characters of a COBOL word as C# identifier characters: a hyphen becomes an underscore, and a
+    /// character a C# identifier cannot hold is written <c>_uXXXX_</c> by its code point — an extended letter of
+    /// Annex B that C# does not accept (KATAKANA MIDDLE DOT U+30FB, a supplementary-plane letter, whose surrogates
+    /// Roslyn refuses in an identifier; kb/Work PB1402). Every other extended letter is kept as written, so the
+    /// generated program reads like its source.</summary>
+    public static string IdentifierCharacters(string cobolName)
+    {
+        System.Text.StringBuilder? sb = null;
+        for (int i = 0; i < cobolName.Length; i++)
+        {
+            char c = cobolName[i];
+            if (c == '-' || !SyntaxFacts.IsIdentifierPartCharacter(c))
+            {
+                sb ??= new System.Text.StringBuilder(cobolName.Length + 8).Append(cobolName, 0, i);
+                if (c == '-') { sb.Append('_'); continue; }
+                bool pair = char.IsHighSurrogate(c) && i + 1 < cobolName.Length && char.IsLowSurrogate(cobolName[i + 1]);
+                int cp = pair ? char.ConvertToUtf32(c, cobolName[++i]) : c;
+                sb.Append("_u").Append(cp.ToString("X4")).Append('_');
+            }
+            else sb?.Append(c);
+        }
+        return sb?.ToString() ?? cobolName;
     }
 }

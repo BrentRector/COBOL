@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Frontend.Preprocessor;
 
 /// <summary>
@@ -19,10 +21,10 @@ internal static class CompilationUnitStart
     /// unit's identification division — the header (or its <c>ID DIVISION</c> abbreviation), or, the header being
     /// optional, the unit's own first paragraph.</summary>
     public static bool IsAt(string trimmed)
-        => trimmed.StartsWith("IDENTIFICATION DIVISION", StringComparison.OrdinalIgnoreCase)
-        || trimmed.StartsWith("ID DIVISION", StringComparison.OrdinalIgnoreCase)
-        || trimmed.StartsWith("PROGRAM-ID", StringComparison.OrdinalIgnoreCase)
-        || trimmed.StartsWith("CLASS-ID", StringComparison.OrdinalIgnoreCase)
-        || trimmed.StartsWith("FUNCTION-ID", StringComparison.OrdinalIgnoreCase)
-        || trimmed.StartsWith("INTERFACE-ID", StringComparison.OrdinalIgnoreCase);
+        => CobolNames.StartsWith(trimmed, "IDENTIFICATION DIVISION")
+        || CobolNames.StartsWith(trimmed, "ID DIVISION")
+        || CobolNames.StartsWith(trimmed, "PROGRAM-ID")
+        || CobolNames.StartsWith(trimmed, "CLASS-ID")
+        || CobolNames.StartsWith(trimmed, "FUNCTION-ID")
+        || CobolNames.StartsWith(trimmed, "INTERFACE-ID");
 }

@@ -6,6 +6,7 @@ using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Generated;
 using CobolNet.Frontend.Preprocessor;
+using CobolNet.Runtime;
 
 namespace CobolNet.Validation;
 
@@ -101,12 +102,12 @@ internal static class DirectivePlacementPass
     {
         if (site.AllForm)
         {
-            var (rule, text) = site.Word.Equals("PUSH", StringComparison.OrdinalIgnoreCase) ? PushRule : PopRule;
+            var (rule, text) = CobolNames.Same(site.Word, "PUSH") ? PushRule : PopRule;
             return $"the >>{site.Word} ALL directive on line {site.Line} is written {where} — \"{text}\" (ISO {rule}).";
         }
         if (named is not null)
         {
-            var (rule, _) = site.Word.Equals("PUSH", StringComparison.OrdinalIgnoreCase) ? PushNameRule : PopNameRule;
+            var (rule, _) = CobolNames.Same(site.Word, "PUSH") ? PushNameRule : PopNameRule;
             return $"the >>{site.Word} {named.DirectiveWords[0]} directive on line {site.Line} is written {where}, where "
                 + $"{named.DirectiveWords[0]} must not be specified (ISO {rule}: \"the {site.Word} directive shall not be "
                 + $"specified where directive-name must not be specified\") — \"{placement!.Text}\" (ISO {placement.Citation}).";

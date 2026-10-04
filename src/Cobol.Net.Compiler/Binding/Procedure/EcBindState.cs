@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Bound;
 using CobolNet.Runtime.Exceptions;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding.Procedure;
 
@@ -32,7 +33,7 @@ internal sealed class EcBindState
     public string ProgramName { get; set; } = "";
 
     /// <summary>PD-header RAISING exception-names (§14.2.1; the GOBACK/EXIT SR2 check).</summary>
-    public HashSet<string> PdRaising { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<string> PdRaising { get; } = new(CobolNames.Comparer);
 
     /// <summary>PD-header RAISING object alternatives — `[FACTORY OF] object-class-name-1` and
     /// `interface-name-1` (§14.2.1 / §14.2.2 SR8–SR9), as the <see cref="Model.RaisingTarget"/> tuples the

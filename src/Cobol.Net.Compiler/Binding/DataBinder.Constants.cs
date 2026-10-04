@@ -13,6 +13,7 @@ using CobolNet.Binding.Model;
 namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// The CONSTANT-entry half of the data binder (ISO/IEC 1989:2023 §13.10 constant entry + §13.18.15 CONSTANT
@@ -87,12 +88,12 @@ public sealed partial class DataBinder
     /// <summary>The per-unit compile-time constant table (§13.10.4 GR1 substitution source). It also holds the
     /// GLOBAL constants of every containing program (<see cref="InheritGlobalConstants"/>, kb/Work PB1009), named
     /// in <see cref="_inheritedConstants"/> until a local declaration shadows them.</summary>
-    private readonly Dictionary<string, ConstantDef> _constants = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ConstantDef> _constants = new(CobolNames.Comparer);
 
     /// <summary>The names in <see cref="_constants"/> that came from a container, not from this unit's own entries,
     /// each with the containment distance of the container that declared it (1 = the direct container) — the tier
     /// <see cref="DropShadowedConstants"/> weighs against a same-spelled data-name's (kb/Work PB1047).</summary>
-    private readonly Dictionary<string, int> _inheritedConstants = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _inheritedConstants = new(CobolNames.Comparer);
 
     /// <summary>ISO §13.18.27.4 GR1–GR2 for constant-names (kb/Work PB1009): "A constant-name, data-name, file-name,
     /// report-name, or screen-name described using a GLOBAL clause is a global name", and "A statement in a program
@@ -179,7 +180,7 @@ public sealed partial class DataBinder
     }
 
     /// <summary>The unit's constant entries by name, in source order (a duplicated name, §13.10.3 SR9, has several).</summary>
-    private readonly Dictionary<string, List<DeclaredConstant>> _declaredConstants = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<DeclaredConstant>> _declaredConstants = new(CobolNames.Comparer);
 
     /// <summary>The same entries by their body — how an in-order walk finds the declaration it has reached.</summary>
     private readonly Dictionary<Core.ConstantEntryBodyContext, DeclaredConstant> _constantByBody = [];
@@ -207,7 +208,7 @@ public sealed partial class DataBinder
             if (body is null || _constantByBody.ContainsKey(body)) continue;
             var d = new DeclaredConstant((Antlr4.Runtime.ParserRuleContext)node, level, nameCtx, body);
             _constantByBody[body] = d;
-            if (nameCtx?.GetText() is not { } name || name.Equals("FILLER", StringComparison.OrdinalIgnoreCase)) continue;
+            if (nameCtx?.GetText() is not { } name || CobolNames.Same(name, "FILLER")) continue;
             if (!_declaredConstants.TryGetValue(name, out var list)) _declaredConstants[name] = list = [];
             list.Add(d);
             if (_inheritedConstants.Remove(name)) _constants.Remove(name);
@@ -262,7 +263,7 @@ public sealed partial class DataBinder
             if (d.Level.GetText() is not ("1" or "01"))
                 Edition.Error(DiagnosticCatalog.ConstantEntryRule,
                     $"{where}: a constant entry shall have level-number 1 or 01 (ISO §13.10.2)");
-            if (name is null || name.Equals("FILLER", StringComparison.OrdinalIgnoreCase))
+            if (name is null || CobolNames.Same(name, "FILLER"))
             {
                 Edition.Error(DiagnosticCatalog.ConstantEntryRule,
                     "a constant entry shall be named — constant-name-1 is required (ISO §13.10.2)");
@@ -416,7 +417,7 @@ public sealed partial class DataBinder
         if (!_constantByBody.TryGetValue(body, out var d))
         {
             _constantByBody[body] = d = new DeclaredConstant(entry, level, nameCtx, body);
-            if (nameCtx?.GetText() is { } name && !name.Equals("FILLER", StringComparison.OrdinalIgnoreCase))
+            if (nameCtx?.GetText() is { } name && !CobolNames.Same(name, "FILLER"))
             {
                 if (!_declaredConstants.TryGetValue(name, out var list)) _declaredConstants[name] = list = [];
                 list.Add(d);

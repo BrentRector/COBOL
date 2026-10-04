@@ -10,6 +10,7 @@ using CobolNet.Binding.Model;
 namespace CobolNet.Compiler.Oo;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// The PASS-1 class symbol table of a compilation group (OO deep-dive D1; ISO §11.2/§11.3/§11.7): built from
@@ -21,7 +22,7 @@ using Core = CobolParserCore;
 /// </summary>
 public sealed class OoClassTable
 {
-    private readonly Dictionary<string, OoClassSymbol> _byName = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, OoClassSymbol> _byName = new(CobolNames.Comparer);
 
     /// <summary>All classes in source order (the emitter's deterministic emission order).</summary>
     public IReadOnlyList<OoClassSymbol> Classes => _classes;
@@ -32,7 +33,7 @@ public sealed class OoClassTable
     /// (<see cref="_ifaceByName"/> is checked against <see cref="_byName"/> at Build — a collision is 0840).</summary>
     public IReadOnlyList<OoInterfaceSymbol> Interfaces => _interfaces;
     private readonly List<OoInterfaceSymbol> _interfaces = [];
-    private readonly Dictionary<string, OoInterfaceSymbol> _ifaceByName = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, OoInterfaceSymbol> _ifaceByName = new(CobolNames.Comparer);
 
     /// <summary>The interface named <paramref name="name"/>, or null (case-insensitive, §8.3.2.2).</summary>
     public OoInterfaceSymbol? FindInterface(string name) => _ifaceByName.TryGetValue(name, out var i) ? i : null;
@@ -44,7 +45,7 @@ public sealed class OoClassTable
     /// class is as subject to it as any other (§8.4.6.4 — a REPOSITORY entry is still required).</summary>
     public OoClassSymbol? Find(string name) =>
         _byName.TryGetValue(name, out var c) ? c
-        : string.Equals(name, OoStandardClasses.BaseName, StringComparison.OrdinalIgnoreCase) ? StandardBase
+        : CobolNames.Same(name, OoStandardClasses.BaseName) ? StandardBase
         : null;
 
     /// <summary>The class whose EXTERNALIZED name (its CLASS-ID's <c>AS literal-1</c>, or its name) is
@@ -53,8 +54,8 @@ public sealed class OoClassTable
     /// class BASE is externalized as its own name, and answers only when no definition of the group claims it —
     /// the same precedence as <see cref="Find"/>.</summary>
     public OoClassSymbol? FindByExternalizedName(string externalized) =>
-        _classes.FirstOrDefault(c => string.Equals(c.ExternalizedName, externalized, StringComparison.OrdinalIgnoreCase))
-        ?? (string.Equals(externalized, StandardBase.ExternalizedName, StringComparison.OrdinalIgnoreCase)
+        _classes.FirstOrDefault(c => CobolNames.Same(c.ExternalizedName, externalized))
+        ?? (CobolNames.Same(externalized, StandardBase.ExternalizedName)
             ? StandardBase : null);
 
     /// <summary>This compilation group's symbol for the standard class BASE (ISO §16; <see cref="OoStandardClasses"/>).
@@ -63,7 +64,7 @@ public sealed class OoClassTable
 
     /// <summary>The interface twin of <see cref="FindByExternalizedName"/> (literal-2).</summary>
     public OoInterfaceSymbol? FindInterfaceByExternalizedName(string externalized) =>
-        _interfaces.FirstOrDefault(i => string.Equals(i.ExternalizedName, externalized, StringComparison.OrdinalIgnoreCase));
+        _interfaces.FirstOrDefault(i => CobolNames.Same(i.ExternalizedName, externalized));
 
     /// <summary>True when <paramref name="name"/> names a PARAMETERIZED class or interface definition of the group
     /// (kb/Work PB759). Such a definition is a skeleton (§9.3.12 / §9.3.13) and is deliberately NOT in this table
@@ -216,8 +217,7 @@ public sealed class OoClassTable
             }
             table._ifaceByName.Add(iname, isym);
             table._interfaces.Add(isym);
-            if (!string.Equals(ictx.interfaceName(ictx.interfaceName().Length - 1).GetText(), iname,
-                    StringComparison.OrdinalIgnoreCase))
+            if (!CobolNames.Same(ictx.interfaceName(ictx.interfaceName().Length - 1).GetText(), iname))
                 using (edition.At(ictx.interfaceName(ictx.interfaceName().Length - 1)))
                     edition.Error("COBOLNET0840",
                         $"END INTERFACE does not match INTERFACE-ID '{iname}' (ISO §10.7)");
@@ -265,11 +265,11 @@ public sealed class OoClassTable
         foreach (var isym in table._interfaces)
         {
             // §11.6.3 SR6: "A given interface-name shall not appear more than once in an INHERITS clause" — the rule is
-            // about the WRITTEN NAME (uppercase and lowercase basic letters are equivalent, §8.1.3.2 GR3), not the interface it resolves to:
+            // about the WRITTEN NAME (two spellings are one name under the Annex C fold, §8.1.3.2 GR3 b)/GR4 b)), not the interface it resolves to:
             // two different REPOSITORY names for one externalized interface (§12.3.8.3 — INTERFACE R6X AS "E" and
             // INTERFACE R6Y AS "E") are two interface-names, which no sentence of the standard forbids, so both are
             // legal and name ONE base (docs/CONFORMANCE.md D-INH1; kb/Work PB1502, following the PB946 determination).
-            var writtenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var writtenNames = new HashSet<string>(CobolNames.Comparer);
             foreach (var inhCtx in isym.Ctx.interfaceName().Skip(1).Take(isym.Ctx.interfaceName().Length - 2))
             {
                 string inh = inhCtx.GetText();
@@ -372,7 +372,7 @@ public sealed class OoClassTable
             table._classes.Add(sym);
 
             if (ctx.endClassHeader().className().GetText() is { } endName
-                && !string.Equals(endName, name, StringComparison.OrdinalIgnoreCase))
+                && !CobolNames.Same(endName, name))
                 using (edition.At(ctx.endClassHeader()))
                     edition.Error("COBOLNET0820",
                         $"END CLASS '{endName}' does not match CLASS-ID '{name}' (ISO §10.7 — the end marker names "
@@ -427,7 +427,7 @@ public sealed class OoClassTable
                         + "resolution signature is PARAMETRIC POLYMORPHISM (ISO §9.3.5.3), an OPTIONAL element "
                         + "(Annex A.4.10 item 3; §9.3.5.3 rule 7) whose support WiseOwl COBOL does not claim");
                 if (sel is null && m.methodName().Length > 1
-                    && !string.Equals(m.methodName(1).GetText(), methodName, StringComparison.OrdinalIgnoreCase))
+                    && !CobolNames.Same(m.methodName(1).GetText(), methodName))
                     using (edition.At(m.methodName(1)))
                         edition.Error("COBOLNET0820",
                             $"class '{name}': END METHOD '{m.methodName(1).GetText()}' does not match METHOD-ID "
@@ -447,7 +447,7 @@ public sealed class OoClassTable
                         : NamingConvention.SetAccessorName(fsel.propertyName().GetText()))
                     : m.methodName(0).GetText();
                 var pd = m.procedureDivision();
-                if (string.Equals(methodName, "NEW", StringComparison.OrdinalIgnoreCase))
+                if (CobolNames.Same(methodName, "NEW"))
                 {
                     edition.Error("COBOLNET0836",
                         $"class '{name}': a factory method may not be named 'NEW' — the predefined New "
@@ -476,7 +476,7 @@ public sealed class OoClassTable
                         + "§9.3.5.3), an OPTIONAL element (Annex A.4.10 item 3) whose support WiseOwl COBOL does "
                         + "not claim — the factory arm carried NO citation at all before this");
                 if (fsel is null && m.methodName().Length > 1
-                    && !string.Equals(m.methodName(1).GetText(), methodName, StringComparison.OrdinalIgnoreCase))
+                    && !CobolNames.Same(m.methodName(1).GetText(), methodName))
                     using (edition.At(m.methodName(1)))
                         edition.Error("COBOLNET0820",
                             $"class '{name}': END METHOD '{m.methodName(1).GetText()}' does not match METHOD-ID "

@@ -52,7 +52,7 @@ public sealed class ProgramTable
     }
 
     private readonly RunUnit _owner;
-    private readonly Dictionary<string, Node> _byPath = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Node> _byPath = new(ExternalizedNames.Comparer);
     private readonly List<Node> _order = [];
     private readonly HashSet<string> _probedModules = new(ExternalizedNames.Comparer);
 

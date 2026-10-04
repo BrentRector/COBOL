@@ -9,6 +9,7 @@ using CobolNet.Frontend.Diagnostics;
 using CobolNet.Frontend.Generated;
 using CobolNet.Frontend.Parsing;
 using CobolNet.Frontend.Preprocessor;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend;
 
@@ -396,7 +397,7 @@ public sealed class Frontend
     /// <c>CompilerDirectiveCatalog</c> row, and the EDITION question was already answered by the driver before the
     /// line reached these stages (kb/Work PB725), which is why none of them takes a dialect any more.
     /// <c>CompilerDirectiveCatalogDriftTests</c> asserts the subset relation.</summary>
-    public static readonly IReadOnlySet<string> LeftDirectives = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    public static readonly IReadOnlySet<string> LeftDirectives = new HashSet<string>(CobolNames.Comparer)
     {
         "TURN", "PUSH", "POP", "PROPAGATE", "REF-MOD-ZERO-LENGTH", "FLAG-02", "FLAG-14", "COBOL-WORDS", "LEAP-SECOND",
     };

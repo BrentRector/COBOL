@@ -4,6 +4,7 @@ using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.Common;
 using Microsoft.CodeAnalysis.CSharp;
+using CobolNet.Runtime;
 
 namespace CobolNet.CodeGen;
 
@@ -48,7 +49,7 @@ internal static class FigurativeConstants
     public static FigurativeOperand Classify(string raw, bool includeNull = true)
     {
         string t = raw.Trim();
-        bool hasAll = t.Length > 3 && t.StartsWith("ALL", StringComparison.OrdinalIgnoreCase);
+        bool hasAll = t.Length > 3 && CobolNames.StartsWith(t, "ALL");
         string rest = hasAll ? t[3..].TrimStart() : t;
         if (KindOf(rest, includeNull) is { } k) return new(k, null);                  // Formats 1–5 (ALL optional)
         if (hasAll && CobolLiteral.IsStringLiteral(rest)) return new(null, rest);     // Format 6 (ALL required)

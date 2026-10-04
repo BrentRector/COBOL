@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Binding.Model;
 
 /// <summary>
@@ -270,7 +272,7 @@ internal static class BitLayout
     private static int IndexOfNamed(IReadOnlyList<DataItem> siblings, string name)
     {
         for (int i = 0; i < siblings.Count; i++)
-            if (string.Equals(siblings[i].CobolName, name, System.StringComparison.OrdinalIgnoreCase)) return i;
+            if (CobolNames.Same(siblings[i].CobolName, name)) return i;
         return -1;
     }
 

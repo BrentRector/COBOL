@@ -102,11 +102,11 @@ public sealed class ExternalTable
         // kind so the two registrations never overwrite or cross-compare.
         string key = desc.Kind + ":" + name;
         if (!_describers.TryGetValue(key, out var entries))
-            _describers[key] = entries = new Dictionary<string, ExternalDescriptor>(StringComparer.OrdinalIgnoreCase);
+            _describers[key] = entries = new Dictionary<string, ExternalDescriptor>(ExternalizedNames.Comparer);
         if (gate != ExternalChecks.None)
             foreach (var (other, prior) in entries)
             {
-                if (other.Equals(describer, StringComparison.OrdinalIgnoreCase)) continue;
+                if (ExternalizedNames.Same(other, describer)) continue;
                 if ((gate & ExternalChecks.FormatConflict) != 0 && desc.Kind == "record"
                     && (prior.ByteCount != desc.ByteCount || prior.ValueImage != desc.ValueImage
                         || prior.StrongTypeKey != desc.StrongTypeKey || prior.ConstantRecord != desc.ConstantRecord))

@@ -16,6 +16,7 @@ using CobolNet.Compiler.Oo;
 namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// THE Binder phase (rearch PHASE-06 Step 2): binds a whole compilation group to an immutable
@@ -276,7 +277,7 @@ internal sealed class BinderDriver
     {
         var byExternalName = units.SelectMany(u => u.Data.Files)
             .Where(f => f is { IsExternal: true, ExternalName: not null })
-            .GroupBy(f => f.ExternalName!.ToUpperInvariant());
+            .GroupBy(f => f.ExternalName!, CobolNames.Comparer);
         // The 2023 requirement REMOVES a prior-edition freedom (corresponding external-file SELECTs could name
         // inconsistent / non-external FILE STATUS + RELATIVE KEY items), so its severity follows the removal policy:
         // an Error under strict, downgraded to a Warning under --permissive migration mode — the same contract the
@@ -294,20 +295,21 @@ internal sealed class BinderDriver
                 $"external file '{ext}'", "ISO §14.8.4.2 / Annex E.2 item 9");
         foreach (var group in byExternalName)
         {
+            string externalName = group.Key.ToUpperInvariant();   // the name as the diagnostics show it; equality was the fold's above
             var conns = group.ToList();
             // Conjunct 1 (externality) is enforced for EVERY external connector, regardless of describer count — a
             // lone-program external file whose file-referencing item is non-external is a §14.8.4.2 violation.
             foreach (var f in conns)
             {
                 if (f.FileStatusName is not null && ExternalItemIdentity(f.FileStatusItem) is null)
-                    edition.Report(Externality(group.Key, "FILE STATUS", f.FileStatusName));
+                    edition.Report(Externality(externalName, "FILE STATUS", f.FileStatusName));
                 if (f.Organization == FileOrganization.Relative && f.RelativeKeyName is not null
                     && ExternalItemIdentity(f.RelativeKeyItem) is null)
-                    edition.Report(Externality(group.Key, "RELATIVE KEY", f.RelativeKeyName));
+                    edition.Report(Externality(externalName, "RELATIVE KEY", f.RelativeKeyName));
                 if (f.Linage is { } lin)
                     foreach (var op in lin.Operands)
                         if (op.DataName is not null && ExternalItemIdentity(op.Item) is null)
-                            edition.Report(Externality(group.Key, "LINAGE", op.DataName));   // literal operands are exempt
+                            edition.Report(Externality(externalName, "LINAGE", op.DataName));   // literal operands are exempt
             }
             // Conjunct 2 (cross-unit CONSISTENCY, §12.4.5.3 GR1(h)/(i)) needs ≥2 in-group describers to reconcile; the
             // single-describer externality face is enforced above, and cross-compilation sameness stays with the
@@ -321,10 +323,10 @@ internal sealed class BinderDriver
                 var ids = conns.Select(f => ExternalItemIdentity(f.FileStatusItem)).ToList();
                 if (ids.Any(id => id is null) || ids.Distinct(StringComparer.Ordinal).Count() > 1)
                     edition.Report(new EditionDiagnostic("COBOLNET1573", severity, "external-file-status-consistency",
-                        $"external file '{group.Key}': all corresponding SELECT statements in the run unit shall "
+                        $"external file '{externalName}': all corresponding SELECT statements in the run unit shall "
                         + "specify FILE STATUS naming the same corresponding external data item "
                         + "(ISO §12.4.5.3 GR1(i); Annex E.2 item 12)",
-                        $"external file '{group.Key}'", "ISO §12.4.5.3 GR1(i) / §14.8.4.2 / Annex E.2 item 12"));
+                        $"external file '{externalName}'", "ISO §12.4.5.3 GR1(i) / §14.8.4.2 / Annex E.2 item 12"));
             }
 
             // VCR 31 — RELATIVE KEY: for an external RELATIVE file, if ANY corresponding SELECT specifies RELATIVE
@@ -335,10 +337,10 @@ internal sealed class BinderDriver
                 var ids = conns.Select(f => ExternalItemIdentity(f.RelativeKeyItem)).ToList();
                 if (ids.Any(id => id is null) || ids.Distinct(StringComparer.Ordinal).Count() > 1)
                     edition.Report(new EditionDiagnostic("COBOLNET1575", severity, "external-relative-key-consistency",
-                        $"external relative file '{group.Key}': all corresponding SELECT statements in the run unit "
+                        $"external relative file '{externalName}': all corresponding SELECT statements in the run unit "
                         + "shall specify RELATIVE KEY naming the same corresponding external data item "
                         + "(ISO §12.4.5.3 GR1(h); Annex E.2 item 24)",
-                        $"external relative file '{group.Key}'", "ISO §12.4.5.3 GR1(h) / §14.8.4.2 / Annex E.2 item 24"));
+                        $"external relative file '{externalName}'", "ISO §12.4.5.3 GR1(h) / §14.8.4.2 / Annex E.2 item 24"));
             }
         }
     }
@@ -899,7 +901,7 @@ internal sealed class BinderDriver
                 // COBOLNET0840). A pair already reported THERE is skipped here rather than doubled — but only
                 // that pair: two class definitions whose words DIFFER and whose AS literals coincide are
                 // §8.3.2.2's business alone, and nothing else in the compiler looks at them.
-                if (IsOo(kind) && IsOo(first.Kind) && string.Equals(word, first.Word, StringComparison.OrdinalIgnoreCase)) continue;
+                if (IsOo(kind) && IsOo(first.Kind) && CobolNames.Same(word, first.Word)) continue;
                 // Two EXTERNAL items of ONE kind under one name are the SAME INSTANCE — that sharing is what the
                 // EXTERNAL clause is for ("they refer to the same instance"), and whether their descriptions agree is
                 // §13.18.22.4 / EC-EXTERNAL-*'s question. Only a pair of DIFFERENT kinds conflicts.
@@ -1096,7 +1098,7 @@ internal sealed class BinderDriver
     internal static Dictionary<string, ProgramPrototype> ProgramPrototypesOf(
         DataBinder data, BoundUnit? unit, IReadOnlyDictionary<string, CalleeSignature> programDefinitions)
     {
-        var map = new Dictionary<string, ProgramPrototype>(StringComparer.OrdinalIgnoreCase);
+        var map = new Dictionary<string, ProgramPrototype>(CobolNames.Comparer);
         foreach (var (name, spec) in data.ProgramSpecifiers)
             // GR10 a) / b): the in-group definition — else the in-group program PROTOTYPE definition (kb/Work
             // PB894) — supplies the details; BuildProgramDetailsTable already layered the two in that order.
@@ -1162,14 +1164,14 @@ internal sealed class BinderDriver
         foreach (var (name, externalized) in data.FunctionSpecifiers)
         {
             if (string.Equals(name, externalized, StringComparison.Ordinal)) continue;
-            own ??= new Dictionary<string, UserFunctionSignature>(group, StringComparer.OrdinalIgnoreCase);
+            own ??= new Dictionary<string, UserFunctionSignature>(group, CobolNames.Comparer);
             var target = group.Values.FirstOrDefault(f => CobolNet.Runtime.ExternalizedNames.Same(f.Externalized, externalized));
             if (target is null) own.Remove(name);
             else own[name] = target;
         }
         if (selfSpecified)
         {
-            own ??= new Dictionary<string, UserFunctionSignature>(group, StringComparer.OrdinalIgnoreCase);
+            own ??= new Dictionary<string, UserFunctionSignature>(group, CobolNames.Comparer);
             own[unit!.Name] = new UserFunctionSignature(unit.Name, unit.ExternalizedName,
                 unit.Data.LinkageReturning, unit.Data.LinkageFormals);
         }
@@ -1189,8 +1191,8 @@ internal sealed class BinderDriver
         // (signature-only, §11.5 Format 2). A prototype precedes all other units (§10.6.2 SR1), so a naive
         // first-wins TryAdd would false-report the FOLLOWING same-name definition as a duplicate (1508) — the
         // partition prevents that. Every function unit must carry a RETURNING (§14.2 :23666) — checked once here.
-        var defs = new Dictionary<string, BoundUnit>(StringComparer.OrdinalIgnoreCase);
-        var protos = new Dictionary<string, BoundUnit>(StringComparer.OrdinalIgnoreCase);
+        var defs = new Dictionary<string, BoundUnit>(CobolNames.Comparer);
+        var protos = new Dictionary<string, BoundUnit>(CobolNames.Comparer);
         foreach (var u in units)
         {
             if (!u.IsFunction) continue;
@@ -1223,7 +1225,7 @@ internal sealed class BinderDriver
 
         // §12.3.8 GR11(a) — an in-group DEFINITION is authoritative over a same-name PROTOTYPE (:14871); a lone
         // prototype supplies the signature for a separately-compiled target (:14875 / §8.4.3.2.4 GR6b :6997).
-        var table = new Dictionary<string, UserFunctionSignature>(StringComparer.OrdinalIgnoreCase);
+        var table = new Dictionary<string, UserFunctionSignature>(CobolNames.Comparer);
         foreach (var (name, u) in defs)
             table[name] = new UserFunctionSignature(name, u.ExternalizedName, u.Data.LinkageReturning, u.Data.LinkageFormals);
         foreach (var (name, p) in protos)

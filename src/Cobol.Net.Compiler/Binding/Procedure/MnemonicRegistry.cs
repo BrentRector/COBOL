@@ -7,6 +7,7 @@ using CobolNet.Editions;
 namespace CobolNet.Binding.Procedure;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>The SPECIAL-NAMES {mnemonic-name → implementor system-name} registry (ISO §12.3.7.2: <c>switch-name-1
 /// IS mnemonic-name-1</c> | <c>feature-name-1 IS mnemonic-name-2</c> | <c>device-name-1 IS mnemonic-name-3</c>),
@@ -34,7 +35,7 @@ internal sealed class MnemonicRegistry
     public IReadOnlyDictionary<string, ImplementorName> Of(IParseTree at)
     {
         if (_map is not null) return _map;
-        var map = new Dictionary<string, ImplementorName>(StringComparer.OrdinalIgnoreCase);
+        var map = new Dictionary<string, ImplementorName>(CobolNames.Comparer);
         for (IParseTree? n = at; n is not null; n = n.Parent)
         {
             // kb/Work PB135: a METHOD's parse chain never meets a ProgramUnitContext (it tops out at

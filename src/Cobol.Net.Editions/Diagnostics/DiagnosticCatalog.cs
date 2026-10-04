@@ -82,6 +82,14 @@ public static class DiagnosticCatalog
         "A COBOL word exceeds the edition's length ceiling: 63 characters at COBOL-2023 (Annex E.3.3 item 11 — "
         + "a relaxation, so a 32..63-character word below 2023 is a length error, not an introduction gate), "
         + "31 at 2002/2014, 30 at 1985.", "ISO §8.3.2.1");
+    // The §8.3.2.1 word CHARACTER rule's Annex B half — the same ONE rule site (CobolWordRule), the same two channels
+    // (kb/Work PB1402). The lexer's word class is a superset of Annex B, so a character outside it is named here.
+    public static readonly DiagnosticDescriptor WordCharacterNotPermitted = new(
+        "COBOLNET2773", "word-character-not-permitted", EditionSeverity.Error,
+        "A COBOL word holds a character that the edition's Annex B does not permit where it stands: one outside the "
+        + "repertoire (Annex B.3), or a continuing character (B.3 item 2) as the first character. (A character the "
+        + "COBOL 2014 Annex B permitted where COBOL 2023's does not — Annex E.2 item 4 — is the removed construct "
+        + "user-word-character-removed-2023, COBOLNET0902.)", "ISO §8.3.2.1; §8.1.3.2 GR4; Annex B.3");
     public static readonly DiagnosticDescriptor DigitCapacityOver18Pre2002 = new(
         "COBOLNET0802", "digit-capacity-over-18-pre-2002", EditionSeverity.Error,
         "A fixed-point item/literal exceeds the 18-digit COBOL-85 limit (19–31 need --std 2002+).", "ISO §8.3.3.3.2");

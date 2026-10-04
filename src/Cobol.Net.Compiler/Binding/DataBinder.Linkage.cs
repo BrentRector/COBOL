@@ -373,7 +373,7 @@ public sealed partial class DataBinder
         // cells from — a GLOBAL formal can be addressed from a contained program, kb/Work PB1009/PB1019).
         var addressed = DataBinder.PtrScanAddressOfSenders(pd)
             .Concat(program.nestedProgram().SelectMany(DataBinder.PtrScanAddressOfSenders))
-            .Select(t => t.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .Select(t => t.Name).ToHashSet(CobolNames.Comparer);
         foreach (var prm in pd.usingClause()?.usingParameter() ?? [])
         {
             using var _ = Edition.At(prm);
@@ -439,7 +439,7 @@ public sealed partial class DataBinder
             // mechanism, different carrier: CobolArgAdapt.NumValue instead of the aliasing Num view).
             bool redefined = LinkageRoots.Any(r => !ReferenceEquals(r, item)
                 && r.RedefinesTargetName is { } t
-                && string.Equals(t, item.CobolName, StringComparison.OrdinalIgnoreCase));
+                && CobolNames.Same(t, item.CobolName));
             // ⛔ The elementary/group test here is STRUCTURAL (no subordinate entries), not `IsElementary`
             // (Pic is not null). CallBindLinkage runs inside BindDeclarations, BEFORE the pipeline's
             // UsageInheritancePass, and a level-01 that wrote a PICTURE-less usage — `01 L USAGE BINARY-SHORT.
@@ -578,7 +578,7 @@ public sealed partial class DataBinder
             // a redefinition of a redefinition), so one step reaches it.
             bool viaObject = root.RedefinesTargetName is { } target
                 && roots.FirstOrDefault(o => !ReferenceEquals(o, root)
-                    && string.Equals(o.CobolName, target, StringComparison.OrdinalIgnoreCase)) is { } original
+                    && CobolNames.Same(o.CobolName, target)) is { } original
                 && Satisfied(original);
             if (!Satisfied(root) && !viaObject) _unreferenceableLinkageRoots.Add(root);
         }
@@ -600,7 +600,7 @@ public sealed partial class DataBinder
         _functionFormals.Count != 0 && _functionFormals.Contains(item);
 
     private DataItem? FindLinkageRoot(string name) =>
-        LinkageRoots.FirstOrDefault(r => string.Equals(r.CobolName, name, StringComparison.OrdinalIgnoreCase));
+        LinkageRoots.FirstOrDefault(r => CobolNames.Same(r.CobolName, name));
 
     /// <summary>
     /// Collect the roots whose EXTERNAL / GLOBAL clause the clause-placement screen ADMITTED
@@ -703,7 +703,7 @@ public sealed partial class DataBinder
     /// names, so a type declaration's literal-1 has no externalized name to collide with.</para>
     /// <para>⛔ ONE COMPARISON, THE RUN-UNIT STORE'S (kb/Work PB1236): case-INSENSITIVE. The default externalized name
     /// is the subject's data-name (§13.18.22.4 GR5), and a data-name's case never matters (§8.3.2), so
-    /// <c>ExternalTable</c> keys its cells and describers with <see cref="StringComparer.OrdinalIgnoreCase"/> — that
+    /// <c>ExternalTable</c> keys its cells and describers with <see cref="CobolNames.Comparer"/> — that
     /// is what makes <c>01 XV EXTERNAL</c> in one program and <c>01 Xv EXTERNAL</c> in another ONE record. The
     /// uniqueness screen this method is protects exactly that store, so it must ask the same question: the
     /// ordinal comparison it used to make let <c>EXTERNAL</c> and <c>EXTERNAL AS "a"</c> pass the screen and then
@@ -715,7 +715,7 @@ public sealed partial class DataBinder
         // Almost every source element declares no EXTERNAL subject at all; this pass runs once per unit,
         // so it costs nothing when there is nothing to compare.
         if (_callExternalBackings.Count == 0 && !Files.Any(f => f.IsExternal)) return;
-        var seen = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);   // the ExternalTable's own comparer
+        var seen = new Dictionary<string, string>(CobolNames.Comparer);   // the ExternalTable's own comparer
         void Claim(string externalized, string where, DiagnosticCursor at)
         {
             if (seen.TryGetValue(externalized, out var prior))

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Editions;
+using CobolNet.Runtime;
 namespace CobolNet.Frontend.Preprocessor;
 
 /// <summary>Which migration-flagging directive an option belongs to — <c>&gt;&gt;FLAG-02</c> (§7.3.14, the
@@ -147,9 +148,9 @@ public static class FlagOptions
     private sealed class DirWordComparer : IEqualityComparer<(FlagDirective, string)>
     {
         public bool Equals((FlagDirective, string) x, (FlagDirective, string) y) =>
-            x.Item1 == y.Item1 && string.Equals(x.Item2, y.Item2, StringComparison.OrdinalIgnoreCase);
+            x.Item1 == y.Item1 && CobolNames.Same(x.Item2, y.Item2);
         public int GetHashCode((FlagDirective, string) o) =>
-            HashCode.Combine(o.Item1, StringComparer.OrdinalIgnoreCase.GetHashCode(o.Item2));
+            HashCode.Combine(o.Item1, CobolNames.Comparer.GetHashCode(o.Item2));
     }
 }
 

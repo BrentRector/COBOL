@@ -11,6 +11,7 @@ using CobolNet.Binding.Model;
 namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// The SPECIAL-NAMES external-switch registry (ISO §12.3.7, version-invariant 85→2023): the switch-name clause
@@ -31,7 +32,7 @@ public sealed partial class DataBinder
     /// SPECIAL-NAMES). Consulted by the condition binder AFTER level-88 resolution (NC211A defines a name as BOTH;
     /// the level-88 wins).</summary>
     public Dictionary<string, (string ImplementorName, bool IsOn)> SwitchConditions { get; } =
-        new(StringComparer.OrdinalIgnoreCase);
+        new(CobolNames.Comparer);
 
     /// <summary>User-defined CLASS names (case-insensitive) → the EXPANDED member-character set (ISO §12.3.7
     /// class-name clause: each literal lists its characters; a THRU pair contributes every character between the
@@ -42,7 +43,7 @@ public sealed partial class DataBinder
     /// native sets are the same UTF-16 repertoire today (implementor item 188), so the members coincide — the flag
     /// is recorded so that a native alphanumeric set that is ever NOT that repertoire cannot silently resolve a
     /// national class's ordinals in the wrong set.</para></summary>
-    public Dictionary<string, UserClassDef> UserClasses { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, UserClassDef> UserClasses { get; } = new(CobolNames.Comparer);
 
     /// <summary>ALPHANUMERIC alphabet names (case-insensitive) → what the name references (ISO §12.3.7 GR7): the
     /// built collating table of a literal phrase, the LOCALE arm of an <c>IS LOCALE</c> phrase, the identity
@@ -51,7 +52,7 @@ public sealed partial class DataBinder
     /// <see cref="ImplementorCodeNames"/>: ASCII, identity like STANDARD-1; EBCDIC, whose 256-entry table the row
     /// carries). An <c>ALPHABET … FOR NATIONAL</c> clause registers in <see cref="NationalAlphabets"/>
     /// instead — the two classes are disjoint reference domains (§12.3.6 SR1/SR2, §14.9.40 GR5).</summary>
-    public Dictionary<string, AlphabetDef> Alphabets { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, AlphabetDef> Alphabets { get; } = new(CobolNames.Comparer);
 
     /// <summary>NATIONAL alphabet names (case-insensitive) → what the name references (ISO §12.3.7 GR7 b/d2/f/g/h/k
     /// + Table 6): a null-table identity for NATIVE and the coded-set names (UCS-4 collates in ISO 10646 order,
@@ -59,7 +60,7 @@ public sealed partial class DataBinder
     /// <see cref="NationalAlphabetDef"/> for the §8.5.1.4 derivation; UTF-8/UTF-16 name coded character sets ONLY),
     /// or the sparse <see cref="CollatingTable"/> of a literal phrase (the SAME record the alphanumeric arm
     /// builds - one §12.3.7.4 GR7 k model for both classes).</summary>
-    public Dictionary<string, NationalAlphabetDef> NationalAlphabets { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, NationalAlphabetDef> NationalAlphabets { get; } = new(CobolNames.Comparer);
 
     /// <summary>Is <paramref name="name"/> an alphabet-name of EITHER class (ISO §12.3.7 ALPHABET clause)? The
     /// question a trailing <c>IN word</c> after a THROUGH range's identifier asks (kb/Work PB843): §8.3.2.2 makes an
@@ -82,7 +83,7 @@ public sealed partial class DataBinder
     /// table per evaluation. SORT / MERGE / the indexed-file key registrations render their alphabet inline because
     /// each of those runs once per statement; a WHEN does not. The map is populated at BIND, so the field exists
     /// before any body that names it is rendered.</para></summary>
-    public Dictionary<string, RangeCollationCarrier> RangeCollations { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, RangeCollationCarrier> RangeCollations { get; } = new(CobolNames.Comparer);
 
     /// <summary>Record <paramref name="name"/>'s ALPHANUMERIC alphabet as a range collating sequence — with no
     /// carrier when the alphabet is the native order (an identity sequence needs none: §14.7.8 rule 2's "the
@@ -244,7 +245,7 @@ public sealed partial class DataBinder
     /// integer-1 of the native or IN-alphabet coded character set) and its class. Substituted wherever a figurative
     /// constant may stand — the reference seams consult <see cref="SymbolicOf"/> exactly as they consult the
     /// §13.10 constant table, and the value fills like every figurative (§8.3.3.6.4 GR2 / GR10).</summary>
-    public Dictionary<string, (string Value, bool National)> SymbolicCharacters { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, (string Value, bool National)> SymbolicCharacters { get; } = new(CobolNames.Comparer);
 
     /// <summary>The symbolic character a BARE (unqualified, unsubscripted) data reference names, or null — the
     /// twin of <c>ConstantOf</c> (one shape for "a word that stands for a literal").</summary>
@@ -266,13 +267,13 @@ public sealed partial class DataBinder
     /// <para>⚠ The literal is stored DECODED, not as source text: §12.3.7.3 SR10 admits a national literal
     /// (<c>N"…"</c>) as well as an alphanumeric one, and the runtime resolver matches ordering-table NAMES, not
     /// COBOL literal spellings.</para></summary>
-    public Dictionary<string, string> OrderTables { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> OrderTables { get; } = new(CobolNames.Comparer);
 
     /// <summary>SPECIAL-NAMES <c>DYNAMIC LENGTH STRUCTURE</c> declarations (case-insensitive
     /// dynamic-length-structure-name → its layout; ISO §12.3.7.2; kb/Work PB829), read by the DYNAMIC LENGTH clause's
     /// dynamic-length-structure-name-1 (§13.18.19.3 SR2 / SR4). Configuration-section names reach contained source
     /// elements (§8.4.6.1), so the dictionary inherits with its siblings.</summary>
-    public Dictionary<string, DynamicLengthStructure> DynamicLengthStructures { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, DynamicLengthStructure> DynamicLengthStructures { get; } = new(CobolNames.Comparer);
 
     /// <summary>SPECIAL-NAMES <c>LOCALE locale-name-1 IS {external-locale-name-1 | literal-4}</c> declarations
     /// (case-insensitive locale-name → the symbol; ISO §12.3.7.2; DESIGN-locale-facility seam S1, T1): the locale-name
@@ -280,7 +281,7 @@ public sealed partial class DataBinder
     /// LOCALE (§14.9.39.3 SR26), and — in later increments — the LOCALE phrases of PICTURE format 2, LOCALE-COMPARE /
     /// -DATE / -TIME, UPPER-CASE / LOWER-CASE and CHARACTER CLASSIFICATION. The symbol holds the EXTERNAL IDENTIFICATION
     /// only (§8.1.5 — the locale is "determined at runtime"); it inherits into contained units (§12.3.7.4 GR1).</summary>
-    public Dictionary<string, LocaleSymbol> Locales { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, LocaleSymbol> Locales { get; } = new(CobolNames.Comparer);
 
     /// <summary>The OBJECT-COMPUTER <c>CHARACTER CLASSIFICATION</c> clause (ISO §12.3.6.2; §12.3.6.4 GR5–GR8; kb/Work PB64
     /// T5), or null when none is specified and no containing unit specifies one (GR6 — the coded character set's
@@ -483,7 +484,7 @@ public sealed partial class DataBinder
     /// COMMA; the grammar carries it as a generic IDENTIFIER).</summary>
     private void SwitchBindDecimalPoint(Core.DecimalPointClauseContext dp)
     {
-        if (dp.IDENTIFIER()?.GetText() is { } word && word.Equals("COMMA", StringComparison.OrdinalIgnoreCase))
+        if (dp.IDENTIFIER()?.GetText() is { } word && CobolNames.Same(word, "COMMA"))
             DecimalPointIsComma = true;
         else
             Edition.Error("COBOLNET0894", $"DECIMAL-POINT IS {dp.IDENTIFIER()?.GetText()}: the only form is "
@@ -573,7 +574,7 @@ public sealed partial class DataBinder
             // currency-picture-symbol-2002 (§12.3.7): the pass owns the edition gate (Exec Step E).
             // PICMODE exploit: the word between PICTURE and literal-8 arrives as a PIC_STRING token — it must be
             // the keyword SYMBOL (the grammar cannot distinguish; semantic check per the grammar's own note).
-            if (cur.PIC_STRING()?.GetText() is { } sym && !sym.Equals("SYMBOL", StringComparison.OrdinalIgnoreCase))
+            if (cur.PIC_STRING()?.GetText() is { } sym && !CobolNames.Same(sym, "SYMBOL"))
                 Edition.Error("COBOLNET0892", $"CURRENCY SIGN: expected 'WITH PICTURE SYMBOL', found 'PICTURE {sym}' (ISO §12.3.7)");
             string? literal8 = lits.Length > 1 ? CurrencyTextLiteral(lits[1], CurrencyOperand.Literal8) : "";
             if (literal8 is null) return;
@@ -718,7 +719,7 @@ public sealed partial class DataBinder
     /// repeats a name (after reporting a difference), null when the name is new.</summary>
     private string? CheckRepositorySpecification(string name, RepositorySpecification spec, string externalized)
     {
-        string key = name.ToUpperInvariant();
+        string key = name;
         if (_repositorySpecified.TryGetValue(key, out var first))
         {
             var (prior, priorExternalized) = first;
@@ -741,7 +742,8 @@ public sealed partial class DataBinder
 
     /// <summary>Upper-cased declared name → its FIRST specification and the externalized name it gave: the
     /// §12.3.8.3 SR1 memory, for THIS unit's REPOSITORY.</summary>
-    private readonly Dictionary<string, (RepositorySpecification Spec, string Externalized)> _repositorySpecified = [];
+    private readonly Dictionary<string, (RepositorySpecification Spec, string Externalized)> _repositorySpecified
+        = new(CobolNames.Comparer);
 
 
     /// <summary>Populate the switch registry from the SPECIAL-NAMES paragraph's switch-name clauses (ISO §12.3.7
@@ -758,7 +760,7 @@ public sealed partial class DataBinder
         var currencyClauses = new List<Core.CurrencySignClauseContext>();
         // The names THIS source element declares — a containing element's inherited names may be re-declared
         // (§8.4.6.1: each source element "may use identical user-defined words"), its own may not (§8.4.2.1).
-        var ownDls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ownDls = new HashSet<string>(CobolNames.Comparer);
         foreach (var para in EnvDivisions(program)
                      .SelectMany(env => env.configurationSection()?.configurationParagraph() ?? []))
         {
@@ -800,7 +802,7 @@ public sealed partial class DataBinder
             _paragraphSymbolicNames = sn.specialNameEntry()
                 .Select(e => e.symbolicCharactersClause()).OfType<Core.SymbolicCharactersClauseContext>()
                 .SelectMany(sc => sc.symbolicCharacterEntry()).SelectMany(e => e.cobolWord())
-                .Select(w => w.GetText()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                .Select(w => w.GetText()).ToHashSet(CobolNames.Comparer);
             // ⛔ DEPENDENCY ORDER, NEVER SOURCE ORDER (kb/Work PB1558). A clause that REFERENCES a name another clause
             // of this paragraph DECLARES binds after every declaring clause, whatever the source order:
             //   1. the walk below — the clauses that reference no paragraph name (LOCALE declares locale-names,
@@ -1576,7 +1578,7 @@ public sealed partial class DataBinder
 
     /// <summary>The symbolic-character names the SPECIAL-NAMES paragraph being bound declares (see
     /// <c>SwitchBindSpecialNames</c>) — read by the §12.3.7.3 SR11 arm of <see cref="LiteralPhraseOperand"/>.</summary>
-    private HashSet<string> _paragraphSymbolicNames = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _paragraphSymbolicNames = new(CobolNames.Comparer);
 
     /// <summary>⛔ THE ONE SPECIAL-NAMES literal-operand decoder (ISO §12.3.7.3 SR14 b/c for the ALPHABET clause,
     /// SR17 b/c for the CLASS clause — see <see cref="LiteralPhraseRules"/>): the characters one operand stands

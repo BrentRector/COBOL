@@ -3,6 +3,7 @@
 using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.Frontend.Generated;
+using CobolNet.Runtime;
 
 namespace CobolNet.Compiler.Oo;
 
@@ -59,7 +60,7 @@ public sealed class OoClassSymbol(string name, string csName, CobolParserCore.Cl
     public List<OoInterfaceSymbol> FactoryImplements { get; } = [];
 
 
-    private readonly Dictionary<string, OoMethodSymbol> _methods = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, OoMethodSymbol> _methods = new(CobolNames.Comparer);
 
     /// <summary>The INSTANCE methods in declaration order (the emitter's roster).</summary>
     public IReadOnlyList<OoMethodSymbol> Methods => _methodList;
@@ -86,7 +87,7 @@ public sealed class OoClassSymbol(string name, string csName, CobolParserCore.Cl
     /// narrow in <c>OoEmitter.EmitSetObjectRef</c> is instance-only for exactly that reason).</summary>
     public IReadOnlyList<string> FactoryOrInstanceCsTypes => [CsName, FactoryCsName];
 
-    private readonly Dictionary<string, OoMethodSymbol> _factoryMethods = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, OoMethodSymbol> _factoryMethods = new(CobolNames.Comparer);
 
     /// <summary>The FACTORY methods in declaration order (§11.4 — a SEPARATE interface from the instance
     /// roster; the two may share names, §9.3.6).</summary>

@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Collections.Generic;
 using System.Linq;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding.Model;
 
@@ -117,7 +118,7 @@ public static class StrongTypeModel
     public static bool EquivalentTypeDeclarations(DataItem a, DataItem b)
     {
         if (ReferenceEquals(a, b)) return true;
-        if (!string.Equals(DeclaredTypeName(a), DeclaredTypeName(b), StringComparison.OrdinalIgnoreCase)
+        if (!CobolNames.Same(DeclaredTypeName(a), DeclaredTypeName(b))
             || DeclaredTypeName(a) is null)
             return false;
         if (DeclaredStrong(a) != DeclaredStrong(b) || DeclaredExternal(a) != DeclaredExternal(b)) return false;
@@ -294,7 +295,7 @@ public static class StrongTypeModel
     /// occupy corresponding positions within their declarations.</summary>
     public static bool SameRestriction(TypeRestriction a, TypeRestriction b) =>
         a.IsRestricted && b.IsRestricted
-        && string.Equals(a.Name, b.Name, StringComparison.OrdinalIgnoreCase)
+        && CobolNames.Same(a.Name, b.Name)
         && (a.Declaration is null || b.Declaration is null
             || EquivalentTypeDeclarations(a.Declaration, b.Declaration));
 

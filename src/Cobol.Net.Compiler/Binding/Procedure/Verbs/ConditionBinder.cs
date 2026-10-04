@@ -13,6 +13,7 @@ using CobolNet.Editions;
 namespace CobolNet.Binding.Procedure;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// The boolean-expression / boolean-operator binder (Phase-4 track (a) increment 2; ISO §8.8.2 the operators
@@ -216,7 +217,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     private bool IsBooleanUserFunction(string written) =>
         ctx.CobolWords.Resolve(written) is { } name
         && (ctx.Data.UserFunctionNames.Contains(name)
-            || name.Equals(host.UdfSelfName, System.StringComparison.OrdinalIgnoreCase))
+            || CobolNames.Same(name, host.UdfSelfName))
         && host.UserFunctions is { } functions && functions.TryGetValue(name, out var fn)
         && fn.Returning?.OperandPic?.Category is PicCategory.Boolean;
 
@@ -881,11 +882,11 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             if (ctx.CurrentMethodScope is { } ms)
             {
                 foreach (var f in ms.Formals)
-                    if (string.Equals(f.Item.CobolName, fname, StringComparison.OrdinalIgnoreCase)) { formal = f.Probe; break; }
+                    if (CobolNames.Same(f.Item.CobolName, fname)) { formal = f.Probe; break; }
             }
             else
                 foreach (var f in ctx.Data.LinkageFormals)
-                    if (string.Equals(f.Item.CobolName, fname, StringComparison.OrdinalIgnoreCase)) { formal = f.Probe; break; }
+                    if (CobolNames.Same(f.Item.CobolName, fname)) { formal = f.Probe; break; }
             if (formal is null)
             {
                 ctx.Edition.Error(DiagnosticCatalog.OmittedConditionOperand,

@@ -5,6 +5,7 @@ using CobolNet.Runtime.Exceptions;
 using CobolNet.Frontend.Preprocessor;
 
 using CobolNet.Binding.Model;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding;
 
@@ -180,7 +181,7 @@ public sealed class TurnState
             // ON its own line — see the Ev remark (kb/Work R14). A POP-revoked event is skipped (kb/Work PB941).
             if (e.After(statementLine)) break;
             if (e.RevokedFor(statementLine) || !NameMatches(e.Ec, level3)) continue;
-            if (e.File is not null && (file is null || !e.File.Equals(file, StringComparison.OrdinalIgnoreCase)))
+            if (e.File is not null && (file is null || !CobolNames.Same(e.File, file)))
                 continue;   // a file-scoped event applies only to that file (GR6/GR8)
             last = e;
         }
@@ -216,7 +217,7 @@ public sealed class TurnState
             // exactly (the relative order of the surviving, differently-named events is untouched) and bounds
             // the literal by the count of DISTINCT names the element mentions rather than by directive count.
             evs ??= [];
-            evs.RemoveAll(x => x.Ec.Equals(e.Ec, StringComparison.OrdinalIgnoreCase));
+            evs.RemoveAll(x => CobolNames.Same(x.Ec, e.Ec));
             evs.Add((e.Ec, e.On));
         }
         return evs is null ? EcCheckingProfile.None : EcCheckingProfile.FromEvents(evs);

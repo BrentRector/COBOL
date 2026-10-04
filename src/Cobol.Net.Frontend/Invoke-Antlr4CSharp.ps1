@@ -15,6 +15,13 @@
   - The parser's -lib inputs (imported Core/*.g4 + CobolLexer.tokens) are STAGED in obj/antlr-lib/ — already
     ignored and cleaned by the SDK, and never globbed into Compile.
 
+  ENCODING (kb/Work PB1944): every grammar is read as UTF-8 (`-encoding UTF-8`), never in the JVM's default charset.
+  ANTLR reads a .g4 with the JVM default, which is UTF-8 on Java 18+ locally and on Linux but Cp1252 on Windows CI's
+  JVM, so a non-ASCII character in a grammar's code was one character locally and several (a `warning(180)`, an
+  error under warnings-as-errors) on CI. GrammarEncodingDriftTests pins this flag and that every .g4 is UTF-8
+  without a BOM; with the encoding declared, a grammar may hold non-ASCII text (a character that does not display
+  is still written as a \uXXXX escape, DESIGN-frontend-grammar.md).
+
   PORTABILITY (the DEVLOG-554 CI break): ANTLR mirrors a grammar's RELATIVE DIRECTORY under -o, but it detects
   "has a directory" with the PLATFORM separator — `Core/CobolLexer.g4` is a bare name on Windows (flat output)
   yet a nested path on Linux (output lands in <out>/Core/), which silently broke the tokens hand-off. So each
@@ -67,6 +74,7 @@ function Invoke-Antlr4CSharp {
         try {
             Write-Host "Generating C# from: $grammarName" -ForegroundColor Cyan
             $antlrOutput = & java -jar $JarPath `
+                -encoding UTF-8 `
                 -Dlanguage=CSharp `
                 -no-listener -visitor `
                 -package $PackageName `

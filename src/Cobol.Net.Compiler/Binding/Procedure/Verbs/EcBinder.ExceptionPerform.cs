@@ -10,6 +10,7 @@ using CobolNet.Runtime.Exceptions;
 namespace CobolNet.Binding.Procedure;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// The exception-checking (Format-3) PERFORM binder (ISO §14.9.28 Format 3, COBOL-2023). Produces a
@@ -182,7 +183,7 @@ internal sealed partial class EcBinder
                 {
                     ops.Add(new BoundWhenOperand(null, f));
                     overlay.Add(("EC-I-O", f.CobolName));
-                    census.Add((null, f.CobolName.ToUpperInvariant()));
+                    census.Add((null, f.CobolName));
                 }
             return (null, ops);
         }
@@ -205,7 +206,7 @@ internal sealed partial class EcBinder
             {
                 ops.Add(new BoundWhenOperand(info.Name, null));
                 overlay.Add((info.Name, null));
-                census.Add((info.Name.ToUpperInvariant(), null));
+                census.Add((info.Name, null));
                 continue;
             }
             foreach (var fn in files)
@@ -213,7 +214,7 @@ internal sealed partial class EcBinder
                 {
                     ops.Add(new BoundWhenOperand(info.Name, f));
                     overlay.Add((info.Name, f.CobolName));
-                    census.Add((info.Name.ToUpperInvariant(), f.CobolName.ToUpperInvariant()));
+                    census.Add((info.Name, f.CobolName));
                 }
         }
         return (null, ops);
@@ -233,21 +234,21 @@ internal sealed partial class EcBinder
     private void CheckSr14Sr15(List<(string? Ec, string? File)> census)
     {
         // SR14: group by file-name; a file that appears >1 time with ANY bare (unpaired) instance is illegal.
-        foreach (var g in census.Where(c => c.File is not null).GroupBy(c => c.File))
+        foreach (var g in census.Where(c => c.File is not null).GroupBy(c => c.File!, CobolNames.Comparer))
             if (g.Count() > 1 && g.Any(c => c.Ec is null))
-                ctx.Edition.Error("COBOLNET1599", $"file-name '{g.Key}' is specified in more than one WHEN phrase "
+                ctx.Edition.Error("COBOLNET1599", $"file-name '{g.Key.ToUpperInvariant()}' is specified in more than one WHEN phrase "
                     + "without an exception-name pairing (ISO §14.9.28.3 SR14)");
 
         // SR15: an exception-name may repeat ONLY "in conjunction with different file-names". A repeat is illegal
         // if ANY occurrence is bare (no file — not "in conjunction with a file-name"), or two occurrences share a
         // file. A bare occurrence's null is NOT a licensing "distinct file-name" (so bare+FILE-paired same name is
         // rejected, not just bare+bare).
-        foreach (var g in census.Where(c => c.Ec is not null).GroupBy(c => c.Ec))
+        foreach (var g in census.Where(c => c.Ec is not null).GroupBy(c => c.Ec!, CobolNames.Comparer))
         {
             if (g.Count() <= 1) continue;
             var files = g.Select(c => c.File).ToList();
-            if (files.Any(f => f is null) || files.Distinct().Count() != files.Count)
-                ctx.Edition.Error("COBOLNET1600", $"exception-name '{g.Key}' is specified more than once without a "
+            if (files.Any(f => f is null) || files.Select(f => f!).Distinct(CobolNames.Comparer).Count() != files.Count)
+                ctx.Edition.Error("COBOLNET1600", $"exception-name '{g.Key.ToUpperInvariant()}' is specified more than once without a "
                     + "distinct file-name (ISO §14.9.28.3 SR15)");
         }
     }
@@ -368,7 +369,7 @@ internal sealed partial class EcBinder
         {
             if (site.Line < first || site.Line > last) continue;
             var ban = Array.Find(DirectiveBans,
-                b => string.Equals(b.Word, site.Word, StringComparison.OrdinalIgnoreCase));
+                b => CobolNames.Same(b.Word, site.Word));
             if (ban.Word is null) continue;   // a position-ruled word this statement's rules do not ban
             // Nested Format-3 PERFORMs contain the same directive line; the rule is about the DIRECTIVE, so it
             // is one violation and one warning, reported by whichever bind reaches it first.

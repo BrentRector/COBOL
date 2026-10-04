@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Binding.Procedure;
 
 /// <summary>
@@ -27,12 +29,12 @@ namespace CobolNet.Binding.Procedure;
 /// <see cref="SectionInfo"/> for a section.</typeparam>
 internal sealed class ProcedureNameMap<T>
 {
-    private readonly Dictionary<string, T> _first = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, T> _first = new(CobolNames.Comparer);
 
     /// <summary>Every definition of a spelling declared MORE THAN ONCE, in declaration order (including the
     /// first). Absent — and the dictionary itself empty — for a source unit with no duplicated procedure-name,
     /// which is the overwhelmingly common case.</summary>
-    private readonly Dictionary<string, List<T>> _duplicated = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<T>> _duplicated = new(CobolNames.Comparer);
 
     /// <summary>Record one declaration. A repeat is KEPT (that is the entire point), not discarded: the first
     /// stays the one <see cref="TryResolve"/> answers with, and the spelling becomes

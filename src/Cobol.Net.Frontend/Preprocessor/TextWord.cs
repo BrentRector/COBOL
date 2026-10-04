@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Editions;
+using CobolNet.Runtime;
 namespace CobolNet.Frontend.Preprocessor;
 
 /// <summary>What a <see cref="TextWord"/> is — the §7.2.2.5 classification the text-manipulation stage (COPY and
@@ -54,7 +55,7 @@ internal readonly record struct TextWord(string Source, TextWordKind Kind, int S
     /// <summary>A character-string equal to <paramref name="reservedWord"/>, case-insensitively — how the statement
     /// parsers recognise COPY, OF, IN, SUPPRESS, PRINTING, REPLACING, LEADING, TRAILING, BY and OFF.</summary>
     public bool IsWord(string reservedWord)
-        => Kind == TextWordKind.CharacterString && Span.Equals(reservedWord, StringComparison.OrdinalIgnoreCase);
+        => Kind == TextWordKind.CharacterString && CobolNames.Same(Span, reservedWord);
 
     /// <summary>The separator period that ends a COPY or REPLACE statement (§8.3.5 3)).</summary>
     public bool IsSeparatorPeriod => Kind == TextWordKind.Separator && Source[Start] == '.';
@@ -83,13 +84,14 @@ internal readonly record struct TextWord(string Source, TextWordKind Kind, int S
     {
         if ((Kind == TextWordKind.Literal) != (other.Kind == TextWordKind.Literal)) return false;
         if (Kind != TextWordKind.Literal)
-            return Span.Equals(other.Span, StringComparison.OrdinalIgnoreCase);
+            return CobolNames.Same(Span, other.Span);
 
         var a = TextWordScanner.DecomposeLiteral(Value);
         var b = TextWordScanner.DecomposeLiteral(other.Value);
-        if (!string.Equals(a.Prefix, b.Prefix, StringComparison.OrdinalIgnoreCase)) return false;
-        return string.Equals(a.Content, b.Content,
-            a.IsNonHexadecimalAlphanumericOrNational ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+        if (!CobolNames.Same(a.Prefix, b.Prefix)) return false;
+        return a.IsNonHexadecimalAlphanumericOrNational
+            ? string.Equals(a.Content, b.Content, StringComparison.Ordinal)
+            : CobolNames.Same(a.Content, b.Content);
     }
 }
 
@@ -101,10 +103,10 @@ internal readonly record struct LiteralParts(string Prefix, char Quote, string C
     /// <summary>The "non-hexadecimal formats of alphanumeric and national literals" (§7.2.3.4 9) c) 3.) —
     /// <c>"…"</c> and <c>N"…"</c> — whose content keeps its letter case in matching.</summary>
     public bool IsNonHexadecimalAlphanumericOrNational
-        => Prefix.Length == 0 || Prefix.Equals("N", StringComparison.OrdinalIgnoreCase);
+        => Prefix.Length == 0 || CobolNames.Same(Prefix, "N");
 
     /// <summary>An alphanumeric literal (§8.3.3.2): <c>"…"</c> or its hexadecimal format <c>X"…"</c>.</summary>
-    public bool IsAlphanumeric => Prefix.Length == 0 || Prefix.Equals("X", StringComparison.OrdinalIgnoreCase);
+    public bool IsAlphanumeric => Prefix.Length == 0 || CobolNames.Same(Prefix, "X");
 }
 
 /// <summary>

@@ -7,6 +7,7 @@ using CobolNet.Frontend.Generated;
 namespace CobolNet.Compiler.Oo;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// ⛔ THE ONE FUNNEL FOR RESOLVING A WRITTEN object-class-name OR interface-name (kb/Work PB365).
@@ -165,8 +166,8 @@ public sealed class OoRepositoryScope
     /// containing one — §12.3.4 GR1), and a class / interface definition contributes its own name.</summary>
     public static OoRepositoryScope Build(RuleContext? site)
     {
-        var classes = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        var interfaces = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var classes = new Dictionary<string, string?>(CobolNames.Comparer);
+        var interfaces = new Dictionary<string, string?>(CobolNames.Comparer);
         for (RuleContext? c = site; c is not null; c = c.Parent)
         {
             switch (c)

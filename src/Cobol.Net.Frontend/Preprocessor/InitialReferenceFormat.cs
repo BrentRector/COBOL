@@ -43,7 +43,7 @@ public static class InitialReferenceFormatOption
         format = InitialReferenceFormat.Fixed;
         if (value is null) return false;
         for (int i = 0; i < OptionSpellings.Count; i++)
-            if (OptionSpellings[i].Equals(value, StringComparison.OrdinalIgnoreCase))
+            if (OptionSpellings[i].Equals(value, StringComparison.OrdinalIgnoreCase))   // not a COBOL word: a command-line option value
             {
                 format = (InitialReferenceFormat)i;
                 return true;

@@ -41,11 +41,14 @@ public sealed record TokenRetypes(CobolWordsMap CobolWords, IReadOnlySet<string>
     /// (<see cref="FreedReservedWords"/>, the §8.9 gate), so the SAME decision serves the lexer, the parser's
     /// <c>userWordHere</c> gate and the funnel; <see cref="LexesDifferentlyFrom"/> tells the frontend when a parse
     /// found a declaration that changes which '(' open a SUBSCRIPT, and the text is lexed again.</item>
+    /// <item>the edition's Annex C (kb/Work PB1402): every word is emitted in <paramref name="edition"/>'s spelling
+    /// (<c>CobolNames.EditionSpelling</c>), so the ONE word comparer answers as that edition's case mapping does.</item>
     /// </list></summary>
     public void PrimeLexer(CobolLexer lexer, EditionInfo edition)
     {
         lexer.SetCobolWords(CobolWordsRewriter.Plan.For(CobolWords));
         lexer.SetReservedNonDataNames(ReservedNonDataNames(edition, FreedReservedWords));
+        lexer.SetCaseMappingEdition(edition.Year);
     }
 
     /// <summary>True when <paramref name="other"/>'s decisions prime the lexer differently from this one's at

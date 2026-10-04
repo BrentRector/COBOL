@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Model;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding;
 
@@ -134,7 +135,7 @@ public static class IntrinsicCatalog
 
     private static Dictionary<string, IntrinsicSig> Build()
     {
-        var t = new Dictionary<string, IntrinsicSig>(StringComparer.OrdinalIgnoreCase);
+        var t = new Dictionary<string, IntrinsicSig>(CobolNames.Comparer);
         void Add(IntrinsicSig s) => t.Add(s.Name, s);
         const int inf = int.MaxValue;
 

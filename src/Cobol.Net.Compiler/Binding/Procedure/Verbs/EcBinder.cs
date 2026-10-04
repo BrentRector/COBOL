@@ -9,6 +9,7 @@ using CobolNet.Runtime.Exceptions;
 namespace CobolNet.Binding.Procedure;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// The EC exception-condition binder (P7 Step 10r; ISO/IEC 1989:2023 §14.6.13;
@@ -200,7 +201,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
                 WithLocation: rnsLoc,
                 StatementName: rnsLoc ? site.Verb.Split(' ')[0] : null,
                 Location: rnsLoc ? EcLocation(line) : null,
-                PdRaising: [.. ctx.EcState.PdRaising.OrderBy(n => n, StringComparer.OrdinalIgnoreCase)]);
+                PdRaising: [.. ctx.EcState.PdRaising.OrderBy(n => n, CobolNames.Comparer)]);
         }
         if (raising.cobolWord() is not { } ecWord)
         {
@@ -327,7 +328,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
             foreach (var t in raising)
             {
                 if (t.Kind is not RaisingTargetKind.ObjectClass
-                    || !string.Equals(t.Name, c.Name, StringComparison.OrdinalIgnoreCase)) continue;
+                    || !CobolNames.Same(t.Name, c.Name)) continue;
                 if (t.Factory == od.Factory) return null;
                 factoryMismatch ??= t;
             }

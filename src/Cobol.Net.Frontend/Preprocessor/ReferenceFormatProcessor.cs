@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using CobolNet.Editions;
 using CobolNet.Frontend.Common;
 using CobolNet.Frontend.Diagnostics;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -60,7 +61,7 @@ public static partial class ReferenceFormatProcessor
     /// fixed-form paragraph exactly as they see a free-form one (kb/Work PB1494, PB1758) — no embedded-period or
     /// terminating-period edge cases reach the grammar.
     /// </summary>
-    private static readonly HashSet<string> CommentEntryParagraphs = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> CommentEntryParagraphs = new(CobolNames.Comparer)
     {
         "AUTHOR", "INSTALLATION", "DATE-WRITTEN", "DATE-COMPILED", "SECURITY", "REMARKS",
     };

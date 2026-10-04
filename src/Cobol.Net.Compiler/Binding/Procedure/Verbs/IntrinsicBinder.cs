@@ -124,7 +124,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // name, so its definition permits nothing — the '(' that follows is a ref-mod, not an argument list.
         if (word.Canonical is not { } name) return false;
         if (ctx.Data.UserFunctionNames.Contains(name)
-            || name.Equals(host.UdfSelfName, StringComparison.OrdinalIgnoreCase))
+            || CobolNet.Runtime.CobolNames.Same(name, host.UdfSelfName))
             return host.UserFunctions is { } fns && fns.TryGetValue(name, out var fn) && fn.Formals.Count > 0;
         return IntrinsicCatalog.TryGet(name, out var sig) && sig.MaxArgs > 0;
     }
@@ -334,7 +334,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         bool catalogued = ctx.Data.TryIntrinsicOfThisCompilation(functionWord, out var sig);
         bool repositoryIntrinsic = ctx.Data.IsRepositoryIntrinsic(functionWord);
         bool declaredFn = ctx.Data.UserFunctionNames.Contains(name)
-            || name.Equals(host.UdfSelfName, StringComparison.OrdinalIgnoreCase)
+            || CobolNet.Runtime.CobolNames.Same(name, host.UdfSelfName)
             || repositoryIntrinsic;
         if (!declaredFn && !catalogued) return null;
         // A catalogued name the REPOSITORY does NOT identify may be a user-defined word (§8.3.2.1 rule 5 — a
@@ -382,7 +382,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             // 2-argument function is an ARITY error about a function, never an undefined name: the user
             // DECLARED it a function, so there is no coincidental-collision reading to protect.
             if (ctx.Data.UserFunctionNames.Contains(name)
-                || name.Equals(host.UdfSelfName, StringComparison.OrdinalIgnoreCase))
+                || CobolNet.Runtime.CobolNames.Same(name, host.UdfSelfName))
             {
                 var udfBare = host.Udf.UdfBindCall(name, []);
                 return Activated(capturedRefMod is null
@@ -531,7 +531,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // dispatch PRECEDES the catalog. §8.4.6.6 adds the CONTAINING function definition's own name with
         // no repository declaration (self-recursion; a present self-entry is ignored, §12.3.8 GR11).
         if (ctx.Data.UserFunctionNames.Contains(name)
-            || name.Equals(host.UdfSelfName, StringComparison.OrdinalIgnoreCase))
+            || CobolNet.Runtime.CobolNames.Same(name, host.UdfSelfName))
             return host.Udf.UdfBindCall(name, argCtxs);
 
         // §8.4.3.2.2 — the function-identifier's THIRD name form, function-pointer-name-1 (SR4: "shall be defined
@@ -1792,8 +1792,8 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             string cur = curLit.Value.Trim();
             if (cur.Length == 0
                 || cur.Any(c => char.IsAsciiDigit(c) || c is '*' or '+' or '-' or ',' or '.')
-                || cur.Contains("CR", StringComparison.OrdinalIgnoreCase)
-                || cur.Contains("DB", StringComparison.OrdinalIgnoreCase))
+                || CobolNet.Runtime.CobolNames.Contains(cur, "CR")
+                || CobolNet.Runtime.CobolNames.Contains(cur, "DB"))
                 ctx.Edition.Error("COBOLNET1627", $"FUNCTION {sig.Name} argument-2 shall contain at least one "
                     + "non-space character and none of the digits 0-9, the characters '*' '+' '-' ',' '.', or "
                     + "the letter pair CR/DB in any case (ISO §15.68.3 rule 2)");

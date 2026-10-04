@@ -4,6 +4,7 @@ using System.Text;
 using CobolNet.Editions;
 using CobolNet.Frontend.Common;
 using CobolNet.Frontend.Diagnostics;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -121,7 +122,7 @@ public sealed class CopyProcessor(
         if (!_searchPaths.Contains(sourceDir))
             _searchPaths.Insert(0, sourceDir);
 
-        string expanded = ExpandCopyStatements(sourceText, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0);
+        string expanded = ExpandCopyStatements(sourceText, new HashSet<string>(CobolNames.Comparer), 0);
         return ApplyReplaceStatements(expanded, _diagnostics, _sourceName, EditionInfo.Of(dialectLevel, permissive));
     }
 
@@ -349,9 +350,8 @@ public sealed class CopyProcessor(
             if (w.IsWord("COPY")) return "a COPY statement";
             if (rule.ForbidsReplaceStatement && w.IsWord("REPLACE")) return "a REPLACE statement";
             var span = w.Span;
-            if (directiveNext && span.StartsWith("SOURCE", StringComparison.OrdinalIgnoreCase)
-                || span.StartsWith(">>") && span[2..].TrimStart(CobolSpace.Separators)
-                    .StartsWith("SOURCE", StringComparison.OrdinalIgnoreCase))
+            if (directiveNext && CobolNames.StartsWith(span, "SOURCE")
+                || span.StartsWith(">>") && CobolNames.StartsWith(span[2..].TrimStart(CobolSpace.Separators), "SOURCE"))
                 return "a SOURCE FORMAT directive";
             directiveNext = span.SequenceEqual(">>");
         }
@@ -441,8 +441,8 @@ public sealed class CopyProcessor(
                 // begins (after an optional prefix) and ends with its quotation symbol.
                 var part = from[0].Span;
                 var word = words[w].Span;
-                bool leading = kind == ReplaceKind.Leading && word.StartsWith(part, StringComparison.OrdinalIgnoreCase);
-                bool trailing = kind == ReplaceKind.Trailing && word.EndsWith(part, StringComparison.OrdinalIgnoreCase);
+                bool leading = kind == ReplaceKind.Leading && CobolNames.StartsWith(word, part);
+                bool trailing = kind == ReplaceKind.Trailing && CobolNames.EndsWith(word, part);
                 if (!leading && !trailing) continue;
 
                 sb.AppendSlice(mapped, copiedUpTo, words[w].Start - copiedUpTo);
@@ -632,7 +632,7 @@ public sealed class CopyProcessor(
     /// <summary>The figurative-constant words (§8.3.3.6.2 formats 1–6; a format-7 symbolic-character is a
     /// user-defined word, which as text-name-1 is simply a text-name), barred as literal-1 / literal-2 by
     /// §7.2.3.3 SR4.</summary>
-    private static readonly HashSet<string> FigurativeConstantWords = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> FigurativeConstantWords = new(CobolNames.Comparer)
     {
         "ZERO", "ZEROS", "ZEROES", "SPACE", "SPACES", "HIGH-VALUE", "HIGH-VALUES", "LOW-VALUE", "LOW-VALUES",
         "QUOTE", "QUOTES", "ALL",
@@ -832,7 +832,7 @@ public sealed class CopyProcessor(
         {
             if (word.IsWord(keyword)) return word.Start;
             if (onGlued is not null && word.Kind == TextWordKind.CharacterString && word.Span.Length > keyword.Length
-                && word.Span.EndsWith(keyword, StringComparison.OrdinalIgnoreCase)
+                && CobolNames.EndsWith(word.Span, keyword)
                 && word.Span[^(keyword.Length + 1)] is '.' or ',' or ';')
                 onGlued(word.End - keyword.Length);
         }

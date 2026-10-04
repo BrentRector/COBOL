@@ -11,6 +11,7 @@ using CobolNet.Frontend.Parsing;
 namespace CobolNet.Compiler.Oo;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// ⛔ PARAMETERIZED CLASSES AND INTERFACES ARE EXPANDED, NOT GENERIC (kb/Work PB759; OO deep-dive D12).
@@ -72,7 +73,7 @@ internal static class OoExpansion
         IReadOnlyList<Core.ClassDefinitionContext> classes, IReadOnlyList<Core.InterfaceDefinitionContext> interfaces,
         EditionContext edition, CobolWordsMap words)
     {
-        var skeletons = new Dictionary<string, Skeleton>(StringComparer.OrdinalIgnoreCase);
+        var skeletons = new Dictionary<string, Skeleton>(CobolNames.Comparer);
         var plainClasses = new List<Core.ClassDefinitionContext>();
         var plainInterfaces = new List<Core.InterfaceDefinitionContext>();
         foreach (var c in classes)
@@ -100,9 +101,9 @@ internal static class OoExpansion
         // Every name an actual parameter may resolve to: the written plain definitions and every expansion NAME
         // (an actual may itself be an expansion, declared in the same paragraph — §12.3.8.3 SR4).
         var classNames = new HashSet<string>(plainClasses.Select(c => c.classIdParagraph().className(0).GetText()),
-            StringComparer.OrdinalIgnoreCase);
+            CobolNames.Comparer);
         var ifaceNames = new HashSet<string>(plainInterfaces.Select(i => i.interfaceName(0).GetText()),
-            StringComparer.OrdinalIgnoreCase);
+            CobolNames.Comparer);
         foreach (var sk in skeletons.Values)
             if (classNames.Contains(sk.Name) || ifaceNames.Contains(sk.Name))
             {
@@ -126,14 +127,14 @@ internal static class OoExpansion
             (e.INTERFACE() is not null ? ifaceNames : classNames).Add(en);
         }
 
-        var expansions = new Dictionary<string, Expansion>(StringComparer.OrdinalIgnoreCase);
+        var expansions = new Dictionary<string, Expansion>(CobolNames.Comparer);
         var order = new List<Expansion>();
         foreach (var e in entries)
             if (!skeletons.ContainsKey(DeclaredName(e)!) && Validate(e) is { } x)
             {
                 if (!expansions.TryGetValue(x.Name, out var prior)) { expansions.Add(x.Name, x); order.Add(x); }
                 else if (!ReferenceEquals(prior.Of, x.Of)
-                         || !prior.Actuals.SequenceEqual(x.Actuals, StringComparer.OrdinalIgnoreCase))
+                         || !prior.Actuals.SequenceEqual(x.Actuals, CobolNames.Comparer))
                 {
                     using var _ = edition.At(e);
                     edition.Error(DiagnosticCatalog.ExpandsPhraseInvalid,
@@ -160,7 +161,7 @@ internal static class OoExpansion
                 outClasses.Add(cctx);
             else ReparseFailed(x);
         }
-        return new Result(outClasses, outInterfaces, new HashSet<string>(skeletons.Keys, StringComparer.OrdinalIgnoreCase));
+        return new Result(outClasses, outInterfaces, new HashSet<string>(skeletons.Keys, CobolNames.Comparer));
 
         void AddSkeleton(ParserRuleContext ctx, string name, bool isInterface, Core.OoParameterNameContext[] formals,
             Core.EnvironmentDivisionContext? env, string endName, string header, string sr8, string sr9)
@@ -171,7 +172,7 @@ internal static class OoExpansion
             // forbids to carry one anyway).
             var repo = OoRepositoryScope.SpecifierEntries(env).ToList();
             var kinds = new List<bool?>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seen = new HashSet<string>(CobolNames.Comparer);
             foreach (var f in formals)
             {
                 string fn = f.GetText();
@@ -180,7 +181,7 @@ internal static class OoExpansion
                     edition.Error(DiagnosticCatalog.ParameterizedDefinitionUsing,
                         $"{header} '{name}' USING: the parameter-name '{fn}' is written more than once — a given "
                         + $"parameter-name shall not appear more than once in a USING clause ({sr9})");
-                bool? kind = repo.FirstOrDefault(r => string.Equals(DeclaredName(r), fn, StringComparison.OrdinalIgnoreCase)) is { } decl
+                bool? kind = repo.FirstOrDefault(r => CobolNames.Same(DeclaredName(r), fn)) is { } decl
                     ? decl.INTERFACE() is not null : null;
                 if (kind is null)
                     edition.Error(DiagnosticCatalog.ParameterizedDefinitionUsing,
@@ -194,7 +195,7 @@ internal static class OoExpansion
             // a DECLARATION slot would silently rename a data item, paragraph, method or file in every expansion;
             // one written in a data REFERENCE is caught downstream (the actual names no data item). The
             // declaration slots are exactly the name rules below — none of them admits a class-name.
-            var formalSet = new HashSet<string>(formals.Select(f => f.GetText()), StringComparer.OrdinalIgnoreCase);
+            var formalSet = new HashSet<string>(formals.Select(f => f.GetText()), CobolNames.Comparer);
             foreach (var w in DeclarationSlotWords(ctx).Where(w => formalSet.Contains(w.GetText())))
             {
                 using var __ = edition.At(w);
@@ -213,7 +214,7 @@ internal static class OoExpansion
             // §10.7: the end marker names its definition. OoClassTable.Build checks this for every written
             // definition it receives, and a parameterized one never reaches it (an expansion is renamed at both
             // ends), so the skeleton's own marker is checked here with the same code.
-            if (!string.Equals(endName, name, StringComparison.OrdinalIgnoreCase))
+            if (!CobolNames.Same(endName, name))
                 edition.Error(isInterface ? "COBOLNET0840" : "COBOLNET0820",
                     $"END {(isInterface ? "INTERFACE" : "CLASS")} '{endName}' does not match {header} '{name}' (ISO §10.7)");
             if (!skeletons.TryAdd(name, new Skeleton(ctx, name, isInterface, formals, kinds)))
@@ -239,7 +240,7 @@ internal static class OoExpansion
             var paragraph = ((Core.RepositoryParagraphContext)e.Parent).repositoryEntry();
             bool ok = true;
             foreach (string n in actuals.Prepend(target))
-                if (!paragraph.Any(r => string.Equals(DeclaredName(r), n, StringComparison.OrdinalIgnoreCase)))
+                if (!paragraph.Any(r => CobolNames.Same(DeclaredName(r), n)))
                 {
                     edition.Error(DiagnosticCatalog.ExpandsPhraseInvalid,
                         $"{where}: '{n}' is not defined by a class-specifier or interface-specifier in the same "
@@ -396,7 +397,7 @@ internal static class OoExpansion
     private static List<IToken> SubstitutedTokens(Expansion x)
     {
         var skel = x.Of;
-        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var map = new Dictionary<string, string>(CobolNames.Comparer);
         for (int i = 0; i < skel.Formals.Count; i++) map[skel.Formals[i].GetText()] = x.Actuals[i];
 
         var drop = new HashSet<IToken>();
@@ -445,7 +446,7 @@ internal static class OoExpansion
                 if (tok.Type == TokenConstants.EOF || drop.Contains(tok)) return;
                 string? text = null;
                 if (ReferenceEquals(tok, headerName)
-                    || (ReferenceEquals(tok, endName) && string.Equals(tok.Text, skel.Name, StringComparison.OrdinalIgnoreCase)))
+                    || (ReferenceEquals(tok, endName) && CobolNames.Same(tok.Text, skel.Name)))
                     text = x.Name;
                 else if ((t.Parent is Core.CobolWordContext || tok.Type == CobolLexer.IDENTIFIER)
                          && map.TryGetValue(tok.Text, out var actual))

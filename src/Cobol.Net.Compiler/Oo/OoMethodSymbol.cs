@@ -28,7 +28,7 @@ public sealed record OoMethodSymbol(
     /// INVOKE's method-name "as a COBOL word that maps to the externalized name of the method to be invoked", so the
     /// key is <see cref="ExternalizedName"/> — the same roster key the typed path resolves by — under the ONE
     /// case-insensitive word mapping the invocation side applies (<see cref="CobolNet.Runtime.CobolObject.NormalizeMethodName"/>,
-    /// the roster's <c>OrdinalIgnoreCase</c> comparer at run time). Never <see cref="Name"/>: an AS phrase replaces it.</summary>
+    /// the Annex C fold, <see cref="CobolNet.Runtime.CobolNames"/>). Never <see cref="Name"/>: an AS phrase replaces it.</summary>
     public string DispatchKey => CobolNet.Runtime.CobolObject.NormalizeMethodName(ExternalizedName);
 
     /// <summary>The emitted C# method name. Starts as the sanitized-uppercase COBOL name; an OVERRIDE adopts

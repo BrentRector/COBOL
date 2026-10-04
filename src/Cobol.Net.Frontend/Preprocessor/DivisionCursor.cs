@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Frontend.Preprocessor;
 
 /// <summary>
@@ -34,9 +36,9 @@ internal sealed class DivisionCursor(string text, bool startsInIdentificationDiv
             _scanned = next;
             if (word.Kind == TextWordKind.DirectiveLine) continue;
             string spelling = Text.Substring(word.Start, word.End - word.Start).TrimEnd('.');
-            if (spelling.Equals("DIVISION", StringComparison.OrdinalIgnoreCase))
+            if (CobolNames.Same(spelling, "DIVISION"))
                 _inIdentificationDivision = _previousWord.ToUpperInvariant() is "IDENTIFICATION" or "ID";
-            else if (spelling.EndsWith("-ID", StringComparison.OrdinalIgnoreCase))
+            else if (CobolNames.EndsWith(spelling, "-ID"))
                 _inIdentificationDivision = true;           // PROGRAM-ID / CLASS-ID / ... (the header is optional)
             _previousWord = spelling;
         }

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Editions;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -26,8 +27,8 @@ public readonly record struct DirectiveStackOp(int Line, DirectiveStackKind Kind
     {
         op = default;
         DirectiveStackKind kind;
-        if (directive.Word.Equals("PUSH", StringComparison.OrdinalIgnoreCase)) kind = DirectiveStackKind.Push;
-        else if (directive.Word.Equals("POP", StringComparison.OrdinalIgnoreCase)) kind = DirectiveStackKind.Pop;
+        if (CobolNames.Same(directive.Word, "PUSH")) kind = DirectiveStackKind.Push;
+        else if (CobolNames.Same(directive.Word, "POP")) kind = DirectiveStackKind.Pop;
         else return false;
         if (!CompilerDirectiveCatalog.TryOperandWord(directive.Word, directive.Operand, out string word)
             || word.Length == 0) return false;

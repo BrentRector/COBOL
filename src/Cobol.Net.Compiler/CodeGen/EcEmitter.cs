@@ -9,6 +9,7 @@ using CobolNet.Runtime.Exceptions;
 namespace CobolNet.CodeGen;
 
 using static CobolNet.CodeGen.Emit.EmitText;
+using CobolNet.Runtime;
 
 /// <summary>
 /// The EC exception-condition slice of the Roslyn backend (ISO/IEC 1989:2023 §14.6.13;
@@ -807,7 +808,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
             Tier("// GR3f — level-2 entries", (ec, f, i) =>
                 f is null && L2(ec) ? $"ExceptionCatalog.UnderLevel2(__ec, {CsLiteral(ec)})" : null);
             Tier("// GR3g — the level-1 EC-ALL entry", (ec, f, i) =>
-                f is null && ec.Equals(ExceptionCatalog.EcAll, StringComparison.OrdinalIgnoreCase) ? "true" : null);
+                f is null && CobolNames.Same(ec, ExceptionCatalog.EcAll) ? "true" : null);
             w.Line("return DispatchResult.NoHandler;   // no qualifying declarative (GR3g tail)");
         }
         w.Line();

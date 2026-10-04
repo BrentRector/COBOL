@@ -122,7 +122,7 @@ public static partial class ConditionalCompilationProcessor
     private sealed class Run
     {
         private readonly IReadOnlySet<string> _leave;
-        private readonly Dictionary<string, CtValue> _defines = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, CtValue> _defines = new(CobolNames.Comparer);
         private readonly FlagScanState _flagScan = new();
         // §7.3.20 / §7.3.22 (kb/Work PB941): THIS stage's share of the directive state a PUSH saves and a POP
         // restores — the compilation-variable table (every instance at once, §7.3.22.4 GR3) and the running FLAG
@@ -140,7 +140,7 @@ public static partial class ConditionalCompilationProcessor
         // COPY interleave context (null = pure CC, the legacy shape): the copybook engine + the per-group include
         // set + the current nesting depth (threaded through the recursion for the SR1 circular / depth-20 guards).
         private readonly CopyProcessor? _copy;
-        private readonly HashSet<string> _alreadyIncluded = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _alreadyIncluded = new(CobolNames.Comparer);
         private int _depth;
         // kb/Work PB1066 — the §14.9.28.4 GR14 implicit-op program, keyed to directive encounters, and the
         // encounters themselves (Line = 0-based line in THIS run's output frame). _renderBase is the output-frame line
@@ -181,7 +181,7 @@ public static partial class ConditionalCompilationProcessor
         {
             _implicitOps = implicitOps;
             _inputs = inputs ?? new CompilationInputs();
-            _leave = leaveDirectives ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            _leave = leaveDirectives ?? new HashSet<string>(CobolNames.Comparer);
             _dialectLevel = dialectLevel;
             _edition = EditionInfo.Of(dialectLevel, permissive);
             _bag = diagnostics;
@@ -198,7 +198,7 @@ public static partial class ConditionalCompilationProcessor
             _copy = copy;
             _directiveState
                 .Carry(Constructs.DefineDirective2002, new DirectiveValueCarrier<Dictionary<string, CtValue>>(
-                    () => new Dictionary<string, CtValue>(_defines, StringComparer.OrdinalIgnoreCase),
+                    () => new Dictionary<string, CtValue>(_defines, CobolNames.Comparer),
                     saved => { _defines.Clear(); foreach (var (k, v) in saved) _defines[k] = v; }))
                 .Carry(Constructs.Flag02Directive2014, _flagScan.CarrierFor(FlagDirective.Flag02))
                 .Carry(Constructs.Flag14Directive2023, _flagScan.CarrierFor(FlagDirective.Flag14));
@@ -358,7 +358,7 @@ public static partial class ConditionalCompilationProcessor
                             ParentActive = parentActive, Emitting = false, BranchTaken = false,
                             Start = origin, EvaluateFlagOn = _flagScan.IsOn(FlagOption.Flag14Evaluate) };   // c anchor (§7.3.15.4 GR4 c)
                         string subj = rest.TrimSpaces();
-                        if (subj.Equals("TRUE", StringComparison.OrdinalIgnoreCase)) f.TruthForm = true;
+                        if (CobolNames.Same(subj, "TRUE")) f.TruthForm = true;
                         else if (parentActive) f.Subject = EvaluateOperandText(subj, _evaluator, _diag, ">>EVALUATE");
                         _stack.Push(f);
                         break;
@@ -635,20 +635,17 @@ public static partial class ConditionalCompilationProcessor
             complaint = over ? "OVERRIDE follows no operand" : "no operand follows the compilation-variable-name";
             return false;
         }
-        define = body.Equals("PARAMETER", StringComparison.OrdinalIgnoreCase)
+        define = CobolNames.Same(body, "PARAMETER")
             ? (name, DefineKind.Parameter, "", over)
             : (name, DefineKind.Value, body, over);
         complaint = "";
         return true;
     }
 
-    /// <summary>A compilation-variable-name is a COBOL user-defined word (§8.3.2.1): basic letters, digits, hyphen and
-    /// underscore, neither beginning nor ending with a hyphen.</summary>
-    private static bool IsCompilationVariableNameShape(string w)
-    {
-        foreach (char c in w) if (!char.IsAsciiLetterOrDigit(c) && c is not ('-' or '_')) return false;
-        return w[0] != '-' && w[^1] != '-';
-    }
+    /// <summary>A compilation-variable-name is a COBOL user-defined word (§8.3.2.1): word characters — basic letters,
+    /// digits, hyphen, underscore and the extended letters (kb/Work PB1402) — neither beginning nor ending with a
+    /// hyphen or underscore. Which extended characters the edition permits is <see cref="CobolWordRule"/>'s.</summary>
+    private static bool IsCompilationVariableNameShape(string w) => CobolCharacterRepertoire.IsWordShape(w);
 
     /// <summary>Apply one emitting-branch <c>&gt;&gt;DEFINE</c> to <paramref name="defines"/>. Returns the name whose
     /// entry the directive CHANGED and the operand as written — the event the compilation-variable timeline records
@@ -675,7 +672,7 @@ public static partial class ConditionalCompilationProcessor
         // §8.3.2.1 applies to the compilation-variable-name — a word the tree-walk funnel never sees. Checked at
         // the DEFINITION site (the root: an over-long word can never become defined, so a reference-site spelling
         // is already diagnosed as an unknown variable). Report and continue, matching the funnel's posture.
-        if (CobolWordRule.LengthViolation(name, dialectLevel) is { } violation) diag.WordLength(violation);
+        foreach (var (code, violation) in CobolWordRule.DirectiveWordViolations(name, dialectLevel)) diag.WordRule(code, violation);
         switch (kind)
         {
             case DefineKind.Off:
@@ -801,7 +798,7 @@ public static partial class ConditionalCompilationProcessor
     private static bool MatchesWordAt(string text, int i, string word)
     {
         if (i + word.Length > text.Length) return false;
-        if (string.Compare(text, i, word, 0, word.Length, StringComparison.OrdinalIgnoreCase) != 0) return false;
+        if (!CobolNames.Same(text.AsSpan(i, word.Length), word)) return false;
         int after = i + word.Length;
         return after == text.Length || CobolSpace.IsSeparator(text[after]);
     }
@@ -816,11 +813,11 @@ public static partial class ConditionalCompilationProcessor
         CompilerDirectiveLine.TryParse(trimmed, out var d) ? (d.Word, d.Operand) : ("", "");
 
     private static bool StartsWithWord(string s, string word) =>
-        s.StartsWith(word, StringComparison.OrdinalIgnoreCase)
+        CobolNames.StartsWith(s, word)
         && (s.Length == word.Length || CobolSpace.IsSeparator(s[word.Length]));
 
     private static bool EndsWithWord(string s, string word) =>
-        s.EndsWith(word, StringComparison.OrdinalIgnoreCase)
+        CobolNames.EndsWith(s, word)
         && (s.Length == word.Length || CobolSpace.IsSeparator(s[s.Length - word.Length - 1]));
 
     /// <summary>The frontend diagnostic gateway: the shared evaluator's code-preserving reports (any
@@ -920,10 +917,9 @@ public static partial class ConditionalCompilationProcessor
                 at.ToLocation(), default);
         }
 
-        /// <summary>COBOLNET1567 — the §8.3.2.1 word-length ceiling on a directive-carried word, the SAME code
-        /// and text the tree-walk funnel emits (CobolWordRule owns the message).</summary>
-        public void WordLength(string violation) =>
-            Emit(Editions.Diagnostics.DiagnosticCatalog.WordLengthExceeded.Code, violation);
+        /// <summary>COBOLNET1567 / COBOLNET2773 — the §8.3.2.1 word length and word characters of a directive-carried
+        /// word, the SAME codes and text the tree-walk funnel emits (CobolWordRule owns both).</summary>
+        public void WordRule(string code, string violation) => Emit(code, violation);
 
         private void Emit(string code, string message) =>
             bag?.ReportError(code, message, At.ToLocation(), default);

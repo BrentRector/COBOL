@@ -808,7 +808,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         // The PROTOTYPE arm (§8.4.3.12.3 SR2 + §8.4.6.6): a REPOSITORY function-specifier, or the containing
         // function definition's own user-function-name. The SAME two legs the USAGE clause's TO phrase resolves.
         bool isPrototypeName = ctx.Data.UserFunctionNames.Contains(word)
-            || string.Equals(host.UdfSelfName, word, StringComparison.OrdinalIgnoreCase);
+            || CobolNames.Same(host.UdfSelfName, word);
         if (isPrototypeName)
         {
             // GR3 makes the sender a function-pointer restricted to this prototype, so SR20's compare is the

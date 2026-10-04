@@ -3,6 +3,7 @@
 using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.Frontend.Generated;
+using CobolNet.Runtime;
 
 namespace CobolNet.Compiler.Oo;
 
@@ -40,7 +41,7 @@ public sealed class OoInterfaceSymbol(string name, string csName, CobolParserCor
     /// own INHERITS as C# bases and the emitted class carries its base's implementations.</para></summary>
     public IReadOnlyList<string> ImplementedCsTypes => [CsName];
 
-    private readonly Dictionary<string, OoMethodSymbol> _protos = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, OoMethodSymbol> _protos = new(CobolNames.Comparer);
     public IReadOnlyList<OoMethodSymbol> Prototypes => _protoList;
     private readonly List<OoMethodSymbol> _protoList = [];
 
@@ -75,7 +76,7 @@ public sealed class OoInterfaceSymbol(string name, string csName, CobolParserCor
     /// §11.6.3 SR5 requires "this interface conforms to all inherited interfaces", so one inherited prototype shall
     /// conform to every other; <c>OoConformance.ValidateInterfaceInheritance</c> finds it and records it here
     /// (<see cref="AllPrototypes"/> reads it). Keyed by method-name, like <see cref="AllPrototypes"/>.</summary>
-    private readonly Dictionary<string, OoMethodSymbol> _conformingChoice = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, OoMethodSymbol> _conformingChoice = new(CobolNames.Comparer);
 
     internal void ChooseInheritedPrototype(OoMethodSymbol proto) => _conformingChoice[proto.Name] = proto;
 
@@ -94,7 +95,7 @@ public sealed class OoInterfaceSymbol(string name, string csName, CobolParserCor
     /// a name with one prototype, discovery order.</summary>
     public IEnumerable<OoMethodSymbol> AllPrototypes()
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(CobolNames.Comparer);
         var stack = new Stack<OoInterfaceSymbol>();
         var visited = new HashSet<OoInterfaceSymbol>();
         stack.Push(this);

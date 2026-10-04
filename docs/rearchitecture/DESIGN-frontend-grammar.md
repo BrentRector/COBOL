@@ -1381,6 +1381,48 @@ which beside a data item of the prefix's name compiled as two operands. The lite
 `CompileTimeExpressionEvaluator`. A lexer action that ends a token early does
 so through `CutTokenTo(length)`, which restores the column with the input position (kb/Work PB1728).
 
+### 3.13 The characters of a COBOL word, and the ONE fold that compares words (kb/Work PB1402)
+
+ISO §8.3.2.1 makes a COBOL word basic letters, basic digits, hyphen, underscore and **extended letters**; §8.1.3.2 GR4
+makes the extended letters Annex B less the basic characters, and GR3 b) / GR4 b) compare words by folding uppercase to
+lowercase with Annex C. Three pieces, each in one place:
+
+- **The lexical class** — `CobolCharacterRepertoire.IsWordCharacter` (Editions), mirrored by the lexer's `EXT_CHAR`
+  fragment in `NAME_BODY` / `NAME_TAIL`: the basic word characters plus EVERY character outside the basic repertoire
+  except the noncharacters the text stages use as markers. It is a SUPERSET of Annex B on purpose: the lexer reads
+  UTF-16 code units (a supplementary letter is two surrogates, both in the class), it has no edition, and a character
+  outside Annex B must be NAMED rather than end the word with "unexpected". Every text-stage word scanner (the
+  directive line, `>>DEFINE` / `>>COBOL-WORDS` word shapes, the fixed-form word-continuation test) asks the same
+  predicate, so all stages agree where a word ends.
+- **The legality** — `CobolCharacterRepertoire.Violation(word, edition)` over the edition's Annex B.3 position classes
+  (anywhere / not first / medial), asked by `CobolWordRule` from the tree funnel (`VisitCobolWord`) and the directive
+  stages: COBOLNET2773 for a character outside the edition's Annex B or a B.3 item 2 character first; the construct
+  `user-word-character-removed-2023` (COBOLNET0902) for a character only COBOL 2023 refuses (E.2 item 4); the construct
+  `user-word-extended-letter-2002` (COBOLNET0900) below 2002. The tables are COBOL 2023's, transcribed list for list
+  from the standard by `scripts/spec/gen_annex_bc.py`; COBOL 2002/2014 are derived by reversing Annex E (E.2 item 4,
+  E.3.3 items 4 and 5 — the standard records no 2002→2014 change, so 2002 uses 2014's). `AnnexBCDriftTests` re-reads
+  every list from `specs/ISO_COBOL.md`. A word's length is counted in characters (code points), so a combining
+  character counts separately (GR4 c).
+- **The fold** — `CobolNames` (Runtime, because the run-time externalized-name match needs it too): `Fold`, the
+  `Comparer` every name table uses, and `Same` / `StartsWith` / `EndsWith` / `Contains` over spans. No compiler or
+  frontend file compares a word by `OrdinalIgnoreCase` (`CobolNameFoldDriftTests`; a string that is not a COBOL word
+  says so on its line). The table is COBOL 2023's; the only fold difference a COBOL 2002/2014 word can observe is E.2
+  item 14 (U+0131 → i, U+03C2 → U+03C3 before 2023), so the lexer writes those letters in their edition's fold
+  (`CobolNames.EditionSpelling`, primed through `TokenRetypes.PrimeLexer`) and the one comparer then answers for the
+  edition. A C# identifier derived from a word keeps its extended letters, escaping only those C# cannot hold
+  (`DataItem.IdentifierCharacters`). The EXTERNAL-file group, the SR14/SR15 WHEN census and the REPOSITORY
+  specification table are keyed by the same comparer. Not yet on it: the Editions word tables (`CobolWordsMap`, the
+  directive catalog), because `Cobol.Net.Editions` references nothing and the fold lives in Runtime, and the C#
+  identifier derivations `Sanitize(x).ToUpperInvariant()`.
+- **The encoding of the grammar itself** (kb/Work PB1944) — ANTLR reads a `.g4` in the JVM's default charset (UTF-8 on
+  Java 18+ and on Linux, Cp1252 on Windows CI's JVM), so `Invoke-Antlr4CSharp.ps1` passes `-encoding UTF-8` and every
+  grammar file is valid UTF-8 without a byte-order mark (`GrammarEncodingDriftTests`). The encoding is declared, so
+  no grammar has to avoid non-ASCII text to dodge the JVM default. A character that does not display (a control
+  character or a noncharacter such as `EXT_CHAR`'s U+FDD0 to U+FDEF, U+FFFE and U+FFFF) is written as a Unicode escape
+  so a reader can see it; a displayable character may be written raw (owner 2026-10-04). A raw noncharacter in a set read as three Latin
+  characters under Cp1252 and failed Windows CI's warnings-as-errors build with `warning(180)` when nothing declared
+  the encoding.
+
 ---
 
 ## 4. Current → target module changes

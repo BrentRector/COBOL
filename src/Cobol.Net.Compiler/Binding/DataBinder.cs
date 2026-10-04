@@ -16,6 +16,7 @@ using CobolNet.Compiler.Oo;
 namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// Builds the bound DATA DIVISION model (a forest of <see cref="DataItem"/> trees, one per 01/77 item) from the
@@ -129,7 +130,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// duplicate data-names disambiguated only by qualification (OF/IN), so this is a MULTIMAP — a single-valued
     /// dictionary would silently drop all but the last (a latent wrong-item bug; COBOLNET_DESIGN §3.5).
     /// </summary>
-    public Dictionary<string, List<DataItem>> ByName { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, List<DataItem>> ByName { get; } = new(CobolNames.Comparer);
 
     /// <summary>THE UNIT'S INDEX-NAME NAMESPACE (kb/Work PB919): every INDEXED BY declaration of this unit's own
     /// data division (<see cref="IndexNameRegistry.Own"/> — the <c>long</c> cells it emits, 1-based occurrence
@@ -157,7 +158,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>Level-88 condition-names (case-insensitive) → the conditions with that name (a list, since names
     /// may be duplicated under different parents and disambiguated by qualification).</summary>
-    public Dictionary<string, List<Condition88>> Conditions { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, List<Condition88>> Conditions { get; } = new(CobolNames.Comparer);
 
     /// <summary>OCCURS DYNAMIC <c>CAPACITY IN data-name-3</c> register-names (case-insensitive) → the owning
     /// dynamic-table <see cref="DataItem"/> (ISO §13.18.38 GR15 / §8.5.1.9.1; data-model D9). The register is
@@ -170,7 +171,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         get { Require(PassPhase.OccursResolved, "CapacityRegisters"); return _capacityRegisters; }
     }
-    private readonly Dictionary<string, DataItem> _capacityRegisters = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DataItem> _capacityRegisters = new(CobolNames.Comparer);
 
     /// <summary>REPORT SECTION <b>sum counter</b> names (case-insensitive) → every SUM ENTRY that carries the name —
     /// its <see cref="ReportSumFamily"/>, whose occurrences a subscript selects (kb/Work PB1271) — with its owning
@@ -191,7 +192,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         get { Require(PassPhase.FilesResolved, "SumCounters"); return _sumCounters; }
     }
     private readonly Dictionary<string, List<(ReportModel Report, ReportSumFamily Family)>> _sumCounters
-        = new(StringComparer.OrdinalIgnoreCase);
+        = new(CobolNames.Comparer);
 
     /// <summary>TYPEDEF type declarations (case-insensitive) → the template root <see cref="DataItem"/> (ISO
     /// §13.18.58; data-model D17). The template is built by <see cref="BindEntries"/> but kept OFF <see cref="Roots"/>
@@ -199,7 +200,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// GR1/GR2). A <c>TYPE IS type-name</c> reference clones this subtree into the referencing entry in the post-build
     /// <see cref="ExpandTypes"/> pass — which runs before <see cref="BindResolve"/>, so every resolution pass sees the
     /// clone (the invariant the OO compiler-temp clone already relies on).</summary>
-    public Dictionary<string, DataItem> TypeDecls { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, DataItem> TypeDecls { get; } = new(CobolNames.Comparer);
 
     /// <summary>The GLOBAL type declarations of every containing program, keyed by type-name (ISO §13.18.58.4 GR3 —
     /// "The GLOBAL clause applies to the scope of the type-name" — and §8.4.6.2.2, "A type-name described with a
@@ -207,7 +208,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// source element's OWN declarations: an own declaration must neither collide with an inherited one (§8.4.6.2.1
     /// 3 a — a name declared in the referencing element is the one referenced) nor be walked, emitted or re-validated
     /// as this unit's. <see cref="FindTypeDecl"/> is the ONE lookup, own declarations first.</summary>
-    private readonly Dictionary<string, DataItem> _inheritedTypeDecls = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DataItem> _inheritedTypeDecls = new(CobolNames.Comparer);
 
     /// <summary>Make <paramref name="container"/>'s GLOBAL type declarations visible here (ISO §13.18.58.4 GR3;
     /// §8.4.6.2.1 1 — "all global names that are defined in source element A and in any source elements that
@@ -286,14 +287,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>The files keyed by COBOL file-name (case-insensitive), for the binder to resolve OPEN/READ/CLOSE
     /// targets and to map a WRITE/REWRITE record-name back to its owning file.</summary>
-    public Dictionary<string, FileModel> FilesByName { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, FileModel> FilesByName { get; } = new(CobolNames.Comparer);
 
     /// <summary>The files this unit's OWN file control entries select, by file-name — the subjects of ISO §12.4.5.2
     /// SR2 ("A given file-name may be specified in only one SELECT clause within a factory, function, object, or
     /// program") and SR3 (each needs an FD or SD in the same file section). It is not <see cref="FilesByName"/>,
     /// which also holds the models an FD or SD synthesizes, and it leaves out a class-level FILE-CONTROL, which
     /// §12.4.3 SR1 forbids outright (kb/Work PB1076) and which belongs to no factory or object (kb/Work PB1077).</summary>
-    private readonly Dictionary<string, FileModel> _selectedFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, FileModel> _selectedFiles = new(CobolNames.Comparer);
 
     /// <summary>Every file of every CONTAINING program that is NOT a global name here — its FD has no GLOBAL clause
     /// (ISO §13.18.27.3 SR1 d)), so its file-name is not in <see cref="FilesByName"/>. It is still reachable through a
@@ -315,7 +316,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// only thing that distinguishes them.</item></list>
     /// ⚠ The posture used to be compile-ACCEPT with a staged runtime loud; kb/Work PB260 measured what that
     /// actually did (a screen record printed to standard output) and made it a refusal.</summary>
-    public HashSet<string> ScreenNames { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<string> ScreenNames { get; } = new(CobolNames.Comparer);
 
     /// <summary>True when SOURCE-COMPUTER declares WITH DEBUGGING MODE (the X3.23-1985 compile-time debug
     /// switch) — consumed by the declaratives binder to decide the USE FOR DEBUGGING posture: with the switch the
@@ -331,7 +332,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <see cref="ActivateDebugRegisters"/> when a procedure-subject debugging declarative is collected under
     /// WITH DEBUGGING MODE (empty otherwise — a non-debug program's resolution is unchanged).</summary>
     public IReadOnlyDictionary<string, (DataItem Item, DebugRegisterMember Member)> DebugRegisters => _debugRegisters;
-    private readonly Dictionary<string, (DataItem, DebugRegisterMember)> _debugRegisters = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (DataItem, DebugRegisterMember)> _debugRegisters = new(CobolNames.Comparer);
 
     /// <summary>The implicit description of the predefined object reference <c>EXCEPTION-OBJECT</c>
     /// (ISO §8.4.3.6.3 SR2 — "EXCEPTION-OBJECT is implicitly described as class object and category object
@@ -395,7 +396,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// object-property references (case-insensitive per §8.3.2).</summary>
     /// <para>Keyed by property-name-1 → the name the property is known by in the declared classes: literal-4 when
     /// the specifier writes <c>AS literal-4</c> (§12.3.8.2, kb/Work PB974), otherwise property-name-1 itself.</para>
-    internal Dictionary<string, string> OoRepositoryProperties { get; } = new(StringComparer.OrdinalIgnoreCase);
+    internal Dictionary<string, string> OoRepositoryProperties { get; } = new(CobolNames.Comparer);
 
     /// <summary>The unit's REPOSITORY PROGRAM specifiers (ISO §12.3.8.2's program-specifier, <c>PROGRAM
     /// program-prototype-name-1 [AS literal-3]</c>) keyed by program-prototype-name — the ONE declaration surface
@@ -404,25 +405,25 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// here (syntax); §12.3.8.3 SR15's self/containing-program ignore and §12.3.8.4 GR10's resolution against the
     /// compilation group need the unit's identity and its siblings, so they run in
     /// <c>BinderDriver.ProgramPrototypesOf</c>, exactly as the function twin resolves in BuildUserFunctionTable.</summary>
-    internal Dictionary<string, ProgramSpecifier> ProgramSpecifiers { get; } = new(StringComparer.OrdinalIgnoreCase);
+    internal Dictionary<string, ProgramSpecifier> ProgramSpecifiers { get; } = new(CobolNames.Comparer);
 
     /// <summary>The unit's REPOSITORY user-function specifiers (§12.3.8 — <c>FUNCTION function-prototype-name</c>
     /// WITHOUT the INTRINSIC phrase): the precondition for a user-function reference, and per §12.3.8.2 GR12
     /// (:14885) the declaration that makes the name refer to the USER-DEFINED function "and not to an intrinsic
     /// function of the same name" — so the binder's user-function dispatch precedes the intrinsic catalog.</summary>
-    internal HashSet<string> UserFunctionNames { get; } = new(StringComparer.OrdinalIgnoreCase);
+    internal HashSet<string> UserFunctionNames { get; } = new(CobolNames.Comparer);
 
     /// <summary>The unit's user-defined-function specifiers by function-prototype-name-1 → EXTERNALIZED name:
     /// literal-5 when <c>AS literal-5</c> is written (§12.3.8.4 GR11 NOTE 2 — "Literal-5, if specified, is the
     /// externalized name of the function prototype; otherwise, the externalized name is function-prototype-name-1"),
     /// otherwise the name itself. GR11's search of the compilation group runs in
     /// <c>BinderDriver.UserFunctionsOf</c>, the twin of <c>ProgramPrototypesOf</c> (kb/Work PB974).</summary>
-    internal Dictionary<string, string> FunctionSpecifiers { get; } = new(StringComparer.OrdinalIgnoreCase);
+    internal Dictionary<string, string> FunctionSpecifiers { get; } = new(CobolNames.Comparer);
 
     /// <summary>The unit's REPOSITORY intrinsic-function specifiers by name (§12.3.8 —
     /// <c>FUNCTION intrinsic-function-name INTRINSIC</c>): the §8.4.3.2 SR2 precondition that lets the word
     /// FUNCTION be OMITTED when referencing that intrinsic (GR13). §8.3.2 case-insensitive.</summary>
-    internal HashSet<string> RepositoryIntrinsics { get; } = new(StringComparer.OrdinalIgnoreCase);
+    internal HashSet<string> RepositoryIntrinsics { get; } = new(CobolNames.Comparer);
 
     /// <summary>True when the unit's REPOSITORY specifies <c>FUNCTION ALL INTRINSIC</c> (§12.3.8 GR14): the word
     /// FUNCTION may be omitted for EVERY §8.11 intrinsic-function-name in this scope (SR2/GR13). Read only through
@@ -586,7 +587,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         foreach (var (at, word, kind) in specifierWords)
         {
             if (kind is UserWordKind.ProgramPrototypeName or UserWordKind.FunctionPrototypeName
-                && ownName is not null && ownName.Equals(word, StringComparison.OrdinalIgnoreCase)) continue;
+                && ownName is not null && CobolNames.Same(ownName, word)) continue;
             using (Edition.At(at)) DeclareUserWord(word, kind);
         }
         DeclareUnitName(program);
@@ -1547,8 +1548,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         if (named.Count > 0)
             return UniqueOrReportAmbiguous(named, $"file '{file.CobolName}': COLLATING SEQUENCE OF", written, out _);
         bool unresolvedKeyOfThatName =
-            file.RecordKeyItem is null && string.Equals(file.RecordKeyName, k.Name, StringComparison.OrdinalIgnoreCase)
-            || file.AlternateKeyNames.Any(a => a.Item is null && a.Name.Equals(k.Name, StringComparison.OrdinalIgnoreCase));
+            file.RecordKeyItem is null && CobolNames.Same(file.RecordKeyName, k.Name)
+            || file.AlternateKeyNames.Any(a => a.Item is null && CobolNames.Same(a.Name, k.Name));
         if (!unresolvedKeyOfThatName)
             Edition.Error(DiagnosticCatalog.FileCollatingKey, $"file '{file.CobolName}': COLLATING SEQUENCE OF "
                 + $"'{written}' — '{written}' is not a RECORD KEY or ALTERNATE RECORD KEY of this file "
@@ -2205,7 +2206,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // ⛔ AND THE SELECTION IS COUNTED (kb/Work PB978): SR2 narrows the set to this file's records when any
             // survivor lies there, and what remains must be ONE — two same-named keys in this file's records, or
             // two outside them with none inside, are §8.4.2.2.3 SR1's ambiguity, never the first declared.
-            HashSet<string> refusedKeys = new(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> refusedKeys = new(CobolNames.Comparer);
             DataItem? InRecords(string keyName, IReadOnlyList<string> quals, string face, Editions.DiagnosticCursor at)
             {
                 // ⛔ ALREADY REFUSED AT CAPTURE — one fault, one verdict (kb/Work PB481). ClauseDataName records a
@@ -3096,7 +3097,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // VALUE on a '+'-bearing format-2 picture.
             : pic.LocaleEdit is not null ? pic.Signed
             : edited
-            ? mask.Any(c => c is '+' or '-') || mask.Contains("CR", StringComparison.OrdinalIgnoreCase) || mask.Contains("DB", StringComparison.OrdinalIgnoreCase)
+            ? mask.Any(c => c is '+' or '-') || CobolNames.Contains(mask, "CR") || CobolNames.Contains(mask, "DB")
             : pic.Signed;
         if (neg && !signBearing)
         {
@@ -3183,7 +3184,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         list.Add(item);
     }
 
-    private readonly HashSet<string> _repositoryNameReported = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _repositoryNameReported = new(CobolNames.Comparer);
 
     /// <summary>⛔ THE ONE DECLARATION FUNNEL OF A USER-DEFINED WORD (ISO §8.3.2.2; kb/Work PB1083): every
     /// declaration of every §8.3.2.2 type announces its word here, and the rules about a user-defined word AS
@@ -3219,10 +3220,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// containing element's SPECIAL-NAMES passes down is inherited, not declared here, and a contained source element
     /// may re-declare it as another type (§8.4.6.1: each element "may use identical user-defined words"). Keyed
     /// case-insensitively, like every COBOL word.</summary>
-    private readonly Dictionary<string, UserWordKind> _wordTypes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, UserWordKind> _wordTypes = new(CobolNames.Comparer);
 
     /// <summary>The words already reported as two types, so a third declaration does not repeat the refusal.</summary>
-    private readonly HashSet<string> _wordTypeConflictReported = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _wordTypeConflictReported = new(CobolNames.Comparer);
 
     /// <summary>⛔ §8.3.2.2: "<i>Within a source element, a given user-defined word may be used as only one type of
     /// user-defined word</i>", except as <see cref="UserWordKinds.MayBeOneWord"/> says. Asked at the ONE declaration funnel
@@ -3246,17 +3247,19 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>The letterless words already reported, so a repeated declaration of one (a TYPE expansion re-registers
     /// a clone of its template's words) draws one refusal.</summary>
-    private readonly HashSet<string> _letterlessReported = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _letterlessReported = new(CobolNames.Comparer);
 
     /// <summary>⛔ §8.3.2.2: "<i>With the exception of section-names, paragraph-names, and level-numbers, each
     /// user-defined word shall contain at least one basic letter or extended letter</i>" (kb/Work PB1403). The lexer
     /// cannot ask it — a paragraph-name <c>1-2</c> is legal and a letterless word is the same IDENTIFIER token — so it
     /// is asked here, at the ONE declaration funnel, for every type not in <see cref="UserWordKinds.MayBeLetterless"/>:
-    /// <c>01 1-2 PIC X</c> compiled and ran. A letter is any Unicode letter: the basic letters, and the extended
-    /// letters the implementor admits (§8.3.2.2 leaves them to the implementor; Annex A.1).</summary>
+    /// <c>01 1-2 PIC X</c> compiled and ran. A letter is a basic letter or an extended letter — Annex B.1 makes every
+    /// character of the repertoire beyond the basic ones an extended letter, a combining mark or another script's digit
+    /// included (<see cref="CobolCharacterRepertoire.IsLetter"/>; kb/Work PB1402 — this asked char.IsLetter, which
+    /// such a character is not).</summary>
     private void CheckLetter(string word, UserWordKind kind)
     {
-        if (UserWordKinds.MayBeLetterless.Contains(kind) || word.Any(char.IsLetter) || !_letterlessReported.Add(word)) return;
+        if (UserWordKinds.MayBeLetterless.Contains(kind) || word.Any(CobolCharacterRepertoire.IsLetter) || !_letterlessReported.Add(word)) return;
         Edition.Error(DiagnosticCatalog.UserWordWithoutLetter,
             $"the {kind.Spelling()} '{word}' contains no letter — with the exception of section-names, paragraph-names "
             + "and level-numbers, each user-defined word shall contain at least one basic letter or extended letter "
@@ -3349,7 +3352,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     internal void ExpandTypes()
     {
         foreach (var item in AllItems().Where(i => i.TypeRefName is not null).ToList())
-            ExpandType(item, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            ExpandType(item, new HashSet<string>(CobolNames.Comparer));
         // SAME AS (ISO §13.18.49; P10 Step 16) — expanded AFTER every TYPE reference, so a data-name-1 that
         // was itself declared with a TYPE clause copies its fully-EXPANDED description (GR1 — "as though the
         // data description identified by data-name-1 had been coded in place"). Chains (a target with its own
@@ -3860,7 +3863,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // reference likewise (defensive — the SAME AS loop runs after the TYPE loop, so Roots targets are
         // already expanded; ExpandType is idempotent via the TypeRefName-null mark).
         if (target.SameAsName is not null) ExpandSameAs(target, expanding);
-        if (target.TypeRefName is not null) ExpandType(target, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        if (target.TypeRefName is not null) ExpandType(target, new HashSet<string>(CobolNames.Comparer));
         for (var p = item.Parent; p is not null; p = p.Parent)
             if (ReferenceEquals(p, target))
             {
@@ -3973,7 +3976,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         if (target.IsGroup)
         {
             int levelDelta = item.Level - target.Level;
-            var typeExpanding = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var typeExpanding = new HashSet<string>(CobolNames.Comparer);
             foreach (var child in target.Children)
                 item.Children.Add(CloneItem(child, item, typeExpanding, levelDelta));
         }
@@ -4683,7 +4686,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         if (level is 66 or 88) return null; // RENAMES / condition-names: later slice.
 
         string? cobolName = e.Name;
-        bool isFiller = cobolName is null || cobolName.Equals("FILLER", StringComparison.OrdinalIgnoreCase);
+        bool isFiller = cobolName is null || CobolNames.Same(cobolName, "FILLER");
         string csName = isFiller ? $"_filler{_fillerCounter++}" : DataItem.Sanitize(cobolName!);
 
         string? pictureText = null, usageText = null, rawValue = null, redefinesTargetName = null;
@@ -5173,7 +5176,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // namespace. A name in neither leg names no signature, so the GR25/GR26 restriction would be
         // unverifiable — and a restriction nothing can check is the a_dead_lookup_is_also_unverified shape.
         if (restrictedPrototypeName is not null
-            && !(string.Equals(UnitSelfName, restrictedPrototypeName, StringComparison.OrdinalIgnoreCase)
+            && !(CobolNames.Same(UnitSelfName, restrictedPrototypeName)
                  && UnitIsFunction == isFunctionPointer)
             && !(isFunctionPointer
                  ? UserFunctionNames.Contains(restrictedPrototypeName)
@@ -6768,7 +6771,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // entry's candidates are the roots of ITS OWN section: SR10's "entries defining the area of data-name-2"
                 // do not cross a section boundary.
                 var preceding = scope.TakeWhile(s => !ReferenceEquals(s, item))
-                    .Where(s => string.Equals(s.CobolName, tname, StringComparison.OrdinalIgnoreCase)
+                    .Where(s => CobolNames.Same(s.CobolName, tname)
                         && (item.Parent is not null || s.Section == item.Section)).ToList();
                 item.SetRedefinition(preceding.LastOrDefault(s => s.RedefinesTargetName is null) ?? preceding.LastOrDefault(),
                     RedefinitionKind.Clause);
@@ -7804,7 +7807,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         List<DataItem> hits = [];
         void Walk(DataItem n)
         {
-            if (string.Equals(n.CobolName, name, StringComparison.OrdinalIgnoreCase) && QualifierChainMatches(n, quals))
+            if (CobolNames.Same(n.CobolName, name) && QualifierChainMatches(n, quals))
                 hits.Add(n);
             foreach (var c in n.Children) Walk(c);
         }
@@ -7926,7 +7929,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             string q = qualifiers[qi];
             bool found = false;
             while (!found && ancestors.MoveNext())
-                found = string.Equals(ancestors.Current, q, StringComparison.OrdinalIgnoreCase);
+                found = CobolNames.Same(ancestors.Current, q);
             if (found) continue;
             return qi == qualifiers.Count - 1 && isOutermostContainer(q);
         }

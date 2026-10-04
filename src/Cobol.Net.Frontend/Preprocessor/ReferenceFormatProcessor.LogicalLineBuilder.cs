@@ -432,9 +432,10 @@ public static partial class ReferenceFormatProcessor
         return -1;
     }
 
-    /// <summary>A COBOL word-forming character (§8.3.1 — letters, digits, hyphen; the underscore joined at
-    /// 2002 and rides the same splice rule).</summary>
-    private static bool IsCobolWordChar(char c) => char.IsLetterOrDigit(c) || c is '-' or '_';
+    /// <summary>A COBOL word-forming character (§8.3.2.1 — basic letters, digits, hyphen, the underscore joined at
+    /// 2002, and the extended letters): the ONE lexical word class the lexer's NAME_BODY shares (kb/Work PB1402 — this
+    /// read char.IsLetterOrDigit, which a combining mark of a word is not).</summary>
+    private static bool IsCobolWordChar(char c) => Editions.CobolCharacterRepertoire.IsWordCharacter(c);
 
     /// <summary>The last non-space character of a logical line (the splice's LEFT side), or null when it has none.</summary>
     private static char? LastNonSpace(string line)
