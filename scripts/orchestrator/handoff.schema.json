@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BrentRector/COBOL/scripts/orchestrator/handoff.schema.json",
+  "title": "Orchestrator unit handoff",
+  "description": "What one orchestrator unit hands the supervisor and the next unit (docs/rearchitecture/DESIGN-orchestrator-loop.md section 5). Pointers, not prose: the detail lives in the files it names.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "unit", "outcome", "summary"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "unit": {"enum": ["wave", "land", "resume", "meter"]},
+    "outcome": {"enum": ["done", "split", "failed", "owner-question"]},
+    "summary": {"type": "string", "minLength": 1, "maxLength": 900},
+    "next_unit": {"enum": ["wave", "land", "resume", "meter", "owner-question", null]},
+    "next_unit_reason": {"type": "string", "maxLength": 400},
+    "branches_pending": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["branch", "status"],
+        "properties": {
+          "branch": {"type": "string", "minLength": 1},
+          "worktree": {"type": "string"},
+          "report": {"type": "string"},
+          "status": {"enum": ["DONE", "SPLIT", "DISCHARGED", "BLOCKED"]}
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "run_id": {"type": "string"},
+        "state": {"enum": ["landed", "stopped", "none"]},
+        "scratch": {"type": "string"}
+      }
+    },
+    "landed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "commits": {"type": "array", "items": {"type": "string", "pattern": "^[0-9a-f]{7,40}$"}},
+        "gap_before": {"type": "integer", "minimum": 0},
+        "gap_after": {"type": "integer", "minimum": 0},
+        "devlog_entry": {"type": "integer", "minimum": 1}
+      }
+    },
+    "meter_reading": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["weekly_pct", "session_pct"],
+      "properties": {
+        "weekly_pct": {"type": "number", "minimum": 0, "maximum": 100},
+        "session_pct": {"type": "number", "minimum": 0, "maximum": 100},
+        "session_reset": {"type": ["string", "null"]}
+      }
+    },
+    "owner_question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question"],
+      "properties": {
+        "question": {"type": "string", "minLength": 1, "maxLength": 1200},
+        "context": {"type": "string", "maxLength": 2000}
+      }
+    },
+    "notes_touched": {"type": "array", "items": {"type": "string", "pattern": "^PB[0-9]+$"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"outcome": {"const": "owner-question"}}, "required": ["outcome"]},
+      "then": {"required": ["owner_question"]},
+      "else": {"not": {"required": ["owner_question"]}}
+    },
+    {
+      "if": {"properties": {"unit": {"const": "meter"}, "outcome": {"const": "done"}}, "required": ["unit", "outcome"]},
+      "then": {"required": ["meter_reading"]}
+    }
+  ]
+}

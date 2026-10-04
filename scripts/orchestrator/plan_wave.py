@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Plan the next fix-lane wave deterministically, from a budget in weekly points.
 
-    python scripts/orchestrator/plan_wave.py --wave 1016 --budget-points 3 --dry-run
+    python scripts/orchestrator/plan_wave.py --budget-points 3 --dry-run          # --wave defaults to next
     python scripts/orchestrator/plan_wave.py --wave 1016 --from-budget --scratch <dir> [--reports <dir>]
 
 Design: docs/rearchitecture/DESIGN-orchestrator-loop.md section 9 (kb/Work PB1981 item 3). Waves 1011-1015 each
@@ -396,9 +396,18 @@ def previous_train(repo: pathlib.Path) -> str:
     return "the previous train (see DEVLOG.md)"
 
 
+def next_wave(repo: pathlib.Path, reports: list[Report]) -> int:
+    """One past the highest wave number in the reports directory or the newest 200 DEVLOG lines."""
+    seen = [r.wave for r in reports]
+    with open(repo / "DEVLOG.md", encoding="utf-8", errors="replace") as f:
+        for _, line in zip(range(200), f):
+            seen += [int(w) for w in re.findall(r"\b[Ww]aves? (\d{3,})", line)]
+    return max(seen, default=0) + 1
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--wave", required=True)
+    ap.add_argument("--wave", default="next", help="the wave number, or next (default): one past the highest seen")
     b = ap.add_mutually_exclusive_group(required=True)
     b.add_argument("--budget-points", type=float, help="weekly points this wave may spend")
     b.add_argument("--from-budget", action="store_true", help="use budget.py's headroom_pct")
@@ -454,7 +463,7 @@ def main(argv: list[str] | None = None) -> int:
         classify, unlanded = git_branch_classifier(), unlanded_branch_notes(open_ids)
     p = plan(notes, clusters, half_clusters, reports, classify, unlanded, rules, budget_points, a.max_groups or rules["wave"]["max_groups"])
 
-    wave = str(a.wave)
+    wave = str(next_wave(REPO, reports)) if a.wave == "next" else str(a.wave)
     train = rules["wave"]["train_size"]
     peek_code = alloc.peek("code", REPO, cdir)
     peek_pb = alloc.peek("pb", REPO, cdir)
