@@ -122,7 +122,7 @@ def main():
             if age_minutes(path) < a.min_age:
                 print(f'skipped (touched in the last {a.min_age} min): {b}')
                 continue
-            if git('status', '--short', cwd=path).stdout.strip():
+            if git('status', '--short', '--', '.', ':!.claude/settings.local.json', cwd=path).stdout.strip():
                 print(f'skipped (dirty worktree): {b}')
                 continue
             if locked:
