@@ -13,6 +13,19 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1860 — 2026-10-04 08:45 PDT — Ledger refreshed after trains 1011 and 1012 (GAP 381); a per-landing trend point is now the rule
+
+The owner pointed out the ledger had not been refreshed since train 1010 although trains 1011 and 1012 had landed (GAP 497 to
+426 to 381). `gen_ledger.py` appends only the measurement for the current head, so the eight inventory-moving commits of the
+two trains were back-filled into `ledger-trend.json` from each commit's own `traceability-inventory.json` (112 points; every
+field read with `git show <sha>:tests/version-matrix/traceability-inventory.json`, none typed), `ledger-in-flight.md` now names
+the two trains, wave 1013 and the Opus wave planned after it, and the page was regenerated and republished to the same artifact
+(version 88). The orchestrator refreshes the ledger after every train it sees land, in the same turn as the landing report, not
+at the end of the day.
+
+**Files:** `docs/rearchitecture/evidence/ledger-trend.json`, `docs/rearchitecture/evidence/ledger-in-flight.md`. No code changed,
+no diagnostic code used.
+
 ## Entry 1859 — 2026-10-04 07:48 PDT — Train 1012: wave 1012 groups F, H, K, G, J — GLOBAL bridges and LINKAGE SR4/SR5, SORT/MERGE record sizes, the FLAG-02/FLAG-14 populations, report group and SUM rules, RECURSIVE containers and source-unit shapes; GAP 426 → 381
 
 **Group F (PB1523, PB1249, PB1250; SPLIT — PB1167 not started).** PB1523 reproduced as CS0102 twice and CS1061: `DataBinder.GlobalBridgesOf` appended a bridge per GLOBAL root with no set, so the records of a GLOBAL FD, which share one Tier-B backing, declared it twice, and a Tier-A (Alias) redefiner was bridged under its own name, which the container never declares. The bridge loop in `BinderDriver.BindUnitData` now collects into a set keyed on the emitted member, and `DataBinder.AnchorOf` names the canonical (the rule `ReferenceResolver.PlaceForItem` already applies). PB1249 and PB1250 share one decision point, `DataBinder.SealLinkageRules`: §13.7.3 SR4 is asked per record (an operand of USING or RETURNING, a BASED item, a REDEFINES of one, with subordinates, RENAMES, condition-names and index-names following their record), COBOLNET2746 from the one resolver; SR5 is one arm of `ExpressionBinder.ReceivingPlaceBar`, COBOLNET2747. The implementer determined that an item subordinate to a group function formal is not itself the formal (SR4 b) writes "subordinate to" when it means it). SR5 broke six existing goldens that stored into a function formal and one (pb1216) that used a non-formal LINKAGE item as scratch; each was repaired by keeping its leg through an EXTERNAL item (udf_by_value now prints A1=9999, pb1115 lost its A=NULL line). Found and fixed on the way: an EXTERNAL item as a subscript emitted its bare name (CS0103). Seven comments citing §13.18.30 (HIGHLIGHT) for the GLOBAL FD rule now cite §13.18.27.4 GR1. Rows GR-13.18.27.4-1/-3, SR-13.7.3-4/-5 closed. PB1167 keeps its measured plan in its note (program path `ProgramEmitter.EmitCallMethod`, method path a hidden `__retLen` in `OoEmitter.OoSignatureOf`).

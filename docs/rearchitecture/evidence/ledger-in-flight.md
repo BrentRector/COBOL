@@ -18,19 +18,20 @@
   Classes available: .flight (the accent panel), .cardgrid + .card, .pill.good/.warn/.crit, .mono, .num, .dim.
 -->
   <div class="flight">
-    <h3>In flight — Saturday 2026-10-03, evening</h3>
-    <p><strong>Nothing is running.</strong> Eight trains landed since the last refresh, each CI-proven: <span class="pill good">1003</span> the DYNAMIC LENGTH STRUCTURE record image, SORT/MERGE short-record fill, RETURNING conformance and the preprocessor's COBOL separator set; <span class="pill good">1004</span> constant entries, the report-section grammar, conditional compilation and the SORT binder; <span class="pill good">1005</span> report binder clauses, the <span class="mono">&gt;&gt;COBOL-WORDS</span> retype at lex time and the reference resolver; <span class="pill good">1006</span> OO content-conformance, element-wise table MOVE and dynamic-length I-O limits; <span class="pill good">1007</span> one Annex C name fold for every word comparison, constant-entry forward references and the strongly typed group across INVOKE; <span class="pill good">1008</span> the condition binder and BY CONTENT arithmetic expressions into non-numeric formals; <span class="pill good">1009</span> SET senders, report SOURCE and VARYING operands, and intrinsic argument categories; <span class="pill good">1010</span> report rolled totals, a constant-name at every report-writer integer position, and EVALUATE with an operator-bearing boolean subject.</p>
-    <p><strong>Partly done, by design:</strong> report rolled totals (PB1294), sum-counter families, the OO universal-descriptor leg (PB480, PB1112), the EVALUATE operator-subject half of PB1412, and the OR PAGE heading against a lower-level control footing (PB1927, where two general rules disagree and the record is not yet settled).</p>
-    <p><strong>Next</strong> (after the weekly quota resets Sunday): a fresh fix wave from the computed clusters, a comprehensive battery (the last was #87), and the PB1527 goldens still sitting unlanded in an old worktree.</p>
+    <h3>In flight — Sunday 2026-10-04, morning</h3>
+    <p><strong>Wave 1013 is running</strong> (four Sonnet implementers, then a lander train): the in-progress finishers first (the ANY LENGTH RETURNING item PB1167 with the OO conformance notes, the file-sharing default and fatal-I-O-status determinations of PB322 with the program table, the variable-length group image of PB244), plus a DataBinder residue cluster. Wave 1014 is planned on Opus for the design-heavy clusters (extended letters in COBOL words, the report-section and constant grammar, the OO binder and class table).</p>
+    <p><strong>Landed since the last refresh</strong>, each CI-proven: <span class="pill good">1011</span> STRING and UNSTRING operand screens, the OO data-division placement table and method BY VALUE formals, the report-writer binder residues, the constant-name integer positions and TYPEDEF RENAMES (GAP 497 to 426); <span class="pill good">1012</span> the linkage rules for function formals, SORT and MERGE record-size screens, the FLAG-02 and FLAG-14 detectors, the report binder residues and the binder driver (GAP 426 to 381).</p>
+    <p><strong>Partly done, by design:</strong> PB1167, the PB322 sharing-default and fatal-status parts, PB244 shape (b), PB1042 (a dynamic-capacity table in an EXTERNAL record) and the OO universal-descriptor leg.</p>
+    <p><strong>Pacing:</strong> a new weekly quota began at 03:00; the target is one seventh of it per day, with the model sized to each group.</p>
   </div>
   <div class="cardgrid">
     <div class="card">
-      <h3>Owner decisions today</h3>
-      <p><span class="mono">&gt;&gt;CALL-CONVENTION</span> stays COBOL-only unless a .NET mapping is added, and one may not be required (PB1945). The weekly ceiling for tonight was raised to 99%. Local-model use is limited to leads, indexes and drafts: nothing a local model writes enters the register or a golden without a Claude or human check.</p>
+      <h3>Measured this morning</h3>
+      <p>The first two waves of the week moved 116 rows (GAP 497 to 381) for about 5.9 M subagent tokens and 6 points of the weekly meter, on Sonnet implementers with Opus landers.</p>
     </div>
     <div class="card">
-      <h3>Measured today</h3>
-      <p>GnuCOBOL 3.2.0 is now built in WSL and answers latitude questions by running. A hybrid of keyword and embedding retrieval finds the governing clause of a note in its top 10 about 82% of the time, against 71% for keyword search alone; whether that saves implementer turns is unmeasured.</p>
+      <h3>Owner decisions</h3>
+      <p>Finish pending work first, then new work within the daily share of the weekly quota, keeping the five-hour session meter below its soft line. Fable is recommended where it would help and used only with the owner's explicit approval.</p>
     </div>
     <div class="card">
       <h3>History</h3>
