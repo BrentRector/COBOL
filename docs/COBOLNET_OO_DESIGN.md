@@ -323,8 +323,24 @@ NO GET / NO SET included) in `DataBinder.OoBindPropertyClauses`; §11.7.3 SR6 / 
 RETURNING phrase, an ACTIVE-CLASS formal or returning item) on the BOUND header in `DataBinder.OoBindMethodData`, for
 instance, factory and interface-prototype accessors alike (COBOLNET2790, kb/Work PB1503); §13.18.42.3 SR2/SR3/SR5/SR6
 in `OoBindPropertyClauses` and SR4 in `ResolveOverrides` (COBOLNET2563). Property REFERENCES (`P OF obj` — the §8.4.3.9.4 GR1–GR3 implicit-INVOKE desugar with
-BoundSequence + temps; detected at the ReferenceResolver resolution-failure chokepoint by the
-single-qualifier + roster-property shape) are live. Each reference's POLARITY (GR1 sending / GR2 receiving / GR3
+BoundSequence + temps) are live, and their OBJECT is any identifier (§8.4.3.1.2 Format 7 `property-name-1 OF
+identifier-3`; §8.4.3.1.3 SR1; kb/Work PB1425 with PB1783 step 5): `ReferenceResolver.ResolveObjectProperty`
+(`ReferenceResolver.ObjectProperty.cs`) takes over at the resolution-failure chokepoint and SPLITS the chain — the head
+word is the property-name, identifier-3 is the written reference less that word and its reference modifiers (§8.4.3.1.4
+GR1 a) qualifiers and subscripts before d) OF; g) the reference modifier last, on the property's value), and identifier-3
+is resolved by the ORDINARY resolver, so a qualified, subscripted data name and a chained property (`NM OF NXT OF D`)
+need no arm. What a word cannot spell is the grammar's `propertyObject` suffix (`OF SELF | SUPER | object-view |
+function-identifier | NULL`), bound by `OoBinder.OoBindPropertyObject` through the resolver's `BindPropertyObject` edge:
+SELF / SUPER / `object-class-name-1 OF SUPER` select the accessor exactly as an INVOKE through them selects a method
+(the ONE `OoBinder.OoPredefinedSearchRoot` — §8.4.3.8.3 SR1/SR4, §8.4.3.8.4 GR2–GR4) and invoke it on `this` / `base`
+(`OoPendingPropertyOp.Form`); a view or a function is bound to its temporary, whose evaluating pre-ops travel with the
+property (`OoPendingPropertyOp.Prelude`) so they run before its GET. `K OF SUPER` is one spelling of two formats —
+the qualified SUPER (K a class-name) and the property K of SUPER — decided by the symbol in ONE place,
+`ReferenceResolver.QualifiedSuperClass`; the qualified SUPER's only home is the invocation receiver, elsewhere §8.4.3.8.3
+SR3 (COBOLNET2900). Likewise `A OF G AS C` reads as the property A of a view and as a view of the qualified item
+`A OF G`; the data reference wins the parse (GR1 c) before d)) and the resolver re-reads it as the view when `A OF G` is a
+data name (`ViewOfQualifiedItem`; a receiving one is §8.4.3.5.3 SR2, COBOLNET2871). §8.4.3.9.3 SR2 (a universal
+object, NULL, a computed non-object) is COBOLNET2918. Each reference's POLARITY (GR1 sending / GR2 receiving / GR3
 both) is `BoundStores.StoreKindOf`, a TOTAL classification — a non-nullable answer from the exhaustive bound-statement
 visitor — so every statement that can carry a property classifies it, the SET formats for object references,
 pointers, program- and function-pointers and saved locales, ALLOCATE and FREE included (kb/Work PB1275: those
@@ -339,7 +355,7 @@ window never needs the GR2 SET. INTERFACE PROPERTIES (kb/Work PB1449): §11.7.2'
 definitions and prototypes and §11.7.4 GR6/GR7 make a GET/SET phrase a get/set property method, so an interface's
 `METHOD-ID. GET|SET PROPERTY p` prototype joins its roster under the same pinned `__GET_<P>`/`__SET_<P>` name;
 `ValidateImplements` pairs it with the class's accessor (explicit or clause-defined) by that roster key, the C#
-interface declares the member, and `ReferenceResolver.OoTryBindPropertyReference` resolves `p OF i` for an
+interface declares the member, and `ReferenceResolver.ResolveObjectProperty` resolves `p OF i` for an
 interface-typed `i` over the interface's prototype closure (`AllPrototypes`) — the roster an INVOKE through `i`
 resolves over — with the interface qualifying the formal statics (`OoPendingPropertyOp.InterfaceCsName`). REGISTRY: interface-definition-2002, repository-interface-2002,
 repository-property-2002, implements-clause-2002, property-clause-2002, method-property-selector-2002
@@ -632,10 +648,11 @@ THE OO IDENTIFIERS IN THE EXPRESSION TIER (§8.4.3.1.3 SR1; live — kb/Work PB1
   SR1 — COBOLNET0827. In an arithmetic expression an object reference is §8.8.1.1's COBOLNET0844 under every
   dialect: `--permissive`'s digit decoding reads characters, which class object and class pointer do not have
   (`IntrinsicArgumentRules.IsDigitDecodable`).
-  NOT YET: the object of an object-property identifier (`BAL OF SELF`, Format 7's general identifier-3 — kb/Work
-  PB1425 NEXT, with PB1783), and the statement operand rules that list `functionCall` / `inlineMethodInvocation`
-  outside the expression tier (MOVE's sender, …), where an object operand is illegal anyway and is refused by a
-  parse error rather than by its own rule (MOVE §14.9.25.3 SR1).
+  The object of an object-property identifier (`BAL OF SELF`, `BAL OF [K OF] SUPER`, `BAL OF U AS C`) is Format 7's
+  identifier-3 — see the PROPERTY paragraph above (`ReferenceResolver.ResolveObjectProperty`, kb/Work PB1425).
+  NOT YET: the statement operand rules that list `functionCall` / `inlineMethodInvocation` outside the expression tier
+  (MOVE's sender, …), where an object operand is illegal anyway and is refused by a parse error rather than by its own
+  rule (MOVE §14.9.25.3 SR1).
 
 DYNAMIC/UNIVERSAL dispatch (live; goldens oo_universal / _name / _inherit / _relation):
   INVOKE U MNAME USING X RETURNING R →
@@ -775,7 +792,7 @@ a class-name here?" (INVOKE's receiver, the RAISING word, the property-reference
 `Find`/`FindInterface` directly until kb/Work PB365, so `USE AFTER EXCEPTION OBJECT C` in a program with NO
 REPOSITORY compiled clean; `OoNameResolutionDriftTests` pins the remaining direct callers (all of them
 re-lookups of an already-scope-checked declared name).
-⛔ **A SPECIFIER'S `AS literal-n` MAKES THE WRITTEN WORD A LOCAL NAME** (kb/Work PB974). §12.3.8.2 prints `CLASS object-class-name-1 [ AS literal-1 ]` and `INTERFACE interface-name-2 [ AS literal-2 ]`, and §12.3.8.4 GR2 makes the literal "the externalized name by which the class [or] interface ... is known to the operating environment". So the scope is a MAP, declared word → externalized name (null when no AS was written, and for the containing definition's own name): `OoRepositoryScope.ClassTarget` / `InterfaceTarget`, and `Lookup` finds the definition by `OoClassTable.FindByExternalizedName` when a literal was written, by the declared word otherwise (the DOC-A.1-163 determination). The literal is read by the pure `ExternalizedName.Peek`; `DataBinder.BindSpecifierExternalizedName` is its one diagnosing screen (§12.3.8.3 SR2, COBOLNET1761), and SR1 — a repeated name's specifications identical — is `DataBinder.CheckRepositorySpecification`, over the whole specification (kind, AS literal, EXPANDS phrase) and keyed on the name across every kind (kb/Work PB1017), so `CLASS H EXPANDS P USING A` beside `CLASS H EXPANDS P USING B`, or a name specified as both a CLASS and an INTERFACE, is COBOLNET1761. A USAGE OBJECT REFERENCE descriptor carries the RESOLVED definition's name, never the local word, so every re-lookup of a descriptor name stays a lookup in the group table. The property specifier's `AS literal-4` is the property's name in the declared classes (§12.3.8.3 SR16 a)), read by `OoTryBindPropertyReference`.
+⛔ **A SPECIFIER'S `AS literal-n` MAKES THE WRITTEN WORD A LOCAL NAME** (kb/Work PB974). §12.3.8.2 prints `CLASS object-class-name-1 [ AS literal-1 ]` and `INTERFACE interface-name-2 [ AS literal-2 ]`, and §12.3.8.4 GR2 makes the literal "the externalized name by which the class [or] interface ... is known to the operating environment". So the scope is a MAP, declared word → externalized name (null when no AS was written, and for the containing definition's own name): `OoRepositoryScope.ClassTarget` / `InterfaceTarget`, and `Lookup` finds the definition by `OoClassTable.FindByExternalizedName` when a literal was written, by the declared word otherwise (the DOC-A.1-163 determination). The literal is read by the pure `ExternalizedName.Peek`; `DataBinder.BindSpecifierExternalizedName` is its one diagnosing screen (§12.3.8.3 SR2, COBOLNET1761), and SR1 — a repeated name's specifications identical — is `DataBinder.CheckRepositorySpecification`, over the whole specification (kind, AS literal, EXPANDS phrase) and keyed on the name across every kind (kb/Work PB1017), so `CLASS H EXPANDS P USING A` beside `CLASS H EXPANDS P USING B`, or a name specified as both a CLASS and an INTERFACE, is COBOLNET1761. A USAGE OBJECT REFERENCE descriptor carries the RESOLVED definition's name, never the local word, so every re-lookup of a descriptor name stays a lookup in the group table. The property specifier's `AS literal-4` is the property's name in the declared classes (§12.3.8.3 SR16 a)), read by `ReferenceResolver.ResolveObjectProperty`.
 ⛔ **INVOKE AND THE INLINE METHOD INVOCATION ARE ONE ACTIVATION, NOT TWO** (kb/Work PB428; `OoBinder.InlineInvocation.cs`).
 §8.4.3.4.4 GR1 does not merely resemble the INVOKE statement — it DEFINES the §8.4.3.1.2 Format 4 identifier as one of
 four INVOKE statements written out longhand, and §8.4.3.4.3 SR3 requires that statement to be valid under §14.9.23's own

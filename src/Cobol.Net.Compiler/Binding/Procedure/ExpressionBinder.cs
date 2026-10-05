@@ -831,6 +831,12 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
                 "EXCEPTION-OBJECT shall not be specified as a receiving operand (ISO §8.4.3.6.3 SR1) — it is "
                 + "the predefined object reference for the CURRENT exception object (§8.4.3.6.4 GR1), set by the "
                 + "run unit when an exception is raised");
+        // §8.4.3.5.3 SR2 — "An object-view shall not be specified as a receiving operand" — for the view of a qualified data
+        // item the grammar spells as one chain (`A OF G AS C`, kb/Work PB1425); the property of a view (`P OF U AS C`) is
+        // a property and receivable (§8.4.3.9.3 SR6), and a view of a plain name parses as `objectViewReceiver`.
+        if (ctx.Refs.IsObjectViewOfQualifiedItem(dref))
+            return new(DiagnosticCatalog.ObjectViewReceiving.Code, $"'{DataBinder.WrittenText(dref)}' is written as a "
+                + "receiving operand: an object-view shall not be specified as a receiving operand (ISO §8.4.3.5.3 SR2)");
         // A constant-name substitutes a LITERAL (ISO §13.10.3 SR2 / §13.10.4 GR1) — a literal can never be a
         // receiving operand; without this the name would fall to Refs.Resolve and fail as merely "unresolved".
         if (ctx.Data.ConstantOf(dref) is not null)

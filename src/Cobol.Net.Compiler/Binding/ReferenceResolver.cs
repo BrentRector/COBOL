@@ -64,7 +64,7 @@ internal enum SegmentPosition
 internal readonly record struct RefModSuffixes(
     int RefMods, int Subscripts, int? Start, int? Length, bool NonLiteral, bool BeyondHostLimit = false);
 
-public sealed class ReferenceResolver(DataBinder data)
+public sealed partial class ReferenceResolver(DataBinder data)
 {
     /// <summary>The D18 hook that MATERIALIZES a subscript / ref-mod segment the token renderer cannot render
     /// (fix-queue PB17): given the segment's verbatim source text and its line, it re-parses the text through
@@ -99,107 +99,6 @@ public sealed class ReferenceResolver(DataBinder data)
     /// line, it registers a copy of the DEPENDING ON object into a compiler temp at that index and returns the place
     /// whose extent reads the temp. Null when absent (a data-division resolver): the pre-D18 answer.</summary>
     internal Func<OdoGroupPlace, int, int, Place>? FreezeOdoExtent { get; set; }
-    /// <summary>The object-property reference BINDER (ISO §8.4.3.9; deep-dive D-P2): when normal
-    /// qualification fails and the single qualifier is a class-name (factory form) or a TYPED object
-    /// reference (instance form) whose roster carries an accessor for the head word under the PINNED
-    /// §11.7.4 GR1a names, synthesize the compiler temp, register the pending op (drained into the
-    /// GR1/GR2/GR3 BoundSequence by StatementBinder once the carrying statement's polarity is known), and
-    /// return the temp so the statement binds over its Place. Returns null when the shape is NOT a property
-    /// reference (the caller keeps its generic unknown-name diagnosis). SR checks here: SR1 (:7376) the
-    /// REPOSITORY property-specifier, SR2 (:7378) no universal receiver — both COBOLNET0843; SR3/SR4
-    /// (accessor existence) belong to the drain, where the sending/receiving polarity is known.</summary>
-    private DataItem? OoTryBindPropertyReference(string name, List<string> qualifiers,
-        Antlr4.Runtime.RuleContext? site)
-    {
-        if (qualifiers.Count != 1 || data.OoClasses is not { } table) return null;
-        string recv = qualifiers[0];
-
-        // The class-name qualifier is a SOURCE reference and takes the §8.4.6.4 scope — the source element's
-        // REPOSITORY, not the compilation group (kb/Work PB365; `table.Find` stood here). The lookup is the
-        // funnel's non-diagnosing half because a miss is a legal alternative: the qualifier may be an
-        // identifier naming a typed object reference, the instance form below.
-        OoClassSymbol? cls = Compiler.Oo.OoNameResolution.Lookup(table, site, recv,
-            Compiler.Oo.OoNameResolution.Want.Class).Class;
-        bool factory = cls is not null;                      // prop OF Class-name → the FACTORY accessors (SR3/SR4 "or in the factory object")
-        DataItem? recvItem = null;
-        OoInterfaceSymbol? iface = null;
-        if (cls is null)
-        {
-            recvItem = data.Symbols.TryResolveUnqualified(recv, data.ActiveScope, out var recvItems) ? recvItems[0] : null;
-            if (recvItem?.Pic is not { Category: PicCategory.ObjectReference } rp) return null;
-            var rd = rp.ObjectRef ?? ObjectRefDescriptor.Universal;
-            if (rd.IsUniversal)
-            {
-                // The shape IS a property reference on a universal receiver — SR2 rejects it by name.
-                // (Silently null under a probe — the committing resolution reports; kb/Work PB157.)
-                if (!_probing)
-                    data.Edition.Error("COBOLNET0843",
-                        $"the object-property reference '{name}' OF '{recv}': the receiving identifier shall "
-                        + "not be a universal object reference (ISO §8.4.3.9.3 SR2)");
-                return null;
-            }
-            // A FACTORY-OF receiver names the class's FACTORY accessors, the same half a class-NAME receiver
-            // selects above (§8.4.3.9.3 SR3/SR4 "or in the factory object") — kb/Work PB389.
-            factory = rd.Factory;
-            // An INTERFACE-typed receiver (kb/Work PB1449): §8.4.3.9.3 SR3 asks for a get property method "in the
-            // object referenced by identifier-1", and the interface's GET/SET PROPERTY prototypes are what every such
-            // object has (§11.8.4 GR2) — the accessors are looked up over the interface's prototype closure, the
-            // roster an INVOKE through the same reference resolves over (§14.9.23.3 SR4 e)), and dispatch to the
-            // implementing object at run time.
-            if (rd.Kind is ObjectRefKind.Interface)
-                iface = table.FindInterface(rd.Name!);
-            else
-                cls = table.Find(rd.Name!);
-            if (cls is null && iface is null) return null;
-        }
-
-        // §12.3.8.2's property-specifier `PROPERTY property-name-1 [ AS literal-4 ]` (kb/Work PB974): the source writes
-        // property-name-1, and literal-4 — when written — is the property as the declared classes know it (§12.3.8.3
-        // SR16 a)), so the accessors are looked up under THAT name. Without a specifier the reference is still
-        // reported below (SR1), under the name as written.
-        string known = data.OoRepositoryProperties.TryGetValue(name, out var specified) ? specified : name;
-        string getName = NamingConvention.GetAccessorName(known), setName = NamingConvention.SetAccessorName(known);
-        var get = Accessor(getName);
-        var set = Accessor(setName);
-        if (get is null && set is null) return null;         // not a property of the roster → generic diagnosis
-
-        var model = get?.Binding!.Returning ?? set!.Binding!.Formals[0].Item;
-        // R30 PURITY (kb/Work PB157): a PROBE gets the property's MODEL item — the accessor's own
-        // description, carrying the category the sniff asks about — with NO temp, NO pending op and NO
-        // diagnostics. The committing resolution that follows does all three exactly once. (The orphan
-        // op a probing registration left behind classified as StoreKind.None and made OoWrapPropertyOps
-        // prepend a GET that §8.4.3.9.4 GR2 says a write-only occurrence must not invoke.)
-        if (_probing) return model;
-
-        // A property reference invokes the get / set accessor METHOD (§8.4.3.9.4 GR1/GR2): the source element
-        // "invokes any method" for ISO §7.3.14.4 GR4 b, though the text is a qualified data reference.
-        if (site is not null) data.ActivationSites.Add(site);
-
-        if (!data.OoRepositoryProperties.ContainsKey(name))
-            data.Edition.Error("COBOLNET0843",
-                $"the object-property reference '{name}' OF '{recv}' requires a PROPERTY specifier in the "
-                + "REPOSITORY paragraph (ISO §8.4.3.9.3 SR1; §12.3.8)");
-
-        // ⛔ THE TEMP TAKES THE ACCESSOR'S WHOLE DESCRIPTION, A GROUP INCLUDED (kb/Work PB1448). §8.4.3.9.4 GR1: "The
-        // data description of temp-1 is the same as the data description of the item specified in the RETURNING
-        // phrase of the get property method", GR2 gives temp-2 the USING parameter's, and §8.4.3.9.3 SR5/SR6 admit
-        // the property "wherever a data item with that description would be valid" as a sending / receiving item —
-        // a group is valid in all three of MOVE's, INSPECT's and DISPLAY's operand positions. The ONE temp
-        // constructor already deep-clones a group model (the §8.4.3.2.4 GR1 group RETURNING result), so no category
-        // is staged here.
-        var temp = data.OoCreatePropertyTemp(model, name);
-        data.OoPendingPropertyOps.Add(new DataBinder.OoPendingPropertyOp(
-            temp,
-            recvItem is null ? null : PlaceForItem(recvItem, []),
-            iface?.CsName ?? cls!.CsName, factory, get, set, name, recv, InterfaceCsName: iface?.CsName));
-        return temp;
-
-        OoMethodSymbol? Accessor(string accessorName) =>
-            iface is not null
-                ? iface.AllPrototypes().FirstOrDefault(p => CobolNames.Same(p.ExternalizedName, accessorName))
-                : factory ? cls!.FindFactoryMethod(accessorName) : cls!.FindMethod(accessorName);
-    }
-
     /// <summary>A SYNTHETIC copy of <paramref name="dref"/> without its LAST <c>dataReferenceSuffix</c> — for a
     /// caller whose resolved SYMBOL has shown that the trailing word the parser attached as a qualifier belongs to
     /// the enclosing construct instead (kb/Work PB843: a THROUGH range's <c>IN alphabet-name-1</c>). The copy ADOPTS
@@ -224,34 +123,6 @@ public sealed class ReferenceResolver(DataBinder data)
             _ => dref.Start,
         };
         return cut;
-    }
-
-    /// <summary>True when <paramref name="dref"/> is an OBJECT-PROPERTY reference (ISO §8.4.3.9.2 —
-    /// <c>property-name OF {class-name | identifier}</c>, textually a qualified data reference) rather than an
-    /// ordinary data reference. The ONE such test, over the SAME <see cref="OoTryBindPropertyReference"/>
-    /// resolution the committing path runs, so the two can never disagree about what a property reference is.
-    /// <para>Its caller is §14.9.4.3 SR20's carve-out (kb/Work PB238): "BY CONTENT shall not be omitted when
-    /// identifier-4 is an identifier that is permitted as a receiving operand, EXCEPT that BY CONTENT may be
-    /// omitted when identifier-4 is an object property" — a keyword-less Format-2 CALL argument that is an
-    /// object property takes §14.9.4.4 GR9 a)2's BY CONTENT (a property is not a data item defined in the
-    /// file, working-storage, local-storage or linkage section, so it never meets Syntax rule 3).</para>
-    /// <para>⛔ PURE — it runs the property resolution under <c>_probing</c>, so no temp is synthesized, no
-    /// pending §8.4.3.9.4 op is registered and no diagnostic is reported (the R30 probe contract). The
-    /// ordinary-qualification test comes FIRST for the same reason the committing path orders it that way: a
-    /// genuine qualified data reference is not a property reference, whatever a class roster holds.</para></summary>
-    public bool IsObjectPropertyReference(Core.DataReferenceContext dref)
-    {
-        if (dref.cobolWord() is not { } head) return false;
-        List<string> qualifiers = [];
-        foreach (var suffix in dref.dataReferenceSuffix())
-            if (suffix.qualification() is { } q) qualifiers.Add(q.cobolWord().Name());
-        if (qualifiers.Count != 1) return false;
-        string name = head.Name();
-        if (ResolveQualified(name, qualifiers) is not null) return false;
-        bool saved = _probing;
-        _probing = true;
-        try { return OoTryBindPropertyReference(name, qualifiers, dref) is not null; }
-        finally { _probing = saved; }
     }
 
     /// <summary>Resolve <paramref name="dref"/> to a <see cref="Place"/>, or <see langword="null"/> if unsupported
@@ -589,12 +460,23 @@ public sealed class ReferenceResolver(DataBinder data)
         // and not a rejection.
         if (!ScreenRefModCount(dref, written, name)) return Refused();
 
-        DataItem? item = qualifiers.Count > 0 ? ResolveQualified(name, qualifiers) : ResolveUnqualified(name);
-        // The object-property fallback (§8.4.3.9.2 — `prop OF {class-name | identifier}` is textually a
-        // qualified data reference, so it legitimately FAILS normal qualification): the hook synthesizes the
-        // GR1–GR3 temp and the rest of THIS method gives the temp the full normal tail (subscript rejection —
-        // a temp has no OCCURS — and reference-modification, which SR5/SR6 permit on the property value).
-        item ??= OoTryBindPropertyReference(name, qualifiers, dref);
+        // A reference whose chain ends in a non-word object (SELF, SUPER, a view, a function, NULL) is never a data name.
+        DataItem? item = written.PropertyObject is not null ? null
+            : qualifiers.Count > 0 ? ResolveQualified(name, qualifiers) : ResolveUnqualified(name);
+        // §8.4.3.1.2 Format 7 (kb/Work PB1425): `property-name-1 OF identifier-3` is textually a qualified data
+        // reference, so it legitimately FAILS normal qualification. ResolveObjectProperty splits the chain — identifier-3
+        // takes the qualifiers and the subscripts (§8.4.3.1.4 GR1 a) before d)) — and synthesizes the §8.4.3.9.4 GR1–GR3
+        // temp; the rest of THIS method gives the temp the reference-modification tail (§8.4.3.1.4 GR1 g)), which
+        // §8.4.3.9.3 SR5/SR6 permit on the property value. A view of a qualified data item written `A OF G AS C` arrives
+        // here too, and is that view.
+        bool objectProperty = false;
+        if (item is null)
+        {
+            if (ViewOfQualifiedItem(dref, report) is { } viewOfItem) return viewOfItem;
+            var (temp, final) = ResolveObjectProperty(dref, name, written);
+            if (final is not null) return final;
+            objectProperty = (item = temp) is not null;
+        }
         if (item is null)
         {
             // The NAME resolves to nothing — a typo or a mis-qualification, never a feature gap (kb/Work R30).
@@ -603,8 +485,13 @@ public sealed class ReferenceResolver(DataBinder data)
             return Refused();
         }
 
-        if (report) ScreenLinkageReference(dref, item);
-        if (ReadSubscripts(dref, item, subCtx, out var indexExprs) is { } subscriptFailure) return subscriptFailure;
+        List<string> indexExprs = [];   // a property temp has no OCCURS: the written subscripts were identifier-3's
+        if (!objectProperty)
+        {
+            if (report) ScreenLinkageReference(dref, item);
+            if (ReadSubscripts(dref, item, subCtx, out var subscripts) is { } subscriptFailure) return subscriptFailure;
+            indexExprs = subscripts;
+        }
 
         // ⛔ EVERY NAMED ITEM TAKES THE SAME TAIL — a level-66 RENAMES alias included (kb/Work PB1380). The alias's
         // place is built by PlaceForItem, the ONE item→place builder, and then meets the reference-modification
@@ -1505,12 +1392,16 @@ public sealed class ReferenceResolver(DataBinder data)
     /// <param name="RefModPart">The first parsed <c>refModPart</c> form (<c>start : length</c> as expressions).</param>
     /// <param name="RefModCount">How many reference modifications the whole reference carries — §8.4.3.3.3 SR3
     /// admits at most one, and the count is the only way to see a second one.</param>
+    /// <param name="PropertyObject">The non-word object the qualifier chain ends in (<c>OF SELF</c>, <c>OF SUPER</c>,
+    /// <c>OF U AS C</c>, <c>OF FUNCTION F</c>, <c>OF NULL</c>) — §8.4.3.1.2 Format 7's identifier-3 where a word cannot
+    /// spell it (kb/Work PB1425).</param>
     internal readonly record struct WrittenReference(
         List<string>? Written,
         Core.SubscriptOrRefModContext? SubscriptGroup,
         Core.SubscriptOrRefModContext? RefModGroup,
         Core.RefModPartContext? RefModPart,
-        int RefModCount)
+        int RefModCount,
+        Core.PropertyObjectContext? PropertyObject)
     {
         /// <summary>The shared empty qualifier list for an unqualified reference. Read-only by contract: every
         /// consumer (<see cref="ResolveQualified"/>, <see cref="ReportUnidentified"/>) only enumerates it.</summary>
@@ -1538,6 +1429,7 @@ public sealed class ReferenceResolver(DataBinder data)
         Core.SubscriptOrRefModContext? subCtx = null;
         Core.SubscriptOrRefModContext? refCtx = null;
         Core.RefModPartContext? cleanRef = null;
+        Core.PropertyObjectContext? propertyObject = null;
         int refModCount = 0;
         void Classify(Core.SubscriptOrRefModContext s)
         {
@@ -1555,8 +1447,15 @@ public sealed class ReferenceResolver(DataBinder data)
             }
             else if (suffix.refModPart() is { } rmp) { refModCount++; cleanRef ??= rmp; }
             else if (suffix.subscriptPart()?.subscriptOrRefMod() is { } s) Classify(s);
+            else if (suffix.propertyObject() is { } po)
+            {
+                propertyObject ??= po;
+                // §8.4.3.1.4 GR1 g): a reference modifier written after a function object's arguments applies to the
+                // whole identifier, last — never to the object reference the function returns (kb/Work PB1425).
+                foreach (var resultRef in ResultRefModsOf(po)) { refModCount++; cleanRef ??= resultRef; }
+            }
         }
-        return new WrittenReference(qualifiers, subCtx, refCtx, cleanRef, refModCount);
+        return new WrittenReference(qualifiers, subCtx, refCtx, cleanRef, refModCount, propertyObject);
     }
 
     /// <summary>The reference's subscript list AS WRITTEN — one token segment per subscript position, outermost

@@ -5766,13 +5766,13 @@
   "ordinal": 1,
   "subject": "Identifier",
   "rule-digest": "d54c75396dcb",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#functionCall; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#primaryExpression; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineMethodInvocation; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.SubscriptSegments.cs",
-  "test-ref": "conformance:2002/pb428_inline_method_invocation; conformance:2002/pb1407_address_of_reference_modified",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#functionCall; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineMethodInvocation; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.SubscriptSegments.cs; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#primaryExpression; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom",
+  "test-ref": "conformance:2002/pb428_inline_method_invocation; conformance:2002/pb1407_address_of_reference_modified; conformance:2002/pb1425_object_property_identifier; conformance:2002/pb1425_object_view; conformance:2002/pb1425_predefined_object_operands",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1425 (restated by PB1407's landing). SR1 makes every identifier slot inside another identifier format accept ANY identifier format. Function, subscript and ref-mod nestings work, and so now does a data-address-identifier whose identifier-1 is reference-modified (Format 9 over Format 3, PB1407). Still rejecting legal source: an object property whose identifier-3 is a qualified, subscripted object reference (Format 7 over Format 2); Format 5 is absent (SR-8.4.3.1.3-6's defect).",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1021a). SR1 (cite.py --check 8.4.3.1.3 -> OK 1)): every identifier slot of an identifier format admits any identifier format. Function, subscript and ref-mod nestings work (pb428 / pb1407), a data-address-identifier over a ref-modified identifier works (PB1407), the object-view (Format 5) and SELF / SUPER (Format 6) are identifiers of every sending slot (PB1425 w1019a / w1020c), and the last gap, Format 7's identifier-3, takes any identifier: a qualified, subscripted object reference, a chained property, a view, a function, SELF, SUPER. A property is itself an identifier inside another: a subscript (BAL OF AR(BAL OF D)), a reference modifier's position, a function argument and a relation operand all read it (probe w1021a/probe/PX.cob).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.1.3-2",
@@ -5856,13 +5856,13 @@
   "ordinal": 7,
   "subject": "Identifier",
   "rule-digest": "ca18e3aa8d26",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#selfAndSuper; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#QualifiedSuperClass; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoPredefinedSearchRoot",
+  "test-ref": "conformance:2002/pb922_exception_object_reference; conformance:2002/pb1425_qualified_super; conformance:2002/pb1425_predefined_object_operands; conformance:2002/pb1425_object_property_identifier",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1425 (registrar 15b). SR7 (cite.py --check 8.4.3.1.3 7) OK): predefined-object references are EXCEPTION-OBJECT (8.4.3.6), NULL (8.4.3.7), SELF and [object-class-name-1 OF] SUPER (8.4.3.8). EXCEPTION-OBJECT resolves (spec-derived golden conformance:2002/pb922_exception_object_reference); NULL, SELF and SUPER are objectReference arms (o2.cob: INVOKE SELF -> DER-SPEAK, INVOKE SUPER -> BASE-SPEAK). DEFECT: the qualified SUPER arm is absent - `INVOKE KBASE OF SUPER \"SPEAK\"` inside a class with the single INHERITS FROM KBASE draws COBOLNET0901 \"'SUPER' is a reserved word\" at 2002, 2014 and 2023 (o1.cob), although 8.4.3.8.3 SR6 (cite OK) says with one inheritance 'object-class-name-1 may be specified'. SR5's mandatory-qualifier case needs multiple class inheritance, which A.4.10 item 1 declines - but SR6's single-parent form is core surface. No kb/Work note owns it. Probes under out/probe/ident with the pinned cobol.exe.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1021a). SR7 (cite.py --check 8.4.3.1.3 -> OK 7)): the predefined-object references are EXCEPTION-OBJECT (pb922), NULL, SELF and [object-class-name-1 OF] SUPER. The qualified SUPER, absent when this row was measured, landed with PB1425 (w1014) and is now ONE spelling with the property `K OF SUPER` - the resolver decides by the declared name (QualifiedSuperClass) - and SELF / SUPER are identifiers of the expression tier (w1020c) and objects of a property (w1021a). [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.1.3-8",
@@ -5871,13 +5871,13 @@
   "ordinal": 8,
   "subject": "Identifier",
   "rule-digest": "7b5f00ebf4dc",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps",
-  "test-ref": "conformance:2002/pb987_property_per_evaluation",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#propertyObject; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.PropertyObject.cs#OoBindPropertyObject",
+  "test-ref": "conformance:2002/pb987_property_per_evaluation; conformance:2002/pb1425_object_property_identifier",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1425 (registrar 15b). SR8 (cite.py --check 8.4.3.1.3 8) OK): Format 7 is the 8.4.3.9 object property `property-name-1 OF identifier-1`. It parses as a qualified dataReference and ReferenceResolver's object-property binder re-reads it when the qualifier is an object reference (REPOSITORY PROPERTY gate SR1, universal-reference refusal SR2); OoBinder desugars GET/SET per GR1-GR3. Probe o2.cob: `MOVE NM OF D TO W` -> ABCDEF; `NM OF D (2:3)` -> BCD. pb987 golden cites 8.4.3.9. Probes under out/probe/ident with the pinned cobol.exe. || REFUTED: PARTIAL — Format 7 is `property-name-1 OF identifier-3`, and SR1 lets identifier-3 be any identifier. OoTryBindPropertyReference binds only a single bare-word qualifier (a class-name or a typed object reference). A qualified, subscripted object reference is refused as 'not defined'. The bare form works (the adjudicator's probe and my control).",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1021a). \"Object properties are defined by 8.4.3.9, Object property.\" (cite.py --check 8.4.3.1.3 -> OK 8)). Format 7 is `property-name-1 OF identifier-3`, and identifier-3 is now any identifier (see FMT-8.4.3.9.2): the golden pb1425_object_property_identifier covers a subscripted, a qualified-subscripted, a chained, a viewed, a function-result, a SELF and a SUPER object, sending and receiving, with GR1 d) before e) (NXT OF D :: \"GETNM\") and g) last (NM OF AR(1) (2:3)). [editions: the OO facility, 2002+] retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.1.3-9",
@@ -5946,13 +5946,13 @@
   "ordinal": 1,
   "subject": "Identifier",
   "rule-digest": "5f1e80721abf",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#functionCall; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineMethodInvocation; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataAddressIdentifier; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#RefModOf",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#functionCall; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineMethodInvocation; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataAddressIdentifier; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#RefModOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ViewOfQualifiedItem; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom",
+  "test-ref": "conformance:2002/pb1425_object_property_identifier; conformance:2002/pb428_inline_method_invocation; conformance:2002/pb1407_address_of_reference_modified; conformance:2002/pb1425_object_view",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1425 (registrar 15b). GR1 (cite.py --check 8.4.3.1.4 1) c) and 1) g) OK) orders a) base references, b) address-identifier, c) object-view, d) property OF, e) inline invocation, f) function with arguments, g) reference modifier last. Verified: a->g `FUNCTION CURRENT-DATE (1:2)` -> 20; f->g `FUNCTION UPPER-CASE (W)(2:3)` -> BCD and `FUNCTION UPPER-CASE (W (N:2))(2:1)` -> C; a then g on a qualified subscripted name `A OF G (N)(2:2)` -> 2G; d->g `NM OF D (2:3)` -> BCD (property value then ref-mod, o2.cob); e->g pinned by conformance:2002/pb428_inline_method_invocation item 5. b): dataAddressIdentifier takes `ADDRESS OF? dataReference`, so a ref-mod written after ADDRESS OF X binds inside identifier-1, which 8.4.3.11.3 SR4 a) (cite OK: 'subscripting and reference modification in identifier-1') contemplates - no divergence recorded. c) is UNVERIFIABLE: the object-view has no surface at all (see SR-8.4.3.1.3-6), so the c) half of the ordering does not exist in the compiler. Test-ref empty: pb428 pins only e)->g). Probes under out/probe/ident with the pinned cobol.exe. || editions as written by the adjudicator: 1985 for a)/f)/g) (ref-mod and functions); b)-e) 2002, 2014, 2023",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1021a). GR1 (cite.py --check 8.4.3.1.4 -> OK 1) c), d), g)) orders a) base references, b) address-identifier, c) object-view, d) property OF, e) inline invocation, f) function with arguments, g) reference modifier last. a->g, f->g and e->g were verified (pb428), b) by PB1407. c) before d): `BAL OF U AS C` is the property of the view (the data reference wins the parse, CobolParserCore.g4#objectReferenceAtom / primaryExpression), and `GA OF G AS C`, whose chain is a qualified data name, is re-read as the view of that item (a) before c), ViewOfQualifiedItem). a) before d): the subscripts of `BAL OF AR(2)` are identifier-3's. d) before e): `NXT OF D :: \"GETNM\"` invokes on the property's object. d) before g): `NM OF AR(1) (2:3)` modifies the value.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.2.3-1",
@@ -6562,11 +6562,11 @@
   "subject": "Object-view",
   "rule-digest": "7c8a46d9d1de",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ReceivingFormBar",
   "test-ref": "conformance:negative/pb1425-object-view-receiving",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1425 (w1019a). \"An object-view shall not be specified as a receiving operand\" (cite.py --check 8.4.3.5.3 -> OK 2)). The two object-reference RECEIVING positions parse the view as a superset and refuse it by this rule, COBOLNET2871: SET Format 5's receiving list and INVOKE RETURNING identifier-4. Any other receiving position (MOVE / INITIALIZE / CALL RETURNING receivers) still refuses `X AS C` as a parse error, not by SR2's name - that is the general receiving-operand screen of kb/Work PB1782 step 1 / PB1551, which enumerates every non-receivable identifier form. [editions: the OO facility, 2002+]",
+  "notes": "kb/Work PB1425 (w1019a; w1021a). \"An object-view shall not be specified as a receiving operand\" (cite.py --check 8.4.3.5.3 -> OK 2)). SET Format 5's receiving list and INVOKE RETURNING refuse a view by this rule, COBOLNET2871, and so does every receiving position the ONE receiving chokepoint serves when the view is of a qualified data item written as one chain (`MOVE X TO A OF G AS C`, ExpressionBinder.ReceivingFormBar). A view of a plain name in a MOVE / INITIALIZE / CALL RETURNING receiver is still a parse error, not SR2's refusal - the general receiving-operand screen of kb/Work PB1551. [editions: the OO facility, 2002+]",
   "state": "GAP"
  },
  {
@@ -6816,13 +6816,13 @@
   "ordinal": 3,
   "subject": "SELF and SUPER",
   "rule-digest": "524f7603f502",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindSetObjectRef; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs#BindRaise; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.OoIdentifier.cs#OoBindSelfOperand; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
-  "test-ref": "conformance:negative/pb1425-super-operand; conformance:2002/pb1425_qualified_super",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindSetObjectRef; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs#BindRaise; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.PropertyObject.cs#OoBindPropertyObject; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoPredefinedSearchRoot; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#QualifiedSuperClass; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.OoIdentifier.cs#OoBindSelfOperand; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver",
+  "test-ref": "conformance:negative/pb1425-super-operand; conformance:2002/pb1425_qualified_super; conformance:2002/pb1425_object_property_identifier",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1425 (w1020c). \"SUPER may be specified only as the object in an object-property identifier or as the object used to invoke a method with the INVOKE statement or an inline invocation of a method\" (cite.py --check 8.4.3.8.3 -> OK 3)). The restriction is enforced by its own rule wherever the expression tier now admits SUPER: a relation operand, an INVOKE / inline argument, a RAISING phrase -> COBOLNET2900 (SET's sender keeps 14.9.39.3 SR9, COBOLNET0867; RAISE its SR2, COBOLNET0848); INVOKE SUPER / SUPER :: are legal. PARTIAL: the third legal home, the object of an object-property identifier (`BAL OF SUPER`), is still a parse error (COBOLNET0901) - Format 7's general identifier-3, kb/Work PB1425 NEXT with PB1783. [editions: the OO facility, 2002+]",
-  "state": "GAP"
+  "notes": "kb/Work PB1425 (w1021a). \"SUPER may be specified only as the object in an object-property identifier or as the object used to invoke a method with the INVOKE statement or an inline invocation of a method\" (cite.py --check 8.4.3.8.3 -> OK 3)). All three homes are legal: INVOKE SUPER / [K OF] SUPER ::, and now the object of a property - BAL OF SUPER and BAL OF K OF SUPER read and write through the base class's accessor (base.<accessor>, 8.4.3.8.4 GR3 / GR4: the golden's PB1425FB overrides GET PROPERTY BAL, and BAL OF SUPER still answers its base's 100). Every other position refuses it by this rule, COBOLNET2900: a bare SUPER operand (OoBindSelfOperand) and the qualified `K OF SUPER` operand, which the grammar spells as the chain `K OF SUPER` and the resolver tells from the property K of SUPER by the declared name (QualifiedSuperClass). [editions: the OO facility, 2002+] retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.8.3-4",
@@ -6952,11 +6952,11 @@
   "subject": "Object property",
   "rule-digest": "eda999577bef",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Binding/DataBinder.cs#OoRepositoryProperties",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#OoRepositoryProperties; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "conformance-test:OoSpineTests.PropertyReference_NoRepositorySpecifier_0843",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "cite.py --check 8.4.3.9.3 'Property-name-1 shall be an object property specified in the REPOSITORY paragraph' OK. OoTryBindPropertyReference raises COBOLNET0843 when the name is absent from data.OoRepositoryProperties (the REPOSITORY PROPERTY specifiers, AS literal-4 honoured per PB974). Probe p5 (no PROPERTY specifier) -> 0843 citing SR1; with the specifier the reference binds (oo_property_ref). A name that is not an accessor of the roster at all is rejected by the generic 1639 (still rejected). OoSpineTests.PropertyReference_NoRepositorySpecifier_0843 is spec-derived (asserts the SR1 rejection). [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)]",
+  "notes": "cite.py --check 8.4.3.9.3 'Property-name-1 shall be an object property specified in the REPOSITORY paragraph' OK. OoTryBindPropertyReference raises COBOLNET0843 when the name is absent from data.OoRepositoryProperties (the REPOSITORY PROPERTY specifiers, AS literal-4 honoured per PB974). Probe p5 (no PROPERTY specifier) -> 0843 citing SR1; with the specifier the reference binds (oo_property_ref). A name that is not an accessor of the roster at all is rejected by the generic 1639 (still rejected). OoSpineTests.PropertyReference_NoRepositorySpecifier_0843 is spec-derived (asserts the SR1 rejection). [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)] retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -6967,11 +6967,11 @@
   "subject": "Object property",
   "rule-digest": "1e09a74064cf",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
-  "test-ref": "conformance:negative/l1c20-property-of-universal-reference",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.PropertyObject.cs#OoBindPropertyObject",
+  "test-ref": "conformance:negative/l1c20-property-of-universal-reference; conformance:negative/pb1425-property-object-null",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "cite.py --check 8.4.3.9.3 'Identifier-1 shall be an object reference; neither a universal object reference nor the predefined object reference NULL shall be specified' OK. Universal half: OoTryBindPropertyReference checks rd.IsUniversal and raises COBOLNET0843 (probe p4 `BAL OF U`, U USAGE OBJECT REFERENCE -> 0843 SR2, plus a redundant 1639). NULL half: `DISPLAY BAL OF NULL` (p3) is rejected (COBOLNET0901 reserved word — the diagnostic does not name SR2 but the source is refused). A non-object-reference identifier-1 falls out of the property path (Pic category check) to ordinary qualification and is not accepted as a property. Both halves verified by probe; no spec-derived test pins SR2 -> test-needed. [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)]",
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1021a). \"Identifier-1 shall be an object reference; neither a universal object reference nor the predefined object reference NULL shall be specified\" (cite.py --check 8.4.3.9.3 -> OK 2)). Both halves now name this rule under its own code, COBOLNET2918 (property-object; it shared COBOLNET0843 with SR1, SR3 and SR4): a universal object (BAL OF U, ReferenceResolver.RosterOf), NULL (BAL OF NULL - a parse error COBOLNET0901 before the propertyObject suffix existed; OoBinder.OoBindPropertyObject), and a computed object whose item is no object reference. A non-object data name falls out of the property reading to the generic undefined-name diagnosis. [editions: the OO facility, 2002+] retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -6982,11 +6982,11 @@
   "subject": "Object property",
   "rule-digest": "27494936e43f",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#PropertyGet; src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs#StoreKindOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#PropertyGet; src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs#StoreKindOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "conformance-test:OoSpineTests.PropertyReference_SendingWithNoGet_0843; conformance:2002/pb1275_property_set_formats",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1275 LANDED (w1014u). cite.py --check 8.4.3.9.3 'If the object property is used as a sending item, a get property method shall exist' OK 3). The refuted over-application is fixed: STRING's identifier-3 is classified WRITE-only (14.9.43.3 SR10 'The data item referenced by identifier-3 is the receiving operand'), so a WITH NO GET property as the STRING INTO target no longer demands a GET - it compiles and its SET stores the transferred characters (golden line 8, ABCDEFGH); identifier-4 (POINTER) stays read-modify-write. Every true sending use without a GET still raises COBOLNET0843 naming SR3 (OoSpineTests.PropertyReference_SendingWithNoGet_0843).",
+  "notes": "kb/Work PB1275 LANDED (w1014u). cite.py --check 8.4.3.9.3 'If the object property is used as a sending item, a get property method shall exist' OK 3). The refuted over-application is fixed: STRING's identifier-3 is classified WRITE-only (14.9.43.3 SR10 'The data item referenced by identifier-3 is the receiving operand'), so a WITH NO GET property as the STRING INTO target no longer demands a GET - it compiles and its SET stores the transferred characters (golden line 8, ABCDEFGH); identifier-4 (POINTER) stays read-modify-write. Every true sending use without a GET still raises COBOLNET0843 naming SR3 (OoSpineTests.PropertyReference_SendingWithNoGet_0843). retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -7012,11 +7012,11 @@
   "subject": "Object property",
   "rule-digest": "15e2de6df6fc",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs#StoreKindOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs#StoreKindOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "conformance:2002/pb1275_property_set_formats; conformance:2002/oo_property_explicit_ref",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1275 LANDED (w1014u). cite.py --check 8.4.3.9.3 'This object property may be specified wherever a data item with that description would be valid as a sending item' OK 5). BoundStores.StoreKindOf is now TOTAL (non-nullable, exhaustive visitor): the SET Format 5/7/8/9/10/12 receivers are stores and their senders sending, ALLOCATE RETURNING a store, FREE read-and-write, RAISE and SET LOCALE sending, the universal INVOKE's identifier-3 a crossing - so OoWrapPropertyOps no longer stages the 'outside the classified store taxonomy' COBOLNET0843. A property sends in every SET: SET B TO R OF A (object reference, golden line 2), SET P2 TO Q OF A (pointer, line 3), SET D2 TO INNER OF A (typed, line 4); the relation sender R OF A = A (line 1). The group-valued half was kb/Work PB1448 (landed). A property as identifier-1 of another property (X OF INNER OF B) is the identifier-1 FORMAT (FMT-8.4.3.9.2, kb/Work PB1449), not this description rule.",
+  "notes": "kb/Work PB1275 LANDED (w1014u). cite.py --check 8.4.3.9.3 'This object property may be specified wherever a data item with that description would be valid as a sending item' OK 5). BoundStores.StoreKindOf is now TOTAL (non-nullable, exhaustive visitor): the SET Format 5/7/8/9/10/12 receivers are stores and their senders sending, ALLOCATE RETURNING a store, FREE read-and-write, RAISE and SET LOCALE sending, the universal INVOKE's identifier-3 a crossing - so OoWrapPropertyOps no longer stages the 'outside the classified store taxonomy' COBOLNET0843. A property sends in every SET: SET B TO R OF A (object reference, golden line 2), SET P2 TO Q OF A (pointer, line 3), SET D2 TO INNER OF A (typed, line 4); the relation sender R OF A = A (line 1). The group-valued half was kb/Work PB1448 (landed). A property as identifier-1 of another property (X OF INNER OF B) is the identifier-1 FORMAT (FMT-8.4.3.9.2, kb/Work PB1449), not this description rule. retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -7027,11 +7027,11 @@
   "subject": "Object property",
   "rule-digest": "d92532a82da5",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs#StoreKindOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs#StoreKindOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "conformance:2002/pb1275_property_set_formats; conformance:negative/pb1275-set-property-no-set",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1275 LANDED (w1014u). cite.py --check 8.4.3.9.3 'may be specified wherever a data item with that description would be valid as a receiving item' OK 6). With the store taxonomy total, a property receives in every statement that stores its description: SET R OF A TO A and SET INNER OF A TO D (Format 5, golden lines 1/4), SET Q OF A TO ADDRESS OF W (Format 7, line 3), SET Q OF A UP BY 2 (Format 10, read-modify-write, line 5), ALLOCATE ... RETURNING Q OF A (line 6), FREE Q OF A (line 7), STRING ... INTO S OF A (receiving only, line 8). A receiving use without a SET accessor is refused under SR4 by name (negative pb1275-set-property-no-set). The group-valued half and the temp's description (SR7) were kb/Work PB1448 / PB1450 (landed).",
+  "notes": "kb/Work PB1275 LANDED (w1014u). cite.py --check 8.4.3.9.3 'may be specified wherever a data item with that description would be valid as a receiving item' OK 6). With the store taxonomy total, a property receives in every statement that stores its description: SET R OF A TO A and SET INNER OF A TO D (Format 5, golden lines 1/4), SET Q OF A TO ADDRESS OF W (Format 7, line 3), SET Q OF A UP BY 2 (Format 10, read-modify-write, line 5), ALLOCATE ... RETURNING Q OF A (line 6), FREE Q OF A (line 7), STRING ... INTO S OF A (receiving only, line 8). A receiving use without a SET accessor is refused under SR4 by name (negative pb1275-set-property-no-set). The group-valued half and the temp's description (SR7) were kb/Work PB1448 / PB1450 (landed). retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -7057,11 +7057,11 @@
   "subject": "Object property",
   "rule-digest": "b8b4f78abf3e",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#CreateCompilerTemp",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#CreateCompilerTemp; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "conformance:2002/pb1448_group_valued_property",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1448 landed (w1005e): temp-1 takes the get method's RETURNING description whatever its category. OoTryBindPropertyReference no longer refuses a group and CreateCompilerTemp deep-clones the group; the golden's GET returns a group (R1 PIC 9(3), R2 PIC X(3)) and the sending-only MOVE prints it after exactly one GET-CALLED. The elementary half stays witnessed by oo_property_explicit_ref.",
+  "notes": "kb/Work PB1448 landed (w1005e): temp-1 takes the get method's RETURNING description whatever its category. OoTryBindPropertyReference no longer refuses a group and CreateCompilerTemp deep-clones the group; the golden's GET returns a group (R1 PIC 9(3), R2 PIC X(3)) and the sending-only MOVE prints it after exactly one GET-CALLED. The elementary half stays witnessed by oo_property_explicit_ref. retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -7072,11 +7072,11 @@
   "subject": "Object property",
   "rule-digest": "5619c4046135",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidatePropertyAccessorPairs",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoConformance.cs#ValidatePropertyAccessorPairs; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "conformance:2002/pb1448_group_valued_property; conformance:negative/pb1450-property-accessor-descriptions-differ; conformance:negative/pb1450-property-accessors-split-across-inheritance",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1448 + PB1450 landed (w1005e): temp-2 over a group USING parameter binds (the golden's MOVE of a literal to the group property runs only the SET). The temp is modelled on the GET's description where GR2 names the SET's USING parameter, and the two are identical because SR7 is enforced (COBOLNET2727) for every pair a class sees, inherited accessors included.",
+  "notes": "kb/Work PB1448 + PB1450 landed (w1005e): temp-2 over a group USING parameter binds (the golden's MOVE of a literal to the group property runs only the SET). The temp is modelled on the GET's description where GR2 names the SET's USING parameter, and the two are identical because SR7 is enforced (COBOLNET2727) for every pair a class sees, inherited accessors included. retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -7087,11 +7087,11 @@
   "subject": "Object property",
   "rule-digest": "34d4697843d0",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoWrapPropertyOps; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "conformance:2002/pb1448_group_valued_property",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1448 landed (w1005e): a read-modify-write occurrence wraps ONE temp with the GET before and the SET after; the golden's INSPECT over the group property prints GET-CALLED then SET-CALLED with the replaced content.",
+  "notes": "kb/Work PB1448 landed (w1005e): a read-modify-write occurrence wraps ONE temp with the GET before and the SET after; the golden's INSPECT over the group property prints GET-CALLED then SET-CALLED with the replaced content. retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -12787,11 +12787,11 @@
   "subject": "METHOD-ID paragraph",
   "rule-digest": "dfbf13c8eba6",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "conformance:2002/oo_property_explicit_ref; conformance:2002/pb1449_interface_property; conformance:negative/pb1449-implements-without-property-accessor",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1449 LANDED (wave 1015 Z). cite.py --check 11.7.4 'If the GET phrase is specified, this method is a get property method for property-name-1.' OK 6). The prototype half: an interface's GET PROPERTY prototype is a get property method — it joins the interface roster under __GET_<P>, a class implementing the interface must define it (the clause accessor or an explicit GET PROPERTY; pb1449-implements-without-property-accessor is COBOLNET0841), and BAL OF I with I interface-typed invokes it (pb1449_interface_property: A=00100 through the clause GET, B=00007 through the explicit GET). The class half stays witnessed by oo_property_explicit_ref.",
+  "notes": "kb/Work PB1449 LANDED (wave 1015 Z). cite.py --check 11.7.4 'If the GET phrase is specified, this method is a get property method for property-name-1.' OK 6). The prototype half: an interface's GET PROPERTY prototype is a get property method — it joins the interface roster under __GET_<P>, a class implementing the interface must define it (the clause accessor or an explicit GET PROPERTY; pb1449-implements-without-property-accessor is COBOLNET0841), and BAL OF I with I interface-typed invokes it (pb1449_interface_property: A=00100 through the clause GET, B=00007 through the explicit GET). The class half stays witnessed by oo_property_explicit_ref. retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -12802,11 +12802,11 @@
   "subject": "METHOD-ID paragraph",
   "rule-digest": "0fff51e35831",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "conformance:2002/oo_property_explicit_ref; conformance:2002/pb1449_interface_property",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1449 LANDED (wave 1015 Z). cite.py --check 11.7.4 'If the SET phrase is specified, this method is a set property method for property-name-1.' OK 7). An interface's SET PROPERTY prototype is a set property method: MOVE 42 TO BAL OF I runs the implementing object's SET (A=00042 through the clause SET, B=00021 through the explicit SET, which stores 2*10). The class half stays witnessed by oo_property_explicit_ref.",
+  "notes": "kb/Work PB1449 LANDED (wave 1015 Z). cite.py --check 11.7.4 'If the SET phrase is specified, this method is a set property method for property-name-1.' OK 7). An interface's SET PROPERTY prototype is a set property method: MOVE 42 TO BAL OF I runs the implementing object's SET (A=00042 through the clause SET, B=00021 through the explicit SET, which stores 2*10). The class half stays witnessed by oo_property_explicit_ref. retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -15337,11 +15337,11 @@
   "subject": "REPOSITORY paragraph",
   "rule-digest": "34211d48970a",
   "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindDeclarations; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindDeclarations; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1086: Rule (cite.py --check 12.3.8.3 'there shall be information in the external repository for the property property-name-1 that is part of one of the classes or interfaces that are declared in this REPOSITORY paragraph' -> OK, located under §12.3.8.3 16) a) by the transcription, it is item b)). a) with literal-4 the rule text says 'the property literal-5' - evidently literal-4 (the property specifier's own literal; literal-5 is the function specifier's); the code reads literal-4, which is the only coherent reading, and the transcription/erratum question is recorded as a dossier gap. Code: the property specifier is only recorded (OoRepositoryProperties); no check that the property belongs to a class or interface declared in the same paragraph. At a REFERENCE, OoTryBindPropertyReference looks the accessor up on the RECEIVER's class (not restricted to the paragraph's declared classes), returning to the generic diagnosis on a miss. Probe out/probe/repo/sr10.cob: 'PROPERTY NOSUCHPR' with no class declaring such a property -> compiles clean and runs. Expected: the specifier violates SR16 b). Verified half: pb974_repository_as_phrase's 'PROPERTY AMOUNT AS \"BAL\"' reaches the BAL property of the declared class (a) with the literal).",
+  "notes": "kb/Work PB1086: Rule (cite.py --check 12.3.8.3 'there shall be information in the external repository for the property property-name-1 that is part of one of the classes or interfaces that are declared in this REPOSITORY paragraph' -> OK, located under §12.3.8.3 16) a) by the transcription, it is item b)). a) with literal-4 the rule text says 'the property literal-5' - evidently literal-4 (the property specifier's own literal; literal-5 is the function specifier's); the code reads literal-4, which is the only coherent reading, and the transcription/erratum question is recorded as a dossier gap. Code: the property specifier is only recorded (OoRepositoryProperties); no check that the property belongs to a class or interface declared in the same paragraph. At a REFERENCE, OoTryBindPropertyReference looks the accessor up on the RECEIVER's class (not restricted to the paragraph's declared classes), returning to the generic diagnosis on a miss. Probe out/probe/repo/sr10.cob: 'PROPERTY NOSUCHPR' with no class declaring such a property -> compiles clean and runs. Expected: the specifier violates SR16 b). Verified half: pb974_repository_as_phrase's 'PROPERTY AMOUNT AS \"BAL\"' reaches the BAL property of the declared class (a) with the literal). retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "GAP"
  },
  {
@@ -15367,11 +15367,11 @@
   "subject": "REPOSITORY paragraph",
   "rule-digest": "f56241697db5",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoNameResolution.cs#Lookup; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#FindByExternalizedName; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#UserFunctionsOf; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ProgramPrototypesOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoNameResolution.cs#Lookup; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#FindByExternalizedName; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#UserFunctionsOf; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ProgramPrototypesOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "conformance:2002/pb974_repository_as_phrase; conformance:2002/pb237_program_prototype",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "literal-1/2/3/5 is the externalized name of the class / interface / program / function the declared word then names (resolved against the definition's own externalized name - CLASS-ID / INTERFACE-ID / FUNCTION-ID / PROGRAM-ID AS literal - in the compilation group); the property specifier's literal-4 is the property's name in the declared classes (GR2's second sentence, and SR16 a)). 'The implementor shall specify when the AS phrase is required' is DOC-A.1-163: never. kb/Work PB974.",
+  "notes": "literal-1/2/3/5 is the externalized name of the class / interface / program / function the declared word then names (resolved against the definition's own externalized name - CLASS-ID / INTERFACE-ID / FUNCTION-ID / PROGRAM-ID AS literal - in the compilation group); the property specifier's literal-4 is the property's name in the declared classes (GR2's second sentence, and SR16 a)). 'The implementor shall specify when the AS phrase is required' is DOC-A.1-163: never. kb/Work PB974. retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -15562,11 +15562,11 @@
   "subject": "REPOSITORY paragraph",
   "rule-digest": "465db9f29a47",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindDeclarations; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#InheritConfiguration; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindDeclarations; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#InheritConfiguration; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
   "test-ref": "conformance:2002/pb974_repository_as_phrase",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "Rule (cite.py --check 12.3.8.4 'Property-name-1 is the name of an object property that may be used throughout the scope of the containing environment division' -> OK §12.3.8.4 15)). Code: BindDeclarations records OoRepositoryProperties[property-name-1] = literal-4 or the name; InheritConfiguration (DataBinder.Switches.cs:474) TryAdds the container's entries into every contained unit; ReferenceResolver.OoTryBindPropertyReference resolves 'name OF receiver' through that table (COBOLNET0843 when no specifier is in scope, §8.4.3.9.3 SR1). Evidence: conformance:2002/pb974_repository_as_phrase (PROPERTY AMOUNT AS \"BAL\" used in the declaring program: 100 / 555); probe out/probe/repo/gr15.cob (--std 2002): the specifier in an outermost program, the reference 'MOVE 321 TO AMOUNT OF B' / 'DISPLAY AMOUNT OF B' in a CONTAINED program -> INNER-AMOUNT=321 (the 'throughout the scope' half). Residue noted, not a GR15 defect: an interface-typed receiver has no property path yet (ReferenceResolver comment 'property prototypes are a later refinement').",
+  "notes": "Rule (cite.py --check 12.3.8.4 'Property-name-1 is the name of an object property that may be used throughout the scope of the containing environment division' -> OK §12.3.8.4 15)). Code: BindDeclarations records OoRepositoryProperties[property-name-1] = literal-4 or the name; InheritConfiguration (DataBinder.Switches.cs:474) TryAdds the container's entries into every contained unit; ReferenceResolver.OoTryBindPropertyReference resolves 'name OF receiver' through that table (COBOLNET0843 when no specifier is in scope, §8.4.3.9.3 SR1). Evidence: conformance:2002/pb974_repository_as_phrase (PROPERTY AMOUNT AS \"BAL\" used in the declaring program: 100 / 555); probe out/probe/repo/gr15.cob (--std 2002): the specifier in an outermost program, the reference 'MOVE 321 TO AMOUNT OF B' / 'DISPLAY AMOUNT OF B' in a CONTAINED program -> INNER-AMOUNT=321 (the 'throughout the scope' half). Residue noted, not a GR15 defect: an interface-typed receiver has no property path yet (ReferenceResolver comment 'property prototypes are a later refinement'). retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
   "state": "OK"
  },
  {
@@ -35062,11 +35062,11 @@
   "subject": "CALL statement",
   "rule-digest": "bfd2e28b6b90",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#IsObjectPropertyReference",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#IsObjectPropertyReference",
   "test-ref": "conformance:2023/pb238_call_sr20_object_property; conformance:2023/pb131_gr9_formal_mode",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB238 LANDED — the object-property exception is modelled. Rule (cite.py OK, 14.9.4.3 rule 20): 'BY CONTENT shall not be omitted when identifier-4 is an identifier that is permitted as a receiving operand, except that BY CONTENT may be omitted when identifier-4 is an object property.' The prohibition half needs no arm of its own and never did: 14.9.4.4 GR9 a)1 gives BY REFERENCE to every keyword-less argument that MEETS 14.9.4.3 SR3, so such an operand is identifier-2 and the omitted phrase is BY REFERENCE, not an omitted BY CONTENT. The rule bites exactly on GR9 a)2 — an identifier permitted as a receiving operand that is NOT a data item of the file/working-storage/local-storage/linkage sections — and the standard names the one member of that set: an object property. ReferenceResolver.IsObjectPropertyReference is the ONE such test, running the same OoTryBindPropertyReference resolution the committing path runs, under _probing so no temp is synthesized, no 8.4.3.9.4 pending op is registered and no diagnostic is reported (the R30 probe contract). CallBinder's keyword-less arm then binds CobolPassMode.Content and resolves through the SENDING resolver. PARTIALLY-LANDED HALF UNCHANGED (PB131): Format 2's bare receiving-permitted identifier derives its mechanism from its own formal, never from a preceding phrase, and Format 1's BY VALUE arm is rejected outright, so BY VALUE is transitive under no path. TEST: pb238_call_sr20_object_property — CALL 'PB238PS1' AS NESTED USING BAL OF A, callee MOVEs 777 into the formal, AFTER=00100 proves the SET accessor is NOT invoked. The arm's failure branch was FIRED once (the predicate forced to false and rebuilt): the same source then printed AFTER=00777. EDITIONS 2002+ (FORMAT 2).",
+  "notes": "kb/Work PB238 LANDED — the object-property exception is modelled. Rule (cite.py OK, 14.9.4.3 rule 20): 'BY CONTENT shall not be omitted when identifier-4 is an identifier that is permitted as a receiving operand, except that BY CONTENT may be omitted when identifier-4 is an object property.' The prohibition half needs no arm of its own and never did: 14.9.4.4 GR9 a)1 gives BY REFERENCE to every keyword-less argument that MEETS 14.9.4.3 SR3, so such an operand is identifier-2 and the omitted phrase is BY REFERENCE, not an omitted BY CONTENT. The rule bites exactly on GR9 a)2 — an identifier permitted as a receiving operand that is NOT a data item of the file/working-storage/local-storage/linkage sections — and the standard names the one member of that set: an object property. ReferenceResolver.IsObjectPropertyReference is the ONE such test, running the same OoTryBindPropertyReference resolution the committing path runs, under _probing so no temp is synthesized, no 8.4.3.9.4 pending op is registered and no diagnostic is reported (the R30 probe contract). CallBinder's keyword-less arm then binds CobolPassMode.Content and resolves through the SENDING resolver. PARTIALLY-LANDED HALF UNCHANGED (PB131): Format 2's bare receiving-permitted identifier derives its mechanism from its own formal, never from a preceding phrase, and Format 1's BY VALUE arm is rejected outright, so BY VALUE is transitive under no path. TEST: pb238_call_sr20_object_property — CALL 'PB238PS1' AS NESTED USING BAL OF A, callee MOVEs 777 into the formal, AFTER=00100 proves the SET accessor is NOT invoked. The arm's failure branch was FIRED once (the predicate forced to false and rebuilt): the same source then printed AFTER=00777. EDITIONS 2002+ (FORMAT 2). retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#IsObjectPropertyReference (IsObjectPropertyReference moved with the Format 7 resolution into ReferenceResolver.ObjectProperty.cs (kb/Work PB1425, w1021a))",
   "state": "OK"
  },
  {
@@ -57471,13 +57471,13 @@
   "ordinal": 0,
   "subject": "Identifier",
   "rule-digest": "866d69f98ec7",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataReference; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#functionCall; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineMethodInvocation; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#addressIdentifier; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
-  "test-ref": "conformance:85/pb1153_counter_register_character_image",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataReference; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#functionCall; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineMethodInvocation; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#addressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#propertyObject; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty",
+  "test-ref": "conformance:85/pb1153_counter_register_character_image; conformance:2002/pb1425_object_property_identifier; conformance:2002/pb1425_object_view; conformance:2002/pb1425_predefined_object_operands",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1425, PB1199 (registrar 15b). Eleven identifier formats (cite.py --check 8.4.3.1.3 6)/7) OK). There is no single identifier rule; the formats are spread over dataReference (F2, F3, F10 LINAGE_COUNTER (OF|IN) word, F11 LINE_/PAGE_COUNTER (OF|IN) word), functionCall with refModPart* (F1+F3), inlineMethodInvocation (F4), objectReference NULL|SELF|SUPER plus the EXCEPTION-OBJECT resolver name (F6), the object-property binder in ReferenceResolver (F7), NULL (F8), addressIdentifier (F9). Probe p1.cob (--std 2023): A OF G (N) -> G2G2; A OF G (N)(2:2) -> 2G; FUNCTION UPPER-CASE (W)(2:3) -> BCD; SET P TO NULL / IF P = NULL / IF P = ADDRESS OF W all TRUE. Probe o2.cob (--std 2002): NM OF D -> ABCDEF, INVOKE SELF / INVOKE SUPER dispatch correctly. l5.cob: LINAGE-COUNTER OF F1 / IN F2 resolve the right file (04 / 02). THREE DEFECTS: (1) FORMAT 5 object-view has NO surface: `SET U TO D AS UNIVERSAL` and `INVOKE D AS KBASE \"SPEAK\"` (o3/o4.cob) draw COBOLNET0901 \"'AS' is a reserved word\" - rejects legal source; (2) Format 6's `[object-class-name-1 OF] SUPER` arm: `INVOKE KBASE OF SUPER \"SPEAK\"` with a single INHERITS class (legal per 8.4.3.8.3 SR6, cite OK) draws COBOLNET0901 \"'SUPER' is a reserved word\" at 2002/2014/2023; (3) Formats 10/11 compile clean and ABORT at run time in every string-rendering context: `DISPLAY LINAGE-COUNTER`, `DISPLAY PAGE-COUNTER OF RPT1`, `DISPLAY LINE-COUNTER`, `MOVE PAGE-COUNTER OF RPT1 TO WA` (PIC X(4)) each emit NotImplemented.Value<string>(\"computed expression in a string context\") (l2/l4/r1.cob) - ExpressionBinder binds a counter as BoundComputedOperand(BoundLinageCounterRef) and OperandText.AsStringVisitor.Visit(BoundComputedOperand) is loud on the premise that no general format admits one there; 8.4.3.15.3 SR1 (cite OK) admits the counters 'in any context where an integer data item may appear'. No open kb/Work note owns any of the three (searched object-view, OF SUPER, the string-context stub). Probes under out/probe/ident with the pinned cobol.exe. || editions as written by the adjudicator: Formats 1-3 and 10-11: 1985 (intrinsic functions via the 1989 amendment); Formats 4-9: 2002, 2014, 2023 || kb/Work PB1199 LANDED (wave 73 group C): defect (3) is FIXED - Formats 10/11 (LINAGE-COUNTER, LINE-COUNTER, PAGE-COUNTER) render their PIC 9(d) USAGE DISPLAY image in every string context (conformance:85/pb1153_counter_register_character_image). The row stays PARTIAL on defects (1) and (2), which kb/Work PB1425 owns.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1021a). The eleven identifier formats (cite.py --check 8.4.3.1.3 -> OK 2)-12)). Formats 1-4 and 8-11 were verified by the registrar's probes; Format 5 (object-view) landed w1019a, Format 6's qualified SUPER w1014 and SELF / SUPER as identifiers w1020c, and Format 7's identifier-3 is now any identifier (the dataReference chain split by ResolveObjectProperty, plus the propertyObject suffix for SELF, SUPER, a view, a function, NULL). Every format is spelled and bound. retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.4.3.2.2",
@@ -57591,13 +57591,13 @@
   "ordinal": 0,
   "subject": "Object property",
   "rule-digest": "b35b86858e12",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "conformance:2002/pb1449_interface_property",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs#ResolveObjectProperty; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#propertyObject; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.PropertyObject.cs#OoBindPropertyObject",
+  "test-ref": "conformance:2002/pb1449_interface_property; conformance:2002/pb1425_object_property_identifier; conformance:negative/pb1425-property-object-null",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (also PB1449) (registrar 15c). §8.4.3.9.2 prints `property-name-1 OF {object-class-name-1 | identifier-1}` and §8.4.3.1.3 SR1 makes identifier-1 ANY identifier format ('Identifier is defined recursively' — cite.py --check 8.4.3.1.3 OK; §8.4.3.1.2 Format 7 'property-name-1 OF identifier-3' OK). §8.4.3.8.3 SR3 names the property object explicitly: 'SUPER may be specified only as the object in an object-property identifier' (--check OK), SR7 'SELF and SUPER ... are not universal object references' (--check OK). The binder (ReferenceResolver.OoTryBindPropertyReference :96) returns null unless the reference has EXACTLY ONE qualifier that is a bare word resolving to a class-name or a typed object-reference data item; every other identifier-1 form falls to the generic 1639 'not defined'. Probed with the pinned cobol.exe --std 2002 (probe/objprop): bare data-name and class-name forms work (p5, oo_property_ref); `BAL OF A OF T(2)` (STRONG-typedef table of refs, p6) -> 1639; `BAL OF A(2)` (p1) -> COBOLNET2096 naming the compiler temp '__PROP-TEMP-200002' (subscript attached to the temp); `BAL OF SELF` in a method (p7) -> 0901 'SELF is a reserved word'; `BAL OF INNER OF B` chained property (p8) -> 1639; interface-typed receiver `BAL OF I` (p13) -> 0899 + 1639 (:126 'interface-typed receivers ... later refinement'). Legal source rejected -> DIVERGES. The basic forms are covered by conformance:2002/oo_property_ref / oo_property_factory_ref, which do not close a defective row. [editions as adjudicated: 2002, 2014, 2023 (the object property is part of the OO facility introduced by ISO/IEC 1989:2002; absent from X3.23-1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1021a). 8.4.3.9.2 prints `property-name-1 OF {object-class-name-1 | identifier-1}` and 8.4.3.1.3 SR1 makes identifier-1 any identifier (cite.py --check 8.4.3.1.3 -> OK 1)). The property binder no longer takes one bare word: ReferenceResolver.ResolveObjectProperty splits the written chain - the head word is property-name-1, identifier-1 is the rest less the reference modifiers (8.4.3.1.4 GR1 a) before d), g) last) - and resolves identifier-1 through the ordinary resolver, so a qualified and subscripted object reference (BAL OF A OF T(2), BAL OF AR(2), which used to name the compiler's temporary), a chained property (NM OF NXT OF D), and the forms a word cannot spell (the grammar's propertyObject suffix: SELF, SUPER, object-class-name-1 OF SUPER, an object-view BAL OF U AS C, a function-identifier BAL OF FUNCTION F (5)) are all the object. The class-name arm (factory accessors) is unchanged. [editions: the OO facility, 2002+] retired-witness: src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference (the one-word property binder ReferenceResolver.OoTryBindPropertyReference is deleted by kb/Work PB1425 (w1021a): a property reference is resolved by ReferenceResolver.ResolveObjectProperty, which splits the chain and resolves identifier-3 through the ordinary resolver)",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.4.3.10.2",

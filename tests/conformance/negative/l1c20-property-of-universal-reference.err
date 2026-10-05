@@ -1,1 +1,1 @@
-COBOLNET0843: the object-property reference 'BAL' OF 'U': the receiving identifier shall not be a universal object reference
+COBOLNET2918: the object-property reference 'BAL' OF 'U': its object shall not be a universal object reference

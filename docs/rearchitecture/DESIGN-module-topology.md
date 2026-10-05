@@ -295,7 +295,7 @@ the renderer switches route through it so a missing arm is a **compile error**. 
 `SubscriptTokenParser` (Split/Render/Interpret/CollectLeaf), `NameResolver` (unqualified/qualified/descendant/
 file-qualifier), and `ScopeResolver` (the ONE scoped lookup that understands OO method shadowing — collapses the
 `LookupData`/`LookupDataInScopeOf`/`TryGetVisibleIndexField`/`IndexFieldFor` quadruple). OO property binding
-(`OoTryBindPropertyReference`) moves to `Oo/OoStatementBinder.cs`. The hand-rolled intrinsic-arg expression parser is
+(`ReferenceResolver.ResolveObjectProperty`) moves to `Oo/OoStatementBinder.cs`. The hand-rolled intrinsic-arg expression parser is
 deleted — FUNCTION args parse as real grammar `arithmeticExpression` (edition-gated) and bind through
 `ExpressionBinder` (removes the 3rd parallel numeric evaluator).
 

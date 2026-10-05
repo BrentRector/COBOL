@@ -282,7 +282,7 @@ rows (98, 100–113) are directive-driven, not edition gates, so they carry `<!-
     only function and method). The activations with no syntactic marker are not re-derived from syntax: the BINDER
     records them where it decides them (`DataBinder.ActivationSites`, identity-keyed parse nodes and subscript
     tokens; sites `IntrinsicBinder.KeywordOmittedFunction`, `ReferenceResolver.IsFunctionBearing`,
-    `OoTryBindPropertyReference`) and the pass reads that fact back. Because it flags a DIRECTIVE (a frontend `>>TURN`,
+    `ReferenceResolver.ResolveObjectProperty`) and the pass reads that fact back. Because it flags a DIRECTIVE (a frontend `>>TURN`,
     not a parse node), it runs POST-walk: `TurnState.DirectiveLinesNaming` exposes the `>>TURN` lines naming any
     family name (ON/OFF alike; the raw events store the canonical name as-written, so a level-2 `EC-PROGRAM` matches
     without expansion); the walk opens a `SourceElement` (its own line span + whether it calls/invokes) per source unit

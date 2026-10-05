@@ -72,6 +72,14 @@ internal sealed partial class OoBinder
             source = place;
         }
 
+        return OoApplyViewPhrases(source, written, ov);
+    }
+
+    /// <summary>The AS phrases of <paramref name="ov"/> applied, in order, to identifier-1 already bound to
+    /// <paramref name="source"/> (null = SELF): each phrase a temporary described by it, filled by a
+    /// <see cref="BoundObjectView"/> pre-op from the previous one (§8.4.3.5.4 GR1–GR7).</summary>
+    private BoundExpr OoApplyViewPhrases(Place? source, string written, Core.ObjectViewContext ov)
+    {
         foreach (var phrase in ov.objectViewPhrase())
         {
             string phraseText = DataBinder.WrittenText(phrase);
@@ -88,6 +96,19 @@ internal sealed partial class OoBinder
             written += " " + phraseText;
         }
         return new BoundNumRef(source!);
+    }
+
+    /// <summary>The resolver's view edge (<c>ReferenceResolver.ApplyObjectView</c>): the object-view of a qualified data
+    /// item written as one chain, <c>A OF G AS C</c> (§8.4.3.1.4 GR1 a) before c)), over the item already resolved.
+    /// §8.4.3.5.3 SR1 asks identifier-1's class here as it does for every other subject. Null having reported.</summary>
+    internal Place? OoApplyObjectView(Place subject, Core.ObjectViewContext ov, string written)
+    {
+        if (subject.Item.Pic is not { Category: PicCategory.ObjectReference })
+        {
+            _ = RefuseViewSubject(written, "identifier-1 is not of class object (it is not an object reference)");
+            return null;
+        }
+        return OoApplyViewPhrases(subject, written, ov) is BoundNumRef { Place: var viewed } ? viewed : null;
     }
 
     /// <summary>§8.4.3.5.3 SR1's refusal, naming identifier-1 as written.</summary>

@@ -12,7 +12,7 @@
       *> Everything else is valid: BAL is a REPOSITORY property (SR1)
       *> with a GET PROPERTY method in class L1C20LC (SR3), and the
       *> same statement with the typed reference A compiles. Expected
-      *> rejection: COBOLNET0843 naming this rule's universal arm.
+      *> rejection: COBOLNET2918 (property-object), the code of this rule alone.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1C20L.
        ENVIRONMENT DIVISION.

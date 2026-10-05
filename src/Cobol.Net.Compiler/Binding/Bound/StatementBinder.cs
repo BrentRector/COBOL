@@ -202,6 +202,11 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         // EC-BOUND-REF-MOD checking is enabled at the reference's line (kb/Work PB1707 part 1). Read through
         // Ctx.EcState.Turn AT CALL TIME, so an exception-checking PERFORM's GR14 overlay is the state it sees.
         refs.RefModCheckingAt ??= line => Ctx.EcState.Turn.Enabled("EC-BOUND-REF-MOD", null, line);
+        // The object of an object property that a word cannot spell — SELF, SUPER, a view, a function (§8.4.3.1.2
+        // Format 7; kb/Work PB1425) — and the view of a qualified data item written as one chain: both are bound by the
+        // OO binder, which owns the method context and the view's temporaries, through the same one-way edge.
+        refs.BindPropertyObject ??= Oo.OoBindPropertyObject;
+        refs.ApplyObjectView ??= Oo.OoApplyObjectView;
     }
 
     /// <summary>The ONE guard in front of <see cref="ReportWriterBinder.BindReportGroupClauses"/>: bind the report-section

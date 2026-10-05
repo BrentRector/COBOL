@@ -6834,6 +6834,18 @@ public static class DiagnosticCatalog
         + "object-property identifier. Write SELF to name the object the method is executing on.",
         "ISO §8.4.3.8.3 SR3");
 
+    /// <summary>COBOLNET2918 — the object of an object-property identifier (§8.4.3.1.2 Format 7's identifier-3) is no
+    /// object reference that names a class or an interface: a universal object reference, the predefined NULL, or a
+    /// computed identifier (an object-view, a function-identifier) whose item is not an object reference (kb/Work
+    /// PB1425). It shared COBOLNET0843 with §8.4.3.9.3 SR1, SR3 and SR4, four rules under one code.</summary>
+    public static readonly DiagnosticDescriptor PropertyObject = new(
+        "COBOLNET2918", "property-object", EditionSeverity.Error,
+        "The object of an object-property reference (property-name OF identifier) selects the class whose get or set "
+        + "property method is invoked, so it shall be an object reference described with a class or an interface. A "
+        + "universal object reference and NULL name no class: write an object-view (identifier AS class-name) to give "
+        + "the reference one.",
+        "ISO §8.4.3.9.3 SR2");
+
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

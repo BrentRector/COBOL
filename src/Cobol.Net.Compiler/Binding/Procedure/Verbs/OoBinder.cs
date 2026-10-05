@@ -54,9 +54,25 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             bool needGet = kind == StoreKind.None || kind == StoreKind.ReadWrite;
             bool needSet = kind == StoreKind.Write || kind == StoreKind.ReadWrite;
             string where = $"'{op.PropName}' OF '{op.ReceiverName}'";
-            var form = op.Factory ? InvokeForm.Factory : InvokeForm.Instance;
             var tempPlace = ctx.Refs.ResolveItem(op.Temp)!;
 
+            // ⛔ kb/Work PB2078: the GET runs before the statement and the SET after it, each rendering identifier-3
+            // afresh, so an object selected through a run-time value is one object at the GET and another at the SET
+            // (`ADD 1 TO I, BAL OF AR(I)` stored AR(1)'s BAL + 1 into AR(2)), and neither is the receiver §14.7.7 4) b)
+            // and §14.9.25.4 GR1 identify "as each data item is accessed". Until each receiver's accessors interleave
+            // with its own store, that receiving shape is refused, as it was before PB1425 admitted the subscript.
+            if (needSet && op.SelectedByValue)
+            {
+                ctx.Edition.Error(DiagnosticCatalog.ReceivingReferenceNotImplemented,
+                    $"the object-property reference {where} is a RECEIVING operand whose object is selected by a "
+                    + "run-time value (a data-name subscript or a function-identifier): identifying that object when the "
+                    + "statement reaches it (ISO §14.7.7 4) b), §14.9.25.4 GR1) is not yet implemented for a property");
+                continue;
+            }
+
+            // identifier-3's own evaluation first (§8.4.3.1.4 GR1 a)–c) before d)), then the GET — once, whichever
+            // accessors the polarity needs: the SET of a receiving property uses the same evaluated receiver.
+            pre.AddRange(op.Prelude);
             if (needGet && PropertyGet(op) is { } get) pre.Add(get);
             if (needSet)
             {
@@ -65,7 +81,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                         $"the object-property reference {where} is a RECEIVING operand but the class has no "
                         + "SET property method (ISO §8.4.3.9.3 SR4 — WITH NO SET, or no accessor defined)");
                 else
-                    post.Add(new BoundInvoke(form, op.ClassCsName, op.Receiver, op.Set.CsName, null,
+                    post.Add(new BoundInvoke(op.Form, op.ClassCsName, op.Receiver, op.Set.CsName, null,
                         [new BoundInvokeArg(op.Set.Binding!.Formals[0].Item, tempPlace, null, null, WriteBack: false)],
                         null, op.OwnerCsNameOf(op.Set)));
             }
@@ -93,8 +109,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 + "class has no GET property method (ISO §8.4.3.9.3 SR3 — WITH NO GET, or no accessor defined)");
             return null;
         }
-        return new BoundInvoke(op.Factory ? InvokeForm.Factory : InvokeForm.Instance, op.ClassCsName, op.Receiver,
-            op.Get.CsName, ctx.Refs.ResolveItem(op.Temp)!, null, op.Get.Binding!.Returning, op.OwnerCsNameOf(op.Get));
+        return new BoundInvoke(op.Form, op.ClassCsName, op.Receiver, op.Get.CsName, ctx.Refs.ResolveItem(op.Temp)!, null, op.Get.Binding!.Returning, op.OwnerCsNameOf(op.Get));
     }
 
     /// <summary>Drain the property references registered since <paramref name="mark"/> for a PER-EVALUATION
@@ -114,7 +129,10 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         ops.RemoveRange(mark, ops.Count - mark);
         var gets = new List<BoundStatement>(taken.Count);
         foreach (var op in taken)
+        {
+            gets.AddRange(op.Prelude);   // identifier-3's evaluation precedes its accessor (see OoPendingPropertyOp)
             if (PropertyGet(op) is { } get) gets.Add(get);
+        }
         return gets;
     }
 
@@ -283,48 +301,18 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // spaces are not part of an externalized name (DOC-A.1-68; the one rule, CobolNet.Runtime.ExternalizedNames),
         // so `INVOKE O " GET "` names the method `METHOD-ID. GET` names, by the typed and the universal path alike.
         methodName = CobolNet.Runtime.ExternalizedNames.Form(methodName);
-        if (target.selfAndSuper() is { } selfOrSuper)
+        // `object-class-name-1 OF SUPER` is a word chain (`name OF SUPER`) that the resolver reads as the qualified SUPER
+        // exactly when the name is a class-name (kb/Work PB1425 — otherwise it is the property of SUPER, an ordinary
+        // receiver resolved below); a bare SELF or SUPER is the `selfAndSuper` term.
+        Core.CobolWordContext? superQualifier = target.dataReference() is { } qref ? ctx.Refs.QualifiedSuperClass(qref) : null;
+        if (target.selfAndSuper() is not null || superQualifier is not null)
         {
             // Slice 3b — §8.4.3.8: SELF/SUPER are the predefined object references of the CURRENT method's
             // object; legal only within a method body.
-            bool isSuper = selfOrSuper.SUPER() is not null;
-            string written = selfOrSuper.cobolWord() is { } q0 ? $"{q0.GetText()} OF SUPER" : isSuper ? "SUPER" : "SELF";
-            if (!host.InMethod || host.OoCurrentClass is not { } cur)
-            {
-                return RefusePredefinedObjectOutsideMethod($"INVOKE {written}");
-            }
-            OoClassSymbol searchRoot;
-            if (!isSuper)
-                searchRoot = cur;   // GR2 — resolve on the current class's chain; dispatch on the RUNTIME class
-            else if (selfOrSuper.cobolWord() is { } qualifier)
-            {
-                // `object-class-name-1 OF SUPER` (kb/Work PB1425). §8.4.3.8.3 SR4: "Object-class-name-1 shall be the
-                // name of a class specified in the INHERITS clause of the containing class definition"; GR4: "the
-                // search for the method shall include only those methods defined for object-class-name-1". A class
-                // INHERITS one class here (a multiple-INHERITS class is declined, Annex A.4.10 item 1), so the class
-                // SR4 admits is the containing class's base, and GR4's search starts there — GR3's own root.
-                var named = Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, qualifier, qualifier.GetText(),
-                    Compiler.Oo.OoNameResolution.Want.Class).Class;
-                if (named is null || !ReferenceEquals(named, cur.Base))
-                    return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.SuperQualifierNotInherited,
-                        $"INVOKE {written}: '{qualifier.GetText()}' is "
-                        + (named is null ? "not a class this source element may reference"
-                            : cur.Base is null ? $"not inherited — class '{cur.Name}' has no INHERITS clause"
-                            : $"not the class the INHERITS clause of '{cur.Name}' names ('{cur.Base.Name}')")
-                        + " (ISO §8.4.3.8.3 SR4 — object-class-name-1 shall be the name of a class specified in the "
-                        + "INHERITS clause of the containing class definition)");
-                searchRoot = named;
-            }
-            else if (cur.Base is { } b)
-                searchRoot = b;     // GR3 — the restricted search STARTS at the base class
-            else
-            {
-                // Trap #7 — SUPER in a root class is a clean compile diagnostic, never an internal error
-                // (applies identically to the FACTORY flavor).
-                return BoundRejected.Report(ctx.Edition, "COBOLNET0827",
-                    $"INVOKE SUPER in class '{cur.Name}', which INHERITS from no class (ISO §8.4.3.8 — SUPER "
-                    + "references the inherited class's methods)");
-            }
+            bool isSuper = superQualifier is not null || target.selfAndSuper()!.SUPER() is not null;
+            if (OoPredefinedSearchRoot(isSuper, superQualifier, "INVOKE") is not { } root)
+                return BoundRejected.Reported(ctx.Edition);
+            var (cur, searchRoot) = root;
             // Roster selection by CONTEXT (§14.9.23.3 SR4f/g/h/i): a factory method's SELF/SUPER resolve
             // over the FACTORY interface; an instance method's over the instance interface.
             var sm = host.OoInFactory ? searchRoot.FindFactoryMethod(methodName) : searchRoot.FindMethod(methodName);
@@ -390,6 +378,56 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         return BoundRejected.Report(ctx.Edition, "COBOLNET0823",
             $"INVOKE: '{DataBinder.WrittenText(dref)}' is neither a resolvable data item nor a class this source element "
             + "may reference (ISO §14.9.23.2 — identifier-1 or class-name-1; §8.4.6.4)");
+    }
+
+    /// <summary>⛔ THE ONE §8.4.3.8 METHOD-SEARCH ROOT OF SELF / [object-class-name-1 OF] SUPER (kb/Work PB1425), asked by
+    /// both places that select a method through them: the invocation receiver (<see cref="OoBindByReceiver"/>) and the
+    /// object of an object property (<see cref="OoBindPropertyObject"/>, whose accessor is a method found the same way,
+    /// §8.4.3.9.4 GR1 "as though the associated get property method were invoked"). SELF searches the containing class
+    /// (GR2, dispatched on the run-time class); SUPER starts at the class the INHERITS clause names (GR3), and
+    /// <c>object-class-name-1 OF SUPER</c> at object-class-name-1, which SR4 requires to be that class (GR4) — a class
+    /// INHERITS one class here (a multiple-INHERITS class is declined, Annex A.4.10 item 1). Null after the refusal is
+    /// reported: SR1 outside a method (COBOLNET0827), SR4 (COBOLNET2777), SUPER in a class that inherits nothing —
+    /// reported unless <paramref name="report"/> is false (a resolver PROBE, which never diagnoses).
+    /// <paramref name="position"/> names the construct for the message ("INVOKE", "the object-property reference …").</summary>
+    internal (OoClassSymbol Current, OoClassSymbol SearchRoot)? OoPredefinedSearchRoot(bool isSuper,
+        Core.CobolWordContext? qualifier, string position, bool report = true)
+    {
+        string written = qualifier is not null ? $"{qualifier.GetText()} OF SUPER" : isSuper ? "SUPER" : "SELF";
+        if (!host.InMethod || host.OoCurrentClass is not { } cur)
+        {
+            if (report) _ = RefusePredefinedObjectOutsideMethod($"{position} {written}");
+            return null;
+        }
+        if (!isSuper) return (cur, cur);
+        if (qualifier is not null)
+        {
+            // §8.4.3.8.3 SR4: "Object-class-name-1 shall be the name of a class specified in the INHERITS clause of the
+            // containing class definition"; GR4: "the search for the method shall include only those methods defined
+            // for object-class-name-1".
+            var named = Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, qualifier, qualifier.GetText(),
+                Compiler.Oo.OoNameResolution.Want.Class).Class;
+            if (named is null || !ReferenceEquals(named, cur.Base))
+            {
+                if (report)
+                    ctx.Edition.Error(DiagnosticCatalog.SuperQualifierNotInherited,
+                    $"{position} {written}: '{qualifier.GetText()}' is "
+                    + (named is null ? "not a class this source element may reference"
+                        : cur.Base is null ? $"not inherited — class '{cur.Name}' has no INHERITS clause"
+                        : $"not the class the INHERITS clause of '{cur.Name}' names ('{cur.Base.Name}')")
+                    + " (ISO §8.4.3.8.3 SR4 — object-class-name-1 shall be the name of a class specified in the "
+                    + "INHERITS clause of the containing class definition)");
+                return null;
+            }
+            return (cur, named);
+        }
+        if (cur.Base is { } b) return (cur, b);   // GR3 — the restricted search STARTS at the base class
+        // Trap #7 — SUPER in a root class is a clean compile diagnostic, never an internal error (applies identically
+        // to the FACTORY flavor).
+        if (report)
+            ctx.Edition.Error("COBOLNET0827", $"{position} SUPER in class '{cur.Name}', which INHERITS from no class "
+            + "(ISO §8.4.3.8 — SUPER references the inherited class's methods)");
+        return null;
     }
 
     /// <summary>§8.4.3.8.3 SR1 — "This identifier format may be specified only in a method definition" — for SELF / SUPER

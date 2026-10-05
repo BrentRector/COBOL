@@ -467,7 +467,7 @@ configurationParagraph
 // environment", and the property specifier's literal-4 names the property the declared classes implement. The local
 // name stays the word the source element writes; what it RESOLVES to is found by the literal — OoRepositoryScope
 // (class / interface), BinderDriver.UserFunctionsOf (function), BinderDriver.ProgramPrototypesOf (program) and
-// ReferenceResolver.OoTryBindPropertyReference (property). The PROGRAM specifier had it alone (kb/Work PB237) and the
+// ReferenceResolver.ResolveObjectProperty (property). The PROGRAM specifier had it alone (kb/Work PB237) and the
 // other four refused `CLASS BOXY AS "R11BOX"` with COBOLNET0901 (AS reserved).
 // ⛔ AND THE INTRINSIC SPECIFIER TAKES A LIST: `FUNCTION { intrinsic-function-name-1 } … INTRINSIC` (same page) — one
 // name only refused `FUNCTION PI E INTRINSIC` (COBOL0307). The user-defined-function specifier is the one-name form
@@ -701,10 +701,25 @@ dataReferenceSuffix
     : subscriptPart
     | refModPart
     | qualification
+    | propertyObject
     ;
 
 qualification
     : (OF | IN) cobolWord (subscriptPart | refModPart)*
+    ;
+
+// ⛔ THE OBJECT OF AN OBJECT PROPERTY WHEN IT IS NOT A DATA NAME (kb/Work PB1425, PB1783). §8.4.3.1.2 Format 7 is
+// `property-name-1 OF identifier-3`, and §8.4.3.1.3 SR1 makes identifier-3 "any of the formats for an identifier":
+// a qualified, subscripted data name and a chained property are word chains `qualification` already parses, so they
+// stay ONE reference whose qualifier chain the resolver splits by symbol (ReferenceResolver.ResolveObjectProperty —
+// a property-name is not a qualifier, and only the declared names tell the two apart). What a word chain cannot spell
+// is THIS suffix: SELF, SUPER (§8.4.3.8.3 SR3 names "the object in an object-property identifier" as one of SUPER's
+// two homes, and `object-class-name-1 OF SUPER` is the chain `name OF SUPER`), an object-view (§8.4.3.1.4 GR1 c)
+// applies a view before d) applies OF, so `P OF U AS C` is P of the view), a function-identifier, and NULL — refused
+// by §8.4.3.9.3 SR2 by name, the P3 superset parse. It FOLLOWS `qualification` so ANTLR's lowest-alternative choice
+// keeps `P OF A OF U AS C` a property of `U AS C` (the view binds to the identifier on its left, §8.4.3.1.4 GR1 c)).
+propertyObject
+    : OF (objectView | SELF | SUPER | predefinedNull | functionCall)
     ;
 
 // subscriptPart uses SUBSCRIPT-mode tokens (entered via LPAREN after IDENTIFIER).
@@ -1836,12 +1851,15 @@ objectViewReceiver
     : dataReference objectViewPhrase+
     ;
 
-// ⛔ SELF AND SUPER ARE ONE RULE, `selfAndSuper`, AND THE QUALIFIED SUPER IS ITS ARM (kb/Work PB1425). §8.4.3.8.2
+// ⛔ SELF AND SUPER ARE ONE RULE, `selfAndSuper`, AND THE QUALIFIED SUPER IS A WORD CHAIN (kb/Work PB1425). §8.4.3.8.2
 // prints `{ SELF | [ object-class-name-1 OF ] SUPER }` (SELF, OF and SUPER underlined): the qualifier names the class of
 // the containing class's INHERITS clause whose methods GR4 restricts the search to (SR4; SR6 makes it optional with one
-// INHERITS class, SR5 required with several — a multiple-INHERITS class is declined, Annex A.4.10 item 1). It precedes
-// `dataReference` because `K OF SUPER` begins like a qualified data reference; SUPER is reserved, so the two part on
-// the third token. Every consumer asks the ONE rule (OoBinder.OoBindByReceiver, SetBinder, EcBinder.BindRaise).
+// INHERITS class, SR5 required with several — a multiple-INHERITS class is declined, Annex A.4.10 item 1). But
+// `K OF SUPER` is ALSO §8.4.3.1.2 Format 7 — the property K of SUPER (§8.4.3.8.3 SR3) — and only the declared names
+// tell the two apart, so the grammar has ONE spelling for both: `dataReference` with the `propertyObject` suffix, and
+// the resolver decides by symbol (ReferenceResolver.QualifiedSuperClass: a class-name is the qualified SUPER, anything
+// else the property). Its one legal home is the invocation receiver (OoBinder.OoBindByReceiver); everywhere else
+// §8.4.3.8.3 SR3 refuses it (COBOLNET2900), exactly as it refuses a bare SUPER.
 //
 // ⛔ AN OBJECT-REFERENCE POSITION TAKES EVERY IDENTIFIER FORMAT THAT CAN YIELD AN OBJECT REFERENCE (kb/Work PB1425,
 // PB1197). §14.9.23.3 SR1 ("Identifier-1 shall be an object reference"), §14.9.29.3 SR2 and §14.9.39.3 SR9 ask the
@@ -1867,9 +1885,14 @@ objectReference
 // The view's own identifier-1 is a TERM (the four formats GR1 a) applies first), and the phrase REPEATS because a view
 // is itself an identifier (§8.4.3.1.3 SR1), the inline segment's precedent. NULL and SUPER are terms although §8.4.3.5.3
 // SR1 forbids them as identifier-1: the P3 superset parse, so OoBinder.OoBindObjectView refuses them by that rule.
+// The TERM is the first alternative (kb/Work PB1425, Format 7): `P OF U AS C` reads both as a view of `P OF U` and as
+// the property P of `U AS C`, and §8.4.3.1.4 GR1 applies c) the view before d) OF, so the data reference — which
+// reads it as the property of the view — wins the tie; when the chain is a qualified DATA name instead (`A OF G AS
+// C`), the resolver re-reads it as the view of that item (ReferenceResolver.ResolveObjectProperty). A view of a plain
+// name or of a predefined object (`U AS C`, `SELF AS C`) is no term at all, so it still reaches `objectView`.
 objectReferenceAtom
-    : objectView
-    | objectReferenceTerm
+    : objectReferenceTerm
+    | objectView
     ;
 
 objectReferenceTerm
@@ -1895,7 +1918,7 @@ objectViewPhrase
 
 selfAndSuper
     : SELF
-    | (cobolWord OF)? SUPER
+    | SUPER
     ;
 
 // SET dataReference+ UP/DOWN BY arithmeticExpression (COBOL-85 §14.9.39 Format 2)

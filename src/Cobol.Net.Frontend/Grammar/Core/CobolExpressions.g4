@@ -453,17 +453,21 @@ unaryExpression
 // were reachable only through `objectReference` (INVOKE / SET / RAISE), so `IF O = SELF` and `USING D AS C` were
 // parse errors. Their position rules are the BINDER's, asked of the bound identifier: §8.4.3.8.3 SR1 (a method
 // only), SR3 (SUPER only as an invocation's or a property's object) and §8.4.3.5.3 SR1 (OoBinder.OoBindOoIdentifier).
-// Both precede `dataReference`: a view begins with one, and `K OF SUPER` begins like a qualified data reference
-// (SUPER is reserved, so the two part on the third token). A receiving position never parses an expression, so
-// §8.4.3.8.3 SR2 / §8.4.3.5.3 SR2 are not widened by this.
+// ⛔ `dataReference` PRECEDES THE VIEW (kb/Work PB1425, Format 7): `P OF U AS C` reads both as a view of `P OF U` and
+// as the property P of `U AS C`, and §8.4.3.1.4 GR1 applies c) the view before d) OF, so the data reference (whose
+// `propertyObject` suffix carries the view) wins the tie; a qualified DATA name `A OF G AS C` is re-read as the view of
+// that item by the resolver (ReferenceResolver.ResolveObjectProperty). `U AS C` and `SELF AS C` are no data reference,
+// so they still reach `objectView`. The qualified `K OF SUPER` is a data reference too (`selfAndSuper` is SELF | SUPER),
+// and the resolver refuses it here by §8.4.3.8.3 SR3 when K is a class-name. A receiving position never parses an
+// expression, so §8.4.3.8.3 SR2 / §8.4.3.5.3 SR2 are not widened by this.
 primaryExpression
     : numericLiteral
     | ZERO_ARITH                       // figurative ZERO rewritten by token rewriter in arithmetic context
     | functionCall
     | inlineMethodInvocation           // §8.4.3.1.2 Format 4 (§8.4.3.4) — the Format-1 twin above
-    | objectView                       // §8.4.3.1.2 Format 5 (§8.4.3.5)
-    | selfAndSuper                     // §8.4.3.1.2 Format 6's SELF / [object-class-name-1 OF] SUPER (§8.4.3.8)
     | dataReference
+    | objectView                       // §8.4.3.1.2 Format 5 (§8.4.3.5)
+    | selfAndSuper                     // §8.4.3.1.2 Format 6's SELF / SUPER (§8.4.3.8)
     | LPAREN arithmeticExpression RPAREN
     ;
 

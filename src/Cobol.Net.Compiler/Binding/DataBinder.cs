@@ -452,7 +452,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// qualified data reference, whose get/set accessor is a METHOD invocation). Only the binder can tell these from a
     /// subscripted or qualified data item, so it records the decision here once, where it makes it
     /// (<c>IntrinsicBinder.KeywordOmittedFunction</c>, <c>ReferenceResolver.IsFunctionBearing</c>,
-    /// <c>ReferenceResolver.OoTryBindPropertyReference</c>), and the migration-flag pass reads it back for ISO §7.3.14.4
+    /// <c>ReferenceResolver.ResolveObjectProperty</c>), and the migration-flag pass reads it back for ISO §7.3.14.4
     /// GR4 b ("the source element calls any function, or invokes any method") instead of re-deriving the rule from
     /// syntax. Identity-keyed: a node is a call site or it is not.</summary>
     internal HashSet<object> ActivationSites { get; } = new(ReferenceEqualityComparer.Instance);

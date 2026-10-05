@@ -53,8 +53,8 @@ public sealed class OoNameResolutionDriftTests
                 + "b) the operand's interface and each header-listed interface — all names already scope-checked "
                 + "where they were WRITTEN (the data description entry, and RaisingPhrase.Partition's funnel "
                 + "lookup)"),
-        [Path.Combine("Binding", "ReferenceResolver.cs")] =
-            (2, "the property-reference INSTANCE form's re-lookup of the receiving item's declared class, and of its "
+        [Path.Combine("Binding", "ReferenceResolver.ObjectProperty.cs")] =
+            (2, "the property-reference INSTANCE form's re-lookup (RosterOf) of identifier-3's declared class, and of its "
                 + "declared INTERFACE for an interface-typed receiver (kb/Work PB1449) — a descriptor name, scope-checked "
                 + "where the data description entry WROTE it"),
         [Path.Combine("CodeGen", "EmitterState.cs")] =
@@ -122,7 +122,7 @@ public sealed class OoNameResolutionDriftTests
                      Path.Combine("Binding", "DataBinder.Oo.cs"),
                      Path.Combine("Binding", "RaisingPhrase.cs"),                     // PD-header + METHOD-ID RAISING (PB815)
                      Path.Combine("Binding", "Procedure", "Verbs", "OoBinder.cs"),    // INVOKE / SET class-name
-                     Path.Combine("Binding", "ReferenceResolver.cs"),                 // property-ref qualifier
+                     Path.Combine("Binding", "ReferenceResolver.ObjectProperty.cs"),  // property-ref class-name object (PB1425)
                  })
         {
             string text = File.ReadAllText(Path.Combine(TestRepo.Src("Cobol.Net.Compiler"), rel));

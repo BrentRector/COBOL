@@ -94,7 +94,7 @@ internal sealed class ExpressionFormationPass(IDiagnosticSink sink) : CursorFoll
         if (QualifierAfterSuffix(ctx) is { } q)
         {
             using var _ = Sink.At(q);
-            ReportSuffixBeforeQualifier($"{q.GetChild(0).GetText()} {q.cobolWord().GetText()}",
+            ReportSuffixBeforeQualifier($"{q.GetChild(0).GetText()} {q.GetChild(1).GetText()}",
                 ctx.cobolWord()?.GetText());
         }
         return base.VisitChildren(ctx);
@@ -157,12 +157,15 @@ internal sealed class ExpressionFormationPass(IDiagnosticSink sink) : CursorFoll
         "an identifier", DiagnosticCatalog.SuffixBeforeQualifier.IsoSection));
 
     /// <summary>The first qualifier written after a subscript or reference modifier of the same reference, or null.
-    /// A qualification's OWN suffix tail counts: in `E OF T (1) OF G` the `(1)` hangs off `OF T`.</summary>
-    private static CobolParserCore.QualificationContext? QualifierAfterSuffix(CobolParserCore.DataReferenceContext ctx)
+    /// A qualification's OWN suffix tail counts: in `E OF T (1) OF G` the `(1)` hangs off `OF T`. A non-word property
+    /// object (`P (2) OF SELF`, §8.4.3.1.2 Format 7) is an `OF` too: what precedes it is the property-name, which takes
+    /// neither a subscript nor a reference modifier there (kb/Work PB1425).</summary>
+    private static Antlr4.Runtime.ParserRuleContext? QualifierAfterSuffix(CobolParserCore.DataReferenceContext ctx)
     {
         bool suffixSeen = false;
         foreach (var s in ctx.dataReferenceSuffix())
         {
+            if (s.propertyObject() is { } po) { if (suffixSeen) return po; continue; }
             if (s.qualification() is not { } q) { suffixSeen = true; continue; }
             if (suffixSeen) return q;
             suffixSeen = q.subscriptPart().Length > 0 || q.refModPart().Length > 0;

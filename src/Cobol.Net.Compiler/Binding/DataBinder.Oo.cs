@@ -539,17 +539,27 @@ public sealed partial class DataBinder
     }
 
     /// <summary>One RESOLVED object-property reference awaiting its statement-level desugar (deep-dive
-    /// D-P2; ISO §8.4.3.9.4): the synthesized temp the statement bound over, the receiver (a Place for the
-    /// instance form, null for the <c>prop OF Class-name</c> factory form), the accessor symbols found on
-    /// the pinned-name roster (either may be null — SR3/SR4 checked against the CLASSIFIED polarity, not
-    /// eagerly), and the source names for diagnostics. Registered by ReferenceResolver at resolution time,
+    /// D-P2; ISO §8.4.3.9.4): the synthesized temp the statement bound over, the accessors' invocation
+    /// <paramref name="Form"/> and receiver (an object-reference Place for the instance form; null for the
+    /// <c>prop OF Class-name</c> factory form and for SELF / SUPER, which invoke on the current object — §8.4.3.8.4), the
+    /// accessor symbols found on the pinned-name roster (either may be null — SR3/SR4 checked against the CLASSIFIED
+    /// polarity, not eagerly), and the source names for diagnostics. Registered by ReferenceResolver at resolution time,
     /// drained by StatementBinder.OoWrapPropertyOps after the carrying statement binds. <paramref name="InterfaceCsName"/>
     /// is the emitted C# interface of an INTERFACE-typed receiver (kb/Work PB1449) — the accessors are then the
     /// interface's prototypes, which have no owning class, and the interface carries their formals' statics exactly as
-    /// it does for an INVOKE through the same reference; null for a class receiver (each accessor's own class).</summary>
+    /// it does for an INVOKE through the same reference; null for a class receiver (each accessor's own class).
+    /// <para><paramref name="Prelude"/> is what EVALUATES identifier-3 when it is a computed identifier (kb/Work PB1425 —
+    /// an object-view, a function-identifier, a subscript that activates a function): the statement pre-ops its
+    /// binding registered, taken off the statement's pending list so they run immediately before THIS property's
+    /// accessor — §8.4.3.1.4 GR1 applies identifier-3 (a)–c)) before the property (d)), and the property's GET is
+    /// hoisted ahead of every pre-op of the statement (<c>OoWrapPropertyOps</c>), so left on that list they would run
+    /// after the accessor that reads their result.</para>
+    /// <para><paramref name="SelectedByValue"/>: identifier-3 selects its object through a value read at run time (a
+    /// data-name subscript, a function-identifier), which a RECEIVING property cannot yet carry (kb/Work PB2078).</para></summary>
     internal sealed record OoPendingPropertyOp(
-        DataItem Temp, Place? Receiver, string ClassCsName, bool Factory,
-        OoMethodSymbol? Get, OoMethodSymbol? Set, string PropName, string ReceiverName, string? InterfaceCsName = null)
+        DataItem Temp, Bound.InvokeForm Form, Place? Receiver, string ClassCsName,
+        OoMethodSymbol? Get, OoMethodSymbol? Set, string PropName, string ReceiverName,
+        IReadOnlyList<Bound.BoundStatement> Prelude, string? InterfaceCsName = null, bool SelectedByValue = false)
     {
         /// <summary>The emitted type that qualifies <paramref name="accessor"/>'s formal statics at the call site.</summary>
         public string? OwnerCsNameOf(OoMethodSymbol accessor) => InterfaceCsName ?? accessor.Owner?.CsName;

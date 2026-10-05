@@ -48,6 +48,13 @@ public sealed class InlineMethodInvocationOperandDriftTests
     /// built on it (<c>objectReference</c>) offers both, and the pairing fact holds there.</summary>
     private static readonly string[] Definitions = ["functionCall", "inlineMethodInvocation", "objectReferenceTerm"];
 
+    /// <summary>The rules whose slot ISO §8.4.3.1.4 GR1's ORDER makes Format 4 unspellable in, each with that reason —
+    /// not an exclusion rule but a precedence: a Format-4 operand written there belongs to an enclosing identifier.
+    /// <c>propertyObject</c> is Format 7's identifier-3 when a word cannot spell it (kb/Work PB1425): GR1 applies d) "OF
+    /// for object properties" BEFORE e) "the inline method invocation operator", so <c>P OF X :: "M"</c> is the
+    /// invocation of M on the property <c>P OF X</c>, never the property P of <c>X :: "M"</c>.</summary>
+    private static readonly string[] Format4UnspellableByOrder = ["propertyObject"];
+
     /// <summary>rule-name → its body text, over every grammar file, comments stripped.</summary>
     private static Dictionary<string, string> LoadRules()
     {
@@ -78,8 +85,12 @@ public sealed class InlineMethodInvocationOperandDriftTests
     public void EveryRuleAdmittingAFunctionIdentifier_AlsoAdmitsAnInlineMethodInvocation()
     {
         var rules = LoadRules();
+        // An exemption that no longer names a rule offering a function-identifier exempts nothing — and hides a rename.
+        foreach (string exempt in Format4UnspellableByOrder)
+            Assert.True(rules.TryGetValue(exempt, out string? body) && Mentions(body, "functionCall"),
+                $"Format4UnspellableByOrder names '{exempt}', which is no grammar rule offering functionCall");
         var missing = rules
-            .Where(kv => !Definitions.Contains(kv.Key))
+            .Where(kv => !Definitions.Contains(kv.Key) && !Format4UnspellableByOrder.Contains(kv.Key))
             .Where(kv => Mentions(kv.Value, "functionCall") && !Mentions(kv.Value, "inlineMethodInvocation"))
             .Select(kv => kv.Key)
             .ToList();
