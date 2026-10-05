@@ -404,6 +404,19 @@ public static class DiagnosticCatalog
         + "literal-4, and literal-5 shall be alphanumeric literals or national literals and shall be neither "
         + "figurative constants nor zero-length literals.\"",
         "ISO §12.3.8.3 SR1/SR2");
+    // kb/Work PB609: the CALL side of the restricted program-pointer (§13.18.60.4 GR25). The pointer's own
+    // restriction is declared and screened at its TYPEDEF (COBOLNET0881); this is the rule that CONSUMES it.
+    public static readonly DiagnosticDescriptor CallRestrictedProgramPointerSignature = new(
+        "COBOLNET2936", "call-restricted-program-pointer-signature", EditionSeverity.Error,
+        "A CALL whose identifier-1 references a restricted program-pointer names, in its AS phrase, a "
+        + "program-prototype whose signature differs from the signature of the program-prototype the pointer was "
+        + "declared with. ISO §14.9.4.3 syntax rule 14: \"If identifier-1 references a restricted program-pointer, "
+        + "the signature of the program-prototype specified in the definition of that pointer shall be the same as "
+        + "the signature of program-prototype-name-1.\" A restricted program-pointer \"shall contain only the "
+        + "predefined address NULL or the address of a program with the same signature as that identified by the "
+        + "specified program-prototype-name\" (§13.18.60.4 GR25), so the program the CALL activates through it has "
+        + "the pointer's signature, and the AS phrase shall describe that one.",
+        "ISO §14.9.4.3 SR14");
 
     // ── The identification-division AS externalized-name phrase (kb/Work PB303) ─────────────────────
     /// <summary>COBOLNET1794 — the AS-phrase literal's own syntax rule, in whichever id paragraph carries the

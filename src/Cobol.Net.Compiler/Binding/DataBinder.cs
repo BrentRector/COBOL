@@ -4247,9 +4247,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// (ISO §13.18.57.3): <b>SR4</b> — a strongly-typed item shall not be redefined in whole or in part; <b>SR3</b> —
     /// nor renamed in whole or in part. Both → COBOLNET1532. (SR6, the level-1/strong-parent placement rule, is
     /// checked at clone time in <see cref="ExpandType"/>.) An INTERNAL redefine — a REDEFINES that is part of the same
-    /// strong subtree, cloned in from the type template — is legitimate and NOT flagged (its subject and target share
-    /// a strong root); only an EXTERNAL redefinition of a strong item is prohibited.
-    /// <para><b>The carve-out survives §13.18.57.3 SR4's letter — kb/Work PB183's companion derivation, ANSWERED.</b>
+    /// strong subtree, cloned in from the type template — is NOT flagged HERE (its subject and target share a strong
+    /// root), because it is §13.18.44.3 SR14's and <c>Sr12Sr14Violation</c> reports it once, as COBOLNET1697
+    /// (kb/Work PB1282); only an EXTERNAL redefinition of a strong item is §13.18.57.3 SR4's.
+    /// <para><b>Why SR4 does not reach the internal case — kb/Work PB183's companion derivation, ANSWERED.</b>
     /// SR4 reads "If type-name-1 is described with the STRONG phrase, the subject of the entry shall not be implicitly
     /// or explicitly redefined in whole or in part", and the question was whether that overturns the internal carve-out.
     /// It does not, because SR4's SUBJECT is the entry CARRYING the TYPE clause, and §13.18.57.3 SR2 — "A data
@@ -4257,8 +4258,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// description entry or a level 88 entry" — makes a subordinate REDEFINES under a TYPE entry syntactically
     /// unwritable. The only REDEFINES that can reach a strong subtree from outside is <c>01 X REDEFINES S.</c>, which
     /// the loop below already rejects. A REDEFINES written INSIDE the typedef TEMPLATE has no TYPE-clause subject at
-    /// all, so SR4 never reaches it. PB179's cross-root narrowing was correct and needs no change; a positive golden
-    /// (<c>pb183_redefines_in_strong_typedef_ok</c>) guards it against a later "tightening".</para></summary>
+    /// all, so SR4 never reaches it — SR14 does, and a negative
+    /// (<c>pb1282-redefines-in-strong-typedef</c>) guards that.</para></summary>
     internal void CheckStrongTypeDeclarations()
     {
         // ⛔ SR4's IMPLICIT arm (kb/Work PB836): "the subject of the entry shall not be implicitly or explicitly
@@ -7727,12 +7728,17 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// anchor). Returns the violation text (the diagnostic message AND the class RejectReason), or null.
     /// Each arm's message names the arm that actually fired (the skeptic round: a subordinate-to-strong
     /// violation was described as "is a strongly-typed group" — false of the item named).
-    /// <para>⚠ The SR14 "subordinate to a strongly-typed group item" arm fires only when the subject sits
-    /// OUTSIDE the target's strong subtree: a REDEFINES written INSIDE a STRONG typedef template (subject and
-    /// target under one strong root) is the recorded deliberate carve-out `CheckStrongTypeDeclarations`
-    /// documents ("An INTERNAL redefine … is legitimate and NOT flagged") — this screen must not silently
-    /// overturn that determination; whether the §13.18.57.3 SR4 letter overturns IT is [[PB183]]'s companion
-    /// derivation.</para></summary>
+    /// <para>⛔ The SR14 "subordinate to a strongly-typed group item" arm has NO same-root exemption (kb/Work
+    /// PB1282). It once fired only when the subject sat OUTSIDE the target's strong subtree, which no entry can
+    /// do — a subject and its data-name-2 are siblings, so they share one parent and therefore one strong root —
+    /// so the disjunct was vacuous. The one way to meet it is a REDEFINES written inside a STRONG typedef
+    /// template: §13.18.58.4 GR3 makes every subordinate description of the type "assumed by data defined using
+    /// the type-name", so in each TYPE subject the clause is written and its data-name-2 is "an item subordinate to
+    /// a strongly-typed group item" (Annex D.8.3: such items are "subordinate to a type declaration with the STRONG
+    /// phrase", and "any explicit or implicit redefinitions of such data items with less restrictive data
+    /// descriptions are prohibited"). PB183's companion derivation answered §13.18.57.3 SR4 — the subject of the
+    /// TYPE entry — which is a different rule from this one; <c>CheckStrongTypeDeclarations</c> still leaves the
+    /// internal case to this screen so it is reported once.</para></summary>
 
     /// <summary>The outermost strongly-typed item in <paramref name="record"/>'s subtree (the record itself when it
     /// is a TYPE subject naming a STRONG type), or null — the "in whole or in part" population of §13.18.57.3 SR4
@@ -7759,8 +7765,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         if (StrongTypeModel.IsStrongGroup(target))
             return $"'{target.CobolName ?? target.CsName}' is redefined (data-name-2) but is a strongly-typed "
                 + "group item (ISO §13.18.44.3 SR14)";
-        if (StrongTypeModel.StrongRoot(target) is { } tRoot
-            && !ReferenceEquals(StrongTypeModel.StrongRoot(subject), tRoot))
+        if (StrongTypeModel.StrongRoot(target) is { } tRoot)
             return $"'{target.CobolName ?? target.CsName}' is redefined (data-name-2) but is subordinate to "
                 + "the strongly-typed group item "
                 + $"'{tRoot.CobolName ?? tRoot.CsName}' (ISO §13.18.44.3 SR14)";

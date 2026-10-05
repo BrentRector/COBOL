@@ -126,6 +126,16 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
     /// NestedCallables precedent; null in unit-test direct construction and in class-unit binders.</summary>
     public IReadOnlyDictionary<string, ProgramPrototype>? ProgramPrototypes { get; set; }
 
+    /// <summary>A program-prototype-name's bound signature, through the §8.4.6.8 scope table
+    /// (<see cref="ProgramPrototypes"/>) its declaration was already screened against — THE ONE reader every
+    /// signature comparison asks (the SET program-pointer pairs, the address-identifier argument, a restricted
+    /// program-pointer's CALL, kb/Work PB609). Null for a null or unknown name and for a §12.3.8.4 GR10 c)
+    /// external-repository prototype, which <see cref="PrototypeSignatures.Same"/> treats as conforming.</summary>
+    internal CalleeSignature? ProgramSignatureOf(string? prototypeName) =>
+        prototypeName is not null && ProgramPrototypes?.TryGetValue(prototypeName, out var p) == true
+            ? p.Signature
+            : null;
+
     /// <summary>The unit's RECURSIVE attribute — explicit, or inherited per §11.10.4 GR4 (kb/Work PB137:
     /// §14.9.7.3 SR1 bans COMMIT/ROLLBACK in a recursive source element). Set by BinderDriver.</summary>
     public bool UnitRecursive { get; set; }

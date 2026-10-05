@@ -81,7 +81,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
                               : source is { } ptrSend ? StrongTypeModel.PointerRestriction(ptrSend.Item)
                               : default;
         string senderText = toNull ? "NULL"
-            : (send.dataAddressIdentifier()?.dataReference() ?? send.dataReference()).GetText();
+            : DataBinder.WrittenText(send.dataAddressIdentifier()?.dataReference() ?? send.dataReference());
 
         var receivers = new List<BoundPointerReceiver>(sa.setAddressReceiver().Length);
         foreach (var r in sa.setAddressReceiver())
@@ -119,7 +119,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             // data-pointer, identifier-6 shall be the predefined address NULL or shall reference a data-pointer
             // restricted to the same type") and SR20's converse, which the ADDRESS OF sender supplies through
             // §8.4.3.11.4 GR2. ⛔ TO NULL is admitted by SR19's own words and is screened by neither.
-            if (!toNull && !ScreenPointerReceiverRestriction(tp, dref.GetText(), senderRestriction, senderText,
+            if (!toNull && !ScreenPointerReceiverRestriction(tp, DataBinder.WrittenText(dref), senderRestriction, senderText,
                                                             addressSender: address is not null))
                 return BoundRejected.Reported(ctx.Edition);
             receivers.Add(new BoundPointerReceiver(tp, null));
@@ -181,14 +181,17 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
     ///         identifier-6 is restricted." With data-name-1 as the receiver there IS no identifier-5, so the second
     ///         leg is the only one: an UNTYPED based item over a restricted pointer would otherwise read the typed
     ///         storage through a window with no type, which is exactly the Annex D.9.2.2 guarantee a restricted
-    ///         data-pointer exists to give. "A typed item of the type" is data-name-1's TYPE clause, or — for a
-    ///         restricted pointer, whose type sentence 1 reads as what it is restricted to — that restriction.</item>
+    ///         data-pointer exists to give. "A typed item of the type" is data-name-1's TYPE clause — for a
+    ///         restricted pointer too, whose own type is the TYPEDEF it was declared with.</item>
     /// </list></summary>
     private bool ScreenBasedReceiverRestriction(DataItem based, StrongTypeModel.TypeRestriction senderRestriction,
         string senderText, bool addressSender)
     {
-        var needed = StrongTypeModel.StrongGroupType(based) is { IsRestricted: true } sg
-            ? sg : StrongTypeModel.PointerRestriction(based);
+        // "The type of data-name-1" — the SAME derivation §8.4.3.11.4 GR2 spends on "the type of identifier-1", because
+        // the address SET ADDRESS OF stores is exactly what ADDRESS OF data-name-1 would yield: a strongly-typed
+        // group's type, or, for a restricted pointer, the pointer item's OWN type (the TYPEDEF it was declared with),
+        // never the type its value addresses (kb/Work PB1408).
+        var needed = StrongTypeModel.AddressOfRestriction(based);
         if (needed.IsRestricted && !StrongTypeModel.SameRestriction(needed, senderRestriction))
         {
             RejectRestriction(senderText,
@@ -197,8 +200,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             return false;
         }
         if (senderRestriction.IsRestricted
-            && !StrongTypeModel.SameRestriction(StrongTypeModel.TypedItemType(based), senderRestriction)
-            && !StrongTypeModel.SameRestriction(needed, senderRestriction))
+            && !StrongTypeModel.SameRestriction(StrongTypeModel.TypedItemType(based), senderRestriction))
         {
             RejectRestriction(senderText,
                 $"the sender{(addressSender ? " (ADDRESS OF a strongly-typed group — §8.4.3.11.4 GR2)" : "")} is a "
@@ -287,7 +289,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             string? formalProto = formal.Pic?.RestrictedPrototypeName;
             if (formalProto is null && pa.Prototype is null) return null;
             return formalProto is null || pa.Prototype is null
-                   || !PrototypeSignatures.Same(PrototypeSignature(formalProto), PrototypeSignature(pa.Prototype))
+                   || !PrototypeSignatures.Same(host.ProgramSignatureOf(formalProto), host.ProgramSignatureOf(pa.Prototype))
                 ? $"one is a RESTRICTED program-pointer and the other is not restricted to a program-prototype of "
                   + $"the same signature (argument: {pa.Prototype ?? "unrestricted"}; formal: "
                   + $"{formalProto ?? "unrestricted"}) — ISO §14.8.2.3.2; §8.4.3.13.4 GR3"
@@ -295,11 +297,6 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
         }
         return null;
     }
-
-    /// <summary>A program-prototype-name's bound signature through the §8.4.6.8 scope table (null for a
-    /// §12.3.8.4 GR10 c) prototype, which <see cref="PrototypeSignatures.Same"/> treats as conforming).</summary>
-    private CalleeSignature? PrototypeSignature(string prototypeName) =>
-        host.ProgramPrototypes?.TryGetValue(prototypeName, out var p) == true ? p.Signature : null;
 
     /// <summary>The operand half of <see cref="BindDataAddress"/>: resolve (ISO §8.4.3.11.3 SR1's sections, the
     /// subscripts, a reference modifier), screen the resolved operand once (<see cref="AddressOfOperandScreen"/> — SR1
@@ -311,7 +308,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             // The resolver's own §8.4.2.3.3 screen already named the rule (kb/Work PB681) — once per reference.
             if (ctx.Refs.WasDiagnosed(addrRef)) return null;
             ctx.Edition.Error(DiagnosticCatalog.PointerOperandShape,
-                $"ADDRESS OF '{addrRef.GetText()}': identifier-1 shall reference a data item defined in the file, "
+                $"ADDRESS OF '{DataBinder.WrittenText(addrRef)}': identifier-1 shall reference a data item defined in the file, "
                 + "working-storage, local-storage or linkage section (ISO §8.4.3.11.3 SR1) — the operand names "
                 + "none (an undeclared name, a SCREEN SECTION or REPORT SECTION entry, a constant-name or a special "
                 + "register) or is mis-subscripted (ISO §8.4.2.3)");
@@ -339,7 +336,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
                 ? reason
                 : "an OCCURS-resident anchor — named increment residue";
             ctx.Edition.Error(DiagnosticCatalog.PointerOperandShape,
-                $"ADDRESS OF '{addrRef.GetText()}': the operand's record could not be placed on addressable "
+                $"ADDRESS OF '{DataBinder.WrittenText(addrRef)}': the operand's record could not be placed on addressable "
                 + $"cell storage ({why}; ISO §8.4.3.11)");
             return null;
         }
@@ -398,7 +395,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             // being half-enforced: Form 1 and Form 2 are separate code paths.
             if (StrongTypeModel.PointerRestriction(returning.Item) is { IsRestricted: true } charsRestriction)
             {
-                RejectRestriction(drefs[^1].GetText(),
+                RejectRestriction(DataBinder.WrittenText(drefs[^1]),
                     $"the RETURNING data item is a data-pointer restricted to type '{charsRestriction}', which "
                     + "ALLOCATE … CHARACTERS cannot satisfy — it specifies no data-name-1 to supply that type "
                     + "(ISO §14.9.3.3 SR4)");
@@ -433,17 +430,17 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             var basedType = StrongTypeModel.TypedItemType(based);
             if (strongType.IsRestricted && !StrongTypeModel.SameRestriction(strongType, returningRestriction))
             {
-                RejectRestriction(drefs[^1].GetText(),
-                    $"'{basedRef.GetText()}' is a strongly-typed group item of type '{strongType}', so the "
+                RejectRestriction(DataBinder.WrittenText(drefs[^1]),
+                    $"'{DataBinder.WrittenText(basedRef)}' is a strongly-typed group item of type '{strongType}', so the "
                     + "RETURNING data item shall be a data-pointer restricted to that type (ISO §14.9.3.3 SR5)");
                 return BoundRejected.Reported(ctx.Edition);
             }
             if (returningRestriction.IsRestricted
                 && !StrongTypeModel.SameRestriction(returningRestriction, basedType))
             {
-                RejectRestriction(drefs[^1].GetText(),
+                RejectRestriction(DataBinder.WrittenText(drefs[^1]),
                     $"the RETURNING data item is a data-pointer restricted to type '{returningRestriction}', so "
-                    + $"'{basedRef.GetText()}' shall reference a typed data item of that type — it is "
+                    + $"'{DataBinder.WrittenText(basedRef)}' shall reference a typed data item of that type — it is "
                     + $"{(basedType.IsRestricted ? $"of type '{basedType}'" : "untyped")} (ISO §14.9.3.3 SR4)");
                 return BoundRejected.Reported(ctx.Edition);
             }

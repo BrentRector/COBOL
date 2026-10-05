@@ -14,6 +14,7 @@ namespace CobolNet.Tests.Unit;
 /// [0, 2^128), and the signed Int128 decode lane returns every value at or above 2^127 as a NEGATIVE number, so
 /// both SORT forms need the unsigned lane: the runtime key column (Format 1 and MERGE) and the emitted table
 /// comparer (Format 2), which now decodes through the ONE windowed reader instead of a private copy.</summary>
+[Collection("process-globals")]   // CobolSort's file-name store is one static Dictionary: a class that Init/Close-es a sort file while another's RETURN enumerates it throws "Collection was modified" (wave 1021 gate)
 public sealed class SortNumericKeyLaneTests
 {
     private static NumProfile Binary(int width, bool signed) => new()

@@ -150,7 +150,26 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 // P10 Step 7); any OTHER class is rejected here (kb/Work PB132 — the old arm read the category
                 // only to set the pointer flag, and a numeric or boolean target fell through to a garbage
                 // name-string read at run time).
-                if (place.Item.Pic?.Category is PicCategory.ProgramPointer) isPointerTarget = true;
+                if (place.Item.Pic is { Category: PicCategory.ProgramPointer } pointerPic)
+                {
+                    isPointerTarget = true;
+                    // §14.9.4.3 SR14 (Format 2): "If identifier-1 references a restricted program-pointer, the
+                    // signature of the program-prototype specified in the definition of that pointer shall be the
+                    // same as the signature of program-prototype-name-1." — the pointer's own prototype
+                    // (§13.18.60.3 SR19 / §13.18.60.4 GR25, PicInfo.RestrictedPrototypeName) against the AS phrase's,
+                    // through the ONE signature comparator and the ONE name-to-signature reader the SET
+                    // program-pointer pairs spend. An unrestricted pointer has no prototype to disagree with, and
+                    // a prototype with no compile-time signature (§12.3.8.4 GR10 c)) is the run unit's to match.
+                    if (prototype is { } named && pointerPic.RestrictedPrototypeName is { } held
+                        && !PrototypeSignatures.Same(host.ProgramSignatureOf(held), named.Signature))
+                    {
+                        return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.CallRestrictedProgramPointerSignature,
+                            $"CALL {DataBinder.WrittenText(dref)} AS {named.Name}: '{DataBinder.WrittenText(dref)}' is a "
+                            + $"restricted program-pointer declared with program-prototype '{held}', and the signature of "
+                            + $"'{held}' is not the same as the signature of program-prototype-name-1 '{named.Name}' "
+                            + "(ISO §14.9.4.3 SR14; §13.18.60.4 GR25)");
+                    }
+                }
                 else if (IntrinsicArgumentRules.ClassOf(new BoundFieldOperand(place))
                          is { } tCls and not (CobolClass.Alphanumeric or CobolClass.National))
                 {

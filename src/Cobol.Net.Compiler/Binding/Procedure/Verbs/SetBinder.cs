@@ -675,7 +675,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
                 // compile-time signature, which PrototypeSignatures.Same deliberately lets through.
                 string? senderProto = sender.Pic?.RestrictedPrototypeName;
                 return senderProto is null
-                       || !PrototypeSignatures.Same(ProgramSignatureOf(targetProto), ProgramSignatureOf(senderProto))
+                       || !PrototypeSignatures.Same(host.ProgramSignatureOf(targetProto), host.ProgramSignatureOf(senderProto))
                     ? $"the receiving program-pointer is restricted to program-prototype '{targetProto}' and the sender "
                       + $"{(senderProto is null ? "is unrestricted" : $"to '{senderProto}'")}, so the associated "
                       + "program-prototypes do not have the same signature (ISO §14.9.39.3 SR22; §13.18.60.4 GR25)"
@@ -690,15 +690,6 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
                 return null;
         }
     }
-
-    /// <summary>A program-prototype-name's bound signature, through the §8.4.6.8 scope table the declaration was
-    /// already screened against (<c>StatementBinder.ProgramPrototypes</c>, kb/Work PB237 — its hit's Signature is
-    /// null for a §12.3.8.4 GR10 c) external-repository prototype, which <see cref="PrototypeSignatures.Same"/>
-    /// treats as conforming). The function twin is <see cref="FunctionSignatureOf"/>.</summary>
-    private CalleeSignature? ProgramSignatureOf(string? prototypeName) =>
-        prototypeName is not null && host.ProgramPrototypes?.TryGetValue(prototypeName, out var p) == true
-            ? p.Signature
-            : null;
 
     /// <summary>SET function-pointer assignment (ISO §14.9.39.2 Format 8; §14.9.39.3 SR20 — every target AND the
     /// sender shall be category function-pointer, the sender may be the predefined address NULL, and "the
@@ -1050,8 +1041,8 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         // §8.4.3.13.4 GR3's — the prototype arm only. Captured before the arms so both can answer it.
         string? receiverProto = targets[0].Item.Pic?.RestrictedPrototypeName;
         foreach (var t in targets)
-            if (!PrototypeSignatures.Same(ProgramSignatureOf(receiverProto),
-                                          ProgramSignatureOf(t.Item.Pic?.RestrictedPrototypeName)))
+            if (!PrototypeSignatures.Same(host.ProgramSignatureOf(receiverProto),
+                                          host.ProgramSignatureOf(t.Item.Pic?.RestrictedPrototypeName)))
             {
                 // SR22 binds the receivers to ONE sender, so two receivers restricted to differently-signed
                 // prototypes cannot both conform to it — the SR20 argument on the function twin, verbatim.
@@ -1068,7 +1059,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
             // GR3: this identifier is a program-pointer RESTRICTED to `word`. SR22 then requires the
             // receiver's prototype to have the same signature — an unrestricted receiver meets no condition.
             if (receiverProto is not null
-                && !PrototypeSignatures.Same(ProgramSignatureOf(receiverProto), ProgramSignatureOf(word)))
+                && !PrototypeSignatures.Same(host.ProgramSignatureOf(receiverProto), host.ProgramSignatureOf(word)))
             {
                 return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.PrototypePointerSignature,
                     $"SET '{targets[0].Item.CobolName}' TO ADDRESS OF PROGRAM {word}: the receiving "

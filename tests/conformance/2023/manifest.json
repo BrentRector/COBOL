@@ -208,7 +208,6 @@
   "pb152_options_initialize_arm_agreement",
   "pb183_usage_index_in_group_ok",
   "pb183_usage_pointer_placement_ok",
-  "pb183_redefines_in_strong_typedef_ok",
   "pb153_restricted_pointer",
   "pb271_float_receiver_overflow",
   "pb169_status_operand_shapes",

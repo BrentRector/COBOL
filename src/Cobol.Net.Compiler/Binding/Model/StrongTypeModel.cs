@@ -99,11 +99,17 @@ public static class StrongTypeModel
         bool aIsSubject = ReferenceEquals(ra, a), bIsSubject = ReferenceEquals(rb, b);
         if (aIsSubject != bIsSubject) return false;
         if (!EquivalentTypeDeclarations(ra, rb)) return false;
-        if (aIsSubject) return true;                                     // alternative 1
-        // Alternative 2 — "starting at the same relative byte or bit position and having the same length in
-        // bytes or bits". BITS is the unit that expresses both (§8.5.1.6.3 places bit items at bit positions),
-        // and the placement walk is BitLayout's ONE §8.5.1.6.3 cursor — never a second geometry here.
-        int pa = BitLayout.StartBitOf(ra, a), pb = BitLayout.StartBitOf(rb, b);
+        return aIsSubject || SamePosition(ra, a, rb, b);                 // alternative 1 | alternative 2
+    }
+
+    /// <summary>§8.5.3.1's second alternative past the equivalence of the declarations — "starting at the same
+    /// relative byte or bit position and having the same length in bytes or bits". BITS is the unit that expresses
+    /// both (§8.5.1.6.3 places bit items at bit positions), and the placement walk is BitLayout's ONE §8.5.1.6.3
+    /// cursor — never a second geometry here. Asked by <see cref="SameType"/> of two OPERANDS and by
+    /// <see cref="SameRestriction"/> of the two subordinate members a pair of restrictions name.</summary>
+    private static bool SamePosition(DataItem declA, DataItem a, DataItem declB, DataItem b)
+    {
+        int pa = BitLayout.StartBitOf(declA, a), pb = BitLayout.StartBitOf(declB, b);
         return pa >= 0 && pa == pb && BitLayout.RunBits(a) == BitLayout.RunBits(b);
     }
 
@@ -259,13 +265,29 @@ public static class StrongTypeModel
     /// <param name="Declaration">The type declaration the name resolves to, when the model has it: a TYPE
     /// subject's anchor, or the TYPEDEF template <c>DataBinder.ResolveRestrictedTypes</c> attached. Null when
     /// only the name is known.</param>
-    public readonly record struct TypeRestriction(string? Name, DataItem? Declaration)
+    /// <param name="Member">Null for an item DESCRIBED WITH a TYPE clause (§8.5.3.1's first alternative: the type
+    /// is the declaration). The item itself for one DESCRIBED AS A SUBORDINATE item of a type declaration (the
+    /// second alternative: the type is the declaration PLUS the item's relative position and length in it), so
+    /// "the type of" a strongly-typed group nested inside a strong record is that group's own and never the whole
+    /// record's (§8.4.3.11.4 GR2).</param>
+    public readonly record struct TypeRestriction(string? Name, DataItem? Declaration, DataItem? Member = null)
     {
         /// <summary>True when this is a restriction at all (Annex D.9.2.2 — an ordinary data-pointer is not).</summary>
         public bool IsRestricted => Name is not null;
 
+        /// <summary>The identity two same-type restrictions share, as one string: the upper-cased type-name, and
+        /// for a subordinate member the §8.5.3.1 second alternative's position and length in bits — the form a
+        /// conformance DESCRIPTOR spells it in, so a descriptor never equates a record's address with its
+        /// subordinate group's.</summary>
+        public string Key => Name is null ? "*"
+            : Member is { } m && Declaration is { } d
+                ? $"{Name.ToUpperInvariant()}@{BitLayout.StartBitOf(d, m)}:{BitLayout.RunBits(m)}"
+                : Name.ToUpperInvariant();
+
         /// <inheritdoc/>
-        public override string ToString() => Name ?? "(unrestricted)";
+        public override string ToString() => Name is null ? "(unrestricted)"
+            : Member is null ? Name
+            : $"{Member.CobolName ?? Member.CsName} (a subordinate item of type '{Name}')";
     }
 
     /// <summary>The type a DATA-POINTER ITEM's value is restricted to — Annex D.9.2.2 source 1, the declared
@@ -295,9 +317,20 @@ public static class StrongTypeModel
     /// (<c>AddressOfOperandScreen</c>, kb/Work PB1407), so a strong record's only address is the group's own, the
     /// restricted data-pointer this method returns for it. (This used to say a leaf's address "is UNRESTRICTED and
     /// must stay legal" — the opposite of SR2, and the reason a strong-record leaf could be addressed through an
-    /// untyped BASED view.)</para></summary>
+    /// untyped BASED view.)</para>
+    /// <para>⛔ "THE TYPE OF identifier-1" IS THE OPERAND'S OWN TYPE, AND NEVER WHAT IT POINTS TO OR ENCLOSES (kb/Work
+    /// PB1408). A restricted data-pointer RP is a typed item whose type is the TYPEDEF it was declared with (§13.18.60.3
+    /// SR18 admits the restriction only in a type declaration, so RP always carries a TYPE clause: <c>01 RP TYPE
+    /// PT</c> with <c>PT IS TYPEDEF USAGE POINTER TO T-REC</c> is of type PT) — the address of RP is restricted to
+    /// PT, not to T-REC, which is the type of the item RP's VALUE addresses. (Reading the restriction RP carries
+    /// answered "restricted to T-REC", refusing <c>SET PP TO ADDRESS OF RP</c> for a PP restricted to PT and admitting
+    /// <c>SET ADDRESS OF BS TO ADDRESS OF RP</c> for a T-REC-typed BS.) And a strongly-typed group NESTED in a strong
+    /// record is typed by its position (<see cref="TypedItemType"/>'s <see cref="TypeRestriction.Member"/>), not as
+    /// the enclosing record.</para></summary>
     public static TypeRestriction AddressOfRestriction(DataItem operand) =>
-        StrongGroupType(operand) is { IsRestricted: true } r ? r : PointerRestriction(operand);
+        StrongGroupType(operand) is { IsRestricted: true } r ? r
+        : PointerRestriction(operand).IsRestricted ? TypedItemType(operand)
+        : default;
 
     /// <summary>"Restricted to the same type" (§14.9.39.3 SR19, §14.8.2.3.2, §14.9.3.3 SR4/SR5) — the same
     /// §8.5.3.1 relation every other same-type rule spends, asked of the identity a restriction carries: the
@@ -309,14 +342,21 @@ public static class StrongTypeModel
         a.IsRestricted && b.IsRestricted
         && CobolNames.Same(a.Name, b.Name)
         && (a.Declaration is null || b.Declaration is null
-            || EquivalentTypeDeclarations(a.Declaration, b.Declaration));
+            || EquivalentTypeDeclarations(a.Declaration, b.Declaration))
+        // §8.5.3.1's two alternatives never mix: a type declaration's own type and a position inside one are not
+        // the same type, and two positions are when they start and run alike in equivalent declarations.
+        && (a.Member is null) == (b.Member is null)
+        && (a.Member is not { } ma || b.Member is not { } mb
+            || (a.Declaration is { } da && b.Declaration is { } db && SamePosition(da, ma, db, mb)));
 
     /// <summary>The type a TYPED data item is of — §14.9.3.3 SR4's "shall reference a typed data item, and the
     /// data item referenced by data-name-2 shall be restricted to the type of data-name-1", whose antecedent is
     /// TYPED, strongly or weakly. <see langword="default"/> when the item is untyped. The declaration travels
     /// with the name: the anchor's own subtree IS the type declaration.</summary>
     public static TypeRestriction TypedItemType(DataItem item) =>
-        TypeAnchor(item) is { } anchor ? new TypeRestriction(anchor.TypeName, anchor) : default;
+        TypeAnchor(item) is { } anchor
+            ? new TypeRestriction(anchor.TypeName, anchor, ReferenceEquals(anchor, item) ? null : item)
+            : default;
 
     /// <summary>The type a strongly-typed group item IS (§14.9.3.3 SR5's "the type of data-name-1"), or
     /// <see langword="default"/> when the item is not a strongly-typed group. ⛔ SR4 and SR5 ask about

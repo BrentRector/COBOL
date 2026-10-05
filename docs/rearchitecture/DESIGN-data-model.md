@@ -443,12 +443,22 @@ of addresses, pointers, and based items."
    on `PicInfo.RestrictedTypeName`, read by `StrongTypeModel.PointerRestriction`.
 2. `ADDRESS OF identifier-1` where identifier-1 is a strongly-typed group item or another restricted data-pointer.
    Normative at §8.4.3.11.4 GR2. **This source needs no grammar at all** and was violable from the day strong
-   TYPEDEF landed — `StrongTypeModel.AddressOfRestriction`.
+   TYPEDEF landed — `StrongTypeModel.AddressOfRestriction`. ⛔ "**The type of identifier-1**" is identifier-1's OWN
+   type (`TypedItemType`): for a restricted data-pointer RP declared `TYPE PT` that is PT, never T-REC, the type the
+   pointer's VALUE addresses (`PointerRestriction`, which answers a different question — what a pointer item may
+   hold). One accessor, so `SET PP TO ADDRESS OF RP` (PP restricted to PT) is legal, `SET ADDRESS OF BS TO ADDRESS OF
+   RP` (BS typed T-REC) is not, and SR19's data-name-1 side (`SET ADDRESS OF based …`) asks the same accessor
+   (kb/Work PB1408).
 
 A restriction carries a **`TypeRestriction`** — the type NAME the restriction is spelled with (§13.18.60.4 GR23
 states it as `type-name-1`) together with the type DECLARATION that name resolves to. A restriction is to a TYPE,
-not to a member position, so `SameRestriction` is declaration equivalence and deliberately NOT `SameType`, whose
-second alternative answers the different question of whether two OPERANDS occupy corresponding positions. Within one
+so `SameRestriction` is declaration equivalence and deliberately NOT `SameType`, whose second alternative answers
+the different question of whether two OPERANDS occupy corresponding positions. The one exception is the type of
+an item DESCRIBED AS A SUBORDINATE of a type declaration rather than with a TYPE clause (a strongly-typed group nested in
+a strong record): by §8.5.3.1's second alternative its type is the declaration plus its relative position and
+length in it, carried as `TypeRestriction.Member`, and `SameRestriction` then also compares position and length
+(through the same `SamePosition` `SameType` asks), so the address of a nested group is never "of the type of the whole
+record" (kb/Work PB1408). Within one
 source element §13.18.58 makes a type-name unique, so the name alone decides; ACROSS source elements two
 declarations may share a name and differ, which is why the declaration travels with it —
 `DataBinder.ResolveRestrictedTypes` (the tail of the ONE `ExpandTypes` pass) attaches it to

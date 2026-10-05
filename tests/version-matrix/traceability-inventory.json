@@ -7281,13 +7281,13 @@
   "ordinal": 2,
   "subject": "Data-address-identifier",
   "rule-digest": "9f2a3546a683",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/StrongTypeModel.cs#AddressOfRestriction; src/Cobol.Net.Compiler/Binding/Model/StrongTypeModel.cs#StrongGroupType; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#BindSetAddress; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#AddressConformanceReason",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/StrongTypeModel.cs#AddressOfRestriction; src/Cobol.Net.Compiler/Binding/Model/StrongTypeModel.cs#TypedItemType; src/Cobol.Net.Compiler/Binding/Model/StrongTypeModel.cs#SameRestriction; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#ScreenBasedReceiverRestriction",
+  "test-ref": "conformance:2002/pb1408_address_of_restricted_pointer; conformance:negative/pb1408-set-address-of-based-from-restricted-pointer-address; conformance:negative/pb1408-set-address-of-based-from-subordinate-strong-group; conformance:negative/pb1408-call-address-of-restricted-pointer-into-target-formal",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1408 (registrar 15b). GR2 \"If identifier-1 is a strongly-typed group item or a restricted data-pointer, the data-address-identifier is a restricted data-pointer that is restricted to the type of identifier-1\" (cite.py OK 2)); Annex D.9.2.2 (cite.py --check D.9.2.2 OK): restricted pointers exist so data of one type cannot be treated as another. The level-1 strong-group arm works (G2N: SET plain P TO ADDRESS OF S -> 0869; G4 likewise). But AddressOfRestriction returns the WRONG type in two arms: (a) identifier-1 a restricted data-pointer RP TYPE PT (PT TYPEDEF USAGE POINTER TO T-REC): the code restricts ADDRESS OF RP to T-REC (PointerRestriction = the pointer's TARGET) instead of RP's own type PT. Probe G3: `SET ADDRESS OF BS TO ADDRESS OF RP` with BS TYPE T-REC BASED compiles and runs (ACCEPTED) - a T-REC view over a pointer cell; expected COBOLNET0869 per §14.9.39.3 SR19 second sentence. Probe G5 (legal): PPT TYPEDEF USAGE POINTER TO PT, PP TYPE PPT, `SET PP TO ADDRESS OF RP` is REFUSED 0869 ('restricted to type PT, so the sender shall be ... restricted to the same type') - rejects legal source. (b) identifier-1 a strongly-typed SUBORDINATE group (T-G of S, T-REC STRONG with T-X at offset 0-1, T-G at 2): restricted to 'T-REC' (StrongGroupType -> TypedItemType -> the enclosing anchor's name), so probe G7 `SET ADDRESS OF BS TO ADDRESS OF T-G OF S` compiles and only fails at run time with EC-BOUND-PTR; the address of T-G is not a T-REC. See finding 'restriction type of ADDRESS OF'.",
-  "state": "GAP"
+  "notes": "kb/Work PB1408 landed: both arms fixed at the one accessor (AddressOfRestriction), and SET ADDRESS OF's data-name-1 side (SR19 second sentence) now asks the same accessor, so a based restricted pointer is of its own type there too. Derivation: GR2: the data-address-identifier is restricted to 'the type of identifier-1'. A restricted data-pointer is a typed item (13.18.60.3 SR18 admits the restriction only in a type declaration, reached by TYPE), so its type is its own TYPEDEF (TypedItemType), never the type its value addresses; a strongly-typed group nested in a strong record is typed by its position in the declaration (8.5.3.1 second alternative: TypeRestriction.Member). One accessor feeds SET Format 7 sender and receiver, the CALL/INVOKE address-identifier argument and the conformance descriptor key.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.12.3-1",
@@ -26601,13 +26601,13 @@
   "ordinal": 14,
   "subject": "REDEFINES clause",
   "rule-digest": "863a45fa61a9",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#Sr12Sr14Violation; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CheckStrongTypeDeclarations",
-  "test-ref": "conformance:negative/pb179-redefines-pointer-target",
+  "test-ref": "conformance:negative/pb179-redefines-pointer-target; conformance:negative/pb1282-redefines-in-strong-typedef; conformance:2002/pb1282_redefines_in_weak_typedef_ok",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Owned by kb/Work PB1282. SR14 (cite.py --check 13.18.44.3 'Data-name-2 shall not be of class object, message-tag, or pointer, a strongly-typed group item, or an item subordinate to a strongly-typed group item.' OK). VERIFIED arms: pointer target (pb179 golden), object-reference target (probe sr14_objref_target -> COBOLNET1697 SR14), strongly-typed group target (sr14_strong_target `01 S TYPE T. 01 R REDEFINES S PIC X(4).` -> 1697 + 1532), subordinate-to-strong from OUTSIDE the strong root. DEFECTIVE arm: Sr12Sr14Violation exempts a target whose StrongRoot equals the subject's (`!ReferenceEquals(StrongRoot(subject), tRoot)`), so a REDEFINES written INSIDE a TYPEDEF STRONG template is accepted: probe sr14_in_template `01 T IS TYPEDEF STRONG. 05 X PIC X(4). 05 Y REDEFINES X PIC X(4). 01 S TYPE T.` compiles and runs (ABCD). §13.18.58.4 GR3 (--check OK: 'All other data description clauses and subordinate data descriptions are assumed by data defined using the type-name.') makes Y's REDEFINES X part of S, a strongly-typed group item, so data-name-2 X IN S is 'an item subordinate to a strongly-typed group item'. Since §13.18.57.3 SR2 (--check OK) forbids written subordinates under a TYPE entry, the template is the ONLY way this SR14 disjunct can ever be met - the exemption makes it vacuous. The landed PB183 derivation (golden conformance:2023/pb183_redefines_in_strong_typedef_ok) answered §13.18.57.3 SR4, a DIFFERENT rule, and never quotes §13.18.44.3 SR14's subordinate disjunct - the real-clause-different-question failure mode; that golden pins the non-conforming acceptance and must flip with the fix. Message-tag arm: declined facility (COBOLNET1943). (finding: strong-template-internal-redefines). || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (object/pointer classes and strongly-typed group items arrive in 2002; message-tag is 2023)",
-  "state": "GAP"
+  "notes": "kb/Work PB1282 landed: the same-root exemption is gone; golden pb183_redefines_in_strong_typedef_ok flipped to the negative pb1282-redefines-in-strong-typedef (13.18.57.3 SR4 stays with CheckStrongTypeDeclarations for an EXTERNAL redefinition). Derivation: SR14's last disjunct, an item subordinate to a strongly-typed group item, can only be met by a REDEFINES written inside a STRONG typedef template (13.18.57.3 SR2 forbids a subordinate entry under a TYPE entry; subject and data-name-2 are siblings and share one strong root), which 13.18.58.4 GR3 makes part of every TYPE subject; the same-root exemption made the disjunct vacuous and is removed. A REDEFINES in a weak template stays legal.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.44.3-15",
@@ -34971,13 +34971,13 @@
   "ordinal": 14,
   "subject": "CALL statement",
   "rule-digest": "1875e126ec16",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#BindCall; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntry",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs#BindCall; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs#ProgramSignatureOf; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#CallRestrictedProgramPointerSignature",
+  "test-ref": "conformance:2002/pb609_call_restricted_program_pointer; conformance:negative/pb609-call-restricted-program-pointer-signature",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "RESIDUE NARROWED, NOT CLOSED (kb/Work PB237). The rule needs BOTH of its operands and now exactly ONE of them exists. (b) program-prototype-name-1 IS declarable and resolvable as of this change: 12.3.8.2's program-specifier is in repositoryEntry, BinderDriver.ProgramPrototypesOf resolves it through 12.3.8.4 GR10, and CallBinder.ResolvePrototype carries a ProgramPrototype whose Signature is the callee's CalleeSignature whenever GR10 a) found the definition in the compilation group - so the RIGHT-HAND side of SR14's comparison is in hand. (a) The RESTRICTED PROGRAM-POINTER is still absent and is a SEPARATE mechanism: 13.18.60 GR25's `USAGE PROGRAM-POINTER TO program-prototype-name-1` is still staged loud at DECLARATION by DiagnosticCatalog.ProgramPointerRestricted, its 13.18.60.3 SR19 shape rule (\"If program-prototype-name-1 is specified, the TYPEDEF clause shall be specified for the subject of the entry\") is unimplemented, and no carrier exists on DataItem for the restriction - StrongTypeModel.PointerRestriction answers only for a data-pointer's PicCategory.Pointer RestrictedTypeName. Until an item can BE a restricted program-pointer there is no left-hand side to compare, and BindCall's only program-pointer logic remains the single isPointerTarget assignment. That is a DATA DIVISION usage feature with its own rules (13.18.60 SR19/SR22/GR25, plus the SET and ADDRESS OF PROGRAM screens 8.4.3's program-address-identifier GR3 implies), not a residue of the prototype registry. Ground rule 6 keeps it NOT-IMPLEMENTED. EDITIONS 2002+ : program prototypes and restricted program-pointers are both COBOL-2002.",
-  "state": "GAP"
+  "notes": "kb/Work PB609 landed (COBOLNET2936). The declaration half landed earlier with PB452/PB817. Derivation: Format 2 CALL identifier-1 AS program-prototype-name-1 with identifier-1 a restricted program-pointer: the signature of the pointer's own program-prototype (PicInfo.RestrictedPrototypeName, 13.18.60.4 GR25) shall equal the AS phrase's, compared by the one PrototypeSignatures.Same through the one name-to-signature reader. An unrestricted pointer and a prototype with no compile-time signature (12.3.8.4 GR10 c) are not decided here.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.4.3-15",

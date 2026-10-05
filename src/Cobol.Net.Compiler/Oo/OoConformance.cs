@@ -567,7 +567,7 @@ public static class OoConformance
         : ProgramPointerKey(address.Program!.Prototype);
 
     private static string DataPointerKey(StrongTypeModel.TypeRestriction r) =>
-        "P:D:" + (r.IsRestricted ? r.Name!.ToUpperInvariant() : "*");
+        "P:D:" + r.Key;
 
     private static string ProgramPointerKey(string? prototype) =>
         "P:P:" + (prototype is null ? "*" : prototype.ToUpperInvariant());
