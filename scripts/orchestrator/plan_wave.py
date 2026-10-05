@@ -148,12 +148,14 @@ def git_branch_classifier() -> Callable[[str], str]:
 
 
 def unlanded_branch_notes(open_ids: set[str]) -> dict[str, list[str]]:
-    """{UNLANDED branch: [open note ids its commit subjects name]} over every local branch."""
+    """{UNLANDED or CHECK branch: [open note ids its commit subjects name]} over every local branch. CHECK (a C# name
+    the branch declares is missing from main) is unlanded work until someone reads it: wave 1017's group B branch,
+    which only edited existing files, classified CHECK, and its WIP would have been planned over from main."""
     import prune_worktrees  # noqa: PLC0415
     names = prune_worktrees.main_names()
     out = {}
     for b in prune_worktrees.git("branch", "--format=%(refname:short)").stdout.split():
-        if b == "main" or prune_worktrees.classify(b, names)[0] != "UNLANDED":
+        if b == "main" or prune_worktrees.classify(b, names)[0] not in ("UNLANDED", "CHECK"):
             continue
         subjects = prune_worktrees.git("log", "--format=%s", f"origin/main..{b}").stdout
         out[b] = sorted({i for i in PB.findall(subjects) if i in open_ids}, key=lambda s: int(s[2:]))
@@ -223,12 +225,16 @@ def lander_cost(rules: dict[str, Any]) -> float:
     return c["lander_tokens"] / rules["calibration"]["tokens_per_point"][c["lander_model"]]
 
 
+def branch_resume(branch: str, nid_list: list[str]) -> str:
+    return (f"Branch {branch} carries unlanded work for {', '.join(nid_list)} with no report. Run "
+            f"`python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` if the "
+            f"worktree still exists, read its STATUS.md, cherry-pick its commits onto current main (never merge the "
+            f"branch), resolve conflicts against the spec, re-gate, then finish the notes at their roots.")
+
+
 def finisher_pred(rep: Report | None, branch: str | None, cls: str, nid_list: list[str]) -> str:
     if rep is None:
-        return (f"FINISH-FIRST: branch {branch} carries unlanded work for {', '.join(nid_list)} with no report. Run "
-                f"`python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` if the "
-                f"worktree still exists, read its STATUS.md, cherry-pick its commits onto current main (never merge the "
-                f"branch), resolve conflicts against the spec, re-gate, then finish the notes at their roots.")
+        return "FINISH-FIRST: " + branch_resume(branch or "?", nid_list)
     where = (f"Its branch {rep.branch} (worktree {rep.worktree or 'removed'}, head {rep.head or '?'}) is {cls}: "
              + ("cherry-pick its unlanded commits onto current main (never merge the branch) and re-gate before new work."
                 if cls in ("UNLANDED", "CHECK") else
@@ -277,13 +283,19 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
                                 sorted({f for i in chunk for f in note_files.get(i, [])}),
                                 pred=finisher_pred(rep, rep.branch, classify(rep.branch) if rep.branch else "ABSENT", chunk)))
             taken |= set(chunk)
+    # A half note may also sit on an unlanded branch (a killed wave's WIP): its group carries that branch's resume
+    # instruction too, or the finisher starts over from main and the branch's work is lost (wave 1018's plan).
+    branch_of = {i: b for b, ids in sorted(unlanded.items()) for i in ids if i not in newest}
     for c in half_clusters:  # `status: half` notes, clustered by fix_clusters.py --open-status half
         chunk = [n["id"] for n in c["notes"] if n["id"] not in taken][:cap]
         if chunk:
+            on_branch = {b: [i for i in unlanded[b] if i in chunk]
+                         for b in sorted({branch_of[i] for i in chunk if i in branch_of})}
             groups.append(Group("finisher", chunk, c["file"], list(c.get("files", [])),
                                 pred=("FINISH-FIRST: " + ", ".join(chunk) + (" is" if len(chunk) == 1 else " are") +
                                       " `status: half`: read each note's record of the landed half and its kb/Work "
-                                      "history before touching code; finish the open half at its root.")))
+                                      "history before touching code; finish the open half at its root." +
+                                      "".join(" " + branch_resume(b, ids) for b, ids in on_branch.items()))))
             taken |= set(chunk)
     for branch, ids in sorted(unlanded.items()):
         ids = [i for i in ids if i not in taken and i not in newest]

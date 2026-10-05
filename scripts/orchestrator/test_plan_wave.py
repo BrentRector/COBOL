@@ -80,7 +80,8 @@ CLUSTERS = [cl(F_BIND, "PB1", "PB2", "PB5"), cl(F_EMIT, "PB6", "PB7", "PB3"), cl
             cl(F_OO, "PB8"), cl(F_G4, "PB11"), cl("src/X/Misc.cs", "PB9"), cl("src/X/Other.cs", "PB10"),
             cl("src/X/Zero.cs", "PB13"), cl(F_BIND, "PB14")]
 HALF = [cl("src/X/Half.cs", "PB4")]
-UNLANDED = {"worktree-wf_aaa-1": ["PB1"], "worktree-wf_ddd-9": ["PB13"], "worktree-wf_eee-1": []}
+UNLANDED = {"worktree-wf_aaa-1": ["PB1"], "worktree-wf_ddd-9": ["PB13"], "worktree-wf_eee-1": [],
+            "worktree-wf_fff-3": ["PB4"]}  # a killed wave left WIP for the half note PB4
 
 notes = pw.load_notes(WORK, {"wrong_answer": 8})
 reports = pw.load_reports(REPORTS)
@@ -110,6 +111,8 @@ check("finisher order", order[:3], [list(FIN), ["PB4"], ["PB13"]])
 check("finisher pred names report and branch",
       all(s in G[FIN].pred for s in ("w1014b-PB3-report.md", "worktree-wf_bbb-2", "LANDED")), True)
 check("half pred", "status: half" in G[("PB4",)].pred, True)
+check("half pred names its unlanded branch", "worktree-wf_fff-3" in G[("PB4",)].pred, True)
+check("half note planned once", sum("PB4" in g.notes for g in p["groups"]), 1)
 check("branch-only pred", "worktree-wf_ddd-9" in G[("PB13",)].pred, True)
 
 # 3. clusters by rows claimed: PB2+PB5 (2+1) first, the 1-row ones next, PB14 (0 rows) last
