@@ -254,6 +254,14 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             : null;
     }
 
+    /// <summary>An address-identifier in a VALUE operand position — a relation operand, an EVALUATE selection
+    /// subject or object, a function argument (kb/Work PB1021, PB1060): the bound operand, or a refused carrier when
+    /// <see cref="BindAddressIdentifier"/> has already reported, so the position binds on without a second
+    /// diagnostic.</summary>
+    internal BoundOperand AddressIdentifierOperand(Core.AddressIdentifierContext ai, string site) =>
+        BindAddressIdentifier(ai, site) as BoundOperand
+        ?? BoundOperandError.Refused(ctx.Edition, $"address-identifier '{DataBinder.WrittenText(ai)}'");
+
     /// <summary>§14.8.2's verdict for ONE address-identifier ARGUMENT against its formal parameter — the CALL
     /// argument (kb/Work PB239) and the INVOKE argument (kb/Work PB1021) alike, because §14.9.23.3 SR5 c) sends
     /// INVOKE to the same "14.8.2, Parameters" CALL reads. Both passing regimes reach the same law: BY REFERENCE is

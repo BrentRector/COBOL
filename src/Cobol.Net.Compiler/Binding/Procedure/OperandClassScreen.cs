@@ -145,21 +145,47 @@ internal static class OperandClassScreen
         return false;
     }
 
-    /// <summary>Screen a BOUND operand at <paramref name="pos"/>. Every row is an identifier position that closes
-    /// the operand to DATA ITEMS, so a literal a constant-name substitutes (§13.10.4 GR1), a figurative constant
-    /// or a function-identifier is refused by the same rule; a <see cref="BoundOperandError"/> was reported where
-    /// it was made and is not reported again.</summary>
+    /// <summary>Screen a BOUND operand at <paramref name="pos"/>. Every row is an IDENTIFIER position that closes
+    /// the operand to data items, so a literal a constant-name substitutes (§13.10.4 GR1) or a figurative constant
+    /// is refused by the same rule; a <see cref="BoundOperandError"/> was reported where it was made and is not
+    /// reported again.
+    /// <para>A FUNCTION-IDENTIFIER is an identifier (§8.4.3.1.2 Format 1), and §8.4.3.2.4 GR1 says it "references a
+    /// temporary data item" — an elementary item of the function's category — so it is classed by its RESULT
+    /// (<see cref="FunctionResultClasses"/>), never refused as "not a data item" (kb/Work PB1421: an integer
+    /// function was refused at GO TO … DEPENDING). A user-defined function's or an inline method invocation's
+    /// temporary arrives as a <see cref="BoundFieldOperand"/> over its returning item and takes the data-item
+    /// arm. A RECEIVING row never sees one: §8.4.3.2.3 SR1 keeps a function-identifier out of a receiving
+    /// operand, and those slots do not parse one.</para></summary>
     public static bool Screen(EditionContext edition, OperandPosition pos, BoundOperand op, string text)
     {
         switch (op)
         {
             case BoundOperandError: return false;
             case BoundFieldOperand { Place: var p }: return Screen(edition, pos, p, text);
+            case BoundComputedOperand or BoundNumericLiteral { FunctionValue: true }:
+                if ((FunctionResultClasses(op) & pos.Admits) != 0) return true;
+                Report(edition, pos, text, DescribeFunctionResult(op));
+                return false;
             default:
                 Report(edition, pos, text, "not a data item");
                 return false;
         }
     }
+
+    /// <summary>The enumerable classes of the temporary item an intrinsic function-identifier (or a counter
+    /// register, "a temporary unsigned integer data item", §8.4.3.15.4 GR1) references: the ONE integer classifier
+    /// (§15.2 type 5, <see cref="IntrinsicResultType.IsIntegerOperand(BoundOperand)"/>) and the ONE operand
+    /// category reader. A temporary item is never of class index.</summary>
+    private static OperandClasses FunctionResultClasses(BoundOperand op) =>
+        IntrinsicResultType.IsIntegerOperand(op) ? OperandClasses.IntegerItem | OperandClasses.NumericElementaryItem
+        : IntrinsicResultType.OperandCategory(op) is PicCategory.Numeric ? OperandClasses.NumericElementaryItem
+        : OperandClasses.None;
+
+    private static string DescribeFunctionResult(BoundOperand op) =>
+        IntrinsicResultType.OperandCategory(op) is PicCategory.Numeric
+            ? "a numeric function-identifier, and \"A numeric function shall not be specified where an integer "
+              + "operand is required\" (ISO §8.4.3.2.3 SR11)"
+            : $"a function-identifier of category {IntrinsicResultType.OperandCategory(op)?.ToString().ToLowerInvariant() ?? "unknown"}";
 
     private static void Report(EditionContext edition, OperandPosition pos, string text, string what) =>
         edition.Error(pos.Diagnostic,

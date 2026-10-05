@@ -330,6 +330,12 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
             // activation" — it references no storage-section item, so it crosses BY CONTENT (BY VALUE to a BY VALUE
             // formal) as the storage-free NULL carrier CallEmitter renders for every lane (kb/Work PB1630, PB1427).
             BoundPredefinedNull => new BoundCallArg(formal.ByValue ? CobolPassMode.Value : CobolPassMode.Content, null, op),
+            // An ADDRESS-IDENTIFIER (§8.4.3.1.2 Format 9; kb/Work PB1060) is "any identifier that is not permitted as
+            // a receiving operand" (GR5 b) — a unique pointer item created at the reference — so it crosses BY
+            // CONTENT (BY VALUE to a BY VALUE formal, SR10's class pointer) on the carrier CALL's address argument
+            // uses (CallBinder.AddressArg), never by reference to storage it does not have.
+            BoundAddressOperand ao => new BoundCallArg(formal.ByValue ? CobolPassMode.Value : CobolPassMode.Content, null, null)
+            { DataAddress = ao.Data, ProgramAddress = ao.Program },
             _ => null,
         };
         return arg is null ? null : arg with { Formal = formal.Item };

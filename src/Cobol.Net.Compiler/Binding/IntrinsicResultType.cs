@@ -352,6 +352,10 @@ internal static class IntrinsicResultType
         // not an integer literal though its value is integral, and no §8.3.3.3.3 floating-point literal can be
         // one either — r2 requires its significand to "include a decimal point", so the test excludes the whole
         // floating form without naming it (kb/Work PB248 re-derived this arm and left it unchanged).
+        // A FOLDED function value answers by its function's §15.2 type, never by its text's form: §8.4.3.2.3 SR11
+        // refuses a numeric function where an integer is required "even though a particular reference … might
+        // yield an integer value" (HIGHEST-ALGEBRAIC of a numeric-edited item folds to 999; kb/Work PB1421).
+        BoundNumericLiteral { FunctionType: { } ft } => ft is IntrinsicType.Integer,
         BoundNumericLiteral n => CobolNet.Common.NumericLiteral.IsIntegerLiteralForm(n.Text),
         // ⛔ THE ONE §5.5 2)b)2. PRIMITIVE (kb/Work PB248). This arm read the SCALE alone —
         // `{ Category: Numeric, Scale: <= 0, Usage: not Index }` — and a floating-point item is PICTURE-less, so
@@ -388,7 +392,7 @@ internal static class IntrinsicResultType
     /// purpose (§8.3.3.3.2 rule 2), so <see cref="BoundNegate"/> asks its operand.</summary>
     public static bool IsIntegerOperand(BoundExpr e) => e switch
     {
-        BoundNumLiteral l => IsIntegerOperand(new BoundNumericLiteral(l.Text)),
+        BoundNumLiteral l => IsIntegerOperand(new BoundNumericLiteral(l.Text) { FunctionType = l.FunctionType }),
         BoundNumRef r => IsIntegerOperand(new BoundFieldOperand(r.Place)),
         BoundIntrinsicCall c => IsIntegerOperand(new BoundComputedOperand(c)),
         BoundNegate n => IsIntegerOperand(n.Operand),

@@ -245,8 +245,14 @@ evaluateStatement
 // operator-bearing expression with no relational tail — `EVALUATE A B-AND C WHEN B"1000"` — is Table 15's
 // Boolean-expression column rather than a condition held to §8.8.4.3.3 SR1's length-1 rule. A boolean RELATION
 // (`EVALUATE A B-AND C = B"1000"`) has a tail the alternative cannot consume and still parses as `condition`.
+// An ADDRESS-IDENTIFIER (§8.4.3.1.2 identifier Format 9) IS identifier-1 / identifier-2, and §14.9.13.3 SR7 a) makes
+// each subject/object pair "valid operands for comparison … in accordance with 8.8.4.2" — the relation that compares
+// data-pointers (kb/Work PB1060). It is the ONE `addressIdentifier` rule PB1021 gave comparisonOperand, so the
+// storage forcing and the 2002 introduction gate reach this surface unchanged. ADDRESS heads no valueOperand, so
+// the arm is unambiguous; it fell to `condition` before and drew a false COBOLNET2318 "used as a condition".
 evaluateSubject
     : booleanLiteral                                     // EVALUATE TRUE / FALSE
+    | addressIdentifier                                  // identifier-1 that is an address-identifier (PB1060)
     | valueOperand                                       // identifier-1 / literal-1 / arithmetic-expression-1
     | {boolExprAhead()}? booleanExpression               // boolean-expression-1 (§14.9.13.4 GR3 d)
     | condition                                          // condition-1 (§14.9.13.4 GR3 e)
@@ -309,6 +315,7 @@ evaluateWhenGroup
 // range, SR4).
 evaluateWhenItem
     : valueRange                         // WHEN A THRU N, WHEN 1 THRU 10, WHEN "A" THRU "M" IN ALPH
+    | addressIdentifier                  // identifier-2 that is an address-identifier (kb/Work PB1060, see evaluateSubject)
     | valueOperand                       // single value: "A", 1, VAR
     | {boolExprAhead()}? booleanExpression   // WHEN A B-AND C — boolean-expression-2 (§14.9.13.4 GR4 a) 6.)
     | condition                          // for EVALUATE TRUE / complex WHEN
@@ -335,8 +342,15 @@ evaluateWhenItem
 // narrowing belongs HERE, in the parser, not in a pair of bind-time ifs.
 // Arm order is deliberate — ANTLR takes the first matching alternative, and Format 2 is a proper superset of
 // Format 1's prefix.
+// identifier-1 is an IDENTIFIER, so it admits §8.4.3.1.2 Format 1 (a function-identifier) and Format 4 (an inline
+// method invocation) as every sending identifier position does (kb/Work PB1421 — the PB86 PERFORM … TIMES shape:
+// the arm was missing and `DEPENDING ON FUNCTION INTEGER(X)` was a parse error). A function-identifier references
+// a temporary elementary data item (§8.4.3.2.4 GR1), so §14.9.17.3 SR1's "numeric elementary data item that is an
+// integer" is met by an integer function and refused for a numeric one (§8.4.3.2.3 SR11) — at bind, by the ONE
+// operand-class screen (OperandPositions.GoToDependingSelector). functionCall FIRST: it is keyword-led.
 goToStatement
-    : GO TO? procedureName+ DEPENDING ON? dataReference   // §14.9.17.2 Format 2 (depending)
+    : GO TO? procedureName+ DEPENDING ON?                 // §14.9.17.2 Format 2 (depending)
+      (functionCall | inlineMethodInvocation | dataReference)
     | GO TO? procedureName                                // §14.9.17.2 Format 1 (unconditional)
     | GO TO?                                              // ANSI X3.23-1985 target-less GO TO — no ISO 2023
                                                           // format prints it; DELETED by ISO 2002 and gated by

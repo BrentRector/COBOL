@@ -135,6 +135,51 @@ public sealed class OperandClassScreenDriftTests
             + $"; errors were: {string.Join(" | ", errors)}");
     }
 
+    /// <summary>The FUNCTION-IDENTIFIER shapes (kb/Work PB1421), each with the classes of the temporary item it
+    /// references (§8.4.3.2.4 GR1): an integer function's item is an integer numeric elementary item, a numeric
+    /// function's a numeric one that §8.4.3.2.3 SR11 keeps out of every integer position, an alphanumeric
+    /// function's neither.</summary>
+    private static readonly (string Text, OperandClasses Classes)[] FunctionShapes =
+    [
+        ("FUNCTION INTEGER(2.5)",     OperandClasses.IntegerItem | OperandClasses.NumericElementaryItem),
+        ("FUNCTION LENGTH(F)",        OperandClasses.IntegerItem | OperandClasses.NumericElementaryItem),
+        ("FUNCTION SQRT(4)",          OperandClasses.NumericElementaryItem),
+        ("FUNCTION UPPER-CASE(\"A\")", OperandClasses.None),
+    ];
+
+    /// <summary>The SENDING rows — the identifier positions whose grammar slot admits a function-identifier
+    /// (§8.4.3.2.3 SR1 keeps one out of every receiving position, and those slots do not parse one).</summary>
+    private static readonly OperandPosition[] SendingRows =
+        [OperandPositions.GoToDependingSelector, OperandPositions.WriteAdvancingIdentifier];
+
+    public static IEnumerable<object[]> SendingRowsAndFunctionShapes() =>
+        from i in Enumerable.Range(0, SendingRows.Length)
+        from j in Enumerable.Range(0, FunctionShapes.Length)
+        select new object[] { i, j };
+
+    /// <summary>A function-identifier in a sending row is classed by its RESULT, end to end: refused exactly when
+    /// its temporary item's classes miss what the row admits, and never with a parse error (kb/Work PB1421 — the
+    /// GO TO DEPENDING and WRITE ADVANCING slots admitted no function-identifier at all).</summary>
+    [Theory]
+    [MemberData(nameof(SendingRowsAndFunctionShapes))]
+    public void SendingRow_ClassesAFunctionIdentifierByItsResult(int row, int shape)
+    {
+        var pos = SendingRows[row];
+        var (text, classes) = FunctionShapes[shape];
+        string source =
+            "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. OCF" + row + "X" + shape + ".\n" + FileControl +
+            "       DATA DIVISION.\n" + FileSection + "       WORKING-STORAGE SECTION.\n" +
+            "       01 F PIC 9 VALUE 1.\n" +
+            "       PROCEDURE DIVISION.\n       MAIN.\n" + Templates[pos].Replace("SLOT", text, StringComparison.Ordinal);
+        var errors = CompileErrors(source);
+        bool refused = errors.Any(e => e.Contains(pos.Diagnostic.Code, StringComparison.Ordinal));
+        bool excluded = (classes & pos.Admits) == 0;
+        Assert.True(refused == excluded && errors.Count == (excluded ? 1 : 0),
+            $"{pos.Statement} {pos.Operand} ({pos.Rule}) over {text}: expected "
+            + (excluded ? $"exactly {pos.Diagnostic.Code}" : "no error")
+            + $"; errors were: {string.Join(" | ", errors)}");
+    }
+
     private static IEnumerable<string> RowNames() =>
         typeof(OperandPositions).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Where(f => f.FieldType == typeof(OperandPosition))

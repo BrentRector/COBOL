@@ -3,6 +3,7 @@
 using Antlr4.Runtime.Tree;
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
+using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Generated;
 using CobolNet.Runtime.Exceptions;
@@ -336,6 +337,23 @@ internal sealed partial class EcBinder
             ctx.Edition.Error("COBOLNET1611", "RAISE shall appear only in imperative-statement-1 of an "
                 + "exception-checking PERFORM (ISO §14.9.29.3 SR4)");
 
+        // ── Region E (imperative-statement-5, the FINALLY phrase) ──
+        // §14.9.28.4 GR16: "There shall be no statements that include a transfer of control out of the PERFORM
+        // statement within imperative-statement-5" (kb/Work PB434). Every such statement is statically visible in
+        // the subtree: a GO TO (a procedure-name never lies inside a statement), an EXIT naming a paragraph,
+        // section, program, method or function, a GOBACK, a NEXT SENTENCE, and a STOP RUN — "control is transferred
+        // to the operating system" (§14.9.42.4 GR6); §14.6.3 names STOP beside EXIT PROGRAM and GOBACK as the
+        // statements that transfer control outside the source element, and a GOBACK in a main program "operates as
+        // if executing a STOP statement" (§14.9.18.4 GR3), so the two cannot take different verdicts. EXIT PERFORM
+        // stays admitted — GR16's third sentence gives it the implicit CONTINUE after END-PERFORM.
+        foreach (var transfer in finallyBody.SelectMany(TransfersOut))
+        {
+            using var at = ctx.Edition.At(new DiagnosticCursor(transfer.Start.Line, transfer.Start.Column + 1));   // the statement, not the PERFORM
+            ctx.Edition.Error(DiagnosticCatalog.ExceptionPerformFinallyTransferOut,
+                $"'{DataBinder.WrittenText(transfer)}' transfers control out of the PERFORM statement, and it is written "
+                + "in the FINALLY phrase (imperative-statement-5) of an exception-checking PERFORM (ISO §14.9.28.4 GR16)");
+        }
+
         CheckDirectiveBans(p);   // region B, by LINE — a directive is not in the parse tree
     }
 
@@ -402,6 +420,20 @@ internal sealed partial class EcBinder
         ("POP", "§7.3.20.3", "SR4",
             "The POP directive shall not be specified within an exception checking PERFORM statement"),
     ];
+
+    /// <summary>The statements in <paramref name="node"/>'s subtree that transfer control out of an enclosing PERFORM
+    /// statement (§14.9.28.4 GR16's family): GO TO, EXIT PARAGRAPH / SECTION / PROGRAM / METHOD / FUNCTION, GOBACK,
+    /// NEXT SENTENCE and STOP RUN (§14.9.42.4 GR6). A bare EXIT (Format 1, no operation), EXIT PERFORM and the
+    /// obsolete STOP literal (which resumes at the next statement) are not members.</summary>
+    private static IEnumerable<Antlr4.Runtime.ParserRuleContext> TransfersOut(IParseTree node) =>
+        Descendants<Antlr4.Runtime.ParserRuleContext>(node).Where(s => s switch
+        {
+            Core.GoToStatementContext or Core.GobackStatementContext or Core.NextSentenceStatementContext => true,
+            Core.StopStatementContext stop => stop.RUN() is not null,
+            Core.ExitStatementContext e => e.PARAGRAPH() is not null || e.SECTION() is not null
+                || e.PROGRAM() is not null || e.METHOD() is not null || e.FUNCTION() is not null,
+            _ => false,
+        });
 
     private static IEnumerable<T> Descendants<T>(IParseTree node) where T : class
     {

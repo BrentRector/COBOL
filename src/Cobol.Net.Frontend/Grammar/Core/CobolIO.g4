@@ -647,10 +647,14 @@ writeFrom
 // VersionConformancePass.VisitWriteBeforeAfter — never on a second phrase, which no longer exists. §14.9.51.3
 // SR17 then forbids PAGE with the pair (StatementValidation.CheckWriteBeforeAfterPage). A single BEFORE or a
 // single AFTER is edition-invariant (85+).
+// identifier-2 is an IDENTIFIER, so it admits §8.4.3.1.2 Format 1 (a function-identifier) and Format 4 (an inline
+// method invocation), functionCall first because it is keyword-led (kb/Work PB1421's sibling sweep: the arms were
+// missing, so `AFTER ADVANCING FUNCTION INTEGER(X) LINES` was a parse error). §14.9.51.3 SR14's "an integer data
+// item" is then asked of the function's temporary item (§8.4.3.2.4 GR1) by the ONE operand-class screen.
 writeBeforeAfter
     : (BEFORE AFTER? | AFTER BEFORE?) ADVANCING?
       ( PAGE
-      | (dataReference | integerLiteral | literal) (LINE | LINES)?
+      | (functionCall | inlineMethodInvocation | dataReference | integerLiteral | literal) (LINE | LINES)?
       )
     ;
 

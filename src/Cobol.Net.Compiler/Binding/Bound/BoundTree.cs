@@ -195,6 +195,12 @@ public sealed record BoundNumLiteral(string Text, BinaryFloatCarrier? Carrier = 
     /// function result passes (<c>IntrinsicBinder.BindIntrinsicCore</c>), and carried to the operand by
     /// <c>IntrinsicBinder.OperandOf</c> (kb/Work PB1398, PB1662).</summary>
     public bool FunctionValue { get; init; }
+
+    /// <summary>The §15.2 type of the folded function, set where the fold is made (<c>IntrinsicBinder.Folded</c>);
+    /// null for a literal the source wrote. The folded TEXT does not carry the type: HIGHEST-ALGEBRAIC of a PIC ZZ9
+    /// item folds to <c>999</c> and is a NUMERIC function (§15.43.1), which §8.4.3.2.3 SR11 refuses where an integer
+    /// is required "even though a particular reference … might yield an integer value" (kb/Work PB1421).</summary>
+    public IntrinsicType? FunctionType { get; init; }
 }
 
 /// <summary>The ISO/IEC 60559 binary interchange format a <see cref="BoundNumLiteral"/>'s value is exactly a value
@@ -471,6 +477,9 @@ public sealed record BoundNumericLiteral(string Text) : BoundOperand
     /// wrote — see <see cref="BoundNumLiteral.FunctionValue"/>. Value-wise it IS the literal (every renderer reads
     /// <see cref="Text"/>); only the syntax rules that name a literal, or a data item, tell the two apart.</summary>
     public bool FunctionValue { get; init; }
+
+    /// <summary>The folded function's §15.2 type — see <see cref="BoundNumLiteral.FunctionType"/>.</summary>
+    public IntrinsicType? FunctionType { get; init; }
 }
 
 /// <summary>A reference to a data item (its category decides string-vs-numeric rendering).</summary>

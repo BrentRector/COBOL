@@ -1366,8 +1366,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// operand. A refused operand has been reported by that binder.</para>
     private BoundOperand ComparisonOperand(Core.ComparisonOperandContext operand) =>
         operand.addressIdentifier() is { } ai
-            ? host.Ptr.BindAddressIdentifier(ai, "a relation condition") as BoundOperand
-              ?? BoundOperandError.Refused(ctx.Edition, $"address-identifier '{DataBinder.WrittenText(ai)}'")
+            ? host.Ptr.AddressIdentifierOperand(ai, "a relation condition")
             : ComparisonOperandOf(operand.valueOperand());
 
     /// <summary>⛔ A BOOLEAN OPERAND ENCLOSED IN PARENTHESES, as a relation or EVALUATE operand (kb/Work PB1464):

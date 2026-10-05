@@ -582,9 +582,14 @@ functionArgList
 // expression." The boolean arm sits behind the ARGUMENT-scoped boolArgAhead() predicate (kb/Work PB65,
 // FMT-15.45.2): it fires only when a B-operator belongs to THIS argument, so a bare boolean literal / item still
 // takes its literal / expression arm and a following B-AND outside the argument list is not this argument's.
+// An ADDRESS-IDENTIFIER (§8.4.3.1.2 identifier Format 9) is "an identifier" in SR8's sense, and SR10 names class
+// pointer for a user-defined function's BY VALUE argument (kb/Work PB1060: `F(ADDRESS OF A)` was COBOLNET0901
+// "'ADDRESS' is a reserved word"). It is the ONE `addressIdentifier` rule (kb/Work PB1021); ADDRESS heads no other
+// arm, so the alternative is unambiguous. Each intrinsic's own argument-class rule then accepts or refuses it.
 functionArgument
     : fnArgPhraseWord
     | OMITTED
+    | addressIdentifier
     | {boolArgAhead()}? booleanExpression
     | nonNumericLiteral
     | arithmeticExpression

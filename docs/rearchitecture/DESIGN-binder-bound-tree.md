@@ -515,7 +515,13 @@ GO TO DEPENDING, SEARCH VARYING and the SET receiver were the SAME absence found
 `FieldOperand` / `Refs.Resolve` and nothing asked — and the sibling sweep found the PERFORM VARYING induction
 variable a fourth. `OperandClassScreenDriftTests` holds every row against every class shape END TO END with the
 shapes' classes written from the standard, independently of the classifier, and fails a row that no binder asks,
-that has no template, or that this table does not name. Positions whose rule also admits a LITERAL or a function
+that has no template, or that this table does not name. A FUNCTION-IDENTIFIER in a row's position is an
+identifier (§8.4.3.1.2 Format 1) that references a temporary elementary item (§8.4.3.2.4 GR1), so the screen
+classes it by its RESULT — the ONE integer classifier (`IntrinsicResultType.IsIntegerOperand`) and the ONE operand
+category reader — rather than refusing it as "not a data item": an integer function meets "an integer data item",
+a numeric one is refused under §8.4.3.2.3 SR11 (kb/Work PB1421; the sending rows GO TO DEPENDING and WRITE
+ADVANCING parse `functionCall | inlineMethodInvocation | dataReference`, and the drift test holds each against
+integer, numeric and alphanumeric functions). Positions whose rule also admits a LITERAL or a function
 (PERFORM … TIMES, the STOP/GOBACK status) keep their bound-shape screens above; an arithmetic-expression position
 is §8.8.1.1's.
 
@@ -562,7 +568,12 @@ reference-modified, carried by a run-time-length item per §8.5.1.10.4), and a f
 form — so `MOVE temp TO b` stores in a CHARACTER receiver what `MOVE a TO b` stores (kb/Work PB1007: the
 unflagged 30-digit description moved as zero-padded digits, `MOVE FUNCTION INTEGER(N) TO A B` storing `0000`).
 A literal or figurative constant is NOT materialized: §8.3.3.6.4 GR2 sizes it from the RECEIVER, so it has no
-description of its own.
+description of its own. **The identity store is the copy the operand's CLASS has** (`SendingValueTemp.IdentityStore`):
+a MOVE for every item MOVE can store, and the SET that names the copy for the classes it cannot — an index data item
+(§14.9.39 GR2 b), kb/Work PB1661), a data-pointer, function-pointer or program-pointer (§14.9.39 Formats 7, 8, 9)
+and an object reference (Format 5). A MOVE into a pointer clone stored nothing, so a pointer EVALUATE subject read by two WHEN
+arms compared a null intermediate (kb/Work PB1060's sweep). An address-identifier is never materialized: it is a
+unique item CREATED at the reference (§8.4.3.11.4 GR1), with no storage an earlier store could change.
 
 **A group whose length is decided at run time freezes its EXTENT as well as its value.** A cloned DESCRIPTION has
 a compile-time length, so an intermediate cloned from an `OCCURS DEPENDING` group would hold the group's MAXIMUM

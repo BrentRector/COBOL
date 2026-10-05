@@ -2415,7 +2415,15 @@
   "pb1252-linkage-entry-using-phrase",
   "pb1281-redefines-qualified",
   "pb1281-redefines-subscripted",
-  "pb1281-redefines-odo-in-redefinition"
+  "pb1281-redefines-odo-in-redefinition",
+  "pb1421-goto-depending-numeric-function",
+  "pb1060-evaluate-address-identifier-85",
+  "pb434-finally-transfer-out",
+  "pb434-finally-stop-run",
+  "pb1060-convert-any-address-identifier",
+  "pb1060-baseconvert-address-identifier",
+  "pb1421-goto-depending-folded-numeric-function",
+  "pb1421-perform-times-folded-numeric-function"
  ],
  "pending": []
 }

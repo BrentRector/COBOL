@@ -250,9 +250,14 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
                 // §14.9.17.3 SR1 — identifier-1 is a class-closed position (kb/Work PB210): screened through the
                 // ONE operand-class screen, BOTH halves of the rule at once (numeric elementary AND integer). A
                 // PIC 9V9 selector used to be truncated by the emitter and silently select procedure-name-2.
-                var selector = host.Expr.FieldOperand(g.dataReference());
+                // identifier-1 is any identifier format the grammar's sending slot admits (kb/Work PB1421): a
+                // function-identifier's temporary item (§8.4.3.2.4 GR1) is classed by its result by the same screen.
+                var (selector, written) =
+                    g.functionCall() is { } fc ? (host.Intrinsic.IntrinsicOperand(fc), (Antlr4.Runtime.ParserRuleContext)fc)
+                    : g.inlineMethodInvocation() is { } imi ? (host.Oo.OoInlineInvocationOperand(imi), imi)
+                    : (host.Expr.FieldOperand(g.dataReference()), g.dataReference());
                 bool admitted = OperandClassScreen.Screen(ctx.Edition, OperandPositions.GoToDependingSelector,
-                    selector, g.dataReference().GetText());
+                    selector, DataBinder.WrittenText(written));
                 return resolved && admitted
                     ? new BoundGoToDepending(selector, targets, ctx.SourceLine(g))
                     : BoundRejected.Reported(ctx.Edition);

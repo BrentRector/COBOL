@@ -386,7 +386,8 @@
   "pb1261_depending_attributes_and_area",
   "pb1128_inspect_signed_sign_retained",
   "pb1525_flag_extensions_changes_nothing",
-  "pb1281_redefines_data_name_2_bare"
+  "pb1281_redefines_data_name_2_bare",
+  "pb1421_goto_depending_function_identifier"
  ],
  "pending": []
 }

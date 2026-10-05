@@ -407,6 +407,11 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
             return FeatureAdvancing(before, m.GetText(), system);
         BoundOperand lines =
             wba.integerLiteral() is { } il ? new BoundNumericLiteral(il.GetText())
+            // identifier-2 as a function-identifier (§8.4.3.1.2 Format 1),
+            // or as an inline method invocation (§8.4.3.1.2 Format 4) — kb/Work PB1421's sibling sweep —
+            // each screened on its temporary item below.
+            : wba.functionCall() is { } fc ? host.Intrinsic.IntrinsicOperand(fc)
+            : wba.inlineMethodInvocation() is { } imi ? host.Oo.OoInlineInvocationOperand(imi)
             : wba.dataReference() is { } d ? host.Expr.FieldOperand(d)
             : wba.literal() is { } lit ? host.Expr.LiteralOperand(lit)
             : new BoundNumericLiteral("1");
@@ -430,9 +435,13 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
         {
             case BoundOperandError:
                 return;   // reported where it was made
-            case BoundFieldOperand { Place: var p }:
-                OperandClassScreen.Screen(ctx.Edition, OperandPositions.WriteAdvancingIdentifier, p,
-                    DataBinder.WrittenText(wba.dataReference()!));
+            // identifier-2 in every identifier format (a data reference, or a function-identifier's or inline
+            // method invocation's temporary item, a folded function value among them — kb/Work PB1421): the ONE
+            // operand-class screen classes each.
+            case BoundFieldOperand or BoundComputedOperand or BoundNumericLiteral { FunctionValue: true }:
+                OperandClassScreen.Screen(ctx.Edition, OperandPositions.WriteAdvancingIdentifier, lines,
+                    DataBinder.WrittenText((Antlr4.Runtime.ParserRuleContext?)wba.functionCall()
+                        ?? (Antlr4.Runtime.ParserRuleContext?)wba.inlineMethodInvocation() ?? wba.dataReference()!));
                 return;
             case BoundNumericLiteral n when IntrinsicResultType.IsIntegerOperand(n) && !n.Text.TrimStart().StartsWith('-'):
             case BoundFigurative { Kind: 'Z' }:   // ZERO read numerically is the integer 0 (§8.3.3.6.4 GR4)

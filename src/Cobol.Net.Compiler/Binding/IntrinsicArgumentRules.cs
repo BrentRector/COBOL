@@ -631,6 +631,12 @@ internal static class IntrinsicArgumentRules
         BoundFieldOperand { Place.Item.OperandPic: { } pic } => pic.Usage,
         BoundStringLiteral { Category: PicCategory.National } => Usage.National,
         BoundStringLiteral => Usage.Display,
+        // An ADDRESS-IDENTIFIER "creates a unique data item of class pointer" of category data-pointer
+        // (§8.4.3.11.4 GR1) or program-pointer (§8.4.3.13.4 GR1) — the items USAGE POINTER / PROGRAM-POINTER
+        // describe — so the §15.19.3 r7 and §15.12.3 r1 screens refuse it as they refuse those items. It answered
+        // null ("leave it to the runtime"), and `CONVERT(ADDRESS OF X ANY ANUM HEX)` / `BASECONVERT(ADDRESS OF X
+        // 16 10)` compiled and aborted in a NotImplemented render (kb/Work PB1060, train 1021 review C-2).
+        BoundAddressOperand a => a.Data is not null ? Usage.Pointer : Usage.ProgramPointer,
         BoundComputedOperand { Expr: BoundIntrinsicCall ic } => ic.ResultCategory switch
         {
             PicCategory.National => Usage.National,

@@ -1132,6 +1132,13 @@ public sealed class DataItem
         : Children.Where(c => c.RedefinesTargetName is null).Sum(c => c.ByteWidth * (c.Occurs ?? 1));
 
     /// <summary>An elementary item's byte width — the per-usage pinned widths documented on <see cref="ByteWidth"/>.</summary>
+    /// <summary>The byte width this implementation gives every pointer-class and object-reference item — USAGE
+    /// POINTER, PROGRAM-POINTER, FUNCTION-POINTER, OBJECT REFERENCE (§13.18.60.4 GR23, GR24 and GR26 leave each
+    /// pointer's "alignment, size, and representation" to the implementor) — and so the width of the unique pointer
+    /// item an address-identifier creates
+    /// (§8.4.3.11.4 GR1 / §8.4.3.13.4 GR1), which the LENGTH / BYTE-LENGTH folds read (kb/Work PB1060).</summary>
+    internal const int PointerByteWidth = 8;
+
     internal int ElementaryByteWidth
     {
         get
@@ -1153,7 +1160,7 @@ public sealed class DataItem
                 Usage.FloatBinary128 or Usage.FloatDecimal34 => 16,   // binary128 / decimal128 = 16 bytes
                 Usage.FloatDecimal16 => 8,                            // decimal64 = 8 bytes
                 Usage.Pointer or Usage.ProgramPointer or Usage.FunctionPointer
-                    or Usage.ObjectReference => 8,
+                    or Usage.ObjectReference => PointerByteWidth,
                 Usage.National => CobolNet.Runtime.CobolBits.BytesPerNational * ElementaryImageWidth,   // UTF-16, D-N1/D-N3
                 _ => ElementaryImageWidth,                       // DISPLAY / BIT: 1 byte per character/boolean position
             };

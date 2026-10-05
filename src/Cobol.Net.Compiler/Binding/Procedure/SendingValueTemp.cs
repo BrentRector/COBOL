@@ -147,11 +147,35 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         // store — `EVALUATE IDA WHEN I2 WHEN I1` materialized its subject into an index clone through a MOVE and
         // then compared a value that never arrived, so it took WHEN OTHER. The identity copy of an index data item into
         // its own class-index clone is the SET it names.
-        ctx.Data.PendingPreOps.Add(op is BoundFieldOperand { Place: var src } && model.Item.Pic is { Usage: Usage.Index }
-            ? new BoundSetTo([new SetPlaceTarget(place)], new BoundNumRef(src))
-            : new BoundMove(op, [place]));
+        ctx.Data.PendingPreOps.Add(IdentityStore(op, model.Item, place));
         return place;
     }
+
+    /// <summary>The identity copy of <paramref name="op"/> into its own clone <paramref name="place"/>: a MOVE for
+    /// every item MOVE can store, and the SET that names the copy for the classes MOVE does not store.
+    /// <para>⛔ A CLASS-POINTER OR OBJECT-REFERENCE ITEM IS STORED BY SET, NEVER BY MOVE — the PB1661 index rule's
+    /// siblings (kb/Work PB1060's sweep). A pointer, program-pointer, function-pointer or object reference is not a
+    /// MOVE operand (§14.9.25.3 SR1: "The class of identifier-1 or identifier-2 shall not be index, message-tag,
+    /// object, or pointer"); §14.9.39 Format 7 (data-pointer), Format 8
+    /// (function-pointer), Format 9 (program-pointer) and Format 5 (object-reference) are what store a value into
+    /// one. A MOVE into the clone stored NOTHING, so
+    /// `SET P TO ADDRESS OF B` / `EVALUATE P WHEN Q … WHEN P …` — a subject read by two arms, hence materialized
+    /// (§14.9.13.4 GR3) — compared a null clone and took WHEN OTHER: a wrong answer on conforming source.</para></summary>
+    private static BoundStatement IdentityStore(BoundOperand op, DataItem model, Place place) =>
+        (op, model.Pic?.Usage) switch
+        {
+            (BoundFieldOperand { Place: var src }, Usage.Index) =>
+                new BoundSetTo([new SetPlaceTarget(place)], new BoundNumRef(src)),
+            (BoundFieldOperand { Place: var src }, Usage.Pointer) =>
+                new BoundSetPointer([new BoundPointerReceiver(place, null)], src, ToNull: false),
+            (BoundFieldOperand { Place: var src }, Usage.ProgramPointer) =>
+                new BoundSetProgramPointer([place], src, ToNull: false),
+            (BoundFieldOperand { Place: var src }, Usage.FunctionPointer) =>
+                new BoundSetFunctionPointer([place], src, ToNull: false),
+            (BoundFieldOperand { Place: var src }, Usage.ObjectReference) =>
+                new BoundSetObjectRef([place], src, SourceIsNull: false, SourceIsSelf: false),
+            _ => new BoundMove(op, [place]),
+        };
 
     /// <summary>
     /// ⛔ <b>THE TRUTH-VALUE ARM — the condition→boolean bridge</b> (kb/Work PB842 / PB912). ISO §14.9.13.4 GR3's

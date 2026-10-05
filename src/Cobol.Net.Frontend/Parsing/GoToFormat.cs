@@ -41,12 +41,15 @@ public static class GoToFormats
 {
     /// <summary>The general format <paramref name="g"/> was written in. Total: the grammar admits no fourth
     /// shape.
-    /// <para>Both probes are SINGLE-CHILD accessors — <c>dataReference()</c> and <c>procedureName(0)</c> scan
+    /// <para>Both probes are SINGLE-CHILD accessors — <c>DEPENDING()</c> and <c>procedureName(0)</c> scan
     /// the context's children and return the first match — never <c>procedureName()</c>, whose generated body
     /// allocates a fresh <c>List</c> on every call. This runs once per GO TO at bind, once more in the edition
-    /// pass, and once per single-statement paragraph in the ALTER prepass.</para></summary>
+    /// pass, and once per single-statement paragraph in the ALTER prepass. Format 2 is keyed on the DEPENDING
+    /// keyword, not on its operand: identifier-1 has three alternatives (a data reference, a function-identifier,
+    /// an inline method invocation — kb/Work PB1421), and the keyword is the one child every one of them
+    /// shares.</para></summary>
     public static GoToFormat Of(CobolParserCore.GoToStatementContext g)
-        => g.dataReference() is not null ? GoToFormat.Depending
+        => g.DEPENDING() is not null ? GoToFormat.Depending
          : g.procedureName(0) is not null ? GoToFormat.Unconditional
          : GoToFormat.AnsiAlterable;
 

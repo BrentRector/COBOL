@@ -329,6 +329,8 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
     {
         if (subject.booleanLiteral() is not null) return EvaluateSubjectOperand.TrueOrFalse;
         if (subject.condition() is not null) return EvaluateSubjectOperand.Condition;  // EVALUATE X > 1, NOT BW, X NUMERIC
+        // An address-identifier IS identifier-1 (§8.4.3.1.2 Format 9; kb/Work PB1060) — Table 15's Identifier column.
+        if (subject.addressIdentifier() is not null) return EvaluateSubjectOperand.Identifier;
         // §14.9.13.2's boolean-expression-1 (Table 15's Boolean-expression COLUMN) before SR6 reclassifies it by its
         // result length (kb/Work PB1412).
         if (BooleanOperatorBearing(subject) is not null)
@@ -371,6 +373,8 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
     {
         if (item.ANY() is not null) return EvaluateObjectOperand.Any;
         if (item.valueRange() is not null) return EvaluateObjectOperand.RangeExpression;
+        // An address-identifier IS identifier-2 (§8.4.3.1.2 Format 9; kb/Work PB1060) — Table 15's Identifier row.
+        if (item.addressIdentifier() is not null) return EvaluateObjectOperand.Identifier;
         // §14.9.13.3 SR5 — the object's leftmost portion is a relational operator, a class condition without the
         // identifier, or a sign condition without its operand. The GRAMMAR decides it (that is what SR5 is: a
         // statement about the written form's left edge), so this row needs no symbol resolution — and with it
@@ -643,6 +647,14 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         if (BooleanOperatorBearing(item) is not null && pair.ObjectBare.Boolean is { } objectBoolean)
             return host.Udf.UdfAttachPerEvaluation(
                 host.Cond.CheckedRelational(left, "==", new BoundBoolOperand(objectBoolean)), classifyMark);
+        // An address-identifier object (kb/Work PB1060): "selection-subject = selection-object" over two data
+        // items of class pointer — §8.8.4.2's pointer relation, screened by the ONE relation checkpoint.
+        if (item.addressIdentifier() is { } oai)
+        {
+            var objMark = host.Udf.Mark;
+            return host.Udf.UdfAttachPerEvaluation(host.Cond.CheckedRelational(left, "==",
+                host.Ptr.AddressIdentifierOperand(oai, "an EVALUATE selection object")), objMark);
+        }
         if (BareOperand(item) is { } v)
         {
             var objMark = host.Udf.Mark;
@@ -853,9 +865,18 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
                 return written;
             return new BoundFieldOperand(held);
         }
-        if (BareOperand(subject) is not { } vo) return null;
-        if (slot.Bare.Form is BareOperandForm.ConditionName or BareOperandForm.SwitchStatus) return null;
-        var value = inPlace = BindValueOperand(vo);
+        BoundOperand value;
+        // An address-identifier subject (kb/Work PB1060) is a VALUE subject of class pointer, through the ONE
+        // address-identifier operand binder the relation operand uses; GR3's materialization below applies to it as
+        // to any identifier (a pointer the intermediate cannot model stays the bound operand).
+        if (subject.addressIdentifier() is { } sai)
+            value = inPlace = host.Ptr.AddressIdentifierOperand(sai, "an EVALUATE selection subject");
+        else
+        {
+            if (BareOperand(subject) is not { } vo) return null;
+            if (slot.Bare.Form is BareOperandForm.ConditionName or BareOperandForm.SwitchStatus) return null;
+            value = inPlace = BindValueOperand(vo);
+        }
         // ⛔ NeedsIntermediate, NOT `Uses > 1` (kb/Work PB396). The §14.9.25.4 GR1 argument this slot already
         // carried — at ONE use the single render IS the one evaluation, so nothing is observable and no
         // intermediate is created — holds only when that use is the FIRST arm's. At ZERO uses (every object

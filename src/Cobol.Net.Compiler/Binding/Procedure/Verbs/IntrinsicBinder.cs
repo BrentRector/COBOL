@@ -224,7 +224,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
 
     public static BoundOperand OperandOf(BoundExpr e) => e switch
     {
-        BoundNumLiteral l => new BoundNumericLiteral(l.Text) { FunctionValue = l.FunctionValue },   // a folded function (LENGTH …) keeps saying so
+        BoundNumLiteral l => new BoundNumericLiteral(l.Text) { FunctionValue = l.FunctionValue, FunctionType = l.FunctionType },   // a folded function (LENGTH …) keeps saying so, and its type
         BoundNumRef r => new BoundFieldOperand(r.Place),            // a user-function result temp (M2-UDF-1)
         BoundExprError err => BoundOperandError.Carry(err.Feature, err.IsUnbuilt),
         _ => new BoundComputedOperand(e),
@@ -738,18 +738,18 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
 
         // FUNCTION LENGTH folds at compile time from PIC metadata (§15.50; deep-dive D7).
         if (sig.Bind == IntrinsicBind.Fold && sig.Name == "LENGTH")
-            return BindLengthFold(sig, args);
+            return Folded(sig, args, BindLengthFold(sig, args));
 
         // FUNCTION BYTE-LENGTH folds at compile time from the item's declared BYTE geometry (§15.14; the D7
         // byte-vs-position twin of LENGTH).
         if (sig.Bind == IntrinsicBind.Fold && sig.Name == "BYTE-LENGTH")
-            return BindByteLengthFold(sig, args);
+            return Folded(sig, args, BindByteLengthFold(sig, args));
 
         // SMALLEST/HIGHEST/LOWEST-ALGEBRAIC fold at compile time from the argument item's PICTURE metadata
         // (§15.83/§15.43/§15.58; the same Fold discipline as LENGTH).
         if (sig.Bind == IntrinsicBind.Fold
                 && sig.Name is "SMALLEST-ALGEBRAIC" or "HIGHEST-ALGEBRAIC" or "LOWEST-ALGEBRAIC")
-            return BindAlgebraicFold(sig, args);
+            return Folded(sig, args, BindAlgebraicFold(sig, args));
 
         // ⛔ THE ONE RESULT-TYPE RESOLUTION (§15.x.1 result-type tables; fix-queue PB15). Twenty functions have a
         // type that DEPENDS ON THEIR ARGUMENTS, and this used to be two hand-written name lists here — a
@@ -2091,6 +2091,10 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // called it "a numeric literal".
         BoundComputedOperand { Expr: BoundIntrinsicCall } or BoundNumericLiteral { FunctionValue: true } =>
             FunctionResultLength(sig, args, bytes: false),
+        // An ADDRESS-IDENTIFIER creates "a unique data item of class pointer" (§8.4.3.11.4 GR1 / §8.4.3.13.4 GR1), so
+        // r1's "a data item of any class or category" admits it, and its length is the pointer item's r3 length —
+        // the same carrier width a USAGE POINTER / PROGRAM-POINTER item folds to above (kb/Work PB1060).
+        BoundAddressOperand => new BoundNumLiteral(DataItem.PointerByteWidth.ToString(System.Globalization.CultureInfo.InvariantCulture)),
         // ⛔ A FIGURATIVE CONSTANT IS A LEGAL LENGTH ARGUMENT, AND THE ARM BELOW USED TO REFUSE IT ALONGSIDE THE
         // NUMERIC LITERAL IT CORRECTLY REFUSES (fix-queue PB25). One arm standing for TWO rules enforced neither:
         // §15.50.3 r1 restricts a LITERAL argument to "an alphanumeric, national, or boolean literal", which
@@ -2478,6 +2482,9 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // NO arm for it, so every function argument fell to the catch-all below and was called "a numeric literal".
         BoundComputedOperand { Expr: BoundIntrinsicCall } or BoundNumericLiteral { FunctionValue: true } =>
             FunctionResultLength(sig, args, bytes: true),
+        // An ADDRESS-IDENTIFIER's unique pointer item (§8.4.3.11.4 GR1 / §8.4.3.13.4 GR1) — a data item of class
+        // pointer, admitted by r1 — occupies the pointer carrier's bytes (the LENGTH twin's arm; kb/Work PB1060).
+        BoundAddressOperand => new BoundNumLiteral(DataItem.PointerByteWidth.ToString(System.Globalization.CultureInfo.InvariantCulture)),
         // A COUNTER REGISTER is a data item (§8.4.3.14.4 GR1 / §8.4.3.15.4 GR1), admitted by §15.14.3 r1's
         // "a data item of any class or category"; its implicit PIC 9(d) USAGE DISPLAY occupies d bytes (the
         // LENGTH twin above — kb/Work PB1153).
@@ -2517,6 +2524,13 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// BinaryCapacity item (COMP-5 / BINARY-CHAR family), the mask capacity for a numeric-edited item; LOWEST is the
     /// negated magnitude for a sign-representable item, else 0 (Annex D.32). The value returns as a numeric literal
     /// at the correct scale (BoundNumLiteral — the LENGTH-fold precedent).</summary>
+    /// <summary>A compile-time fold keeps its function's §15.2 type (§15.x.1 through the ONE resolver), because the
+    /// folded literal's text cannot say whether an integer or a numeric function produced it and the ONE integer
+    /// classifier (<see cref="IntrinsicResultType.IsIntegerOperand(BoundOperand)"/>) answers from the type
+    /// (kb/Work PB1421: `GO TO … DEPENDING ON FUNCTION HIGHEST-ALGEBRAIC(E)`, E PIC ZZ9, compiled).</summary>
+    private static BoundExpr Folded(IntrinsicSig sig, List<BoundOperand> args, BoundExpr fold) =>
+        fold is BoundNumLiteral l ? l with { FunctionType = IntrinsicResultType.Resolve(sig, args) } : fold;
+
     private BoundExpr BindAlgebraicFold(IntrinsicSig sig, List<BoundOperand> args)
     {
         // §8.5.2.12 items 3/4/5 make the LINAGE-/LINE-/PAGE-COUNTER registers category-numeric DATA ITEMS, so
@@ -2764,6 +2778,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // boolean-expression binder; the class-boolean operand every §15.3 item-3 rule (INTEGER-OF-BOOLEAN,
         // BOOLEAN-OF-INTEGER's siblings) admits and the renderer images as its '0'/'1' string.
         if (a.booleanExpression() is { } be) return new BoundBoolOperand(host.Cond.BindBoolExpr(be));
+        // §8.4.3.2.3 SR8 — "an identifier", and an ADDRESS-IDENTIFIER is one (§8.4.3.1.2 Format 9; kb/Work PB1060):
+        // bound through the ONE address-identifier binder into a class-pointer operand (§8.4.3.11.4 GR1 /
+        // §8.4.3.13.4 GR1), which a user-defined function's BY VALUE pointer formal admits (SR10) and each
+        // intrinsic's own §15.x argument-class rule accepts or refuses by name. A refusal was reported there.
+        if (a.addressIdentifier() is { } ai) return host.Ptr.AddressIdentifierOperand(ai, "a function argument");
         // ⛔ A CONSTANT-NAME SUBSTITUTES ITS LITERAL, OF ITS OWN CLASS — HERE, BEFORE THE NUMERIC PATH BELOW
         // (fix-queue R01). §13.10.4 GR1: "the effect of specifying constant-name-1 in other than this entry is as
         // if literal-1 … were written where constant-name-1 is written", and §13.10.3 SR2 admits it "anywhere

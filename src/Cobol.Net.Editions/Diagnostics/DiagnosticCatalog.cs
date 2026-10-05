@@ -5428,6 +5428,22 @@ public static class DiagnosticCatalog
         "A TURN, PUSH or POP directive is written inside an exception-checking PERFORM statement.",
         "ISO §7.3.25.3 / §7.3.22.3 / §7.3.20.3");
 
+    /// <summary>COBOLNET2927 — a statement that transfers control OUT of an exception-checking (Format-3) PERFORM is
+    /// written in its FINALLY phrase, imperative-statement-5. §14.9.28.4 GR16: "There shall be no statements that
+    /// include a transfer of control out of the PERFORM statement within imperative-statement-5" — a GO TO (every
+    /// procedure-name is outside a statement), an EXIT PARAGRAPH / SECTION / PROGRAM / METHOD / FUNCTION, a GOBACK,
+    /// a NEXT SENTENCE or a STOP RUN, after which "control is transferred to the operating system" (§14.9.42.4 GR6)
+    /// (kb/Work PB434). It is one region predicate beside its siblings in <c>EcBinder.CheckCrossStatementBans</c>.
+    /// <para>An EXIT PERFORM is NOT a transfer out and stays admitted: GR16's own third sentence sends it to "an
+    /// implicit CONTINUE statement following the END-PERFORM".</para></summary>
+    public static readonly DiagnosticDescriptor ExceptionPerformFinallyTransferOut = new(
+        "COBOLNET2927", "exception-perform-finally-transfer-out", EditionSeverity.Error,
+        "A statement in the FINALLY phrase (imperative-statement-5) of an exception-checking PERFORM transfers control "
+        + "out of the PERFORM statement. §14.9.28.4 GR16: \"There shall be no statements that include a transfer of "
+        + "control out of the PERFORM statement within imperative-statement-5.\" EXIT PERFORM is the way to leave the "
+        + "FINALLY phrase early.",
+        "ISO §14.9.28.4 GR16");
+
     /// <summary>COBOLNET2297 — an UNSUCCESSFUL <c>&gt;&gt;POP directive-name</c>: the named directive's state was
     /// never saved by a PUSH in this compilation group, or every saved state was already restored. ISO §7.3.20.4
     /// GR2 makes the warning an implementor OBLIGATION — "the POP directive is unsuccessful and the implementor
