@@ -960,10 +960,12 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // invocation in this way and for no other purpose", which is NOT "a data item defined in the file,
         // working-storage, local-storage, or linkage section" — so §14.9.23.3 SR9 is not met and GR6 a)2
         // assumes BY CONTENT.
+        // An object-view (Format 5) is the same shape — an identifier referencing a temporary item (§8.4.3.5.4 GR1) —
+        // and crosses the same way; SUPER is refused there by §8.4.3.8.3 SR3 (SELF was taken above, kb/Work PB1425).
         Place? inlinePlace = null;
-        if (dref is null && ConditionBinder.SoleInlineInvocation(arithCtx) is { } soleInline)
+        if (dref is null && ConditionBinder.SoleOoIdentifier(arithCtx) is { } soleInline)
         {
-            if (OoBindInlineInvocation(soleInline) is not BoundNumRef inlineRef) return null;   // reported there
+            if (OoBindOoIdentifier(soleInline) is not BoundNumRef inlineRef) return null;   // reported there
             inlinePlace = inlineRef.Place;
         }
         // ⛔ A FUNCTION-IDENTIFIER IS AN IDENTIFIER TOO — the third shape of the same recovery (kb/Work PB923).

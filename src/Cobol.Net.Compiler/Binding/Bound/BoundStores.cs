@@ -280,6 +280,7 @@ public static class BoundStores
         //    size and a SET amount are SENDING occurrences. ──────────────────────────────────────────────────────
         public StoreKind Visit(BoundSetObjectRef n) => WriteIfAny(n.Targets);           // Format 5 (GR9/GR10)
         public StoreKind Visit(BoundObjectView n) => Hit(n.Target) ? StoreKind.Write : StoreKind.None;   // the view's temporary (§8.4.3.5.4); identifier-1 is only read
+        public StoreKind Visit(BoundSelfReference n) => Hit(n.Target) ? StoreKind.Write : StoreKind.None;   // SELF's temporary (§8.4.3.8.4 GR1)
         public StoreKind Visit(BoundSetPointer n) =>                                     // Format 7 (GR12)
             WriteIfAny(n.Receivers.Select(r => r.Pointer).OfType<Place>());
         public StoreKind Visit(BoundSetProgramPointer n) => WriteIfAny(n.Targets);      // Format 9 (GR16)

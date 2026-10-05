@@ -802,6 +802,12 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         Ctx.Writer.Line(PlaceRenderer.Write(v.Target, viewed) + "   // object-view (ISO §8.4.3.5.4)");
     }
 
+    /// <summary>SELF as an identifier operand (ISO §8.4.3.8.4 GR1; kb/Work PB1425): store the reference to the object the
+    /// method was invoked on into the ACTIVE-CLASS temporary. The object is of that class by GR1, so nothing is
+    /// checked.</summary>
+    public void EmitSelfReference(BoundSelfReference s) =>
+        Ctx.Writer.Line(PlaceRenderer.Write(s.Target, $"({s.Target.Item.Pic!.ClrType})(this)") + "   // SELF (ISO §8.4.3.8.4 GR1)");
+
     /// <summary>The spans of a FIXED-length group argument's tables that correspond to a variable-length group
     /// formal's dynamic-capacity tables (kb/Work PB965) — null when the argument is itself variable-length (it
     /// composes its own carrier) or is not a group place the correspondence can be stated for.</summary>

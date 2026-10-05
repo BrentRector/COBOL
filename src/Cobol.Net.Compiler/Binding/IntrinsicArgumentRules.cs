@@ -361,6 +361,13 @@ internal static class IntrinsicArgumentRules
     public static bool IsArithmeticOperandClass(BoundOperand op) =>
         CandidateClasses(op) is var set && (set.Length == 0 || set.Contains(CobolClass.Numeric));
 
+    /// <summary>Whether an operand §8.8.1.1 refuses can still be read by the <c>--permissive</c> digit-decoding
+    /// extension (decision 2026-07-29: an alphanumeric item's digit characters decoded as an unsigned integer). An
+    /// item of class object or class pointer (§8.5.2.1 Table 2) holds a REFERENCE, not characters, so there is
+    /// nothing to decode and the extension cannot reach it: `COMPUTE N = SELF` or `= O` with O an object reference
+    /// went on to a C# conversion error in the generated program (kb/Work PB1425's sweep).</summary>
+    public static bool IsDigitDecodable(BoundOperand op) => ClassOf(op) is not (CobolClass.Object or CobolClass.Pointer);
+
     /// <summary>The §8.8.1.1 answer for a resolved data item — the <see cref="ClassOfItem"/> lane, for the
     /// <c>ReferenceResolver</c> fast path that never builds a <see cref="Place"/> (kb/Work PB170).</summary>
     public static bool IsArithmeticOperandClass(DataItem item) =>

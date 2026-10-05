@@ -194,6 +194,18 @@ public sealed record BoundSetObjectRef(IReadOnlyList<Place> Targets, Place? Sour
 /// <param name="Written">The object-view as written, for the run-time diagnostic.</param>
 public sealed record BoundObjectView(Place Target, Place? Source, ObjectRefDescriptor View, string Written) : BoundStatement;
 
+/// <summary>SELF written as an identifier operand (ISO §8.4.3.1.2 Format 6; §8.4.3.8; kb/Work PB1425) — a relation
+/// operand (§8.8.4.2.15), an argument, a RAISING phrase's identifier-1. §8.4.3.8.4 GR1: SELF references "the object
+/// that was used to invoke the method in which the reference to SELF … appears", and §8.4.3.8.3 SR7 describes it as
+/// class object, category object reference, not universal. The binder gives it the one description that says
+/// exactly that — ACTIVE-CLASS (§13.18.60.4 GR22 e), "the same class as the object that was used to invoke the
+/// method"), FACTORY OF in a factory method — on a compiler temporary this statement pre-op fills with the
+/// reference, so every position reads it as it reads an object-view's or an inline invocation's temporary. No
+/// conformance check: the object is, by GR1, of that class. SR2 forbids SELF as a receiving operand, so nothing
+/// writes through the temporary.</summary>
+/// <param name="Target">The temporary (a USAGE OBJECT REFERENCE ACTIVE-CLASS item).</param>
+public sealed record BoundSelfReference(Place Target) : BoundStatement;
+
 /// <summary>A method-context <c>GOBACK</c> / (pre-2023) <c>EXIT METHOD</c> (ISO §14.9.18.4 GR4; deep-dive D8 —
 /// the one decision that silently miscompiles if missed): terminates the executing METHOD only, returning
 /// control to the INVOKE site — never the run unit (<see cref="BoundStop"/>) and never the program activation

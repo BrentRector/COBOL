@@ -273,6 +273,8 @@ internal sealed class SetFormatSelection(BinderContext ctx, StatementBinder host
     public SetOperandKind KindOfSender(SetSender sender)
     {
         if (sender.Ref is { } dref) return KindOf(dref);
+        // SELF / SUPER: class object, category object reference (§8.4.3.8.3 SR7) — Format 5's sending brace.
+        if (sender.Predefined is not null) return SetOperandKind.ObjectReference;
         if (sender.TemporaryItem is { } temp)
             return KindOfItem(temp.Item, Table16Operand.Of(temp).Category);
         return sender.IdentifierClass is CobolClass.Index ? SetOperandKind.IndexDataItem : SetOperandKind.Unclassified;

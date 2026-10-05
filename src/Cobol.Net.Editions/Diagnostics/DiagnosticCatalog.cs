@@ -6784,6 +6784,16 @@ public static class DiagnosticCatalog
         + "docs/CONFORMANCE.md DOC-A.1-164.",
         "ISO §4.2.15; §12.4.5.14.3 GR1");
 
+    /// <summary>COBOLNET2900 — SUPER written as an operand that is neither the object an INVOKE statement or inline
+    /// invocation invokes a method on nor the object of an object-property identifier (kb/Work PB1425): a relation
+    /// operand (<c>IF O = SUPER</c>), an argument, a SET sender, a RAISING phrase's identifier-1.</summary>
+    public static readonly DiagnosticDescriptor SuperPosition = new(
+        "COBOLNET2900", "super-position", EditionSeverity.Error,
+        "SUPER selects WHERE a method search starts; it is not an object of its own. It may be specified only as the "
+        + "object used to invoke a method (the INVOKE statement or an inline invocation) or as the object in an "
+        + "object-property identifier. Write SELF to name the object the method is executing on.",
+        "ISO §8.4.3.8.3 SR3");
+
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

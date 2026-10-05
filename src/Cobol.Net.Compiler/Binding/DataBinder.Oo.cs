@@ -616,16 +616,28 @@ public sealed partial class DataBinder
 
     /// <summary>Synthesize the temporary an OBJECT-VIEW references (§8.4.3.5.4 GR1, kb/Work PB1425): "This reference
     /// of identifier-1 is treated at compile-time as though it had the description specified by the AS phrase", so the
-    /// temporary is a USAGE OBJECT REFERENCE item described <paramref name="view"/> — the description every
-    /// object-reference rule then asks of it. The same <see cref="CreateCompilerTemp"/> as the other temporaries.</summary>
-    internal DataItem OoCreateObjectViewTemp(ObjectRefDescriptor view)
+    /// temporary is a USAGE OBJECT REFERENCE item described <paramref name="view"/>.</summary>
+    internal DataItem OoCreateObjectViewTemp(ObjectRefDescriptor view) =>
+        OoCreateObjectReferenceTemp(view, "__VIEW-TEMP-", "__view");
+
+    /// <summary>Synthesize the temporary SELF references when it is written as an operand (kb/Work PB1425): §8.4.3.8.3
+    /// SR7 makes SELF class object and category object reference, not universal, and §8.4.3.8.4 GR1 the object the
+    /// method was invoked on — the description ACTIVE-CLASS spells (§13.18.60.4 GR22 e)), FACTORY OF in a factory
+    /// method.</summary>
+    internal DataItem OoCreateSelfTemp(string containingClass, bool factory) =>
+        OoCreateObjectReferenceTemp(ObjectRefDescriptor.ActiveClass(containingClass, factory), "__SELF-TEMP-", "__self");
+
+    /// <summary>The ONE object-reference temporary: a USAGE OBJECT REFERENCE item described
+    /// <paramref name="description"/>, the description every object-reference rule then asks of it. The same
+    /// <see cref="CreateCompilerTemp"/> as the other temporaries; each client names its own fixed family.</summary>
+    private DataItem OoCreateObjectReferenceTemp(ObjectRefDescriptor description, string cobolPrefix, string csPrefix)
     {
         var model = new DataItem
         {
-            Level = 1, CobolName = "__VIEW", CsName = "__view",
-            Pic = PicInfo.ObjectReferenceItem(view),
+            Level = 1, CobolName = "__OREF", CsName = "__oref",
+            Pic = PicInfo.ObjectReferenceItem(description),
         };
-        return CreateCompilerTemp(model, "__VIEW-TEMP-", "__view", view.Name ?? "UNIVERSAL");
+        return CreateCompilerTemp(model, cobolPrefix, csPrefix, description.Name ?? "UNIVERSAL");
     }
 
     /// <summary>The (temp, model) clone pairs <see cref="CreateCompilerTemp"/> produced — consumed by the

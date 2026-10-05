@@ -26,11 +26,19 @@ using Core = CobolParserCore;
 /// format that takes it), <see cref="Identifier"/> (a function-identifier or inline invocation, BOUND ONCE here — its
 /// activation registers a statement pre-op, so binding it a second time would run a user function twice), or neither
 /// (a literal or an arithmetic expression, which each format's own syntax rule refuses).</para></summary>
-internal sealed record SetSender(string Text, Core.DataReferenceContext? Ref, BoundExpr? Bound, ParserRuleContext? Syntax)
+internal sealed record SetSender(string Text, Core.DataReferenceContext? Ref, BoundExpr? Bound, ParserRuleContext? Syntax,
+    Core.SelfAndSuperContext? Predefined = null)
 {
-    /// <summary>The sender is an identifier of some format — a data reference, a function-identifier or an inline
-    /// method invocation — rather than a literal or an arithmetic expression.</summary>
-    public bool IsIdentifierOperand => Ref is not null || Bound is not null;
+    /// <summary>The sender is an identifier of some format — a data reference, a function-identifier, an inline
+    /// method invocation, an object-view or SELF / SUPER — rather than a literal or an arithmetic expression.</summary>
+    public bool IsIdentifierOperand => Ref is not null || Bound is not null || Predefined is not null;
+
+    /// <summary>The sender is SELF (§8.4.3.8). §14.9.39.3 names it in its own rules (SR10 d), SR12 c), SR14 b) — the
+    /// SELF sender against each receiving description), so it is carried by name and never bound to a temporary.</summary>
+    public bool IsSelf => Predefined?.SELF() is not null;
+
+    /// <summary>The sender is [object-class-name-1 OF] SUPER, which §14.9.39.3 SR9 refuses by name.</summary>
+    public bool IsSuper => Predefined?.SUPER() is not null;
 
     /// <summary>The bound operand of a function-identifier / invocation sender (null for a <see cref="Ref"/> or a
     /// non-identifier sender). <see cref="IntrinsicBinder.OperandOf"/> is the ONE expression→operand mapping: a user
@@ -74,8 +82,13 @@ internal sealed class SetSenders(StatementBinder host)
         string text = amount.GetText();
         if (ConditionBinder.SoleFunctionCall(amount) is { } fc)
             return Identified(fc, host.Intrinsic.BindIntrinsic(fc));
-        if (ConditionBinder.SoleInlineInvocation(amount) is { } imi)
-            return Identified(imi, host.Oo.OoBindInlineInvocation(imi));
+        // SELF / SUPER (Format 6) are carried by NAME: the SET rules speak of them as such (kb/Work PB1425). They parse
+        // here, not as `setObjectReferenceStatement`, since the expression tier carries them (that alternative follows).
+        if (ConditionBinder.SolePredefinedObject(amount) is { } predefined)
+            return new SetSender(DataBinder.WrittenText(amount), null, null, predefined, predefined);
+        // An inline invocation or an object-view (Formats 4 and 5) references a temporary item, bound once here.
+        if (ConditionBinder.SoleOoIdentifier(amount) is { } ooId)
+            return Identified(ooId, host.Oo.OoBindOoIdentifier(ooId));
         if (OoBinder.OoExtractBareReference(amount) is not { } dref) return SetSender.OfExpression(text);
         // §8.4.3.2.3 SR2 — a REPOSITORY function name written without the word FUNCTION parses as a subscripted
         // data reference; the binder's ONE detector tells the two apart (a declared data item wins).

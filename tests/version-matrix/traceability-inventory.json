@@ -6817,11 +6817,11 @@
   "subject": "SELF and SUPER",
   "rule-digest": "524f7603f502",
   "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindSetObjectRef; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs#BindRaise",
-  "test-ref": "",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindSetObjectRef; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs#BindRaise; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.OoIdentifier.cs#OoBindSelfOperand; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#OoTryBindPropertyReference",
+  "test-ref": "conformance:negative/pb1425-super-operand; conformance:2002/pb1425_qualified_super",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). Rule (--check 8.4.3.8.3 'SUPER may be specified only as the object in an object-property identifier' -> OK §8.4.3.8.3 3)). Restrictive half verified: `SET O TO SUPER` -> COBOLNET0867 (SR9), `RAISE SUPER` -> 0848, `USING SUPER` / `USING BY CONTENT SUPER` -> rejected (PSSET, PSRAISE, PSUSE, PSUSESC in probe/self-and-super/). Admitted positions: INVOKE SUPER (oo_super) and inline `SUPER :: \"GETN\"` (PPROP3 prints 7) work; but the rule's FIRST named position, SUPER as the object of an object-property identifier (`BAL OF SUPER`, §8.4.3.9.2 Format 7 with §8.4.3.9.3 SR2 excluding only universal and NULL), is rejected COBOLNET0901 (PPROP2). Two halves, one verified -> PARTIAL; the missing position is finding F2. [editions as adjudicated: 2002, 2014, 2023 (OO predefined object references; absent from COBOL-85)]",
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1020c). \"SUPER may be specified only as the object in an object-property identifier or as the object used to invoke a method with the INVOKE statement or an inline invocation of a method\" (cite.py --check 8.4.3.8.3 -> OK 3)). The restriction is enforced by its own rule wherever the expression tier now admits SUPER: a relation operand, an INVOKE / inline argument, a RAISING phrase -> COBOLNET2900 (SET's sender keeps 14.9.39.3 SR9, COBOLNET0867; RAISE its SR2, COBOLNET0848); INVOKE SUPER / SUPER :: are legal. PARTIAL: the third legal home, the object of an object-property identifier (`BAL OF SUPER`), is still a parse error (COBOLNET0901) - Format 7's general identifier-3, kb/Work PB1425 NEXT with PB1783. [editions: the OO facility, 2002+]",
   "state": "GAP"
  },
  {
@@ -6876,13 +6876,13 @@
   "ordinal": 7,
   "subject": "SELF and SUPER",
   "rule-digest": "ec8e1219657a",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindSetObjectRef; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver",
-  "test-ref": "conformance:negative/pb389-only-receiver-self-sender",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.OoIdentifier.cs#OoBindSelfOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateSelfTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitSelfReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#SoleOoIdentifier",
+  "test-ref": "conformance:negative/pb389-only-receiver-self-sender; conformance:2002/pb1425_predefined_object_operands; unit:ReferenceOperandArithmeticTests.ObjectReferenceInArithmetic_IsRefusedUnderEveryDialect",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). Rule (--check 8.4.3.8.3 'are not universal object references' -> OK §8.4.3.8.3 7)). Where SELF reaches binding its description is the containing class, not universal: SET receiver arms (universal/interface/object-class/ACTIVE-CLASS) adjudicate SELF as the containing class (pb389-only-receiver-self-sender rejects an ONLY receiver; pb451 fixtures), and INVOKE SELF \"M\" statically requires M on the containing class chain (0825). But SR7 also makes SELF/SUPER operands of class object for §8.8.4.2.15 relation conditions and argument positions, and there SELF never reaches binding (IF O = SELF -> COBOL0001; USING SELF -> 0901/COBOL0001; probes PSCMP, PSCMP2, PSSELFU, PSUSEC, PSUSEV). Edge unverified/unreachable -> PARTIAL; owned by finding F2. [editions as adjudicated: 2002, 2014, 2023 (OO predefined object references; absent from COBOL-85)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1020c). \"SELF and SUPER are both implicitly described as class object and category object reference, and are not universal object references\" (cite.py --check 8.4.3.8.3 -> OK 7)). SELF as an operand is a compiler temporary described ACTIVE-CLASS (FACTORY OF in a factory method) - class object, not universal, the class of the object the method was invoked on (8.4.3.8.4 GR1) - so it is compared as class object (8.8.4.2.15: IF O = SELF, IF SELF = A, EVALUATE SELF WHEN O, in an instance and a factory method), passed as an object-reference argument (BY CONTENT / BY VALUE / bare, inline), raised (GOBACK RAISING SELF, the 14.9.18.3 SR4 c) ACTIVE-CLASS check), and refused in an arithmetic expression by 8.8.1.1 (COBOLNET0844) under every dialect - --permissive's digit decoding no longer reaches class object or pointer (it used to end in a Roslyn CS1503). SET's SELF sender keeps its named rules (14.9.39.3 SR10 d) / SR12 c) / SR14 b)). [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.8.4-1",
@@ -50317,11 +50317,11 @@
   "subject": "Intrinsic functions",
   "rule-digest": "36befef72ff7",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#LengthPositions",
-  "test-ref": "conformance:2023/pb61_length_byte_length_rule_branches; conformance-test:IntrinsicFunctionDifferentialTests.Length_SuperIsStructurallyUnparseable",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#LengthPositions; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.OoIdentifier.cs#OoBindSelfOperand",
+  "test-ref": "conformance:2023/pb61_length_byte_length_rule_branches; conformance:2002/pb1425_predefined_object_operands; conformance-test:IntrinsicFunctionDifferentialTests.Length_SuperIsRefusedByName",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "LANDED (kb/Work PB124 wave 5c): both unverified edges now carry pins. (a) pb61's CARR line gained OBJECT REFERENCE and PROGRAM-POINTER legs - LENGTH/BYTE-LENGTH answer 8/8 through ElementaryByteWidth's previously-unexercised arms. (b) The SUPER prohibition's structural refusal (a lexer token outside cobolWord, so LENGTH(SUPER) cannot parse as a data reference) is pinned by a compile-must-fail fact - the drift pin the grammar property lacked; a future widening of cobolWord that admits SUPER breaks it loudly.",
+  "notes": "kb/Work PB124 wave 5c, re-witnessed by kb/Work PB1425 (w1020c). \"An object reference shall be specified; the predefined object reference SUPER shall not be specified\" (15.3 item 11). pb61's CARR line carries OBJECT REFERENCE and PROGRAM-POINTER legs (LENGTH / BYTE-LENGTH 8/8). SELF and SUPER are now identifiers of the expression tier (8.4.3.1.2 Format 6), so the refusal of SUPER is no longer a parse accident: FUNCTION LENGTH(SUPER) is refused by name, COBOLNET2900 (8.4.3.8.3 SR3 - SUPER only as an invocation's or a property's object), and FUNCTION LENGTH(SELF) in a method is the legal type-11 argument (golden pb1425_predefined_object_operands: LENGTH(SELF) = LENGTH(O)). retired-witness: conformance-test:IntrinsicFunctionDifferentialTests.Length_SuperIsStructurallyUnparseable (renamed Length_SuperIsRefusedByName by kb/Work PB1425: SUPER is now an expression-tier identifier refused by 8.4.3.8.3 SR3 (COBOLNET2900), not a parse error)",
   "state": "OK"
  },
  {
@@ -57576,13 +57576,13 @@
   "ordinal": 0,
   "subject": "SELF and SUPER",
   "rule-digest": "612a15704c08",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#invokeTarget; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineMethodInvocation; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#selfAndSuper; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#primaryExpression; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.OoIdentifier.cs#OoBindOoIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindByReceiver",
+  "test-ref": "conformance:2002/pb1425_predefined_object_operands; conformance:2002/pb1425_qualified_super; conformance:negative/pb1425-super-operand; conformance:negative/pb1425-super-qualifier-not-inherited",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). Rule: `{SELF | [object-class-name-1 OF] SUPER}` (cite.py --check 8.4.3.8.2 \"object-class-name-1 OF\" -> OK), and it is identifier Format 6 (predefined-object) of §8.4.3.1.2 (cite.py --find 'predefined-object' -> §8.4.3.1.2 General format). Code: `objectReference : dataReference | NULL_ | SELF | SUPER` is the only production naming SELF/SUPER and it is reachable only from INVOKE's receiver, the inline-invocation receiver, SET ... TO (Format 5 sender) and RAISE. (1) The `object-class-name-1 OF` prefix has NO grammar surface: probe probe/self-and-super/PSOF.cob (DOG INHERITS FROM ANIMAL; `INVOKE PSOFA OF SUPER \"SPEAK\"`) is rejected COBOLNET0901 \"'SUPER' is a reserved word\" at 2023 - legal source per SR6 with a single base, expected ANIMAL then DOG. (2) SELF/SUPER are identifiers (§8.4.3.1.2 Format 6) but are not admitted where an object-class identifier is legal: `IF O = SELF` / `IF SELF = O` -> COBOL0001 parse error (PSCMP, PSCMP2; legal per §8.8.4.2.15, --check OK 'An operand of class object may be compared with another operand of class object'); `INVOKE SELF \"TAKE\" USING SELF` / `BY CONTENT SELF` / `BY VALUE SELF` -> 0901 / COBOL0001 (PSSELFU, PSUSEC, PSUSEV); `DISPLAY BAL OF SELF` / `BAL OF SUPER` object-property (Format 7, §8.4.3.9.3 SR2 excludes only universal and NULL, --check OK) -> 0901 (PPROP, PPROP2). Verified working: bare SELF/SUPER as INVOKE receiver, inline `SELF :: \"GETN\"` / `SUPER :: \"GETN\"` (PPROP3 prints 7 twice), SET O TO SELF. Half the format is implemented; see finding F1 (OF SUPER) and F2 (SELF/SUPER as general identifier). The negative fixture oo-multi-base-super.cob and landed kb/Work PB285 both record the OF-prefix gap, but no open note owns it. [editions as adjudicated: 2002, 2014, 2023 (OO predefined object references; absent from COBOL-85)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1020c). The general format `{ SELF | [ object-class-name-1 OF ] SUPER }` is ONE rule, `selfAndSuper`, and it is now an identifier of the expression tier (`primaryExpression`), besides the object-reference operand rule (INVOKE / inline receiver, SET Format 5, RAISE, the GOBACK / EXIT RAISING phrase). So every sending position spells it: relation and EVALUATE operands (`IF O = SELF`), INVOKE and inline-invocation arguments, SET senders, RAISING SELF - each was a parse error (COBOL0001 / COBOLNET0901 'SELF is a reserved word'). The binder's one door is OoBinder.OoBindOoIdentifier; SELF binds to an ACTIVE-CLASS temporary filled with the method's object (BoundSelfReference). The object of an object-property identifier (`BAL OF SELF`) is Format 7's identifier-3, owned by FMT-8.4.3.9.2. [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.4.3.9.2",

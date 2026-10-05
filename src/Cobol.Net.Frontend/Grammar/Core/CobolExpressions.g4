@@ -445,11 +445,24 @@ unaryExpression
 // enforces exactly that over the .g4 text, so the NEXT operand rule to gain functionCall cannot forget it.
 // It precedes `dataReference` because its own first element IS a dataReference (ANTLR takes the first
 // matching alternative — feedback_grammar_precedence).
+//
+// ⛔ THE OBJECT-VIEW AND SELF / SUPER ARE IDENTIFIERS HERE TOO (kb/Work PB1425, PB1782 step 2). §8.4.3.1.3 SR1 makes
+// every identifier slot "any of the formats for an identifier", and Formats 5 (object-view, §8.4.3.5) and 6 (SELF
+// and [object-class-name-1 OF] SUPER, §8.4.3.8) are identifiers of class object: §8.8.4.2.15 "An operand of class
+// object may be compared with another operand of class object", and an argument or a SET sender may be one. They
+// were reachable only through `objectReference` (INVOKE / SET / RAISE), so `IF O = SELF` and `USING D AS C` were
+// parse errors. Their position rules are the BINDER's, asked of the bound identifier: §8.4.3.8.3 SR1 (a method
+// only), SR3 (SUPER only as an invocation's or a property's object) and §8.4.3.5.3 SR1 (OoBinder.OoBindOoIdentifier).
+// Both precede `dataReference`: a view begins with one, and `K OF SUPER` begins like a qualified data reference
+// (SUPER is reserved, so the two part on the third token). A receiving position never parses an expression, so
+// §8.4.3.8.3 SR2 / §8.4.3.5.3 SR2 are not widened by this.
 primaryExpression
     : numericLiteral
     | ZERO_ARITH                       // figurative ZERO rewritten by token rewriter in arithmetic context
     | functionCall
     | inlineMethodInvocation           // §8.4.3.1.2 Format 4 (§8.4.3.4) — the Format-1 twin above
+    | objectView                       // §8.4.3.1.2 Format 5 (§8.4.3.5)
+    | selfAndSuper                     // §8.4.3.1.2 Format 6's SELF / [object-class-name-1 OF] SUPER (§8.4.3.8)
     | dataReference
     | LPAREN arithmeticExpression RPAREN
     ;

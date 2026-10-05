@@ -998,24 +998,20 @@ public sealed class IntrinsicFunctionDifferentialTests
     }
 
     [Fact]
-    public void Length_SuperIsStructurallyUnparseable()
+    public void Length_SuperIsRefusedByName()
     {
-        // §15.3 type 11 — "the predefined object reference SUPER shall not be specified". The refusal is
-        // STRUCTURAL: SUPER is a lexer token and not an alternative of cobolWord, so LENGTH(SUPER) cannot
-        // parse as a data reference (kb/Work PB124 wave 5c, AR-15.3-11 — this fact is the drift pin the
-        // grammar property lacked; a future widening of cobolWord that admits SUPER breaks it loudly).
-        // ⚠ PB428 opened a SECOND surface under this rule and the test now measures BOTH, because the first
-        // one alone stopped being able to see the difference. Until PB428 the parser had nothing to do with
-        // SUPER in an argument position, so its message named the token; since §8.4.3.1.2 Format 4 (inline
-        // method invocation) reached every operand rule admitting a functionCall, SUPER is the LEFT EDGE of a
-        // receiver, so a BARE SUPER now runs one token further and fails at the ')' where Format 4's
-        // `:: method-name (arguments)` tail never arrived. The refusal is still STRUCTURAL and still loud — the
-        // method name is still true — but the offending token ANTLR names is no longer SUPER, so pinning that
-        // word would now be pinning ANTLR's recovery choice instead of the standard's obligation.
+        // §15.3 type 11 — "An object reference shall be specified; the predefined object reference SUPER shall not be
+        // specified". The refusal USED to be structural (SUPER was no identifier of the expression tier, so
+        // LENGTH(SUPER) was a COBOL0001 parse error — kb/Work PB124 wave 5c, AR-15.3-11). Since kb/Work PB1425 SELF
+        // and [object-class-name-1 OF] SUPER ARE identifiers there (§8.4.3.1.2 Format 6, §8.4.3.1.3 SR1), so
+        // LENGTH(SELF) in a method is the legal type-11 argument it always was, and SUPER is refused BY THE RULE that
+        // forbids it as any operand but an invocation's or a property's object — §8.4.3.8.3 SR3, COBOLNET2900, the
+        // same verdict §15.3 type 11 asks for. Pinning the code, not a parse error, is what keeps the refusal a
+        // rule's rather than ANTLR's recovery choice.
         var (ok, _, detail) = new CobolNetCompiler(2023).CompileAndRun(
             Program("01 R PIC 9(4).", "    COMPUTE R = FUNCTION LENGTH(SUPER).\n    DISPLAY R."));
         Assert.False(ok, "LENGTH(SUPER) must not compile (§15.3 type 11)");
-        Assert.Contains("COBOL0001", detail);
+        Assert.Contains("COBOLNET2900", detail);
 
         // The surface Format 4 newly makes REACHABLE, and the reason the bare form above is refused at all:
         // §8.4.3.8.3 SR3 — "SUPER may be specified only as the object in an object-property identifier or as

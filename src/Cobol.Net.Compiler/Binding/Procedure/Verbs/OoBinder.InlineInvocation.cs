@@ -27,8 +27,8 @@ using Core = CobolParserCore;
 /// where no passing phrase exists to say so; an INVOKE spells the mode itself.</param>
 /// <param name="Address">The operand is an ADDRESS-IDENTIFIER (§8.4.3.1.2 identifier Format 9) — §14.9.23.3 SR9
 /// names it for identifier-3 and SR19 makes it a SENDING operand (kb/Work PB1021).</param>
-/// <param name="Self">The operand is the predefined object reference SELF (§8.4.3.8; INVOKE only — kb/Work
-/// PB1137): identifier-5, never a receiving operand.</param>
+/// <param name="Self">The operand is the predefined object reference SELF (§8.4.3.8; kb/Work PB1137) — identifier-5
+/// of the INVOKE statement, identifier-2 of the inline form (kb/Work PB1425) — never a receiving operand.</param>
 internal readonly record struct InvocationArg(
     bool ByValueWritten,
     bool ByReferenceWritten,
@@ -54,13 +54,21 @@ internal readonly record struct InvocationArg(
         // §14.9.4.4 GR8's INVOKE twin) happens HERE, once, for every consumer of the argument (the typed path and the
         // universal path alike), and it is what `Ref` has always meant.
         var reference = a.dataReference() ?? (keywordLess ? ConditionBinder.SoleDataReference(a.arithmeticExpression()) : null);
+        // SELF is identifier-5 under BY CONTENT, BY VALUE or no phrase (kb/Work PB1137), and it arrives as the sole
+        // primary of the expression arm (the identifier tier, kb/Work PB1425) — recovered here, once, like `Ref`.
+        bool self = IsSoleSelf(a.arithmeticExpression());
         return new(
             a.VALUE() is not null, a.REFERENCE() is not null, a.CONTENT() is not null, Omitted: a.OMITTED() is not null,
             Expression: keywordLess && reference is null && a.literal() is null && a.OMITTED() is null
-                && a.addressIdentifier() is null && !(a.SELF() is not null),
+                && a.addressIdentifier() is null && !self,
             a.booleanExpression(), a.arithmeticExpression(), a.literal(), reference,
-            a.addressIdentifier(), a.SELF() is not null);
+            a.addressIdentifier(), self);
     }
+
+    /// <summary>The argument is SELF and nothing else (§8.4.3.8). SUPER is not: §8.4.3.8.3 SR3 refuses it as an
+    /// argument, and that refusal is the OO identifier door's (<c>OoBinder.OoBindOoIdentifier</c>).</summary>
+    private static bool IsSoleSelf(Core.ArithmeticExpressionContext? arith) =>
+        ConditionBinder.SolePredefinedObject(arith)?.SELF() is not null;
 
     /// <summary>The inline form's <c>argument</c> reading (§8.4.3.4.2). No passing phrase exists in that
     /// general format, so the mode is §14.9.23.4 GR6's default — exactly what a bare INVOKE argument takes.
@@ -70,8 +78,10 @@ internal readonly record struct InvocationArg(
     public static InvocationArg OfInlineArgument(Core.ArgumentContext a) => new(
         ByValueWritten: false, ByReferenceWritten: false, ByContentWritten: false,
         Omitted: a.OMITTED() is not null,
-        Expression: a.literal() is null && a.OMITTED() is null && a.addressIdentifier() is null,
-        a.booleanExpression(), a.arithmeticExpression(), a.literal(), Ref: null, a.addressIdentifier());
+        Expression: a.literal() is null && a.OMITTED() is null && a.addressIdentifier() is null
+            && !IsSoleSelf(a.arithmeticExpression()),
+        a.booleanExpression(), a.arithmeticExpression(), a.literal(), Ref: null, a.addressIdentifier(),
+        IsSoleSelf(a.arithmeticExpression()));
 }
 
 /// <summary>

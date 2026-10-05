@@ -23,6 +23,7 @@
   "pb1425_computed_object_reference_operands",
   "pb1425_object_view",
   "pb1425_object_view_unchecked",
+  "pb1425_predefined_object_operands",
   "pb1136_invoke_selector_forms",
   "pb1165_active_class_returning_subclass",
   "pb1275_property_set_formats",

@@ -942,8 +942,9 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
                 : ConditionBinder.SoleFunctionCall(expr) is { } sfc
                     ? IntrinsicBinder.OperandOf(host.Intrinsic.BindIntrinsic(sfc))
                 // …and its Format-4 twin, as on the relation side (kb/Work PB1142): a sole inline method
-                // invocation is an identifier of its temporary's class (ISO §8.4.3.4.4 GR1).
-                : ConditionBinder.SoleInlineInvocation(expr) is { } sii ? host.Oo.OoInlineInvocationOperand(sii)
+                // invocation is an identifier of its temporary's class (ISO §8.4.3.4.4 GR1); an object-view and SELF
+                // are identifiers of class object (kb/Work PB1425).
+                : ConditionBinder.SoleOoIdentifier(expr) is { } soi ? host.Oo.OoIdentifierOperand(soi)
                 // A sole numeric LITERAL stays a literal operand — against an alphanumeric/group operand it
                 // participates as its WRITTEN character form, leading zeros intact (ISO §8.8.4.2.1).
                 : ConditionBinder.SoleNumLiteral(expr) is { } lit ? new BoundNumericLiteral(host.Expr.CheckLiteral(lit))

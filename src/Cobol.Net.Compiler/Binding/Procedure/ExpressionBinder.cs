@@ -546,14 +546,15 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
             && !IntrinsicArgumentRules.IsArithmeticOperandClass(new BoundFieldOperand(p)))
         {
             string what = NonNumericOperandKind(p);
-            if (ctx.Edition.Permissive)
+            bool decodable = IntrinsicArgumentRules.IsDigitDecodable(new BoundFieldOperand(p));
+            if (ctx.Edition.Permissive && decodable)
                 ctx.Edition.Warning("COBOLNET0844", $"{what} is not a numeric operand (ISO §8.8.1.1); accepted "
                     + "under --permissive, decoding its digit characters as an unsigned integer");
             else
             {
                 ctx.Edition.Error("COBOLNET0844", $"{what} is not a numeric operand: ISO §8.8.1.1 admits only an "
                     + "identifier referencing a NUMERIC data item, a numeric literal, or the figurative constant "
-                    + "ZERO in an arithmetic expression. --permissive accepts it as a digit-decoding extension");
+                    + "ZERO in an arithmetic expression." + PermissiveDecodingHint(decodable));
                 return BoundExprError.Refused(ctx.Edition, $"{what} in an arithmetic expression (ISO §8.8.1.1)");
             }
         }
@@ -1160,7 +1161,10 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // The two §8.4.3.1.2 identifier formats that are NOT a data-name reference — Format 1 (a FUNCTION call,
         // ISO §15; StatementBinder.Intrinsics.cs) and Format 4 (an inline method invocation, §8.4.3.4; kb/Work
         // PB428) — take ONE entry, shared with the operand-wrapper walk, so both reach §8.8.1.1's class screen.
-        if (((Antlr4.Runtime.ParserRuleContext?)pe.functionCall() ?? pe.inlineMethodInvocation()) is { } id)
+        // Formats 5 and 6 — an object-view and SELF / SUPER (kb/Work PB1425) — are identifiers of class object; they
+        // take the same entry, whose screen refuses them in an arithmetic position by §8.8.1.1's class rule.
+        if (((Antlr4.Runtime.ParserRuleContext?)pe.functionCall() ?? pe.inlineMethodInvocation()
+                ?? (Antlr4.Runtime.ParserRuleContext?)pe.objectView() ?? pe.selfAndSuper()) is { } id)
             return BindIdentifierOperand(id, context);
         return BoundExprError.Refused(ctx.Edition, "primary-expression operand");
     }
@@ -1202,9 +1206,10 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         var bound = id switch
         {
             Core.FunctionCallContext fc => host.Intrinsic.BindIntrinsic(fc),
-            Core.InlineMethodInvocationContext imi => host.Oo.OoBindInlineInvocation(imi),
+            Core.InlineMethodInvocationContext or Core.ObjectViewContext or Core.SelfAndSuperContext
+                => host.Oo.OoBindOoIdentifier(id),
             _ => throw new InvalidOperationException(
-                $"BindIdentifierOperand serves ISO §8.4.3.1.2 Formats 1 and 4 only, not {id.GetType().Name}"),
+                $"BindIdentifierOperand serves ISO §8.4.3.1.2 Formats 1, 4, 5 and 6 only, not {id.GetType().Name}"),
         };
         return ScreenIdentifierOperand(bound, id, context);
     }
@@ -1224,10 +1229,18 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         string article = cls[0] is 'a' or 'e' or 'i' or 'o' or 'u' ? "an" : "a";
         string what = bound is BoundIntrinsicCall sc
             ? $"FUNCTION {sc.Sig.Name} ({article} {cls} function, ISO §15.2)"
-            : id is Core.InlineMethodInvocationContext
-                ? $"the inline method invocation '{id.GetText()}' ({article} {cls} result, ISO §8.4.3.4.4 GR1)"
-                : $"the function-identifier '{id.GetText()}' ({article} {cls} result, ISO §15.2)";
-        if (ctx.Edition.Permissive)
+            : id switch
+            {
+                Core.InlineMethodInvocationContext =>
+                    $"the inline method invocation '{id.GetText()}' ({article} {cls} result, ISO §8.4.3.4.4 GR1)",
+                Core.ObjectViewContext =>
+                    $"the object-view '{DataBinder.WrittenText(id)}' (an object reference, ISO §8.4.3.5.4 GR1)",
+                Core.SelfAndSuperContext =>
+                    $"'{DataBinder.WrittenText(id)}' (an object reference, ISO §8.4.3.8.3 SR7)",
+                _ => $"the function-identifier '{id.GetText()}' ({article} {cls} result, ISO §15.2)",
+            };
+        bool decodable = IntrinsicArgumentRules.IsDigitDecodable(operand);
+        if (ctx.Edition.Permissive && decodable)
         {
             ctx.Edition.Warning("COBOLNET0844", $"{what} is not a numeric operand (ISO §8.8.1.1); accepted "
                 + "under --permissive, decoding its digit characters as an unsigned integer");
@@ -1235,9 +1248,14 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         }
         ctx.Edition.Error("COBOLNET0844", $"{what} is not a numeric operand: ISO §8.8.1.1 admits only an "
             + "identifier referencing a NUMERIC data item, a numeric literal, or the figurative constant "
-            + "ZERO in an arithmetic expression. --permissive accepts it as a digit-decoding extension");
+            + "ZERO in an arithmetic expression." + PermissiveDecodingHint(decodable));
         return BoundExprError.Refused(ctx.Edition, $"{what} in an arithmetic expression (ISO §8.8.1.1)");
     }
+
+    /// <summary>The closing sentence of a strict §8.8.1.1 refusal: the <c>--permissive</c> digit-decoding extension is
+    /// named only for an operand it can actually read (<see cref="IntrinsicArgumentRules.IsDigitDecodable"/>).</summary>
+    private static string PermissiveDecodingHint(bool decodable) =>
+        decodable ? " --permissive accepts it as a digit-decoding extension" : "";
 
     /// <summary>Descend an operand-wrapper node to its inner arithmetic expression, or its leaf literal / data
     /// ref. The wrapper chain can nest the expression MORE than one level deep (<c>comparisonOperand →

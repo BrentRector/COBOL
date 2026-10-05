@@ -219,14 +219,20 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
             // discharged at COMPILE time, which makes the activated-side EC-OO-EXCEPTION rule-1 check
             // STATICALLY true in v1 (D-EO5: a typed reference only ever holds a conforming object, no
             // universal identifier-1 exists, and factory objects cannot enter a typed reference).
-            if (raising.dataReference() is not { } dref) return null;
-            // kb/Work PB1030: a reference that did not resolve is the resolver's diagnostic (null = reported).
-            if (host.Expr.ResolveSending(dref).PlaceOrReported(ctx.Edition) is not { } op) return null;
-            if (op.Item.Pic is not { Category: PicCategory.ObjectReference } opic)
+            if (raising.objectReference() is not { } oref) return null;
+            bool isNull = oref.objectReferenceAtom()?.objectReferenceTerm()?.predefinedNull() is not null;
+            Place? op = isNull ? null : RaisingObjectOperand(oref, site);
+            if (!isNull && op is null) return null;   // reported
+            if (op?.Item.Pic is not { Category: PicCategory.ObjectReference } opic)
             {
-                ctx.Edition.Error("COBOLNET0849",
-                    $"{site.Context} '{DataBinder.WrittenText(dref)}': identifier-1 shall be a USAGE OBJECT REFERENCE "
-                    + $"data item ({site.Cite(site.ObjectRule)})");
+                // NULL references no object, and §14.9.18.4 GR1 b) 2. makes "the object referenced by identifier-1"
+                // the exception object — there is nothing to propagate (kb/Work PB1425's determination).
+                ctx.Edition.Error("COBOLNET0849", isNull
+                    ? $"{site.Context} NULL: the predefined NULL references no object, and the object referenced by "
+                      + $"identifier-1 is what becomes the exception object in the activating runtime element "
+                      + $"({site.Cite(site.ObjectRule)}; GR1 b) 2.)"
+                    : $"{site.Context} '{DataBinder.WrittenText(oref)}': identifier-1 shall be a USAGE OBJECT REFERENCE "
+                      + $"data item ({site.Cite(site.ObjectRule)})");
                 return null;
             }
             // ⛔ SR5d (EXIT) / SR4d (GOBACK) ask ONE thing — is this reference UNIVERSAL — and before kb/Work PB389 it was
@@ -269,6 +275,25 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
             Fatal: info.IsFatal,
             WithLocation: ctx.EcState.Turn.WithLocation(info.Name, null, line),
             StatementName: site.Verb.Split(' ')[0], Location: EcLocation(line));
+    }
+
+    /// <summary>⛔ THE RAISING PHRASE'S identifier-1 IS ANY IDENTIFIER THAT IS AN OBJECT REFERENCE (kb/Work PB1425):
+    /// GOBACK §14.9.18.3 SR4 / EXIT §14.9.14.3 SR5, "Identifier-1 shall be an object reference", ask its class, and
+    /// §8.4.3.1.3 SR1 lets any identifier format answer — so it is bound through the same doors RAISE's identifier-1
+    /// takes: a computed identifier (an inline invocation, a function-identifier, an object-view) to the temporary it
+    /// references, SELF to its ACTIVE-CLASS temporary (§8.4.3.8.4 GR1 — whose description c) then asks), a data
+    /// reference through the sending resolver. SUPER is refused by §8.4.3.8.3 SR3 inside the OO door. NULL is the
+    /// caller's (it references no object). Null after reporting.</summary>
+    private Place? RaisingObjectOperand(Core.ObjectReferenceContext oref, EcRaiseSite site)
+    {
+        if (host.Oo.OoBindComputedObjectReference(oref) is { } computed)
+            return host.Oo.OoObjectReferenceTemporary(computed, oref, "COBOLNET0849",
+                $"identifier-1 shall be an object reference ({site.Cite(site.ObjectRule)})");
+        var term = oref.objectReferenceAtom()!.objectReferenceTerm()!;
+        if (term.selfAndSuper() is { } selfOrSuper)
+            return host.Oo.OoBindOoIdentifier(selfOrSuper) is BoundNumRef self ? self.Place : null;
+        // kb/Work PB1030: a reference that did not resolve is the resolver's diagnostic (null = reported).
+        return host.Expr.ResolveSending(term.dataReference()!).PlaceOrReported(ctx.Edition);
     }
 
     /// <summary>Capture the PROCEDURE DIVISION header RAISING phrase of a program / function unit (§14.2.1) through

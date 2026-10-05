@@ -2016,8 +2016,12 @@ resumeStatement
 // uppercase word an optional word. `GOBACK RAISING LAST.` and `EXIT PROGRAM RAISING LAST.` are therefore legal
 // and were rejected outright. §7.3.21.4 rule 2 is third-party evidence inside the standard: the PROPAGATE rule
 // writes the phrase back as "as though a GOBACK RAISING LAST statement were executed".
+// ⛔ identifier-1 IS THE OBJECT-REFERENCE OPERAND RULE, NOT A BARE `dataReference` (kb/Work PB1425): §14.9.18.3 SR4 /
+// §14.9.14.3 SR5 ask "Identifier-1 shall be an object reference", a CLASS question §8.4.3.1.3 SR1 lets any identifier
+// format answer — SELF, an object-view, an inline invocation or a function returning one, exactly the operand RAISE's
+// identifier-1 is. EcBinder.EcBindRaising binds it through the same door RAISE does (OoBindComputedObjectReference).
 raisingPhrase
-    : RAISING (EXCEPTION cobolWord | LAST EXCEPTION? | dataReference)
+    : RAISING (EXCEPTION cobolWord | LAST EXCEPTION? | objectReference)
     ;
 
 // The PROCEDURE DIVISION header RAISING phrase (ISO §14.2.1), measured off the printed diagram (PDF page 557,

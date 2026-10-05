@@ -91,10 +91,11 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
                 return host.Oo.RefuseObjectViewReceiver(receivingView.objectViewReceiver(), "a receiving operand of a SET statement");
             var sorRefs = Array.ConvertAll(receivers, r => r.dataReference());
             var objRef = sor.objectReference();
-            // The grammar spells NULL / SELF / SUPER here: a data-reference, function-identifier or inline-invocation
-            // sender parses as setToValueStatement (it precedes this alternative), whose ONE classifier
-            // (SetSenders.Classify) reads it. `objectReference` is the shared object-reference operand rule, so its
-            // computed forms are read here by the shared binder too, never left to fall through unread.
+            // NULL is the sender that arrives here: every identifier the expression tier carries — a data reference,
+            // a function-identifier, an inline invocation, an object-view, SELF / SUPER (kb/Work PB1425) — parses as
+            // setToValueStatement (it precedes this alternative), whose ONE classifier (SetSenders.Classify) reads it.
+            // `objectReference` is the shared object-reference operand rule, so its other forms are still read here
+            // by the shared binder, never left to fall through unread.
             // The plain term — null for an inline invocation or an object-view, which the computed arm below binds.
             var atom = objRef.objectReferenceAtom()?.objectReferenceTerm();
             SetSender? sorSender = null;
@@ -1237,15 +1238,16 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         // §14.9.39.3 SR8. It now selects Format 5 and SR8 refuses N4 by name.
         switch (_fmt.SelectForTo(kinds, sender, out _))
         {
+            // SELF / SUPER senders arrive here too (the expression tier carries them, kb/Work PB1425), by name.
             case SetFormat.F7:
-                return BindSetPointer(recvs, sender, toNull: false, senderIsSelfSuper: false, senderText);
+                return BindSetPointer(recvs, sender, toNull: false, senderIsSelfSuper: sender.Predefined is not null, senderText);
             case SetFormat.F9:
-                return BindSetProgramPointer(recvs, sender, toNull: false, senderIsSelfSuper: false, senderText);
+                return BindSetProgramPointer(recvs, sender, toNull: false, senderIsSelfSuper: sender.Predefined is not null, senderText);
             case SetFormat.F8:
-                return BindSetFunctionPointer(recvs, sender, toNull: false, senderIsSelfSuper: false, senderText);
+                return BindSetFunctionPointer(recvs, sender, toNull: false, senderIsSelfSuper: sender.Predefined is not null, senderText);
             case SetFormat.F5:
-                return host.Oo.OoBindSetObjectRef(recvs, sender, senderNull: false, senderSelf: false,
-                    senderSuper: false, senderText);
+                return host.Oo.OoBindSetObjectRef(recvs, sender, senderNull: false, senderSelf: sender.IsSelf,
+                    senderSuper: sender.IsSuper, senderText);
             case SetFormat.F17:   // reached from a message-tag SENDER over Format 1's catch-all receiving brace
                 return BindMessageTagSet(recvs, senderText);
             case SetFormat.F1:

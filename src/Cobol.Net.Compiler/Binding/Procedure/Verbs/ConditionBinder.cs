@@ -1340,9 +1340,22 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// node instead of the meaning applies an expression rule to an identifier — which is precisely how an
     /// alphanumeric-returning invocation came to be refused as a method ARGUMENT (§14.8.2.3.3 rule 2a's
     /// COMPUTE lane instead of rule 2d's MOVE lane). Over the ONE <see cref="SolePrimary"/> descent, never a
-    /// second walk.</summary>
-    internal static Core.InlineMethodInvocationContext? SoleInlineInvocation(
-        Core.ArithmeticExpressionContext? arith) => SolePrimary(arith)?.inlineMethodInvocation();
+    /// second walk.
+    /// <para>⛔ AND ITS TWO OO SIBLINGS RIDE WITH IT (kb/Work PB1425): an object-view (Format 5) and SELF / SUPER
+    /// (Format 6) are identifiers the expression tier now carries too, and a sole one is an identifier of class
+    /// object, never an arithmetic expression. Every consumer of the family reads all three through this one
+    /// reduction and binds them through the ONE door, <c>OoBinder.OoBindOoIdentifier</c>; a consumer whose rule
+    /// treats SELF by name (SET Format 5, the INVOKE argument) asks <see cref="SolePredefinedObject"/> first.</para></summary>
+    internal static Antlr4.Runtime.ParserRuleContext? SoleOoIdentifier(Core.ArithmeticExpressionContext? arith) =>
+        SolePrimary(arith) is { } p
+            ? (Antlr4.Runtime.ParserRuleContext?)p.inlineMethodInvocation()
+              ?? (Antlr4.Runtime.ParserRuleContext?)p.objectView() ?? p.selfAndSuper()
+            : null;
+
+    /// <summary>An expression that is nothing but SELF or [object-class-name-1 OF] SUPER (§8.4.3.1.2 Format 6) — for
+    /// the positions whose rules name SELF itself (§14.9.39.3's SELF sender, §14.8.2.3.3's SET-rule argument).</summary>
+    internal static Core.SelfAndSuperContext? SolePredefinedObject(Core.ArithmeticExpressionContext? arith) =>
+        SolePrimary(arith)?.selfAndSuper();
 
     /// <summary>Bind a comparison operand: a non-numeric literal, a sole data reference, or a numeric expression.</summary>
     /// <para>⛔ AN ADDRESS-IDENTIFIER IS A RELATION OPERAND (kb/Work PB1021): §8.8.4.2.2 Format 3 prints
@@ -1407,7 +1420,9 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
                 // §8.4.3.4.4 GR1), so an alphanumeric-returning one is a legal relation operand exactly as a sole
                 // alphanumeric function is. The expression spine's §8.8.1.1 screen now reads an invocation's class
                 // too, so the sole form must be short-circuited here for the same reason PB172 gave the function.
-                : SoleInlineInvocation(expr) is { } sii ? host.Oo.OoInlineInvocationOperand(sii)
+                // An object-view and SELF ride the same reduction (kb/Work PB1425): §8.8.4.2.15, "An operand of class
+                // object may be compared with another operand of class object" — `IF O = SELF`, `IF U AS C = D`.
+                : SoleOoIdentifier(expr) is { } soi ? host.Oo.OoIdentifierOperand(soi)
                 // A sole numeric LITERAL stays a literal operand — against an alphanumeric/group operand it
                 // participates as its WRITTEN character form, leading zeros intact (ISO §8.8.4.2.1), which a
                 // computed wrapper would lose.
