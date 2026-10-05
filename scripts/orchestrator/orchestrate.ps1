@@ -114,10 +114,11 @@ function Resolve-Launch([string]$exe) {
     }
 }
 
-function Build-Prompt([string]$unit, [string]$scratch) {
+function Build-Prompt([string]$unit, [string]$scratch, [string]$sessionId) {
+    $tasksDir = (Join-Path $env:TEMP "claude/E--COBOL/$sessionId/tasks") -replace '\\', '/'   # forward slashes: the unit uses it inside bash
     $sub = {
         param($t)
-        $t.Replace('{COORD}', $CoordDir).Replace('{HANDOFF}', $Handoff).Replace('{STOP_UNIT}', $StopUnit).
+        $t.Replace('{TASKS_DIR}', $tasksDir).Replace('{COORD}', $CoordDir).Replace('{HANDOFF}', $Handoff).Replace('{STOP_UNIT}', $StopUnit).
            Replace('{PREV_HANDOFF}', $LastHandoff).Replace('{SCRATCH}', $scratch).
            Replace('{BORROW_DAYS}', "$BorrowDays")
     }
@@ -134,7 +135,7 @@ function Get-ProjectTranscriptDir([string]$sessionId) {
 
 function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]$logBase) {
     $scratch = Join-Path $CoordDir 'scratch'
-    $prompt = Build-Prompt $unit $scratch
+    $prompt = Build-Prompt $unit $scratch $sessionId
     $claudeArgs = @('-p', $prompt, '--model', $model, '--permission-mode', $PermissionMode, '--permission-prompts', 'none',
         '--output-format', 'stream-json', '--verbose', '--session-id', $sessionId)
     if ($unit -eq 'meter') { $claudeArgs += '--chrome' }

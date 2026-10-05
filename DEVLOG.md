@@ -13,6 +13,27 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1875 — 2026-10-04 17:17 PDT — Wave 1017 died with its unit: a headless session that ends a turn exits and kills the fleet; the wave unit now blocks on the Workflow's result file
+
+The second real `wave` unit (opus, 17:03) planned eight groups (wave 1017, groups A-H, Sonnet implementers) and launched the rolling-wave
+Workflow, which ran six implementers for eleven minutes (488 tool calls, 1.2 M tokens). The unit then wrote "Six implementers are
+running and the watchdog is back up. I'm waiting for the Workflow to finish." and ended its turn. Under `claude -p` nothing wakes a
+session after `end_turn` (the Workflow tool's "you will be notified when it completes" needs a live interactive session), so the
+process exited 0 with no handoff, the supervisor scored FAILURE 1 of 3, and the Workflow and two implementer gate runs were killed:
+the unit's own stream ends with `task_notification ... status: stopped`. Stranded: six worktrees `wf_a4d90677-e09-1..6`, two with
+WIP commits (groups C and D) and four with uncommitted changes. The `common.md` rule said "never end the session with a Workflow in
+flight", which a model that believes it is waiting reads as satisfied.
+
+Root cause: the unit had no mechanism for waiting, only a prohibition on ending. `wave.md` step 4 now states the fact (an ended turn
+exits the process) and the mechanism (repeat foreground `timeout 580 bash -c 'until grep -q totalToolCalls <task output>'` calls;
+the Workflow's output file is empty while it runs and holds its result when it returns, checked against a finished wave's file from
+2026-10-03). The supervisor substitutes `{TASKS_DIR}`, the session's own Workflow task-output directory with forward slashes, since
+the unit uses it inside bash. `test_orchestrate.ps1` checks the path names the unit's session and no placeholder survives (43/43).
+The `resume` unit recovers the stranded worktrees next.
+
+**Files:** `scripts/orchestrator/orchestrate.ps1`, `scripts/orchestrator/units/wave.md`, `scripts/orchestrator/test_orchestrate.ps1`.
+No diagnostic code used.
+
 ## Entry 1874 — 2026-10-04 16:40 PDT — First real `wave` unit planned nothing: the owner's `-BorrowDays` never reached the unit's own plan call
 
 `orchestrate.ps1 -MaxUnits 1 -Unit wave -BorrowDays 1` ran Opus for 42 s (10 calls, $0.57), loaded the workstream skill, called

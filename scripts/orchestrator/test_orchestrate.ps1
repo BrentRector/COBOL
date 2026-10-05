@@ -78,6 +78,13 @@ $r = Run-Orch 'borrow' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSec
 $inv = Get-Content (Join-Path $r.coord 'fake-invocations.txt') -Raw
 Check 'borrow days substituted into the unit prompt' ($inv -match '--borrow-days 2 --scratch') $true
 
+# 4d. the wave unit's prompt names the Workflow task-output directory of ITS session, so it can block on the result
+$r = Run-Orch 'tasksdir' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0')
+$inv = Get-Content (Join-Path $r.coord 'fake-invocations.txt') -Raw
+$sid = [regex]::Match($inv, '--session-id \| ([0-9a-f-]{36})').Groups[1].Value
+Check 'tasks dir names the unit session' ($inv -match [regex]::Escape("claude/E--COBOL/$sid/tasks")) $true
+Check 'no placeholder left in the prompt' ($inv -match '\{TASKS_DIR\}') $false
+
 # 5. the circuit breaker trips after three fast failures and leaves an owner note
 $r = Run-Orch 'breaker' 'fastfail' @('-Unit', 'wave', '-FastFailSeconds', '120')
 Check 'breaker exit' $r.code 4
