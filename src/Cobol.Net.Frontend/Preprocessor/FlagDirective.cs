@@ -166,61 +166,72 @@ public static class FlagOptions
 public sealed record FlagEvent(int Line, FlagDirective Which, bool On, IReadOnlyList<FlagOption> Options);
 
 /// <summary>Parses the operand of a <c>&gt;&gt;FLAG-02</c> / <c>&gt;&gt;FLAG-14</c> directive line —
-/// <c>{ ALL | option-word… } { ON | OFF }</c> (ISO §7.3.14.2 / §7.3.15.2). One-or-more option words in any order
-/// (or the single word ALL), then ON/OFF (ON is the implicit default for FLAG-02 when omitted; FLAG-14 requires
-/// the choice). The single source of directive-line syntax, reused by both collection sites.</summary>
+/// <c>{ ALL | |option…| } { ON | OFF }</c> (ISO §7.3.14.2 / §7.3.15.2). Both directives print the SAME shape, and in
+/// both <c>ALL</c> and <c>ON</c> are NOT underlined — optional words (§5.2.3) — so by §5.2.6.3 each is the DEFAULT
+/// of its braces and is selected when no other alternative is written: a bare directive is <c>ALL ON</c>, a lone
+/// <c>OFF</c> is <c>ALL OFF</c>, and a lone option list is <c>ON</c>. The option list is one or more words in any
+/// order, each at most once (§5.2.6.4 choice indicators within braces). The single source of directive-line
+/// syntax, reused by both collection sites.</summary>
 public static class FlagDirectiveLine
 {
     /// <summary>Parse the operand text that FOLLOWS the <c>FLAG-02</c>/<c>FLAG-14</c> keyword. On success yields the
     /// selected options (empty ⇒ ALL) and the ON/OFF flag; on a malformed operand yields <paramref name="error"/>
-    /// (an unknown option word, no option/ALL named, or a missing ON/OFF for FLAG-14).</summary>
+    /// (an unknown option word, a word written twice, <c>ALL</c> combined with options, or an ON/OFF that is not the
+    /// last word).</summary>
     public static bool TryParse(FlagDirective directive, string operand,
         out IReadOnlyList<FlagOption> options, out bool on, out string? error)
     {
         options = [];
-        on = true;
+        on = true;   // §5.2.6.3: ON is the un-underlined alternative of its braces, hence the default; §7.3.15.4 2): "explicitly or implicitly specified"
         error = null;
 
         var tokens = operand.SplitSpaces();
-        if (tokens.Length == 0) { error = "no option and no ON/OFF phrase"; return false; }
 
-        // Trailing ON/OFF (FLAG-14 requires it; FLAG-02 defaults to ON when omitted).
+        // The second pair of braces: a trailing ON/OFF, written or not, identically for both directives.
         int end = tokens.Length;
-        string last = tokens[^1].ToUpperInvariant();
-        if (last is "ON" or "OFF") { on = last == "ON"; end--; }
-        else if (directive == FlagDirective.Flag14) { error = "the ON or OFF phrase is required"; return false; }
+        if (end > 0 && tokens[^1].ToUpperInvariant() is "ON" or "OFF")
+        {
+            on = tokens[^1].ToUpperInvariant() == "ON";
+            end--;
+        }
 
-        if (end == 0) { error = "no option or ALL is named"; return false; }
-
-        // ALL is a fan-out to every option of the directive; it may not be combined with named options.
-        bool all = false;
+        // The first pair of braces: ALL (un-underlined, so the default when no option is written) or the option list.
+        bool allWritten = false;
         var picked = new List<FlagOption>();
         for (int i = 0; i < end; i++)
         {
             string w = tokens[i].ToUpperInvariant();
-            if (w == "ALL") { all = true; continue; }
-            if (FlagOptions.TryOption(directive, w) is { } opt)
+            if (w == "ALL")
             {
-                if (!picked.Contains(opt)) picked.Add(opt);   // §5.2.6.4: each option at most once
-                continue;
+                if (allWritten) { error = Repeated(tokens[i]); return false; }
+                allWritten = true;
             }
-            error = $"'{tokens[i]}' is not a valid option of >>{DirectiveWord(directive)}";
-            return false;
+            else if (w is "ON" or "OFF")
+            {
+                error = $"'{tokens[i]}' may be written only once, as the last word of the directive";
+                return false;
+            }
+            else if (FlagOptions.TryOption(directive, w) is { } opt)
+            {
+                if (picked.Contains(opt)) { error = Repeated(tokens[i]); return false; }
+                picked.Add(opt);
+            }
+            else
+            {
+                error = $"'{tokens[i]}' is not a valid option of >>{DirectiveWord(directive)}";
+                return false;
+            }
         }
 
-        if (all)
-        {
-            if (picked.Count > 0) { error = "ALL may not be combined with individual options"; return false; }
-            options = [];   // empty ⇒ ALL fan-out at fold time
-        }
-        else
-        {
-            if (picked.Count == 0) { error = "no option or ALL is named"; return false; }
-            options = picked;
-        }
-
+        if (allWritten && picked.Count > 0) { error = "ALL may not be combined with individual options"; return false; }
+        options = allWritten || picked.Count == 0 ? [] : picked;   // empty ⇒ ALL fan-out at fold time
         return true;
     }
+
+    /// <summary>§5.2.6.4: within choice indicators enclosed by braces "any single alternative shall be specified only
+    /// once" — a repeated option word (or a repeated ALL) is a syntax error, never a silent merge.</summary>
+    private static string Repeated(string word) =>
+        $"'{word}' is specified more than once (ISO §5.2.6.4: any single alternative shall be specified only once)";
 
     /// <summary>The directive's general-format word — <c>FLAG-02</c> / <c>FLAG-14</c>.</summary>
     public static string DirectiveWord(FlagDirective directive) =>

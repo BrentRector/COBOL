@@ -50,15 +50,57 @@ public sealed class FlagDirectiveTests
     {
         Assert.True(FlagDirectiveLine.TryParse(FlagDirective.Flag02, "I-O-STATUS-07",
             out var options, out bool on, out _));
-        Assert.True(on);   // FLAG-02: ON is the implicit default (§7.3.14.2)
+        Assert.True(on);   // ON is not underlined: the implicit default (§5.2.6.3, §7.3.14.2)
         Assert.Equal([FlagOption.Flag02IoStatus07], options);
     }
 
-    [Fact]
-    public void Parse_Flag14_MissingOnOff_IsError()
+    // §7.3.14.2 / §7.3.15.2 print ALL and ON NOT underlined: optional words (§5.2.3), so §5.2.6.3 makes each the
+    // DEFAULT of its braces. The rendered pages (ISO PDF p.100 / p.102), not the OCR, decide the underlining.
+    [Theory]
+    [InlineData(FlagDirective.Flag14, "READ-PREVIOUS", "READ-PREVIOUS", true)]    // ON omitted  -> ON
+    [InlineData(FlagDirective.Flag02, "I-O-STATUS-07", "I-O-STATUS-07", true)]
+    [InlineData(FlagDirective.Flag14, "ALL", "", true)]                              // ON omitted  -> ON
+    [InlineData(FlagDirective.Flag02, "ALL", "", true)]
+    [InlineData(FlagDirective.Flag14, "OFF", "", false)]                             // ALL omitted -> ALL
+    [InlineData(FlagDirective.Flag02, "OFF", "", false)]
+    [InlineData(FlagDirective.Flag14, "ON", "", true)]
+    [InlineData(FlagDirective.Flag02, "ON", "", true)]
+    [InlineData(FlagDirective.Flag14, "", "", true)]                                 // both omitted -> ALL ON
+    [InlineData(FlagDirective.Flag02, "", "", true)]
+    [InlineData(FlagDirective.Flag14, "   ", "", true)]
+    public void Parse_AllAndOn_AreTheDefaults_WhenOmitted(FlagDirective directive, string operand, string expectedWord, bool expectedOn)
     {
-        Assert.False(FlagDirectiveLine.TryParse(FlagDirective.Flag14, "READ-PREVIOUS", out _, out _, out string? error));
-        Assert.NotNull(error);   // FLAG-14 requires the ON/OFF choice
+        Assert.True(FlagDirectiveLine.TryParse(directive, operand, out var options, out bool on, out string? error), error);
+        Assert.Equal(expectedOn, on);
+        if (expectedWord.Length == 0) Assert.Empty(options);   // empty => the ALL fan-out
+        else Assert.Equal([FlagOptions.TryOption(directive, expectedWord)!.Value], options);
+    }
+
+    // §5.2.6.4: within choice indicators enclosed by braces "any single alternative shall be specified only once"
+    // — a repeat is a syntax error, never a silent merge; ALL is one alternative of the outer braces.
+    [Theory]
+    [InlineData(FlagDirective.Flag14, "VALUE-ZERO VALUE-ZERO ON")]
+    [InlineData(FlagDirective.Flag14, "EVALUATE READ-PREVIOUS evaluate")]
+    [InlineData(FlagDirective.Flag02, "I-O-STATUS-07 I-O-STATUS-07")]
+    [InlineData(FlagDirective.Flag02, "ALL ALL ON")]
+    [InlineData(FlagDirective.Flag14, "ALL ALL")]
+    public void Parse_RepeatedAlternative_IsError(FlagDirective directive, string operand)
+    {
+        Assert.False(FlagDirectiveLine.TryParse(directive, operand, out _, out _, out string? error));
+        Assert.Contains("more than once", error, StringComparison.Ordinal);
+    }
+
+    // ON / OFF is the second pair of braces: one alternative, written last. A mid-list or doubled one is an
+    // error, and an option list is never confused with it.
+    [Theory]
+    [InlineData(FlagDirective.Flag14, "ON READ-PREVIOUS")]
+    [InlineData(FlagDirective.Flag14, "READ-PREVIOUS OFF ON")]
+    [InlineData(FlagDirective.Flag02, "ALL ON OFF")]
+    [InlineData(FlagDirective.Flag02, "OFF OFF")]
+    public void Parse_OnOffNotLast_IsError(FlagDirective directive, string operand)
+    {
+        Assert.False(FlagDirectiveLine.TryParse(directive, operand, out _, out _, out string? error));
+        Assert.Contains("last word", error, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -218,6 +260,51 @@ public sealed class FlagDirectiveTests
             "           STOP RUN.\n";
         var warnings = CompileWarnings(program);
         Assert.Contains(warnings, w => w.Contains("warning COBOLNET1620", StringComparison.Ordinal));
+    }
+
+    // ── PB1374: the printed defaults, end to end — ALL and ON omitted (§5.2.6.3) ─────────────────────────────
+
+    private static bool FlaggedValueZero(string directives) =>
+        CompileWarnings(ValueProgram(directives, "01 NE PIC ZZ9.99 VALUE ZERO."))
+            .Any(w => w.Contains("COBOLNET1621", StringComparison.Ordinal) && w.Contains("VALUE-ZERO", StringComparison.Ordinal));
+
+    [Theory]
+    [InlineData("       >>FLAG-14 VALUE-ZERO\n", true)]            // ON omitted: the option list is ON
+    [InlineData("       >>FLAG-14 ALL\n", true)]                    // ON omitted: ALL is ON
+    [InlineData("       >>FLAG-14 ON\n", true)]                     // ALL omitted: every option
+    [InlineData("       >>FLAG-14\n", true)]                        // both omitted: ALL ON
+    [InlineData("       >>FLAG-14\n       >>FLAG-14 OFF\n", false)] // OFF with ALL omitted turns every option off (GR2)
+    [InlineData("       >>FLAG-14 VALUE-ZERO\n       >>FLAG-14 VALUE-ZERO OFF\n", false)]
+    [InlineData("       >>FLAG-14 OFF\n", false)]                   // OFF from the default-off state flags nothing (GR5)
+    public void Compile_Flag14_DefaultedBraces_SelectTheRightOptions(string directives, bool flagged) =>
+        Assert.Equal(flagged, FlaggedValueZero(directives));
+
+    [Theory]
+    [InlineData("       >>FLAG-02 I-O-STATUS-07\n", true)]          // ON omitted
+    [InlineData("       >>FLAG-02 ON\n", true)]                     // ALL omitted
+    [InlineData("       >>FLAG-02\n", true)]                        // both omitted
+    [InlineData("       >>FLAG-02\n       >>FLAG-02 OFF\n", false)]
+    [InlineData("       >>FLAG-02 OFF\n", false)]
+    public void Compile_Flag02_DefaultedBraces_SelectTheRightOptions(string directive, bool flagged)
+    {
+        string program =
+            "       IDENTIFICATION DIVISION.\n" +
+            "       PROGRAM-ID. FLAGDF.\n" +
+            "       ENVIRONMENT DIVISION.\n" +
+            "       INPUT-OUTPUT SECTION.\n" +
+            "       FILE-CONTROL.\n" +
+            "           SELECT F ASSIGN TO \"f.dat\".\n" +
+            "       DATA DIVISION.\n" +
+            "       FILE SECTION.\n" +
+            "       FD F.\n" +
+            "       01 F-REC PIC X(4).\n" +
+            "       PROCEDURE DIVISION.\n" +
+            "       MAIN.\n" +
+            "           OPEN INPUT F.\n" +
+            directive +
+            "           CLOSE F UNIT.\n" +
+            "           STOP RUN.\n";
+        Assert.Equal(flagged, CompileWarnings(program).Any(w => w.Contains("COBOLNET1620", StringComparison.Ordinal)));
     }
 
     // ── Incr 1a: the VALUE-clause data options g NUM-ED-ZERO-FIGCONST + l VALUE-ZERO (§7.3.15.4 GR4 g/l) ──

@@ -2916,13 +2916,13 @@
   "ordinal": 1,
   "subject": "FLAG-14 directive",
   "rule-digest": "53acc3b946bf",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs#FlagConformancePass; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#FlagScanState; src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs#Flag14Warning",
-  "test-ref": "unit:FlagDirectiveTests.Compile_Flag14ReadPreviousOn_EmitsCobolnet1621; unit:FlagPopulationTests.IoStatus_FlagsEveryConditionThatTestsTheFileStatusItem",
+  "test-ref": "unit:FlagDirectiveTests.Compile_Flag14ReadPreviousOn_EmitsCobolnet1621; unit:FlagPopulationTests.IoStatus_FlagsEveryConditionThatTestsTheFileStatusItem; unit:FlagDirectiveTests.Compile_Flag14_DefaultedBraces_SelectTheRightOptions",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1374 (handed over from PB1375, w1012k). cite.py --check 7.3.15.4 'The implementor shall provide a warning mechanism that flags the incompatibilities potentially affecting existing programs' OK (GR1). The mechanism exists (COBOLNET1621, a Warning, one per flagged construct, per-option message naming its GR4 sub-rule and Annex E.2 item, documented in docs/DIAGNOSTICS.md and CONFORMANCE.md A.1 item 80) and, since kb/Work PB1375, flags every option's whole GR4 population (see GR-7.3.15.4-4). What remains is the SELECTION of an option: the implicit-ON / implicit-ALL forms ('>>FLAG-14 VALUE-ZERO', '>>FLAG-14 ALL', '>>FLAG-14 OFF') are refused with COBOLNET1622 (FMT-7.3.15.2; kb/Work PB1374), so some legal ways to select an option cannot reach the mechanism.",
-  "state": "GAP"
+  "notes": "kb/Work PB1374 (w1020f). cite.py --check 7.3.15.4 'The implementor shall provide a warning mechanism that flags the incompatibilities potentially affecting existing programs' OK (GR1). The mechanism (COBOLNET1621, a Warning, one per flagged construct, naming its GR4 sub-rule and Annex E.2 item; docs/DIAGNOSTICS.md, CONFORMANCE.md A.1 item 80) flags every option's whole GR4 population (GR-7.3.15.4-4), and every legal way to SELECT an option now reaches it: the implicit-ON / implicit-ALL forms `>>FLAG-14 VALUE-ZERO`, `>>FLAG-14 ALL`, `>>FLAG-14 ON`, `>>FLAG-14 OFF`, bare `>>FLAG-14` are accepted (FMT-7.3.15.2), probed on the w1020f build: each flags or silences VALUE-ZERO as 5.2.6.3 requires.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.15.4-2",
@@ -2931,13 +2931,13 @@
   "ordinal": 2,
   "subject": "FLAG-14 directive",
   "rule-digest": "29919097a8a4",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/FlagState.cs#IsOnAt; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#FlagScanState; src/Cobol.Net.Frontend/Preprocessor/FlagDirective.cs#TryParse",
-  "test-ref": "unit:FlagDirectiveTests.Fold_DefaultsOff_AndIsStickyForwardStrictlyAfterTheDirective",
+  "test-ref": "unit:FlagDirectiveTests.Fold_DefaultsOff_AndIsStickyForwardStrictlyAfterTheDirective; unit:FlagDirectiveTests.Compile_Flag14_DefaultedBraces_SelectTheRightOptions; unit:FlagDirectiveTests.Parse_AllAndOn_AreTheDefaults_WhenOmitted",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1374 (registrar 15a). cite.py --check 7.3.15.4 'If ON is explicitly or implicitly specified for an option' OK. EXPLICIT ON works: FlagState.IsOnAt folds the last toggle strictly before the site line, so ON applies to the text that follows. ON is sticky until end of the group, until an ALL OFF (Fold_AllOff_ResetsAPreviouslyEnabledOption; probe FH '>>FLAG-14 VALUE-ZERO ON' then '>>FLAG-14 ALL OFF' -> no warning), or until that option's own OFF (probe FG: ALL ON then VALUE-ZERO OFF -> VALUE-ZERO silent, while NUM-ED-ZERO-FIGCONST and VALUE-EDITING still flag). The frontend-inline FlagScanState mirrors the fold for b/c, applies only in emitting branches, and joins PUSH/POP. IMPLICIT ON (the word omitted, 5.2.6.3 default) is rejected with COBOLNET1622 by FlagDirectiveLine.TryParse (probes FA/FB/FD). That half of the rule is unreachable, which is the FMT-7.3.15.2 mechanism.",
-  "state": "GAP"
+  "notes": "kb/Work PB1374 (w1020f). cite.py --check 7.3.15.4 'If ON is explicitly or implicitly specified for an option' OK. EXPLICIT ON: FlagState.IsOnAt folds the last toggle strictly before the site line (Fold_DefaultsOff_AndIsStickyForwardStrictlyAfterTheDirective), sticky until the end of the group, an ALL OFF or that option's own OFF. IMPLICIT ON (the word omitted, the 5.2.6.3 default) is now accepted by FlagDirectiveLine.TryParse: `>>FLAG-14 VALUE-ZERO`, `>>FLAG-14 ALL` and a bare `>>FLAG-14` flag exactly as the written-ON forms do (Compile_Flag14_DefaultedBraces_SelectTheRightOptions).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.15.4-3",
@@ -2946,13 +2946,13 @@
   "ordinal": 3,
   "subject": "FLAG-14 directive",
   "rule-digest": "ec948a7d09a0",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/FlagState.cs#IsOnAt; src/Cobol.Net.Frontend/Preprocessor/FlagDirective.cs#TryParse",
-  "test-ref": "unit:FlagDirectiveTests.Compile_Flag14ReadPreviousOff_EmitsNoFlagWarning",
+  "test-ref": "unit:FlagDirectiveTests.Compile_Flag14ReadPreviousOff_EmitsNoFlagWarning; unit:FlagDirectiveTests.Compile_Flag14_DefaultedBraces_SelectTheRightOptions",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1374 (registrar 15a). cite.py --check 7.3.15.4 'If OFF is specified, flagging for the selected option or options is disabled' OK. OFF for EXPLICITLY selected options works: a single option (probe FG), several options, and explicit ALL OFF (probe FH; unit Fold_AllOff_ResetsAPreviouslyEnabledOption). '>>FLAG-14 OFF' is OFF specified with the implicitly selected ALL (the 5.2.6.3 default of the outer braces), and it is rejected with COBOLNET1622 'no option or ALL is named' (probe FC), so that form of the rule cannot be exercised. Same mechanism as FMT-7.3.15.2.",
-  "state": "GAP"
+  "notes": "kb/Work PB1374 (w1020f). cite.py --check 7.3.15.4 'If OFF is specified, flagging for the selected option or options is disabled' OK. OFF for explicitly selected options (a single option, several, explicit ALL OFF) already worked; `>>FLAG-14 OFF` is OFF with the implicitly selected ALL (the 5.2.6.3 default of the outer braces) and is now accepted: a bare `>>FLAG-14` followed by `>>FLAG-14 OFF` leaves VALUE-ZERO silent (Compile_Flag14_DefaultedBraces_SelectTheRightOptions).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.15.4-4",
@@ -57201,13 +57201,13 @@
   "ordinal": 0,
   "subject": "FLAG-02 directive",
   "rule-digest": "1df3dcb486ca",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/FlagDirective.cs#TryParse; src/Cobol.Net.Frontend/Preprocessor/FlagDirectiveProcessor.cs#Process",
-  "test-ref": "",
+  "test-ref": "unit:FlagDirectiveTests.Parse_AllAndOn_AreTheDefaults_WhenOmitted; unit:FlagDirectiveTests.Parse_RepeatedAlternative_IsError; unit:FlagDirectiveTests.Parse_OnOffNotLast_IsError; unit:FlagDirectiveTests.Compile_Flag02_DefaultedBraces_SelectTheRightOptions; conformance:2014/pb1374_flag02_defaults; conformance:negative/pb1374-flag02-all-repeated",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "kb/Work PB1374 (registrar 15a). Printed format (PDF p.100 / folio 70, rendered and inspected: ALL and ON carry NO underline; FLAG-02, the five option words and OFF are underlined). cite.py --check 5.2.3 'They are shown in uppercase and not underlined in general formats' OK; --check 5.2.6.3 'If one of the alternatives contains only optional words, that alternative is the default and is selected unless another alternative is explicitly specified' OK; --check 5.2.6.4 'but any single alternative shall be specified only once' OK. So the outer braces' ALL alternative (optional words only) is the DEFAULT: `>>FLAG-02`, `>>FLAG-02 ON`, `>>FLAG-02 OFF` are legal and mean ALL ON / ALL ON / ALL OFF (GR2's 'a FLAG-02 directive ... that turns off all flagging options'). Code: TryParse returns 'no option or ALL is named' / 'no option and no ON/OFF phrase' -> COBOLNET1622 ERROR. Probes a/b/c.cbl: all three rejected (a.cbl(12,1): error COBOLNET1622). Opposite half: `>>FLAG-02 I-O-STATUS-07 I-O-STATUS-07 ON` and `>>FLAG-02 ALL ALL ON` are ACCEPTED (TryParse dedups silently, comment cites 5.2.6.4 but applies it as a merge, not a rejection) -> under-rejects (probes d/f). Verified correct: ALL alone, several options any order, trailing ON omitted = ON, ALL+option rejected, unknown word rejected, 2002 rejects (COBOLNET0900), 2023 warns obsolete (COBOLNET0903). Sibling (rule 4): FlagDirectiveLine.TryParse also REQUIRES ON/OFF for FLAG-14 though §7.3.15.2 prints ON bare too (outside this row set). probe dir: scratchpad/adj-d2/out/probe/flag02/ (pinned adj-d2 cobol.exe, --std 2014) || editions (adjudicator): 2014 (introduced: §7.3.14.1 — incompatibilities between ISO 1989:2002 and ISO/IEC 1989:2014); 2023 (obsolete element, §7.3.14.1 NOTE); not in 1985/2002",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "kb/Work PB1374 (w1020f). Printed format rendered from the canonical PDF (p.100, folio 70): `>> FLAG-02 { ALL | { |EC-PROGRAM-EXCEPTIONS | I-O-STATUS-07 | MOVE-TO-SAME-NAME | RANGE-EXCEPTION-FOR-INDEX | TERMINATE-WITH-VARYING| } } { ON | OFF }` with FLAG-02, the five option words and OFF underlined and ALL and ON NOT. cite.py --check 5.2.3 'They are shown in uppercase and not underlined in general formats' OK; 5.2.6.3 'If one of the alternatives contains only optional words, that alternative is the default and is selected unless another alternative is explicitly specified' OK; 5.2.6.4 'any single alternative shall be specified only once' OK. FlagDirectiveLine.TryParse now takes the ON/OFF braces as optional (default ON) and the outer braces as ALL by default, so `>>FLAG-02`, `>>FLAG-02 ON` and `>>FLAG-02 OFF` are accepted (ALL ON / ALL ON / ALL OFF), and a repeated option word or repeated ALL, ALL combined with options, or an ON/OFF that is not the last word is COBOLNET1622. Before: the three forms were rejected and a repeated word silently merged. The same parse serves FLAG-14 (FMT-7.3.15.2). [editions: introduced 2014 (7.3.14.1), obsolete element at 2023 (7.3.14.1 NOTE) so it warns COBOLNET0903 and still works; refused below 2014 with COBOLNET0900]",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-7.3.15.2",
@@ -57216,13 +57216,13 @@
   "ordinal": 0,
   "subject": "FLAG-14 directive",
   "rule-digest": "6a3ebbfe62f0",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/FlagDirective.cs#TryParse; src/Cobol.Net.Frontend/Preprocessor/FlagDirectiveProcessor.cs#Process",
-  "test-ref": "",
+  "test-ref": "unit:FlagDirectiveTests.Parse_AllAndOn_AreTheDefaults_WhenOmitted; unit:FlagDirectiveTests.Parse_RepeatedAlternative_IsError; unit:FlagDirectiveTests.Parse_OnOffNotLast_IsError; unit:FlagDirectiveTests.Compile_Flag14_DefaultedBraces_SelectTheRightOptions; conformance:2023/pb1374_flag14_defaults; conformance:negative/pb1374-flag14-option-repeated",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1374 (registrar 15a). The printed format is >>FLAG-14 { ALL | { |option...| } } { ON | OFF }, with ALL and ON NOT underlined (spec figure note, PB808's glyph measurement against page 102, and errata D1). cite.py --check 5.2.3 'They are shown in uppercase and not underlined in general formats' OK; --check 5.2.6.3 'If one of the alternatives contains only optional words, that alternative is the default and is selected unless another alternative is explicitly specified' OK. So ON is the default of the trailing braces (GR2 says 'explicitly or implicitly specified' -- cite.py --check 7.3.15.4 'If ON is explicitly or implicitly specified for an option' OK) and ALL is the default of the outer braces (which also resolves errata D1: omitting ALL means the same as writing it). FlagDirectiveLine.TryParse instead returns 'the ON or OFF phrase is required' for FLAG-14 and 'no option or ALL is named' when only ON/OFF is written. Probes (pinned cobol.exe, E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/flag14/): FA '>>FLAG-14 VALUE-ZERO' -> COBOLNET1622 error (expected: accepted, VALUE-ZERO ON); FB '>>FLAG-14 ALL' -> 1622 (expected ALL ON); FC '>>FLAG-14 OFF' -> 1622 (expected ALL OFF); FD bare '>>FLAG-14' -> 1622 (expected ALL ON); FI '>>FLAG-14 ON' -> 1622 (expected ALL ON). Correct: explicit ALL ON/OFF, several options in any order (FF), lowercase words (FJ), unknown word and ALL-plus-option rejected. Second defect, under-rejection: FE '>>FLAG-14 VALUE-ZERO VALUE-ZERO ON' compiles clean because TryParse silently de-duplicates, but 5.2.6.4 says 'any single alternative shall be specified only once' (cite.py --check 5.2.6.4 OK). The green unit test FlagDirectiveTests.Parse_Flag14_MissingOnOff_IsError PINS the divergence, and DESIGN-flag-directives.md says 'FLAG-14 requires the choice', which contradicts the spec's own figure note. No open kb/Work note owns this (PB808 is the LISTING transcription note only). The spec figure note's closing sentence ('The trailing ON/OFF braces are a separate, required one-of-two selection') contradicts its own first paragraph; see dossier_gaps. || editions (adjudicator): 2023 (FLAG-14 is new in 2023 per 7.3.15.1 / Annex E new-features item 21; below 2023 COBOLNET0900 fires, verified with --std 2014)",
-  "state": "GAP"
+  "notes": "kb/Work PB1374 (w1020f). Printed format rendered from the canonical PDF (p.102, folio 72): `>> FLAG-14 { ALL | { |twelve options| } } { ON | OFF }` with FLAG-14, every option word and OFF underlined and ALL and ON NOT (the spec figure note agrees; its closing sentence calling the ON/OFF braces 'required' contradicted its own first paragraph and is corrected in specs/ISO_COBOL.md). cite.py --check 5.2.3, 5.2.6.3, 5.2.6.4 and 7.3.15.4 'If ON is explicitly or implicitly specified for an option' OK. TryParse now accepts `>>FLAG-14 VALUE-ZERO`, `>>FLAG-14 ALL`, `>>FLAG-14 ON`, `>>FLAG-14 OFF` and a bare `>>FLAG-14` (ALL and ON are the defaults, 5.2.6.3), and refuses `>>FLAG-14 VALUE-ZERO VALUE-ZERO ON` (5.2.6.4) with COBOLNET1622. Before: the first five drew COBOLNET1622 and the repeat compiled clean. [editions: a 2023 introduction (7.3.15.1); COBOLNET0900 below 2023]",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-7.3.16.2",

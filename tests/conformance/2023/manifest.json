@@ -801,7 +801,8 @@
   "pb1293_report_source_move_valid",
   "pb1134_options_initialize_index_and_national",
   "pb1134_method_local_storage_numeric_fill",
-  "pb533_editing_char1_basic_letters"
+  "pb533_editing_char1_basic_letters",
+  "pb1374_flag14_defaults"
   ],
  "pending": [
   "pb485_value_only_format1"

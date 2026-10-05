@@ -40,9 +40,12 @@ indicators** (the `|…|` bars the OCR dropped, restored in the `.md` figure not
                        | WRITE-END-OF-PAGE| } }  { ON | OFF }
 ```
 
-* One directive names **`ALL`** or **one-or-more option words** (each at most once, **any order**), then a
-  **required** `ON | OFF`. (`ON` is not underlined in FLAG-02 = the implicit default when the trailing word is
-  omitted; FLAG-14 requires the choice.)
+* One directive names **`ALL`** or **one-or-more option words** (each at most once, **any order**; a repeated
+  word is a syntax error, COBOLNET1622, §5.2.6.4), then `ON | OFF`. In BOTH directives the printed format leaves
+  `ALL` and `ON` un-underlined (rendered ISO PDF pp. 100 and 102): optional words (§5.2.3), so each is the
+  DEFAULT of its braces (§5.2.6.3) and is selected when the other alternative is not written. A bare directive
+  is `ALL ON`, a lone `OFF` is `ALL OFF`, a lone option list is `ON`, and `ON`/`OFF` is the last word
+  (kb/Work PB1374). One parse rule for both directives; only the option vocabulary differs.
 * **SR1 (placement, both):** only between clauses outside the procedure division, and between statements
   within it — i.e. a free-standing directive line at a clause/statement boundary.
 * **State semantics (GR2/GR3/GR5, both):** default **OFF** for every option (GR5). `ON` is **sticky-forward**

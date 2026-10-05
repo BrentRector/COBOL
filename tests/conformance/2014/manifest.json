@@ -192,7 +192,8 @@
   "pb1929_set_function_pointer_function_sender",
   "pb1948_dynamic_length_limit_constant",
   "pb1674_global_capacity_register",
-  "pb1265_occurs_printed_formats"
+  "pb1265_occurs_printed_formats",
+  "pb1374_flag02_defaults"
  ],
  "pending": []
 }

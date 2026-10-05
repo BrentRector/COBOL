@@ -2366,7 +2366,9 @@
   "pb533-picture-editing-extended-letter",
   "pb819-usage-message-tag-elementary",
   "pb1089-currency-symbol-literal7-class-usage",
-  "pb529-picture-editing-no-digit-position"
+  "pb529-picture-editing-no-digit-position",
+  "pb1374-flag14-option-repeated",
+  "pb1374-flag02-all-repeated"
  ],
  "pending": []
 }

@@ -1353,8 +1353,9 @@ public static class DiagnosticCatalog
         + "affecting existing programs (the specific option + change is named in the message).", "ISO §7.3.15");
     public static readonly DiagnosticDescriptor FlagDirectiveMalformed = new(
         "COBOLNET1622", "flag-directive-malformed", EditionSeverity.Error,
-        "A >>FLAG-02 / >>FLAG-14 directive is malformed — an unknown option word, no option or ALL named, ALL "
-        + "combined with individual options, or (FLAG-14) a missing ON/OFF phrase.", "ISO §7.3.14.2 / §7.3.15.2");
+        "A >>FLAG-02 / >>FLAG-14 directive is malformed — an unknown option word, an option word or ALL written "
+        + "more than once (§5.2.6.4), ALL combined with individual options, or an ON/OFF that is not the last word.",
+        "ISO §7.3.14.2 / §7.3.15.2");
     // §7.3.10 COBOL-WORDS directive — a malformed directive or a syntax-rule violation. Error: an ill-formed or
     // rule-violating word-modification would silently mis-shape the reserved/context/function word tables.
     public static readonly DiagnosticDescriptor CobolWordsDirectiveInvalid = new(
