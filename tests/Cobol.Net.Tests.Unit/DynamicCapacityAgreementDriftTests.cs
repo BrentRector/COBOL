@@ -22,12 +22,14 @@ namespace CobolNet.Tests.Unit;
 /// <c>CobolDynString.Agree</c> asks the question there. A table cannot get into that position: the implementor's
 /// internal format is one <c>CobolDynTable</c> object, and every one a program reads was CONSTRUCTED from that
 /// program's own OCCURS clause (its FROM minimum and TO expected capacity) or RECREATED into it by
-/// <c>FromCurrentImage</c>, which applies the receiving description's minimum (§14.6.9.2). No storage form shares
-/// one across descriptions: an EXTERNAL record holding one is refused (COBOLNET0899), a file record cannot hold one
-/// (§8.5.1.9.1 3)), and a LINKAGE one sits in a variable-length group formal, which crosses through that same
-/// recreation. So rule 6 is unreachable BY CONSTRUCTION, and these facts are what keep it so: a new path that
-/// built or adopted a table some other way would have to say whose OCCURS clause it agrees with, and fails here
-/// first.
+/// <c>FromCurrentImage</c>, which applies the receiving description's minimum (§14.6.9.2). A file record cannot hold
+/// one (§8.5.1.9.1 3)), and a LINKAGE one sits in a variable-length group formal, which crosses through that same
+/// recreation. ONE storage form does share a table across descriptions — a CELL-BACKED area (kb/Work PB1042: two
+/// programs describing one EXTERNAL record) — and there rule 6 is reachable and is asked on every reference:
+/// <c>StorageCell.DynTableAt</c> takes the REFERENCING description's minimum and element width, carried by the
+/// <c>CellTableSegment</c> every cell table reference is built from. Everywhere else rule 6 is unreachable BY
+/// CONSTRUCTION, and these facts are what keep it so: a new path that built or adopted a table some other way would
+/// have to say whose OCCURS clause it agrees with, and fails here first.
 /// </summary>
 public sealed class DynamicCapacityAgreementDriftTests
 {

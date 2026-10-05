@@ -7266,13 +7266,13 @@
   "ordinal": 1,
   "subject": "Data-address-identifier",
   "rule-digest": "2962a8aa9dae",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#BindDataAddress; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/PtrBinder.cs#PtrBindAddressOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ResolveForAddressOf; src/Cobol.Net.Compiler/Binding/DataBinder.Ptr.cs#PtrScanAddressOfTargets; src/Cobol.Net.Compiler/CodeGen/Verbs/PtrEmitter.cs#AddressOfText",
-  "test-ref": "conformance:2002/address_of_qualified",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#ForceStringCanonical; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#AssignCellComponents; src/Cobol.Net.Runtime/Control/StorageCell.cs#DynTableAt",
+  "test-ref": "conformance:2002/address_of_qualified; conformance:2014/pb1042_cell_variable_components",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1042 (registrar 15b). GR1 \"creates a unique data item of class pointer and category data-pointer that contains the address of identifier-1\" (cite.py --check 8.4.3.11.4 -> OK 1)). Probe p1.cob: ADDRESS OF a WS record, of a subscripted occurrence W-T(2), of an elementary item at offset 0 (P = P2 -> SAME), of a LOCAL-STORAGE item, relation `IF ADDRESS OF W-REC = P`, and `SET ADDRESS OF B TO ADDRESS OF W-REC` then a MOVE into W-A visible through B (QBCD) - all correct; F1.cob FILE SECTION record correct; RS.cob national group, national leaf, ODO group and ODO element all accepted and run. PARTIAL because a legal operand is still refused by a named storage residue: `01 DT. 05 DX OCCURS DYNAMIC. 10 DY PIC X(2).` + `SET P TO ADDRESS OF DT` -> COBOLNET0869 'could not be placed on addressable cell storage (... dynamic-capacity table ... no fixed extent)'; SR6 forbids only an ELEMENT of / an item SUBORDINATE TO a dynamic-capacity table, not the group containing it. That rejection is owned by open kb/Work PB1042 (rejects_legal_source) - not re-reported here.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1042 (wave 1021 B2). GR1 'Data-address-identifier creates a unique data item of class pointer and category data-pointer that contains the address of identifier-1'. The one PARTIAL residue (ADDRESS OF a group CONTAINING a dynamic-capacity table refused COBOLNET0869, though §8.4.3.11.3 SR6 bars only an element of / an item subordinate to such a table) is closed: the ADDRESS-OF cell forcer (ForceStringCanonical, the one forcer of the three cell surfaces) now carries the table as a cell component. Measured: SET P TO ADDRESS OF DT with DT holding OCCURS DYNAMIC ... INITIALIZED, then SET ADDRESS OF B TO P; DT grows by receiving subscript and SET UP BY, its INITIALIZED occurrences take their VALUEs, LENGTH(DT) and INITIALIZE DT are correct, and the BASED view B reads DT's fixed run. Editions: ADDRESS OF from 2002.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.11.4-2",
@@ -7971,13 +7971,13 @@
   "ordinal": 3,
   "subject": "Dynamic-capacity tables",
   "rule-digest": "917f7f964aa2",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs; src/Cobol.Net.Compiler/Binding/Model/TableValuePlan.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#AssignCellComponents; src/Cobol.Net.Compiler/Binding/Model/Place.cs#CellComponents; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#WindowScopeOf; src/Cobol.Net.Runtime/Control/StorageCell.cs#DynTableAt; src/Cobol.Net.Compiler/CodeGen/DataDivision/GroupImageCodec.cs#CellDynSeeds",
+  "test-ref": "conformance:2014/pb1042_external_dynamic_table; conformance:2014/pb1042_cell_variable_components; conformance:negative/pb1042-external-dynamic-table; conformance-test:OccursDynamicGuardTests.FileSectionDynamicTable_Rejected1526",
   "derivation": "",
-  "editions": "2014, 2023, 85, 2002",
-  "notes": "kb/Work PB1042 (registrar 15b). Rule (--check OK 8.5.1.9.1 3)): 'it may be defined in any place, other than the file section, in which a fixed-capacity table may be defined and may be nested in any combination to the same number of levels as a fixed-capacity table' + non-contiguity/allocation implementor-defined + 'If neither is specified, the current capacity is initialized to zero' + TO = expected capacity exceedable with a nonfatal exception + maximum capacity = implementor/resource limit. VERIFIED: FILE SECTION rejected (conformance-test:OccursDynamicGuardTests.FileSectionDynamicTable_Rejected1526); WORKING-STORAGE and LOCAL-STORAGE accepted and run (probe p3); nesting dynamic-in-fixed, dynamic-in-dynamic, fixed-in-dynamic and 7 levels of dynamic all run (p3, p4); initial capacity: none -> 0, FROM 3 -> 3, Format 2 VALUE of 2 -> 2 (p3 C0=0 C1=3 C2=2 Z2=AB); TO exceedable (dyn_capacity_bounds). DIVERGES (rejects-legal-source): probe p4 original - 01 WX EXTERNAL with an OCCURS DYNAMIC subordinate -> COBOLNET0899 'cannot be cell-backed ... recognized but not yet implemented', though EXTERNAL WORKING-STORAGE is a place a fixed-capacity table may be defined. This half is OWNED by the open register note PB1042 (inventory_rows SR-8.5.1.9.1-3, EXTERNAL / ADDRESS-OF / BASED records) - not re-reported as a new finding. The maximum-capacity (resource) sentence's runtime defect is recorded under GR-8.5.1.9.6-2. Row stays open until PB1042 lands; no single spec-derived test closes all halves (test-needed). [code-location note: (post-build OCCURS DYNAMIC pass, FILE SECTION prohibition COBOLNET1526); code-location note: (COBOLNET0899 cell-backing refusal)] || editions as written by the adjudicator: 2014, 2023 (dynamic-capacity tables are a COBOL-2014 facility, ISO optional module A.4.4; absent from 1985/2002 - the compiler gates them COBOLNET0900 below 2014, probe p4 --std 2002; the 2023 Annex E records no change to 8.5.1.9)",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "kb/Work PB1042 (wave 1021 B2). §8.5.1.9.1 3): a dynamic-capacity table 'may be defined in any place, other than the file section, in which a fixed-capacity table may be defined and may be nested in any combination to the same number of levels as a fixed-capacity table'. The EXTERNAL / ADDRESS-OF half that DIVERGED (COBOLNET0899 'cannot be cell-backed') is closed: a cell-backed area's components (dynamic-length items and dynamic-capacity tables) ride managed slots of the cell, one ordinal per occurrence of every enclosing fixed table (Place.CellComponents; DataBinder.AssignCellComponents), and a table's slot is a CobolDynTable<StorageCell> whose occurrences are element cells, a scope of their own, so nesting in any combination is the same mechanism one level down. Measured: two programs sharing an EXTERNAL record see each other's growth (§13.18.22.4 GR1), group MOVE recreates (§14.6.9.2), INITIALIZE keeps the capacity (§14.9.20.4 GR10), SEARCH/SORT/SUM(ALL)/LENGTH/SET capacity work, a table nested in a table element and a dynamic-length item per occurrence run. The FILE SECTION bar stays (COBOLNET1526). Editions: 2014 introduced OCCURS DYNAMIC (COBOLNET0900 below it).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.9.6-1",
@@ -32872,11 +32872,11 @@
   "subject": "Exception condition handling",
   "rule-digest": "fb845f76f95c",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#FromCurrentImage",
-  "test-ref": "unit:DynamicCapacityAgreementDriftTests.ATableIsConstructedOnlyFromItsOwnDescription; unit:DynamicCapacityAgreementDriftTests.ATableIsRecreatedOnlyThroughTheReceivingDescription; unit:DynamicCapacityAgreementDriftTests.TheRuntimeTableCannotAdoptForeignStorage",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#FromCurrentImage; src/Cobol.Net.Runtime/Control/StorageCell.cs#DynTableAt; src/Cobol.Net.Compiler/Binding/Model/AccessPath.cs#CellTableSegment; src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs#DynTableNew",
+  "test-ref": "unit:DynamicCapacityAgreementDriftTests.ATableIsConstructedOnlyFromItsOwnDescription; unit:DynamicCapacityAgreementDriftTests.ATableIsRecreatedOnlyThroughTheReceivingDescription; unit:DynamicCapacityAgreementDriftTests.TheRuntimeTableCannotAdoptForeignStorage; conformance:2014/pb1042_dyn_table_agreement",
   "derivation": "",
   "editions": "2014, 2023",
-  "notes": "kb/Work PB1118 (landed). cite.py --check 14.6.13.2 'does not agree with the corresponding OCCURS clause' -> OK 14.6.13.2 6). Unreachable by construction, documented in docs/CONFORMANCE.md ('Incompatible dynamic-length and dynamic-capacity data'): the implementor's internal format is one CobolDynTable, and every one a program reads was constructed from its own OCCURS clause (ValueInitializer) or recreated into it at the receiving description by a variable-length group transfer (GroupImageCodec -> FromCurrentImage, 14.6.9.2); an EXTERNAL record holding one is COBOLNET0899, a file record cannot hold one (8.5.1.9.1 3)), a LINKAGE one crosses through the same recreation. DynamicCapacityAgreementDriftTests pins the construction paths.",
+  "notes": "kb/Work PB1042 (wave 1021 B2) made rule 6 REACHABLE and gave it its raise site. 'When the internal format of a dynamic-capacity table, as defined by the implementor, is not correctly formed or does not agree with the corresponding OCCURS clause an EC-DATA-INCOMPATIBLE exception condition is set to exist.' Until PB1042 every table a program read was constructed from that program's own OCCURS clause (ValueInitializer, now the ONE construction DynTableNew for both storage lanes) or recreated into it (FromCurrentImage), so the rule was unreachable by construction. A cell-backed area (an EXTERNAL record described by two programs) now shares one table across descriptions, so every cell table reference carries the REFERENCING description's FROM minimum and element width (CellTableSegment) and StorageCell.DynTableAt asks agreement, the twin of CobolDynString.Agree for rule 5: a capacity below the minimum or elements of another width disagree, an area holding no table at the component is not correctly formed; with checking enabled the fatal condition is raised, with it off the result is undefined and the reference proceeds. Witness: three programs describing one EXTERNAL record (element width 3 vs 2; FROM 3 vs capacity 2; an agreeing description). Editions: 2014 (OCCURS DYNAMIC), 2023.",
   "state": "OK"
  },
  {

@@ -542,10 +542,31 @@ content-validation half is separately answered by the declined A.4.14 facility (
   decomposition by the record's extent table else the take step, with `ContiguousExtentsAt` the table a WRITE sends
   beside it — and crosses a variable-length MOVE / boundary as its `CobolVarGroup` carrier —
   `VarGroupAt` / `StoreVarGroupAt`). Both derive from `Place.CellWindowCoding`, the one base every re-anchoring
-  consumer reads. **Refused** (`DataBinder.VariableLengthCellResidueOf`): a dynamic-length item inside a table
-  element (no slot per occurrence) and a dynamic-capacity table — exactly the shapes a declared group's
-  current-extent composer excludes. Before this, such a leaf was a ZERO-WIDTH byte window: `01 G EXTERNAL.
+  consumer reads. Before this, such a leaf was a ZERO-WIDTH byte window: `01 G EXTERNAL.
   05 A PIC X(3). 05 D PIC X DYNAMIC LENGTH.` displayed only A, silently.
+- **D-SLOT, the CELL COMPONENTS (kb/Work PB1042, 2026-10-05).** The dynamic-length half generalized: a cell-backed
+  area's VARIABLE-LENGTH COMPONENTS are its dynamic-length items AND its dynamic-capacity tables (§8.5.1.9.1 3): a
+  table "may be defined in any place, other than the file section, in which a fixed-capacity table may be defined",
+  and an EXTERNAL or ADDRESS-OF-taken record is such a place). `Place.CellComponents` is THE ONE model: components
+  are numbered in storage order with ONE ORDINAL PER OCCURRENCE of every enclosing fixed table
+  (`CellComponents.PerOccurrence` is the subscript stride; `DataBinder.AssignCellComponents` is the one writer of
+  `ClassDynOrdinal`), so a dynamic-length item inside a fixed table element has its own slot per occurrence. A
+  table's slot holds a `CobolDynTable<StorageCell>` (`StorageCell.DynTableAt` / `SeedDynTable`, a key family apart
+  from the dynamic-length and pointer slots) whose every occurrence is an ELEMENT CELL: the element's fixed run in
+  its `Ref`, the element's own components in its own slots — a SCOPE of its own, where the element's members are
+  re-laid out from offset zero and numbered from zero. So a table, or a dynamic-length item, inside a table element is
+  the same mechanism one level down, and every capacity rule (§8.5.1.9.2–.6, SET Format 14, EC-BOUND-*) stays
+  `CobolDynTable`'s. In the fixed run a table RESERVES its one-element `ByteWidth` (the D-SLOT pointer reason: every
+  following offset is the byte-addressed walk's) and the cell composers cut the reservations out
+  (`VarGroupWindow.DynTable` = each component's element width, 0 for a dynamic-length item). A reference walks its
+  subscript levels through ONE walk (`ReferenceResolver.WindowScopeOf`): a fixed level displaces offset, bit offset
+  and ordinal; a dynamic-capacity level enters the occurrence's element cell (`CellTableSegment` +
+  `DynTableSegment`, its accessor the reference's direction). The whole-table path is `BuildTablePath` (its string
+  twin was deleted), and the INITIALIZE / MOVE element / CORRESPONDING cursors re-anchor on the window's scope
+  (`RedefViewPlace.Cell` / `DynOrdinal`, `PlaceCursor.DynamicElement`). The composer's own exclusion is the declared
+  group's (`DataItem.CurrentExtentImageCapable`): a group whose table element holds a component of its own is the
+  named loud for whole-group image operations, while each element and the element's members are referenced
+  normally.
 - **D-SLOT the MANAGED SLOTS of a shared storage area** (kb/Work PB231, 2026-09-05 — the pointer third). A
   data item of class pointer or class object holds a MANAGED REFERENCE, which is not a byte sequence, so it is
   the one leaf kind a byte window genuinely cannot express. It does not ride the area's bytes: **`StorageCell`

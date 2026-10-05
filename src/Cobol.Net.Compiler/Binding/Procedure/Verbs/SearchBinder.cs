@@ -42,11 +42,11 @@ internal sealed class SearchBinder(BinderContext ctx, StatementBinder host)
             bail = BoundRejected.Reported(ctx.Edition);
             return null;
         }
-        // A dynamic table NESTED under another table has no whole-table path (TablePath null), so the AT-END bound
+        // A dynamic table NESTED under another table has no whole-table path (BuildTablePath null), so the AT-END bound
         // (§8.5.1.9.1 current capacity) and the EnterSearch/ExitSearch bracket cannot be addressed by name — a
         // subscripted capacity path over the enclosing indices is a later increment. Reject rather than let
         // SearchBound fall back to Count=0 and silently scan ZERO occurrences (OCCURS DYNAMIC review #5; D9).
-        if (table.IsDynamicTable && ctx.Refs.TablePath(table) is null)
+        if (table.IsDynamicTable && ReferenceResolver.BuildTablePath(table) is null)
         {
             bail = new BoundUnsupported($"{verb} of the dynamic-capacity table '{table.CobolName}' nested under "
                 + "another table (the scan bound over its current capacity needs a subscripted access path — a "
@@ -133,7 +133,7 @@ internal sealed class SearchBinder(BinderContext ctx, StatementBinder host)
             [.. s.searchWhenClause().Select(wc => (wc.condition(), wc.statementBlock()))]);
         return new BoundSearch(searchIx, table.Occurs ?? 0, also, atEnd, whens,
             DependItem: OdoModel.SearchDepending(table, ctx.Refs),
-            DynTable: table.IsDynamicTable ? ctx.Refs.TablePath(table) : null,   // EC-FLOW-SEARCH bracket (GR31, D9)
+            DynTable: table.IsDynamicTable ? ReferenceResolver.BuildTablePath(table) : null,   // EC-FLOW-SEARCH bracket (GR31, D9)
             // §14.9.37.4 GR4: an out-of-range initial index (SEARCH-INDEX) / a scan advancing off the end (NO-MATCH)
             // sets the nonfatal range EC when checking is enabled — captured at the statement line (F10/CONTINUE template).
             CheckSearchIndex: ctx.EcState.Turn.Enabled("EC-RANGE-SEARCH-INDEX", null, s.Start.Line),
@@ -179,7 +179,7 @@ internal sealed class SearchBinder(BinderContext ctx, StatementBinder host)
             [(wc.condition(), wc.statementBlock())]);
         return new BoundSearch(table.Indexes[0].Cell, table.Occurs ?? 0,
             AlsoVaried: null, atEnd, whens, IsAll: true, DependItem: OdoModel.SearchDepending(table, ctx.Refs),
-            DynTable: table.IsDynamicTable ? ctx.Refs.TablePath(table) : null,   // EC-FLOW-SEARCH bracket (GR31, D9)
+            DynTable: table.IsDynamicTable ? ReferenceResolver.BuildTablePath(table) : null,   // EC-FLOW-SEARCH bracket (GR31, D9)
             // SEARCH ALL forces the index to 1 (GR9 ignores the initial setting) so SEARCH-INDEX can never arise;
             // only an unsuccessful scan (incl. an empty table) sets EC-RANGE-SEARCH-NO-MATCH.
             CheckSearchIndex: false,

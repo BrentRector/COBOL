@@ -89,20 +89,48 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         return NationalWindow.PositionsOf(item) is not null ? RuntimeApi.NatBytes(image) : image;
     }
 
-    /// <summary>⛔ THE ONE SEEDER OF A CELL'S DYNAMIC-LENGTH HALF (kb/Work PB1026) — the twin of
-    /// <see cref="ImageInitOf"/> for the slots <see cref="ImageInitOfOne"/> leaves out: a
-    /// <c>.SeedDyn(ordinal, content)</c> call per dynamic-length item of <paramref name="root"/>'s cell-backed class
-    /// whose initial content is not empty — §8.6.4 via the VALUE clause's own recipe
-    /// (<see cref="ValueInitializer.InitializerFrom"/>'s dynamic-length arm: MOVE-like, truncated to the maximum
-    /// size; absent a VALUE the initial length is zero, which an unwritten slot already is). Empty when there is
-    /// nothing to seed, so every cell without such an item is emitted exactly as before.</summary>
-    public string CellDynSeeds(DataItem root, bool useValues = true)
+    /// <summary>⛔ THE ONE SEEDER OF A CELL'S VARIABLE-LENGTH HALF (kb/Work PB1026, PB1042) — the twin of
+    /// <see cref="ImageInitOf"/> for the component slots <see cref="ImageInitOfOne"/> leaves out, one chained call per
+    /// component of <paramref name="root"/>'s scope in ordinal order (<see cref="CellComponents.Of"/>, the order the
+    /// binder numbered them in): a <c>.SeedDyn(ordinal, content)</c> for a dynamic-length item whose initial content is
+    /// not empty — §8.6.4 via the VALUE clause's own recipe (<see cref="ValueInitializer.InitializerFrom"/>'s
+    /// dynamic-length arm: MOVE-like, truncated to the maximum size; absent a VALUE the initial length is zero, which
+    /// an unwritten slot already is) — and a <c>.SeedDynTable(ordinal, table)</c> for EVERY dynamic-capacity table,
+    /// which has no unwritten state: its FROM capacity of element cells, each seeded by this same method one scope
+    /// down (§8.5.1.9.1). Empty when the scope has no component, so every cell without one is emitted as before.</summary>
+    /// <param name="useValues">False for a PLAIN external record (§13.18.63.4 GR4 a): no VALUE seeds the initial
+    /// state — though the occurrences a statement creates under the INITIALIZED phrase are still composed as an
+    /// INITIALIZE … TO VALUE composes them (§8.5.1.9.5).</param>
+    public string CellDynSeeds(DataItem root, bool useValues = true) => string.Concat(CellScopeSeeds(root, useValues, default));
+
+    private IEnumerable<string> CellScopeSeeds(DataItem scope, bool useValues, Subscripts subs)
     {
-        if (!useValues) return "";
-        var seeds = DataItem.DescendantsOf(root).Prepend(root)
-            .Where(d => DynSlotWindow.CarriedBySlot(d) && d.ClassDynOrdinal >= 0 && d.RawValue is not null)
-            .Select(d => $".{nameof(CobolNet.Runtime.StorageCell.SeedDyn)}({d.ClassDynOrdinal}, {vals.InitializerFrom(d, d.RawValue)})");
-        return string.Concat(seeds);
+        int ordinal = scope.IsDynamicTable ? 0 : scope.ClassDynOrdinal;
+        foreach (var (c, _, fixedSubs) in CellComponents.Of(scope))
+        {
+            int k = ordinal++;
+            if (c.IsDynamicTable) yield return RuntimeApi.CellSeedDynTable(k, CellTable(c, useValues, subs.With(fixedSubs)));
+            else if (useValues && c.RawValue is not null)
+                yield return $".{nameof(CobolNet.Runtime.StorageCell.SeedDyn)}({k}, {vals.InitializerFrom(c, c.RawValue)})";
+        }
+    }
+
+    /// <summary>A cell's dynamic-capacity table, constructed by THE ONE construction from the table's own OCCURS clause
+    /// (<see cref="ValueInitializer.DynTableNew"/>, shared with the record-struct lane). Each occurrence is an element
+    /// cell: the element's image (<see cref="ImageInitOf"/> at that occurrence's subscript) and its own components'
+    /// seeds. An occurrence a STATEMENT creates under the INITIALIZED phrase is composed with VALUEs whatever
+    /// <paramref name="useValues"/> says (§8.5.1.9.5: "as though … INITIALIZE … WITH FILLER ALL TO VALUE THEN TO
+    /// DEFAULT"); a table VALUE (Format 2) applies only where VALUEs do.</summary>
+    private string CellTable(DataItem table, bool useValues, Subscripts subs)
+    {
+        string Element(int o, SeedRecipe recipe)
+        {
+            bool values = useValues || recipe is SeedRecipe.Initialize;
+            return $"new StorageCell {{ Ref = {ImageInitOf(table, values, subs.With(o), recipe)} }}"
+                + string.Concat(CellScopeSeeds(table, values, subs.With(o)));
+        }
+        return ValueInitializer.DynTableNew(table, nameof(CobolNet.Runtime.StorageCell), Element, SeedRecipe.InitialState,
+            useValues);
     }
 
     /// <summary>One MEMBER's contribution to its group's compile-time image seed — the COMPILE-TIME twin of

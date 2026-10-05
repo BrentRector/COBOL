@@ -1932,11 +1932,12 @@ internal static class RuntimeApi
     public static string PtrSlotWrite(string cellExpr, string byteOffsetExpr, string valueExpr) =>
         $"{nameof(CobolPtr)}.{nameof(CobolPtr.SlotWrite)}({cellExpr}, {byteOffsetExpr}, {valueExpr})";
 
-    // ── A CELL-BACKED area's DYNAMIC-LENGTH half (kb/Work PB1026) — StorageCell's dynamic slots ──────────────────
+    // ── A CELL-BACKED area's VARIABLE-LENGTH half (kb/Work PB1026, PB1042) — StorageCell's component slots ──────────
 
-    /// <summary>The current content of a dynamic-length member of a cell-backed area — <c>StorageCell.DynAt</c>.</summary>
-    public static string CellDynRead(string cellExpr, int ordinal) =>
-        $"{cellExpr}.{nameof(StorageCell.DynAt)}({ordinal})";
+    /// <summary>The current content of a dynamic-length member of a cell-backed area — <c>StorageCell.DynAt</c>.
+    /// <paramref name="ordinal"/> is the component ordinal expression (<c>Place.CellComponents</c>).</summary>
+    public static string CellDynRead(string cellExpr, string ordinal) =>
+        $"{cellExpr}.{nameof(StorageCell.DynAt)}((int)({ordinal}))";
 
     /// <summary>The SENDING read of a dynamic-length item through a description that does not own its storage —
     /// <c>CobolDynString.Agree</c>, ISO §14.6.13.2 rule 5's agreement with THIS description's maximum size (kb/Work
@@ -1946,42 +1947,56 @@ internal static class RuntimeApi
 
     /// <summary>Store a dynamic-length member's new content — <c>StorageCell.SetDynAt</c>, the receiving twin of
     /// <see cref="CellDynRead"/>. <paramref name="valueExpr"/> already carries §8.5.1.10.4's receiving rule.</summary>
-    public static string CellDynWrite(string cellExpr, int ordinal, string valueExpr) =>
-        $"{cellExpr}.{nameof(StorageCell.SetDynAt)}({ordinal}, {valueExpr})";
+    public static string CellDynWrite(string cellExpr, string ordinal, string valueExpr) =>
+        $"{cellExpr}.{nameof(StorageCell.SetDynAt)}((int)({ordinal}), {valueExpr})";
+
+    /// <summary>A cell-backed area's dynamic-capacity table, asked to agree with the referencing description's FROM
+    /// minimum and element width (ISO §14.6.13.2 rule 6) — <c>StorageCell.DynTableAt</c> (kb/Work PB1042).</summary>
+    public static string CellDynTable(string cellExpr, string ordinal, int min, int elementWidth) =>
+        $"{cellExpr}.{nameof(StorageCell.DynTableAt)}((int)({ordinal}), {min}, {elementWidth})";
+
+    /// <summary>Seed a cell's dynamic-capacity table component — the chained <c>.SeedDynTable(ordinal, table)</c> of a
+    /// cell initializer (kb/Work PB1042). <paramref name="tableExpr"/> is the table's construction from its own OCCURS
+    /// clause, <c>ValueInitializer.DynTableNew</c> — the one construction site.</summary>
+    public static string CellSeedDynTable(int ordinal, string tableExpr) =>
+        $".{nameof(StorageCell.SeedDynTable)}({ordinal}, {tableExpr})";
 
     /// <summary>A C# collection expression of int constants — the <c>ReadOnlySpan&lt;int&gt;</c> layout arguments
     /// of the cell's variable-length group helpers (constant data, so no allocation at the call).</summary>
     private static string IntSpan(IEnumerable<int> xs) => $"[{string.Join(", ", xs)}]";
 
-    /// <summary>A cell-backed variable-length group's CONTIGUOUS image (§8.5.1.11.2) — <c>StorageCell.ContiguousAt</c>.</summary>
-    public static string CellVarContiguous(string cellExpr, string fixedAtExpr, int fixedWidth, int dynBase,
-                                           IEnumerable<int> dynFixedAt) =>
-        $"{cellExpr}.{nameof(StorageCell.ContiguousAt)}({fixedAtExpr}, {fixedWidth}, {dynBase}, {IntSpan(dynFixedAt)})";
+    /// <summary>A cell-backed variable-length group's CONTIGUOUS image (§8.5.1.11.2) — <c>StorageCell.ContiguousAt</c>.
+    /// <paramref name="dynTable"/> is each component's table element width, 0 for a dynamic-length item.</summary>
+    public static string CellVarContiguous(string cellExpr, string fixedAtExpr, int width, string dynBase,
+                                           IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable) =>
+        $"{cellExpr}.{nameof(StorageCell.ContiguousAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)})";
 
     /// <summary>Make a contiguous image a cell-backed variable-length group's content — <c>StorageCell.StoreContiguousAt</c>.</summary>
-    public static string CellVarStoreContiguous(string cellExpr, string fixedAtExpr, int fixedWidth, int dynBase,
+    public static string CellVarStoreContiguous(string cellExpr, string fixedAtExpr, int width, string dynBase,
                                                 IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax,
-                                                IEnumerable<int> dynStructure, string imageExpr,
+                                                IEnumerable<int> dynStructure, IEnumerable<int> dynTable, string imageExpr,
                                                 string? extentsExpr = null, bool fixedForm = false) =>
-        $"{cellExpr}.{nameof(StorageCell.StoreContiguousAt)}({fixedAtExpr}, {fixedWidth}, {dynBase}, "
-        + $"{IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {imageExpr}, {extentsExpr ?? "null"}{(fixedForm ? ", true" : "")})";
+        $"{cellExpr}.{nameof(StorageCell.StoreContiguousAt)}({fixedAtExpr}, {width}, (int)({dynBase}), "
+        + $"{IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {IntSpan(dynTable)}, {imageExpr}, {extentsExpr ?? "null"}{(fixedForm ? ", true" : "")})";
 
     /// <summary>A cell-backed variable-length group's EXTENT TABLE — <c>StorageCell.ContiguousExtentsAt</c>
     /// (determination D-FRA (v); kb/Work PB1053). <paramref name="dynStructure"/> is each dynamic-length member's
     /// DYNAMIC LENGTH STRUCTURE code (<c>CobolDynStructure.Code</c>; kb/Work PB1094), 0 for none.</summary>
-    public static string CellVarContiguousExtents(string cellExpr, int fixedWidth, int dynBase,
+    public static string CellVarContiguousExtents(string cellExpr, int width, string dynBase,
                                                   IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax,
-                                                  IEnumerable<int> dynStructure) =>
-        $"{cellExpr}.{nameof(StorageCell.ContiguousExtentsAt)}({fixedWidth}, {dynBase}, {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)})";
+                                                  IEnumerable<int> dynStructure, IEnumerable<int> dynTable) =>
+        $"{cellExpr}.{nameof(StorageCell.ContiguousExtentsAt)}({width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {IntSpan(dynTable)})";
 
     /// <summary>A cell-backed variable-length group's §8.5.1.12 component carrier — <c>StorageCell.VarGroupAt</c>.</summary>
-    public static string CellVarCarrier(string cellExpr, string fixedAtExpr, int fixedWidth, int dynBase, int dynCount) =>
-        $"{cellExpr}.{nameof(StorageCell.VarGroupAt)}({fixedAtExpr}, {fixedWidth}, {dynBase}, {dynCount})";
+    public static string CellVarCarrier(string cellExpr, string fixedAtExpr, int width, string dynBase,
+                                        IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable) =>
+        $"{cellExpr}.{nameof(StorageCell.VarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)})";
 
     /// <summary>Distribute a component carrier into a cell-backed variable-length group — <c>StorageCell.StoreVarGroupAt</c>.</summary>
-    public static string CellVarStoreCarrier(string cellExpr, string fixedAtExpr, int fixedWidth, int dynBase,
-                                             IEnumerable<int> dynMax, string carrierExpr) =>
-        $"{cellExpr}.{nameof(StorageCell.StoreVarGroupAt)}({fixedAtExpr}, {fixedWidth}, {dynBase}, {IntSpan(dynMax)}, {carrierExpr})";
+    public static string CellVarStoreCarrier(string cellExpr, string fixedAtExpr, int width, string dynBase,
+                                             IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax,
+                                             IEnumerable<int> dynTable, string carrierExpr) =>
+        $"{cellExpr}.{nameof(StorageCell.StoreVarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynTable)}, {carrierExpr})";
 
     /// <summary>The INVOKE null-receiver guard (EC-OO-NULL, §14.9.23.4 GR5) — <c>CobolObject.RequireNonNull</c>.</summary>
     public static string ObjRequireNonNull(string receiver) =>

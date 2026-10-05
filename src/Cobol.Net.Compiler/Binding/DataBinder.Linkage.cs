@@ -823,8 +823,7 @@ public sealed partial class DataBinder
         // clause; §13.18.22 conditions EXTERNAL on nothing subordinate at all. A bit leaf is admitted by all
         // three, so the reject was rejects-legal-source — the same argument that retired the negative fixture
         // pb151-based-comp-leaf at the PB164 landing. Its residue clause now names the ACTUAL leaf.
-        if ((leaves.Select(ByteWindowResidueOf).FirstOrDefault(r => r is not null)
-             ?? cls.Members.Select(VariableLengthCellResidueOf).FirstOrDefault(r => r is not null)) is { } residue)
+        if (leaves.Select(ByteWindowResidueOf).FirstOrDefault(r => r is not null) is { } residue)
         {
             cls.Classify(RedefinesTier.Rejected, cls.Width,
                 $"{what} '{item.CobolName}' has {residue} — the shared byte cell cannot carry it");
@@ -850,13 +849,16 @@ public sealed partial class DataBinder
             AssignClassOffsets(member, 0, cls);
             member.IsCanonical = false;   // NO local stored field — the backing is the cell bridge
         }
-        // ⛔ THE CELL'S DYNAMIC-LENGTH HALF (kb/Work PB1026): each dynamic-length leaf rides the cell's dynamic slot
-        // numbered by its storage order among the class's dynamic-length leaves (Place.DynSlotWindow;
-        // StorageCell.DynAt). It occupies zero bytes of the backing — its ByteWidth — so the class walk above has
-        // already laid out the FIXED RUN every variable-length group view of the class composes over.
+        // ⛔ THE CELL'S VARIABLE-LENGTH HALF (kb/Work PB1026, PB1042): each COMPONENT — a dynamic-length item or a
+        // dynamic-capacity table (Place.CellComponents) — rides a managed slot of the cell numbered in storage order,
+        // one per occurrence of every enclosing fixed table, and a table's element is a scope of its own
+        // (AssignCellComponents). A dynamic-length item occupies zero bytes of the backing — its ByteWidth — and a
+        // table reserves its one-element ByteWidth, so the class walk above has already laid out the FIXED RUN every
+        // variable-length group view of the class composes over. §8.5.1.9.1 3) — "it may be defined in any place,
+        // other than the file section, in which a fixed-capacity table may be defined" — is why an EXTERNAL or
+        // ADDRESS-OF-taken record carries the table rather than refusing it.
         int dynOrdinal = 0;
-        foreach (var leaf in leaves.Where(DynSlotWindow.CarriedBySlot))
-            leaf.ClassDynOrdinal = dynOrdinal++;
+        foreach (var member in cls.Members) dynOrdinal = AssignCellComponents(member, dynOrdinal);
         // ⛔ EVERY byte-form numeric leaf windowed over the string backing decodes/encodes its IMAGE — the
         // same rule ClassifyRedefinesClasses applies to a Tier-B class, applied here for the synth class.
         // The predicate MUST be the one CellCapable admits above (THE ONE image predicate): the Step D
@@ -871,24 +873,35 @@ public sealed partial class DataBinder
         return cls;
     }
 
-    /// <summary>The variable-length shapes a cell cannot carry (kb/Work PB1026), or null. A dynamic-length item
-    /// rides a slot numbered once per ITEM, so one that repeats — under an OCCURS within the record — has no slot
-    /// per occurrence; a dynamic-capacity table has no fixed run to window at all. Both are the same shapes a
-    /// declared variable-length group's current-extent composer excludes (CONFORMANCE.md A.1 item 57's "a
-    /// runtime-length item inside a table element"), so the cell refuses exactly what the struct refuses.</summary>
-    private static string? VariableLengthCellResidueOf(DataItem member)
+    /// <summary>Number <paramref name="node"/>'s variable-length COMPONENTS in its scope from ordinal
+    /// <paramref name="next"/> and return the next free ordinal (kb/Work PB1042) — the ONE writer of
+    /// <see cref="DataItem.ClassDynOrdinal"/>, walking exactly the order <see cref="CellComponents.Of"/> enumerates: a
+    /// component takes one ordinal; a group's children follow in storage order, a fixed table's occurrence k taking
+    /// the k-th run of its per-occurrence components (so a subscript displaces an ordinal by
+    /// <see cref="CellComponents.PerOccurrence"/>); a non-component's ordinal is that of its first component. A
+    /// dynamic-capacity table's ELEMENT is a scope of its own — each occurrence is an element cell
+    /// (<c>StorageCell.DynTableAt</c>) — so the element's members are re-laid out from offset zero and numbered from
+    /// zero, which is what makes a table, or a dynamic-length item, inside a table element the same mechanism one
+    /// level down (§8.5.1.9.1 3): "may be nested in any combination to the same number of levels as a fixed-capacity
+    /// table").</summary>
+    private static int AssignCellComponents(DataItem node, int next)
     {
-        foreach (var d in DataItem.DescendantsOf(member).Prepend(member))
+        node.ClassDynOrdinal = next;
+        if (node.IsDynamicTable)
         {
-            if (d.IsDynamicTable)
-                return $"a dynamic-capacity table ('{d.CobolName ?? "FILLER"}', ISO §8.5.1.9) with no fixed extent";
-            if (DynSlotWindow.CarriedBySlot(d))
-                for (var a = d; a is not null && !ReferenceEquals(a, member.Parent); a = a.Parent)
-                    if (a.Occurs is not null || a.OccursSpec is not null)
-                        return $"a dynamic-length item inside a table element ('{d.CobolName ?? "FILLER"}', ISO "
-                            + "§8.5.1.10) with no slot per occurrence";
+            (int at, int bit) = (node.ClassOffset, node.ClassBitOffset);
+            AssignClassOffsets(node, 0, node.Class!);   // the element's own layout, relative to its element cell
+            (node.ClassOffset, node.ClassBitOffset) = (at, bit);   // the table keeps its reservation in its parent scope
+            int inner = 0;
+            foreach (var c in node.Children.Where(c => c.RedefinesTargetName is null))
+                inner = AssignCellComponents(c, inner);
+            return next + 1;
         }
-        return null;
+        if (DynSlotWindow.CarriedBySlot(node)) return next + 1;
+        int k = next;
+        foreach (var c in node.Children.Where(c => c.RedefinesTargetName is null))
+            k += (AssignCellComponents(c, k) - k) * (c.Occurs ?? 1);
+        return k;
     }
 
     /// <summary>Seed the unique-id counter so every unit of a multi-program compilation gets a disjoint

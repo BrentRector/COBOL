@@ -86,26 +86,8 @@ internal sealed class ValueInitializer(EmitContext ctx)
         // unreferenced locations in the new table element and the content of the other new occurrences are
         // undefined", and the initial-state seed is a conforming choice for it (docs/CONFORMANCE.md DOC-A.1-61).
         if (item.IsDynamicTable)
-        {
-            var s = item.OccursSpec!;
-            int min = s.InitialCap ?? 0;
-            string expected = s.ExpectedMax is int e ? e.ToString() : "null";
-            if (!item.ContainsTableValue)
-            {
-                string opening = ElementInit(item, outer.With(1), recipe);
-                string created = s.Initialized ? ElementInit(item, outer.With(1), SeedRecipe.Initialize) : opening;
-                return $"new CobolDynTable<{item.ElementType}>(() => {opening}, {min}, {expected}, "
-                     + (created == opening ? "null" : $"() => {created}") + ")";
-            }
-            // §13.18.63.4 GR16 fixed the initial capacity in the binder ("If more than one VALUE clause applies,
-            // the maximum value thus calculated becomes the initial capacity"); occurrences within it take their
-            // keyed element, and growth beyond re-seeds through the same function to the VALUE-less default.
-            int cap = Math.Max(min, item.TableValueInitialCapacity ?? min);
-            string openingAt = SeedSwitch(item, outer, cap, recipe);
-            string createdAt = s.Initialized ? SeedSwitch(item, outer, cap, SeedRecipe.Initialize) : openingAt;
-            return $"new CobolDynTable<{item.ElementType}>({openingAt}, {min}, {expected}, "
-                 + $"{(createdAt == openingAt ? "null" : createdAt)}, {cap})";
-        }
+            return DynTableNew(item, item.ElementType, (o, r) => ElementInit(item, outer.With(o), r), recipe,
+                valuesSeedInitialState: true);
         if (item.Occurs is { } n)
         {
             // Without a table VALUE in the subtree every occurrence is identical — compose ONE and repeat it (the
@@ -124,16 +106,47 @@ internal sealed class ValueInitializer(EmitContext ctx)
     private string ElementInit(DataItem item, Subscripts subs, SeedRecipe recipe) =>
         item.IsGroup ? Slicer.ComposedInit(item, subs, recipe) : InitializerFor(item, subs, recipe);
 
-    /// <summary>The per-occurrence seed function of a DYNAMIC-capacity table carrying (or containing) a Format 2
-    /// VALUE: <c>(int __i) =&gt; __i switch { … }</c> over occurrences 1..<paramref name="cap"/>, defaulting to the
-    /// VALUE-less element for anything the table grows to later. Occurrences whose element text is IDENTICAL share
-    /// one arm — the common case is one literal over a whole range, and an arm per occurrence would put a
-    /// thousand identical branches into the generated source.</summary>
-    private string SeedSwitch(DataItem item, Subscripts outer, int cap, SeedRecipe recipe)
+    /// <summary>⛔ THE ONE CONSTRUCTION OF A DYNAMIC-CAPACITY TABLE, from the table's OWN OCCURS clause (kb/Work PB1118's
+    /// invariant, <c>DynamicCapacityAgreementDriftTests</c>) — for both storage lanes: a record struct's typed
+    /// <c>CobolDynTable&lt;T&gt;</c> (<see cref="FieldInit"/>) and a cell-backed area's table of element cells
+    /// (<c>GroupImageCodec.CellDynSeeds</c>; kb/Work PB1042). <paramref name="elementAt"/> composes occurrence
+    /// <c>o</c>'s element under a recipe. It opens at FROM (min), raised to the §13.18.63.4 GR16 initial capacity when
+    /// a table VALUE seeds the initial state (<paramref name="valuesSeedInitialState"/> false only for a PLAIN external
+    /// record, §13.18.63.4 GR4 a) — "If more than one VALUE clause applies, the maximum value thus calculated becomes
+    /// the initial capacity"; occurrences within it take their keyed element, and growth beyond re-seeds through the
+    /// same function to the VALUE-less default); TO is the expected capacity; an occurrence a statement creates takes
+    /// the INITIALIZED phrase's composition when it differs — keyed to ITS occurrence whatever the initial state did,
+    /// because §8.5.1.9.5's INITIALIZE … TO VALUE sends "the literal in the VALUE clause that corresponds to the
+    /// occurrence being initialized" (§14.9.20.4 GR6 a) 3.).</summary>
+    internal static string DynTableNew(DataItem item, string elementType, Func<int, SeedRecipe, string> elementAt,
+                                       SeedRecipe recipe, bool valuesSeedInitialState)
     {
-        // Subscript 0 identifies no table element (§13.18.63.3 SR20 admits none below 1), so it is the tuple that
-        // deliberately matches no FROM..TO range: the element as it stands with no table VALUE keyed to it.
-        string dflt = ElementInit(item, outer.With(0), recipe);
+        var s = item.OccursSpec!;
+        int min = s.InitialCap ?? 0;
+        string expected = s.ExpectedMax is int e ? e.ToString() : "null";
+        bool openingKeyed = valuesSeedInitialState && item.ContainsTableValue;
+        if (!openingKeyed && !(s.Initialized && item.ContainsTableValue))
+        {
+            string opening = elementAt(1, recipe);
+            string created = s.Initialized ? elementAt(1, SeedRecipe.Initialize) : opening;
+            return $"new CobolDynTable<{elementType}>(() => {opening}, {min}, {expected}, "
+                 + (created == opening ? "null" : $"() => {created}") + ")";
+        }
+        int cap = Math.Max(min, item.TableValueInitialCapacity ?? min);
+        string openingAt = openingKeyed ? OccurrenceSwitch(o => elementAt(o, recipe), cap) : $"(int __i) => {elementAt(0, recipe)}";
+        string createdAt = s.Initialized ? OccurrenceSwitch(o => elementAt(o, SeedRecipe.Initialize), cap) : openingAt;
+        return $"new CobolDynTable<{elementType}>({openingAt}, {min}, {expected}, "
+             + $"{(createdAt == openingAt ? "null" : createdAt)}, {(openingKeyed ? cap : min)})";
+    }
+
+    /// <summary>⛔ THE ONE per-occurrence seed switch (kb/Work PB1042 made it shared): <paramref name="elementAt"/>
+    /// composes the element of occurrence <c>o</c> — the record-struct lane's typed element, or a cell-backed area's
+    /// element cell (<c>GroupImageCodec.CellDynSeeds</c>) — and the switch (<c>(int __i) =&gt; __i switch { … }</c> over 1..<paramref name="cap"/>) folds IDENTICAL arms into one, since the common case is one literal over a whole range. Occurrence 0
+    /// identifies no table element (§13.18.63.3 SR20 admits none below 1), so it is the tuple that deliberately
+    /// matches no FROM..TO range: the element as it stands with no table VALUE keyed to it.</summary>
+    internal static string OccurrenceSwitch(Func<int, string> elementAt, int cap)
+    {
+        string dflt = elementAt(0);
         var arms = new List<string>();
         var pending = new List<int>();
         string? pendingText = null;
@@ -146,7 +159,7 @@ internal sealed class ValueInitializer(EmitContext ctx)
         }
         for (int o = 1; o <= cap; o++)
         {
-            string text = ElementInit(item, outer.With(o), recipe);
+            string text = elementAt(o);
             if (pendingText is not null && !string.Equals(text, pendingText, StringComparison.Ordinal)) Flush();
             pendingText = text;
             pending.Add(o);

@@ -41,7 +41,7 @@ public sealed record AccessPath(IReadOnlyList<AccessSegment> Segments)
 
     /// <summary>True when any segment evaluates a subscript (a table access) — the structural replacement for the
     /// former <c>path.Contains("CobolTable.At(")</c> string-sniff (CORRESPONDING ref-vs-value anchoring).</summary>
-    public bool HasIndex => Segments.Any(s => s is FixedTableSegment or DynTableSegment);
+    public bool HasIndex => Segments.Any(s => s is FixedTableSegment or DynTableSegment or CellTableSegment);
 }
 
 /// <summary>One step of an <see cref="AccessPath"/>.</summary>
@@ -78,3 +78,18 @@ public sealed record OdoReferenceCheck(Place Depending, int MinOccurs, int MaxOc
 /// (<c>RefSending</c> on a read, <c>RefReceiving</c> on a write), chosen at RENDER time from the operation.
 /// <paramref name="OneBasedIndex"/> is the D10 transitional index string.</summary>
 public sealed record DynTableSegment(string OneBasedIndex) : AccessSegment;
+
+/// <summary>A CELL-BACKED area's dynamic-capacity table (kb/Work PB1042; <see cref="CellComponents"/>): the
+/// accumulated path is the area's <c>StorageCell</c> (or an element cell of an enclosing such table) and this step
+/// reaches its component <paramref name="Ordinal"/> — <c>StorageCell.DynTableAt</c>, a <c>CobolDynTable</c> whose
+/// occurrences are element cells. <paramref name="Ordinal"/> is the D10 transitional ordinal expression (it carries
+/// a subscript term for each enclosing fixed table level). <paramref name="Min"/> and <paramref name="ElementWidth"/>
+/// are the REFERENCING description's OCCURS facts — its FROM minimum and its element's storage width — which the
+/// runtime asks the shared table to agree with (ISO §14.6.13.2 rule 6).</summary>
+public sealed record CellTableSegment(string Ordinal, int Min, int ElementWidth) : AccessSegment
+{
+    /// <summary>The step to <paramref name="table"/>'s component at <paramref name="ordinal"/>, carrying the table's
+    /// own description.</summary>
+    public static CellTableSegment Of(DataItem table, string ordinal) =>
+        new(ordinal, table.OccursSpec?.InitialCap ?? 0, table.ByteWidth);
+}

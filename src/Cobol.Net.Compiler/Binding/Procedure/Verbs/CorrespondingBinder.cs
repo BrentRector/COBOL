@@ -362,6 +362,8 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
         private readonly ReferenceResolver _refs;
         private bool _hoisted;
         private bool _isAlias;                 // a level-66 THROUGH alias: each member resolves on its own
+        private AccessPath? _cell;             // the view group's scope cell (kb/Work PB1042)
+        private string? _dynOrdinal;           // the view group's component ordinal expression (kb/Work PB1042)
 
         private CorrAccess(List<CorrespondingHoist> hoists, string local, Place? group, string offsetInit,
             bool isMember, bool subscripted, AccessPath? backing, DataItem groupItem, ReferenceResolver refs)
@@ -389,7 +391,7 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
                 MemberPlace m => new CorrAccess(hoists, local, group: m, offsetInit: "", isMember: true,
                     subscripted: m.Path.HasIndex, backing: null, m.Item, refs),
                 RedefViewPlace v => new CorrAccess(hoists, local, group: null, offsetInit: v.OffsetExpr, isMember: false,
-                    subscripted: false, v.Backing, v.Item, refs),
+                    subscripted: false, v.Backing, v.Item, refs) { _cell = v.Cell, _dynOrdinal = v.DynOrdinal },
                 // A level-66 THROUGH alias (kb/Work PB966): its members are the elementary items §13.18.45.4 GR2
                 // says it includes, none subject to an OCCURS clause (§13.18.45.3 SR3 keeps both endpoints out of
                 // one, and CorrMembers excludes an item under an OCCURS inside the window), so each is identified
@@ -427,10 +429,15 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
             // ⛔ THROUGH THE ONE WINDOW BUILDER (kb/Work PB203): `hoist - groupItem.ClassOffset` is precisely the
             // group's RUNTIME displacement (its subscript/BASED part, with the static in-class offset removed),
             // which is what a BIT member's window needs — its own position is carried in BITS by ClassBitOffset.
-            string displacement = $"{Hoist(isRef: false)} - {_groupItem.ClassOffset}";
+            // In a cell-backed class the group's SCOPE is re-anchored too (kb/Work PB1042): its cell — the element cell
+            // when the group is one occurrence of a dynamic-capacity table, at whose offset zero it then lies — and
+            // its component ordinal, by which a dynamic-length pair member's slot is displaced like its window.
+            bool element = _groupItem.IsDynamicTable;
+            string displacement = $"{Hoist(isRef: false)} - {(element ? 0 : _groupItem.ClassOffset)}";
             return RedefViewPlace.For(_backing!, leaf,
-                $"{displacement} + {leaf.ClassOffset}", displacement,
-                cell: ReferenceResolver.BuildCellPath(_groupItem.Class));
+                $"{displacement} + {leaf.ClassOffset}", displacement, cell: _cell,
+                dynOrdinal: _dynOrdinal is { } o
+                    ? $"({o}) - {(element ? 0 : _groupItem.ClassDynOrdinal)} + {leaf.ClassDynOrdinal}" : null);
         }
 
         /// <summary>Record the anchor hoist on first use and return its local name.</summary>

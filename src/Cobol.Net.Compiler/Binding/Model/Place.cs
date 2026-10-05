@@ -204,6 +204,16 @@ public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int W
     /// <summary>The bit coding, or null — the discriminated read of <see cref="Coding"/>.</summary>
     public BitWindow? Bit => Coding as BitWindow;
 
+    /// <summary>The <c>StorageCell</c> of the window's SCOPE in a cell-backed class (kb/Work PB1042) — the class's
+    /// cell, or the element cell of the dynamic-capacity table the item lies in (<see cref="CellComponents"/>); null
+    /// for a REDEFINES class. What a cursor over the window's members re-anchors on.</summary>
+    public AccessPath? Cell { get; init; }
+
+    /// <summary>The D10 transitional expression of the item's first component ordinal in <see cref="Cell"/> (kb/Work
+    /// PB1042) — its <see cref="DataItem.ClassDynOrdinal"/> displaced by the subscripts of the reference; null for a
+    /// REDEFINES class. A cursor over the window's members displaces each member's ordinal by the same amount.</summary>
+    public string? DynOrdinal { get; init; }
+
     /// <summary>⛔ TRUE WHEN THIS VIEW'S <c>Read()</c> IS A CHARACTER STRING — the ONE test for the assumption
     /// the wrapping consumers make about a Tier-B view ("its read is already the value image, use it
     /// verbatim"). It holds for the identity coding, for <see cref="BitWindow"/> (the boolean carrier) and for
@@ -233,9 +243,13 @@ public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int W
     /// null for a REDEFINES class, whose backing is a plain stored string field. It is what a
     /// <see cref="SlotWindow"/> member needs (kb/Work PB231); see <see cref="SlotWindow.CarriedBySlot"/> for
     /// why a REDEFINES class can never hold one.</param>
+    /// <param name="dynOrdinal">The D10 transitional expression of the member's first component ordinal in its
+    /// scope's cell (<see cref="CellComponents"/>; kb/Work PB1042) — what a dynamic-length member's slot and a
+    /// variable-length group's first component are numbered by. Null when no table level displaces it: the
+    /// item's own <see cref="DataItem.ClassDynOrdinal"/>.</param>
     public static RedefViewPlace For(AccessPath backing, DataItem item, string byteOffsetExpr,
                                      string? runtimeByteDisplacement = null, string occursBitTerms = "",
-                                     AccessPath? cell = null)
+                                     AccessPath? cell = null, string? dynOrdinal = null)
     {
         // ⛔ THE WINDOW IS THE MEMBER'S STORAGE EXTENT, NOT ITS CHARACTER-POSITION COUNT (kb/Work PB231).
         // §13.18.44.4 GR1 states the association over "an area sufficient to contain the number of BITS
@@ -244,7 +258,9 @@ public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int W
         // units. ByteWidth IS ImageWidth for every leaf kind but NATIONAL, whose §13.18.60.4 GR8 size this
         // implementation pins at two bytes per position (D-N1), so this read is byte-identical everywhere
         // else and is the whole of RESIDUE-11's geometry here.
-        var window = new RedefViewPlace(backing, byteOffsetExpr, item.ByteWidth, item);
+        dynOrdinal ??= $"{item.ClassDynOrdinal}";
+        var window = new RedefViewPlace(backing, byteOffsetExpr, item.ByteWidth, item)
+            { Cell = cell, DynOrdinal = cell is null ? null : dynOrdinal };
         // ⛔ A POINTER-CLASS MEMBER'S VALUE IS NOT IN THE BYTES (kb/Work PB231 — the pointer third): it is the
         // managed slot of the SAME area at the SAME byte offset, so its bytes stay reserved (§14.9.3.4 GR3's
         // byte quantity, and every following member's offset, are unaffected) and its value rides
@@ -272,8 +288,8 @@ public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int W
                 : window with
                 {
                     Coding = DynSlotWindow.CarriedBySlot(item)
-                        ? new DynSlotWindow(cell, item.ClassDynOrdinal)
-                        : VarGroupWindow.Of(item, cell),
+                        ? new DynSlotWindow(cell, dynOrdinal)
+                        : VarGroupWindow.Of(item, cell, dynOrdinal),
                 };
         if (NationalWindow.WindowPositionsOf(item) is { } positions)
             return window with { Coding = new NationalWindow(positions) };
@@ -415,49 +431,114 @@ public sealed record SlotWindow(AccessPath Cell) : CellWindowCoding(Cell)
 /// <summary>A <see cref="RedefViewPlace"/>'s DYNAMIC-LENGTH window (kb/Work PB1026): the member is a dynamic-length
 /// elementary item of a CELL-BACKED class. ISO §8.5.1.10.3 — "Dynamic-length elementary items may be physically
 /// located in memory within the record they are subordinate to, or they may be located elsewhere in the computer's
-/// memory" — and this implementation locates it in the cell's dynamic slot numbered <paramref name="Ordinal"/> (its
-/// place among the class's dynamic-length items, in storage order), so every description sharing the cell
-/// (§13.18.22.4 GR1 / GR4 b)) shares its content. It occupies ZERO bytes of the backing (its
-/// <see cref="DataItem.ByteWidth"/>), which is §8.5.1.12.3's own accounting of the fixed run. Its read IS its
-/// content string, so <see cref="RedefViewPlace.ReadsCharacterImage"/> holds.</summary>
-public sealed record DynSlotWindow(AccessPath Cell, int Ordinal) : CellWindowCoding(Cell)
+/// memory" — and this implementation locates it in a managed slot of the cell <paramref name="Cell"/> (its scope's
+/// cell: the record's, or the element cell of the dynamic-capacity table it lies in — <see cref="CellComponents"/>),
+/// so every description sharing the cell (§13.18.22.4 GR1 / GR4 b)) shares its content. <paramref name="Ordinal"/> is
+/// the D10 transitional expression of its component ordinal: <see cref="DataItem.ClassDynOrdinal"/> plus, for each
+/// fixed table level crossed within the scope, <c>(index − 1) ×</c> that level's components per occurrence (kb/Work
+/// PB1042 — one slot per OCCURRENCE). It occupies ZERO bytes of the backing (its <see cref="DataItem.ByteWidth"/>),
+/// which is §8.5.1.12.3's own accounting of the fixed run. Its read IS its content string, so
+/// <see cref="RedefViewPlace.ReadsCharacterImage"/> holds.</summary>
+public sealed record DynSlotWindow(AccessPath Cell, string Ordinal) : CellWindowCoding(Cell)
 {
     /// <summary>⛔ THE ONE test for "does this member ride a dynamic-length slot?" — an elementary dynamic-length
-    /// item. The cell forcer's gate (<c>DataBinder.ForceStringCanonical</c>), the REDEFINES classifier's carrier
-    /// question and the geometry (<see cref="RedefViewPlace.For"/>) all ask it.</summary>
+    /// item. The cell forcer (<c>DataBinder.ForceStringCanonical</c>), the REDEFINES classifier's carrier question and
+    /// the geometry (<see cref="RedefViewPlace.For"/>) all ask it.</summary>
     public static bool CarriedBySlot(DataItem item) => item is { IsElementary: true, IsDynamicLength: true };
 }
 
-/// <summary>A <see cref="RedefViewPlace"/>'s VARIABLE-LENGTH GROUP window (kb/Work PB1026): a group of a CELL-BACKED
-/// class with dynamic-length items under it. Its fixed run is <see cref="RedefViewPlace.Width"/> bytes of the
-/// backing from the window's offset; its dynamic-length items are the cell's dynamic slots <paramref name="DynBase"/>
-/// onward, sitting at fixed-run positions <paramref name="DynFixedAt"/> (relative to the group) with maximum sizes
-/// <paramref name="DynMax"/>, each laid out in a record image by its <paramref name="DynStructure"/>
-/// (<c>CobolDynStructure.Code</c>, 0 for none — ISO §12.3.7.4 GR18/GR19; kb/Work PB1094).
-/// ISO §8.5.1.11.2 — "a variable-length data item behaves in all respects as though it
+/// <summary>⛔ THE ONE MODEL OF A CELL-BACKED AREA'S VARIABLE-LENGTH COMPONENTS (kb/Work PB1026, PB1042). A component
+/// is a dynamic-length elementary item (<see cref="DynSlotWindow.CarriedBySlot"/>) or a dynamic-capacity table: ISO
+/// §8.5.1.9.1 3) lets the table be "defined in any place, other than the file section, in which a fixed-capacity table
+/// may be defined", so an EXTERNAL or ADDRESS-OF-taken record may hold one. Each rides its own managed slot of the
+/// cell (<c>StorageCell.DynAt</c> / <c>DynTableAt</c>), numbered in storage order with one slot per OCCURRENCE of
+/// every enclosing fixed table, and a table's elements are element cells that are a SCOPE of their own: the element's
+/// members are windows over its element cell, numbered from zero within it, so a table or a dynamic-length item inside
+/// a table element is this same model one level down. The ordinal walk (<c>DataBinder.ForceStringCanonical</c>), the
+/// reference geometry (<c>ReferenceResolver</c>), the group composer (<see cref="VarGroupWindow"/>) and the cell seeder
+/// (<c>GroupImageCodec.CellDynSeeds</c>) all read THIS enumeration, so they cannot disagree about where a component
+/// is.</summary>
+public static class CellComponents
+{
+    /// <summary>True when <paramref name="item"/> is a component of its scope.</summary>
+    public static bool IsComponent(DataItem item) => DynSlotWindow.CarriedBySlot(item) || item.IsDynamicTable;
+
+    /// <summary>How many components ONE occurrence of <paramref name="item"/> holds in its scope — the stride a
+    /// subscript of a fixed table level displaces a component ordinal by. A component counts one (a table's own
+    /// elements hold theirs in the element cells); a group, the sum over its storage children, each times its
+    /// occurrence count.</summary>
+    public static int PerOccurrence(DataItem item) =>
+        IsComponent(item) ? 1
+        : item.Children.Where(c => c.RedefinesTargetName is null).Sum(c => PerOccurrence(c) * (c.Occurs ?? 1));
+
+    /// <summary>The components of ONE occurrence of <paramref name="group"/>, in ordinal (storage) order with every
+    /// fixed table's occurrences expanded, each with its position in the group's window and the occurrence numbers of
+    /// the fixed tables it was expanded through (<c>Fixed</c>, most inclusive first — the tail §13.18.63.3 SR20's
+    /// subscript tuple gains below the group, so a seeder keys a table VALUE to the right element). A
+    /// dynamic-capacity table enumerates its ELEMENT's components (it is referenced one element at a time, and its
+    /// members' offsets are relative to the element cell).</summary>
+    public static IEnumerable<(DataItem Item, int At, Subscripts Fixed)> Of(DataItem group) =>
+        Walk(group, group.IsDynamicTable ? 0 : group.ClassOffset, 0, default);
+
+    private static IEnumerable<(DataItem Item, int At, Subscripts Fixed)> Walk(DataItem node, int origin, int shift,
+                                                                               Subscripts fixedSubs)
+    {
+        foreach (var c in node.Children.Where(c => c.RedefinesTargetName is null))
+            for (int o = 0; o < (c.Occurs ?? 1); o++)
+            {
+                int s = shift + o * c.ByteWidth;
+                var f = c.Occurs is null ? fixedSubs : fixedSubs.With(o + 1);
+                if (IsComponent(c)) yield return (c, c.ClassOffset - origin + s, f);
+                else foreach (var x in Walk(c, origin, s, f)) yield return x;
+            }
+    }
+}
+
+/// <summary>A <see cref="RedefViewPlace"/>'s VARIABLE-LENGTH GROUP window (kb/Work PB1026, PB1042): a group of a
+/// CELL-BACKED class with variable-length components under it (<see cref="CellComponents"/>). Its window is
+/// <see cref="RedefViewPlace.Width"/> bytes of its scope's backing from the window's offset, in which each component
+/// sits at <paramref name="DynFixedAt"/> (relative to the group): a dynamic-length item occupying nothing, a
+/// dynamic-capacity table reserving its one-element extent <paramref name="DynTable"/> (0 for a dynamic-length item).
+/// The components are the cell's slots <paramref name="DynBase"/> onward (the D10 transitional expression of the
+/// first ordinal), with maximum sizes <paramref name="DynMax"/> (a table's in occurrences), each laid out in a record
+/// image by its <paramref name="DynStructure"/> (<c>CobolDynStructure.Code</c>, 0 for none — ISO §12.3.7.4
+/// GR18/GR19; kb/Work PB1094). ISO §8.5.1.11.2 — "a variable-length data item behaves in all respects as though it
 /// were in fact contiguous with its neighbors whenever a procedural operation is applied to a group containing it"
 /// — is why its read is the CONTIGUOUS image (<c>StorageCell.ContiguousAt</c>), exactly what a declared group's
 /// generated <c>CurrentImage()</c> composes.</summary>
-public sealed record VarGroupWindow(AccessPath Cell, int DynBase, IReadOnlyList<int> DynFixedAt,
-                                    IReadOnlyList<int> DynMax, IReadOnlyList<int> DynStructure) : CellWindowCoding(Cell)
+public sealed record VarGroupWindow(AccessPath Cell, string DynBase, IReadOnlyList<int> DynFixedAt,
+                                    IReadOnlyList<int> DynMax, IReadOnlyList<int> DynStructure,
+                                    IReadOnlyList<int> DynTable) : CellWindowCoding(Cell)
 {
-    /// <summary>The coding for <paramref name="group"/> when it has dynamic-length items under it, else null.
-    /// The layout is read off the class walk (<see cref="DataItem.ClassOffset"/> /
-    /// <see cref="DataItem.ClassDynOrdinal"/>), never recomputed, so the group and its members cannot disagree
-    /// about where a component sits.</summary>
-    public static VarGroupWindow? Of(DataItem group, AccessPath cell)
+    /// <summary>The coding for <paramref name="group"/> when it has components under it, else null. The layout is
+    /// read off the class walk (<see cref="CellComponents.Of"/> over <see cref="DataItem.ClassOffset"/>), never
+    /// recomputed, so the group and its members cannot disagree about where a component sits.</summary>
+    public static VarGroupWindow? Of(DataItem group, AccessPath cell, string dynBase)
     {
         if (!group.IsGroup) return null;
-        var dyn = DataItem.DescendantsOf(group).Where(DynSlotWindow.CarriedBySlot).ToList();
-        return dyn.Count == 0 ? null
-            : new VarGroupWindow(cell, dyn[0].ClassDynOrdinal,
-                dyn.Select(d => d.ClassOffset - group.ClassOffset).ToList(), dyn.Select(d => d.DynMaxSize).ToList(),
-                dyn.Select(d => FileModel.StructureOf(d)?.Code ?? 0).ToList());
+        var parts = CellComponents.Of(group).ToList();
+        return parts.Count == 0 ? null
+            : new VarGroupWindow(cell, dynBase,
+                parts.Select(p => p.At).ToList(),
+                parts.Select(p => p.Item.IsDynamicTable ? p.Item.OccursSpec?.Max ?? 0 : p.Item.DynMaxSize).ToList(),
+                parts.Select(p => p.Item.IsDynamicTable ? 0 : FileModel.StructureOf(p.Item)?.Code ?? 0).ToList(),
+                parts.Select(p => p.Item.IsDynamicTable ? p.Item.ByteWidth : 0).ToList());
     }
 
     /// <summary>True when <paramref name="group"/> would take this coding.</summary>
-    public static bool Applies(DataItem group) =>
-        group.IsGroup && DataItem.DescendantsOf(group).Any(DynSlotWindow.CarriedBySlot);
+    public static bool Applies(DataItem group) => group.IsGroup && CellComponents.Of(group).Any();
+
+    /// <summary>Each component's position in the group's FIXED RUN — its window position less the reservations of
+    /// the tables before it — the coordinate <c>CobolVarGroup</c> interleaves components at (§8.8.4.2.17).</summary>
+    public IEnumerable<int> RunFixedAt()
+    {
+        int cut = 0;
+        for (int k = 0; k < DynFixedAt.Count; k++)
+        {
+            yield return DynFixedAt[k] - cut;
+            cut += DynTable[k];
+        }
+    }
 }
 
 /// <summary>

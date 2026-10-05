@@ -24,6 +24,14 @@ public readonly struct Subscripts : IEquatable<Subscripts>
         return new Subscripts(a);
     }
 
+    /// <summary>This tuple with every subscript of <paramref name="tail"/> appended, in order.</summary>
+    public Subscripts With(Subscripts tail)
+    {
+        var r = this;
+        for (int i = 0; i < tail.Count; i++) r = r.With(tail[i]);
+        return r;
+    }
+
     public int Count => _v?.Length ?? 0;
 
     public int this[int i] => _v[i];

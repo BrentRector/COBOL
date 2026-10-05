@@ -713,9 +713,11 @@ public sealed class DataItem
         "computed post-build by DataBinder.AssignClassOffsets over the clone's OWN redefines class")]
     public int ClassOffset { get; internal set; }
 
-    /// <summary>This dynamic-length item's ordinal among the dynamic-length items of its CELL-BACKED class, in
-    /// storage order — the cell's dynamic slot it rides (<see cref="DynSlotWindow"/>; kb/Work PB1026). -1 when
-    /// the item is not such a member. ONE writer: <c>DataBinder.ForceStringCanonical</c>, the cell forcer.</summary>
+    /// <summary>In a CELL-BACKED class: this item's component ordinal in its scope (<see cref="CellComponents"/>;
+    /// kb/Work PB1026, PB1042) — for a dynamic-length item or a dynamic-capacity table the slot it rides in its
+    /// occurrence 1 (<see cref="DynSlotWindow"/>, <c>StorageCell.DynTableAt</c>), for any other item the ordinal of its
+    /// first component. -1 outside a cell-backed class. ONE writer: <c>DataBinder.AssignCellComponents</c>, reached
+    /// from the cell forcer.</summary>
     [DescriptionCopy(DescriptionCopyKind.None,
         "computed post-build by DataBinder.ForceStringCanonical over the clone's OWN cell-backed class")]
     public int ClassDynOrdinal { get; internal set; } = -1;

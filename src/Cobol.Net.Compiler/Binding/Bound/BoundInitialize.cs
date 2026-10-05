@@ -80,7 +80,7 @@ public sealed record InitializeLoop(string Var, AllCount Count, IReadOnlyList<In
 /// chain, MOST INCLUSIVE FIRST — exactly the order §13.18.63.3 SR20 keys the plan's subscript tuples by, so an
 /// arm's <see cref="InitializeOccurrenceArm.When"/> tuples index straight into them. Arms are TESTED IN ORDER and
 /// are mutually exclusive by construction (one arm per distinct literal, the occurrences sharing it coalesced —
-/// the same folding <c>ValueInitializer.SeedSwitch</c> does, so a literal spanning a thousand occurrences is one
+/// the same folding <c>ValueInitializer.OccurrenceSwitch</c> does, so a literal spanning a thousand occurrences is one
 /// branch and not a thousand).</para></summary>
 public sealed record InitializeOccurrenceSelect(
     IReadOnlyList<string> IndexVars,

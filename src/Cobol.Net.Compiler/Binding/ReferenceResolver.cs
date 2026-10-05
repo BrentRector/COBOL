@@ -1003,36 +1003,20 @@ public sealed partial class ReferenceResolver(DataBinder data)
             // (occurrence − 1) × that level's per-occurrence width — the redefined table lays its occurrences
             // end-to-end in the ONE backing (ISO §13.18.44). ClassOffset is the occurrence-1 position; subscripts
             // map to the in-class OCCURS levels outer→inner, exactly as in AccessPath.
-            var occursLevels = new List<DataItem>();
-            for (DataItem? n = item; n is not null && ReferenceEquals(n.Class, sc); n = n.Parent)
-                if (n.Occurs is not null) occursLevels.Add(n);
-            occursLevels.Reverse();
-            if (indexExprs.Count != outerCount + occursLevels.Count) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }   // an item-path caller's count
-            if (BuildBackingPath(sc, [.. indexExprs.Take(outerCount)]) is not { } backing) { gap = new(DeferredShape.NestedClassBacking, item); return null; }
+            var levels = SubscriptLevelsWithin(item, sc);
+            if (indexExprs.Count != outerCount + levels.Count) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }   // an item-path caller's count
+            if (BuildBackingPath(sc, [.. indexExprs.Take(outerCount)]) is not { } classBacking) { gap = new(DeferredShape.NestedClassBacking, item); return null; }
             indexExprs = [.. indexExprs.Skip(outerCount)];
-            string offset = item.ClassOffset.ToString();
-            // The BIT twin of the same displacement, for a USAGE BIT member (kb/Work PB203): a bit item's
-            // occurrences lie at successive BIT positions (§8.5.1.6.3's "next bit position in storage"; the same
-            // stride GroupImageCodec.EmitRunMemberFromBits distributes a run's occurrences at), so the per-level
-            // stride is its bit extent — `PIC 1(4) USAGE BIT OCCURS 6` strides 4 bits, not the 1 byte its
-            // ImageWidth ceiling reports.
-            string bitTerms = "";
-            for (int k = 0; k < occursLevels.Count; k++)
-            {
-                // The BYTE stride is the level's STORAGE extent, never its character-position count (kb/Work
-                // PB231): the backing is byte-addressed and a NATIONAL element occupies two bytes per position
-                // (§13.18.60.4 GR8 / D-N1), so `05 T PIC N(2) OCCURS 3` strides FOUR bytes. ByteWidth is
-                // ImageWidth for every other leaf kind, so this is byte-identical elsewhere — the same
-                // relationship the bit twin below has to it.
-                offset += $" + ({indexExprs[k]} - 1) * {occursLevels[k].ByteWidth}";
-                bitTerms += $" + ({indexExprs[k]} - 1) * {BitLayout.StrideBits(occursLevels[k])}";   // ALIGNED strides whole bytes (§13.18.1.4 GR2)
-            }
+            if (WindowScopeOf(classBacking, BuildCellPath(sc), levels, indexExprs) is not { } scope) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }
+            // A dynamic-capacity table referenced by its subscript IS its element, at offset zero of the element cell.
+            string offset = (item.IsDynamicTable ? 0 : item.ClassOffset) + scope.Terms;
             // A BASED class's window is displaced by the data-address pointer's runtime offset (ISO §13.18.5
             // — the view addresses wherever the pointer currently points; Phase-4b increment 2). The backing
             // property renders FIRST in both Read and Write, so the Deref null/bounds traps (GR3/GR4) fire
-            // before the null-lenient OffsetOf.
+            // before the null-lenient OffsetOf. (A BASED record holds no dynamic-capacity table — §13.18.5.3 SR2 —
+            // so the displacement is always the record scope's.)
             string? based = null;
-            if (sc.BasedPointerField is { } addr)
+            if (sc.BasedPointerField is { } addr && !scope.Nested)
             {
                 based = $"CobolPtr.OffsetOf({addr})";
                 offset = $"{based} + {offset}";
@@ -1041,7 +1025,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
             // A class-tier GROUP holding an occurs-depending table is an ODO operand exactly like a struct group
             // (kb/Work PB80: a BASED record — string-canonical — sent its MAXIMUM image; §13.18.38.4 GR8 does not
             // care how the group is stored). ONE wrap rule for both storage shapes.
-            return WrapIfOdoGroup(RedefViewPlace.For(backing, item, offset, based, bitTerms, BuildCellPath(sc)), item);
+            string? dynOrdinal = scope.Cell is null ? null : $"{(item.IsDynamicTable ? 0 : item.ClassDynOrdinal)}{scope.OrdinalTerms}";
+            return WrapIfOdoGroup(RedefViewPlace.For(scope.Backing, item, offset, based, scope.BitTerms, scope.Cell, dynOrdinal), item);
         }
         // A Tier-A view forwards to the canonical (a numeric view reinterprets the shared unscaled value via its own
         // scale, for free). A not-yet-wired (Tier-C) / Rejected view is loud.
@@ -1728,6 +1713,63 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 OmittedFormalGuard.Of(cls.Canonical) is { } g ? g with { CarrierPrefix = cls.BackingCellCsName } : null)])
             : null;
 
+    /// <summary>The subscript levels of a reference to <paramref name="item"/> WITHIN its Tier-B class
+    /// <paramref name="cls"/>, outermost first: every fixed OCCURS level and every dynamic-capacity table level on
+    /// its path (§8.4.2.3.3 SR3 — one subscript per OCCURS clause, a dynamic table's included).</summary>
+    private static List<DataItem> SubscriptLevelsWithin(DataItem item, RedefinesClass cls)
+    {
+        var levels = new List<DataItem>();
+        for (DataItem? n = item; n is not null && ReferenceEquals(n.Class, cls); n = n.Parent)
+            if (n.Occurs is not null || n.IsDynamicTable) levels.Add(n);
+        levels.Reverse();
+        return levels;
+    }
+
+    /// <summary>Where a Tier-B class reference's window lives, and its displacements there.</summary>
+    /// <param name="Cell">The scope's <c>StorageCell</c> path (null for a REDEFINES class, which has none).</param>
+    /// <param name="Backing">The scope's character backing — the class backing, or an element cell's <c>Ref</c>.</param>
+    /// <param name="Terms">The byte displacement of the fixed levels crossed in the scope.</param>
+    /// <param name="BitTerms">The same displacement in bits, for a USAGE BIT member.</param>
+    /// <param name="OrdinalTerms">The component-ordinal displacement of the same levels (cell only).</param>
+    /// <param name="Nested">True when a dynamic-capacity table level opened an element cell's scope.</param>
+    private readonly record struct WindowScope(AccessPath? Cell, AccessPath Backing, string Terms, string BitTerms,
+                                               string OrdinalTerms, bool Nested);
+
+    /// <summary>⛔ THE ONE WALK OF A TIER-B REFERENCE'S SUBSCRIPT LEVELS (kb/Work PB1042), outermost first. A fixed
+    /// level displaces the window by <c>(index − 1) ×</c> its per-occurrence STORAGE extent — never its
+    /// character-position count (kb/Work PB231: a NATIONAL element occupies two bytes per position, §13.18.60.4 GR8 /
+    /// D-N1) — its BIT twin by the level's bit stride (kb/Work PB203: `PIC 1(4) USAGE BIT OCCURS 6` strides 4 bits;
+    /// ALIGNED strides whole bytes, §13.18.1.4 GR2), and, in a cell, the component ordinal by the level's components
+    /// per occurrence (<see cref="CellComponents.PerOccurrence"/>). A dynamic-capacity table level — ISO §8.5.1.9.1
+    /// 3): it "may be defined in any place, other than the file section, in which a fixed-capacity table may be
+    /// defined" — opens the SCOPE of its element: the occurrence's element cell (<see cref="CellTableSegment"/> then
+    /// <see cref="DynTableSegment"/>, whose accessor is the reference's direction, §8.5.1.9.2 / §8.5.1.9.3), whose
+    /// <c>Ref</c> is the backing and whose own offsets and ordinals start again at zero. Null when such a level lies in
+    /// a class with no cell.</summary>
+    private static WindowScope? WindowScopeOf(AccessPath backing, AccessPath? cell, IReadOnlyList<DataItem> levels,
+                                              IReadOnlyList<string> indexExprs)
+    {
+        string terms = "", bitTerms = "", ordinalTerms = "";
+        bool nested = false;
+        for (int k = 0; k < levels.Count; k++)
+        {
+            var level = levels[k];
+            if (level.IsDynamicTable)
+            {
+                if (cell is null) return null;
+                cell = cell.Add(CellTableSegment.Of(level, $"{level.ClassDynOrdinal}{ordinalTerms}"))
+                           .Add(new DynTableSegment(indexExprs[k]));
+                backing = cell.Add(new MemberSegment(nameof(CobolNet.Runtime.StorageCell.Ref)));
+                (terms, bitTerms, ordinalTerms, nested) = ("", "", "", true);
+                continue;
+            }
+            terms += $" + ({indexExprs[k]} - 1) * {level.ByteWidth}";
+            bitTerms += $" + ({indexExprs[k]} - 1) * {BitLayout.StrideBits(level)}";
+            if (cell is not null) ordinalTerms += $" + ({indexExprs[k]} - 1) * {CellComponents.PerOccurrence(level)}";
+        }
+        return new WindowScope(cell, backing, terms, bitTerms, ordinalTerms, nested);
+    }
+
     /// <summary>⛔ THE ONE ROOT SEGMENT OF AN ITEM'S ACCESS PATH (kb/Work PB971): the item's field, carrying the
     /// *-ARG-OMITTED guard when the item is a formal parameter (<see cref="OmittedFormalGuard.Of"/>), so every
     /// path builder — element, whole table, Tier-B backing — checks a reference to an omitted formal the same
@@ -1818,26 +1860,6 @@ public sealed partial class ReferenceResolver(DataBinder data)
     }
 
     // ── Access-path construction (subscripts attach to OCCURS levels, outer→inner) ───────────────────────
-
-    /// <summary>
-    /// The C# member-access path for an item: a static field at the root, else <c>Parent.Child</c> chained, with
-    /// each <paramref name="indexExprs"/> entry inserted as <c>[expr - 1]</c> at its OCCURS level (outermost first).
-    /// Returns <see langword="null"/> if the subscript count does not match the table's OCCURS dimension.
-    /// </summary>
-    /// <summary>The C# field path to a WHOLE table's field (the bare <c>.CsName</c> chain, NO subscript wrap) — for
-    /// the OCCURS DYNAMIC CAPACITY-register view (<c>{path}.Capacity</c>), and (later increments) FUNCTION LENGTH,
-    /// the SEARCH bound, and INITIALIZE of a dynamic table. Returns <see langword="null"/> when an ancestor is
-    /// ITSELF a table (fixed or dynamic): a subscript would be required, so a whole-table reference is ambiguous and
-    /// the caller fails loud (ISO §13.18.38; data-model D9).</summary>
-    internal string? TablePath(DataItem table)
-    {
-        var chain = new List<DataItem>();
-        for (DataItem? n = table; n is not null; n = n.Parent) chain.Add(n);
-        chain.Reverse();
-        for (int i = 0; i < chain.Count - 1; i++)   // any table STRICTLY above → ambiguous whole-table reference
-            if (chain[i].IsTable) return null;
-        return string.Join(".", chain.Select((n, i) => i == 0 ? RootText(n) : n.CsName));
-    }
 
     /// <summary>The D10 transitional STRING twin of <see cref="RootOf"/>: the root item's field text, through the
     /// guard's one rendering when the item is a formal parameter (kb/Work PB971).</summary>
@@ -2130,9 +2152,11 @@ public sealed partial class ReferenceResolver(DataBinder data)
         return new AccessPath(segs);
     }
 
-    /// <summary>The STRUCTURAL whole-table path (no subscript wraps) — the <see cref="CapacityRegisterPlace"/> twin of
-    /// the string <see cref="TablePath"/> (also the base of a whole-dynamic-table INITIALIZE element path). Null when
-    /// an ancestor is itself a table (an ambiguous whole-table reference).</summary>
+    /// <summary>The STRUCTURAL whole-table path (no subscript wraps) — the ONE whole-table path: the
+    /// <see cref="CapacityRegisterPlace"/>'s table, the SEARCH bound and EC-FLOW-SEARCH bracket, and the base of a
+    /// whole-dynamic-table INITIALIZE element path (its string twin was deleted with kb/Work PB1042, which found it
+    /// blind to a cell-backed table). Null when an ancestor is itself a table (an ambiguous whole-table
+    /// reference).</summary>
     internal static AccessPath? BuildTablePath(DataItem table) => BuildTablePath(table, []);
 
     /// <summary>⛔ THE ONE MODEL OF A TABLE LEVEL'S CURRENT OCCURRENCE COUNT (the <see cref="AllCount"/> the backend
@@ -2170,6 +2194,17 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// reports.</summary>
     internal static AccessPath? BuildTablePath(DataItem table, IReadOnlyList<string> outerIndexExprs)
     {
+        // A dynamic-capacity table of a CELL-BACKED class is a component of its scope's cell (kb/Work PB1042): the
+        // enclosing levels are walked by THE ONE scope walk, and the table is that cell's component.
+        if (table is { IsDynamicTable: true, Class: { IsCellBacked: true } cc } && BuildCellPath(cc) is { } rootCell)
+        {
+            var outer = SubscriptLevelsWithin(table, cc);
+            outer.RemoveAt(outer.Count - 1);   // the table itself
+            if (outerIndexExprs.Count < outer.Count) return null;   // an enclosing table with no index — ambiguous
+            return WindowScopeOf(rootCell, rootCell, outer, outerIndexExprs) is { Cell: { } scopeCell } s
+                ? scopeCell.Add(CellTableSegment.Of(table, $"{table.ClassDynOrdinal}{s.OrdinalTerms}"))
+                : null;
+        }
         var chain = new List<DataItem>();
         for (DataItem? n = table; n is not null; n = n.Parent) chain.Add(n);
         chain.Reverse();
@@ -2190,6 +2225,11 @@ public sealed partial class ReferenceResolver(DataBinder data)
         return new AccessPath(segs);
     }
 
+    /// <summary>
+    /// The C# member-access path for an item: a static field at the root, else <c>Parent.Child</c> chained, with
+    /// each <paramref name="indexExprs"/> entry inserted at its OCCURS level (outermost first).
+    /// Returns <see langword="null"/> if the subscript count does not match the table's OCCURS dimension.
+    /// </summary>
     private static string? AccessPath(DataItem item, IReadOnlyList<string> indexExprs,
         AccessDir dir = AccessDir.Sending)
     {

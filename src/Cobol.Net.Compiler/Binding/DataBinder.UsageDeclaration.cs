@@ -147,7 +147,7 @@ public sealed partial class DataBinder
             // ── §13.18.5.3 SR2 ───────────────────────────────────────────────────────────────────────────
             // "The subject of the entry shall not be a dynamic-length elementary item or a variable-length
             // group." (kb/Work PB1213.) Asked of the SHAPE, through the one screen of that pair — never of the
-            // BASED cell's carriage gates (ByteWindowResidueOf / VariableLengthCellResidueOf), which answer what
+            // BASED cell's carriage gate (ByteWindowResidueOf) or its component walk (Place.CellComponents), which answer what
             // the shared cell can HOLD and are shared with EXTERNAL and ADDRESS OF, where a variable-length group
             // is legal. Until this arm, a BASED group with a DYNAMIC LENGTH leaf compiled and ran because the
             // cell had learned to carry one, and the dynamic-capacity-table spelling was refused only as "not yet

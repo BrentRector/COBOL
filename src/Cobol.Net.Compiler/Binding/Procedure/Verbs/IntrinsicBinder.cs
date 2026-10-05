@@ -2340,7 +2340,14 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         void Add(BoundExpr e) => runtime = runtime is null ? e : new BoundBinary(runtime, '+', e);
         BoundExprError? failure = null;
 
-        void Walk(DataItem g, AccessPath? path)
+        // A component of a CELL-BACKED group (kb/Work PB1042): its ordinal is the group window's first ordinal plus
+        // its place among the group's components — the difference of the two static ordinals (a group that is
+        // itself a table element numbers its members from zero), plus `shift`, the displacement of the fixed-table
+        // occurrence the per-occurrence walk below has entered (CellComponents.PerOccurrence per occurrence).
+        string CellOrdinal(VarGroupWindow vg, DataItem c, int shift) =>
+            $"{vg.DynBase} + {c.ClassDynOrdinal - (group.IsDynamicTable ? 0 : group.ClassDynOrdinal) + shift}";
+
+        void Walk(DataItem g, AccessPath? path, int shift = 0)
         {
             foreach (var c in g.Children.Where(x => x.RedefinesTargetName is null))
             {
@@ -2351,10 +2358,14 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     // r7c / r6c — the current capacity × the element width. ByteWidth counted ONE occurrence.
                     if (HasRuntimeLength(c) || (c.IsElementary && c.IsDynamicLength))
                     { failure = Stage($"the dynamic-capacity table '{c.CobolName ?? c.CsName}' has a runtime-length element — a per-occurrence sum"); return; }
-                    if (cPath is null || c.OccursSpec?.CapacityRegister is not { } reg)
+                    // A CELL-BACKED group's table is a component of the cell (kb/Work PB1042): its path is the
+                    // group's cell and its ordinal relative to the group's first component.
+                    var tablePath = cPath ?? (inner is RedefViewPlace { Coding: VarGroupWindow tg }
+                        ? tg.Cell.Add(CellTableSegment.Of(c, CellOrdinal(tg, c, shift))) : null);
+                    if (tablePath is null || c.OccursSpec?.CapacityRegister is not { } reg)
                     { failure = Stage($"the dynamic-capacity table '{c.CobolName ?? c.CsName}' could not be addressed"); return; }
                     fixedPart -= c.ByteWidth;
-                    Add(new BoundBinary(new BoundNumRef(new CapacityRegisterPlace(cPath, reg)), '*',
+                    Add(new BoundBinary(new BoundNumRef(new CapacityRegisterPlace(tablePath, reg)), '*',
                                         new BoundNumLiteral(c.ByteWidth.ToString())));
                 }
                 else if (c.OccursSpec is { DependingName: not null } spec)
@@ -2384,11 +2395,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     // SAME member kind the current-extent composer calls a NestedTable (GroupImageCodec), so
                     // DISPLAY, LENGTH and the boundary agree about which groups have a current extent.
                     bool perOccurrence = c.IsGroup && !HasOdoBeneath(c)
-                                         && HasRuntimeLength(c) && cPath is not null;
+                                         && HasRuntimeLength(c) && (cPath is not null || inner is RedefViewPlace { Coding: VarGroupWindow });
                     if (perOccurrence)
                     {
                         for (int i = 1; i <= times && failure is null; i++)
-                            Walk(c, cPath!.Add(new FixedTableSegment(i.ToString())));
+                            Walk(c, cPath?.Add(new FixedTableSegment(i.ToString())), shift + (i - 1) * CellComponents.PerOccurrence(c));
                     }
                     else if (HasRuntimeLength(c) || c.IsDynamicLength)
                     { failure = Stage($"the table '{c.CobolName ?? c.CsName}' has a runtime-length element — a per-occurrence sum"); return; }
@@ -2399,16 +2410,17 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     // channel (LengthInBytes — r6's byte count); BYTE-LENGTH is the storage image already.
                     // A CELL-BACKED group's dynamic-length subordinate (an EXTERNAL record, an ADDRESS-OF-taken
                     // record — kb/Work PB1026) has no member path: its content rides the cell's dynamic slot, and
-                    // its place is built by THE ONE window builder over the same cell (Place.DynSlotWindow).
+                    // its place is built by THE ONE window builder over the same cell (Place.DynSlotWindow), at
+                    // its ordinal relative to the group's own first component (kb/Work PB1042).
                     Place? cPlace = cPath is not null ? new MemberPlace(cPath, c)
                         : inner is RedefViewPlace { Coding: VarGroupWindow vg } rv
-                            ? RedefViewPlace.For(rv.Backing, c, rv.OffsetExpr, cell: vg.Cell)
+                            ? RedefViewPlace.For(rv.Backing, c, rv.OffsetExpr, cell: vg.Cell, dynOrdinal: CellOrdinal(vg, c, shift))
                             : null;
                     if (cPlace is null) { failure = Stage($"the dynamic-length subordinate '{c.CobolName ?? c.CsName}' could not be addressed"); return; }
                     Add(new BoundIntrinsicCall(sig, [new BoundFieldOperand(cPlace)], PicCategory.Numeric)
                             { LengthInBytes = !bytes && c.Pic is { Category: PicCategory.National } });
                 }
-                else if (c.IsGroup) Walk(c, cPath);
+                else if (c.IsGroup) Walk(c, cPath, shift);
             }
         }
         Walk(group, basePath);

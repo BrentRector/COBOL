@@ -51,7 +51,14 @@ internal static class PlaceIdentification
     {
         MemberPlace m => m with { Path = FreezePath(m.Path, hoist) },
         DynTablePlace d => d with { Path = FreezePath(d.Path, hoist) },
-        RedefViewPlace v => v with { Backing = FreezePath(v.Backing, hoist), OffsetExpr = HoistFragment(v.OffsetExpr, hoist) },
+        RedefViewPlace v => v with
+        {
+            Backing = FreezePath(v.Backing, hoist),
+            OffsetExpr = HoistFragment(v.OffsetExpr, hoist),
+            Coding = FreezeCoding(v.Coding, hoist),
+            Cell = v.Cell is { } cell ? FreezePath(cell, hoist) : null,
+            DynOrdinal = v.DynOrdinal is { } ordinal ? HoistFragment(ordinal, hoist) : null,
+        },
         // The decorations that carry an address of their own: the slice, and the occurs-depending wrapper whose INNER
         // is the addressed storage. A reference modifier is evaluated AFTER its identifier's subscripts (§14.6.4
         // steps 6/7), so the inner is frozen first.
@@ -70,6 +77,17 @@ internal static class PlaceIdentification
         return r with { Inner = inner, Start = start, Length = length };
     }
 
+    /// <summary>A cell window's own address fragments (kb/Work PB1042): the cell path — which, inside a
+    /// dynamic-capacity table's element, carries that table's subscript — and the component ordinal, which carries a
+    /// subscript term per enclosing fixed table.</summary>
+    private static WindowCoding? FreezeCoding(WindowCoding? coding, Func<string, string> hoist) => coding switch
+    {
+        SlotWindow s => s with { Cell = FreezePath(s.Cell, hoist) },
+        DynSlotWindow d => d with { Cell = FreezePath(d.Cell, hoist), Ordinal = HoistFragment(d.Ordinal, hoist) },
+        VarGroupWindow g => g with { Cell = FreezePath(g.Cell, hoist), DynBase = HoistFragment(g.DynBase, hoist) },
+        _ => coding,
+    };
+
     private static AccessPath FreezePath(AccessPath path, Func<string, string> hoist)
     {
         if (!path.HasIndex) return path;
@@ -79,6 +97,7 @@ internal static class PlaceIdentification
             {
                 FixedTableSegment f => f with { OneBasedIndex = HoistFragment(f.OneBasedIndex, hoist) },
                 DynTableSegment d => d with { OneBasedIndex = HoistFragment(d.OneBasedIndex, hoist) },
+                CellTableSegment c => c with { Ordinal = HoistFragment(c.Ordinal, hoist) },   // kb/Work PB1042
                 _ => s,
             });
         return new AccessPath(segments);

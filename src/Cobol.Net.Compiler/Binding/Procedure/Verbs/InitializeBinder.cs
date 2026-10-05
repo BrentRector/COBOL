@@ -202,18 +202,19 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
         // item hides a container's GLOBAL dynamic table of the same name (SymbolTable.TryResolveUnqualified).
         if (dref.dataReferenceSuffix().Length == 0
             && ctx.Symbols.TryResolveUnqualified(dref.cobolWord()?.GetText() ?? dref.GetText(), ctx.ActiveScope, out var dyns)
-            && dyns.FirstOrDefault(i => i.IsDynamicTable) is { } dtbl && ctx.Refs.TablePath(dtbl) is { } dtp)
+            && dyns.FirstOrDefault(i => i.IsDynamicTable) is { } dtbl && ReferenceResolver.BuildTablePath(dtbl) is { } tblPath)
         {
             string v = $"__ini{_initializeLoopVar++}";
             var body = new List<InitializeAction>();
-            var tblPath = ReferenceResolver.BuildTablePath(dtbl)!;
             // identifier-1 carries no subscript on this arm (the guard above), so the ONE dimension the expansion
-            // enters is the whole occurrence key a Format-2 VALUE on the element is looked up by.
-            ExpandInitialize(new DynElementCursor(tblPath.Add(new DynTableSegment(v)), dtbl),
-                spec, body, dtbl, [new OccurrenceDim(v, null)], identifier1: true);
+            // enters is the whole occurrence key a Format-2 VALUE on the element is looked up by. A cell-backed
+            // table's occurrence is an element cell (kb/Work PB1042), a record's a typed element.
+            PlaceCursor element = ViewCursor.AtCellTable(dtbl)?.DynamicElement(v)
+                ?? new DynElementCursor(tblPath.Add(new DynTableSegment(v)), dtbl);
+            ExpandInitialize(element, spec, body, dtbl, [new OccurrenceDim(v, null)], identifier1: true);
             if (body.Count > 0 && OccurrenceCounts.Capacity(dtbl, tblPath) is { } cap) actions.Add(new InitializeLoop(v, cap, body));
             else if (body.Count > 0) actions.Add(new InitializeErrorAction(
-                $"INITIALIZE of the dynamic-capacity table '{dtbl.CobolName ?? dtp}' (no capacity register)"));
+                $"INITIALIZE of the dynamic-capacity table '{dtbl.CobolName ?? "FILLER"}' (no capacity register)"));
             return;
         }
         // ⛔ identifier-1 RESOLVES THROUGH THE ONE RECEIVING CHOKEPOINT, BECAUSE §14.9.20.3 SR7 SAYS IT IS THE
@@ -403,10 +404,9 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
             {
                 string dv = $"__ini{_initializeLoopVar++}";
                 var dbody = new List<InitializeAction>();
-                if (childCur.StoragePath is { } dtp)
+                if (childCur.StoragePath is { } dtp && childCur.DynamicElement(dv) is { } elementCur)
                 {
-                    ExpandInitialize(new DynElementCursor(dtp.Add(new DynTableSegment(dv)), child),
-                        spec, dbody, identifier1Item, [.. key, new OccurrenceDim(dv, null)]);
+                    ExpandInitialize(elementCur, spec, dbody, identifier1Item, [.. key, new OccurrenceDim(dv, null)]);
                     if (dbody.Count > 0 && TableCount(child, identifier1Item, dtp) is { } dcount)
                         actions.Add(new InitializeLoop(dv, dcount, dbody));
                     else if (dbody.Count > 0)

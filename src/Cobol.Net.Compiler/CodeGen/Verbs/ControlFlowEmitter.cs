@@ -505,7 +505,7 @@ internal sealed class ControlFlowEmitter(EmitContext ctx, NumericRenderer num, C
         // An OCCURS DYNAMIC table brackets the scan with EnterSearch/ExitSearch so a SET Format 14 on that same
         // table WHILE searching raises EC-FLOW-SEARCH (ISO §14.9.39 GR31; data-model D9). A try/finally is required
         // because the WHEN/AT-END arms `goto __searchEnd` OUT of the scan — ExitSearch must run on every exit path.
-        if (s.DynTable is { } dt)
+        if (s.DynTable is { } table && PlaceRenderer.RenderPath(table, AccessDir.Sending) is var dt)
         {
             w.Line($"{dt}.EnterSearch();");
             using (w.Block("try")) EmitSearchScan(s, id);
@@ -532,7 +532,7 @@ internal sealed class ControlFlowEmitter(EmitContext ctx, NumericRenderer num, C
     private void EmitSearchScan(BoundSearch s, int id)
     {
         var w = ctx.Writer;
-        string bound = s.DynTable is { } dt ? $"{dt}.Capacity"
+        string bound = s.DynTable is { } dt ? $"{PlaceRenderer.RenderPath(dt, AccessDir.Sending)}.Capacity"
             : s.DependItem is { } dp ? PlaceRenderer.CountRead(dp)
             : $"{s.Count}L";
         // CA36 (ISO §14.9.37.4 GR1b2): when the AT END phrase is ABSENT and EC-RANGE checking is ON, a raised

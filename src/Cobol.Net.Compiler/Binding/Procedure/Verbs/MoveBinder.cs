@@ -276,9 +276,7 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     /// table's element through its direction-specific accessor (data-model D9 — a read is RefSending, a store
     /// RefReceiving, which within the current capacity never grows it), any other table through its OCCURS index.</summary>
     private static Place ElementPlace(PlaceCursor tableCursor, DataItem table, string v) =>
-        table.IsDynamicTable && tableCursor.StoragePath is { } path
-            ? new DynElementCursor(path.Add(new DynTableSegment(v)), table).ToPlace()
-            : tableCursor.Indexed(v).ToPlace();
+        (table.IsDynamicTable ? tableCursor.DynamicElement(v) : null)?.ToPlace() ?? tableCursor.Indexed(v).ToPlace();
 
     // ── The … FROM and … INTO phrases (kb/Work PB348) ───────────────────────────────────────────────────────
 
