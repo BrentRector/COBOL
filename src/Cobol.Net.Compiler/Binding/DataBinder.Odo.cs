@@ -372,8 +372,9 @@ public sealed partial class DataBinder
             if (UniqueOrReportAmbiguous(tier, depFace, writtenDep, out bool _) is not { } dep) continue;
             spec.Depending = dep;
 
-            // SR17: data-name-1 shall describe an integer (an index item is NOT an integer data item).
-            if (dep.Pic is not { IsUnscaledInteger: true })
+            // SR17: data-name-1 shall describe an integer — §5.5 2) b) 2., so a trailing-P PIC 99P is one (an index
+            // item is NOT an integer data item).
+            if (dep.Pic is not { IsIntegerDescription: true })
                 Edition.Error("COBOLNET0852", $"OCCURS … DEPENDING ON '{depName}' on '{subject}': data-name-1 "
                     + "shall describe an integer (ISO §13.18.38.3 SR17)");
 

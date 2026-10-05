@@ -58,4 +58,16 @@ public static class FigurativeAssociation
             where);
         return true;
     }
+
+    /// <summary>⛔ THE ONE GATE FOR §8.3.3.6.3 SR1 a)'s ALL HALF (kb/Work PB1415): "If the literal is restricted to a
+    /// numeric literal, the only figurative constant permitted is ZERO (ZEROS, ZEROES) WITHOUT the ALL phrase."
+    /// The caller has established both facts — the position is numeric-restricted (the VALUE clause of a numeric
+    /// subject, §13.18.63.3 SR2; an arithmetic-expression operand, §8.8.1.1) and the operand is ZERO written WITH
+    /// the word ALL — and this reports it through the construct registry. ⚠ DETERMINATION (VCR Table 7 row 7.28,
+    /// a DERIVED edge like SR3's row 7.13 above): accepted at 85, where ALL before a figurative word is redundant
+    /// and CCVS-85 writes <c>VALUE ALL ZEROS</c> on <c>PIC 999</c> (NC201A); COBOLNET0902 at 2002 and later, a
+    /// warning under <c>--permissive</c>. Where it is admitted the operand IS the figurative ZERO: the caller
+    /// keeps the value zero either way, because a refused compile reaches no output.</summary>
+    public static void GateAllZeroAsNumeric(EditionInfo edition, IDiagnosticSink sink, string where) =>
+        ConstructRegistry.Check(edition, sink, Constructs.FigurativeAllZeroNumericRemoved2002, where);
 }

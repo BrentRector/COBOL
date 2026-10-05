@@ -2682,7 +2682,7 @@ public sealed partial class DataBinder
             $"RD '{model.Name}': OCCURS … DEPENDING ON", spec.DependingAt);
         if (spec.DependingItem is null) return;
         // SR17 read exactly as the data-division OCCURS reads it (an index item is NOT an integer data item).
-        if (spec.DependingItem.Pic is not { IsUnscaledInteger: true })
+        if (spec.DependingItem.Pic is not { IsIntegerDescription: true })
             Edition.Error(DiagnosticCatalog.ReportOccursFormat3Rule, $"RD '{model.Name}': OCCURS … DEPENDING ON "
                 + $"'{spec.DependingName}' — data-name-1 shall describe an integer (ISO §13.18.38.3 SR17)");
         // SR18 is a FORMATS 2 AND 3 rule (kb/Work PB1261): a report group entry is subordinate to its report

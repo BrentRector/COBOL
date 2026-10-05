@@ -6824,6 +6824,28 @@ public static class DiagnosticCatalog
         + "docs/CONFORMANCE.md DOC-A.1-164.",
         "ISO §4.2.15; §12.4.5.14.3 GR1");
 
+    /// <summary>COBOLNET2921 — §12.4.5.2 SR12: a RESERVE clause in the file control entry of a LINE SEQUENTIAL
+    /// file (kb/Work PB781). Reported at the RESERVE clause once the whole entry is read, because the
+    /// ORGANIZATION clause may follow it.</summary>
+    public static readonly DiagnosticDescriptor ReserveOnLineSequentialFile = new(
+        "COBOLNET2921", "reserve-on-line-sequential-file", EditionSeverity.Error,
+        "A file control entry whose ORGANIZATION clause specifies LINE SEQUENTIAL also specifies a RESERVE clause. "
+        + "ISO §12.4.5.2 SR12: 'If the LINE SEQUENTIAL phrase of the ORGANIZATION clause is specified, the RESERVE "
+        + "clause shall not be specified.' Remove the RESERVE clause; a RECORD SEQUENTIAL file may keep it.",
+        "ISO §12.4.5.2 SR12");
+
+    /// <summary>COBOLNET2922 — §13.18.43.3 SR6: the data-name-1 of a Format 2 RECORD clause's DEPENDING phrase is
+    /// not an elementary unsigned integer described in the working-storage, local-storage or linkage section
+    /// (kb/Work PB858). One code for the rule's three obligations, each a row of <c>RecordClauseRules</c>; the
+    /// message names the one broken.</summary>
+    public static readonly DiagnosticDescriptor RecordDependingOperand = new(
+        "COBOLNET2922", "record-depending-operand", EditionSeverity.Error,
+        "The data item named by the DEPENDING phrase of a RECORD IS VARYING clause is not one the rule admits. ISO "
+        + "§13.18.43.3 SR6: 'Data-name-1 shall describe an elementary unsigned integer in the working-storage, "
+        + "local-storage, or linkage section.' A group item, a signed or non-integer item, or an item described in "
+        + "the file section (the record itself included) is refused; describe the length item in working-storage.",
+        "ISO §13.18.43.3 SR6");
+
     /// <summary>COBOLNET2900 — SUPER written as an operand that is neither the object an INVOKE statement or inline
     /// invocation invokes a method on nor the object of an object-property identifier (kb/Work PB1425): a relation
     /// operand (<c>IF O = SUPER</c>), an argument, a SET sender, a RAISING phrase's identifier-1.</summary>

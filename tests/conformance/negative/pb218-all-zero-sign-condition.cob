@@ -1,4 +1,8 @@
-      *> reject-at: 85 2002 2014 2023
+      *> reject-at: 2002 2014 2023
+      *> kb/Work PB1415 moved this to 2002+ with COBOLNET0902: the ALL half of SR1 a
+      *> has a DERIVED edition edge (VCR Table 7 row 7.28) - at 85 ALL before a
+      *> figurative word is redundant (CCVS-85 NC201A), so the 85 twin is legal
+      *> (conformance/85/pb1415_all_zero_numeric_85).
       *> ISO 8.3.3.6.3 SR1 a: "If the literal is restricted to a numeric literal,
       *> the only figurative constant permitted is ZERO (ZEROS, ZEROES) WITHOUT
       *> the ALL phrase." A sign condition's operand is an arithmetic expression

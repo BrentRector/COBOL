@@ -27,8 +27,11 @@ internal static class FigurativeConstants
     /// Formats 1–5 figurative word (see <see cref="KindOf"/>) and <paramref name="AllLiteral"/> the Format-6
     /// <c>ALL literal-1</c> operand's literal-1, still PREFIXED so <see cref="CobolLiteral.ClassOf"/> and
     /// <see cref="CobolLiteral.Decode"/> apply to it. At most one is non-null; both null means an ordinary
-    /// literal, which every caller stores or compares verbatim.</summary>
-    public readonly record struct FigurativeOperand(char? Kind, string? AllLiteral);
+    /// literal, which every caller stores or compares verbatim. <paramref name="BeginsWithAll"/> is whether the
+    /// operand was WRITTEN with the word ALL — always true for Format 6, and for Formats 1–5 the optional word
+    /// the fill semantics ignore but a rule may not: §8.3.3.6.3 SR1 a) admits ZERO in a numeric-restricted
+    /// position only "without the ALL phrase" (kb/Work PB1415), so the strip must never lose it.</summary>
+    public readonly record struct FigurativeOperand(char? Kind, string? AllLiteral, bool BeginsWithAll = false);
 
     /// <summary>⛔ THE ONE READER of a VALUE-clause / level-88 VALUE operand's figurative form (ISO §8.3.3.6.2;
     /// kb/Work PB461). §14.9.39.4 GR6 stores a <c>SET condition-name TO TRUE</c> value "<i>according to the rules
@@ -51,8 +54,8 @@ internal static class FigurativeConstants
         string t = raw.Trim();
         bool hasAll = t.Length > 3 && CobolNames.StartsWith(t, "ALL");
         string rest = hasAll ? t[3..].TrimStart() : t;
-        if (KindOf(rest, includeNull) is { } k) return new(k, null);                  // Formats 1–5 (ALL optional)
-        if (hasAll && CobolLiteral.IsStringLiteral(rest)) return new(null, rest);     // Format 6 (ALL required)
+        if (KindOf(rest, includeNull) is { } k) return new(k, null, hasAll);                // Formats 1–5 (ALL optional)
+        if (hasAll && CobolLiteral.IsStringLiteral(rest)) return new(null, rest, true);     // Format 6 (ALL required)
         return default;
     }
 

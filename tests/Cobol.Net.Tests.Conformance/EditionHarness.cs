@@ -32,9 +32,7 @@ public static class EditionHarness
         try
         {
             string src = Path.Combine(dir, "prog.cob");
-            src = CompiledProgramCache.StageSource(src, source);
-            foreach (var (name, text) in copybooks ?? new Dictionary<string, string>())
-                File.WriteAllText(Path.Combine(Path.GetDirectoryName(src)!, name), text);
+            src = CompiledProgramCache.StageSource(src, source, copybooks);   // copybooks staged WITH it (kb/Work PB1755)
             var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
                 src, Path.Combine(dir, "prog.dll"), DialectLevel: edition, Permissive: permissive,
                 CopyPaths: copybooks is null ? null : [Path.GetDirectoryName(src)!], SourceFormat: InitialReferenceFormat.Auto,

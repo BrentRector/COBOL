@@ -5031,13 +5031,13 @@
   "ordinal": 1,
   "subject": "Figurative constant values",
   "rule-digest": "e75155955975",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ValidateValueCategory; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ArithmeticBinder.cs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ControlFlowBinder.PerformVarying.cs; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/CallBinder.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/FigurativeAssociation.cs#GateAllZeroAsNumeric; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ValidateValueCategory; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#NonNumericInNumericContext; src/Cobol.Net.Compiler/CodeGen/Roslyn/FigurativeConstants.cs#Classify",
+  "test-ref": "conformance:negative/pb1415-value-all-zero-numeric; conformance:85/pb1415_all_zero_numeric_85; conformance:negative/pb218-all-zero-sign-condition; conformance:negative/pb1631-call-by-value-all-zero",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1415 (registrar 15b). Rule: 'A figurative constant may be used whenever 'literal' appears in a format or when a rule allows it, with the following restrictions: a) If the literal is restricted to a numeric literal, the only figurative constant permitted is ZERO (ZEROS, ZEROES) without the ALL phrase. b) A figurative constant shall not be specified where a syntax rule prohibits it.' (cite.py --check 8.3.3.6.3 -> OK 1) a and b). SR1a VERIFIED in the procedure division: ADD SPACE / ADD ALL ZERO / ADD LOW-VALUE / MULTIPLY HIGH-VALUE / SUBTRACT ALL ZERO / DIVIDE ALL ZEROES / PERFORM VARYING FROM SPACE / FROM ALL ZERO / IF ALL ZERO IS POSITIVE all draw COBOLNET0844 citing SR1a, while ADD ZEROS and FROM ZERO compile and run (probes s_*.cob, t_*.cob in probe/figurative-constant-values). SR1a VIOLATED in the VALUE clause: §13.18.63.3 SR2 'If the category of the subject of the entry is numeric, all literals in the VALUE clause shall be numeric' restricts the literal to numeric, so ALL ZERO is excluded — yet t_u.cob '01 V6 PIC 9(3) VALUE ALL ZEROES.' and '01 V7 PIC S9(3)V9 COMP-3 VALUE ALL ZEROS.' and t_r.cob '88 C4 VALUE ALL ZERO.' under a PIC 9 variable compile clean and run (expected: a diagnostic, as t_v.cob 'VALUE ALL \"0\"' and t_r2.cob 'VALUE SPACE' correctly get COBOLNET1657). ValidateValueCategory sets isZeroWord = figOp.Kind is 'Z' after FigurativeConstants.Classify strips the optional ALL, so the ALL phrase is invisible to the numeric screen — the PB218 shape one clause over. SR1 main clause / b) are whole-language admission rules (PB780 shape): sampled positions admit (STRING, INSPECT, EVALUATE, VALUE, PERFORM FROM ZERO) and STRING SR2's prohibition of ALL figuratives is enforced (p6.cob first run: COBOLNET1757); the unsampled remainder is covered by PB780's generated-check argument. See finding 'VALUE ALL ZERO on numeric'.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1415 (wave 1021 B). SR1 a)'s ALL half is now asked in the VALUE clause too: FigurativeConstants.Classify carries BeginsWithAll (it used to strip the optional ALL of Formats 1-5, so VALUE ALL ZEROS on a numeric item read as ZERO), and DataBinder.ValidateValueCategory (item VALUE, level-88 VALUE, group funnel) and ExpressionBinder's arithmetic-operand arm both ask the ONE gate FigurativeAssociation.GateAllZeroAsNumeric (construct figurative-all-zero-numeric-removed-2002, COBOLNET0902). DETERMINATION, a DERIVED edition edge (VCR Table 7 row 7.28): accepted at 85, where ALL before a figurative word is redundant and CCVS-85 writes VALUE ALL ZEROS on PIC 999 (NC201A/NC211A/NC250A), refused at 2002+ (Annex E lists no 2014->2023 change, so 2014 agrees; the edge is 2002, the sibling SR3's edge, row 7.13). The procedure arm (PB218) moved from 0844 at every edition to the same gate. SR1 b) is each prohibiting rule's own site. Editions: 85 (accepted, ALL redundant), 2002-2023 (ALL ZERO refused).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.3.6.3-2",
@@ -15756,13 +15756,13 @@
   "ordinal": 12,
   "subject": "File control entry",
   "rule-digest": "e1d8d923d51a",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#fileReserveClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileControl",
+  "test-ref": "conformance:negative/pb781-reserve-on-line-sequential; conformance:2023/pb781_reserve_beside_line_sequential",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB781: Rule: 'If the LINE SEQUENTIAL phrase of the ORGANIZATION clause is specified, the RESERVE clause shall not be specified.' (cite.py --check 12.4.5.2 -> OK §12.4.5.2 12)). Owned by OPEN kb/Work PB781 (inventory_rows SR-12.4.5.2-12): fileReserveClause is parsed and read by nothing, so the screen has no carrier. Re-measured on the pin: probe/fce/sr12_ls_reserve `SELECT S1 ASSIGN TO \"s.tmp\" ORGANIZATION LINE SEQUENTIAL RESERVE 2 AREAS.` + FD compiles clean and runs 'OK' exit 0 at --std 2023. Expected: compile-time error. Harm: under-rejects. Not re-filed (PB781 owns it; PB643 owns the unread RESERVE clause). [registrar 14a — editions as adjudicated: 2023 (the rule's antecedent, the LINE SEQUENTIAL phrase, is a COBOL-2023 introduction - §12.4.5.10.3 GR2, gated COBOLNET0900 per landed PB688)]",
-  "state": "GAP"
+  "notes": "kb/Work PB781 (wave 1021 B). The RESERVE carrier (FileModel.ReserveAreas, PB1079/PB643) now has its SR12 screen: BindFileControl keeps the RESERVE clause's cursor and, once the whole entry is read (the ORGANIZATION clause may follow RESERVE), refuses RESERVE on a file whose organization is LINE SEQUENTIAL with COBOLNET2921 at the RESERVE clause. The predicate is LINE SEQUENTIAL itself, not FileModel.IsSequential: RECORD SEQUENTIAL and the omitted clause (12.4.5.10.3 GR6) keep RESERVE (NIST IX4014/SQ2034/SQ2264; positive golden writes and reads all three). Editions 2023 only: below it LINE SEQUENTIAL is refused by its introduction gate (COBOLNET0900).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.2-13",
@@ -26061,13 +26061,13 @@
   "ordinal": 6,
   "subject": "RECORD clause",
   "rule-digest": "d95f25db99d1",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFiles",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/RecordClauseRules.cs#Rules; src/Cobol.Net.Compiler/Binding/RecordClauseRules.cs#Screen; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFiles",
+  "test-ref": "conformance:negative/pb858-record-depending-in-record; conformance:negative/pb858-record-depending-not-unsigned-integer; conformance:85/l1c23_record_varying_bounds_depending; unit:RecordClauseRuleDriftTests.Sr6StatesThreeObligations_AndTheTableHasARowForEach",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB858. cite.py --check 13.18.43.3 'Data-name-1 shall describe an elementary unsigned integer in the working-storage, local-storage, or linkage section' OK (SR6). None of the three obligations is enforced: data-name-1 described as PIC S99, PIC XX, PIC 9V9, a group, an item inside the FD's own record, and an item in LOCAL-STORAGE (legal) all compile clean with no diagnostic (probe/record-clause/sr6.cob loop). Under-rejects. OWNED by kb/Work PB858 (OPEN, claims this row; all three obligations are in its body) - not re-reported. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (local-storage from 2002) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFiles (VaryingDependingItem resolved, never screened)",
-  "state": "GAP"
+  "notes": "kb/Work PB858 (wave 1021 B). SR6's three obligations are three rows of the RecordClauseRules table (subject DependingOperand): elementary (a group is refused), unsigned integer (PicInfo.IsUnscaledInteger and not signed: PIC S99, PIC 9V9 and PIC XX refused), and the section (DataItem.Section, PB1080: an item of the FILE section, the FD's own record included, is refused; working-storage, local-storage and linkage are admitted). ResolveFiles now resolves the DEPENDING operand before the screen runs. One code, COBOLNET2922; the message names the obligation broken. The drift test re-derives the three arms from the printed rule.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.43.3-7",

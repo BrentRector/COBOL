@@ -580,9 +580,10 @@ public sealed record PicInfo(
     public bool IsIntegerDescription => IsClassNumericFixedPoint && Scale <= 0;
 
     /// <summary>True for a class-numeric, fixed-point description whose scale is exactly zero — an integer with no
-    /// symbol 'P' and no digit position to the right of the radix point, the shape "shall describe an integer" asks of
-    /// an OCCURS DEPENDING ON object (§13.18.38.3 SR17) and "an elementary numeric integer data item without the
-    /// symbol P" asks of a STRING / UNSTRING POINTER, COUNT IN and TALLYING item (§14.9.43.3 SR7, §14.9.48.3 SR5–SR6).
+    /// symbol 'P' and no digit position to the right of the radix point, the shape "an elementary numeric integer data
+    /// item without the symbol P" asks of a STRING / UNSTRING POINTER, COUNT IN and TALLYING item (§14.9.43.3 SR7,
+    /// §14.9.48.3 SR5–SR6). ⛔ NOT the bare "integer" of a syntax rule (§13.18.38.3 SR17, §13.18.43.3 SR6): §5.5 2) b)
+    /// 2. admits a trailing-P description there, and that is <see cref="IsIntegerDescription"/>.
     /// ⛔ NEVER WRITTEN AS <c>Pic is { Category: Numeric, IsFloat: false, Scale: 0 }</c>: that pattern admits USAGE INDEX,
     /// whose storage profile is category Numeric at scale 0 (see <see cref="IsClassNumericFixedPoint"/>), so an index data
     /// item was accepted as an OCCURS DEPENDING ON object and as a STRING / UNSTRING pointer or tally (kb/Work PB543).</summary>

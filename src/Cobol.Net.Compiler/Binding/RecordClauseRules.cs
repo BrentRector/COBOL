@@ -18,15 +18,21 @@ internal enum RecordRuleSubject
     /// <summary>ONE record description entry associated with the file description entry — SR3 and SR4, which
     /// compare a record's §13.18.43.4 GR8 byte count against the clause's bounds.</summary>
     RecordDescription,
+
+    /// <summary>The RESOLVED data-name-1 of the Format 2 DEPENDING phrase — SR6's three obligations (elementary,
+    /// unsigned integer, described in the working-storage, local-storage or linkage section; kb/Work PB858).</summary>
+    DependingOperand,
 }
 
 /// <summary>ONE subject of a §13.18.43.3 syntax rule, as the screen sees it: the clause alone
-/// (<paramref name="Record"/> null, the sizes meaningless), or one record description entry with its
-/// §13.18.43.4 GR8 a) / GR8 b) byte counts already computed.</summary>
-/// <param name="Record">The record description entry, or null when the subject is the clause itself.</param>
+/// (<paramref name="Record"/> null, the sizes meaningless), one record description entry with its
+/// §13.18.43.4 GR8 a) / GR8 b) byte counts already computed, or the DEPENDING phrase's data-name-1.</summary>
+/// <param name="Record">The record description entry, or null when the subject is not a record description.</param>
 /// <param name="MinBytes">GR8 a) — the sum with every occurs-depending table at its MINIMUM occurrences.</param>
 /// <param name="MaxBytes">GR8 b) — the same sum with every such table at its MAXIMUM occurrences.</param>
-internal readonly record struct RecordClauseSubject(DataItem? Record, int MinBytes, int MaxBytes)
+/// <param name="Depending">The resolved data-name-1 of the DEPENDING phrase, for a
+/// <see cref="RecordRuleSubject.DependingOperand"/> row; null for every other subject.</param>
+internal readonly record struct RecordClauseSubject(DataItem? Record, int MinBytes, int MaxBytes, DataItem? Depending = null)
 {
     /// <summary>How a diagnostic names this record description: its 01 record-name, or the fact that it is the
     /// §14.9.30.4 GR6 IMPLIED entry, which has no name because the program never wrote one.</summary>
@@ -114,11 +120,6 @@ internal sealed record RecordClauseRule(
 /// <item><b>SR2</b> ("The words BYTES and CHARACTERS are synonymous and may be used interchangeably") is a
 /// LEXICAL permission, not a check: it is discharged by the grammar admitting both words in
 /// <c>CobolData.g4 recordClause</c>, with BYTES carried as the §8.10 context-sensitive word it is.</item>
-/// <item><b>SR6</b> (data-name-1 "shall describe an elementary unsigned integer in the working-storage,
-/// local-storage, or linkage section") states THREE obligations, and the third needs which SECTION an item was
-/// described in. Screening two arms of three would be the very defect the SR4 split above exists to prevent, so
-/// this rule is not yet a row; the section fact now exists (<c>DataItem.Section</c>, kb/Work PB1080, read by the
-/// FILE STATUS screen's identical conjunct) and the rule's three rows are kb/Work PB858's.</item>
 /// <item><b>SR7 and SR8</b> ("Integer-2 / integer-4 shall be greater than or equal to zero") are discharged by
 /// the GENERAL FORMAT, and a row asserting them would be a dead lookup. §5.5 1) makes every <c>integer-n</c> "a
 /// fixed-point integer literal that shall be unsigned and nonzero unless otherwise specified in the associated
@@ -141,6 +142,12 @@ internal static class RecordClauseRules
         "record descriptions for the file shall describe neither records that contain a lesser number of "
         + "bytes than that specified by integer-2 nor records that contain a greater number of bytes than "
         + "that specified by integer-3 (ISO §13.18.43.3 SR4)";
+
+    /// <summary>The whole of §13.18.43.3 SR6, shipped by its three rows for the reason <see cref="Sr4Sentence"/>
+    /// is shipped by SR4's two.</summary>
+    private const string Sr6Sentence =
+        "data-name-1 shall describe an elementary unsigned integer in the working-storage, local-storage, or "
+        + "linkage section (ISO §13.18.43.3 SR6)";
 
     private static readonly RecordClauseRule[] Rules =
     [
@@ -192,6 +199,40 @@ internal static class RecordClauseRules
                 + Sr4Sentence,
             DiagnosticCatalog.RecordClauseDescriptionSize),
 
+        // SR6 — "Data-name-1 shall describe an elementary unsigned integer in the working-storage, local-storage, or
+        // linkage section" (kb/Work PB858). ⛔ THREE OBLIGATIONS, THREE ROWS, for the reason SR4 is two: a rule read
+        // as one predicate ships with an arm silent. The integer arm asks only of an elementary item (a group has no
+        // numeric description to judge, and the elementary row has already named it). "Integer" is §5.5 2) b) 2.'s
+        // "a fixed-point numeric data item … whose description does not include any digit positions to the right of
+        // the radix point" — PicInfo.IsIntegerDescription, so a trailing-P PIC 99P (§13.18.40.4 GR14) IS one; where
+        // the standard bars the symbol P it says so (§12.4.5.13.3 SR2). "Unsigned" is no S.
+        // The section is DataItem.Section (kb/Work PB1080), the fact §12.4.5.8.3 SR2's FILE STATUS screen reads.
+        new("SR-13.18.43.3-6", "13.18.43.3", "ISO §13.18.43.3 SR6",
+            "Data-name-1 shall describe an elementary",
+            RecordClauseFormat.Varying, RecordRuleSubject.DependingOperand,
+            (_, s) => s.Depending is { IsElementary: false },
+            (f, _, s) => $"{f.EntryFace} '{f.CobolName}': the RECORD clause's DEPENDING ON '{s.Depending?.CobolName}' "
+                + $"is a group item; {Sr6Sentence}",
+            DiagnosticCatalog.RecordDependingOperand),
+
+        new("SR-13.18.43.3-6", "13.18.43.3", "ISO §13.18.43.3 SR6",
+            "elementary unsigned integer",
+            RecordClauseFormat.Varying, RecordRuleSubject.DependingOperand,
+            (_, s) => s.Depending is { IsElementary: true } d && d.Pic is not { IsIntegerDescription: true, Signed: false },
+            (f, _, s) => $"{f.EntryFace} '{f.CobolName}': the RECORD clause's DEPENDING ON '{s.Depending?.CobolName}' "
+                + $"is not an unsigned integer; {Sr6Sentence}",
+            DiagnosticCatalog.RecordDependingOperand),
+
+        new("SR-13.18.43.3-6", "13.18.43.3", "ISO §13.18.43.3 SR6",
+            "in the working-storage, local-storage, or linkage section",
+            RecordClauseFormat.Varying, RecordRuleSubject.DependingOperand,
+            (_, s) => s.Depending?.Section is { } sec
+                && sec is not (EntrySection.WorkingStorage or EntrySection.LocalStorage or EntrySection.Linkage),
+            (f, _, s) => $"{f.EntryFace} '{f.CobolName}': the RECORD clause's DEPENDING ON '{s.Depending?.CobolName}' "
+                + $"is described in the {(s.Depending?.Section is { } sec ? DataBinder.SectionWords(sec) : "file section")}; "
+                + Sr6Sentence,
+            DiagnosticCatalog.RecordDependingOperand),
+
         // ── FORMAT 3 (fixed-or-variable-length) ──────────────────────────────────────────────────────────────
         // ⛔ SR9 IS SR5 ONE FORMAT OVER, AND FORMAT 3 HAS NO SR4-ANALOGUE — deliberately, not by omission:
         // §13.18.43.4 GR18 says that for this format "the size of each record is completely defined in the
@@ -229,6 +270,18 @@ internal static class RecordClauseRules
             if (rule.Format != clause.Format || rule.Subject != RecordRuleSubject.Clause) continue;
             var subject = default(RecordClauseSubject);
             if (rule.Violated(clause, subject)) edition.Error(rule.Code, rule.Message(file, clause, subject));
+        }
+        // data-name-1 of the DEPENDING phrase, RESOLVED by DataBinder.ResolveFiles before this screen runs (null when
+        // the phrase is absent or its resolution failed and was reported there), reported at the phrase.
+        if (file.VaryingDependingItem is { } depending)
+        {
+            using var at = edition.At(file.Varying!.DependingAt.IsSet ? file.Varying.DependingAt : file.EntryAt);
+            var subject = new RecordClauseSubject(null, 0, 0, depending);
+            foreach (var rule in Rules)
+            {
+                if (rule.Format != clause.Format || rule.Subject != RecordRuleSubject.DependingOperand) continue;
+                if (rule.Violated(clause, subject)) edition.Error(rule.Code, rule.Message(file, clause, subject));
+            }
         }
         if (!Rules.Any(r => r.Format == clause.Format && r.Subject == RecordRuleSubject.RecordDescription)) return;
         foreach (var record in file.Records)

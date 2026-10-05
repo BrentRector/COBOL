@@ -349,7 +349,10 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// figurative constant permitted is ZERO (ZEROS, ZEROES) without the ALL phrase." The grammar has a distinct
     /// <c>ALL zeroWord</c> alternative, so <c>zeroWord()</c> alone also answers true for <c>ALL ZERO</c>. The ALL
     /// test is part of the rule (kb/Work PB218), and every numeric-restricted literal position asks it here: the
-    /// arithmetic operand, CALL §14.9.4.3 SR23 and INVOKE §14.9.23.3 SR16 (kb/Work PB1631).</summary>
+    /// arithmetic operand, CALL §14.9.4.3 SR23 and INVOKE §14.9.23.3 SR16 (kb/Work PB1631). ⚠ The ALL half has
+    /// an EDITION edge (kb/Work PB1415, VCR Table 7 row 7.28): at 85 the word ALL before ZERO is redundant, so
+    /// the arithmetic operand routes <c>ALL ZERO</c> through <see cref="FigurativeAssociation.GateAllZeroAsNumeric"/>;
+    /// the CALL and INVOKE positions are COBOL-2002 constructs, where this strict test and the gate agree.</summary>
     internal static bool IsNumericRestrictedZero(Core.FigurativeConstantContext? fig) =>
         fig?.zeroWord() is not null && fig.ALL() is null;
 
@@ -1057,6 +1060,14 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
             // fix: `IF ALL ZEROS IS POSITIVE` compiled clean and evaluated `0 > 0`, under a comment quoting the
             // very rule that bars it — a citation enforcing nothing is worse than no citation.
             if (IsNumericRestrictedZero(fig)) return new BoundNumLiteral("0");
+            // ALL ZERO: the ALL half has an edition edge (kb/Work PB1415, VCR Table 7 row 7.28) — redundant at 85,
+            // COBOLNET0902 from 2002 — asked through the ONE gate the VALUE clause asks; the operand is ZERO either way.
+            if (fig.zeroWord() is not null)
+            {
+                FigurativeAssociation.GateAllZeroAsNumeric(ctx.Edition.Edition, ctx.Edition.Sink,
+                    $"figurative constant '{ConcatFolder.Spelling(fig)}' as an arithmetic operand{where}");
+                return new BoundNumLiteral("0");
+            }
             // The bare BoundExprError here carried no diagnostic and rendered as a RUNTIME NotImplemented —
             // the wrong stage for a syntax-rule violation (kb/Work PB155).
             ctx.Edition.Error("COBOLNET0844", $"figurative constant '{ConcatFolder.Spelling(fig)}' is not a numeric "

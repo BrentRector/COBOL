@@ -1149,6 +1149,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // ABSENCE of a clause, so there is nothing else to point at (kb/Work PB699).
             file.EntryAt = Edition.Cursor;
             Core.AccessModeClauseContext? accessAt = null;   // the ACCESS MODE clause cursor for §12.4.5.5.2 SR2, below
+            Core.FileReserveClauseContext? reserveAt = null;   // the RESERVE clause cursor for §12.4.5.2 SR12, below
             foreach (var clauses in grp.fileControlClauses())
             {
                 // ISO §12.4.5.3 GR3 — BOTH phrases of the ASSIGN clause, on both general-format arms
@@ -1247,6 +1248,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 else if (clauses.fileReserveClause() is { } res)
                 {
                     using var rsv = Edition.At(res);
+                    reserveAt = res;
                     file.ReserveAreas = IntegerOperandValue(res.integerOperand(), $"file '{name}' RESERVE clause")
                         ?? RecoveredIntegerOperand;
                     if (file.ReserveAreas > CobolNet.Runtime.IO.HostFile.MaxInputOutputAreas)
@@ -1309,6 +1311,19 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     + $"specified for a sequential file — this entry's organization is "
                     + file.OrganizationFace
                     + " (ISO §12.4.5.5.2 SR2)");
+            }
+            // §12.4.5.2 SR12 — "If the LINE SEQUENTIAL phrase of the ORGANIZATION clause is specified, the RESERVE
+            // clause shall not be specified" (kb/Work PB781). A clause-pair exclusion decidable from the entry alone,
+            // so it sits here beside its two siblings and not in FileControlKeyRules (COBOLNET_FILES_DESIGN D19).
+            // ⛔ The predicate is LINE SEQUENTIAL itself, NOT `IsSequential`: RECORD SEQUENTIAL and the omitted
+            // clause (§12.4.5.10.3 GR6) are sequential too and keep RESERVE (NIST IX4014, SQ2034, SQ2264 …).
+            // The ORGANIZATION clause may follow the RESERVE clause, so the screen waits for the whole entry.
+            // Reachable at 2023 only: below it LINE SEQUENTIAL is refused by its introduction gate.
+            if (file.Organization == FileOrganization.LineSequential && reserveAt is not null)
+            {
+                using var rsv2 = Edition.At(reserveAt);
+                Edition.Error(DiagnosticCatalog.ReserveOnLineSequentialFile, $"file '{name}': the RESERVE clause "
+                    + $"({WrittenText(reserveAt)}) may not be specified for a LINE SEQUENTIAL file (ISO §12.4.5.2 SR12)");
             }
             // §12.4.5.9 SR2: WITH LOCK ON MULTIPLE RECORDS shall not be specified for a sequentially-accessed
             // or sequential-organization file. The organization half is `FileModel.IsSequential` — the ONE
@@ -2283,12 +2298,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // compare the clause's integers against §13.18.43.4 GR8's byte counts of the record descriptions,
             // which are settled only once the forest is bound. Until kb/Work PB721 nothing checked them at all
             // and `RECORD IS VARYING IN SIZE FROM 20 TO 5` compiled clean at every edition.
-            RecordClauseRules.Screen(file, Edition);
-            // RECORD VARYING … DEPENDING ON names an integer item outside the record (ISO §13.18.43 SR — the
-            // length register WRITE/REWRITE/RELEASE read per GR13a and READ/RETURN set per GR15).
+            // RECORD VARYING … DEPENDING ON data-name-1 — the length register WRITE/REWRITE/RELEASE read and
+            // READ/RETURN set (§13.18.43.4) — is resolved FIRST, because SR6 (an elementary unsigned integer in the
+            // working-storage, local-storage or linkage section) is one of the screen's rows (kb/Work PB858).
             if (file.Varying?.DependingName is { } vn)
                 file.VaryingDependingItem = ResolveClauseOperand(
                     vn, file.Varying.DependingQualifiers, "RECORD … DEPENDING ON", file.Varying.DependingAt);
+            RecordClauseRules.Screen(file, Edition);
             ResolveLinage(file);   // §13.18.34 — the logical-page operands and §13.18.34.3's syntax rules
         }
     }
@@ -2849,6 +2865,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // funnel serves — the item VALUE (formats 1 and 2), the level-88 set (format 3) and the group-level
         // VALUE (kb/Work PB921). See ScreenNumericEditedNumericLiteral for the rule and the determination.
         ScreenNumericEditedNumericLiteral(pic, raw, where);
+        // §8.3.3.6.3 SR1 a)'s ALL half (kb/Work PB1415): a numeric subject restricts its VALUE literals to numeric
+        // ones (§13.18.63.3 SR2), so ZERO is admitted only WITHOUT the ALL phrase. Classify carries the written
+        // ALL (it used to strip it, so ALL ZEROS read as ZERO here). The edition edge is the gate's (VCR 7.28).
+        if (pic.Category is PicCategory.Numeric && isZeroWord && figOp.BeginsWithAll)
+            FigurativeAssociation.GateAllZeroAsNumeric(Edition.Edition, Edition.Sink,
+                $"{where} (VALUE ALL {raw.Trim()[3..].TrimStart()})");   // the parse text glues the two words
         switch (pic.Category)
         {
             // ── The numeric literal's FORM vs the subject's (kb/Work PB97; the floating-point form is ISO §8.3.3.3.3):

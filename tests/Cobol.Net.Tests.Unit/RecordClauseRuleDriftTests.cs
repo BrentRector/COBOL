@@ -173,14 +173,35 @@ public sealed class RecordClauseRuleDriftTests
     {
         var file = new FileModel { CobolName = "F", SelectName = "F", AssignTarget = "F" };
         var record = new DataItem { Level = 1, CobolName = "F-REC", CsName = "FRec" };
+        var depending = new DataItem { Level = 1, CobolName = "F-LEN", CsName = "FLen", RootSection = EntrySection.File };
         foreach (var rule in RecordClauseRules.Catalog)
         {
             var clause = new RecordClauseFacts(rule.Format, 3, 7, default);
-            // ⛔ THE SUBJECT CARRIES A REAL RECORD, so a message that renders the record's name and size is
-            // exercised down the branch a program actually reads rather than down an absent-item fallback.
-            var subject = new RecordClauseSubject(record, 3, 7);
+            // ⛔ THE SUBJECT CARRIES A REAL RECORD AND A REAL DEPENDING ITEM, so a message that renders their names,
+            // size and section is exercised down the branch a program actually reads rather than down a fallback.
+            var subject = new RecordClauseSubject(record, 3, 7, depending);
             Assert.Contains(rule.Citation, rule.Message(file, clause, subject));
         }
+    }
+
+    /// <summary>⛔ SR6 STATES THREE OBLIGATIONS — ELEMENTARY, UNSIGNED INTEGER, AND THE SECTION — and the table has a
+    /// row for each (kb/Work PB858), the SR4 clamp one rule over. The arms are re-derived from the printed rule, so
+    /// a rule that is reworded or grows a fourth conjunct makes this red instead of shipping a silent arm.</summary>
+    [Fact]
+    public void Sr6StatesThreeObligations_AndTheTableHasARowForEach()
+    {
+        string printed = SpecClauseText.Norm(
+            SpecClauseText.NumberedRules(SpecClauseText.ClauseRegion(SpecClauseText.Lines(), Clause))[6]);
+        string[] arms = ["data-name-1 shall describe an elementary", "elementary unsigned integer",
+                         "in the working-storage, local-storage, or linkage section"];
+        var rows = RecordClauseRules.Catalog.Where(r => r.RuleId == $"SR-{Clause}-6").ToList();
+        Assert.Equal(arms.Length, rows.Count);
+        foreach (string arm in arms)
+        {
+            Assert.Contains(SpecClauseText.Norm(arm), printed);
+            Assert.Contains(rows, r => SpecClauseText.Norm(r.RuleText) == SpecClauseText.Norm(arm));
+        }
+        Assert.All(rows, r => Assert.Equal(RecordRuleSubject.DependingOperand, r.Subject));
     }
 
     /// <summary>⛔ THE OPERAND NAMES ARE THE FORMAT'S OWN. §13.18.43.2 spells Format 1 with integer-1, Format 2

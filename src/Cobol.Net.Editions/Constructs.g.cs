@@ -125,6 +125,7 @@ public static class Constructs
     public const string MoveAlphanumericFigurativeRemoved2023 = "move-alphanumeric-figurative-removed-2023";
     public const string MoveAllDigitIntegerObsolete2023 = "move-all-digit-integer-obsolete-2023";
     public const string AllLiteralMulticharNumericRemoved2002 = "all-literal-multichar-numeric-removed-2002";
+    public const string FigurativeAllZeroNumericRemoved2002 = "figurative-all-zero-numeric-removed-2002";
     public const string NationalData2002 = "national-data-2002";
     public const string NationalEdited2002 = "national-edited-2002";
     public const string BooleanData2002 = "boolean-data-2002";

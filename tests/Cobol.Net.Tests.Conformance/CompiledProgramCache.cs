@@ -114,29 +114,45 @@ internal static class CompiledProgramCache
     /// path every time, alone in its directory (a COPY search of the source directory therefore finds nothing but
     /// what the key recorded). The file keeps <paramref name="plannedPath"/>'s NAME. When the cache is OFF the text is
     /// written to <paramref name="plannedPath"/> itself, exactly as the harness always did, so a cold run keeps the
-    /// historical layout. Returns the path to compile.</summary>
-    public static string StageSource(string plannedPath, string sourceText)
+    /// historical layout. Returns the path to compile.
+    /// <para>⛔ <paramref name="companions"/> (a copybook set the program COPYs from its own directory) are staged
+    /// WITH the program, into the directory the program AND its companions name (kb/Work PB1755): they are part of
+    /// the compile's input, and writing them into a directory named by the program text alone made every case
+    /// that compiles the same program a second writer of the same file — the version matrix compiles one construct
+    /// at four editions in parallel, and the loser read a half-written copybook ("being used by another process").
+    /// Every file is placed write-if-absent through a temporary file and an atomic move, so a concurrent stager of
+    /// the identical content never sees a partial file.</para></summary>
+    public static string StageSource(string plannedPath, string sourceText,
+        IReadOnlyDictionary<string, string>? companions = null)
     {
+        var others = companions?.OrderBy(c => c.Key, StringComparer.Ordinal).ToList() ?? [];
         if (!Enabled)
         {
             File.WriteAllText(plannedPath, sourceText);
+            foreach (var (name, text) in others) File.WriteAllText(Path.Combine(Path.GetDirectoryName(plannedPath)!, name), text);
             return plannedPath;
         }
 
         string fileName = Path.GetFileName(plannedPath);
+        var identity = new StringBuilder(fileName).Append('\0').Append(sourceText);
+        foreach (var (name, text) in others) identity.Append('\0').Append(name).Append('\0').Append(text);
 
-        string dir = Path.Combine(Root, "src", Sha256Hex(Encoding.UTF8.GetBytes(fileName + "\0" + sourceText))[..32]);
+        string dir = Path.Combine(Root, "src", Sha256Hex(Encoding.UTF8.GetBytes(identity.ToString()))[..32]);
         string path = Path.Combine(dir, fileName);
         Directory.CreateDirectory(dir);
-        if (!File.Exists(path))
-        {
-            string tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            File.WriteAllText(tmp, sourceText);
-            try { File.Move(tmp, path); }
-            catch (IOException) { TryDeleteFile(tmp); }   // a concurrent stager placed the identical file first
-        }
+        StageFile(path, sourceText);
+        foreach (var (name, text) in others) StageFile(Path.Combine(dir, name), text);
         try { Directory.SetLastWriteTimeUtc(dir, DateTime.UtcNow); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         return path;
+
+        static void StageFile(string target, string text)
+        {
+            if (File.Exists(target)) return;
+            string tmp = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            File.WriteAllText(tmp, text);
+            try { File.Move(tmp, target); }
+            catch (IOException) { TryDeleteFile(tmp); }   // a concurrent stager placed the identical file first
+        }
     }
 
     // ───────────────────────────── the key ─────────────────────────────

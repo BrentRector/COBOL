@@ -1588,6 +1588,18 @@
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. MVALLM.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 W-INT PIC 9(3).\nPROCEDURE DIVISION.\nMAIN.\n    MOVE ALL \"57\" TO W-INT.\n    DISPLAY W-INT.\n    STOP RUN.\n"
   },
   {
+   "id": "figurative-all-zero-numeric-removed-2002",
+   "description": "The figurative constant ZERO (ZEROS, ZEROES) WITH the ALL phrase where the literal is restricted to a numeric literal - the VALUE clause of a numeric item and a level-88 VALUE under a numeric conditional variable (13.18.63.3 SR2: 'all literals in the VALUE clause shall be numeric'), and an arithmetic-expression operand (8.8.1.1). ISO 8.3.3.6.3 SR1 a): 'the only figurative constant permitted is ZERO (ZEROS, ZEROES) without the ALL phrase'; edition-unqualified in 2023 and absent from Annex E, so 2014 agrees. DERIVED edge (VCR Table 7 row 7.28; no 1985/2002/2014 text in-repo): accepted at 85, where ALL before a figurative word is redundant and CCVS-85 writes VALUE ALL ZEROS on PIC 999 (NC201A/NC211A/NC250A); 0902 at 2002+, the edition that restructured 8.3.3.6 into the seven formats with ALL optional in Formats 1-5 - the edge of its sibling SR3 (row 7.13). Under --permissive a warning, the value ZERO. One gate: FigurativeAssociation.GateAllZeroAsNumeric (kb/Work PB1415); askers DataBinder.ValidateValueCategory and ExpressionBinder (the arithmetic operand).",
+   "display": "the figurative constant ALL ZERO where the literal is restricted to a numeric literal",
+   "diagnosticCode": "COBOLNET0902",
+   "citation": "§8.3.3.6.3 SR1 a); ALL before a figurative word redundant at 85, barred from 2002 (DERIVED edge — VCR Table 7 row 7.28)",
+   "introducedIn": 85,
+   "removedIn": 2002,
+   "expectDiagnostic": "COBOLNET0902",
+   "vcr": "VCR Table 7 row 7.28 (8.3.3.6.3 SR1 a))",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VALLZ.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 W-INT PIC 9(3) VALUE ALL ZEROS.\nPROCEDURE DIVISION.\nMAIN.\n    DISPLAY W-INT.\n    STOP RUN.\n"
+  },
+  {
    "id": "national-data-2002",
    "status": "active",
    "description": "National data (PICTURE symbol N / USAGE NATIONAL, ISO 8.5.2 category national / 13.18.40 / 13.18.60). LIVE, WHOLE: compiles at 2002+ (one UTF-16 char per national position, D-N1; MOVE Table 16 + 14.6.8.5 alignment + 8.8.4.2.9 ordinal comparison); below 2002 the introduction gate rejects (COBOLNET0900). All FIVE picture shapes 13.18.60.3 SR12 admits are live - national, national-edited, and the national-form boolean / numeric / numeric-edited, whose digits, sign and insertion characters are national character positions (13.18.40.4 GR1) serialized two bytes each (13.18.60.4 GR8, D-N1/D-N7). The byte-surface legs (REDEFINES / EXTERNAL-BASED-ADDRESS-OF cells / FD records) ride too.",
