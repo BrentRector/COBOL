@@ -106,6 +106,18 @@ public sealed record LocaleValue(string Collate, string Ctype, string Messages, 
 /// </summary>
 public static class LocaleIdentification
 {
+    /// <summary>Do two LOCALE phrases carry "the same external identification, where the external identification is
+    /// the external-locale-name or literal value associated with a locale-name in the LOCALE clause" (ISO §8.5.3.1
+    /// "Additionally", §9.3.6 match rule 3 e) 3. b., §9.3.8.2.3 rule 3 "Additionally", §14.8.2.3.2 "Additionally" a),
+    /// §14.8.3.3 "Additionally" 1))? The identification AS WRITTEN — never the locale <see cref="Normalize"/> resolves it
+    /// to (kb/Work PB1166): <c>"en-US"</c> and <c>"en_US.UTF-8"</c> select one locale but are two literal values. A
+    /// literal value compares character for character; an external-locale-name is a COBOL word, and COBOL basic letters
+    /// outside a literal are case-insensitive (§8.1.3.2 GR3 a)), so any pair involving one compares without regard to
+    /// case. The ONE copy of the rule: the compiler's <c>LocaleSymbol</c> and the run-time universal-dispatch relation
+    /// (<see cref="ActivationRelations"/>, kb/Work PB480) both ask it.</summary>
+    public static bool SameExternalIdentification(string a, bool aFromLiteral, string b, bool bFromLiteral) =>
+        aFromLiteral && bFromLiteral ? string.Equals(a, b, StringComparison.Ordinal) : CobolNames.Same(a, b);
+
     /// <summary>Normalize an external identification to its locale tag (L1). Never throws; an unusable spelling
     /// comes back as given (lower-cased) and is simply not available.</summary>
     public static string Normalize(string? external)

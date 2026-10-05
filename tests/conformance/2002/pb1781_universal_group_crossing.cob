@@ -19,8 +19,8 @@
       *>   TN  a NATIONAL group (as-if PICTURE N(3), 13.18.29.4 GR2 b) crosses as its 3 positions;
       *>       the method shows TN:ABC and stores N"XYZ"                                       -> b=XYZ
       *>   TR  a group delivered through RETURNING: the method's returning item "RR42"         -> c=RR42
-      *> An 8-character group into a 4-character group formal (14.8.2.2 rule 1's prefix) needs the MATCH relation of
-      *> kb/Work PB480 and is not pinned here.
+      *> An 8-character group into a 4-character group formal (14.8.2.2 rule 1's prefix) is pinned by
+      *> conformance:2002/pb480_universal_match_relations (kb/Work PB480).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1781A.
        ENVIRONMENT DIVISION.

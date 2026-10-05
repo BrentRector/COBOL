@@ -38,6 +38,18 @@ public abstract class CobolObject
             $"INVOKE: the runtime class '{GetType().Name}' implements no method named '{name}' that matches "
             + "the invocation (ISO §9.3.6 6); §14.9.23.4 GR7b)");
 
+    /// <summary>The FACTORY type of the class this INSTANCE object belongs to — overridden by every emitted instance class,
+    /// so the most-derived override is the object's run-time class's. Null for a factory object (whose own type is
+    /// its factory type). ISO §9.3.6 match rule 3 d) 5. asks it of the object a method is invoked on: an ACTIVE-CLASS
+    /// FACTORY formal "shall evaluate to an object reference to the factory of the class specified in the invocation"
+    /// (<see cref="ActivationRelations"/>; kb/Work PB1112).</summary>
+    protected internal virtual Type? __FactoryClassType => null;
+
+    /// <summary>The INSTANCE type of the class this FACTORY object belongs to — overridden by every emitted factory
+    /// class. Null for an instance object (whose own type is its class). §9.3.6 match rule 3 d) 4.: an ACTIVE-CLASS
+    /// formal "shall evaluate to an object reference of the same class specified in the invocation".</summary>
+    protected internal virtual Type? __InstanceClassType => null;
+
     /// <summary>Normalize an identifier-2 method-name value (§14.9.23.4 GR2a): the content IS a
     /// user-defined word — formed by the one externalized-name rule (<see cref="ExternalizedNames.Form"/>: leading
     /// and trailing spaces, which include the PIC X padding, are not part of the name) and case-insensitive

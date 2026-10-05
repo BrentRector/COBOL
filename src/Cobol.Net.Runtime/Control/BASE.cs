@@ -38,9 +38,9 @@ public abstract class BASE : CobolObject
     /// switch falls through <c>default:</c> to here for a method no COBOL class of the hierarchy declares.</summary>
     public override void __CobolInvoke(string name, CobolInvokeArg[] args, CobolInvokeArg? returning)
     {
-        if (CobolNames.Same(name, "FACTORYOBJECT"))   // the normalized key is the Annex C fold (PB1402)
+        if (CobolNames.Same(name, "FACTORYOBJECT")   // the normalized key is the Annex C fold (PB1402)
+            && StandardMethodCrossing.Matches(args, returning))
         {
-            StandardMethodCrossing.Check("FactoryObject", args, returning);
             returning!.Value = FACTORYOBJECT();
             return;
         }
@@ -96,9 +96,9 @@ public abstract class BASE__FACTORY : CobolObject
     /// universal reference, <c>INVOKE u "New" RETURNING r</c>.</summary>
     public override void __CobolInvoke(string name, CobolInvokeArg[] args, CobolInvokeArg? returning)
     {
-        if (CobolNames.Same(name, "NEW"))   // the normalized key is the Annex C fold (PB1402)
+        if (CobolNames.Same(name, "NEW")   // the normalized key is the Annex C fold (PB1402)
+            && StandardMethodCrossing.Matches(args, returning))
         {
-            StandardMethodCrossing.Check("New", args, returning);
             returning!.Value = __New();
             return;
         }
@@ -106,32 +106,24 @@ public abstract class BASE__FACTORY : CobolObject
     }
 }
 
-/// <summary>The §14.9.23.4 GR7c runtime conformance check for a universal invocation of a BASE method. Both §16.2
-/// methods take no parameters and return an object reference described ACTIVE-CLASS, so an argument, a missing
-/// RETURNING, or a RETURNING item that is not an object reference does not conform. Whether the returned object's
-/// CLASS conforms to a typed receiving item is a question only the object can answer — the receiver's class is
-/// the one the activator named — so the caller's delivery asks it (<see cref="CobolObject.NarrowUniversal{T}"/>).
-/// The EC-OO-UNIVERSAL half is gated on the activator's checking (§14.9.23.4 GR7c "enabled in both" — BASE's
-/// methods carry no &gt;&gt;TURN of their own, so the activator's state decides); when it is off the crossing still
-/// cannot proceed into typed code and stops through <see cref="CobolImplementorFatalException"/>, the same two-arm
-/// stop every emitted case renders.</summary>
+/// <summary>ISO §9.3.6's MATCH for a universal invocation of a BASE method (kb/Work PB480). Both §16.2 methods take no
+/// parameters and return an object reference described ACTIVE-CLASS, so an invocation with an argument (match rule 1:
+/// "The number of invocation parameters shall be equal"), without a RETURNING item (rule 1: "if there is a returning item
+/// in the invoked method …"), or whose RETURNING item a SET cannot receive an object reference into (rule 6) does not
+/// match: the search goes on up the chain and ends in EC-OO-METHOD (§9.3.6 resolution step 6), exactly as for a method
+/// written in COBOL — it used to raise EC-OO-UNIVERSAL, which §14.9.23.4 GR7 c) reserves for a BOUND method. Whether
+/// the returned object's CLASS conforms to a typed receiving item is a question only the object can answer, so the
+/// caller's delivery asks it (<see cref="CobolObject.NarrowUniversal{T}"/>; §14.8.3.3 rule 2).</summary>
 internal static class StandardMethodCrossing
 {
-    /// <summary>The descriptor prefix of every object-reference description (the compiler's
-    /// <c>OoConformance.ConformanceDescriptor</c>: <c>"O:" + ObjectRefDescriptor.SignatureKey</c>).</summary>
-    private const string ObjectDescriptorPrefix = "O:";
-
-    public static void Check(string method, CobolInvokeArg[] args, CobolInvokeArg? returning)
+    /// <summary>The §16.2 returning item, <c>OBJECT REFERENCE ACTIVE-CLASS</c>.</summary>
+    private static readonly ActivationDescription ActiveClassReturning = new()
     {
-        string? problem =
-            args.Length != 0 ? $"{args.Length} argument(s) for 0 formal(s) (ISO §14.9.23.4 GR7c/§14.8.2.1)"
-            : returning is null ? "the method returns an object reference but no RETURNING is specified (ISO §14.9.23.4 GR7c/§14.8.3)"
-            : !returning.Descriptor.StartsWith(ObjectDescriptorPrefix, StringComparison.Ordinal)
-                ? $"the RETURNING item ({returning.Descriptor}) is not an object reference (ISO §14.9.23.4 GR7c/§14.8.3)"
-            : null;
-        if (problem is null) return;
-        string detail = $"INVOKE 'BASE' '{method}': {problem}";
-        if (ExceptionState.OoUniversalChecking) throw new CobolFatalException("EC-OO-UNIVERSAL", detail);
-        throw new CobolImplementorFatalException(detail);
-    }
+        Shape = ActivationShape.ObjectReference, Category = ActivationCategory.Object,
+        ObjectKind = ObjectReferenceKind.ActiveClass,
+    };
+
+    public static bool Matches(CobolInvokeArg[] args, CobolInvokeArg? returning) =>
+        args.Length == 0 && returning is not null
+        && ActivationRelations.ReturningMatches(returning.Description, ActiveClassReturning);
 }

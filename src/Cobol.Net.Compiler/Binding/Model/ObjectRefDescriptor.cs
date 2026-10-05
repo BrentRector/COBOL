@@ -150,19 +150,6 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
         => Kind == other.Kind && Factory == other.Factory && Only == other.Only
            && (IsActiveClass || CobolNames.Same(Name, other.Name));
 
-    /// <summary>An INJECTIVE string key for the description — the object-reference half of
-    /// <c>OoConformance.ConformanceDescriptor</c>, the runtime universal-crossing signature. Injective over the
-    /// tuple is what keeps that pass's locked invariant true (descriptor equality ⇔
-    /// <c>DescriptionMismatch == null</c>): a key that carried only the NAME made
-    /// <c>OBJECT REFERENCE C</c> and <c>OBJECT REFERENCE FACTORY OF C ONLY</c> the same signature.</summary>
-    public string SignatureKey => Kind switch
-    {
-        ObjectRefKind.Universal => "*",
-        ObjectRefKind.Interface => "I:" + Name!.ToUpperInvariant(),
-        ObjectRefKind.ActiveClass => (Factory ? "FA:" : "A:") + (Name ?? "").ToUpperInvariant(),
-        _ => (Factory ? "F" : "") + (Only ? "C!:" : "C:") + Name!.ToUpperInvariant(),
-    };
-
     /// <summary>How the description reads back in a diagnostic — the phrases as written, so a message never
     /// has to say "universal" about a typed reference (the PB389 misdiagnosis).</summary>
     public string Spelled => Kind switch

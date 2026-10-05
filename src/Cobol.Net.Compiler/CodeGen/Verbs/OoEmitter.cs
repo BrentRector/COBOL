@@ -282,7 +282,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // connector registers the key window at).
         static string KeyEntry(string name, DataItem? item) => item is null ? name.ToUpperInvariant()
             : $"{name.ToUpperInvariant()}@{RecordLayout.OffsetOf(item)?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?"}"
-              + $":{(item.IsGroup ? "G" : "E")}{item.ByteWidth}:{OoConformance.ConformanceDescriptor(item)}";
+              + $":{(item.IsGroup ? "G" : "E")}{item.ByteWidth}:"
+              + (ActivationDescriptions.Of(item) is { } d ? $"{d.Category}/{d.Clauses}/{d.Positions}" : "-");
         // k) "the same SUPPRESS WHEN phrase" — the operand as the literal position read it (form, class, characters,
         // figurative kind), so `SUPPRESS WHEN "XX"` and `SUPPRESS WHEN SPACE` differ and an absent phrase is empty.
         static string Suppress(SuppressWhenOperand? s) => s is null ? ""
@@ -382,6 +383,10 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // override, and the most-derived class's override is the runtime class's factory. Only a class that has
         // BASE's object interface has one (§16.1: "This use is not required").
         bool lifeCycle = cls.Symbol.InheritsStandardBase;
+        // §9.3.6 match rule 3 d) 4./5. — "the class specified in the invocation" of a universal INVOKE is the class of the
+        // object it runs on; each half names the other half's type, so the run-time relation can ask an ACTIVE-CLASS
+        // formal's question of either (CobolObject.__FactoryClassType / __InstanceClassType; kb/Work PB1112).
+        instExtras.Add($"protected override System.Type? __FactoryClassType => typeof({cls.Symbol.FactoryCsName});");
         if (lifeCycle)
             instExtras.Add($"protected override BASE__FACTORY __FactoryOfClass => {cls.Symbol.FactoryCsName}."
                 + $"{NamingConvention.FactoryInstanceField};   // FactoryObject (ISO §16.2.2.2 GR1)");
@@ -405,6 +410,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // that class's accessor; the runtime BASE__FACTORY declares none, so there is nothing to hide.
             $"public {(cls.Symbol.Base is { IsStandard: false } ? "new " : "")}static {cls.Symbol.FactoryCsName} "
                 + $"{NamingConvention.FactoryInstanceField} => {RuntimeApi.FactoryObject(cls.Symbol.FactoryCsName)};",
+            $"protected override System.Type? __InstanceClassType => typeof({cls.CsName});",
         };
         // New's creation step (§16.2.1.2 GR1), exactly when the class has BaseFactoryInterface through INHERITS
         // (§16.2; §9.3.9): a covariant override of BASE__FACTORY.__Create, so New invoked on a subclass's factory —
@@ -532,32 +538,43 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// <summary>Emit the class's <c>__CobolInvoke</c> override (D10/D-U2/D-U4): a switch over the methods
     /// this type DECLARES that are NOT overrides (an override needs no case — the BASE class's case calls
     /// <c>this.M(…)</c> and C# virtual dispatch delivers the override; 0829 guarantees identical
-    /// descriptors), keyed by each method's EXTERNALIZED name (<see cref="OoMethodSymbol.DispatchKey"/>), and a
+    /// descriptions), keyed by each method's EXTERNALIZED name (<see cref="OoMethodSymbol.DispatchKey"/>), and a
     /// method that is absent or does not MATCH falls out of the switch into <c>base.__CobolInvoke</c> — the chain IS
-    /// §9.3.6 resolution order, and the CobolObject root raises EC-OO-METHOD (§9.3.6 6); GR7 b)). Each case first
-    /// decides the §9.3.6 match — arity, RETURNING presence BOTH directions, per-argument conformance-descriptor
-    /// equality (D-U3: the SAME rule as the compile-time strict check) — and only a bound method's residual
-    /// violations (§14.9.23.4 GR7 c): an ANY LENGTH formal or returning item, a RETURNING description that differs)
-    /// raise EC-OO-UNIVERSAL (<see cref="EmitCobolInvokeCase"/>; kb/Work PB1500). Box forms are CANONICAL BY DESCRIPTOR (D-U6a — never
-    /// by either side's StoreAsImage — the read-only projection of the Storage the group-tail StorageFormPass computes): S:* → string; N:Display:* →
-    /// the display IMAGE string (bridged by the FormatDisplay/StoreDisplay overload pair); other N:* →
-    /// the native value; O:* → the CobolObject reference. A type declaring zero non-override methods
-    /// emits no override.</summary>
+    /// §9.3.6 resolution order, and the CobolObject root raises EC-OO-METHOD (§9.3.6 6); GR7 b)). Each case asks the
+    /// run-time relations (<see cref="ActivationRelations"/>, kb/Work PB480) of the caller's
+    /// <see cref="ActivationDescription"/>s and the method's, which are <c>static readonly</c> fields of the type
+    /// (<see cref="EmitCobolInvokeCase"/>). Box forms are CANONICAL BY DESCRIPTION (D-U6a — never by either side's
+    /// StoreAsImage): a string-carried item → string; a zoned numeric → its display IMAGE string (bridged by the
+    /// FormatDisplay/StoreDisplay overload pair); another numeric → the native value; an object reference → the
+    /// reference; a variable-length group → its carrier; a strong group with no image → its leaf vector. A type
+    /// declaring zero non-override methods emits no override.</summary>
     private void EmitCobolInvoke(string cobolName, IReadOnlyList<OoMethodSymbol> roster, CodeWriter w)
     {
         var cases = roster.Where(m => m.OverrideOf is null).ToList();
         if (cases.Count == 0) return;
         w.Line();
+        // The method side's descriptions, built once per type (ActivationDescriptions — the ONE builder the caller's
+        // side is built by too).
+        for (int c = 0; c < cases.Count; c++)
+        {
+            var b = cases[c].Binding!;
+            if (b.Formals.Any(f => f.ByValue)) continue;   // never a match (EmitCobolInvokeCase), so never asked
+            for (int i = 0; i < b.Formals.Count; i++)
+                if (ActivationDescriptions.OfFormal(b.Formals[i]) is { } fd)
+                    w.Line($"private static readonly {nameof(ActivationDescription)} {CaseDescription(c, i)} = {RuntimeApi.ActivationDescriptionNew(fd)};");
+            if (b.Returning is { } r && ActivationDescriptions.Of(r) is { } rd)
+                w.Line($"private static readonly {nameof(ActivationDescription)} {CaseDescription(c, -1)} = {RuntimeApi.ActivationDescriptionNew(rd)};");
+        }
         using (w.Block("public override void __CobolInvoke(string __name, CobolInvokeArg[] __a, CobolInvokeArg? __ret)"))
         {
             using (w.Block("switch (__name)"))
             {
-                foreach (var m in cases)
+                for (int c = 0; c < cases.Count; c++)
                     // ⛔ THE CASE LABEL IS THE METHOD'S DISPATCH KEY (kb/Work PB1405): §8.3.2.2 1) maps a universal INVOKE's
                     // method-name "to the externalized name of the method to be invoked", which is the roster key the TYPED
                     // path resolves by (PB303) — never the declared METHOD-ID word, which an AS phrase replaces.
-                    using (w.Block($"case {Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(m.DispatchKey, quote: true)}:"))
-                        EmitCobolInvokeCase(cobolName, m, w);
+                    using (w.Block($"case {Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(cases[c].DispatchKey, quote: true)}:"))
+                        EmitCobolInvokeCase(cobolName, cases[c], c, w);
             }
             // §9.3.6 2)/4): a class that declares no method of this name, or whose method does not MATCH the invocation, hands
             // the search to the class it inherits from; the CobolObject root is step 6) — EC-OO-METHOD (§14.9.23.4 GR7 b)).
@@ -565,23 +582,32 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         }
     }
 
-    /// <summary>One method's arm of the universal dispatch switch, in the order §14.9.23.4 GR7 prescribes (kb/Work PB1500).
+    /// <summary>The name of the <c>static readonly</c> description of case <paramref name="c"/>'s formal
+    /// <paramref name="i"/> (−1: its returning item).</summary>
+    private static string CaseDescription(int c, int i) => i < 0 ? $"__ad{c}_r" : $"__ad{c}_{i}";
+
+    /// <summary>One method's arm of the universal dispatch switch, in the order §14.9.23.4 GR7 prescribes (kb/Work PB1500,
+    /// PB480).
     ///
     /// <para><b>GR7 b) — does this method MATCH?</b> §9.3.6's match rules are conditions of METHOD RESOLUTION: rule 1 (an
     /// equal argument count, trailing OPTIONAL formals counting as equal; RETURNING present on both sides or neither),
-    /// rule 3 (every universal argument is BY REFERENCE, §14.9.23.3 SR6: an OMITTED one needs an OPTIONAL formal, any
-    /// other one the same class, category and description — the descriptor projection of the one strict-conformance
-    /// rule, <see cref="OoConformance.ConformanceDescriptor"/>), and rules 6)/7) (the RETURNING items can meet in a SET
-    /// or a MOVE at all — <see cref="OoConformance.ReturningMatchClass"/>). A method that does not match is not bound:
-    /// the arm <c>break</c>s out of the switch into the inherited class's search, and when no class matches, §9.3.6 6)
-    /// sets EC-OO-METHOD — never a conformance violation of a method that was never selected.</para>
+    /// rule 3 for every argument (all BY REFERENCE, §14.9.23.3 SR6 — <see cref="ActivationRelations.Matches"/>: an
+    /// OMITTED one needs an OPTIONAL formal, an object reference the 3 d) description or, for an ACTIVE-CLASS formal, an
+    /// object of the class the method is invoked on; any other the same class, category and 3 e) clauses), and rules
+    /// 6)/7) for the RETURNING items (<see cref="ActivationRelations.ReturningMatches"/>). A method that does not match is
+    /// not bound: the arm <c>break</c>s out of the switch into the inherited class's search, and when no class matches,
+    /// §9.3.6 6) sets EC-OO-METHOD.</para>
     ///
-    /// <para><b>GR7 c) — the bound method's conformance.</b> Once bound, "neither a formal parameter nor the returning
-    /// item in the invoked method shall be described with the ANY LENGTH clause, and the rules for conformance specified
-    /// in 14.8.2 … and 14.8.3 … apply": the residue §9.3.6 does not restate is an ANY LENGTH formal or returning item and
-    /// a RETURNING pair that can meet in a MOVE/SET but whose descriptions differ (§14.8.3.3). Those raise EC-OO-UNIVERSAL
-    /// through <see cref="OoUnivStop"/>.</para></summary>
-    private void EmitCobolInvokeCase(string cobolName, OoMethodSymbol m, CodeWriter w)
+    /// <para><b>GR7 c) — the bound method's conformance.</b> "neither a formal parameter nor the returning item in the
+    /// invoked method shall be described with the ANY LENGTH clause, and the rules for conformance specified in 14.8.2 …
+    /// and 14.8.3 … apply" — <see cref="ActivationRelations.ParameterViolation"/> and
+    /// <see cref="ActivationRelations.ReturningViolation"/>, raised as EC-OO-UNIVERSAL through
+    /// <see cref="OoUnivStop"/>.</para>
+    ///
+    /// <para>A GROUP formal whose argument has another shape the relations admitted — a smaller formal (§14.8.2.2 rule
+    /// 1's prefix) or a fixed / variable-length pair (§8.5.1.12) — is carried by <see cref="UniversalGroupCarrier"/>,
+    /// which the RETURNING delivery uses too.</para></summary>
+    private void EmitCobolInvokeCase(string cobolName, OoMethodSymbol m, int c, CodeWriter w)
     {
         var formalsList = m.Binding!.Formals;
         var returning = m.Binding!.Returning;
@@ -595,6 +621,14 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             w.Line("break;   // a BY VALUE formal: not a §9.3.6 match for a universal (all BY REFERENCE) invocation — the search continues upward");
             return;
         }
+        // A formal or returning item with no universal crossing form (a Tier-C group) can match no argument: the binder
+        // refuses every such argument (COBOLNET0866), so no description of the caller's can be its.
+        if (formalsList.Any(f => ActivationDescriptions.OfFormal(f) is null)
+            || returning is not null && ActivationDescriptions.Of(returning) is null)
+        {
+            w.Line("break;   // a formal or returning item with no universal crossing form matches no invocation");
+            return;
+        }
         // §14.8.2.1 and §9.3.6 match rule 1: fewer arguments than formals is an EQUAL number when every formal to the
         // right of the last argument is OPTIONAL — so the least admissible count is one past the last NON-optional
         // formal (kb/Work PB757).
@@ -604,58 +638,79 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             minArgs == formals ? $"__a.Length != {formals}" : $"__a.Length < {minArgs} || __a.Length > {formals}",
             returning is null ? "__ret is not null" : "__ret is null",
         };
+        // A position past the supplied arguments is a trailing omission (§14.9.23.4 GR9); the arity term above has
+        // already proved every such formal OPTIONAL.
+        string Present(int i) => i < minArgs ? "" : $"__a.Length > {i} && ";
         for (int i = 0; i < formals; i++)
-        {
-            var f = formalsList[i];
-            string wantLit = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(OoConformance.ConformanceDescriptor(f.Item), quote: true);
-            // A position past the supplied arguments is a trailing omission (§14.9.23.4 GR9); the arity term above has
-            // already proved every such formal OPTIONAL.
-            string present = i < minArgs ? "" : $"__a.Length > {i} && ";
-            // §9.3.6 match rule 3 b): a spelled OMITTED argument needs an OPTIONAL formal and is then "considered to
-            // match exactly" — exempt from the descriptor term; against a non-OPTIONAL formal its descriptor fails it.
-            string exempt = f.Optional ? $"__a[{i}].Descriptor != {RuntimeApi.ObjOmittedDescriptor} && " : "";
-            noMatch.Add($"{present}{exempt}__a[{i}].Descriptor != {wantLit}");
-        }
+            noMatch.Add($"{Present(i)}!{nameof(ActivationRelations)}.{nameof(ActivationRelations.Matches)}(__a[{i}].Description, "
+                + $"__a[{i}].Value, {CaseDescription(c, i)}, this)");
         if (returning is not null)
-            noMatch.Add(ReturningClassMismatch(OoConformance.ReturningMatchClass(OoConformance.ConformanceDescriptor(returning))));
+            noMatch.Add($"!{nameof(ActivationRelations)}.{nameof(ActivationRelations.ReturningMatches)}(__ret!.Description, "
+                + $"{CaseDescription(c, -1)})");
         w.Line($"if ({string.Join(" || ", noMatch.Select(t => $"({t})"))}) break;   // not a §9.3.6 match — the search continues upward");
 
-        // GR7 c): the bound method's ANY LENGTH formal or returning item is a violation whatever the argument.
+        // GR7 c): the bound method's conformance — §14.8.2 per argument, §14.8.3 for the returning item.
+        var violations = Enumerable.Range(0, formals)
+            .Select(i => $"({(i < minArgs ? "" : $"__a.Length <= {i} ? null : ")}{nameof(ActivationRelations)}."
+                + $"{nameof(ActivationRelations.ParameterViolation)}(__a[{i}].Description, {CaseDescription(c, i)}))")
+            .Concat(returning is null ? [] : [$"{nameof(ActivationRelations)}.{nameof(ActivationRelations.ReturningViolation)}("
+                + $"__ret!.Description, {CaseDescription(c, -1)})"])
+            .ToList();
+        if (violations.Count > 0)
+        {
+            w.Line($"string? __viol = {string.Join(" ?? ", violations)};");
+            w.Line(OoUnivStop(m, "__viol is not null",
+                $"$\"INVOKE '{cobolName}' '{m.Name}': {{__viol}} (ISO §14.9.23.4 GR7 c))\""));
+        }
+        // An ANY LENGTH formal or returning item is a violation whatever the arguments (GR7 c) bans the DESCRIPTION) —
+        // including an OPTIONAL one whose argument is OMITTED or trailing-omitted, which no relation is asked about — so
+        // the bound method's stop is unconditional here: no activation of the method is emitted (its ANY LENGTH
+        // signature takes lengths a box cannot supply).
         if (formalsList.Any(f => f.Item.IsAnyLength) || returning is { IsAnyLength: true })
         {
-            w.Line(OoUnivThrow(m, $"\"INVOKE '{cobolName}' '{m.Name}': a method whose formal parameter or returning item is "
-                + "described with the ANY LENGTH clause cannot be invoked through a universal object reference (ISO §14.9.23.4 GR7 c))\""));
+            w.Line(OoUnivThrow(m, Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(
+                $"INVOKE '{cobolName}' '{m.Name}': a formal parameter or the returning item is described with the ANY "
+                + "LENGTH clause, which a method invoked through a universal object reference shall not have "
+                + "(ISO §14.9.23.4 GR7 c))", quote: true)));
             return;
-        }
-        if (returning is not null)
-        {
-            string rl = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(OoConformance.ConformanceDescriptor(returning), quote: true);
-            w.Line(OoUnivStop(m, $"__ret!.Descriptor != {rl}",
-                $"$\"INVOKE '{cobolName}' '{m.Name}': the RETURNING item (caller {{__ret!.Descriptor}}, method \" + {rl} + \") "
-                + "does not conform (ISO §14.9.23.4 GR7 c)/§14.8.3.3)\""));
         }
         for (int i = 0; i < formals; i++)
         {
+            var fi = formalsList[i].Item;
             w.Line($"bool __o{i} = {(i < minArgs ? "" : $"__a.Length <= {i} || ")}__a[{i}].Omitted;   // §14.9.23.4 GR9");
-            w.Line($"var __p{i} = __o{i} ? default! : {OoUnivUnbox(formalsList[i].Item, $"__a[{i}].Value")};");
+            string unbox = OoUnivGroupCarried(fi) is { } g
+                ? g ? $"{nameof(UniversalGroupCarrier)}.{nameof(UniversalGroupCarrier.VariableCarrier)}(__a[{i}].Value, __a[{i}].Description, {CaseDescription(c, i)})"
+                    : $"{nameof(UniversalGroupCarrier)}.{nameof(UniversalGroupCarrier.FixedImage)}(__a[{i}].Value, __a[{i}].Description, {CaseDescription(c, i)})"
+                : OoUnivUnbox(fi, $"__a[{i}].Value");
+            w.Line($"var __p{i} = __o{i} ? default! : {unbox};");
         }
         string argList = string.Join(", ", Enumerable.Range(0, formals).Select(i => OoArgPair($"__p{i}", $"__o{i}")));
         w.Line(returning is null ? $"this.{m.CsName}({argList});" : $"var __rv = this.{m.CsName}({argList});");
         for (int i = 0; i < formals; i++)
-            w.Line($"if (!__o{i}) __a[{i}].Value = {OoUnivRebox(formalsList[i].Item, $"__p{i}")};   // SR6 BY REFERENCE write-back");
+        {
+            var fi = formalsList[i].Item;
+            string rebox = OoUnivGroupCarried(fi) is { } g
+                ? g ? $"{nameof(UniversalGroupCarrier)}.{nameof(UniversalGroupCarrier.WriteBackVariable)}(__a[{i}].Value, __a[{i}].Description, {CaseDescription(c, i)}, __p{i})"
+                    : $"{nameof(UniversalGroupCarrier)}.{nameof(UniversalGroupCarrier.WriteBackFixed)}(__a[{i}].Value, __a[{i}].Description, {CaseDescription(c, i)}, __p{i})"
+                : OoUnivRebox(fi, $"__p{i}");
+            w.Line($"if (!__o{i}) __a[{i}].Value = {rebox};   // SR6 BY REFERENCE write-back");
+        }
         if (returning is not null)
-            w.Line($"__ret!.Value = {OoUnivRebox(returning, "__rv")};");
+            w.Line(OoUnivGroupCarried(returning) is not null
+                ? $"__ret!.Value = {nameof(UniversalGroupCarrier)}.{nameof(UniversalGroupCarrier.Deliver)}({OoUnivRebox(returning, "__rv")}, "
+                  + $"__ret!.Description, {CaseDescription(c, -1)});   // GR8 delivery in the receiving item's form"
+                : $"__ret!.Value = {OoUnivRebox(returning, "__rv")};");
         w.Line("return;");
     }
 
-    /// <summary>The C# test that the caller's RETURNING descriptor is OUTSIDE <paramref name="matchClass"/> (§9.3.6 match
-    /// rules 6/7; <see cref="OoConformance.ReturningMatchClass"/>): an object-reference or pointer class admits exactly its
-    /// own prefix, the data class admits everything that is neither.</summary>
-    private static string ReturningClassMismatch(string matchClass) =>
-        matchClass.Length > 0
-            ? $"!__ret.Descriptor.StartsWith({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(matchClass, quote: true)}, StringComparison.Ordinal)"
-            : string.Join(" || ", OoConformance.ReturningReferenceClasses.Select(c =>
-                $"__ret.Descriptor.StartsWith({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(c, quote: true)}, StringComparison.Ordinal)"));
+    /// <summary>Whether a group formal or returning item crosses through <see cref="UniversalGroupCarrier"/> — true for
+    /// a VARIABLE-length group, false for a FIXED-length alphanumeric group (the two shapes §14.8.2.2 / §8.5.1.12 pair
+    /// with an argument of another shape), null for every other item, whose argument the relations admit only in its own
+    /// shape and form.</summary>
+    private static bool? OoUnivGroupCarried(DataItem item) =>
+        item.IsGroup && !item.IsAsIfElementary && !StrongTypeModel.IsStrongGroup(item)
+            ? OoVarGroupCarried(item) ? true : item.IsImageCapable ? false : null
+            : null;
 
     /// <summary>D-U6a: true when the item's canonical UNIVERSAL box form is the display IMAGE string while
     /// its local crossing form is native — the FormatDisplay/StoreDisplay bridge applies both directions.</summary>
@@ -687,8 +742,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // spelled `(string)box!` into a `ref CobolVarGroup` parameter: CS1503 on a method merely DECLARED,
         // the PB177 arm-A shape exactly.
         OoVarGroupCarried(item) ? $"({RuntimeApi.VarGroupType}){box}!"
-        // A strong group's leaf vector (kb/Work PB1116) — its "T:!" descriptor matches no caller until kb/Work PB480's
-        // structured description carries a strong type through universal dispatch, but the case must compile.
+        // A strong group's leaf vector (kb/Work PB1116): the relations admit only an argument of the same type, which
+        // the caller boxes as the same vector (OoUnivCallerRead).
         : OoClassTable.LeafCarried(item) ? $"(object?[]){box}!"
         : OoUnivNativeBoxOverImage(item) ? NumericRenderer.ImageOfCarrier($"({item.Pic!.ClrType}){box}!", item)
         : OoStringCarried(item) ? $"(string){box}!"
@@ -720,15 +775,19 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         string boxes = string.Join(", ", u.Args.Select((a, i) => a.Address is { } ao
             // An ADDRESS-IDENTIFIER (kb/Work PB1137) boxes its pointer VALUE — the ONE address-operand renderer the
             // typed path uses — under its class-pointer descriptor; SR19 makes it sending, so nothing copies back.
-            ? $"new CobolInvokeArg({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(a.Descriptor, quote: true)}, (object?){U.Ptr.AddressOperandText(ao)})"
+            ? $"new CobolInvokeArg({RuntimeApi.ActivationDescriptionNew(a.Description)}, (object?){U.Ptr.AddressOperandText(ao)})"
             : a.Source is not { } src
             ? RuntimeApi.ObjOmittedArgument
             : fwd[i] is { } t
-                ? $"new CobolInvokeArg({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(a.Descriptor, quote: true)}, {t} ? null : {OoUnivCallerRead(src)}, {t})"
-                : $"new CobolInvokeArg({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(a.Descriptor, quote: true)}, {OoUnivCallerRead(src)})"));
+                ? $"new CobolInvokeArg({RuntimeApi.ActivationDescriptionNew(a.Description)}, {t} ? null : {OoUnivCallerRead(src)}, {t})"
+            // A reference-modified argument's length is its EVALUATED length (§8.4.3.3.4 GR5 c)): the runtime measures
+            // the slice the box reads, whatever the modifier's form (a literal one measures to its static length).
+            : src is RefModPlace
+                ? RuntimeApi.ObjReferenceModifiedArgument(RuntimeApi.ActivationDescriptionNew(a.Description), OoUnivCallerRead(src))
+                : $"new CobolInvokeArg({RuntimeApi.ActivationDescriptionNew(a.Description)}, {OoUnivCallerRead(src)})"));
         w.Line($"var __ua{id} = new CobolInvokeArg[] {{ {boxes} }};");
         w.Line(u.Returning is not null
-            ? $"var __ur{id} = new CobolInvokeArg({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(u.ReturningDescriptor!, quote: true)});"
+            ? $"var __ur{id} = new CobolInvokeArg({RuntimeApi.ActivationDescriptionNew(u.ReturningDescription!)});"
             : $"CobolInvokeArg? __ur{id} = null;");
         string selector = u.MethodLiteral is { } lit
             ? Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(lit, quote: true)
@@ -829,33 +888,34 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             ? VariableLengthCompatibility.CorrespondingSpans(fixedSide, varSide.Item)
             : null;
 
-    /// <summary>⛔ THE CALLER'S BOX OF ONE UNIVERSAL ARGUMENT — D10's canonical box (<c>S:*</c> → string, <c>V:*</c> →
-    /// the variable-length carrier, <c>O:*</c> → the reference, <c>N:*</c> → per <see cref="OoUnivImageBridged"/> /
-    /// <see cref="OoUnivNativeBoxOverImage"/>). A fixed GROUP is string-carried (<see cref="OoStringCarried"/> is true of
-    /// every group, and the callee unboxes it as <c>(string)box</c>), so its box is its character IMAGE — read through
-    /// <see cref="CallEmitter.CallStringRead"/>, the ONE boundary reader the CALL and the typed INVOKE lanes use (the full
-    /// image of an alphanumeric group, the elementary alphabet of a bit / national group, kb/Work PB1166). It used to fall
-    /// to <c>PlaceRenderer.Read(p)</c>, the record STRUCT, which the copy-out then overwrote with a string: a Roslyn
-    /// CS0029 on every legal group argument (kb/Work PB1781 — the READ half of a pair whose WRITE half had the arm).
-    /// <see cref="OoUnivCallerWrite"/> carries the twin of every arm here; <c>UniversalCrossingShapeDriftTests</c> holds
-    /// the pair together shape by shape.</summary>
+    /// <summary>⛔ THE CALLER'S BOX OF ONE UNIVERSAL ARGUMENT — D10's canonical box, in the ARGUMENT's own form (the
+    /// callee converts a group box it admits in another shape, <see cref="UniversalGroupCarrier"/>): a string-carried
+    /// item → string, a variable-length group → its carrier, a strong group with no image → its leaf vector (kb/Work
+    /// PB1116 — the vector its typed crossing uses), an object reference → the reference, a numeric → per
+    /// <see cref="OoUnivImageBridged"/> / <see cref="OoUnivNativeBoxOverImage"/>. Any other GROUP is string-carried, so
+    /// its box is its character IMAGE — read through <see cref="CallEmitter.CallStringRead"/>, the ONE boundary reader
+    /// the CALL and the typed INVOKE lanes use (the full image of an alphanumeric group, the elementary alphabet of a bit
+    /// / national group, kb/Work PB1166; kb/Work PB1781). <see cref="OoUnivCallerWrite"/> carries the twin of every arm
+    /// here; <c>UniversalCrossingShapeDriftTests</c> holds the pair together shape by shape.</summary>
     private static string OoUnivCallerRead(Place p) =>
         p is RefModPlace ? PlaceRenderer.Read(p)
         : CallEmitter.CallPlaceIsVarGroup(p) ? PlaceRenderer.VarGroupBoundaryImage(p, "INVOKE argument")
+        : OoClassTable.LeafCarried(p.Item) ? PlaceRenderer.GroupLeaves(p)
         : p.Item.IsGroup ? CallEmitter.CallStringRead(p)
         : OoUnivImageBridged(p.Item) ? PlaceRenderer.Read(new NumericImagePlace(p))
         : OoUnivNativeBoxOverImage(p.Item) ? $"(object?){NumericRenderer.CarrierOfImage(PlaceRenderer.Read(p), p.Item)}"   // kb/Work PB187
         : PlaceRenderer.Read(p);
 
     /// <summary>The caller's copy-out / RETURNING delivery of a universal box — the twin of <see cref="OoUnivCallerRead"/>,
-    /// arm for arm. A fixed group takes its image back through <see cref="CallEmitter.CallStringWrite"/>, the boundary
-    /// writer that distributes the FULL image (the elementary alphabet for a bit / national group). The callee's box is
-    /// exactly the argument's width: the universal descriptor is compared for equality, so §14.8.2.2 rule 1's by-reference
-    /// prefix (a smaller formal group) cannot reach here until the match relation admits it (kb/Work PB480).</summary>
+    /// arm for arm. The box comes back in the argument's own form (a smaller formal group's write-back is spliced over the
+    /// argument's image by the callee, §14.8.2.2 rule 1), so a fixed group takes its whole image back through
+    /// <see cref="CallEmitter.CallStringWrite"/>, the boundary writer that distributes the FULL image (the elementary
+    /// alphabet for a bit / national group).</summary>
     private static string OoUnivCallerWrite(Place p, string box) =>
         p is RefModPlace ? PlaceRenderer.Write(p, $"(string){box}!")
         : CallEmitter.CallPlaceIsVarGroup(p)
             ? PlaceRenderer.WriteVarGroupImage(p, $"({RuntimeApi.VarGroupType}){box}!", "INVOKE copy-out into")
+        : OoClassTable.LeafCarried(p.Item) ? PlaceRenderer.WriteGroupLeaves(p, $"(object?[]){box}!")
         : p.Item.IsGroup ? CallEmitter.CallStringWrite(p, $"(string){box}!")
         : OoUnivNativeBoxOverImage(p.Item) ? PlaceRenderer.Write(p, NumericRenderer.ImageOfCarrier($"({p.Item.Pic!.ClrType}){box}!", p.Item))   // kb/Work PB187
         : OoStringCarried(p.Item) ? PlaceRenderer.Write(p, $"(string){box}!")

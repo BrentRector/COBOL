@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-274 drift tests.
+275 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -30,6 +30,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [UseTierEditionInvarianceDriftTests](../tests/Cobol.Net.Tests.Conformance/UseTierEditionInvarianceDriftTests.cs) | ⛔ THE DRIFT GUARD ON A DETERMINATION: the Format-1 USE selection tiers of ISO/IEC 1989:2023 §14.9.49.4 — GR3 a)/GR5 (file-name scope) and GR3 b)/GR6 b)–e) (open-mode scope) — are the SAME at 85, 2002, 2014 and 2023, so the generated selector must be TEXTUALLY IDENTICAL at all four (kb/Work PB344). | — |
 | [VcrDriftTests](../tests/Cobol.Net.Tests.Conformance/VcrDriftTests.cs) | The P3.6 VERSION_CHANGE_REFERENCE (VCR) audit gate — the Tier-1 STRUCTURAL spine that makes the ledger's status DERIVED (never hand-ticked): each change row carries a machine anchor in its gating cell (<!-- gate:construct-id --> / ref-only / pin-to-spec / todo), and the generated "Gating status index" block (between <!-- GEN:VCR-STATUS START/END -->) is rendered from those anchors + constructs.jso… | `docs/VERSION_CHANGE_REFERENCE.md`, `tests/version-matrix/constructs.json`, `specs/ISO_COBOL.md` |
 | [ActivationConformanceDriftTests](../tests/Cobol.Net.Tests.Unit/ActivationConformanceDriftTests.cs) | ⛔ EVERY ACTIVATION WHOSE FORMALS ARE KNOWN AT BIND ASKS THE ONE ARGUMENT HALF OF ISO §14.8.2 (kb/Work PB1418 / PB1115, CLAUDE.md rule 5). | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs` |
+| [ActivationDescriptionFieldDriftTests](../tests/Cobol.Net.Tests.Unit/ActivationDescriptionFieldDriftTests.cs) | ⛔ EVERY FACT AN ACTIVATION DESCRIPTION CARRIES IS ASKED BY A RELATION (kb/Work PB480 / PB1576). | `src/Cobol.Net.Runtime/Control/ActivationRelations.cs`, `src/Cobol.Net.Runtime/Control/CobolInvokeArg.cs` |
 | [ActivationStorageReseedDriftTests](../tests/Cobol.Net.Tests.Unit/ActivationStorageReseedDriftTests.cs) | kb/Work PB1132 — every storage channel of automatic data is re-seeded at every activation, by the ONE seed. | — |
 | [AddressOfOperandScreenDriftTests](../tests/Cobol.Net.Tests.Unit/AddressOfOperandScreenDriftTests.cs) | ⛔ EVERY ADDRESS OF identifier-1 OPERAND PASSES THROUGH THE ONE §8.4.3.11.3 SCREEN (kb/Work PB1407, PB1062). | `src/Cobol.Net.Compiler`, `src/Cobol.Net.Compiler/Binding/Procedure/Verbs` |
 | [AnnexA1RegisterDriftTests](../tests/Cobol.Net.Tests.Unit/AnnexA1RegisterDriftTests.cs) | ⛔ THE GATE THAT RUNS THE ANNEX A.1 REGISTER AUDIT — scripts/spec/audit_annex_a1.py. | `scripts/spec/audit_annex_a1.py`, `tests/version-matrix/traceability-inventory.json` |

@@ -2015,9 +2015,38 @@ internal static class RuntimeApi
     /// <c>CobolInvokeArg.OmittedArgument()</c>.</summary>
     public static string ObjOmittedArgument => $"{nameof(CobolInvokeArg)}.{nameof(CobolInvokeArg.OmittedArgument)}()";
 
-    /// <summary>The descriptor a spelled OMITTED universal argument carries — <c>CobolInvokeArg.OmittedDescriptor</c>
-    /// (the callee switch exempts it from the descriptor check against an OPTIONAL formal, §9.3.6 match rule 3 b)).</summary>
-    public static string ObjOmittedDescriptor => $"{nameof(CobolInvokeArg)}.{nameof(CobolInvokeArg.OmittedDescriptor)}";
+    /// <summary>A reference-modified argument through a universal receiver, described at its EVALUATED length
+    /// (ISO §8.4.3.3.4 GR5 c); kb/Work PB480) — <c>CobolInvokeArg.ReferenceModified(description, slice)</c>.</summary>
+    public static string ObjReferenceModifiedArgument(string descriptionExpr, string sliceExpr) =>
+        $"{nameof(CobolInvokeArg)}.{nameof(CobolInvokeArg.ReferenceModified)}({descriptionExpr}, {sliceExpr})";
+
+    /// <summary>⛔ THE ONE C# RENDERING OF AN <see cref="ActivationDescription"/> (kb/Work PB480): an object initializer
+    /// naming every member that differs from its default, so the generated code rebuilds exactly the description the
+    /// compiler's <c>ActivationDescriptions</c> built. Every member is rendered (reflection over the init properties),
+    /// so a member added to the description cannot be dropped on its way to the run-time relations.</summary>
+    public static string ActivationDescriptionNew(ActivationDescription d)
+    {
+        if (d.Shape is ActivationShape.Omitted) return $"{nameof(ActivationDescription)}.{nameof(ActivationDescription.Omitted)}";
+        var members = new List<string>();
+        foreach (var prop in typeof(ActivationDescription).GetProperties(
+                     System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            object? v = prop.GetValue(d);
+            string? text = v switch
+            {
+                null => null,
+                string s => s.Length == 0 ? null : Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(s, quote: true),
+                bool b => b ? "true" : null,
+                int n => n == 0 ? null : n.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                int[] a => $"new int[] {{ {string.Join(", ", a.Select(x => x.ToString(System.Globalization.CultureInfo.InvariantCulture)))} }}",
+                Enum e => Convert.ToInt32(e, System.Globalization.CultureInfo.InvariantCulture) == 0 ? null : $"{e.GetType().Name}.{e}",
+                _ => throw new InvalidOperationException(
+                    $"ActivationDescription.{prop.Name} is of a type ({v.GetType().Name}) the renderer does not spell"),
+            };
+            if (text is not null) members.Add($"{prop.Name} = {text}");
+        }
+        return $"new {nameof(ActivationDescription)} {{ {string.Join(", ", members)} }}";
+    }
 
     /// <summary>Normalize a runtime method-name value for universal dispatch (D-U6) —
     /// <c>CobolObject.NormalizeMethodName</c>.</summary>

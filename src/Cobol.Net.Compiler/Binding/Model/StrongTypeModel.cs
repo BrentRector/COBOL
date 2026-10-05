@@ -158,6 +158,50 @@ public static class StrongTypeModel
         return true;
     }
 
+    /// <summary>ISO §8.5.3.1's same-type relation as ONE KEY, for an operand whose counterpart is described only at run
+    /// time — a strongly-typed group crossing a UNIVERSAL object-reference dispatch, where §14.8.2.2 / §14.8.3.2 ("both
+    /// shall be of the same type") is asked of two independently compiled descriptions (kb/Work PB480). Built from
+    /// exactly what <see cref="SameType"/> reads: the type-name, the STRONG and EXTERNAL presence of the declaration,
+    /// the alternative (a TYPE subject, or a subordinate item at its relative bit position and length), and each
+    /// elementary item's relative bit position, length in bits and §8.5.3.1 essential characteristics (the
+    /// <see cref="SameEssentialCharacteristics"/> list: ALIGNED, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED,
+    /// SYNCHRONIZED and the analyzed PICTURE / SIGN / USAGE profile), so equal keys ⇔ <see cref="SameType"/> — pinned
+    /// end to end by <c>conformance:2002/pb480_universal_match_relations</c> (two equivalent declarations of one
+    /// type-name in two source elements cross). The one fact a key cannot carry exactly is the LOCALE phrase's
+    /// external identification, which §8.5.3.1 compares character for character between two literals but without
+    /// regard to case when a word is involved: it is keyed as written, word or literal, so a literal and a word that
+    /// differ only in case key apart.</summary>
+    public static string TypeIdentityKey(DataItem item)
+    {
+        var anchor = TypeAnchor(item) ?? item;
+        var key = new System.Text.StringBuilder();
+        key.Append(CobolNames.Fold(DeclaredTypeName(anchor) ?? "")).Append(DeclaredStrong(anchor) ? "|STRONG" : "|-")
+            .Append(DeclaredExternal(anchor) ? "|EXTERNAL" : "|-");
+        if (!ReferenceEquals(anchor, item))
+            key.Append($"|SUBORDINATE {BitLayout.StartBitOf(anchor, item)}:{BitLayout.RunBits(item)}");
+        List<(DataItem Item, int Start)> leaves = [];
+        if (!CollectElementary(anchor, 0, leaves)) return key.Append("|UNPLACED ").Append(anchor.CobolName).ToString();
+        foreach (var (leaf, start) in leaves)
+            key.Append($"|{start}:{BitLayout.RunBits(leaf)}:{EssentialCharacteristicsKey(leaf)}");
+        return key.ToString();
+    }
+
+    /// <summary><see cref="SameEssentialCharacteristics"/> as a key: the entry clauses, then the analyzed profile
+    /// (<see cref="PicInfo"/>'s own record text, every axis by construction, with the two members
+    /// <see cref="SameAnalyzedProfile"/> handles apart rendered apart).</summary>
+    private static string EssentialCharacteristicsKey(DataItem x)
+    {
+        string entry = $"{(x.IsAligned ? "A" : "-")}{(x.BlankWhenZero ? "B" : "-")}{(x.Justified ? "J" : "-")}"
+            + $"{(x.Synchronized ? "Y" : "-")}"
+            + (x.IsDynamicLength ? $"D{x.DynMaxSize}/{CobolNames.Fold(x.DynStructure?.Name ?? "")}" : "");
+        if (x.Pic is not { } p) return entry;
+        string locale = p.LocaleEdit is { } le
+            ? $"{le.Size}/{le.Picture}/{(le.Locale.Named is { } n ? (n.FromLiteral ? "L:" + n.External : "W:" + CobolNames.Fold(n.External)) : "-")}"
+            : "";
+        string rules = p.EditingRules is null ? "" : string.Join(";", p.EditingRules);
+        return $"{entry}|{p with { EditingRules = null, RestrictedTypeDecl = null, LocaleEdit = null }}|{rules}|{locale}";
+    }
+
     /// <summary>The type-name of a declaration in either of its two forms — a TYPEDEF template's own name
     /// (§13.18.58: the TYPEDEF clause "declares and names" the type) or the name a TYPE-clause subject
     /// references (<see cref="DataItem.TypeName"/>). Null when the item is neither.</summary>
@@ -275,14 +319,18 @@ public static class StrongTypeModel
         /// <summary>True when this is a restriction at all (Annex D.9.2.2 — an ordinary data-pointer is not).</summary>
         public bool IsRestricted => Name is not null;
 
-        /// <summary>The identity two same-type restrictions share, as one string: the upper-cased type-name, and
-        /// for a subordinate member the §8.5.3.1 second alternative's position and length in bits — the form a
-        /// conformance DESCRIPTOR spells it in, so a descriptor never equates a record's address with its
-        /// subordinate group's.</summary>
+        /// <summary>The identity two same-type restrictions share, as one string — the form a universal dispatch's
+        /// activation description spells a pointer's restriction in (<c>ActivationDescriptions.Restriction</c>), where
+        /// the two restrictions come from two independently compiled source elements. "Of the same type" is §8.5.3.1's
+        /// relation, which <see cref="SameRestriction"/> asks of the two declarations, so the key is the declaration's
+        /// <see cref="TypeIdentityKey"/> (equal keys ⇔ <see cref="SameType"/>): two non-equivalent declarations of one
+        /// type-name key apart, and a subordinate member keys with its §8.5.3.1 second-alternative position and length,
+        /// so a description never equates a record's address with its subordinate group's. Only a restriction whose
+        /// declaration the model does not hold keys by its type-name alone, under the fold
+        /// <see cref="SameRestriction"/> compares names with.</summary>
         public string Key => Name is null ? "*"
-            : Member is { } m && Declaration is { } d
-                ? $"{Name.ToUpperInvariant()}@{BitLayout.StartBitOf(d, m)}:{BitLayout.RunBits(m)}"
-                : Name.ToUpperInvariant();
+            : (Member ?? Declaration) is { } declared ? TypeIdentityKey(declared)
+            : CobolNames.Fold(Name);
 
         /// <inheritdoc/>
         public override string ToString() => Name is null ? "(unrestricted)"

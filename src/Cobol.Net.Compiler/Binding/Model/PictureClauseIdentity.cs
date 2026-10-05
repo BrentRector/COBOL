@@ -112,8 +112,8 @@ public sealed record PictureClauseIdentity(string CharacterString, string? Curre
               + "\"Additionally\" d))";
     }
 
-    /// <summary>The identity as one key, for the universal-dispatch descriptor
-    /// (<c>OoConformance.ConformanceDescriptor</c>) — equal keys ⇔ <see cref="Mismatch"/> is null. The character-string
+    /// <summary>The identity as one key, for the universal-dispatch activation description
+    /// (<c>ActivationDescriptions.ElementaryClauses</c>) — equal keys ⇔ <see cref="Mismatch"/> is null. The character-string
     /// holds picture symbols only (never '|'), the currency string is length-prefixed and the free-text editing rules
     /// come last, so no two identities share a key.</summary>
     public string Key =>

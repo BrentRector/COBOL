@@ -1309,7 +1309,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // formal known until runtime, §14.9.23.3 SR18's OPTIONAL requirement is the callee switch's GR7c check.
             if (a.Omitted)
             {
-                args.Add(new BoundUniversalArg(null, CobolNet.Runtime.CobolInvokeArg.OmittedDescriptor));
+                args.Add(new BoundUniversalArg(null, CobolNet.Runtime.ActivationDescription.Omitted));
                 continue;
             }
             if (a.ByValueWritten || a.ByContentWritten)
@@ -1329,7 +1329,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             {
                 if (host.Ptr.BindAddressIdentifier(addrCtx, "INVOKE … USING") is not { } ao)
                     return BoundRejected.Reported(ctx.Edition);
-                args.Add(new BoundUniversalArg(null, OoConformance.AddressDescriptor(ao)) { Address = ao });
+                args.Add(new BoundUniversalArg(null, ActivationDescriptions.OfAddress(ao)) { Address = ao });
                 continue;
             }
             if (a.Ref is not { } dref)
@@ -1361,18 +1361,20 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + "(factory/instance) data — it may not cross BY REFERENCE (ISO §14.9.23.3 SR10), and "
                     + "the universal path has no BY CONTENT fallback (SR6)");
             }
-            string d = OoConformance.ConformanceDescriptor(p.Item);
-            if (d == "T:!")
+            // A REFERENCE-MODIFIED argument is the unique data item §8.4.3.3.4 GR5/GR6 create, never the description of
+            // the item it windows (it used to cross under identifier-1's whole description).
+            if ((p is RefModPlace rm ? ActivationDescriptions.OfReferenceModification(rm) : ActivationDescriptions.Of(p.Item))
+                is not { } d)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
-                    $"INVOKE: the argument '{p.Item.CobolName}' has no crossing form (a Tier-C group or a "
-                    + "not-yet-carried category — mirrors the typed path's rejection)");
+                    $"INVOKE: the argument '{p.Item.CobolName}' has no crossing form — "
+                    + (p.Item.IsGroup ? TierCIsland.Reason(p.Item, "argument group") : "it has no PICTURE description"));
             }
             args.Add(new BoundUniversalArg(p, d));
         }
 
         Place? retPlace = null;
-        string? retDesc = null;
+        CobolNet.Runtime.ActivationDescription? retDesc = null;
         if (site.ReturningRef is { } retRef)
         {
             if (host.Expr.ResolveReceiving(retRef) is not { } rp)
@@ -1382,11 +1384,12 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + "to storage");
             }
             if (!OoScreenReturning(rp, retRef, methodName: null)) return BoundRejected.Reported(ctx.Edition);
-            retDesc = OoConformance.ConformanceDescriptor(rp.Item);
-            if (retDesc == "T:!")
+            retDesc = ActivationDescriptions.Of(rp.Item);
+            if (retDesc is null)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
-                    $"INVOKE RETURNING '{rp.Item.CobolName}': no crossing form (Tier-C / not-carried)");
+                    $"INVOKE RETURNING '{rp.Item.CobolName}': no crossing form — "
+                    + (rp.Item.IsGroup ? TierCIsland.Reason(rp.Item, "returning group") : "it has no PICTURE description"));
             }
             retPlace = rp;
         }

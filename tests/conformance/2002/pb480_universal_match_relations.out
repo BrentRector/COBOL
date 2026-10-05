@@ -1,0 +1,19 @@
+TN:ABC
+a=XYZ
+TB:1010
+b=0101
+TE: 12.50
+e=  3.25
+TL:  $10.00
+TP:ABCD
+p=WXYZEFGH
+HANDLED=EC-OO-UNIVERSAL                
+HANDLED=EC-OO-UNIVERSAL                
+HANDLED=EC-OO-METHOD                   
+HANDLED=EC-OO-METHOD                   
+TS:WXYZ
+HANDLED=EC-OO-METHOD                   
+r=RRRR
+SAME
+HANDLED=EC-OO-METHOD                   
+END

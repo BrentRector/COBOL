@@ -135,13 +135,15 @@ public sealed record BoundInvokeArg(
 /// <summary>A bound UNIVERSAL-receiver INVOKE (deep-dive D10/D-U5): there is NO formal roster at compile
 /// time, so the bound facts differ in KIND from <see cref="BoundInvoke"/> — the method selector is a
 /// bind-normalized literal OR a data-item Place read at runtime (§14.9.23.3 SR7), and every argument
-/// carries its caller-side CONFORMANCE DESCRIPTOR (OoConformance.ConformanceDescriptor — compared by the
-/// callee's generated switch at runtime: an argument mismatch means no §9.3.6 match, so EC-OO-METHOD; a bound
-/// method's RETURNING mismatch is §14.9.23.4 GR7c's EC-OO-UNIVERSAL — kb/Work PB1500). Every argument
-/// is BY REFERENCE (SR6 — implicit), so every argument writes back through its box.</summary>
+/// carries its caller-side DESCRIPTION (<see cref="CobolNet.Runtime.ActivationDescription"/>, built by
+/// <see cref="CobolNet.Compiler.Oo.ActivationDescriptions"/>), which the callee's generated switch hands to the run-time
+/// relations: no §9.3.6 match is EC-OO-METHOD after the INHERITS walk, a bound method's §14.8 violation is
+/// §14.9.23.4 GR7 c)'s EC-OO-UNIVERSAL (kb/Work PB1500, PB480). Every argument is BY REFERENCE (SR6 — implicit),
+/// so every argument writes back through its box.</summary>
 public sealed record BoundInvokeUniversal(
     Place Receiver, string? MethodLiteral, Place? MethodSource,
-    IReadOnlyList<BoundUniversalArg> Args, Place? Returning, string? ReturningDescriptor)
+    IReadOnlyList<BoundUniversalArg> Args, Place? Returning,
+    CobolNet.Runtime.ActivationDescription? ReturningDescription)
     : BoundStatement, IActivatingStatement
 {
     /// <inheritdoc/>
@@ -154,17 +156,17 @@ public sealed record BoundInvokeUniversal(
 
 }
 
-/// <summary>One universal-dispatch argument: the storage and its conformance descriptor (D-U3).</summary>
-public sealed record BoundUniversalArg(Place? Source, string Descriptor)
+/// <summary>One universal-dispatch argument: the storage and its description (kb/Work PB480).</summary>
+public sealed record BoundUniversalArg(Place? Source, CobolNet.Runtime.ActivationDescription Description)
 {
-    /// <summary>A spelled OMITTED argument (ISO §14.9.23.2; kb/Work PB757) — no source; its descriptor is
-    /// <c>CobolInvokeArg.OmittedDescriptor</c>, and the callee's switch admits it only against an OPTIONAL formal
-    /// (§9.3.6 match rule 3 b), checked at runtime through a universal receiver (§14.9.23.4 GR7c).</summary>
+    /// <summary>A spelled OMITTED argument (ISO §14.9.23.2; kb/Work PB757) — no source; its description is
+    /// <see cref="CobolNet.Runtime.ActivationDescription.Omitted"/>, and the callee's switch admits it only against an
+    /// OPTIONAL formal (§9.3.6 match rule 3 b), checked at runtime through a universal receiver.</summary>
     public bool Omitted => Source is null && Address is null;
 
     /// <summary>An ADDRESS-IDENTIFIER argument (ISO §14.9.23.3 SR9; kb/Work PB1137): no <see cref="Source"/> — the
     /// pointer VALUE §8.4.3.11.4 GR1 / §8.4.3.13.4 GR1 create crosses in the box under its class-pointer
-    /// <see cref="Descriptor"/>, and SR19 makes it a SENDING operand, so the box is never copied back.</summary>
+    /// <see cref="Description"/>, and SR19 makes it a SENDING operand, so the box is never copied back.</summary>
     public BoundAddressOperand? Address { get; init; }
 }
 

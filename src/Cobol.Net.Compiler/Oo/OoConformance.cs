@@ -45,7 +45,7 @@ public readonly record struct ContentValue(Table16Operand Position, BoundOperand
 /// The OO conformance SERVICE (P9 — R3: validation moved OFF the pass-1 symbol table, which stays a pure
 /// lookup structure): the §9.3.8.2 override-signature check, the §9.3.11 IMPLEMENTS pass (returning the
 /// covariant <see cref="AdapterPair"/>s instead of mutating table state), the ONE strict identical-description
-/// check (§14.8.2.3.2), its runtime descriptor projection (D-U3), and the §14.8.3.3-rule-1 object-reference
+/// check (§14.8.2.3.2) and the §14.8.3.3-rule-1 object-reference
 /// widening direction. Stateless — every entry takes the <see cref="OoClassTable"/> it validates over.
 /// </summary>
 public static class OoConformance
@@ -470,117 +470,6 @@ public static class OoConformance
         }
     }
 
-    /// <summary>The RUNTIME projection of the strict-conformance rule (D-U3 — the universal-dispatch
-    /// wave): ONE descriptor string per description, computed at BIND time on both sides of a universal
-    /// crossing; the generated <c>__CobolInvoke</c> switch compares for STRING EQUALITY — an argument mismatch
-    /// means the method does not MATCH (§9.3.6 match rule 3, so resolution continues and ends in EC-OO-METHOD), a
-    /// RETURNING mismatch within one match class is §14.9.23.4 GR7 c)'s EC-OO-UNIVERSAL (kb/Work PB1500; conformance
-    /// through a universal receiver is checked at runtime, §9.3.8.2.1 NOTE). Intended invariant: descriptor equality ⇔
-    /// <see cref="DescriptionMismatch"/> == null over every carried category — derived NEXT TO the one mismatch
-    /// function so the two projections cannot drift (feedback_one_mechanism_per_job). ⚠ No unit test enumerates
-    /// the categories (this comment used to say one did; none has ever existed): each axis is held only by the
-    /// goldens that exercise it, and the variable-length-group axis DID drift — the comparator accepted, in pair
-    /// mode, a pair whose descriptors ("V:" versus "S:") differ, until kb/Work PB1519
-    /// (negative/w59h-vlg-override-fixed-group).
-    /// Deliberate strictness deltas, both LOUD-fail directions (AS-BUILT notes): equality cannot express
-    /// §14.8.2.2 rule 1's by-ref group-PREFIX leniency (a smaller formal group raises EC-OO-UNIVERSAL
-    /// through universal where the TYPED path accepts a prefix), and JUSTIFIED is encoded on alphanumeric
-    /// items while the group⇄alphanumeric image pairing carries none. Not-carried categories return the
-    /// <c>T:!</c> sentinel — bind rejects them from universal crossings (0866) before any box exists, and
-    /// the sentinel deliberately matches nothing the callee ever emits as a checked formal.</summary>
-    public static string ConformanceDescriptor(DataItem item)
-    {
-        // A bit / national group is treated as an ELEMENTARY item at the activation boundary (§14.8.2.1 / §14.8.3.1
-        // NOTE), never as the alphanumeric group the "S:" image pairing stands for (kb/Work PB1166): its key is its
-        // group usage and its position count, so two such groups of one kind and size match and nothing
-        // alphanumeric does. The elementary boolean / national items the comparator also pairs it with are not
-        // carried through universal dispatch ("T:!" below) — the same loud strictness delta those items already have.
-        if (item.IsAsIfElementary)
-            return $"G:{item.GroupUsage}:{item.AsIfPic!.Length}";
-        if (item.IsGroup)
-            // A VARIABLE-LENGTH group crosses as its §8.5.1.12 component carrier, so its descriptor is that
-            // layout's canonical signature (kb/Work PB204) — without it the item fell to the T:! sentinel and
-            // bind refused every universal crossing of legal source (COBOLNET0866).
-            return item.CurrentExtentImageCapable ? $"V:{VariableLengthCompatibility.Signature(item)}"
-                : item.IsImageCapable ? $"S:{item.ImageWidth}:N" : "T:!";
-        if (item.Pic is not { } p) return "T:!";
-        return p.Category switch
-        {
-            // The WHOLE §13.18.60.2 description, not just the name (kb/Work PB389): two items described
-            // `OBJECT REFERENCE C` and `OBJECT REFERENCE FACTORY OF C ONLY` are different descriptions and
-            // §9.3.8.2.3 rule 2 c) makes them non-conformant, so their keys must differ.
-            PicCategory.ObjectReference => "O:" + (p.ObjectRef ?? ObjectRefDescriptor.Universal).SignatureKey,
-            PicCategory.Numeric =>
-                $"N:{p.Usage}:{p.Digits}:{p.Scale}:{(p.Signed ? "S" : "U")}:{p.SignKind}:"
-                + (item.BlankWhenZero ? "B" : "-") + ClauseKey(item),
-            PicCategory.Alphanumeric =>
-                // An ANY LENGTH item's length is runtime-varying (ISO §13.18.2 GR1) — encoded '*' so the pair
-                // semantics track DescriptionMismatch (ANY LENGTH must MATCH between the sides; when both carry
-                // it the length compare is void). Through UNIVERSAL dispatch a concrete argument never MATCHES an
-                // ANY LENGTH formal (§9.3.6 match rule 3 e) names the ANY LENGTH clause), so it resolves no method;
-                // an ANY LENGTH argument that does match one is §14.9.23.4 GR7 c)'s ban on the bound method, which
-                // OoEmitter.EmitCobolInvokeCase raises as EC-OO-UNIVERSAL (kb/Work PB1500).
-                // A picture that is not all X — alphabetic, edited, or mixed A/9/X — carries its PICTURE-clause
-                // identity (kb/Work PB1166: PIC A(5) is not PIC X(5)); a plain X(n) item keeps the bare "S:n:J"
-                // key the alphanumeric-group image pairs with. The one consequence is a documented LOUD delta: a
-                // mixed-symbol category-alphanumeric item (PIC X9X) meeting an alphanumeric group, which the typed
-                // path admits by §14.8.2.2 rule 1, raises EC-OO-UNIVERSAL through universal dispatch.
-                $"S:{(item.IsAnyLength ? "*" : p.Length.ToString())}:{(item.Justified ? "J" : "N")}"
-                + (item.IsDynamicLength ? $":D{item.DynMaxSize}:{item.DynStructure?.Name}" : "")
-                + (IsAllX(p) ? "" : ClauseKey(item)),
-            // ⛔ CLASS POINTER CROSSES TOO (kb/Work PB1137). §14.8.2.3.2's class-pointer paragraph makes a data-pointer
-            // and a program-pointer conform to the same category, and "if either is a restricted pointer, both shall
-            // be restricted and of the same type" — so the key is the category plus the restriction, the SAME pair
-            // AddressDescriptor builds for an address-identifier argument. A program-pointer's restriction is keyed by
-            // its prototype's NAME, where the typed path compares signatures: two same-signature prototypes under
-            // different names raise EC-OO-UNIVERSAL here — a LOUD strictness delta, the by-ref group-prefix family.
-            PicCategory.Pointer => DataPointerKey(StrongTypeModel.PointerRestriction(item)),
-            PicCategory.ProgramPointer => ProgramPointerKey(p.RestrictedPrototypeName),
-            _ => "T:!",
-        };
-    }
-
-    /// <summary>The descriptor prefixes of the reference classes a RETURNING pair must share to MATCH (§9.3.6 match rules
-    /// 6 and 7, kb/Work PB1500): an object-reference or pointer returning item is received by a SET, which admits only
-    /// its own class and pointer category (§14.8.3.3 rule 1; §14.8.2.3.2's class-pointer paragraph), and every other
-    /// description is received by a MOVE, which neither of those can take part in. Object references are one class here
-    /// because which object classes a SET admits is a run-time question through a universal receiver
-    /// (<c>CobolObject.NarrowUniversal</c>).</summary>
-    public static readonly IReadOnlyList<string> ReturningReferenceClasses = ["O:", "P:D:", "P:P:"];
-
-    /// <summary>The §9.3.6 rule 6/7 match class of a RETURNING <paramref name="descriptor"/>: the one
-    /// <see cref="ReturningReferenceClasses"/> prefix it carries, or "" for the MOVE class. Two RETURNING items of one
-    /// class can meet in a SET or MOVE and so MATCH; whether their descriptions are the SAME is then §14.8.3.3's
-    /// conformance question, which §14.9.23.4 GR7 c) asks of the bound method.</summary>
-    public static string ReturningMatchClass(string descriptor) =>
-        ReturningReferenceClasses.FirstOrDefault(c => descriptor.StartsWith(c, StringComparison.Ordinal)) ?? "";
-
-    /// <summary>The conformance descriptor of an ADDRESS-IDENTIFIER argument crossing a universal dispatch (kb/Work
-    /// PB1137): §8.4.3.11.4 GR1 — "Data-address-identifier creates a unique data item of class pointer and category
-    /// data-pointer" —
-    /// restricted to the type of its operand when that is a strongly-typed group or a restricted data-pointer (GR2,
-    /// <see cref="StrongTypeModel.AddressOfRestriction"/>) — and §8.4.3.13.4 GR1 a program-address-identifier one of
-    /// category program-pointer, restricted by its prototype (GR3). Keyed exactly as
-    /// <see cref="ConformanceDescriptor"/> keys a pointer ITEM, so the callee's formal compares for equality.</summary>
-    public static string AddressDescriptor(BoundAddressOperand address) =>
-        address.Data is { } data ? DataPointerKey(StrongTypeModel.AddressOfRestriction(data.Item))
-        : ProgramPointerKey(address.Program!.Prototype);
-
-    private static string DataPointerKey(StrongTypeModel.TypeRestriction r) =>
-        "P:D:" + r.Key;
-
-    private static string ProgramPointerKey(string? prototype) =>
-        "P:P:" + (prototype is null ? "*" : prototype.ToUpperInvariant());
-
-    /// <summary>The PICTURE-clause identity's descriptor suffix (<see cref="PictureClauseIdentity.Key"/>), or ""
-    /// for an item with no PICTURE clause or an ANY LENGTH item (whose one-symbol picture is its length's
-    /// placeholder — the comparator skips the identity for it too).</summary>
-    private static string ClauseKey(DataItem item) =>
-        item.Pic?.Clause is { } c && !item.IsAnyLength ? ":P" + c.Key : "";
-
-    /// <summary>A plain <c>X(n)</c> picture — the only elementary shape whose descriptor is the bare image key.</summary>
-    private static bool IsAllX(PicInfo p) => p.Clause is null || p.Clause.CharacterString.All(c => c == 'X');
-
     /// <summary>§14.8.2.2 rule 1 / §14.8.3.2: the elementary side of an alphanumeric-group pairing "shall be … an
     /// elementary item of category alphanumeric" — the CATEGORY (§8.5.2), so neither alphabetic (<c>PIC A</c>) nor
     /// alphanumeric-edited, both of which share <see cref="PicCategory.Alphanumeric"/> storage (kb/Work PB1166).</summary>
@@ -680,8 +569,7 @@ public static class OoConformance
         // X(4).` argument crossed BY REFERENCE into a `01 LF TYPE CT-T.` strong formal of the same width and
         // ran, defeating exactly the data integrity §8.5.3.3's restrictions exist to protect.
         if (StrongTypeMismatch(formal, arg) is { } strongWhy) return strongWhy;
-        // ANY LENGTH (ISO §13.18.2). PAIR mode (the default — override/implements signatures and the universal
-        // descriptor; the §9.3.8.2/§14.8.2 conformance tables :12177/:12247/:12335/:12383 list ANY LENGTH among
+        // ANY LENGTH (ISO §13.18.2). PAIR mode (the default — override/implements signatures; the §9.3.8.2/§14.8.2 conformance tables :12177/:12247/:12335/:12383 list ANY LENGTH among
         // the clauses that shall be THE SAME between corresponding items): the clause must match between the
         // sides, and when both carry it the length compare is void — both lengths track the same runtime
         // argument (GR1). ACTIVATION mode (<paramref name="anyLengthActivationRelax"/> — INVOKE arguments
@@ -767,8 +655,8 @@ public static class OoConformance
                 // COMPATIBLE and their collapsed widths agree. Measured before this arm: a base formal
                 // `05 T PIC X(2) OCCURS DYNAMIC …` overridden by `05 T PIC X(2) OCCURS 1.` passed the width compare
                 // below and died in Roslyn (CS0115, "no suitable method found to override"), because the C#
-                // projection — ConformanceDescriptor's "V:" versus "S:" — already told the two apart: this arm
-                // restores the invariant that the descriptor and this comparator agree.
+                // projection — the variable-length carrier versus the image string — already told the two apart:
+                // this arm restores the invariant that the C# signature and this comparator agree.
                 if (VariableLengthCompatibility.IsVariableLength(formal) != VariableLengthCompatibility.IsVariableLength(arg))
                     return $"one is a variable-length group and the other a fixed-length group (the formal is "
                         + $"{(VariableLengthCompatibility.IsVariableLength(formal) ? "variable" : "fixed")}-length) — "
@@ -941,7 +829,10 @@ public static class OoConformance
             case PicCategory.Pointer:
             case PicCategory.ProgramPointer:
             case PicCategory.FunctionPointer:
-                if (!CobolNames.Same(f.RestrictedTypeName, a.RestrictedTypeName))
+                // "Of the same type" is §8.5.3.1's relation (SameRestriction): the type-name AND, across source
+                // elements, the equivalence of the two declarations it names — never the name alone.
+                if (StrongTypeModel.PointerRestriction(formal) is var fr && StrongTypeModel.PointerRestriction(arg) is var ar
+                    && (fr.IsRestricted || ar.IsRestricted) && !StrongTypeModel.SameRestriction(fr, ar))
                     return $"restricted data-pointer mismatch (formal {PointerRestrictionText(f.RestrictedTypeName, "type")}, "
                         + $"argument {PointerRestrictionText(a.RestrictedTypeName, "type")} — §14.8.2.3.2: if either is a "
                         + "restricted pointer, both shall be restricted and of the same type)";

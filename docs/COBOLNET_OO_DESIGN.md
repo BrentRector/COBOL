@@ -225,8 +225,8 @@ see each other, so a shared struct would serve only the same-element case and th
 conversion; the vector is the one carrier that works between any two of them, and it changes no other emission.
 **Not yet carried:** the program ABI (CALL / user function, `CobolArg`): `ParameterConformance.CheckArgument` /
 `ReturningCarrierResidue` refuse it at compile time (COBOLNET1688 / the RETURNING code) naming the carrier, after the rule
-has admitted it; and universal dispatch, whose `T:!` descriptor matches nothing until kb/Work PB480's structured
-description carries a strong type.
+has admitted it. Universal dispatch carries it (kb/Work PB480): the caller boxes the same leaf vector, and the
+run-time relations admit only an argument of the same type (§8.5.2.1 category = type-name, §8.5.3.1 identity).
 
 **Tier-C posture at the method boundary.** A NON-strong group with a pointer leaf, or a variable-length group
 (§8.5.1.12.1) outside the current-extent carrier, has no character image (`DataItem.IsImageCapable`) and the crossing stages the documented Tier-C
@@ -374,19 +374,35 @@ implementing one interface, polymorphic dispatch through an interface-typed refe
 **Implementation.**
 The signature is `void __CobolInvoke(string name, CobolInvokeArg[] args, CobolInvokeArg? returning)`:
 the mutable `CobolInvokeArg.Value` is the SR6 BY-REFERENCE
-write-back channel and its `Descriptor` carries the runtime-conformance encoding
-(`OoConformance.ConformanceDescriptor`, ONE rule beside DescriptionMismatch), compared by string equality AT
-RUNTIME in the order §14.9.23.4 GR7 prescribes (kb/Work PB1500):
-- **GR7 b) — resolution.** §9.3.6's match rules decide whether a method is BOUND at all: rule 1 (argument count,
-  trailing OPTIONAL formals counting as equal; RETURNING present on both sides or neither), rule 3 (every universal
-  argument is BY REFERENCE: an OMITTED one needs an OPTIONAL formal, any other one the formal's descriptor) and
-  rules 6/7 (the RETURNING items share a SET/MOVE class, `OoConformance.ReturningMatchClass`). A method that does
-  not match is NOT bound: its case `break`s out of the switch into `base.__CobolInvoke`, the search continues up the
-  INHERITS chain (§9.3.6 2)/4)), and the CobolObject root sets EC-OO-METHOD (§9.3.6 6)) — a declarative on
-  EC-OO-METHOD selects it.
-- **GR7 c) — the bound method's conformance.** What §9.3.6 does not restate: an ANY LENGTH formal or returning item
-  ("neither a formal parameter nor the returning item in the invoked method shall be described with the ANY LENGTH
-  clause") and a RETURNING pair of one match class whose descriptions differ (§14.8.3.3). The EC-OO-UNIVERSAL
+write-back channel and its `Description` is the caller's `ActivationDescription` (runtime, `Control/ActivationDescription.cs`;
+kb/Work PB480): shape, §8.5.2 class and category, the §9.3.6 3 e) clause identity, the LOCALE external identification,
+ANY LENGTH, positions, the §8.5.3.1 strong-type identity, the §8.5.1.12 layout and signature, the object-reference
+phrases and, on a formal, OPTIONAL and BY VALUE. The compiler builds every description in ONE place
+(`Oo/ActivationDescriptions` — caller arguments and RETURNING in the binder, method formals and returning items as
+`static readonly` fields of the class half) and renders it through ONE renderer (`RuntimeApi.ActivationDescriptionNew`).
+The generated case asks the standard's TWO relations of them (`ActivationRelations`), in the order §14.9.23.4 GR7
+prescribes (kb/Work PB1500):
+- **GR7 b) — resolution: `ActivationRelations.Matches` / `ReturningMatches`.** §9.3.6's match rules decide whether a
+  method is BOUND at all: rule 1 (argument count, trailing OPTIONAL formals counting as equal; RETURNING present on both
+  sides or neither), rule 3 for every argument (all BY REFERENCE: a BY VALUE formal never matches; an OMITTED argument
+  needs an OPTIONAL formal; an object reference needs the 3 d) 1.–3. description, and for an ACTIVE-CLASS formal its
+  VALUE must be an object of the class the method is invoked on, or that class's factory with FACTORY — 3 d) 4./5.,
+  asked through `CobolObject.__InstanceClassType` / `__FactoryClassType`, which every emitted class half overrides; any
+  other argument the same class and category, 3 c), and the same 3 e) clauses — a group carries none, so two groups
+  match whatever their sizes and a group never matches an `X(n)`; a strongly-typed group's category is its type-name,
+  §8.5.2.1) and rules 6/7 for the RETURNING items (the same SET class — object, a pointer category, index — or both
+  MOVE-received). A method that does not match is NOT bound: its case `break`s out of the switch into
+  `base.__CobolInvoke`, the search continues up the INHERITS chain (§9.3.6 2)/4)), and the CobolObject root sets
+  EC-OO-METHOD (§9.3.6 6)) — a declarative on EC-OO-METHOD selects it. The standard class BASE's New and FactoryObject
+  match the same way (`StandardMethodCrossing.Matches`).
+- **GR7 c) — the bound method's conformance: `ActivationRelations.ParameterViolation` / `ReturningViolation`.** An ANY
+  LENGTH formal or returning item ("neither a formal parameter nor the returning item in the invoked method shall be
+  described with the ANY LENGTH clause"), §14.8.2.2 rule 1 (a formal group no larger than the argument), the
+  strong-type sentence (§8.5.3.1 equivalence of the two declarations, `StrongTypeModel.TypeIdentityKey`), §8.5.1.12
+  compatibility of a variable-length pair (equal signatures, or a fixed group whose tables correspond to every dynamic
+  item, `CobolVarGroup.CorrespondingSpans`), §14.8.2.3.2 "Additionally" b)/c) for bit / national groups, and §14.8.3
+  for the RETURNING pair (§14.8.3.2's same length, §14.8.3.3's clause identity; an object reference is delivered by the
+  SET-rule narrowing `CobolObject.NarrowUniversal`). The EC-OO-UNIVERSAL
   exception condition is set to exist WHEN checking for it is enabled in BOTH the activated method and the
   activating runtime element; the method invocation is then unsuccessful and control continues per GR7g through
   the §14.6.13 EC machinery (declaratives / >>TURN), like every other EC. When checking is not enabled in both,
@@ -412,10 +428,10 @@ runtime universal type, GR2b defers non-COBOL interop, no cast at dispatch sites
 for methods the type DECLARES that are NOT overrides (the base's case + C# virtual dispatch delivers
 overrides — proven by oo_universal_inherit's DERIVED-VOICE); an absent or non-matching name chains base — the chain IS §9.3.6;
 zero non-override methods ⇒ no override emitted; BOTH type halves get switches (a universal can hold a
-factory object). Box forms are CANONICAL BY DESCRIPTOR (each side's storage form is computed independently
-per unit, so "box per your own storage" would desync): `S:*` →
-string; `N:Display:*` → the display IMAGE string (the FormatDisplay/StoreDisplay overload pair bridges
-native↔image on each side independently); other `N:*` → the native value; `O:*` → the reference. Binder:
+factory object). Box forms are CANONICAL BY DESCRIPTION (each side's storage form is computed independently
+per unit, so "box per your own storage" would desync): a string-carried item → string; a zoned numeric → the display
+IMAGE string (the FormatDisplay/StoreDisplay overload pair bridges native↔image on each side independently); another
+numeric → the native value; an object reference → the reference. Binder:
 `BoundInvokeUniversal`/`BoundUniversalArg` (facts differ in KIND from BoundInvoke — no roster exists);
 SR6/SR7/SR8/SR10 + Tier-C = **0866**. SET Format 5 is live (grammar `dataReference+`; a
 dataReference SENDER parses as the Format-1 shape by alternative order, so `BindSetTo` re-routes
@@ -424,23 +440,25 @@ singleton senders come through the gated rule; SR8/SR9/SR12 = **0867**; universa
 the narrowing tool is the OBJECT VIEW, `SET B TO U AS C`, live (see "OBJECT-VIEW" below)). Object relations are live
 (Format 3 `=`/`<>` only + both-class-object = **0868**; identity renders
 `object.ReferenceEquals(l, r)` in the ConditionRenderer's object branch BEFORE the figurative branch, so
-NULL never width-materializes). ⚠ String equality is used as §9.3.6's MATCH test, which is not the same relation as the §14.8.2 conformance the
-descriptor projects (match rule 3 e) makes two alphanumeric groups of any size match and a group NOT match an `X(n)`,
-while both are keyed `S:<width>`); national / boolean / numeric-edited items are the `T:!` sentinel (0866); and a fixed
-GROUP argument boxes as its character IMAGE on BOTH sides of the crossing (kb/Work PB1781): `OoEmitter.OoUnivCallerRead`
-reads it through `CallEmitter.CallStringRead` and `OoUnivCallerWrite` returns it through `CallEmitter.CallStringWrite` —
-the one boundary reader / writer the CALL and typed INVOKE lanes use, so an alphanumeric group is its full image and a
-bit / national group (`G:<usage>:<m>`) its m positions — and `UniversalCrossingShapeDriftTests` holds the universal lane
-to the typed lane shape by shape. An UNEQUAL-width group (§14.8.2.2 rule 1's by-reference prefix) is still no MATCH
-here, because the descriptor is compared for equality: that, and group-versus-`X(n)`, are kb/Work PB480 / PB1780's
-structured replacement.
-Descriptor-vs-DescriptionMismatch drift protection is a UNIT MATRIX over ELEMENTARY
-pictures ANALYZED by `PictureAnalyzer` (groups, pointers and object references are outside it — kb/Work PB1576) (`PictureClauseIdentityDriftTests.ConformanceDescriptor_AgreesWithTheComparator_OverEveryCarriedPair`,
-kb/Work PB1166) plus the behavioral EC-OO-METHOD (no match) / conforming-crossing pair over the 9(4)/9(8) hazard. Both
-projections read the ONE PICTURE-clause identity (`PicInfo.Clause` — expanded character-string, currency STRING,
-DECIMAL-POINT IS COMMA when a period/comma symbol is present), so a plain `X(n)` keeps the bare `S:n:J` key the
-alphanumeric-group image pairs with and every other alphanumeric picture adds its clause key; a bit / national
-group's key is `G:<usage>:<positions>` (it is an elementary item at the boundary, §14.8.2.1 NOTE).
+NULL never width-materializes). Box forms are the ARGUMENT's own form (a string-carried item → string, a zoned numeric →
+its display IMAGE, another numeric → the native value, an object reference → the reference, a variable-length group →
+its carrier, a strong group with no image → its leaf vector), and a fixed GROUP argument boxes as its character IMAGE on
+BOTH sides (kb/Work PB1781): `OoEmitter.OoUnivCallerRead` reads it through `CallEmitter.CallStringRead` and
+`OoUnivCallerWrite` returns it through `CallEmitter.CallStringWrite` — the one boundary reader / writer the CALL and typed
+INVOKE lanes use — and `UniversalCrossingShapeDriftTests` holds the universal lane to the typed lane shape by shape. A
+group FORMAL the relations admitted in another shape is converted by the callee (`UniversalGroupCarrier`): §14.8.2.2
+rule 1's PREFIX (the formal sees the argument's leading positions; its write-back is spliced over them and the tail
+survives) and §8.5.1.12's fixed / variable-length pair (through the pair's `CorrespondingSpans`, both directions, and the
+RETURNING delivery). A REFERENCE-MODIFIED argument is the §8.4.3.3.4 GR6 unique data item — no PICTURE, so it matches
+only a group formal of its class. Drift protection: `PictureClauseIdentityDriftTests.ActivationMatch_AgreesWithTheComparator_OverEveryElementaryPair`
+(the relation's match ⇔ the typed comparator's identity over analyzed elementary pictures, national / boolean /
+numeric-edited included) and `ActivationDescriptionFieldDriftTests` (every description field is read by a relation or
+the carrier and spelled by the renderer); the goldens `conformance:2002/pb480_universal_match_relations`,
+`conformance:2002/pb1112_active_class_universal` and `conformance:2014/pb480_universal_variable_length` pin each arm.
+**Residue:** two variable-length groups whose §8.5.1.12 signatures differ are compatible only when equal (the
+element-wise walk with recursion into element groups is the compiler's `VariableLengthCompatibility.Walk`, not yet
+carried to the runtime), and rule 7's MOVE-class RETURNING match admits every non-reference pair, so a MOVE-illegal pair
+surfaces as EC-OO-UNIVERSAL rather than EC-OO-METHOD.
 
 ### D12. Parameterized classes and interfaces (§9.3.12 / §9.3.13) are EXPANDED, one ordinary class per expansion — never C# generics; the parameterized definition itself is a skeleton that binds and emits nothing.
 

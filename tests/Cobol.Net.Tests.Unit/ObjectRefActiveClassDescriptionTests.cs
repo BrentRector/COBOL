@@ -46,7 +46,6 @@ public sealed class ObjectRefActiveClassDescriptionTests
     {
         var ownerless = ObjectRefDescriptor.ActiveClass(null);
         Assert.Equal("CobolObject", ownerless.ClrTypeName);
-        Assert.Equal("A:", ownerless.SignatureKey);
         Assert.Contains("interface method prototype", ownerless.Spelled);
         Assert.Equal("OBJECT REFERENCE ACTIVE-CLASS", ownerless.ToString());
     }

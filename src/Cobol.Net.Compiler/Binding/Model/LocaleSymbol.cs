@@ -24,20 +24,13 @@ public sealed record LocaleSymbol(string Name, string External, bool FromLiteral
     /// <c>INVARIANT</c> → "") — what the generated code carries and the runtime resolves at use.</summary>
     public string Tag { get; } = LocaleIdentification.Normalize(External);
 
-    /// <summary>Do two symbols carry "the same external identification, where the external identification is the
-    /// external-locale-name or literal value associated with a locale-name in the LOCALE clause" (ISO §8.5.3.1
-    /// "Additionally", §9.3.8.2.3 rule 3 "Additionally", §14.8.2.3.2 "Additionally" a), §14.8.3.3 "Additionally" 1))? The
-    /// identification AS WRITTEN — not the locale it resolves to (kb/Work PB1166): <c>"en-US"</c> and
-    /// <c>"en_US.UTF-8"</c> select the same locale at run time (DETERMINATION L1,
-    /// <see cref="LocaleIdentification.Normalize"/>) but are two literal values, so two PICTURE clauses naming them
-    /// are not the same clause. A literal value compares character for character; an external-locale-name is a
-    /// COBOL word, and COBOL basic letters outside a literal are case-insensitive (§8.1.3.2 GR3 a)), so any pair
-    /// involving one compares without regard to case. The locale-NAME never enters: two locale-names bound to the
+    /// <summary>Do two symbols carry "the same external identification" (ISO §8.5.3.1 "Additionally", §9.3.8.2.3 rule 3
+    /// "Additionally", §14.8.2.3.2 "Additionally" a), §14.8.3.3 "Additionally" 1))? The identification AS WRITTEN,
+    /// through the ONE rule <see cref="LocaleIdentification.SameExternalIdentification"/>, which the run-time
+    /// universal-dispatch relation asks too (kb/Work PB480). The locale-NAME never enters: two locale-names bound to the
     /// same identification match.</summary>
     public bool SameExternalIdentificationAs(LocaleSymbol other) =>
-        FromLiteral && other.FromLiteral
-            ? string.Equals(External, other.External, StringComparison.Ordinal)
-            : CobolNames.Same(External, other.External);
+        LocaleIdentification.SameExternalIdentification(External, FromLiteral, other.External, other.FromLiteral);
 
     public override string ToString() => $"LOCALE {Name} IS {(FromLiteral ? $"\"{External}\"" : External)} → {(Tag.Length == 0 ? "root" : Tag)}";
 }

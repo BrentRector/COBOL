@@ -7,6 +7,7 @@ using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.Compiler.Oo;
 using CobolNet.Editions;
+using CobolNet.Runtime;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
@@ -23,9 +24,9 @@ namespace CobolNet.Tests.Unit;
 /// <c>PIC X(5)</c>, and ALIGNED / DYNAMIC LENGTH were compared nowhere.
 /// <para>This pins the properties that keep the identity single: (1) the comparator honours every axis of
 /// <see cref="PictureClauseIdentity"/>, measured over pictures ANALYZED by <see cref="PictureAnalyzer"/> — never
-/// hand-built profiles that could omit the field; (2) the universal-dispatch descriptor
-/// (<see cref="OoConformance.ConformanceDescriptor"/>) agrees with the comparator over every pair of carried items,
-/// the invariant its own summary states and no test had ever enumerated; (3) the non-PICTURE clauses are read
+/// hand-built profiles that could omit the field; (2) the universal-dispatch relation's §9.3.6 match
+/// (<see cref="ActivationRelations.Matches"/> over <see cref="ActivationDescriptions"/>, kb/Work PB480) agrees with
+/// the comparator over every pair of elementary items; (3) the non-PICTURE clauses are read
 /// through the one <see cref="DescriptionClauses"/> predicate the §8.5.3.1 compare reads too.</para>
 /// </summary>
 public sealed class PictureClauseIdentityDriftTests
@@ -95,12 +96,14 @@ public sealed class PictureClauseIdentityDriftTests
             OoConformance.DescriptionMismatch(dynamic, plain));
     }
 
-    /// <summary>The descriptor invariant — equal descriptors ⇔ the comparator conforms (pair mode) — over every
-    /// ordered pair drawn from a population that varies each axis the identity carries. Categories the universal
-    /// path does not carry ("T:!") and the two documented LOUD deltas (none arises between elementary items of one
-    /// shape here) are the only exclusions, and the population asserts it produced carried pairs at all.</summary>
+    /// <summary>The universal-dispatch relation agrees with the comparator (kb/Work PB480): over every ordered pair of
+    /// ELEMENTARY items drawn from a population that varies each axis the identity carries, §9.3.6 match rule 3 e)
+    /// (<see cref="ActivationRelations.Matches"/> over the descriptions <see cref="ActivationDescriptions"/> builds)
+    /// holds exactly when the comparator finds the two descriptions identical — the national, boolean and
+    /// numeric-edited categories included, which the string descriptor this replaced could not carry. The population
+    /// asserts it produced pairs at all.</summary>
     [Fact]
-    public void ConformanceDescriptor_AgreesWithTheComparator_OverEveryCarriedPair()
+    public void ActivationMatch_AgreesWithTheComparator_OverEveryElementaryPair()
     {
         var usd = new Dictionary<char, CurrencyDefinition> { ['$'] = Alnum("USD") };
         var items = new List<DataItem>
@@ -108,19 +111,24 @@ public sealed class PictureClauseIdentityDriftTests
             Item("X(5)"), Item("XXXXX"), Item("A(5)"), Item("X(4)"), Item("XBX"), Item("X9X"),
             Item("9(4)"), Item("9999"), Item("S9(4)"), Item("9(2)V99"), Item("9(2)V99", dpc: true),
             Item("9(4)", usage: Usage.Binary), Item("9(4)", currencies: usd),
+            Item("N(3)", usage: Usage.National), Item("N(4)", usage: Usage.National), Item("1(4)"),
+            Item("1(4)", usage: Usage.Bit), Item("ZZ9.99"), Item("ZZ9.99", dpc: true), Item("$$9.99"),
+            Item("$$9.99", currencies: usd),
         };
-        int carried = 0;
-        foreach (var x in items)
-            foreach (var y in items)
+        int pairs = 0;
+        foreach (var formal in items)
+            foreach (var arg in items)
             {
-                string dx = OoConformance.ConformanceDescriptor(x), dy = OoConformance.ConformanceDescriptor(y);
-                if (dx == "T:!" || dy == "T:!") continue;
-                carried++;
-                bool conforms = OoConformance.DescriptionMismatch(x, y) is null;
-                Assert.True(conforms == (dx == dy),
-                    $"PIC {x.PictureText} vs PIC {y.PictureText}: comparator says {(conforms ? "conforms" : "differs")}"
-                    + $" but descriptors are '{dx}' / '{dy}'");
+                var df = ActivationDescriptions.Of(formal)!;
+                var da = ActivationDescriptions.Of(arg)!;
+                pairs++;
+                bool identical = OoConformance.DescriptionMismatch(formal, arg) is null;
+                bool matches = ActivationRelations.Matches(da, null, df, null!)
+                    && ActivationRelations.ParameterViolation(da, df) is null;
+                Assert.True(identical == matches,
+                    $"PIC {formal.PictureText} vs PIC {arg.PictureText}: comparator says {(identical ? "identical" : "differs")}"
+                    + $" but the run-time relation says {(matches ? "matches" : "does not match")} ('{df.Clauses}' / '{da.Clauses}')");
             }
-        Assert.True(carried > 100, $"only {carried} carried pairs — the population no longer exercises the invariant");
+        Assert.True(pairs > 300, $"only {pairs} pairs — the population no longer exercises the invariant");
     }
 }
