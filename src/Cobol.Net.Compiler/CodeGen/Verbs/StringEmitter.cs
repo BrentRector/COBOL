@@ -342,9 +342,10 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
     /// (§14.9.43.4 GR7 — the image already carries the untouched positions): a character-image group distributes
     /// via <c>FromImage</c>; a Tier-B view / reference window splices through its own <c>Write</c>; a long-stored
     /// numeric-DISPLAY receiver (SR1 admits usage-display numeric) decodes the updated zoned image back to its
-    /// value; an alphanumeric, NATIONAL or image-stored receiver assigns the image directly (same width by
-    /// construction — a national elementary item is a string of national character positions, and §14.9.43.4 GR3 a)
-    /// moves "national-to-national" with no space fill, GR7 keeping every position not written; kb/Work PB1179).</summary>
+    /// value; an alphanumeric, NATIONAL, USAGE DISPLAY boolean or image-stored receiver assigns the image directly
+    /// (same width by construction — a national elementary item is a string of national character positions, and
+    /// §14.9.43.4 GR3 a) moves "national-to-national" with no space fill, GR7 keeping every position not written; a
+    /// display boolean item is a string of '0' / '1' characters; kb/Work PB1179).</summary>
     private void WriteImage(Place p, string imageExpr)
     {
         var w = ctx.Writer;
@@ -361,12 +362,13 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
             w.Line(PlaceRenderer.Write(p, ArithmeticEmitter.Narrow(RuntimeApi.NumParseDisplay(imageExpr, p.Item.ProfileName), p.Item)));
             return;
         }
-        if (p is not RedefViewPlace && !p.Item.StoreAsImage
-            && p.Item.Pic is not { Category: PicCategory.Alphanumeric or PicCategory.National })
-        {
-            w.Line(LoudStmt($"STRING INTO receiver '{p.Item.CobolName}' (usage display or national required, ISO §14.9.43.3 SR1)"));
-            return;
-        }
+        // Every other receiver SR1 and SR5 leave legal is a string of character positions — alphanumeric, national
+        // or USAGE DISPLAY boolean (a string of '0' / '1' characters, ReceivingStore.StorageArea: "display boolean ...
+        // stores the characters as they are") — and the image stores through its own writer. There is no loud arm:
+        // every receiver SR1 refuses (a COMP, PACKED, INDEX, POINTER or BIT item), SR5 refuses (an edited item) or
+        // SR4 refuses (a reference-modified one) is rejected at BIND time (StringUnstringBinder.BindString), so a loud
+        // stage here could only fire on LEGAL source and mislabel it an SR1 violation (kb/Work PB1179: the national
+        // and the USAGE DISPLAY boolean receiver both did).
         w.Line(PlaceRenderer.Write(p, imageExpr));
     }
 }

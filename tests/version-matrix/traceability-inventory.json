@@ -47376,13 +47376,13 @@
   "ordinal": 1,
   "subject": "STRING statement",
   "rule-digest": "97863f04cd93",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/StringUnstringBinder.cs#BindString; src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitString; src/Cobol.Net.Runtime/Verbs/CobolStringOps.cs#StringTransfer",
-  "test-ref": "",
+  "test-ref": "conformance:2023/pb1179_string_receiver_arms; conformance:2023/pb1179_string_into_national_receiver",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1179 (registrar 14c). GR1: literal-2/identifier-2 content delimits; SIZE moves the complete item; SIZE over a dynamic-length identifier-1 moves its CURRENT length. Code: the emitter passes OperandText.AsString(delimiter) as the delimiter string and null for SIZE; the kernel matches the delimiter with ordinal IndexOf. Probe gr1.cob (--std 2023): D1 PIC X DYNAMIC LENGTH LIMIT 8 holding 'XYZ', STRING D1 DELIMITED BY SIZE 'Q' ... POINTER P -> A[XYZQ......] 05 (current length 3, not the limit 8) - correct; S1='AB,CD' DELIMITED BY DD (DD=',') -> D[AB!.......] - correct. cite.py --check 14.9.43.4 'the current length of the data item is used to determine the number of characters moved' -> OK §14.9.43.4 1). PARTIAL: NATIONAL RECEIVER (finding M1): every STRING whose identifier-3 is an elementary item of class national compiles clean and aborts at run time with NotImplementedCobolFeatureException 'STRING INTO receiver ... (usage display required, ISO §14.9.43.3 SR1)' (probe nat2.cob: 01 NS PIC N(4) VALUE N\"AB-C\". 01 NOUT PIC N(8). STRING NS DELIMITED BY SIZE INTO NOUT -> crash at --std 2002/2014/2023), so the national arm of this rule is unverifiable/broken. No spec-derived test pins the dynamic-length SIZE sentence. [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 §14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text); the dynamic-length sentence needs the DYNAMIC LENGTH clause (not at 85)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1179 (registrar 14c; landed w1018h). GR1: literal-2/identifier-2 content delimits; SIZE moves the complete item; SIZE over a dynamic-length identifier-1 moves its CURRENT length. The emitter passes OperandText.AsString(delimiter) as the delimiter string and null for SIZE; the kernel matches the delimiter with ordinal IndexOf. Pinned by pb1179_string_receiver_arms F (D1 PIC X DYNAMIC LENGTH LIMIT 8 holding 'XYZ', DELIMITED BY SIZE, then 'Q' -> A[XYZQ........] pointer 05: current length 3, not the limit 8) and G (the national twin, UVWQ 05), and by pb1179_string_into_national_receiver B (national delimiter N'-'); a field delimiter keeps its full content (probe S1='AB,CD' DELIMITED BY DD -> AB). cite.py --check 14.9.43.4 'the current length of the data item is used to determine the number of characters moved' -> OK 14.9.43.4 1). The national receiver arm that used to abort is gone (WriteImage). [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 section 14.9.43); Annex E lists no STRING change 2014->2023; the dynamic-length sentence needs the DYNAMIC LENGTH clause (not at 85)]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.43.4-2",
@@ -47451,13 +47451,13 @@
   "ordinal": 6,
   "subject": "STRING statement",
   "rule-digest": "377ab2dad190",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Verbs/CobolStringOps.cs#StringTransfer; src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitString",
-  "test-ref": "conformance:85/pb664_string_operand_screen",
+  "test-ref": "conformance:85/pb664_string_operand_screen; conformance:2023/pb1179_string_receiver_arms; conformance:2023/pb1179_string_into_national_receiver",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1179 (registrar 14c). GR6: characters move one at a time into the position designated by identifier-4, which increases by one per character and is changed by nothing else. Kernel: chars[pointer-1]=source[j]; pointer++ per character; the emitter writes the pointer back once, BEFORE the ON/NOT ON OVERFLOW phrases (so imperative-statement-1 sees the advanced value). Probes: gr8.cob C (P=4, 'XYZ' 'QQ' into X(5)) -> ON OVERFLOW sees P=6 ('0F'), receiver '...XY'; gr8 A/B: no characters moved -> P unchanged; pb664 L1 PTR4 1->0003; pb871 STR3 (dynamic receiver) 5->6. PARTIAL: the same positions for a national identifier-3 are never reached - NATIONAL RECEIVER (finding M1): every STRING whose identifier-3 is an elementary item of class national compiles clean and aborts at run time with NotImplementedCobolFeatureException 'STRING INTO receiver ... (usage display required, ISO §14.9.43.3 SR1)' (probe nat2.cob: 01 NS PIC N(4) VALUE N\"AB-C\". 01 NOUT PIC N(8). STRING NS DELIMITED BY SIZE INTO NOUT -> crash at --std 2002/2014/2023), so the national arm of this rule is unverifiable/broken. [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 §14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1179 (registrar 14c; landed w1018h). GR6: characters move one at a time into the position designated by identifier-4, which increases by one per character and is changed by nothing else. Kernel: chars[pointer-1]=source[j]; pointer++ per character; the emitter writes the pointer back once, BEFORE the ON/NOT ON OVERFLOW phrases (so imperative-statement-1 sees the advanced value) and only when a character moved. Probes: gr8.cob C (P=4, 'XYZ' 'QQ' into X(5)) -> ON OVERFLOW sees P=6, receiver '...XY'; pb664 L1 PTR4 1->0003; pb871 STR3 (dynamic receiver) 5->6. The national identifier-3 arm: pb1179_string_into_national_receiver C (pointer 3 into N(8) -> pointer 07) and pb1179_string_receiver_arms A/B/C/D (national N(3): pointer 1 -> 04 with the overflow before the fourth character; pointer 0 stays 00; pointer 2 -> 04). [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 section 14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text)]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.43.4-7",
@@ -47466,13 +47466,13 @@
   "ordinal": 7,
   "subject": "STRING statement",
   "rule-digest": "189aa1412ff1",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitString; src/Cobol.Net.Runtime/Verbs/CobolStringOps.cs#StringTransfer; src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#WriteImage",
-  "test-ref": "conformance:2014/pb871_dynamic_length_receivers",
+  "test-ref": "conformance:2014/pb871_dynamic_length_receivers; conformance:2023/pb1179_string_receiver_arms; conformance:2023/pb1179_string_into_national_receiver",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1179 (registrar 14c). GR7: only the referenced portion of identifier-3 changes. The emitter materializes the receiver's CURRENT image, the kernel overwrites only moved positions (ToCharArray, no fill), and WriteImage stores the full image back through the receiver's own store (group image / numeric-display decode / alphanumeric). Verified: SpecPinned test (receiver ABCDEF preserved), pb871 golden STR1 [XYCDEFGH], probes numrcv.cob A[5634] B[ABYZ] C[QR57], gr2 dotted tails. PARTIAL: NATIONAL RECEIVER (finding M1): every STRING whose identifier-3 is an elementary item of class national compiles clean and aborts at run time with NotImplementedCobolFeatureException 'STRING INTO receiver ... (usage display required, ISO §14.9.43.3 SR1)' (probe nat2.cob: 01 NS PIC N(4) VALUE N\"AB-C\". 01 NOUT PIC N(8). STRING NS DELIMITED BY SIZE INTO NOUT -> crash at --std 2002/2014/2023), so the national arm of this rule is unverifiable/broken. [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 §14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1179 (registrar 14c; landed w1018h). GR7: only the referenced portion of identifier-3 changes. The emitter materializes the receiver's CURRENT image, the kernel overwrites only moved positions (ToCharArray, no fill), and WriteImage stores the full image back through the receiver's own store (group image / numeric-display decode / the image writer for an alphanumeric, NATIONAL or USAGE DISPLAY boolean receiver). There is no loud arm: every receiver SR1/SR4/SR5 refuse is rejected at bind, so the run-time stage that mislabelled legal national AND legal display-boolean receivers as an SR1 violation is deleted. Verified: pb871 golden STR1 [XYCDEFGH]; pb1179_string_into_national_receiver A/B/C/G/F (national unwritten positions kept, GROUP-USAGE NATIONAL receiver, national figurative); pb1179_string_receiver_arms C (.XY), E (A2345), H (dynamic national CDEF) and I (boolean B'101' into PIC 1(8) -> 10100000). [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 section 14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text)]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.43.4-8",
@@ -47481,13 +47481,13 @@
   "ordinal": 8,
   "subject": "STRING statement",
   "rule-digest": "5d2642861c7a",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Verbs/CobolStringOps.cs#StringTransfer; src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitString; src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs#EmitOverflow",
-  "test-ref": "conformance-test:StringUnstringDifferentialTests.String_PointerBelowOne_OverflowsWithoutTransfer_SpecPinned; conformance-test:ExceptionConditionConformanceTests.StringOverflow_NoPhrase_RaisesEcOverflowString",
+  "test-ref": "conformance-test:StringUnstringDifferentialTests.String_PointerBelowOne_OverflowsWithoutTransfer_SpecPinned; conformance-test:ExceptionConditionConformanceTests.StringOverflow_NoPhrase_RaisesEcOverflowString; conformance:2023/pb1179_string_receiver_arms",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1179 (registrar 14c). GR8: before EACH character move, pointer < 1 or > size(identifier-3) => a) no further transfer (kernel latches `overflow` and short-circuits every later sender - probe gr8 C: 'QQ' not transferred), b) EC-OVERFLOW-STRING set to exist (EcEmitter.EmitOverflow under enabled checking, per §14.6.13.1.1 NOTE 3 'set to exist only if checking ... is enabled'; ECT017 test prints 'H: EC-OVERFLOW-STRING'), c) ON OVERFLOW runs, explicit transfer honored (probe gr8 G: ON OVERFLOW GO TO P-OUT -> 'G-JUMPED [ABCDE]', statement after END-STRING skipped), d) no phrase -> nonfatal continue (§14.6.13.1.4; ECT017 R=ABC), e) NOT ON OVERFLOW ignored (SpecPinned test, gr8 A). cite.py --check 14.9.43.4 'Before each move of a character to the data item referenced by identifier-3' -> OK §14.9.43.4 8). PARTIAL: NATIONAL RECEIVER (finding M1): every STRING whose identifier-3 is an elementary item of class national compiles clean and aborts at run time with NotImplementedCobolFeatureException 'STRING INTO receiver ... (usage display required, ISO §14.9.43.3 SR1)' (probe nat2.cob: 01 NS PIC N(4) VALUE N\"AB-C\". 01 NOUT PIC N(8). STRING NS DELIMITED BY SIZE INTO NOUT -> crash at --std 2002/2014/2023), so the national arm of this rule is unverifiable/broken. [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 §14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text); b) EC-OVERFLOW-STRING belongs to the exception-condition model (not at 85)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1179 (registrar 14c; landed w1018h). GR8: before EACH character move, pointer < 1 or > size(identifier-3) => a) no further transfer (the kernel latches overflow and short-circuits every later sender - probe gr8 C: 'QQ' not transferred), b) EC-OVERFLOW-STRING set to exist (EcEmitter.EmitOverflow under enabled checking, per section 14.6.13.1.1 NOTE 3), c) ON OVERFLOW runs, explicit transfer honored (probe gr8 G), d) no phrase -> nonfatal continue (14.6.13.1.4; ECT017 R=ABC), e) NOT ON OVERFLOW ignored. cite.py --check 14.9.43.4 'Before each move of a character to the data item referenced by identifier-3' -> OK 14.9.43.4 8). The national arm: pb1179_string_receiver_arms A (N(3) receiver, 'AB-C' from pointer 1: ON OVERFLOW sees AB- and pointer 04), B (pointer 0: no transfer, receiver and pointer unchanged), D (pointer 4 past N(3): overflow before the first move). [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 section 14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text); b) EC-OVERFLOW-STRING belongs to the exception-condition model (not at 85)]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.43.4-9",
@@ -47496,13 +47496,13 @@
   "ordinal": 9,
   "subject": "STRING statement",
   "rule-digest": "b23c0edd341e",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitString",
-  "test-ref": "conformance:85/phrase_order_overflow",
+  "test-ref": "conformance:85/phrase_order_overflow; conformance:2023/pb1179_string_receiver_arms",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1179 (registrar 14c). GR9: no GR8 condition => ON OVERFLOW ignored, NOT ON OVERFLOW runs, then control to end of statement. EmitOverflow: `if (flag) {on} else {not}` / `if (!flag) {not}`. Verified: phrase_order_overflow golden (STR-NOT, both phrase orders), gr2 C (NOV with ON omitted), gr8 B (zero characters moved -> B-NOV). PARTIAL: NATIONAL RECEIVER (finding M1): every STRING whose identifier-3 is an elementary item of class national compiles clean and aborts at run time with NotImplementedCobolFeatureException 'STRING INTO receiver ... (usage display required, ISO §14.9.43.3 SR1)' (probe nat2.cob: 01 NS PIC N(4) VALUE N\"AB-C\". 01 NOUT PIC N(8). STRING NS DELIMITED BY SIZE INTO NOUT -> crash at --std 2002/2014/2023), so the national arm of this rule is unverifiable/broken. [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 §14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1179 (registrar 14c; landed w1018h). GR9: no GR8 condition => ON OVERFLOW ignored, NOT ON OVERFLOW runs, then control to end of statement. EmitOverflow: if (flag) {on} else {not} / if (!flag) {not}. Verified: phrase_order_overflow golden (STR-NOT, both phrase orders), gr2 C (NOV with ON omitted), gr8 B (zero characters moved -> B-NOV); the national arm: pb1179_string_receiver_arms C (pointer 2, 'XY' fills 2-3 of N(3): C-NOV runs, ON OVERFLOW ignored) and E (NOT ON OVERFLOW alone after a delimited transfer into a national receiver). cite.py --check 14.9.43.4 'If, at the time of execution of a STRING statement with the NOT ON OVERFLOW phrase' -> OK 14.9.43.4 9). [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 section 14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text)]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.43.4-10",
