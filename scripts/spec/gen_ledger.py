@@ -305,6 +305,14 @@ def measure_battery(stamp_sha: str) -> dict:
         # two tables.
         legs.append((label, fmt.format(*(f"{int(g.replace(',', '')):,}" for g in mm.groups()))
                      if mm else "not parsed from plan §0", bool(mm)))
+    unread = [label for label, _, ok in legs if not ok]
+    if unread:
+        # ⛔ A leg the reader cannot find shows as UNREAD on the owner's page, and the page cannot say WHY. The bullet is
+        # hand-written, so say it here, where whoever regenerates the page is looking (2026-10-05: the differential row
+        # read UNREAD for two batteries because the bullet said `GnuCOBOL differential: 1323 cases, 43 per-case flips`).
+        shapes = "; ".join(f"{label}: /{rx}/" for label, rx, _ in BATTERY_LEGS if label in unread)
+        print(f"⛔ battery #{n.group(1)}: the CURRENT bullet in plan §0 does not carry {', '.join(unread)} in the shape "
+              f"this reader parses. Reword the bullet to match: {shapes}", file=sys.stderr)
     totals = re.search(r"totals unchanged at\s*\n?\s*([\d/]+)", blk)
     # Measured to the STAMP commit, not to HEAD: "is a battery owed" must not answer differently because a
     # session happened to have an unrelated WIP commit on top.
