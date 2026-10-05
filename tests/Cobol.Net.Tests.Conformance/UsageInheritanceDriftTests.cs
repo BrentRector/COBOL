@@ -105,15 +105,6 @@ public sealed class UsageInheritanceDriftTests
         return codes.Count > 0 ? string.Join(",", codes) : "OK " + stdout.Trim();
     }
 
-    /// <summary>Is this verdict one where the compiler refuses the USAGE KEYWORD ITSELF, before the item can
-    /// acquire a <see cref="PicInfo"/> model at all? Two codes say so and they are ONE situation, not two:
-    /// COBOLNET0899 (recognized but STAGED — today USAGE FUNCTION-POINTER, waiting on the P13 prototype
-    /// registry) and COBOLNET1943 (recognized and DECLINED — USAGE MESSAGE-TAG, Annex A.3 item 4, kb/Work
-    /// PB487). ⛔ A PREDICATE, deliberately, not a check written inline twice: the situation is what the
-    /// carve-outs below are about, and the next refused keyword joins it here in one place.</summary>
-    private static bool KeywordRefused(string verdict) =>
-        verdict.Contains("COBOLNET0899") || verdict.Contains("COBOLNET1943");
-
     private static string Program(string id, string ws) =>
         $"""
          IDENTIFICATION DIVISION.
@@ -157,22 +148,6 @@ public sealed class UsageInheritanceDriftTests
             string dv = Verdict(direct), iv = Verdict(inherited);
             string label = $"{clause} / {(pic.Length == 0 ? "(no picture)" : pic)}";
 
-            // A usage whose KEYWORD the compiler refuses — STAGED (COBOLNET0899, USAGE FUNCTION-POINTER, whose
-            // representation waits on the P13 prototype registry) or DECLINED (COBOLNET1943, USAGE MESSAGE-TAG,
-            // Annex A.3 item 4) — has no PicInfo model of its own, so the item it describes does not exist on
-            // EITHER arm and the codes past the refusal are not comparable: §13.18.60.3 SR14's elementary arm
-            // keys on the resolved class, which such a usage has none of, so it fires on the group spelling
-            // (from the WRITTEN clause) and not on the elementary one. That asymmetry belongs to the refusal,
-            // not to GR1 — it is registered as kb/Work PB819, whose fix shape is arm B keying on the written or
-            // inherited PHRASE, and DataBinder.UsageDeclaration's Sr14PhraseOf documents it at the site.
-            // Assert what GR1 does require here: both spellings are refused.
-            if (KeywordRefused(dv) || KeywordRefused(iv))
-            {
-                Assert.True(dv.StartsWith("COBOL") && iv.StartsWith("COBOL"),
-                    $"{label}: a usage whose keyword is refused must be refused on BOTH spellings — direct {dv}, "
-                    + $"inherited {iv}");
-                continue;
-            }
             Assert.Equal($"{label} → {dv}", $"{label} → {iv}");
         }
     }
@@ -188,10 +163,12 @@ public sealed class UsageInheritanceDriftTests
     ///
     /// <para>Some members are excluded because the compiler refuses the KEYWORD before any picture rule is
     /// reached, so neither spelling is evidence about SR8: FLOAT-BINARY-128 and FLOAT-DECIMAL-16/-34 are
-    /// documented processor-dependent non-support (COBOLNET1564, Annex A.3 items 17/19), FUNCTION-POINTER stages
-    /// loud pending the P13 prototype registry, and MESSAGE-TAG is declined non-support (COBOLNET1943, Annex A.3
-    /// item 4, kb/Work PB487). They are named by PREDICATE — <see cref="KeywordRefused"/> and the 1564 test —
-    /// never by list, so a member that later lands is tested automatically.</para>
+    /// documented processor-dependent non-support (COBOLNET1564, Annex A.3 items 17/19), and the five pointer/object
+    /// phrases (MESSAGE-TAG, declined non-support COBOLNET1943, Annex A.3 item 4, kb/Work PB487, among them) are
+    /// refused by §13.18.60.3 SR14 at level 05 whatever the picture — which they are on BOTH spellings since
+    /// kb/Work PB819 made the elementary arm read the phrase, so no carve-out for a refused keyword remains in the
+    /// GR1 equivalence above. They are named by PREDICATE — the 1564 test and the 1724 test — never by list, so a
+    /// member that later lands is tested automatically.</para>
     ///
     /// <para>The second sentence's arm is asserted only in the picture-less direction (a picture-less item of a
     /// picture-less usage compiles). Its converse — a picture-REQUIRING usage with no picture — is kb/Work
@@ -206,9 +183,9 @@ public sealed class UsageInheritanceDriftTests
         string withPicture = Verdict(Program($"S8P{tag}", $"01 G.\n    05 A PIC 9(4) USAGE {word}."));
         string without = Verdict(Program($"S8N{tag}", $"01 G.\n    05 A USAGE {word}."));
 
-        // The keyword itself refused (documented non-support COBOLNET1564, or staged / declined — see
-        // KeywordRefused): neither spelling is SR8 evidence, because no picture rule is ever reached.
-        if (withPicture.Contains("COBOLNET1564") || KeywordRefused(withPicture)) return;
+        // The keyword itself refused (documented non-support COBOLNET1564): neither spelling is SR8 evidence,
+        // because no picture rule is ever reached.
+        if (withPicture.Contains("COBOLNET1564")) return;
         // §13.18.60.3 SR14 refuses the five pointer/object phrases at level 05 whatever the picture — the
         // placement rule fires first, so again neither spelling is SR8 evidence here.
         if (withPicture.Contains("COBOLNET1724") && without.Contains("COBOLNET1724")) return;

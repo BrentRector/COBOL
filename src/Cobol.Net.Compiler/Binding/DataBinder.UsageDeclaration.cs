@@ -185,12 +185,16 @@ public sealed partial class DataBinder
                 continue;
             }
 
-            // ARM B — an ELEMENTARY item of one of SR14's classes, however it acquired the usage.
-            if (!Sr14Elementary(item) || !Sr14PlacementClass(item)) continue;
+            // ARM B — an ELEMENTARY item that carries one of SR14's usage phrases, however it acquired it. ⛔ BOTH ARMS
+            // READ THE SAME SOURCE OF TRUTH, the phrase (Sr14PhraseOf: the written clause, else the resolved profile's
+            // usage), never the resolved CATEGORY (kb/Work PB819): a usage the compiler refuses by name — MESSAGE-TAG,
+            // declined non-support — binds a recovery profile with no class, so a class-keyed arm B never saw
+            // `05 A USAGE MESSAGE-TAG.` inside an ordinary group while arm A reported its group spelling.
+            if (!Sr14Elementary(item) || Sr14PhraseOf(item) is not { } phraseB) continue;
             if (Sr14PermittedLevel(item.Level) || UnderStrongTypeDeclaration(item)) continue;
 
             Edition.Error(DiagnosticCatalog.UsageDeclarationPlacement, $"data item '{name}' is described with "
-                + $"USAGE {Sr14PhraseNameOf(item)} at level {item.Level:00}, subordinate to "
+                + $"USAGE {phraseB} at level {item.Level:00}, subordinate to "
                 + $"'{item.Parent?.CobolName ?? "FILLER"}', which is not a type declaration that includes the "
                 + $"STRONG phrase — a USAGE clause with the {Sr14PhraseList} phrase may be specified only for "
                 + "an elementary data item at level 1 or an elementary data item subordinate to a type "
@@ -258,37 +262,32 @@ public sealed partial class DataBinder
     private const string Sr14PhraseList = "MESSAGE-TAG, OBJECT REFERENCE, POINTER, FUNCTION-POINTER, or "
         + "PROGRAM-POINTER";
 
-    /// <summary>The classes ISO §13.18.60.3 SR14's five USAGE phrases produce (§8.5.2): class object
-    /// (OBJECT REFERENCE), class pointer (POINTER / PROGRAM-POINTER / FUNCTION-POINTER) and class message-tag
-    /// (MESSAGE-TAG). ⛔ CLASS INDEX IS NOT AMONG THEM — SR14 names five phrases where the neighbouring SR4
-    /// names six, and the omission of INDEX is the difference; see <see cref="Sr4ConstantRecordUsage"/>.
-    ///
-    /// <para>This is deliberately the SAME population as <c>PointerObjectClass</c>, the §13.18.44.3 SR12/SR14
-    /// REDEFINES class test (kb/Work PB179): that rule names the classes ("class object, message-tag, or
-    /// pointer") and this one names the phrases that produce exactly those classes, so the two screens resolve
-    /// their class question through ONE predicate and cannot drift apart as MESSAGE-TAG and FUNCTION-POINTER
-    /// gain models. A unit pin asserts the identity.</para></summary>
-    private static bool Sr14PlacementClass(DataItem d) => PointerObjectClass(d);
+    /// <summary>⛔ THE ONE SOURCE OF TRUTH FOR "WHICH OF SR14's FIVE PHRASES DOES THIS ITEM CARRY" (kb/Work PB819): the
+    /// item's own WRITTEN usage clause when it wrote one, else the usage of its resolved profile — a usage acquired
+    /// by §13.18.60.4 GR1 inheritance, a TYPE clone or a SAME AS copy has no written clause of its own and is visible
+    /// only there. Null for every other usage, INDEX included (SR14 names five phrases where SR4 names six; see
+    /// <see cref="Sr4ConstantRecordUsage"/>).
+    /// <para>It asks the PHRASE and never the resolved CATEGORY, because the rule is written over the phrase
+    /// ("A USAGE clause with the MESSAGE-TAG, OBJECT REFERENCE, POINTER, FUNCTION-POINTER, or PROGRAM-POINTER
+    /// phrase") and a usage the compiler REFUSES by name (MESSAGE-TAG, declined non-support, COBOLNET1943) binds a
+    /// recovery profile whose category is no analysis: arm B used to key on the class
+    /// (<c>PointerObjectClass</c>, the §13.18.44.3 REDEFINES screen's predicate), so it was blind to exactly the usages
+    /// whose keyword is refused while arm A, reading the written clause, still reported them — a staged or declined
+    /// usage took a different path from a landed one. FUNCTION-POINTER was the first such cell and gained a model
+    /// (kb/Work PB817); MESSAGE-TAG is the live one. A usage added tomorrow is covered by
+    /// <see cref="ItemCategory.Sr14PhraseOf(Usage?)"/>'s recorded verdict
+    /// (<c>UsageDeclarationPlacementDriftTests</c>) instead of by this screen's author remembering it.</para></summary>
+    private static string? Sr14PhraseOf(DataItem d) =>
+        ItemCategory.Sr14PhraseOf(d.OwnUsage) ?? ItemCategory.Sr14PhraseOf(d.Pic?.Usage);
 
-    /// <summary>The phrase to NAME in arm B's message: the item's own written clause when it wrote one, else
-    /// the phrase its resolved class implies — a usage acquired by §13.18.60.4 GR1 inheritance, a TYPE clone or
-    /// a SAME AS copy has no written clause of its own, and a message that said "described with USAGE &lt;null&gt;"
-    /// would name a clause the user cannot find.
-    /// <para>⛔ The fall-through says so rather than GUESSING a phrase. It is unreachable while
-    /// <see cref="Sr14PlacementClass"/> is the caller's guard — every class it admits is named above — and a
-    /// default of "POINTER" would make the ONE symptom of the predicate having been widened wrongly (an INDEX
-    /// item reported as a pointer) look like an ordinary correct verdict. Measured: with the predicate
-    /// deliberately widened to SR4's six-usage list, that default reported <c>05 IX USAGE INDEX.</c> as
-    /// "described with USAGE POINTER". A message that cannot be false is worth one arm.</para></summary>
-    private static string Sr14PhraseNameOf(DataItem d) => ItemCategory.Sr14PhraseOf(d.OwnUsage) ?? d.Pic?.Category switch
-    {
-        PicCategory.Pointer => "POINTER",
-        PicCategory.ProgramPointer => "PROGRAM-POINTER",
-        PicCategory.FunctionPointer => "FUNCTION-POINTER",
-        PicCategory.ObjectReference => "OBJECT REFERENCE",
-        var c => $"an unnamed usage of class {c?.ToString() ?? "(none)"} — this is a compiler defect: the "
-            + "§13.18.60.3 SR14 class predicate admitted a category this message does not name",
-    };
+    /// <summary>The phrase to NAME for an item the callers already know is slot-carried (class object or pointer):
+    /// <see cref="Sr14PhraseOf(DataItem)"/>, with a fall-through that says so rather than GUESSING a phrase — it is
+    /// unreachable for a slot-carried item (every slot category's profile carries its usage), and a default of
+    /// "POINTER" would make the one symptom of that invariant breaking look like an ordinary correct verdict.
+    /// A message that cannot be false is worth one arm.</summary>
+    private static string Sr14PhraseNameOf(DataItem d) => Sr14PhraseOf(d)
+        ?? $"an unnamed usage of class {d.Pic?.Category.ToString() ?? "(none)"} — this is a compiler defect: a "
+            + "slot-carried item whose profile names no §13.18.60.3 SR14 usage";
 
     /// <summary>SR14's "at level 1" arm. ⛔ 77 SATISFIES IT — see this file's header for the derivation
     /// (§8.5.1.3.2 "no true concept of level"; §13.11.1 makes the level-1 and level-77 spellings alternatives

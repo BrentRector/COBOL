@@ -246,11 +246,10 @@ public static class ItemCategory
     /// INDEX. A second copy would drift the moment MESSAGE-TAG or FUNCTION-POINTER gains a bound model;
     /// <c>ConditionNameAssociationDriftTests</c> asserts the two populations are the same set.</para>
     /// <para>The WRITTEN clause is read as well as the resolved one, and both arms are load-bearing: a
-    /// MESSAGE-TAG entry is refused non-support by <c>PictureAnalyzer.ParseUsage</c> (COBOLNET1943) and a
-    /// FUNCTION-POINTER entry is staged there, so neither gains a <see cref="PicInfo"/> at all and only
-    /// <see cref="DataItem.OwnUsage"/> sees them — while a usage acquired by §13.18.60.4 GR1 inheritance, a TYPE
-    /// clone or a SAME AS copy writes no clause of its own and is visible only in the resolved
-    /// <see cref="DataItem.Pic"/>.</para></summary>
+    /// MESSAGE-TAG entry is refused non-support by <c>PictureAnalyzer.ParseUsage</c> (COBOLNET1943) and binds a
+    /// recovery <see cref="PicInfo"/> (no class), so its WRITTEN clause is the reliable witness — while a usage
+    /// acquired by §13.18.60.4 GR1 inheritance, a TYPE clone or a SAME AS copy writes no clause of its own and is
+    /// visible only in the resolved <see cref="DataItem.Pic"/>.</para></summary>
     public static bool IsIndexMessageTagObjectOrPointer(DataItem item) =>
         Sr4PhraseOf(item.OwnUsage) is not null || Sr4PhraseOf(item.Pic?.Usage) is not null;
 
@@ -279,11 +278,11 @@ public static class ItemCategory
     public static bool IsMessageTag(DataItem item) =>
         item.OwnUsage is Usage.MessageTag || item.Pic?.Usage is Usage.MessageTag;
 
-    /// <summary>Which of ISO §13.18.60.3 SR14's phrases a <see cref="DataItem.OwnUsage"/> names, or null.
-    /// FUNCTION-POINTER is included: <c>PictureAnalyzer.ParseUsage</c> stages it loud (the P13 prototype band)
-    /// so its <c>Pic</c> stays null and a resolved-usage arm never sees it, but the written clause is still
-    /// visible here and the rule governs it. MESSAGE-TAG (kb/Work PB487) is the SECOND member in that position,
-    /// for the same reason by a different route — the usage is declined non-support and refused by name.
+    /// <summary>Which of ISO §13.18.60.3 SR14's phrases a usage names, or null — asked of a
+    /// <see cref="DataItem.OwnUsage"/> (the written clause) and of a resolved <see cref="PicInfo.Usage"/> alike
+    /// (<c>DataBinder.Sr14PhraseOf(DataItem)</c> reads both, kb/Work PB819). MESSAGE-TAG (kb/Work PB487) is the member
+    /// the compiler refuses BY NAME (declined non-support, COBOLNET1943): its profile is a recovery shape with no
+    /// class, so only the usage — never the category — identifies it.
     /// <para>SR14: "A USAGE clause with the MESSAGE-TAG, OBJECT REFERENCE, POINTER, FUNCTION-POINTER, or
     /// PROGRAM-POINTER phrase may be specified only for an elementary data item at level 1 or an elementary data
     /// item subordinate to a type declaration that includes the STRONG phrase."</para></summary>

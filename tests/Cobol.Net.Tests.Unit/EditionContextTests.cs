@@ -58,6 +58,28 @@ public sealed class EditionContextTests
         Assert.True(ed.HasErrors);
     }
 
+    /// <summary>ISO §13.18.40.3 SR14 — "the number of digit positions described by character-string-1 shall range
+    /// from 1 through 31": BOTH ends are asked by the ONE screen (kb/Work PB529). The lower bound is reached from
+    /// source by <c>PIC LL EDITING L IS ":"</c> (<c>negative/pb529-picture-editing-no-digit-position</c>); the
+    /// screen itself is witnessed here on every edition's capacity, COBOL-85's 18 included.</summary>
+    [Theory]
+    [InlineData(2023, 0, "COBOLNET2882")]
+    [InlineData(85, 0, "COBOLNET2882")]
+    [InlineData(2023, 1, null)]
+    [InlineData(2023, 31, null)]
+    [InlineData(2023, 32, "COBOLNET0801")]
+    [InlineData(85, 18, null)]
+    [InlineData(85, 19, "COBOLNET0802")]
+    public void CheckDigitCapacity_AsksSr14sRangeAtBothEnds(int edition, int digits, string? code)
+    {
+        var ed = new EditionContext(edition);
+        ed.CheckDigitCapacity(digits, "data item 'X' (PICTURE Q)");
+        if (code is null)
+            Assert.False(ed.HasErrors);
+        else
+            Assert.Contains(ed.Diagnostics, d => d.Contains($"error {code}:", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Driver_CarriesWarnings_OnSuccess()
     {

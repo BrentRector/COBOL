@@ -2631,11 +2631,18 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// capacity is SR15's 1..36 significand digits, checked by the analyzer (kb/Work PB66 — DigitPositions is 0
     /// there). A report group entry's PICTURE is "the same clause" as a data description entry's (§13.15.4 GR2), so
     /// both binders ask it HERE (kb/Work PB1687: the report entry binder never asked, and `PIC 9(20) SUM …` compiled
-    /// at COBOL-85).</summary>
-    private void ScreenPictureDigitCapacity(PicInfo? pic, string what)
+    /// at COBOL-85).
+    /// <para>⛔ THE SCREEN'S DOMAIN IS NAMED POSITIVELY (kb/Work PB529): an ANALYSED picture
+    /// (<see cref="PicInfo.AnalyzedCategory"/> is null for a recovery profile, whose picture was already rejected) of
+    /// category numeric or fixed-point numeric-edited, and a WRITTEN one — the callers pass only an entry that carries
+    /// a PICTURE clause, so a PICTURE-less usage (INDEX, the pointers: category numeric, no digit position, no PICTURE
+    /// for SR14 to speak of) is out of the domain by construction. The screen used to be skipped on
+    /// <c>DigitPositions &gt; 0</c>, so the very count SR14's lower bound forbids was the one that skipped the
+    /// check.</para></summary>
+    private void ScreenPictureDigitCapacity(PicInfo pic, string what)
     {
-        if (pic is { Category: PicCategory.Numeric or PicCategory.NumericEdited, IsFloat: false, IsFloatEdited: false }
-            && pic.DigitPositions > 0)
+        if (pic is { IsFloat: false, IsFloatEdited: false }
+            && pic.AnalyzedCategory is PicCategory.Numeric or PicCategory.NumericEdited)
             Edition.CheckDigitCapacity(pic.DigitPositions, what);
     }
 
@@ -5369,7 +5376,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // Digits check let slip past. DigitPositions == Digits for pure-numeric-without-P, so no regression. (CA33.)
         // §13.18.40.3 SR14 reaches category numeric and FIXED-POINT numeric-edited items; the floating-point form's
         // capacity is SR15's 1..36 significand digits, checked by the analyzer (kb/Work PB66 — DigitPositions is 0 there).
-        ScreenPictureDigitCapacity(pic, $"data item '{cobolName ?? "FILLER"}' (PICTURE {pictureText})");
+        if (pictureText is not null && pic is not null)
+            ScreenPictureDigitCapacity(pic, $"data item '{cobolName ?? "FILLER"}' (PICTURE {pictureText})");
         // (§13.18.52.3 SR1/SR2 — the SIGN clause's subject — is CheckSignClauses, post-forest: the float-edited
         // special case that used to stand here is its numeric-edited arm, kb/Work PB537.)
         // §13.16.3 SR19 — the SIGN clause shall not be specified with a format-2 (LOCALE) PICTURE: the sign
@@ -6698,7 +6706,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         if (item.Pic is not { } pic || pic.IsRecovery || pic.Usage == effective) return;
         var screened = PictureAnalyzer.ScreenUsageAgainstPicture(pic.Category, effective, explicitUsage: true,
-            item.PictureText ?? "", Edition, $"data item '{item.CobolName ?? "FILLER"}'");
+            item.PictureText ?? "", Edition, $"data item '{item.CobolName ?? "FILLER"}'", pic.CurrencyClass);
         if (screened != pic.Usage)
             item.Pic = pic with
             {
@@ -7391,16 +7399,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     // COBOLNET1525 arm. Two spellings of one walk collapsed into the predicate the standard actually defines.)
 
     /// <summary>The §13.18.44.3 SR12/SR14 class test (kb/Work PB179): object/pointer classes occupy no
-    /// character positions and can neither overlay nor be overlaid. Message-tag has no bound model yet;
-    /// a USAGE FUNCTION-POINTER entry's semantics are staged at declaration (the P13 band — its Pic stays
-    /// null), so it never reaches the class machinery live.
-    /// <para>⛔ THE ONE CLASS PREDICATE FOR BOTH SCREENS. §13.18.60.3 SR14's declaration-placement screen
-    /// (<c>DataBinder.UsageDeclaration.cs</c>, kb/Work PB183) resolves its class question through this same
-    /// method — see <c>Sr14PlacementClass</c>. The two rules spell the population differently (SR12/SR14 name
-    /// the CLASSES "class object, message-tag, or pointer"; §13.18.60.3 SR14 names the five USAGE PHRASES that
-    /// produce exactly those classes) and a second hand-written list would drift the moment MESSAGE-TAG or
-    /// FUNCTION-POINTER gains a model. A unit pin asserts the identity. ⛔ CLASS INDEX IS NOT HERE and must
-    /// never be added: §13.18.60.3 SR4 is the rule whose list includes INDEX, and it has its own predicate.
+    /// character positions and can neither overlay nor be overlaid. Message-tag has no bound model (declined
+    /// non-support, COBOLNET1943), so it is never of a class here.
+    /// <para>⛔ CLASS INDEX IS NOT HERE and must never be added: §13.18.60.3 SR4 is the rule whose list includes
+    /// INDEX, and it has its own predicate. §13.18.60.3 SR14's declaration-placement screen
+    /// (<c>DataBinder.UsageDeclaration.cs</c>) does NOT ask this CLASS question: SR14 is written over the five USAGE
+    /// PHRASES, so it reads the phrase (<c>Sr14PhraseOf</c>), which sees a usage the compiler refuses by name
+    /// where a class cannot (kb/Work PB819). <c>UsageDeclarationPlacementDriftTests</c> pins the two readers'
+    /// agreement on every profile that has a class.
     /// </para>
     /// <para>⛔ AND IT IS NOW THE STORAGE PREDICATE TOO. <see cref="SlotWindow.CarriedBySlot"/> — "does this
     /// member ride the storage area's MANAGED SLOTS rather than its bytes?" (kb/Work PB231, the pointer third)

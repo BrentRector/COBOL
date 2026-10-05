@@ -289,10 +289,25 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
         else Warning(d.Code, d.Message);
     }
 
-    /// <summary>Check a fixed-point digit-position count against the edition cap (ISO §8.3.3.3.2 / §13.18.40):
-    /// 19–31 digits require COBOL-2002+; more than 31 is invalid at every edition.</summary>
+    /// <summary>⛔ THE ONE HOME OF SR14's RANGE, BOTH ENDS (ISO §13.18.40.3 SR14: "the number of digit positions
+    /// described by character-string-1 shall range from 1 through 31"; kb/Work PB529): fewer than one is
+    /// <see cref="DiagnosticCatalog.DigitCapacityUnder1"/>, 19–31 digits require COBOL-2002+ (COBOL-85's own limit
+    /// is 18, §8.3.3.3.2), more than 31 is invalid at every edition. The lower bound used to be the CALLER's skip
+    /// guard (<c>DigitPositions &gt; 0</c>), which made the exact condition SR14 forbids the condition that skipped
+    /// its check. The composition validator's SR12 a) (COBOLNET1934) stops most digit-position-less pictures first
+    /// (<c>PIC S</c>, <c>PIC V</c>, a lone <c>$</c>), but not <c>PIC LL EDITING L IS ":"</c>: two simple insertion
+    /// character-1 satisfy SR12 a's "at least two occurrences of … character-1" and describe NO digit position, which
+    /// was the live exemption the old guard carried (pinned by <c>pb528_picture_editing_transparency_2023</c> until
+    /// kb/Work PB529). Here is where SR14 itself refuses it.</summary>
     public void CheckDigitCapacity(int digits, string what)
     {
+        if (digits < 1)
+        {
+            Error(DiagnosticCatalog.DigitCapacityUnder1, $"{what} has {digits} digit positions; the number of digit "
+                + "positions of a numeric or fixed-point numeric-edited item shall range from 1 through 31 "
+                + "(ISO §13.18.40.3 SR14)");
+            return;
+        }
         if (digits <= MaxDigits) return;
         if (digits > 31)
             Error("COBOLNET0801", $"{what} has {digits} digit positions; ISO/IEC 1989 limits fixed-point items "

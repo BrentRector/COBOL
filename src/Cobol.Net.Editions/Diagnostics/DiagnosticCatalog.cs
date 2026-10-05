@@ -74,6 +74,14 @@ public static class DiagnosticCatalog
     public static readonly DiagnosticDescriptor DigitCapacityOver31 = new(
         "COBOLNET0801", "digit-capacity-over-31", EditionSeverity.Error,
         "A fixed-point item/literal exceeds the 31-digit ISO limit.", "ISO §8.3.3.3.2");
+    public static readonly DiagnosticDescriptor DigitCapacityUnder1 = new(
+        "COBOLNET2882", "digit-capacity-under-1", EditionSeverity.Error,
+        "A numeric or fixed-point numeric-edited PICTURE describes no digit position (SR14's range starts at 1).",
+        "ISO §13.18.40.3 SR14");
+    public static readonly DiagnosticDescriptor CurrencySymbolClassUsage = new(
+        "COBOLNET2883", "currency-symbol-class-usage", EditionSeverity.Error,
+        "A currency symbol defined by an alphanumeric literal-7 defines a numeric-edited item with usage national, or one "
+        + "defined by a national literal-7 defines one with usage display.", "ISO §12.3.7.3 SR28");
     // ── The §8.3.2.1 word-length ceiling — ONE rule (CobolWordRule), reported from the tree-walk funnel
     //    (VersionConformancePass.VisitCobolWord) AND the directive stages (>>TURN operands, >>DEFINE names),
     //    which never reach the tree walk (kb/Work R05's sweep). ─────────────────────────────────────────

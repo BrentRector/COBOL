@@ -2348,7 +2348,12 @@
   "pb1265-occurs-to-without-depending",
   "pb1265-occurs-step-in-working-storage",
   "pb1265-occurs-dynamic-phrase-repeated",
-  "pb1265-occurs-dynamic-phrases-reordered"
+  "pb1265-occurs-dynamic-phrases-reordered",
+  "pb529-picture-no-digit-position",
+  "pb533-picture-editing-extended-letter",
+  "pb819-usage-message-tag-elementary",
+  "pb1089-currency-symbol-literal7-class-usage",
+  "pb529-picture-editing-no-digit-position"
  ],
  "pending": []
 }

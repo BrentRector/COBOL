@@ -40,7 +40,7 @@ public sealed class UsageDeclarationPlacementDriftTests
     private static string? Sr14PhraseOf(Usage? u) => ItemCategory.Sr14PhraseOf(u);
     private static string? Sr4PhraseOf(Usage? u) => ItemCategory.Sr4PhraseOf(u);
     private static bool PointerObjectClass(DataItem d) => (bool)M("PointerObjectClass").Invoke(null, [d])!;
-    private static bool Sr14PlacementClass(DataItem d) => (bool)M("Sr14PlacementClass").Invoke(null, [d])!;
+    private static string? Sr14PhraseOf(DataItem d) => (string?)M("Sr14PhraseOf").Invoke(null, [d]);
 
     /// <summary>The recorded §13.18.60.3 verdict for EVERY <see cref="Usage"/> member: the SR14 phrase name the
     /// screen must report, or null when the rule does not name that usage. Keyed by the enum member's NAME so
@@ -63,9 +63,8 @@ public sealed class UsageDeclarationPlacementDriftTests
         ["Bit"] = null,
         ["Pointer"] = "POINTER",
         ["ProgramPointer"] = "PROGRAM-POINTER",
-        // FUNCTION-POINTER is recognized and staged loud at ParseUsage (the P13 prototype band), so its PicInfo
-        // stays null and the CLASS arm never sees it — but the WRITTEN clause is visible to the screen, and the
-        // rule governs it, so the phrase arm carries it today.
+        // FUNCTION-POINTER has a bound model (kb/Work PB452/PB817: PicInfo.FunctionPointerItem), so BOTH the
+        // written clause and the resolved profile name it.
         ["FunctionPointer"] = "FUNCTION-POINTER",
         ["FloatShort"] = null,
         ["FloatLong"] = null,
@@ -107,7 +106,7 @@ public sealed class UsageDeclarationPlacementDriftTests
     {
         foreach (var u in Enum.GetValues<Usage>())
             Assert.Equal(Sr14Verdict[u.ToString()], Sr14PhraseOf(u));
-        Assert.Null(Sr14PhraseOf(null));
+        Assert.Null(Sr14PhraseOf((Usage?)null));
     }
 
     /// <summary>⛔ THE ANTI-UNIFICATION PIN. SR4's list is SR14's list PLUS INDEX — exactly, and nothing else.
@@ -127,34 +126,53 @@ public sealed class UsageDeclarationPlacementDriftTests
         Assert.Equal("INDEX", Sr4PhraseOf(Usage.Index));
     }
 
-    /// <summary>The two §13.18.60.3-family screens resolve their CLASS question through ONE predicate. PB179's
-    /// REDEFINES screen names the classes ("class object, message-tag, or pointer", §13.18.44.3 SR12/SR14) and
-    /// this screen names the five USAGE phrases that produce exactly those classes — the same population, said
-    /// two ways. Two hand-written lists would drift the moment MESSAGE-TAG gains a model, and that drift is
-    /// invisible in both screens' own tests.</summary>
+    /// <summary>⛔ SR14's SUBJECT IS A USAGE PHRASE, READ FROM THE WRITTEN CLAUSE OR THE RESOLVED PROFILE'S USAGE
+    /// (kb/Work PB819) — never the resolved CATEGORY. The REDEFINES screen of §13.18.44.3 SR12/SR14 (PB179) names
+    /// CLASSES ("class object, message-tag, or pointer") and asks <c>PointerObjectClass</c>; the placement screen
+    /// names the five PHRASES that produce those classes and asks <c>Sr14PhraseOf</c>. On every profile that HAS a
+    /// class the two agree; they differ on exactly one population, the usage the compiler refuses by name, whose
+    /// profile is a recovery shape with no class — which is the cell PB819 closed (arm B was keyed on the class and
+    /// never saw it). A written clause on an item with no profile at all is seen by the phrase reader alone.</summary>
     [Fact]
-    public void Sr14ClassPredicateIsTheRedefinesScreensClassPredicate()
+    public void Sr14PhraseReaderAgreesWithTheClassPredicate_ExceptWhereTheUsageIsRefused()
     {
-        foreach (var cat in Enum.GetValues<PicCategory>())
+        (PicInfo Pic, bool ClassPredicate, string? Phrase)[] profiles =
+        [
+            (PicInfo.PointerItem(), true, "POINTER"),
+            (PicInfo.ProgramPointerItem(), true, "PROGRAM-POINTER"),
+            (PicInfo.FunctionPointerItem("P"), true, "FUNCTION-POINTER"),
+            (PicInfo.ObjectReferenceItem(ObjectRefDescriptor.Universal), true, "OBJECT REFERENCE"),
+            // The refused usage: a recovery profile that carries the WRITTEN usage and no class.
+            (PicInfo.MessageTagRecovery(), false, "MESSAGE-TAG"),
+            (PicInfo.IndexItem, false, null),
+            (new PicInfo(PicCategory.Numeric, Usage.Display, Length: 1, Digits: 1, Scale: 0, Signed: false), false, null),
+            (new PicInfo(PicCategory.Alphanumeric, Usage.Display, Length: 1, Digits: 0, Scale: 0, Signed: false), false, null),
+        ];
+        foreach (var (pic, classPredicate, phrase) in profiles)
         {
-            var item = new DataItem { Level = 5, CsName = "X" };
-            if (cat is not PicCategory.Group)
-                item.Pic = new PicInfo(cat, Usage.Display, Length: 1, Digits: 0, Scale: 0, Signed: false);
-            Assert.Equal(PointerObjectClass(item), Sr14PlacementClass(item));
+            var item = new DataItem { Level = 5, CsName = "X", Pic = pic };
+            Assert.Equal(classPredicate, PointerObjectClass(item));
+            Assert.Equal(phrase, Sr14PhraseOf(item));
         }
-        // And a PICTURE-less group item (Pic null) is in neither.
-        Assert.False(Sr14PlacementClass(new DataItem { Level = 1, CsName = "G" }));
+        // The WRITTEN clause alone (no profile): the phrase reader sees it for every usage the rule names.
+        foreach (var u in Enum.GetValues<Usage>())
+            Assert.Equal(Sr14Verdict[u.ToString()], Sr14PhraseOf(new DataItem { Level = 5, CsName = "X", OwnUsage = u }));
+        // And a PICTURE-less group item (no usage, no profile) is in neither.
+        Assert.Null(Sr14PhraseOf(new DataItem { Level = 1, CsName = "G" }));
+        Assert.False(PointerObjectClass(new DataItem { Level = 1, CsName = "G" }));
     }
 
-    /// <summary>⛔ CLASS INDEX IS NOT IN THE SR14 CLASS SET. An index data item's <c>PicInfo</c> is
-    /// <c>(Numeric, Usage.Index)</c> — its CATEGORY is numeric — so the class predicate must not see it, and
-    /// a "let's add Index for symmetry with SR4" edit fails here before it reaches a user.</summary>
+    /// <summary>⛔ INDEX IS NOT AMONG SR14's PHRASES. An index data item's <c>PicInfo</c> is
+    /// <c>(Numeric, Usage.Index)</c>, and the phrase reader must not name it, so a "let's add Index for symmetry
+    /// with SR4" edit fails here before it reaches a user (written clause AND resolved profile).</summary>
     [Fact]
-    public void IndexIsNotInTheSr14ClassSet()
+    public void IndexIsNotAmongTheSr14Phrases()
     {
-        var ix = new DataItem { Level = 5, CsName = "IX", Pic = PicInfo.IndexItem };
-        Assert.False(Sr14PlacementClass(ix));
-        Assert.False(PointerObjectClass(ix));
+        var resolved = new DataItem { Level = 5, CsName = "IX", Pic = PicInfo.IndexItem };
+        var written = new DataItem { Level = 5, CsName = "IX", OwnUsage = Usage.Index };
+        Assert.Null(Sr14PhraseOf(resolved));
+        Assert.Null(Sr14PhraseOf(written));
+        Assert.False(PointerObjectClass(resolved));
     }
 
     /// <summary>SR14's "at level 1" arm, as ONE named predicate — and the recorded determination that a level-77

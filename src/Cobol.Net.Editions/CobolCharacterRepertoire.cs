@@ -53,7 +53,15 @@ public static partial class CobolCharacterRepertoire
     /// digits, hyphen and underscore is an extended letter — a combining mark or a digit of another script included —
     /// so every character outside the basic repertoire counts; whether the edition's Annex B holds it is
     /// <see cref="Violation"/>'s question.</summary>
-    public static bool IsLetter(char c) => c < 0x80 ? char.IsAsciiLetter(c) : IsWordCharacter(c);
+    public static bool IsLetter(char c) => IsBasicLetter(c) || (c >= 0x80 && IsWordCharacter(c));
+
+    /// <summary>⛔ THE ONE BASIC-LETTER PREDICATE: the basic letters of §8.1.3.1 Table 1 are the Latin letters
+    /// A–Z and a–z and nothing else — an extended letter (Annex B; §8.1.3.2 GR4) is a DISTINCT row of the same table,
+    /// so "any basic letter in the COBOL character set" (§13.18.40.3 SR8, a PICTURE EDITING phrase's character-1)
+    /// excludes every one of them (kb/Work PB533). <see cref="char.IsLetter(char)"/> is NOT this question: it admits
+    /// every Unicode letter, which is the word-character question's superset
+    /// (<see cref="IsLetter"/>/<see cref="IsWordCharacter"/>), and a rule that says "basic" shall not ask it.</summary>
+    public static bool IsBasicLetter(char c) => char.IsAsciiLetter(c);
 
     /// <summary>The SHAPE of a COBOL word (§8.3.2.1), as every text-stage word reader asks it: one or more
     /// <see cref="IsWordCharacter"/> characters, "The hyphen or underscore shall not appear as the first or last

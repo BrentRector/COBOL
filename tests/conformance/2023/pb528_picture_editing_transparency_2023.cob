@@ -14,10 +14,14 @@
       *>
       *> N01 9L9 EDITING L IS ":" with 12 - 13.18.40.5 rule 3 (simple insertion): character-1 inserts
       *>     literal-1 at each occurrence, sign-independent => "1:2".
-      *> N02 LL EDITING L IS ":" - the very shape SR12 a's second bullet names as sufficient, "at least
-      *>     two occurrences of one of the symbols from the set character-1 ...". What it proves is the
-      *>     ACCEPT the Table-10 'cs' mapping would have refused (row 'cs' trailing has a BLANK 'cs'
-      *>     leading column); nothing is moved to it, so the DISPLAY shows its initial state => "  ".
+      *> N02 9LL EDITING L IS ":" with 5 - two adjacent character-1 after the digit: SR12 a's second bullet
+      *>     ("at least two occurrences of one of the symbols from the set character-1 ...") is met, and
+      *>     what it proves is the ACCEPT the Table-10 'cs' mapping would have refused (row 'cs' trailing
+      *>     has a BLANK 'cs' leading column). Rule 3 makes each character-1 a simple insertion symbol, so
+      *>     the item is the digit then ":" at each occurrence => "5::". (kb/Work PB529: this item was `LL`
+      *>     with no 9 until the SR14 lower bound became a screen of its own - two simple insertion symbols
+      *>     describe ZERO digit positions, and 13.18.40.3 SR14 requires 1 through 31 for a numeric-edited
+      *>     item; negative/pb529-picture-no-digit-position pins `PIC LL EDITING L IS ":"` as COBOLNET2882.)
       *> N03 9L9F EDITING L FOR NEGATIVE IS "-" EDITING F FOR POSITIVE IS "+" with -12 - SR24's "either
       *>     one or two extended editing sign control symbols may be used" and SR25's leftmost/rightmost
       *>     placement. Table 9: character-1 with the NEGATIVE phrase renders literal-2 over a negative
@@ -27,11 +31,12 @@
        DATA DIVISION.
        WORKING-STORAGE SECTION.
        01 N01 PIC 9L9 EDITING L IS ":".
-       01 N02 PIC LL EDITING L IS ":".
+       01 N02 PIC 9LL EDITING L IS ":".
        01 N03 PIC 9L9F EDITING L FOR NEGATIVE IS "-"
                        EDITING F FOR POSITIVE IS "+".
        PROCEDURE DIVISION.
            MOVE 12 TO N01
+           MOVE 5 TO N02
            MOVE -12 TO N03
            DISPLAY "N01=[" N01 "]"
            DISPLAY "N02=[" N02 "]"

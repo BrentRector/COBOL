@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Common;
 using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Binding.Model;
@@ -93,7 +94,7 @@ public static class PictureAnalyzer
     /// </summary>
     public static PicInfo Analyze(string picture, Usage usage, EditionContext edition, string where,
         SignSpec? sign = null, char currency = '$', bool blankWhenZero = false, bool explicitUsage = false,
-        IReadOnlyList<EditingPhraseSpec>? editing = null, IReadOnlyDictionary<char, string>? currencies = null,
+        IReadOnlyList<EditingPhraseSpec>? editing = null, IReadOnlyDictionary<char, CurrencyDefinition>? currencies = null,
         LocaleEditSpec? localeFormat2 = null, bool decimalPointIsComma = false)
     {
         var pic = AnalyzeCharacterString(picture, usage, edition, where, sign, currency, blankWhenZero, explicitUsage,
@@ -106,7 +107,7 @@ public static class PictureAnalyzer
     /// phrase rules once those are resolved.</summary>
     private static PicInfo AnalyzeCharacterString(string picture, Usage usage, EditionContext edition, string where,
         SignSpec? sign, char currency, bool blankWhenZero, bool explicitUsage,
-        IReadOnlyList<EditingPhraseSpec>? editing, IReadOnlyDictionary<char, string>? currencies,
+        IReadOnlyList<EditingPhraseSpec>? editing, IReadOnlyDictionary<char, CurrencyDefinition>? currencies,
         LocaleEditSpec? localeFormat2, bool decimalPointIsComma, out PictureClauseIdentity? clause)
     {
         clause = null;
@@ -152,8 +153,9 @@ public static class PictureAnalyzer
         // r24 fixed / r28 floating: a picture carries one currency symbol kind), or the legacy single symbol.
         // Two DIFFERENT set members in one picture are an invalid PICTURE (0808). The mask is canonicalized to
         // '$' below and the symbol's STRING travels on PicInfo.CurrencyString.
-        IReadOnlyDictionary<char, string> currencySet = currencies
-            ?? new Dictionary<char, string> { [char.ToUpperInvariant(currency)] = currency.ToString() };
+        IReadOnlyDictionary<char, CurrencyDefinition> currencySet = currencies
+            ?? new Dictionary<char, CurrencyDefinition>
+            { [char.ToUpperInvariant(currency)] = new(currency.ToString(), LiteralClass.Alphanumeric) };
         char cs = '\0';
         foreach (char raw in expanded)
         {
@@ -166,7 +168,10 @@ public static class PictureAnalyzer
                 + "currency symbol kind (ISO §13.18.40.3 r24 / r28)");
             return PicInfo.Recovery();
         }
-        string currencyString = cs == '\0' ? "$" : currencySet[cs];
+        string currencyString = cs == '\0' ? "$" : currencySet[cs].Text;
+        // §12.3.7.3 SR28's input — the class of the literal-7 behind the symbol THIS picture uses; null when it uses
+        // none (the default below is only what the whitelist/editing checks see, not a symbol the picture wrote).
+        LiteralClass? currencyClass = cs == '\0' ? null : currencySet[cs].LiteralClass;
         if (cs == '\0') cs = '$';   // no currency symbol in this picture: the whitelist/editing checks see the default
         // GR14: the first occurrence contributes the whole string; the mask below is canonical ('$').
         int currencyExtra = expanded.Any(c => char.ToUpperInvariant(c) == cs) ? currencyString.Length - 1 : 0;
@@ -187,7 +192,7 @@ public static class PictureAnalyzer
         // §13.18.40.5 rule 6 makes FLOATING insertion symbols. The introduction gate below 2023 is fired by
         // VersionConformancePass.ParseArm.VisitPictureClause.
         var editRules = ValidateEditing(editing, expanded, usage, edition, where, cs,
-            out var char1Set, out var char1Extended);
+            out var char1Set, out var char1Extended, out var char1Declared);
         // §13.18.40.4 GR14 'es' — the character-1 positions' size beyond the one position each occupies in
         // character-string-1 (kb/Work PB491). Computed once here, beside the currency widening, and added at
         // every category arm a character-1 can reach.
@@ -205,7 +210,7 @@ public static class PictureAnalyzer
         for (int i = 0; i < expanded.Length; i++)
         {
             char c = expanded[i];
-            if (char1Set.Contains(c)) continue;   // a declared PICTURE EDITING character-1 (ISO §13.18.40.3 SR8) — not an invalid symbol
+            if (char1Declared.Contains(c)) continue;   // a declared PICTURE EDITING character-1 (ISO §13.18.40.3 SR8) — not an invalid symbol
             switch (c)
             {
                 // '$' is a currency picture symbol iff it is a member of the unit's CURRENCY SIGN SET —
@@ -396,7 +401,7 @@ public static class PictureAnalyzer
         // alphabetic/alphanumeric (anyAlpha), numeric-edited (anyEdit) and pure numeric.
         usage = ScreenUsageAgainstPicture(
             anyAlpha ? PicCategory.Alphanumeric : anyEdit ? PicCategory.NumericEdited : PicCategory.Numeric,
-            usage, explicitUsage, picture, edition, where);
+            usage, explicitUsage, picture, edition, where, currencyClass);
 
         if (anyAlpha)
         {
@@ -452,7 +457,7 @@ public static class PictureAnalyzer
             return new PicInfo(PicCategory.NumericEdited, usage,
                 Length: CharacterPositions(expanded, currencyExtra, editingExtra), Digits: digits, Scale: scale, Signed: signed)
             { SignKind = signKind, EditMask = CanonicalCurrencyMask(expanded, cs), EditingRules = editRules, DigitPositions = digitPos,
-              CurrencyString = currencyString == "$" ? null : currencyString };
+              CurrencyString = currencyString == "$" ? null : currencyString, CurrencyClass = currencyClass };
 
         // ⛔ GR11's ANTECEDENT, at the arm that answers it (kb/Work PB535). This arm is the FALL-THROUGH — it is
         // reached by exhaustion, by everything that is not national, boolean, alphabetic/alphanumeric or edited —
@@ -505,8 +510,24 @@ public static class PictureAnalyzer
     /// only keeps the doomed emit crash-free (DEVLOG 597).</para>
     /// </summary>
     internal static Usage ScreenUsageAgainstPicture(PicCategory category, Usage usage, bool explicitUsage,
-        string picture, EditionContext edition, string where)
+        string picture, EditionContext edition, string where, LiteralClass? currencyClass = null)
     {
+        // ── §12.3.7.3 SR28 ── "If literal-7 is of class alphanumeric, the associated currency symbol may be used
+        // only to define a numeric-edited item with usage display. If literal-7 is of class national, the associated
+        // currency symbol may be used only to define a numeric-edited item with usage national." The two classes pair
+        // with the two usages crosswise-forbidden, so one comparison asks both sentences (kb/Work PB1089).
+        // currencyClass is the class of the literal-7 behind the symbol the PICTURE uses, null when it uses none.
+        // Asked HERE — the one USAGE × PICTURE screen — so the written clause and a usage acquired from the group
+        // (§13.18.60.4 GR1) are screened by the same call; a usage other than display/national is SR3's.
+        if (currencyClass is { } literal7Class && category is PicCategory.NumericEdited
+            && (usage is Usage.Display or Usage.National)
+            && (literal7Class is LiteralClass.National) != (usage is Usage.National))
+            edition.Error(DiagnosticCatalog.CurrencySymbolClassUsage, $"{where}: the currency symbol of PICTURE {picture} "
+                + $"is defined by a{(literal7Class is LiteralClass.National ? " national" : "n alphanumeric")} literal-7 "
+                + "of a CURRENCY SIGN clause (the clause SR25 implies for '$' is alphanumeric), so it may be used only to "
+                + $"define a numeric-edited item with usage {(literal7Class is LiteralClass.National ? "national" : "display")}"
+                + $", not one with USAGE {UsageFamilies.UsageWord(usage)} (ISO §12.3.7.3 SR28)");
+
         // ── §13.18.60.3 SR20 ── "Only the NATIONAL phrase may be specified in a USAGE clause associated with an
         // elementary data item whose explicit or implicit picture character-string contains the symbol 'N'."
         // With no clause associated at all, SR13a supplies NATIONAL — so the rule bites only on a written one.
@@ -814,10 +835,12 @@ public static class PictureAnalyzer
     /// character-string-1 contains the symbol 'N' …".</para></summary>
     private static CobolEdit.EditRule[]? ValidateEditing(
         IReadOnlyList<EditingPhraseSpec>? editing, string expanded, Usage usage, EditionContext edition,
-        string where, char cs, out HashSet<char> char1Set, out HashSet<char> char1Extended)
+        string where, char cs, out HashSet<char> char1Set, out HashSet<char> char1Extended,
+        out HashSet<char> char1Declared)
     {
         char1Set = [];
         char1Extended = [];
+        char1Declared = [];
         if (editing is null || editing.Count == 0) return null;
 
         // ── ISO §13.18.40.3 SR9, first sentence — the LITERAL CLASS the phrase's literals shall be written in.
@@ -830,9 +853,14 @@ public static class PictureAnalyzer
         // Pre-scan every phrase's character-1 (SR25 admits up to two extended sign symbols — e.g. a leftmost 'L'
         // and a rightmost 'F') so SR12b's "only character-1 and 9 . cs P V Z" test admits ALL declared editing
         // characters, not just the phrase under validation.
-        var allChar1 = new HashSet<char>();
+        // The pre-scan records every single LETTER a phrase NAMES as character-1 — an extended letter included, and a
+        // letter SR8 is about to refuse — in <paramref name="char1Declared"/>: SR8 (basic letters only) is asked ONCE,
+        // in the loop below, and the SR2 symbol whitelist beside it reads the DECLARED set, so a refused letter does
+        // not draw a second "not an allowable picture symbol" for the same fault (the PB960 shape). char1Set, by
+        // contrast, holds only the character-1 that passed SR8-SR11.
+        var allChar1 = char1Declared;
         foreach (var ph0 in editing)
-            if ((ph0.Char1Text ?? "") is { Length: 1 } t0 && char.IsLetter(t0[0])) allChar1.Add(char.ToUpperInvariant(t0[0]));
+            if ((ph0.Char1Text ?? "") is { Length: 1 } t0 && CobolCharacterRepertoire.IsLetter(t0[0])) allChar1.Add(char.ToUpperInvariant(t0[0]));
 
         var rules = new List<CobolEdit.EditRule>();
         bool error = false;
@@ -845,12 +873,14 @@ public static class PictureAnalyzer
         foreach (var ph in editing)
         {
             // character-1 (§13.18.40.3 SR8): a single basic letter, not a CURRENCY-SIGN letter and not one of
-            // A B C D E N P R S V X Z.
+            // A B C D E N P R S V X Z. "Basic" is §8.1.3.1 Table 1's row — the Latin letters A-Z and a-z — and an
+            // extended letter (Annex B) is a DIFFERENT row, so the question is CobolCharacterRepertoire.IsBasicLetter,
+            // never char.IsLetter, which admits every Unicode letter (kb/Work PB533).
             string c1 = ph.Char1Text ?? "";
-            if (c1.Length != 1 || !char.IsLetter(c1[0]))
+            if (c1.Length != 1 || !CobolCharacterRepertoire.IsBasicLetter(c1[0]))
             {
                 edition.Error("COBOLNET1591", $"{where}: PICTURE EDITING character-1 must be a single basic letter "
-                    + $"(ISO §13.18.40.3 SR8; got \"{c1}\")");
+                    + $"(A-Z or a-z; an extended letter is not one — ISO §13.18.40.3 SR8; ISO §8.1.3.1 Table 1; got \"{c1}\")");
                 error = true; continue;
             }
             char char1 = char.ToUpperInvariant(c1[0]);

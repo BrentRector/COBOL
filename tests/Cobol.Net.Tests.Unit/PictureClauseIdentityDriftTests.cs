@@ -30,9 +30,11 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class PictureClauseIdentityDriftTests
 {
-    private static readonly IReadOnlyDictionary<char, string> Dollar = new Dictionary<char, string> { ['$'] = "$" };
+    private static CurrencyDefinition Alnum(string text) => new(text, CobolNet.Common.LiteralClass.Alphanumeric);
 
-    private static DataItem Item(string picture, IReadOnlyDictionary<char, string>? currencies = null,
+    private static readonly IReadOnlyDictionary<char, CurrencyDefinition> Dollar = new Dictionary<char, CurrencyDefinition> { ['$'] = Alnum("$") };
+
+    private static DataItem Item(string picture, IReadOnlyDictionary<char, CurrencyDefinition>? currencies = null,
         bool dpc = false, Usage usage = Usage.Display)
     {
         var ed = new EditionContext(2023);
@@ -52,9 +54,9 @@ public sealed class PictureClauseIdentityDriftTests
     [Fact]
     public void CurrencySymbols_MatchIffTheirStringsMatch()
     {
-        var usdDollar = Item("$$$9.99", new Dictionary<char, string> { ['$'] = "USD" });
-        var usdU = Item("UUU9.99", new Dictionary<char, string> { ['U'] = "USD" });
-        var eurDollar = Item("$$$9.99", new Dictionary<char, string> { ['$'] = "EUR" });
+        var usdDollar = Item("$$$9.99", new Dictionary<char, CurrencyDefinition> { ['$'] = Alnum("USD") });
+        var usdU = Item("UUU9.99", new Dictionary<char, CurrencyDefinition> { ['U'] = Alnum("USD") });
+        var eurDollar = Item("$$$9.99", new Dictionary<char, CurrencyDefinition> { ['$'] = Alnum("EUR") });
         Assert.Null(OoConformance.DescriptionMismatch(usdDollar, usdU));        // §14.8.2.3.2 rule 2 a): same string
         Assert.Contains("currency string", OoConformance.DescriptionMismatch(usdDollar, eurDollar));
     }
@@ -100,7 +102,7 @@ public sealed class PictureClauseIdentityDriftTests
     [Fact]
     public void ConformanceDescriptor_AgreesWithTheComparator_OverEveryCarriedPair()
     {
-        var usd = new Dictionary<char, string> { ['$'] = "USD" };
+        var usd = new Dictionary<char, CurrencyDefinition> { ['$'] = Alnum("USD") };
         var items = new List<DataItem>
         {
             Item("X(5)"), Item("XXXXX"), Item("A(5)"), Item("X(4)"), Item("XBX"), Item("X9X"),

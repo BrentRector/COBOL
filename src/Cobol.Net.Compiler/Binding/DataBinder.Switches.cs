@@ -313,7 +313,10 @@ public sealed partial class DataBinder
 
     /// <summary>
     /// The unit's CURRENCY SIGN SET (ISO §12.3.7): every currency PICTURE SYMBOL (uppercase-keyed — §12.3.7.3
-    /// r20 / §8.1.3 GR3 make the letter cases equivalent) → the currency STRING it stands for (GR13). A bare
+    /// r20 / §8.1.3 GR3 make the letter cases equivalent) → the currency STRING it stands for (GR13) AND the CLASS
+    /// of the literal-7 that gave it (<see cref="CurrencyDefinition"/>; §12.3.7.3 SR28 confines an alphanumeric
+    /// literal-7's symbol to usage-display numeric-edited items and a national one's to usage-national ones, and a set
+    /// of symbol → string alone cannot ask it — kb/Work PB1089). A bare
     /// <c>CURRENCY SIGN IS literal-7</c> makes literal-7 both string and symbol (r22, one character); the 2002+
     /// <c>WITH PICTURE SYMBOL literal-8</c> form names the one-character symbol (r26/r27) for a string "of any
     /// length" (r23). r25 IMPLIES <c>CURRENCY SIGN '$' PICTURE SYMBOL '$'</c> unless a clause specifies '$' as
@@ -329,9 +332,9 @@ public sealed partial class DataBinder
     /// records it on <c>PicInfo.CurrencyString</c> after canonicalizing the mask's symbol to '$'), and NUMVAL-C's
     /// §15.68.3 r3 default is <see cref="SoleCurrencyString"/>.
     /// </summary>
-    public IReadOnlyDictionary<char, string> CurrencySigns => _currencySigns;
+    public IReadOnlyDictionary<char, CurrencyDefinition> CurrencySigns => _currencySigns;
 
-    private readonly Dictionary<char, string> _currencySigns = new();
+    private readonly Dictionary<char, CurrencyDefinition> _currencySigns = new();
 
     /// <summary>The DISTINCT currency strings the unit's EXPLICIT CURRENCY SIGN clauses specify (r3 of §15.68.3
     /// counts these: "there shall be only one currency string for the compilation unit, either the default
@@ -360,7 +363,7 @@ public sealed partial class DataBinder
     /// specified '$' as literal-7 or literal-8. Idempotent (a re-walk cannot double it).</summary>
     private void FinalizeCurrencySigns()
     {
-        if (!_dollarSpecified) _currencySigns.TryAdd('$', "$");
+        if (!_dollarSpecified) _currencySigns.TryAdd('$', CurrencyDefinition.ImpliedDollar);
     }
 
     /// <summary>Normalize a NUMERIC literal's source text to the canonical dot-decimal form the whole emit-side
@@ -622,14 +625,20 @@ public sealed partial class DataBinder
         }
 
         char key = char.ToUpperInvariant(symbol);
-        // r21: no two clauses may bind equivalent symbols to different strings.
-        if (_currencySigns.TryGetValue(key, out string? bound) && bound != currencyString)
+        // §12.3.7.3 SR28's input: the CLASS of literal-7 — alphanumeric (a plain or X"…" literal) or national (N"…" /
+        // NX"…", a §8.8.3.3 concatenation folding to national). Boolean and every other shape were refused above.
+        var definition = new CurrencyDefinition(currencyString,
+            OperandLiteralClass(lits[0]) is LiteralClass.National ? LiteralClass.National : LiteralClass.Alphanumeric);
+        // r21: no two clauses may bind equivalent symbols to different strings — and a string of the other CLASS is
+        // not the identical string (SR28 would then confine the one symbol to display AND to national items).
+        if (_currencySigns.TryGetValue(key, out var bound) && bound != definition)
         {
             Edition.Error("COBOLNET0891", $"CURRENCY SIGN: the symbol '{symbol}' is already bound to "
-                + $"\"{bound}\" (ISO §12.3.7.3 r21)");
+                + $"{(bound.LiteralClass is LiteralClass.National ? "national " : "")}\"{bound.Text}\" "
+                + $"(ISO §12.3.7.3 r21; SR28)");
             return;
         }
-        _currencySigns[key] = currencyString;
+        _currencySigns[key] = definition;
         _explicitCurrencyStrings.Add(currencyString);
         if (currencyString == "$" || key == '$') _dollarSpecified = true;   // r25 — no implied clause
     }

@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Common;
 using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Runtime;
@@ -494,6 +495,18 @@ public sealed record PicInfo(
     /// multi-character string widens the item by its extra length (§13.18.40.4 GR14, already in
     /// <see cref="Length"/>). Null when the picture has no currency symbol, or its string is <c>$</c>.</summary>
     public string? CurrencyString { get; init; }
+
+    /// <summary>⛔ THE CLASS OF THE CURRENCY LITERAL BEHIND THE PICTURE'S CURRENCY SYMBOL (ISO §12.3.7.3 SR28; kb/Work
+    /// PB1089): <see cref="LiteralClass.Alphanumeric"/> or <see cref="LiteralClass.National"/> — the class of
+    /// literal-7 of the CURRENCY SIGN clause that defined the symbol (the implied clause of SR25 is alphanumeric) —
+    /// or <see langword="null"/> when the picture uses no currency symbol. SR28 says "If literal-7 is of class
+    /// alphanumeric, the associated currency symbol may be used only to define a numeric-edited item with usage
+    /// display. If literal-7 is of class national, … only … with usage national", so the screen that asks it needs
+    /// the class at the moment the item's usage is final, which for an item whose usage comes from its group
+    /// (§13.18.60.4 GR1) is a later pass than the analyzer — it rides the profile exactly as
+    /// <see cref="CurrencyString"/> does. Unlike that property it is NOT elided for <c>$</c>: the implied
+    /// <c>$</c> has a class too.</summary>
+    public LiteralClass? CurrencyClass { get; init; }
 
     /// <summary>The identity of the PICTURE clause this profile was analyzed from — the expanded character-string
     /// with its currency STRING and, when it has a period or comma symbol, the declaring source element's
