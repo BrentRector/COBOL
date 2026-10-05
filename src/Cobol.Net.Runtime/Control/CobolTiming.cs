@@ -14,16 +14,25 @@ public static class CobolTiming
     /// non-blocking-forever cap.</summary>
     public const long MaxSeconds = 86_400;
 
+    // ⛔ ONE SUSPENSION RULE, ONE OVERLOAD PER CARRIER (kb/Work PB1529). The interval is the value of an
+    // arithmetic expression, and the emitter hands it over on the carrier it evaluated on: the scaled Int128, the
+    // unsigned-wide UInt128, the SDIDI CobolDec or binary64 (the NumXCarrier family). Each overload takes the sign
+    // (GR1 a-c) and the whole seconds (GR1's implicit COMPUTE without ROUNDED, m = 0) from the value IN ITS OWN
+    // DOMAIN, exactly, and narrows through the carrier's saturating position reader (CobolNum.PositionOf). A value
+    // past the long range therefore stays "greater than the maximum meaningful value" and is replaced by it, where
+    // an emitter-side (long) cast, or the low-order-digits landing a store may take (CobolDec.ToUnscaled), wrapped a
+    // huge interval into a short or a zero suspension. The value is evaluated ONCE (the former exact lane rendered
+    // the expression twice, once for its sign and once for its seconds).
+
     /// <summary>
-    /// CONTINUE AFTER n SECONDS (ISO §14.9.9.4 GR1): suspend execution for <paramref name="seconds"/> seconds,
-    /// then continue with the next statement. The implementor value of m (the fractional digit count of the
-    /// temporary 9(n)V9(m) item) is 0 — fractional seconds truncate toward zero (the implicit COMPUTE without
-    /// ROUNDED), which the integer-typed caller already applied. GR1a — a value below zero is forced to 0; GR1b —
-    /// when <paramref name="checkLessThanZero"/> (EC-CONTINUE-LESS-THAN-ZERO checking was enabled at the statement),
-    /// the nonfatal EC-CONTINUE-LESS-THAN-ZERO is set to exist (observable via FUNCTION EXCEPTION-STATUS), then
-    /// execution continues (§14.6.13.1.4). A value above <see cref="MaxSeconds"/> suspends for the maximum.
-    /// (The §14.6.13.1.4 selection of a matching USE declarative for this nonfatal condition is a scheduled
-    /// follow-on — the last-exception status this sets is the observable behavior.)
+    /// CONTINUE AFTER n SECONDS (ISO §14.9.9.4 GR1) for a BINARY64 interval: suspend execution for
+    /// <paramref name="seconds"/> seconds, then continue with the next statement. The implementor value of m (the
+    /// fractional digit count of the temporary 9(n)V9(m) item) is 0 — fractional seconds truncate toward zero (the
+    /// implicit COMPUTE without ROUNDED). GR1a — a value below zero is forced to 0; GR1b — when
+    /// <paramref name="checkLessThanZero"/> (EC-CONTINUE-LESS-THAN-ZERO checking was enabled at the statement), the
+    /// nonfatal EC-CONTINUE-LESS-THAN-ZERO is set to exist and REPORTED to the site by the return value, which runs
+    /// the §14.6.13.1.4 USE-declarative selection (kb/Work PB138). A value above <see cref="MaxSeconds"/> suspends
+    /// for the maximum.
     /// </summary>
     public static bool ContinueAfter(double seconds, bool checkLessThanZero)
     {
@@ -37,48 +46,44 @@ public static class CobolTiming
             return false;
         }
         // GR1a/GR1b operate on arithmetic-expression-1's EVALUATED value (the sign test precedes the m=0
-        // truncation), so a negative FRACTIONAL interval in (-1, 0) must still set the exception — test the sign of
-        // the full-precision value, not a pre-truncated integer. The raise is REPORTED to the site (kb/Work
-        // PB138) so the emitted §14.6.13.1.4 nonfatal dispatch can run — the recorded status used to be the
-        // whole story and the golden's own generated handler pc was dead code.
-        if (seconds < 0.0)
+        // truncation), so a negative FRACTIONAL interval in (-1, 0) must still set the exception.
+        return Continue(seconds < 0.0, CobolNum.PositionOf(seconds), checkLessThanZero);
+    }
+
+    /// <summary>The scaled-<see cref="Int128"/> interval (a fixed-point item or expression: <paramref name="unscaled"/>
+    /// × 10^-<paramref name="scale"/>). The sign is the unscaled value's, exactly, so a fraction in (-1, 0) still
+    /// raises GR1b while truncating to 0 seconds, and a binary64 image that would round across an integer boundary
+    /// is never consulted (kb/Work PB138).</summary>
+    public static bool ContinueAfter(Int128 unscaled, int scale, bool checkLessThanZero) =>
+        Continue(unscaled < 0, CobolNum.PositionOf(unscaled, scale), checkLessThanZero);
+
+    /// <summary>The unsigned-wide interval (a 16-byte unsigned COMP-5 item's full [0, 2^128) range, kb/Work R10):
+    /// never negative, and every value past the <see cref="long"/> range is above the maximum.</summary>
+    public static bool ContinueAfter(UInt128 unscaled, int scale, bool checkLessThanZero) =>
+        Continue(false, CobolNum.PositionOf(unscaled, scale), checkLessThanZero);
+
+    /// <summary>The standard-decimal interval (§8.8.1.5 SDIDI: an expression the arithmetic planner lifted to
+    /// <see cref="CobolDec"/>). The sign is the significand's and the whole seconds are the saturating truncation
+    /// <see cref="CobolNum.PositionOf(CobolDec)"/> reads, so 10^40 suspends for the maximum and not for the zero its
+    /// 38 low-order digits make.</summary>
+    public static bool ContinueAfter(CobolDec seconds, bool checkLessThanZero) =>
+        Continue(seconds.Sig < 0, CobolNum.PositionOf(seconds), checkLessThanZero);
+
+    /// <summary>GR1 a-c and the suspension, once: a value below zero is set to 0 and raises the nonfatal
+    /// EC-CONTINUE-LESS-THAN-ZERO when its checking is enabled (the return value reports it to the site); any
+    /// other value suspends for its whole seconds, never above <see cref="MaxSeconds"/>.</summary>
+    private static bool Continue(bool negative, long wholeSeconds, bool checkLessThanZero)
+    {
+        if (negative)
         {
             if (checkLessThanZero) { ExceptionState.Set("EC-CONTINUE-LESS-THAN-ZERO", fatal: false); return true; }
             return false;                                           // GR1a - value set to 0 → no suspension
         }
-        SleepTruncated(WholeSeconds(seconds));                      // m = 0: truncate toward zero (GR1, no ROUNDED)
-        return false;
-    }
-
-    /// <summary>⛔ THE INTERVAL'S WHOLE SECONDS, CLAMPED BEFORE THE NARROWING (kb/Work PB1529). §14.9.9.4 GR1: a value
-    /// "greater than this maximum meaningful value" is replaced by the maximum meaningful value
-    /// (<see cref="MaxSeconds"/>), so the comparison has to come BEFORE any cast — an unchecked <c>(long)</c> of a
-    /// double past the long range is unspecified (it wrapped to a negative or small count, so a huge interval
-    /// suspended 0 s or a few seconds instead of the maximum). Every value at or above the maximum IS the maximum;
-    /// only a smaller one is truncated toward zero.</summary>
-    private static long WholeSeconds(double seconds) => seconds >= MaxSeconds ? MaxSeconds : (long)seconds;
-
-    /// <summary>The EXACT-lane overload (kb/Work PB138): a fixed-point or standard-decimal interval's
-    /// binary64 image can round UP across an integer boundary (0.999… with enough nines converts to exactly
-    /// 1.0), so the emitter hands the sign-test value AND the exactly-truncated seconds separately — GR1's
-    /// implicit COMPUTE without ROUNDED truncates in the value's own domain, never in binary64.</summary>
-    public static bool ContinueAfterExact(double fullPrecisionForSign, long truncatedSeconds, bool checkLessThanZero)
-    {
-        if (fullPrecisionForSign < 0.0)
-        {
-            if (checkLessThanZero) { ExceptionState.Set("EC-CONTINUE-LESS-THAN-ZERO", fatal: false); return true; }
-            return false;
-        }
-        SleepTruncated(truncatedSeconds);
-        return false;
-    }
-
-    private static void SleepTruncated(long secs)
-    {
-        if (secs <= 0) return;                                      // GR1 - no suspension for a zero interval
-        int ms = (int)System.Math.Min(secs, MaxSeconds) * 1000;
-        if (SuspensionObserver.Value is { } observe) { observe(ms); return; }
+        if (wholeSeconds <= 0) return false;                        // GR1 - no suspension for a zero interval
+        int ms = (int)System.Math.Min(wholeSeconds, MaxSeconds) * 1000;
+        if (SuspensionObserver.Value is { } observe) { observe(ms); return false; }
         System.Threading.Thread.Sleep(ms);
+        return false;
     }
 
     /// <summary>Test seam (kb/Work PB1590): when set, a suspension is REPORTED (its length in milliseconds) instead

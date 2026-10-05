@@ -269,15 +269,17 @@ internal static class RuntimeApi
     public static string DynSetSize(string current, string newLen, string limit) =>
         $"{nameof(CobolDynString)}.{nameof(CobolDynString.SetSize)}({current}, {newLen}, {limit})";
 
-    /// <summary>CONTINUE AFTER n SECONDS (ISO §14.9.9) — the timed pause; a negative interval sets the nonfatal
+    /// <summary>CONTINUE AFTER n SECONDS (ISO §14.9.9.4 GR1) — the timed pause for an interval carried as ONE value: a
+    /// binary64 or a standard-decimal <c>CobolDec</c>. A negative interval sets the nonfatal
     /// EC-CONTINUE-LESS-THAN-ZERO when checking is enabled — <c>CobolTiming.ContinueAfter(seconds, check)</c>.</summary>
     public static string ContinueAfter(string seconds, string checkLessThanZero) =>
         $"{nameof(CobolTiming)}.{nameof(CobolTiming.ContinueAfter)}({seconds}, {checkLessThanZero})";
 
-    /// <summary>The exact-lane suspension (kb/Work PB138) — the sign value at full precision beside the
-    /// exactly-truncated seconds: <c>CobolTiming.ContinueAfterExact(full, truncated, check)</c>.</summary>
-    public static string ContinueAfterExact(string fullForSign, string truncatedSeconds, string checkLessThanZero) =>
-        $"{nameof(CobolTiming)}.{nameof(CobolTiming.ContinueAfterExact)}({fullForSign}, {truncatedSeconds}, {checkLessThanZero})";
+    /// <summary>The scaled-integer interval (kb/Work PB1529): the <c>Int128</c> or <c>UInt128</c> unscaled value and its
+    /// scale, so the runtime takes the sign and the saturated whole seconds from the exact value —
+    /// <c>CobolTiming.ContinueAfter(unscaled, scale, check)</c>.</summary>
+    public static string ContinueAfterScaled(string unscaledOfCarrierType, string scale, string checkLessThanZero) =>
+        $"{nameof(CobolTiming)}.{nameof(CobolTiming.ContinueAfter)}({unscaledOfCarrierType}, {scale}, {checkLessThanZero})";
 
     /// <summary>Set the run-unit termination status passed to the OS as the process exit code (ISO §14.9.42.4 GR5 /
     /// §14.9.18.4 GR10) — <c>RunUnit.SetExitStatus(status)</c>.</summary>

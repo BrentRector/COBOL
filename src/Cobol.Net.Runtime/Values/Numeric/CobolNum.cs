@@ -555,6 +555,20 @@ public static partial class CobolNum
         _ => Position(unscaled),
     };
 
+    /// <summary>The <see cref="PositionOf(Int128, int)"/> twin for an UNSIGNED-WIDE value (a 16-byte unsigned
+    /// COMP-5 item's [0, 2^128) range, kb/Work R10): truncated toward zero and SATURATED to <c>long</c>, never
+    /// wrapped — the <c>(Int128)</c> cast of a value at or above 2^127 is negative, which is how a huge unsigned
+    /// interval or position read as "less than one" (kb/Work PB1529). A positive scale divides (exact);
+    /// a NEGATIVE scale multiplies by 10^|scale| and saturates once the product leaves the <c>long</c> range.</summary>
+    public static long PositionOf(UInt128 unscaled, int scale)
+    {
+        if (scale > 0) return Position(unscaled / Pow10U(scale));
+        if (scale == 0 || unscaled == 0) return Position(unscaled);
+        // |unscaled| ≤ long.MaxValue and at most 18 places keep the product inside UInt128; beyond either bound
+        // the value is past every table's range, so it saturates.
+        return -scale <= 18 && unscaled <= (UInt128)long.MaxValue ? Position(unscaled * Pow10U(-scale)) : long.MaxValue;
+    }
+
     /// <summary>⛔ THE ONE NARROWING of a wide position value to the <c>long</c> every table/ref-mod accessor
     /// takes, and it SATURATES rather than wraps. ISO §8.4.2.3.4 GR2: "If the value of the subscript is not a
     /// positive integer or is less than one or is greater than the highest permissible occurrence number, the

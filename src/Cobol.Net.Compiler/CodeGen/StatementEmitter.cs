@@ -200,25 +200,29 @@ internal sealed class StatementEmitter : IBoundStatementVisitor<bool>
     // so there can never be one) the statement is CONTINUE-equivalent; the node exists for the SR2 cross-pass
     // identity (kb/Work PB137).
     public bool Visit(BoundCommitRollback n) => false;
+    /// <summary>⛔ THE CONTINUE AFTER SUSPENSION CALL, ONE ARM PER CARRIER (kb/Work PB1529). §14.9.9.4 GR1: the sign
+    /// test (GR1a/GR1b: a fractional (-1,0) still sets the EC) and the m=0 truncation (the implicit COMPUTE without
+    /// ROUNDED) are taken by <c>CobolTiming.ContinueAfter</c> from the value in ITS OWN DOMAIN, which then clamps to
+    /// the maximum meaningful value through the carrier's SATURATING position reader. The emitter narrows nothing: a
+    /// <c>(long)</c> cast here wrapped 2^64 seconds to 0, the SDIDI low-digit landing turned 10^40 into 0, an
+    /// <c>(Int128)</c> cast of a UInt128 at or above 2^127 went negative, and a binary64 image rounds 0.999... up to
+    /// 1.0. A carrier this switch does not map throws, so the carrier drift test (every <see cref="NumXCarrier"/>
+    /// renders a call onto its own overload) fails the build of a fifth carrier before a user meets it.</summary>
+    internal static string ContinueAfterCall(NumX x, string check) => x.Carrier switch
+    {
+        NumXCarrier.Binary64 or NumXCarrier.Sdidi => RuntimeApi.ContinueAfter(x.Expr, check),
+        NumXCarrier.UnsignedWide => RuntimeApi.ContinueAfterScaled($"(UInt128)({x.Expr})", x.Scale.ToString(), check),
+        NumXCarrier.Scaled => RuntimeApi.ContinueAfterScaled($"(Int128)({x.Expr})", x.Scale.ToString(), check),
+        _ => throw new InvalidOperationException($"CONTINUE AFTER: no suspension call for the carrier {x.Carrier}"),
+    };
+
     public bool Visit(BoundContinueAfter n)
     {
-        // CONTINUE AFTER n SECONDS (§14.9.9.4 GR1; kb/Work PB138): the sign test runs on the FULL-precision
-        // value (GR1a/GR1b — a fractional (-1,0) still sets the EC), and the m=0 truncation runs in the
-        // interval's OWN domain — a fixed-point or decimal 0.999… whose binary64 image rounds to exactly 1.0
-        // must still suspend ZERO seconds (the implicit COMPUTE without ROUNDED), so those lanes hand the
-        // exactly-truncated seconds beside the sign value. A float interval truncates in double (its own
-        // domain), with the runtime screening NaN/±Inf as EC-DATA-NOT-FINITE.
+        // CONTINUE AFTER n SECONDS (§14.9.9.4 GR1; kb/Work PB138, PB1529): the interval is evaluated ONCE and handed to
+        // the runtime on the carrier it evaluated on (ContinueAfterCall); the emitter narrows nothing.
         var x = _num.Render(n.Seconds, ReceiverContext.None);
         string check = n.CheckLessThanZero ? "true" : "false";
-        string call = x switch
-        {
-            { Real: true } => RuntimeApi.ContinueAfter(x.Expr, check),
-            { Dec: true } => RuntimeApi.ContinueAfterExact($"({x.Expr}).ToDouble()",
-                RuntimeApi.HostInt64($"({x.Expr}).ToUnscaled(0, CobolRounding.Truncation)"), check),
-            { Scale: 0 } => RuntimeApi.ContinueAfterExact($"(double)({x.Expr})", RuntimeApi.HostInt64(x.Expr), check),
-            _ => RuntimeApi.ContinueAfterExact(NumericRenderer.Real(x),
-                RuntimeApi.HostInt64(RuntimeApi.NumRescale(x.Expr, x.Scale.ToString(), "0", CobolRounding.Truncation)), check),
-        };
+        string call = ContinueAfterCall(x, check);
         if (!n.CheckLessThanZero)
         {
             _ctx.Writer.Line(call + ";");
