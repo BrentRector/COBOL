@@ -153,7 +153,7 @@ like `FlagState`/`RefModZeroLengthState`.
   **composed** `ReservedWordSet` (replacing the hard-coded `ReservedWordSet.Default` at `ParseArm._reservedWords`)
   so RESERVE rejects (COBOLNET0901) and UNDEFINE/SUBSTITUTE-lit4 no longer reject. `VersionConformancePass.Run`
   also runs the **SR3/SR4 semantic validation** of the map (needs all three registries — `ReservedWords`
-  [Editions], `CobolLexer.DefaultVocabulary` [Frontend, context words], `IntrinsicCatalog` [Compiler]).
+  [Editions, §8.9], `ContextSensitiveWords` [Editions, §8.10], `IntrinsicCatalog` [Compiler, §8.11]).
   `IntrinsicBinder` consults the map to resolve function-name synonyms / removals before `IntrinsicCatalog.TryGet`.
 
 **Greenfield/legacy split:** `COBOL-WORDS` is a recognized directive of the ONE roster
@@ -183,8 +183,23 @@ is the user-word token type.
 
 ## §5 Syntax-rule validation (split by where the facts live)
 
-- **SR1 (before first ID DIVISION)** — Frontend: the first line matching `IDENTIFICATION DIVISION` (or `ID
-  DIVISION`) fixes the boundary; any `>>COBOL-WORDS` at a later line ⇒ COBOLNET1623 (SR1).
+- **SR1 (before first ID DIVISION)** — Frontend: the boundary is the first line `CompilationUnitStart.IsAt` accepts (the
+  `IDENTIFICATION DIVISION` / `ID DIVISION` header, or, the header being optional, the unit's own `PROGRAM-ID` /
+  `CLASS-ID` / `FUNCTION-ID` / `INTERFACE-ID` paragraph — §11.2.1, kb/Work PB829), **read through the group's own
+  synonyms** (kb/Work PB1373): after `>>COBOL-WORDS EQUATE "IDENTIFICATION" WITH "IDENT"` the line `IDENT DIVISION.` IS
+  the header (§7.3.10.4 GR2), so the entries in effect at the line (a POP that withdrew one has taken it back) rewrite the
+  line's first two words before the test (`IsAt(trimmed, map)`). `CobolWordsDirectiveProcessor.Process` returns that line
+  as `FirstUnitLine` (the third result), and `DirectiveSiteProcessor.JudgeFirstUnitPlacement` is the ONE judge of the row's
+  `BeforeFirstCompilationUnit` placement — for the directive and for a PUSH/POP naming it (§7.3.20.3 SR2, §7.3.22.3
+  SR2): a site after that line ⇒ COBOLNET2652 (it was COBOLNET1623 before kb/Work PB1377). The site stage cannot judge it on
+  the raw text, because it runs before the directive stage and so before any synonym exists.
+- **Operand reading (§8.3.5 2, 5)** — the separator comma and semicolon (each followed by a space) are read as the space they
+  stand for ONCE, by the directive-line parse (`CompilerDirectiveLine.SeparatorsAsSpaces`), for every directive operand, so
+  `>>COBOL-WORDS EQUATE "DISPLAY", WITH "SHOW"` and `>>TURN EC-SIZE; CHECKING ON` are the space-only spellings (a comma or
+  semicolon ending the operand stays: §7.3.3 SR3/SR4 allow only spaces and an inline comment after a directive). The
+  literal reader then takes a doubled quotation symbol as one character (§8.3.3.2.3 3)) and gives a literal with no closing
+  delimiter, or one the next character does not separate, as DEFECTIVE ⇒ COBOLNET1623 (SR2: "Each literal shall be an
+  alphanumeric literal").
 - **SR2 (alphanumeric literal, non-hex, space-free)** — Frontend, per literal at parse time. A WORD in a literal
   slot is a compilation-variable-name (§7.3.11.4 GR1, kb/Work PB1368): it must be defined before the directive
   (the `>>DEFINE` timeline's `DefinitionAt`, the same fold `CONSTANT … FROM` reads), its value alphanumeric (the slot's
@@ -192,9 +207,14 @@ is the user-word token type.
   hexadecimal format. Otherwise COBOLNET1623.
 - **SR5 (a word in ≤1 directive's literals)** — Frontend: a group-wide multiset of every literal's content;
   a repeat ⇒ COBOLNET1623 (SR5). (Both the modified word and its substitute count, per D.12.1.)
-- **SR3 (lit1/3/4 = reserved OR context OR intrinsic; not special-character)** — Compiler: reserved via
-  `ReservedWords.Find` (the generated §8.9 table), **context via `ContextSensitiveWords.Contains` (the
-  generated §8.10 table)**, intrinsic via `IntrinsicCatalog.TryGet`. None ⇒ COBOLNET1623 (SR3).
+- **SR3 (lit1/3/4 = reserved OR context OR intrinsic; not special-character)** — Compiler: ONE population predicate,
+  `VersionConformancePass.IsReservedContextOrIntrinsic`, shared by SR3 and SR4 and read at the directive's own edition
+  (`CobolWordsMap.DirectiveEdition`, 2023): reserved via `ReservedWords.Find(w).R2023` (the generated §8.9 table's 2023
+  flag — a word §8.9 dropped before 2023, AUTHOR or MEMORY, is not in it), **context via `ContextSensitiveWords.Contains`
+  (the generated §8.10 table)**, intrinsic via `IntrinsicCatalog.TryGet` inside its window (`IsDefinedAt`). None ⇒
+  COBOLNET1623 (SR3). ⛔ The lexer vocabulary (`CobolKeywordTokens.TryTokenType`) is NOT a population of the standard and no
+  longer answers either rule (kb/Work PB1373: SR3 accepted `UNDEFINE "AUTHOR"` because the lexer tokenizes it, and SR4
+  refused `RESERVE "AUTHOR"` for the same reason).
   ⛔ This used to read "context via `DefaultVocabulary` (a keyword token exists)", which answers a DIFFERENT
   question — the vocabulary knows only the context words this compiler happens to tokenize, so SR3 rejected
   every legal directive naming one of the 31 that it does not (HEX, CURRENT, LC_ALL, ANUM, BYTE, ACTIVATING,
@@ -204,9 +224,21 @@ is the user-word token type.
   `scripts/gen-reserved-words.ps1` and drift-tested against it; it needs no per-edition flags because the
   directive is a COBOL-2023 introduction, so 2023 is the only edition at which SR3/SR4 are ever asked.
 - **SR4 (lit2/5/6 NOT reserved/context/intrinsic; a valid user-defined word §8.3.2.2)** — Compiler: reject if
-  the word is reserved (high-confidence, at-edition) / context-sensitive (§8.10 table) / intrinsic; the
-  §8.3.2.2 well-formedness (letters/digits/hyphens, not all-digits, no leading/trailing hyphen) is a cheap
-  Frontend check at parse time.
+  the word is in the same 2023 population (`IsReservedContextOrIntrinsic`); the §8.3.2.1 / §8.3.2.2 well-formedness is a
+  Frontend check at parse time (`CobolWordsDirectiveProcessor.UserWord`): the word shape (word characters — letters,
+  digits, hyphen, underscore, the extended letters — neither hyphen nor underscore first or last), at least one letter, and
+  `CobolWordRule.DirectiveWordViolations` at the directive's edition (the 63-character ceiling and Annex B's placement of
+  each extended character) — asked here because a fresh word no statement uses never reaches the tree funnel.
+
+**Omitted conditional-compilation branches (§7.2.1, kb/Work PB2003).** The directive in the false path of a `>>IF` is part
+of the text that shall be "syntactically correct", but the conditional-compilation driver consumes that line and the stage
+that parses the operand never sees it. Each stage that owns an operand therefore has a **check-only entry**
+(`CobolWordsDirectiveProcessor.CheckOperand`, the same for `TurnDirectiveProcessor` and `FlagDirectiveProcessor`): the same
+parse, the same diagnostic, nothing applied and no timeline read (a compilation-variable-name in a literal slot is accepted
+by its shape; SR3/SR4 categories, SR5 uniqueness and the DEFINE lookup belong to the directive that is compiled).
+`StageOperandChecks` registers one entry per owner stage and the driver asks it in an omitted branch;
+`CompilerDirectiveCatalogDriftTests.EveryStageOwner_HasACheckOnlyEntryOrIsTheDriver` fails for a Stage row whose owner has
+none.
 
 ## §6 Hazards & resolutions
 
@@ -227,8 +259,9 @@ the EFFECTIVE word:
 
 - **COBOLNET0900** — introduction gate (below 2023), via `ConstructRegistry.Check(Constructs.CobolWordsDirective2023)`.
 - **COBOLNET1623** `cobol-words-directive-invalid` (Error) — a malformed directive (unknown option word,
-  missing `WITH`/`BY`, missing/badly-formed literal) OR a syntax-rule violation (SR1 placement, SR2 literal
-  form, SR3 lit1/3/4 category, SR4 lit2/5/6 category / user-word form, SR5 duplicate); the message names the SR.
+  missing `WITH`/`BY`, missing/badly-formed or unterminated literal) OR a syntax-rule violation (SR2 literal
+  form, SR3 lit1/3/4 category, SR4 lit2/5/6 category / user-word form, SR5 duplicate); the message names the SR. SR1's
+  placement is COBOLNET2652 (`DirectivePlacementViolation`).
 - **COBOLNET0901** — RESERVE's use-site rejection (existing edition-reserved-word funnel), one per distinct word.
 
 ## §8 Threading

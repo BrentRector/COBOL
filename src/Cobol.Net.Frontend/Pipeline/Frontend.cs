@@ -362,11 +362,14 @@ public sealed class Frontend
         // >>COBOL-WORDS (ISO §7.3.10): parse the per-group reserved/context/intrinsic word-table modification into
         // the CobolWordsMap (the lexer retype + composed ReservedWordSet consume it), edition-gate the
         // directive word, and enforce SR1/SR2/SR5. Line-count preserving like the stages above.
-        (text, var cobolWordsMap) = CobolWordsDirectiveProcessor.Process(text, diagnostics, sourcePath, lineMap, stackOps,
-            compilationVariables);
+        (text, var cobolWordsMap, int firstUnitLine) = CobolWordsDirectiveProcessor.Process(text, diagnostics, sourcePath, lineMap,
+            stackOps, compilationVariables);
         if (CountLines(text) != linesBefore)
             throw new InvalidOperationException(
                 "CobolWordsDirectiveProcessor changed the line count (hazard H3)");
+        // §7.3.10.3 SR1's placement rule, judged against the boundary that stage reads with the group's own synonyms
+        // (kb/Work PB1373) — for the COBOL-WORDS directive itself and for a PUSH / POP naming it.
+        DirectiveSiteProcessor.JudgeFirstUnitPlacement(directiveSites, firstUnitLine, diagnostics, sourcePath, lineMap);
 
         // >>LEAP-SECOND (ISO §7.3.17): the ON/OFF toggles the binder folds at each compilation unit's first line — the
         // §15.3 date/time consumers' fact (kb/Work PB65 — it used to be consumed and discarded; kb/Work PB1378 — it is

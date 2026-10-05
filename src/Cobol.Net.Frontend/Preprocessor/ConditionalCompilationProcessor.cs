@@ -319,6 +319,9 @@ public static partial class ConditionalCompilationProcessor
                     // compiled clean. The closed-word-set rows answer here, through the ONE COBOLNET1911
                     // producer; a row whose operand a downstream stage parses is a declared no-op.
                     CompilerDirectiveCatalog.CheckOperand(keyword, rest, _edition, sink);
+                    // The directives a DOWNSTREAM stage parses never reach that stage from an omitted branch (the line is
+                    // consumed below), so the stage's own syntax-only entry asks their operand here (kb/Work PB2003).
+                    if (!emitting) StageOperandChecks.CheckOmitted(keyword, rest, _dialectLevel, _bag, _diag.At.ToLocation());
                 }
                 string emit = "";   // directives are consumed by default (output blank line)
                 switch (keyword)

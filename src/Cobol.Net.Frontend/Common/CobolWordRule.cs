@@ -14,8 +14,9 @@ namespace CobolNet.Frontend.Common;
 /// with COBOLNET1567" was measured on the statement spelling only). §8.3.2.1 covers every COBOL word — "a
 /// compiler-directive word, a context-sensitive word, an intrinsic-function-name, a reserved word, a
 /// system-name, or a user-defined word" — so the directive stages enforce the SAME rule through the SAME text,
-/// reporting on their own channels. (&gt;&gt;COBOL-WORDS needs no site of its own: the words its literals
-/// introduce reach the main tree — and the funnel — wherever they are actually used.)
+/// reporting on their own channels. (&gt;&gt;COBOL-WORDS asks it of the fresh word of each entry — SR4 requires "a
+/// COBOL word that meets the requirements for a user-defined data-name" — because a word no statement uses never
+/// reaches the tree funnel; kb/Work PB1373.)
 ///
 /// <para>The ceiling: 63 at COBOL-2023 (Annex E.3.3 item 11 — a RELAXATION, so firing below 2023 for a 32..63
 /// word is a length error, not an introduction gate), 31 at 2002/2014, 30 at 1985. Above 63 is a hard cap at

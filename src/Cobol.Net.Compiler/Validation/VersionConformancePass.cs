@@ -91,9 +91,9 @@ internal sealed class VersionConformancePass
         // The per-compilation-group EFFECTIVE reserved-word set (ISO §7.3.10 D9 seam): the generated §8.9 table
         // composed with the >>COBOL-WORDS overlay (RESERVE adds, UNDEFINE/SUBSTITUTE remove). Empty map ⇒ Default.
         var reservedWords = ReservedWordSet.Compose(group.Session.CobolWords);
-        // >>COBOL-WORDS SR3/SR4 category validation (§7.3.10.3) — needs all three registries (reserved via the §8.9
-        // table + the lexer vocab, intrinsic via IntrinsicCatalog); the frontend validated SR1/SR2/SR5 already.
-        ValidateCobolWords(group.Session.CobolWords, edition, sink);
+        // >>COBOL-WORDS SR3/SR4 category validation (§7.3.10.3) — needs all three registries (§8.9 reserved, §8.10
+        // context-sensitive, §8.11 intrinsic via IntrinsicCatalog); the frontend validated SR1/SR2/SR5 already.
+        ValidateCobolWords(group.Session.CobolWords, sink);
         // ── PARSE-tree arm (Step 14h): ONE walk of the raw compilation unit, firing every SYNTACTIC
         //    introduction/removal/phrase gate + the §8.9 reserved-word funnel on the construct's RECOGNITION
         //    (absorbs the former EditionValidator). Recognition-based so a below-edition construct that ALSO
@@ -121,45 +121,35 @@ internal sealed class VersionConformancePass
 
     /// <summary>&gt;&gt;COBOL-WORDS SR3/SR4 category validation (ISO §7.3.10.3): the EXISTING word (literal-1/3/4)
     /// must be a reserved word, context-sensitive word, or intrinsic-function name (SR3); the NEW word
-    /// (literal-2/5/6) must be none of those (SR4 — the §8.3.2.2 well-formedness is the frontend half). Reserved /
-    /// context membership comes from the §8.9 table + the lexer vocabulary (<see cref="CobolKeywordTokens"/>);
-    /// intrinsic from <see cref="IntrinsicCatalog"/>. Both checks err AWAY from rejecting legal source (the
-    /// no-false-reject principle): SR3 accepts on ANY membership signal, SR4 rejects only on a CERTAIN one.</summary>
-    private static void ValidateCobolWords(CobolWordsMap map, EditionInfo edition, IDiagnosticSink sink)
+    /// (literal-2/5/6) must be none of those (SR4 — the §8.3.2.2 well-formedness is the frontend half). Both rules
+    /// ask the ONE population, <see cref="IsReservedContextOrIntrinsic"/>.</summary>
+    private static void ValidateCobolWords(CobolWordsMap map, IDiagnosticSink sink)
     {
         if (map.IsEmpty) return;
         foreach (var op in map.Ops)
         {
-            if (op.Existing is { } e && !IsExistingWordCategory(e))
+            if (op.Existing is { } e && !IsReservedContextOrIntrinsic(e))
                 ReportCobolWordsInvalid(sink, $"the existing word '{e}' is not a reserved word, "
                     + "context-sensitive word, or intrinsic-function name (ISO §7.3.10.3 SR3)");
-            if (op.New is { } n && IsReservedCategory(n, edition))
+            if (op.New is { } n && IsReservedContextOrIntrinsic(n))
                 ReportCobolWordsInvalid(sink, $"the new word '{n}' is a reserved / context-sensitive / "
                     + "intrinsic-function word and cannot be a user-defined word (ISO §7.3.10.3 SR4)");
         }
     }
 
-    /// <summary>SR3 membership — broad (accept on any signal): a lexer keyword/context token, an intrinsic-function
-    /// name, ANY §8.9 table entry, or any §8.10 context-sensitive word.
-    /// <para>⛔ THE §8.10 ARM IS WHAT THE LEXER VOCABULARY CANNOT SUPPLY (kb/Work PB250).
-    /// <see cref="CobolKeywordTokens"/> knows only the context words this compiler TOKENIZES; the other 31 —
-    /// HEX, NAT, ANUM, BYTE, CURRENT, ACTIVATING, STACK, TOP-LEVEL, the LC_ categories, UCS-4/UTF-8/UTF-16 and
-    /// the rest — arrive as bare IDENTIFIERs, so SR3 rejected the perfectly legal
-    /// <c>&gt;&gt;COBOL-WORDS EQUATE "HEX" WITH …</c> with COBOLNET1623 and no directive could name them at all.
-    /// §8.10's own NOTE is the counter-evidence: "Words can be added or deleted from this list for a specific
-    /// compilation group by use of the COBOL-WORDS directive."</para></summary>
-    private static bool IsExistingWordCategory(string w) =>
-        CobolKeywordTokens.IsKeyword(w) || IntrinsicCatalog.TryGet(w, out _) || ReservedWords.Find(w) is not null
-        || ContextSensitiveWords.Contains(w);
-
-    /// <summary>SR4 membership — narrow (reject only when certain): a lexer keyword/context token, an
-    /// intrinsic-function name, a §8.10 context-sensitive word, or a HIGH-CONFIDENCE reserved-at-edition table
-    /// entry. The §8.10 arm is CERTAIN despite carrying no per-edition flags: the directive is a COBOL-2023
-    /// introduction (<c>cobol-words-directive-2023</c>; §7.3.10, Annex E.3.3 item 12), so 2023 is the only
-    /// edition at which this question is ever asked and the table transcribes exactly that edition.</summary>
-    private static bool IsReservedCategory(string w, EditionInfo edition) =>
-        CobolKeywordTokens.IsKeyword(w) || IntrinsicCatalog.TryGet(w, out _) || ContextSensitiveWords.Contains(w)
-        || (ReservedWords.Find(w) is { Confidence: "high" } r && r.IsReservedAt(edition.Year));
+    /// <summary>⛔ THE POPULATION SR3 AND SR4 SPEAK OF, in one place (kb/Work PB1373): "a reserved word, a
+    /// context-sensitive word, or an intrinsic function name" — §8.9, §8.10 and §8.11 as the COBOL-2023 text lists them,
+    /// because the directive is a COBOL-2023 introduction (<see cref="CobolWordsMap.DirectiveEdition"/>) and no other
+    /// edition ever asks. It used to be two guesses that disagreed with the standard in opposite directions: the SR3
+    /// test accepted anything the LEXER tokenizes or ANY edition's §8.9 row carries (so <c>UNDEFINE "AUTHOR"</c>, a
+    /// word reserved in 1985 and gone from §8.9, compiled), and the SR4 test rejected anything the lexer tokenizes (so
+    /// <c>RESERVE "AUTHOR"</c>, a fresh word, was refused). The lexer's vocabulary is what this compiler TOKENIZES, which
+    /// is not a population of the standard; the §8.9 flag is the 2023 list itself (<c>ReservedWordsDriftTests</c>), the
+    /// §8.10 table carries no flags because it transcribes only 2023, and an intrinsic function is a name of the
+    /// edition inside its window (<see cref="IntrinsicSig.IsDefinedAt"/>).</summary>
+    private static bool IsReservedContextOrIntrinsic(string w) =>
+        ReservedWords.Find(w) is { R2023: true } || ContextSensitiveWords.Contains(w)
+        || (IntrinsicCatalog.TryGet(w, out var function) && function.IsDefinedAt(CobolWordsMap.DirectiveEdition));
 
     private static void ReportCobolWordsInvalid(IDiagnosticSink sink, string message) =>
         sink.Report(new EditionDiagnostic(DiagnosticCatalog.CobolWordsDirectiveInvalid.Code, EditionSeverity.Error,

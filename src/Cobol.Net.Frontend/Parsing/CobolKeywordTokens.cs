@@ -69,10 +69,6 @@ public static class CobolKeywordTokens
         return type != 0;
     }
 
-    /// <summary>True when <paramref name="word"/> is a reserved word or context-sensitive word (a keyword lexer
-    /// token). False for user words and for intrinsic-function-only names.</summary>
-    public static bool IsKeyword(string word) => ByWord.ContainsKey(word) || ProbedType(word) != 0;
-
     private static int ProbedType(string word)
     {
         lock (Probed)

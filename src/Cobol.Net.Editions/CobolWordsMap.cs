@@ -43,6 +43,12 @@ public sealed class CobolWordsMap
     /// <summary>The no-directive map — every consumer short-circuits on <see cref="IsEmpty"/>.</summary>
     public static readonly CobolWordsMap Empty = new([]);
 
+    /// <summary>The edition whose word populations §7.3.10.3 speaks of: the one that INTRODUCED the directive
+    /// (<c>cobol-words-directive-2023</c>; §7.3.10, Annex E.3.3 item 12), the only edition at which any rule of the
+    /// directive is ever asked. SR3/SR4 (§8.9 reserved ∪ §8.10 context-sensitive ∪ §8.11 intrinsic) and SR4's
+    /// §8.3.2.1 word limits are both read at it, so no caller restates the number.</summary>
+    public static readonly int DirectiveEdition = ConstructRegistry.Find(Constructs.CobolWordsDirective2023)!.IntroducedIn;
+
     private readonly Dictionary<string, string> _synonyms;
     private readonly HashSet<string> _deReserved;
     private readonly HashSet<string> _reserved;

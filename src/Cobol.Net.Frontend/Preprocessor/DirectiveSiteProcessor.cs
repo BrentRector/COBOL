@@ -65,6 +65,34 @@ public static class DirectiveSiteProcessor
         CompilerDirectiveCatalog.Words.Where(w => CompilerDirectiveCatalog.Find(w)?.Placement is not null)
             .ToHashSet(CobolNames.Comparer);
 
+    /// <summary>⛔ THE ONE JUDGE OF <see cref="DirectivePlacementRule.BeforeFirstCompilationUnit"/> (§7.3.10.3 SR1,
+    /// COBOLNET2652; kb/Work PB1377, PB1373): a directive whose row carries that rule — and a PUSH or POP that names
+    /// it (§7.3.20.3 SR2, §7.3.22.3 SR2: "shall not be specified where directive-name must not be specified") — written
+    /// on a line AFTER <paramref name="firstUnitLine"/> is a placement violation. The line is the boundary the
+    /// COBOL-WORDS stage reports, because that stage is the one that reads the unit's header as the group's own
+    /// <c>&gt;&gt;COBOL-WORDS</c> synonyms spell it; this stage cannot, so it never judges the rule on the raw text.</summary>
+    /// <param name="sites">The sites <see cref="Process"/> recorded.</param>
+    /// <param name="firstUnitLine">The 1-based line the first compilation unit begins on, or <see cref="int.MaxValue"/>.</param>
+    public static void JudgeFirstUnitPlacement(IReadOnlyList<DirectiveSite> sites, int firstUnitLine,
+        DiagnosticBag diagnostics, string sourcePath = "<source>", SourceLineMap? lineMap = null)
+    {
+        foreach (var site in sites)
+        {
+            if (site.Line <= firstUnitLine) continue;
+            bool named = site.NamedRow is not null;
+            if ((named ? ConstructRegistry.Find(site.NamedRow!) : CompilerDirectiveCatalog.Find(site.Word))
+                    is not { Placement: { Rule: DirectivePlacementRule.BeforeFirstCompilationUnit } placement } subject)
+                continue;
+            diagnostics.ReportError(DiagnosticCatalog.DirectivePlacementViolation.Code,
+                named
+                    ? $">>{site.Word} {subject.DirectiveWords[0]} is written where {subject.DirectiveWords[0]} must not be specified "
+                      + $"(ISO §7.3.20.3 SR2, §7.3.22.3 SR2) — \"{placement.Text}\" (ISO {placement.Citation})"
+                    : $">>{site.Word} is written after the first compilation unit began — \"{placement.Text}\" "
+                      + $"(ISO {placement.Citation}); write it before the first IDENTIFICATION DIVISION of the compilation group",
+                lineMap?.Locate(site.Line, sourcePath) ?? new SourceLocation(sourcePath, 0, site.Line - 1, 0), default);
+        }
+    }
+
     /// <summary>Record the position-ruled directive sites on <paramref name="text"/>, record the PUSH/POP ops the
     /// later stages replay (<see cref="DirectiveStateStack"/>), warn for each unsuccessful named POP (§7.3.20.4
     /// GR2, <c>COBOLNET2297</c> — here, once, because only this stage sees every PUSH/POP of the final text), and
@@ -78,34 +106,19 @@ public static class DirectiveSiteProcessor
         List<DirectiveStackOp>? ops = null;
         DirectiveStateStack? pairing = null;   // carries nothing: it answers GR2's "was it saved?" and no more
         bool blanked = false;
-        bool sawUnit = false;   // a compilation unit's first line has been passed — §7.3.10.3 SR1's boundary
         for (int i = 0; i < lines.Length; i++)
         {
             // The ONE compiler-directive line parse (kb/Work PB794) — the indicator's optional space and the
             // trailing inline comment are its rules, not this stage's.
-            if (!CompilerDirectiveLine.TryParse(lines[i], out var directive))
-            {
-                if (!sawUnit && CompilationUnitStart.IsAt(lines[i].TrimSpacesStart())) sawUnit = true;
-                continue;
-            }
+            if (!CompilerDirectiveLine.TryParse(lines[i], out var directive)) continue;
             if (!PositionRuled.Contains(directive.Word) && !PlacementRuled.Contains(directive.Word)) continue;
             bool isOp = DirectiveStackOp.TryParse(directive, i + 1, out var op);
             (sites ??= []).Add(new DirectiveSite(i + 1, directive.Word, AllForm: isOp && op.Row is null,
                 NamedRow: isOp ? op.Row : null));
-            // §7.3.10.3 SR1 (COBOL-WORDS) is a rule about the TEXT — the directive's own state boundary is the first
-            // unit's first line, and COBOL-WORDS is consumed before the parse — so it is judged here, for the
-            // directive itself and for a PUSH/POP that names it (§7.3.20.3 SR2, §7.3.22.3 SR2). The rules that need
-            // the parse tree are judged by DirectivePlacementPass from the sites just recorded.
-            if (sawUnit && diagnostics is not null
-                && (isOp && op.Row is not null ? ConstructRegistry.Find(op.Row) : CompilerDirectiveCatalog.Find(directive.Word))
-                    is { Placement: { Rule: DirectivePlacementRule.BeforeFirstCompilationUnit } placement } subject)
-                diagnostics.ReportError(DiagnosticCatalog.DirectivePlacementViolation.Code,
-                    isOp
-                        ? $">>{directive.Word} {directive.Operand} is written where {subject.DirectiveWords[0]} must not be specified "
-                          + $"(ISO §7.3.20.3 SR2, §7.3.22.3 SR2) — \"{placement.Text}\" (ISO {placement.Citation})"
-                        : $">>{directive.Word} is written after the first compilation unit began — \"{placement.Text}\" "
-                          + $"(ISO {placement.Citation}); write it before the first IDENTIFICATION DIVISION of the compilation group",
-                    lineMap?.Locate(i + 1, sourcePath) ?? new SourceLocation(sourcePath, 0, i, 0), default);
+            // §7.3.10.3 SR1 (COBOL-WORDS) is a rule about the TEXT, judged against the first unit's first line — which
+            // only the COBOL-WORDS stage can name, because a header may be spelled with that group's own synonym — by
+            // JudgeFirstUnitPlacement over the sites recorded here. The rules that need the parse tree are judged by
+            // DirectivePlacementPass from the same sites.
             if (!Consumed.Contains(directive.Word)) continue;
             if (isOp)
             {

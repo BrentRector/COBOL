@@ -60,6 +60,12 @@ public static class TurnDirectiveProcessor
         return (string.Join('\n', lines), events.ToTimeline(stackOps ?? []));
     }
 
+    /// <summary>The SYNTAX-ONLY check of one <c>&gt;&gt;TURN</c> operand — what ISO §7.2.1 asks of a directive line in an
+    /// OMITTED conditional-compilation branch ("syntactically correct in the initial source text and library text";
+    /// kb/Work PB2003): the same parse the compiled directive gets, reporting what it reports and applying nothing.</summary>
+    internal static void CheckOperand(string operand, int dialectLevel, DiagnosticBag diagnostics, SourceLocation loc) =>
+        ParseTurn(operand, 0, dialectLevel, diagnostics, loc);
+
     /// <summary>Parse one directive body: <c>{ec-name [file-name]…}… CHECKING {ON [WITH LOCATION] | OFF}</c>
     /// (§7.3.25.2). SR1: any word starting <c>EC-</c> is an exception-name, not a file-name. Null on a malformed
     /// directive (reported).</summary>

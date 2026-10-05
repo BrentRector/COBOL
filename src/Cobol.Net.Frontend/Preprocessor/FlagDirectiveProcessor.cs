@@ -47,7 +47,6 @@ public static class FlagDirectiveProcessor
             else if (line.Word == "FLAG-14") directive = FlagDirective.Flag14;
             else continue;
 
-            string keyword = FlagDirectiveLine.DirectiveWord(directive);   // "FLAG-02" / "FLAG-14" (7 chars)
             string operand = line.Operand;
             var loc = lineMap?.Locate(i + 1, sourcePath) ?? new SourceLocation(sourcePath, 0, i, 0);   // the SOURCE origin of resultant line i (kb/Work PB82)
 
@@ -62,18 +61,28 @@ public static class FlagDirectiveProcessor
                 events.Add(directive == FlagDirective.Flag02 ? Constructs.Flag02Directive2014 : Constructs.Flag14Directive2023,
                     i + 1, new FlagEvent(i + 1, directive, on, options));
             else
-                diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FlagDirectiveMalformed.Code,
-                    $">>{keyword} is malformed: {error} (ISO §7.3.{(directive == FlagDirective.Flag02 ? "14" : "15")}.2)",
-                    loc, default);
+                ReportMalformed(directive, error, diagnostics, loc);
 
             lines[i] = "";   // blank, never delete — line-count preserving (the >>TURN H3 discipline)
         }
         return (string.Join('\n', lines), events.ToTimeline(stackOps ?? []));
     }
 
-    /// <summary>Does the directive body begin with <paramref name="keyword"/> as a whole word (the next char is
-    /// whitespace or end-of-line)?</summary>
-    private static bool Matches(string body, string keyword) =>
-        CobolNames.StartsWith(body, keyword)
-        && (body.Length == keyword.Length || CobolSpace.IsSeparator(body[keyword.Length]));
+    /// <summary>The SYNTAX-ONLY check of one <c>&gt;&gt;FLAG-02</c> / <c>&gt;&gt;FLAG-14</c> operand — what ISO §7.2.1
+    /// asks of a directive line in an OMITTED conditional-compilation branch ("syntactically correct in the initial source
+    /// text and library text"; kb/Work PB2003): the same parse and the same COBOLNET1622 the compiled directive gets,
+    /// and nothing applied. <paramref name="word"/> is the directive word (<c>FLAG-02</c> / <c>FLAG-14</c>).</summary>
+    internal static void CheckOperand(string word, string operand, DiagnosticBag diagnostics, SourceLocation loc)
+    {
+        var directive = CobolNames.Same(word, "FLAG-02") ? FlagDirective.Flag02 : FlagDirective.Flag14;
+        if (!FlagDirectiveLine.TryParse(directive, operand, out _, out _, out string? error))
+            ReportMalformed(directive, error, diagnostics, loc);
+    }
+
+    /// <summary>The ONE COBOLNET1622 sentence — the compiled directive and its omitted twin say the same thing.</summary>
+    private static void ReportMalformed(FlagDirective directive, string? error, DiagnosticBag diagnostics, SourceLocation loc) =>
+        diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FlagDirectiveMalformed.Code,
+            $">>{FlagDirectiveLine.DirectiveWord(directive)} is malformed: {error} "
+            + $"(ISO §7.3.{(directive == FlagDirective.Flag02 ? "14" : "15")}.2)",
+            loc, default);
 }

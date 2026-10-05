@@ -1881,13 +1881,13 @@
   "ordinal": 1,
   "subject": "COBOL-WORDS directive",
   "rule-digest": "54c48dd1339f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#Process; src/Cobol.Net.Frontend/Preprocessor/CompilationUnitStart.cs#IsAt",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#Process; src/Cobol.Net.Frontend/Preprocessor/CompilationUnitStart.cs#IsAt; src/Cobol.Net.Frontend/Preprocessor/DirectiveSiteProcessor.cs#JudgeFirstUnitPlacement",
+  "test-ref": "conformance:negative/pb1373-cobol-words-sr1-equated-header; conformance:2023/pb1373_cobol_words_separators_header_populations; unit:CobolWordsDirectiveTests.Sr1_UnitHeaderSpelledWithAGroupSynonym_ClosesTheRegion; unit:CobolWordsDirectiveTests.Sr1_ASynonymNotYetEquated_DoesNotCloseTheRegion; unit:CobolWordsDirectiveTests.Sr1_ASynonymThatAPopWithdrew_DoesNotCloseTheRegion; unit:CobolWordsDirectiveTests.Sr1_AfterIdDivision_RejectedAsAPlacementViolation",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1373 (registrar 15a). SR1 'The COBOL-WORDS directive may be specified only before the first IDENTIFICATION DIVISION within a compilation group. There is no limit to the number of COBOL-WORDS directives' (cite.py OK §7.3.10.3 1)). Placement: sawFirstIdDivision via CompilationUnitStart.IsAt; probes: after IDENTIFICATION DIVISION -> 1623; after a first program, before the second -> 1623 (sr1_second_prog); headerless unit covered by negative pb829. 'No limit': five directives in one group all effective (many_directives). HOLE: the boundary is a TEXT test, blind to the directive's own synonyms: '>>COBOL-WORDS EQUATE \"IDENTIFICATION\" WITH \"IDENT\"' / 'IDENT DIVISION.' / '>>COBOL-WORDS RESERVE \"ZQX\"' / 'PROGRAM-ID. CWT01.' compiles and runs clean (sr1_synonym_id) though the second directive follows the first identification division (GR2 makes IDENT the IDENTIFICATION word). Expected COBOLNET1623. Under-rejects in a narrow edge; existing tests (unit Sr1_AfterIdDivision_Rejected1623, negative pb829) cover the main arm only. || editions (adjudicator): 2023 only (new in COBOL-2023: Foreword list 'Additional compiler directives were added: COBOL-WORDS directive'; Annex E.3.3 item 12, cite.py OK §E.3.3 12)); below 2023 the directive word is COBOLNET0900",
-  "state": "GAP"
+  "notes": "kb/Work PB1373 landed (w1019 G). SR1 'The COBOL-WORDS directive may be specified only before the first IDENTIFICATION DIVISION within a compilation group' (cite.py OK §7.3.10.3 1)). The boundary is now read through the group's own COBOL-WORDS synonyms (§7.3.10.4 GR2): CobolWordsDirectiveProcessor.Process returns FirstUnitLine (CompilationUnitStart.IsAt(line, map) rewrites the first two words through the EQUATE/SUBSTITUTE entries in effect at the line, POP withdrawals honored) and DirectiveSiteProcessor.JudgeFirstUnitPlacement is the one COBOLNET2652 judge for the directive and for a PUSH/POP naming it. Measured: EQUATE IDENTIFICATION WITH IDENT / IDENT DIVISION. / >>COBOL-WORDS RESERVE ZQX -> COBOLNET2652 (was clean).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.10.3-2",
@@ -1896,13 +1896,13 @@
   "ordinal": 2,
   "subject": "COBOL-WORDS directive",
   "rule-digest": "af30cef5f337",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#Literal; src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#ReadQuoted; src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#Tokenize",
-  "test-ref": "",
+  "test-ref": "conformance:negative/pb1373-cobol-words-unterminated-literal; unit:CobolWordsDirectiveTests.MalformedLiteral_IsRejectedWithItsReason; unit:CobolWordsDirectiveTests.DoubledQuotationSymbol_IsOneCharacterOfTheLiteral",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1373 (registrar 15a). SR2 'Each literal shall be an alphanumeric literal, shall not be specified in hexadecimal-alphanumeric format, shall not contain a space character, and shall be evaluated as case-insensitive' (cite.py OK §7.3.10.3 2)). Verified: unquoted word, X\"..\", N\"..\" (national_lit), embedded space all 1623; case-insensitive upper-casing. HOLE: ReadQuoted accepts an UNTERMINATED quoted operand as a literal ('returns the index past the closing quote (or end of string when unterminated)') -- '>>COBOL-WORDS RESERVE \"FOO' compiles clean and FOO is reserved (probe unterminated). An unclosed quotation is not an alphanumeric literal (§8.3.3.2.2 format requires the closing delimiter), so COBOLNET1623 is expected. Under-rejects. || editions (adjudicator): 2023 only (new in COBOL-2023: Foreword list 'Additional compiler directives were added: COBOL-WORDS directive'; Annex E.3.3 item 12, cite.py OK §E.3.3 12)); below 2023 the directive word is COBOLNET0900",
-  "state": "GAP"
+  "notes": "kb/Work PB1373 landed (w1019 G). SR2 'Each literal shall be an alphanumeric literal, shall not be specified in hexadecimal-alphanumeric format, shall not contain a space character, and shall be evaluated as case-insensitive' (cite.py OK §7.3.10.3 2)). The reader now gives a literal with no closing delimiter, or one the next character does not separate (§8.3.5 5)), as defective (COBOLNET1623), and reads a doubled quotation symbol as one character (§8.3.3.2.3 3)); the hexadecimal / national prefix and space-free screens are unchanged.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.10.3-3",
@@ -1911,13 +1911,13 @@
   "ordinal": 3,
   "subject": "COBOL-WORDS directive",
   "rule-digest": "c38042e0ade8",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#IsExistingWordCategory; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#ValidateCobolWords",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#IsReservedContextOrIntrinsic; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#ValidateCobolWords",
+  "test-ref": "conformance:negative/pb1373-cobol-words-sr3-word-in-no-2023-list; unit:CobolWordsDirectiveTests.Sr3_AWordNo2023ListHolds_Rejected1623; unit:CobolWordsDirectiveTests.Sr3_EachOfTheThreeLists_IsAnExistingWord; unit:CobolWordsDirectiveTests.Sr3_ExistingNotAWord_Rejected1623",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1373 (registrar 15a). SR3 'The content of literal-1, literal-3, and literal-4 shall be a reserved word, a context-sensitive word, or an intrinsic function name. The content of these literals shall not be a special-character word' (cite.py OK §7.3.10.3 3)). Non-words rejected (ZZTOP -> 1623, unit Sr3_ExistingNotAWord_Rejected1623); special-character words '+' and '>=' rejected (1623, though by the category arm, not a special-character test). HOLE: IsExistingWordCategory accepts ANY lexer keyword token (CobolKeywordTokens.IsKeyword) and ANY §8.9-table row regardless of edition (ReservedWords.Find(w) is not null), while the directive exists only at 2023: '>>COBOL-WORDS UNDEFINE \"AUTHOR\"' and 'EQUATE \"MEMORY\" WITH \"RAM\"' compile clean (probes sr3_author, sr3_memory) though AUTHOR and MEMORY are absent from the 2023 §8.9 reserved-word list and the §8.10 context-sensitive list and are not §8.11 intrinsic names (reserved-words.json r2023=false). Expected COBOLNET1623. Under-rejects. || editions (adjudicator): 2023 only (new in COBOL-2023: Foreword list 'Additional compiler directives were added: COBOL-WORDS directive'; Annex E.3.3 item 12, cite.py OK §E.3.3 12)); below 2023 the directive word is COBOLNET0900",
-  "state": "GAP"
+  "notes": "kb/Work PB1373 landed (w1019 G). SR3 'The content of literal-1, literal-3, and literal-4 shall be a reserved word, a context-sensitive word, or an intrinsic function name' (cite.py OK §7.3.10.3 3)). The test is the 2023 population (ReservedWords R2023, ContextSensitiveWords, IntrinsicCatalog.IsDefinedAt(2023)), not the lexer vocabulary or any edition's table row: UNDEFINE AUTHOR and EQUATE MEMORY WITH RAM (words §8.9 dropped before 2023) are COBOLNET1623 (were clean). The special-character-word clause is vacuous: no special-character word is in any of the three lists. retired-witness: src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#IsExistingWordCategory (IsExistingWordCategory was replaced by IsReservedContextOrIntrinsic, the one 2023 population (§8.9 R2023 flag, §8.10, §8.11 window) that SR3 and SR4 share)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.10.3-4",
@@ -1926,13 +1926,13 @@
   "ordinal": 4,
   "subject": "COBOL-WORDS directive",
   "rule-digest": "d3e253741e7e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#UserWord; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#IsReservedCategory",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#UserWord; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#IsReservedContextOrIntrinsic",
+  "test-ref": "conformance:negative/pb1373-cobol-words-fresh-word-too-long; conformance:2023/pb1373_cobol_words_separators_header_populations; unit:CobolWordsDirectiveTests.FreshWord_IsHeldToTheSixtyThreeCharacterCeiling; unit:CobolWordsDirectiveTests.FreshWord_Shape; unit:CobolWordsDirectiveTests.Sr4_AWordNo2023ListHolds_IsAFreshWord; unit:CobolWordsDirectiveTests.Sr4_EachOfTheThreeLists_IsNotAFreshWord; unit:CobolWordsDirectiveTests.Sr4_NewWordReserved_Rejected1623",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1373 (registrar 15a). SR4 'The content of literal-2, literal-5, and literal-6 shall not be a reserved word, a context-sensitive word, nor an intrinsic function-name. The content of each of these literals shall be a COBOL word that meets the requirements for a user-defined data-name as specified in 8.3.2.2' (cite.py OK §7.3.10.3 4)); §8.3.2.1: not more than 63 characters, letters/digits/extended letters/hyphen/UNDERSCORE, neither first nor last (cite.py OK §8.3.2.1); §8.3.2.2: every user-defined word except section/paragraph-names and level-numbers 'shall contain at least one basic letter or extended letter' (cite.py OK §8.3.2.2). Verified: reserved/context/intrinsic new words rejected (ANYCASE, TRIM, DISPLAY-class; unit Sr4_NewWordReserved_Rejected1623), leading hyphen rejected. DEFECTS both directions: (1) UserWord rejects underscore -- EQUATE \"DISPLAY\" WITH \"MY_SHOW\" -> 1623 (rejects legal source; MY_SHOW is a legal 2023 data-name, golden r02_underscore_in_cobol_words); (2) UserWord accepts an all-digit word -- RESERVE \"123\" clean (needs a letter); (3) no 63-character limit -- a 64-character RESERVE literal clean; (4) IsReservedCategory rejects any LEXER keyword regardless of edition -- RESERVE \"AUTHOR\" -> 1623 though AUTHOR is not reserved/context/intrinsic at 2023 (rejects legal source). || editions (adjudicator): 2023 only (new in COBOL-2023: Foreword list 'Additional compiler directives were added: COBOL-WORDS directive'; Annex E.3.3 item 12, cite.py OK §E.3.3 12)); below 2023 the directive word is COBOLNET0900",
-  "state": "GAP"
+  "notes": "kb/Work PB1373 landed (w1019 G). SR4 'The content of literal-2, literal-5, and literal-6 shall not be a reserved word, a context-sensitive word, nor an intrinsic function-name. The content of each of these literals shall be a COBOL word that meets the requirements for a user-defined data-name as specified in 8.3.2.2' (cite.py OK §7.3.10.3 4)). Population: the same 2023 one as SR3, so RESERVE AUTHOR (a fresh word) is accepted (was COBOLNET1623). Form: the §8.3.2.1 word shape (underscore a word character, neither hyphen nor underscore first or last), §8.3.2.2 at least one letter, and CobolWordRule's 63-character ceiling and Annex B placement (a 64-character fresh word is COBOLNET1623); MY_SHOW is legal. retired-witness: src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#IsReservedCategory (IsReservedCategory was replaced by IsReservedContextOrIntrinsic, the one 2023 population that SR3 and SR4 share)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.10.3-5",
@@ -57141,13 +57141,13 @@
   "ordinal": 0,
   "subject": "COBOL-WORDS directive",
   "rule-digest": "365b22efc1ea",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#TryParseOption; src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#TryBinary; src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#TryUnary",
-  "test-ref": "unit:CobolWordsDirectiveTests.Malformed_Emits1623_AndCollectsNoOp",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#TryParseOption; src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#TryBinary; src/Cobol.Net.Frontend/Preprocessor/CobolWordsDirectiveProcessor.cs#TryUnary; src/Cobol.Net.Editions/CompilerDirectiveLine.cs#SeparatorsAsSpaces",
+  "test-ref": "unit:CobolWordsDirectiveTests.Malformed_Emits1623_AndCollectsNoOp; unit:CobolWordsDirectiveTests.SeparatorCommaOrSemicolon_IsASeparatorSpace; unit:CobolWordsDirectiveTests.CommaOrSemicolonThatSeparatesNothing_IsMalformed1623; unit:DirectiveOperandSeparatorTests.SeparatorsAsSpaces_ReadsTheSeparatorsOutsideLiterals; conformance:2023/pb1373_cobol_words_separators_header_populations",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1373 (registrar 15a). Format: >>COBOL-WORDS { EQUATE literal-1 WITH literal-2 | UNDEFINE literal-3 | SUBSTITUTE literal-4 BY literal-5 | RESERVE literal-6 } (cite.py OK §7.3.10.2). TryParseOption switches on exactly one of the four option words (case-insensitive); TryBinary demands exactly 4 tokens with WITH/BY in slot 3 (wrong join word rejected), TryUnary exactly 2 tokens; any other shape is COBOLNET1623. Probed: all four options accepted, lowercase '>>cobol-words equate ... with ...' accepted (probe lower_kw), apostrophe-quoted literals accepted (apos_lit), unknown option / missing WITH / BY-for-WITH / no option rejected (unit theory). Literal-content defects are SR2/SR4 rows, not the format. || REFUTED: PARTIAL — The four options, join words and arity are parsed correctly, but the operand tokenizer only splits on whitespace: a separator comma or semicolon between elements (legal anywhere a separator space is, §5.2.8 / §8.3.5 SR2) is rejected with COBOLNET1623, so legal source is rejected; and an UNTERMINATED quoted literal (no closing quote) is silently accepted as literal-6 (ReadQuoted returns end-of-string) instead of being diagnosed as a malformed literal. || editions (adjudicator): 2023 only (new in COBOL-2023: Foreword list 'Additional compiler directives were added: COBOL-WORDS directive'; Annex E.3.3 item 12, cite.py OK §E.3.3 12)); below 2023 the directive word is COBOLNET0900",
-  "state": "GAP"
+  "notes": "kb/Work PB1373 landed (w1019 G). Format: >>COBOL-WORDS { EQUATE literal-1 WITH literal-2 | UNDEFINE literal-3 | SUBSTITUTE literal-4 BY literal-5 | RESERVE literal-6 } (cite.py OK §7.3.10.2). The four options, their join words and arity were already parsed; the separator comma and semicolon (§8.3.5 2), cite.py OK) are now read as the space they stand for once, by CompilerDirectiveLine.SeparatorsAsSpaces, for every directive operand, and an unterminated literal is COBOLNET1623 (the two refuted-PARTIAL gaps). Measured: EQUATE \"DISPLAY\", WITH \"SHOW\" -> synonym (was COBOLNET1623).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-7.3.11.2",

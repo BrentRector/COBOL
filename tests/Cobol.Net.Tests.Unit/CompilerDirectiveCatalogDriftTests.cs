@@ -297,6 +297,63 @@ public sealed class CompilerDirectiveCatalogDriftTests
             $"these conforming directive lines are rejected inside an omitted branch: [{string.Join(", ", rejected)}]");
     }
 
+    /// <summary>What each STAGE-owned operand's stage reports for a malformed operand, and one operand it accepts — the
+    /// two facts the omitted-branch witness below cannot derive from a row (a Stage row's grammar is the stage's own).
+    /// A new owner is one entry here and one in <see cref="StageOperandChecks"/>; the test that reads this fails, naming
+    /// the owner, until both exist.</summary>
+    private static readonly Dictionary<string, (string Code, string Conforming)> StageOwners = new()
+    {
+        [nameof(TurnDirectiveProcessor)] = ("COBOLNET0718", "EC-ALL CHECKING ON"),
+        [nameof(FlagDirectiveProcessor)] = ("COBOLNET1622", "ALL ON"),
+        [nameof(CobolWordsDirectiveProcessor)] = ("COBOLNET1623", "RESERVE \"ZQXWORD\""),
+    };
+
+    /// <summary>ISO §7.2.1 (kb/Work PB2003): every directive row whose operand a DOWNSTREAM stage parses is owned by the
+    /// conditional-compilation driver itself (which evaluates it in every branch) or by a stage with a check-only entry
+    /// the driver asks in an omitted branch (<see cref="StageOperandChecks"/>). A row whose owner is neither is a
+    /// directive whose false-path lines are accepted in silence, found here instead of by a user.</summary>
+    [Fact]
+    public void EveryStageOwner_HasACheckOnlyEntryOrIsTheDriver()
+    {
+        var missing = ConstructRegistry.Entries
+            .Where(e => e.DirectiveOperand is { Form: DirectiveOperandForm.Stage } o && o.Owner != StageOperandChecks.Driver)
+            .Select(e => e.DirectiveOperand!.Owner!)
+            .Distinct()
+            .Where(owner => !StageOperandChecks.Owners.Contains(owner) || !StageOwners.ContainsKey(owner))
+            .ToList();
+        Assert.True(missing.Count == 0,
+            $"these stages own a directive operand but have no check-only entry (StageOperandChecks) or no witness "
+            + $"(StageOwners in this test): [{string.Join(", ", missing)}]");
+        Assert.All(StageOperandChecks.Owners, owner => Assert.Contains(owner,
+            ConstructRegistry.Entries.Where(e => e.DirectiveOperand is { Form: DirectiveOperandForm.Stage })
+                .Select(e => e.DirectiveOperand!.Owner)));
+    }
+
+    /// <summary>The witness: for every stage-owned directive row, a malformed operand written inside an OMITTED branch
+    /// draws the owning stage's own diagnostic — the one the same line draws compiled — and the stage's conforming
+    /// operand there draws no error (a checker that rejected everything would satisfy the first half and reject legal
+    /// source, which is the worse defect). Derived from the rows, so a new stage row is witnessed with no edit here beyond
+    /// <see cref="StageOwners"/>.</summary>
+    [Fact]
+    public void EveryStageOwnedOperand_IsSyntaxCheckedInAnOmittedBranchToo()
+    {
+        var silent = new List<string>();
+        var rejected = new List<string>();
+        foreach (var row in ConstructRegistry.Entries.Where(e =>
+                     e.DirectiveOperand is { Form: DirectiveOperandForm.Stage } o && o.Owner != StageOperandChecks.Driver))
+        {
+            var (code, conforming) = StageOwners[row.DirectiveOperand!.Owner!];
+            string word = row.DirectiveWords[0];
+            if (!Diagnose(word, "GARBAGE", row.IntroducedIn, omittedBranch: true).Any(d => d.Code == code))
+                silent.Add($"{word} GARBAGE (expected {code})");
+            if (Diagnose(word, conforming, row.IntroducedIn, omittedBranch: true).Any(d => d.Severity == DiagnosticSeverity.Error))
+                rejected.Add($"{word} {conforming}");
+        }
+
+        Assert.True(silent.Count == 0, $"these directive lines are accepted in silence inside an omitted branch: [{string.Join(", ", silent)}] (ISO §7.2.1)");
+        Assert.True(rejected.Count == 0, $"these conforming directive lines are rejected inside an omitted branch: [{string.Join(", ", rejected)}]");
+    }
+
     /// <summary>The complement: every directive's own CONFORMING operand — the first alternative its general
     /// format admits — passes. A checker that rejected everything would satisfy the witness test above and
     /// reject legal source everywhere, which is the worse defect of the two.</summary>

@@ -61,9 +61,43 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
         if (i == wordStart) return false;                            // ">>" with no word heads no directive
 
         string word = s[wordStart..i].ToString().ToUpperInvariant();
-        string operand = StripInlineComment(s[i..].ToString()).TrimSpaces();
+        string operand = SeparatorsAsSpaces(StripInlineComment(s[i..].ToString()).TrimSpaces()).TrimSpaces();
         directive = new CompilerDirectiveLine(word, operand);
         return true;
+    }
+
+    /// <summary>
+    /// Read the separator comma and semicolon of an operand as the separator space they stand for (kb/Work PB1373,
+    /// PB2003). ISO §8.3.5 2): "The COBOL characters comma and semicolon, immediately followed by a space, are separators
+    /// that may be used anywhere the separator space is used" — so <c>&gt;&gt;COBOL-WORDS EQUATE "DISPLAY", WITH
+    /// "SHOW"</c> and <c>&gt;&gt;TURN EC-SIZE; CHECKING ON</c> write the operands their space-only spellings write. That is
+    /// one fact about every directive operand, so it is read ONCE, here, beside the indicator and the inline comment, and
+    /// not by each operand tokenizer (every one of which split on the space alone and rejected the legal spelling).
+    /// <para>Only a comma or semicolon that is followed by a space is a separator (a comma inside a numeric literal
+    /// <c>1,5</c> or glued to a word is not), the characters of a character-string are untouched (§8.3.3.2.3 3): a doubled
+    /// quotation symbol stays inside), and a comma or semicolon that ends the operand stays where it is — §7.3.3 3)
+    /// allows "only space characters and an optional inline comment" after the directive, and the operand is
+    /// trimmed, so one that ends it has nothing after it to separate from. The replacement is one character for one, so
+    /// no column of the operand moves.</para>
+    /// </summary>
+    public static string SeparatorsAsSpaces(string operand)
+    {
+        if (operand.AsSpan().IndexOfAny(',', ';') < 0) return operand;
+        var chars = operand.ToCharArray();
+        char quote = '\0';
+        for (int i = 0; i < chars.Length; i++)
+        {
+            char c = chars[i];
+            if (quote != '\0')
+            {
+                if (c != quote) continue;
+                if (i + 1 < chars.Length && chars[i + 1] == quote) i++;   // a doubled quotation symbol stays inside
+                else quote = '\0';
+            }
+            else if (c is '"' or '\'') quote = c;
+            else if (c is ',' or ';' && i + 1 < chars.Length && CobolSpace.IsSeparator(chars[i + 1])) chars[i] = ' ';
+        }
+        return new string(chars);
     }
 
     /// <summary>

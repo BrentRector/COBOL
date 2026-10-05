@@ -29,10 +29,12 @@ public sealed class CobolWordsDirectiveTests
         // stage alone would test a path the compiler does not have.
         string text = ConditionalCompilationProcessor.Process(
             src, CobolNet.Frontend.Frontend.LeftDirectives, bag, "t.cob", std);
-        // Then the site stage, which judges §7.3.10.3 SR1's placement from the row's directivePlacement data and
-        // consumes PUSH/POP into the ops the state stages replay (kb/Work PB1377).
-        var (sited, _, stackOps) = DirectiveSiteProcessor.Process(text, bag, "t.cob");
-        var (_, map) = CobolWordsDirectiveProcessor.Process(sited, bag, "t.cob", stackOps: stackOps);
+        // Then the site stage, which records the directive sites and consumes PUSH/POP into the ops the state stages
+        // replay (kb/Work PB1377) — and, after this stage has read the unit boundary with the group's own synonyms, the
+        // ONE judge of §7.3.10.3 SR1's placement from the row's directivePlacement data (kb/Work PB1373).
+        var (sited, sites, stackOps) = DirectiveSiteProcessor.Process(text, bag, "t.cob");
+        var (_, map, firstUnitLine) = CobolWordsDirectiveProcessor.Process(sited, bag, "t.cob", stackOps: stackOps);
+        DirectiveSiteProcessor.JudgeFirstUnitPlacement(sites, firstUnitLine, bag, "t.cob");
         return (map, bag);
     }
 
@@ -144,6 +146,112 @@ public sealed class CobolWordsDirectiveTests
         Assert.Contains("FOO", map.Reserved);
     }
 
+    // ── kb/Work PB1373: the operand is read as §8.3.5 separators and SR2 literals, the boundary as the group's own words ─
+
+    [Theory] // §8.3.5 2) — a comma or semicolon followed by a space is a separator, usable wherever a space is.
+    [InlineData(">>COBOL-WORDS EQUATE \"DISPLAY\", WITH \"SHOW\"\n")]
+    [InlineData(">>COBOL-WORDS EQUATE \"DISPLAY\"; WITH \"SHOW\"\n")]
+    [InlineData(">>COBOL-WORDS EQUATE, \"DISPLAY\" WITH, \"SHOW\"\n")]
+    public void SeparatorCommaOrSemicolon_IsASeparatorSpace(string src)
+    {
+        var (map, diags) = Run(src);
+        Assert.False(diags.HasErrors);
+        Assert.Equal("DISPLAY", map.Synonyms["SHOW"]);
+    }
+
+    [Theory] // §7.3.3 SR3/SR4 — a comma or semicolon that ENDS the directive is not a space; and one glued to the
+    // next word separates nothing (§8.3.5 2) needs the space after it).
+    [InlineData(">>COBOL-WORDS RESERVE \"ZQX\";\n")]
+    [InlineData(">>COBOL-WORDS RESERVE \"ZQX\",\n")]
+    [InlineData(">>COBOL-WORDS EQUATE \"DISPLAY\",WITH \"SHOW\"\n")]
+    public void CommaOrSemicolonThatSeparatesNothing_IsMalformed1623(string src)
+    {
+        var (map, diags) = Run(src);
+        Assert.True(Has(diags, "COBOLNET1623"));
+        Assert.True(map.IsEmpty);
+    }
+
+    [Fact] // §8.3.3.2.3 — a comma INSIDE a literal is the literal's own character, never a separator.
+    public void CommaInsideALiteral_IsNotASeparator()
+    {
+        var (_, diags) = Run(">>COBOL-WORDS RESERVE \"A, B\"\n");
+        // a space inside the one literal (SR2) — not a split operand, which would be an arity error of another sentence
+        Assert.Contains(diags.Diagnostics, d => d.Code == "COBOLNET1623" && d.Message.Contains("space-free"));
+    }
+
+    [Theory] // SR2 — "Each literal shall be an alphanumeric literal": no closing delimiter, or one the next character
+    // does not separate from what follows (§8.3.5 5)), is no literal at all.
+    [InlineData(">>COBOL-WORDS RESERVE \"FOO\n", "no closing quotation symbol")]
+    [InlineData(">>COBOL-WORDS RESERVE 'FOO\n", "no closing quotation symbol")]
+    [InlineData(">>COBOL-WORDS RESERVE \"FOO\"BAR\n", "followed by 'B'")]
+    [InlineData(">>COBOL-WORDS EQUATE \"DISPLAY\"WITH \"SHOW\"\n", "followed by 'W'")]
+    public void MalformedLiteral_IsRejectedWithItsReason(string src, string reason)
+    {
+        var (map, diags) = Run(src);
+        Assert.Contains(diags.Diagnostics, d => d.Code == "COBOLNET1623" && d.Message.Contains(reason));
+        Assert.True(map.IsEmpty);
+    }
+
+    [Fact] // §8.3.3.2.3 3) — two contiguous quotation symbols are ONE character of the content.
+    public void DoubledQuotationSymbol_IsOneCharacterOfTheLiteral()
+    {
+        var (_, diags) = Run(">>COBOL-WORDS RESERVE \"A\"\"B\"\n");
+        Assert.Contains(diags.Diagnostics, d => d.Code == "COBOLNET1623" && d.Message.Contains("'A\"B'"));
+    }
+
+    [Fact] // §8.3.2.1 + §8.3.2.2 — 63 characters is the ceiling of the fresh word; 64 is not a user-defined word.
+    public void FreshWord_IsHeldToTheSixtyThreeCharacterCeiling()
+    {
+        var (map, ok) = Run($">>COBOL-WORDS RESERVE \"{new string('A', 63)}\"\n");
+        Assert.False(ok.HasErrors);
+        Assert.Single(map.Reserved);
+
+        var (_, tooLong) = Run($">>COBOL-WORDS RESERVE \"{new string('A', 64)}\"\n");
+        Assert.Contains(tooLong.Diagnostics, d => d.Code == "COBOLNET1623" && d.Message.Contains("64 characters"));
+    }
+
+    [Theory] // §8.3.2.1 — hyphen and underscore are word characters (not first or last); §8.3.2.2 wants a LETTER.
+    [InlineData("MY_SHOW", true)]
+    [InlineData("MY-SHOW", true)]
+    [InlineData("A1", true)]
+    [InlineData("123", false)]
+    [InlineData("_SHOW", false)]
+    [InlineData("SHOW_", false)]
+    public void FreshWord_Shape(string word, bool legal)
+    {
+        var (_, diags) = Run($">>COBOL-WORDS RESERVE \"{word}\"\n");
+        Assert.Equal(!legal, Has(diags, "COBOLNET1623"));
+    }
+
+    [Theory] // §7.3.10.3 SR1 + §7.3.10.4 GR2 — the unit's header, spelled with a word the group's own EQUATE made a synonym,
+    // IS the first IDENTIFICATION DIVISION: a directive after it is a placement violation, as after the spelled-out header.
+    [InlineData(">>COBOL-WORDS EQUATE \"IDENTIFICATION\" WITH \"IDENT\"\nIDENT DIVISION.\n>>COBOL-WORDS RESERVE \"ZQX\"\nPROGRAM-ID. P.\n")]
+    [InlineData(">>COBOL-WORDS EQUATE \"IDENTIFICATION\" WITH \"IDENT\"\nident division.\n>>COBOL-WORDS RESERVE \"ZQX\"\nPROGRAM-ID. P.\n")]
+    [InlineData(">>COBOL-WORDS SUBSTITUTE \"IDENTIFICATION\" BY \"IDENT\"\nIDENT DIVISION.\n>>COBOL-WORDS RESERVE \"ZQX\"\nPROGRAM-ID. P.\n")]
+    [InlineData(">>COBOL-WORDS EQUATE \"DIVISION\" WITH \"DIV\"\nIDENTIFICATION DIV.\n>>COBOL-WORDS RESERVE \"ZQX\"\nPROGRAM-ID. P.\n")]
+    [InlineData(">>COBOL-WORDS EQUATE \"PROGRAM-ID\" WITH \"PID\"\nPID. P.\n>>COBOL-WORDS RESERVE \"ZQX\"\n")]
+    public void Sr1_UnitHeaderSpelledWithAGroupSynonym_ClosesTheRegion(string src)
+    {
+        var (_, diags) = Run(src);
+        Assert.True(Has(diags, "COBOLNET2652"));
+    }
+
+    [Fact] // the synonym is read at the line it is written on: before its EQUATE, IDENT is no header.
+    public void Sr1_ASynonymNotYetEquated_DoesNotCloseTheRegion()
+    {
+        var (_, diags) = Run("IDENT DIVISION.\n>>COBOL-WORDS EQUATE \"IDENTIFICATION\" WITH \"IDENT\"\n");
+        Assert.False(Has(diags, "COBOLNET2652"));   // (the IDENT line is a parse error of its own, not this stage's)
+    }
+
+    [Fact] // §7.3.20.4 GR1 — a synonym a POP withdrew before the line is no synonym there: IDENT is no header.
+    public void Sr1_ASynonymThatAPopWithdrew_DoesNotCloseTheRegion()
+    {
+        var (_, diags) = Run(
+            ">>PUSH COBOL-WORDS\n>>COBOL-WORDS EQUATE \"IDENTIFICATION\" WITH \"IDENT\"\n>>POP COBOL-WORDS\n"
+            + "IDENT DIVISION.\n>>COBOL-WORDS RESERVE \"ZQX\"\n");
+        Assert.False(Has(diags, "COBOLNET2652"));
+    }
+
     // ── edition gate ────────────────────────────────────────────────────────────────────────────────────────
 
     [Fact] // §7.3.10 is a COBOL-2023 addition — below 2023 the directive word is COBOLNET0900.
@@ -167,7 +275,7 @@ public sealed class CobolWordsDirectiveTests
     {
         const string src = ">>COBOL-WORDS RESERVE \"FOO\"\nIDENTIFICATION DIVISION.\n";
         var bag = new DiagnosticBag();
-        var (outText, _) = CobolWordsDirectiveProcessor.Process(src, bag, "t.cob");
+        var (outText, _, _) = CobolWordsDirectiveProcessor.Process(src, bag, "t.cob");
         Assert.Equal(src.Count(c => c == '\n'), outText.Count(c => c == '\n'));
         Assert.DoesNotContain("COBOL-WORDS", outText);
     }
@@ -211,9 +319,9 @@ public sealed class CobolWordsDirectiveTests
     [Fact]
     public void Keyword_Reserved_And_Context_AreKeywords_UserWordIsNot()
     {
-        Assert.True(CobolKeywordTokens.IsKeyword("MOVE"));       // a hard reserved word
-        Assert.True(CobolKeywordTokens.IsKeyword("display"));    // case-insensitive
-        Assert.False(CobolKeywordTokens.IsKeyword("ZZUSERWORD"));
+        Assert.True(CobolKeywordTokens.TryTokenType("MOVE", out _));       // a hard reserved word
+        Assert.True(CobolKeywordTokens.TryTokenType("display", out _));    // case-insensitive
+        Assert.False(CobolKeywordTokens.TryTokenType("ZZUSERWORD", out _));
         Assert.True(CobolKeywordTokens.TryTokenType("DISPLAY", out int t) && t > 0);
     }
 
@@ -262,6 +370,50 @@ public sealed class CobolWordsDirectiveTests
             "       >>COBOL-WORDS RESERVE \"MOVE\"\n" +
             "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. CWE3.\n" +
             "       PROCEDURE DIVISION.\n       MAIN.\n           DISPLAY \"X\".\n           STOP RUN.\n");
+        Assert.Contains(errors, e => e.Contains("COBOLNET1623") && e.Contains("SR4"));
+    }
+
+    private static string NoOpProgram(string directive) =>
+        "       " + directive + "\n       IDENTIFICATION DIVISION.\n       PROGRAM-ID. CWP.\n"
+        + "       PROCEDURE DIVISION.\n       MAIN.\n           DISPLAY \"X\".\n           STOP RUN.\n";
+
+    [Theory] // §7.3.10.3 SR3 — the existing word is in the 2023 population (§8.9 ∪ §8.10 ∪ §8.11): a word §8.9 dropped
+    // before 2023 (AUTHOR, MEMORY) is in none of them, however the lexer or an older edition treats it.
+    [InlineData("UNDEFINE \"AUTHOR\"")]
+    [InlineData("EQUATE \"MEMORY\" WITH \"RAM\"")]
+    [InlineData("SUBSTITUTE \"AUTHOR\" BY \"WRITER\"")]
+    public void Sr3_AWordNo2023ListHolds_Rejected1623(string option)
+    {
+        var errors = CompileErrors(NoOpProgram(">>COBOL-WORDS " + option));
+        Assert.Contains(errors, e => e.Contains("COBOLNET1623") && e.Contains("SR3"));
+    }
+
+    [Theory] // SR4 — the fresh word is in none of the three 2023 lists: AUTHOR (a lexer keyword, not a §8.9 word) is legal.
+    [InlineData("RESERVE \"AUTHOR\"")]
+    [InlineData("EQUATE \"DISPLAY\" WITH \"MEMORY\"")]
+    public void Sr4_AWordNo2023ListHolds_IsAFreshWord(string option)
+    {
+        var errors = CompileErrors(NoOpProgram(">>COBOL-WORDS " + option));
+        Assert.DoesNotContain(errors, e => e.Contains("COBOLNET1623"));
+    }
+
+    [Theory] // SR3 admits each of the three lists: §8.9 (DISPLAY), §8.10 (HEX), §8.11 (SQRT, an intrinsic-function-name).
+    [InlineData("EQUATE \"DISPLAY\" WITH \"SHOWIT\"")]
+    [InlineData("EQUATE \"HEX\" WITH \"HEXIT\"")]
+    [InlineData("EQUATE \"SQRT\" WITH \"ROOT\"")]
+    public void Sr3_EachOfTheThreeLists_IsAnExistingWord(string option)
+    {
+        var errors = CompileErrors(NoOpProgram(">>COBOL-WORDS " + option));
+        Assert.DoesNotContain(errors, e => e.Contains("COBOLNET1623"));
+    }
+
+    [Theory] // SR4 refuses a word of each of the three lists as the fresh word.
+    [InlineData("RESERVE \"DISPLAY\"")]
+    [InlineData("RESERVE \"HEX\"")]
+    [InlineData("RESERVE \"SQRT\"")]
+    public void Sr4_EachOfTheThreeLists_IsNotAFreshWord(string option)
+    {
+        var errors = CompileErrors(NoOpProgram(">>COBOL-WORDS " + option));
         Assert.Contains(errors, e => e.Contains("COBOLNET1623") && e.Contains("SR4"));
     }
 

@@ -38,7 +38,7 @@ public sealed class DirectiveOperandSpaceTests
     public void CobolWords_DoesNotSplitOperandOnNoBreakSpace()
     {
         var bag = new DiagnosticBag();
-        var (_, map) = CobolWordsDirectiveProcessor.Process($">>COBOL-WORDS UNDEFINE{Nbsp}\"MOVE\"\n", bag, "t.cob");
+        var (_, map, _) = CobolWordsDirectiveProcessor.Process($">>COBOL-WORDS UNDEFINE{Nbsp}\"MOVE\"\n", bag, "t.cob");
         Assert.DoesNotContain("MOVE", map.DeReserved);
     }
 

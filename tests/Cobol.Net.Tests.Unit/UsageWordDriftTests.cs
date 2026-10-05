@@ -25,7 +25,7 @@ public class UsageWordDriftTests
     /// case that makes the disjunction necessary — it has no §13.18.60.2 spelling at all (it is the dialect word
     /// the programmer wrote, lexed as COMPUTATIONAL_5), so ReservedWords alone would reject it.</summary>
     private static bool IsCobolWord(string w) =>
-        CobolNet.Frontend.Parsing.CobolKeywordTokens.IsKeyword(w) || ReservedWords.Find(w) is not null;
+        CobolNet.Frontend.Parsing.CobolKeywordTokens.TryTokenType(w, out _) || ReservedWords.Find(w) is not null;
 
     [Fact]
     public void EveryUsage_RendersAsCobolWords()

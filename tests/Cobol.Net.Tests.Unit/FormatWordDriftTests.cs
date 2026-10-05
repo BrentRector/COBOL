@@ -43,9 +43,9 @@ public sealed class FormatWordDriftTests
     /// IDENTIFIER, which is exactly the population the funnel screens position-blind.</summary>
     private static HashSet<string> TokenlessReservedWords()
     {
-        // CobolKeywordTokens.IsKeyword runs the pipeline's own lexer over the word: false = it lexes as IDENTIFIER.
+        // CobolKeywordTokens.TryTokenType runs the pipeline's own lexer over the word: false = it lexes as IDENTIFIER.
         return CobolWordsDriftTests.LoadReservedIntervals()
-            .Where(kv => kv.Value.Any(r => r) && !CobolNet.Frontend.Parsing.CobolKeywordTokens.IsKeyword(kv.Key))
+            .Where(kv => kv.Value.Any(r => r) && !CobolNet.Frontend.Parsing.CobolKeywordTokens.TryTokenType(kv.Key, out _))
             .Select(kv => kv.Key)
             .ToHashSet(StringComparer.Ordinal);
     }
