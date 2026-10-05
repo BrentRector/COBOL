@@ -144,6 +144,7 @@
   "pb1017_repository_identical_repeats",
   "pb1021_address_identifier_operands",
   "pb1407_address_of_reference_modified",
+  "pb1969_address_of_odo_group_current_extent",
   "pb665_restricted_pointer_conforming",
   "pb606_call_not_on_propagated",
   "pb987_property_per_evaluation",

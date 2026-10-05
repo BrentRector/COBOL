@@ -39,8 +39,13 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
         // that exact), from the bit of the first byte at which identifier-1 itself starts.
         if (a.RefMod is { } rm)
         {
+            // The size the position is tested against is identifier-1's CURRENT one (§8.4.3.3.4 5)): for an
+            // occurs-depending group that is the run-time extent a read of the reference measures (kb/Work PB1969).
+            string size = rm.CurrentExtent is { } odo ? PlaceRenderer.CurrentPositionsExpr(odo)
+                : rm.Positions is { } n ? n.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : RuntimeApi.UnknownRefModSize;
             string pos = RuntimeApi.StrRefModStartOffset(RuntimeApi.RefModStart(rm.Spec.Start),
-                RuntimeApi.RefModLength(rm.Spec.Length), rm.Positions, rm.Spec.AllowZeroLength);
+                RuntimeApi.RefModLength(rm.Spec.Length), size, rm.Spec.AllowZeroLength);
             off += rm is { UnitBits: 8, LeadBits: 0 }
                 ? $" + (long){pos}"
                 : $" + (({rm.LeadBits}L + (long){pos} * {rm.UnitBits}) / 8)";

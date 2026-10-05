@@ -1497,11 +1497,15 @@ public sealed record BoundAddressOf(DataItem Item, string? OccursDisplacement = 
 /// the same reference does (§8.4.3.3.4 GR5 b/c; EC-BOUND-REF-MOD). <paramref name="Spec"/> is the screened modifier;
 /// <paramref name="Positions"/> the positions identifier-1 has (<see cref="RefModPlace.PositionCount"/>), or null
 /// when its size is a run-time fact (an ANY LENGTH item) and only the lower bound is checked;
+/// <paramref name="CurrentExtent"/> the occurs-depending group place whose CURRENT extent is the size when identifier-1
+/// holds an OCCURS DEPENDING ON table (§13.18.38.4 GR8; kb/Work PB1969) — it replaces <paramref name="Positions"/>, the
+/// maximum, which a read of the same reference never measures against;
 /// <paramref name="UnitBits"/> the storage width of one position (<see cref="RefModPlace.PositionBits"/>: 8 for a
 /// character, 16 for a national character, 1 for a bit) and <paramref name="LeadBits"/> the bit within its first
 /// byte at which identifier-1 starts (nonzero only for a bit item, whose SR4 b) alignment proof guarantees the
 /// slice itself starts on a byte boundary).</summary>
-public sealed record AddressRefMod(RefModSpec Spec, int? Positions, int UnitBits, int LeadBits);
+public sealed record AddressRefMod(RefModSpec Spec, int? Positions, int UnitBits, int LeadBits,
+    OdoGroupPlace? CurrentExtent = null);
 
 /// <summary>A bound §8.4.3.13 PROGRAM-ADDRESS-IDENTIFIER (<c>ADDRESS OF PROGRAM …</c>) as a pointer VALUE: the
 /// program named by a compile-time <paramref name="NameLiteral"/> (literal-1, or program-prototype-name-1's

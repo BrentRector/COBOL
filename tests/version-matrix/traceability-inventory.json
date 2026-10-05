@@ -5811,13 +5811,13 @@
   "ordinal": 4,
   "subject": "Identifier",
   "rule-digest": "fd23a167d6ea",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#refModPart; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#refModSpec; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#RefModOf",
-  "test-ref": "conformance:2002/pb1407_address_of_reference_modified",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#refModPart; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#refModSpec; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#RefModOf; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ReadRefMod; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#LeftmostPositionOmitted; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving",
+  "test-ref": "conformance:2002/pb1407_address_of_reference_modified; conformance:negative/pb1407-ref-mod-leftmost-position-omitted; conformance:negative/pb1407-address-of-ref-mod-leftmost-position-omitted",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1407 (registrar 15b, restated). Format 3 is identifier-1 + the 8.4.3.3 reference-modifier; refModPart follows a dataReference, a functionCall and an inlineMethodInvocation. A reference-modified data-address-identifier now works (PB1407). Remaining divergence: the rule imports the 8.4.3.3.2 format, and when the required leftmost-position is omitted, X (:2) is refused only by the internal-error safety net (COBOLNET2362: 'refused without a diagnostic naming the rule') instead of a diagnostic naming 8.4.3.3.2 -- ReferenceResolver.ReadScreenedRefMod returns null for the empty leftmost segment (SubscriptOrRefMod capture) and SegmentFailure supplies no report.",
-  "state": "GAP"
+  "notes": "kb/Work PB1407 (wave 1019 C). Format 3 is identifier-1 + the 8.4.3.3 reference-modifier. The one remaining divergence is closed: a reference modifier with no leftmost-position (X (:2), X (: 2), X (:)) is refused COBOLNET2876 naming 8.4.3.3.2 by the one reader of the captured modifier (ReferenceResolver.ReadRefMod), on every surface (sending operand, relation operand, ADDRESS OF operand, function result). The RECEIVING surface used to drop the operand with no diagnostic at all (MOVE \"A\" TO X (:2) compiled clean with the MOVE missing) because ExpressionBinder.ResolveReceiving built no refusal node for the PB1029 ledger to check; it now records the refusal there, so a resolver that claims to have reported and did not fails the compile (COBOLNET2362) on the receiving arm as on the sending one.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.1.3-5",
@@ -57501,13 +57501,13 @@
   "ordinal": 0,
   "subject": "Reference-modification",
   "rule-digest": "39fb6e57d078",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#refModPart; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#refModSpec; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#subscriptOrRefMod; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ScreenEmptyParentheses",
-  "test-ref": "conformance:85/pb202_odo_refmod_group_direction",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#refModPart; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#refModSpec; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#subscriptOrRefMod; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ReadRefMod; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#LeftmostPositionOmitted; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#ScreenEmptyParentheses",
+  "test-ref": "conformance:85/pb202_odo_refmod_group_direction; conformance:negative/pb1407-ref-mod-leftmost-position-omitted",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1458 (registrar 15c). Format (cite.py --check 8.4.3.3.2 OK): identifier-1( leftmost-position : [ length ] ) - leftmost-position REQUIRED, length optional. Accept side verified at --std 85 and 2023 (out/probe/refmod-fmt/fmt1.cob): X(3:2)=CD, X(L + 1:L * 2)=CDEF, X(8:)=HIJ, X (2 : 3)=BCD, A OF G(2:3)=LMN, T(I)(2:2)=UV, T (I) (3:)=VW, X(L ** 2 - 1:(L + 1) / 3)=C, MOVE \"zz\" TO X(9:) writes positions 9-10; FUNCTION UPPER-CASE(X)(2:3)=BCD, T OF G(I)(1:2)=PQ, FUNCTION REVERSE(X) (1:) whole result. Reject side: X(1:2)(1:1) -> COBOLNET1630 (SR3), X(1:2:3) -> COBOLNET2363 (SR4), X() -> COBOLNET2309 naming §8.4.3.3.2. DEFECT (the PARTIAL): X(:2) - the REQUIRED leftmost-position omitted - is refused only by the PB1029 safety net COBOLNET2362 'refused without a diagnostic naming the rule it breaks; this is a COBOL.NET internal error', because ReferenceResolver's ref-mod arm calls RenderSegment(tokens.GetRange(0, colonIdx), SegmentPosition.RefMod) on an EMPTY token range and returns (null, true) with no Edition.Error; the same holds for T(1)( :2). Nonconforming source is still rejected (no under-reject), but the user is told it is a compiler bug instead of the §8.4.3.3.2 format violation. The golden cited covers both the length-specified and length-omitted forms at 85 (G (1:7), G (4:)); nothing spec-derived pins the missing-leftmost refusal. [editions as adjudicated: 85, 2002, 2014, 2023 (reference modification is a COBOL-85 facility; the format is unchanged since)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1458 (closed by PB1407 wave 1019 C, the same code site). The PARTIAL was X(:2): the REQUIRED leftmost-position omitted was refused only by the COBOLNET2362 internal-error net. It is now COBOLNET2876 naming the 8.4.3.3.2 format identifier-1( leftmost-position : [ length ] ), for X (:2), X (: 2) and X (:) on a sending, receiving, relation and ADDRESS OF operand. T(1)( :2) and FUNCTION F (:2) never reach the resolver: the default-mode refModPart grammar rule requires the leftmost expression, so they are parse errors (COBOL0001).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.4.3.4.2",

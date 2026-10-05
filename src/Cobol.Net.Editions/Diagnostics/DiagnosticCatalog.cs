@@ -5759,6 +5759,19 @@ public static class DiagnosticCatalog
         + "(§8.4.3.2.2 brackets argument-1 inside them), which a data-name is not.",
         "ISO §8.4.2.3.2; §8.4.3.3.2; §8.4.3.2.2");
 
+    /// <summary>A reference modifier whose leftmost-position is omitted — <c>X (:2)</c> (kb/Work PB1407 / PB1458).
+    /// Reported by the ONE reader of the captured reference-modifier group (<c>ReferenceResolver.ReadRefMod</c>) so
+    /// every surface that reads one — a sending operand, a receiving operand, an ADDRESS OF operand, a function
+    /// result — names the rule. Before it, a sending operand drew the COBOLNET2362 internal-error net and a RECEIVING
+    /// operand (<c>MOVE "A" TO X (:2)</c>) was DROPPED from its statement with no diagnostic at all.</summary>
+    public static readonly DiagnosticDescriptor RefModLeftmostPositionOmitted = new(
+        "COBOLNET2876", "ref-mod-leftmost-position-omitted", EditionSeverity.Error,
+        "A reference modifier is written with nothing before the colon — X (:2) or X (:). ISO §8.4.3.3.2 prints the "
+        + "general format identifier-1( leftmost-position : [ length ] ): only the LENGTH is bracketed, so the "
+        + "leftmost-position is required and the colon cannot lead. To take the first characters, write the position "
+        + "explicitly — X (1:2) — and to run to the rightmost position omit the length, X (3:).",
+        "ISO §8.4.3.3.2");
+
     /// <summary>A SPECIAL-NAMES FOR ALPHANUMERIC / FOR NATIONAL phrase written after the clause's definition
     /// (kb/Work PB977) — refused by name in ClosedFormatPass for the ALPHABET, CLASS and SYMBOLIC CHARACTERS
     /// clauses alike.</summary>

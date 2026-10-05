@@ -752,6 +752,12 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
                 ctx.Edition.Error(DiagnosticCatalog.ReceivingReferenceNotImplemented,
                     $"receiving operand '{DataBinder.WrittenText(dref)}' names a declared item in a reference shape WiseOwl COBOL does "
                     + "not yet implement as a receiver (COBOLNET_DESIGN §1.4 — rejected rather than dropped)");
+            // ⛔ A REPORTED REFUSAL IS A CLAIM THE REFUSAL LEDGER CHECKS (kb/Work PB1407). The sending arm builds a
+            // refusal NODE through a factory that records itself, so a resolver that said "reported" and did not is
+            // caught per statement (COBOLNET2362). This receiving arm builds no node — the caller simply drops the
+            // receiver — so the claim was never checked, and `MOVE "A" TO X (:2)` compiled CLEAN with the whole MOVE
+            // missing. Recording the refusal here puts the receiving arm under the same per-statement check.
+            else ctx.Edition.NoteRefusal(DiagnosticCatalog.UnreportedRefusal, $"receiving operand '{DataBinder.WrittenText(dref)}'");
             return null;
         }
         if (ReceivingPlaceBar(dref, place) is { } placeBar) return Refuse(placeBar);

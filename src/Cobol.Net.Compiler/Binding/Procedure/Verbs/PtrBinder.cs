@@ -361,7 +361,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
         int? positions = item.IsAnyLength ? null : RefModPlace.PositionCount(item);
         int lead = r.SubscriptedPlace is { } bit && ParameterConformance.BitStartOf(bit).Bits is { } start
             ? (int)(start % BitLayout.BitsPerCharacter) : 0;
-        return new AddressRefMod(spec, positions, RefModPlace.PositionBits(item), lead);
+        return new AddressRefMod(spec, positions, RefModPlace.PositionBits(item), lead, r.CurrentExtent);
     }
 
     /// <summary>Bind ALLOCATE (ISO §14.9.3, both formats). The INITIALIZED based form lowers per GR7 to the

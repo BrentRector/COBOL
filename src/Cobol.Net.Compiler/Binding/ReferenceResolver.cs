@@ -297,12 +297,13 @@ public sealed class ReferenceResolver(DataBinder data)
     /// produced must never reach the bound tree (kb/Work PB221).</summary>
     public readonly record struct ProbeResult(DataItem Item, PicCategory? OperandCategory, string? NonSectionKind);
 
-    /// <summary>The drefs this resolver has already DIAGNOSED (an undefined name — <see cref="ReportUnidentified"/> —
-    /// or a rejected reference shape: SR3 ref-mod-of-ref-mod, SR1 identifier-1 exclusion): one report per source
-    /// reference even when a statement binder resolves the same node more than once, and the fact the receiving
+    /// <summary>The source nodes this resolver has already DIAGNOSED — a data reference (an undefined name,
+    /// <see cref="ReportUnidentified"/>, or a rejected reference shape: SR3 ref-mod-of-ref-mod, SR1 identifier-1
+    /// exclusion) or a captured reference-modifier group (an omitted leftmost-position,
+    /// <see cref="ReadRefMod(Core.SubscriptOrRefModContext)"/>): one report per source node even when a statement binder resolves the same node more than once, and the fact the receiving
     /// chokepoint asks (<see cref="WasDiagnosed"/>) so that a null it gets back is EITHER already reported OR
     /// reported there — never a silently dropped receiver (kb/Work PB70).</summary>
-    private readonly HashSet<Core.DataReferenceContext> _diagnosed = [];
+    private readonly HashSet<ParserRuleContext> _diagnosed = [];
 
     /// <summary>True when a diagnostic has been emitted for <paramref name="dref"/> by this resolver — the
     /// receiving chokepoint reports an undiagnosed null itself (recognized-not-implemented shape).</summary>
@@ -671,6 +672,10 @@ public sealed class ReferenceResolver(DataBinder data)
         if ((written.RefModPart is not null ? ReadRefMod(written.RefModPart) : ReadRefMod(written.RefModGroup!)) is not { } spec)
         {
             refusal = SegmentFailure(DataBinder.WrittenText(dref));   // a bound the materializer refused or deferred (§8.4.3.3.3 SR4)
+            // A REFUSED segment was reported by whoever refused it (the materializer, or ReadRefMod's omitted
+            // leftmost-position), so the reference counts as diagnosed: a caller that asks (ADDRESS OF's binder) then
+            // adds no second, misleading "mis-subscripted" error of its own.
+            if (refusal.Outcome == RefOutcome.Reported && !_probing) _diagnosed.Add(dref);
             return null;
         }
         if (!ScreenRefModLiterals(dref, described, spec, dref.Start.Line))
@@ -931,9 +936,22 @@ public sealed class ReferenceResolver(DataBinder data)
     }
 
     /// <summary>Read the SUBSCRIPT-mode CAPTURED group form. The caller has already established the group IS a
-    /// ref-mod (<see cref="HasDepth0Colon"/>); null on an unrenderable segment.</summary>
+    /// ref-mod (<see cref="HasDepth0Colon"/>); null on an unrenderable segment, or on an OMITTED leftmost-position,
+    /// which is reported HERE — in the one reader of the captured form, so a sending operand, a receiving operand,
+    /// an ADDRESS OF operand and a function result all name §8.4.3.3.2 (kb/Work PB1407, PB1458). The default-mode
+    /// <c>refModPart</c> carrier cannot arise: its grammar rule requires the leftmost arithmetic expression.</summary>
     internal RefModSpec? ReadRefMod(Core.SubscriptOrRefModContext group)
     {
+        if (LeftmostPositionOmitted(group))
+        {
+            // R30 purity: a probe never diagnoses (kb/Work PB157); one report per written group (_diagnosed).
+            if (!_probing && _diagnosed.Add(group))
+                data.Edition.Error(DiagnosticCatalog.RefModLeftmostPositionOmitted,
+                    $"'({DataBinder.WrittenText(group).Trim()})': a reference modifier is written ( leftmost-position : "
+                    + "[ length ] ) and only the length may be omitted, so the colon cannot lead (ISO §8.4.3.3.2). Write "
+                    + "the leftmost position explicitly, for example (1:2).");
+            return null;
+        }
         var (rm, _) = InterpretSubscripts(group);
         return rm is { Count: > 0 }
             ? new RefModSpec(rm[0], rm.Count > 1 ? rm[1] : null, data.RefModZeroLength.IsOnAt(group.Start.Line))
@@ -1723,6 +1741,7 @@ public sealed class ReferenceResolver(DataBinder data)
         if (ReadSubscripts(dref, item, subCtx, out var exprs) is not null) return null;
         RefModSpec? refMod = null;
         Place? bitPlace = null;
+        OdoGroupPlace? extent = null;
         if (written.IsReferenceModified || BitLayout.IsBitItem(item))
         {
             var inner = PlaceForItem(item, exprs);
@@ -1730,10 +1749,14 @@ public sealed class ReferenceResolver(DataBinder data)
             {
                 if (ReadScreenedRefMod(dref, written, inner?.Item ?? item, out _) is not { } spec) return null;
                 refMod = spec;
+                // §8.4.3.3.4 GR5 / 5): the area a position is tested against is identifier-1's CURRENT size, and an
+                // occurs-depending group's is a run-time value (§13.18.38.4 GR8) — the same extent a read of the
+                // reference measures through its sending image (kb/Work PB1969).
+                extent = inner as OdoGroupPlace;
             }
             if (BitLayout.IsBitItem(item)) bitPlace = inner;
         }
-        if (subCtx is null) return new AddressOfOperand(item, null, refMod, bitPlace);
+        if (subCtx is null) return new AddressOfOperand(item, null, refMod, bitPlace, extent);
         // The in-class OCCURS levels outer→inner — the PlaceForItem Tier-B walk (same layout, same formula).
         var occursLevels = new List<DataItem>();
         bool underDynamicTable = false;
@@ -1743,18 +1766,21 @@ public sealed class ReferenceResolver(DataBinder data)
             underDynamicTable |= n.IsDynamicTable;
         }
         // SR6's refusal is the binder's, and it needs the operand: a dynamic level has no fixed stride to render.
-        if (underDynamicTable) return new AddressOfOperand(item, null, refMod, bitPlace);
+        if (underDynamicTable) return new AddressOfOperand(item, null, refMod, bitPlace, extent);
         occursLevels.Reverse();
         if (occursLevels.Count != exprs.Count) return null;   // wrong subscript count → loud
         // ByteWidth, for the same reason as the PlaceForItem twin above: the class backing is byte-addressed
         // and a NATIONAL element strides two bytes per position (kb/Work PB231; §13.18.60.4 GR8 / D-N1).
         string disp = string.Join(" + ", occursLevels.Select((lv, k) => $"({exprs[k]} - 1) * {lv.ByteWidth}"));
-        return new AddressOfOperand(item, disp, refMod, bitPlace);
+        return new AddressOfOperand(item, disp, refMod, bitPlace, extent);
     }
 
     /// <summary>What an <c>ADDRESS OF identifier-1</c> operand (ISO §8.4.3.11) resolves to: the item, the OCCURS
     /// displacement of its subscripts, the reference modification when one is written, and, for a bit item, the
     /// place its §8.4.3.11.3 SR4 alignment proof walks.</summary>
+    /// <param name="CurrentExtent">The occurs-depending group place whose CURRENT extent bounds a written reference
+    /// modifier (§8.4.3.3.4 5) — "a position outside the area of identifier-1", the area being the group's current
+    /// size under §13.18.38.4 GR8); null for every operand whose size is a compile-time fact.</param>
     /// <param name="Item">The data item the reference names (the table ELEMENT's item for a subscripted one).</param>
     /// <param name="OccursDisplacement"><c>(idx − 1) × width [+ …]</c> bytes within the item's storage class, or null
     /// for an unsubscripted reference — and for an item at or under a dynamic-capacity table, which §8.4.3.11.3 SR6
@@ -1766,7 +1792,7 @@ public sealed class ReferenceResolver(DataBinder data)
     /// built only for a bit item (SR4's proof is a walk over a place); null for any other item and for a shape the
     /// place builder cannot model, which the proof then accepts rather than reject what it cannot prove.</param>
     internal readonly record struct AddressOfOperand(
-        DataItem Item, string? OccursDisplacement, RefModSpec? RefMod, Place? SubscriptedPlace);
+        DataItem Item, string? OccursDisplacement, RefModSpec? RefMod, Place? SubscriptedPlace, OdoGroupPlace? CurrentExtent);
 
     /// <summary>The STRUCTURAL access path to a Tier-B/Tier-C class's single stored backing field (the
     /// <see cref="RedefViewPlace"/> twin of the old string <c>BackingPath</c>). The backing is emitted in the
@@ -2334,6 +2360,17 @@ public sealed class ReferenceResolver(DataBinder data)
             else if (tt == Core.SUB_COLON && d == 0) return true;
         }
         return false;
+    }
+
+    /// <summary>True when the captured ref-mod group has NOTHING but separators before its depth-0 colon — an
+    /// omitted leftmost-position (§8.4.3.3.2 brackets only the length). The group is already known to carry the
+    /// colon (<see cref="HasDepth0Colon"/>).</summary>
+    private static bool LeftmostPositionOmitted(Core.SubscriptOrRefModContext group)
+    {
+        var tokens = new List<IToken>();
+        CollectLeafTokens(group, tokens);
+        // the first non-separator token is the colon (a leftmost-position written would come first)
+        return tokens.FirstOrDefault(t => t.Type != Core.SUB_WS)?.Type == Core.SUB_COLON;
     }
 
     /// <param name="indexNames">§8.4.2.3.3 SR4's collector — the index-names used as subscripts, for

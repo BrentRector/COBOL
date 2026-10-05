@@ -865,6 +865,19 @@ internal static class PlaceRenderer
     private static string NatLengthExpr(OdoGroupPlace p) =>
         $"({CharLengthExpr(p)}) / {RuntimeApi.BytesPerNational}";
 
+    /// <summary>⛔ THE CURRENT SIZE, IN REFERENCE-MODIFICATION POSITIONS, OF AN OCCURS-DEPENDING GROUP OPERAND — the
+    /// quantity a read of <c>G (n:m)</c> measures its leftmost position against, because the read slices the SENDING
+    /// string (<see cref="SendingGroupValue"/>), whose length is exactly this: bit positions for a bit group
+    /// (<see cref="LengthExpr"/>), national positions for a national group (<see cref="NatLengthExpr"/>), character
+    /// positions of the storage image otherwise (<see cref="CharLengthExpr"/>). §8.4.3.3.4 5) tests a position against
+    /// "the area of identifier-1", and §13.18.38.4 GR8 makes that area the group's current extent (kb/Work PB1969).
+    /// The three arms are the three channels <see cref="SendingGroupValue"/> chooses between, so an operand that needs
+    /// the SIZE and not the string — ADDRESS OF — cannot disagree with the read.</summary>
+    public static string CurrentPositionsExpr(OdoGroupPlace p) =>
+        !p.Item.IsAsIfElementary ? CharLengthExpr(p)
+        : p.Item.GroupUsage is GroupUsage.Bit ? LengthExpr(p)
+        : NatLengthExpr(p);
+
     /// <summary>A receiving store over an occurs-depending GROUP operand's CURRENT extent (GR8a — depending-outside):
     /// splice the stored prefix over the live image, leaving positions past the count unmodified. A zero current
     /// extent (OCCURS 0 TO n DEPENDING at count 0, §13.18.38 GR8a) is a no-op store, NOT a reference-modification

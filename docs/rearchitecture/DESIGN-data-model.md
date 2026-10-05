@@ -492,7 +492,13 @@ subscripts and byte alignment → COBOLNET2786, through `ParameterConformance.Bi
 CALL, INVOKE and the function-identifier share). A reference-modified identifier-1 is legal (SR4 a) names it): the
 resolver admits it through the same `ReadScreenedRefMod` as an ordinary reference, and the address is that of its
 leftmost position (`BoundAddressOf.RefMod`, emitted through `CobolString.RefModStartOffset`, the same range test as
-a read). Residue: an OCCURS DEPENDING ON group is range-checked against its maximum extent, not its current one.
+a read). The size that range test measures is identifier-1's CURRENT one (§8.4.3.3.4 5)): for a group holding an OCCURS
+DEPENDING ON table that is the run-time extent §13.18.38.4 GR8 gives it, carried as `AddressRefMod.CurrentExtent` (the
+`OdoGroupPlace` the resolver built) and rendered by `PlaceRenderer.CurrentPositionsExpr`, whose three arms are the channels
+`SendingGroupValue` reads (kb/Work PB1969), so the address and a read of the same reference cannot disagree. A reference
+modifier with no leftmost-position is refused COBOLNET2876 by `ReferenceResolver.ReadRefMod`, the one reader of the captured
+form, on every surface (§8.4.3.3.2: only the length is bracketed); the receiving chokepoint records any unreported resolver
+refusal on the refusal ledger, so a dropped receiver cannot compile clean (kb/Work PB1407).
 
 ### 2.5 The explicit bind pipeline (the pass contract)
 

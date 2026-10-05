@@ -343,6 +343,8 @@
   "pb1407-address-of-constant-record",
   "pb1407-address-of-dynamic-capacity",
   "pb1407-address-of-bit-alignment",
+  "pb1407-address-of-ref-mod-leftmost-position-omitted",
+  "pb1407-ref-mod-leftmost-position-omitted",
   "pb665-set-address-of-untyped-from-restricted",
   "pb816-set-up-by-strong-restricted-pointer",
   "pb606-call-not-on-propagated-below-2002",
