@@ -1216,6 +1216,78 @@
       "dns": 457,
       "label": "PB1425+PB1197: identifier Fo",
       "battery": null
+    },
+    {
+      "sha": "9833d1e2",
+      "date": "2026-10-05",
+      "gap": 227,
+      "closed": 4120,
+      "dns": 457,
+      "label": "PB2003+PB1373: omitted-branc",
+      "battery": null
+    },
+    {
+      "sha": "4e34a3c6",
+      "date": "2026-10-05",
+      "gap": 222,
+      "closed": 4125,
+      "dns": 457,
+      "label": "PB1374: FLAG-02/FLAG-14 defa",
+      "battery": null
+    },
+    {
+      "sha": "edbc2fd7",
+      "date": "2026-10-05",
+      "gap": 214,
+      "closed": 4133,
+      "dns": 457,
+      "label": "PB1301+PB1302+PB1476+PB2018+",
+      "battery": null
+    },
+    {
+      "sha": "16a17629",
+      "date": "2026-10-05",
+      "gap": 210,
+      "closed": 4137,
+      "dns": 457,
+      "label": "PB1525+PB855+PB876: extensio",
+      "battery": null
+    },
+    {
+      "sha": "96815ba6",
+      "date": "2026-10-05",
+      "gap": 208,
+      "closed": 4139,
+      "dns": 457,
+      "label": "PB643: RESERVE integer-1 siz",
+      "battery": null
+    },
+    {
+      "sha": "1ebf0c5d",
+      "date": "2026-10-05",
+      "gap": 203,
+      "closed": 4144,
+      "dns": 457,
+      "label": "PB773+PB1073: one table of f",
+      "battery": null
+    },
+    {
+      "sha": "df469049",
+      "date": "2026-10-05",
+      "gap": 201,
+      "closed": 4146,
+      "dns": 457,
+      "label": "PB1425: SELF, SUPER, object-",
+      "battery": null
+    },
+    {
+      "sha": "6e87def8",
+      "date": "2026-10-05",
+      "gap": 197,
+      "closed": 4150,
+      "dns": 457,
+      "label": "PB1281+PB1252: REDEFINES ope",
+      "battery": null
     }
   ]
 }

@@ -8,6 +8,10 @@ fires inside subagents and Workflow agents too. Each rule below was written in a
                             popped the registrar's stash. WIP goes into a commit (workstream skill, references/landing.md).
   bare push to main         main requires the ci-gate check; the only route is `bash scripts/push-main.sh`
                             (owner decision Q23, 2026-09-06). A push to ci/<sha> or any other branch is fine.
+  direct push in a unit     inside an orchestrator unit (COBOL_COORD_DIR set) ANY `git push`, any repository, any
+                            flags: a unit lands through `bash scripts/push-main.sh` and never publishes another repo
+                            (owner 2026-10-05, kb/Work/PB2044: the wave unit pushed the public skills repo's main with
+                            `git push -q origin HEAD:main`, which the deny rule's text pattern missed).
   escapes in a heredoc      heredoc bodies with backslash escapes were mangled or mis-escaped in six sessions (and the
                             harness decodes some escapes in tool input); write the file with the Write tool instead.
   bare `~X` test filter     `--filter "~X|~Y"` matches NOTHING and exits 0 — a silent green; every term needs a
@@ -30,6 +34,7 @@ fires inside subagents and Workflow agents too. Each rule below was written in a
 Exit 2 blocks the call and returns stderr to the agent. Anything unparseable passes (a hook must never wedge a session).
 """
 import json
+import os
 import re
 import sys
 
@@ -88,6 +93,44 @@ for m in ([] if other_repo else re.finditer(r"\bgit\s+(?:-C\s+\S+\s+)?push\b([^;
         block("a direct push to main is refused by the server (required `ci-gate` check). Land with "
               "`bash scripts/push-main.sh` — it pushes ci/<sha>, waits for green, then fast-forwards main. "
               "It is idempotent; run it with run_in_background and block on its log.")
+# 2b. ANY direct `git push`, in ANY repository, inside an orchestrator unit (owner 2026-10-05, kb/Work/PB2044).
+# Rule 2 guards THIS repo's main and deliberately leaves another repository to its own rules, so an attended session may
+# push the sites and the public skills repo. A unit has no such need and runs under `bypassPermissions`: on 2026-10-05 the
+# wave unit published the public skills repo's main with `git push -q origin HEAD:main` from a scratch clone, and the
+# project's deny rule (a TEXT pattern, `git push origin HEAD:main`) missed it because of the extra `-q`. A unit lands
+# through `bash scripts/push-main.sh`, whose command text contains no `git push`; the supervisor exports
+# COBOL_COORD_DIR into every unit's environment and hooks (also in its subagents) inherit it. Attended sessions and
+# cloud sessions never have it set, so their pushes are untouched. The pattern is the git SUBCOMMAND after any global
+# options (`-C dir`, `-c k=v`, `--no-pager`), so flags before or after cannot dodge it and `git log --grep=push` is not hit.
+_PUSH = re.compile(r"\bgit(?:\s+(?:-C\s+\S+|-c\s+\S+|--[\w-]+(?:=\S+)?))*\s+push\b")
+_QUOTED = re.compile(r"\"[^\"]*\"|'[^']*'")
+# the payload of `bash -c '…'` / `pwsh -Command "…"` IS a command line, so it is scanned; every other quoted span is text
+# (a commit message that says "git push" is not a push)
+_SHELL_PAYLOAD = re.compile(r"\b(?:bash|sh|zsh|pwsh|powershell)(?:\.exe)?\s+(?:-\w+\s+)*-(?:c|lc|Command)\s+([\"'])(.*?)\1", re.S)
+
+
+def _without_heredoc_bodies(text: str) -> str:
+    """Everything except the BODIES of heredocs. `commands` above stops at the first `<<`, so a push written AFTER a heredoc
+    (`cat > msg <<'EOF' … EOF` then `git commit -F msg; git push …`, the shape the unit used) would never be scanned."""
+    out, pos = [], 0
+    for m in re.finditer(r"<<-?\s*[\"']?(\w+)[\"']?[^\n]*\n", text):
+        if m.start() < pos:
+            continue
+        out.append(text[pos:m.end()])
+        end = re.search(r"^\s*" + re.escape(m.group(1)) + r"\s*$", text[m.end():], re.M)
+        pos = m.end() + (end.end() if end else len(text) - m.end())
+    out.append(text[pos:])
+    return "".join(out)
+
+
+if os.environ.get("COBOL_COORD_DIR"):
+    scan = _without_heredoc_bodies(cmd)
+    payloads = [m.group(2) for m in _SHELL_PAYLOAD.finditer(scan)]
+    if any(_PUSH.search(t) for t in [_QUOTED.sub(" ", scan)] + payloads):
+        block("a direct `git push` is refused inside an orchestrator unit (any repository, any flags). Land this "
+              "repository's work with `bash scripts/push-main.sh`. A change to ANOTHER repository (the public skills "
+              "repo, a site) is never published by a unit: hand it off as an owed push in the handoff and the "
+              "attended session or the owner publishes it (kb/Work/PB2044).")
 # 3. backslash escapes inside a heredoc body
 if body and re.search(r"\\[nrtuUx0abfvdswDSW\\'\"]", body):
     block("this heredoc body contains backslash escape sequences, which have been mangled here repeatedly. Write the "

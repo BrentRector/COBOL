@@ -5,6 +5,7 @@ A guard hook is a gate, and a gate is only trusted once its failure branch has f
 fails). Run: python scripts/hooks/test_forbidden_commands.py   (CI `audits` job and build-local run it too.)
 """
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -73,15 +74,52 @@ CASES = [
 ]
 
 
-def blocked(cmd: str) -> bool:
+def blocked(cmd: str, unit: bool = False) -> bool:
+    # The environment is part of the case: an orchestrator unit has COBOL_COORD_DIR, an attended session never does. Set or
+    # removed EXPLICITLY, so the result never depends on who runs this test.
+    env = {k: v for k, v in os.environ.items() if k != "COBOL_COORD_DIR"}
+    if unit:
+        env["COBOL_COORD_DIR"] = "E:/COBOL-coord"
     r = subprocess.run([sys.executable, str(HOOK)], input=json.dumps({"tool_input": {"command": cmd}}),
-                       capture_output=True, text=True, timeout=30)
+                       capture_output=True, text=True, timeout=30, env=env)
     return r.returncode == 2
 
 
-fails = [(c, e) for c, e in CASES if blocked(c) != e]
+# Inside an orchestrator unit EVERY direct `git push` is refused, whatever the repository or the flags (PB2044: a unit pushed
+# the public skills repo with `git push -q origin HEAD:main`, which the deny rule's text pattern missed). The legitimate
+# neighbours stay silent: the landing script, other git subcommands that merely mention the word, and a stash (rule 1's).
+UNIT_CASES = [
+    ("git push -q origin HEAD:main", True),
+    ("cd /e/claude-skills && git push -q origin main", True),
+    ("git -C E:/claude-skills push origin main", True),
+    ("git -c core.askpass=x push origin v1.18.0", True),
+    ("git --no-pager push --quiet origin HEAD:refs/heads/main", True),
+    ("git push origin HEAD:ci/abc123", True),
+    ("cd /e/Sites/wiseowlsoftware.com; git push", True),
+    ("git push -u origin claude/batch-7", True),
+    ("bash scripts/push-main.sh", False),
+    ("git log --grep=push", False),
+    ("git log --oneline -3 -- scripts/push-main.sh", False),
+    ("git commit -q -m 'document git push for the owner'", False),
+    ('git commit -q -m "PB2044: a unit ran git push -q origin HEAD:main"', False),
+    ("bash -c 'cd /e/claude-skills && git push -q origin main'", True),       # the payload of bash -c IS a command line
+    ('pwsh -Command "git -C E:/claude-skills push origin main"', True),
+    ("git status -s", False),
+    # THE SHAPE THE UNIT ACTUALLY USED: a heredoc, then the commit and the push after its terminator
+    ("cd /x/scratch; git add -A; cat > ../m.txt <<'EOF'" + chr(10) + "v1.17.1: a fix" + chr(10) + "EOF" + chr(10)
+     + "git commit -q -F ../m.txt; git push -q origin HEAD:main", True),
+    ("cat > ../m.txt <<'EOF'" + chr(10) + "the unit ran git push -q origin HEAD:main" + chr(10) + "EOF" + chr(10)
+     + "git commit -q -F ../m.txt", False),                                    # the word inside the heredoc BODY is text
+]
+
+fails =[(c, e) for c, e in CASES if blocked(c) != e]
+fails += [(f"[unit] {c}", e) for c, e in UNIT_CASES if blocked(c, unit=True) != e]
+# The same pushes in an ATTENDED session (no COBOL_COORD_DIR) keep their old behaviour: rule 2 alone decides.
+ATTENDED = [("git push -u origin claude/batch-7", False), ("git -C E:/claude-skills push origin v1.18.0", False),
+            ("git push -q origin HEAD:main", True)]
+fails += [(f"[attended] {c}", e) for c, e in ATTENDED if blocked(c) != e]
 for c, e in fails:
     print(f"FAIL: expected {'BLOCK' if e else 'PASS'}: {c!r}")
-print(f"forbidden_commands self-test: {len(CASES) - len(fails)}/{len(CASES)} "
-      + ("GREEN" if not fails else "RED"))
+total = len(CASES) + len(UNIT_CASES) + len(ATTENDED)
+print(f"forbidden_commands self-test: {total - len(fails)}/{total} " + ("GREEN" if not fails else "RED"))
 sys.exit(1 if fails else 0)
