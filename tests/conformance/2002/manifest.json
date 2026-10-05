@@ -315,6 +315,8 @@
     "constant_entry",
     "constant_record",
     "directive_expressions",
+    "pb1363_omitted_branch_directives_legal",
+    "pb1367_define_general_format_alternatives",
     "ec_bound_ref_mod",
     "exception_file_n",
     "file_collating_seq",

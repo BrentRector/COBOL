@@ -301,11 +301,15 @@ public static partial class ConditionalCompilationProcessor
                 // edge is COBOLNET0900, a removal COBOLNET0902 and an obsolete use COBOLNET0903, with the
                 // §4.2 severity decided by the ONE EditionSeverityPolicy — never a local `if (dialect < N)`.
                 // A directive in an OMITTED branch is not compiled, so it is not gated (it drops with its
-                // branch, like every other omitted line).
-                if (emitting && _bag is not null)
+                // branch, like every other omitted line). Its SYNTAX is another matter (§7.2.1, kb/Work PB1363): the
+                // standard requires "compiler directives" to be "syntactically correct in the initial source text and
+                // library text", and the false path of an IF or EVALUATE is part of that text. So the OPERAND below is
+                // asked of every directive line whichever branch it is in, and the conditional-compilation arms parse
+                // their operands in an omitted branch too (they only EVALUATE them in a compiled one).
+                if (_bag is not null)
                 {
                     var sink = new BagSink(_bag, _diag.At.ToLocation());
-                    CompilerDirectiveCatalog.Check(keyword, _edition, sink);
+                    if (emitting) CompilerDirectiveCatalog.Check(keyword, _edition, sink);
                     // ── AND THE OPERAND, from the same row (kb/Work PB794) ───────────────────────────────
                     // §7.3.3 SR6 composes compiler-instruction "as specified in the syntax of each directive",
                     // so "may this word head a >> line" and "may these words follow it" are two questions with
@@ -316,19 +320,13 @@ public static partial class ConditionalCompilationProcessor
                     // producer; a row whose operand a downstream stage parses is a declared no-op.
                     CompilerDirectiveCatalog.CheckOperand(keyword, rest, _edition, sink);
                 }
-                else if (_bag is not null && keyword is "ELSE" or "END-IF" or "END-EVALUATE")
-                {
-                    // The phrase directives of an IF / EVALUATE in an omitted branch are not COMPILED, but they are still
-                    // the frame stack's structure, and their format writes no operand (kb/Work PB806; §7.3.3 SR3/SR4):
-                    // `>>ELSE JUNK` is as malformed inside an omitted branch as outside one.
-                    CompilerDirectiveCatalog.CheckOperand(keyword, rest, _edition, new BagSink(_bag, _diag.At.ToLocation()));
-                }
                 string emit = "";   // directives are consumed by default (output blank line)
                 switch (keyword)
                 {
                     case "IF":
                     {
                         bool parentActive = _stack.Count == 0 || _stack.Peek().Emitting;
+                        if (!parentActive) CheckCceSyntax(rest, _diag, ">>IF");   // omitted branch: parsed (§7.2.1), never evaluated
                         bool cond = parentActive && EvaluateCceText(rest, _evaluator, _diag, ">>IF");
                         _stack.Push(new Frame { Kind = FrameKind.If, Phase = FramePhase.IfThen, TextId = _currentText,
                             ParentActive = parentActive, Emitting = cond, BranchTaken = cond, Start = origin });
@@ -360,6 +358,7 @@ public static partial class ConditionalCompilationProcessor
                         string subj = rest.TrimSpaces();
                         if (CobolNames.Same(subj, "TRUE")) f.TruthForm = true;
                         else if (parentActive) f.Subject = EvaluateOperandText(subj, _evaluator, _diag, ">>EVALUATE");
+                        else CheckOperandSyntax(subj, _diag, ">>EVALUATE");   // omitted branch: parsed (§7.2.1), never evaluated
                         _stack.Push(f);
                         break;
                     }
@@ -397,10 +396,13 @@ public static partial class ConditionalCompilationProcessor
                                 // §7.3.13.3 SR3/SR11/SR12/SR14-16 are properties of EVERY >>WHEN of the directive, not of the
                                 // branch §7.3.13.4 GR4 selects (kb/Work PB1364): the operand is parsed and category-checked
                                 // whenever the directive itself is being compiled; only the EMIT decision is gated on an earlier match.
-                                bool match = evalFrame.ParentActive
-                                    && (evalFrame.TruthForm
-                                        ? EvaluateCceText(obj, _evaluator, _diag, ">>WHEN")               // Format 2: constant-conditional-expression
-                                        : MatchWhen(evalFrame.Subject, obj, _evaluator, _diag));          // Format 1: subject = object [THRU object3]
+                                bool match;
+                                if (evalFrame.TruthForm)                                                  // Format 2: constant-conditional-expression
+                                {
+                                    if (evalFrame.ParentActive) match = EvaluateCceText(obj, _evaluator, _diag, ">>WHEN");
+                                    else { CheckCceSyntax(obj, _diag, ">>WHEN"); match = false; }         // omitted branch: parsed, never evaluated
+                                }
+                                else match = MatchWhen(evalFrame.Subject, obj, _evaluator, _diag);        // Format 1: subject = object [THRU object3]
                                 evalFrame.Emitting = match && !evalFrame.BranchTaken;
                                 if (evalFrame.Emitting) evalFrame.BranchTaken = true;
                             }
@@ -424,7 +426,7 @@ public static partial class ConditionalCompilationProcessor
                         // compilation-variable timeline, recorded at this directive's output-frame line (the encounter's,
                         // below) so the CONSTANT FROM and directive-literal uses can read the table as of their own line
                         // (§7.3.11.4 GR1, kb/Work PB1368).
-                        if (emitting && ApplyDefine(rest, _defines, _evaluator, _diag, _dialectLevel, _inputs) is var (defined, written))
+                        if (ApplyDefine(rest, _defines, _evaluator, _diag, _dialectLevel, _inputs, apply: emitting) is var (defined, written))
                             _compilationVariables.Add(new CompilationVariableEvent(_renderBase + output.Count, defined,
                                 _defines.GetValueOrDefault(defined), written));
                         changesState = emitting;
@@ -433,6 +435,8 @@ public static partial class ConditionalCompilationProcessor
                         // §7.3.12.4 GR1: the operands are transferred when the directive is processed — in an emitting branch
                         // only, like every directive (an omitted branch is not compiled). The line itself is consumed.
                         if (emitting) ApplyDisplay(rest, _evaluator, _diag, _inputs, _bag);
+                        else if (rest.Length > 0 && DirectiveExpressionFragment.ParseDisplay(rest) is null)
+                            _diag.Malformed(">>DISPLAY", rest);   // omitted branch: nothing is transferred, but the operands are still parsed (§7.2.1)
                         break;
                     default:
                         // A >> directive other than the conditional-compilation set handled above. Its edition
@@ -647,12 +651,13 @@ public static partial class ConditionalCompilationProcessor
     /// hyphen or underscore. Which extended characters the edition permits is <see cref="CobolWordRule"/>'s.</summary>
     private static bool IsCompilationVariableNameShape(string w) => CobolCharacterRepertoire.IsWordShape(w);
 
-    /// <summary>Apply one emitting-branch <c>&gt;&gt;DEFINE</c> to <paramref name="defines"/>. Returns the name whose
+    /// <summary>Check one <c>&gt;&gt;DEFINE</c> against its general format and, when <paramref name="apply"/> (the
+    /// directive is in a compiled branch), apply it to <paramref name="defines"/>. Returns the name whose
     /// entry the directive CHANGED and the operand as written — the event the compilation-variable timeline records
-    /// (kb/Work PB1368) — or null when the directive changed nothing (malformed, or an operand that did not evaluate;
-    /// each already reported).</summary>
+    /// (kb/Work PB1368) — or null when the directive changed nothing (malformed, an operand that did not evaluate, or
+    /// an omitted branch; each violation already reported).</summary>
     private static (string Name, string Written)? ApplyDefine(string rest, Dictionary<string, CtValue> defines,
-        CompileTimeExpressionEvaluator evaluator, DirectiveDiag diag, int dialectLevel, CompilationInputs inputs)
+        CompileTimeExpressionEvaluator evaluator, DirectiveDiag diag, int dialectLevel, CompilationInputs inputs, bool apply)
     {
         // The directive's own general format first (kb/Work PB1367): every violation names the rule and the directive
         // is not applied, so one malformed line cannot cascade into misleading "undefined variable" errors.
@@ -673,6 +678,13 @@ public static partial class ConditionalCompilationProcessor
         // the DEFINITION site (the root: an over-long word can never become defined, so a reference-site spelling
         // is already diagnosed as an unknown variable). Report and continue, matching the funnel's posture.
         foreach (var (code, violation) in CobolWordRule.DirectiveWordViolations(name, dialectLevel)) diag.WordRule(code, violation);
+        if (!apply)
+        {
+            // A DEFINE in an omitted branch changes nothing, but it is still a directive in the initial source text, so its
+            // general format, its name and the syntax of its operand are held to §7.3.11.2 / §7.2.1 like any other's.
+            if (kind == DefineKind.Value) CheckOperandSyntax(operand, diag, $">>DEFINE {name}");
+            return null;
+        }
         switch (kind)
         {
             case DefineKind.Off:
@@ -729,6 +741,21 @@ public static partial class ConditionalCompilationProcessor
         return evaluator.EvaluateOperand(operand, where);
     }
 
+    /// <summary>Fragment-parse a compile-time operand WITHOUT evaluating it — the syntax check of a directive in an omitted
+    /// branch (ISO §7.2.1: compiler directives shall be syntactically correct in the initial source text, and the false
+    /// path of an IF or EVALUATE is part of it). A syntax error is COBOLNET1619, exactly as in a compiled branch;
+    /// evaluation errors (undefined name, category, division) need values and belong to a compiled branch only.</summary>
+    private static void CheckOperandSyntax(string text, DirectiveDiag diag, string where)
+    {
+        if (DirectiveExpressionFragment.ParseOperand(text) is null) diag.Malformed(where, text);
+    }
+
+    /// <summary>The constant-conditional-expression twin of <see cref="CheckOperandSyntax"/>.</summary>
+    private static void CheckCceSyntax(string text, DirectiveDiag diag, string where)
+    {
+        if (DirectiveExpressionFragment.ParseCce(text) is null) diag.Malformed(where, text);
+    }
+
     /// <summary>Fragment-parse and evaluate a constant-conditional-expression; a malformed cce / formation error
     /// yields false for line selection (and is reported).</summary>
     private static bool EvaluateCceText(string text, CompileTimeExpressionEvaluator evaluator,
@@ -748,8 +775,16 @@ public static partial class ConditionalCompilationProcessor
     private static bool MatchWhen(CtValue? subject, string whenText, CompileTimeExpressionEvaluator evaluator,
         DirectiveDiag diag)
     {
-        if (subject is null) return false;
         var (loText, hiText) = SplitRange(whenText);
+        if (subject is null)
+        {
+            // No subject value to compare with: the directive is in an omitted branch (its Subject is never evaluated
+            // there; §7.2.1 still requires it syntactically correct) or its subject was malformed (already reported).
+            // The objects are parsed all the same.
+            CheckOperandSyntax(loText, diag, ">>WHEN");
+            if (hiText is not null) CheckOperandSyntax(hiText, diag, ">>WHEN");
+            return false;
+        }
         if (EvaluateOperandText(loText, evaluator, diag, ">>WHEN") is not { } lo) return false;
         // §7.3.13.3 SR11 — all selection subjects and objects shall be of the same category.
         if (subject.Category != lo.Category)

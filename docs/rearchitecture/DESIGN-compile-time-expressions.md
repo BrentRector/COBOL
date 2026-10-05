@@ -74,6 +74,19 @@ The conditional-compilation stage (§7.2 text-manipulation) has two different jo
    CtValue (numeric / alphanumeric / national / boolean) — or a loud diagnostic, never a wrong value
 ```
 
+**Syntax is a property of the directive line; only EVALUATION and EMISSION depend on the branch** (§7.2.1: "compiler
+directives" shall be "syntactically correct in the initial source text and library text", and the false path of an IF or
+EVALUATE is part of that text; kb/Work PB1363, PB1364, PB1367, PB806). So the driver keeps three questions apart:
+*structure* (the `Frame` stack: kind, phase, the library text it opened in — COBOLNET2649, judged in every branch),
+*operand syntax* (every directive line is asked of `CompilerDirectiveCatalog.CheckOperand` in every branch, and the
+conditional-compilation arms fragment-parse their operands in an omitted branch with `CheckOperandSyntax` /
+`CheckCceSyntax`, which report a malformed operand as COBOLNET1619 and never need a value) and *evaluation* (names,
+categories, division, which WHEN matches — a compiled branch only, because an omitted branch's `Q` need not be a
+compilation variable). A `>>DEFINE` in an omitted branch is checked against its general format and its operand is
+parsed, but it applies nothing. Words whose operand a downstream stage parses (`TURN`, `FLAG-02`, `FLAG-14`,
+`COBOL-WORDS`) are the exception: their stage runs on the FINAL text and never sees an omitted line, so their operand
+syntax is not yet checked in an omitted branch.
+
 ## 3. Assembly layering (done)
 
 The evaluator must live in **Frontend** so both callers reach it (`Editions ← Frontend ← Compiler`; Frontend

@@ -234,15 +234,7 @@ public sealed class CompilerDirectiveCatalogDriftTests
         foreach (var row in ConstructRegistry.Entries
                      .Where(e => e.DirectiveOperand is { } o && (o.Form != DirectiveOperandForm.Stage || o.OperandRequired)))
         {
-            var s = row.DirectiveOperand!;
-            string? malformed = s.Form switch
-            {
-                // A word the set does not admit — for >>CALL-CONVENTION that is an undefined call-convention-name,
-                // which names no convention WiseOwl COBOL defines (kb/Work PB1383; DOC-A.1-68).
-                DirectiveOperandForm.Words => "ZZBOGUS",
-                _ when s.OperandRequired => "",
-                _ => null,   // PAGE's comment-text-1 (§7.3.19.3 SR2) and the two removed FLAG windows
-            };
+            string? malformed = MalformedOperandOf(row.DirectiveOperand!);
             if (malformed is null) { exempt.Add(row.Id); continue; }
             if (!Diagnose(row.DirectiveWords[0], malformed, row.IntroducedIn)
                     .Any(d => d.Code == "COBOLNET1911"))
@@ -255,6 +247,54 @@ public sealed class CompilerDirectiveCatalogDriftTests
         // The exemptions are NAMED, so growing the set is a visible edit rather than a quiet one.
         Assert.Equal(["flag-85-directive-window", "flag-native-arithmetic-directive-window", "page-directive-2002"],
             exempt.Order(StringComparer.Ordinal));
+    }
+
+    /// <summary>The operand spelling a row's general format does not admit, derived from the row: a word the closed
+    /// set does not admit, or nothing where the format requires an operand; null when no malformed operand exists
+    /// (PAGE's comment-text-1, §7.3.19.3 SR2, and the two removed FLAG windows).</summary>
+    private static string? MalformedOperandOf(DirectiveOperandSyntax s) => s.Form switch
+    {
+        // A word the set does not admit — for >>CALL-CONVENTION that is an undefined call-convention-name,
+        // which names no convention WiseOwl COBOL defines (kb/Work PB1383; DOC-A.1-68).
+        DirectiveOperandForm.Words => "ZZBOGUS",
+        _ when s.OperandRequired => "",
+        _ => null,
+    };
+
+    /// <summary>ISO §7.2.1 (kb/Work PB1363): "compiler directives" shall be "syntactically correct in the initial source
+    /// text and library text", and the false path of an IF directive is part of it — so the operand column is a
+    /// property of the directive line, not of the branch the line is in. Derived from the same rows as the test above:
+    /// each malformed operand, written inside an OMITTED branch, still draws COBOLNET1911, and each conforming one
+    /// there still draws nothing.</summary>
+    [Fact]
+    public void EveryClosedOperandDirective_IsCheckedInAnOmittedBranchToo()
+    {
+        var silent = new List<string>();
+        var rejected = new List<string>();
+        foreach (var row in ConstructRegistry.Entries
+                     .Where(e => e.DirectiveOperand is { } o && (o.Form != DirectiveOperandForm.Stage || o.OperandRequired)))
+        {
+            var s = row.DirectiveOperand!;
+            string word = row.DirectiveWords[0];
+            if (MalformedOperandOf(s) is { } malformed
+                && !Diagnose(word, malformed, row.IntroducedIn, omittedBranch: true).Any(d => d.Code == "COBOLNET1911"))
+                silent.Add($"{word} {malformed}".Trim());
+            string conforming = s.Form switch
+            {
+                DirectiveOperandForm.Words when s.Choice.Count > 0 => s.Choice[0],
+                DirectiveOperandForm.Words when s.DirectiveName => "LISTING",
+                DirectiveOperandForm.Text when s.OperandRequired => "\"x\"",
+                _ => "",
+            };
+            if (s.Form != DirectiveOperandForm.Stage
+                && Diagnose(word, conforming, row.IntroducedIn, omittedBranch: true).Any(d => d.Code == "COBOLNET1911"))
+                rejected.Add($"{word} {conforming}".Trim());
+        }
+
+        Assert.True(silent.Count == 0,
+            $"these directive lines are accepted in silence inside an omitted branch: [{string.Join(", ", silent)}] (ISO §7.2.1)");
+        Assert.True(rejected.Count == 0,
+            $"these conforming directive lines are rejected inside an omitted branch: [{string.Join(", ", rejected)}]");
     }
 
     /// <summary>The complement: every directive's own CONFORMING operand — the first alternative its general
@@ -368,10 +408,15 @@ public sealed class CompilerDirectiveCatalogDriftTests
     /// <summary>Drive the REAL text-manipulation stage with one directive line and return what it reported.
     /// The edition is the directive's own introducing one, so the introduction gate never fires and what is
     /// measured is the operand check alone.</summary>
-    private static IReadOnlyList<Diagnostic> Diagnose(string word, string operand, int edition)
+    private static IReadOnlyList<Diagnostic> Diagnose(string word, string operand, int edition, bool omittedBranch = false)
     {
         var bag = new DiagnosticBag();
         string line = $">>{word} {operand}".TrimEnd();
+        // The line is in the false path of an IF directive (ISO §7.2.1). The reference-format stage reads every branch
+        // (§7.2.1 Step 1: SOURCE FORMAT in a false path is processed, kb/Work PB1006) and is fixed form until a directive
+        // says otherwise, so its case first switches to free form to make the wrapper's own `>>` lines recognizable.
+        if (omittedBranch)
+            line = (word == "SOURCE" ? ">>SOURCE FORMAT IS FREE\n" : "") + $">>IF 1 = 2\n{line}\n>>END-IF";
         if (word == "SOURCE")
             ReferenceFormatProcessor.NormalizeToFreeForm(
                 line + "\nIDENTIFICATION DIVISION.\n", new ReferenceFormatDiagnostics(edition, false, bag), "t.cob");

@@ -2556,13 +2556,13 @@
   "ordinal": 14,
   "subject": "EVALUATE directive",
   "rule-digest": "6a81bbc43bb8",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#EvaluateOperandText; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#compileTimeOperand; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#EvaluateOperandText; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#MatchWhen; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CheckOperandSyntax",
+  "test-ref": "conformance:negative/pb1364-when-after-match-arithmetic-formation; conformance:negative/pb1363-omitted-when-object-malformed; conformance:negative/pb1363-omitted-when-through-malformed",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1364 (registrar 15a). cite.py --check 7.3.13.3 \"shall be formed in accordance with 7.3.6, Compile-time arithmetic expressions.\" OK; §7.3.6.2 SR1a checked. Where an operand IS evaluated the 7.3.6 formation rules are enforced: probes L `2 ** 3` -> COBOLNET1619 SR1a; L3 `1 / 0` -> SR1c; L4 `1.5E3` -> §7.3.3 SR10; W `\"A\" + 1` malformed; W2 undefined name -> SR1b; W3 defined compilation variables (§7.3.11.4 GR1, --check OK) accepted and evaluated (R8); L2 7 / 2 truncates to 3 (§7.3.6.3 GR3). But arithmetic-expression-2/-3 of a WHEN after a prior match are NEVER PARSED: probe LZ `>>EVALUATE 1 / >>WHEN 1 / >>WHEN 2 ** 3` compiles clean. Same mechanism as SR11. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1364. cite.py --check 7.3.13.3 'Arithmetic-expression-1, arithmetic-expression-2, and arithmetic-expression-3 shall be formed in accordance with 7.3.6, Compile-time arithmetic expressions.' OK 14). MatchWhen parses and formation-checks the operand of EVERY >>WHEN of a compiled EVALUATE (`>>WHEN 2 ** 3` after a matching WHEN is COBOLNET1619, SR1a of 7.3.6.2), and an EVALUATE in an omitted branch has its operands fragment-parsed (CheckOperandSyntax, ISO 7.2.1) though never evaluated.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-15",
@@ -2571,13 +2571,13 @@
   "ordinal": 15,
   "subject": "EVALUATE directive",
   "rule-digest": "0dce225b48d6",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#EvaluateOperandText; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#EvaluateOperandText; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#MatchWhen; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CheckOperandSyntax",
+  "test-ref": "conformance:negative/pb1364-when-after-match-boolean-formation; conformance:negative/pb1363-omitted-evaluate-subject-malformed",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1364 (registrar 15a). cite.py --check 7.3.13.3 \"shall be formed in accordance with 7.3.7, Compile-time boolean expressions.\" OK. Evaluated path: probe M evaluates B\"1100\" B-AND B\"0110\" = B\"0100\" and selects it; probe Y `B\"1\" B-AND 1` -> COBOLNET1619 (§7.3.7.2 SR1). Unevaluated path: probe LZ_bool `>>EVALUATE B\"1\" / >>WHEN B\"1\" / >>WHEN B\"1\" B-AND 1` compiles clean. Same mechanism as SR11. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1364. cite.py --check 7.3.13.3 'Boolean-expression-1 and boolean-expression-2 shall be formed in accordance with 7.3.7, Compile-time boolean expressions.' OK 15). The same arm as SR14: a boolean operand of a WHEN after a match (`B\"1\" B-AND 1`) is COBOLNET1619 (7.3.7.2 SR1), and an omitted-branch EVALUATE subject is parsed.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.13.3-16",
@@ -3036,13 +3036,13 @@
   "ordinal": 4,
   "subject": "IF directive",
   "rule-digest": "4ca719a910e5",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand",
+  "test-ref": "conformance:negative/pb806-else-trailing-word; conformance:negative/pb806-else-trailing-word-in-omitted-branch; unit:CompilerDirectiveCatalogDriftTests.EveryNoOperandWord_RejectsAnOperandAndAcceptsTheBareWord",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB806 (registrar 15a). SR4 (cite.py --check 7.3.16.3 OK): 'Text-2 shall begin on a new line.' Text-2 written on the >>ELSE line is silently discarded (case \"ELSE\" never reads `rest`): probe p19 '>>ELSE DISPLAY \"B\"' compiles clean with no diagnostic. Same mechanism as SR3; OWNED by open kb/Work PB806 — not re-reported. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, incl. conditional compilation, is absent from COBOL-85; the pinned compiler gates >>IF at --std 85 with COBOLNET0900, probe p01)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB806. cite.py --check 7.3.16.3 'Text-2 shall begin on a new line.' OK 4). Text-2 written on the >>ELSE line is no longer discarded: >>ELSE takes no operand, so any word after it is COBOLNET1911 (7.3.3 SR3/SR4), in a compiled and in an omitted branch alike; text-2 on the following lines is ordinary text (probe `>>ELSE DISPLAY \"B\"` -> COBOLNET1911).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.16.3-5",
@@ -57156,13 +57156,13 @@
   "ordinal": 0,
   "subject": "DEFINE directive",
   "rule-digest": "a589579ff194",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#TrySplitDefine",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ApplyDefine; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#TrySplitDefine; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CheckOperandSyntax",
+  "test-ref": "conformance:2002/pb1367_define_general_format_alternatives; conformance:negative/pb1367-define-off-override; conformance:negative/pb1367-define-without-name; conformance:negative/pb1367-define-without-operand; conformance:negative/pb1367-define-words-after-off; conformance:negative/pb1367-define-off-override-in-omitted-branch; conformance:negative/pb1367-define-operand-malformed-in-omitted-branch; unit:ConditionalCompilationDefineTests.Parameter_NoValue_RedefiningADefinedName_WithoutOverride_Rejected1618",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1367 (registrar 15a). Format: >>DEFINE compilation-variable-name-1 [AS] { {arith-expr-1|boolean-expr-1|literal-1|PARAMETER} [OVERRIDE] | OFF }. cite.py --check 7.3.11.2 \"OVERRIDE\" -> OK (general format). Every LEGAL form is accepted (probes p1b/q7/r1/t6: AS omitted, AS OFF, bare OFF, PARAMETER, PARAMETER OVERRIDE, value OVERRIDE, arith/boolean/literal). SplitDefine is a string splitter that under-rejects two ILLEGAL shapes: (1) '>>DEFINE X AS OFF OVERRIDE' compiles clean (probe n1.cob) - OVERRIDE belongs only to the value group, never to OFF (figure notes: outer brace = value group [OVERRIDE] | OFF); SplitDefine strips a trailing OVERRIDE before testing for OFF. (2) a bare '>>DEFINE' with no compilation-variable-name-1 compiles clean (probe t1.cob) - ApplyDefine 'if (name.Length == 0) return;' and the registry row's DirectiveOperandForm.Stage delegates the operand check to this stage. Expected: both rejected (COBOLNET1619-class directive-syntax error). Other malformed shapes ARE caught (t2 'OVERRIDE OVERRIDE', t3 'PARAMETER OFF', t4 '1 2', n8 missing operand -> COBOLNET1619). || editions (adjudicator): 2002, 2014, 2023 - §7.3 compiler-directive facility; ISO/IEC 1989:2023 Annex E lists no change to §7.3.11 against 2014 (the 2002 introduction is not stated in the 2023 text itself; below 2002 the directive is COBOLNET0900) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#SplitDefine (kb/Work PB1367: SplitDefine became TrySplitDefine when DEFINE was parsed from its general format)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1367. cite.py --check 7.3.11.2 'OVERRIDE' OK (general format). TrySplitDefine parses the directive from its general format (name required and a COBOL word, AS optional, then OFF alone or a value [OVERRIDE]); OVERRIDE after OFF, words after OFF, no name and no operand are COBOLNET2651. The positive golden writes every alternative (literal, arithmetic, boolean, PARAMETER, OVERRIDE, OFF, with and without AS) and checks each result; a DEFINE in an omitted branch is format-checked and its operand parsed but applies nothing.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-7.3.12.2",
@@ -57186,13 +57186,13 @@
   "ordinal": 0,
   "subject": "EVALUATE directive",
   "rule-digest": "941382ab94bd",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Frame",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#PhraseFrame; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#MatchWhen; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CheckOperandSyntax; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand",
+  "test-ref": "conformance:2023/pb1363_conditional_compilation_structure_legal; conformance:2002/pb1363_omitted_branch_directives_legal; conformance:negative/pb1363-evaluate-without-when; conformance:negative/pb1363-evaluate-when-other-twice; conformance:negative/pb1363-evaluate-when-after-when-other; conformance:negative/pb1363-evaluate-not-closed; conformance:negative/pb1363-evaluate-closed-in-library-text; conformance:negative/pb1363-when-without-evaluate; conformance:negative/pb1363-end-evaluate-without-evaluate; conformance:negative/pb1363-text-before-first-when; conformance:negative/pb1363-omitted-evaluate-subject-malformed; conformance:negative/pb1363-omitted-when-object-malformed; conformance:negative/pb1363-omitted-when-through-malformed; conformance:negative/pb1363-omitted-when-truth-malformed; conformance:negative/pb1364-when-format2-after-match-malformed; conformance:negative/pb1364-when-other-trailing-text-after-match; conformance:negative/pb806-end-evaluate-trailing-word; unit:CompilerDirectiveCatalogDriftTests.EveryNoOperandWord_RejectsAnOperandAndAcceptsTheBareWord",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1363 (registrar 15a). Both formats: `{ >>WHEN ... [text-1] } ...` is a REQUIRED repeated group (figure note, cite.py --check 7.3.13.2 \"shall be specified one or more times\" OK), followed by ONE optional `[ >>WHEN OTHER [text-2] ]` and a required `>>END-EVALUATE`. The preprocessor is a flat frame stack with no phrase-order/cardinality state: WHEN, WHEN OTHER and END-EVALUATE arms each act on whatever frame is on top. Probes (probe dir out/probe/evaluate-directive-p1 (pinned adj-d2 cobol.exe, --std 2023)): A `>>EVALUATE 1 / >>WHEN 2 / >>WHEN OTHER (DISPLAY O1) / >>WHEN OTHER (DISPLAY O2)` compiles clean and prints `O1 | O2` (also at --std 2002) -- the second OTHER re-computes Emitting = ParentActive && !BranchTaken, so text-2 is included TWICE; B `>>WHEN OTHER (O1) / >>WHEN 1 (W1)` prints `O1 | W1` -- OTHER does not set BranchTaken, so a WHEN after it still matches and both branches' text is included, contrary to §7.3.13.4 GR4 (\"all lines of text-2 associated with a WHEN OTHER phrase are omitted\" when a WHEN is TRUE); C `>>EVALUATE 1 / text / >>END-EVALUATE` with no WHEN compiles clean (text silently omitted); D an EVALUATE unclosed at end of source compiles clean (frame stack never checked at EOF); E a stray `>>END-EVALUATE` / `>>WHEN 1` with no open EVALUATE compiles clean (arms guard on `_stack.Peek().Kind == Evaluate` and otherwise do nothing). What conforms: EVALUATE TRUE vs. subject dispatch, WHEN / WHEN OTHER / END-EVALUATE recognized, nesting via the stack, required subject (`>>EVALUATE` alone -> COBOLNET1619 malformed). Edition gate: evaluate-directive-2002 row, COBOLNET0900 below 2002 (pb725 negative). The END-EVALUATE trailing-operand half is PB806's (open). Finding: EVALUATE-directive phrase structure unvalidated. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, absent from 1985; Annex E E.2 item 8 shows the EVALUATE directive already in the previous standard)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1363 + PB1364 + PB806. cite.py --check 7.3.13.2 'shall be specified one or more times' OK (figure notes: the >>WHEN group is required and repeatable, one optional >>WHEN OTHER follows it, >>END-EVALUATE is required). The phrase structure is the Frame's (kind, phase, library text; COBOLNET2649) in every branch; the subject, every WHEN object and THROUGH operand of Format 1 and every WHEN constant-conditional-expression of Format 2 are parsed whether or not the WHEN is selected and whether or not the directive is in a compiled branch (COBOLNET1619); >>WHEN OTHER and >>END-EVALUATE take no operand.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-7.3.14.2",
@@ -57231,13 +57231,13 @@
   "ordinal": 0,
   "subject": "IF directive",
   "rule-digest": "35e0af68562c",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Frame",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#PhraseFrame; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#CheckCceSyntax; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand",
+  "test-ref": "conformance:2002/conditional_compilation; conformance:2023/pb1363_conditional_compilation_structure_legal; conformance:2002/pb1363_omitted_branch_directives_legal; conformance:negative/pb1363-else-without-if; conformance:negative/pb1363-else-twice; conformance:negative/pb1363-else-in-evaluate; conformance:negative/pb1363-end-if-without-if; conformance:negative/pb1363-if-not-closed; conformance:negative/pb1363-if-opened-in-library-text; conformance:negative/pb1363-omitted-if-operand-malformed; conformance:negative/pb806-else-trailing-word; conformance:negative/pb806-end-if-trailing-word; conformance:negative/pb806-else-trailing-word-in-omitted-branch; unit:CompilerDirectiveCatalogDriftTests.EveryNoOperandWord_RejectsAnOperandAndAcceptsTheBareWord; unit:CompilerDirectiveCatalogDriftTests.EveryClosedOperandDirective_IsCheckedInAnOmittedBranchToo",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1363 (registrar 15a). Format: '>> IF constant-conditional-expression-1 [ text-1 ] [ >> ELSE [ text-2 ] ] >> END-IF' (cite.py --check 7.3.16.2 \"constant-conditional-expression-1 [ text-1 ]\" OK). The format admits AT MOST ONE >>ELSE, only after an >>IF, and a REQUIRED >>END-IF. Render's switch handles the three words over a frame stack but never diagnoses a mismatch: case ELSE and case END-IF do nothing when the stack top is not an If frame, a second ELSE re-evaluates Emitting=ParentActive && !BranchTaken, and after the loop the stack is never checked for unclosed frames. Probes (pinned cobol.exe, probe/if-directive/): p02 orphan >>ELSE -> compiles, prints A and B; p03 orphan >>END-IF -> compiles, prints A; p04 >>IF V = 1 with no >>END-IF -> compiles, prints A; p05 two >>ELSE arms (V=1, IF V = 2) -> compiles, prints B then C; p12 >>ELSE inside >>EVALUATE TRUE -> ignored, prints W1 and EL. Expected: each is a violation of the general format and must be diagnosed. The well-formed shape conforms (p01: T1/U2 at 2002/2014/2023; conformance:2002/conditional_compilation) but the DEFECTIVE verdict forbids closing the row with it. Harm: under-rejects (p05/p12 also silently pick arbitrary text). New finding (no kb/Work note owns unbalanced IF/ELSE/END-IF; PB806 owns only trailing junk on ELSE/END-IF). || editions (adjudicator): 2002, 2014, 2023 (the §7.3 compiler-directive facility, incl. conditional compilation, is absent from COBOL-85; the pinned compiler gates >>IF at --std 85 with COBOLNET0900, probe p01)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1363 + PB806. cite.py --check 7.3.16.2 'constant-conditional-expression-1 [ text-1 ]' OK (general format). Every part of the general format is now enforced: the constant-conditional-expression is required and fragment-parsed in every branch (COBOLNET1619; omitted branches by CheckCceSyntax), >>ELSE only after an open >>IF and at most once, >>END-IF required and closing the >>IF of its own text (COBOLNET2649), and neither >>ELSE nor >>END-IF takes an operand (COBOLNET1911, 7.3.3 SR3/SR4). The former retired witness (the frame stack with no phase) is gone.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-7.3.17.2",
