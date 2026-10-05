@@ -57,8 +57,9 @@
       *>         character positions, so the alias is PIC X(2).             -> 7[1010|0101|1010]
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 S-TAB OCCURS 3.
-           05 S-X PIC X(2) VALUES ARE "AB" "CD" FROM (1).
+       01 S-GRP.
+           05 S-TAB OCCURS 3.
+               10 S-X PIC X(2) VALUES ARE "AB" "CD" FROM (1).
        01 M-GRP.
            05 M-ROW OCCURS 2.
                10 M-C PIC 9 OCCURS 3 VALUES ARE 1 2 3 4 5 6 FROM (1 1) TO (2 3).
@@ -73,8 +74,9 @@
        01 TT IS TYPEDEF.
            05 T-X PIC X(2) OCCURS 3 VALUES ARE "AB" "CD" FROM (1).
        01 T-REC TYPE TT.
-       01 D-TAB OCCURS DYNAMIC CAPACITY IN D-CAP FROM 1 TO 4.
-           05 D-X PIC X(2) VALUES ARE "AB" "CD" FROM (1) TO (3).
+       01 D-GRP.
+           05 D-TAB OCCURS DYNAMIC CAPACITY IN D-CAP FROM 1 TO 4.
+               10 D-X PIC X(2) VALUES ARE "AB" "CD" FROM (1) TO (3).
        01 BG GROUP-USAGE BIT.
            05 BT PIC 1(4) OCCURS 3 VALUES ARE B"1010" B"0101" FROM (1).
        01 BV REDEFINES BG PIC X(2).

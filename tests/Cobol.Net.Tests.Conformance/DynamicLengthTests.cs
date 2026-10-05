@@ -131,7 +131,7 @@ public sealed class DynamicLengthTests
     [Fact]
     public void OccursCoClause_Rejected1563()
     {
-        var (ok, diag) = EditionHarness.Compile(Prog("01 WS-D PIC X DYNAMIC LENGTH OCCURS 3 TIMES."), 2014);
+        var (ok, diag) = EditionHarness.Compile(Prog("01 WS-G.\n   05 WS-D PIC X DYNAMIC LENGTH OCCURS 3 TIMES."), 2014);
         Assert.False(ok, "OCCURS with DYNAMIC LENGTH must be rejected (ISO §13.16.3 SR18)");
         EditionHarness.AssertHasDiagnostic(diag, "COBOLNET1563");
     }

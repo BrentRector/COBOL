@@ -15,9 +15,10 @@
        PROGRAM-ID. PB505N4.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 G OCCURS 2.
-           05 T PIC X OCCURS DYNAMIC CAPACITY IN C1
-               VALUE "A" FROM (1 1) TO (2 3).
+       01 GG.
+           05 G OCCURS 2.
+               10 T PIC X OCCURS DYNAMIC CAPACITY IN C1
+                   VALUE "A" FROM (1 1) TO (2 3).
        PROCEDURE DIVISION.
        MAIN.
            DISPLAY T(1 1)

@@ -6050,7 +6050,8 @@ public static class DiagnosticCatalog
         + "item.\"",
         "ISO §13.16.3 SR11 / §13.18.32.3 SR1");
 
-    /// <summary>The EXTERNAL / GLOBAL clause's RESIDENCE rules: the level-number (§13.16.3 SR6, §13.18.22.3 SR1,
+    /// <summary>The OCCURS clause's own level rule joined this row in kb/Work PB1260 (§13.18.38.3 SR1 a): no OCCURS
+    /// at level 01 or 77). Below that: the EXTERNAL / GLOBAL clause's RESIDENCE rules: the level-number (§13.16.3 SR6, §13.18.22.3 SR1,
     /// §13.18.27.3 SR1 b)), the section (§13.18.22.3 SR1 — EXTERNAL only in WORKING-STORAGE), the data-name format
     /// of the entry-name clause (§13.16.3 SR7, both the entry's own half and the FD-record half), and the
     /// same-entry exclusion (§13.16.3 SR5 — EXTERNAL with REDEFINES or BASED).
@@ -6062,8 +6063,8 @@ public static class DiagnosticCatalog
         "COBOLNET2404", "data-clause-placement", EditionSeverity.Error,
         "An EXTERNAL or GLOBAL clause was specified where its syntax rules do not admit it: below level 1, "
         + "outside the sections that admit it, on an entry without a data-name, or (EXTERNAL) in the same entry "
-        + "as REDEFINES or BASED.",
-        "ISO §13.16.3 SR5/SR6/SR7 · §13.18.22.3 SR1 · §13.18.27.3 SR1 b)");
+        + "as REDEFINES or BASED; or an OCCURS clause was specified on an entry whose level-number is 01 or 77.",
+        "ISO §13.16.3 SR5/SR6/SR7 · §13.18.22.3 SR1 · §13.18.27.3 SR1 b) · §13.18.38.3 SR1 a)");
 
     /// <summary>The SUBJECT rules of the BLANK WHEN ZERO and JUSTIFIED clauses — what the elementary item they are
     /// written on may be. §13.18.8.3 SR1 (category numeric-edited, or numeric without 'S') and SR2 (usage display

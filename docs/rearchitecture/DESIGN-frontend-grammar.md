@@ -1129,9 +1129,10 @@ is what makes the next clause automatic rather than remembered.
 
 **The placement half (kb/Work PB507 / PB512 / PB518 / PB519).** The same vocabulary carries the rules about WHERE
 a clause may be written. `ClausePlacementRules.Rules` (`Binding/DataBinder.ClausePlacement.cs`) holds one row per
-rule sentence, of four shapes — `ElementaryOnly` (§13.18.40.3 SR1, §13.16.3 SR11), `Residence` (level 1 in named
+rule sentence, of five shapes — `ElementaryOnly` (§13.18.40.3 SR1, §13.16.3 SR11), `Residence` (level 1 in named
 sections: §13.16.3 SR6 / §13.18.27.3 SR1 b) for GLOBAL, §13.18.22.3 SR1 for EXTERNAL), `DataNameRequired`
-(§13.16.3 SR7, both halves) and `NotWith` (§13.16.3 SR5) — and TWO sites read it: `BindEntry` applies the
+(§13.16.3 SR7, both halves), `NotAtLevel` (§13.18.38.3 SR1 a), OCCURS at level 01/66/77/88 — kb/Work PB1260) and
+`NotWith` (§13.16.3 SR5) — and TWO sites read it: `BindEntry` applies the
 entry-local rows through `ScreenClausePlacement` (level, entry-name, section and the written set are all known
 there) and `CheckElementaryOnlyClauses` applies the `ElementaryOnly` rows over the finished forest. A refused
 EXTERNAL / GLOBAL clause never reaches `DataItem.HasExternalClause` / `HasGlobalClause`, and those two facts are the

@@ -27,7 +27,8 @@ public sealed class RecoveryCategoryCascadeTests
                01 W-E   PIC ZZ9.
                01 W-X   PIC X(4).
                01 W-B   PIC 1(4).
-               01 W-T   PIC X OCCURS 3 INDEXED BY IX.
+               01 W-TG.
+                  05 W-T PIC X OCCURS 3 INDEXED BY IX.
                PROCEDURE DIVISION.
                MAIN.
                    {stmt}

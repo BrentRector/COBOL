@@ -16,7 +16,7 @@
       *>   13.18.57.4 GR3 - the subject's OWN VALUE clause takes precedence over the type declaration's, so
       *>     A shows "abc" and not T's own value (T declares none here; the rule is what makes VALUE legal
       *>     on the subject at all).
-      *>   13.18.38 OCCURS - B is 3 occurrences of that same 3-character description; MOVE "xy" TO B(2)
+      *>   13.18.38 OCCURS (below level 01, 13.18.38.3 SR1 a) - B is 3 occurrences of that same 3-character description; MOVE "xy" TO B(2)
       *>     space-fills to the right (14.9.25.4 GR5 / 14.6.8, an alphanumeric receiver), so B(2) is "xy ".
       *>   TYPEDEF with TYPE - TT is a type declaration whose own description is TYPE T, so F, which is
       *>     TYPE TT, is PIC X(3) through the two GR1 hops.
@@ -36,7 +36,8 @@
            05  TGA PIC X(2).
            05  TGB PIC 9(2).
        01  A TYPE T VALUE "abc".
-       01  B TYPE T OCCURS 3.
+       01  BG.
+           05  B TYPE T OCCURS 3.
        01  C TYPE T IS GLOBAL.
        01  D TYPE TG.
        01  E TYPE T BASED.

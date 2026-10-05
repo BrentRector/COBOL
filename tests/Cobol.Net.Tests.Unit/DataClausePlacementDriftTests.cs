@@ -58,6 +58,7 @@ public sealed class DataClausePlacementDriftTests
                 Assert.NotEqual(DataClauseKind.None, rule.Excluded);
             else
                 Assert.Equal(DataClauseKind.None, rule.Excluded);
+            Assert.Equal(rule.Kind is ClausePlacementKind.NotAtLevel, rule.Levels is { Count: > 0 });
             if (rule.Kind is not ClausePlacementKind.Residence)
                 Assert.Equal(EntrySections.All, rule.Sections);
         }
@@ -139,6 +140,30 @@ public sealed class DataClausePlacementDriftTests
         Assert.DoesNotContain(diags, d => d.Contains("COBOLNET2404", StringComparison.Ordinal));
         Assert.Single(binder.CallExternalBackings);
         Assert.Equal("A", binder.CallExternalBackings[0].Record.CobolName);
+    }
+
+    /// <summary>§13.18.38.3 SR1 a) (kb/Work PB1260) — "The OCCURS clause shall not be specified in a data description
+    /// entry that: a) Has a level-number of 01, 66, 77, or 88". The row refuses a level-01 or level-77 table in every
+    /// section, and its legal twin (the table one level below a group) binds clean.</summary>
+    [Theory]
+    [InlineData("WORKING-STORAGE", "       01  A PIC X OCCURS 3.")]
+    [InlineData("WORKING-STORAGE", "       77  A PIC X OCCURS 3.")]
+    [InlineData("WORKING-STORAGE", "       01  A PIC X OCCURS 1 TO 3 DEPENDING ON N.")]
+    [InlineData("WORKING-STORAGE", "       01  A PIC X OCCURS DYNAMIC.")]
+    [InlineData("LOCAL-STORAGE", "       01  A PIC X OCCURS 3.")]
+    [InlineData("LINKAGE", "       01  A PIC X OCCURS 3.")]
+    public void OccursAtLevel01Or77_IsRefused(string section, string entry)
+    {
+        Bind("OCCLVL", section, "       77  N PIC 9.\r\n" + entry + "\r\n", out var diags);
+        Assert.Contains(diags, d => d.Contains("COBOLNET2404", StringComparison.Ordinal)
+                                    && d.Contains("§13.18.38.3 SR1 a)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void OccursBelowLevelOne_BindsClean()
+    {
+        Bind("OCCOK", "WORKING-STORAGE", "       01  G.\r\n           05  A PIC X OCCURS 3.\r\n", out var diags);
+        Assert.DoesNotContain(diags, d => d.Contains("COBOLNET2404", StringComparison.Ordinal));
     }
 
     // ── the subject rules (§13.18.8.3 SR1/SR2, §13.18.32.3 SR3/SR4) ────────────────────────────────────────

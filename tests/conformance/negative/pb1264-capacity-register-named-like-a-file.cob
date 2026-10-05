@@ -3,8 +3,10 @@
       *>   defined elsewhere in the source element" - and 8.3.2.2: a given
       *>   user-defined word "may be used as only one type of user-defined
       *>   word". F is a FILE-NAME below; the CAPACITY register written F
-      *>   is refused COBOLNET1523 (the check used to consult only the
-      *>   data-name index and the other registers).
+      *>   is a data-name (SR30 defines it as one), so the ONE user-word
+      *>   declaration funnel refuses it COBOLNET2692 (the check used to
+      *>   consult only the data-name index and the other registers, then
+      *>   a hand-written file-name scan beside them).
       *> cite.py --check 13.18.38.3 "Data-name-3 shall not be defined
       *>   elsewhere in the source element" -> OK  13.18.38.3 30)
        IDENTIFICATION DIVISION.

@@ -23,8 +23,10 @@
       *>             each row.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01  S-T PIC X(2) OCCURS 3 VALUE "AB" FROM (+1) TO (+3).
-       01  U-T PIC X(2) OCCURS 2 VALUE "XY" FROM (1) TO (+2).
+       01  S-GRP.
+           05  S-T PIC X(2) OCCURS 3 VALUE "AB" FROM (+1) TO (+3).
+       01  U-GRP.
+           05  U-T PIC X(2) OCCURS 2 VALUE "XY" FROM (1) TO (+2).
        01  M-GRP.
            05  M-ROW OCCURS 2.
                10  M-C PIC 9 OCCURS 3 VALUES ARE 1 2 FROM (+1 +1) TO (+2 +3).

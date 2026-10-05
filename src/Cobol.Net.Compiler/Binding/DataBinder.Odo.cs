@@ -631,20 +631,22 @@ public sealed partial class DataBinder
 
             // SR30 — data-name-3 is implicitly defined at the OCCURS entry, so it must not also be an explicit
             // data-name (a duplicate definition) nor the CAPACITY register of another dynamic table.
-            // "Defined elsewhere" is any user-defined word of ANOTHER type too (§8.3.2.2: a given user-defined word "may be
-            // used as only one type of user-defined word"), so a FILE-NAME counts (kb/Work PB1264) — the check used to
-            // consult the data-name index and the other registers only. A paragraph-name is declared later, by the
-            // procedure-division binder, and is not asked here.
             // (This pass runs inside Bind, before a contained program inherits its containers' globals, so the
             // map holds only this element's own registers here — the "elsewhere in the source element" SR30 means.)
-            if (ByName.ContainsKey(capName) || _capacityRegisters.ContainsKey(capName)
-                || Files.Any(f => CobolNames.Same(f.CobolName, capName)))
+            if (ByName.ContainsKey(capName) || _capacityRegisters.ContainsKey(capName))
             {
                 Edition.Error("COBOLNET1523", $"CAPACITY IN '{capName}' on '{subject}': data-name-3 is implicitly "
-                    + "defined by the OCCURS DYNAMIC entry and shall not duplicate another data-name, a file-name or "
+                    + "defined by the OCCURS DYNAMIC entry and shall not duplicate another data-name or "
                     + "CAPACITY register (ISO §13.18.38.3 SR30)");
                 continue;
             }
+            // "Defined elsewhere" is any user-defined word of ANOTHER type too (§8.3.2.2: a given user-defined word "may be
+            // used as only one type of user-defined word"): the register IS a data-name (SR30 defines it as one), so it
+            // is announced through the ONE declaration funnel (kb/Work PB1264, PB1083), which holds it to the
+            // one-type-per-word rule against a file-name, an index-name, a condition-name, a section- or paragraph-name
+            // declared before OR after it — the procedure-division binder declares those later and its declaration is
+            // the one refused. This used to be a hand-written file-name scan beside the data-name test.
+            DeclareUserWord(capName, UserWordKind.DataName);
             AddCapacityRegister(capName, item);
         }
     }

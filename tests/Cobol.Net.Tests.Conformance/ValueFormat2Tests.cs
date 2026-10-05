@@ -179,7 +179,7 @@ public sealed class ValueFormat2Tests
     public void SubordinateToOccurs_IsConforming_Sr18()
     {
         var (ok, stdout, detail) = EditionHarness.CompileAndRun(
-            Prog("01 T OCCURS 3.\n   05 X PIC X(2) VALUES ARE \"AB\" \"CD\" FROM (1).",
+            Prog("01 TG.\n   05 T OCCURS 3.\n      10 X PIC X(2) VALUES ARE \"AB\" \"CD\" FROM (1).",
                  "    DISPLAY \"[\" X(1) \"|\" X(2) \"|\" X(3) \"]\"."), 2023);
         Assert.True(ok, detail);
         Assert.Contains("[AB|CD|AB]", stdout);
@@ -205,9 +205,9 @@ public sealed class ValueFormat2Tests
     /// superordinate to it. Both directions of the mismatch: too many on a one-dimension table, too few on a
     /// two-dimension one, and a TO phrase whose count disagrees with its own FROM.</summary>
     [Theory]
-    [InlineData("01 T PIC X(2) OCCURS 3 VALUE \"AB\" FROM (1 1).")]
-    [InlineData("01 G OCCURS 2.\n   05 T PIC X(2) OCCURS 3 VALUE \"AB\" FROM (1).")]
-    [InlineData("01 G OCCURS 2.\n   05 T PIC X(2) OCCURS 3 VALUE \"AB\" FROM (1 1) TO (2).")]
+    [InlineData("01 TG.\n   05 T PIC X(2) OCCURS 3 VALUE \"AB\" FROM (1 1).")]
+    [InlineData("01 GG.\n   05 G OCCURS 2.\n      10 T PIC X(2) OCCURS 3 VALUE \"AB\" FROM (1).")]
+    [InlineData("01 GG.\n   05 G OCCURS 2.\n      10 T PIC X(2) OCCURS 3 VALUE \"AB\" FROM (1 1) TO (2).")]
     public void SubscriptCountMismatch_Rejected1945(string ws)
     {
         var (ok, diag) = EditionHarness.Compile(Prog(ws, "    DISPLAY \"X\"."), 2023);
@@ -242,7 +242,7 @@ public sealed class ValueFormat2Tests
     public void SubordinateToDynamicWithoutTo_Rejected1588()
     {
         var (ok, diag) = EditionHarness.Compile(
-            Prog("01 G OCCURS DYNAMIC CAPACITY IN C1.\n   05 X PIC X(2) VALUE \"AB\" FROM (1).", "    DISPLAY \"X\"."), 2023);
+            Prog("01 GG.\n   05 G OCCURS DYNAMIC CAPACITY IN C1.\n      10 X PIC X(2) VALUE \"AB\" FROM (1).", "    DISPLAY \"X\"."), 2023);
         Assert.False(ok);
         EditionHarness.AssertHasDiagnostic(diag, "COBOLNET1588");
     }
@@ -254,13 +254,13 @@ public sealed class ValueFormat2Tests
     public void DynamicWithoutTo_HigherSubscriptsShallBeEqual_1946()
     {
         var (bad, diag) = EditionHarness.Compile(
-            Prog("01 G OCCURS 2.\n   05 T PIC X OCCURS DYNAMIC CAPACITY IN C1 VALUE \"A\" FROM (1 1) TO (2 3).",
+            Prog("01 GG.\n   05 G OCCURS 2.\n      10 T PIC X OCCURS DYNAMIC CAPACITY IN C1 VALUE \"A\" FROM (1 1) TO (2 3).",
                  "    DISPLAY \"X\"."), 2023);
         Assert.False(bad);
         EditionHarness.AssertHasDiagnostic(diag, "COBOLNET1946");
 
         var (ok, stdout, detail) = EditionHarness.CompileAndRun(
-            Prog("01 G OCCURS 2.\n   05 T PIC X OCCURS DYNAMIC CAPACITY IN C1 VALUE \"A\" FROM (1 1) TO (1 3).",
+            Prog("01 GG.\n   05 G OCCURS 2.\n      10 T PIC X OCCURS DYNAMIC CAPACITY IN C1 VALUE \"A\" FROM (1 1) TO (1 3).",
                  "    DISPLAY \"[\" T(1 1) T(1 2) T(1 3) \"]\"."), 2023);
         Assert.True(ok, detail);
         Assert.Contains("[AAA]", stdout);
@@ -290,8 +290,8 @@ public sealed class ValueFormat2Tests
     public void DynamicOuterDimension_SubordinateTableValue_Gr16Capacity()
     {
         var (ok, stdout, detail) = EditionHarness.CompileAndRun(
-            Prog("01 G OCCURS DYNAMIC CAPACITY IN C1 FROM 1 TO 4.\n"
-               + "   05 X PIC X(2) VALUES ARE \"AB\" \"CD\" FROM (1) TO (3).",
+            Prog("01 GG.\n   05 G OCCURS DYNAMIC CAPACITY IN C1 FROM 1 TO 4.\n"
+               + "      10 X PIC X(2) VALUES ARE \"AB\" \"CD\" FROM (1) TO (3).",
                  "    DISPLAY \"[\" C1 \"][\" X(1) \"|\" X(2) \"|\" X(3) \"]\"."), 2023);
         Assert.True(ok, detail);
         Assert.Contains("][AB|CD|AB]", stdout);

@@ -11,8 +11,9 @@
       *>   3[AB/CD|AB/CD]  a GROUP entry's table VALUE, GR5's area deposit per occurrence
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 S-TAB OCCURS 3.
-           05 S-X PIC X(2) VALUES ARE "AB" "CD" FROM (1).
+       01 S-GRP.
+           05 S-TAB OCCURS 3.
+               10 S-X PIC X(2) VALUES ARE "AB" "CD" FROM (1).
        01 M-GRP.
            05 M-ROW OCCURS 2.
                10 M-C PIC 9 OCCURS 3 VALUES ARE 1 2 3 4 5 6 FROM (1 1) TO (2 3).

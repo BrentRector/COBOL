@@ -55,8 +55,10 @@
        01 WS-I PIC 9(4).
        01 WS-A PIC X(3).
        01 RT PIC 9V99 VALUE 0.10.
-       01 AM PIC 9(3) OCCURS 1 TO 4 DEPENDING ON WS-N.
-       01 TC PIC X OCCURS 1 TO 3 DEPENDING ON WS-N.
+       01 AM-GRP.
+          05 AM PIC 9(3) OCCURS 1 TO 4 DEPENDING ON WS-N.
+       01 TC-GRP.
+          05 TC PIC X OCCURS 1 TO 3 DEPENDING ON WS-N.
        01 X8 PIC X(8) VALUE "xxABCDyy".
        01 W.
           05 WD PIC X(3) OCCURS 3 TIMES.

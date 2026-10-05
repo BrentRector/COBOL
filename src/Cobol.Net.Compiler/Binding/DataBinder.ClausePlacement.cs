@@ -18,6 +18,9 @@ internal enum ClausePlacementKind
     Residence,
     /// <summary>Only with the data-name format of the entry-name clause (never FILLER, never omitted).</summary>
     DataNameRequired,
+    /// <summary>Never in an entry whose level-number is one of <see cref="ClausePlacementRule.Levels"/> — the
+    /// "shall not be specified in a data description entry that has a level-number of …" shape.</summary>
+    NotAtLevel,
     /// <summary>Never in the same entry as any clause of <see cref="ClausePlacementRule.Excluded"/>.</summary>
     NotWith,
 }
@@ -38,11 +41,13 @@ internal enum EntrySections
 /// <summary>One placement rule, transcribed from its sentence. <see cref="Clauses"/> is the SUBJECT set (every
 /// clause the sentence restricts), <see cref="Rule"/> the citation and <see cref="Sentence"/> the rule's own
 /// words, which is what the diagnostic quotes. <see cref="TypeDeclarationInAnySection"/> is §13.18.22.3 SR1's
-/// third residence — "in level 1 type declarations", which names no section.</summary>
+/// third residence — "in level 1 type declarations", which names no section. <see cref="Levels"/> is the level-number
+/// set a <see cref="ClausePlacementKind.NotAtLevel"/> rule forbids; it is stated whole as the sentence states it, so
+/// a level the entry binder never sees here (66 and 88 are RENAMES and condition-name entries) is still in the row.</summary>
 internal sealed record ClausePlacementRule(
     DataClauseKind Clauses, ClausePlacementKind Kind, string Rule, string Sentence, DiagnosticDescriptor Code,
     DataClauseKind Excluded = DataClauseKind.None, EntrySections Sections = EntrySections.All,
-    bool TypeDeclarationInAnySection = false);
+    bool TypeDeclarationInAnySection = false, IReadOnlyList<int>? Levels = null);
 
 /// <summary>
 /// ⛔ <b>THE DATA-DESCRIPTION CLAUSE-PLACEMENT SCREEN — one table, two sites, no private copies</b>
@@ -120,6 +125,15 @@ internal static class ClausePlacementRules
             "The PROPERTY clause may be specified only for an elementary item whose name does not require "
             + "qualification for uniqueness of reference.",
             DiagnosticCatalog.PropertyClauseRule),
+        // §13.18.38.3 SR1 a) — kb/Work PB1260. The OCCURS clause's level rule: no table at level 01 or 77 (66 and 88 are
+        // the same sentence; they reach the binder as RENAMES / condition-name entries, which carry no OCCURS clause,
+        // and the grammar refuses the clause there). Level 01 is the one an entry binder SEES: `01 A PIC X OCCURS 3`
+        // compiled as a table. The sibling SR1 b) (an occurs-depending table subordinate to the OCCURS entry) and SR10
+        // (seven subscripts) need the finished forest and are OdoResolve's.
+        new(DataClauseKind.Occurs, ClausePlacementKind.NotAtLevel, "§13.18.38.3 SR1 a)",
+            "The OCCURS clause shall not be specified in a data description entry that: a) Has a level-number of 01, "
+            + "66, 77, or 88",
+            DiagnosticCatalog.DataClausePlacement, Levels: [1, 66, 77, 88]),
         // §13.16.3 SR7 — kb/Work PB518. The FD-record half is ScreenFileRecordEntryNames.
         new(DataClauseKind.External | DataClauseKind.Global, ClausePlacementKind.DataNameRequired, "§13.16.3 SR7",
             "The data-name format of the entry-name clause shall be specified for any entry containing the GLOBAL "
@@ -136,7 +150,6 @@ internal static class ClausePlacementRules
         new Dictionary<DataClauseKind, string>
         {
             [DataClauseKind.Usage] = "no placement rule — group or elementary (§13.18.60.4 GR1 inheritance)",
-            [DataClauseKind.Occurs] = "§13.18.38.3 level rules — OdoBindOccursSpec / the OCCURS screens",
             [DataClauseKind.Redefines] = "§13.18.44.3 — ScreenRedefinesPosition / ScreenRedefinesEntry (DataBinder.RedefinesEntry.cs: position, level, file-section, size, alignment)",
             [DataClauseKind.Value] = "§13.18.63.3 — ScreenValueLiteral / CheckGroupValueDeclarations",
             [DataClauseKind.Sign] = "§13.18.52.3 — InheritSignClauses (group and elementary both legal)",
@@ -178,6 +191,8 @@ public sealed partial class DataBinder
                 ClausePlacementKind.Residence when (rule.Sections & (EntrySections)(1 << (int)section)) == 0
                     && !(rule.TypeDeclarationInAnySection && (written & DataClauseKind.Typedef) != 0) =>
                     $"this entry is in the {SectionWords(section)}",
+                ClausePlacementKind.NotAtLevel when rule.Levels!.Contains(level) =>
+                    $"this entry's level-number is {level:00}",
                 ClausePlacementKind.DataNameRequired when isFiller =>
                     "this entry has no data-name (the FILLER format of the entry-name clause, written or implied)",
                 ClausePlacementKind.NotWith when (written & rule.Excluded) is var bad && bad != DataClauseKind.None =>

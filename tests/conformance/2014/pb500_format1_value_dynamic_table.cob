@@ -72,22 +72,28 @@
       *>         category defaults, spaces for PIC X(2) and zero for PIC 9.       -> 7[0000000002][  /0|  /0]
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 E-TAB PIC 9(3) OCCURS DYNAMIC CAPACITY IN E-CAP FROM 3 TO 9
-          VALUE 7.
-       01 N-TAB OCCURS DYNAMIC CAPACITY IN N-CAP FROM 2 TO 10.
-           05 N-A PIC X(2) VALUE "AB".
-           05 N-B PIC 9    VALUE 4.
-       01 O-TAB OCCURS DYNAMIC CAPACITY IN O-CAP FROM 2.
-           05 O-A PIC X(2) VALUE "AB".
-           05 O-B PIC 9    VALUE 4.
-       01 Z-TAB PIC X OCCURS DYNAMIC CAPACITY IN Z-CAP INITIALIZED
-          VALUE "V".
-       01 X-TAB OCCURS DYNAMIC CAPACITY IN X-CAP FROM 1 TO 8.
-           05 X-A PIC X VALUE "Z".
-           05 X-B PIC X VALUES ARE "Q" FROM (1) TO (4).
-       01 I-TAB OCCURS DYNAMIC CAPACITY IN I-CAP FROM 2 INITIALIZED.
-           05 I-A PIC X(2).
-           05 I-B PIC 9.
+       01 E-GRP.
+          05 E-TAB PIC 9(3) OCCURS DYNAMIC CAPACITY IN E-CAP
+             FROM 3 TO 9 VALUE 7.
+       01 N-GRP.
+          05 N-TAB OCCURS DYNAMIC CAPACITY IN N-CAP FROM 2 TO 10.
+             10 N-A PIC X(2) VALUE "AB".
+             10 N-B PIC 9    VALUE 4.
+       01 O-GRP.
+          05 O-TAB OCCURS DYNAMIC CAPACITY IN O-CAP FROM 2.
+             10 O-A PIC X(2) VALUE "AB".
+             10 O-B PIC 9    VALUE 4.
+       01 Z-GRP.
+          05 Z-TAB PIC X OCCURS DYNAMIC CAPACITY IN Z-CAP INITIALIZED
+             VALUE "V".
+       01 X-GRP.
+          05 X-TAB OCCURS DYNAMIC CAPACITY IN X-CAP FROM 1 TO 8.
+             10 X-A PIC X VALUE "Z".
+             10 X-B PIC X VALUES ARE "Q" FROM (1) TO (4).
+       01 I-GRP.
+          05 I-TAB OCCURS DYNAMIC CAPACITY IN I-CAP FROM 2 INITIALIZED.
+             10 I-A PIC X(2).
+             10 I-B PIC 9.
        PROCEDURE DIVISION.
        MAIN.
            DISPLAY "1[" E-CAP "][" E-TAB(1) "|" E-TAB(3) "]"

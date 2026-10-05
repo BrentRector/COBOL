@@ -23721,13 +23721,13 @@
   "ordinal": 1,
   "subject": "OCCURS clause",
   "rule-digest": "e0d89f51440e",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#OdoResolve",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.ClausePlacement.cs#ClausePlacementRules; src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#OdoResolve",
+  "test-ref": "conformance:negative/pb1260-occurs-at-level-01; conformance:negative/pb1260-occurs-at-level-77; conformance:negative/pb1260-odo-under-occurs-dynamic; conformance:85/index_name_r7_windows; unit:DataClausePlacementDriftTests.OccursAtLevel01Or77_IsRefused",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "Owned by kb/Work PB1260. cite.py --check 13.18.38.3 \"Has a level-number of 01, 66, 77, or 88\" -> OK. Two halves, and each diverges. (a) `01 A PIC X OCCURS 3.` and `77 A PIC X OCCURS 3.` compile clean and run -> probe/occurs-p1/sr1a_01, sr1a_77 (no level-number check exists; searched src for an OCCURS/level screen, none). Level 66 is rejected at parse (COBOL0307) and level 88 by COBOLNET1747, both through other rules. (b) An occurs-depending table under a FIXED OCCURS entry is rejected COBOLNET0854 (sr1b_fixed). BUT OdoResolve's ancestor walk tests `a.Occurs is not null`, and a Format 4 dynamic table leaves DataItem.Occurs null (OdoBindOccursSpec: 'DataItem.Occurs stays null'), so `05 G OCCURS DYNAMIC FROM 2. 10 T PIC X OCCURS 1 TO 5 DEPENDING ON N.` compiles clean (sr1b_dyn) and a FUNCTION LENGTH(G(1)) then draws a warning COBOLNET1756 and ABORTS the run unit with NotImplementedCobolFeatureException (sr1b_dyn_run2). The same Occurs-null blind spot is ReferenceResolver.cs:1806's own comment ('a dynamic table IS an OCCURS dimension though its Occurs is null').",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1260: both halves enforced. a) the clause-placement table's NotAtLevel row refuses OCCURS on a level-01 or level-77 entry (COBOLNET2404, every section, every edition); levels 66 and 88 are refused through the RENAMES grammar (COBOL0307) and COBOLNET1747. b) OdoResolve's IsTable ancestor test refuses an occurs-depending table under a fixed or Format-4 OCCURS (COBOLNET0854).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-2",
@@ -24126,13 +24126,13 @@
   "ordinal": 28,
   "subject": "OCCURS clause",
   "rule-digest": "18a61a92177a",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#DynamicResolve; src/Cobol.Net.Compiler/Validation/IntegerOperandPass.cs#OccursDynamic",
-  "test-ref": "conformance-test:OccursDynamicGuardTests.FromGreaterThanTo_Rejected1522",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#DynamicResolve; src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#DynamicBoundWithinMaximum; src/Cobol.Net.Compiler/Validation/IntegerOperandPass.cs#OccursDynamic",
+  "test-ref": "conformance-test:OccursDynamicGuardTests.FromGreaterThanTo_Rejected1522; conformance:negative/pb1264-occurs-dynamic-from-above-maximum",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "Owned by kb/Work PB1264. cite.py --check 13.18.38.3 \"Integer-4 shall be nonnegative\" -> OK. FROM 5 TO 5 -> COBOLNET1522 (probe/occurs-p1/sr28_eq); FROM 8 TO 3 -> 1522 (the covering test); FROM -1 is rejected at parse, since integerLiteral is unsigned (sr28_neg); FROM 0 TO 3 is accepted with capacity 0 (sr28_from0; IntegerSlot.Zero admits zero for integer-4 only). A lone TO 0 is rejected COBOLNET2386 under §5.5 1), which is right because SR28 grants zero only to integer-4 (sr28_to0). || REFUTED: PARTIAL — The FROM>=TO comparison is skipped whenever either literal does not fit the parsed integer: DataBinder.Odo.cs:334 guards on `spec.InitialCap is { } from && spec.ExpectedMax is { } to`, and an over-range FROM leaves InitialCap null. `OCCURS DYNAMIC FROM 99999999999 TO 5` (integer-5 not greater than integer-4) compiles and runs with no diagnostic (r28_big_from rc=0), as does FROM 99999999999 TO 99999999998 (r28_big_both). In-range shapes are right (FROM 0 TO 0 -> 1522+2386; FROM 8 TO 3 under --std 2014 -> 1522). Shares its root with the SR29 DIVERGES (over-range values silently dropped); an SR29 diagnostic would also close this hole.",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "kb/Work PB1264: FROM >= TO is COBOLNET1522, FROM 0 is accepted and TO 0 is COBOLNET2386; the refuter's hole (an over-range FROM left InitialCap null and skipped the comparison) is closed by SR29's own refusal, COBOLNET2647: every value above CobolDynTable.MaxOccurrences is a compile error, so no over-range pair reaches a compiled program (re-probed: FROM 99999999999 TO 5 is COBOLNET2427 + COBOLNET2647).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-29",
@@ -24156,13 +24156,13 @@
   "ordinal": 30,
   "subject": "OCCURS clause",
   "rule-digest": "b5963d17200f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#DynamicResolve; src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#CapacityRegisterName; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#CapacityRegisterFor",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#DynamicResolve; src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs#CapacityRegisterName; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#CapacityRegisterFor; src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUserWord",
+  "test-ref": "conformance:negative/pb1264-capacity-register-named-like-a-file; conformance:negative/pb1264-capacity-register-named-like-a-paragraph; conformance:negative/pb1264-capacity-register-named-like-a-section; conformance:negative/pb457-capacity-register-under-table",
   "derivation": "",
-  "editions": "2014, 2023",
-  "notes": "Owned by kb/Work PB1264. cite.py --check 13.18.38.3 \"Data-name-3 shall not be defined elsewhere in the source element\" -> OK. Second sentence (implicit definition at the OCCURS entry's level) is implemented by PB457 (landed) and pinned by conformance:negative/pb457-capacity-register-under-table and pb457-capacity-register-bad-qualifier (they cover that half only). First sentence: a data-name duplicate is rejected COBOLNET1523 whether declared before or after (probe/occurs-p1/sr30_dup, sr30_dup_later). But the check is `ByName.ContainsKey(capName) || _capacityRegisters.ContainsKey(capName)`, and ByName holds data-names only, so `CAPACITY IN F` where F is a FILE-NAME compiles clean (sr30_file), and so does a PARAGRAPH-name C (sr30_dup_para). §8.3.2.2 (--check OK: 'a given user-defined word may be used as only one type of user-defined word') makes every such reuse illegal. Note: an ordinary data-name/paragraph-name collision is ALSO accepted (sr30_general_para), so the paragraph case belongs to a cross-cutting §8.3.2.2 gap. The file-name case is SR30's own.",
-  "state": "GAP"
+  "editions": "2014,2023",
+  "notes": "kb/Work PB1264: data-name-3 is announced through the ONE user-word declaration funnel as a data-name, so a file-name, paragraph-name or section-name spelled like the register is refused COBOLNET2692 (the later declaration is the one reported); a data-name or another register duplicate stays COBOLNET1523 (DynamicResolve's own test). The hand-written file-name scan is gone.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.38.3-31",

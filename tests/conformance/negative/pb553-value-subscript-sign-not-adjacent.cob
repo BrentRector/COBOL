@@ -13,7 +13,8 @@
        PROGRAM-ID. PB553NAD.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01  S-T PIC X(2) OCCURS 3 VALUE "AB" FROM ( + 1) TO (+3).
+       01  S-G.
+           05  S-T PIC X(2) OCCURS 3 VALUE "AB" FROM ( + 1) TO (+3).
        PROCEDURE DIVISION.
        MAIN.
            DISPLAY S-T(1)

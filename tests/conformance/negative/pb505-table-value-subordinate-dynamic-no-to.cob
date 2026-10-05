@@ -13,8 +13,9 @@
        PROGRAM-ID. PB505N3.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 G OCCURS DYNAMIC CAPACITY IN C1.
-           05 X PIC X(2) VALUE "AB" FROM (1).
+       01 GG.
+           05 G OCCURS DYNAMIC CAPACITY IN C1.
+               10 X PIC X(2) VALUE "AB" FROM (1).
        PROCEDURE DIVISION.
        MAIN.
            DISPLAY X(1)
