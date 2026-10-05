@@ -6,13 +6,16 @@ The unattended orchestrator loop: one fresh headless `claude -p` session per bou
 .DESCRIPTION
 Design: docs/rearchitecture/DESIGN-orchestrator-loop.md (kb/Work PB1981). Each iteration, in this order:
   1. single instance (orchestrate.lock holds the PID; a dead PID's lock is stale and taken over)
-  2. STOP file in the coordination directory ends the loop
+  2. STOP file in the coordination directory ends the loop; during a unit it winds the unit down gracefully first
+     (STOP-UNIT plus the fleet STOP, so nothing is lost), see stop.ps1
   3. circuit breaker: three consecutive units that fail (nonzero exit, invalid or missing handoff, or under
      -FastFailSeconds without a `done` handoff) stop the loop with an owner note; exponential backoff between failures
   4. budget.py decides go / hold-session / hold-day / stop-week
   5. the next unit: -Unit for the first iteration, else next_unit.py (the handoff's next_unit, then the deterministic checks)
-  6. run `claude -p` with the unit prompt, a fresh session id, stream-json to logs\; watch the context size and
-     create STOP-UNIT past -MaxContextTokens; kill only after the grace period
+  6. run `claude -p` with the unit prompt (first stream-json message on stdin, which stays open so the session outlives
+     a model turn that ends with a Workflow in flight; the supervisor closes it when the stream is idle with no
+     background task), a fresh session id, stream-json to logs\; watch the context size and wind the unit down past
+     -MaxContextTokens or on STOP; kill only after the grace period
   7. validate handoff.json against handoff.schema.json
   8. append one line to units.jsonl
 Exit codes: 0 stopped (STOP, -MaxUnits, stop-week, -DryRun), 3 another instance runs, 4 circuit breaker,
@@ -41,6 +44,7 @@ param(
     [string]$Python = 'python',
     [string]$TelemetryDir = '',
     [int]$FastFailSeconds = 120,
+    [int]$IdleCloseSeconds = 20,
     [int]$BackoffBaseSeconds = 60
 )
 $ErrorActionPreference = 'Stop'
@@ -136,16 +140,22 @@ function Get-ProjectTranscriptDir([string]$sessionId) {
 function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]$logBase) {
     $scratch = Join-Path $CoordDir 'scratch'
     $prompt = Build-Prompt $unit $scratch $sessionId
-    $claudeArgs = @('-p', $prompt, '--model', $model, '--permission-mode', $PermissionMode, '--permission-prompts', 'none',
-        '--output-format', 'stream-json', '--verbose', '--session-id', $sessionId)
+    # The prompt goes in as the first stream-json message and stdin STAYS OPEN: a headless session exits the moment its
+    # model ends a turn, and a Workflow or background gate dies with it, but an open stdin keeps the session alive so the
+    # background task's completion notification wakes the model (probed 2026-10-04: end_turn at 16.8 s, woken at 41 s).
+    # The SUPERVISOR decides when the unit is over (idle, below), never the model's choice of words.
+    $claudeArgs = @('-p', '--input-format', 'stream-json', '--model', $model, '--permission-mode', $PermissionMode,
+        '--permission-prompts', 'none', '--output-format', 'stream-json', '--verbose', '--session-id', $sessionId)
     if ($unit -eq 'meter') { $claudeArgs += '--chrome' }
     $exe, $pre = Resolve-Launch $ClaudeExe
     $psi = [System.Diagnostics.ProcessStartInfo]::new($exe)
     foreach ($a in @($pre) + $claudeArgs) { $psi.ArgumentList.Add([string]$a) }
     $psi.WorkingDirectory = $RepoDir
     $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
+    $psi.StandardInputEncoding = [System.Text.UTF8Encoding]::new($false)
     $psi.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
     $psi.Environment['COBOL_COORD_DIR'] = $CoordDir
 
@@ -158,6 +168,12 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
     $log = [System.IO.StreamWriter]::new("$logBase.jsonl", $false, [System.Text.UTF8Encoding]::new($false))
     $proc = [System.Diagnostics.Process]::Start($psi)
     $errTask = $proc.StandardError.ReadToEndAsync()
+    $proc.StandardInput.WriteLine((@{ type = 'user'; message = @{ role = 'user'; content = $prompt } } | ConvertTo-Json -Compress -Depth 5))
+    $proc.StandardInput.Flush()
+    $resultSeen = $false     # the model has ended a turn and nothing has started since
+    $bgTasks = 0             # background tasks (a Workflow, a gate) the session reports as running
+    $lastEventAt = Get-Date
+    $stdinClosed = $false
     if ($Watch -and $unit -eq 'wave') {
         try {
             $watcher = Start-Process -PassThru -WindowStyle Hidden -FilePath (Get-Command pwsh).Source -ArgumentList @(
@@ -171,9 +187,13 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
                 $line = $read.Result
                 if ($null -eq $line) { break }
                 $log.WriteLine($line); $log.Flush()
+                $lastEventAt = Get-Date
                 $ev = $null
                 try { $ev = $line | ConvertFrom-Json -Depth 64 } catch { }
                 if ($ev -and $ev.PSObject.Properties['type']) {
+                    if ($ev.type -eq 'assistant') { $resultSeen = $false }
+                    elseif ($ev.type -eq 'result') { $resultSeen = $true }
+                    elseif ($ev.type -eq 'system' -and $ev.subtype -eq 'background_tasks_changed') { $bgTasks = @($ev.tasks).Count }
                     if ($ev.type -eq 'assistant' -and $ev.message -and $ev.message.PSObject.Properties['usage']) {
                         # stream-json repeats one model call's usage on each content block: count each message id once.
                         $id = [string]$ev.message.id
@@ -195,9 +215,22 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
                 }
                 $read = $proc.StandardOutput.ReadLineAsync()
             }
-            if (-not $stats.stop_unit_sent -and $stats.context -gt $MaxContextTokens) {
-                Say "context $($stats.context) > ${MaxContextTokens}: STOP-UNIT (the unit hands off at its next step)"
-                New-Item -ItemType File -Force -Path $StopUnit | Out-Null
+            # The unit is over when its model ended a turn, no background task is running and the stream has been quiet
+            # for -IdleCloseSeconds (a finishing task's completion event arrives just after the task list empties, and
+            # wakes the model, so a close on the first idle instant could cut a woken turn off).
+            if (-not $stdinClosed -and $resultSeen -and $bgTasks -eq 0 -and ((Get-Date) - $lastEventAt).TotalSeconds -ge $IdleCloseSeconds) {
+                try { $proc.StandardInput.Close() } catch { }
+                $stdinClosed = $true
+            }
+            # Two reasons to wind the unit down gracefully: its context passed the cap, or the owner created STOP. Both do
+            # the same thing, so no work is lost: STOP-UNIT (the unit hands off at its next step) and the fleet's own
+            # graceful-stop file (every implementer and lander checkpoints and returns SPLIT), then wait for the handoff.
+            $windDown = $null
+            if ($stats.context -gt $MaxContextTokens) { $windDown = "context $($stats.context) > ${MaxContextTokens}" }
+            elseif (Test-Path $StopFile) { $windDown = 'STOP file present' }
+            if (-not $stats.stop_unit_sent -and $windDown) {
+                Say "${windDown}: winding the unit down (STOP-UNIT and the fleet STOP; the unit checkpoints and hands off, the loop then ends if STOP is set)"
+                New-Item -ItemType File -Force -Path $StopUnit, (Join-Path $scratch 'STOP') | Out-Null
                 $stats.stop_unit_sent = $true
                 $stopAt = Get-Date
             }
@@ -278,7 +311,8 @@ try {
             break
         }
 
-        Remove-Item $StopUnit, $Handoff -Force -ErrorAction SilentlyContinue
+        # A fleet STOP left by a previous wind-down would stop this unit's fleet at its first step.
+        Remove-Item $StopUnit, $Handoff, (Join-Path $CoordDir 'scratch/STOP') -Force -ErrorAction SilentlyContinue
         Say "unit '$($choice.unit)' ($($choice.reason)) on $model, session $sessionId"
         $started = Get-Date
         $r = Invoke-Unit $choice.unit $model $sessionId $logBase

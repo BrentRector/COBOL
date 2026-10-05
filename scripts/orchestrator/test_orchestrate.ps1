@@ -27,7 +27,7 @@ function Run-Orch([string]$case, [string]$mode, [string[]]$extra, [scriptblock]$
     if ($before) { & $before $coord }
     $env:FAKE_CLAUDE_MODE = $mode
     $env:FAKE_CLAUDE_MARK = $mark
-    $out = & pwsh -NoProfile -File $Orch -ClaudeExe $Fake -CoordDir $coord -TelemetryDir $Tele -BackoffBaseSeconds 0 @extra 2>&1
+    $out = & pwsh -NoProfile -File $Orch -ClaudeExe $Fake -CoordDir $coord -TelemetryDir $Tele -BackoffBaseSeconds 0 -IdleCloseSeconds 1 @extra 2>&1
     $code = $LASTEXITCODE
     $runs = if (Test-Path $mark) { @(Get-Content $mark).Count } else { 0 }
     $units = if (Test-Path (Join-Path $coord 'units.jsonl')) { @(Get-Content (Join-Path $coord 'units.jsonl') | ForEach-Object { $_ | ConvertFrom-Json }) } else { @() }
@@ -84,6 +84,42 @@ $inv = Get-Content (Join-Path $r.coord 'fake-invocations.txt') -Raw
 $sid = [regex]::Match($inv, '--session-id \| ([0-9a-f-]{36})').Groups[1].Value
 Check 'tasks dir names the unit session' ($inv -match [regex]::Escape("claude/E--COBOL/$sid/tasks")) $true
 Check 'no placeholder left in the prompt' ($inv -match '\{TASKS_DIR\}') $false
+
+# 4e. the SUPERVISOR owns the session's lifetime: a turn that ends with a background task running does not end the unit,
+# the task's completion wakes the model (a second call), and stdin is closed only once the stream is idle with no task
+$r = Run-Orch 'wakes' 'wakes' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0')
+Check 'woken unit exit' $r.code 0
+Check 'woken unit made both calls' $r.units[0].calls 2
+Check 'woken unit handed off done' $r.units[0].handoff_outcome 'done'
+Check 'supervisor closed stdin when idle' (Test-Path (Join-Path $r.coord 'eof.txt')) $true
+$r = Run-Orch 'goodeof' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0')
+Check 'a finished unit is closed by the supervisor, not left running' (Test-Path (Join-Path $r.coord 'eof.txt')) $true
+
+# 4f. STOP while a unit runs closes work down asap WITHOUT losing it: the supervisor creates STOP-UNIT and the fleet STOP,
+# the unit checkpoints and hands off (split, next unit resume), and the loop then ends instead of starting another unit
+$r = Run-Orch 'stopnow' 'stopsme' @('-Unit', 'wave', '-FastFailSeconds', '0')
+Check 'stop during a unit exit' $r.code 0
+Check 'stop during a unit ran exactly one unit' $r.runs 1
+Check 'fleet STOP existed when the unit wound down' ((Get-Content (Join-Path $r.coord 'fleet-stop-seen.txt') -Raw).Trim()) 'True'
+Check 'the unit was not killed' $r.units[0].killed $false
+Check 'the wind-down handoff is kept for resume' ((Get-Content (Join-Path $r.coord 'handoff.last.json') -Raw) -match '"next_unit":\s*"resume"') $true
+Check 'the owner STOP file is left in place' (Test-Path (Join-Path $r.coord 'STOP')) $true
+# a fleet STOP left by that wind-down must not stop the NEXT unit's fleet at its first step
+$r = Run-Orch 'stalefleetstop' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0') {
+    param($c) New-Item -ItemType Directory -Force -Path (Join-Path $c 'scratch') | Out-Null
+    Set-Content -Path (Join-Path $c 'scratch/STOP') -Value 'stale' }
+Check 'a stale fleet STOP is cleared at unit start' (Test-Path (Join-Path $r.coord 'scratch/STOP')) $false
+
+# 4g. stop.ps1: creates STOP, reports status, and -Clear removes STOP, STOP-UNIT and the fleet STOP
+$sc = Join-Path $Root 'stopscript'
+New-Item -ItemType Directory -Force -Path (Join-Path $sc 'scratch') | Out-Null
+$StopPs = Join-Path (Split-Path $Orch) 'stop.ps1'
+& pwsh -NoProfile -File $StopPs -CoordDir $sc | Out-Null
+Check 'stop.ps1 creates STOP' (Test-Path (Join-Path $sc 'STOP')) $true
+Check 'stop.ps1 -Status reports it' ((& pwsh -NoProfile -File $StopPs -Status -CoordDir $sc) -join ' ' -match 'STOP pending: True') $true
+Set-Content -Path (Join-Path $sc 'STOP-UNIT') -Value 'x'; Set-Content -Path (Join-Path $sc 'scratch/STOP') -Value 'x'
+& pwsh -NoProfile -File $StopPs -Clear -CoordDir $sc | Out-Null
+Check 'stop.ps1 -Clear removes all three' (@('STOP', 'STOP-UNIT', 'scratch/STOP') | Where-Object { Test-Path (Join-Path $sc $_) }).Count 0
 
 # 5. the circuit breaker trips after three fast failures and leaves an owner note
 $r = Run-Orch 'breaker' 'fastfail' @('-Unit', 'wave', '-FastFailSeconds', '120')

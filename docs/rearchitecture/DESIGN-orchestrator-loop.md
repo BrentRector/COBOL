@@ -44,8 +44,9 @@ the tools it runs). Contents:
 | `alloc.lock` | `alloc.py` | the allocator's lock (atomic create; stale after 60 s) |
 | `readings.json` | the `meter` unit (via `budget.py --record`) | owner-meter readings, a list of `{noted_at, weekly_pct, session_pct, session_reset}` |
 | `orchestrate.lock` | the supervisor | one instance only: `{pid, started_at, host}` |
-| `STOP` | the owner | ends the loop after the current unit |
-| `STOP-UNIT` | the supervisor | asks the running unit to write its handoff and end (section 4.3) |
+| `STOP` | the owner (`stop.ps1`) | closes work down as soon as possible without losing any: a running unit is wound down (below), then the loop ends; `stop.ps1 -Clear` removes it |
+| `STOP-UNIT` | the supervisor | asks the running unit to write its handoff and end (section 4.3); created for the context cap and for `STOP` |
+| `scratch\STOP` | the supervisor | the fleet's graceful-stop file, created with `STOP-UNIT`: every implementer and lander checkpoints, commits and returns `SPLIT`; removed at the start of the next unit |
 | `handoff.json` | the running unit | its handoff (section 5); the supervisor archives it per unit |
 | `handoff.last.json` | the supervisor | the newest VALID handoff, which the next unit reads and `next_unit.py` decides from |
 | `scratch\` | the units and their fleets | the fleet scratch directory (`{SCRATCH}`): specs, `groups.json`, the Workflow args, and `reports\`, which `plan_wave.py` reads for finishers; it persists across units |
@@ -77,8 +78,8 @@ it stays alive until its lander has landed. Its context stays small anyway, beca
 pointers (the rolling wave's `summary` is capped at 900 characters and the forensic detail is in the report files),
 and the unit polls nothing (it waits for the Workflow's completion signal).
 
-If the context cap fires (section 4.3) while a Workflow runs, the unit does NOT end the session: it creates the
-fleet's graceful-stop file `{SCRATCH}\STOP`, so every implementer checkpoints and returns `SPLIT` and every lander
+If the context cap fires (section 4.3) or the owner creates `STOP` while a Workflow runs, the unit does NOT end the
+session: the supervisor creates the fleet's graceful-stop file `{SCRATCH}\STOP` (with `STOP-UNIT`), so every implementer checkpoints and returns `SPLIT` and every lander
 finishes or abandons its train at a cluster boundary, waits for the Workflow to return, writes a handoff with
 `next_unit: resume` that names every branch, worktree and report, and ends. The next unit is a fresh `resume`.
 A kill (after `-GraceMinutes`) is the last resort, and it loses only uncheckpointed agent work: every agent
@@ -122,7 +123,7 @@ shell), `-CoordDir`, `-RepoDir` (default the repository containing the script), 
 150000), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave`
 unit gets three times this, because a lander train must be allowed to finish), `-BorrowDays` (passed to
 `budget.py`), `-Unit` (the first unit, overriding `next_unit.py` once), `-Watch` (section 13), `-Python`, and the
-test seams `-TelemetryDir` (passed to `budget.py`), `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
+test seams `-TelemetryDir` (passed to `budget.py`), `-IdleCloseSeconds` (default 20, section 4.6) and `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
 (default 60). Exit codes: 0 stopped (`STOP`, `-MaxUnits`, `stop-week`, `-DryRun`), 3 another instance runs,
 4 circuit breaker, 5 an owner question is waiting.
 
@@ -130,8 +131,14 @@ Each iteration, in this order:
 
 1. **Single instance.** `orchestrate.lock` is created atomically holding the PID. An existing lock whose PID is a
    live process refuses the start (exit 3); a lock whose PID is gone is stale and is taken over.
-2. **STOP.** `STOP` in the coordination directory ends the loop (exit 0). The owner creates it; the loop deletes
-   nothing of the owner's.
+2. **STOP.** `STOP` in the coordination directory ends the loop (exit 0), and it does so ASAP WITHOUT LOSING WORK
+   (owner 2026-10-04: "close down work asap when needed without losing any"). Between units the loop ends at once;
+   a hold or a backoff is interrupted within a minute; a RUNNING unit is wound down by the supervisor itself, not left
+   to finish: it creates `STOP-UNIT` and the fleet's `scratch\STOP`, every agent checkpoint-commits its WIP and returns
+   `SPLIT`, the unit writes a handoff (`next_unit: resume`, naming every branch), and only then does the loop end. A
+   unit that ignores the wind-down for `-GraceMinutes` is killed (the last resort, losing only uncheckpointed agent
+   work). The owner runs `pwsh scripts/orchestrator/stop.ps1` (`-Status` to watch, `-Clear` to run again); the loop
+   deletes nothing of the owner's, so `STOP` stays until cleared and the logon start honours it.
 3. **Circuit breaker.** Three consecutive units that end in under two minutes or with a nonzero exit or an invalid
    handoff stop the loop (exit 4) and write `logs\BREAKER-<time>.md` plus an `OWNER-QUESTIONS.md` entry naming the
    three units and their logs. Between failures the loop backs off 1, 2, 4 minutes (exponential, capped at 30).
@@ -142,14 +149,24 @@ Each iteration, in this order:
 6. **Run it**: `claude -p <prompt> --model <unit model> --permission-mode <mode> --permission-prompts none
    --output-format stream-json --verbose --session-id <fresh GUID>` from the repository root (plus `--chrome` for
    `meter`). The prompt is `units/common.md` followed by `units/<unit>.md`, with the substitutions `{COORD}`,
-   `{HANDOFF}`, `{STOP_UNIT}`, `{PREV_HANDOFF}`, `{SCRATCH}` and `{BORROW_DAYS}` (the supervisor's `-BorrowDays`, so the
+   `{HANDOFF}`, `{STOP_UNIT}`, `{PREV_HANDOFF}`, `{SCRATCH}`, `{TASKS_DIR}` and `{BORROW_DAYS}` (the supervisor's `-BorrowDays`, so the
    `wave` unit's `plan_wave.py --from-budget` sees the same allowance the supervisor's gate used). The stream goes to `logs\<time>-<unit>.jsonl`,
    stderr to `logs\<time>-<unit>.stderr.txt`.
    While it runs, the supervisor reads every `assistant` event's `usage` (counting each message id once: the
    stream repeats a call's usage on each content block) and keeps the running context estimate =
    `input_tokens + cache_read_input_tokens + cache_creation_input_tokens` of the LATEST call (the size of the
-   context the model just read). When it passes `-MaxContextTokens` the supervisor creates `STOP-UNIT` and waits
-   for the session to end; after the grace period it kills the process tree.
+   context the model just read). When it passes `-MaxContextTokens`, or the owner creates `STOP`, the supervisor
+   creates `STOP-UNIT` and the fleet's `scratch\STOP` and waits for the session to end; after the grace period it
+   kills the process tree.
+   **The supervisor, not the model, decides when the unit is over.** The prompt is the first stream-json message
+   (`--input-format stream-json`) and stdin stays open, because a headless session exits the moment its model ends a
+   turn and a Workflow or background gate dies with it (wave 1017, 2026-10-04: the unit wrote "I'm waiting for the
+   Workflow" and ended its turn, and an eight-agent fleet died at minute 11). With stdin open a background task's
+   completion notification wakes the model after `end_turn` (probed: ended at 16.8 s, woken at 41 s). The supervisor
+   tracks `result` and `system/background_tasks_changed` events and closes stdin when the model has ended a turn, no
+   background task runs and the stream has been quiet for `-IdleCloseSeconds` (20; a task's completion event arrives
+   just after its list empties, so the close waits). `units/wave.md` also tells the model to wait with foreground
+   calls on the Workflow's task-output file (`{TASKS_DIR}`), a second line of defence, never the only one.
 7. **Validate the handoff** against `handoff.schema.json` (`Test-Json -SchemaFile`). Missing or invalid counts as a
    failure for the breaker, and the next unit is `resume`.
 8. **Record** one line in `units.jsonl`: `{unit, reason, model, session_id, started_at, ended_at, duration_s,
@@ -209,7 +226,8 @@ registered by this change (open decision D2).
 | the 5-hour session window runs out mid-unit | a unit killed at the limit | `hold-session` at the soft stop (70 %) before a unit starts |
 | two sessions allocate the same id or code | a renumbering pass (five collisions in one day, 2026-09) | `alloc.py`: one lock, reservations outside every worktree |
 | a landing reopens a closed inventory row | silent conformance regression | `inventory_ratchet.py` (section 7) |
-| the owner wants it stopped | | `STOP` |
+| the owner wants it stopped | losing agent work if the process were killed | `STOP` (`stop.ps1`): a graceful wind-down of the running unit and its fleet, a kill only after the grace period |
+| a unit's model ends a turn with a fleet in flight | the headless process exits and the fleet dies (wave 1017) | the supervisor holds stdin open and closes it only when idle with no background task |
 | a unit runs a WSL lifecycle command | every other session's Linux gate dies | the unit prompts forbid it; `forbidden_commands.py` is the hook-level guard (open decision D4: add these shapes there) |
 
 ## 5. The handoff (`handoff.schema.json`)
