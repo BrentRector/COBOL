@@ -2462,6 +2462,16 @@ public static class DiagnosticCatalog
         + "ISO §13.18.44.3 SR4/SR7/SR10 place data-name-2 among the entries preceding the subject at the same level; "
         + "§8.4.2.1 requires every reference to identify a resource. Name the entry that defines the area.",
         "ISO §13.18.44.3 / §8.4.2.1");
+    // kb/Work PB1281: the REDEFINES operand was captured as the dataReference's GLUED text, so `REDEFINES A OF G`
+    // reached the resolver as the one word AOFG — refused as COBOLNET1654 naming the wrong rule when no AOFG existed,
+    // and bound SILENTLY to an unrelated item AOFG when one did. The base data-name is now what resolves, and the
+    // qualifier is refused by its own rule (the subscript and reference-modifier arms are COBOLNET2024's screen).
+    public static readonly DiagnosticDescriptor RedefinesDataName2Qualified = new(
+        "COBOLNET2915", "redefines-data-name-2-qualified", EditionSeverity.Error,
+        "The REDEFINES clause's data-name-2 is written with a qualifier (OF / IN). ISO §13.18.44.3 SR6: \"Data-name-2 "
+        + "shall not be qualified.\" — the required placement (SR4: data-name-2 precedes the subject at the same "
+        + "level) already makes the reference unambiguous (NOTE 1). Write the bare data-name.",
+        "ISO §13.18.44.3 SR6");
     public static readonly DiagnosticDescriptor RenamesOperandUnresolved = new(
         "COBOLNET1655", "renames-operand-unresolved", EditionSeverity.Error,
         "A RENAMES clause's data-name-2 or data-name-3 does not name an elementary item or group of elementary items in "
@@ -4553,12 +4563,13 @@ public static class DiagnosticCatalog
         "COBOLNET2024", "clause-operand-not-a-data-name", EditionSeverity.Error,
         "A clause operand (a file description or file control clause, or an OCCURS clause's DEPENDING, KEY or "
         + "CAPACITY phrase in the data or report section — §13.18.38.3 SR2/SR5/SR31), or a SORT or MERGE KEY "
-        + "phrase operand (§14.9.40.2, §14.9.24.2; §14.9.40.3 SR14 b), written where the clause's "
+        + "phrase operand (§14.9.40.2, §14.9.24.2; §14.9.40.3 SR14 b), or a REDEFINES clause's data-name-2 "
+        + "(§13.18.44.3 SR5), written where the clause's "
         + "general format prints data-name-n is not a qualified-data-name (ISO §8.4.2.2.2 Format 1): it is a special register "
         + "(LINAGE-COUNTER, LINE-COUNTER or PAGE-COUNTER — §8.4.3.1 Format 10 / Format 11 identifiers, confined "
         + "to the procedure division by §8.4.3.14.3 SR1 and §8.4.3.15.3 SR1), or it carries a subscript "
-        + "(§8.4.2.3 — an identifier form; the operand shall not be subject to any OCCURS clauses), or it is "
-        + "reference-modified (§8.4.3.3.3 NOTE). Write a data-name, with IN/OF qualifiers if it needs them.",
+        + "(§8.4.2.3 — an identifier form; the message quotes the clause's own subscript rule), or it is "
+        + "reference-modified (§8.4.3.3.3 NOTE). Write a data-name, with IN/OF qualifiers if the clause admits them.",
         "ISO §8.4.2.2.2 / §8.4.2.3 / §8.4.3.1 / §8.4.3.3.3 / §8.4.3.14.3 / §8.4.3.15.3");
 
     /// <summary>COBOLNET2025 — the LINAGE clause's own operand syntax rules (ISO §13.18.34.3), screened at the

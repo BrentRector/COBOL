@@ -5253,7 +5253,7 @@ lowering **privately**, and the bound tree it consumes is the SAME neutral tree 
 >    `openClause` `{is2002() || retryPhraseAhead()}?` and the `boolExprAhead()`-based boolean-condition ENTRY) **PLUS**
 >    `{is2023()}? inlineMethodInvocationStatement` (`CobolParserCore.g4` — genuinely ambiguous with a subscripted
 >    `x(args)` reference — **DELETED by kb/Work PB428: the rule matched a shape ISO defines nowhere, and the real
->    §8.4.3.4 construct needs no predicate because `::` is unambiguous**), `{is2002()}? linkageProcedureParameter` (`CobolData.g4` — the 2002 procedure-parameter form),
+>    §8.4.3.4 construct needs no predicate because `::` is unambiguous**), `{is2002()}? linkageProcedureParameter` (`CobolData.g4` — **DELETED by kb/Work PB1252: no ISO edition defines a linkage entry with a USING phrase, and every binder silently dropped it**),
 >    and the `{!(is2002() && LA(1)==PROPERTY)}?` VALUE-list negative lookahead (`CobolData.g4` — PROPERTY is a 2002
 >    keyword that can follow a VALUE clause). Each resolves a genuine syntactic ambiguity across editions per the
 >    design's own "a forward, identity-carrying lookahead survives ONLY where a construct is genuinely ambiguous across

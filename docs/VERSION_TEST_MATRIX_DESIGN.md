@@ -387,8 +387,8 @@ decision.
 > against the CLI before enablement.
 > **(d) Position-aware reserved words** — reserved-word checking is position-aware:
 > non-IDENTIFIER/non-EC-band `cobolWord` occurrences reject 0901 when (and only when) they occupy a slot no
-> cobolWord-admitted keyword can legally occupy — the data/parameter entry-name (`dataName` under
-> `dataDescriptionEntry`/`linkageProcedureParameter`), paragraph/section DEFINITIONS, the SELECT file-name, and
+> cobolWord-admitted keyword can legally occupy — the data entry-name (`dataName` under
+> `dataDescriptionEntry`/`constantEntry`), paragraph/section DEFINITIONS, the SELECT file-name, and
 > the three `programName` sites (`VersionConformancePass.IsProvableUserWordPosition`, grammar-proved per slot). The
 > mis-parse-prone optional entry-name slots (`dataName` under `reportGroupEntry` — the RW104A COLUMN hazard — and `screenName`)
 > and all reference positions stay unchecked (conservative false-negative, never false-positive). Of the 34

@@ -2397,7 +2397,11 @@
   "pb1374-flag02-all-repeated",
   "pb876-national-of-national-numeric-edited",
   "pb855-picture-editing-es-mid-string",
-  "pb855-picture-editing-es-two-before-cs"
+  "pb855-picture-editing-es-two-before-cs",
+  "pb1252-linkage-entry-using-phrase",
+  "pb1281-redefines-qualified",
+  "pb1281-redefines-subscripted",
+  "pb1281-redefines-odo-in-redefinition"
  ],
  "pending": []
 }

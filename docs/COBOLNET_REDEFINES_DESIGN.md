@@ -151,7 +151,10 @@ MODEL (IMPLEMENTED — `src/Cobol.Net.Compiler/Binding/Model/RedefinesModel.cs` 
   class RenamesInfo { required string FromName; string? ThruName; DataItem? From; DataItem? Thru; List<DataItem> SpanLeaves; bool IsAlias => ThruName is null; }
   enum RedefinesTier { Alias, StringCanonical, Rejected }   // ByteCanonical DELETED — Step D, kb/Work PB164
   class RedefinesClass { required DataItem Canonical; List<DataItem> Members; RedefinesTier Tier; int Width; string BackingCsName => "_redef_"+Canonical.CsName; string? RejectReason; }
-  DataBinder: binds the REDEFINES clause to RedefinesTargetName (resolved after the forest is built); binds level 66 via BindRenames —
+  DataBinder: binds the REDEFINES clause to RedefinesTargetName (resolved after the forest is built) through RedefinesDataName2, which
+  screens the WRITTEN operand first — §13.18.44.3 SR6 no qualifier (COBOLNET2915), SR5 no subscript and §8.4.3.3.3 no reference-modifier
+  (the one data-name-n screen, COBOLNET2024) — and keeps only the base data-name, never the reference's glued text (kb/Work PB1281);
+  binds level 66 via BindRenames —
   attached to the owning record's Renames66 list, NOT the storage tree; a post-build pass resolves REDEFINES/RENAMES targets, groups overlaid
   entries into RedefinesClasses, and runs ComputeTier (cascade D > B > A; a mixed-USAGE pun is an ordinary Tier-B byte-window class since Step D,
   kb/Work PB164 — the remaining Tier-D rejects are the 2-byte national overlay, the §13.18.44.3 SR5 sentence-1

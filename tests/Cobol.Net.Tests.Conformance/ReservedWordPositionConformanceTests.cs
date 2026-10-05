@@ -227,9 +227,7 @@ public sealed class ReservedWordPositionConformanceTests
 
     // ── The W2 adversarial-review coverage additions (DEVLOG 595): the programName and section-name slots
     // end-to-end with a BAND token (the unit facts used IDENTIFIER names, which the funnel checks
-    // position-blind anyway). The linkageProcedureParameter arm stays untested by design: its grammar rule
-    // (parameterDescription, CobolData.g4:169) is 2002-gated UDF-prototype surface with no parseable
-    // plain-program shape today — Phase 4(c) owns its witness.
+    // position-blind anyway). (The non-ISO linkageProcedureParameter arm is deleted, kb/Work PB1252.)
 
     /// <summary>A program NAMED with a band word: user-definable at 85, 0901 at 2002+ strict (§8.3.2.1 r1;
     /// SCREEN reserved 2002 — the A.4.2 module word).</summary>

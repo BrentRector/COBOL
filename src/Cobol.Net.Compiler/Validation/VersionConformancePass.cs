@@ -528,7 +528,7 @@ internal sealed class VersionConformancePass
     /// </summary>
     internal static bool IsProvableUserWordPosition(CobolParserCore.CobolWordContext ctx) => ctx.Parent switch
     {
-        // The data-description / linkage-parameter ENTRY-NAME slot (§13.16 level-number data-name-1): the
+        // The data-description ENTRY-NAME slot (§13.16 level-number data-name-1): the
         // slot is optional, and a cobolWord token that lands in it is always the entry's NAME.
         // ⚠ THE GROUND FOR THAT CHANGED and is re-derived here rather than inherited. It used to read "NO
         // dataDescriptionClause alternative begins with a cobolWord-admitted token", which the declined-A.4.14
@@ -545,7 +545,6 @@ internal sealed class VersionConformancePass
         CobolParserCore.DataNameContext
         {
             Parent: CobolParserCore.DataDescriptionEntryContext
-                or CobolParserCore.LinkageProcedureParameterContext
                 // A report-section constant entry (§13.8.2): the only token that may follow the name slot is
                 // CONSTANT, so a cobolWord there is always the constant's NAME (kb/Work PB1226).
                 or CobolParserCore.ConstantEntryContext

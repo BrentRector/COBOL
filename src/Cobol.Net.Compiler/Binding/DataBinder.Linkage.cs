@@ -355,13 +355,7 @@ public sealed partial class DataBinder
     internal void CallBindLinkage(Core.ProgramUnitContext program, HashSet<string> rootNames)
     {
         if (program.dataDivision()?.linkageSection() is { } ls)
-        {
-            var entries = ls.linkageEntry()
-                .Select(e => e.dataDescriptionEntry())
-                .Where(e => e is not null)
-                .Select(e => e!);
-            LinkageRoots.AddRange(BindEntries(entries, rootNames, EntrySection.Linkage));
-        }
+            LinkageRoots.AddRange(BindEntries(ls.dataDescriptionEntry(), rootNames, EntrySection.Linkage));
 
         if (program.procedureDivision() is not { } pd)
         {

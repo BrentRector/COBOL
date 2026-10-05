@@ -275,7 +275,9 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                 // reference-modifier where the format prints data-name-n): the one data-name-n screen, ahead of
                 // KeyReference, which keeps the qualifiers and DROPS every other suffix — `SORT E ON ASCENDING
                 // KEY K(4:3)` used to sort on all of K (kb/Work PB481, measured).
-                if (!DataBinder.ScreenDataNameShape(dref, "SORT table key", ctx.Edition))
+                // A table key lies UNDER the table's OCCURS by SR14 a), so the subscript sentence is SR14 b)'s own.
+                if (!DataBinder.ScreenDataNameShape(dref, "SORT table key", ctx.Edition,
+                        "\"Key data names shall not be subscripted\" (ISO §14.9.40.3 SR14 b))"))
                     return BoundRejected.Reported(ctx.Edition);
                 // §14.9.40.3 SR14 a)'s own walk — "The data item identified by a key data-name shall be the same
                 // as, or subordinate to, the data item referenced by data-name-2" — over data-name-2's subtree,
@@ -578,7 +580,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             // identifier: §8.4.3.3.3's NOTE forbids the reference-modifier and §14.9.40.3 SR6 b) the subscript. The one
             // data-name-n screen refuses both BEFORE the resolver, which would otherwise hand back the base item
             // with the modifier dropped and key the file on the whole field (kb/Work PB481).
-            if (!DataBinder.ScreenDataNameShape(dref, "SORT/MERGE key", ctx.Edition)) return false;
+            if (!DataBinder.ScreenDataNameShape(dref, "SORT/MERGE key", ctx.Edition, DataBinder.NotSubjectToOccurs))
+                return false;
             // ⛔ WHICH ITEMS MAY BE A KEY is the ONE admissibility predicate's (kb/Work PB1173, PB1052): §14.9.40.3 SR6 b)
             // c) d) f) / §14.9.24.3 SR4, asked of the NAMED item before any occurrence is resolved — the resolver's own
             // SR5 screen would answer a key under an OCCURS with "a table element needs a subscript", which is true

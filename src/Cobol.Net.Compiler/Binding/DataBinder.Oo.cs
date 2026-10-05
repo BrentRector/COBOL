@@ -334,8 +334,7 @@ public sealed partial class DataBinder
             }
             if (dd.linkageSection() is { } lk)
             {
-                var lkEntries = lk.linkageEntry().Select(e => e.dataDescriptionEntry())
-                    .Where(e => e is not null).Select(e => e!).ToList();
+                var lkEntries = lk.dataDescriptionEntry();
                 GateMethodGlobal(lkEntries);
                 m.Binding!.LinkageRoots.AddRange(BindEntries(lkEntries, _rootNames, EntrySection.Linkage));
             }

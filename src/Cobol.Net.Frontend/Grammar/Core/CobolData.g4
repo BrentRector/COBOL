@@ -221,26 +221,16 @@ localStorageSection
     : LOCAL_STORAGE SECTION DOT dataDescriptionEntry*
     ;
 
+// ISO §13.7.2: `LINKAGE SECTION. [ { 77-level-description-entry | constant-entry | record-description-entry |
+// type-declaration-entry } ... ]` — the same four entry kinds as §13.5.2's working-storage section, all of which
+// ride dataDescriptionEntry. ⛔ There is NO fifth kind (kb/Work PB1252): the `linkageProcedureParameter` alternative
+// that stood here (`level dataName? USING [BY] {REFERENCE|VALUE|CONTENT} data-ref clauses.`) is defined by no ISO
+// edition and no dialect this compiler declares, and every binder filtered it out, so `01 L-X USING BY VALUE W-A
+// PIC 9(4).` compiled clean and the entry silently vanished. A USING phrase on a linkage entry is now a syntax
+// error at every edition; a formal parameter and its passing mode are written in the procedure division header's
+// using-phrase (§14.2.1).
 linkageSection
-    : LINKAGE SECTION DOT linkageEntry*
-    ;
-
-linkageEntry
-    : dataDescriptionEntry
-    | linkageProcedureParameter
-    ;
-
-// Procedure parameters (COBOL 2002+)
-linkageProcedureParameter
-    : {is2002()}? levelNumber dataName? parameterDescriptionBody DOT
-    ;
-
-parameterDescriptionBody
-    : parameterPassingClause (dataDescriptionClause+)?
-    ;
-
-parameterPassingClause
-    : USING (BY? REFERENCE | BY? VALUE | BY? CONTENT)? dataReference   // BY optional everywhere (kb/Work PB130)
+    : LINKAGE SECTION DOT dataDescriptionEntry*
     ;
 
 // ==========================================

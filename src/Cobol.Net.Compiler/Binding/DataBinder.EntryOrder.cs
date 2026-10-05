@@ -71,8 +71,7 @@ public sealed partial class DataBinder
         if (scope.workingStorageSection() is { } ws) DeclareRun(ws.dataDescriptionEntry(), EntrySection.WorkingStorage);
         if (scope.localStorageSection() is { } ls) DeclareRun(ls.dataDescriptionEntry(), EntrySection.LocalStorage);
         if (scope.linkageSection() is { } lk)
-            DeclareRun([.. lk.linkageEntry().Select(e => e.dataDescriptionEntry()).Where(e => e is not null).Select(e => e!)],
-                EntrySection.Linkage);
+            DeclareRun(lk.dataDescriptionEntry(), EntrySection.Linkage);
     }
 
     private void DeclareRun(Core.DataDescriptionEntryContext[] run, EntrySection section)

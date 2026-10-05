@@ -59,9 +59,9 @@ internal enum EntryBodyForm
 /// and §13.16.3 SR1 ("Level-number may be 77 or 1 through 49" for a format-1 entry), plus §13.16.3 SR2's
 /// obligation that a 77 entry name itself.</item>
 /// </list>
-/// Four grammar rules spell a level-number (<c>dataDescriptionEntry</c>, <c>linkageProcedureParameter</c>,
-/// <c>reportGroupEntry</c>, <c>screenDescriptionEntry</c>) and the sets they must satisfy differ; a per-binder copy
-/// of the test would be four copies of one rule, and the four binders historically carried ZERO (kb/Work PB485).
+/// Four grammar rules spell a level-number (<c>dataDescriptionEntry</c>, <c>reportGroupEntry</c>, the report
+/// section's <c>constantEntry</c>, <c>screenDescriptionEntry</c>) and the sets they must satisfy differ; a per-binder
+/// copy of the test would be one copy per rule, and the binders historically carried ZERO (kb/Work PB485).
 /// </summary>
 internal static class LevelNumberRules
 {
@@ -103,10 +103,7 @@ internal static class LevelNumberRules
     /// <summary>Which §13.18.33.3 arm governs this <c>levelNumber</c> node — decided by the entry rule that spells
     /// it and, for a data description entry, by the SECTION that contains the entry. A <see langword="null"/>
     /// result means the grammar grew an arm this table does not know; the screen then stays silent (never
-    /// over-rejects) and <c>LevelNumberArmDriftTests</c> fails, which is the mechanism that keeps this current.
-    /// <para>A <c>linkageProcedureParameter</c> (the COBOL-2002 procedure-parameter form, §13.18.33.3's linkage
-    /// section) is a linkage-section entry and takes the SAME SR5 set — it is the arm that never reached
-    /// <c>DataBinder</c> at all.</para></summary>
+    /// over-rejects) and <c>LevelNumberArmDriftTests</c> fails, which is the mechanism that keeps this current.</summary>
     internal static LevelNumberArm? Classify(CobolParserCore.LevelNumberContext ctx) => ctx.Parent switch
     {
         CobolParserCore.DataDescriptionEntryContext e => e.Parent switch
@@ -115,10 +112,9 @@ internal static class LevelNumberRules
                 or CobolParserCore.SortMergeDescriptionEntryContext => LevelNumberArm.FileRecord,
             CobolParserCore.WorkingStorageSectionContext
                 or CobolParserCore.LocalStorageSectionContext
-                or CobolParserCore.LinkageEntryContext => LevelNumberArm.NoncontiguousCapable,
+                or CobolParserCore.LinkageSectionContext => LevelNumberArm.NoncontiguousCapable,
             _ => null,
         },
-        CobolParserCore.LinkageProcedureParameterContext => LevelNumberArm.NoncontiguousCapable,
         CobolParserCore.ReportGroupEntryContext => LevelNumberArm.ReportGroup,
         // A constant entry standing in the REPORT SECTION (§13.8.2, kb/Work PB1226) is a §13.10 entry, not a
         // report group description entry, so §13.18.33.3 SR4 does not speak about it; its level rule is §13.10.2's
@@ -211,7 +207,6 @@ internal static class LevelNumberRules
     internal static string EntryName(RuleContext? entry) => entry switch
     {
         CobolParserCore.DataDescriptionEntryContext e => e.dataName()?.GetText() ?? "FILLER",
-        CobolParserCore.LinkageProcedureParameterContext p => p.dataName()?.GetText() ?? "FILLER",
         CobolParserCore.ReportGroupEntryContext r => r.dataName()?.GetText() ?? "FILLER",
         CobolParserCore.ConstantEntryContext c => c.dataName()?.GetText() ?? "FILLER",
         CobolParserCore.ScreenDescriptionEntryContext s => s.screenName()?.GetText() ?? "FILLER",
@@ -242,11 +237,12 @@ internal static class LevelNumberRules
 /// format of the entry-name clause). Both axes ask one question about one token, so both live here. The format
 /// axis is decided from the entry BODY and never from the level-number — see <see cref="EntryBodyForm"/>.</para>
 ///
-/// <para><b>Why a pass and not a check in <c>DataBinder</c>.</b> Four grammar rules spell a <c>levelNumber</c> and
-/// they reach three different binders: <c>dataDescriptionEntry</c> → <c>DataBinder.BindEntries</c>,
+/// <para><b>Why a pass and not a check in <c>DataBinder</c>.</b> Several grammar rules spell a <c>levelNumber</c>
+/// and they reach different binders: <c>dataDescriptionEntry</c> → <c>DataBinder.BindEntries</c>,
 /// <c>reportGroupEntry</c> → <c>DataBinder.BindReportGroups</c>, <c>screenDescriptionEntry</c> →
-/// <c>ScreenFacility</c>, and <c>linkageProcedureParameter</c> → NO binder at all. Writing the test at each site
-/// would be four copies of one rule with a fifth site guaranteed to be forgotten (the two-arm-dispatch shape this
+/// <c>ScreenFacility</c>. A fifth rule, the non-ISO <c>linkageProcedureParameter</c>, once reached NO binder at all
+/// and its entries silently vanished (it is deleted, kb/Work PB1252). Writing the test at each site would be one
+/// copy of one rule per site with the next site guaranteed to be forgotten (the two-arm-dispatch shape this
 /// repo reproduces most often). One traversal over the ONE grammar node that carries a level-number screens every
 /// arm that exists and every arm that will exist, and <c>LevelNumberArmDriftTests</c> fails the moment the grammar
 /// adds one the classifier does not know.</para>

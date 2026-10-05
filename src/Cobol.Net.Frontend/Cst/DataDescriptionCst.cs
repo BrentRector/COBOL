@@ -113,8 +113,11 @@ public readonly struct DataDescriptionClauseCst(Core.DataDescriptionClauseContex
         }
     }
 
-    /// <summary>The REDEFINES target's <c>dataReference</c> text, or null.</summary>
-    public string? RedefinesTargetName => ctx.redefinesClause()?.dataReference().GetText();
+    /// <summary>The REDEFINES clause's operand as WRITTEN — the whole <c>dataReference</c>, or null. ⛔ Never its
+    /// text: <c>GetText()</c> glues <c>A OF G</c> into the one word <c>AOFG</c>, which resolved to an unrelated item
+    /// of that name (kb/Work PB1281). The binder screens the shape (§13.18.44.3 SR5/SR6) and resolves the base
+    /// data-name.</summary>
+    public Core.DataReferenceContext? RedefinesTarget => ctx.redefinesClause()?.dataReference();
 
     // (The canonical USAGE keyword text and the VALUE-operand normalization stay in DataBinder's shared
     // UsageKeyword / ExtractValue helpers — reused by BOTH BindEntry and DataBinder.Reports.cs, so the façade does

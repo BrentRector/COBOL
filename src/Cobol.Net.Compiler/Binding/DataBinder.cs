@@ -1711,7 +1711,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// key clauses' own silent drop of a subscript or ref-mod (kb/Work PB205) is the same sentence and ends
     /// here too.</para></summary>
     private bool ScreenClauseOperandShape(Core.DataReferenceContext dref, string clauseFace) =>
-        ScreenDataNameShape(dref, clauseFace, Edition);
+        ScreenDataNameShape(dref, clauseFace, Edition, NotSubjectToOccurs);
+
+    /// <summary>The subscript sentence of every caller whose own rule forbids an operand <i>"subject to any OCCURS
+    /// clauses"</i> — the file clauses (§13.18.34.3 SR1, §12.4.5.12.3 SR1, §12.4.5.6.3 SR1, §12.4.5.13.3 SR1) and the
+    /// SORT / MERGE file keys (§14.9.40.3 SR6 b), §14.9.24.3 SR4 b)). A caller whose operand MAY lie under an OCCURS
+    /// (a table SORT key, a REDEFINES data-name-2) states its own rule instead.</summary>
+    internal const string NotSubjectToOccurs = "the operand shall not be subject to any OCCURS clauses";
 
     /// <summary>The body of <see cref="ScreenClauseOperandShape"/>, static over the <see cref="EditionContext"/>
     /// so a PROCEDURE-DIVISION operand written where a general format prints <i>data-name-n</i> is refused by
@@ -1720,8 +1726,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// be subscripted"</i>) are the same obligation this screen discharges for the file clauses. Those keys used
     /// to reach the one reference resolver (Format 1) or <see cref="KeyReference"/> (Format 2), and BOTH kept
     /// the base item and dropped a reference-modifier — <c>SORT E ON ASCENDING KEY K(4:3)</c> sorted on all six
-    /// characters of K (kb/Work PB481, measured).</summary>
-    internal static bool ScreenDataNameShape(Core.DataReferenceContext dref, string clauseFace, EditionContext edition)
+    /// characters of K (kb/Work PB481, measured).
+    /// <para><paramref name="subscriptRule"/> is the CALLER's own rule about a subscript, quoted after the general
+    /// sentence: the operands differ in whether they may lie under an OCCURS at all (a file clause's may not; a
+    /// table SORT key and a REDEFINES data-name-2 may, they are only not WRITTEN subscripted), so one fixed sentence
+    /// was false for two of the four callers (kb/Work PB1281).</para></summary>
+    internal static bool ScreenDataNameShape(Core.DataReferenceContext dref, string clauseFace, EditionContext edition,
+        string subscriptRule)
     {
         using var _ = edition.At(dref);
         string? register =
@@ -1756,8 +1767,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             edition.Error(DiagnosticCatalog.ClauseOperandNotADataName,
                 $"{clauseFace} '{WrittenText(dref)}' is written with a subscript; the clause's general format prints "
                 + "data-name-n, which is a qualified-data-name (ISO §8.4.2.2.2 Format 1) and carries no subscript "
-                + "— subscripting is §8.4.2.3's qualified-data-name-with-subscripts, an identifier form, and the "
-                + "operand shall not be subject to any OCCURS clauses");
+                + "— subscripting is §8.4.2.3's qualified-data-name-with-subscripts, an identifier form, and "
+                + subscriptRule);
         else if (refModified)
             edition.Error(DiagnosticCatalog.ClauseOperandNotADataName,
                 $"{clauseFace} '{WrittenText(dref)}' is reference-modified; \"where data-name-n is used in a general "
@@ -5094,10 +5105,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     // every later statement mentioning it; it is implemented now (kb/Work PB389).
                     objectRefUsage = usage.usageKeyword()?.objectReferenceUsage();
                 }
-                else if (clause.RedefinesTargetName is { } redefTarget)
+                else if (clause.RedefinesTarget is { } redefTarget)
                     // Capture the target name only; resolution waits until the forest is built (the target is a
                     // prior sibling, but a chain A REDEFINES B REDEFINES C resolves in the post-build pass).
-                    redefinesTargetName = redefTarget;
+                    redefinesTargetName = RedefinesDataName2(redefTarget, cobolName);
                 else if (clause.Context.valueClause() is { } value)
                 {
                     valueClauseWritten = true;
@@ -6903,6 +6914,33 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     }
 
     // ── REDEFINES / RENAMES resolution + classification (post-build, ISO §13.18.44/45) ───────────────────────
+
+    /// <summary>⛔ THE REDEFINES OPERAND'S SHAPE, AND THE NAME THAT RESOLVES (kb/Work PB1281). §13.18.44.2 prints
+    /// <c>REDEFINES data-name-2</c>, and its syntax rules narrow even the qualified-data-name that data-name-n
+    /// normally is: SR6 — <i>"Data-name-2 shall not be qualified."</i> (COBOLNET2915) — and SR5's last sentence —
+    /// <i>"the reference to data-name-2 in the REDEFINES clause shall not be subscripted"</i> — with §8.4.3.3.3's
+    /// NOTE forbidding a reference-modifier and §8.4.3.1 making a special register no data-name at all (the ONE
+    /// data-name-n screen, <see cref="ScreenDataNameShape"/>, COBOLNET2024).
+    /// <para>The operand used to reach <see cref="ResolveRedefines"/> as the reference's GLUED text, so
+    /// <c>REDEFINES A OF G</c> looked up the one word <c>AOFG</c>: COBOLNET1654 citing the wrong rules when no such
+    /// item existed, and a SILENT bind to an unrelated item <c>AOFG</c> when one did. The BASE data-name is what
+    /// resolves now, whatever else was written, so a refused shape reports its own rule and nothing cascades; a
+    /// special register has no data-name, and the entry then redefines nothing.</para></summary>
+    private string? RedefinesDataName2(Core.DataReferenceContext dref, string? subject)
+    {
+        string face = $"'{subject ?? "FILLER"}' REDEFINES";
+        ScreenDataNameShape(dref, face, Edition,
+            "\"the reference to data-name-2 in the REDEFINES clause shall not be subscripted\" (ISO §13.18.44.3 SR5)");
+        if (dref.dataReferenceSuffix().Any(s => s.qualification() is not null))
+        {
+            using var _ = Edition.At(dref);
+            Edition.Error(DiagnosticCatalog.RedefinesDataName2Qualified,
+                $"{face} '{WrittenText(dref)}': \"Data-name-2 shall not be qualified\" (ISO §13.18.44.3 SR6); "
+                + "\"no ambiguity of reference exists because of the required placement of the REDEFINES clause\" "
+                + "(NOTE 1)");
+        }
+        return dref.cobolWord()?.Name();
+    }
 
     /// <summary>Resolve each item's REDEFINES target name to its <see cref="DataItem"/>, and each level-66 RENAMES
     /// FROM/THRU operand to its item. A REDEFINES target is an unqualified prior entry in the same scope (SR1/SR6); a

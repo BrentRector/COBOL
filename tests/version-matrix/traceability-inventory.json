@@ -26466,13 +26466,13 @@
   "ordinal": 5,
   "subject": "REDEFINES clause",
   "rule-digest": "1fa599f5cf30",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ClassifyRedefinesClasses; src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs; src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#PlaceForItem; src/Cobol.Net.Compiler/Binding/RefResolution.cs#DeferredShapes",
-  "test-ref": "conformance:negative/pb177-redefines-target-occurs",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#RedefinesDataName2; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenDataNameShape; src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs",
+  "test-ref": "conformance:negative/pb177-redefines-target-occurs; conformance:negative/pb1281-redefines-subscripted; conformance:negative/pb1281-redefines-odo-in-redefinition; conformance:85/pb1281_redefines_data_name_2_bare",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1279 + PB1281. SR5 (cite.py --check 13.18.44.3 'However, data-name-2 may be subordinate to an item whose data description entry contains an OCCURS clause. In this case, the reference to data-name-2 in the REDEFINES clause shall not be subscripted.' OK). Four sentences. S1 (no OCCURS on data-name-2): COBOLNET1701, golden pb177-redefines-target-occurs + conformance-test:OccursDynamicGuardTests.RedefinesOverDynamicTable_ObjectSide_Rejected1701. S4 (no ODO in either): COBOLNET0855 on both sides (probes sr5_odo_in_redef, sr5_odo_target). S3 (not subscripted): rejected, but only because the CST captures dataReference().GetText() and 'A(1)' names nothing -> COBOLNET1654 'data-name-2 does not name a preceding entry ... SR4/SR7/SR10' (wrong rule named). S2 (PERMISSION to redefine an item subordinate to an OCCURS) is REFUSED for a Tier-B class: sr5_occ_grp `01 T. 05 E OCCURS 3. 10 A PIC X(4). 10 B REDEFINES A. 15 B1 PIC X(2). 15 B2 PIC 99.` -> COBOLNET0899 on MOVE \"ab12\" TO A(2) and COBOLNET1756 (run-time abort) on B1(2); sr5_sub_occurs_ok (`10 A PIC X(2). 10 B REDEFINES A PIC 99.`) likewise. Spec-derived expected: ab 12 / 13 (ADD 1 TO B(2) after MOVE \"12\" TO A(2)). The same-PIC Tier-A shape works (sr5_occ_tierA -> 12). DeferredShape.NestedClassBacking has NO owning kb/Work note (PB1056 records the census gap). Rejects legal source. (finding: nested-class-backing). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (the REDEFINES clause is in the base language of every edition; the 2023 Annex E lists no change to this rule)",
-  "state": "GAP"
+  "notes": "kb/Work PB1281 (wave 1020 H). SR5 (cite.py --check 13.18.44.3 \"the reference to data-name-2 in the REDEFINES clause shall not be subscripted\" OK §13.18.44.3 5); --check \"nor the redefinition shall include an occurs-depending table\" OK). All four sentences now hold. S1 (no OCCURS on data-name-2's own entry): COBOLNET1701, negative pb177-redefines-target-occurs. S2 (data-name-2 MAY be subordinate to an OCCURS item): the Tier-B shape this row recorded as refused works since kb/Work PB1279 — 85/pb1281_redefines_data_name_2_bare redefines A by a group B1/B2 inside `05 E OCCURS 3`, MOVE \"ab12\" TO A(2), ADD 1 TO B2(2) and prints `ab 13 ab13`, the spec-derived value. S3 (not subscripted): the one data-name-n shape screen ScreenDataNameShape refuses `REDEFINES A (1)` as COBOLNET2024 quoting SR5 itself (it used to be COBOLNET1654 on the glued text A(1), naming the wrong rule); a reference-modifier is refused by the same screen under §8.4.3.3.3's NOTE and a special register under §8.4.3.1. S4 (no occurs-depending table in the original or the redefinition): COBOLNET0855, negative pb1281-redefines-odo-in-redefinition.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.44.3-6",
@@ -26481,13 +26481,13 @@
   "ordinal": 6,
   "subject": "REDEFINES clause",
   "rule-digest": "c4971f85c015",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Cst/DataDescriptionCst.cs#RedefinesTargetName; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveRedefines",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Cst/DataDescriptionCst.cs#RedefinesTarget; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RedefinesDataName2; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveRedefines",
+  "test-ref": "conformance:negative/pb1281-redefines-qualified; conformance:85/pb1281_redefines_data_name_2_bare",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1281. SR6 (cite.py --check 13.18.44.3 'Data-name-2 shall not be qualified.' OK). The grammar takes a full dataReference and the CST hands the binder `ctx.redefinesClause()?.dataReference().GetText()` - the qualified text with whitespace removed. sr6_qualified `05 B REDEFINES A OF G` is rejected only as COBOLNET1654 naming 'AOFG' and citing SR4/SR7/SR10 (wrong rule). Worse, the concatenation can NAME a real item: sr6_aofg `01 G. 05 AOFG PIC X(4) VALUE \"WXYZ\". 05 B REDEFINES A OF G PIC X(4).` compiles CLEAN and prints WXYZ - a qualified data-name-2 silently bound to a different item. NOTE 1's nearest-preceding reading for a non-unique name is implemented (sr6_dup_nearest -> GGGG). Under-rejects. (finding: redefines-operand-text-capture). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (the REDEFINES clause is in the base language of every edition; the 2023 Annex E lists no change to this rule)",
-  "state": "GAP"
+  "notes": "kb/Work PB1281 (wave 1020 H). SR6 (cite.py --check 13.18.44.3 \"Data-name-2 shall not be qualified\" OK §13.18.44.3 6)). The CST used to hand the binder dataReference().GetText(), so `REDEFINES A OF G` resolved the glued word AOFG: COBOLNET1654 citing SR4/SR7/SR10 when no AOFG existed, and a SILENT bind to an unrelated item AOFG when one did (sr6_aofg printed WXYZ). DataDescriptionCst.RedefinesTarget now returns the written reference and DataBinder.RedefinesDataName2 refuses a qualifier as COBOLNET2915 (naming SR6 and quoting NOTE 1) and resolves the BASE data-name only, so nothing cascades; negative pb1281-redefines-qualified keeps an AOFG item declared to prove the silent bind is gone. NOTE 1's placement reading for a non-unique data-name-2 is pinned by 85/pb1281_redefines_data_name_2_bare (Z REDEFINES X inside H overlays H's X: CD). retired-witness: src/Cobol.Net.Frontend/Cst/DataDescriptionCst.cs#RedefinesTargetName (kb/Work PB1281 replaced the glued-text accessor RedefinesTargetName with RedefinesTarget, which hands the binder the written dataReference)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.44.3-7",
@@ -58566,13 +58566,13 @@
   "ordinal": 0,
   "subject": "Working-storage section",
   "rule-digest": "2f4cc6b67702",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#workingStorageSection; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDescriptionEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#constantEntryBody",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#workingStorageSection; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntries",
+  "test-ref": "conformance:2002/pb1309_working_storage_four_entry_kinds; conformance:negative/pb1246-section-first-entry-not-level-1",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Owned by kb/Work PB1309. §13.5.2 prints WORKING-STORAGE SECTION. (both words underlined, so required) followed by an optional bracket of {77-level-description-entry | constant-entry | record-description-entry | type-declaration-entry} with an ellipsis: any number, any order, possibly none. Grammar: `workingStorageSection : WORKING_STORAGE SECTION DOT dataDescriptionEntry*`. The four kinds all ride dataDescriptionEntry, and the binder separates them by level number and body (CONSTANT / TYPEDEF). Probe probe/ws/p1fmt.cob mixes 77, a CONSTANT AS numeric, a TYPEDEF, a level-01 record using TYPE, another 77, and a CONSTANT AS alphanumeric, and a second program has an EMPTY WS. At --std 2002/2014/2023 it prints `007 42 ABWXYZ Q HI` / `EMPTY-WS-OK`, which is what the spec requires. The non-standard level 78 is refused (negative/pb485-level-78-working-storage). cite.py --check 13.5.2 \"record-description-entry\" OK. No golden exists that was written for the §13.5.2 interleaving of all four kinds, so test-ref is left empty. || REFUTED: PARTIAL — The format admits exactly four entry kinds (77-level, constant, record-description, type-declaration). A record-description-entry's first entry shall have level-number 1 (13.11.1, cite.py OK). The grammar's `dataDescriptionEntry*` admits any level number as the first WS entry, and nothing downstream screens it: a WS whose first entry is `05 X PIC X` or `02 X PIC X` is none of the four kinds, yet it compiles clean and runs at --std 85, 2002 and 2023. That is under-rejection of the section format. The admission half (the four kinds interleaved, and an empty WS) is verified as the adjudicator said. Secondary: the BYTE-LENGTH OF constant-entry form is refused with COBOLNET0899. That form belongs to the 13.10 row, but it means one constant-entry shape the format admits is not accepted in WS. No open kb/Work note owns the leading-non-01 case (PB1045 covers GLOBAL only). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85/2002/2014/2023 (the section itself); the constant-entry and type-declaration-entry alternatives exist from 2002",
-  "state": "GAP"
+  "notes": "kb/Work PB1309 (wave 1020 H, DISCHARGED: the refuter's hole was closed by kb/Work PB1246). §13.5.2 (cite.py --check 13.5.2 \"type-declaration-entry\" OK, General format) admits the four entry kinds in any number and order, possibly none. Admission half: 2002/pb1309_working_storage_four_entry_kinds interleaves 77, CONSTANT AS numeric, TYPEDEF, a level-01 record using TYPE, another 77, CONSTANT AS BYTE-LENGTH OF and CONSTANT AS alphanumeric, and prints 007 42 AB WXY HI. Leading-entry half (the refuter's PARTIAL): a section whose first entry is level 02-49 is none of the four kinds (§13.11.1, cite.py --check 13.11.1 \"the first of which shall have level-number 1\" OK); DataBinder.BindEntries now refuses it with COBOLNET2771 (kb/Work PB1246), re-probed on this tree: `WORKING-STORAGE SECTION. 05 X PIC X VALUE \"Q\".` -> COBOLNET2771 at --std 2023. The BYTE-LENGTH OF constant-entry form the refuter saw refused (COBOLNET0899) is accepted (kb/Work PB1228).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.6.2",
@@ -58596,13 +58596,13 @@
   "ordinal": 0,
   "subject": "Linkage section",
   "rule-digest": "e90f6e9c6e4f",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#linkageSection; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#linkageEntry; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#linkageProcedureParameter; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#linkageSection; src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage",
+  "test-ref": "conformance:2002/pb1252_linkage_section_four_entry_kinds; conformance:negative/pb1252-linkage-entry-using-phrase",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1252, 14d). Rule (cite.py --check 13.7.2 \"LINKAGE\" -> OK §13.7.2 General format): LINKAGE SECTION. followed by zero or more of { 77-level-description-entry | constant-entry | record-description-entry | type-declaration-entry }. The four ISO alternatives all work: probe fmt1.cob (--std 2023: 77 L-A, 01 L-K CONSTANT AS 7, 01 L-T TYPEDEF, 01 L-B TYPE L-T, USING L-A L-B) printed A=0019 B=WORLD (12+7, caller storage updated); fmt85.cob (--std 85, 77 + record) printed the same; at --std 85 the CONSTANT/TYPEDEF/TYPE alternatives draw COBOLNET0900 (2002 introduction). Empty LINKAGE SECTION (fmt1.cob main) accepted. DEFECT: linkageEntry has a FIFTH alternative, linkageProcedureParameter (`{is2002()}? levelNumber dataName? USING [BY] {REFERENCE|VALUE|CONTENT} dataReference clauses DOT`), which no ISO format defines (§13.7.2 and §13.2.1 list only the four entry kinds). CallBindLinkage filters it out (`.Select(e => e.dataDescriptionEntry()).Where(e => e is not null)`) and LevelNumberPass.cs:242 records that it reaches 'NO binder at all'. Probe ext1.cob (`01 L-X USING BY VALUE W-A PIC 9(4).` in LINKAGE) compiles clean at --std 2023 and 2002 and runs (A=0012) — the entry is silently discarded; ext2.cob shows a later reference to L-X then gets COBOLNET1639 'not defined'. Expected from spec: a syntax error for a non-ISO entry in strict mode (at minimum an extension diagnostic), never a silent drop. Harm: under-rejects, silent. Probes: out13/probe/linkage-section/fmt1.cob, fmt85.cob, ext1.cob, ext2.cob. || Editions (adjudicator): 85, 2002, 2014, 2023 (the LINKAGE SECTION exists at every edition; the constant-entry and type-declaration-entry alternatives, function/method/prototype definitions are 2002+ per the clauses they reference)",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB1252 (wave 1020 H). §13.7.2 (cite.py --check 13.7.2 \"type-declaration-entry\" OK, General format): LINKAGE SECTION. followed by any number, in any order, of 77-level-description-entry, constant-entry, record-description-entry and type-declaration-entry, all of which ride dataDescriptionEntry. The non-ISO fifth alternative linkageProcedureParameter (`level dataName? USING [BY] {REFERENCE|VALUE|CONTENT} data-ref clauses.`), which parsed at 2002+ and which every binder silently dropped, is DELETED: `01 L-X USING BY VALUE W-A PIC 9(4).` is now COBOL0001 at every edition (negative pb1252-linkage-entry-using-phrase). The four kinds interleaved in a called program's linkage section, with an empty linkage section in the caller, are pinned by 2002/pb1252_linkage_section_four_entry_kinds (A=019 B=WORLD: the constant added to the 77 formal and WORLD moved into the record typed by the linkage TYPEDEF, both BY REFERENCE). At 85 the constant and type entries draw COBOLNET0900 (2002 introduction). retired-witness: src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#linkageEntry (kb/Work PB1252 deleted both grammar rules: linkageEntry was only the wrapper for the non-ISO linkageProcedureParameter alternative, and linkageSection now reads dataDescriptionEntry* directly) retired-witness: src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#linkageProcedureParameter (kb/Work PB1252 deleted both grammar rules: linkageEntry was only the wrapper for the non-ISO linkageProcedureParameter alternative, and linkageSection now reads dataDescriptionEntry* directly)",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.8.2",
@@ -59362,11 +59362,11 @@
   "subject": "REDEFINES clause",
   "rule-digest": "daf7642b52e3",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#redefinesClause; src/Cobol.Net.Frontend/Cst/DataDescriptionCst.cs#RedefinesTargetName; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveRedefines",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#redefinesClause; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveRedefines; src/Cobol.Net.Frontend/Cst/DataDescriptionCst.cs#RedefinesTarget; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RedefinesDataName2",
   "test-ref": "conformance:2023/pb203_redefines_bit_window",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "Format `level-number [ entry-name-clause ] REDEFINES data-name-2` (cite.py --check 13.18.44.2 OK). The grammar's redefinesClause is `REDEFINES dataReference` inside the free-order dataDescriptionClauses list; both the named and the entry-name-less form parse and run (probe sr1_noname_ok: `01 REDEFINES A. 05 B1.. 05 B2..` -> CD). The grammar is a SUPERSET (dataReference admits OF/IN and subscripts, and clause order is free) - those residues are SR1/SR5/SR6 questions and are recorded on those rows, not here. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (the REDEFINES clause is in the base language of every edition; the 2023 Annex E lists no change to this rule)",
+  "notes": "Format `level-number [ entry-name-clause ] REDEFINES data-name-2` (cite.py --check 13.18.44.2 OK). The grammar's redefinesClause is `REDEFINES dataReference` inside the free-order dataDescriptionClauses list; both the named and the entry-name-less form parse and run (probe sr1_noname_ok: `01 REDEFINES A. 05 B1.. 05 B2..` -> CD). The grammar is a SUPERSET (dataReference admits OF/IN and subscripts, and clause order is free) - those residues are SR1/SR5/SR6 questions and are recorded on those rows, not here. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (the REDEFINES clause is in the base language of every edition; the 2023 Annex E lists no change to this rule) retired-witness: src/Cobol.Net.Frontend/Cst/DataDescriptionCst.cs#RedefinesTargetName (kb/Work PB1281 replaced the glued-text accessor RedefinesTargetName with RedefinesTarget, which hands the binder the written dataReference; DataBinder.RedefinesDataName2 decides the operand's shape)",
   "state": "OK"
  },
  {

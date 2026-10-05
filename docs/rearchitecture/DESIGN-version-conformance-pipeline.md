@@ -236,9 +236,10 @@ section axis cannot: its level is perfectly in range, and before the pass it rea
 uncompilable C#.
 
 **The arm list is DERIVED, not remembered.** Four grammar rules spell a `levelNumber` — `dataDescriptionEntry`,
-`linkageProcedureParameter`, `reportGroupEntry`, `screenDescriptionEntry` — and they reach three different binders
-plus, for the procedure-parameter form, none at all. A per-binder check would have been four copies of one rule
-with a fifth site guaranteed to be forgotten. `LevelNumberArmDriftTests` reads the `.g4` files and fails until
+`reportGroupEntry`, the report section's `constantEntry`, `screenDescriptionEntry` — and they reach different
+binders. (A fifth, the non-ISO `linkageProcedureParameter`, reached none at all and its entries silently vanished;
+it is deleted, kb/Work PB1252.) A per-binder check would have been one copy of one rule per binder with the next
+site guaranteed to be forgotten. `LevelNumberArmDriftTests` reads the `.g4` files and fails until
 `LevelNumberRules.Classify` names every rule that spells a level-number and every section that hosts a data
 description entry (kb/Work PB485).
 
