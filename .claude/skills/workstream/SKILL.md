@@ -1,6 +1,6 @@
 ---
 name: workstream
-description: Use BEFORE dispatching any fleet, lander, implementer or adjudication workflow - the owner's standing instructions (2026-09-02) for running workstreams so a session-limit kill costs at most one step and a restart never repeats work - checkpoint to disk, fresh agents from checkpoints, a hard concurrency budget, finished work landed first, central id allocation. Carries the brief and workflow templates.
+description: Use BEFORE dispatching any fleet, lander, implementer or adjudication workflow, and before starting or supervising the orchestrator loop (scripts/orchestrator/orchestrate.ps1, the default way to run the fix lane) - the owner's standing instructions (2026-09-02) for running workstreams so a session-limit kill costs at most one step and a restart never repeats work - checkpoint to disk, fresh agents from checkpoints, a hard concurrency budget, finished work landed first, central id allocation. Carries the brief and workflow templates.
 ---
 
 > ⛔ **BASE SKILL FIRST.** Invoke `brent-tools:agent-fleet` (Skill tool) before reading on. If the plugin is not loaded
@@ -18,6 +18,29 @@ description: Use BEFORE dispatching any fleet, lander, implementer or adjudicati
 > `templates/dispatch-spec-implementer.md` (never hand-written in a scratchpad); `check_practices.py` must print
 > `=== PRACTICES CHECK: GREEN ===` over the briefs and over every rendered spec before a Workflow call. A new
 > practice is added THERE, with its reason and measurement, and to `check_practices.py` — nowhere else.
+
+> ⭐ **THE DEFAULT WAY TO RUN THE FIX LANE IS THE ORCHESTRATOR LOOP** (owner 2026-10-04: it "appears to better handle
+> autonomous progress towards the compiler"; wave 1018 ran 2.5 hours unattended and landed 8 of 8 groups, GAP 281 to
+> 255). `pwsh scripts/orchestrator/orchestrate.ps1 [-BorrowDays N] [-MaxUnits N] [-Unit meter|resume|land|wave] [-DryRun]
+> [-Watch]` runs one bounded unit per fresh `claude -p` session, chosen by `next_unit.py` from the last handoff and the
+> disk (meter, resume, land, wave); each unit loads THIS skill and follows `scripts/orchestrator/units/*.md`. Design:
+> `docs/rearchitecture/DESIGN-orchestrator-loop.md` (kb/Work PB1981); the generalized form is the base skill's
+> `references/orchestrator-loop.md`. What it already does, so no session hand-rolls it:
+> - **The supervisor owns each unit's lifetime**: the prompt is the first stream-json message and stdin stays open, because
+>   a one-shot `claude -p` terminates background tasks 600 s after its model ends a turn (wave 1017's fleet died that way).
+> - **Frequent handoffs** (PB2015): `checkpoint.json` every 5 minutes and on background-task changes, the model's
+>   `milestones.jsonl`, and a synthesized `split`/`resume` handoff when a unit dies or the supervisor does.
+> - **STOP** (`pwsh scripts/orchestrator/stop.ps1`, `-Status`, `-Clear`) winds a running unit and its fleet down without
+>   losing work: agents checkpoint-commit and return `SPLIT`; a kill only after the grace period.
+> - **One allocator** (`alloc.py`), the quota estimate (`budget.py`, with the owner's `-BorrowDays`), the closed-rows ratchet,
+>   the planner (`plan_wave.py`, which plans from branches and worktrees, never from remembered reports).
+>
+> **The attended session's duties while the loop runs**: publish the ledger whenever the supervisor logs `LEDGER PUBLISH
+> OWED` (a headless unit has no Artifact tool): render `{COORD}\ledger.html`, publish it to the owner's artifact, then
+> `python scripts/orchestrator/ledger_state.py mark-published` (PB2016, owner 2026-10-04: "Publish ledger each time");
+> read each unit's handoff; prune with `scripts/prune_worktrees.py`; run the battery on its cadence. Hand-dispatching a
+> Workflow stays legal for a supervised one-off, and everything below still governs it. Do not edit the main checkout
+> while a unit runs: work in a worktree.
 
 The orchestrator (the session model) dispatches, reconciles, gates and commits; every other job — probe, implement,
 validate, adversarial review, land — is a subagent, and ⭐ **THE MODEL FOLLOWS THE ROLE** (MANDATORY-PRACTICES P1,
@@ -109,14 +132,18 @@ The orchestrator allocates `kb/Work` ids and diagnostic-code ranges in the dispa
 `python scripts/orchestrator/alloc.py pb N | code N | devlog`, which keeps the reservations of in-flight worktrees
 outside every worktree, so two sessions never hand out the same value (`peek <kind>` reads without reserving;
 `scripts/orchestrator/plan_wave.py` allocates a wave's codes and lead-id blocks through it). DEVLOG numbers are read
-from the file at landing time (top entry + 1). `session-probe` prints `alloc.py peek code --probe`: the next free
+from the file at landing time (top entry + 1): a lander takes top + 1 whatever `alloc.py devlog` reserved, so re-read
+the top before committing an entry that waited for a rebase (entry 1880 was renumbered after train 1018b took 1879). `session-probe` prints `alloc.py peek code --probe`: the next free
 diagnostic code above every code in `src/`, the catalog and the reservations.
 
 ## 5. On restart after a cutoff
 
 The base's §12 "On restart after a cutoff" applies as written: its `status_delta.py` is
 `tools/claude-skills/skills/agent-fleet/references/status_delta.py <worktree>`, and `.agent-fleet.json` already
-leaves `.claude/settings.local.json` out of its uncommitted list.
+leaves `.claude/settings.local.json` out of its uncommitted list. Under the orchestrator loop a restart is automatic:
+the supervisor turns a surviving `checkpoint.json` into the dead unit's handoff, and the first unit is a `resume` that
+reads it (the first real `resume` unit recovered six interrupted worktrees in 141 s). Read a dead unit's `.stderr.txt`
+before its stream: it names the real cause (the 600 s background ceiling).
 
 ## 6. Templates (substitute the session's paths for `{SCRATCH}`, `{PIN}`)
 
