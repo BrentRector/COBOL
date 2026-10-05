@@ -11,8 +11,9 @@ Prints JSON {unit, reason}. The order (docs/rearchitecture/DESIGN-orchestrator-l
   5. the last unit failed or ended split, or a branch classified UNLANDED got a commit after the last unit
      started (an agent of a unit that died)          -> resume
   6. branches_pending with status DONE               -> land
-  7. the ledger page is older than the newest inventory change on origin/main -> land (it refreshes the ledger)
-  8. otherwise                                       -> wave
+  7. otherwise                                       -> wave
+(A stale ledger page is NOT a reason for a unit: a headless unit cannot publish, so the supervisor announces an owed
+publish through ledger_state.py and the attended session publishes.)
 """
 from __future__ import annotations
 
@@ -28,8 +29,6 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 import coord  # noqa: E402
 
-LEDGER = pathlib.Path("docs/rearchitecture/evidence/conformance-ledger.html")
-INVENTORY = "tests/version-matrix/traceability-inventory.json"
 
 
 def git(repo: pathlib.Path, *args: str) -> subprocess.CompletedProcess:
@@ -70,14 +69,6 @@ def fresh_unlanded(repo: pathlib.Path, since: dt.datetime) -> list[str]:
     return out
 
 
-def ledger_stale(repo: pathlib.Path) -> bool:
-    page = repo / LEDGER
-    last = git(repo, "log", "-1", "--format=%ct", "origin/main", "--", INVENTORY).stdout.strip()
-    if not last:
-        return False
-    return not page.exists() or page.stat().st_mtime < int(last)
-
-
 def choose(handoff: dict | None, cdir: pathlib.Path, repo: pathlib.Path, now: dt.datetime, last_failed: bool,
            last_started: dt.datetime | None, max_meter_age_h: float) -> dict[str, str]:
     h = handoff or {}
@@ -100,8 +91,6 @@ def choose(handoff: dict | None, cdir: pathlib.Path, repo: pathlib.Path, now: dt
     done = [b["branch"] for b in h.get("branches_pending", []) if b.get("status") == "DONE"]
     if done:
         return {"unit": "land", "reason": "finished branches waiting: " + ", ".join(done)}
-    if ledger_stale(repo):
-        return {"unit": "land", "reason": "the ledger page is older than the last inventory change on main"}
     return {"unit": "wave", "reason": "nothing pending"}
 
 

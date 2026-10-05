@@ -391,6 +391,12 @@ try {
         Add-Content -Path $UnitsLog -Encoding utf8 -Value ($line | ConvertTo-Json -Compress -Depth 5)
         Say "unit '$($choice.unit)' ended: exit $($r.exit), handoff $outcome, $([Math]::Round($duration)) s, $($r.stats.calls) calls$(if ($failed) { " — FAILURE $failures of 3" })"
         $ran++
+        # A headless unit cannot publish the owner's ledger artifact (no Artifact tool); say loudly when a publish is owed
+        # so the attended session does it (ledger_state.py compares the page's stamp with the last published one).
+        try {
+            $ls = Invoke-Py @((Join-Path $Here 'ledger_state.py'), 'owed', '--repo', $RepoDir)
+            if ($ls -match '^owed') { Say "LEDGER PUBLISH OWED ($ls): render with gen_ledger.py --out $CoordDir\ledger.html, publish it to the owner's artifact, then ledger_state.py mark-published" }
+        } catch { Say "ledger state not read (the loop continues): $_" }
 
         if ($valid -and $outcome -eq 'owner-question') {
             Add-OwnerQuestion "question from the $($choice.unit) unit" "$($h.owner_question.question)`n`n$(if ($h.owner_question.PSObject.Properties['context']) { $h.owner_question.context })"

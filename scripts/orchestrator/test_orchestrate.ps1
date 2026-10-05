@@ -145,6 +145,14 @@ $r = Run-Orch 'diedmid' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSe
 Check 'a leftover checkpoint is announced' ($r.out -match "survives from a supervisor that died mid-unit") $true
 Check 'the leftover checkpoint is archived, not left to repeat' (@(Get-ChildItem (Join-Path $r.coord 'logs') -Filter '*wave.checkpoint.json').Count -ge 1) $true
 
+# 4i. PUBLISH THE LEDGER EACH TIME: a headless unit cannot publish, so the supervisor announces an owed publish after every unit
+# (and says nothing once the current stamp is marked published)
+$r = Run-Orch 'ledgerowed' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0')
+Check 'an owed ledger publish is announced after a unit' ($r.out -match 'LEDGER PUBLISH OWED') $true
+$r = Run-Orch 'ledgercurrent' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0') {
+    param($c) & python (Join-Path (Split-Path $Orch) 'ledger_state.py') mark-published --coord $c | Out-Null }
+Check 'a published ledger is not announced again' ($r.out -match 'LEDGER PUBLISH OWED') $false
+
 # 5. the circuit breaker trips after three fast failures and leaves an owner note
 $r = Run-Orch 'breaker' 'fastfail' @('-Unit', 'wave', '-FastFailSeconds', '120')
 Check 'breaker exit' $r.code 4

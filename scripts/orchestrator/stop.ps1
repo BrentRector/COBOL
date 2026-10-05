@@ -38,6 +38,7 @@ if ($Status) {
     $r = Get-Running
     Write-Host ("orchestrator: " + $(if ($r) { "running (pid $($r.pid), since $($r.started_at))" } else { 'not running' }))
     Write-Host ("STOP pending: " + (Test-Path $stop) + "; unit winding down (STOP-UNIT): " + (Test-Path $stopUnit))
+    Write-Host ("ledger: " + ((& python (Join-Path $PSScriptRoot 'ledger_state.py') owed --coord $CoordDir) -join ' '))
     return
 }
 New-Item -ItemType Directory -Force -Path $CoordDir | Out-Null

@@ -82,5 +82,8 @@
   2026-10-04: trains 1011 and 1012 had landed with no refresh). The generator back-fills one trend point per
   inventory-moving commit since the series' last point (`missed_points`), so a missed refresh costs nothing but
   a stale page. The first publish after an unseen live version is refused with that version's source; publish the
-  same file again unchanged and it goes through.
+  same file again unchanged and it goes through. **After every publish run `python scripts/orchestrator/ledger_state.py
+  mark-published`**; the orchestrator's supervisor prints `LEDGER PUBLISH OWED` after any unit while the page's stamp is
+  newer than the marked one, because a headless unit has no Artifact tool and only renders `{COORD}\ledger.html` (owner
+  2026-10-04: "Publish ledger each time"; DESIGN-orchestrator-loop.md section 14).
 - `python scripts/semgrep/verify.py` has a recorded red baseline (`kb/Work/PB175`): a landing must not INCREASE it.

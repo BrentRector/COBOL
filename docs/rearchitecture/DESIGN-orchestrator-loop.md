@@ -65,7 +65,7 @@ one session.
 | Unit | Model | Starts when | Ends when |
 |---|---|---|---|
 | `wave` | Opus (the orchestrator's judgment; the implementers are routed per group by `model_rules.json`) | nothing pending to land or resume and the budget says `go` | its Workflow returned, the last lander train landed through `push-main.sh`, the ledger refreshed (`python scripts/spec/gen_ledger.py`, `references/landing.md`) and the handoff written |
-| `land` | Opus | finished implementer branches exist with no lander (a previous wave unit ended early), or a handoff says `next_unit: land` | the train landed (or was dropped with reasons) and the ledger refreshed |
+| `land` | Opus | finished implementer branches exist with no lander (a previous wave unit ended early), or a handoff says `next_unit: land` | the train landed (or was dropped with reasons) and the ledger rendered to `{COORD}\ledger.html` (section 14) |
 | `resume` | Opus | the previous unit died, timed out, was stopped with a Workflow in flight, or handed off `split` | it has classified every pending branch and report (finish, land, re-plan) and handed off the next unit |
 | `meter` | Sonnet, with `--chrome` | the newest reading in `readings.json` is older than 3 hours | the reading is appended (`budget.py --record`) and the handoff written |
 | `owner-question` | none | a handoff carries `owner_question` | immediately: the supervisor appends the question to `OWNER-QUESTIONS.md` and STOPS; it never guesses and never starts a session for it |
@@ -111,10 +111,8 @@ that fires wins (the supervisor's `-Unit` overrides the first iteration only):
    Older unlanded branches do not trigger it, so an abandoned branch cannot cause a `resume` loop; `plan_wave.py`
    still sees them.
 6. The handoff lists `branches_pending` with status `DONE` → `land`.
-7. The ledger page (`docs/rearchitecture/evidence/conformance-ledger.html`, `gen_ledger.py`'s default output) is older
-   than the newest inventory commit on `origin/main` → `land` (whose prompt refreshes the ledger when it has
-   nothing to land).
-8. Otherwise → `wave`.
+7. Otherwise → `wave`. (A stale ledger page is not a reason for a unit: a headless unit cannot publish it, section 14.
+   The earlier rule 7 compared a repo file that never existed, so it sent every idle loop to `land`.)
 
 ## 4. The supervisor loop (`orchestrate.ps1`)
 
@@ -448,7 +446,8 @@ owner question stop the start, all in temp directories.
 Python self-tests in the style of `scripts/hooks/test_dispatch_guard.py` (a script that prints a case count and
 exits nonzero on a failure; no framework): `test_alloc.py` (including two real parallel processes allocating
 concurrently with no duplicate), `test_inventory_ratchet.py` (a fabricated reopen, a GAP rise, the marker),
-`test_budget.py`, `test_checkpoint.py` (real linked worktrees: committed, dirty, clean; a synthesized handoff checked
+`test_budget.py`, `test_ledger_state.py` (owed until the current stamp is marked, owed again after an input-touching commit,
+not after an unrelated one), `test_checkpoint.py` (real linked worktrees: committed, dirty, clean; a synthesized handoff checked
 against the schema's required and permitted keys), `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
 real dispatch-spec template and `check_practices.py`'s same-file rule), `test_watch_agent.py` (a transcript with a
 partial last line). CI runs the hook self-tests in the `audits` job (`python3 scripts/hooks/test_forbidden_commands.py
@@ -459,6 +458,23 @@ inventory at `HEAD`, which the job's full-history checkout provides. The supervi
 `pwsh scripts/orchestrator/test_orchestrate.ps1`, drives the loop with a fake `-ClaudeExe`
 (`testdata/fake-claude.ps1`) and `open-watchers.ps1` with a fake `wt.exe` (`testdata/fake-wt.ps1`); it needs
 PowerShell 7 and git, so it would run in the `windows-build-test` job. The workflow file is not edited by this change.
+
+## 14. Publishing the ledger after every landing
+
+Owner 2026-10-04: "Publish ledger each time." The page is the owner's live view (the artifact recorded in the memory
+`conformance-ledger-artifact`), and a stale page is worse than none. Publishing is the one step a headless unit CANNOT do:
+its session has no `Artifact` tool (probed 2026-10-04 on Haiku: asked whether the tool is available, it answers NO), and a
+wrapper around the claude.ai API would be a second author of the page. So the work splits where the capability is:
+- **A unit renders** (`units/wave.md` step 5, `units/land.md` step 3): `python scripts/spec/gen_ledger.py --out
+  {COORD}\ledger.html`, refreshing `docs/rearchitecture/evidence/ledger-in-flight.md` when the lanes changed.
+- **The supervisor announces.** After every unit it runs `ledger_state.py owed`, which compares the page's own stamp (the
+  last commit touching an input of the page, `gen_ledger.STAMP_PATHS`, imported so the two cannot disagree) with
+  `ledger-published.json`, and prints `LEDGER PUBLISH OWED` in its log when they differ. `stop.ps1 -Status` shows the same.
+- **The attended session publishes** and records it: `Artifact` publish of the rendered page to the existing URL, then
+  `python scripts/orchestrator/ledger_state.py mark-published`. In an attended session a unit's end arrives as a
+  notification, and the publish is the first action after the landing report.
+The limit, stated plainly: in a fully unattended run the publish waits for the next attended session, and the log line and
+`stop.ps1 -Status` are how it is seen. `next_unit.py` no longer starts a `land` unit for a stale page.
 
 ## 13. Watching agents
 

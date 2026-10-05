@@ -15,7 +15,9 @@ UNIT: wave.
    (the file is empty while the Workflow runs and holds its result with `totalToolCalls` when it returns) and read the
    stall watchdog's log between waits. Never end a turn while that file is empty.
    Judge each lander report: a dropped cluster gets its reason into its kb/Work note.
-5. In the same turn as the landing report, refresh the ledger (`python scripts/spec/gen_ledger.py`, as
-   .claude/skills/workstream/references/landing.md says).
+5. In the same turn as the landing report, render the ledger: `python scripts/spec/gen_ledger.py --out {COORD}\ledger.html`
+   (and refresh the narrative in docs/rearchitecture/evidence/ledger-in-flight.md if the lanes changed). You cannot
+   PUBLISH it (a headless session has no Artifact tool): the supervisor announces the owed publish after you end, and the
+   attended session publishes `{COORD}\ledger.html` to the owner's artifact. Do not look for a way around that.
 6. Write the handoff: `workflow.state`, `landed`, and every unlanded branch in `branches_pending`; `next_unit` null
    unless you know better.
