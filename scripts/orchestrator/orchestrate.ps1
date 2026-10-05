@@ -45,6 +45,7 @@ param(
     [string]$TelemetryDir = '',
     [int]$FastFailSeconds = 120,
     [int]$IdleCloseSeconds = 20,
+    [int]$CheckpointSeconds = 300,
     [int]$BackoffBaseSeconds = 60
 )
 $ErrorActionPreference = 'Stop'
@@ -94,6 +95,16 @@ function Wait-Until([datetime]$until) {
         Start-Sleep -Seconds ([Math]::Max(1, [Math]::Min(60, ($until - (Get-Date)).TotalSeconds)))
     }
     return -not (Test-Path $StopFile)
+}
+
+# The supervisor's own frequent handoff (checkpoint.py): never fatal, a missed checkpoint must not end the unit.
+function Write-Checkpoint([string]$unit, [string]$sessionId, [datetime]$started, $stats, [int]$bgTasks, [datetime]$lastEventAt) {
+    try {
+        [void](Invoke-Py @((Join-Path $Here 'checkpoint.py'), 'write', '--unit', $unit, '--session', $sessionId,
+            '--started', $started.ToString('o'), '--last-event', $lastEventAt.ToString('o'), '--calls', "$($stats.calls)",
+            '--context', "$($stats.context)", '--cost', "$([double]$(if ($null -ne $stats.cost_usd) { $stats.cost_usd } else { 0 }))",
+            '--bg-tasks', "$bgTasks", '--repo', $RepoDir))
+    } catch { Say "checkpoint not written (the unit continues): $_" }
 }
 
 function Invoke-Py([string[]]$ArgList) {
@@ -176,6 +187,10 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
     $bgTasks = 0             # background tasks (a Workflow, a gate) the session reports as running
     $lastEventAt = Get-Date
     $stdinClosed = $false
+    $unitStarted = Get-Date
+    $lastCheckpoint = Get-Date
+    $lastBgChecked = 0
+    Write-Checkpoint $unit $sessionId $unitStarted $stats $bgTasks $lastEventAt   # one at once: a crash in the first minutes still leaves one
     if ($Watch -and $unit -eq 'wave') {
         try {
             $watcher = Start-Process -PassThru -WindowStyle Hidden -FilePath (Get-Command pwsh).Source -ArgumentList @(
@@ -224,6 +239,14 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
                 try { $proc.StandardInput.Close() } catch { }
                 $stdinClosed = $true
             }
+            # Frequent handoffs: a checkpoint every -CheckpointSeconds, and at once (at most every 10 s) when the set of
+            # background tasks changes, because that is when a Workflow starts, a train lands or a gate ends.
+            $sinceCp = ((Get-Date) - $lastCheckpoint).TotalSeconds
+            if ($CheckpointSeconds -gt 0 -and ($sinceCp -ge $CheckpointSeconds -or ($bgTasks -ne $lastBgChecked -and $sinceCp -ge 10))) {
+                Write-Checkpoint $unit $sessionId $unitStarted $stats $bgTasks $lastEventAt
+                $lastCheckpoint = Get-Date
+                $lastBgChecked = $bgTasks
+            }
             # Two reasons to wind the unit down gracefully: its context passed the cap, or the owner created STOP. Both do
             # the same thing, so no work is lost: STOP-UNIT (the unit hands off at its next step) and the fleet's own
             # graceful-stop file (every implementer and lander checkpoints and returns SPLIT), then wait for the handoff.
@@ -243,6 +266,7 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
             }
         }
         $proc.WaitForExit()
+        Write-Checkpoint $unit $sessionId $unitStarted $stats $bgTasks $lastEventAt   # the final state, for the log and a successor
     } finally {
         $log.Close()
         if ($watcher -and -not $watcher.HasExited) { Stop-Process -Id $watcher.Id -Force -ErrorAction SilentlyContinue }
@@ -256,6 +280,15 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
 if (-not (Take-Lock)) { exit 3 }
 $exitCode = 0
 try {
+    $leftover = Join-Path $CoordDir 'checkpoint.json'
+    if ((Test-Path $leftover) -and -not $DryRun) {
+        # The previous supervisor died mid-unit (a reboot, a kill): its last checkpoint is the only record. Turn it into the
+        # handoff the dead unit never wrote, so the first unit of this run is a `resume` with facts.
+        $cpUnit = [string]((Get-Content $leftover -Raw | ConvertFrom-Json).unit)
+        Say "a checkpoint of unit '$cpUnit' survives from a supervisor that died mid-unit: synthesizing its handoff"
+        [void](Invoke-Py @((Join-Path $Here 'checkpoint.py'), 'synthesize', '--unit', $cpUnit, '--out', $LastHandoff, '--repo', $RepoDir))
+        Move-Item $leftover (Join-Path $CoordDir "logs/$(Get-Date -Format 'yyyyMMdd-HHmmss')-$cpUnit.checkpoint.json") -Force
+    }
     $failures = 0
     $ran = 0
     $lastFailed = $false
@@ -314,7 +347,7 @@ try {
         }
 
         # A fleet STOP left by a previous wind-down would stop this unit's fleet at its first step.
-        Remove-Item $StopUnit, $Handoff, (Join-Path $CoordDir 'scratch/STOP') -Force -ErrorAction SilentlyContinue
+        Remove-Item $StopUnit, $Handoff, (Join-Path $CoordDir 'scratch/STOP'), (Join-Path $CoordDir 'milestones.jsonl'), (Join-Path $CoordDir 'checkpoint.json') -Force -ErrorAction SilentlyContinue
         Say "unit '$($choice.unit)' ($($choice.reason)) on $model, session $sessionId"
         $started = Get-Date
         $r = Invoke-Unit $choice.unit $model $sessionId $logBase
@@ -332,6 +365,20 @@ try {
                 Copy-Item $Handoff $LastHandoff -Force
             } else { $outcome = 'invalid'; Copy-Item $Handoff "$logBase.handoff.invalid.json" -Force }
         }
+        if (-not $valid) {
+            # No usable handoff from the model (a crash, a kill, a terminated background task): the supervisor writes
+            # one from its last checkpoint and the worktrees as they are now, so the successor starts with facts, not a
+            # guess. The unit still counts as failed for the breaker.
+            try {
+                [void](Invoke-Py @((Join-Path $Here 'checkpoint.py'), 'synthesize', '--unit', $choice.unit, '--out', $Handoff, '--repo', $RepoDir))
+                Copy-Item $Handoff $LastHandoff -Force
+                Copy-Item $Handoff "$logBase.handoff.synthesized.json" -Force
+                $outcome = "synthesized ($outcome)"
+            } catch { Say "handoff not synthesized: $_" }
+        }
+        # Moved, not copied: a checkpoint.json that is still here at the next supervisor start means the supervisor itself died mid-unit.
+        if (Test-Path (Join-Path $CoordDir 'checkpoint.json')) { Move-Item (Join-Path $CoordDir 'checkpoint.json') "$logBase.checkpoint.json" -Force }
+        if (Test-Path (Join-Path $CoordDir 'milestones.jsonl')) { Move-Item (Join-Path $CoordDir 'milestones.jsonl') "$logBase.milestones.jsonl" -Force }
         $failed = ($r.exit -ne 0) -or (-not $valid) -or (($duration -lt $FastFailSeconds) -and ($outcome -ne 'done'))
         $failures = if ($failed) { $failures + 1 } else { 0 }
         $lastFailed = $failed

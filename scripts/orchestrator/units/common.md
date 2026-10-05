@@ -5,6 +5,11 @@ supervisor starts the next unit after you end.
 - Before EACH new step, check whether {STOP_UNIT} exists. If it does, finish the current step, write the handoff and
   end. With a Workflow in flight never end the session: create the fleet's stop file `{SCRATCH}\STOP`, wait for the
   Workflow to return, then hand off `next_unit: resume` naming every branch, worktree and report.
+- Frequent handoffs: the supervisor writes `{COORD}\checkpoint.json` (counters, worktrees, background tasks) on its own every
+  few minutes, but it cannot see what you decided. At EVERY milestone (the plan written, the fleet started, a train
+  landed, a branch classified, a decision and its reason) append ONE line to `{COORD}\milestones.jsonl` as you go:
+  `{"at":"<ISO time>","what":"<one sentence>"}` plus `"shas"` or `"branches"` when there are some. If you die at minute 100, the
+  supervisor builds your handoff from these lines and the checkpoint; whatever you did not write down is lost.
 - End by writing {HANDOFF}: JSON valid against scripts/orchestrator/handoff.schema.json, `summary` at most 900
   characters; the detail lives in the files it names. Then end your turn.
 - A decision only the owner can make: never guess. End with `outcome: owner-question` and `owner_question`

@@ -44,6 +44,12 @@ switch ($env:FAKE_CLAUDE_MODE) {
             owner_question = @{ question = 'Adopt reading A or reading B of 13.18.38.3 SR6?'; context = 'kb/Work/PB1' } }
         exit 0
     }
+    'crash' {
+        # A unit that records a milestone, then dies with no handoff (a kill, a terminated background task).
+        Call 'msg_1' 5000
+        Add-Content -Path (Join-Path $coord 'milestones.jsonl') -Value '{"at":"t1","what":"plan written for wave 9"}' -Encoding utf8
+        exit 1
+    }
     'stopsme' {
         # The owner creates STOP while this unit runs; the supervisor must wind the unit down (STOP-UNIT and the fleet STOP).
         Call 'msg_1' 5000

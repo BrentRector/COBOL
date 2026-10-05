@@ -60,7 +60,7 @@ Check 'lock released' (Test-Path (Join-Path $r.coord 'orchestrate.lock')) $false
 
 # 3. a unit that writes no handoff is a failure
 $r = Run-Orch 'nohandoff' 'nohandoff' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0')
-Check 'missing handoff recorded' $r.units[0].handoff_outcome 'missing'
+Check 'missing handoff recorded, and replaced by a synthesized one' $r.units[0].handoff_outcome 'synthesized (missing)'
 Check 'missing handoff is a failure' $r.units[0].failed $true
 
 # 4. the STOP file ends the loop before any unit
@@ -120,6 +120,30 @@ Check 'stop.ps1 -Status reports it' ((& pwsh -NoProfile -File $StopPs -Status -C
 Set-Content -Path (Join-Path $sc 'STOP-UNIT') -Value 'x'; Set-Content -Path (Join-Path $sc 'scratch/STOP') -Value 'x'
 & pwsh -NoProfile -File $StopPs -Clear -CoordDir $sc | Out-Null
 Check 'stop.ps1 -Clear removes all three' (@('STOP', 'STOP-UNIT', 'scratch/STOP') | Where-Object { Test-Path (Join-Path $sc $_) }).Count 0
+
+# 4h. FREQUENT HANDOFFS: a unit that dies with no handoff leaves a synthesized one for its successor (from the supervisor's
+# checkpoint, the unit's milestone lines and the worktrees), and the checkpoint and milestones are archived with the logs
+$r = Run-Orch 'crash' 'crash' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0')
+$hl = Get-Content (Join-Path $r.coord 'handoff.last.json') -Raw | ConvertFrom-Json
+Check 'a crashed unit still counts as failed' $r.units[0].failed $true
+Check 'handoff outcome says synthesized' ($r.units[0].handoff_outcome -like 'synthesized*') $true
+Check 'the synthesized handoff names resume as the next unit' $hl.next_unit 'resume'
+Check 'the synthesized handoff is flagged' $hl.synthesized $true
+Check 'the unit''s milestone reaches the synthesized summary' ($hl.summary -match 'plan written for wave 9') $true
+Check 'the final checkpoint is archived with the log' (@(Get-ChildItem (Join-Path $r.coord 'logs') -Filter '*.checkpoint.json').Count) 1
+Check 'the milestones are archived with the log' (@(Get-ChildItem (Join-Path $r.coord 'logs') -Filter '*.milestones.jsonl').Count) 1
+Check 'no live checkpoint is left behind' (Test-Path (Join-Path $r.coord 'checkpoint.json')) $false
+
+# a checkpoint every few seconds while a unit runs, and one when the background-task set changes (the `wakes` fake)
+$r = Run-Orch 'periodic' 'wakes' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0', '-CheckpointSeconds', '1')
+$cp = Get-ChildItem (Join-Path $r.coord 'logs') -Filter '*.checkpoint.json' | Select-Object -First 1 | Get-Content -Raw | ConvertFrom-Json
+Check 'the archived checkpoint is the unit''s final state' ($cp.unit, $cp.calls) @('wave', 2)
+
+# a supervisor that DIED mid-unit leaves checkpoint.json behind; the next start turns it into the missing handoff
+$r = Run-Orch 'diedmid' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0') {
+    param($c) Set-Content -Path (Join-Path $c 'checkpoint.json') -Value '{"schema_version":1,"unit":"wave","calls":77,"worktrees":[],"milestones":[]}' }
+Check 'a leftover checkpoint is announced' ($r.out -match "survives from a supervisor that died mid-unit") $true
+Check 'the leftover checkpoint is archived, not left to repeat' (@(Get-ChildItem (Join-Path $r.coord 'logs') -Filter '*wave.checkpoint.json').Count -ge 1) $true
 
 # 5. the circuit breaker trips after three fast failures and leaves an owner note
 $r = Run-Orch 'breaker' 'fastfail' @('-Unit', 'wave', '-FastFailSeconds', '120')

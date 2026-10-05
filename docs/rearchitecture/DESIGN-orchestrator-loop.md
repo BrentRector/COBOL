@@ -45,6 +45,8 @@ the tools it runs). Contents:
 | `readings.json` | the `meter` unit (via `budget.py --record`) | owner-meter readings, a list of `{noted_at, weekly_pct, session_pct, session_reset}` |
 | `orchestrate.lock` | the supervisor | one instance only: `{pid, started_at, host}` |
 | `STOP` | the owner (`stop.ps1`) | closes work down as soon as possible without losing any: a running unit is wound down (below), then the loop ends; `stop.ps1 -Clear` removes it |
+| `checkpoint.json` | the supervisor (`checkpoint.py`) | the running unit's frequent handoff (section 5.1); moved to `logs\` when the unit ends, so a survivor means the supervisor died |
+| `milestones.jsonl` | the running unit's model | one line per milestone; moved to `logs\` when the unit ends |
 | `STOP-UNIT` | the supervisor | asks the running unit to write its handoff and end (section 4.3); created for the context cap and for `STOP` |
 | `scratch\STOP` | the supervisor | the fleet's graceful-stop file, created with `STOP-UNIT`: every implementer and lander checkpoints, commits and returns `SPLIT`; removed at the start of the next unit |
 | `handoff.json` | the running unit | its handoff (section 5); the supervisor archives it per unit |
@@ -123,7 +125,7 @@ shell), `-CoordDir`, `-RepoDir` (default the repository containing the script), 
 150000), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave`
 unit gets three times this, because a lander train must be allowed to finish), `-BorrowDays` (passed to
 `budget.py`), `-Unit` (the first unit, overriding `next_unit.py` once), `-Watch` (section 13), `-Python`, and the
-test seams `-TelemetryDir` (passed to `budget.py`), `-IdleCloseSeconds` (default 20, section 4.6) and `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
+test seams `-TelemetryDir` (passed to `budget.py`), `-IdleCloseSeconds` (default 20, section 4.6), `-CheckpointSeconds` (default 300, section 5.1) and `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
 (default 60). Exit codes: 0 stopped (`STOP`, `-MaxUnits`, `stop-week`, `-DryRun`), 3 another instance runs,
 4 circuit breaker, 5 an owner question is waiting.
 
@@ -242,8 +244,32 @@ Optional: `next_unit` (one of the unit types, or null to let the deterministic c
 `DONE` · `SPLIT` · `DISCHARGED` · `BLOCKED`); `workflow` (`{run_id, state}` with state `landed` · `stopped` ·
 `none`); `landed` (`{commits, gap_before, gap_after, devlog_entry}`); `meter_reading` (the reading appended, for
 the `meter` unit); `owner_question` (`{question, context}`), required exactly when `outcome` is `owner-question`;
-`notes_touched` (kb/Work ids). Additional properties are refused, so a misspelled key fails validation instead of
-being ignored.
+`notes_touched` (kb/Work ids); `synthesized` (true when the supervisor, not the unit's model, wrote it) and
+`checkpoint` (the path of the checkpoint it was built from). Additional properties are refused, so a misspelled key
+fails validation instead of being ignored.
+
+### 5.1 Frequent handoffs: the checkpoint, the milestones and the synthesized handoff
+
+A handoff written only when a unit ends is lost with the unit (wave 1017 ran 11 minutes, was terminated, and its
+successor rebuilt the state from stderr and git; owner 2026-10-04: "we need more frequent handoffs written"). Three
+mechanisms, in order of how little they trust the model:
+1. **`checkpoint.json`, written by the supervisor** (`checkpoint.py write`) at unit start, every `-CheckpointSeconds`
+   (default 300), whenever the set of background tasks changes (a Workflow starts, a train lands, a gate ends; at most
+   every 10 s) and at the unit's end. It holds the stream counters (calls, context, cost), the running background-task
+   count, and every linked worktree's branch, head, commits ahead of `origin/main`, uncommitted-file count (the owner's
+   `settings.local.json` and `STATUS.md` excluded) and `STATUS.md` headline, plus the unit's last milestones. No model
+   is involved and a failed write never ends the unit.
+2. **`milestones.jsonl`, written by the unit's model** at every milestone (`units/common.md`): one line, `{at, what}`
+   plus `shas` or `branches`. It carries what the supervisor cannot see: the decision and its reason.
+3. **The synthesized handoff** (`checkpoint.py synthesize`): when a unit ends with no valid handoff (a crash, a kill,
+   the background-task ceiling, a malformed file) the supervisor writes one from the last checkpoint, the five last
+   milestones and the worktrees AS THEY ARE NOW: `outcome: split`, `next_unit: resume`, `synthesized: true`,
+   `branches_pending` for every worktree that holds work. The unit still counts as failed for the breaker, and
+   `units.jsonl` records `synthesized (<what was wrong>)`. If the SUPERVISOR dies mid-unit (a reboot), `checkpoint.json`
+   is still on disk at the next start (a finished unit's checkpoint is moved to `logs\`, never left), and the supervisor
+   turns it into the missing handoff before choosing the first unit.
+Every unit's checkpoint and milestones are kept beside its log: `logs\<time>-<unit>.checkpoint.json` and
+`.milestones.jsonl`.
 
 ## 6. The allocator (`alloc.py`)
 
@@ -422,7 +448,8 @@ owner question stop the start, all in temp directories.
 Python self-tests in the style of `scripts/hooks/test_dispatch_guard.py` (a script that prints a case count and
 exits nonzero on a failure; no framework): `test_alloc.py` (including two real parallel processes allocating
 concurrently with no duplicate), `test_inventory_ratchet.py` (a fabricated reopen, a GAP rise, the marker),
-`test_budget.py`, `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
+`test_budget.py`, `test_checkpoint.py` (real linked worktrees: committed, dirty, clean; a synthesized handoff checked
+against the schema's required and permitted keys), `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
 real dispatch-spec template and `check_practices.py`'s same-file rule), `test_watch_agent.py` (a transcript with a
 partial last line). CI runs the hook self-tests in the `audits` job (`python3 scripts/hooks/test_forbidden_commands.py
 && ...`); the orchestrator tests would be one more step there

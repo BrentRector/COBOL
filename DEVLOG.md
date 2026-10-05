@@ -13,6 +13,25 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1880 — 2026-10-04 21:05 PDT — Frequent handoffs: the supervisor checkpoints a running unit and writes the handoff a dead unit never did (PB2015)
+
+The owner, two hours into the third `wave` unit: "In the future, we need more frequent handoffs written." Until now a unit's
+handoff was written once, by its model, at the very end, so wave 1017's death at minute 11 left nothing and a death at minute 100 would
+have lost proportionally more; a supervisor that died mid-unit (a reboot) left no record at all. Three mechanisms, ordered by how little
+they trust the model (design doc section 5.1, `scripts/orchestrator/checkpoint.py`). (1) `checkpoint.json`, written by the supervisor
+with no model: at unit start, every `-CheckpointSeconds` (300), when the background-task set changes (a Workflow starts, a train lands)
+and at the end; it holds the stream counters and every linked worktree's head, commits ahead of `origin/main`, uncommitted-file count
+and `STATUS.md` headline. (2) `milestones.jsonl`, one line the unit's model appends per milestone, for what the supervisor cannot see
+(a decision and its reason). (3) A synthesized handoff (`outcome: split`, `next_unit: resume`, `synthesized: true`) whenever a unit ends
+without a valid one; a checkpoint that survives into the next supervisor start becomes the missing handoff first. The unit still
+counts as failed for the breaker and `units.jsonl` says `synthesized (missing)`. `test_checkpoint.py` uses real linked worktrees and
+checks the synthesized handoff against the schema's required and permitted keys; `test_orchestrate.ps1` is 69/69 (a crash with a
+milestone, the periodic and final checkpoint, a supervisor that died mid-unit). Built in its own worktree, because the running wave's
+main checkout had to stay clean; landed after the wave ended.
+
+**Files:** `scripts/orchestrator/checkpoint.py`, `test_checkpoint.py`, `orchestrate.ps1`, `handoff.schema.json`, `units/common.md`,
+`testdata/fake-claude.ps1`, `test_orchestrate.ps1`, `docs/rearchitecture/DESIGN-orchestrator-loop.md`, `kb/Work/PB2015.md`.
+No diagnostic code used.
 ## Entry 1879 — 2026-10-04 20:18 PDT — Train 1018b: wave 1018 groups E, H and G land (PB1110; PB1179; PB1529), GAP 263 to 255
 
 Train 1018b carries the last three of wave 1018's finisher branches, one commit per cluster, on top of train 1018 (DEVLOG 1878). Each finisher had cherry-picked its wave-1017 predecessor's checkpoint, re-probed it on its own build and finished it. Every cluster was brought in from its branch as a patch that left out `DEVLOG.md` and `tests/version-matrix/traceability-inventory.json`; the three verdict batches were then re-applied in order on the merged tree with `record_verdicts.py` (E 263 → 261, H 261 → 256, G 256 → 255). All three patches applied cleanly, and no cluster's files overlapped another's.
