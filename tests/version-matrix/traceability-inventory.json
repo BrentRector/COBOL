@@ -20423,7 +20423,7 @@
   "rule-digest": "47c8b6eace6a",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#COLS; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#COLUMNS; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindReportEntry",
-  "test-ref": "conformance:2002/l1c03_report_column_synonyms_printable_size",
+  "test-ref": "conformance:2002/l1c03_report_column_synonyms_printable_size; conformance:2002/pb1221_report_keyword_prefixes",
   "derivation": "",
   "editions": "85",
   "notes": "cite.py --check 13.18.14.3 \"COLUMN, COL, COLUMNS, and COLS are synonyms.\" -> OK SR1. The report production takes all four spellings in one alternative and the binder reads only the operands (reportColumnOperand), so the spelling cannot change the meaning. Probes at 2023 (out13/probe/column-clause-p1/syn_col, syn_cols, syn_columns, syn_colnumis): `COL 5`, `COLS 5`, `COLUMNS 5`, `COL NUMBER IS 5` each print 'A' in column 5, identical to `COLUMN 5`. At --std 85 `COL 5` is refused COBOLNET0900 (the non-COLUMN spellings are 2002 introductions — gate in VisitReportColumnClause; edition edge derived, not quoted). Format 2 half: the screen module is declined (A.4.2 Not claimed, PB260 owns it). Test-needed: conformance:2023/pb506_report_value_operand_list and 2002/pb506_report_operand_lists_2002 exercise COLUMNS ARE only (derived for §13.18.63.3 SR35, not SR1); no spec-derived test witnesses COL/COLS equivalence. || Editions (adjudicator): 85 (single absolute COLUMN NUMBER IS integer-1 form), 2002, 2014, 2023 — Report Writer is in every edition; Annex E lists no 2014->2023 change to §13.18.14; the COL/COLS/COLUMNS/NUMBERS/ARE/multiple/relative forms are 2002 introductions (derived, repo holds no 85/2002 text)",
@@ -20466,13 +20466,13 @@
   "ordinal": 4,
   "subject": "COLUMN clause",
   "rule-digest": "a5be4cefe050",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitReportColumnClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause",
+  "test-ref": "unit:ReportClauseKeywordPrefixTests.ColumnPrefix_ParsesExactlyWhenPrinted; conformance:negative/pb1221-column-are-singular; conformance:2002/pb1221_report_keyword_prefixes",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1221, 14d). cite.py --check 13.18.14.3 \"The keyword ARE may be specified only if COLUMNS, COLS, or NUMBERS is specified.\" -> OK SR4. Grammar `(COLUMN|COLUMNS|COL|COLS) (NUMBER|NUMBERS)? (IS|ARE)?` admits every pairing and no pass screens it (COBOLNET_REPORT_WRITER_DESIGN §5 records 'SR4/SR5 IS/ARE-spelling pairings ... not enforced'). Probes at 2023 (out13/probe/column-clause-p1/sr4_column_are, sr4_colnumber_are): `COLUMN ARE 5` and `COL NUMBER ARE 5` compile clean and print. Expected: a syntax-rule diagnostic. Harm under-rejects (finding F2). || Editions (adjudicator): 2002, 2014, 2023 (ARE is a 2002 spelling; at 85 it is refused COBOLNET0900 by the introduction gate)",
-  "state": "GAP"
+  "notes": "(kb/Work PB1221, wave 1021 F). cite.py --check 13.18.14.3 \"The keyword ARE may be specified only if COLUMNS, COLS, or NUMBERS is specified\" -> OK SR4. reportColumnClause now opens with two closed halves: a PLURAL half ((COLUMN | COL) NUMBERS | COLUMNS | COLS) reportColumnAlignment? ARE? and a SINGULAR half (COLUMN | COL) NUMBER? reportColumnAlignment? IS?, so ARE is grammatical only after COLUMNS, COLS or NUMBERS, across the alignment word that sits between them. Probes at 2023: COLUMN ARE 5, COL NUMBER ARE 5 and COLUMN RIGHT ARE 5 are COBOL0001; COLUMN NUMBERS ARE, COLS ARE, COLUMNS RIGHT ARE and COL NUMBERS LEFT ARE compile and place their items (conformance:2002/pb1221_report_keyword_prefixes). ReportClauseKeywordPrefixTests enumerates all 72 (spelling, NUMBER|NUMBERS, alignment, IS|ARE) combinations against the printed set. || Editions: ARE is a 2002 spelling (COBOLNET0900 at 85 through report-multi-column-2002); the parse refusal itself holds at every edition.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.14.3-5",
@@ -20481,13 +20481,13 @@
   "ordinal": 5,
   "subject": "COLUMN clause",
   "rule-digest": "f39dc0001def",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitReportColumnClause",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportColumnClause",
+  "test-ref": "unit:ReportClauseKeywordPrefixTests.ColumnPrefix_ParsesExactlyWhenPrinted; conformance:2002/pb1221_report_keyword_prefixes",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "(kb/Work PB1221, 14d). cite.py --check 13.18.14.3 \"The keyword IS shall not be specified if COLUMNS, COLS, or NUMBERS is specified.\" -> OK SR5. Same unscreened grammar as SR4. Probes at 2023 (out13/probe/column-clause-p1/sr5_columns_is, sr5_cols_is, sr5_numbers_is): `COLUMNS IS 5`, `COLS IS 5`, `COLUMN NUMBERS IS 5` all compile clean. Expected: a syntax-rule diagnostic. Harm under-rejects (finding F2). || Editions (adjudicator): 2002, 2014, 2023 (COLUMNS/COLS/NUMBERS are 2002 spellings)",
-  "state": "GAP"
+  "notes": "(kb/Work PB1221, wave 1021 F). cite.py --check 13.18.14.3 \"The keyword IS shall not be specified if COLUMNS, COLS, or NUMBERS is specified\" -> OK SR5. The PLURAL half of reportColumnClause admits no IS, so COLUMNS IS 5, COLS IS 5, COLUMN NUMBERS IS 5 and COLS LEFT IS 5 are COBOL0001 (or COBOL0307 where error recovery reads the context-sensitive NUMBERS as a user word, 8.10); COLUMN IS, COL NUMBER IS and COL NUMBER CENTER IS compile and place their items. ReportClauseKeywordPrefixTests enumerates every combination. || Editions: COLUMNS/COLS/NUMBERS are 2002 spellings; the parse refusal holds at every edition.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.14.3-6",
@@ -23108,10 +23108,10 @@
   "rule-digest": "b47ec7b01604",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportLineClause; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitReportLineClause",
-  "test-ref": "conformance:2023/l1c16_report_lines_synonym",
+  "test-ref": "conformance:2023/l1c16_report_lines_synonym; conformance:2002/pb1221_report_keyword_prefixes",
   "derivation": "",
   "editions": "2023",
-  "notes": "cite.py --check 13.18.35.3 \"LINE and LINES are synonyms.\" OK (13.18.35.3 2)). The grammar takes (LINE | LINES) as one token choice and no binder or emitter path reads which was written (ScreenReportLineClauses and ReportRepetitionOf read only reportLineOperand), so the two are semantically identical by construction. Probes: LINES ARE 3 5 and LINE NUMBERS ARE 3 PLUS 2 at 2023 print on 3 and 5; LINES 3 at 2002 prints on 3. No spec-derived golden writes the LINES spelling in a report group (grep of tests/conformance) - test-needed. The over-admitted noise-word combinations (LINES IS, LINES NUMBER IS) are the FMT row's defect. || Editions (adjudicator): 2023 text. The compiler gates the LINES spelling at 2002 (grammar comment); the introducing edition is NOT derivable from the 2023 text (VERSION_CHANGE_REFERENCE row 130d), so only 2002/2014/2023 were probed. || Code sites (adjudicator detail): src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportLineClause; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#ParseArm.VisitReportLineClause",
+  "notes": "cite.py --check 13.18.35.3 \"LINE and LINES are synonyms.\" OK (13.18.35.3 2)). No binder or emitter path reads which spelling was written (ScreenReportLineClauses and ReportRepetitionOf read only reportLineOperand), so the two are semantically identical by construction; conformance:2023/l1c16_report_lines_synonym and conformance:2002/pb1221_report_keyword_prefixes (LINES ARE PLUS 1, LINES PLUS 1) witness it. The synonymy is of MEANING: each spelling keeps the companions its 13.18.35.2 alternative prints (LINE [NUMBER] [IS], LINE [NUMBERS] [ARE], LINES [ARE]), and the parser refuses the rest (kb/Work PB1221, FMT-13.18.35.2). || Editions (adjudicator): 2023 text. The compiler gates the LINES spelling at 2002; the introducing edition is NOT derivable from the 2023 text (VERSION_CHANGE_REFERENCE row 130d), so only 2002/2014/2023 were probed. || Code sites (adjudicator detail): src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportLineClause; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs",
   "state": "OK"
  },
  {
@@ -27713,10 +27713,10 @@
   "rule-digest": "fe8d67460456",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportSourceClause; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#SOURCES; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#VisitReportSourceClause",
-  "test-ref": "conformance:2023/pb506_report_value_operand_list",
+  "test-ref": "conformance:2023/pb506_report_value_operand_list; conformance:2002/pb1221_report_keyword_prefixes",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "\"SOURCE and SOURCES are synonyms.\" (cite.py --check 13.18.53.3 OK SR1). Both spellings reach the same production and the binder never reads which was written; p1 uses SOURCES ARE and SOURCE IS in one program with identical semantics, p8/p9 show either spelling with either noise word works. The SOURCES spelling is introduction-gated below 2002 (COBOLNET0900, constructs.json report-multi-source-2002). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (Report Writer: 85 optional module, 2023 optional element A.4.11; the 2023 Annex E lists no SOURCE-clause change; the multi-operand / SOURCES / arithmetic-expression forms are 2002 introductions per docs/VERSION_CHANGE_REFERENCE - not derivable from the 2023 text itself)",
+  "notes": "\"SOURCE and SOURCES are synonyms.\" (cite.py --check 13.18.53.3 OK SR1). Both spellings reach the same production and the binder never reads which was written; conformance:2002/pb1221_report_keyword_prefixes writes SOURCES ARE and SOURCE IS in one report line with identical placement. The synonymy is of MEANING: each spelling keeps the connective its format alternative prints ({SOURCE IS | SOURCES ARE}, 13.18.53.2), so SOURCE ARE and SOURCES IS are refused by the parser (kb/Work PB1221). The SOURCES spelling is introduction-gated below 2002 (COBOLNET0900, constructs.json report-multi-source-2002). || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 1985, 2002, 2014, 2023 (Report Writer: 85 optional module, 2023 optional element A.4.11; the 2023 Annex E lists no SOURCE-clause change; the multi-operand / SOURCES / arithmetic-expression forms are 2002 introductions per docs/VERSION_CHANGE_REFERENCE - not derivable from the 2023 text itself)",
   "state": "OK"
  },
  {
@@ -59226,13 +59226,13 @@
   "ordinal": 0,
   "subject": "LINE clause",
   "rule-digest": "623cc3ead3c1",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportLineClause; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportLineOperand; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportRelativeSign; src/Cobol.Net.Frontend/Grammar/Core/CobolScreen.g4#screenLineClause",
-  "test-ref": "conformance:2002/pb1001_line_next_page",
+  "test-ref": "conformance:2002/pb1001_line_next_page; unit:ReportClauseKeywordPrefixTests.LinePrefix_ParsesExactlyWhenPrinted; conformance:negative/pb1221-line-prefix-not-printed; conformance:2002/pb1221_report_keyword_prefixes",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "(kb/Work PB1221, 14d). Rendered PDF p.420 (13.18.35.2): Format 1 is a THREE-way left brace {LINE NUMBER IS | LINE NUMBERS ARE | LINES ARE} followed by the brace {integer-1 [ON NEXT PAGE] | {PLUS|+} integer-2 | ON NEXT PAGE} with an ellipsis. cite.py --check 13.18.35.2 \"exactly one of its three alternatives shall be specified\" OK. The OPERAND half is exact (reportLineOperand; PB951's reportRelativeSign gives PLUS/+; PB1001 gives integer-1 ON NEXT PAGE and the bare [ON] NEXT PAGE); probes LINE NUMBER IS 3, LINES ARE 3 5, LINE NUMBERS ARE 3 PLUS 2, LINE 3 + 2 all compile at 2023 and print on 3 / 3,5 / 3,5 / 3,5. DEFECT (under-rejects): the KEYWORD half is written (LINE|LINES) (NUMBER|NUMBERS)? (IS|ARE)? - a cross product - so five spellings the diagram does not contain compile clean and run: LINES NUMBER IS 3, LINE NUMBER ARE 3, LINES IS 3, LINES NUMBERS ARE 3, LINE NUMBERS IS 3 (probe fm5..fm9.cob under E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out13/probe/line-clause/). Format 2 (screen) is the declined A.4.2 module, refused by name COBOLNET1560 (PB260 landed; it owns the SR-13.18.35.3-11..13 / GR-13.18.35.4-10..14 witnesses) - not re-adjudicated here. Side note: at --std 85 the single-operand `LINES 3` is refused with COBOLNET0900 worded 'multiple LINE ... requires COBOL-2002' - the gate is the grammar comment's 2002 LINES spelling, which the 2023 text cannot confirm (row 130d), and the message misnames a single-operand clause as a multiple LINE clause. || Editions (adjudicator): Format 1: 85, 2002, 2014, 2023 (Report Writer is an optional module in 85 and an optional language element in 2023, A.4.11; the 2023 text and its Annex E record no per-edition change to this rule - docs/VERSION_CHANGE_REFERENCE.md row 130d). Format 2 (screen): the screen section facility (A.4.2), which docs/CONFORMANCE.md section 5 declares Not claimed.",
-  "state": "GAP"
+  "notes": "(kb/Work PB1221, wave 1021 F). Rendered PDF (13.18.35.2): Format 1 is the THREE-way brace {LINE NUMBER IS | LINE NUMBERS ARE | LINES ARE} (NUMBER, NUMBERS, IS, ARE not underlined) followed by the brace {integer-1 [ON NEXT PAGE] | {PLUS|+} integer-2 | ON NEXT PAGE} with an ellipsis; the transcription's diagram drew LINE NUMBER IS outside the first brace and is corrected. cite.py --check 13.18.35.2 \"NUMBERS\" OK. reportLineClause now opens (LINE (NUMBERS ARE? | ARE | NUMBER? IS?) | LINES ARE?), exactly the brace, so LINES NUMBER IS, LINE NUMBER ARE, LINES IS, LINES NUMBERS ARE and LINE NUMBERS IS are refused by the parser (COBOL0001 / COBOL0307), and LINE ARE, LINE IS, LINE NUMBER, LINE NUMBERS, LINES and LINES ARE compile and print on their lines (conformance:2002/pb1221_report_keyword_prefixes). The OPERAND half is unchanged (reportLineOperand; PB951 reportRelativeSign; PB1001 ON NEXT PAGE). ReportClauseKeywordPrefixTests enumerates all 18 (LINE|LINES, NUMBER|NUMBERS, IS|ARE) combinations. The 85 gate now names the written form (the LINES spelling, the multiple LINE clause form) instead of calling a single-operand LINES 3 a multiple LINE clause. Format 2 (screen) is the declined A.4.2 module, refused by name COBOLNET1560 (PB260). || Editions: Format 1 in every edition; the LINES / NUMBERS / ARE spellings and the multi-operand form are 2002 (report-multi-line-2002, COBOLNET0900 at 85).",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.36.2",
@@ -59497,11 +59497,11 @@
   "subject": "SOURCE clause",
   "rule-digest": "2b504f432524",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#IdentifierOperandOf",
-  "test-ref": "conformance:2023/pb506_report_value_operand_list; conformance:85/pb1292_source_forms_85; conformance:2002/pb1292_source_operand_forms; conformance:negative/pb1316-source-alphanumeric-constant",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceOperand; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#IdentifierOperandOf; src/Cobol.Net.Frontend/Grammar/Core/CobolReportWriter.g4#reportSourceClause",
+  "test-ref": "conformance:2023/pb506_report_value_operand_list; conformance:85/pb1292_source_forms_85; conformance:2002/pb1292_source_operand_forms; conformance:negative/pb1316-source-alphanumeric-constant; unit:ReportClauseKeywordPrefixTests.SourcePrefix_ParsesExactlyWhenPrinted; conformance:2002/pb1221_report_keyword_prefixes",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1292 + PB1316 landed. The format {identifier-1 | arithmetic-expression-1} ... [rounded-phrase] is realised whole: identifier-1 with its subscripts and reference modification is the GR1 sender, arithmetic-expression-1 the GR2 COMPUTE operand, and a bare numeric constant-name is arithmetic-expression-1 with one operand (cite.py --check 13.10.3 'constant-name-1 may be used anywhere that a format specifies a literal' OK, SR2) - an alphanumeric constant is refused (COBOLNET2141, negative pb1316-source-alphanumeric-constant). retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference (BindSourceReference is deleted; BindSourceOperand classifies the form and FieldReferenceSource carries the identifier)",
+  "notes": "kb/Work PB1292 + PB1316 landed. The format {identifier-1 | arithmetic-expression-1} ... [rounded-phrase] is realised whole: identifier-1 with its subscripts and reference modification is the GR1 sender, arithmetic-expression-1 the GR2 COMPUTE operand, and a bare numeric constant-name is arithmetic-expression-1 with one operand (cite.py --check 13.10.3 'constant-name-1 may be used anywhere that a format specifies a literal' OK, SR2) - an alphanumeric constant is refused (COBOLNET2141, negative pb1316-source-alphanumeric-constant). The keyword prefix is the printed brace {SOURCE IS | SOURCES ARE} (kb/Work PB1221's sibling sweep): reportSourceClause opens (SOURCE IS? | SOURCES ARE?), so SOURCE ARE and SOURCES IS are COBOL0001 (ReportClauseKeywordPrefixTests). retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#BindSourceReference (BindSourceReference is deleted; BindSourceOperand classifies the form and FieldReferenceSource carries the identifier)",
   "state": "OK"
  },
  {

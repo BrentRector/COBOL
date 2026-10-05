@@ -164,12 +164,18 @@ reportControlName
     : (ON | FOR)? (FINAL | dataReference)
     ;
 
-// {LINE|LINES} [NUMBER|NUMBERS] [IS|ARE] {integer [ON NEXT PAGE] | {PLUS|+} integer | [ON] NEXT PAGE}...  (§13.18.35 F1)
-// The multi-operand form (a "multiple LINE clause", §13.18.35.3 SR10) and the LINES/NUMBERS/ARE spellings are
-// COBOL-2002 — introduction-gated post-bind by VersionConformancePass ParseArm.VisitReportLineClause; the
-// multi-operand repetition itself stages LOUD at bind (COBOLNET0899 report-multiple-line).
+// {LINE NUMBER IS | LINE NUMBERS ARE | LINES ARE} {integer-1 [ON NEXT PAGE] | {PLUS|+} integer-2 | ON NEXT PAGE}...
+// (§13.18.35.2 Format 1, the PDF diagram rendered). ⛔ THE KEYWORD PREFIX IS A CLOSED THREE-WAY BRACE, NOT A CROSS
+// PRODUCT (kb/Work PB1221): LINE is underlined in the first two alternatives and LINES in the third, NUMBER /
+// NUMBERS / IS / ARE in none, so §5.2.6.3 admits exactly LINE [NUMBER] [IS], LINE [NUMBERS] [ARE] and LINES [ARE].
+// The rule used to be (LINE | LINES) (NUMBER | NUMBERS)? (IS | ARE)?, which compiled `LINES NUMBER IS 3`,
+// `LINE NUMBER ARE 3` and `LINES IS 3`; the parser now refuses the complement (PrintedFormatAlternativeDriftTests'
+// shape). §13.18.35.3 SR2 ("LINE and LINES are synonyms") is a statement about MEANING, not a licence to pair LINES
+// with the singular words. The leading LINE is factored so that `LINE` alone, which both LINE alternatives admit,
+// has ONE parse. The multi-operand form (a "multiple LINE clause", §13.18.35.3 SR10) and the LINES/NUMBERS/ARE
+// spellings are COBOL-2002 — introduction-gated post-bind by VersionConformancePass ParseArm.VisitReportLineClause.
 reportLineClause
-    : (LINE | LINES) (NUMBER | NUMBERS)? (IS | ARE)? reportLineOperand+
+    : (LINE (NUMBERS ARE? | ARE | NUMBER? IS?) | LINES ARE?) reportLineOperand+
     ;
 
 reportLineOperand
@@ -195,24 +201,46 @@ reportNextGroupClause
     : NEXT GROUP IS? (reportRelativeSign integerOperand | integerOperand | NEXT PAGE (WITH? RESET)?)
     ;
 
-// {COLUMN|COLUMNS|COL|COLS} [NUMBER|NUMBERS] [LEFT|CENTER|RIGHT] [IS|ARE] {integer | {PLUS|+} integer}...  (§13.18.14 F1)
-// The multi-operand form (a "multiple COLUMN clause", §13.18.14.3 SR10), the relative PLUS operand, the
+// {COLUMN NUMBER | COLUMN NUMBERS | COLUMNS | COL NUMBER | COL NUMBERS | COLS} {LEFT|CENTER|RIGHT} [IS|ARE]
+//     {integer-1 | {PLUS|+} integer-2}...  (§13.18.14.2 Format 1, the PDF diagram rendered)
+// ⛔ THE KEYWORD PREFIX IS CLOSED, NOT A CROSS PRODUCT (kb/Work PB1221). The six-way spelling brace pairs NUMBER and
+// NUMBERS with COLUMN and COL only (COLUMNS and COLS stand alone), and §13.18.14.3 SR4 ("The keyword ARE may be
+// specified only if COLUMNS, COLS, or NUMBERS is specified") with SR5 ("The keyword IS shall not be specified if
+// COLUMNS, COLS, or NUMBERS is specified") splits the [IS|ARE] bracket by that spelling: a SINGULAR spelling
+// (COLUMN or COL, NUMBER optional) takes only IS, a PLURAL one (COLUMN/COL NUMBERS, COLUMNS, COLS) only ARE. The
+// two alternatives below are those two halves, so the parser refuses `COLUMN ARE 5`, `COLUMNS IS 5`, `COLS NUMBER 5`
+// and every other shape the format and SR4/SR5 exclude, instead of an over-accepting (COLUMN | COLUMNS | COL | COLS)
+// (NUMBER | NUMBERS)? … (IS | ARE)? that compiled them all. The alignment word sits between the spelling and IS/ARE,
+// which is why the split is two whole alternatives rather than a pairing of adjacent words.
+// ⛔ THE ALIGNMENT BRACE IS OPTIONAL HERE although the diagram prints it as a brace: §13.18.14.3 SR9 — "If any of the
+// operands is absolute and neither LEFT, CENTER, nor RIGHT is specified, LEFT is assumed" — licenses its omission,
+// and `COLUMN 5` is the form every report program writes. The phrase is once per clause (the ellipsis closes only the
+// operand brace); SR9's "all the operands shall be absolute" is bound, not parsed (DataBinder.Reports, kb/Work
+// PB1220). The multi-operand form (a "multiple COLUMN clause", §13.18.14.3 SR10), the relative PLUS operand, the
 // COL/COLS/COLUMNS/NUMBERS/ARE spellings and the alignment phrase are COBOL-2002 — introduction-gated post-bind by
 // VersionConformancePass ParseArm.VisitReportColumnClause.
-// ⛔ THE ALIGNMENT BRACE IS OPTIONAL HERE although the PDF diagram (p386, rendered) prints it as a brace: §13.18.14.3
-// SR9 — "If any of the operands is absolute and neither LEFT, CENTER, nor RIGHT is specified, LEFT is assumed" —
-// licenses its omission, and `COLUMN 5` is the form every report program writes. The phrase sits BEFORE IS/ARE and
-// once per clause (the ellipsis closes only the operand brace); SR9's "all the operands shall be absolute" is
-// bound, not parsed (DataBinder.Reports, kb/Work PB1220).
 reportColumnClause
-    : (COLUMN | COLUMNS | COL | COLS) (NUMBER | NUMBERS)? (LEFT | CENTER | RIGHT)? (IS | ARE)? reportColumnOperand+
+    : ( ((COLUMN | COL) NUMBERS | COLUMNS | COLS) reportColumnAlignment? ARE?
+      | (COLUMN | COL) NUMBER? reportColumnAlignment? IS?
+      ) reportColumnOperand+
+    ;
+
+// {LEFT | CENTER | RIGHT} — the COLUMN clause's alignment word (§13.18.14.4 GR6), its own rule so that both halves of
+// the closed keyword prefix above read ONE spelling of it.
+reportColumnAlignment
+    : LEFT
+    | CENTER
+    | RIGHT
     ;
 
 reportColumnOperand
     : reportRelativeSign? integerOperand
     ;
 
-// {SOURCE|SOURCES} [IS|ARE] {identifier-1}...  (§13.18.53 Format)
+// {SOURCE IS | SOURCES ARE} {identifier-1 | arithmetic-expression-1}... [rounded-phrase]  (§13.18.53.2)
+// ⛔ THE KEYWORD PREFIX IS THE PRINTED TWO-WAY BRACE, NOT A CROSS PRODUCT (kb/Work PB1221's sibling sweep): SOURCE
+// pairs with IS and SOURCES with ARE (IS and ARE not underlined, so each is optional within its alternative), so
+// `SOURCE ARE X` and `SOURCES IS X` are refused by the parser, exactly as CONTROL IS / CONTROLS ARE above.
 // THE OPERAND LIST IS PLURAL BY DESIGN (kb/Work PB506). §13.18.53.2's ellipsis follows the
 // `{ identifier-1 / arithmetic-expression-1 }` brace pair, so the clause takes one or MORE operands, and
 // §13.18.53.3 SR6 confines the multi-operand form to a repeating entry — the VALUE clause's §13.18.63.3 SR35
@@ -226,7 +254,7 @@ reportColumnOperand
 // ONE phrase governs the whole clause; §13.18.53.3 SR5 then makes a ROUNDED identifier an arithmetic-expression
 // and §13.18.53.4 GR2 gives it the implicit COMPUTE.
 reportSourceClause
-    : (SOURCE | SOURCES) (IS | ARE)? reportValueOperand+ roundedPhrase?
+    : (SOURCE IS? | SOURCES ARE?) reportValueOperand+ roundedPhrase?
     ;
 
 // ⛔ THE ONE OPERAND OF A REPORT VALUE CLAUSE (kb/Work PB852 × PB883). §13.18.53.2 (SOURCE) and §13.18.54.2

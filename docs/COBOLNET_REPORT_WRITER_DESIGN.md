@@ -647,14 +647,24 @@ with `PresentOrPageHeadings` (§13.18.57.4 GR6 c): every OR PAGE heading, major 
 new page via `PresentBody(reprint: true)` — no page-fit test, NEXT GROUP or SUM reset; the page advance of a control
 heading reprints only the headings above it, and the proviso for a control footing is applied as written). The GR7 d)
 upper limits are realised by placement, not modelled as limits. **The COLUMN LEFT/CENTER/RIGHT alignment
-phrase (§13.18.14 F1, kb/Work PB1220)** is `reportColumnClause : … (NUMBER | NUMBERS)? (LEFT | CENTER | RIGHT)? (IS | ARE)?
-reportColumnOperand+` — optional in the grammar although the printed diagram shows a brace, because SR9 licenses its
-omission ("LEFT is assumed") — with CENTER a context-sensitive token (§8.10; cobol-words.json). The word rides
+phrase (§13.18.14 F1, kb/Work PB1220)** is `reportColumnAlignment : LEFT | CENTER | RIGHT`, written optional in
+`reportColumnClause` although the printed diagram shows a brace, because SR9 licenses its omission ("LEFT is
+assumed") — with CENTER a context-sensitive token (§8.10; cobol-words.json). **The keyword prefixes of the LINE,
+COLUMN and SOURCE clauses are the CLOSED sets the formats print, never the cross product of their words (kb/Work
+PB1221):** `reportLineClause` opens `(LINE (NUMBERS ARE? | ARE | NUMBER? IS?) | LINES ARE?)` — §13.18.35.2's brace
+{LINE NUMBER IS | LINE NUMBERS ARE | LINES ARE}; `reportColumnClause` opens with a PLURAL half
+`((COLUMN | COL) NUMBERS | COLUMNS | COLS) reportColumnAlignment? ARE?` and a SINGULAR half
+`(COLUMN | COL) NUMBER? reportColumnAlignment? IS?` — §13.18.14.2's six-way spelling brace with §13.18.14.3 SR4 (ARE
+only after COLUMNS, COLS or NUMBERS) and SR5 (IS never after them) splitting the [IS | ARE] bracket across the
+alignment word; `reportSourceClause` opens `(SOURCE IS? | SOURCES ARE?)` — §13.18.53.2's brace. The parser refuses the
+complement (COBOL0001), so no bind screen is needed; `ReportClauseKeywordPrefixTests` enumerates every word
+combination of the three clauses against the printed sets. A NUMBERS the format does not permit at its position is a
+user-defined word by §8.10 (`COLS NUMBERS 5` is a two-operand clause naming a constant NUMBERS). The word rides
 `ReportColumnSpec.Alignment`, and ONE function, `ReportColumnSpec.AbsoluteLeftmost(printable-size)` (GR6 b)–d)), feeds both
 the emitter's placement and GR9's horizontal counter (`AbsoluteRightmost`) AND the bind-time line-width walk; SR9's
 absolute-only rule is COBOLNET2711, and an aligned item whose leftmost column falls before column 1 — a case the
 standard states no outcome for — is COBOLNET2712 (CONFORMANCE §3). The phrase gates with the other 2002 COLUMN forms
-(`report-multi-column-2002`). The §13.18.14.3 SR4/SR5 IS/ARE-spelling pairings are not enforced (over-acceptance).
+(`report-multi-column-2002`).
 **The ARRANGEMENT rules** (kb/Work PB1222, PB1270) have three homes, one per kind of fact:
 - *Written clause* — `ScreenReportColumnClauses` (COBOLNET2745, once per written clause over the flat entry array):
   §13.18.14.3 SR10 a) (a multiple COLUMN clause and an OCCURS clause in one entry — the COLUMN arm of the two-arm rule

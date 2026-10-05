@@ -1197,16 +1197,20 @@ internal sealed class VersionConformancePass
         /// <summary>The 2002 COLUMN-clause forms (ISO §13.18.14 Format 1; P10 Step 13): more than one operand
         /// (the SR10 "multiple COLUMN clause"), a relative PLUS operand, the COL/COLS/COLUMNS/NUMBERS/ARE
         /// spellings, or the LEFT/CENTER/RIGHT alignment phrase (§13.18.14.4 GR6; kb/Work PB1220) — the COBOL-85
-        /// form was exactly <c>COLUMN NUMBER IS integer-1</c>. Fires at most once per
-        /// written clause; report-section-exclusive rule.</summary>
+        /// form was exactly <c>COLUMN NUMBER IS integer-1</c>. ARE needs no test of its own: the grammar admits it
+        /// only after COLUMNS, COLS or NUMBERS (§13.18.14.3 SR4; kb/Work PB1221), each of which is tested. Fires at
+        /// most once per written clause, naming the form that made it 2002; report-section-exclusive rule.</summary>
         public override object? VisitReportColumnClause(CobolParserCore.ReportColumnClauseContext ctx)
         {
-            if (ctx.COL() is not null || ctx.COLS() is not null || ctx.COLUMNS() is not null
-                || ctx.NUMBERS() is not null || ctx.ARE() is not null
-                || ctx.LEFT() is not null || ctx.CENTER() is not null || ctx.RIGHT() is not null   // the §13.18.14.4 GR6 alignment phrase
-                || ctx.reportColumnOperand().Length > 1
-                || ctx.reportColumnOperand().Any(o => o.reportRelativeSign() is not null))
-                _p.Check(Constructs.ReportMultiColumn2002, "the multiple/relative COLUMN clause forms (report group description)");
+            string? form = ctx.reportColumnOperand().Length > 1 ? "the multiple COLUMN clause form"
+                : ctx.reportColumnOperand().Any(o => o.reportRelativeSign() is not null) ? "the relative (PLUS) COLUMN operand"
+                : ctx.reportColumnAlignment() is { } aligned   // the §13.18.14.4 GR6 alignment phrase
+                    ? $"the {aligned.GetText().ToUpperInvariant()} alignment word of the COLUMN clause"
+                : (ctx.COL() ?? ctx.COLS() ?? ctx.COLUMNS() ?? ctx.NUMBERS()) is { } spelled
+                    ? $"the {spelled.GetText().ToUpperInvariant()} spelling of the COLUMN clause"
+                : null;
+            if (form is not null)
+                _p.Check(Constructs.ReportMultiColumn2002, form + " (report group description)");
             return base.VisitChildren(ctx);
         }
 
@@ -1224,13 +1228,17 @@ internal sealed class VersionConformancePass
 
         /// <summary>The 2002 LINE-clause forms (ISO §13.18.35 Format 1; P10 Step 13): more than one operand
         /// (the SR10 "multiple LINE clause") or the LINES/NUMBERS/ARE spellings — the COBOL-85 form was
-        /// <c>LINE NUMBER IS</c> with ONE operand. The repetition itself also stages LOUD at bind
-        /// (COBOLNET0899 report-multiple-line). Report-section-exclusive rule.</summary>
+        /// <c>LINE NUMBER IS</c> with ONE operand. Fires at most once per written clause, naming the form that made
+        /// it 2002 — a single-operand <c>LINES 3</c> is reported as the LINES spelling, never as a multiple LINE
+        /// clause; report-section-exclusive rule.</summary>
         public override object? VisitReportLineClause(CobolParserCore.ReportLineClauseContext ctx)
         {
-            if (ctx.LINES() is not null || ctx.NUMBERS() is not null || ctx.ARE() is not null
-                || ctx.reportLineOperand().Length > 1)
-                _p.Check(Constructs.ReportMultiLine2002, "the multiple LINE clause form (report group description)");
+            string? form = ctx.reportLineOperand().Length > 1 ? "the multiple LINE clause form"
+                : (ctx.LINES() ?? ctx.NUMBERS() ?? ctx.ARE()) is { } spelled
+                    ? $"the {spelled.GetText().ToUpperInvariant()} spelling of the LINE clause"
+                : null;
+            if (form is not null)
+                _p.Check(Constructs.ReportMultiLine2002, form + " (report group description)");
             return base.VisitChildren(ctx);
         }
 

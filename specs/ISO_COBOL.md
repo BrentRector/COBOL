@@ -17071,9 +17071,9 @@ The LINE clause also specifies vertical positioning for its screen item.
 Format 1 (report-writer):
 
 <pre style="line-height:1">
-  <u>LINE</u> NUMBER IS     ╭ integer-1 [ ON <u>NEXT</u> <u>PAGE</u> ] ╮
-                     │                            │
-╭                  ╮ │ ╭ <u>PLUS</u> ╮                   │ …
+                     ╭ integer-1 [ ON <u>NEXT</u> <u>PAGE</u> ] ╮
+╭ <u>LINE</u> NUMBER IS   ╮ │                            │
+│                  │ │ ╭ <u>PLUS</u> ╮                   │ …
 ┤ <u>LINE</u> NUMBERS ARE ├ ┤ ┤      ├ integer-2         ├
 │                  │ │ │      │                   │
 ╰ <u>LINES</u> ARE        ╯ │ ╰ +    ╯                   │
@@ -17081,7 +17081,7 @@ Format 1 (report-writer):
                      ╰ ON <u>NEXT</u> <u>PAGE</u>               ╯
 </pre>
 
-> **Figure notes (LINE clause Format 1 (report-writer) syntax diagram).** `LINE` (in the first two alternatives), `LINES`, `NEXT`, `PAGE`, and `PLUS` are underlined in the printed standard (required words); `NUMBER`, `NUMBERS`, `IS`, `ARE`, and `ON` are not underlined (optional words). ⚠ **The second group is enclosed in BRACES, not brackets** — exactly one of its three alternatives shall be specified; the `…` to its right repeats that brace group. Within the second alternative, `PLUS` and `+` are a nested brace pair (synonyms, one required).
+> **Figure notes (LINE clause Format 1 (report-writer) syntax diagram).** `LINE` (in the first two alternatives), `LINES`, `NEXT`, `PAGE`, and `PLUS` are underlined in the printed standard (required words); `NUMBER`, `NUMBERS`, `IS`, `ARE`, and `ON` are not underlined (optional words). ⚠ **The first group is a three-way BRACE** — `LINE NUMBER IS`, `LINE NUMBERS ARE`, `LINES ARE`, one alternative per printed line, with `LINE NUMBER IS` INSIDE the brace (re-rendered 2026-10-05, kb/Work PB1221; an earlier transcription drew it as a prefix outside the brace). So `NUMBER` pairs only with `IS`, `NUMBERS` only with `LINE … ARE`, and `LINES` takes neither `NUMBER`, `NUMBERS` nor `IS`. ⚠ **The second group is enclosed in BRACES, not brackets** — exactly one of its three alternatives shall be specified; the `…` to its right repeats that brace group. Within the second alternative, `PLUS` and `+` are a nested brace pair (synonyms, one required).
 
 Format 2 (screen):
 

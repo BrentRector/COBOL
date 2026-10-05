@@ -1116,6 +1116,8 @@
   "pb1220-column-alignment-relative",
   "pb1220-column-alignment-left-of-line",
   "pb1220-column-alignment-at-85",
+  "pb1221-column-are-singular",
+  "pb1221-line-prefix-not-printed",
   "pb1129-code-literal-numeric",
   "pb1129-code-identifier-numeric",
   "pb1129-code-identifier-odo-group",

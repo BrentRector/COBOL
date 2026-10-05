@@ -2820,13 +2820,13 @@ public sealed partial class DataBinder
                     // §13.18.14.3 SR9 — the alignment word (LEFT assumed when none is written) and its absolute-only
                     // rule: "If LEFT, CENTER, or RIGHT is specified, all the operands shall be absolute." The word
                     // belongs to the clause, so every operand of a multiple COLUMN clause carries it.
-                    var alignment = cc.CENTER() is not null ? ReportColumnAlignment.Center
-                        : cc.RIGHT() is not null ? ReportColumnAlignment.Right : ReportColumnAlignment.Left;
-                    if ((cc.LEFT() is not null || cc.CENTER() is not null || cc.RIGHT() is not null)
-                        && cc.reportColumnOperand().Any(o => o.reportRelativeSign() is not null))
+                    var written = cc.reportColumnAlignment();
+                    var alignment = written?.CENTER() is not null ? ReportColumnAlignment.Center
+                        : written?.RIGHT() is not null ? ReportColumnAlignment.Right : ReportColumnAlignment.Left;
+                    if (written is not null && cc.reportColumnOperand().Any(o => o.reportRelativeSign() is not null))
                         Edition.Error(DiagnosticCatalog.ReportColumnAlignmentNotAbsolute, $"RD '{model.Name}' entry "
                             + $"'{entryName ?? "FILLER"}': the COLUMN clause writes "
-                            + $"{(cc.CENTER() ?? cc.RIGHT() ?? cc.LEFT()).GetText().ToUpperInvariant()} and a relative (PLUS) operand; "
+                            + $"{written.GetText().ToUpperInvariant()} and a relative (PLUS) operand; "
                             + "if LEFT, CENTER, or RIGHT is specified, all the operands shall be absolute (ISO §13.18.14.3 SR9)");
                     foreach (var op in cc.reportColumnOperand())
                     {
