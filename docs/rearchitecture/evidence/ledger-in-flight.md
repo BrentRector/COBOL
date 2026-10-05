@@ -18,17 +18,18 @@
   Classes available: .flight (the accent panel), .cardgrid + .card, .pill.good/.warn/.crit, .mono, .num, .dim.
 -->
   <div class="flight">
-    <h3>In flight — Sunday 2026-10-04, evening</h3>
-    <p><strong>No wave is running.</strong> The first wave driven by the orchestrator loop (wave 1018, a 2.5-hour unit) landed all eight groups in two CI-proven trains: <span class="pill good">1018</span> line-sequential WRITE keying, the OCCURS level, bound and CAPACITY rules, directive syntax in omitted conditional-compilation branches, INSPECT sign and item identification, and the SORT terminator, literal and object references; <span class="pill good">1018b</span> binary32 ACCEPT rounding, STRING receivers for every legal form, and CONTINUE AFTER saturation. Wave 1017, which died when its one-shot session reached the 600-second background ceiling, was recovered from its six checkpointed worktrees, and none of its work was lost.</p>
-    <p><strong>Waiting:</strong> PB1425 stays half (the identifier-position work), PB1042 stays its own redesign slice, and PB2003 and PB2004 are new from train 1018.</p>
-    <p><strong>Tooling landed today:</strong> the orchestrator prototype (PB1981) is on main and has now run real units: a quota meter, a resume and two waves. Defects the first real runs exposed are fixed: the supervisor owns each unit's lifetime through an open stdin, STOP winds a running unit down without losing work (<span class="mono">stop.ps1</span>), and frequent handoffs (PB2015) checkpoint a running unit and write the handoff a dead unit never did. The ledger is published after every landing.</p>
+    <h3>In flight — Monday 2026-10-05, morning</h3>
+    <p><strong>No wave is running.</strong> Wave 1019, the second wave the orchestrator loop ran unattended, landed train <span class="pill good">1019</span>. Its five groups covered the TURN directive operands proven whole, the omitted leftmost reference-modification position, four PICTURE rules (SR14 bounds, basic letters, MESSAGE-TAG placement, the currency literal class), three formats now parsed as printed (UNSTRING INTO, LOCK ON, ALTERNATE RECORD KEY) with ASSIGN USING gated at 2002, and identifier Format 5, the object-view.</p>
+    <p><strong>Queued for the next train:</strong> two finished, gated branches are held because two are fewer than a train's minimum of three. One is the directive-line separators and the COBOL-WORDS literal reader (PB1373, PB2003). The other is the BASED residence rule and four data-division notes (PB516, PB486, PB1650, PB1744), carrying PB1301, PB1302 and PB1476 from its predecessor.</p>
+    <p><strong>Waiting:</strong> PB643 (RESERVE areas at run time) needs an owner reading of the unbuffered shared-writer posture; PB1525 (the nonstandard-extension register) and PB1425's remaining identifier positions are hand-offs; PB2023 and PB2024 are new.</p>
+    <p><strong>Tooling:</strong> the stall watchdog reported every just-started agent as stalled, which ended its watch each time. It is fixed in the public skills (brent-tools 1.17.1, PB2033).</p>
     <p><strong>Partly done, by design:</strong> PB1042 and the ODO notes, the PB1425 SELF and SUPER identifier positions, the PB1136 receiver half, the PB244 residues, PB1722 and the OO universal-descriptor leg (PB480, PB1112).</p>
     <p><strong>Pacing:</strong> one seventh of the weekly quota per day is the target, with the owner's okay to borrow from the next day; today stayed inside the borrowed allowance. Models are sized per group.</p>
   </div>
   <div class="cardgrid">
     <div class="card">
       <h3>Measured today</h3>
-      <p>Six trains and one single-cluster landing moved 242 rows (GAP 497 to 255) since the weekly reset. The model routing and turns per agent are the cost levers: most of the spend is in the agents, and the orchestrator session is a small share of it.</p>
+      <p>Seven trains and one single-cluster landing moved 265 rows (GAP 497 to 232) since the weekly reset. The model routing and turns per agent are the cost levers: most of the spend is in the agents, and the orchestrator session is a small share of it.</p>
     </div>
     <div class="card">
       <h3>Owner decisions</h3>

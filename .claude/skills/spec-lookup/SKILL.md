@@ -8,7 +8,7 @@ description: Use BEFORE implementing, debugging, or adjudicating any COBOL seman
 > failure modes and the latitude precedence are the procedure. If the plugin is not loaded (a cloud session receives
 > no project marketplace), Read `tools/claude-skills/skills/spec-oracle/SKILL.md` instead
 > (`git submodule update --init tools/claude-skills` if the path is missing). THEN apply this overlay: where the
-> COBOL standard, its tools and the owner's decisions live. It wins on conflict. Pinned: **brent-tools 1.17.0**
+> COBOL standard, its tools and the owner's decisions live. It wins on conflict. Pinned: **brent-tools 1.17.1**
 > (`tools/claude-skills`, kb/Work/PB1699).
 
 # Spec lookup

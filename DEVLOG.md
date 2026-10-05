@@ -13,6 +13,14 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1886 — 2026-10-05 04:17 PDT — PB2033: the stall watchdog no longer reports a just-started agent as stalled; brent-tools pin 1.17.0 → 1.17.1
+
+Wave 1019 ran under the orchestrator loop (unit `wave`: 8 groups planned by `plan_wave.py`, 9 agents). Train 1019 (DEVLOG 1885) landed B, C, E, F and A. G and D2, which carries D, are held for the next wave's first train because two branches are fewer than `min_final_train`.
+
+The stall watchdog that MANDATORY-PRACTICES O8 runs beside every fleet exited `3` twice while every agent was working. The first time was at the fleet's start (B, C and D). The second was when a freed slot started G. Each time it reported `transcript unreadable or empty`. Cause: `stall_watch.py`'s `last_record` skipped every record whose content is not a list, and an agent's first record, its prompt, has string content. A transcript holding only the prompt returned `None`, which `check()` reports as a stall at once. The same immediate alarm hit the sibling case, a transcript that is still empty just after its agent's `started` journal record. Each false alarm also ended the watch, so the fleet was unwatched until the watchdog was restarted.
+
+Fixed in the public base first (brent-tools 1.17.1, `BrentRector/claude-skills` commit `6e94e58`, tag `v1.17.1`). A string-content record reads as waiting on the model, so the normal `--model-stall` limit applies. A live watch times an unreadable transcript from the poll that first saw it and alarms only past `--model-stall`. `--once` still alarms at once. Verified: a prompt-only transcript returns a record where it returned `None`. `--once` over the live fleet listed all six agents with `EXIT=0` where 1.17.0 exited `3`. The fixed copy watched the rest of the wave without a false alarm. `lint_skills.py` OK. The pin moves to 1.17.1, and the four overlays and PB1699 name it. Note PB2033 (landed). The ledger trend and the in-flight narrative are refreshed for train 1019.
+
 ## Entry 1885 — 2026-10-05 03:51 PDT — Train 1019: wave 1019 groups B, C, E, F, A — directive operands proven whole, the omitted ref-mod position named, four PICTURE rules, three printed formats, and the Format 5 object-view (GAP 255 → 232)
 
 Five clusters in one landing, each brought in from its implementer branch as a patch (DEVLOG and the traceability inventory excluded), the inventory rebuilt by re-applying every cluster's `record_verdicts` batch in train order on the merged tree, one whole-population gate, one push.
