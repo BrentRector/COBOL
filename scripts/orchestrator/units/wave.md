@@ -8,9 +8,9 @@ UNIT: wave.
 3. Start `.claude/skills/workstream/templates/wf_rolling_wave.js` with the args file it wrote
    ({SCRATCH}\wf-args-w<wave>.json), and run stall_watch.py beside it as the skill says.
 4. Stay in this session until the Workflow returns and its last lander train has landed (the Workflow dies with this
-   process). ⛔ This session is headless: nothing wakes it after you end a turn, so a turn that ends with text and no
-   tool call EXITS THE PROCESS and kills the fleet (wave 1017 lost an eight-agent fleet at minute 11 exactly so, after
-   "I'm waiting for the Workflow to finish"). Wait only by tool calls: repeat, as separate foreground Bash calls,
+   process). The supervisor keeps this session alive and wakes you when a background task finishes, but do not rely on
+   being woken: wave 1017's one-shot session was terminated 600 s after its model ended a turn with the Workflow
+   running, and an eight-agent fleet died. Prefer waiting by tool calls: repeat, as separate foreground Bash calls,
    `timeout 580 bash -c 'until grep -q totalToolCalls "{TASKS_DIR}/<workflow task id>.output"; do sleep 20; done'`
    (the file is empty while the Workflow runs and holds its result with `totalToolCalls` when it returns) and read the
    stall watchdog's log between waits. Never end a turn while that file is empty.

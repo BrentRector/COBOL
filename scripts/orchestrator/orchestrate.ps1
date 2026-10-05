@@ -140,9 +140,11 @@ function Get-ProjectTranscriptDir([string]$sessionId) {
 function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]$logBase) {
     $scratch = Join-Path $CoordDir 'scratch'
     $prompt = Build-Prompt $unit $scratch $sessionId
-    # The prompt goes in as the first stream-json message and stdin STAYS OPEN: a headless session exits the moment its
-    # model ends a turn, and a Workflow or background gate dies with it, but an open stdin keeps the session alive so the
-    # background task's completion notification wakes the model (probed 2026-10-04: end_turn at 16.8 s, woken at 41 s).
+    # The prompt goes in as the first stream-json message and stdin STAYS OPEN. Once a one-shot `claude -p` model ends a
+    # turn the process waits for background tasks only up to CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS (600 s), then
+    # terminates them ("Background tasks still running after 600s; terminating": wave 1017's Workflow, 653 s). With stdin
+    # open the session never enters that exit wait, and a finishing task's notification wakes the model (probed
+    # 2026-10-04 with the ceiling set to 5 s: turn ended at 6 s, task done and model woken at 30 s, session alive).
     # The SUPERVISOR decides when the unit is over (idle, below), never the model's choice of words.
     $claudeArgs = @('-p', '--input-format', 'stream-json', '--model', $model, '--permission-mode', $PermissionMode,
         '--permission-prompts', 'none', '--output-format', 'stream-json', '--verbose', '--session-id', $sessionId)

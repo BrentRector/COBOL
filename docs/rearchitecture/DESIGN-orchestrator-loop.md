@@ -159,10 +159,13 @@ Each iteration, in this order:
    creates `STOP-UNIT` and the fleet's `scratch\STOP` and waits for the session to end; after the grace period it
    kills the process tree.
    **The supervisor, not the model, decides when the unit is over.** The prompt is the first stream-json message
-   (`--input-format stream-json`) and stdin stays open, because a headless session exits the moment its model ends a
-   turn and a Workflow or background gate dies with it (wave 1017, 2026-10-04: the unit wrote "I'm waiting for the
-   Workflow" and ended its turn, and an eight-agent fleet died at minute 11). With stdin open a background task's
-   completion notification wakes the model after `end_turn` (probed: ended at 16.8 s, woken at 41 s). The supervisor
+   (`--input-format stream-json`) and stdin stays open, because a one-shot `claude -p` waits for background tasks after its
+   model ends a turn only up to `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` (600 s) and then terminates them (wave 1017,
+   2026-10-04: the unit wrote "I'm waiting for the Workflow" and ended its turn, `stderr` said "Background tasks still
+   running after 600s; terminating", and an eight-agent fleet died at 653 s; the `resume` unit found the line). With
+   stdin open the session never enters that exit wait, and a background task's completion notification wakes the
+   model after `end_turn` (probed twice: ended 16.8 s, woken 41 s; and with the ceiling set to 5 s, woken at 30 s and
+   still alive, so the ceiling does not apply to an open stdin). The supervisor
    tracks `result` and `system/background_tasks_changed` events and closes stdin when the model has ended a turn, no
    background task runs and the stream has been quiet for `-IdleCloseSeconds` (20; a task's completion event arrives
    just after its list empties, so the close waits). `units/wave.md` also tells the model to wait with foreground
@@ -227,7 +230,7 @@ registered by this change (open decision D2).
 | two sessions allocate the same id or code | a renumbering pass (five collisions in one day, 2026-09) | `alloc.py`: one lock, reservations outside every worktree |
 | a landing reopens a closed inventory row | silent conformance regression | `inventory_ratchet.py` (section 7) |
 | the owner wants it stopped | losing agent work if the process were killed | `STOP` (`stop.ps1`): a graceful wind-down of the running unit and its fleet, a kill only after the grace period |
-| a unit's model ends a turn with a fleet in flight | the headless process exits and the fleet dies (wave 1017) | the supervisor holds stdin open and closes it only when idle with no background task |
+| a unit's model ends a turn with a fleet in flight | a one-shot `claude -p` terminates background tasks 600 s later and the fleet dies (wave 1017) | the supervisor holds stdin open and closes it only when idle with no background task |
 | a unit runs a WSL lifecycle command | every other session's Linux gate dies | the unit prompts forbid it; `forbidden_commands.py` is the hook-level guard (open decision D4: add these shapes there) |
 
 ## 5. The handoff (`handoff.schema.json`)
