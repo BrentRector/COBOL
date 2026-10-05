@@ -74,6 +74,14 @@ public sealed class Condition88
     {
         var c = new Condition88 { Name = Name, Parent = newParent, Alphabet = Alphabet, FalseValue = FalseValue };
         c.Values.AddRange(Values);
+        c._clonedFrom = this;
         return c;
     }
+
+    /// <summary>The condition-name <see cref="CopyOnto"/> reproduced this one from, or null for a written entry —
+    /// the copy's provenance, never a constituent of Format 3 (so it is read-only and not "carried"). Followed to
+    /// its end it names the WRITTEN definition the copy stands for, which ISO §8.4.2.2.1 rule 4's "any other
+    /// definition of the name" is about (kb/Work PB1476; <c>DataBinder.WithLapsedTypeConditions</c>).</summary>
+    public Condition88? ClonedFrom => _clonedFrom;
+    private Condition88? _clonedFrom;
 }

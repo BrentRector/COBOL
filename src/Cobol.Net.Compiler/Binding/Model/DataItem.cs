@@ -278,6 +278,31 @@ public sealed class DataItem
         "the STRONG phrase OF the TYPEDEF clause (ISO §13.18.58.2) — excluded with it; a subject's carried strength is StrongType")]
     public bool TypedefStrong { get; init; }
 
+    /// <summary>⛔ THE ONE ANSWER TO "is data defined using this TYPE DECLARATION strongly typed?" (kb/Work PB1301).
+    /// A declaration's own STRONG phrase, or — for a declaration whose own description is a TYPE clause
+    /// (<c>01 S2 TYPEDEF TYPE S.</c>) — the strength that clause composed into it (<see cref="StrongType"/>, set
+    /// when the declaration is completed): ISO §13.18.57.4 GR1 makes a TYPE clause's effect "as though the data
+    /// description identified by type-name-1 had been coded in place", so data typed through S2 is described with
+    /// <c>TYPE S</c>, and §8.5.3.1 makes an item "described with a TYPE clause that references a type declaration
+    /// specifying the STRONG phrase" strongly typed. False for an entry that is not a type declaration.</summary>
+    public bool DeclaresStrongType => IsTypedef && (TypedefStrong || StrongType);
+
+    /// <summary>True once any TYPE clause in the source unit — on a storage item or on a member of another type
+    /// declaration — references this TYPE DECLARATION: the antecedent of ISO §8.4.2.2.1 rule 4's exemption ("Any
+    /// other definition of the name is subordinate to a type declaration entry for which the type-name is not
+    /// referenced in any TYPE clause in the source unit"). Written by <c>DataBinder.ExpandType</c>, which every TYPE
+    /// clause passes through (kb/Work PB1476).</summary>
+    [DescriptionCopy(DescriptionCopyKind.None,
+        "a fact about the type DECLARATION's references, never a clause of the entry")]
+    public bool ReferencedByTypeClause { get; set; }
+
+    /// <summary>The entry a TYPE / SAME AS copy reproduced this subordinate from (<c>DataBinder.CloneItem</c>), or
+    /// null for a written entry. Followed to its end it names the WRITTEN definition the copy stands for — the
+    /// identity ISO §8.4.2.2.1 rule 4 asks about ("any other definition of the name"), so a reference to the one
+    /// copy of a type member is not made ambiguous by the member's own declaration (kb/Work PB1476).</summary>
+    [DescriptionCopy(DescriptionCopyKind.None, "the copy's provenance — identity, written by CloneItem itself")]
+    public DataItem? ClonedFrom { get; set; }
+
     /// <summary>True when this TYPEDEF entry also carries the EXTERNAL clause (ISO §13.18.22 SR1 — a level-1
     /// type declaration may be external; §13.18.58.3 SR3). The type declaration itself has no storage
     /// (§13.18.58.4 GR2); the effect is on its REFERENCES: any record description containing that type is itself
@@ -345,22 +370,22 @@ public sealed class DataItem
     /// <summary>The type-name of a <c>TYPE IS type-name</c> reference (ISO §13.18.57), or null. The referencing entry
     /// is CLONED from that type declaration's subtree by the post-build <c>DataBinder.ExpandTypes</c> pass (D17), which
     /// clears this once expanded.</summary>
-    [DescriptionCopy(DescriptionCopyKind.MemberOnly,
-        "a nested TYPE reference inside a template re-expands PER CLONE (ISO §13.18.57); an ENTRY copy's source is already expanded")]
+    [DescriptionCopy(DescriptionCopyKind.None,
+        "a reference is expanded in its OWN declaration before anything copies it (DataBinder.ExpandTemplate / ExpandSameAs complete the source first, kb/Work PB1302), so no copy carries a pending one")]
     public string? TypeRefName { get; set; }
 
     /// <summary>The <c>SAME AS data-name-1</c> target name (ISO §13.18.49), or null. Structurally the TYPE
     /// reference with a DATA-NAME source: <c>DataBinder.ExpandSameAs</c> (inside the ONE <c>ExpandTypes</c> pass)
     /// resolves the target entry and clones its description in via the SAME <c>CloneItem</c> machinery (GR1/GR2),
     /// then clears this. <see cref="SameAsQualifiers"/> carries any OF/IN qualifiers of the reference.</summary>
-    [DescriptionCopy(DescriptionCopyKind.MemberOnly,
-        "a nested SAME AS inside a copied description re-expands per clone (ISO §13.18.49.4 GR1)")]
+    [DescriptionCopy(DescriptionCopyKind.None,
+        "a reference is expanded in its OWN declaration before anything copies it (DataBinder.ExpandTemplate / ExpandSameAs complete the source first, kb/Work PB1302), so no copy carries a pending one")]
     public string? SameAsName { get; set; }
 
     /// <summary>The OF/IN qualifier names of a <see cref="SameAsName"/> reference, in written order (empty when
     /// unqualified). Each must name an ancestor of the target for the reference to match.</summary>
-    [DescriptionCopy(DescriptionCopyKind.MemberOnly,
-        "the OF/IN qualifiers of the SameAsName it rides")]
+    [DescriptionCopy(DescriptionCopyKind.None,
+        "the OF/IN qualifiers of the SameAsName it rides, which no copy carries")]
     public List<string> SameAsQualifiers { get; } = [];
 
     /// <summary>After <c>ExpandTypes</c>: the type-name this item (or its containing subtree root) was cloned from —

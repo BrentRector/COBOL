@@ -310,7 +310,7 @@ public sealed partial class DataBinder
     private static bool UnderStrongTypeDeclaration(DataItem item)
     {
         for (var p = item.Parent; p is not null; p = p.Parent)
-            if (p.TypedefStrong) return true;
+            if (p.DeclaresStrongType) return true;
         return false;
     }
 

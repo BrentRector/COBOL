@@ -1476,6 +1476,28 @@ edition-INVARIANT compile-time diagnostics (no cross-edition behavior variance).
 row `usage-pointer-to-type-2014` (the P12 re-scout re-anchored the former "`TYPE TO` pointer-target" label: plain
 `TYPE [TO]` is the TYPE clause's optional word, §13.18.57.2, already live).
 
+(5) **Declaration-first expansion (kb/Work PB1302, PB1301, PB1476).** `ExpandTypes` completes every one of the unit's
+type declarations AS A DECLARATION before any storage item copies one: `ExpandTemplate` expands the template's own
+chained TYPE clause (`01 S2 TYPEDEF TYPE S.`) and then every TYPE and SAME AS reference among its members, in source
+order, and a declaration reached while it is still IN PROGRESS is the recursion §13.18.58.3 SR2 forbids (**1530**) —
+a property of the declaration, diagnosed whether or not anything references it, and independent of declaration
+order. A copy therefore never re-expands anything (`CloneItem` asserts its source carries no pending TYPE / SAME AS
+reference), and a SAME AS target's whole subtree is likewise completed, on the current chain, before it is copied,
+so §13.18.49.3 SR3 is ONE order-independent test (the target is or contains a subject whose expansion is in progress
+→ **1557**) and a TYPE clause in that subtree naming a declaration in progress is §13.18.57.3 SR1 (**1557**). Copies
+made INSIDE a declaration stay off the name, condition-name and index-name indexes (`InTypeDeclaration`); the
+reference's own copy registers them, and also reproduces a member's composed RENAMES aliases. A failed expansion
+leaves a recovery profile on its subject, so the §13.16.3 SR8 guard does not re-report it. Strength is ONE predicate:
+`DataItem.DeclaresStrongType` (a declaration's own STRONG phrase, or the strength its own TYPE clause composed —
+§13.18.57.4 GR1's "coded in place" makes data typed through S2 `TYPE S`, strongly typed by §8.5.3.1), read by SR6,
+§13.18.22.3 SR5 (now asked over every typed entry a composed subject in an external record holds), §13.16.3 SR13,
+§8.5.3.1's equivalence (`StrongTypeModel.DeclaredStrong`) and §13.18.58.3 SR1, which is asked when the declaration is
+COMPLETED so `01 T TYPEDEF STRONG TYPE E.` over an elementary E is refused (**1529**). §8.4.2.2.1 rule 4's antecedent
+is `DataItem.ReferencedByTypeClause`, recorded from every WRITTEN TYPE clause before anything expands; once set, the
+declaration's members join a name's storage candidates in `SymbolTable.TryResolve` (`DataBinder.WithLapsedTypeMembers`)
+as definitions that COUNT for uniqueness but never resolve alone, except a member the candidate is itself a copy of
+(`DataItem.ClonedFrom`), which is §13.18.58.4 GR1's one-group case.
+
 **Additional hardening (current invariants).** `ExpandType` sets `TypeName`/`StrongType` BEFORE cloning children, so a
 nested TYPE ref's SR6 ancestor walk sees the enclosing strong item (no false SR6 strong-in-strong rejection).
 `StrongTypeModel.TypeAnchor` (the NEAREST TYPE-carrying ancestor) drives `SameType`, so a nested `TYPE INNER-T`

@@ -952,7 +952,7 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
                 // category (§8.4.3.2.4 GR1) drives the class dispatch; a raw BoundComputedOperand — which this
                 // arm used to build — would compare an alphanumeric/national result NUMERICALLY. For every other
                 // shape OperandOf returns the identical BoundComputedOperand, so the emit floor is unchanged.
-                : IntrinsicBinder.OperandOf(host.Expr.BindIndexWindowExpr(expr));   // EVALUATE compares — a relation window (kb/Work R29)
+                : IntrinsicBinder.OperandOf(host.Expr.BindExpr(expr));   // a COMPOUND selection operand is an arithmetic expression (§8.8.1.1), as on the relation side (kb/Work PB2018)
         return BoundOperandError.Refused(ctx.Edition, "EVALUATE operand");
     }
 }

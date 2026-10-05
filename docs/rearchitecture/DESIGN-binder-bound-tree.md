@@ -448,7 +448,7 @@ Every operand slot answers **three independent axes**, and both now live in `Ope
 | `OperandContext` | A | B | C | Why |
 |---|---|---|---|---|
 | `Arithmetic` | screen | screen | no | the plain arithmetic-expression position |
-| `ArithmeticIndexWindow` | screen | exempt | yes | BOTH lists name it (SET · SEARCH · relation operand) |
+| `ArithmeticIndexWindow` | screen | exempt | yes | BOTH lists name it (SET amounts and values; a SEARCH or relation operand that is a bare name never reaches the expression spine, PB2018) |
 | `ArithmeticIndexNameWindow` | screen | exempt | no | r7 lists it, SR10 does not (subscript segment · PERFORM VARYING FROM/BY) — PB215 |
 | `FunctionArgument` | exempt | screen | yes | the function's own §15.x argument rule governs (COBOLNET1627) |
 | `CallByValue` | exempt | exempt | yes | §14.9.4.3 SR22 governs, and screens the operand itself (COBOLNET1628) |
@@ -483,7 +483,8 @@ to offer, and `dialect_two_axes` constrains the leniencies this compiler impleme
 | Entry | Rule that governs | Where | r7 lane |
 |---|---|---|---|
 | ADD/SUBTRACT/MULTIPLY/DIVIDE senders · COMPUTE RHS · CONTINUE AFTER · RETRY · ALLOCATE · START WITH LENGTH · boolean-shift count (bound here, then narrowed to §8.8.2 rule 5's ONE integer operand: Table 4 shape by `ExpressionFormationPass`, integer-ness by `IntrinsicResultType.IsIntegerOperand` — kb/Work PB1413) · CALL BY CONTENT/REFERENCE arithmetic arg | §8.8.1.1 — genuinely `arithmetic-expression-1` | `BindExpr` | arithmetic: warn+coerce |
-| SET TO / UP BY / CAPACITY / SIZE · pointer SET UP BY · compound relation / EVALUATE operand | §8.8.1.1 + r7 window + SR10 | `BindIndexWindowExpr` | exempt (r7 lists them) |
+| SET TO / UP BY / CAPACITY / SIZE · pointer SET UP BY | §8.8.1.1 + r7 window + SR10 | `BindIndexWindowExpr` | exempt (r7 lists them) |
+| **COMPOUND** relation / EVALUATE operand (an arithmetic expression: `N < (K + 2)`, `IX + 1 = 4`) | §8.8.1.1 — the index-name or index data item is an operand of the EXPRESSION, while r7 and §8.8.4.2.13 name the relation's own operand; R29 had bound it in the SET window (PB2018) | `BindExpr` | arithmetic: warn+coerce |
 | PERFORM VARYING FROM/BY · D18 **subscript** segment | §8.8.1.1 + r7 window; SR10 does NOT list them, so an index **data item** takes axis A (PB215) | `BindIndexNameWindowOperandExpr` / `BindIndexNameWindowExpr` | exempt (r7 lists them) |
 | RW VARYING FROM/BY | §13.18.64.2 → §8.8.1.1; on neither index list (PB215) | `BindExpr` | arithmetic: warn+coerce |
 | D18 **ref-mod** segment | §8.4.3.3.3 SR4 → §8.8.1.1; **r7 does NOT list a ref-mod position** | `BindExpr` (PB170/PB172) | arithmetic: warn+coerce |

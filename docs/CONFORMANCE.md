@@ -1212,6 +1212,16 @@ of an unsupported facility.
   `conformance:85/pb1662_index_name_against_function`,
   `conformance:negative/pb1468-relation-numeric-not-integer` and `conformance:negative/pb1468-relation-index-pair`.
 
+- **D-RELINDEXEXPR — an index-name inside a relation's arithmetic expression is refused (kb/Work PB2018).**
+  **An index-name is not an operand of an arithmetic expression:** §13.18.38.3 SR7 admits it "as an operand in a
+  relation condition" and §8.8.4.2.13 says "Relation tests may be made only between" an index-name and "a numeric
+  data item or numeric literal", so a relation operand that is itself an arithmetic expression (`IF N < (K + 2)`,
+  `IF K + 1 = 4`, `EVALUATE N WHEN K + 1`) holds the index-name as an operand of the EXPRESSION, where §8.8.1.1 names
+  only numeric data items, numeric literals and ZERO; it is COBOLNET1637 (a warning under `--permissive`, the
+  occurrence number computes) exactly as `COMPUTE N = K + 2`, and an index data item there is COBOLNET0844. kb/Work
+  R29's golden had read "inside an expression" as legal; that reading was wider than r7 and §8.8.4.2.13 and is
+  withdrawn. Pinned by `conformance:85/index_name_r7_windows` and `conformance:negative/pb2018-*`.
+
 - **D-ARGEXPR — a keyword-less `N + 1` in a CALL, INVOKE or inline-invocation argument list is ONE argument
   (kb/Work PB1135 / PB130, decision R59).** A USING list is juxtaposition, so `USING N + 1` has two grammatical
   readings: the ONE arithmetic-expression-1 argument, or the two arguments `N` and a unary `+ 1`. The format answers

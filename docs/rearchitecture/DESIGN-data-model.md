@@ -402,7 +402,7 @@ points and nothing else:
   corresponding pair carrying the same ALIGNED / BLANK WHEN ZERO / DYNAMIC LENGTH / JUSTIFIED / PICTURE / SIGN /
   SYNCHRONIZED / USAGE clauses. It takes a declaration in EITHER form the model holds one: a TYPE-clause SUBJECT
   (whose subtree `ExpandType` cloned through the ONE `CopyEntryDescription`, so it IS the declaration) or a
-  `TypeDecls` TEMPLATE (also fully expanded — `ExpandTypes` walks the templates). Geometry comes from
+  `TypeDecls` TEMPLATE (also fully expanded — `ExpandTypes` completes every declaration first, kb/Work PB1302). Geometry comes from
   `BitLayout.StartBitWithin`, the ONE §8.5.1.6.3 cursor walk; the clause list is §8.5.3.1's own, one conjunct each;
   the PICTURE/SIGN/USAGE conjunct is `PicInfo`'s record equality (so a later analysis axis is included by
   construction), with §8.5.3.1's currency / decimal-point / LOCALE exceptions falling out of the analysis the

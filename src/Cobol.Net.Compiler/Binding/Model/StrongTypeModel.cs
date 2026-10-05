@@ -159,7 +159,7 @@ public static class StrongTypeModel
 
     /// <summary>"…both have the same presence or absence of … the STRONG phrase" (§8.5.3.1) — the template's own
     /// STRONG phrase, or the strength a TYPE subject acquired from the template it references.</summary>
-    private static bool DeclaredStrong(DataItem d) => d.IsTypedef ? d.TypedefStrong : d.StrongType;
+    internal static bool DeclaredStrong(DataItem d) => d.IsTypedef ? d.DeclaresStrongType : d.StrongType;
 
     /// <summary>"…both have the same presence or absence of the EXTERNAL clause …" AT LEVEL 1 OF THE TYPE
     /// DECLARATION (§8.5.3.1 ¶1) — so the fact read is the TYPE DECLARATION's own EXTERNAL clause
@@ -283,7 +283,7 @@ public static class StrongTypeModel
     /// restriction whose declaration is not in hand (an unresolved type-name, already refused by §13.18.60.3 SR18's
     /// TYPEDEF requirement) is not decided here — never a rejection of what the model cannot prove strong.</summary>
     public static bool IsRestrictedToStrongType(DataItem pointer) =>
-        PointerRestriction(pointer) is { IsRestricted: true, Declaration: { } decl } && (decl.TypedefStrong || decl.StrongType);
+        PointerRestriction(pointer) is { IsRestricted: true, Declaration: { } decl } && DeclaredStrong(decl);
 
     /// <summary>The type an <c>ADDRESS OF identifier-1</c> VALUE is restricted to — Annex D.9.2.2 source 2, whose
     /// normative statement is §8.4.3.11.4 GR2: "If identifier-1 is a strongly-typed group item or a restricted

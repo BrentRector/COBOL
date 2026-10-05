@@ -102,11 +102,12 @@ public sealed partial class DataBinder
     /// (§13.16.2 Formats 2–4) and never carry a PICTURE, so they are excluded by level.</para>
     /// <para>An UNEXPANDED <c>TYPE</c> or <c>SAME AS</c> reference is excluded too, and by the rule's own words:
     /// SR8 governs "any other entry DESCRIBING an elementary item", and such an entry describes nothing —
-    /// §13.18.57.4 GR1 and §13.18.49.4 GR1/GR2 give it the REFERENCED entry's description. <c>ExpandTypes</c>
-    /// clears both fields at every reference SITE, but a nested reference inside a TYPEDEF TEMPLATE
-    /// (<c>01 OUTER-T TYPEDEF STRONG. 05 SUB TYPE INNER-T.</c>) is expanded per clone and the template's own
-    /// entry keeps its <c>TypeRefName</c> — measured: the first cut of this guard rejected exactly that legal
-    /// program (tests/conformance/2002/typedef_nested_strong.cob).</para></summary>
+    /// §13.18.57.4 GR1 and §13.18.49.4 GR1/GR2 give it the REFERENCED entry's description. The exclusion bites for
+    /// the §13.16.3 SR9 synthesis (<c>SynthesizeImpliedPictures</c>), which runs BEFORE <c>ExpandTypes</c>, so a
+    /// TYPE subject's own VALUE never implies a PICTURE of its own (<c>01 W TYPE U VALUE "QRSTUV".</c> takes U's
+    /// size). By the time this guard runs, every reference — a TYPEDEF template member's included, since each
+    /// declaration is completed as a declaration (kb/Work PB1302) — is expanded, or refused and given a recovery
+    /// profile.</para></summary>
     private static bool IsPictureLessLeaf(DataItem item) =>
         item.Pic is null && HasNoSubordinates(item) && item.Level is not (66 or 88)
         && item.TypeRefName is null && item.SameAsName is null;

@@ -36,6 +36,15 @@ public readonly struct NameCandidates<T> where T : class
     public NameCandidates<T> Where(Func<T, bool> predicate) =>
         new(_items is null ? [] : _items.Where(predicate).ToList());
 
+    /// <summary>Whether any survivor satisfies <paramref name="predicate"/>.</summary>
+    internal bool Any(Func<T, bool> predicate) => _items is not null && _items.Exists(i => predicate(i));
+
+    /// <summary>The survivors followed by <paramref name="more"/> — further declarations that COUNT for the
+    /// uniqueness verdict (ISO §8.4.2.2.1 rule 4's lapsed type-declaration members); the existing survivors keep
+    /// their places, so <see cref="FirstDeclaredForPermissive"/> is unchanged.</summary>
+    internal NameCandidates<T> Including(IReadOnlyCollection<T> more) =>
+        more.Count == 0 ? this : new([.. _items ?? [], .. more]);
+
     /// <summary>The first-declared survivor — read ONLY by <see cref="DataBinder.UniqueOrReportAmbiguous{T}"/>'s
     /// <c>--permissive</c> arm (<c>DataNameResolutionDriftTests</c> holds every other reader out).</summary>
     internal T FirstDeclaredForPermissive => _items![0];

@@ -61,7 +61,7 @@ public sealed class SymbolTable
         }
         if (_data.ByName.TryGetValue(name, out var list) && list.Count > 0)
         {
-            items = list;
+            items = _data.WithLapsedTypeMembers(name, list);
             return true;
         }
         items = [];
@@ -123,7 +123,7 @@ public sealed class SymbolTable
         }
         if (_data.Conditions.TryGetValue(name, out var list) && list.Count > 0)
         {
-            conds = list;
+            conds = _data.WithLapsedTypeConditions(name, list);
             return true;
         }
         conds = [];
@@ -159,7 +159,7 @@ public sealed class SymbolTable
         // a contained program's `01 IX` hides its container's GLOBAL table's `INDEXED BY IX`, exactly as its
         // `01 X` hides the container's global `X`. At EQUAL depth the index-name keeps the reference, as before.
         if (indexes.Count > 0 && NearerDataNameHides(name, qualifiers, indexDepth)) return null;
-        return indexes;
+        return _data.WithLapsedTypeIndexes(name, indexes, d => _data.IndexQualifierChainMatches(d, qualifiers));
     }
 
     /// <summary>⛔ ISO §8.4.6.2.1 3) ACROSS NAME CLASSES — the ONE answer to "does an ordinary DATA-name of this spelling,

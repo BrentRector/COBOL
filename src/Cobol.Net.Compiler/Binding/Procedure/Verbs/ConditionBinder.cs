@@ -1417,7 +1417,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
                 // the temp's cloned category (§8.4.3.2.4 GR1) drives the relation's class dispatch — a raw
                 // computed wrapper would compare an alphanumeric/national result NUMERICALLY. Numeric
                 // renderings are identical either way (AsNum unwraps both to the same FieldNum read).
-                : IntrinsicBinder.OperandOf(host.Expr.BindIndexWindowExpr(expr));   // a relation operand — an r7 window (kb/Work R29)
+                : IntrinsicBinder.OperandOf(host.Expr.BindExpr(expr));   // a COMPOUND relation operand is an arithmetic expression (§8.8.1.1): no index-name or index data item inside it (kb/Work PB2018)
         return BoundOperandError.Refused(ctx.Edition, "comparison operand");
     }
 
@@ -1449,6 +1449,9 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         // §8.4.6.2.1 3) after qualification — a condition-name of this source element hides a container's global
         // one, a nearer container's a farther one (kb/Work PB1047); placed by its conditional variable.
         matches = ctx.Symbols.NearestDeclaring(matches, static c => c.Parent);
+        // A lapsed type-declaration condition-name (§8.4.2.2.1 rule 4; DataBinder.WithLapsedTypeConditions) only
+        // COUNTS against a condition-name the reference also reaches; alone it names nothing to test.
+        if (matches.TrueForAll(DataBinder.IsTypeDeclarationCondition)) return null;
         // The NEGATIVE side of §13.16.3 SR23 (kb/Work PB567): no condition-name of this spelling is subordinate to
         // the written qualifiers, so this reference names no condition-name. It is not reported HERE because the
         // same word may still be a DATA-name those qualifiers do reach; the caller falls through to the data

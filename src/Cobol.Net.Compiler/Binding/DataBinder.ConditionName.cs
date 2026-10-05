@@ -197,7 +197,7 @@ public sealed partial class DataBinder
         new('g', "A type declaration described with the STRONG phrase, or a group item subordinate to such a "
                 + "type declaration.",
             "a STRONG type declaration or a group item subordinate to one",
-            static d => (d.IsTypedef && d.TypedefStrong) || (d.IsGroup && UnderStrongTypeDeclaration(d))),
+            static d => d.DeclaresStrongType || (d.IsGroup && UnderStrongTypeDeclaration(d))),
 
         // h) A variable-length group.
         // §8.5.1.12.1: "A variable-length group is a group item whose data description has at least one

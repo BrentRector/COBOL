@@ -43,6 +43,8 @@ public sealed class GlobalNameClassDriftTests
         ["TypeDecls"] = "a type-name is inherited BEFORE Bind by InheritGlobalTypeDecls (§13.18.58.4 GR3; kb/Work PB1303), "
             + "and a template's subordinate names are kept off the name index",
         ["_inheritedTypeDecls"] = "the inherited half of the type-name index itself (InheritGlobalTypeDecls)",
+        ["_lapsedTypeMembers"] = "the members of THIS element's referenced type declarations, which COUNT for §8.4.2.2.1 "
+            + "rule 4 and never resolve (kb/Work PB1476) — a derived view of TypeDecls, declaring no name of its own",
         ["_debugRegisters"] = "the X3.23-1985 DEBUG-ITEM special register of the element's own debugging declaratives, "
             + "never declared by a data description entry",
     };

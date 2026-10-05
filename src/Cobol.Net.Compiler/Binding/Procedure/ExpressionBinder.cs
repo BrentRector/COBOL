@@ -64,11 +64,17 @@ internal enum OperandContext
     /// </remarks>
     CallByValue,
 
-    /// <summary>An arithmetic-expression position that BOTH index clauses list — the SET statement and a
-    /// relation-condition operand (and the SEARCH statement): §13.18.38.3 r7 admits an INDEX-NAME here and
-    /// §13.18.60.3 SR10 admits an INDEX DATA ITEM here (kb/Work R29, PB215). The §8.8.1.1 class screening is
-    /// otherwise identical to <see cref="Arithmetic"/>, so <c>SET IX UP BY N</c>, <c>SET IX TO IDN</c> and
-    /// <c>IF IX = 2</c> stay legal while <c>COMPUTE N = IX + 1</c> does not.</summary>
+    /// <summary>An arithmetic-expression position that BOTH index clauses list — the SET statement's amounts and
+    /// values: §13.18.38.3 r7 admits an INDEX-NAME here and §13.18.60.3 SR10 admits an INDEX DATA ITEM here
+    /// (kb/Work R29, PB215). The §8.8.1.1 class screening is otherwise identical to <see cref="Arithmetic"/>, so
+    /// <c>SET IX UP BY N</c> and <c>SET IX TO IDN</c> stay legal while <c>COMPUTE N = IX + 1</c> does not.
+    /// ⚠ A RELATION OPERAND IS NOT HERE (kb/Work PB2018). r7's "as an operand in a relation condition" and
+    /// §8.8.4.2.13's "Relation tests may be made only between" an index-name and a numeric data item or numeric
+    /// literal name the relation's OPERAND, which <c>ConditionBinder.ComparisonOperandOf</c> binds through
+    /// <c>FieldOperand</c> when it is a bare name. An operand that is an arithmetic expression
+    /// (<c>IF N &lt; (K + 2)</c>, <c>IF IX + 1 = 4</c>) holds the name as an operand of the EXPRESSION, which §8.8.1.1
+    /// does not admit, so it binds under <see cref="Arithmetic"/>. R29 had bound the whole relation operand here and
+    /// its golden read "inside an expression" as legal, a wider reading than r7 and §8.8.4.2.13 give.</summary>
     ArithmeticIndexWindow,
 
     /// <summary>An arithmetic-expression position that §13.18.38.3 r7 lists and §13.18.60.3 SR10 does NOT — a
@@ -130,7 +136,8 @@ internal static class OperandContextRules
         // lists "a SEARCH or SET statement, a relation condition, an intrinsic function argument, …". One
         // member used to serve both, so it could not say no to an index data item in a subscript or PERFORM
         // VARYING, and every such site answered SR10's question with r7's list.
-        //   · SET (every format, incl. CAPACITY / SIZE / pointer UP BY), SEARCH, a relation condition: on BOTH.
+        //   · SET (every format, incl. CAPACITY / SIZE / pointer UP BY): on BOTH. (A relation condition and SEARCH are
+        //     on both lists too, but their OPERAND is a bare name — FieldOperand — never an expression: PB2018.)
         OperandContext.ArithmeticIndexWindow => (true,      false,           true),
         //   · a subscript's compound segment, PERFORM VARYING FROM/BY: on r7's list only. (The SIMPLE
         //     subscript never comes through here — ReferenceResolver screens it by the same two rules.)
@@ -481,14 +488,16 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
             if (ctx.Edition.Permissive)
                 ctx.Edition.Warning(DiagnosticCatalog.IndexNameContext,
                     $"the index-name '{DataBinder.WrittenText(dref)}' is used as an arithmetic operand; §13.18.38.3 r7 "
-                    + "admits an index-name only in a subscript, PERFORM/SEARCH VARYING, SET, or a relation "
-                    + "condition — accepted under --permissive, computing the occurrence number");
+                    + "admits an index-name only in a subscript, PERFORM/SEARCH VARYING, SET, or as an operand OF a "
+                    + "relation condition, never inside an arithmetic expression (§8.8.4.2.13) — accepted under "
+                    + "--permissive, computing the occurrence number");
             else
             {
                 ctx.Edition.Error(DiagnosticCatalog.IndexNameContext,
                     $"the index-name '{DataBinder.WrittenText(dref)}' is not an arithmetic operand (ISO §8.8.1.1 names no "
                     + "index-names; §13.18.38.3 r7 admits an index-name only in a subscript, PERFORM/SEARCH "
-                    + "VARYING, SET, or a relation condition). SET a data item to the index first "
+                    + "VARYING, SET, or as an operand OF a relation condition, never inside an arithmetic "
+                    + "expression, §8.8.4.2.13). SET a data item to the index first "
                     + $"(SET data-item TO {DataBinder.WrittenText(dref)}) — or --permissive accepts it as the occurrence "
                     + "number");
                 return BoundExprError.Refused(ctx.Edition, $"index-name '{DataBinder.WrittenText(dref)}' in an arithmetic expression");
@@ -634,6 +643,16 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// with a bind-time diagnostic naming the rule.</summary>
     private FileModel? LinageFileOf(Core.DataReferenceContext dref)
     {
+        // ⛔ §8.4.3.14.3 SR1 — "LINAGE-COUNTER may be referenced only in procedure division statements". The report
+        // section's clause expressions (SOURCE, PRESENT WHEN, SUM, VARYING) bind through THIS binder with the report in
+        // scope, and this is the ONE producer of the LINAGE-COUNTER operand, so one test here refuses every such position
+        // — present and future — by BINDING CONTEXT; before it, `SOURCE LINAGE-COUNTER + 1` and `PRESENT WHEN
+        // LINAGE-COUNTER > 1` bound and read the live counter (kb/Work PB1431).
+        if (ctx.Refs.ReportScope is { } report)
+        {
+            DataBinder.ReportLinageCounterOutsideProcedure(ctx.Edition, dref, $"RD '{report.Name}': clause operand", DataBinder.WrittenText(dref));
+            return null;
+        }
         if (dref.cobolWord() is { } q)   // qualified: LINAGE-COUNTER OF/IN file-name
         {
             if (ctx.Data.FilesByName.TryGetValue(q.GetText(), out var named) && named.Linage is not null) return named;
@@ -929,9 +948,9 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// <see cref="BindByValueExpr"/>.</para></summary>
     public BoundExpr BindExpr(IParseTree node) => BindExprCore(node, OperandContext.Arithmetic);
 
-    /// <summary>Bind an arithmetic expression at a position BOTH index clauses list — SET amounts/values and
-    /// relation/EVALUATE operands — where an index-name (§13.18.38.3 r7) and an index data item (§13.18.60.3
-    /// SR10) are legal operands (kb/Work R29, PB215). Identical to <see cref="BindExpr"/> otherwise.</summary>
+    /// <summary>Bind an arithmetic expression at a position BOTH index clauses list — SET amounts/values — where an
+    /// index-name (§13.18.38.3 r7) and an index data item (§13.18.60.3 SR10) are legal operands (kb/Work R29,
+    /// PB215). Identical to <see cref="BindExpr"/> otherwise. A relation or EVALUATE operand is not one (PB2018).</summary>
     public BoundExpr BindIndexWindowExpr(IParseTree node) => BindExprCore(node, OperandContext.ArithmeticIndexWindow);
 
     /// <summary>Bind an arithmetic expression at a position §13.18.38.3 r7 lists and §13.18.60.3 SR10 does not —

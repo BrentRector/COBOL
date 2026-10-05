@@ -2682,7 +2682,7 @@ public sealed partial class DataBinder
             $"RD '{model.Name}': OCCURS … DEPENDING ON", spec.DependingAt);
         if (spec.DependingItem is null) return;
         // SR17 read exactly as the data-division OCCURS reads it (an index item is NOT an integer data item).
-        if (spec.DependingItem.Pic is not { Category: PicCategory.Numeric, IsFloat: false, Scale: 0 })
+        if (spec.DependingItem.Pic is not { IsUnscaledInteger: true })
             Edition.Error(DiagnosticCatalog.ReportOccursFormat3Rule, $"RD '{model.Name}': OCCURS … DEPENDING ON "
                 + $"'{spec.DependingName}' — data-name-1 shall describe an integer (ISO §13.18.38.3 SR17)");
         // SR18 is a FORMATS 2 AND 3 rule (kb/Work PB1261): a report group entry is subordinate to its report
@@ -4490,6 +4490,14 @@ public sealed partial class DataBinder
                 return;
             }
             addend.Rejected = false;
+            return;
+        }
+        // §8.4.3.14.3 SR1 — a bare LINAGE-COUNTER addend names no data item, so the lookup below would answer "does
+        // not resolve" under SR5, a sentence about a different rule (kb/Work PB1431). The expression forms bind through
+        // ExpressionBinder.LinageFileOf, which asks the same rule by binding context.
+        if (addend.Reference?.LINAGE_COUNTER() is not null)
+        {
+            ReportLinageCounterOutsideProcedure(Edition, addend.Ctx, $"RD '{model.Name}': SUM addend", addend.Written);
             return;
         }
         // SR4's data-name-1 — a report-section item: a name ALSO declared in ordinary storage resolves THERE

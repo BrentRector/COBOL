@@ -560,7 +560,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
     /// UNSTRING SR5–SR6 require of the POINTER / COUNT IN / TALLYING items (a V or P picture yields a non-zero
     /// scale; P is the signed-scale encoding, §13.18.40).</summary>
     private static bool StrUnstrIsInteger(Place p) =>
-        p.Item.Pic is { Category: PicCategory.Numeric, IsFloat: false, Scale: 0 };
+        p.Item.Pic is { IsUnscaledInteger: true };
 
     /// <summary>ISO §14.9.43.3 SR2 / §14.9.48.3 SR1 — "a figurative constant that begins with the word ALL", read off the
     /// WRITTEN operand: the ALL-literal node says so (<see cref="BoundAllLiteral.BeginsWithAll"/>, a bare symbolic
