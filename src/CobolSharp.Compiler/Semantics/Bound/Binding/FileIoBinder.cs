@@ -89,7 +89,6 @@ internal sealed class FileIoBinder
         var notInvalidKey = new List<BoundStatement>();
         if (ctx.writeInvalidKey() is { } wikCtx)
         {
-            DialectStrictnessChecks.CheckInvalidKeyNoiseWord(_ctx, wikCtx);
             BindInvalidKeyBlocks(wikCtx.statementBlock(), wikCtx.Start?.Type == CobolParserCore.NOT, invalidKey, notInvalidKey);
         }
 
@@ -345,7 +344,6 @@ internal sealed class FileIoBinder
         var notInvalidKey = new List<BoundStatement>();
         if (ctx.readInvalidKey() is { } ikCtx)
         {
-            DialectStrictnessChecks.CheckInvalidKeyNoiseWord(_ctx, ikCtx);
             BindInvalidKeyBlocks(ikCtx.statementBlock(), ikCtx.Start?.Type == CobolParserCore.NOT, invalidKey, notInvalidKey);
         }
 
@@ -377,7 +375,6 @@ internal sealed class FileIoBinder
         var notInvalidKey = new List<BoundStatement>();
         if (ctx.rewriteInvalidKeyPhrase() is { } rikCtx)
         {
-            DialectStrictnessChecks.CheckInvalidKeyNoiseWord(_ctx, rikCtx);
             BindInvalidKeyBlocks(rikCtx.statementBlock(), rikCtx.Start?.Type == CobolParserCore.NOT, invalidKey, notInvalidKey);
         }
 
@@ -398,7 +395,6 @@ internal sealed class FileIoBinder
         var notInvalidKey = new List<BoundStatement>();
         if (ctx.deleteInvalidKeyPhrase() is { } ikCtx)
         {
-            DialectStrictnessChecks.CheckInvalidKeyNoiseWord(_ctx, ikCtx);
             BindInvalidKeyBlocks(ikCtx.statementBlock(), ikCtx.Start?.Type == CobolParserCore.NOT, invalidKey, notInvalidKey);
         }
 
@@ -447,7 +443,6 @@ internal sealed class FileIoBinder
         var notInvalidKey = new List<BoundStatement>();
         if (ctx.startInvalidKeyPhrase() is { } ikCtx)
         {
-            DialectStrictnessChecks.CheckInvalidKeyNoiseWord(_ctx, ikCtx);
             BindInvalidKeyBlocks(ikCtx.statementBlock(), ikCtx.Start?.Type == CobolParserCore.NOT, invalidKey, notInvalidKey);
         }
 
@@ -570,7 +565,6 @@ internal sealed class FileIoBinder
         else if (ctx.sortOutputProcedurePhrase() is { } outputCtx)
             (outputProc, outputProcThru) = ResolveSortMergeProcedure(outputCtx.procedureName());
 
-        DialectStrictnessChecks.CheckCollatingNoiseWord(_ctx, ctx.sortCollatingPhrase());
         return new BoundSortStatement(fileSym, keys, duplicates,
             usingFiles, givingFiles,
             inputProc, inputProcThru,
@@ -656,7 +650,6 @@ internal sealed class FileIoBinder
         }
 
         bool duplicates = ctx.sortDuplicatesPhrase() != null;
-        DialectStrictnessChecks.CheckCollatingNoiseWord(_ctx, ctx.sortCollatingPhrase());
         return new BoundTableSortStatement(tableSym, keys, duplicates,
             ExtractCollatingName(ctx.sortCollatingPhrase()));
     }
@@ -686,7 +679,6 @@ internal sealed class FileIoBinder
         else if (ctx.mergeOutputProcedurePhrase() is { } outputCtx)
             (outputProc, outputProcThru) = ResolveSortMergeProcedure(outputCtx.procedureName());
 
-        DialectStrictnessChecks.CheckCollatingNoiseWord(_ctx, ctx.sortCollatingPhrase());
         return new BoundMergeStatement(fileSym, keys, usingFiles, givingFiles,
             outputProc, outputProcThru,
             ExtractCollatingName(ctx.sortCollatingPhrase()));

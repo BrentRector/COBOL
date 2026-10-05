@@ -406,30 +406,27 @@ internal sealed class StringStatementBinder
         foreach (var d in delimiterItems)
             delimiters.Add(new BoundUnstringDelimiter(d.Expr, d.IsAll));
 
-        // INTO phrases (one or more)
+        // ONE INTO phrase, one or more receivers (ISO §14.9.48.2; kb/Work PB1183)
         var intos = new List<BoundUnstringInto>();
-        foreach (var intoPhrase in ctx.unstringIntoPhrase())
+        foreach (var target in ctx.unstringIntoPhrase().unstringIntoTarget())
         {
-            foreach (var target in intoPhrase.unstringIntoTarget())
-            {
-                var identifiers = target.dataReference();
-                int idIdx = 0;
+            var identifiers = target.dataReference();
+            int idIdx = 0;
 
-                // First identifier is the INTO target
-                var targetExpr = _ctx.Expression.BindDataReferenceWithSubscripts(identifiers[idIdx++]);
+            // First identifier is the INTO target
+            var targetExpr = _ctx.Expression.BindDataReferenceWithSubscripts(identifiers[idIdx++]);
 
-                // DELIMITER IN (optional)
-                BoundExpression? delimiterIn = null;
-                if (target.DELIMITER() != null && idIdx < identifiers.Length)
-                    delimiterIn = _ctx.Expression.BindDataReferenceWithSubscripts(identifiers[idIdx++]);
+            // DELIMITER IN (optional)
+            BoundExpression? delimiterIn = null;
+            if (target.DELIMITER() != null && idIdx < identifiers.Length)
+                delimiterIn = _ctx.Expression.BindDataReferenceWithSubscripts(identifiers[idIdx++]);
 
-                // COUNT IN (optional)
-                BoundExpression? countIn = null;
-                if (target.COUNT() != null && idIdx < identifiers.Length)
-                    countIn = _ctx.Expression.BindDataReferenceWithSubscripts(identifiers[idIdx++]);
+            // COUNT IN (optional)
+            BoundExpression? countIn = null;
+            if (target.COUNT() != null && idIdx < identifiers.Length)
+                countIn = _ctx.Expression.BindDataReferenceWithSubscripts(identifiers[idIdx++]);
 
-                intos.Add(new BoundUnstringInto(targetExpr, countIn, delimiterIn));
-            }
+            intos.Add(new BoundUnstringInto(targetExpr, countIn, delimiterIn));
         }
 
         // WITH POINTER (optional)

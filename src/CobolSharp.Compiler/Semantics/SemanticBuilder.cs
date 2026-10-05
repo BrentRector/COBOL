@@ -842,8 +842,6 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
                 // the correct record position even when several keys share the base name (ISO §12.4.5.12).
                 fileSym.RecordKey = keyClause.dataReference().cobolWord().GetText();
                 fileSym.RecordKeyQualifiers.AddRange(ExtractQualifiers(keyClause.dataReference()));
-                // Leniency L3 (docs/dialect-strictness.md): ISO §12.4.5.12 requires the KEY keyword.
-                CheckRecordKeyNoiseWord(keyClause, keyClause.KEY() == null);
             }
             if (clause.fileStatusClause() is { } statusClause)
                 // Use the base data-name only — a "STATUS data-name IN group" qualifier is a
@@ -856,48 +854,16 @@ public sealed class SemanticBuilder : CobolParserCoreBaseVisitor<object?>
                 var altQualifiers = ExtractQualifiers(altKeyClause.dataReference());
                 bool duplicates = altKeyClause.DUPLICATES() != null;
                 fileSym.AlternateKeys.Add(new AlternateKeyInfo(altKeyName, altQualifiers, duplicates));
-                // Leniency L3: KEY is also required in ALTERNATE RECORD KEY (§12.4.5.12).
-                CheckRecordKeyNoiseWord(altKeyClause, altKeyClause.KEY() == null);
             }
+            // KEY and IS are optional words in RELATIVE KEY, RECORD KEY and ALTERNATE RECORD KEY (ISO §12.4.5.13.2,
+            // §12.4.5.12.2, §12.4.5.6.2 underline neither), so the no-KEY forms are conforming and are not flagged
+            // (kb/Work PB756 removed the "leniency L2/L3" strict-mode checks that flagged them).
             if (clause.relativeKeyClause() is { } relKeyClause)
-            {
                 fileSym.RelativeKey = relKeyClause.dataReference().GetText();
-                // Leniency L2 (docs/dialect-strictness.md): ISO §12.4.5.13 requires the KEY keyword.
-                // The data-name is captured either way (so the file works in all modes); the no-KEY form
-                // is accepted in Default and diagnosed under named-strict modes.
-                if (relKeyClause.KEY() == null)
-                {
-                    var tok = relKeyClause.Start;
-                    var loc = new Common.SourceLocation(_sourceName, 0, tok.Line, tok.Column);
-                    var span = new Common.TextSpan(tok.StartIndex, relKeyClause.Stop?.StopIndex ?? tok.StopIndex);
-                    if (_options.Config.IsStrict)
-                        _diagnostics.Report(DiagnosticDescriptors.CBL3613, loc, span, _options.Config.DisplayName);
-                    else if (_options.WarnNonStandard)
-                        _diagnostics.Report(DiagnosticDescriptors.CBL3614, loc, span);
-                }
-            }
         }
 
         _symbols.Program.GlobalScope.TryDeclare(fileSym, out _);
         return base.VisitFileControlClauseGroup(ctx);
-    }
-
-    /// <summary>
-    /// Leniency L3 (docs/dialect-strictness.md): the RECORD KEY / ALTERNATE RECORD KEY clause with the
-    /// required KEY keyword omitted (ISO §12.4.5.12 — KEY is unbracketed → required; the CCVS suite writes
-    /// `RECORD data-name`). The data-name is captured as the key either way (so the file works in all
-    /// modes); the no-KEY form is accepted in Default and diagnosed under named-strict modes.
-    /// </summary>
-    private void CheckRecordKeyNoiseWord(Antlr4.Runtime.ParserRuleContext clause, bool noKey)
-    {
-        if (!noKey) return;
-        var tok = clause.Start;
-        var loc = new Common.SourceLocation(_sourceName, 0, tok.Line, tok.Column);
-        var span = new Common.TextSpan(tok.StartIndex, clause.Stop?.StopIndex ?? tok.StopIndex);
-        if (_options.Config.IsStrict)
-            _diagnostics.Report(DiagnosticDescriptors.CBL3615, loc, span, _options.Config.DisplayName);
-        else if (_options.WarnNonStandard)
-            _diagnostics.Report(DiagnosticDescriptors.CBL3616, loc, span);
     }
 
     // ═══════════════════════════════════

@@ -2573,6 +2573,18 @@
    "source": "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. ROWCOL.\n       ENVIRONMENT DIVISION.\n       CONFIGURATION SECTION.\n       SPECIAL-NAMES.\n           ALPHABET AL IS \"ABCDEFGHIJKLMNOPQRSTUVWXYZ\".\n       INPUT-OUTPUT SECTION.\n       FILE-CONTROL.\n           SELECT F ASSIGN TO \"f.dat\" ORGANIZATION IS INDEXED\n               RECORD KEY IS R-KEY\n               COLLATING SEQUENCE IS AL.\n       DATA DIVISION.\n       FILE SECTION.\n       FD F.\n       01 R.\n          05 R-KEY PIC X(4).\n          05 R-D   PIC X(4).\n       PROCEDURE DIVISION.\n       MAIN. STOP RUN.\n"
   },
   {
+   "id": "assign-using-2002",
+   "description": "The USING phrase of the ASSIGN clause (ISO §12.4.5.3 GR3 b) / §9.1.21 dynamic file assignment: the file connector is associated with the physical file named by data-name-1's content at each OPEN, SORT or MERGE), on BOTH arms of the clause - `ASSIGN TO {device-name-1 | literal-1}... USING data-name-1` and the bare `ASSIGN USING data-name-1`. A COBOL-2002 introduction. THE EDGE IS DERIVED, NOT QUOTED (the repo holds no 2002 or 2014 text, ratified decision #1; the R61 method): Annex E, which itemizes the 2014->2023 delta, never names the phrase, so it predates 2023; GnuCOBOL's per-standard dialect files date it at 2002 - cobol85.conf `assign-using-variable: unconformable`, cobol2002.conf and cobol2014.conf `ok` - and cobc 3.2 -std=cobol85 refuses `SELECT F ASSIGN USING WS-NAME` ('ASSIGN USING/VARYING variable does not conform to COBOL 85') while -std=cobol2002 accepts it (kb/Work PB746; CLAUDE.md rule 1 precedence: ISO, then GnuCOBOL). Gated in ONE place, the VersionConformancePass parse arm on assignClause (the USING token appears in no other file-control rule).",
+   "display": "the USING phrase of the ASSIGN clause",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §12.4.5.3 GR3 b), §9.1.21; a COBOL-2002 introduction (derived: GnuCOBOL 3.2 cobol85.conf / cobol2002.conf assign-using-variable; VCR row 7.27)",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "dynamic file assignment (§9.1.21) - 2002 introduction",
+   "source": "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. ROWAU.\n       ENVIRONMENT DIVISION.\n       INPUT-OUTPUT SECTION.\n       FILE-CONTROL.\n           SELECT F ASSIGN USING WS-NAME ORGANIZATION IS SEQUENTIAL.\n       DATA DIVISION.\n       FILE SECTION.\n       FD F.\n       01 R PIC X(8).\n       WORKING-STORAGE SECTION.\n       01 WS-NAME PIC X(20) VALUE \"f.dat\".\n       PROCEDURE DIVISION.\n       MAIN. STOP RUN.\n"
+  },
+  {
    "id": "file-organization-line-sequential-2023",
    "description": "ORGANIZATION IS LINE SEQUENTIAL (ISO §12.4.5.10.3 GR2) — the line sequential file organization, introduced 2023",
    "display": "ORGANIZATION LINE SEQUENTIAL",

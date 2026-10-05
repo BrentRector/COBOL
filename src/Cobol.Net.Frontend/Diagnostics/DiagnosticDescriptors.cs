@@ -707,34 +707,11 @@ public static partial class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor CBL3607 = new("CBL3607", DiagnosticSeverity.Warning,
         "{0} is an obsolete element; removed from COBOL-2002 and later standards");
 
-    // ══════════════════════════════════════
-    // CBL3611–3612: non-standard CCVS dialect leniencies (see docs/dialect-strictness.md).
-    // Leniency L1: 'KEY' omitted from the INVALID KEY phrase.
-    // ══════════════════════════════════════
-    public static readonly DiagnosticDescriptor CBL3611 = new("CBL3611", DiagnosticSeverity.Error,
-        "'KEY' is required in the INVALID KEY phrase; the no-KEY form is a non-standard CCVS leniency not allowed in {0} mode");
-    public static readonly DiagnosticDescriptor CBL3612 = new("CBL3612", DiagnosticSeverity.Warning,
-        "'KEY' omitted from the INVALID KEY phrase; non-standard (accepted as a CCVS leniency)");
-
-    // Leniency L2: 'KEY' omitted from the RELATIVE KEY clause (ISO §12.4.5.13 requires it).
-    public static readonly DiagnosticDescriptor CBL3613 = new("CBL3613", DiagnosticSeverity.Error,
-        "'KEY' is required in the RELATIVE KEY clause; the no-KEY form is a non-standard CCVS leniency not allowed in {0} mode");
-    public static readonly DiagnosticDescriptor CBL3614 = new("CBL3614", DiagnosticSeverity.Warning,
-        "'KEY' omitted from the RELATIVE KEY clause; non-standard (accepted as a CCVS leniency)");
-
-    // Leniency L3: 'KEY' omitted from the RECORD KEY / ALTERNATE RECORD KEY clause (ISO §12.4.5.12 requires it).
-    public static readonly DiagnosticDescriptor CBL3615 = new("CBL3615", DiagnosticSeverity.Error,
-        "'KEY' is required in the RECORD KEY clause; the no-KEY form is a non-standard CCVS leniency not allowed in {0} mode");
-    public static readonly DiagnosticDescriptor CBL3616 = new("CBL3616", DiagnosticSeverity.Warning,
-        "'KEY' omitted from the RECORD KEY clause; non-standard (accepted as a CCVS leniency)");
-
-    // Leniency L5: 'COLLATING' omitted from the SORT/MERGE COLLATING SEQUENCE phrase (ISO §14.9.45/§14.9.24
-    // — COLLATING is a required keyword; CCVS ST139A writes `SEQUENCE alphabet-name`). (L4 is USE…ERROR
-    // without STANDARD, still deferred.)
-    public static readonly DiagnosticDescriptor CBL3617 = new("CBL3617", DiagnosticSeverity.Error,
-        "'COLLATING' is required in the SORT/MERGE COLLATING SEQUENCE phrase; the no-COLLATING form is a non-standard CCVS leniency not allowed in {0} mode");
-    public static readonly DiagnosticDescriptor CBL3618 = new("CBL3618", DiagnosticSeverity.Warning,
-        "'COLLATING' omitted from the SORT/MERGE SEQUENCE phrase; non-standard (accepted as a CCVS leniency)");
+    // CBL3611–3618 are RETIRED (kb/Work PB756). They named four "CCVS leniencies" — KEY omitted from INVALID KEY,
+    // RELATIVE KEY and RECORD KEY / ALTERNATE RECORD KEY, and COLLATING omitted from SORT/MERGE — and claimed ISO
+    // required each word. None of the four is underlined in its printed format, so each is an OPTIONAL word (ISO
+    // §5.2.2; §8.3.2.4.3) and every source they flagged was conforming; their only reporter was the legacy
+    // binder's strict mode.
 
     // ══════════════════════════════════════
     // CBL3620–3622: COPY preprocessing (ISO §7.2.3). All three are unconditional errors: CBL3620 is library

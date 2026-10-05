@@ -1358,6 +1358,21 @@ internal sealed class VersionConformancePass
         public override object? VisitFileCollatingSequenceClause(CobolParserCore.FileCollatingSequenceClauseContext ctx)
         { _p.Check(Constructs.FileCollatingClause2002, "the file COLLATING SEQUENCE clause"); return base.VisitChildren(ctx); }
 
+        /// <summary>The USING phrase of the ASSIGN clause (ISO §12.4.5.3 GR3 b) — dynamic file assignment, §9.1.21) —
+        /// a COBOL-2002 introduction, on BOTH arms of <c>assignClause</c>: the <c>TO … USING data-name-1</c> tail and
+        /// the bare <c>ASSIGN USING data-name-1</c>. One token test covers both, because USING is the only token the
+        /// two arms share past ASSIGN and no other file-control rule spells it.
+        /// <para>THE EDGE IS DERIVED, NOT QUOTED (kb/Work PB746; constructs.json <c>assign-using-2002</c> and VCR row 7.27
+        /// carry the derivation): Annex E never names the phrase, so it predates 2023, and GnuCOBOL's per-standard
+        /// dialect files place it at 2002 (cobol85.conf <c>assign-using-variable: unconformable</c>, cobol2002.conf
+        /// <c>ok</c>). Recognition-fire on the clause, so a SELECT that also fails to bind still names its edition.</para></summary>
+        public override object? VisitAssignClause(CobolParserCore.AssignClauseContext ctx)
+        {
+            if (ctx.USING() is not null)
+                _p.Check(Constructs.AssignUsing2002, "the USING phrase of the ASSIGN clause");
+            return base.VisitChildren(ctx);
+        }
+
         /// <summary>The LINE SEQUENTIAL phrase of the ORGANIZATION clause (ISO §12.4.5.10.3 GR2: "The LINE
         /// SEQUENTIAL phrase specifies that the file organization is line sequential") — a COBOL-2023 introduction.
         /// <para>THE EDITION IS DERIVED, NOT INHERITED (kb/Work PB688). The Foreword's list of the main changes

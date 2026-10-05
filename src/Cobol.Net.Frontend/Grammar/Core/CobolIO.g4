@@ -62,15 +62,15 @@ assignTarget
 fileControlClauses
     : assignClause
     // relativeKeyClause precedes organizationClause: both can begin with RELATIVE (organizationType
-    // has a bare RELATIVE), and under leniency L2 `RELATIVE data-name` (no KEY) is the key clause while
+    // has a bare RELATIVE), and `RELATIVE data-name` (KEY is an optional word) is the key clause while
     // a lone RELATIVE is the organization. Trying the key clause first means `RELATIVE <data-name>`
     // binds the key; a bare RELATIVE (no following data-name) fails the key clause and falls through to
     // organizationClause. `ORGANIZATION RELATIVE` is unaffected (it begins with ORGANIZATION).
     | relativeKeyClause
     | organizationClause
     | accessModeClause
-    // recordKeyClause and recordDelimiterClause both begin with RECORD. With KEY now optional in
-    // recordKeyClause (leniency L3), disambiguation rests on the operand: DELIMITER is a reserved token
+    // recordKeyClause and recordDelimiterClause both begin with RECORD. KEY is an optional word in
+    // recordKeyClause, so disambiguation rests on the operand: DELIMITER is a reserved token
     // so `RECORD DELIMITER …` cannot satisfy recordKeyClause's dataReference and falls through to
     // recordDelimiterClause. List recordKeyClause first; the parser back-tracks to the delimiter form.
     | recordKeyClause
@@ -142,11 +142,12 @@ lockModeClause
     ;
 // §12.4.5.9.2's second half: [ [WITH] LOCK ON [MULTIPLE] {RECORD | RECORDS} ]. WITH is un-underlined (measured
 // p355: its box 251.70–278.69 has no rule; the rule at 283.11–306.22 belongs to the LOCK that follows it).
-// ⚠ ON IS UNDERLINED THERE (83.5% cover) and MULTIPLE too (95.0%) — MULTIPLE is optional because the printed
-// format BRACKETS it, not because it is un-underlined, and `ON?` is an over-acceptance this change does not
-// take on (see the PB695 family-3 report's new-defect paragraph).
+// ⛔ ON IS UNDERLINED THERE (83.5% cover: box 311.09–325.35, rule 312.52–324.43), so it is REQUIRED (§5.2.2:
+// keywords "are shown in uppercase and underlined in general formats"); `ON?` admitted `WITH LOCK MULTIPLE
+// RECORDS`, a spelling no edition prints (kb/Work PB755). MULTIPLE is underlined too (95.0%) and optional only
+// because the printed format BRACKETS it.
 lockOnPhrase
-    : WITH? LOCK ON? MULTIPLE? (RECORD | RECORDS)
+    : WITH? LOCK ON MULTIPLE? (RECORD | RECORDS)
     ;
 
 fileReserveClause
@@ -216,16 +217,16 @@ accessMode
     | DYNAMIC
     ;
 
-// IS is an optional word in the RECORD KEY / ALTERNATE RECORD KEY clauses (ISO §12.4.5 — the CCVS
-// suite writes "RECORD KEY data-name" without IS).
-//
-// Leniency L3 (see docs/dialect-strictness.md): ISO §12.4.5.12 requires `RECORD KEY IS data-name`
-// (⚠ KEY is NOT required — see below), and the CCVS suite writes `RECORD data-name` without KEY (e.g.
-// IX103A `RECORD IX-FS1-KEY`). The grammar parses the permissive superset `RECORD KEY? IS?
-// dataReference`; the no-KEY form is accepted in DialectMode.Default and diagnosed under named-strict
-// modes by the inline check in SemanticBuilder.VisitFileControlClauseGroup (CBL3615/3616). Disambiguation
-// from recordDelimiterClause still holds: DELIMITER is a reserved token, so `RECORD DELIMITER …` cannot
-// match dataReference and falls through to recordDelimiterClause (likewise RECORD CONTAINS/VARYING in an FD).
+// ⛔ KEY AND IS ARE OPTIONAL WORDS, RECORD (and ALTERNATE) ARE NOT — measured, not a leniency. §5.2.2: keywords
+// "are shown in uppercase and underlined in general formats"; §8.3.2.4.3: "uppercase words that are not underlined
+// are called optional words". The printed pages (§12.4.5.12.2 = p359, §12.4.5.6.2 = p350) underline RECORD,
+// ALTERNATE and SOURCE and leave KEY and IS plain, so `RECORD IX-FS1-KEY` (CCVS IX103A) is CONFORMING source and
+// `RECORD KEY? IS?` is the format exactly. ⛔ `ALTERNATE RECORD? KEY?` was NOT: RECORD's box 131.86–171.34 carries a
+// rule at 133.25–170.36 (94.0% cover), so `ALTERNATE KEY IS k` — a spelling no edition prints — compiled at exit 0
+// (kb/Work PB756). This comment used to call the no-KEY form "Leniency L3", diagnosed under named-strict modes by
+// a check in the legacy SemanticBuilder; KEY was never required, and that check is gone. Disambiguation from
+// recordDelimiterClause holds: DELIMITER is a reserved token, so `RECORD DELIMITER …` cannot match dataReference
+// and falls through to recordDelimiterClause (likewise RECORD CONTAINS/VARYING in an FD).
 //
 // ⛔ BOTH CLAUSES CARRY A **REQUIRED CHOICE OF TWO KEY FORMS**, and the second one is DECLINED — so it is a
 // DISTINCT PARSE ALTERNATIVE the binder can SEE and refuse by name, exactly as `WRITE … FILE file-name-1` is
@@ -261,7 +262,7 @@ recordKeyClause
     ;
 
 alternateKeyClause
-    : ALTERNATE RECORD? KEY? IS? (recordKeySourcePhrase | dataReference)
+    : ALTERNATE RECORD KEY? IS? (recordKeySourcePhrase | dataReference)
       (WITH? DUPLICATES)?
       alternateKeySuppressWhen?
     ;
@@ -307,12 +308,11 @@ fileStatusClause
     : FILE? STATUS IS? dataReference
     ;
 
-// Leniency L2 (see docs/dialect-strictness.md): ISO §12.4.5.13 requires `RELATIVE KEY IS data-name`,
-// but the CCVS suite writes `RELATIVE data-name` without KEY (e.g. RL109A `RELATIVE RL-FR1-KEY`). The
-// grammar parses the permissive superset `RELATIVE KEY? IS? dataReference`; the no-KEY form is accepted
-// in DialectMode.Default and diagnosed under named-strict modes by
-// DialectStrictnessChecks.CheckRelativeKeyNoiseWord (called from SemanticBuilder). The dataReference is
-// captured as the relative key either way, so random/dynamic WRITE/REWRITE/DELETE position correctly.
+// ISO §12.4.5.13.2 prints `<u>RELATIVE</u> KEY IS data-name-1`: only RELATIVE is underlined (measured, p360), so KEY
+// and IS are optional words (§8.3.2.4.3) and `RELATIVE RL-FR1-KEY` (CCVS RL109A) is CONFORMING source, not a
+// leniency. This comment used to call it "Leniency L2", diagnosed under named-strict modes by a check in the legacy
+// SemanticBuilder; KEY was never required, and that check is gone (kb/Work PB756). The dataReference is captured as
+// the relative key either way, so random/dynamic WRITE/REWRITE/DELETE position correctly.
 relativeKeyClause
     : RELATIVE KEY? IS? dataReference
     ;
@@ -565,13 +565,9 @@ readAtEnd
 // carries none in ALL FIVE statements that have the phrase — DELETE (p635), READ (p722), REWRITE (p740),
 // START (p784) and WRITE (p816) — so `INVALID <imperative>` is conforming ISO. The same mistake was made for
 // the RECORD KEY clause above (p359: RECORD and SOURCE underlined, KEY and IS not) and for COLLATING in
-// SORT/MERGE (p687, p776). The legacy compiler still DIAGNOSES these under strict/warn modes, i.e. it reports
-// conforming source; that is filed as SR2 in CONFORMANCE-FIX-QUEUE.md. The grammar accepting them is correct.
-// Retained history: the CCVS suite
-// and 1980s/90s compilers tolerate "INVALID <imperative>" without it. The dropped 'KEY' is accepted
-// in DialectMode.Default and diagnosed under named-strict modes by
-// DialectStrictnessChecks.CheckInvalidKeyNoiseWord (called from FileIoBinder). 'INVALID' is a reserved
-// word, so this relaxation is unambiguous. Applies to all five INVALID KEY phrases below.
+// SORT/MERGE (p687, p776). The legacy compiler's strict mode used to DIAGNOSE all of these (CBL3611–3618), i.e. it
+// reported conforming source; those checks and codes are retired (kb/Work PB756). The grammar accepting them is
+// correct. 'INVALID' is a reserved word, so `KEY?` is unambiguous. Applies to all five INVALID KEY phrases below.
 // ISO 5.2.6.4: the positive and negative phrases are enclosed in CHOICE INDICATORS (| bars inside the
 // brackets of the printed general format), so BOTH may be specified, each at most once, IN ANY ORDER.
 // The reversed order was rejected until 2026-07-19 (the transcription had dropped the bars); the shape
@@ -893,7 +889,7 @@ sortCollatingPhrase
     // SEQUENCE in `COLLATING SEQUENCE`, and §5.2.2 / §5.2.3 make the underlining — not the absence of brackets — what
     // requires a word. `SEQUENCE alphabet-name` (the CCVS85 suite's ST139A spelling) is therefore the standard's own
     // form, not a leniency to flag; the legacy oracle's CBL3617/CBL3618 premise ("unbracketed so required") was the
-    // misreading.
+    // misreading, and both codes are retired (kb/Work PB756).
     // COLLATING SEQUENCE {IS alphabet-name-1 [alphabet-name-2] | {FOR ALPHANUMERIC IS alphabet-name-1 |
     // FOR NATIONAL IS alphabet-name-2}…} (ISO §14.9.40.2 / §14.9.24.2). alphabet-name-2 + the FOR forms
     // are the 2002 national class — gated on recognition (VisitSortCollatingPhrase).
@@ -1083,12 +1079,11 @@ stringOnOverflow
 unstringStatement
     : UNSTRING strUnstrSender
       unstringDelimiterPhrase?
-      unstringIntoPhrase+
+      unstringIntoPhrase
       unstringWithPointer?
       unstringTallying?
       unstringOnOverflow?
       END_UNSTRING?
-
     ;
 
 unstringDelimiterPhrase
@@ -1099,6 +1094,10 @@ unstringDelimiterItem
     : (ALL)? strUnstrOperand
     ;
 
+// ⛔ ONE INTO, THEN THE REPEATED RECEIVER GROUP (kb/Work PB1183). §14.9.48.2 prints `INTO { identifier-4
+// [ DELIMITER IN identifier-5 ] [ COUNT IN identifier-6 ] } …`: the ellipsis follows the BRACED group, so it repeats
+// the receivers and never the keyword. `unstringStatement` once read `unstringIntoPhrase+`, which admitted
+// `INTO A INTO B` — a spelling no edition prints — at every --std; the repetition lives in `unstringIntoTarget+`.
 unstringIntoPhrase
     : INTO unstringIntoTarget+
     ;

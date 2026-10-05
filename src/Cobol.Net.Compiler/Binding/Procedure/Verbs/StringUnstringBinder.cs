@@ -219,66 +219,65 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
             }
 
         var areas = new List<(Place Target, Place? DelimiterIn, Place? CountIn)>();
-        foreach (var ip in un.unstringIntoPhrase())
-            foreach (var t in ip.unstringIntoTarget())
+        foreach (var t in un.unstringIntoPhrase().unstringIntoTarget())   // ONE INTO, then the receivers (§14.9.48.2; kb/Work PB1183)
+        {
+            var drefs = t.dataReference();
+            if (host.Expr.ResolveReceiving(drefs[0]) is not { } target)
+                return new BoundUnsupported("UNSTRING INTO operand");   // identifier-4 is a receiver — the chokepoint reported it (kb/Work PB429)
+            // SR4 — identifier-4 shall be (usage display + category alphabetic/alphanumeric/numeric) or (usage
+            // national + category national/numeric). A fixed-length group (SR10) and a reference-modified slice
+            // are alphanumeric-image receivers and are exempt; edited, COMP/packed/COMP-5, index, and float
+            // receivers are not permitted.
+            // ⛔ DA7: a COMPILE-TIME diagnostic. The verdict was already correct and already computed HERE,
+            // but returning only BoundUnsupported let the illegal program compile clean and throw when control
+            // reached the UNSTRING. An alphanumeric or national group stays exempt — §14.9.43.4 GR3a's
+            // alphanumeric-MOVE semantics carry a group receiver, including one holding a BINARY/PACKED leaf
+            // (V59) — but a BIT group is class and category boolean (§13.18.29.4 GR1 a) and a strongly-typed group's
+            // category is its type-name (§8.5.2.1), neither of which SR4's list admits (kb/Work PB1182: the receiver
+            // arm exempted every group, while Sr2OffendingCategory's sender arm already knew both).
+            if (target.DenotedItem is not null
+                && (target.Item.IsGroup
+                    ? target.Item.GroupUsage is GroupUsage.Bit || StrongTypeModel.IsStrongGroup(target.Item)
+                    : !UnstringReceiverAllowed(target.Item.Pic)))
             {
-                var drefs = t.dataReference();
-                if (host.Expr.ResolveReceiving(drefs[0]) is not { } target)
-                    return new BoundUnsupported("UNSTRING INTO operand");   // identifier-4 is a receiver — the chokepoint reported it (kb/Work PB429)
-                // SR4 — identifier-4 shall be (usage display + category alphabetic/alphanumeric/numeric) or (usage
-                // national + category national/numeric). A fixed-length group (SR10) and a reference-modified slice
-                // are alphanumeric-image receivers and are exempt; edited, COMP/packed/COMP-5, index, and float
-                // receivers are not permitted.
-                // ⛔ DA7: a COMPILE-TIME diagnostic. The verdict was already correct and already computed HERE,
-                // but returning only BoundUnsupported let the illegal program compile clean and throw when control
-                // reached the UNSTRING. An alphanumeric or national group stays exempt — §14.9.43.4 GR3a's
-                // alphanumeric-MOVE semantics carry a group receiver, including one holding a BINARY/PACKED leaf
-                // (V59) — but a BIT group is class and category boolean (§13.18.29.4 GR1 a) and a strongly-typed group's
-                // category is its type-name (§8.5.2.1), neither of which SR4's list admits (kb/Work PB1182: the receiver
-                // arm exempted every group, while Sr2OffendingCategory's sender arm already knew both).
-                if (target.DenotedItem is not null
-                    && (target.Item.IsGroup
-                        ? target.Item.GroupUsage is GroupUsage.Bit || StrongTypeModel.IsStrongGroup(target.Item)
-                        : !UnstringReceiverAllowed(target.Item.Pic)))
-                {
-                    return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.CharacterOperandUsage,
-                        $"UNSTRING INTO '{DataBinder.WrittenText(drefs[0])}' requires a usage-display alphabetic/alphanumeric/"
-                        + "numeric or usage-national national/numeric receiver, a numeric one without the symbol P; "
-                        + "edited, COMP, packed, index, float and boolean (bit-group) receivers have no character image, "
-                        + "and a strongly-typed group's category is its type-name (§8.5.2.1) (ISO §14.9.48.3 SR4)");
-                }
-                bool hasDelim = t.DELIMITER() is not null, hasCount = t.COUNT() is not null;
-                if ((hasDelim || hasCount) && un.unstringDelimiterPhrase() is null)
-                    return Reject("UNSTRING DELIMITER IN / COUNT IN: the DELIMITED BY phrase shall be specified when either "
-                        + "is written (ISO §14.9.48.3 SR7)");
-                if (target.Item.IsGroup && ReferenceResolver.HasVariableLengthSubordinate(target.Item))
-                    return Reject($"UNSTRING INTO '{DataBinder.WrittenText(drefs[0])}' shall not reference a variable-length group (ISO §14.9.48.3 SR10; §8.5.1.12)");
-                int next = 1;
-                Place? delimIn = null, countIn = null;
-                if (hasDelim)
-                {
-                    if (host.Expr.ResolveReceiving(drefs[next]) is not { } d5)
-                        return new BoundUnsupported("UNSTRING DELIMITER IN operand");   // identifier-5 is a receiver — the chokepoint reported it (kb/Work PB429)
-                    // identifier-5 is SR2's fourth name (kb/Work PB155) — the delimiter RECEIVER shares the
-                    // category rule, not SR4's receiver list.
-                    if (Sr2OffendingCategory(d5.Item) is { } badD5)
-                        return Reject($"UNSTRING DELIMITER IN '{DataBinder.WrittenText(drefs[next])}' is category {badD5} "
-                            + "(identifier-5 shall reference a data item of category alphanumeric or national, "
-                            + "ISO §14.9.48.3 SR2)");
-                    delimIn = d5;
-                    next++;
-                }
-                if (hasCount)
-                {
-                    if (host.Expr.ResolveReceiving(drefs[next]) is not { } c6)
-                        return new BoundUnsupported("UNSTRING COUNT IN operand");   // identifier-6 is a receiver — the chokepoint reported it (kb/Work PB429)
-                    if (!StrUnstrIsInteger(c6))
-                        return Reject($"UNSTRING COUNT IN '{DataBinder.WrittenText(drefs[next])}': identifier-6 shall reference an integer "
-                            + "data item without the symbol P (ISO §14.9.48.3 SR5)");
-                    countIn = c6;
-                }
-                areas.Add((target, delimIn, countIn));
+                return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.CharacterOperandUsage,
+                    $"UNSTRING INTO '{DataBinder.WrittenText(drefs[0])}' requires a usage-display alphabetic/alphanumeric/"
+                    + "numeric or usage-national national/numeric receiver, a numeric one without the symbol P; "
+                    + "edited, COMP, packed, index, float and boolean (bit-group) receivers have no character image, "
+                    + "and a strongly-typed group's category is its type-name (§8.5.2.1) (ISO §14.9.48.3 SR4)");
             }
+            bool hasDelim = t.DELIMITER() is not null, hasCount = t.COUNT() is not null;
+            if ((hasDelim || hasCount) && un.unstringDelimiterPhrase() is null)
+                return Reject("UNSTRING DELIMITER IN / COUNT IN: the DELIMITED BY phrase shall be specified when either "
+                    + "is written (ISO §14.9.48.3 SR7)");
+            if (target.Item.IsGroup && ReferenceResolver.HasVariableLengthSubordinate(target.Item))
+                return Reject($"UNSTRING INTO '{DataBinder.WrittenText(drefs[0])}' shall not reference a variable-length group (ISO §14.9.48.3 SR10; §8.5.1.12)");
+            int next = 1;
+            Place? delimIn = null, countIn = null;
+            if (hasDelim)
+            {
+                if (host.Expr.ResolveReceiving(drefs[next]) is not { } d5)
+                    return new BoundUnsupported("UNSTRING DELIMITER IN operand");   // identifier-5 is a receiver — the chokepoint reported it (kb/Work PB429)
+                // identifier-5 is SR2's fourth name (kb/Work PB155) — the delimiter RECEIVER shares the
+                // category rule, not SR4's receiver list.
+                if (Sr2OffendingCategory(d5.Item) is { } badD5)
+                    return Reject($"UNSTRING DELIMITER IN '{DataBinder.WrittenText(drefs[next])}' is category {badD5} "
+                        + "(identifier-5 shall reference a data item of category alphanumeric or national, "
+                        + "ISO §14.9.48.3 SR2)");
+                delimIn = d5;
+                next++;
+            }
+            if (hasCount)
+            {
+                if (host.Expr.ResolveReceiving(drefs[next]) is not { } c6)
+                    return new BoundUnsupported("UNSTRING COUNT IN operand");   // identifier-6 is a receiver — the chokepoint reported it (kb/Work PB429)
+                if (!StrUnstrIsInteger(c6))
+                    return Reject($"UNSTRING COUNT IN '{DataBinder.WrittenText(drefs[next])}': identifier-6 shall reference an integer "
+                        + "data item without the symbol P (ISO §14.9.48.3 SR5)");
+                countIn = c6;
+            }
+            areas.Add((target, delimIn, countIn));
+        }
 
         // ⛔ SR3 (kb/Work PB980): "If any of identifier-1, identifier-2, identifier-3, identifier-4, identifier-5,
         // literal-1, or literal-2 are of category national, then all shall be of category national" — the rule shape

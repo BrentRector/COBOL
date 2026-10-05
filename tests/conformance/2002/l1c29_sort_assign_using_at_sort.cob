@@ -19,9 +19,10 @@
       *> GR4 (content meaning) is the documented choice DOC-A.1-73 in
       *> docs/CONFORMANCE.md: the content with spaces removed is the target,
       *> and a target containing "." is used verbatim.
-      *> Edition: ASSIGN USING (dynamic file assignment, §9.1.21) is placed
-      *> at 2002 per the adjudicated row; ISO_COBOL.md itself does not date
-      *> it (the project also accepts it at 85, pb324_assign_using_85).
+      *> Edition: ASSIGN USING (dynamic file assignment, §9.1.21) is a 2002
+      *> introduction; ISO_COBOL.md itself does not date it, and the edge
+      *> is derived from GnuCOBOL's per-standard dialect files (constructs
+      *> row assign-using-2002, VCR row 7.27; kb/Work PB746).
       *> Setup: both connectors are last OPENed on a DIFFERENT file than
       *> the one named at the SORT: FI last opened l1c29b-1.dat (Z1,Y1),
       *> FO last opened l1c29b-q.dat (QQ). Before the SORT the names are

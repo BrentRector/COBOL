@@ -1,5 +1,6 @@
 {
  "enabled": [
+  "pb756_alternate_record_key_spellings",
   "pb351_delimited_conditional_operand",
   "pb1446_comma_point_literal_value_and_size",
   "pb1146_procedure_division_formats",
@@ -121,7 +122,6 @@
   "pb332_use_optional_words",
   "pb350_return_at_end_required_85",
   "pb347_record_name_identity_85",
-  "pb324_assign_using_85",
   "pb326_flow_report_unconditional",
   "pb365_report_group_qualified_85",
   "pb336_optional_absent_read_46_85",
@@ -268,7 +268,6 @@
   "l1c17_colon_separator",
   "l1c17_linkage_index_separate",
   "l1c18_merge_key_order_ties",
-  "l1c18_merge_assign_using_association",
   "l1c20_occurs_clauses_per_occurrence",
   "l1c20_odo_record_varying_no_depending",
   "l1c20_page_clause_defaults",

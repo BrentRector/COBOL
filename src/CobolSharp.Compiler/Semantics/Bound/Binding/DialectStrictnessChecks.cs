@@ -9,15 +9,13 @@ using CobolNet.Frontend.Generated;
 namespace CobolSharp.Compiler.Semantics.Bound.Binding;
 
 /// <summary>
-/// Centralized checks for non-standard CCVS dialect leniencies (see docs/dialect-strictness.md).
-/// The grammar parses a permissive superset; these checks flag the lenient forms under the
-/// named-strict dialect modes. Each leniency is accepted in <see cref="DialectMode.Default"/>
-/// (permissive) and diagnosed — error, or warning when <see cref="CompilationOptions.WarnNonStandard"/>
-/// — under <see cref="DialectMode.StrictCobol85"/> and later.
-///
-/// This is the single home for the strictness axis: every leniency added to the grammar must be
-/// routed through a check here from the moment it is introduced, never left as an unconditional
-/// grammar relaxation (which would silently leak into strict-conformance mode).
+/// The legacy binder's obsolete-element flags (CBL3607) — the NIST OBSOLETE flagging modules.
+/// <para>⛔ It no longer flags OPTIONAL WORDS (kb/Work PB756). It used to carry four "CCVS leniency" checks —
+/// KEY omitted from INVALID KEY (L1), from RELATIVE KEY (L2), from RECORD KEY / ALTERNATE RECORD KEY (L3), and
+/// COLLATING omitted from SORT/MERGE (L5) — each on the premise that an unbracketed word is required. The test is
+/// UNDERLINING (ISO §5.2.2; §8.3.2.4.3: "uppercase words that are not underlined are called optional words"),
+/// and none of those four words is underlined on the printed pages, so every one of them flagged CONFORMING source.
+/// §4.2.10's warning mechanism flags extensions only.</para>
 /// </summary>
 internal static class DialectStrictnessChecks
 {
@@ -26,48 +24,6 @@ internal static class DialectStrictnessChecks
 
     private static TextSpan MakeSpan(ParserRuleContext ctx) =>
         new(ctx.Start.StartIndex, ctx.Stop?.StopIndex ?? ctx.Start.StopIndex);
-
-    /// <summary>
-    /// Leniency L1 — the INVALID KEY / NOT INVALID KEY phrase with the required <c>KEY</c> keyword
-    /// omitted (e.g. <c>REWRITE rec INVALID GO TO …</c>). <c>KEY</c> is unbracketed in the ISO
-    /// statement formats so it is required; <c>INVALID</c> is a reserved word so dropping <c>KEY</c>
-    /// is unambiguous but non-conformant. Detects a missing keyword by comparing the count of direct
-    /// <c>INVALID</c> tokens (1 or 2 — the INVALID and the NOT INVALID branch) against <c>KEY</c>
-    /// tokens in the same phrase.
-    /// </summary>
-    internal static void CheckInvalidKeyNoiseWord(BindingContext ctx, ParserRuleContext? phrase)
-    {
-        if (phrase == null) return;
-
-        int invalidCount = phrase.GetTokens(CobolParserCore.INVALID).Length;
-        int keyCount = phrase.GetTokens(CobolParserCore.KEY).Length;
-        if (keyCount >= invalidCount) return; // every INVALID had its KEY — conformant
-
-        if (ctx.Options.Config.IsStrict)
-            ctx.Diagnostics.Report(DiagnosticDescriptors.CBL3611,
-                MakeLocation(ctx.SourceName, phrase), MakeSpan(phrase), ctx.Options.Config.DisplayName);
-        else if (ctx.Options.WarnNonStandard)
-            ctx.Diagnostics.Report(DiagnosticDescriptors.CBL3612,
-                MakeLocation(ctx.SourceName, phrase), MakeSpan(phrase));
-    }
-
-    /// <summary>
-    /// Leniency L5 — the SORT/MERGE collating phrase with the required <c>COLLATING</c> keyword omitted
-    /// (e.g. <c>MERGE … SEQUENCE alphabet-name</c>). <c>COLLATING</c> is unbracketed in the ISO SORT/MERGE
-    /// formats so it is required; <c>SEQUENCE</c> is a reserved word so dropping <c>COLLATING</c> is
-    /// unambiguous but non-conformant.
-    /// </summary>
-    internal static void CheckCollatingNoiseWord(BindingContext ctx, CobolParserCore.SortCollatingPhraseContext? phrase)
-    {
-        if (phrase == null || phrase.COLLATING() != null) return; // absent phrase or conformant — nothing to flag
-
-        if (ctx.Options.Config.IsStrict)
-            ctx.Diagnostics.Report(DiagnosticDescriptors.CBL3617,
-                MakeLocation(ctx.SourceName, phrase), MakeSpan(phrase), ctx.Options.Config.DisplayName);
-        else if (ctx.Options.WarnNonStandard)
-            ctx.Diagnostics.Report(DiagnosticDescriptors.CBL3618,
-                MakeLocation(ctx.SourceName, phrase), MakeSpan(phrase));
-    }
 
     /// <summary>
     /// Obsolete-element flag (CBL3607) — the <c>OPEN … REVERSED</c> tape phrase. REVERSED is obsolete in

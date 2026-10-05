@@ -231,8 +231,8 @@ public class StringTests : EndToEndTestBase
             MAIN-PARA.
                 UNSTRING SRC DELIMITED BY ","
                     INTO A
-                    INTO B
-                    INTO C
+                         B
+                         C
                 END-UNSTRING.
                 DISPLAY A.
                 DISPLAY B.
@@ -264,7 +264,7 @@ public class StringTests : EndToEndTestBase
             MAIN-PARA.
                 UNSTRING SRC DELIMITED BY ","
                     INTO A
-                    INTO B
+                         B
                 END-UNSTRING.
                 DISPLAY A.
                 DISPLAY B.
@@ -293,7 +293,7 @@ public class StringTests : EndToEndTestBase
             MAIN-PARA.
                 UNSTRING SRC DELIMITED BY ","
                     INTO X
-                    INTO Y
+                         Y
                     ON OVERFLOW DISPLAY "OVF"
                     NOT ON OVERFLOW DISPLAY "OK"
                 END-UNSTRING.
