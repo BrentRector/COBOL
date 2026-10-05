@@ -46,6 +46,7 @@ param(
     [int]$FastFailSeconds = 120,
     [int]$IdleCloseSeconds = 20,
     [int]$CheckpointSeconds = 300,
+    [int]$StartupTicks = 300,
     [int]$BackoffBaseSeconds = 60
 )
 $ErrorActionPreference = 'Stop'
@@ -181,8 +182,13 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
     $log = [System.IO.StreamWriter]::new("$logBase.jsonl", $false, [System.Text.UTF8Encoding]::new($false))
     $proc = [System.Diagnostics.Process]::Start($psi)
     $errTask = $proc.StandardError.ReadToEndAsync()
-    $proc.StandardInput.WriteLine((@{ type = 'user'; message = @{ role = 'user'; content = $prompt } } | ConvertTo-Json -Compress -Depth 5))
-    $proc.StandardInput.Flush()
+    # ⛔ NEVER WRITE THE PROMPT SYNCHRONOUSLY. The CLI writes a large `init` event to stdout BEFORE it reads stdin; once that
+    # fills the stdout pipe it blocks until we read, and a synchronous write of a prompt larger than the stdin pipe buffer
+    # (about 4 KB: the wave prompt grew past it on 2026-10-04) blocks until it reads: a cross-pipe deadlock, found as a wave
+    # unit that sat two hours with a 0-byte log. The write is a task, and the read loop below starts at once.
+    $promptWrite = $proc.StandardInput.WriteLineAsync((@{ type = 'user'; message = @{ role = 'user'; content = $prompt } } | ConvertTo-Json -Compress -Depth 5))
+    $startTicks = 0          # loop ticks (one per second waited) with no event at all: immune to the clock, unlike a timestamp
+    $anyEvent = $false
     $resultSeen = $false     # the model has ended a turn and nothing has started since
     $bgTasks = 0             # background tasks (a Workflow, a gate) the session reports as running
     $lastEventAt = Get-Date
@@ -200,9 +206,31 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
     try {
         $read = $proc.StandardOutput.ReadLineAsync()
         while ($true) {
-            if ($read.Wait(1000)) {
+            if (-not $read.Wait(1000)) {
+                # Startup watchdog: a unit that has emitted NO event after -StartupTicks ticks is hung at start (a deadlock, a
+                # network or hook stall); a healthy session emits its init event within seconds. Count ticks, not wall time,
+                # so a suspended machine cannot trip it. The unit counts as failed and the supervisor synthesizes its handoff.
+                if (-not $anyEvent) {
+                    $startTicks++
+                    if ($startTicks -ge $StartupTicks -and -not $proc.HasExited) {
+                        Say "no event from the unit in $StartupTicks s of waiting: it is hung at start; killing it (the loop continues)"
+                        $proc.Kill($true)
+                        $stats.killed = $true
+                    }
+                }
+            }
+            if ($promptWrite -and $promptWrite.IsCompleted) {
+                if ($promptWrite.IsFaulted) {
+                    Say "the prompt could not be delivered ($($promptWrite.Exception.GetBaseException().Message)); killing the unit"
+                    if (-not $proc.HasExited) { $proc.Kill($true) }
+                    $stats.killed = $true
+                }
+                $promptWrite = $null
+            }
+            if ($read.IsCompleted) {
                 $line = $read.Result
                 if ($null -eq $line) { break }
+                $anyEvent = $true
                 $log.WriteLine($line); $log.Flush()
                 $lastEventAt = Get-Date
                 $ev = $null

@@ -8,12 +8,24 @@
 # Like the real session, a mode that emits `result` then STAYS ALIVE until the supervisor closes stdin (eof.txt records it).
 # Every invocation appends its arguments to FAKE_CLAUDE_MARK, so a test can prove whether it ran and with what.
 $ErrorActionPreference = 'Stop'
+if ($env:FAKE_CLAUDE_MODE -eq 'bigstart') {
+    # The real CLI writes a large `init` event (tools, MCP servers, slash commands) to stdout BEFORE it reads stdin. When
+    # that fills the stdout pipe, the child blocks until the supervisor reads; a supervisor still blocked writing a prompt
+    # larger than the stdin pipe buffer deadlocks with it (the 2026-10-05 wave unit: 2 hours, 0 bytes of log).
+    [Console]::Out.WriteLine((@{ type = 'system'; subtype = 'init'; padding = ('x' * 300000) } | ConvertTo-Json -Compress))
+    [Console]::Out.Flush()
+}
 # The prompt arrives as the first stream-json line on stdin (the supervisor keeps stdin open); one mark line carries both.
 $firstLine = [Console]::In.ReadLine()
 if ($env:FAKE_CLAUDE_MARK) { Add-Content -Path $env:FAKE_CLAUDE_MARK -Value ((($args -join ' | ') + ' | STDIN ' + $firstLine) -replace '[\r\n]+', ' ') -Encoding utf8 }
 $coord = $env:COBOL_COORD_DIR
 $handoff = Join-Path $coord 'handoff.json'
 $sid = $args[[array]::IndexOf($args, '--session-id') + 1]
+if ($env:FAKE_CLAUDE_MODE -eq 'silent') {
+    # A unit hung at start: it read its prompt and then emits NOTHING, not even `init` (the startup watchdog must kill it).
+    Start-Sleep -Seconds 600
+    exit 0
+}
 function Emit($o) { [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress -Depth 10)); [Console]::Out.Flush() }
 function Call([string]$id, [long]$cacheRead) {
     $usage = @{ input_tokens = 3; output_tokens = 200; cache_read_input_tokens = $cacheRead; cache_creation_input_tokens = 1000 }
