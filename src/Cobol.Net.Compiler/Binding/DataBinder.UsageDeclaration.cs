@@ -73,7 +73,7 @@ public sealed partial class DataBinder
     ///
     /// <para>⛔ Runs over <see cref="ConformanceForest"/>, NOT <see cref="CompositionForest"/>. These are
     /// properties of the WRITTEN clause list, and the forest choice is what makes the verdict once-per-source:
-    /// it walks <see cref="Roots"/> + <see cref="LinkageRoots"/> + the TYPEDEF templates in <see cref="TypeDecls"/>
+    /// it walks <see cref="Roots"/> (which already holds the LINKAGE roots) + the TYPEDEF templates in <see cref="TypeDecls"/>
     /// and PRUNES the TYPE-clone subtrees, so <c>01 W IS TYPEDEF. 05 WP USAGE POINTER.</c> is rejected ONCE at
     /// the template no matter how many <c>TYPE W</c> reference sites exist — the entry the programmer must
     /// change. A SAME AS copy is NOT pruned (<see cref="StrongTypeModel.TypeAnchor"/> keys on a TYPE clause,

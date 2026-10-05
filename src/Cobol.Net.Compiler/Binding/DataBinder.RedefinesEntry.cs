@@ -2,17 +2,14 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Model;
 using CobolNet.Editions.Diagnostics;
-using CobolNet.Frontend.Cst;
-using CobolNet.Frontend.Generated;
 
 namespace CobolNet.Binding;
-
-using Core = CobolParserCore;
 
 /// <summary>
 /// The REDEFINES clause's ENTRY-level syntax rules (ISO §13.18.44.3; kb/Work PB1280) — the ones that ask about the
 /// subject and data-name-2 as WRITTEN, before the storage-class machinery (<c>ClassifyRedefinesClasses</c>) lays the
-/// overlay out: SR1 (position in the entry), SR2 (identical level-numbers), SR3 (not a level-1 file-section entry),
+/// overlay out: SR1 (position in the entry — <c>ScreenLeadingClausePosition</c>, DataBinder.ClausePlacement.cs, beside
+/// its §13.16.3 SR4 TYPEDEF twin), SR2 (identical level-numbers), SR3 (not a level-1 file-section entry),
 /// SR8 (the size screen, in BITS, with its level-1-without-EXTERNAL exception), SR13 (data-name-2 is no CONSTANT
 /// RECORD) and SR15 (alignment). The clause-placement table had named <c>ResolveRedefines</c> as the home of the
 /// "level and position rules" and nothing was there: data-name-2 was found by name alone, so a 77 and an 01 were
@@ -20,26 +17,6 @@ using Core = CobolParserCore;
 /// </summary>
 public sealed partial class DataBinder
 {
-    /// <summary>§13.18.44.3 SR1 — "The REDEFINES clause shall immediately follow the entry-name clause; if the
-    /// entry-name clause is not specified, the REDEFINES clause shall immediately follow the level-number." The
-    /// dataDescriptionClauses list is free-order, so the check is the clause's ORDINAL in the entry: the entry-name and
-    /// level-number are not in the list, which makes "immediately follows" exactly "is its FIRST clause". Asked where
-    /// the entry's parse node is at hand.</summary>
-    private void ScreenRedefinesPosition(DataDescriptionCst entry, string? cobolName)
-    {
-        var clauses = entry.Clauses;
-        for (int i = 0; i < clauses.Count; i++)
-        {
-            if (clauses[i].Kind != DataClauseKind.Redefines) continue;
-            if (i == 0) return;
-            Edition.Error(DiagnosticCatalog.RedefinesEntryRule,
-                $"'{cobolName ?? "FILLER"}': the REDEFINES clause follows {DataClauseKinds.Name(clauses[0].Kind)} but shall "
-                + "immediately follow the entry-name clause, or the level-number when the entry-name clause is not "
-                + "specified (ISO §13.18.44.3 SR1)");
-            return;
-        }
-    }
-
     /// <summary>The entry-level rules over the RESOLVED pair (subject, data-name-2), asked once per REDEFINES clause by
     /// <see cref="ResolveRedefines"/> — the one place both entries are known.</summary>
     private void ScreenRedefinesEntry(DataItem item, DataItem target)

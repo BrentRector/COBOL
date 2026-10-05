@@ -13,8 +13,9 @@ internal enum ClausePlacementKind
     /// <summary>Only on an entry with no subordinate entries (§8.5.1.3.1's "not further subdivided"). Decidable
     /// only over the finished forest — the subordinates are not parsed when the entry binds.</summary>
     ElementaryOnly,
-    /// <summary>Only at level-number 1, and only in the sections <see cref="ClausePlacementRule.Sections"/>
-    /// names — one rule because every such sentence in the standard states both halves together.</summary>
+    /// <summary>Only at the level-numbers <see cref="ClausePlacementRule.ResidenceLevels"/> admits (level 1 when
+    /// the row names none), and only in the sections <see cref="ClausePlacementRule.Sections"/> names — one rule
+    /// because every such sentence in the standard states both halves together.</summary>
     Residence,
     /// <summary>Only with the data-name format of the entry-name clause (never FILLER, never omitted).</summary>
     DataNameRequired,
@@ -43,11 +44,32 @@ internal enum EntrySections
 /// words, which is what the diagnostic quotes. <see cref="TypeDeclarationInAnySection"/> is §13.18.22.3 SR1's
 /// third residence — "in level 1 type declarations", which names no section. <see cref="Levels"/> is the level-number
 /// set a <see cref="ClausePlacementKind.NotAtLevel"/> rule forbids; it is stated whole as the sentence states it, so
-/// a level the entry binder never sees here (66 and 88 are RENAMES and condition-name entries) is still in the row.</summary>
+/// a level the entry binder never sees here (66 and 88 are RENAMES and condition-name entries) is still in the row.
+/// <see cref="ResidenceLevels"/> is the OPPOSITE set — the level-numbers a <see cref="ClausePlacementKind.Residence"/>
+/// rule ADMITS; null is level 1 alone, which is what every residence sentence says but §13.16.3 SR16's ("The level
+/// number of such data description entries shall be 1 or 77").</summary>
 internal sealed record ClausePlacementRule(
     DataClauseKind Clauses, ClausePlacementKind Kind, string Rule, string Sentence, DiagnosticDescriptor Code,
     DataClauseKind Excluded = DataClauseKind.None, EntrySections Sections = EntrySections.All,
-    bool TypeDeclarationInAnySection = false, IReadOnlyList<int>? Levels = null);
+    bool TypeDeclarationInAnySection = false, IReadOnlyList<int>? Levels = null,
+    IReadOnlyList<int>? ResidenceLevels = null)
+{
+    /// <summary>Why an entry at <paramref name="level"/> in <paramref name="section"/> breaks this
+    /// <see cref="ClausePlacementKind.Residence"/> row, in words for the diagnostic — or null when it does not.
+    /// ⛔ THE ONE residence test: <c>DataBinder.ScreenClausePlacement</c> asks it of a WRITTEN clause and
+    /// <c>DataBinder.ScreenComposedBased</c> of a BASED clause a TYPE or SAME AS clause composed into the entry, so
+    /// the two arms cannot hold different halves of one sentence (kb/Work PB516: the SECTION half of SR16 was asked
+    /// by neither). <paramref name="section"/> is null for an entry no section describes (a compiler temporary).</summary>
+    public string? ResidenceFault(int level, EntrySection? section, bool isTypeDeclaration)
+    {
+        if (ResidenceLevels is { } admitted ? !admitted.Contains(level) : level != 1)
+            return $"this entry's level-number is {level:00}";
+        if (section is { } s && (Sections & (EntrySections)(1 << (int)s)) == 0
+            && !(TypeDeclarationInAnySection && isTypeDeclaration))
+            return $"this entry is in the {DataBinder.SectionWords(s)}";
+        return null;
+    }
+}
 
 /// <summary>
 /// ⛔ <b>THE DATA-DESCRIPTION CLAUSE-PLACEMENT SCREEN — one table, two sites, no private copies</b>
@@ -111,6 +133,17 @@ internal static class ClausePlacementRules
             + "entries in the working-storage section, and in level 1 type declarations.",
             DiagnosticCatalog.DataClausePlacement, Sections: EntrySections.WorkingStorage,
             TypeDeclarationInAnySection: true),
+        // §13.16.3 SR16 — kb/Work PB516. Both sentences in one row: the level half used to be a private arm of the
+        // BASED block and the SECTION half was asked by nothing, so `FD F. 01 R BASED PIC X(10).` compiled — a
+        // record area the file subsystem fills, described at once as an unallocated template. The TYPE / SAME AS
+        // composed BASED asks the same row (DataBinder.ScreenComposedBased, ResidenceFault).
+        new(DataClauseKind.Based, ClausePlacementKind.Residence, "§13.16.3 SR16",
+            "The BASED clause may be specified only in data description entries in the linkage section, in the "
+            + "working-storage section, and in the local-storage section. The level number of such data description "
+            + "entries shall be 1 or 77.",
+            DiagnosticCatalog.DataClausePlacement,
+            Sections: EntrySections.Linkage | EntrySections.WorkingStorage | EntrySections.LocalStorage,
+            ResidenceLevels: [1, 77]),
         // §13.16.3 SR21 — kb/Work PB1273. It was a private arm of the OO pass, which walks only the object/factory
         // working storage it synthesizes accessors for, so the refusal hung on SR1's placement being right.
         new(DataClauseKind.Property, ClausePlacementKind.NotWith, "§13.16.3 SR21",
@@ -150,16 +183,15 @@ internal static class ClausePlacementRules
         new Dictionary<DataClauseKind, string>
         {
             [DataClauseKind.Usage] = "no placement rule — group or elementary (§13.18.60.4 GR1 inheritance)",
-            [DataClauseKind.Redefines] = "§13.18.44.3 — ScreenRedefinesPosition / ScreenRedefinesEntry (DataBinder.RedefinesEntry.cs: position, level, file-section, size, alignment)",
+            [DataClauseKind.Redefines] = "§13.18.44.3 — ScreenLeadingClausePosition (position) / ScreenRedefinesEntry (DataBinder.RedefinesEntry.cs: level, file-section, size, alignment)",
             [DataClauseKind.Value] = "§13.18.63.3 — ScreenValueLiteral / CheckGroupValueDeclarations",
             [DataClauseKind.Sign] = "§13.18.52.3 — InheritSignClauses (group and elementary both legal)",
             [DataClauseKind.Synchronized] = "§13.18.55 — group legal at 2023 (UsageInheritanceGroup's edition gate)",
             [DataClauseKind.Aligned] = "§13.18.1.3 SR1 — CheckAlignedClauses",
             [DataClauseKind.ConstantRecord] = "§13.16.3 SR6 / §13.18.15.3 SR1 — BindEntry's CONSTANT RECORD block and BindEntries",
             [DataClauseKind.Type] = "§13.16.3 SR14 — BindEntry's TYPE composition check",
-            [DataClauseKind.Typedef] = "§13.16.3 SR15 — RegisterTypeDecl and BindEntries (level 1, data-name)",
+            [DataClauseKind.Typedef] = "§13.16.3 SR15 — RegisterTypeDecl and BindEntries (level 1, data-name); SR4 — ScreenLeadingClausePosition (first clause)",
             [DataClauseKind.SameAs] = "§13.16.3 SR12 — BindEntry's SAME AS composition check",
-            [DataClauseKind.Based] = "§13.16.3 SR3/SR16 — BindEntry's BASED block",
             [DataClauseKind.AnyLength] = "§13.18.2.3 — AnyLengthValidateUnit (linkage, elementary)",
             [DataClauseKind.DynamicLength] = "§13.18.19.3 — BindEntry's DYNAMIC LENGTH block",
             [DataClauseKind.GroupUsage] = "§13.18.29.3 SR1 — UsageInheritanceGroup / UsageInheritanceElementary",
@@ -184,13 +216,10 @@ public sealed partial class DataBinder
             if (subject == DataClauseKind.None) continue;
             string? why = rule.Kind switch
             {
-                // Level 77 is not level 1: §13.16.3 SR1 lists them as distinct level-numbers, and every
-                // residence sentence in this table says "level-number is 1" / "level 1".
-                ClausePlacementKind.Residence when level != 1 =>
-                    $"this entry's level-number is {level:00}",
-                ClausePlacementKind.Residence when (rule.Sections & (EntrySections)(1 << (int)section)) == 0
-                    && !(rule.TypeDeclarationInAnySection && (written & DataClauseKind.Typedef) != 0) =>
-                    $"this entry is in the {SectionWords(section)}",
+                // Level 77 is not level 1: §13.16.3 SR1 lists them as distinct level-numbers, and a residence
+                // sentence admits 77 only where it says so (SR16 — the row's ResidenceLevels).
+                ClausePlacementKind.Residence =>
+                    rule.ResidenceFault(level, section, (written & DataClauseKind.Typedef) != 0),
                 ClausePlacementKind.NotAtLevel when rule.Levels!.Contains(level) =>
                     $"this entry's level-number is {level:00}",
                 ClausePlacementKind.DataNameRequired when isFiller =>
@@ -208,7 +237,38 @@ public sealed partial class DataBinder
         return refused;
     }
 
-    private static string SectionWords(EntrySection section) => section switch
+    /// <summary>The clauses whose POSITION in the entry the standard fixes — "shall immediately follow the
+    /// entry-name clause" — each with the rule that says so and the code it reports under. The REDEFINES row is
+    /// §13.18.44.3 SR1 (restated by §13.16.3 SR4); the TYPEDEF row is §13.16.3 SR4 alone, which nothing asked until
+    /// kb/Work PB486, so `01 T PIC X(4) IS TYPEDEF.` compiled. §13.16.3 SR4 ends "The remaining clauses may be
+    /// written in any order", so this set is closed.</summary>
+    private static readonly (DataClauseKind Kind, string Rule, DiagnosticDescriptor Code)[] LeadingClauses =
+    [
+        (DataClauseKind.Redefines, "§13.18.44.3 SR1", DiagnosticCatalog.RedefinesEntryRule),
+        (DataClauseKind.Typedef, "§13.16.3 SR4", DiagnosticCatalog.DataClausePlacement),
+    ];
+
+    /// <summary>§13.16.3 SR4's positional sentences: "The REDEFINES clause, if specified, shall immediately follow
+    /// the entry-name clause, if specified; otherwise, the REDEFINES clause shall immediately follow the
+    /// level-number. If the TYPEDEF clause is specified, … the TYPEDEF clause shall immediately follow the
+    /// entry-name clause." The clause list is free-order (<c>dataDescriptionClause*</c>), so the check is each
+    /// clause's ORDINAL in the entry: the entry-name and level-number are not in the list, which makes "immediately
+    /// follows" exactly "is its FIRST clause". (A TYPEDEF entry without a data-name is SR15's, asked by
+    /// <c>RegisterTypeDecl</c>; REDEFINES beside TYPEDEF is SR3's, so such an entry draws both.)</summary>
+    private void ScreenLeadingClausePosition(DataDescriptionCst entry, string? cobolName)
+    {
+        var clauses = entry.Clauses;
+        for (int i = 1; i < clauses.Count; i++)
+            foreach (var (kind, rule, code) in LeadingClauses)
+                if (clauses[i].Kind == kind)
+                    Edition.Error(code, $"'{cobolName ?? "FILLER"}': the {DataClauseKinds.Name(kind)} clause follows "
+                        + $"{DataClauseKinds.Name(clauses[0].Kind)} but shall immediately follow the entry-name clause"
+                        + (kind == DataClauseKind.Redefines
+                            ? ", or the level-number when the entry-name clause is not specified" : "")
+                        + $" (ISO {rule})");
+    }
+
+    internal static string SectionWords(EntrySection section) => section switch
     {
         EntrySection.WorkingStorage => "working-storage section",
         EntrySection.LocalStorage => "local-storage section",

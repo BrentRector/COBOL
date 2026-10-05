@@ -203,8 +203,10 @@ unscreened for every one of them. The same-entry half of SR13 stays in `BindEntr
 **⛔ THE REDEFINES CLAUSE'S ENTRY-LEVEL RULES ARE ASKED OF THE RESOLVED PAIR, IN ONE FILE** (kb/Work PB1280;
 `DataBinder.RedefinesEntry.cs`). Data-name-2 is selected as the original definition: the nearest same-named
 preceding entry that is not itself a redefinition (§13.18.44.3 SR7 + NOTE 1, §8.4.2.2.1 rule 2), among the subject's
-siblings, and at top level among the roots of the subject's own section (SR10). `ScreenRedefinesPosition` (asked in
-`BindEntry`, where the written clause list is: SR1 "immediately follows" is "is the first clause") and
+siblings, and at top level among the roots of the subject's own section (SR10). `ScreenLeadingClausePosition` (asked in
+`BindEntry`, where the written clause list is: SR1 "immediately follows" is "is the first clause"; it lives in
+`DataBinder.ClausePlacement.cs` because §13.16.3 SR4 fixes the TYPEDEF clause's position in the same words, kb/Work
+PB486) and
 `ScreenRedefinesEntry` (asked once per resolved clause: SR2 identical level-numbers, SR3 no REDEFINES in a level-1
 file-section entry, SR8 the size screen in BITS with its level-1-without-EXTERNAL exemption, SR13 no CONSTANT RECORD
 target, SR15 alignment — a subject that needs a byte boundary over a data-name-2 that begins mid-byte) are COBOLNET2739
@@ -1647,7 +1649,7 @@ all three are now `CheckUsageDeclarations`
 §13.18.60.4 GR1 group inheritance, a TYPE clone, and a SAME AS copy. The structural twin §13.18.57.3 SR6 is
 implemented in this tree as two hand-written parent walks (in `ExpandType` and `ExpandSameAs`), so writing SR14
 that way would have duplicated a rule at four sites instead of two. `DataBinder.ConformanceForest()` already means
-"every entry the programmer WROTE, once each" — it walks `Roots` + `LinkageRoots` + the `TypeDecls` templates and
+"every entry the programmer WROTE, once each" — it walks `Roots` (which already holds the LINKAGE roots) + the `TypeDecls` templates and
 prunes TYPE-clone subtrees — so one predicate over it covers all four routes, anchors the verdict at the entry
 that must change (a weak typedef's pointer member is reported ONCE at the template, not once per `TYPE` use), and
 screens a fifth route added later for free.

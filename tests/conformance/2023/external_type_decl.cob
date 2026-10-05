@@ -9,7 +9,7 @@
       *> below-edition leg is asserted by the version matrix.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 T IS EXTERNAL TYPEDEF STRONG.
+       01 T TYPEDEF STRONG IS EXTERNAL.
           05 A PIC X(4).
        01 R TYPE T IS EXTERNAL.
        PROCEDURE DIVISION.

@@ -690,7 +690,7 @@
    "removedIn": null,
    "expectDiagnostic": "COBOLNET0900",
    "vcr": "VCR row 63 (strongly-typed EXTERNAL type declaration — 2023 introduction; weak external TYPEDEF stays COBOL-2002)",
-   "source": "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. XTD.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n       01 T IS EXTERNAL TYPEDEF STRONG.\n          05 A PIC X(4).\n       01 R TYPE T IS EXTERNAL.\n       PROCEDURE DIVISION.\n       MAIN.\n           STOP RUN.\n"
+   "source": "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. XTD.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n       01 T TYPEDEF STRONG IS EXTERNAL.\n          05 A PIC X(4).\n       01 R TYPE T IS EXTERNAL.\n       PROCEDURE DIVISION.\n       MAIN.\n           STOP RUN.\n"
   },
   {
    "id": "value-numeric-literal-numeric-edited-2023",

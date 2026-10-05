@@ -194,6 +194,11 @@ internal static class OoExpansion
                         + $"definition ({sr8})");
                 kinds.Add(kind);
             }
+            // §12.3.8.3 SR12 / SR13 (kb/Work PB1744): a parameter-name is a user-defined word (§8.3.2.2) in the scope
+            // of this definition's REPOSITORY paragraph, so one its FUNCTION … INTRINSIC specifier identifies is
+            // refused — through the one declaration funnel, since no binder ever binds this skeleton.
+            new DataBinder(edition) { CobolWords = words }
+                .DeclareParameterNames(OoRepositoryScope.RepositoryEntries(env), formals);
             // §11.3.4 GR6 / §11.6.4 GR4: a parameter-name may be specified "only where an object-class-name or an
             // interface-name is permitted". Every occurrence is substituted (that is GR5), so a formal written in
             // a DECLARATION slot would silently rename a data item, paragraph, method or file in every expansion;

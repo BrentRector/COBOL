@@ -580,17 +580,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // (M2-UDF-4). `FUNCTION ALL INTRINSIC` carries no functionName.
             else if (re.FUNCTION() is not null && re.INTRINSIC() is not null)
             {
-                if (re.ALL() is not null) RepositoryAllIntrinsic = true;
-                else foreach (var inf in re.functionName())
-                {
-                    // An intrinsic-function-name-1 is one of the names §12.3.8.3 SR1 compares (kb/Work PB1017).
+                // An intrinsic-function-name-1 is one of the names §12.3.8.3 SR1 compares (kb/Work PB1017).
+                foreach (var inf in re.functionName())
                     using (Edition.At(re))
                         CheckRepositorySpecification(inf.GetText(), new RepositorySpecification(IntrinsicKind, null, null),
                             inf.GetText());
-                    // The CANONICAL name (an EQUATE / SUBSTITUTE synonym names its intrinsic), so every spelling of
-                    // the function is a member (RepositoryIntrinsicSpecifier; kb/Work PB1083).
-                    RepositoryIntrinsics.Add(FunctionWord.OfToken(inf.Start, CobolWords).Name);
-                }
+                AddRepositoryIntrinsics(re);
             }
         }
         // ⛔ A specifier that names THIS unit is IGNORED (§12.3.8.3 SR11 for a function-specifier, SR15 for a
@@ -1098,8 +1093,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             return;
         }
         if (item.RedefinesTargetName is not null)
-            Edition.Error(DiagnosticCatalog.TypeDeclarationShape, $"TYPEDEF '{item.CobolName}': the TYPEDEF and REDEFINES clauses are "
-                + "mutually exclusive (ISO §13.16)");
+            Edition.Error(DiagnosticCatalog.TypeDeclarationShape, $"TYPEDEF '{item.CobolName}': the REDEFINES clause shall not be "
+                + "specified in the same data description entry as the TYPEDEF clause (ISO §13.16.3 SR3)");
         // §13.18.58.3 SR1 (an elementary subject shall not specify STRONG) is asked when the declaration is
         // COMPLETED (ExpandTemplate): a subject that is elementary through its own TYPE clause has no PICTURE yet
         // here (kb/Work PB1301).
@@ -3263,6 +3258,37 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         return true;
     }
 
+    /// <summary>Record one <c>FUNCTION … INTRINSIC</c> specifier's members in the REPOSITORY membership
+    /// <see cref="RepositoryIntrinsicSpecifier"/> reads: <c>ALL</c> (§12.3.8.3 SR13) or each listed name (SR12) by
+    /// its CANONICAL name (an EQUATE / SUBSTITUTE synonym names its intrinsic), so every spelling of the function is
+    /// a member (kb/Work PB1083). The one writer of that membership — a program's REPOSITORY loop and a
+    /// parameterized definition's (<see cref="DeclareParameterNames"/>) both come here.</summary>
+    private void AddRepositoryIntrinsics(Core.RepositoryEntryContext re)
+    {
+        if (re.ALL() is not null) RepositoryAllIntrinsic = true;
+        else foreach (var inf in re.functionName())
+            RepositoryIntrinsics.Add(FunctionWord.OfToken(inf.Start, CobolWords).Name);
+    }
+
+    /// <summary>Declare a PARAMETERIZED class or interface definition's parameter-names (§11.3.2 / §11.6.2
+    /// <c>USING parameter-name-1</c>) through the one funnel, <see cref="DeclareUserWord"/>, within the scope of that
+    /// definition's own REPOSITORY paragraph (kb/Work PB1744). The definition is a skeleton that no binder binds:
+    /// <c>OoExpansion</c> replaces every formal by its actual before the class table exists, so an expansion's binder
+    /// sees only the actual. The formal's own spelling was therefore never asked §12.3.8.3 SR12 ("Intrinsic-function-
+    /// name-1 shall not be specified as a user-defined word within the scope of this REPOSITORY paragraph") or SR13
+    /// (ALL), and <c>CLASS-ID. C USING SQRT.</c> under <c>FUNCTION ALL INTRINSIC</c> compiled. Only the INTRINSIC
+    /// specifiers are recorded here: the class- and interface-specifiers that declare the formals are those formals
+    /// (§11.3.3 SR8), so declaring them again as object-class-names would make one word two types of user-defined
+    /// word (§8.3.2.2).</summary>
+    internal void DeclareParameterNames(IEnumerable<Core.RepositoryEntryContext> repository,
+        IEnumerable<Core.OoParameterNameContext> formals)
+    {
+        foreach (var re in repository)
+            if (re.FUNCTION() is not null && re.INTRINSIC() is not null) AddRepositoryIntrinsics(re);
+        foreach (var f in formals)
+            using (Edition.At(f)) DeclareUserWord(f.GetText(), UserWordKind.ParameterName);
+    }
+
     /// <summary>The TYPE each user-defined word of THIS source element was first declared as — the census behind
     /// §8.3.2.2's "<i>a given user-defined word may be used as only one type of user-defined word</i>" (kb/Work
     /// PB990). One instance of the binder is one source element, so the map is per element by construction; a name a
@@ -3692,31 +3718,35 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         return null;
     }
 
-    /// <summary>ISO §13.16.3 SR16's LEVEL sentence — "The level number of such data description entries shall be
-    /// 1 or 77" — as ONE predicate for both ways an entry comes to carry a BASED clause: written
-    /// (<c>BindEntry</c>'s BASED block) and composed by a TYPE / SAME AS copy (<see cref="ScreenComposedBased"/>).
-    /// ⚠ SR16's SECTION sentence ("only in data description entries in the linkage section, in the
-    /// working-storage section, and in the local-storage section") is NOT asked yet by either arm — kb/Work PB516
-    /// owns it, and its fix belongs HERE so both arms acquire it at once.</summary>
-    private static bool BasedLevelAdmitted(int level) => level is 1 or 77;
+    /// <summary>The clause-placement table's §13.16.3 SR16 row — the BASED clause's residence (level 1 or 77; the
+    /// linkage, working-storage or local-storage section), the one statement both arms ask: a WRITTEN BASED
+    /// clause through <c>ScreenClausePlacement</c>, a composed one through <see cref="ScreenComposedBased"/>.</summary>
+    private static readonly ClausePlacementRule BasedResidence = ClausePlacementRules.Rules.Single(r =>
+        r.Kind is ClausePlacementKind.Residence && r.Clauses == DataClauseKind.Based);
 
     /// <summary>The placement screen for a BASED clause a TYPE or SAME AS clause COMPOSED into
     /// <paramref name="subject"/> (kb/Work PB1300). §13.18.57.4 GR1 and §13.18.49.4 GR1 make the clause's effect
     /// "as though the data description identified by type-name-1 [data-name-1] had been coded in place", and
     /// neither excludes BASED, so the composed entry is held to the rules a written BASED clause is: §13.16.3 SR16
-    /// (level 1 or 77), SR5 ("The EXTERNAL clause shall not be specified in the same data description entry as
-    /// the REDEFINES or BASED clause") and SR13 (BASED "shall not be specified in the same data description entry
-    /// with the CONSTANT RECORD clause"). §13.16.3 SR3's REDEFINES arm cannot arise — SR12 and SR14 already refuse
-    /// REDEFINES beside SAME AS and TYPE. The formal-parameter ban (§14.2.2 SR1) and the class-object rule
-    /// (§13.18.5.3 SR1) read <see cref="DataItem.IsBased"/> in later passes and so judge the composed entry
-    /// without help. A violation reports once and clears the flag, so the entry binds as ordinary storage under
-    /// an already-failed compile — the written arm's discipline.</summary>
+    /// (level 1 or 77, in the linkage, working-storage or local-storage section — <see cref="BasedResidence"/>,
+    /// kb/Work PB516), SR5 ("The EXTERNAL clause shall not be specified in the same data description entry as
+    /// the REDEFINES or BASED clause"), SR13 (BASED "shall not be specified in the same data description entry
+    /// with the CONSTANT RECORD clause") and SR21 a) ("The PROPERTY clause shall not be specified in the same data
+    /// description entry as: a) a BASED clause" — kb/Work PB1650; §13.18.57.4 GR1 lists no PROPERTY exclusion and
+    /// §13.16.3 SR14 admits PROPERTY beside TYPE, so `01 P TYPE T PROPERTY.` over a BASED type is this case).
+    /// §13.16.3 SR3's REDEFINES arm cannot arise — SR12 and SR14 already refuse REDEFINES beside SAME AS and TYPE.
+    /// The formal-parameter ban (§14.2.2 SR1) and the class-object rule (§13.18.5.3 SR1) read
+    /// <see cref="DataItem.IsBased"/> in later passes and so judge the composed entry without help. A violation
+    /// reports once and clears the flag, so the entry binds as ordinary storage under an already-failed compile —
+    /// the written arm's discipline.</summary>
     private void ScreenComposedBased(DataItem subject, string via)
     {
         string? rule =
-            !BasedLevelAdmitted(subject.Level)
-                ? $"the BASED clause may be specified only in a level-01 or level-77 entry, and this entry is at "
-                  + $"level {subject.Level:00} (ISO §13.16.3 SR16)"
+            BasedResidence.ResidenceFault(subject.Level, subject.Section, isTypeDeclaration: false) is { } why
+                ? $"{why}: \"{BasedResidence.Sentence}\" (ISO {BasedResidence.Rule})"
+            : subject.Property is not null
+                ? "the PROPERTY clause shall not be specified in the same data description entry as a BASED clause "
+                  + "(ISO §13.16.3 SR21 a))"
             : subject.HasExternalClause
                 ? "the EXTERNAL clause shall not be specified in the same data description entry as the BASED "
                   + "clause (ISO §13.16.3 SR5)"
@@ -4920,7 +4950,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // author remembered. Read from the CST rather than reconstructed from those flags, because a syntax rule
         // asks what was SPECIFIED and several of the flags below are CLEARED by their own recovery paths.
         DataClauseKind written = e.WrittenClauses;
-        if ((written & DataClauseKind.Redefines) != 0) ScreenRedefinesPosition(e, cobolName);   // §13.18.44.3 SR1
+        if ((written & (DataClauseKind.Redefines | DataClauseKind.Typedef)) != 0)
+            ScreenLeadingClausePosition(e, cobolName);   // §13.18.44.3 SR1 / §13.16.3 SR4
 
         // The dataDescriptionClauses presence guard folds into e.Clauses (empty when the body has no clause list).
             foreach (var clause in e.Clauses)
@@ -5176,6 +5207,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         DataClauseKind placementRefused = ScreenClausePlacement(written, level, isFiller, section, entryWhere);
         if ((placementRefused & DataClauseKind.External) != 0) { hasExternal = false; externalAs = null; }
         if ((placementRefused & DataClauseKind.Property) != 0) property = null;   // §13.16.3 SR21 — no accessor from a refused clause
+        if ((placementRefused & DataClauseKind.Based) != 0) isBased = false;      // §13.16.3 SR16 — ordinary storage, never a half-based state
         // §13.18.42.3 SR1 — "The PROPERTY clause may be specified only in the working-storage section of a factory
         // definition or an instance definition" (kb/Work PB1273). Not a table row: the rule's axis is the SOURCE
         // ELEMENT (object or factory, never a program, function or METHOD), which the placement table's section bits
@@ -5711,20 +5743,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // ResolveTableValues pass — they read the entry's OCCURS ANCESTORS, which do not exist yet here.
         ScreenTableValueLiterals(item, entryWhere);
 
-        // BASED declaration validation (the 0881 declaration-entry band; Phase-4b increment 2): §13.16 SR16 —
-        // a BASED entry is a level-01/77 record-description entry (WS/LS/LINKAGE; the file-subsystem sweep is
-        // a named residue); §13.18.5 SRs — REDEFINES and BASED are mutually exclusive (:17215) and a VALUE
-        // clause cannot seed storage the item does not own. Violations clear the flag so the item binds as
-        // ordinary storage under an already-failed compile (never a half-based state).
+        // BASED declaration validation (Phase-4b increment 2). §13.16.3 SR16 — level 1 or 77, in the linkage,
+        // working-storage or local-storage section — is the clause-placement table's BASED Residence row, screened
+        // above (kb/Work PB516), which clears `isBased` on refusal. §13.16.3 SR3 — REDEFINES and BASED are mutually
+        // exclusive. Violations clear the flag so the item binds as ordinary storage under an already-failed
+        // compile (never a half-based state).
         if (isBased)
         {
-            if (!BasedLevelAdmitted(level))
-            {
-                Edition.Error(DiagnosticCatalog.UsageClauseCompatibility, $"{entryWhere}: the BASED clause may be specified only in a "
-                    + "level-01 or level-77 entry (ISO §13.16.3 SR16 / §13.18.5)");
-                isBased = false;
-            }
-            else if (redefinesTargetName is not null)
+            if (redefinesTargetName is not null)
             {
                 Edition.Error(DiagnosticCatalog.UsageClauseCompatibility, $"{entryWhere}: BASED and REDEFINES may not be specified "
                     + "together (ISO §13.16.3 SR3)");
@@ -7906,9 +7932,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>
     /// Every SOURCE-DECLARED data item this unit binds, for the post-bind <c>VersionConformancePass</c> data-attribute
-    /// gates (Step 14g): the WS + FILE-record + OO-method forest (<see cref="Roots"/>), the LINKAGE forest
-    /// (<see cref="LinkageRoots"/>, kept OFF <c>Roots</c>), and the TYPEDEF templates (<see cref="TypeDecls"/>, also OFF
-    /// <c>Roots</c>) — pre-order DFS, declaration order. It EXCLUDES the products of post-bind expansion, which the binder
+    /// gates (Step 14g): the WS + LS + FILE-record + LINKAGE + OO-method forest (<see cref="Roots"/> — the LINKAGE 01/77
+    /// items bind into it too, so <see cref="LinkageRoots"/> is a SUBSET of it and is not walked again) and the TYPEDEF
+    /// templates (<see cref="TypeDecls"/>, kept OFF <c>Roots</c>) — pre-order DFS, declaration order. It EXCLUDES the products of post-bind expansion, which the binder
     /// never re-analyzed and so never gated: a <c>TYPE IS type-name</c> clone subtree (its items carry a non-null
     /// <see cref="DataItem.TypeAnchor"/>; the once-per-source gate fired on the TEMPLATE in <c>TypeDecls</c>) and the
     /// OO/UDF compiler temps (recorded in <see cref="CompilerTempClones"/>; both share the source item's <c>PicInfo</c> by
@@ -7944,9 +7970,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// </summary>
     public IEnumerable<DataItem> CompositionForest() => DeclaredForest();
 
-    /// <summary>The shared spine of the two forests: <see cref="Roots"/> + <see cref="LinkageRoots"/> +
-    /// <see cref="TypeDecls"/> templates, pre-order DFS in declaration order, pruning the OO/UDF compiler temps
-    /// recorded in <see cref="CompilerTempClones"/>.</summary>
+    /// <summary>The shared spine of the two forests: <see cref="Roots"/> + <see cref="TypeDecls"/> templates, pre-order
+    /// DFS in declaration order, pruning the OO/UDF compiler temps recorded in <see cref="CompilerTempClones"/>.
+    /// ⛔ <see cref="LinkageRoots"/> is NOT concatenated: <c>BindEntries</c> puts every LINKAGE 01/77 on
+    /// <see cref="Roots"/> as well (DataBinder.Linkage.cs: "LINKAGE 01/77 items bind into the ordinary storage
+    /// forest"), so walking both yielded every linkage item TWICE to every per-item pass (measured on a two-root
+    /// LINKAGE SECTION: four items; found by kb/Work PB516's drift test).</summary>
     private IEnumerable<DataItem> DeclaredForest()
     {
         var temps = CompilerTempClones.Count == 0 ? null
@@ -7961,7 +7990,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             foreach (var c in d.Children)
                 foreach (var x in Walk(c)) yield return x;
         }
-        return Roots.Concat(LinkageRoots).SelectMany(Walk).Concat(TypeDecls.Values.SelectMany(Walk));
+        return Roots.SelectMany(Walk).Concat(TypeDecls.Values.SelectMany(Walk));
     }
 
     /// <summary>The elementary leaves of an item (itself if elementary), in source order.</summary>

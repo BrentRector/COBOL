@@ -15277,11 +15277,11 @@
   "subject": "REPOSITORY paragraph",
   "rule-digest": "d48e2a77b2fd",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUserWord; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RepositoryIntrinsicSpecifier; src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUnitName; src/Cobol.Net.Compiler/Binding/UserWordKind.cs#UserWordKind; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#DeclareUserWord; src/Cobol.Net.Compiler/Oo/OoDriver.cs#DeclareMethodWords",
-  "test-ref": "conformance:negative/pb1083-special-names-intrinsic-words; conformance:negative/pb1083-contained-program-intrinsic-name; unit:UserWordDeclarationDriftTests.EveryType_IsDeclared_OrExemptWithItsReason; unit:UserWordDeclarationDriftTests.TheEnum_IsTheStandardsList",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUserWord; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RepositoryIntrinsicSpecifier; src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUnitName; src/Cobol.Net.Compiler/Binding/UserWordKind.cs#UserWordKind; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#DeclareUserWord; src/Cobol.Net.Compiler/Oo/OoDriver.cs#DeclareMethodWords; src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareParameterNames; src/Cobol.Net.Compiler/Oo/OoExpansion.cs#Expand",
+  "test-ref": "conformance:negative/pb1083-special-names-intrinsic-words; conformance:negative/pb1083-contained-program-intrinsic-name; unit:UserWordDeclarationDriftTests.EveryType_IsDeclared_OrExemptWithItsReason; unit:UserWordDeclarationDriftTests.TheEnum_IsTheStandardsList; conformance:negative/pb1744-interface-parameter-name-intrinsic",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1083: every declaration of every §8.3.2.2 user-defined-word type announces its word through ONE funnel, DataBinder.DeclareUserWord(word, UserWordKind) — data-, record-, constant-, type-, condition-, index-, file-, report-, screen-, record-key-names, the SPECIAL-NAMES words (alphabet-, class-, locale-, mnemonic-, ordering-, dynamic-length-structure-names, symbolic-characters, switch condition-names), paragraph/section names, the unit's own program-/user-function-/prototype-name, the REPOSITORY's specifier words and the OO words. It asks the ONE membership (RepositoryIntrinsicSpecifier) and draws COBOLNET1649 naming SR12 for a FUNCTION name INTRINSIC specifier. UserWordDeclarationDriftTests parses §8.3.2.2's list from the spec and fails on a type neither declared nor exempted with its reason. The alphabet-name PI, class-name E and symbolic-character ABS (negative/pb1083-special-names-intrinsic-words) and a contained program named MOD under its container's FUNCTION MOD INTRINSIC (§12.3.4 GR1; negative/pb1083-contained-program-intrinsic-name) are refused; they compiled clean before. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName (kb/Work PB1083 replaced the six-caller screen with the one declaration funnel DataBinder.DeclareUserWord, which every §8.3.2.2 type reaches)",
+  "notes": "kb/Work PB1744 (wave 1019 D2) restates PB1083's CONFORMS with the parameter-name witness. SR12 ('Intrinsic-function-name-1 shall not be specified as a user-defined word within the scope of this REPOSITORY paragraph.', cite.py OK 12)) now reaches every §8.3.2.2 type: a parameterized class's or interface's parameter-names are declared through DeclareUserWord by DataBinder.DeclareParameterNames, which OoExpansion calls for every skeleton over the definition's own REPOSITORY (its FUNCTION ... INTRINSIC specifiers recorded by the one writer, AddRepositoryIntrinsics). `INTERFACE-ID. I USING MOD.` under `FUNCTION MOD INTRINSIC` is COBOLNET1649; the drift test's ParameterName exemption is gone.",
   "state": "OK"
  },
  {
@@ -15292,11 +15292,11 @@
   "subject": "REPOSITORY paragraph",
   "rule-digest": "9a4af3f24229",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUserWord; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RepositoryIntrinsicSpecifier; src/Cobol.Net.Compiler/Binding/DataBinder.cs#TryIntrinsicOfThisCompilation; src/Cobol.Net.Compiler/Binding/IntrinsicCatalog.cs#IsDefinedAt",
-  "test-ref": "conformance:negative/pb1083-all-intrinsic-2023-names; conformance:negative/pb1083-cobol-words-synonym-as-user-word; conformance:2014/pb1083_all_intrinsic_edition_names; unit:UserWordDeclarationDriftTests.EveryType_IsDeclared_OrExemptWithItsReason",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareUserWord; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RepositoryIntrinsicSpecifier; src/Cobol.Net.Compiler/Binding/DataBinder.cs#TryIntrinsicOfThisCompilation; src/Cobol.Net.Compiler/Binding/IntrinsicCatalog.cs#IsDefinedAt; src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclareParameterNames; src/Cobol.Net.Compiler/Oo/OoExpansion.cs#Expand",
+  "test-ref": "conformance:negative/pb1083-all-intrinsic-2023-names; conformance:negative/pb1083-cobol-words-synonym-as-user-word; conformance:2014/pb1083_all_intrinsic_edition_names; unit:UserWordDeclarationDriftTests.EveryType_IsDeclared_OrExemptWithItsReason; conformance:negative/pb1744-parameter-name-intrinsic; conformance:2002/pb1744_parameter_name_all_intrinsic",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1083: under FUNCTION ALL INTRINSIC the prohibited names are the §8.11 names OF THE TARGETED EDITION after >>COBOL-WORDS (DataBinder.TryIntrinsicOfThisCompilation: CobolWordsMap.Resolve, then IntrinsicSig.IsDefinedAt, the D8 window). So CONCAT / FIND-STRING / BASECONVERT are legal data-names at --std 2014 (2014/pb1083_all_intrinsic_edition_names prints 123) and refused at 2023 (Annex E.2 item 13; negative/pb1083-all-intrinsic-2023-names), and an EQUATE/SUBSTITUTE synonym (MYPI, EULER) is refused as a data-name (negative/pb1083-cobol-words-synonym-as-user-word). Every §8.3.2.2 type reaches the screen (see SR-12.3.8.3-12). retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenRepositoryIntrinsicName (kb/Work PB1083 replaced the six-caller screen with the one declaration funnel DataBinder.DeclareUserWord and the one membership RepositoryIntrinsicSpecifier)",
+  "notes": "kb/Work PB1744 (wave 1019 D2) restates PB1083's CONFORMS with the parameter-name witness: under FUNCTION ALL INTRINSIC ('none of the names of the intrinsic functions may be specified as a user-defined word within the scope of this REPOSITORY paragraph', cite.py OK 13)) `CLASS-ID. C USING SQRT.` is COBOLNET1649, while the legal parameter-name ELT compiles and its expansion runs (pb1744_parameter_name_all_intrinsic).",
   "state": "OK"
  },
  {
@@ -18876,13 +18876,13 @@
   "ordinal": 4,
   "subject": "Data description entry",
   "rule-digest": "2d891dac76cc",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDescriptionEntry; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntry",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDescriptionEntry; src/Cobol.Net.Compiler/Binding/DataBinder.ClausePlacement.cs#ScreenLeadingClausePosition; src/Cobol.Net.Compiler/Binding/DataBinder.cs#RegisterTypeDecl",
+  "test-ref": "conformance:negative/pb486-typedef-not-first; conformance:negative/pb1280-redefines-after-picture; conformance:negative/pb1280-redefines-after-global; conformance:2002/pb486_leading_clauses",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB486 — TWO of the rule's four obligations hold, TWO are enforced nowhere. HOLD: (i) 'the entry-name clause shall immediately follow the level-number' — the grammar shape `levelNumber dataName? dataDescriptionBody DOT` admits the entry-name in no other position; (ii) 'If no entry-name clause is specified, it is as though the filler format ... were specified' — BindEntry's `isFiller = cobolName is null || FILLER`; (iii) 'If the TYPEDEF clause is specified, the data-name format ... shall also be specified' — RegisterTypeDecl rejects an unnamed TYPEDEF (COBOLNET1529). FAIL: 'The REDEFINES clause ... shall immediately follow the entry-name clause' and 'the TYPEDEF clause shall immediately follow the entry-name clause'. `01 B PIC X(4) REDEFINES A.` and `01 T PIC X(4) IS TYPEDEF.` both compile and RUN clean at --std 85/2002/2014/2023 (probes p_sr4_redef.cob / p_sr4_typedef.cob). The clause list is a set, not a sequence, and nothing re-reads the written order. See finding data-description-entry-p2/F1. || code sites, verbatim from the adjudication: src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDescriptionEntry:212 + #dataDescriptionClauses:266 (`dataDescriptionClause*` — position-blind); src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntry:2186 (clause `foreach` at ~2228, order-insensitive); #RegisterTypeDecl:745",
-  "state": "GAP"
+  "notes": "kb/Work PB486 (wave 1019 D2). SR4's four obligations (cite.py --check 13.16.3 OK 4)): the entry-name immediately follows the level-number (grammar shape `levelNumber dataName? dataDescriptionBody`); REDEFINES immediately follows the entry-name or level-number (§13.18.44.3 SR1, COBOLNET2739); TYPEDEF requires the data-name format (RegisterTypeDecl) and immediately follows the entry-name ('If the TYPEDEF clause is specified, ... the TYPEDEF clause shall immediately follow the entry-name clause.'), now asked by the same ordinal screen as REDEFINES, ScreenLeadingClausePosition (COBOLNET2404) — `01 T PIC X(4) IS TYPEDEF.` used to compile and run. Nine corpus sources that wrote TYPEDEF after another clause were reordered (they were nonconforming).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.16.3-5",
@@ -19056,13 +19056,13 @@
   "ordinal": 16,
   "subject": "Data description entry",
   "rule-digest": "6e539e1dc62d",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntry",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.ClausePlacement.cs#ClausePlacementRules; src/Cobol.Net.Compiler/Binding/DataBinder.ClausePlacement.cs#ResidenceFault; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenComposedBased",
+  "test-ref": "conformance:negative/pb516-based-in-file-section; conformance:negative/pb516-composed-based-in-file-section; conformance:negative/based-level-05; conformance:negative/w66g-pb1300-composed-based-level; conformance:2002/pb516_based_residence; unit:DataClausePlacementDriftTests.Based_OutsideItsResidence_IsRefused; unit:DataClausePlacementDriftTests.Based_InEveryAdmittedResidence_BindsBased",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB516 — SECOND SENTENCE YES, FIRST SENTENCE NO. The level half is enforced: BindEntry rejects `level is not (1 or 77)` with COBOLNET0881 citing §13.16 SR16 (probe sr16_based_05; golden conformance:negative/based-level-05, reject-at 2002 2014 2023 -- spec-derived, but its .err pins only the message text of the LEVEL half, so it does not cover the row). The SECTION half -- 'may be specified only in data description entries in the linkage section, in the working-storage section, and in the local-storage section' -- has NO implementation: BindEntry never receives the EntrySection, and BindEntries (which does) applies its section test only to CONSTANT RECORD. Measured: a BASED record in the FILE SECTION under an FD compiles clean (`FD F. 01 R BASED PIC X(10).`, probes h_based_file / q_based_file_run), which is exactly the shape §13.18.5's storage model forbids -- a record area the file subsystem owns, described as an unallocated template with an implicit NULL data-address pointer. The three legal sections were probed positive (q_based_ls, q_based_lnk, sr16_based_ws_ok). The binder's own comment at the 0881 site already concedes it ('the file-subsystem sweep is a named residue'), and the fix is the section argument BindEntries already holds, threaded to the same guard that serves CONSTANT RECORD (§13.18.15.3 SR1) -- one section screen, two clauses.",
-  "state": "GAP"
+  "notes": "kb/Work PB516 (wave 1019 D2). Both sentences of SR16 ('The BASED clause may be specified only in data description entries in the linkage section, in the working-storage section, and in the local-storage section. The level number of such data description entries shall be 1 or 77.', cite.py --check 13.16.3 OK 16)) are ONE Residence row of the clause-placement table (admitted levels [1, 77], sections LINKAGE|WS|LS), asked of a WRITTEN BASED clause by ScreenClausePlacement (COBOLNET2404; the refusal clears IsBased) and of a BASED clause a TYPE or SAME AS clause composes by ScreenComposedBased (COBOLNET2510) through the same ClausePlacementRule.ResidenceFault. Before: the level half was a private arm of the BASED block and the SECTION half was asked by nothing, so `FD F. 01 R BASED PIC X(10).` compiled.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.16.3-17",
@@ -19132,11 +19132,11 @@
   "subject": "Data description entry",
   "rule-digest": "e5e63da4f8d3",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses",
-  "test-ref": "conformance:negative/pb521-property-with-based; conformance:negative/pb521-property-with-typedef",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.ClausePlacement.cs#ClausePlacementRules; src/Cobol.Net.Compiler/Binding/DataBinder.cs#ScreenComposedBased",
+  "test-ref": "conformance:negative/pb521-property-with-based; conformance:negative/pb521-property-with-typedef; conformance:negative/pb1650-property-composed-based; conformance:2002/pb1650_property_typed",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB521 (landed with PB956) - SR21 (\"The PROPERTY clause shall not be specified in the same data description entry as: a) a BASED clause, b) a TYPEDEF clause.\", cite.py --check 13.16.3 OK) is asked of the ENTRY'S OWN CLAUSES before the property roster looks up a subject, so both legs are COBOLNET2333 at 2002/2014/2023: b) no longer falls through the Roots lookup (a TYPEDEF template is kept off Roots) and a) no longer rides the retired whole-unit BASED-in-a-class stage.",
+  "notes": "kb/Work PB1650 (wave 1019 D2). SR21 ('The PROPERTY clause shall not be specified in the same data description entry as: a) a BASED clause, b) a TYPEDEF clause.', cite.py OK 21)) is the clause-placement table's NotWith row for a WRITTEN clause (COBOLNET2333), and ScreenComposedBased asks a) of a BASED clause a TYPE clause composes (§13.18.57.4 GR1, 'as though the data description identified by type-name-1 had been coded in place'; COBOLNET2510): `01 T TYPEDEF BASED PIC X(4). 01 P TYPE T PROPERTY.` in a class's object storage used to compile. b) cannot be composed: a TYPE copy never makes its subject a type declaration. The legal TYPE + PROPERTY spelling (SR14 admits it) is pb1650_property_typed. The code-location no longer names OoBindPropertyClauses, which holds no SR21 arm. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoBindPropertyClauses (OoBindPropertyClauses holds no SR21 arm since kb/Work PB1273 moved the written arm to the clause-placement table; the composed arm is ScreenComposedBased (kb/Work PB1650))",
   "state": "OK"
  },
  {
@@ -26407,11 +26407,11 @@
   "subject": "REDEFINES clause",
   "rule-digest": "b6043fe653e1",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDescriptionClauses; src/Cobol.Net.Frontend/Cst/DataClauseKind.cs; src/Cobol.Net.Compiler/Binding/DataBinder.RedefinesEntry.cs#ScreenRedefinesPosition; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntry",
-  "test-ref": "conformance:negative/pb1280-redefines-after-picture; conformance:negative/pb1280-redefines-after-global; conformance:2002/pb1280_redefines_entry_rules_legal",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#dataDescriptionClauses; src/Cobol.Net.Frontend/Cst/DataClauseKind.cs; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindEntry; src/Cobol.Net.Compiler/Binding/DataBinder.ClausePlacement.cs#ScreenLeadingClausePosition",
+  "test-ref": "conformance:negative/pb1280-redefines-after-picture; conformance:negative/pb1280-redefines-after-global; conformance:2002/pb1280_redefines_entry_rules_legal; conformance:2002/pb486_leading_clauses",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1280 (wave 1011 B2). cite.py --check 13.18.44.3 'The REDEFINES clause shall immediately follow the entry-name clause' OK SR1. The clause list is free-order and the entry-name / level-number are not in it, so 'immediately follows' is 'is the FIRST clause of the entry': BindEntry asks the written clause ordinal (ScreenRedefinesPosition) and names the clause that came first; COBOLNET2739.",
+  "notes": "kb/Work PB1280, re-sited by kb/Work PB486 (wave 1019 D2): SR1 ('The REDEFINES clause shall immediately follow the entry-name clause; if the entry-name clause is not specified, the REDEFINES clause shall immediately follow the level-number.', cite.py OK 1)) is asked by ScreenLeadingClausePosition (DataBinder.ClausePlacement.cs), the one ordinal screen it now shares with §13.16.3 SR4's TYPEDEF position; the message and COBOLNET2739 are unchanged. retired-witness: src/Cobol.Net.Compiler/Binding/DataBinder.RedefinesEntry.cs#ScreenRedefinesPosition (renamed and moved: the REDEFINES position screen is ScreenLeadingClausePosition in DataBinder.ClausePlacement.cs (kb/Work PB486), named by this record)",
   "state": "OK"
  },
  {
@@ -59481,13 +59481,13 @@
   "ordinal": 0,
   "subject": "SIGN clause",
   "rule-digest": "f2585a3f548d",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4; src/Cobol.Net.Compiler/Binding/DataBinder.cs; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#signClause; src/Cobol.Net.Frontend/Cst/ClauseCardinality.cs#ClauseCardinalities; src/Cobol.Net.Compiler/Validation/ClosedFormatPass.cs#ScreenClauseRepetition",
+  "test-ref": "conformance:negative/pb486-sign-written-twice; conformance:negative/pb917-data-usage-twice; conformance:negative/pb917-report-group-picture-twice",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB486 — THE CLAUSE'S OWN FORMAT IS EXACT; THE ENTRY MAY CARRY IT TWICE. The figure was RENDERED from the canonical PDF (scripts/render-spec-page.py 513 -> printed folio 483), not read from the transcription: `[ SIGN IS ] { LEADING / TRAILING } [ SEPARATE CHARACTER ]`, with SIGN, LEADING, TRAILING and SEPARATE underlined and IS and CHARACTER not, LEADING/TRAILING in BRACES (exactly one, no choice indicators). `signClause : (SIGN IS?)? (LEADING | TRAILING) (SEPARATE CHARACTER?)?` is a token-for-token match and every boundary was probed: all six printed shapes parse and behave (sg_fmt_bare_lead, sg_fmt_is_lead, sg_fmt_nosign_lead, sg_fmt_nosign_trail_sep, sg_fmt_full, sg_fmt_nosign_sepchar); the `SIGN IS` bracket is a UNIT, so `PIC S9(3) IS LEADING` is a parse error (sg_fmt_is_only); the brace is enforced, so `SIGN IS SEPARATE CHARACTER` with neither alternative is rejected (sg_fmt_neither); CHARACTER is optional and non-repeatable (sg_fmt_char_twice rejected). PARTIAL FOR ONE MEASURED OVER-ACCEPTANCE: a data description entry may carry the SIGN clause TWICE and the compiler silently takes the LAST. `01 A PIC S9(3) SIGN IS TRAILING LEADING VALUE -12.` compiles and stores a LEADING over-punch (`}12`) though the program selected TRAILING first (sg_fmt_trail_lead), while `SIGN IS LEADING TRAILING` stores a TRAILING over-punch (`01K`, sg_fmt_both) -- the LAST clause wins in written order either way, and `05 A PIC S9(3) SIGN IS LEADING SEPARATE SIGN IS TRAILING VALUE -12.` compiles and DROPS the separate character position -- the enclosing group image shrinks from 5 characters to 4 (`G=[01K|]`; sg_fmt_twice / sg_fmt_sep_then_lead / sg85_dup_85 / _2002 / _2014 / _2023, identical at all four editions). Mechanism: `dataDescriptionClause*` is a plain star and DataBinder.cs:2378 assigns `ownSign` unconditionally on each pass of the clause loop, so a second SIGN clause overwrites the first with no diagnostic. Both enclosing general formats print the slot exactly once (§13.15.2 `[ sign-clause ]`; §13.16.2's own bracket) and §5.2.6.2 makes a bracket 'may be explicitly specified ... or omitted', never repeated. See finding sign-duplicate-clause-last-wins. The SCREEN SECTION alternative (CobolScreen.g4:68) is owner-declined A.4.2 non-support refused by name (COBOLNET1560, ScreenFacility.cs:89 carries the per-clause fact for signClause), owned by kb/Work PB260 -- not adjudicated here. || code sites, verbatim from the adjudication: src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4:647 (signClause); CobolData.g4:276 (dataDescriptionClause alt); CobolReportWriter.g4:94; CobolScreen.g4:68; src/Cobol.Net.Compiler/Binding/DataBinder.cs:2377-2378; src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs:427-428",
-  "state": "GAP"
+  "notes": "kb/Work PB486 (wave 1019 D2), re-probed: the clause's own format (LEADING / TRAILING in braces, SEPARATE CHARACTER optional) is exact, and the entry-level repeat the finding measured is now refused by kb/Work PB917's ClosedFormatPass over the §13.16.2 and §13.15.2 cardinality rows (COBOLNET2423): `SIGN IS LEADING SEPARATE SIGN IS TRAILING` (the case that silently dropped the SEPARATE position) and `SIGN IS TRAILING LEADING` are both rejected at 85-2023, in a data description entry and in a report group description entry. §5.2.6.2 (cite.py OK): brackets 'may be explicitly specified or that portion of the general format may be omitted'. Witness added: pb486-sign-written-twice.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-13.18.53.2",

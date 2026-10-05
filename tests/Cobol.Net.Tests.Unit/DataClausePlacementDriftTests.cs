@@ -60,7 +60,10 @@ public sealed class DataClausePlacementDriftTests
                 Assert.Equal(DataClauseKind.None, rule.Excluded);
             Assert.Equal(rule.Kind is ClausePlacementKind.NotAtLevel, rule.Levels is { Count: > 0 });
             if (rule.Kind is not ClausePlacementKind.Residence)
+            {
                 Assert.Equal(EntrySections.All, rule.Sections);
+                Assert.Null(rule.ResidenceLevels);   // an admitted-level set means something only to a Residence row
+            }
         }
     }
 
@@ -157,6 +160,34 @@ public sealed class DataClausePlacementDriftTests
         Bind("OCCLVL", section, "       77  N PIC 9.\r\n" + entry + "\r\n", out var diags);
         Assert.Contains(diags, d => d.Contains("COBOLNET2404", StringComparison.Ordinal)
                                     && d.Contains("§13.18.38.3 SR1 a)", StringComparison.Ordinal));
+    }
+
+    /// <summary>§13.16.3 SR16 (kb/Work PB516) — "The BASED clause may be specified only in data description entries in
+    /// the linkage section, in the working-storage section, and in the local-storage section. The level number of
+    /// such data description entries shall be 1 or 77." Both sentences are the one Residence row: the file section
+    /// and a level-05 entry are refused (and the entry binds as ordinary storage), level 1 and 77 in the three
+    /// admitted sections bind as based items.</summary>
+    [Theory]
+    [InlineData("FILE", "       FD  F.\r\n       01  R BASED PIC X(4).\r\n", "this entry is in the file section")]
+    [InlineData("WORKING-STORAGE", "       01  G.\r\n           05  B BASED PIC X(4).\r\n", "level-number is 05")]
+    public void Based_OutsideItsResidence_IsRefused(string section, string entries, string why)
+    {
+        var binder = Bind("BASEDOUT" + section, section, entries, out var diags);
+        Assert.Contains(diags, d => d.Contains("COBOLNET2404", StringComparison.Ordinal)
+                                    && d.Contains("§13.16.3 SR16", StringComparison.Ordinal)
+                                    && d.Contains(why, StringComparison.Ordinal));
+        Assert.DoesNotContain(binder.ConformanceForest(), i => i.IsBased);
+    }
+
+    [Theory]
+    [InlineData("WORKING-STORAGE", "       01  B BASED PIC X(4).\r\n       77  C BASED PIC X(4).\r\n")]
+    [InlineData("LOCAL-STORAGE", "       01  B BASED PIC X(4).\r\n       77  C BASED PIC X(4).\r\n")]
+    [InlineData("LINKAGE", "       01  B BASED PIC X(4).\r\n       77  C BASED PIC X(4).\r\n")]
+    public void Based_InEveryAdmittedResidence_BindsBased(string section, string entries)
+    {
+        var binder = Bind("BASEDIN" + section, section, entries, out var diags);
+        Assert.DoesNotContain(diags, d => d.Contains("COBOLNET2404", StringComparison.Ordinal));
+        Assert.Equal(2, binder.ConformanceForest().Count(i => i.IsBased));
     }
 
     [Fact]

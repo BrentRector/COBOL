@@ -123,9 +123,9 @@ public sealed class PointerUsageOperandDriftTests
     }
 
     [Theory]
-    [InlineData("POINTER", "01 PT-T USAGE POINTER REC-T IS TYPEDEF.\n")]
-    [InlineData("POINTER", "01 PT-T USAGE POINTER TO REC-T IS TYPEDEF.\n")]
-    [InlineData("PROGRAM-POINTER", "01 PP-T USAGE PROGRAM-POINTER REC-T IS TYPEDEF.\n")]
+    [InlineData("POINTER", "01 PT-T IS TYPEDEF USAGE POINTER REC-T.\n")]
+    [InlineData("POINTER", "01 PT-T IS TYPEDEF USAGE POINTER TO REC-T.\n")]
+    [InlineData("PROGRAM-POINTER", "01 PP-T IS TYPEDEF USAGE PROGRAM-POINTER REC-T.\n")]
     [InlineData("FUNCTION-POINTER", "01 FP USAGE FUNCTION-POINTER REC-T.\n")]
     [InlineData("FUNCTION-POINTER", "01 FP FUNCTION-POINTER TO REC-T.\n")]
     public void TheOperand_IsRecognized_WithOrWithoutTo(string usage, string entry)

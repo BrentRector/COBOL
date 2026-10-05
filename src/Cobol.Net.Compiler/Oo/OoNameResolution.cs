@@ -213,8 +213,13 @@ public sealed class OoRepositoryScope
     /// is DECLARED exactly as a plain specifier's is (kb/Work PB759). The one walk this scope and
     /// <see cref="OoExpansion"/> (a parameterized definition's own formals, §11.3.3 SR8 / §11.6.3 SR4) share.</summary>
     internal static IEnumerable<Core.RepositoryEntryContext> SpecifierEntries(Core.EnvironmentDivisionContext? env)
+        => RepositoryEntries(env).Where(r => r.CLASS() is not null || r.INTERFACE() is not null);
+
+    /// <summary>Every specifier of the REPOSITORY paragraph directly in <paramref name="env"/> — the scope a
+    /// parameterized definition's parameter-names are declared in (<c>DataBinder.DeclareParameterNames</c>, kb/Work
+    /// PB1744), whose FUNCTION … INTRINSIC specifiers are not class- or interface-specifiers.</summary>
+    internal static IEnumerable<Core.RepositoryEntryContext> RepositoryEntries(Core.EnvironmentDivisionContext? env)
         => env?.configurationSection()?.configurationParagraph()
                .Select(p => p.repositoryParagraph()).Where(r => r is not null)
-               .SelectMany(r => r!.repositoryEntry())
-               .Where(r => r.CLASS() is not null || r.INTERFACE() is not null) ?? [];
+               .SelectMany(r => r!.repositoryEntry()) ?? [];
 }

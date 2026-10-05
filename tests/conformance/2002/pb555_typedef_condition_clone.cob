@@ -29,7 +29,7 @@
            ALPHABET MYALPH IS "Z" "Y" "X" "A".
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01  T-GRADE     PIC X TYPEDEF.
+       01  T-GRADE     TYPEDEF PIC X.
            88  HI-G    VALUE "Z" THRU "X" IN MYALPH WHEN SET TO FALSE IS "A".
        01  G1          TYPE T-GRADE.
        PROCEDURE DIVISION.

@@ -32,8 +32,6 @@ public sealed class UserWordDeclarationDriftTests
         [UserWordKind.LevelNumber] = "a level-number is digits, never an intrinsic-function-name, and declares nothing",
         [UserWordKind.DirectiveName] = "the PUSH/POP directive-name names a compiler directive — a reference processed "
             + "in the text-manipulation stage, not a declaration",
-        [UserWordKind.ParameterName] = "a parameterized class's parameter-names are substituted by OoExpansion before any "
-            + "binder exists (lead filed with kb/Work PB1083)",
     };
 
     private static string[] SpecListedTypes()
