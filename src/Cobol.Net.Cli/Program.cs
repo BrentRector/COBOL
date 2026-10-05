@@ -16,7 +16,7 @@ namespace CobolNet.Cli;
 /// </summary>
 /// <remarks>
 /// Usage: <c>cobol &lt;source.cob&gt; [-o out.dll] [--nist [NAME]] [--std 85|2002|2014|2023] [--permissive]
-/// [--copy DIR] [--run] [--sign-encoding ibm|ascii]</c>. Every value option accepts BOTH <c>--opt value</c> and <c>--opt=value</c>; no
+/// [--copy DIR] [--run] [--sign-encoding ibm|ascii] [--source-format fixed|free|auto] [--flag-extensions]</c>. Every value option accepts BOTH <c>--opt value</c> and <c>--opt=value</c>; no
 /// option can swallow a following flag. The generated C# is written next to the output assembly
 /// (<c>&lt;name&gt;.g.cs</c>) so the translation is directly inspectable.
 /// </remarks>
@@ -114,10 +114,19 @@ internal static class Program
                     + $"{string.Join(", ", InitialReferenceFormatOption.OptionSpellings)} (got {v}).");
         });
 
+        // kb/Work PB1525: ISO §4.2.10 — "An implementation shall provide a warning mechanism that optionally may be
+        // invoked by the user at compile time to indicate use of a nonstandard extension in a compilation group."
+        // This is that mechanism. It is a pure opt-in: without it a compile prints exactly what it printed before.
+        var flagExtensionsOption = new Option<bool>("--flag-extensions")
+        {
+            Description = "Warn (COBOLNET2894) at every use of a nonstandard extension this compiler accepts — a "
+                + "construct ISO/IEC 1989 does not define (ISO 4.2.10). The register is docs/CONFORMANCE.md 3.2.",
+        };
+
         var root = new RootCommand("cobol — translate a COBOL source unit to typed-native .NET (the Roslyn backend).")
         {
             sourceArgument, outputOption, nistOption, stdOption, permissiveOption, copyOption, runOption,
-            signEncodingOption, sourceFormatOption,
+            signEncodingOption, sourceFormatOption, flagExtensionsOption,
         };
 
         CliOptions Resolve(ParseResult parse)
@@ -141,7 +150,7 @@ internal static class Program
             return new CliOptions(
                 source, parse.GetValue(outputOption), nistName, std,
                 parse.GetValue(copyOption) ?? [], parse.GetValue(runOption), parse.GetValue(permissiveOption),
-                signEncoding, sourceFormat);
+                signEncoding, sourceFormat, parse.GetValue(flagExtensionsOption));
         }
 
         // A no-emit BATCH check subcommand (the INV-1 continuity sweep fast path): parse + edition-validate +
@@ -204,7 +213,8 @@ internal static class Program
     {
         var result = CompilerDriver.Compile(new CompilerDriver.Options(
             options.SourcePath, options.OutputPath, options.NistTestName, options.DialectLevel, options.CopyPaths,
-            options.Permissive, SignEncoding: options.SignEncoding, SourceFormat: options.SourceFormat));
+            options.Permissive, SignEncoding: options.SignEncoding, SourceFormat: options.SourceFormat,
+            FlagExtensions: options.FlagExtensions));
 
         // What the compilation itself transferred — the lines of its DISPLAY directives (ISO §7.3.12.4 GR1, DOC-A.1-53,
         // kb/Work PB1538) — each to the compiler stream it names, in the order the directives were met.

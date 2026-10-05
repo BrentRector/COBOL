@@ -714,7 +714,8 @@
   "pb1212_composed_entry_class_rules_legal",
   "pb1422_function_argument_exception_no_activation",
   "pb165_dynamic_call_description_check",
-  "pb1089_currency_literal7_class_pairings"
+  "pb1089_currency_literal7_class_pairings",
+  "pb876_national_value_no_editing_bwz_inert"
   ],
   "pending": []
 }

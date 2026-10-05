@@ -98,6 +98,14 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
     /// test construction and every unflagged compile is unchanged.</summary>
     public SignEncoding SignEncoding { get; set; } = SignEncoding.Ibm;
 
+    /// <summary>The compilation's §4.2.10 warning mechanism is ON — the CLI's <c>--flag-extensions</c> (kb/Work
+    /// PB1525): "An implementation shall provide a warning mechanism that optionally may be invoked by the user at
+    /// compile time to indicate use of a nonstandard extension in a compilation group". Orthogonal to
+    /// <see cref="Edition"/> and to <see cref="Permissive"/> (a user can flag extensions at any edition, strict or
+    /// permissive), and read by <see cref="Extension"/> alone. Off by default, so an unflagged compile emits nothing
+    /// new.</summary>
+    public bool FlagExtensions { get; set; }
+
     /// <summary>The <see cref="IDiagnosticSink.Cursor"/> — REAL here (the interface default is a no-op).</summary>
     public DiagnosticCursor Cursor { get; set; }
 
@@ -209,6 +217,32 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
     /// SAME shape, or the asymmetry writes the bug for the next caller.
     /// <see cref="DiagnosticEmitFormDriftTests"/> keeps it from returning.</summary>
     public void Warning(DiagnosticDescriptor descriptor, string message) => Warning(descriptor.Code, message);
+
+    /// <summary>⛔ THE ONE SEAM FOR A NONSTANDARD EXTENSION IN USE (ISO §4.2.10; kb/Work PB1525) — every binder
+    /// site that ACCEPTS a construct ISO does not define names it through here, with the register row's id
+    /// (<see cref="ExtensionIds"/>), at the one place the construct is accepted. Under <see cref="FlagExtensions"/> it
+    /// writes the named warning <see cref="DiagnosticCatalog.NonstandardExtensionUsed"/> (COBOLNET2894), once per
+    /// occurrence; otherwise it does nothing. The row, not the site, says whether the extension is flaggable: §4.2.10
+    /// "shall flag only extensions that are syntactically distinguishable", so a row that is not
+    /// <see cref="NonstandardExtension.Distinguishable"/> or is only <see cref="ExtensionSupport.RefusedByName"/> is a
+    /// defect to name here (and throws, as an unknown id does — a compiler bug, not a user error).</summary>
+    /// <param name="id">The row's <see cref="NonstandardExtension.Id"/> (an <see cref="ExtensionIds"/> constant).</param>
+    /// <param name="seen">The occurrence as the message should name it ("data item 'X': USAGE COMP-3").</param>
+    public void Extension(string id, string seen) => Extension(NonstandardExtensionRegister.Get(id), seen);
+
+    /// <summary><see cref="Extension(string, string)"/> for a caller that already holds the row — the usage funnel,
+    /// which finds it by spelling.</summary>
+    public void Extension(NonstandardExtension row, string seen)
+    {
+        if (row.Support != ExtensionSupport.Accepted || !row.Distinguishable)
+            throw new InvalidOperationException(
+                $"nonstandard extension '{row.Id}' is not an accepted, syntactically distinguishable construct, so "
+                + "no binder site may flag it (ISO §4.2.10: the warning mechanism flags only those)");
+        if (!FlagExtensions) return;
+        Warning(DiagnosticCatalog.NonstandardExtensionUsed, $"{seen} is a nonstandard extension — {row.Display}; "
+            + $"from {row.Origin}. ISO/IEC 1989 does not define it (§4.2.10). Standard form: {row.Standard} "
+            + "(docs/CONFORMANCE.md §3.2)");
+    }
 
     /// <summary>THE severity seam for removed-construct gating (P2.1): a construct the targeted edition REMOVED
     /// is an error under strict, a warning (with the pre-removal semantics preserved) under

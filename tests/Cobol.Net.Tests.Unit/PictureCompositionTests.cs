@@ -154,25 +154,53 @@ public sealed class PictureCompositionTests
     [Theory]
     // two phrases in the reverse order of their symbols — SR25
     [InlineData("F999.99L", new[] { 'L', 'F' }, "COBOLNET1984")]
-    [InlineData("9L9F", new[] { 'F', 'L' }, "COBOLNET1984")]
-    // three extended symbols — SR24
+    [InlineData("L99F", new[] { 'F', 'L' }, "COBOLNET1984")]
+    // two symbols that are not the string's two ends — SR25 as written (kb/Work PB855)
+    [InlineData("9L9F", new[] { 'L', 'F' }, "COBOLNET1984")]
+    [InlineData("LF$999", new[] { 'L', 'F' }, "COBOLNET1984")]
+    // three extended symbols — SR24, counted over SYMBOLS (a fixed occurrence each), not over phrases
     [InlineData("9L9F9G", new[] { 'L', 'F', 'G' }, "COBOLNET1985")]
+    [InlineData("L9L9L", new[] { 'L' }, "COBOLNET1985")]
+    // a single extended symbol takes the 'cs' precedence (§13.18.40.6): never between digit positions
+    [InlineData("99L99", new[] { 'L' }, "COBOLNET1935")]
+    [InlineData("9L9", new[] { 'L' }, "COBOLNET1935")]
     public void TheExtendedEditingSymbolSet_IsScreened(string picture, char[] phraseOrder, string code)
         => Assert.Contains(DiagnoseEditing(picture, phraseOrder), d => d.Contains(code));
 
-    /// <summary>The complement: the conforming phrase order binds, at BOTH ends of the string and mid-string —
-    /// "the leftmost symbol" is read as the leftmost OF THE TWO extended symbols, so a mid-string pair is an
-    /// order question and not a placement one (the determination PB528's character-1 transparency rests on; a
-    /// literal reading of §13.18.40.6's 'es'-takes-'cs'-precedence sentence would reject the standard's own
-    /// Annex D.24 example <c>PIC IS L9999.99F</c>).</summary>
+    /// <summary>The complement: every placement the standard sanctions binds. Two symbols are the string's two
+    /// ENDS in phrase order (SR25 as written — Annex D.24's own <c>PIC IS L9999.99F</c> included, with a currency
+    /// symbol or a floating string beside them); one symbol stands where a fixed currency symbol could, first or
+    /// last (§13.18.40.6's closing sentence), and a currency symbol keeps its SR26 place beside it. The order of
+    /// one currency-like symbol against another is SR25/SR26's and not Table 10's blank cell, which is why
+    /// <c>L$999F</c> and <c>L999L</c> are legal.</summary>
     [Theory]
     [InlineData("F999.99L", new[] { 'F', 'L' })]
     [InlineData("L9999.99F", new[] { 'L', 'F' })]
-    [InlineData("9L9F", new[] { 'L', 'F' })]
-    [InlineData("99L99", new[] { 'L' })]
-    public void AConformingExtendedEditingPhraseOrder_IsAccepted(string picture, char[] phraseOrder)
+    [InlineData("L99F", new[] { 'L', 'F' })]
+    [InlineData("L$999F", new[] { 'L', 'F' })]
+    [InlineData("LLLL9.99F", new[] { 'L', 'F' })]
+    [InlineData("L999", new[] { 'L' })]
+    [InlineData("9999L", new[] { 'L' })]
+    [InlineData("L$999", new[] { 'L' })]
+    [InlineData("999$L", new[] { 'L' })]
+    [InlineData("L999L", new[] { 'L' })]
+    [InlineData("LLLL9.99", new[] { 'L' })]
+    public void AConformingExtendedEditingPlacement_IsAccepted(string picture, char[] phraseOrder)
         => Assert.DoesNotContain(DiagnoseEditing(picture, phraseOrder),
-            d => d.Contains("COBOLNET1984") || d.Contains("COBOLNET1985"));
+            d => d.Contains("COBOLNET1984") || d.Contains("COBOLNET1985") || d.Contains("COBOLNET1934")
+                 || d.Contains("COBOLNET1935"));
+
+    /// <summary>⛔ A FLOATING string is rule 6's ADJACENCY property for an extended character-1 as for the
+    /// currency symbol (kb/Work PB855): <c>EditRule.Floating</c> was a bare count of the letter's occurrences, so
+    /// <c>PIC L999L</c> — two fixed occurrences — rendered as one floating string ("(0012" for -12).</summary>
+    [Theory]
+    [InlineData("LLLL9.99F", 'L', true)]
+    [InlineData("LLLL9.99F", 'F', false)]
+    [InlineData("L999L", 'L', false)]
+    [InlineData("L9999.99F", 'L', false)]
+    public void AnExtendedFloatingStringIsAdjacency_NotACount(string expanded, char letter, bool floating)
+        => Assert.Equal(floating, PictureComposition.HasFloatingString(expanded, '$',
+            new HashSet<char> { 'L', 'F' }, new HashSet<char> { 'L', 'F' }, '.', ',', letter));
 
     private static string[] DiagnoseEditing(string picture, char[] phraseOrder)
     {

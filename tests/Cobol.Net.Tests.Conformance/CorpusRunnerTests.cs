@@ -124,6 +124,15 @@ internal static class ConformanceCorpus
                         : throw new InvalidOperationException(
                             $"'*> options: source-format={kv[1]}' is not one of "
                             + string.Join(", ", InitialReferenceFormatOption.OptionSpellings)),
+                    // kb/Work PB1525: ISO §4.2.10's warning mechanism (--flag-extensions). A golden that pins "the program
+                    // still compiles and runs identically with extension flagging ON" states it here.
+                    "flag-extensions" => kv[1] switch
+                    {
+                        "on" => options with { FlagExtensions = true },
+                        "off" => options with { FlagExtensions = false },
+                        _ => throw new InvalidOperationException(
+                            $"'*> options: flag-extensions={kv[1]}' is not one of on, off"),
+                    },
                     _ => throw new InvalidOperationException($"'*> options:' key '{kv[0]}' is not recognized"),
                 };
             }

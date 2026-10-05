@@ -117,6 +117,19 @@ public sealed class CliParserTests
         Assert.NotEmpty(Errors("a.cob", "--source-format", "--run"));
     }
 
+    /// <summary>ISO §4.2.10's warning mechanism is an OPT-IN: absent, a compile asks for nothing new; present
+    /// (<c>--flag-extensions</c>, a bare switch that never swallows the token after it) it is carried to the driver
+    /// (kb/Work PB1525).</summary>
+    [Fact]
+    public void FlagExtensions_IsAnOptIn_SwitchThatSwallowsNothing()
+    {
+        Assert.False(Resolve("a.cob").FlagExtensions);
+        var on = Resolve("a.cob", "--flag-extensions", "--run");
+        Assert.True(on.FlagExtensions);
+        Assert.True(on.Run);
+        Assert.Equal("a.cob", on.SourcePath);
+    }
+
     [Fact]
     public void Flags_And_Full_Sweep_Pattern()
     {

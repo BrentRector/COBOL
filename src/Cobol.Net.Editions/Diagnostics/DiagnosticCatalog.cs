@@ -82,6 +82,15 @@ public static class DiagnosticCatalog
         "COBOLNET2883", "currency-symbol-class-usage", EditionSeverity.Error,
         "A currency symbol defined by an alphanumeric literal-7 defines a numeric-edited item with usage national, or one "
         + "defined by a national literal-7 defines one with usage display.", "ISO §12.3.7.3 SR28");
+    // ── §4.2.10's WARNING MECHANISM (kb/Work PB1525): emitted by EditionContext.Extension, and only under
+    //    --flag-extensions, so a compile that did not ask for it is byte-identical to one that never had the option.
+    public static readonly DiagnosticDescriptor NonstandardExtensionUsed = new(
+        "COBOLNET2894", "nonstandard-extension-used", EditionSeverity.Warning,
+        "The compilation group uses a nonstandard extension (ISO §4.2.10) — a construct this implementation accepts "
+        + "that ISO/IEC 1989 does not define. Reported only when the user asks (--flag-extensions), once per use, and "
+        + "only for an extension that is syntactically distinguishable. The register of claimed extensions, with the "
+        + "standard construct to write instead, is docs/CONFORMANCE.md §3.2.",
+        "ISO §4.2.10");
     // ── The §8.3.2.1 word-length ceiling — ONE rule (CobolWordRule), reported from the tree-walk funnel
     //    (VersionConformancePass.VisitCobolWord) AND the directive stages (>>TURN operands, >>DEFINE names),
     //    which never reach the tree walk (kb/Work R05's sweep). ─────────────────────────────────────────
@@ -4295,23 +4304,20 @@ public static class DiagnosticCatalog
     //    phrases bound clean, and the phrase order the standard fixes was never compared to the symbol order.
     //    Sentence 1 of each rule needs no code — Table 10 carries it (COBOLNET1935). ──
 
-    /// <summary>COBOLNET1984 — the two EDITING phrases of a two-extended-symbol PICTURE are written in the
-    /// reverse order of their symbols (ISO §13.18.40.3 SR25, second sentence).</summary>
+    /// <summary>COBOLNET1984 — the two EDITING phrases of a two-extended-symbol PICTURE are not for the string's
+    /// leftmost and rightmost symbols, in that order (ISO §13.18.40.3 SR25, second sentence).</summary>
     public static readonly DiagnosticDescriptor PictureEditingPhraseOrder = new(
         "COBOLNET1984", "picture-editing-phrase-order", EditionSeverity.Error,
         "ISO §13.18.40.3 syntax rule 25, second sentence: \"When extended editing sign control symbols are used "
         + "and two are specified, the first occurrence of the EDITING phrase shall be for the leftmost symbol in "
         + "character-string-1 and the second occurrence shall be for the rightmost symbol in character-string-1.\" "
-        + "The phrases here are written in the reverse order of the symbols they are for. The order is not "
-        + "cosmetic: each extended symbol renders its own literal at its own position, so `PIC F999.99L` with "
-        + "the phrases reversed renders -1.5 as \")001.50(\" where the conforming spelling renders \"(001.50)\". "
-        + "⛔ \"The leftmost symbol\" is read as the leftmost OF THE TWO extended symbols the sentence names, so "
-        + "this rule constrains the PHRASE order and not the symbols' placement — the alternative reading, that "
-        + "the two shall also be character-string-1's first and last symbols, is not taken because the only "
-        + "other text that would place an extended symbol (§13.18.40.6: 'es' takes \"the same precedence as the "
-        + "'cs' symbol in the column and row of non-floating insertion symbols\") cannot be applied literally "
-        + "without rejecting the standard's own Annex D.24 example, `PIC IS L9999.99F` with two FOR phrases, "
-        + "against Table 10's blank leading-currency-before-trailing-currency cell (kb/Work PB528, PB530).",
+        + "The first FOR phrase here is not for the character-string's first symbol, or the second is not for its "
+        + "last. The order is not cosmetic: each extended symbol renders its own literal at its own position, so "
+        + "`PIC F999.99L` with the phrases reversed renders -1.5 as \")001.50(\" where the conforming spelling "
+        + "renders \"(001.50)\". The sentence is read AS WRITTEN (kb/Work PB855, replacing PB530's reading of "
+        + "\"the leftmost symbol\" as the leftmost of the two): §13.18.40.6's sentence giving 'es' the precedence "
+        + "of 'cs' is applied to every symbol but another currency-like one (PictureComposition.Precedence), so "
+        + "the stricter reading no longer refuses Annex D.24's `PIC IS L9999.99F`.",
         "ISO §13.18.40.3 SR25");
 
     /// <summary>COBOLNET1985 — more than two extended editing sign control symbols in one PICTURE clause (ISO
@@ -4319,13 +4325,14 @@ public static class DiagnosticCatalog
     public static readonly DiagnosticDescriptor PictureEditingExtendedCount = new(
         "COBOLNET1985", "picture-editing-extended-count", EditionSeverity.Error,
         "ISO §13.18.40.3 syntax rule 24, second sentence: \"For extended editing sign control symbols, either "
-        + "one or two extended editing sign control symbols may be used in character-string-1.\" A third FOR "
-        + "phrase exceeds that maximum. An extended symbol is the FOR form alone (SR12: \"If literal-1 is "
-        + "specified, character-1 is a fixed editing sign control symbol. If the FOR phrase is specified, "
-        + "character-1 is an extended editing sign control symbol\"), so any number of IS-form (simple "
-        + "insertion) phrases is untouched by this rule. The bound is what makes SR25's second sentence "
-        + "well-formed — it pairs the FIRST phrase with the leftmost symbol and the SECOND with the rightmost, "
-        + "and says nothing about a third (kb/Work PB530).",
+        + "one or two extended editing sign control symbols may be used in character-string-1.\" A third extended "
+        + "symbol exceeds that maximum — each non-floating occurrence of a FOR-phrase character-1 is one, and a "
+        + "floating string of one such character-1 is one (Annex D.24's `PIC LLLL9.99F` uses two). An extended "
+        + "symbol is the FOR form alone (SR12: \"If literal-1 is specified, character-1 is a fixed editing sign "
+        + "control symbol. If the FOR phrase is specified, character-1 is an extended editing sign control "
+        + "symbol\"), so any number of IS-form (simple insertion) phrases is untouched by this rule. The bound is "
+        + "what makes SR25's second sentence well-formed — it pairs the FIRST phrase with the leftmost symbol "
+        + "and the SECOND with the rightmost, and says nothing about a third (kb/Work PB530, PB855).",
         "ISO §13.18.40.3 SR24");
 
     // ── COBOLNET1981/1982/1983 — the INITIALIZE category-name, once it became the standard's SET of thirteen

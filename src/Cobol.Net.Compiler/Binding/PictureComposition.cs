@@ -152,6 +152,11 @@ internal static class PictureComposition
     /// role-k symbol may precede the role-r symbol. Packed once; the walk is then one shift and one test.</summary>
     internal static readonly int[] MayPrecede = PackTable();
 
+    /// <summary>The two roles of a NON-FLOATING currency-like symbol — the fixed currency symbol and, by
+    /// §13.18.40.6's closing sentence, the fixed extended editing sign control symbol — as a bit set over
+    /// <see cref="PicRole"/>. Their order against one another is SR24/SR25/SR26's, never the matrix's.</summary>
+    private const int CurrencyLikeRoles = (1 << (int)PicRole.CurrencyLeading) | (1 << (int)PicRole.CurrencyTrailing);
+
     private static int[] PackTable()
     {
         var packed = new int[Table10Rows.Length];
@@ -339,6 +344,26 @@ internal static class PictureComposition
                 $"character-string-1 uses {fixedSign} editing sign control symbols as FIXED insertion — only one may "
                 + "be used (ISO §13.18.40.3 SR24)");
 
+        // SR24, second sentence: "For extended editing sign control symbols, either one or two extended editing sign
+        // control symbols may be used in character-string-1." A symbol is an OCCURRENCE — a FLOATING string of one
+        // extended character-1 is the single floating insertion symbol rule 6 makes of it (Annex D.24's
+        // `PIC LLLL9.99F` uses TWO) — so the count is the floating strings plus the non-floating occurrences. It
+        // lives here, over the picture, and not over the EDITING phrases (the check ValidateEditing used to make,
+        // which a repeated fixed `L9L9L` under ONE phrase escaped), and it is also the bound that keeps the
+        // position-ambiguous role search below at 2^4 assignments (kb/Work PB855).
+        int extendedFixed = 0;
+        var extendedFloating = new HashSet<char>();
+        for (int i = 0; i < n; i++)
+        {
+            if (!char1Extended.Contains(syms[i].Kind)) continue;
+            if (IsFloating(i)) extendedFloating.Add(syms[i].Kind); else extendedFixed++;
+        }
+        if (extendedFixed + extendedFloating.Count > 2)
+            return Fail(DiagnosticCatalog.PictureEditingExtendedCount,
+                $"character-string-1 uses {extendedFixed + extendedFloating.Count} extended editing sign control "
+                + "symbols (each fixed occurrence, and each floating string of one character-1, is one) — either ONE "
+                + "or TWO may be used (ISO §13.18.40.3 SR24)");
+
         // SR12 a) "Character-string-1 shall contain: — at least on[e] one of the symbols from the set 'A', 'N',
         // 'X', 'Z', '1', '9', *', or — at least two occurrences of one of the symbols from the set character-1,
         // 'x', '+', '-', and the currency symbol." (The two printed defects — "at least on one" and the
@@ -395,7 +420,7 @@ internal static class PictureComposition
         // a PICTURE clause are specified in 13.18.40.6, Precedence rules"). Assign every occurrence its role,
         // then require an 'x' for EVERY ordered pair: an 'x' means the column symbol "may precede (BUT NOT
         // NECESSARILY IMMEDIATELY)" the row symbol, so the relation binds non-adjacent pairs too.
-        return Precedence(syms, n, cs, char1, dp, decimalSep, grouping, IsFloating, leadingP, Fail);
+        return Precedence(syms, n, cs, char1, char1Extended, dp, decimalSep, grouping, IsFloating, leadingP, Fail);
     }
 
     /// <summary>
@@ -444,6 +469,21 @@ internal static class PictureComposition
             return (sym, occ);
         }
         return ('\0', 0);
+    }
+
+    /// <summary>Is any occurrence of the extended character-1 <paramref name="letter"/> part of a floating insertion
+    /// string? — rule 6's own test (an ADJACENCY property, <see cref="FloatingString"/>) applied to ONE letter, which
+    /// is what <c>CobolEdit.EditRule.Floating</c> records. A bare occurrence count is NOT that test: `PIC L999L`
+    /// holds two fixed occurrences, each rendering its own sign literal, and no floating string (kb/Work PB855 —
+    /// the same count-for-adjacency error kb/Work PB528 removed for the currency symbol).</summary>
+    internal static bool HasFloatingString(string expanded, char cs, IReadOnlySet<char> char1,
+        IReadOnlySet<char> char1Extended, char decimalSep, char grouping, char letter)
+    {
+        var syms = Tokenize(expanded);
+        var floating = MarkFloating(syms, cs, char1, char1Extended, decimalSep, grouping);
+        for (int i = 0; i < syms.Count; i++)
+            if (floating[i] && syms[i].Kind == letter) return true;
+        return false;
     }
 
     /// <summary>Mark every symbol occurrence that belongs to a floating insertion string — see
@@ -506,8 +546,9 @@ internal static class PictureComposition
     /// <para><paramref name="dp"/> is the decimal point position from <see cref="DecimalPointPosition"/> — the
     /// ONE derivation of it (SR29 counts from the same one), and what splits the eight two-row symbols into
     /// their left-of-point and right-of-point halves.</para></summary>
-    private static bool Precedence(List<Sym> syms, int n, char cs, IReadOnlySet<char> char1, int dp,
-        char decimalSep, char grouping, Func<int, bool> isFloating, bool leadingP,
+    private static bool Precedence(List<Sym> syms, int n, char cs, IReadOnlySet<char> char1,
+        IReadOnlySet<char> char1Extended, int dp, char decimalSep, char grouping, Func<int, bool> isFloating,
+        bool leadingP,
         Func<DiagnosticDescriptor, string, bool> fail)
     {
         var roleA = new PicRole[n];      // the first candidate role
@@ -518,21 +559,37 @@ internal static class PictureComposition
         {
             char c = syms[i].Kind;
             bool left = i < dp;
-            // ⛔ A PICTURE EDITING character-1 is DELIBERATELY TRANSPARENT to Table 10. The standard gives a
-            // Table-10 precedence to 'es' ALONE — "If the EDITING phrase is specified, the precedence of 'es' as
-            // related to Table 10 … has the same precedence as the 'cs' symbol in the column and row of
-            // non-floating insertion symbols" — where 'es' is the EXTENDED editing sign control symbol, the FOR
-            // form (SR12: "If literal-1 is specified, character-1 is a fixed editing sign control symbol. If the
-            // FOR phrase is specified, character-1 is an extended editing sign control symbol"). Even for 'es'
-            // that mapping contradicts the rules that place it: the leading-currency-before-trailing-currency
-            // cell is BLANK, while SR24 and SR25 expressly sanction TWO extended symbols, "the first occurrence
-            // … for the leftmost symbol in character-string-1 and the second occurrence … for the rightmost".
-            // For the IS form the standard assigns no Table-10 precedence at all, and §13.18.40.5 rule 3 makes it
-            // SIMPLE insertion, which would take the B 0 / row. Applying the 'cs' mapping to either would REJECT
-            // LEGAL SOURCE (`PIC L999F` with two FOR phrases; `PIC LL EDITING "L" IS ":"`, the very shape SR12 a)
-            // names as sufficient), so character-1 constrains no neighbour here. Its own rules are SR8-SR12,
-            // SR25 and SR26, screened by PictureAnalyzer.ValidateEditing. (kb/Work PB528; data-model design D24.)
-            if (char1.Contains(c)) { live[i] = false; continue; }
+            // ⛔ A PICTURE EDITING character-1 TAKES A TABLE-10 ROLE ONLY WHEN THE STANDARD GIVES IT ONE. The
+            // standard gives a Table-10 precedence to 'es' ALONE — "If the EDITING phrase is specified, the
+            // precedence of 'es' as related to Table 10 … has the same precedence as the 'cs' symbol in the column
+            // and row of non-floating insertion symbols" (§13.18.40.6) — where 'es' is the EXTENDED editing sign
+            // control symbol, the FOR form (SR12: "If literal-1 is specified, character-1 is a fixed editing sign
+            // control symbol. If the FOR phrase is specified, character-1 is an extended editing sign control
+            // symbol"). So a NON-FLOATING extended occurrence is position-ambiguous exactly like a fixed currency
+            // symbol, leading (first or second symbol) or trailing (last or penultimate), and is asked of every
+            // OTHER symbol by the matrix (kb/Work PB855: `PIC 99L99` places it mid-string, where neither cs role
+            // admits it). Three things stay outside the matrix, each for a stated reason:
+            //  - the IS form is SIMPLE insertion (§13.18.40.5 rule 3) and the standard assigns it no Table-10
+            //    precedence, so it constrains no neighbour (`PIC LL EDITING L IS ":"` is the shape SR12 a) names as
+            //    sufficient; kb/Work PB528);
+            //  - a FLOATING extended string is floating insertion (rule 6), and §13.18.40.6 states the 'cs'
+            //    mapping for the NON-floating column and row alone;
+            //  - the ORDER OF ONE CURRENCY-LIKE SYMBOL AGAINST ANOTHER is not the matrix's: the blank
+            //    leading-currency-before-trailing-currency cell would refuse the very pairs SR25 ("the first
+            //    occurrence of the EDITING phrase shall be for the leftmost symbol … the second … for the rightmost
+            //    symbol": Annex D.24's `PIC L9999.99F`) and SR26 (a currency symbol "optionally preceded by
+            //    character-1", `PIC L$999`) sanction, so the walk below exempts that one pair of roles and
+            //    ValidateEditing asks SR25 itself.
+            if (char1.Contains(c))
+            {
+                if (char1Extended.Contains(c) && !isFloating(i))
+                {
+                    live[i] = true;
+                    roleA[i] = PicRole.CurrencyLeading; roleB[i] = PicRole.CurrencyTrailing; ambiguous.Add(i);
+                }
+                else live[i] = false;
+                continue;
+            }
             live[i] = true;
             switch (c)
             {
@@ -587,6 +644,10 @@ internal static class PictureComposition
                 if (!live[j]) continue;
                 tests++;
                 int refused = seen & ~MayPrecede[(int)role[j]];
+                // The pair-of-currency-likes exemption (see the role map above): a fixed currency symbol is bounded to
+                // ONE by SR24, so before extended symbols took these roles a currency role was never in `seen` when
+                // a currency role was asked and the exemption removed nothing.
+                if (role[j] is PicRole.CurrencyLeading or PicRole.CurrencyTrailing) refused &= ~CurrencyLikeRoles;
                 if (refused != 0)
                 {
                     // Report the LOWEST refused role's FIRST occurrence — deterministic, and the symbol a
@@ -606,12 +667,23 @@ internal static class PictureComposition
         }
 
         WalkObserver.Value?.Invoke(tests);
+        // A non-floating EXTENDED character-1 on either side of the pair stands in the cs column and row (§13.18.40.6,
+        // closing sentence), which is not obvious from the picture, so the message says it.
+        bool esInPair = IsFixedExtended(syms[worst.First], worst.First) || IsFixedExtended(syms[worst.Second], worst.Second);
         return fail(DiagnosticCatalog.PicturePrecedence,
             $"the symbol '{syms[worst.Second].Text}' at symbol position {worst.Second + 1} may not follow the symbol "
             + $"'{syms[worst.First].Text}' at symbol position {worst.First + 1}. Character-string-1 shall consist of "
             + "an allowable COMBINATION of characters used as picture symbols (ISO §13.18.40.3 SR2), and the "
             + "allowable combinations are §13.18.40.6, Table 10 — Format 1 picture symbol order of precedence, "
-            + "whose blank cell here is a prohibition");
+            + "whose blank cell here is a prohibition"
+            + (esInPair
+                ? ". A non-floating extended editing sign control symbol (a character-1 written with the FOR phrase) "
+                  + "\"has the same precedence as the 'cs' symbol in the column and row of non-floating insertion "
+                  + "symbols\" (§13.18.40.6), so it may stand only where a fixed currency symbol may: first or "
+                  + "second, or last or penultimate"
+                : ""));
+
+        bool IsFixedExtended(Sym s, int at) => char1Extended.Contains(s.Kind) && !isFloating(at);
     }
 
     /// <summary>Split the repeat-expanded string into SYMBOLS: one character each, except <c>CR</c> and

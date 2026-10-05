@@ -1159,7 +1159,9 @@ of an unsupported facility.
   decision R58 for END-INVOKE and the same ISO text for the other two; negatives
   `pb758-invoke-end-invoke-after-returning`, `pb758-invoke-end-invoke-after-using-returning`,
   `pb758-sort-end-sort-is-not-a-terminator` and `pb758-merge-end-merge-is-not-a-terminator`). The single source is
-  `tests/version-matrix/cobol-words.json` `extensionReserved`; `CobolWordsDriftTests` fails when this list, that array and the lexer disagree.
+  `tests/version-matrix/cobol-words.json` `extensionReserved`; `CobolWordsDriftTests` fails when this list, that array and the lexer disagree,
+  and `NonstandardExtensionRegisterDriftTests` fails when it and the `ReservedWords` of the §3.2 register's rows disagree
+  (each word is reserved on the account of one extension row).
   ⚠ DETERMINATION (owner may overturn): reserving them keeps the vendor forms recognizable by name; the rejected
   reading — admitting them as user words at every edition — would make each vendor construct ambiguous with a
   data reference in every operand list.
@@ -1578,6 +1580,50 @@ a result, so GnuCOBOL 3.2 (libcob, measured on every case below) is the comparat
   (libcob `cob_unstring_init` and `cob_unstring_finish`; this case already matched GnuCOBOL on every leg). Pinned by
   `conformance:2023/pb1907_unstring_overlap_pointer`, which also guards D-UNS1 to D-UNS3 against re-reading the pointer
   mid-statement.
+
+### 3.2 Nonstandard extensions (§4.2.10; kb/Work PB1525)
+
+§4.2.10: "Documentation associated with an implementation shall identify nonstandard extensions for which support is
+claimed and shall specify any reserved words added for nonstandard extensions", and "An implementation shall provide a
+warning mechanism that optionally may be invoked by the user at compile time to indicate use of a nonstandard extension
+in a compilation group. This warning mechanism shall flag only extensions that are syntactically distinguishable"
+(`cite.py --check 4.2.10` on both sentences → OK §4.2.10 3)). This section is the first obligation and the **register**
+behind it is the second: one table, `NonstandardExtensionRegister` (`src/Cobol.Net.Editions/NonstandardExtension.cs`), read
+by the one binder seam `EditionContext.Extension`; `NonstandardExtensionRegisterDriftTests` keeps this table, that
+register, the reserved-word table (D-RW1) and the grammar's `usageKeyword` equal, and refuses an accepted extension that
+no binder site names.
+
+**The warning mechanism is `cobol --flag-extensions`.** Off by default — a compile that does not ask is byte-identical to
+one that never had the option. On, every use of an extension below that the compiler ACCEPTS draws **COBOLNET2894**, a
+warning that names the construct, its origin and the standard form to write instead; it is orthogonal to `--std` and to
+`--permissive`, and it never changes whether the program compiles. A row marked *not flagged* is documented and never
+flagged, because it is not a property of the compilation group's text (§4.2.10: "flag only extensions that are
+syntactically distinguishable"). Adding an extension is adding a row: a usage spelling joins its row's spellings and the one
+usage funnel (`PictureAnalyzer.ParseUsage`) flags it; a statement or phrase gets one `EditionContext.Extension` call at the
+one place its binder accepts it.
+
+| Id | Extension (class 1: a documented language element ISO does not define) | Origin | `--flag-extensions` | Standard form |
+|---|---|---|---|---|
+| `usage-comp-1` | `USAGE COMP-1` / `COMPUTATIONAL-1`, single-precision floating point | IBM Enterprise COBOL, Micro Focus, GnuCOBOL | flagged | `USAGE FLOAT-SHORT` (§13.18.60.4 GR13) |
+| `usage-comp-2` | `USAGE COMP-2` / `COMPUTATIONAL-2`, double-precision floating point | IBM Enterprise COBOL, Micro Focus, GnuCOBOL | flagged | `USAGE FLOAT-LONG` (§13.18.60.4 GR13) |
+| `usage-comp-3` | `USAGE COMP-3` / `COMPUTATIONAL-3`, packed decimal | IBM Enterprise COBOL, Micro Focus, GnuCOBOL | flagged | `USAGE PACKED-DECIMAL` (§13.18.60.4) |
+| `usage-comp-4` | `USAGE COMP-4` / `COMPUTATIONAL-4`, binary | IBM Enterprise COBOL, Micro Focus, GnuCOBOL | flagged | `USAGE BINARY`, or `COMP` / `COMPUTATIONAL` (§13.18.60.3 SR6: "COMP is an abbreviation for COMPUTATIONAL") |
+| `usage-comp-5` | `USAGE COMP-5` / `COMPUTATIONAL-5`, native binary | IBM Enterprise COBOL, Micro Focus, GnuCOBOL | flagged | the fixed-width `BINARY-CHAR`, `BINARY-SHORT`, `BINARY-LONG`, `BINARY-DOUBLE` (§13.18.60.4) |
+| `goback-returning` | `GOBACK RETURNING` / `GIVING identifier` (COBOL-2002 and later, where GOBACK is) | GnuCOBOL, Micro Focus | flagged | move the value to the PROCEDURE DIVISION header's RETURNING item, then `GOBACK` (§14.9.18.2 has no RETURNING phrase) |
+| `set-program-pointer-to-entry` | `SET program-pointer TO ENTRY literal-or-identifier` (COBOL-2002 and later) | IBM Enterprise COBOL, Micro Focus | flagged | `SET program-pointer TO ADDRESS OF PROGRAM program-name` (§14.9.39.2 Format 9, §8.4.3.13) |
+| `source-format-auto` | `--source-format auto`, detection of the reference format from the text's layout (Annex A.1 item 158, §7) | this implementation | not flagged (a property of how the compiler is invoked) | state the format: `--source-format fixed` / `free`, or `>>SOURCE FORMAT` (§7.3.24.3) |
+| `vendor-statement-words` | `ENTRY`, `JSON GENERATE/PARSE`, `XML GENERATE/PARSE` — the words are RESERVED so each statement can be refused by name; **no support is claimed** | IBM Enterprise COBOL, Micro Focus, GnuCOBOL | not flagged (refused, an error already) | none: ENTRY is COBOLNET2269, JSON and XML are COBOL0313 |
+
+**What is not a row, and why.** (1) Behaviours that the standard leaves to the implementor and that have a standard
+default and a selector — `--sign-encoding ibm|ascii` (§13.18.52.4 GR4/GR5, Annex A.1 items 177/178) — are implementor
+latitude, not an extension; they are documented where the latitude is (§7). (2) Constructs `--permissive` accepts — a
+removed ISO construct, or a violation of a syntax rule the user opts into (COBOLNET0844, COBOLNET0819,
+`CallByValueOperandClass`, …) — are flagged unconditionally, by their own named warning through `EditionContext.Removed`,
+which IS the §4.2.10 warning mechanism for them; they are never accepted in silence, so they need no second warning. (3)
+Extensions of **class 3** (§4.2.10: a required element with different functionality, "provided that standard-conforming
+behavior is also implemented and that an implementor-defined mechanism exists for selection of the nonstandard behavior")
+are the options themselves: `--source-format` selects its nonstandard auto mode, and the standard behavior is the default.
+The reserved words added for these extensions are D-RW1.
 
 ## 4. Documented non-support facilities (§4.2.6 / §4.2.7 / §4.2.13)
 

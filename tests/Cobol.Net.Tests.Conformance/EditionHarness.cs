@@ -24,7 +24,8 @@ public static class EditionHarness
     /// the program and that directory is named as a <c>--copy</c> search path, as a user names theirs (the default
     /// COBOL library never includes the source file's own directory — DOC-A.1-40, kb/Work PB1355).</summary>
     public static (bool Ok, IReadOnlyList<string> Errors, IReadOnlyList<string> Warnings) CompileFull(
-        string source, int edition, bool permissive = false, IReadOnlyDictionary<string, string>? copybooks = null)
+        string source, int edition, bool permissive = false, IReadOnlyDictionary<string, string>? copybooks = null,
+        bool flagExtensions = false)
     {
         string dir = Path.Combine(Path.GetTempPath(), "CobolNet_Ed_" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(dir);
@@ -36,7 +37,8 @@ public static class EditionHarness
                 File.WriteAllText(Path.Combine(Path.GetDirectoryName(src)!, name), text);
             var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
                 src, Path.Combine(dir, "prog.dll"), DialectLevel: edition, Permissive: permissive,
-                CopyPaths: copybooks is null ? null : [Path.GetDirectoryName(src)!], SourceFormat: InitialReferenceFormat.Auto));
+                CopyPaths: copybooks is null ? null : [Path.GetDirectoryName(src)!], SourceFormat: InitialReferenceFormat.Auto,
+                FlagExtensions: flagExtensions));
             return (r.Success, r.Success ? [] : [.. r.Errors.DefaultIfEmpty($"status {r.Status}")], r.Warnings);
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }

@@ -69,6 +69,7 @@ Recognized keys:
 |---|---|---|
 | `sign-encoding` | `ibm` (default) · `ascii` | the DISPLAY over-punch convention (`--sign-encoding`; Annex A.1 items 177/178, kb/Work PB803) |
 | `source-format` | `fixed` · `free` · `auto` | the reference format the source starts in (`--source-format`; kb/Work PB1362) |
+| `flag-extensions` | `on` · `off` (default) | ISO §4.2.10's warning mechanism (`--flag-extensions`; kb/Work PB1525): the program must still compile and run identically with every nonstandard extension named by a COBOLNET2894 warning |
 
 ## Reference format — the harness contract today
 

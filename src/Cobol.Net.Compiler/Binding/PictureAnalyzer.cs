@@ -191,7 +191,7 @@ public static class PictureAnalyzer
         // letters like 'L'/'T'/'G' would trip COBOLNET0808); char1Extended is the FOR-phrase subset, which
         // §13.18.40.5 rule 6 makes FLOATING insertion symbols. The introduction gate below 2023 is fired by
         // VersionConformancePass.ParseArm.VisitPictureClause.
-        var editRules = ValidateEditing(editing, expanded, usage, edition, where, cs,
+        var editRules = ValidateEditing(editing, expanded, usage, edition, where, cs, decimalPointIsComma,
             out var char1Set, out var char1Extended, out var char1Declared);
         // §13.18.40.4 GR14 'es' — the character-1 positions' size beyond the one position each occupies in
         // character-string-1 (kb/Work PB491). Computed once here, beside the currency widening, and added at
@@ -835,7 +835,7 @@ public static class PictureAnalyzer
     /// character-string-1 contains the symbol 'N' …".</para></summary>
     private static CobolEdit.EditRule[]? ValidateEditing(
         IReadOnlyList<EditingPhraseSpec>? editing, string expanded, Usage usage, EditionContext edition,
-        string where, char cs, out HashSet<char> char1Set, out HashSet<char> char1Extended,
+        string where, char cs, bool decimalPointIsComma, out HashSet<char> char1Set, out HashSet<char> char1Extended,
         out HashSet<char> char1Declared)
     {
         char1Set = [];
@@ -864,11 +864,10 @@ public static class PictureAnalyzer
 
         var rules = new List<CobolEdit.EditRule>();
         bool error = false;
-        // The EXTENDED (FOR-phrase) editing sign control symbols in PHRASE ORDER, each with the symbol position
-        // its character-1 first takes in character-string-1 — the two facts SR24's and SR25's second sentences
-        // are stated over. They are a property of the phrase LIST, not of any one phrase, so they are asked once
-        // after this loop (kb/Work PB530).
-        var extended = new List<(char Char1, int At)>(2);
+        // The character-1 of the EXTENDED (FOR-phrase) editing sign control symbols in PHRASE ORDER — the fact SR25's
+        // second sentence is stated over. It is a property of the phrase LIST, not of any one phrase, so it is asked
+        // once after this loop (kb/Work PB530).
+        var extended = new List<char>(2);
 
         foreach (var ph in editing)
         {
@@ -897,11 +896,10 @@ public static class PictureAnalyzer
                     + "one EDITING phrase (ISO §13.18.40.3 SR11 — each character-1 shall be distinct)");
                 error = true; continue;
             }
-            // SR10: character-1 shall appear at least once in the character-string. The same scan records WHERE
-            // it first stands, which is what SR24's and SR25's second sentences count (below).
-            int occ = 0, firstAt = -1;
+            // SR10: character-1 shall appear at least once in the character-string.
+            int occ = 0;
             for (int i = 0; i < expanded.Length; i++)
-                if (char.ToUpperInvariant(expanded[i]) == char1) { occ++; if (firstAt < 0) firstAt = i; }
+                if (char.ToUpperInvariant(expanded[i]) == char1) occ++;
             if (occ == 0)
             {
                 edition.Error("COBOLNET1593", $"{where}: PICTURE EDITING character-1 '{c1}' does not appear in the "
@@ -952,10 +950,8 @@ public static class PictureAnalyzer
             if (ph.IsForForm)
             {
                 // SR12: "If the FOR phrase is specified, character-1 is an EXTENDED editing sign control symbol"
-                // — so this phrase, and only this form, counts toward SR24's and SR25's second sentences. The
-                // position recorded is character-1's FIRST occurrence, which is "the leftmost symbol" of a
-                // floating extended string as much as of a single one (§13.18.40.5 rule 6).
-                extended.Add((char1, firstAt));
+                // — so this phrase, and only this form, is one of the two SR25's second sentence orders.
+                extended.Add(char1);
                 char1Extended.Add(char1);
                 // SR12b: a FOR (extended sign-control) picture may contain only character-1 and 9 . cs P V Z.
                 foreach (char mc in expanded)
@@ -982,14 +978,17 @@ public static class PictureAnalyzer
                 int width = (negLitSpec ?? posLitSpec)?.Text.Length ?? 0;
                 string negLit = negLitSpec?.Text ?? new string(' ', width);
                 string posLit = posLitSpec?.Text ?? new string(' ', width);
-                // FOR = an EXTENDED editing sign control symbol. ONE occurrence is FIXED insertion (§13.18.40.5
-                // rule 5, Table 8); TWO OR MORE are a FLOATING insertion string — rule 6's first sentence lists
-                // "the extended editing sign control symbols, if specified" among the floating insertion
-                // symbols and its second sentence is the ≥2 test, with Table 9 for the result. A literal wider
-                // than one character is no longer a GAP either: §13.18.40.4 GR14's 'es' entry gives the item
-                // the literal's width and CobolEdit materializes it (kb/Work PB491; Annex D.24 demonstrates
-                // both shapes, so both were legal source the compiler refused).
-                rules.Add(new CobolEdit.EditRule(char1, negLit, posLit, SimpleInsertion: false, Floating: occ >= 2));
+                // FOR = an EXTENDED editing sign control symbol. A FIXED occurrence is rule 5 (Table 8); a STRING of at
+                // least two identical symbols is a FLOATING insertion string — rule 6's first sentence lists "the
+                // extended editing sign control symbols, if specified" among the floating insertion symbols and its
+                // second sentence is the ≥2 test, with Table 9 for the result. Which one a letter is depends on the
+                // WHOLE character-string and the full set of character-1 (an IS-form letter embedded in the string is
+                // part of it), so the flag is decided AFTER this loop, by the one floating-string detector
+                // (PictureComposition.HasFloatingString). A literal wider than one character is no longer a GAP
+                // either: §13.18.40.4 GR14's 'es' entry gives the item the literal's width and CobolEdit
+                // materializes it (kb/Work PB491; Annex D.24 demonstrates both shapes, so both were legal source
+                // the compiler refused).
+                rules.Add(new CobolEdit.EditRule(char1, negLit, posLit, SimpleInsertion: false, Floating: false));
             }
             else
             {
@@ -1002,41 +1001,39 @@ public static class PictureAnalyzer
             }
         }
 
-        // ── The EXTENDED editing sign control symbols as a SET (ISO §13.18.40.3 SR24 and SR25, each second
-        // sentence). Neither rule is askable inside the phrase loop: both are stated over the WHOLE phrase list.
-        // SR24: "For extended editing sign control symbols, either one or two extended editing sign control
-        // symbols may be used in character-string-1" — so three is a syntax error, and it was an unmeasured one:
-        // `PIC 9L9F9G` with three FOR phrases bound clean and rendered -12 as "0(1)2]" (kb/Work PB530).
-        if (extended.Count > 2)
+        // Rule 6's floating test, per extended letter, now that every character-1 is known (see the FOR arm above).
+        for (int k = 0; k < rules.Count; k++)
+            if (!rules[k].SimpleInsertion)
+                rules[k] = rules[k] with
+                {
+                    Floating = PictureComposition.HasFloatingString(expanded, cs, char1Set, char1Extended,
+                        decimalPointIsComma ? ',' : '.', decimalPointIsComma ? '.' : ',', rules[k].Char1),
+                };
+
+        // ── SR25's SECOND sentence over the EXTENDED editing sign control symbols as a SET (ISO §13.18.40.3). It is
+        // not askable inside the phrase loop: it is stated over the WHOLE phrase list. (SR24's second sentence, the
+        // bound of one or two symbols, is asked over the PICTURE by PictureComposition.Validate: a count of EDITING
+        // phrases misses a repeated fixed occurrence, kb/Work PB855.)
+        // SR25: "When extended editing sign control symbols are used and two are specified, the first occurrence of
+        // the EDITING phrase shall be for the leftmost symbol in character-string-1 and the second occurrence shall
+        // be for the rightmost symbol in character-string-1."
+        // ⛔ DETERMINATION (kb/Work PB855, replacing PB530's): the sentence is read AS WRITTEN — the first phrase's
+        // character-1 IS character-string-1's leftmost symbol and the second's IS its rightmost. PB530 read "the
+        // leftmost symbol" as the leftmost OF THE TWO and constrained only the phrase ORDER, because §13.18.40.6's
+        // sentence giving 'es' the precedence of 'cs' "cannot be applied literally": Table 10's blank
+        // leading-currency-before-trailing-currency cell would refuse Annex D.24's `PIC IS L9999.99F`. That premise
+        // is true of the cell and false of the reading — PictureComposition.Precedence applies the sentence to
+        // every symbol BUT another currency-like one, whose order SR25 and SR26 own — so the stricter reading no
+        // longer rejects the standard's own example, and the weaker one left `PIC LF$999` (two extended symbols
+        // ahead of the currency symbol) and `PIC 9L9F` legal against the words of the rule.
+        if (extended.Count == 2
+            && (char.ToUpperInvariant(expanded[0]) != extended[0] || char.ToUpperInvariant(expanded[^1]) != extended[1]))
         {
-            edition.Error(DiagnosticCatalog.PictureEditingExtendedCount, $"{where}: character-string-1 uses "
-                + $"{extended.Count} extended editing sign control symbols ('"
-                + string.Join("', '", extended.Select(e => e.Char1)) + "') — either ONE or TWO may be used "
-                + "(ISO §13.18.40.3 SR24)");
-            error = true;
-        }
-        // SR25, second sentence: "When extended editing sign control symbols are used and two are specified, the
-        // first occurrence of the EDITING phrase shall be for the leftmost symbol in character-string-1 and the
-        // second occurrence shall be for the rightmost symbol in character-string-1."
-        // ⛔ DETERMINATION (kb/Work PB530) — "the leftmost symbol" is read as the leftmost OF THE TWO extended
-        // symbols the sentence has just named, so the rule constrains the PHRASE ORDER and not the two symbols'
-        // placement in the string. The STRICTER alternative reading — that the two shall also BE the string's
-        // first and last symbols — is not taken, for a measured reason: the only other text that would place an
-        // extended symbol, §13.18.40.6's "the precedence of 'es' … has the same precedence as the 'cs' symbol in
-        // the column and row of non-floating insertion symbols", cannot be applied literally, because Table 10's
-        // leading-currency-before-trailing-currency cell is BLANK and applying it would reject the standard's
-        // OWN example, Annex D.24's `PIC IS L9999.99F` with two FOR phrases. With the placement text unusable,
-        // the reading that rejects LESS is the one that cannot refuse legal source; a later tightening stays
-        // source-compatible, where the reverse would not. This is also the reading PictureComposition's
-        // character-1 transparency already rests on (kb/Work PB528, golden pb528_picture_editing_transparency).
-        else if (extended.Count == 2 && extended[0].At > extended[1].At)
-        {
-            edition.Error(DiagnosticCatalog.PictureEditingPhraseOrder, $"{where}: the FIRST EDITING phrase is for "
-                + $"character-1 '{extended[0].Char1}', which stands at symbol position {extended[0].At + 1}, to the "
-                + $"RIGHT of '{extended[1].Char1}' at symbol position {extended[1].At + 1} — when two extended "
-                + "editing sign control symbols are specified, the first occurrence of the EDITING phrase shall "
-                + "be for the leftmost symbol in character-string-1 and the second occurrence for the rightmost "
-                + "(ISO §13.18.40.3 SR25)");
+            edition.Error(DiagnosticCatalog.PictureEditingPhraseOrder, $"{where}: with two extended editing sign "
+                + "control symbols the FIRST EDITING phrase shall be for the LEFTMOST symbol of character-string-1 "
+                + $"and the SECOND for the RIGHTMOST, but the first phrase is for '{extended[0]}' and the "
+                + $"second for '{extended[1]}', while the string begins with '{expanded[0]}' and ends with "
+                + $"'{expanded[^1]}' (ISO §13.18.40.3 SR25)");
             error = true;
         }
 
@@ -1059,6 +1056,12 @@ public static class PictureAnalyzer
     /// </summary>
     public static Usage ParseUsage(string? keyword, EditionContext edition, string where)
     {
+        // ⛔ THE ONE PLACE A USAGE SPELLING IS RECOGNIZED, so it is also the one place a NONSTANDARD one is named
+        // (ISO §4.2.10; kb/Work PB1525): COMP-1 … COMP-5 and their COMPUTATIONAL-n long spellings are vendor
+        // spellings of usages ISO defines under other words (FLOAT-SHORT, FLOAT-LONG, PACKED-DECIMAL, BINARY, …).
+        // The register row carries the spellings, so a new vendor usage word is flagged by adding it to its row.
+        if (keyword is not null && NonstandardExtensionRegister.ForUsageSpelling(keyword) is { } extension)
+            edition.Extension(extension, $"{where}: USAGE {keyword.ToUpperInvariant()}");
         switch (keyword?.ToUpperInvariant().Replace("COMPUTATIONAL", "COMP"))
         {
             case null or "DISPLAY": return Usage.Display;

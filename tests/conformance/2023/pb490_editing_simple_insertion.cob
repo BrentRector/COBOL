@@ -14,8 +14,11 @@
       *> NIS  ZT9 EDITING T IS ":" <- 5: the ':' is immediately right of the 'Z' string, so it is
       *>      part of it, and rule 7 a) replaces every position preceding the first character position
       *>      for which no zero suppression is specified (the '9') => "  5".
-      *> NFOR ZU9 EDITING U FOR NEGATIVE IS ":" POSITIVE IS ":" <- 5: FIXED insertion, not part of
-      *>      the string; the 'Z' before it suppresses and the ':' stands => " :5".
+      *> NFOR UZ9 EDITING U FOR NEGATIVE IS ":" POSITIVE IS ":" <- 5: FIXED insertion, not part of
+      *>      the string, and at the LEFT END where a fixed insertion symbol may stand (13.18.40.6: an
+      *>      extended editing sign control symbol "has the same precedence as the 'cs' symbol in the column
+      *>      and row of non-floating insertion symbols", so the mid-string spelling ZU9 is COBOLNET1935 -
+      *>      kb/Work PB855); the ':' stands and the 'Z' after it suppresses => ": 5".
       *> NFL  ++T++9 EDITING T IS ":" <- 5: embedded in the FLOATING string, so rule 6 a) lands the
       *>      single '+' immediately preceding the first nonzero numeric character, every position
       *>      before it a space => "    +5".
@@ -31,7 +34,7 @@
        DATA DIVISION.
        WORKING-STORAGE SECTION.
        01 NIS      PIC ZT9 EDITING T IS ":".
-       01 NFOR     PIC ZU9 EDITING U FOR NEGATIVE IS ":"
+       01 NFOR     PIC UZ9 EDITING U FOR NEGATIVE IS ":"
                                           POSITIVE IS ":".
        01 NFL      PIC ++T++9 EDITING T IS ":".
        01 AE       PIC XXTXX EDITING T IS ":".

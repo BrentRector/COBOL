@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-273 drift tests.
+274 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -178,6 +178,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [MoveTable16AskerDriftTests](../tests/Cobol.Net.Tests.Unit/MoveTable16AskerDriftTests.cs) | ⛔ ONE QUESTION, ONE ENTRY (kb/Work PB878). ISO §14.9.25.3's MOVE-validity question — SR2, SR6/SR7/SR8, SR9 and SR10 (Table 16) — is asked by the written MOVE, by every implicit move MoveBinder.BindMoveOf binds, by §14.9.20.3 SR4 (INITIALIZE REPLACING's hypothetical MOVE), by §14.7.6 rule 2 (the CORRESPONDING pairing filter) and by §14.8.2.3.3 rule 2d (a BY CONTENT / BY VALUE argument). | `src/Cobol.Net.Compiler` |
 | [NestedStatementEcRegionDriftTests](../tests/Cobol.Net.Tests.Unit/NestedStatementEcRegionDriftTests.cs) | kb/Work PB441 — a nested source statement list is an EC REGION BOUNDARY. | `src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs`, `src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs` |
 | [NoWallClockAssertionDriftTests](../tests/Cobol.Net.Tests.Unit/NoWallClockAssertionDriftTests.cs) | kb/Work PB1590: no test may assert on a stopwatch reading. A fixed wall-clock ceiling measures the host, not the code — hosted CI runners are shared and loaded, and `DeepNestingTests` went red TWICE on a 1-second compile that took 26 s there. | `tests` |
+| [NonstandardExtensionRegisterDriftTests](../tests/Cobol.Net.Tests.Unit/NonstandardExtensionRegisterDriftTests.cs) | ⛔ THE §4.2.10 REGISTER OF NONSTANDARD EXTENSIONS IS ONE TABLE, AND EVERYTHING THAT SAYS WHAT AN EXTENSION IS READS IT (kb/Work PB1525). | `tests/version-matrix/cobol-words.json`, `src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4`, `src/Cobol.Net.Editions/NonstandardExtension.cs`, `src`, `docs/CONFORMANCE.md` |
 | [NumericByteFormDriftTests](../tests/Cobol.Net.Tests.Unit/NumericByteFormDriftTests.cs) | ⛔ THE BYTE-FORM TABLE (V59 step 2). Every USAGE has exactly ONE byte representation, stated here as a table so that adding a usage to the compiler cannot silently inherit a representation it was never given. | — |
 | [NumericEditedValueEditionGateDriftTests](../tests/Cobol.Net.Tests.Unit/NumericEditedValueEditionGateDriftTests.cs) | ⛔ ONE RULE, EVERY FORMAT: ISO §13.18.63.3 SR6's edition reaches every general format of the VALUE clause that can carry a numeric literal on a numeric-edited subject. | — |
 | [NumericRoundUpSiteDriftTests](../tests/Cobol.Net.Tests.Unit/NumericRoundUpSiteDriftTests.cs) | ⛔ THE DRIFT TEST for the "rounded up to the next whole number" landing (kb/Work PB142-B). | `src`, `specs/ISO_COBOL.md` |

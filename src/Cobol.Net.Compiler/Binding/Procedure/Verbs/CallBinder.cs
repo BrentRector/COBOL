@@ -3,6 +3,7 @@
 using CobolNet.Common;
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
+using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Generated;
 using CobolNet.Runtime;
@@ -888,11 +889,17 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
     /// <c>*</c>; §5.2.6.4's "only once" half is read HERE, through the shared
     /// <see cref="ChoiceIndicators.AtMostOnce"/> — not as a hand-written "if both, error", so the next figure
     /// with choice indicators inherits it.</remarks>
-    private GobackPhrases DecodeGobackPhrases(Core.GobackStatementContext g) =>
-        new(g.dataReference(),
+    private GobackPhrases DecodeGobackPhrases(Core.GobackStatementContext g)
+    {
+        // ⛔ §14.9.18.2's general format has no RETURNING/GIVING phrase (the grammar's own note; kb/Work PB407), so
+        // writing one is a nonstandard extension (ISO §4.2.10; kb/Work PB1525), named here — the ONE decode both the
+        // program and the method arm read — and not at either arm.
+        if (g.dataReference() is not null) ctx.Edition.Extension(ExtensionIds.GobackReturning, "GOBACK RETURNING");
+        return new(g.dataReference(),
             ChoiceIndicators.AtMostOnce(ctx.Edition, g.raisingPhrase(), "GOBACK", "the RAISING phrase", "14.9.18.2"),
             host.ControlFlow.BindTerminationStatus(
                 ChoiceIndicators.AtMostOnce(ctx.Edition, g.statusPhrase(), "GOBACK", "the status phrase", "14.9.18.2")));
+    }
 
     /// <summary>The phrases of ONE <c>gobackStatement</c>, decoded once by <see cref="DecodeGobackPhrases"/> and
     /// consumed by both arms of the §14.9.18.4 GR2/GR4 fork — the activation return (<see cref="BindGoback"/>)

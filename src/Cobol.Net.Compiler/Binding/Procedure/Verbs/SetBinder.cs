@@ -3,6 +3,7 @@
 using Antlr4.Runtime;
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
+using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Common;
 using CobolNet.Frontend.Generated;
@@ -955,6 +956,9 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         // The LAST dataReference is the ENTRY identifier operand when no literal is present — the grammar
         // shape is `SET dataReference+ TO ENTRY (nonNumericLiteral | dataReference)`.
         var drefs = se.dataReference();
+        // ⛔ The words `TO ENTRY` occur nowhere in ISO/IEC 1989 (the grammar's own note; kb/Work PB549) — a Micro Focus /
+        // IBM spelling this compiler accepts for its program-pointer semantics, so the §4.2.10 warning names it.
+        ctx.Edition.Extension(ExtensionIds.SetProgramPointerToEntry, "SET … TO ENTRY");
         bool identForm = se.nonNumericLiteral() is null;
         int targetCount = identForm ? drefs.Length - 1 : drefs.Length;
         if (targetCount < 1)

@@ -1844,17 +1844,22 @@ stays legal, and the positive golden `85/pb530_picture_floating_anchor_85` pins 
 anchored shapes (`$$.$$`, `$$V99`, `++.++`, `$$$PP`); `negative/pb530-picture-floating-left-of-point` holds the
 seven rejections at all four editions.
 
-**A PICTURE EDITING character-1 is deliberately TRANSPARENT to the walk.** §13.18.40.6 gives a Table-10
-precedence to `es` alone — "If the EDITING phrase is specified, the precedence of 'es' … has the same precedence
-as the 'cs' symbol in the column and row of non-floating insertion symbols" — and SR12 makes `es` the EXTENDED
-(FOR-phrase) symbol only, the IS form being a *fixed* editing sign control symbol whose editing is simple
-insertion (§13.18.40.5 rule 3). Even for `es` the `cs` mapping cannot be applied literally: the
-leading-currency-before-trailing-currency cell is blank while SR24 and SR25 expressly sanction TWO extended
-symbols, "the first occurrence … for the leftmost symbol in character-string-1 and the second occurrence … for
-the rightmost symbol". Applying it would reject `PIC L999F` and `PIC LL EDITING "L" IS ":"` — the latter the very
-shape SR12 a) names as sufficient. So character-1 constrains no neighbour in the walk; its own placement stays
-SR8–SR12 / SR25 / SR26 in `PictureAnalyzer.ValidateEditing`. Golden
-`2023/pb528_picture_editing_transparency_2023` holds the determination.
+**An IS-form PICTURE EDITING character-1 is deliberately TRANSPARENT to the walk; a non-floating FOR-form one takes
+the `cs` role (kb/Work PB528, PB855).** §13.18.40.6 gives a Table-10 precedence to `es` alone — "If the EDITING
+phrase is specified, the precedence of 'es' … has the same precedence as the 'cs' symbol in the column and row of
+non-floating insertion symbols" — and SR12 makes `es` the EXTENDED (FOR-phrase) symbol only, the IS form being a
+*fixed* editing sign control symbol whose editing is simple insertion (§13.18.40.5 rule 3) with no Table-10
+precedence at all: it constrains no neighbour (`PIC LL EDITING "L" IS ":"` is the shape SR12 a) names as
+sufficient). A NON-FLOATING `es` is position-ambiguous exactly like a fixed currency symbol (`CurrencyLeading` /
+`CurrencyTrailing` in `PictureComposition.Precedence`), asked of every other symbol by the matrix: `PIC 99L99`
+refuses (COBOLNET1935), `PIC L999`, `PIC 9999L`, `PIC L$999`, `PIC 999$L` bind. A FLOATING `es` string (rule 6) is
+floating insertion and Table 10 states the `cs` mapping for the non-floating column and row alone, so it stays
+transparent. **The one pair the matrix does NOT judge is one currency-like symbol against another** (`es`/`es`,
+`es`/`cs`): the blank leading-currency-before-trailing-currency cell would refuse the two ends of Annex D.24's `PIC
+IS L9999.99F` and SR26's `PIC L$999`, so the walk exempts `CurrencyLikeRoles` from each other (a fixed `cs` is bounded
+to one by SR24, so the exemption removes nothing for a picture with no `es`) and SR25 / SR26 own the order. An `es`
+placed beside a `cs` in the other order (`PIC $L99`, `PIC 999L$`) is accepted: nothing but the blank cell refuses it
+and the cell is the one the standard overrides for its sibling pairs — the reading that rejects LESS.
 
 **character-1 IS WRITTEN BARE, and its render is VARIABLE-WIDTH (kb/Work PB568, PB491).** The Format 1 general
 format — re-rendered from the canonical PDF, printed page 441 — is `EDITING character-1 { IS literal-1 | FOR {
@@ -1914,29 +1919,37 @@ as an unhandled `ArgumentOutOfRangeException` and `PIC X(2000000000)` as an `Out
 crash with no diagnostic and no source location. PICTURE format 2's SIZE obeys the same cap (§13.18.40.4 GR17
 makes integer-1 a character-position count), asked at the one place the limit lives.
 
-**The extended editing sign control symbols are a SET, and two rules are stated over it (kb/Work PB530).** SR24's
-and SR25's SECOND sentences are the two the matrix cannot reach for the same reason the transparency exists, and
-neither is askable while validating ONE phrase — both are properties of the whole EDITING phrase LIST, so both
-live at the end of `ValidateEditing`, over the FOR-form phrases it collected (SR12: the FOR form alone is an
-extended symbol; an IS-form phrase is simple insertion and is not counted). SR24: "either one or two extended
-editing sign control symbols may be used in character-string-1" — a third is COBOLNET1985; `PIC 9L9F9G` with
-three FOR phrases used to bind and render `MOVE -12` as `0(1)2]`. SR25: "the first occurrence of the EDITING
-phrase shall be for the leftmost symbol in character-string-1 and the second occurrence shall be for the
-rightmost symbol" — the reverse order is COBOLNET1984, and the order is not cosmetic, because each extended
-symbol renders its own literal at its own position: `PIC F999.99L` with the phrases reversed rendered `-1.5` as
-`)001.50(` where the conforming spelling renders `(001.50)`.
-**⛔ THE READING**: "the leftmost symbol" is the leftmost OF THE TWO extended symbols the sentence has just
-named, so SR25's second sentence constrains the PHRASE ORDER and not the two symbols' placement in
-character-string-1. The alternative — that the two shall also BE character-string-1's first and last symbols —
-is not taken, because the only other text that would place an extended symbol is the `es`-takes-`cs`-precedence
-sentence above, which cannot be applied literally without rejecting the standard's own Annex D.24 example
-(`PIC IS L9999.99F` with two FOR phrases) against a blank Table-10 cell; with that text unusable, the reading
-that rejects LESS is the one that cannot refuse legal source, and a later tightening stays source-compatible
-where the reverse would not. It is also the reading the character-1 transparency above already rests on.
-Goldens: `2023/pb530_picture_editing_order_2023` (the conforming orders, including D.24's own example and the
-single mid-string symbol SR25 does not constrain), `negative/pb530-picture-editing-phrase-order` and
-`negative/pb530-picture-editing-extended-count`, all at 2023 — the EDITING phrase is a COBOL-2023 introduction
-and `negative/pb490-picture-editing-at-85` is the below-2023 gate.
+**The extended editing sign control symbols are a SET, and two rules are stated over it (kb/Work PB530, PB855).**
+SR24's and SR25's SECOND sentences are the two the matrix cannot reach (they order one currency-like symbol against
+another, which Table 10's blank cell would refuse). SR24: "either one or two extended editing sign control symbols
+may be used in character-string-1" — a third is COBOLNET1985, asked in `PictureComposition.Validate` over the PICTURE,
+because a SYMBOL is an occurrence (a FLOATING string of one character-1 is one, each fixed occurrence is one): a count
+of EDITING phrases missed `PIC L9L9L` under one phrase, and `PIC 9L9F9G` with three FOR phrases once bound and
+rendered `MOVE -12` as `0(1)2]`. The same bound keeps the position-ambiguous role search at 2^4 assignments. SR25: "the
+first occurrence of the EDITING phrase shall be for the leftmost symbol in character-string-1 and the second occurrence
+shall be for the rightmost symbol" — asked at the end of `PictureAnalyzer.ValidateEditing`, over the FOR-form phrases it
+collected (SR12: the FOR form alone is an extended symbol; an IS-form phrase is simple insertion and is not counted),
+and refused as COBOLNET1984 unless the first phrase's character-1 IS the string's first symbol and the second's its last.
+The order is not cosmetic, because each extended symbol renders its own literal at its own position: `PIC F999.99L`
+with the phrases reversed rendered `-1.5` as `)001.50(` where the conforming spelling renders `(001.50)`.
+**⛔ THE READING (PB855, replacing PB530's)**: SR25 is read AS WRITTEN. PB530 read "the leftmost symbol" as the
+leftmost OF THE TWO extended symbols (a phrase-ORDER rule only), because §13.18.40.6's `es`-takes-`cs`-precedence
+sentence "cannot be applied literally" against Table 10's blank leading-currency-before-trailing-currency cell and
+would reject Annex D.24's `PIC IS L9999.99F`. The premise was true of the cell and false of the reading: the walk now
+applies the sentence to every symbol but another currency-like one, so the stricter SR25 refuses nothing the standard
+shows, and the weaker reading had left `PIC LF$999` (two extended symbols before the currency symbol, SR26's "optionally
+preceded by character-1" taken as unbounded) and `PIC 9L9F` legal against the words of the rule. SR26's singular is the
+same fact seen from the currency symbol: with SR25 an `es` before the currency symbol is the string's leftmost symbol.
+An IS-form character-1 beside the currency symbol (`PIC T$999 EDITING T IS ":"`) stays unconstrained — rule 3 makes it
+simple insertion and no rule counts it against SR26.
+**The floating test is the same adjacency for an extended character-1** (`PictureComposition.HasFloatingString`, read
+by `ValidateEditing` for `EditRule.Floating`): the flag was a bare count of the letter's occurrences, so `PIC L999L` —
+two FIXED occurrences — rendered as one floating string (`(0012`); it renders `(012(`.
+Goldens: `2023/pb530_picture_editing_order_2023` (the conforming placements, including D.24's own example, a single
+trailing symbol, a currency symbol between a pair and the two-fixed-occurrences case),
+`negative/pb530-picture-editing-phrase-order`, `negative/pb530-picture-editing-extended-count`,
+`negative/pb855-picture-editing-es-mid-string` and `negative/pb855-picture-editing-es-two-before-cs`, all at 2023 — the
+EDITING phrase is a COBOL-2023 introduction and `negative/pb490-picture-editing-at-85` is the below-2023 gate.
 
 **Where it runs.** `Analyze` calls it on the fixed-point Format-1 path, after the SR2 membership whitelist and
 the national / boolean / floating-point arms have taken their strings and BEFORE the geometry derivation — which

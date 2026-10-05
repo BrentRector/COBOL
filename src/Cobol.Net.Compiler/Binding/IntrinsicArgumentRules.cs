@@ -566,12 +566,9 @@ internal static class IntrinsicArgumentRules
     /// here, never remembered at each screen.
     /// </para>
     /// <para>
-    /// ⚠ THE NATIONAL HALF OF GR6 c) IS UNREACHABLE and is deliberately not written here: a national-form
-    /// numeric-edited item (<c>PIC ZZ9 USAGE NATIONAL</c>) is refused by name at COBOLNET0899 before any screen
-    /// sees it (kb/Work PB646), so an arm for it would be a lookup nothing can reach — and a dead lookup is also
-    /// an unverified one. PB646's landing owns the usage-keyed arm, beside <see cref="Usage.Index"/>'s in
-    /// <see cref="ClassOfItem"/>; this projection needs no change when it lands, because the classifier will
-    /// then report <see cref="CobolClass.National"/> and never reach the refined member.
+    /// The national half of GR6 c) is <see cref="CobolClass.NumericEditedNational"/> (a <c>PIC ZZ9 USAGE NATIONAL</c>
+    /// item, buildable since kb/Work PB646 / PB492 and witnessed by <c>2002/pb876_national_value_no_editing_bwz_inert</c>);
+    /// this projection un-refines it to <see cref="CobolClass.National"/> exactly as it un-refines its display twin.
     /// </para>
     /// </remarks>
     public static CobolClass TableTwoClass(CobolClass c) => c switch

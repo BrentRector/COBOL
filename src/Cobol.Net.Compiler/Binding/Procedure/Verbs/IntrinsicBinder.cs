@@ -1537,24 +1537,33 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             ctx.Edition.Error("COBOLNET1546", "FUNCTION NATIONAL-OF: argument-1 shall not be a zero-length "
                 + "literal (ISO §15.66.3 rule 3)");
 
-        if (OperandCategory(args[0]) is { } c1)
+        // ⛔ CLASS, NOT CATEGORY (kb/Work PB876): every rule below but NATIONAL-OF's argument-2 is worded "class", and
+        // §8.5.2.1 Table 2 splits numeric-edited between alphanumeric (usage display) and national (usage national)
+        // and puts national-edited in national — which the CATEGORY the check used to read cannot see: a national
+        // numeric-edited item was refused as DISPLAY-OF's argument-1 and admitted as NATIONAL-OF's. The one class
+        // answer is IntrinsicArgumentRules.ClassOf read through TableTwoClass, as every other class-worded screen does.
+        if (IntrinsicArgumentRules.ClassOf(args[0]) is { } k1)
         {
-            if (!toNat && c1 is not PicCategory.National)
+            CobolClass c1 = IntrinsicArgumentRules.TableTwoClass(k1);
+            if (!toNat && c1 is not CobolClass.National)
                 ctx.Edition.Error("COBOLNET1546", "FUNCTION DISPLAY-OF: argument-1 shall be of class national "
                     + "(ISO §15.26.3 rule 1) — FUNCTION NATIONAL-OF is the alphanumeric→national conversion");
-            else if (toNat && c1 is not (PicCategory.Alphanumeric or PicCategory.NumericEdited))
+            else if (toNat && c1 is not (CobolClass.Alphabetic or CobolClass.Alphanumeric))
                 ctx.Edition.Error("COBOLNET1546", "FUNCTION NATIONAL-OF: argument-1 shall be of class alphabetic "
                     + "or alphanumeric (ISO §15.66.3 rule 1) — FUNCTION DISPLAY-OF is the national→alphanumeric "
                     + "conversion");
         }
 
         if (args.Count < 2) return;
-        if (OperandCategory(args[1]) is { } c2)
+        if (!toNat && IntrinsicArgumentRules.ClassOf(args[1]) is { } k2)
         {
-            if (!toNat && c2 is not (PicCategory.Alphanumeric or PicCategory.NumericEdited))
+            if (IntrinsicArgumentRules.TableTwoClass(k2) is not (CobolClass.Alphabetic or CobolClass.Alphanumeric))
                 ctx.Edition.Error("COBOLNET1546", "FUNCTION DISPLAY-OF: argument-2 (the substitution character) "
                     + "shall be of class alphabetic or alphanumeric (ISO §15.26.3 rule 2)");
-            else if (toNat && c2 is not PicCategory.National)
+        }
+        else if (toNat && OperandCategory(args[1]) is { } c2)
+        {
+            if (c2 is not PicCategory.National)
                 ctx.Edition.Error("COBOLNET1546", "FUNCTION NATIONAL-OF: argument-2 (the substitution character) "
                     + "shall be of category national (ISO §15.66.3 rule 2)");
         }

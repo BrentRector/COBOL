@@ -262,6 +262,24 @@ which absorbs and replaces `EditionValidator`:
   difference per edition, asserted by a new `VersionBehaviorMatrixTests` running the program under
   each `--std` and diffing stdout. This is the currently-weakest leg of "four compilers in one".
 
+### 2.11 The nonstandard-extension register (ISO §4.2.10; kb/Work PB1525)
+
+`ConstructRegistry` answers "at which EDITION does an ISO construct exist". A nonstandard extension is the other
+question — a construct ISO does not define at any edition — and §4.2.10 owes the user an answer in three parts:
+documentation that identifies the extensions for which support is claimed (and the reserved words added for them), a
+user-invocable compile-time warning mechanism, and that mechanism flagging only syntactically distinguishable
+extensions. All three are read from ONE table, `NonstandardExtensionRegister` (`Cobol.Net.Editions`,
+`NonstandardExtension.cs`): a row per extension (id, display, support, origin, standard form, distinguishable, usage
+spellings, reserved words). It is hand-authored C# and not generated JSON because nothing outside the compiler and its
+tests reads it; `docs/CONFORMANCE.md` §3.2 is the documentation half, held equal to it by
+`NonstandardExtensionRegisterDriftTests`, which also joins it to `cobol-words.json` `extensionReserved`, to the
+grammar's `usageKeyword` (a silent new vendor usage word fails) and to the binder sites. The warning is
+`cobol --flag-extensions` → `CompilerDriver.Options.FlagExtensions` → `EditionContext.FlagExtensions` (the
+`--sign-encoding` thread), emitted ONLY through `EditionContext.Extension` as COBOLNET2894. A usage spelling is found by
+row in the one usage funnel; a statement or phrase is one `Extension(ExtensionIds.X, …)` call at the one place its
+binder accepts it. Not rows: constructs `--permissive` accepts (a violation of a standard rule, flagged
+unconditionally through `EditionContext.Removed`) and implementor latitude (`--sign-encoding`).
+
 ---
 
 ## 3. Current → target module changes

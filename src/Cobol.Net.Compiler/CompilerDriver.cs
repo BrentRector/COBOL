@@ -41,6 +41,11 @@ public static class CompilerDriver
     /// <param name="SourceFormat">The reference format the compilation group starts in (CLI <c>--source-format</c>;
     /// kb/Work PB1362): fixed form, ISO §7.3.24.3 2)'s default, unless free form or the documented auto-detection
     /// extension is selected (§4.2.10 3) — docs/CONFORMANCE.md DOC-A.1-158).</param>
+    /// <param name="FlagExtensions">The §4.2.10 warning mechanism (CLI <c>--flag-extensions</c>; kb/Work PB1525):
+    /// "An implementation shall provide a warning mechanism that optionally may be invoked by the user at compile time
+    /// to indicate use of a nonstandard extension in a compilation group". When set, every use of a syntactically
+    /// distinguishable extension of the register (<see cref="Editions.NonstandardExtensionRegister"/>) is named by a
+    /// COBOLNET2894 warning. Orthogonal to <paramref name="DialectLevel"/> and <paramref name="Permissive"/>.</param>
     public sealed record Options(
         string SourcePath,
         string? OutputPath = null,
@@ -50,7 +55,8 @@ public static class CompilerDriver
         bool Permissive = false,
         bool CheckOnly = false,
         SignEncoding SignEncoding = SignEncoding.Ibm,
-        Frontend.Preprocessor.InitialReferenceFormat SourceFormat = Frontend.Preprocessor.InitialReferenceFormat.Fixed);
+        Frontend.Preprocessor.InitialReferenceFormat SourceFormat = Frontend.Preprocessor.InitialReferenceFormat.Fixed,
+        bool FlagExtensions = false);
 
     /// <summary>Which phase a compilation reached (drives the CLI's exit code).</summary>
     public enum Outcome { Success, SourceNotFound, FrontendError, BindError, BackendError }
@@ -154,6 +160,9 @@ public static class CompilerDriver
             // per-compilation object the edition does (DataBinder.Edition → EmitContext.SignEncoding), so every
             // NumProfile and every signed class condition this compile emits states one convention.
             SignEncoding = options.SignEncoding,
+            // kb/Work PB1525: the §4.2.10 warning mechanism rides the same per-compilation object, and is read by
+            // EditionContext.Extension alone.
+            FlagExtensions = options.FlagExtensions,
         };
         var emitter = new CSharpEmitter();
         var bound = emitter.Bind(tree, edition, frontend.Directives);   // Phase 2a — BIND (terminal = conformance pass)

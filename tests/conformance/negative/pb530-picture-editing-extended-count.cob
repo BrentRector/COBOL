@@ -14,6 +14,9 @@
       *>
       *> PX01 9L9F9G with three FOR phrases, in the conforming left-to-right order, so SR25 is satisfied and
       *>     SR24 is the only rule the string breaks.
+      *> PX02 L9L9L with ONE FOR phrase (kb/Work PB855): the bound is over SYMBOLS - each fixed occurrence and
+      *>     each floating string of one character-1 - not over phrases, so three fixed occurrences of one
+      *>     letter are three extended symbols.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB530PXC.
        DATA DIVISION.
@@ -21,5 +24,6 @@
        01 PX01 PIC 9L9F9G EDITING L FOR NEGATIVE IS "("
                           EDITING F FOR NEGATIVE IS ")"
                           EDITING G FOR NEGATIVE IS "]".
+       01 PX02 PIC L9L9L EDITING L FOR NEGATIVE IS "(".
        PROCEDURE DIVISION.
            STOP RUN.
