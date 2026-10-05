@@ -6747,6 +6747,19 @@ public static class DiagnosticCatalog
         + "factory or exact-class variant.",
         "ISO §8.4.3.5.2; §8.4.3.5.4 GR6");
 
+    /// <summary>COBOLNET2897 — a RESERVE clause's integer-1 exceeds 524,287, this implementation's limit on the
+    /// number of input-output areas (kb/Work PB643). A connector's areas are one host buffer whose length is a
+    /// 32-bit count (<c>HostFile.MaxInputOutputAreas</c>), and §12.4.5.14.3 GR1 makes the count exact, so a larger
+    /// integer-1 cannot be honored and is refused rather than silently reduced.</summary>
+    public static readonly DiagnosticDescriptor ReserveAreasBeyondLimit = new(
+        "COBOLNET2897", "reserve-areas-beyond-limit", EditionSeverity.Error,
+        "The RESERVE clause asks for more input-output areas than this implementation can allocate: a file "
+        + "connector's areas are one buffer of 4,096 bytes per area, and the limit is 524,287 areas. ISO §4.2.15: "
+        + "'A conforming implementation may place such limits.' §12.4.5.14.3 GR1 requires the number allocated to "
+        + "equal integer-1, so the count is never reduced; write a smaller integer-1. The limit is documented in "
+        + "docs/CONFORMANCE.md DOC-A.1-164.",
+        "ISO §4.2.15; §12.4.5.14.3 GR1");
+
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

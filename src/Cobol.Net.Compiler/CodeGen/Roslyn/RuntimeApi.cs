@@ -1138,6 +1138,12 @@ internal static class RuntimeApi
     public static string FileRegisterRecordLengthFromDepending(string name) =>
         $"{nameof(CobolFile)}.{nameof(CobolFile.RegisterRecordLengthFromDepending)}({name})";
 
+    /// <summary>Declare the connector's input-output area count — <c>CobolFile.RegisterReserve</c>, emitted right after
+    /// the registration (the <see cref="FileRegisterNationalArea"/> pattern) for exactly the files whose file control
+    /// entry writes the RESERVE clause (ISO §12.4.5.14.3 GR1; kb/Work PB643).</summary>
+    public static string FileRegisterReserve(string name, int areas) =>
+        $"{nameof(CobolFile)}.{nameof(CobolFile.RegisterReserve)}({name}, {areas})";
+
     /// <summary>Declare the connector's §13.18.13 CODE-SET conversion — <c>CobolFile.RegisterCodeSet</c>,
     /// emitted right after the registration (the <see cref="FileRegisterNationalArea"/> pattern) for exactly the
     /// files whose CODE-SET clause names a coded character set whose correspondence with the native one is NOT

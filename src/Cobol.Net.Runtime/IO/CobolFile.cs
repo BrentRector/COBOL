@@ -274,6 +274,10 @@ public static class CobolFile
     /// <see cref="FileRegistry.RegisterRecordLengthFromDepending"/> (§14.9.51.4 GR21/GR22; kb/Work PB1191).</summary>
     public static void RegisterRecordLengthFromDepending(string name) => _reg.RegisterRecordLengthFromDepending(name);
 
+    /// <summary>Register the file's RESERVE clause, its input-output area count (§12.4.5.14.3 GR1) — see
+    /// <see cref="FileRegistry.RegisterReserve"/>.</summary>
+    public static void RegisterReserve(string name, int areas) => _reg.RegisterReserve(name, areas);
+
     /// <summary>Register the file's §13.18.13 CODE-SET conversion — see
     /// <see cref="FileRegistry.RegisterCodeSet"/>.</summary>
     public static void RegisterCodeSet(string name, char[] toNative) => _reg.RegisterCodeSet(name, toNative);

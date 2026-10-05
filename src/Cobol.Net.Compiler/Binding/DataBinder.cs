@@ -1241,14 +1241,26 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     file.LockMode = MapLockMode(lm);
                 else if (clauses.fileCollatingSequenceClause() is { } col)   // §12.4.5.7 — introduction-gated post-bind; resolved in ResolveFileCollating
                     CaptureFileCollating(file, col);
-                // RESERVE clause (ISO §12.4.5.14) — integer-1 is captured because §12.4.5.3 GR1 d) makes "The same
-                // value for integer-1 in the RESERVE clause" part of an external file connector's entry identity
-                // (kb/Work PB1079): FileModel.ReserveAreas is read by the EC-EXTERNAL-FILE-MISMATCH fingerprint.
+                // RESERVE clause (ISO §12.4.5.14) — integer-1 is the connector's input-output area count
+                // (§12.4.5.14.3 GR1, "If the RESERVE clause is specified, the number of input-output areas allocated
+                // is equal to the value of integer-1"; kb/Work PB643): the emitter tells the connector
+                // (SequentialIoEmitter.EmitReserveRegistration), whose reader, writer or store handle allocates them.
+                // It is also part of an external file connector's entry identity — §12.4.5.3 GR1 d), "The same value
+                // for integer-1 in the RESERVE clause" (kb/Work PB1079, the EC-EXTERNAL-FILE-MISMATCH fingerprint).
+                // The areas are one host buffer, so integer-1 above HostFile.MaxInputOutputAreas is refused
+                // (COBOLNET2897, §4.2.15: "A conforming implementation may place such limits").
                 else if (clauses.fileReserveClause() is { } res)
                 {
                     using var rsv = Edition.At(res);
                     file.ReserveAreas = IntegerOperandValue(res.integerOperand(), $"file '{name}' RESERVE clause")
                         ?? RecoveredIntegerOperand;
+                    if (file.ReserveAreas > CobolNet.Runtime.IO.HostFile.MaxInputOutputAreas)
+                    {
+                        Edition.Error(DiagnosticCatalog.ReserveAreasBeyondLimit,
+                            $"file '{name}': RESERVE {file.ReserveAreas} AREAS exceeds this implementation's limit of "
+                            + $"{CobolNet.Runtime.IO.HostFile.MaxInputOutputAreas} input-output areas (ISO §4.2.15)");
+                        file.ReserveAreas = RecoveredIntegerOperand;
+                    }
                 }
                 // RECORD DELIMITER clause (ISO §12.4.5.11) — DECLINED, ACCEPT-INERT, and diagnosed by name at
                 // EVERY edition on BOTH arms of its required choice (kb/Work PB292). STANDARD-1 is Annex A.3

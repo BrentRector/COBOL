@@ -952,6 +952,18 @@ public sealed class FileRegistry
         if (_files.TryGetValue(name, out var c)) c.RecordLengthFromDepending = true;
     }
 
+    /// <summary>Declare the file's RESERVE clause (ISO §12.4.5.14.3 GR1: <i>"If the RESERVE clause is specified, the
+    /// number of input-output areas allocated is equal to the value of integer-1"</i>; emitted right after
+    /// registration, only for a file control entry that writes the clause — kb/Work PB643). The compiler has
+    /// already refused an integer-1 above <see cref="HostFile.MaxInputOutputAreas"/> (COBOLNET2897), so a value out
+    /// of range here is a broken caller, not a program's error.</summary>
+    public void RegisterReserve(string name, int areas)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(areas, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(areas, HostFile.MaxInputOutputAreas);
+        if (_files.TryGetValue(name, out var c)) c.InputOutputAreas = areas;
+    }
+
     /// <summary>Declare the file's §13.18.13 CODE-SET conversion (§13.18.13.4 GR2: the coded character set used
     /// to represent data on the storage medium, established at OPEN and constant thereafter).
     /// <paramref name="toNative"/> is §12.3.7.4 GR7 i's correspondence — the native character each medium code

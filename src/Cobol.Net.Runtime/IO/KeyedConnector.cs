@@ -137,13 +137,15 @@ public abstract class KeyedConnector : FileConnector
     /// to hold, and by that arm ONLY: an arm with no file (an absent OPTIONAL one on INPUT) locks nothing.
     /// <para><paramref name="create"/> is §14.9.27.4 GR17/GR18's creation — the OUTPUT arm and the absent
     /// OPTIONAL I-O/EXTEND arms — and is the only difference between the arms, because the store's own
-    /// truncation is <c>RecordFraming.WriteStore</c>'s.</para></summary>
+    /// truncation is <c>RecordFraming.WriteStore</c>'s.</para>
+    /// <para>The handle's buffer is this connector's input-output areas (ISO §12.4.5.14.3 GR1;
+    /// <see cref="HostFile.OpenConnectorStore"/>, kb/Work PB643).</para></summary>
     /// <returns>The handle, so the arm that took it writes its store through that value rather than through a
     /// nullable field it has to re-assert.</returns>
     protected FileStream TakeFileLock(bool create)
     {
-        var taken = HostFile.OpenConnectorStream(HostPath, create ? FileMode.OpenOrCreate : FileMode.Open,
-            HostAccess(Mode), HostShare);
+        var taken = HostFile.OpenConnectorStore(HostPath, create ? FileMode.OpenOrCreate : FileMode.Open,
+            HostAccess(Mode), HostShare, InputOutputAreas);
         _store?.Dispose();   // no arm takes it twice; belt-and-braces so a future one cannot leak
         return _store = taken;
     }

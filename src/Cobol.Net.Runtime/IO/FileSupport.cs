@@ -182,8 +182,9 @@ public enum FilePresence
 /// question the operating environment refused to answer at all — and <see cref="PermitsWrite"/> may be CALLED
 /// only from <see cref="FileConnector"/>, because a capability asked inside one organization's arm is a
 /// capability the other organizations do not ask (kb/Work PB328).
-/// <para>⛔ IT IS ALSO THE ONE PLACE A HOST-PATH <b>STREAM</b> IS OPENED — <see cref="OpenConnectorStream"/>
-/// (a connector's own long-lived handle) and <see cref="OpenAuxiliary"/> (a short-lived handle the runtime
+/// <para>⛔ IT IS ALSO THE ONE PLACE A HOST-PATH <b>STREAM</b> IS OPENED — <see cref="OpenConnectorStream"/>,
+/// <see cref="OpenConnectorWriteStream"/> and <see cref="OpenConnectorStore"/> (a connector's own long-lived
+/// handles) and <see cref="OpenAuxiliary"/> (a short-lived handle the runtime
 /// takes for its own bookkeeping over a path a connector of THIS run unit may already hold). The share mode is
 /// derived here from the role, never spelled at a call site, because a call site that omits it inherits the
 /// .NET constructor default and the default is WRONG in both directions: <c>new FileStream(p, m, a)</c> is
@@ -355,20 +356,64 @@ public static class HostFile
     /// permissive handle, and two clause-less connectors Table 19 PERMITS to share one file were refused by the
     /// host and answered '30' (kb/Work PB740). <see cref="FileLockPosture"/> is where the rule lives now; this
     /// role only spends it.</para>
-    /// <para>⛔ AND THE SAME POSTURE DECIDES WHETHER THE HANDLE MAY HOLD A BUFFER OF ITS OWN (kb/Work PB753).
-    /// A handle whose file lock admits another writer is UNBUFFERED (<c>bufferSize: 1</c>), exactly as
-    /// <see cref="OpenConnectorWriteStream"/>'s repositioning writer is and for the mirror-image reason. The
-    /// connector above already keeps ONE buffer — the <see cref="StreamReader"/>'s — and invalidates it when a
-    /// sibling releases a record (<c>SequentialConnector.EnsureReaderCoherent</c>), but it can only discard the
-    /// buffer it owns: a second, lower buffer keeps the superseded bytes and hands them straight back, because
+    /// <para>⛔ THE HANDLE HOLDS NO BUFFER OF ITS OWN, IN ANY POSTURE (kb/Work PB753, PB643). The sequential
+    /// connector above it keeps ONE buffer — its <see cref="StreamReader"/>'s, which holds the connector's
+    /// input-output areas (<see cref="InputOutputAreaBytes"/>) — and invalidates it when a sibling releases a
+    /// record (<c>SequentialConnector.EnsureReaderCoherent</c>), but it can only discard the buffer it owns: a
+    /// second, lower buffer keeps the superseded bytes and hands them straight back, because
     /// <see cref="FileStream.Seek"/> reuses its read buffer whenever the target offset falls inside it. That was
     /// measured — with the invalidation in place and this handle still 4096-byte buffered, a sibling's REWRITE
     /// was still invisible. §14.9.30.4 GR21 c) selects <i>"the first existing record in the physical file"</i>;
-    /// one managed buffer between the connector and the file is the most that leaves true.</para></summary>
+    /// one managed buffer between the connector and the file is the most that leaves true. It used to be
+    /// unbuffered only where the posture admitted another writer and 4096-byte buffered elsewhere, which put the
+    /// connector's area in the HANDLE in one posture and in the reader in the other, so RESERVE integer-1 had no
+    /// one place to size (§12.4.5.14.3 GR1); the areas are now always the reader's.</para></summary>
     public static FileStream OpenConnectorStream(string hostPath, FileMode mode, FileAccess access,
         FileShare share, FileOptions options = FileOptions.None) =>
-        new(hostPath, mode, access, share,
-            FileLockPosture.AdmitsAnotherWriter(share) ? 1 : 4096, options);
+        new(hostPath, mode, access, share, bufferSize: 1, options);
+
+    /// <summary>A RELATIVE or INDEXED connector's own long-lived handle — its §9.1.15 file lock, and the ONE stream
+    /// its whole store is loaded from at the OPEN and persisted through at the CLOSE (kb/Work PB771). Its buffer
+    /// IS the connector's input-output areas (<see cref="InputOutputAreaBuffer"/>), in every posture: the store
+    /// is read through this handle once, by a handle that has read nothing before, and written once, so no
+    /// buffered image can go stale between two reads — the hazard that keeps the sequential read handle
+    /// (<see cref="OpenConnectorStream"/>) unbuffered does not arise. <paramref name="share"/> is
+    /// <see cref="FileConnector.HostShare"/>, the posture <see cref="FileLockPosture"/> derived.</summary>
+    public static FileStream OpenConnectorStore(string hostPath, FileMode mode, FileAccess access,
+        FileShare share, int areas) =>
+        new(hostPath, mode, access, share, InputOutputAreaBuffer(areas), FileOptions.None);
+
+    // ── The input-output areas (ISO §12.4.5.14) ───────────────────────────────────────────────────────────────
+
+    /// <summary>The size of ONE input-output area: 4,096 bytes — on the sequential organization's medium channel one
+    /// byte is one character (<see cref="FileCharacterSet.Medium"/>), so the reader's and the writer's areas, sized
+    /// in characters, hold the same 4,096 bytes. ISO §12.4.5.14.1: <i>"The RESERVE clause allows the user to specify
+    /// the number of input-output areas allocated"</i>; the area's size is this implementation's
+    /// (docs/CONFORMANCE.md DOC-A.1-164).</summary>
+    public const int InputOutputAreaBytes = 4096;
+
+    /// <summary>The number of input-output areas a connector allocates when its file control entry writes no
+    /// RESERVE clause — ISO §12.4.5.14.3 GR1, <i>"If the RESERVE clause is not specified, the number of
+    /// input-output areas allocated is specified by the implementor"</i>: one (DOC-A.1-164).</summary>
+    public const int ImplementorInputOutputAreas = 1;
+
+    /// <summary>The largest RESERVE integer-1 this implementation accepts — ISO §4.2.15, <i>"A conforming
+    /// implementation may place such limits"</i>. A connector's areas are ONE contiguous buffer whose length is an
+    /// <see cref="int"/>, so the limit is the largest count whose areas that length can hold (524,287 areas,
+    /// 2,147,479,552 bytes, inside <see cref="Array.MaxLength"/>). The compiler refuses a larger integer-1
+    /// (COBOLNET2897), so every count that reaches the runtime fits.</summary>
+    public const int MaxInputOutputAreas = int.MaxValue / InputOutputAreaBytes;
+
+    /// <summary>⛔ THE ONE SIZE OF A CONNECTOR'S INPUT-OUTPUT AREAS — ISO §12.4.5.14.3 GR1, <i>"If the RESERVE clause
+    /// is specified, the number of input-output areas allocated is equal to the value of integer-1"</i>:
+    /// <paramref name="areas"/> areas of <see cref="InputOutputAreaBytes"/>, as the one buffer the connector keeps
+    /// between its record area and the medium (the sequential reader's and writer's, the keyed store handle's).</summary>
+    public static int InputOutputAreaBuffer(int areas)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(areas, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(areas, MaxInputOutputAreas);
+        return areas * InputOutputAreaBytes;
+    }
 
     /// <summary>A SHORT-LIVED stream the runtime opens for its own bookkeeping over a host path — the write-base
     /// measurement of a shared <c>OPEN EXTEND</c>, the §14.9.27.4 GR10 store-header read, the varying framing's
@@ -401,15 +446,19 @@ public static class HostFile
     /// <paramref name="share"/> does not admit another writer — <c>SHARING WITH NO OTHER</c>'s
     /// <see cref="FileShare.None"/>, <c>READ ONLY</c>'s and the undetermined implementor default's
     /// <see cref="FileShare.Read"/>, with no writing sibling admitted — this connector holds the only writable
-    /// handle there is, so it gets the plain buffered stream it always had plus
-    /// <see cref="FileOptions.SequentialScan"/>. When the posture DOES admit another writer (kb/Work PB740 made
+    /// handle there is, so it gets the plain stream plus <see cref="FileOptions.SequentialScan"/>. When the
+    /// posture DOES admit another writer (kb/Work PB740 made
     /// that a derived fact rather than a clause's side effect, so a clause-less pair the arbiter permits is
     /// covered too) it gets <see cref="SharedAppendStream"/>, which positions at the physical end before every
     /// write — the semantics §14.9.51.4 GR19 asks for, <i>"the added records follow the records present in the
     /// physical file when it was opened"</i>, read at the moment each record is added rather than once at the
-    /// OPEN. Its handle is UNBUFFERED (<c>bufferSize: 1</c>): the connector already batches a whole logical
-    /// record into its own writer and flushes it as one release (§14.9.51.4 GR12), and a second buffer between
-    /// that release and the file is exactly the thing that hid the record from the other connector.</para>
+    /// OPEN.</para>
+    /// <para>⛔ EITHER WAY THE HANDLE IS UNBUFFERED (<c>bufferSize: 1</c>; kb/Work PB643). The connector's
+    /// input-output areas are its own <see cref="StreamWriter"/>'s buffer (<see cref="InputOutputAreaBuffer"/>):
+    /// a connector that may share the file with another writer flushes it at every release (§14.9.51.4 GR12), and
+    /// a second buffer between that release and the file is exactly the thing that hid the record from the other
+    /// connector; a connector that holds the only writable handle lets it fill, so the RESERVE clause's areas,
+    /// not a fixed host buffer, decide when its records reach the medium (§12.4.5.14.3 GR1).</para>
     /// <para><paramref name="mode"/> is <see cref="FileMode.Append"/> for <c>OPEN EXTEND</c> and
     /// <see cref="FileMode.Create"/> for <c>OPEN OUTPUT</c> — Table 19 admits an incoming EXTEND against an
     /// existing connector open in the OUTPUT mode (its <c>extend I-O output</c> column group), so the OUTPUT
@@ -421,7 +470,7 @@ public static class HostFile
             ? new SharedAppendStream(new FileStream(hostPath, mode, FileAccess.Write,
                 share, bufferSize: 1, FileOptions.None))
             : new FileStream(hostPath, mode, FileAccess.Write,
-                share, 4096, FileOptions.SequentialScan);
+                share, bufferSize: 1, FileOptions.SequentialScan);
 }
 
 /// <summary>

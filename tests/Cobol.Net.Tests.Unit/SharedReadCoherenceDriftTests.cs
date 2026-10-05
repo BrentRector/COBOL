@@ -520,20 +520,53 @@ public sealed class SharedReadCoherenceDriftTests
             + "so a second caller is a second, unchecked read path. Sites:\n  " + string.Join("\n  ", callers));
     }
 
-    /// <summary>⛔ ONE BUFFER BETWEEN THE CONNECTOR AND THE MEDIUM. The connector can discard only the buffer
-    /// it owns, so a participant's OS handle shall hold none: <c>HostFile.OpenConnectorStream</c> reads the
-    /// buffer size off the §9.1.15 file lock, exactly as <c>OpenConnectorWriteStream</c> reads its repositioning
-    /// arm off it. This was proved, not assumed — with the generation in place and this handle still 4096-byte
-    /// buffered, a sibling's REWRITE was STILL invisible, because <see cref="FileStream.Seek"/> reuses its read
-    /// buffer when the target offset falls inside it.</summary>
+    /// <summary>⛔ ONE BUFFER BETWEEN THE CONNECTOR AND THE MEDIUM, AND IT IS THE CONNECTOR'S INPUT-OUTPUT AREAS.
+    /// The connector can discard only the buffer it owns, so the sequential connector's host handles —
+    /// <c>HostFile.OpenConnectorStream</c> (read) and both arms of <c>OpenConnectorWriteStream</c> — hold none, in
+    /// ANY posture. This was proved, not assumed — with the generation in place and the read handle still
+    /// 4096-byte buffered, a sibling's REWRITE was STILL invisible, because <see cref="FileStream.Seek"/> reuses its
+    /// read buffer when the target offset falls inside it (kb/Work PB753). The one buffer the connector keeps is
+    /// sized in ONE place, <c>HostFile.InputOutputAreaBuffer</c>, from the RESERVE clause's count (ISO §12.4.5.14.3
+    /// GR1, kb/Work PB643): the sequential reader and writer and the keyed store handle all ask it, so a role that
+    /// spelled its own size would be a connector whose RESERVE clause does nothing again.</summary>
     [Fact]
-    public void AParticipantsReadHandleCarriesNoBufferOfItsOwn()
+    public void TheConnectorKeepsOneBuffer_ItsInputOutputAreas_SizedInOnePlace()
     {
-        string[] lines = File.ReadAllLines(TestRepo.Src("Cobol.Net.Runtime", "IO", "FileSupport.cs"));
-        var body = Body(lines, "public static FileStream OpenConnectorStream(");
-        string code = string.Concat(lines[body.Start..(body.End + 1)].Select(Strip));
-        Assert.Contains("FileLockPosture.AdmitsAnotherWriter(share)", code, StringComparison.Ordinal);
-        Assert.Contains("? 1 :", code, StringComparison.Ordinal);
+        string[] support = File.ReadAllLines(TestRepo.Src("Cobol.Net.Runtime", "IO", "FileSupport.cs"));
+        string read = Statement(support, "public static FileStream OpenConnectorStream(");
+        Assert.Contains("bufferSize: 1", read, StringComparison.Ordinal);
+        Assert.DoesNotContain("AdmitsAnotherWriter", read, StringComparison.Ordinal);
+        string write = Statement(support, "public static Stream OpenConnectorWriteStream(");
+        Assert.Equal(2, write.Split("bufferSize: 1").Length - 1);   // the plain arm AND the repositioning arm
+        string store = Statement(support, "public static FileStream OpenConnectorStore(");
+        Assert.Contains("InputOutputAreaBuffer(areas)", store, StringComparison.Ordinal);
+        foreach (string role in new[] { read, write, store })
+            Assert.DoesNotContain("4096", role, StringComparison.Ordinal);
+
+        string connector = string.Concat(File.ReadAllLines(ConnectorSource).Select(Strip));
+        Assert.Equal(2, connector.Split("HostFile.InputOutputAreaBuffer(InputOutputAreas)").Length - 1);   // reader + writer
+        string keyed = string.Concat(File.ReadAllLines(
+            TestRepo.Src("Cobol.Net.Runtime", "IO", "KeyedConnector.cs")).Select(Strip));
+        Assert.Contains("HostFile.OpenConnectorStore(", keyed, StringComparison.Ordinal);
+        Assert.Contains("InputOutputAreas)", keyed, StringComparison.Ordinal);
+    }
+
+    /// <summary>The code of the declaration that starts on the line holding <paramref name="signature"/> through
+    /// the first line that ends its statement with <c>;</c> — the shape of an expression-bodied member.</summary>
+    private static string Statement(string[] lines, string signature)
+    {
+        int decl = Array.FindIndex(lines, l => l.Contains(signature, StringComparison.Ordinal)
+            && !l.TrimStart().StartsWith("//", StringComparison.Ordinal));
+        Assert.True(decl >= 0, $"'{signature}' is no longer declared in FileSupport.cs.");
+        var code = new System.Text.StringBuilder();
+        for (int i = decl; i < lines.Length; i++)
+        {
+            string s = Strip(lines[i]);
+            code.Append(s);
+            if (s.TrimEnd().EndsWith(';')) return code.ToString();
+        }
+        Assert.Fail($"'{signature}' has no terminating ';'.");
+        return "";
     }
 
     /// <summary>The read-coherence rule is a rule about the MEDIUM, so its state reaches EVERY connector —

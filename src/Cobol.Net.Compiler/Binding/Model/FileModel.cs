@@ -401,9 +401,10 @@ public sealed class FileModel
     public LockModeInfo? LockMode { get; set; }
 
     /// <summary>The RESERVE clause's integer-1 (ISO §12.4.5.14), or null when the entry writes no RESERVE clause.
-    /// The managed I-O model's buffering is the stream's, so no allocation reads it; its reader is the external
-    /// file connector's entry identity, which §12.4.5.3 GR1 d) makes include "The same value for integer-1 in the
-    /// RESERVE clause" (<c>OoEmitter.SelectFingerprint</c>, kb/Work PB1079).</summary>
+    /// It has two readers: the connector's input-output area count (§12.4.5.14.3 GR1 — "the number of input-output
+    /// areas allocated is equal to the value of integer-1"; <c>SequentialIoEmitter.EmitReserveRegistration</c>,
+    /// kb/Work PB643), and the external file connector's entry identity, which §12.4.5.3 GR1 d) makes include "The
+    /// same value for integer-1 in the RESERVE clause" (<c>OoEmitter.SelectFingerprint</c>, kb/Work PB1079).</summary>
     public int? ReserveAreas { get; set; }
 
     /// <summary>The RECORD DELIMITER clause's phrase as written — <c>STANDARD-1</c> or the uppercased

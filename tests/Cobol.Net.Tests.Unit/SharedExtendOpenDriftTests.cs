@@ -381,24 +381,27 @@ public sealed class SharedExtendOpenDriftTests
             + "unit legitimately holds — and ISO §9.1.15 puts that gate on the file connectors and §14.9.27.4 "
             + "Table 19, not on the operating environment's handle. An OPEN's only outcomes are the §9.1.13 I-O "
             + "statuses (§14.9.27.4 GR1/GR25), never an escaping IOException (kb/Work PB713). Call "
-            + "HostFile.OpenConnectorStream (a connector's own long-lived handle) or HostFile.OpenAuxiliary "
+            + "HostFile.OpenConnectorStream / OpenConnectorWriteStream / OpenConnectorStore (a connector's own "
+            + "long-lived handles) or HostFile.OpenAuxiliary "
             + "(short-lived bookkeeping over a path a connector may hold). Offending sites:\n  "
             + string.Join("\n  ", offenders));
     }
 
     /// <summary>The positive complement, for the reason
     /// <c>HostFileProbeDriftTests.TheProbeItselfStillLivesInItsNamedHome</c> gives: a ban over a subsystem that
-    /// opens NOTHING passes exactly as green as one that opens everything in the right place. This pins both
-    /// roles to their home and asserts that every stream constructed there names its <c>FileShare</c> — the
-    /// omission being the whole defect.</summary>
+    /// opens NOTHING passes exactly as green as one that opens everything in the right place. This pins the four
+    /// roles (the connector's read, write and keyed-store handles and the bookkeeping handle) to their home and
+    /// asserts that every stream constructed there names its <c>FileShare</c> — the omission being the whole
+    /// defect.</summary>
     [Fact]
-    public void BothOpenRolesStillLiveInTheirNamedHome_AndNameTheirShareMode()
+    public void EveryOpenRoleStillLivesInItsNamedHome_AndNamesItsShareMode()
     {
         string home = TestRepo.Src("Cobol.Net.Runtime", "IO", StreamHome);
         string text = File.ReadAllText(home);
         Assert.Contains("public static FileStream OpenConnectorStream(", text, StringComparison.Ordinal);
         Assert.Contains("public static FileStream OpenAuxiliary(", text, StringComparison.Ordinal);
         Assert.Contains("public static Stream OpenConnectorWriteStream(", text, StringComparison.Ordinal);
+        Assert.Contains("public static FileStream OpenConnectorStore(", text, StringComparison.Ordinal);
 
         var shareless = new List<string>();
         string[] lines = File.ReadAllLines(home);

@@ -17061,13 +17061,13 @@
   "ordinal": 1,
   "subject": "RESERVE clause",
   "rule-digest": "6496e82bc134",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileControl; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitReserveRegistration; src/Cobol.Net.Runtime/IO/FileRegistry.cs#RegisterReserve; src/Cobol.Net.Runtime/IO/FileConnector.cs#InputOutputAreas; src/Cobol.Net.Runtime/IO/FileSupport.cs#InputOutputAreaBuffer; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OpenReader; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OpenWriter; src/Cobol.Net.Runtime/IO/KeyedConnector.cs#TakeFileLock",
+  "test-ref": "conformance:2002/pb643_reserve_areas_visibility; conformance:85/pb643_reserve_areas_all_organizations; conformance:negative/pb643-reserve-beyond-limit",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB643: §12.4.5.14.3 1) (cite.py --check 12.4.5.14.3 \"If the RESERVE clause is not specified, the number of input-output areas allocated is specified by the implementor\" -> OK): with RESERVE the number of I-O areas equals integer-1; without it the count is implementor-defined. Search of src (grep FileReserveClause/fileReserveClause over *.cs excluding Generated) finds only IntegerOperandPass's operand classification: no binder arm, no FileModel field, no emitter/runtime reads the clause, so integer-1 is discarded and the implementor-defined default is recorded nowhere (docs/CONFORMANCE.md has no RESERVE row). Both halves unimplemented/undocumented. Already owned by the OPEN register note PB643 (RESERVE parsed and read by nothing, no implementor determination documented); PB781 (open) owns the missing carrier for §12.4.5.2 SR12. Not re-filed.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "kb/Work PB643 (landed, wave 1020 B). cite.py --check 12.4.5.14.3 \"If the RESERVE clause is specified, the number of input-output areas allocated is equal to the value of integer-1\" -> OK §12.4.5.14.3 1); \"If the RESERVE clause is not specified, the number of input-output areas allocated is specified by the implementor\" -> OK. Both halves: the binder reads integer-1 into FileModel.ReserveAreas, the emitter registers it on every registering arm (record-described files of all three organizations and report files) through CobolFile.RegisterReserve, and FileConnector.InputOutputAreas (default HostFile.ImplementorInputOutputAreas = 1, DOC-A.1-164) is spent by ONE sizing site, HostFile.InputOutputAreaBuffer (areas x 4,096 bytes): the sequential reader's and writer's buffer (the host handle beneath is unbuffered in every posture, PB753's one-buffer rule) and the keyed store handle's buffer (HostFile.OpenConnectorStore). Measured before the fix (probe E:/COBOL-coord/scratch/w1020b/probes/r1.cob, r4.cob): RESERVE 1 and RESERVE 4 both let a sibling reader see 64 of 100 64-byte records written under SHARING WITH READ ONLY (the 4,096-byte host buffer whatever the clause said). After: RESERVE 1 AREA 064, RESERVE 2 AREAS 000, 100 after CLOSE, 100 under SHARING WITH ALL OTHER (conformance:2002/pb643_reserve_areas_visibility, 2002/2014/2023 identical); every organization round-trips through its areas at 85 (conformance:85/pb643_reserve_areas_all_organizations). Limit integer-1 <= 524,287 (cite.py --check 4.2.15 \"A conforming implementation may place such limits\" -> OK), COBOLNET2897 above it (conformance:negative/pb643-reserve-beyond-limit).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.15.3-1",
@@ -64327,12 +64327,12 @@
   "subject": "RESERVE clause (number of input-output areas, if not specified)",
   "rule-digest": "c8cd34af54df",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-164; src/Cobol.Net.Runtime/IO/FileSupport.cs#OpenConnectorStream; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#fileReserveClause",
-  "test-ref": "",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-164; src/Cobol.Net.Runtime/IO/FileSupport.cs#OpenConnectorStream; src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4#fileReserveClause; src/Cobol.Net.Runtime/IO/FileSupport.cs#ImplementorInputOutputAreas; src/Cobol.Net.Runtime/IO/FileSupport.cs#InputOutputAreaBuffer; src/Cobol.Net.Runtime/IO/FileConnector.cs#InputOutputAreas",
+  "test-ref": "conformance:2002/pb643_reserve_areas_visibility",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "A.1 item 164 required + documented. cite.py --check 12.4.5.14.3 'If the RESERVE clause is not specified, the number of input-output areas allocated is specified by the implementor' -> OK §12.4.5.14.3 1). Determination = kb/Work PB643's own proposed disposition ('with the clause absent the count is one'); the owner reading PB643 holds open concerns only whether an EXPLICIT RESERVE may be accepted with no effect without a diagnostic (§4.2.6 vs GR1's first sentence) — it does not touch the no-clause count, which is why doc-rows-1's SKIP no longer applies to this item. Code at pin 80de60472: one record area per connector (the generated record struct / FileConnector record image); FileSupport.OpenConnectorStream gives the connector's handle a 4096-byte buffer, or bufferSize 1 when FileLockPosture.AdmitsAnotherWriter (its own doc comment: 'one managed buffer between the connector and the file is the most that leaves true'). The count is not observable from COBOL source (§12.4.5.14.3 assigns a quantity, not a behaviour a program can read back), so the row CONFORMS by construction with an empty test-ref and stays GAP until a unit: witness or the unobservable-rule closure path (kb/Work PB386) — the DOC-A.1-19 shape. No probe can distinguish; none run. Owning note: kb/Work/PB643 (claims DOC-A.1-164 and GR-12.4.5.14.3-1). DOC-ROWS-2 REFUTER (determination): overturned and corrected; the recorded row carries the correction (adjudication/doc-rows-2/LANDING.md).",
-  "state": "GAP"
+  "notes": "A.1 item 164 required + documented. cite.py --check 12.4.5.14.3 \"If the RESERVE clause is not specified, the number of input-output areas allocated is specified by the implementor\" -> OK §12.4.5.14.3 1). Determination (docs/CONFORMANCE.md DOC-A.1-164, rewritten by kb/Work PB643, wave 1020 B): one input-output area of 4,096 bytes per connector when the clause is absent (HostFile.ImplementorInputOutputAreas = 1), the ONE buffer between the record area and the medium in every sharing posture (the former 'no input-output area when another writer is admitted' exception is gone: the areas exist in every posture, and the posture decides only when they are emptied). WITNESSED: conformance:2002/pb643_reserve_areas_visibility's no-clause phase reads 064 of 100 64-byte records before the writer's CLOSE (one 4,096-byte area) and 100 after; the RESERVE 1 AREA phase reads the same, RESERVE 2 AREAS reads 000. Supersedes the doc-rows-2 empty test-ref ('the count is not observable'): it is observable through a sibling connector.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-165",

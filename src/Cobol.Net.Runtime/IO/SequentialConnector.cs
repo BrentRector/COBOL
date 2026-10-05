@@ -275,12 +275,14 @@ public sealed class SequentialConnector : FileConnector
     /// reader's <c>BaseStream</c>, and takes NO <see cref="FileOptions.SequentialScan"/> for the same reason: it
     /// seeks, and the sequential-access hint asks the host to evict what a seek comes back for.
     /// It carries <see cref="FileConnector.HostShare"/>, the posture the registry derived immediately before the
-    /// OPEN body ran.</summary>
+    /// OPEN body ran. The reader's buffer IS the connector's input-output areas (ISO §12.4.5.14.3 GR1;
+    /// <see cref="HostFile.InputOutputAreaBuffer"/>) — the handle beneath it holds none (kb/Work PB643).</summary>
     private StreamReader OpenReader()
     {
         var r = new StreamReader(HostFile.OpenConnectorStream(HostPath, FileMode.Open,
             Mode == FileOpenMode.IO ? FileAccess.ReadWrite : FileAccess.Read, HostShare,
-            Mode == FileOpenMode.IO ? FileOptions.None : FileOptions.SequentialScan), Encoding.Latin1);
+            Mode == FileOpenMode.IO ? FileOptions.None : FileOptions.SequentialScan), Encoding.Latin1,
+            detectEncodingFromByteOrderMarks: true, HostFile.InputOutputAreaBuffer(InputOutputAreas));
         // A brand-new handle has read nothing, so it agrees with the medium by construction (kb/Work PB753).
         _coherentAt = Physical?.ReleaseGeneration ?? 0;
         return r;
@@ -288,14 +290,18 @@ public sealed class SequentialConnector : FileConnector
 
     /// <summary>⛔ THE ONE SPELLING OF THIS CONNECTOR'S WRITE HANDLE — the OUTPUT arm
     /// (<see cref="FileMode.Create"/>) and the EXTEND arm (<see cref="FileMode.Append"/>). The role
-    /// decides plain-versus-repositioning from the posture; this decides the newline and the encoding, once.</summary>
+    /// decides plain-versus-repositioning from the posture; this decides the newline, the encoding and the
+    /// buffer, once. The writer's buffer IS the connector's input-output areas (ISO §12.4.5.14.3 GR1;
+    /// <see cref="HostFile.InputOutputAreaBuffer"/>) — the handle beneath it holds none (kb/Work PB643) — so a
+    /// connector holding the only writable handle releases its records to the medium as each area set fills, and
+    /// one that may share the file with another writer at every release (<see cref="ReleaseRecord"/>).</summary>
     private StreamWriter OpenWriter(FileMode mode)
     {
         // The file coded character set's STRICT encoding (kb/Work PB690): every write arm refuses a record holding
         // a character with no byte image before it reaches this writer ('91' / '71'), so the exception fallback is
         // the guard that keeps that refusal the only answer — never Latin-1's silent '?'.
         return new StreamWriter(HostFile.OpenConnectorWriteStream(HostPath, mode, HostShare),
-            FileCharacterSet.Medium) { NewLine = _lineEnd };
+            FileCharacterSet.Medium, HostFile.InputOutputAreaBuffer(InputOutputAreas)) { NewLine = _lineEnd };
     }
 
     /// <summary>The count of records ALREADY IN the physical file, in the framing this connector reads — the

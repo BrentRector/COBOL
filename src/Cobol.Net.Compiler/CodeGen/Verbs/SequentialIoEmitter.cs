@@ -194,6 +194,15 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
                     // file with NO record description, so no rule comparing its bytes with a record length (the
                     // layout notice) applies to it (kb/Work PB677).
                     w.Line($"{RuntimeApi.FileRegisterReport(FileKeyExpr(file), CsLiteral(file.AssignTarget), $"{width}", file.Optional ? "true" : "false", ctx.Data.Edition.DialectLevel, CsLiteral(file.SelectName))};");
+                    // ⛔ The SAME connector properties every other registration declares (kb/Work PB643): a report
+                    // file has input-output areas (§12.4.5.14.3 GR1), §13.4.5.2 Format 3 prints CODE-SET for it
+                    // (§13.18.13.4 GR1 converts "during output operations"), and its SELECT is a Format 3 entry
+                    // that may write SHARING / LOCK MODE (§12.4.5.15, §12.4.5.9). This arm used to `continue` past
+                    // all three, so `FD RPT CODE-SET IS EB REPORT IS R` wrote native "ABC" where the EBCDIC medium
+                    // holds C1C2C3, and a report file declared SHARING WITH ALL OTHER refused a reader '61' as if it
+                    // had written no clause.
+                    EmitAreaRegistrations(w, file);
+                    EmitSharingRegistration(w, file);
                 }
                 continue;
             }
@@ -294,7 +303,8 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             w.Line($"{RuntimeApi.FileRegisterNationalArea(FileKeyExpr(file))};");
     }
 
-    /// <summary>⛔ THE CONNECTOR PROPERTIES a file description declares ABOUT ITS RECORD AREA AND ITS MEDIUM,
+    /// <summary>⛔ THE CONNECTOR PROPERTIES a file description (or, for RESERVE, the file control entry) declares
+    /// ABOUT ITS RECORD AREA, ITS INPUT-OUTPUT AREAS AND ITS MEDIUM,
     /// emitted immediately after the registration for every organization alike — ONE call site per registration
     /// so the next such property is a line HERE and not three edits at the registrations (kb/Work PB793).</summary>
     internal static void EmitAreaRegistrations(CodeWriter w, FileModel file)
@@ -305,6 +315,19 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         if (file.Varying is { DependingName: not null })
             w.Line($"{RuntimeApi.FileRegisterRecordLengthFromDepending(FileKeyExpr(file))};");
         EmitCodeSetRegistration(w, file);        // §13.18.13.4 GR2/GR6 (kb/Work PB793)
+        EmitReserveRegistration(w, file);        // §12.4.5.14.3 GR1 (kb/Work PB643)
+    }
+
+    /// <summary>§12.4.5.14.3 GR1's input-output area count, told to the connector: <i>"If the RESERVE clause is
+    /// specified, the number of input-output areas allocated is equal to the value of integer-1"</i>. Emitted ONLY
+    /// when the file control entry writes the clause — without it the connector keeps the implementor's count
+    /// (<c>HostFile.ImplementorInputOutputAreas</c>, docs/CONFORMANCE.md DOC-A.1-164) — so every other program's
+    /// registration is unchanged byte for byte. Reached through <see cref="EmitAreaRegistrations"/>, which every
+    /// registering arm calls — the report-file arm included.</summary>
+    private static void EmitReserveRegistration(CodeWriter w, FileModel file)
+    {
+        if (file.ReserveAreas is { } areas)
+            w.Line($"{RuntimeApi.FileRegisterReserve(FileKeyExpr(file), areas)};");
     }
 
     /// <summary>§13.18.13.4 GR2's on-medium coded character set, told to the connector: the GR7 c / GR7 i

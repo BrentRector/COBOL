@@ -365,8 +365,9 @@ public sealed class SharedExtendWriteDriftTests
     /// <c>OPEN OUTPUT</c> (<c>Create</c>) and <c>OPEN EXTEND</c> (<c>Append</c>), so the mode has to be
     /// spellable at the call sites that distinguish them (kb/Work PB740). What may not happen is CONSTRUCTING a
     /// stream over an append mode, or handing that mode to one of the two roles that know nothing about
-    /// repositioning — <c>OpenAuxiliary</c> (short-lived bookkeeping) or <c>OpenConnectorStream</c> (a read or
-    /// read-write handle). Those are the two ways a naked append handle can come back.</para></summary>
+    /// repositioning — <c>OpenAuxiliary</c> (short-lived bookkeeping), <c>OpenConnectorStream</c> (a read or
+    /// read-write handle) or <c>OpenConnectorStore</c> (a keyed store handle). Those are the ways a naked append
+    /// handle can come back.</para></summary>
     [Fact]
     public void OnlyHostFileTakesAnAppendHandle()
     {
@@ -394,7 +395,8 @@ public sealed class SharedExtendWriteDriftTests
                         || lines[j].Contains("File.Open", StringComparison.Ordinal);
                 // Shape 2 — handed to a role that does not reposition.
                 bool wrongRole = lines[i].Contains("OpenAuxiliary(", StringComparison.Ordinal)
-                    || lines[i].Contains("OpenConnectorStream(", StringComparison.Ordinal);
+                    || lines[i].Contains("OpenConnectorStream(", StringComparison.Ordinal)
+                    || lines[i].Contains("OpenConnectorStore(", StringComparison.Ordinal);
                 if (constructs || wrongRole)
                     offenders.Add($"{Path.GetRelativePath(io, file)}:{i + 1}: {t}");
             }

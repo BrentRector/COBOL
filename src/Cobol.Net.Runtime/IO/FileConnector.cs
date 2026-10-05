@@ -701,6 +701,13 @@ public abstract class FileConnector
         // character content ('31'); this is the residue only the operating environment can judge.
         catch (ArgumentException) { s = FileStatusCode.PermanentError; }
         catch (NotSupportedException) { s = FileStatusCode.PermanentError; }
+        // The connector's input-output areas are allocated HERE, by the OPEN that takes its streams (ISO §12.4.5.14.3
+        // GR1; HostFile.InputOutputAreaBuffer, kb/Work PB643). RESERVE integer-1 may ask for more memory than the run
+        // unit has — that is "current resource availability", not a compile-time limit (§4.2.15's limit,
+        // HostFile.MaxInputOutputAreas, only bounds the count's arithmetic) — and an OPEN has only I-O statuses as
+        // outcomes, so an allocation the runtime cannot make is §9.1.13.6 item 1's '30' like any other permanent
+        // failure, never an OutOfMemoryException killing the run unit (the CobolDynTable precedent, kb/Work PB1410).
+        catch (OutOfMemoryException) { s = FileStatusCode.PermanentError; }
         _openMode = s[0] == '0';   // a success-family OPEN ('00'/'05'/'07') puts the connector in its open mode
         // §9.1.15 — "The SUCCESSFUL opening of a file establishes a file lock": an unsuccessful one establishes
         // none, and §14.9.27.4 GR25 leaves the file unaffected. Any handle the body took on its way to failing
@@ -840,6 +847,14 @@ public abstract class FileConnector
     /// <summary>The organization-specific CLOSE body (flush/persist/dispose); returns the resulting status.
     /// A successful close must clear <see cref="ModeKnown"/> (§9.1.4 — the file is then in no open mode).</summary>
     protected abstract string CloseCore();
+
+    /// <summary>⛔ ISO §12.4.5.14.3 GR1 — the number of input-output areas this connector allocates: the RESERVE
+    /// clause's integer-1, set by the emitter right after registration for exactly the files whose file control entry
+    /// writes the clause (kb/Work PB643, the <see cref="NationalRecordArea"/> pattern), else
+    /// <see cref="HostFile.ImplementorInputOutputAreas"/>. Each organization spends it through
+    /// <see cref="HostFile.InputOutputAreaBuffer"/> when its OPEN takes its streams, so it is read at every OPEN
+    /// and never cached.</summary>
+    public int InputOutputAreas { get; internal set; } = HostFile.ImplementorInputOutputAreas;
 
     // ── Record-area shaping ──────────────────────────────────────────────────────────────────────────────────
 

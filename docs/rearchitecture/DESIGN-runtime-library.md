@@ -238,7 +238,7 @@ accident, since its I-O and EXTEND streams *are* write opens, while the relative
 their store: the same read-only file answered '37' sequentially and '00' keyed, then '00' for READ and REWRITE,
 and the loss surfaced as a '30' at CLOSE on a byte-identical file. The two-arm dispatch again, one arm fixed.)
 
-**One host-path OPEN, three named roles (`HostFile.OpenConnectorStream` / `HostFile.OpenAuxiliary` / `HostFile.OpenConnectorWriteStream`, same file).**
+**One host-path OPEN, four named roles (`HostFile.OpenConnectorStream` / `HostFile.OpenConnectorWriteStream` / `HostFile.OpenConnectorStore` / `HostFile.OpenAuxiliary`, same file).**
 The third question `HostFile` owns is *"what may every OTHER handle on this physical file do while this one is
 open?"*, and it is not a per-call-site decision: §9.1.15 puts the in-run-unit gate on the file connectors —
 *"Before access to a shared physical file is allowed through an OPEN statement, the sharing mode and the open
@@ -247,10 +247,20 @@ the physical file"*, arbitrated by §14.9.27.4's Table 19 — never on the opera
 (⛔ That sentence is §9.1.15's, not §14.9.27.4's: this paragraph carried the wrong clause number from the
 PB713 landing until PB740's, an INHERITED citation, `cite.py --check`ed on both spellings.) The share mode is
 therefore SPENT here and DERIVED in `FileLockPosture` (below).
-`OpenConnectorStream(path, mode, access, share, options)` is a connector's own long-lived read or read-write
-stream, and the SAME posture decides whether that handle may hold a buffer of its own: when the file lock admits
-another writer it is UNBUFFERED, the mirror of the write role below, because the connector above keeps exactly one
-buffer and can invalidate only the one it owns (kb/Work PB753, below). `OpenAuxiliary(path, mode, access)` is a short-lived
+`OpenConnectorStream(path, mode, access, share, options)` is a sequential connector's own long-lived read or
+read-write stream, and `OpenConnectorWriteStream(path, mode, share)` its write stream; BOTH are UNBUFFERED in every
+posture, because the connector above keeps exactly one buffer — its `StreamReader`'s or `StreamWriter`'s — and can
+invalidate or release only the one it owns (kb/Work PB753, below). **That one buffer IS the connector's input-output
+areas** (ISO §12.4.5.14.3 GR1, kb/Work PB643): `FileConnector.InputOutputAreas` (the RESERVE clause's integer-1,
+registered by `CobolFile.RegisterReserve`, else `HostFile.ImplementorInputOutputAreas` = 1) × `HostFile.InputOutputAreaBytes`
+(4,096), sized in ONE place, `HostFile.InputOutputAreaBuffer`. A connector holding the only writable handle releases
+its records to the medium as its areas fill; one whose file lock admits another writer releases at every WRITE /
+REWRITE (`SequentialConnector.ReleaseRecord`), so the posture decides WHEN the areas are emptied, never WHETHER they
+exist (before PB643 the areas were the host handle's 4,096-byte buffer in one posture and the reader's default buffer
+in the other, so RESERVE had no one place to land). `OpenConnectorStore(path, mode, access, share, areas)` is a
+RELATIVE or INDEXED connector's long-lived store handle (kb/Work PB771, below), and ITS buffer is that connector's
+areas in every posture: the store is loaded once at the OPEN by a fresh handle and persisted once at the CLOSE, so
+the stale-read hazard that keeps the sequential handle unbuffered cannot arise. `OpenAuxiliary(path, mode, access)` is a short-lived
 bookkeeping handle over a path a connector may already hold — the shared `OPEN EXTEND` write-base measurement,
 the §14.9.27.4 GR10 store-header read and the varying framing's parse check — and is **always**
 `FileShare.ReadWrite`, because a handle's share mode has to admit the access every outstanding handle already
@@ -258,7 +268,7 @@ holds or the host refuses it. Every one of those runs BEFORE the connector's own
 which is what makes the permissiveness free: this role is never the handle a COBOL statement is served
 through and never stands in for a file lock. **A keyed store's whole-file load and persist LEFT this list**
 (kb/Work PB771) — they were the only handle those organizations ever took, which is why they held no
-§9.1.15 lock; they now travel through the connector's own `OpenConnectorStream` handle. `SharedExtendOpenDriftTests` bans every other host-path open under `Runtime/IO`
+§9.1.15 lock; they now travel through the connector's own `OpenConnectorStore` handle. `SharedExtendOpenDriftTests` bans every other host-path open under `Runtime/IO`
 and pins both roles to this file. (kb/Work PB713 — a sharing-active `OPEN EXTEND` measured its write-ordinal
 base from a SECOND handle on the path it had just opened for WRITE: `File.ReadLines` for the line-sequential
 framing, a three-argument `FileStream` for the varying one, both `FileShare.Read`, both refused. The refusal ran
