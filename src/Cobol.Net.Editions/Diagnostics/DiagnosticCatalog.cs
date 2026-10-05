@@ -3657,7 +3657,11 @@ public static class DiagnosticCatalog
         + "associated with the file (§12.4.5.12.3 SR2 / §12.4.5.6.3 SR2), or breaks one of the clause's other "
         + "syntax rules: all three state \"Data-name-1 and data-name-2 shall not be subject to any OCCURS "
         + "clauses\" (§12.4.5.12.3 syntax rule 1 and its twins), and RELATIVE KEY adds the unsigned-integer "
-        + "(§12.4.5.13.3 SR2) and not-in-a-record-of-this-file (SR3) rules. A key clause may also be written on a "
+        + "(§12.4.5.13.3 SR2) and not-in-a-record-of-this-file (SR3) rules; the RECORD KEY and ALTERNATE RECORD KEY "
+        + "clauses each add \"Data-name-1 and data-name-2 shall not reference a variable-length data item\" "
+        + "(§12.4.5.12.3 SR3 / §12.4.5.6.3 SR3, a dynamic-length elementary item), and the ALTERNATE RECORD KEY "
+        + "clause adds that data-name-1 shall not have the leftmost byte position of the prime record key or of "
+        + "another alternate record key (§12.4.5.6.3 SR4). A key clause may also be written on a "
         + "file whose organization does not carry it at all — a RECORD KEY or ALTERNATE RECORD KEY clause on a "
         + "non-indexed file, or a RELATIVE KEY clause on a non-relative one (§12.4.5.2 SR8 / SR9, first "
         + "sentence) — or name an operand that is not of category alphanumeric or national (§12.4.5.12.3 SR2 / "
@@ -3666,23 +3670,43 @@ public static class DiagnosticCatalog
         + "The site names the rule it caught.",
         "ISO §12.4.5.1 / §12.4.5.2 / §12.4.5.12.3 / §12.4.5.6.3 / §12.4.5.13.3 / §8.4.3.14 / §13.18.34");
 
-    /// <summary>COBOLNET1900 — §12.4.5.2 SR8 and SR9's SECOND sentence, which both print verbatim: "The
-    /// associated file description entry shall not be a sort-merge file description entry" (kb/Work PB742).
+    /// <summary>COBOLNET1900 — §12.4.5.2 SR8, SR9 and SR11's SECOND sentence, which all print verbatim: "The
+    /// associated file description entry shall not be a sort-merge file description entry" (kb/Work PB742,
+    /// PB773), and the SD's own SR13 — Format 4 is the one format a sort-merge file's entry is written in.
     /// <para>SEPARATE FROM <see cref="FileKeyClauseRule"/> because the subject is DIFFERENT: not a key clause's
     /// own rule but the ENTRY's format against the kind of file description entry that describes it, and the
     /// remedy is a different edit (describe the file with an FD, or stop writing the format's clauses). The
     /// format may be specified by the ORGANIZATION clause with no key clause present at all, so a key-clause code
-    /// could not carry it. ONE code for both rules: the sentence is the same sentence, and the message names
+    /// could not carry it. ONE code for all four rules: the sentence is the same sentence, and the message names
     /// which format the entry specified and by which clause.</para></summary>
     public static readonly DiagnosticDescriptor FileControlFormatOnSortMerge = new(
         "COBOLNET1900", "file-control-format-on-sort-merge", EditionSeverity.Error,
-        "A file control entry specifies ISO §12.4.5.1's Format 1 (indexed) or Format 2 (relative) — by an "
-        + "ORGANIZATION IS INDEXED / RELATIVE clause, a RECORD KEY, ALTERNATE RECORD KEY or COLLATING SEQUENCE "
-        + "clause, or a RELATIVE KEY clause — for a file that is described by a SORT-MERGE file description "
-        + "entry (an SD). §12.4.5.2 SR8 and SR9 both close with \"The associated file description entry shall "
-        + "not be a sort-merge file description entry\"; §12.4.5.1 Format 4 is the only format a sort-merge file "
-        + "may be written in, and it carries no key clause and only the SEQUENTIAL organization phrase.",
-        "ISO §12.4.5.2 SR8 / SR9 / §12.4.5.1 Format 4");
+        "A file control entry written for a file that is described by a SORT-MERGE file description entry (an "
+        + "SD) goes beyond ISO §12.4.5.1's Format 4, which carries only SELECT [OPTIONAL], ASSIGN and "
+        + "[ [ ORGANIZATION IS ] SEQUENTIAL ]. Format 1 (indexed) is specified by an ORGANIZATION IS INDEXED "
+        + "clause, a RECORD KEY, ALTERNATE RECORD KEY or COLLATING SEQUENCE clause; Format 2 (relative) by an "
+        + "ORGANIZATION IS RELATIVE or a RELATIVE KEY clause; Format 3 (sequential) by an ORGANIZATION IS LINE "
+        + "SEQUENTIAL or a RECORD DELIMITER clause; and an ACCESS MODE, FILE STATUS, LOCK MODE, RESERVE or "
+        + "SHARING clause belongs to several formats and to none of them is Format 4. §12.4.5.2 SR8, SR9 and "
+        + "SR11 each close with \"The associated file description entry shall not be a sort-merge file "
+        + "description entry\"; SR13 requires the entry of a sort-merge file to be Format 4.",
+        "ISO §12.4.5.2 SR8 / SR9 / SR11 / SR13 / §12.4.5.1 Format 4");
+
+    /// <summary>COBOLNET2912 — §12.4.5.2 SR11's FIRST sentence, "Format 3 shall be specified only for a
+    /// sequential file or a report file", broken by an entry that writes a clause of §12.4.5.1's Format 3
+    /// alone — a RECORD DELIMITER clause — for an indexed or a relative file (kb/Work PB773).
+    /// <para>SEPARATE FROM <see cref="FileControlFormatOnSortMerge"/> because the subject is the file's
+    /// ORGANIZATION, not its kind of file description entry, and the remedy is a different edit (delete the
+    /// clause, or change the organization). SR8 and SR9's first sentences, the mirror images over the key
+    /// clauses, are COBOLNET0863's: they name a key clause, and this names none.</para></summary>
+    public static readonly DiagnosticDescriptor FileControlFormat3OnKeyedFile = new(
+        "COBOLNET2912", "file-control-format-3-on-keyed-file", EditionSeverity.Error,
+        "A file control entry writes a clause that only ISO §12.4.5.1's Format 3 (sequential) carries — the "
+        + "RECORD DELIMITER clause — for a file that is neither sequential nor a report file. §12.4.5.2 SR11: "
+        + "\"Format 3 shall be specified only for a sequential file or a report file.\" The ORGANIZATION clause "
+        + "is what makes the file indexed or relative, so either the Format-3 clause is removed or the "
+        + "organization is changed.",
+        "ISO §12.4.5.2 SR11");
 
     /// <summary>COBOLNET1858 — §12.4.5.5.2 SR2, the ACCESS MODE clause's own organization rule, checked on the
     /// FILE CONTROL ENTRY (kb/Work PB692). One descriptor, not one per phrase: DYNAMIC and RANDOM are two

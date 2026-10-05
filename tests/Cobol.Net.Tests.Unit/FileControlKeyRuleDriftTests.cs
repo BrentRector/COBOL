@@ -127,10 +127,17 @@ public sealed class FileControlKeyRuleDriftTests
     /// sort-merge file description entry" to their format sentence, and §12.4.5.12.3 SR2 / §12.4.5.6.3 SR2 each
     /// join a CATEGORY to a LOCATION with the word "within". This test re-derives the split FROM THE SPEC — it
     /// finds the sentence boundary in the printed rule itself — and asserts the table carries a row quoting each
-    /// side. A rule that grows a third obligation makes it fail rather than silently shipping two thirds.</summary>
+    /// side. A rule that grows a third obligation makes it fail rather than silently shipping two thirds.
+    /// <para>§12.4.5.2 SR11 (kb/Work PB773) is the fourth member. SR13 prints the same two-sentence shape and is
+    /// deliberately NOT in this list: its first sentence ("Format 4 shall be specified only for a sort-merge
+    /// file") cannot be broken by any entry, because Format 4 is a SUBSET of Format 3 — an entry with only SELECT,
+    /// ASSIGN and SEQUENTIAL is a legal Format 3 entry for an FD — so the one row SR13 has (the SD's entry shall
+    /// be Format 4) quotes its second sentence alone. <see cref="EveryEntryClause_IsCarriedByExactlyTheFormatsThatPrintIt"/>
+    /// pins the subset relation, which is what makes that statement checkable rather than asserted.</para></summary>
     [Theory]
     [InlineData("12.4.5.2", 8)]
     [InlineData("12.4.5.2", 9)]
+    [InlineData("12.4.5.2", 11)]
     [InlineData("12.4.5.12.3", 2)]
     [InlineData("12.4.5.6.3", 2)]
     public void ARuleWithTwoObligations_HasARowForEachArm(string clause, int ordinal)
@@ -156,9 +163,9 @@ public sealed class FileControlKeyRuleDriftTests
     }
 
     /// <summary>A row screened on a SORT-MERGE file quotes the sentence that speaks about one, and cites the only
-    /// clause that states it. §12.4.5.2 SR8/SR9 are the whole of that set: no key clause's own rules mention a
-    /// sort-merge file description entry, and a row that reached an SD without one would be a rule fired on a
-    /// file it was never written about.</summary>
+    /// clause that states it. §12.4.5.2 SR8/SR9/SR11/SR13 are the whole of that set: no key clause's own rules
+    /// mention a sort-merge file description entry, and a row that reached an SD without one would be a rule fired
+    /// on a file it was never written about.</summary>
     [Fact]
     public void EverySortMergeRow_QuotesTheSortMergeSentenceOfSection12452()
     {
@@ -174,6 +181,91 @@ public sealed class FileControlKeyRuleDriftTests
         // `if (file.IsSortMerge) return;` unnecessary rather than merely absent.
         Assert.All(FileControlKeyRules.Catalog.Where(r => r.Role != FileKeyRole.Entry),
             r => Assert.False(r.ScreenedOn.HasFlag(FileKinds.SortMerge)));
+    }
+
+    /// <summary>What each <see cref="FileControlKeyRules.EntryClauseCatalog"/> row looks like IN A PRINTED DIAGRAM, with
+    /// the diagram's markup stripped. This is the ORACLE the table is checked against, written independently of
+    /// the table: a row that carries a clause in a format whose diagram does not print it — or omits one it does —
+    /// is red, so the set of formats per clause cannot drift from §12.4.5.1.</summary>
+    private static readonly (string Face, Regex Printed)[] DiagramOracle =
+    [
+        ("ORGANIZATION IS INDEXED", new(@"\bINDEXED\b")),
+        ("a RECORD KEY clause", new(@"(?<!ALTERNATE )RECORD KEY IS")),
+        ("an ALTERNATE RECORD KEY clause", new(@"ALTERNATE RECORD KEY IS")),
+        ("a COLLATING SEQUENCE clause", new(@"collating-sequence-clause")),
+        ("ORGANIZATION IS RELATIVE", new(@"ORGANIZATION IS \] +RELATIVE")),
+        ("a RELATIVE KEY clause", new(@"RELATIVE KEY IS")),
+        ("ORGANIZATION IS LINE SEQUENTIAL", new(@"\bLINE\b")),
+        ("a RECORD DELIMITER clause", new(@"RECORD DELIMITER IS")),
+        // `[ ORGANIZATION IS ] … SEQUENTIAL` on ONE line: Format 4 prints it bare, Format 3 inside the LINE/RECORD brace.
+        ("ORGANIZATION IS SEQUENTIAL", new(@"ORGANIZATION IS \][^\n]*SEQUENTIAL")),
+        ("ACCESS MODE IS SEQUENTIAL", new(@"ACCESS MODE IS")),          // every format that prints ACCESS prints SEQUENTIAL
+        ("ACCESS MODE IS RANDOM or DYNAMIC", new(@"\bRANDOM\b")),
+        ("a FILE STATUS clause", new(@"FILE STATUS IS")),
+        ("a LOCK MODE clause", new(@"LOCK MODE IS")),
+        ("a LOCK MODE clause with WITH LOCK ON MULTIPLE RECORDS", new(@"\bMULTIPLE\b")),
+        ("a RESERVE clause", new(@"RESERVE integer-1")),
+        ("a SHARING clause", new(@"SHARING WITH")),
+    ];
+
+    /// <summary>The four general formats' diagrams as printed text, keyed by format number, markup stripped.</summary>
+    private static Dictionary<FileFormats, string> PrintedFormats()
+    {
+        var region = ClauseRegion(SpecLines(), "12.4.5.1");
+        var blocks = new Dictionary<FileFormats, string>();
+        FileFormats? current = null;
+        bool inPre = false;
+        var text = new System.Text.StringBuilder();
+        void Flush()
+        {
+            if (current is { } c) blocks[c] = Regex.Replace(text.ToString(), "</?u>", "");
+            text.Clear();
+        }
+        foreach (var line in region)
+        {
+            var m = Regex.Match(line, @"^Format (?<n>[1-4]) \(");
+            if (m.Success)
+            {
+                Flush();
+                current = (FileFormats)(1 << (int.Parse(m.Groups["n"].Value) - 1));
+                inPre = false;
+            }
+            else if (line.StartsWith("<pre", StringComparison.Ordinal)) inPre = true;
+            else if (line.StartsWith("</pre>", StringComparison.Ordinal)) inPre = false;
+            else if (inPre) text.Append(line).Append('\n');
+        }
+        Flush();
+        return blocks;
+    }
+
+    /// <summary>⛔ THE FORMAT-MEMBERSHIP TABLE IS RE-DERIVED FROM THE FOUR PRINTED DIAGRAMS ON EVERY RUN (kb/Work
+    /// PB773). <see cref="FileControlKeyRules.EntryClauseCatalog"/> says which §12.4.5.1 formats print each clause
+    /// that is not in all four, and SR8, SR9, SR11 and SR13 are decided by it; this test reads the diagrams and
+    /// asserts, per clause and per format, that the table agrees. It also states the SUBSET relation the SR13
+    /// design rests on — Format 4 prints nothing that Format 3 does not — and that SELECT/ASSIGN, the clauses in no
+    /// row, really are in all four.</summary>
+    [Fact]
+    public void EveryEntryClause_IsCarriedByExactlyTheFormatsThatPrintIt()
+    {
+        var printed = PrintedFormats();
+        Assert.Equal(4, printed.Count);
+        Assert.All(printed.Values, b => Assert.Contains("SELECT", b));
+        Assert.All(printed.Values, b => Assert.Contains("ASSIGN", b));   // the clause in every format is in no row
+
+        var catalog = FileControlKeyRules.EntryClauseCatalog;
+        Assert.Equal(DiagramOracle.Select(o => o.Face).Order(), catalog.Select(c => c.Face).Order());
+        foreach (var (face, regex) in DiagramOracle)
+        {
+            var row = catalog.Single(c => c.Face == face);
+            foreach (var (format, block) in printed)
+                Assert.True(row.Carried.HasFlag(format) == regex.IsMatch(block),
+                    $"'{face}': the table says Format {(int)Math.Log2((int)format) + 1} "
+                    + $"{(row.Carried.HasFlag(format) ? "prints" : "does not print")} it, the printed diagram "
+                    + $"{(regex.IsMatch(block) ? "does" : "does not")} — fix the row, or re-render the page.");
+        }
+        // The subset fact: no clause is carried by Format 4 without Format 3.
+        Assert.All(catalog.Where(c => c.Carried.HasFlag(FileFormats.Format4)),
+            c => Assert.True(c.Carried.HasFlag(FileFormats.Format3), c.Face));
     }
 
     /// <summary>The message a row ships names the row's OWN citation. A row whose sentence and whose printed §
@@ -211,7 +303,14 @@ public sealed class FileControlKeyRuleDriftTests
         {
             if (rule.Role is FileKeyRole.Entry)
             {
-                Assert.Equal(FileKinds.SortMerge, rule.ScreenedOn);   // the entry rules speak only about an SD
+                // An entry rule speaks either about an SD (the "shall not be a sort-merge file description
+                // entry" sentence SR8, SR9 and SR11 close with, and SR13) or — SR11's FIRST sentence — about the
+                // files its format is not for. Format 3's own kinds are the sequential ones, and the screened set
+                // must stay clear of them: a row over a sequential file would be a rule about the format it allows.
+                if (rule.ScreenedOn == FileKinds.SortMerge) continue;
+                Assert.Equal("12.4.5.2", rule.Clause);
+                Assert.NotEqual(FileKinds.None, rule.ScreenedOn);
+                Assert.Equal(FileKinds.None, rule.ScreenedOn & (FileKinds.SortMerge | FileKinds.Sequential | FileKinds.LineSequential));
                 continue;
             }
             var own = rule.Role is FileKeyRole.RelativeKey ? FileKinds.Relative : FileKinds.Indexed;

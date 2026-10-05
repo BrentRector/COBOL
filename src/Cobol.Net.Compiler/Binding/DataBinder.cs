@@ -1178,7 +1178,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     }
                 }
                 else if (clauses.organizationClause() is { } org) { file.Organization = MapOrganization(org); file.OrganizationWritten = true; }
-                else if (clauses.accessModeClause() is { } acc) { file.AccessMode = MapAccessMode(acc); accessAt = acc; }
+                else if (clauses.accessModeClause() is { } acc) { file.AccessMode = MapAccessMode(acc); file.AccessModeWritten = true; accessAt = acc; }
                 // The base word PLUS its IN/OF qualifiers (`SQ-FS4-STATUS OF STATUS-GROUP`, SQ133A): a raw
                 // GetText() would glue the qualifier into the lookup key, and keeping the base word ALONE
                 // resolved the first same-named declaration in order (kb/Work PB489).

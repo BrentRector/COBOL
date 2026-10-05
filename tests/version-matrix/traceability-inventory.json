@@ -15741,13 +15741,13 @@
   "ordinal": 11,
   "subject": "File control entry",
   "rule-digest": "cb117217f6dd",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileControl",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/FileControlKeyRules.cs#Rules",
+  "test-ref": "conformance:negative/pb773-sd-record-delimiter-clause; conformance:negative/pb773-record-delimiter-on-indexed-file; conformance:85/pb773_legal_file_control_entries_85; conformance-test:FileControlKeyRuleSpecTests.AClauseBeyondFormat4_OnASortMergeEntry_IsRefusedByTheRuleThatFitsIt; conformance-test:FileControlKeyRuleSpecTests.Format3Clause_OnAKeyedFile_IsRefusedAtEveryEdition; unit:FileControlKeyRuleDriftTests.EveryEntryClause_IsCarriedByExactlyTheFormatsThatPrintIt; unit:FileControlKeyRuleDriftTests.ARuleWithTwoObligations_HasARowForEachArm",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB773: Rule: 'Format 3 shall be specified only for a sequential file or a report file. The associated file description entry shall not be a sort-merge file description entry.' (cite.py --check 12.4.5.2 -> OK §12.4.5.2 11)). Owned by OPEN kb/Work PB773 (inventory_rows SR-12.4.5.2-11, SR-12.4.5.2-13) - not re-reported as a new finding. Re-measured on the pin: the second half is unenforced - an SD whose SELECT writes Format-3-only clauses compiles clean exit 0 at --std 2023: probe/fce/sr13_fs (FILE STATUS IS FS), sr13_acc (ACCESS MODE IS SEQUENTIAL), sr13_ls (ORGANIZATION IS LINE SEQUENTIAL), sr13_share (SHARING WITH NO OTHER), sr13_reserve (RESERVE 2 AREAS), sr13_lock (LOCK MODE IS MANUAL). Expected: a compile-time error (Format 4 admits only SELECT [OPTIONAL] - ASSIGN - [[ORGANIZATION IS] SEQUENTIAL]). The first half (sequential or report file) is structurally met: a Format-3 entry that writes a key clause is caught by COBOLNET0863/COBOLNET1900 under SR8/SR9 (landed PB742). Harm: under-rejects. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 per the clause text (Format 3 is the sequential file control entry in every edition; its LINE SEQUENTIAL/LOCK/SHARING members carry their own introduction gates)] [registrar 14a — FileControlKeyRules.cs#Screen removed from code-location: the table does not screen SR11/SR13 (FileControlKeyRuleDriftTests' 'screened here = a row' clamp); the SD screen is PB773's to add]",
-  "state": "GAP"
+  "notes": "LANDED 2026-10-05 (kb/Work PB773). RULE (--check 12.4.5.2 11): \"Format 3 shall be specified only for a sequential file or a report file. The associated file description entry shall not be a sort-merge file description entry.\" TWO OBLIGATIONS, TWO ROWS with one rule-id, exactly as SR8/SR9. Sentence 2 (the SD arm): FileControlKeyRules.Rules, Entry role, ScreenedOn SortMerge, reports COBOLNET1900 when the SD's entry writes a clause only Format 3 prints (ORGANIZATION IS LINE SEQUENTIAL, a RECORD DELIMITER clause). Sentence 1 (the organization arm): Entry role, ScreenedOn Indexed|Relative, reports the new COBOLNET2912 when an indexed or relative file's entry writes the RECORD DELIMITER clause (a report file is exempt: Format 3 is stated for it). WHICH FORMAT A CLAUSE SPECIFIES is now ONE table, FileControlKeyRules.EntryClauses, which carries per clause the SET of §12.4.5.1 formats printing it; SR8, SR9, SR11 and SR13 all read it, and FileControlKeyRuleDriftTests.EveryEntryClause_IsCarriedByExactlyTheFormatsThatPrintIt re-derives every row's set from the four printed diagrams on every run. The pre-PB773 note's premise ('one table row each') was wrong and the table gained an entry-level formats column instead (rule 5).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.2-12",
@@ -15771,13 +15771,13 @@
   "ordinal": 13,
   "subject": "File control entry",
   "rule-digest": "ec5c374a4081",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindFileControl",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/FileControlKeyRules.cs#Rules",
+  "test-ref": "conformance:negative/pb773-sd-file-status-clause; conformance:85/pb773_legal_file_control_entries_85; conformance-test:FileControlKeyRuleSpecTests.AClauseBeyondFormat4_OnASortMergeEntry_IsRefusedByTheRuleThatFitsIt; conformance-test:FileControlKeyRuleSpecTests.ASortMergeEntryWithTwoClausesBeyondFormat4_IsRefusedOncePerClause; unit:FileControlKeyRuleDriftTests.EveryEntryClause_IsCarriedByExactlyTheFormatsThatPrintIt",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB773: Rule: 'Format 4 shall be specified only for a sort-merge file. The associated file description entry shall be a sort-merge file description entry.' (cite.py --check 12.4.5.2 -> OK §12.4.5.2 13)). Owned by OPEN kb/Work PB773. Re-measured on the pin: an SD's file control entry that goes beyond Format 4 (SELECT [OPTIONAL] - ASSIGN - [[ORGANIZATION IS] SEQUENTIAL]) is accepted: probe/fce/sr13_fs, sr13_acc, sr13_ls, sr13_share, sr13_reserve, sr13_lock all compile clean exit 0 at --std 2023; only Format 1/2 clauses on an SD are refused (COBOLNET1900, SR8/SR9). probe/fce/sr13_optional (SELECT OPTIONAL on an SD) is correctly accepted - Format 4 prints [OPTIONAL]. Expected: compile-time error for every non-Format-4 clause on an SD entry. Harm: under-rejects. [registrar 14a — editions as adjudicated: 85, 2002, 2014, 2023 per the clause text (the sort-merge file control entry exists in every edition)] [registrar 14a — FileControlKeyRules.cs#Screen removed from code-location: the table does not screen SR11/SR13 (FileControlKeyRuleDriftTests' 'screened here = a row' clamp); the SD screen is PB773's to add]",
-  "state": "GAP"
+  "notes": "LANDED 2026-10-05 (kb/Work PB773). RULE (--check 12.4.5.2 13): \"Format 4 shall be specified only for a sort-merge file. The associated file description entry shall be a sort-merge file description entry.\" DETERMINATION: §12.4.5.1 prints Format 4 as SELECT [OPTIONAL], ASSIGN and [[ORGANIZATION IS] SEQUENTIAL] and nothing else, so an SD's file control entry is Format 4. Format 4 is a SUBSET of Format 3 (checked against the printed diagrams by the drift test), so an entry on an FD can never specify Format 4 alone and neither sentence can be broken from the FD side; the enforceable obligation is the SD's, and it is enforced clause by clause with each clause reported by exactly ONE row: a clause only one format prints names that format (SR8 Format 1, SR9 Format 2, SR11 Format 3), and a clause several formats print and Format 4 does not (ACCESS MODE, FILE STATUS, LOCK MODE, RESERVE, SHARING) is SR13's own row (FileControlKeyRules.Rules, Entry role, ScreenedOn SortMerge, COBOLNET1900). Re-measured before the fix on the pin's probes: FILE STATUS, ACCESS MODE IS SEQUENTIAL, ORGANIZATION IS LINE SEQUENTIAL, SHARING, RESERVE, LOCK MODE and RECORD DELIMITER on an SD all compiled clean; SELECT OPTIONAL and ORGANIZATION IS [RECORD] SEQUENTIAL on an SD remain legal (Format 4 prints them).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.4.5.3-1",
@@ -16041,13 +16041,13 @@
   "ordinal": 3,
   "subject": "ALTERNATE RECORD KEY clause",
   "rule-digest": "05ce6ffbad40",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/FileControlKeyRules.cs#Rules",
+  "test-ref": "conformance:negative/pb1073-alternate-key-dynamic-length-item; conformance:2014/pb1073_dynamic_length_member_not_a_key_2014; conformance-test:FileControlKeyRuleSpecTests.IndexedEntryRule_ReportsAtEveryEdition_WithOrWithoutAKeyedVerb",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "kb/Work PB1073: cite.py --check 12.4.5.6.3 \"Data-name-1 and data-name-2 shall not reference a variable-length data item\" -> OK SR3; cite.py --find §8.5.1.11.1 \"The term variable-length data item refers to either a dynamic-capacity table or a dynamic-length elementary item\" -> OK. No screen exists: FileControlKeyRules.cs's summary (lines 154-157) states §12.4.5.6.3 SR3..SR7 are deliberately NOT in its table, and a search of src for the rule found no other enforcement. The dynamic-capacity-table arm is subsumed by SR1 (OCCURS, enforced); the dynamic-length arm is not. Probe sr3.cob (2023): `ALTERNATE RECORD KEY IS R-DYN WITH DUPLICATES` with `05 R-DYN PIC X DYNAMIC LENGTH` compiles exit 0 with no diagnostic and WRITE returns '00'. Spec: a syntax-rule violation, shall be diagnosed. Under-rejects. Same gap on the RECORD KEY twin SR-12.4.5.12.3-3 (also GAP). [registrar 14a — editions as adjudicated: 2014,2023 (a variable-length data item is a dynamic-capacity table or a dynamic-length elementary item, §8.5.1.11.1; dynamic-length items pre-date 2023 per Annex E.3.3 item 17; below 2014 the rule is vacuous)]",
-  "state": "GAP"
+  "notes": "LANDED 2026-10-05 (kb/Work PB1073). RULE (--check 12.4.5.6.3 3): \"Data-name-1 and data-name-2 shall not reference a variable-length data item.\" §8.5.1.11.1: a variable-length data item is \"a dynamic-capacity table or a dynamic-length elementary item\". FileControlKeyRules.Rules (AlternateRecordKey role) asks the key operand's IsDynamicLength attribute (COBOLNET0863). The dynamic-capacity-table arm is a key under OCCURS and SR1's row reports it (a dynamic-capacity table cannot be in a record at all, COBOLNET1526), so the row does not say the same fact twice; a GROUP containing a dynamic-length item is a variable-length GROUP, which the standard names separately where it means to forbid one (§12.4.5.8.3 SR3, §13.10.3 SR12) and does not name here, so it is accepted (the minimum-record-size rule, SR5, bounds it). Re-measured before the fix: probe sr3.cob compiled exit 0 and WRITE returned '00'.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.6.3-4",
@@ -16056,13 +16056,13 @@
   "ordinal": 4,
   "subject": "ALTERNATE RECORD KEY clause",
   "rule-digest": "682f22b36f20",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/FileControlKeyRules.cs#Rules",
+  "test-ref": "conformance:negative/pb1073-alternate-key-at-prime-key-position; conformance:negative/pb1073-alternate-key-at-another-alternate-position; conformance:85/pb773_legal_file_control_entries_85; conformance-test:FileControlKeyRuleSpecTests.AnAlternateKey_AtAnotherKeysLeftmostBytePosition_IsRefusedAtEveryEdition",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1073: cite.py --check 12.4.5.6.3 \"whose leftmost byte position corresponds to the leftmost byte position of the prime record key, or of another alternate record key\" -> OK SR4. Not enforced anywhere (FileControlKeyRules.cs summary lines 154-157 excludes SR3..SR7; RecordLayout.cs:341's leftmost-position lookup serves START, not this clause). Probes (2023, all exit 0, no diagnostic): sr4prime.cob `ALTERNATE RECORD KEY IS R-KEY` (the prime key itself); sr4alt.cob `ALTERNATE RECORD KEY IS R-GRP` + `ALTERNATE RECORD KEY IS R-G1` (R-G1 is R-GRP's first byte); sr4dupsame.cob the same alternate key named twice. Each shall be diagnosed (the SOURCE exemption does not apply - neither key uses SOURCE). Under-rejects.",
-  "state": "GAP"
+  "notes": "LANDED 2026-10-05 (kb/Work PB1073). RULE (--check 12.4.5.6.3 4): \"Data-name-1 shall not reference an item whose leftmost byte position corresponds to the leftmost byte position of the prime record key, or of another alternate record key. This restriction does not apply in the case where either key is specified using the SOURCE phrase.\" FileControlKeyRules.Rules (AlternateRecordKey role, COBOLNET0863) compares each alternate clause's RecordLayout.KeyWindowInFile offset with the prime key's and with every OTHER alternate clause's (the operand carries its clause ordinal, so two clauses naming one item each violate it). The SOURCE exemption exempts a form this compiler declines (Annex A.3 item 40, COBOLNET1954), so no operand reaches the row through it. Positions are compared as the fixed-run offset plus whether a variable-length member precedes the key. Re-measured before the fix: sr4prime, sr4alt and sr4dupsame all compiled exit 0.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.6.3-5",
@@ -16881,13 +16881,13 @@
   "ordinal": 3,
   "subject": "RECORD KEY clause",
   "rule-digest": "05ce6ffbad40",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/FileControlKeyRules.cs#Rules",
+  "test-ref": "conformance:negative/pb1073-prime-key-dynamic-length-item; conformance:2014/pb1073_dynamic_length_member_not_a_key_2014; conformance-test:FileControlKeyRuleSpecTests.IndexedEntryRule_ReportsAtEveryEdition_WithOrWithoutAKeyedVerb",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "kb/Work PB1073: cite.py --check 12.4.5.12.3 \"Data-name-1 and data-name-2 shall not reference a variable-length data item\" -> OK SR3; --check 8.5.1.11.1 \"The term variable-length data item refers to either a dynamic-capacity table or a dynamic-length elementary item\" -> OK; --check E.3.3 \"The SET statement was enhanced to allow the setting of the length of a dynamic-length elementary item\" -> OK item 17; --check 8.5.1.10.3 \"Dynamic-length elementary items may be physically located in memory within the record they are subordinate to\" -> OK (a dynamic-length item is legal in a record). No screen: FileControlKeyRules.cs's summary says the semantic rules §12.4.5.12.3 SR3/SR4/SR5 are deliberately not in its table, and a search of src found no other enforcement. The dynamic-capacity-table arm is unreachable in a record (probe sr3b.cob: OCCURS DYNAMIC in the FILE SECTION -> COBOLNET1526, §8.5.1.9.1) and SR1 (OCCURS) is enforced anyway; the dynamic-length arm is not screened. Probe sr3.cob (2023): `RECORD KEY IS R-DYN` over `05 R-DYN PIC X DYNAMIC LENGTH` compiles exit 0 with no diagnostic and WRITE returns '00'. Spec: a syntax-rule violation, shall be diagnosed. Under-rejects. Same mechanism as the ALTERNATE RECORD KEY twin SR-12.4.5.6.3-3 (reported by that clause's adjudication); see finding 2. [registrar 14a — editions as adjudicated: 2014,2023 (a variable-length data item is a dynamic-capacity table or a dynamic-length elementary item, §8.5.1.11.1; dynamic-length items pre-date 2023 per Annex E.3.3 item 17; below 2014 the rule is vacuous)]",
-  "state": "GAP"
+  "notes": "LANDED 2026-10-05 (kb/Work PB1073). RULE (--check 12.4.5.12.3 3): \"Data-name-1 and data-name-2 shall not reference a variable-length data item.\" The RECORD KEY twin of SR-12.4.5.6.3-3, one row in the same table (FileControlKeyRules.Rules, PrimeRecordKey role, COBOLNET0863), same one-arm reading of §8.5.1.11.1 (the table arm is SR1's). Re-measured before the fix: probe record-key-clause/sr3.cob compiled exit 0 and the WRITE returned '00'.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.12.3-4",

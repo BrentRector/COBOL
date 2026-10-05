@@ -126,6 +126,14 @@ public sealed class FileControlKeyRuleSpecTests
         d.Add("ix-alternate-key-numeric", "category alphanumeric or national",
             "        RECORD KEY IS F-KEY\n        ALTERNATE RECORD KEY IS F-ALT.|"
             + "01 F-REC.\n   05 F-KEY PIC X(3).\n   05 F-ALT PIC 9(2).|");
+        // §12.4.5.12.3 SR3 / §12.4.5.6.3 SR3 — a key that is a dynamic-length elementary item (kb/Work PB1073). The
+        // alternate key is the LAST item, so the minimum-record-size rule has nothing to add and SR3 is the only
+        // rule this entry breaks.
+        d.Add("ix-record-key-dynamic-length", "§12.4.5.12.3 SR3", "        RECORD KEY IS F-KEY.|"
+            + "01 F-REC.\n   05 F-KEY PIC X DYNAMIC LENGTH.\n   05 F-D PIC X(4).|");
+        d.Add("ix-alternate-key-dynamic-length", "§12.4.5.6.3 SR3",
+            "        RECORD KEY IS F-KEY\n        ALTERNATE RECORD KEY IS F-ALT.|"
+            + "01 F-REC.\n   05 F-KEY PIC X(3).\n   05 F-D PIC X(2).\n   05 F-ALT PIC X DYNAMIC LENGTH.|");
         return d;
     }
 
@@ -302,6 +310,8 @@ public sealed class FileControlKeyRuleSpecTests
         01 F-REC.
            05 F-KEY PIC X(3).
            05 F-D PIC X(4).
+        WORKING-STORAGE SECTION.
+        01 F-FS PIC XX.
         PROCEDURE DIVISION.
         MAIN.
             DISPLAY "X"
@@ -345,6 +355,94 @@ public sealed class FileControlKeyRuleSpecTests
             Assert.DoesNotContain(d, e => e.Contains("COBOLNET0863", StringComparison.Ordinal));
             Assert.DoesNotContain(d, e => e.Contains("COBOLNET1900", StringComparison.Ordinal));
         }
+    }
+
+    /// <summary>⛔ §12.4.5.2 SR11 SENTENCE 2 AND SR13 — every clause a sort-merge file's entry writes beyond
+    /// §12.4.5.1 Format 4 (SELECT, ASSIGN, <c>[ [ ORGANIZATION IS ] SEQUENTIAL ]</c>) is refused by exactly ONE
+    /// row, under the rule that fits it (COBOLNET1900, kb/Work PB773): a clause only Format 3 prints names that
+    /// format (SR11), one that several formats print names none (SR13). The minimum edition is where the clause
+    /// itself exists, because an edition error for the clause would otherwise be what the case measures.</summary>
+    [Theory]
+    [InlineData("        FILE STATUS IS F-FS.", "SR13", 85)]
+    [InlineData("        ACCESS MODE IS SEQUENTIAL.", "SR13", 85)]
+    [InlineData("        RESERVE 2 AREAS.", "SR13", 85)]
+    [InlineData("        ACCESS MODE IS RANDOM.", "SR13", 85)]   // also a §12.4.5.5.2 SR2 error: two rules, two sentences
+    [InlineData("        LOCK MODE IS MANUAL.", "SR13", 2002)]
+    [InlineData("        LOCK MODE IS MANUAL WITH LOCK ON MULTIPLE RECORDS.", "SR13", 2002)]
+    [InlineData("        SHARING WITH NO OTHER.", "SR13", 2002)]
+    [InlineData("        RECORD DELIMITER IS STANDARD-1.", "SR11", 85)]
+    public void AClauseBeyondFormat4_OnASortMergeEntry_IsRefusedByTheRuleThatFitsIt(
+        string clauses, string rule, int minEdition)
+    {
+        foreach (int edition in AllEditions.Where(e => e >= minEdition))
+        {
+            int hits = Diagnostics(SortMerge(clauses), edition)
+                .Count(e => e.Contains("COBOLNET1900", StringComparison.Ordinal)
+                    && e.Contains($"(ISO §12.4.5.2 {rule})", StringComparison.Ordinal));
+            Assert.True(hits == 1, $"[SD + {clauses.Trim()}] @ {edition}: {rule} reported {hits}×, expected 1");
+        }
+    }
+
+    /// <summary>The entry rules are about the ENTRY, so a clause beyond Format 4 on an SD is refused whether or not
+    /// the program ever names the file in a SORT statement — the bare program above has none.</summary>
+    [Fact]
+    public void ASortMergeEntryWithTwoClausesBeyondFormat4_IsRefusedOncePerClause()
+    {
+        foreach (int edition in AllEditions)
+        {
+            var d = Diagnostics(SortMerge("        FILE STATUS IS F-FS\n        RECORD DELIMITER IS STANDARD-1."), edition);
+            Assert.Equal(1, d.Count(e => e.Contains("(ISO §12.4.5.2 SR13)", StringComparison.Ordinal)));
+            Assert.Equal(1, d.Count(e => e.Contains("(ISO §12.4.5.2 SR11)", StringComparison.Ordinal)));
+        }
+    }
+
+    /// <summary>§12.4.5.2 SR11 SENTENCE 1 — <i>"Format 3 shall be specified only for a sequential file or a report
+    /// file"</i> — over every organization (COBOLNET2912): the RECORD DELIMITER clause is Format 3's alone, so it
+    /// is refused on an indexed or relative file, and the BOUNDARY rows are the same clause on the sequential
+    /// files it is for, and the clauses that Formats 1 to 3 share on an indexed file, which are not Format 3's.</summary>
+    [Theory]
+    [InlineData("        ORGANIZATION IS INDEXED\n        RECORD KEY IS F-KEY\n        RECORD DELIMITER IS STANDARD-1.", 1)]
+    [InlineData("        ORGANIZATION IS RELATIVE\n        RECORD DELIMITER IS STANDARD-1.", 1)]
+    [InlineData("        ORGANIZATION IS SEQUENTIAL\n        RECORD DELIMITER IS STANDARD-1.", 0)]
+    [InlineData("        RECORD DELIMITER IS STANDARD-1.", 0)]
+    [InlineData("        ORGANIZATION IS INDEXED\n        RECORD KEY IS F-KEY\n        FILE STATUS IS F-FS\n        RESERVE 2 AREAS.", 0)]
+    public void Format3Clause_OnAKeyedFile_IsRefusedAtEveryEdition(string clauses, int expected)
+    {
+        string source = Organized("", clauses, "01 F-REC.\n   05 F-KEY PIC X(3).\n   05 F-D PIC X(4).",
+            "WORKING-STORAGE SECTION.\n01 F-FS PIC XX.", EntryOnlyBody);
+        foreach (int edition in AllEditions)
+        {
+            int hits = Diagnostics(source, edition).Count(e => e.Contains("COBOLNET2912", StringComparison.Ordinal));
+            Assert.True(hits == expected, $"[{clauses.Replace('\n', ' ').Trim()}] @ {edition}: COBOLNET2912 {hits}×, expected {expected}");
+        }
+    }
+
+    /// <summary>The two ALTERNATE RECORD KEY rules of kb/Work PB1073, each over every position the rule names: the
+    /// prime key's own leftmost byte (an alternate that IS the prime key, and one that is the first subordinate of
+    /// the prime GROUP), and another alternate's (two clauses on one item, and a group and its first subordinate).
+    /// A clause coincides with something and so does the OTHER one, so a coinciding pair is reported twice — each
+    /// clause is the subject of its own sentence — and a lone coincidence with the prime key once.</summary>
+    [Theory]
+    [InlineData("        RECORD KEY IS F-KEY\n        ALTERNATE RECORD KEY IS F-KEY.", 1)]
+    [InlineData("        RECORD KEY IS F-KG\n        ALTERNATE RECORD KEY IS F-K1.", 1)]
+    [InlineData("        RECORD KEY IS F-KEY\n        ALTERNATE RECORD KEY IS F-ALT\n        ALTERNATE RECORD KEY IS F-ALT.", 2)]
+    [InlineData("        RECORD KEY IS F-KEY\n        ALTERNATE RECORD KEY IS F-AG\n        ALTERNATE RECORD KEY IS F-A1.", 2)]
+    // The boundary: an alternate that begins INSIDE the prime group but not at its first byte, one after it, and a
+    // prime key that begins where an alternate's group does not.
+    [InlineData("        RECORD KEY IS F-KG\n        ALTERNATE RECORD KEY IS F-K2\n        ALTERNATE RECORD KEY IS F-ALT.", 0)]
+    [InlineData("        RECORD KEY IS F-KEY\n        ALTERNATE RECORD KEY IS F-A2\n        ALTERNATE RECORD KEY IS F-AG.", 0)]
+    public void AnAlternateKey_AtAnotherKeysLeftmostBytePosition_IsRefusedAtEveryEdition(string keyClauses, int expected)
+    {
+        const string record = "01 F-REC.\n   05 F-KEY PIC X(2).\n   05 F-KG REDEFINES F-KEY.\n      10 F-K1 PIC X.\n      10 F-K2 PIC X.\n"
+            + "   05 F-ALT PIC X(3).\n   05 F-AG.\n      10 F-A1 PIC X.\n      10 F-A2 PIC X(2).";
+        foreach (int edition in AllEditions)
+            foreach (string body in new[] { EntryOnlyBody, WithKeyedVerbBody })
+            {
+                int hits = Diagnostics(Indexed(keyClauses, record, "", body), edition)
+                    .Count(e => e.Contains("§12.4.5.6.3 SR4", StringComparison.Ordinal));
+                Assert.True(hits == expected,
+                    $"[{keyClauses.Replace('\n', ' ').Trim()}] @ {edition}: SR4 reported {hits}×, expected {expected}");
+            }
     }
 
     /// <summary>THE OVER-REJECTION GUARD ON THE CATEGORY ARM (kb/Work PB743). §12.4.5.12.3 SR2 and §12.4.5.6.3

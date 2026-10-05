@@ -181,6 +181,12 @@ public sealed class FileModel
     /// <summary>The access mode (default SEQUENTIAL).</summary>
     public FileAccessMode AccessMode { get; set; } = FileAccessMode.Sequential;
 
+    /// <summary>Whether the entry WROTE an ACCESS MODE clause — the fact <see cref="AccessMode"/>'s SEQUENTIAL
+    /// default cannot distinguish from a written <c>ACCESS MODE IS SEQUENTIAL</c>. §12.4.5.1 Format 4 (sort-merge)
+    /// carries no ACCESS clause at all, so an SD's entry that writes one — whatever its mode — is not a Format 4
+    /// entry (<see cref="FileControlKeyRules"/>, §12.4.5.2 SR13).</summary>
+    public bool AccessModeWritten { get; set; }
+
     /// <summary>True for a SELECT OPTIONAL file.</summary>
     public bool Optional { get; set; }
 

@@ -1220,10 +1220,44 @@ ASSIGN … USING screen — which admits an alphanumeric group item (§13.18.29.
 refuses alphabetic, numeric, edited, boolean and the PICTURE-less usages. The inventory row earns CONFORMS only
 when both rows are live, which is why PB699 recorded no verdict for either.
 
-**Boundaries.** The screen holds only what the standard states about the ENTRY. It does not carry the SEMANTIC
-rules of the same clauses — §12.4.5.12.3 SR3–SR5, §12.4.5.6.3 SR3–SR7 — which need machinery the screen does not
-have (variable-length record geometry; the `record-key-name-1 SOURCE` phrase, whose declined status is stated
-just below). §12.4.5.2 SR8's third operand, the file-level COLLATING SEQUENCE clause, is refused where it
+**WHICH FORMAT A CLAUSE SPECIFIES IS ONE TABLE TOO** (kb/Work PB773). §12.4.5.2 SR8, SR9, SR11 and SR13 tie a
+format to a file (Format 1 to an indexed file, Format 2 to a relative one, Format 3 to a sequential or report file,
+Format 4 to a sort-merge file), and every one of them has to know which format an entry SPECIFIES. The only source
+is the four §12.4.5.1 diagrams, and the compiler read them twice — as two hand-written marker lists, one per
+format — before the third and fourth rule arrived. `FileControlKeyRules.EntryClauses` is the one list: a row per
+clause that is not in all four formats (`EntryClause(Face, Carried, Written)`, `Carried` the SET of `FileFormats`
+that print it), and `FileControlKeyRuleDriftTests.EveryEntryClause_IsCarriedByExactlyTheFormatsThatPrintIt`
+re-reads the printed diagrams on every run and fails a row whose set disagrees. A clause printed in exactly one
+format SPECIFIES it (`ORGANIZATION IS INDEXED`, RECORD KEY, ALTERNATE RECORD KEY, COLLATING SEQUENCE → Format 1;
+`RELATIVE`, RELATIVE KEY → Format 2; `LINE SEQUENTIAL`, RECORD DELIMITER → Format 3); a clause several formats
+print is not in Format 4 whichever it was meant for (ACCESS MODE, FILE STATUS, LOCK MODE, RESERVE, SHARING).
+**Every clause beyond Format 4 on an SD is therefore reported by exactly one row** — SR8, SR9 or SR11 when the
+clause names a format, SR13's own row when it names none — and a clause a later edition adds is one `EntryClauses`
+row plus one oracle line in the drift test. `ORGANIZATION IS RECORD SEQUENTIAL` and the bare `SEQUENTIAL` are one
+phrase (RECORD is an optional word, §12.4.5.10.2), which Format 3 and Format 4 both print, so an SD may write
+either. **SR11 is two rows, one per sentence, SR13 one row** — Format 4 is a SUBSET of Format 3, so an entry with
+only SELECT, ASSIGN and SEQUENTIAL is a legal Format 3 entry for an FD and no entry can break either SR13 sentence
+from the FD side; the obligation SR13 states is the SD's (its entry shall be Format 4), and the drift test pins the
+subset relation so that statement is checked rather than asserted. SR11's first sentence is the one row on the
+`Entry` role that is NOT about an SD: it is screened over the indexed and relative kinds (a report file is exempt:
+Format 3 is stated for it), under its own code, COBOLNET2912, because its subject is the file's organization and
+not a key clause (SR8's and SR9's first sentences are COBOLNET0863 rows over the key clause that names them). The
+note PB773 was dispatched as *"one table row each"*; measured against the table that was wrong — the table's rows
+were about one key operand and these two rules are about the whole clause SET of an entry — so the table gained
+the formats column instead.
+
+**Boundaries.** The screen holds only what the standard states about the ENTRY. It carries every syntax rule of the
+three key clauses except the two DESCRIPTIVE ones, §12.4.5.12.3 SR5 and §12.4.5.6.3 SR6 (*"Record-key-name-1 has
+the class and category of data-name-2"*), which state a property of the SOURCE phrase's operand and have nothing
+to screen while that phrase is declined (just below). §12.4.5.12.3 SR3 and §12.4.5.6.3 SR3 (kb/Work PB1073) are
+one row each over the operand's own DYNAMIC LENGTH attribute, which is the ELEMENTARY half of §8.5.1.11.1's
+*"dynamic-capacity table or … dynamic-length elementary item"* — the table half is a key under OCCURS, which SR1
+already reports, and a GROUP that merely contains a dynamic-length item is a variable-length GROUP, which the
+standard names separately where it means to forbid one (§12.4.5.8.3 SR3, §13.10.3 SR12) and does not name for a
+key. §12.4.5.6.3 SR4 is one row that compares each alternate clause's `RecordLayout.KeyWindowInFile` offset (and
+whether a variable-length member precedes it) with the prime key's and with every OTHER alternate clause's; the
+operand carries its clause ordinal (`FileKeyOperand.Ordinal`), so two clauses naming one item each violate it. Its
+SOURCE-phrase exemption exempts the declined form, so no operand reaches the row through it. §12.4.5.2 SR8's third operand, the file-level COLLATING SEQUENCE clause, is refused where it
 is RESOLVED (`DataBinder.ResolveFileCollating`, COBOLNET1582), because the same test is also the guard that stops
 the rest of that method and splitting a guard from its report would leave the resolution running on an entry it
 has already refused; its citation was §12.4.5.7.1, the clause's descriptive General paragraph, and is now SR8.
@@ -1266,9 +1300,9 @@ owner-visible break of D10's store-header format.
 
 **Still homeless, and NOT closed by either half** (measured over the entry-rule family while here):
 §12.4.5.5.2 **SR1** (RANDOM banned on a file named in a SORT/MERGE USING or GIVING phrase — a statement-context
-rule, so D13 puts it in the SORT/MERGE binder, not here); §12.4.5.2 **SR11/SR13** (Format 3 only for a sequential
-or report file, Format 4 only for a sort-merge file — SR8's and SR9's two remaining siblings, unclaimed);
-§12.4.5.2 **SR12** (LINE SEQUENTIAL excludes RESERVE). PB742 closed §12.4.5.2 **SR8/SR9** and PB743 the CATEGORY
+rule, so D13 puts it in the SORT/MERGE binder, not here); §12.4.5.2 **SR12** (LINE SEQUENTIAL excludes RESERVE;
+kb/Work PB781 — the RESERVE clause is now carried, `FileModel.ReserveAreas`, so it is one clause-pair check beside
+the §12.4.5.5.2 SR2 screen). PB742 closed §12.4.5.2 **SR8/SR9**, PB773 **SR11/SR13** and PB743 the CATEGORY
 arm of both SR2s; the over-rejection sweep behind them measured **zero** hits across `tests/` (1611 file control
 entries — 230 RECORD KEY, 29 ALTERNATE RECORD KEY, 94 RELATIVE KEY clauses, 263 ORGANIZATION INDEXED, and no
 numeric indexed key), and the external GnuCOBOL corpus is absent from a worktree and was not swept there. PB699

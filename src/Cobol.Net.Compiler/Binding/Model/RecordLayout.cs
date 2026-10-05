@@ -256,6 +256,18 @@ internal static class RecordLayout
         return new KeyWindow(off, bytes, false, off + bytes);
     }
 
+    /// <summary><see cref="KeyWindowOf"/> for a key of <paramref name="file"/>'s own file control entry — the form
+    /// every rule that reads a RECORD KEY or ALTERNATE RECORD KEY asks (§12.4.5.12.3 SR4, §12.4.5.6.3 SR4 and SR5):
+    /// the key's window in the record that holds it, null when <paramref name="key"/> is null, is not in a record of
+    /// the file (its SR2 reports that), or is subject to OCCURS (its SR1 reports that).</summary>
+    public static KeyWindow? KeyWindowInFile(FileModel file, DataItem? key)
+    {
+        if (key is null || !IsInRecordOfFile(file, key)) return null;
+        var root = key;
+        while (root.Parent is { } p) root = p;
+        return KeyWindowOf(root, key, key.ByteWidth);
+    }
+
     /// <summary>The walk behind <see cref="KeyWindowOf"/>: <paramref name="key"/>'s offset in
     /// <paramref name="root"/>'s FIXED run (every variable-length member contributing ZERO — the §8.5.1.12.3
     /// accounting the emitted layout's <c>FixedAt</c> uses, flattened through nested variable-length groups the

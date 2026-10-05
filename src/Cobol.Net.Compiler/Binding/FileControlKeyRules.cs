@@ -22,11 +22,12 @@ internal enum FileKeyRole
     RelativeKey,
 
     /// <summary>NOT A KEY CLAUSE: the file control ENTRY itself, for a rule whose subject is the entry rather
-    /// than one operand of it — §12.4.5.2 SR8 and SR9's SECOND sentence, <i>"The associated file description
+    /// than one operand of it — §12.4.5.2 SR8, SR9 and SR11's SECOND sentence, <i>"The associated file description
     /// entry shall not be a sort-merge file description entry"</i>, which is broken by an entry that specifies
-    /// §12.4.5.1's Format 1 or Format 2 in ANY of its ways, including by writing only
-    /// <c>ORGANIZATION IS INDEXED</c> with no key clause at all. It contributes exactly ONE operand, with a null
-    /// name, so a rule about the entry is the same kind of row as a rule about an operand.</summary>
+    /// §12.4.5.1's Format 1, 2 or 3 in ANY of its ways, including by writing only
+    /// <c>ORGANIZATION IS INDEXED</c> with no key clause at all; SR13, the SD's own rule that its entry is Format 4;
+    /// and SR11's FIRST sentence, Format 3 for a file that is not sequential. It contributes exactly ONE operand,
+    /// with a null name, so a rule about the entry is the same kind of row as a rule about an operand.</summary>
     Entry,
 }
 
@@ -74,10 +75,43 @@ internal enum FileKinds
 /// PRESENCE; every operand rule below it tests <paramref name="Item"/> or <paramref name="Name"/> and is
 /// correctly silent on a refused clause.</para>
 /// <para><paramref name="SuppressWhen"/> is an ALTERNATE RECORD KEY clause's SUPPRESS WHEN literal-1 as read
-/// (§12.4.5.6.3 SR7's subject); null on every other role and on a clause without the phrase.</para></summary>
+/// (§12.4.5.6.3 SR7's subject); null on every other role and on a clause without the phrase.</para>
+/// <para><paramref name="Ordinal"/> is an ALTERNATE RECORD KEY clause's position among the entry's alternate
+/// clauses as written — what lets §12.4.5.6.3 SR4's "another alternate record key" exclude the clause itself
+/// without excluding a SECOND clause that names the same item; 0 on every other role.</para></summary>
 internal readonly record struct FileKeyOperand(
     FileKeyRole Role, string ClauseFace, string? Name, DataItem? Item, DiagnosticCursor At, bool Written = true,
-    SuppressWhenOperand? SuppressWhen = null);
+    SuppressWhenOperand? SuppressWhen = null, int Ordinal = 0);
+
+/// <summary>The four general formats of ISO/IEC 1989:2023 §12.4.5.1, as the set a clause is printed in.</summary>
+[Flags]
+internal enum FileFormats
+{
+    None = 0,
+
+    /// <summary>Format 1 (indexed).</summary>
+    Format1 = 1,
+
+    /// <summary>Format 2 (relative).</summary>
+    Format2 = 2,
+
+    /// <summary>Format 3 (sequential).</summary>
+    Format3 = 4,
+
+    /// <summary>Format 4 (sort-merge): SELECT [OPTIONAL], ASSIGN and [ [ORGANIZATION IS] SEQUENTIAL ] — nothing else.</summary>
+    Format4 = 8,
+}
+
+/// <summary>ONE clause of a file control entry that is not common to all four formats, with the formats whose
+/// printed diagram carries it and the test for "this entry wrote it". SELECT, OPTIONAL and ASSIGN are in every
+/// format and so in no row.</summary>
+/// <param name="Face">The clause as a diagnostic names it — the ONLY spelling of it.</param>
+/// <param name="Carried">The §12.4.5.1 formats that print the clause. <c>FileControlKeyRuleDriftTests</c>
+/// re-derives every row's set from the printed diagrams, so the table cannot drift from the standard.</param>
+/// <param name="Written">Whether this entry wrote the clause (in the sense of <paramref name="Carried"/>:
+/// <c>ACCESS MODE IS RANDOM</c> is a different row from <c>ACCESS MODE IS SEQUENTIAL</c>, because Format 3 prints
+/// only the second).</param>
+internal readonly record struct EntryClause(string Face, FileFormats Carried, Func<FileModel, bool> Written);
 
 /// <summary>ONE syntax rule of the file control entry stated about a key clause.</summary>
 /// <param name="RuleId">The traceability-inventory row this rule closes (<c>SR-12.4.5.12.3-1</c>), or null for a
@@ -99,9 +133,10 @@ internal readonly record struct FileKeyOperand(
 /// <param name="Message">The diagnostic body — what the operand IS, then the rule, then the citation.</param>
 /// <param name="Code">The diagnostic this row reports under. Almost every row is COBOLNET0863's own subject —
 /// "a file control entry's key clause breaks one of its syntax rules" — which is why the code is a column with a
-/// default rather than a parameter every row restates. §12.4.5.2 SR8/SR9's SECOND sentence is the exception: its
-/// subject is the FILE DESCRIPTION ENTRY, not a key clause, and its remedy is a different edit, so it carries its
-/// own code (COBOLNET1900).</param>
+/// default rather than a parameter every row restates. §12.4.5.2 SR8/SR9/SR11's SECOND sentence and SR13 are the
+/// exception: their subject is the FILE DESCRIPTION ENTRY, not a key clause, and their remedy is a different edit,
+/// so they carry their own code (COBOLNET1900); SR11's FIRST sentence is about the file's organization and has
+/// COBOLNET2912.</param>
 internal sealed record FileControlKeyRule(
     string? RuleId,
     string Clause,
@@ -155,11 +190,24 @@ internal sealed record FileControlKeyRule(
 /// This table holds the rules that need a RESOLVED DATA ITEM: a key clause names a data-name whose OCCURS
 /// ancestry, PICTURE and owning record description are unknown until the data forest is indexed. That is the
 /// whole criterion for which of the two a new entry rule joins — `COBOLNET_FILES_DESIGN.md` D19.</para>
-/// <para>NOT HERE, deliberately: the SEMANTIC rules of the same clauses — §12.4.5.12.3 SR3/SR4/SR5 and
-/// §12.4.5.6.3 SR3/SR4/SR6 — which need machinery this screen does not have (variable-length record geometry, the
-/// record-key-name-1 SOURCE phrase, which has no grammar carrier: Annex A.3 item 40). Each is one row when it is
-/// implemented; that is the point of the table — §12.4.5.6.3 SR5 and SR7 became rows exactly that way (kb/Work
-/// PB1025, PB1072).</para>
+/// <para>⛔ WHICH FORMAT AN ENTRY SPECIFIES IS ONE TABLE TOO (<see cref="EntryClauses"/>, kb/Work PB773). The
+/// §12.4.5.2 rules that tie a format to a file — SR8 (Format 1), SR9 (Format 2), SR11 (Format 3), SR13 (Format 4) —
+/// all ask which format a CLAUSE belongs to, and the four general-format diagrams are the only source of that
+/// answer. They were two hand-written marker lists (Format 1's clauses, Format 2's) and the third and fourth rule
+/// would have been two more; the table carries one row per clause that is not in every format, with the SET of
+/// formats that print it. A clause printed in exactly one format SPECIFIES that format (SR8/SR9/SR11); a clause
+/// printed in several, none of them Format 4 (ACCESS MODE, FILE STATUS, LOCK MODE, RESERVE, SHARING), is not in an
+/// SD's Format-4 entry whichever of the others it was meant for (SR13). Every clause beyond Format 4 is therefore
+/// answered by exactly one row, and a clause a later edition adds is one table row plus one oracle line in the
+/// drift test. §12.4.5.1 Format 4 is a SUBSET of Format 3 (an entry with only SELECT, ASSIGN and SEQUENTIAL is
+/// both), so an entry on an FD can never specify Format 4 alone and SR13's FD direction has nothing to screen:
+/// the obligation it states for an SD is the one the SD rows carry.</para>
+/// <para>NOT HERE, deliberately: the DESCRIPTIVE rules of the same clauses — §12.4.5.12.3 SR5 and §12.4.5.6.3 SR6,
+/// "Record-key-name-1 has the class and category of data-name-2", which state a property of the SOURCE phrase's
+/// operand and have no obligation to screen while that phrase is declined (Annex A.3 item 40, COBOLNET1954). Every
+/// other syntax rule of the three key clauses is a row, which is the point of the table — §12.4.5.6.3 SR5 and SR7
+/// and §12.4.5.12.3 SR4 became rows exactly that way (kb/Work PB1025, PB1072), and SR3 and SR4 of the ALTERNATE
+/// RECORD KEY (PB1073) after them.</para>
 /// <para>ALSO NOT HERE, and the one place §12.4.5.2 SR8 is written down twice: the COLLATING SEQUENCE clause is a
 /// Format-1 clause too, and a file-level one on a non-indexed file is refused by
 /// <c>DataBinder.ResolveFileCollating</c> (COBOLNET1582) — because that test is ALSO the guard that stops the
@@ -228,6 +276,20 @@ internal static class FileControlKeyRules
             (_, op) => $"{op.ClauseFace} '{op.Name}' is subject to an OCCURS clause; data-name-1 shall not be "
                 + "(ISO §12.4.5.12.3 SR1)"),
 
+        // SR3 — kb/Work PB1073. §8.5.1.11.1 defines the term: "a dynamic-capacity table or a dynamic-length
+        // elementary item". The TABLE arm is a key under an OCCURS clause and SR1 above already reports it (a
+        // dynamic-capacity table cannot even be in a record, COBOLNET1526), so this row asks the elementary arm
+        // alone rather than telling the program the same fact in two sentences. A GROUP that merely CONTAINS a
+        // dynamic-length item is a variable-length GROUP, which the standard names separately wherever it means
+        // to forbid one (§12.4.5.8.3 SR3, §13.10.3 SR12) and does NOT name here.
+        new("SR-12.4.5.12.3-3", "12.4.5.12.3", "ISO §12.4.5.12.3 SR3",
+            "Data-name-1 and data-name-2 shall not reference a variable-length data item",
+            FileKinds.Indexed, FileKeyRole.PrimeRecordKey,
+            _ => true,
+            (_, op) => op.Item is { IsDynamicLength: true },
+            (_, op) => $"{op.ClauseFace} '{op.Name}' is a dynamic-length elementary item, which is a variable-length "
+                + "data item (ISO §8.5.1.11.1); data-name-1 shall not reference one (ISO §12.4.5.12.3 SR3)"),
+
         // ⛔ THE MINIMUM-RECORD-SIZE RULE (kb/Work PB1025). Unenforced until 2026-09-22: a RECORD KEY that a
         // dynamic-length item preceded compiled clean, was sliced at its FIXED-run offset, and a READ … KEY
         // returned a different record. The reach is RecordLayout.KeyWindowOf's — the ONE answer SORT/MERGE's
@@ -279,6 +341,33 @@ internal static class FileControlKeyRules
             (_, op) => op.Item is { } i && RecordLayout.IsSubjectToOccurs(i),
             (_, op) => $"{op.ClauseFace} '{op.Name}' is subject to an OCCURS clause; data-name-1 shall not "
                 + "be (ISO §12.4.5.6.3 SR1)"),
+
+        // SR3 — the ALTERNATE RECORD KEY twin of §12.4.5.12.3 SR3 above, same one-arm reading (kb/Work PB1073).
+        new("SR-12.4.5.6.3-3", "12.4.5.6.3", "ISO §12.4.5.6.3 SR3",
+            "Data-name-1 and data-name-2 shall not reference a variable-length data item",
+            FileKinds.Indexed, FileKeyRole.AlternateRecordKey,
+            _ => true,
+            (_, op) => op.Item is { IsDynamicLength: true },
+            (_, op) => $"{op.ClauseFace} '{op.Name}' is a dynamic-length elementary item, which is a variable-length "
+                + "data item (ISO §8.5.1.11.1); data-name-1 shall not reference one (ISO §12.4.5.6.3 SR3)"),
+
+        // SR4 — kb/Work PB1073. The rule is stated about the ALTERNATE key and counts the PRIME key and every OTHER
+        // alternate clause as the keys it may not coincide with, so two clauses naming the same item each violate it
+        // (each coincides with the other) and a prime key is never itself a subject. Its closing sentence — "This
+        // restriction does not apply in the case where either key is specified using the SOURCE phrase" — exempts a
+        // form this compiler declines (Annex A.3 item 40, COBOLNET1954): no operand reaches this row through it.
+        // "Leftmost byte position" is the position in the key's own record (RecordLayout.KeyWindowOf, the one
+        // reader every key rule uses), so a key a variable-length member precedes is compared by its fixed-run
+        // position AND that fact.
+        new("SR-12.4.5.6.3-4", "12.4.5.6.3", "ISO §12.4.5.6.3 SR4",
+            "Data-name-1 shall not reference an item whose leftmost byte position corresponds to the leftmost byte position of the prime record key, or of another alternate record key",
+            FileKinds.Indexed, FileKeyRole.AlternateRecordKey,
+            _ => true,
+            (f, op) => CoincidingKey(f, op) is not null,
+            (f, op) => $"{op.ClauseFace} '{op.Name}' begins at the same byte position as "
+                + $"{CoincidingKey(f, op) ?? "the prime record key or another alternate record key"}; data-name-1 "
+                + "shall not reference an item whose leftmost byte position corresponds to the leftmost byte position "
+                + "of the prime record key, or of another alternate record key (ISO §12.4.5.6.3 SR4)"),
 
         // SR5 — the ALTERNATE RECORD KEY twin of §12.4.5.12.3 SR4 above, one reach reader for both (kb/Work PB1025).
         new("SR-12.4.5.6.3-5", "12.4.5.6.3", "ISO §12.4.5.6.3 SR5",
@@ -415,33 +504,108 @@ internal static class FileControlKeyRules
                 + "entry associated with ISO §12.4.5.1 Format 2 shall not be a sort-merge file description entry "
                 + "(ISO §12.4.5.2 SR9)",
             DiagnosticCatalog.FileControlFormatOnSortMerge),
+
+        // ── The ENTRY — §12.4.5.2 SR11 and SR13 (kb/Work PB773) ─────────────────────────────────────────────
+        // SR11 is SR8/SR9's twin one format over: Format 3 (sequential) is specified by a clause that ONLY Format 3
+        // prints, ORGANIZATION IS LINE SEQUENTIAL or RECORD DELIMITER. Its second sentence is the SD arm (the same
+        // sentence SR8 and SR9 close with, one code); its first is the organization arm, which only an indexed or
+        // relative file can break. A SORT-MERGE file is left to the second sentence, and a REPORT file is one
+        // Format 3 is stated FOR ("a sequential file or a report file"), so it is exempt from the first.
+        new("SR-12.4.5.2-11", "12.4.5.2", "ISO §12.4.5.2 SR11",
+            "The associated file description entry shall not be a sort-merge file description entry",
+            FileKinds.SortMerge, FileKeyRole.Entry,
+            SpecifiesSequentialFormat,
+            (_, _) => true,
+            (f, _) => $"file '{f.CobolName}' is described by a sort-merge file description entry, but its file "
+                + $"control entry specifies the sequential format ({SequentialFormatMarker(f)}); the file description "
+                + "entry associated with ISO §12.4.5.1 Format 3 shall not be a sort-merge file description entry "
+                + "(ISO §12.4.5.2 SR11)",
+            DiagnosticCatalog.FileControlFormatOnSortMerge),
+
+        new("SR-12.4.5.2-11", "12.4.5.2", "ISO §12.4.5.2 SR11",
+            "Format 3 shall be specified only for a sequential file or a report file",
+            FileKinds.Indexed | FileKinds.Relative, FileKeyRole.Entry,
+            f => !f.IsReportFile && SpecifiesSequentialFormat(f),
+            (_, _) => true,
+            (f, _) => $"file '{f.CobolName}' is {f.OrganizationFace}, but its file control entry specifies the "
+                + $"sequential format ({SequentialFormatMarker(f)}), which appears only in ISO §12.4.5.1 Format 3; "
+                + "Format 3 shall be specified only for a sequential file or a report file (ISO §12.4.5.2 SR11)",
+            DiagnosticCatalog.FileControlFormat3OnKeyedFile),
+
+        // SR13 — the SD's own rule: the entry of a sort-merge file is Format 4 (SELECT [OPTIONAL], ASSIGN,
+        // [[ORGANIZATION IS] SEQUENTIAL]). It answers the clauses SR8/SR9/SR11 cannot name a format for — ACCESS MODE,
+        // FILE STATUS, LOCK MODE, RESERVE and SHARING each belong to Formats 1 to 3 together — so every clause beyond
+        // Format 4 is reported by exactly one row. The quoted sentence is the one that ties Format 4 to the SD.
+        new("SR-12.4.5.2-13", "12.4.5.2", "ISO §12.4.5.2 SR13",
+            "The associated file description entry shall be a sort-merge file description entry",
+            FileKinds.SortMerge, FileKeyRole.Entry,
+            f => SharedClauseBeyondFormat4(f) is not null,
+            (_, _) => true,
+            (f, _) => $"file '{f.CobolName}' is described by a sort-merge file description entry, so its file control "
+                + "entry shall be ISO §12.4.5.1 Format 4 — SELECT, ASSIGN and [ORGANIZATION IS] SEQUENTIAL only — but "
+                + $"it writes {SharedClauseBeyondFormat4(f)}, which Format 4 does not print; Format 4 is the entry "
+                + "of a sort-merge file and the file description entry associated with it shall be a sort-merge "
+                + "file description entry (ISO §12.4.5.2 SR13)",
+            DiagnosticCatalog.FileControlFormatOnSortMerge),
     ];
 
     // ── Which §12.4.5.1 FORMAT an entry specifies ───────────────────────────────────────────────────────────
-    // An entry specifies a format by writing a clause that ONLY that format carries. Read off §12.4.5.1: Format 1
-    // (indexed) alone carries `[ORGANIZATION IS] INDEXED`, RECORD KEY, ALTERNATE RECORD KEY and the
-    // collating-sequence-clause; Format 2 (relative) alone carries `[ORGANIZATION IS] RELATIVE` and RELATIVE KEY.
+    // An entry specifies a format by writing a clause that ONLY that format carries, and a file control entry is
+    // never in Format 4 by what it writes beyond SELECT, ASSIGN and SEQUENTIAL. The clauses are ONE table, read off
+    // the four printed diagrams (FileControlKeyRuleDriftTests re-reads them on every run), in the order a message
+    // names the first that applies.
     // ⚠ A clause carried by MORE THAN ONE format identifies none — ACCESS MODE IS RANDOM appears in Formats 1 and
     // 2 both, and the standard screens it with the ACCESS clause's own rule (§12.4.5.5.2 SR2, DataBinder), not
     // with SR8/SR9. The collating-sequence-clause is likewise screened at its own resolution site
     // (DataBinder.ResolveFileCollating, COBOLNET1582), which has to guard on the organization anyway.
+    private const FileFormats Formats123 = FileFormats.Format1 | FileFormats.Format2 | FileFormats.Format3;
+    private const FileFormats Formats12 = FileFormats.Format1 | FileFormats.Format2;
 
-    // ⛔ THE CLAUSE LIST IS WRITTEN ONCE. Each `…Marker` NAMES the clause that specifies the format — a message
-    // that only said "the indexed format" would leave the writer of an `SD` + `RECORD KEY` entry with nothing to
-    // edit — and returns null when none is written, which is also the "does this entry specify the format?"
+    private static readonly EntryClause[] EntryClauses =
+    [
+        new("ORGANIZATION IS INDEXED", FileFormats.Format1, f => f.Organization is FileOrganization.Indexed),
+        new("a RECORD KEY clause", FileFormats.Format1, f => f.RecordKeyName is not null),
+        new("an ALTERNATE RECORD KEY clause", FileFormats.Format1, f => f.AlternateKeyNames.Count > 0),
+        new("a COLLATING SEQUENCE clause", FileFormats.Format1,
+            f => f.FileLevelCollating is not null || f.KeyLevelCollating.Count > 0),
+        new("ORGANIZATION IS RELATIVE", FileFormats.Format2, f => f.Organization is FileOrganization.Relative),
+        new("a RELATIVE KEY clause", FileFormats.Format2, f => f.RelativeKeyName is not null),
+        new("ORGANIZATION IS LINE SEQUENTIAL", FileFormats.Format3, f => f.Organization is FileOrganization.LineSequential),
+        new("a RECORD DELIMITER clause", FileFormats.Format3, f => f.RecordDelimiter is not null),
+        // `RECORD SEQUENTIAL` and the bare `SEQUENTIAL` are one phrase (RECORD is an optional word, §12.4.5.10.2).
+        new("ORGANIZATION IS SEQUENTIAL", FileFormats.Format3 | FileFormats.Format4,
+            f => f.OrganizationWritten && f.Organization is FileOrganization.Sequential),
+        new("ACCESS MODE IS SEQUENTIAL", Formats123, f => f.AccessModeWritten && f.AccessMode is FileAccessMode.Sequential),
+        new("ACCESS MODE IS RANDOM or DYNAMIC", Formats12, f => f.AccessModeWritten && f.AccessMode is not FileAccessMode.Sequential),
+        new("a FILE STATUS clause", Formats123, f => f.FileStatusName is not null),
+        new("a LOCK MODE clause", Formats123, f => f.LockMode is { Multiple: false }),
+        new("a LOCK MODE clause with WITH LOCK ON MULTIPLE RECORDS", Formats12, f => f.LockMode is { Multiple: true }),
+        new("a RESERVE clause", Formats123, f => f.ReserveAreas is not null),
+        new("a SHARING clause", Formats123, f => f.Sharing is not SharingMode.None),
+    ];
+
+    // ⛔ THE CLAUSE LIST IS WRITTEN ONCE (EntryClauses). Each `…Marker` NAMES the first written clause of its kind — a
+    // message that only said "the indexed format" would leave the writer of an `SD` + `RECORD KEY` entry with nothing
+    // to edit — and returns null when none is written, which is also the "does this entry specify the format?"
     // answer. A separate boolean predicate beside the marker would be the same list twice, and the second copy is
-    // the one that would not learn about the next Format-1 clause.
-    private static string? IndexedFormatMarker(FileModel f) =>
-        f.Organization is FileOrganization.Indexed ? "ORGANIZATION IS INDEXED"
-        : f.RecordKeyName is not null ? "a RECORD KEY clause"
-        : f.AlternateKeyNames.Count > 0 ? "an ALTERNATE RECORD KEY clause"
-        : f.FileLevelCollating is not null || f.KeyLevelCollating.Count > 0 ? "a COLLATING SEQUENCE clause"
-        : null;
+    // the one that would not learn about the next clause.
+    private static string? WrittenClause(FileModel f, Func<FileFormats, bool> carriedBy)
+    {
+        foreach (var clause in EntryClauses)
+            if (carriedBy(clause.Carried) && clause.Written(f)) return clause.Face;
+        return null;
+    }
 
-    private static string? RelativeFormatMarker(FileModel f) =>
-        f.Organization is FileOrganization.Relative ? "ORGANIZATION IS RELATIVE"
-        : f.RelativeKeyName is not null ? "a RELATIVE KEY clause"
-        : null;
+    private static string? IndexedFormatMarker(FileModel f) => WrittenClause(f, c => c == FileFormats.Format1);
+
+    private static string? RelativeFormatMarker(FileModel f) => WrittenClause(f, c => c == FileFormats.Format2);
+
+    private static string? SequentialFormatMarker(FileModel f) => WrittenClause(f, c => c == FileFormats.Format3);
+
+    /// <summary>The first clause the entry writes that Format 4 does not print and that no single format owns —
+    /// the clauses SR8, SR9 and SR11 cannot name a format for.</summary>
+    private static string? SharedClauseBeyondFormat4(FileModel f) =>
+        WrittenClause(f, c => !c.HasFlag(FileFormats.Format4) && !System.Numerics.BitOperations.IsPow2((int)c));
 
     /// <summary>What a SUPPRESS WHEN operand IS, in the words §12.4.5.6.3 SR7 uses — the phrase its three rows
     /// print.</summary>
@@ -467,12 +631,25 @@ internal static class FileControlKeyRules
     /// §12.4.5.6.3 SR5 — "contained within the first n bytes of the record, where n equals the minimum record size
     /// specified for the file"; §13.18.43.4 GR9 supplies the minimum a RECORD clause leaves unstated), else null.
     /// A key outside this file's records is SR2's to report, and is not measured here.</summary>
-    private static RecordLayout.KeyWindow? BeyondMinimum(FileModel f, DataItem? key)
+    private static RecordLayout.KeyWindow? BeyondMinimum(FileModel f, DataItem? key) =>
+        RecordLayout.KeyWindowInFile(f, key) is { } w && w.MaxEnd > f.VaryMin ? w : null;
+
+    /// <summary>The key — the prime record key, or ANOTHER alternate record key clause — whose leftmost byte
+    /// position is the position of <paramref name="op"/>'s item (§12.4.5.6.3 SR4), rendered for the message, else
+    /// null. Positions are compared as <see cref="RecordLayout.KeyWindow"/>'s record offset PLUS whether a
+    /// variable-length member precedes the key: two keys can only share a fixed-run offset by overlapping or by one
+    /// following a zero-width dynamic-length member, and in the second case they are not at one position.
+    /// The prime key is asked first so an alternate that coincides with both hears about the one SR4 names first.</summary>
+    private static string? CoincidingKey(FileModel f, FileKeyOperand op)
     {
-        if (key is null || !RecordLayout.IsInRecordOfFile(f, key)) return null;
-        var root = key;
-        while (root.Parent is { } p) root = p;
-        return RecordLayout.KeyWindowOf(root, key, key.ByteWidth) is { } w && w.MaxEnd > f.VaryMin ? w : null;
+        if (RecordLayout.KeyWindowInFile(f, op.Item) is not { } mine) return null;
+        bool Same(DataItem? other) =>
+            RecordLayout.KeyWindowInFile(f, other) is { } w && w.Offset == mine.Offset && w.FollowsVariable == mine.FollowsVariable;
+        if (Same(f.RecordKeyItem)) return $"the prime record key '{f.RecordKeyName}'";
+        for (int i = 0; i < f.AlternateKeyNames.Count; i++)
+            if (i != op.Ordinal && Same(f.AlternateKeyNames[i].Item))
+                return $"another alternate record key '{f.AlternateKeyNames[i].Name}'";
+        return null;
     }
 
     private static string BeyondMinimumMessage(FileModel f, FileKeyOperand op, string n, string citation)
@@ -489,6 +666,11 @@ internal static class FileControlKeyRules
     }
 
     private static bool SpecifiesRelativeFormat(FileModel f) => RelativeFormatMarker(f) is not null;
+
+    private static bool SpecifiesSequentialFormat(FileModel f) => SequentialFormatMarker(f) is not null;
+
+    /// <summary>The table, for <c>FileControlKeyRuleDriftTests</c> — the only reason it is not private.</summary>
+    internal static IReadOnlyList<EntryClause> EntryClauseCatalog => EntryClauses;
 
     /// <summary>The table, for <c>FileControlKeyRuleDriftTests</c> — the only reason it is not private.</summary>
     internal static IReadOnlyList<FileControlKeyRule> Catalog => Rules;
@@ -566,9 +748,12 @@ internal static class FileControlKeyRules
             case FileKeyRole.AlternateRecordKey:
                 // The clauses AS WRITTEN, not FileModel.AlternateKeys: a clause whose data-name-1 resolved to
                 // nothing is absent from the resolved list, and that is precisely the case SR2 speaks about.
-                foreach (var alt in file.AlternateKeyNames)
+                for (int i = 0; i < file.AlternateKeyNames.Count; i++)
+                {
+                    var alt = file.AlternateKeyNames[i];
                     yield return new FileKeyOperand(role, "ALTERNATE RECORD KEY", alt.Name, alt.Item, alt.At,
-                        SuppressWhen: alt.SuppressWhen);
+                        SuppressWhen: alt.SuppressWhen, Ordinal: i);
+                }
                 break;
             case FileKeyRole.RelativeKey:
                 yield return new FileKeyOperand(role, "RELATIVE KEY", file.RelativeKeyName, file.RelativeKeyItem,
