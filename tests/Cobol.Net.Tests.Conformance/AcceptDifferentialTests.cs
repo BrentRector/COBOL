@@ -274,6 +274,36 @@ public sealed class AcceptDifferentialTests
             stdin: "1E-05\n",
             dialect: 2023);
 
+    // A BINARY32 receiver takes the device record in ONE rounding (kb/Work PB1110; §14.6.8.3 rule 2: "in a manner
+    // consistent with the specifications of ISO/IEC 60559:2020" — cite.py-checked), never through binary64. The
+    // binary32 neighbours of 1 are 1 and 1 + 2**-23 = 1.00000011920928955078125, midpoint 1 + 2**-24 =
+    // 1.000000059604644775390625. "1.0000000596046448" lies ABOVE the midpoint by 2.5E-17 (under half a binary64
+    // ulp, so the binary64 detour lands ON the midpoint and ties down to 1): the single conversion is 1 + 2**-23.
+    // The stored value is shown by a MOVE into a PIC 9V9(23), which prints it exactly. The exact midpoint itself
+    // ties to the even mantissa (1), and a record one unit above it in the 31st digit is above it (1 + 2**-23).
+    [Fact]
+    public void Device_Binary32Receiver_IsOneRoundingOfTheRecord()
+        => AssertOutputs(
+            Program("ACCFLT3", """
+                01 B1 USAGE FLOAT-BINARY-32.
+                01 B2 USAGE FLOAT-SHORT.
+                01 B3 USAGE COMP-1.
+                01 B4 USAGE FLOAT-SHORT.
+                01 R PIC 9V9(23).
+                """, """
+                ACCEPT B1.
+                ACCEPT B2.
+                ACCEPT B3.
+                ACCEPT B4.
+                MOVE B1 TO R. DISPLAY R "]".
+                MOVE B2 TO R. DISPLAY R "]".
+                MOVE B3 TO R. DISPLAY R "]".
+                MOVE B4 TO R. DISPLAY R "]".
+            """),
+            expected: "100000011920928955078125]\n100000011920928955078125]\n100000011920928955078125]\n100000000000000000000000]",
+            stdin: "1.0000000596046448\n1.0000000596046448E+0\n1.000000059604644775390625000001\n1.000000059604644775390625\n",
+            dialect: 2023);
+
     // §14.9.1.4 GR6 — the temporal transfer is "according to the rules for the MOVE statement", so EVERY receiver
     // category behaves as the MOVE from the GR7–GR12 conceptual unsigned integer would (kb/Work PB887: the transfer
     // is now that bound MOVE, rendered by the MOVE emitter, where the emitter used to carry its own copy of the

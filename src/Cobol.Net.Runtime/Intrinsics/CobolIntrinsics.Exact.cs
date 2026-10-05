@@ -496,6 +496,20 @@ public static partial class CobolIntrinsics
         return p.Neg ? -r : r;
     }
 
+    /// <summary>NUMVAL-F's value converted ONCE into a BINARY32 receiver (ISO §14.6.8.3 rule 2: "in a manner
+    /// consistent with the specifications of ISO/IEC 60559:2020" — one correctly rounded conversion; kb/Work
+    /// PB1110): <see cref="CobolFloat.ScaledToSingle"/> of the scan's exact (significand, scale). Narrowing
+    /// <see cref="NumvalFDouble"/> would round twice — a text a hair above a binary32 midpoint lands ON that
+    /// midpoint in binary64 and the cast then ties to even. The result is returned as the binary64 that holds the
+    /// binary32 EXACTLY, so the caller's <c>(float)</c> cast is exact (the <see cref="FloatResultant"/>
+    /// convention). Same scan and reject projection as <see cref="NumvalFDouble"/>.</summary>
+    public static double NumvalFSingle(string text, bool commaMode = false, int digitCap = 31)
+    {
+        NvfParse p = NvfScan(text, commaMode, digitCap);
+        if (p.ErrPos != 0) return (double)NumvalFReject(p, text, digitCap);
+        return CobolFloat.ScaledToSingle(p.Neg ? -p.Unscaled : p.Unscaled, p.Frac - p.Exp);
+    }
+
     /// <summary>NUMVAL-F under NATIVE arithmetic in a receiver-less or float-receiver context — the §15.69.4 r2
     /// approximation ("the returned value is an approximation of the numeric value represented by argument-1")
     /// carried as binary64, exactly the FLOAT family's documented determination (CONFORMANCE.md item 92;

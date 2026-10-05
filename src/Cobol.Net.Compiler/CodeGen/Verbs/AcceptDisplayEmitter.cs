@@ -149,10 +149,12 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
                 // exclude a float receiver, so this is legal source with a DOCUMENTED conversion (CONFORMANCE.md §7
                 // DOC-A.1-1; kb/Work PB887 — this arm was a run-time LoudStmt that aborted the run unit): ONE
                 // record read as the inverse of the DISPLAY image (AcceptSource.DeviceFloat — the NUMVAL-F format;
-                // a non-conforming record is zero). The binary64 value lands in the receiver's carrier by a plain
-                // narrowing cast — this is the device conversion, NOT a MOVE (GR1–GR4 are explicitly not the MOVE
-                // rules), so no EC-DATA-OVERFLOW; a WINDOWED receiver re-encodes its IEEE window bytes.
-                string fvalue = $"({fpic.ClrType})AcceptSource.DeviceFloat()";
+                // a non-conforming record is zero). The value lands in the receiver's carrier by a plain cast of a
+                // value already converted ONCE into the receiver's own format (§14.6.8.3 rule 2; kb/Work PB1110:
+                // DeviceFloat(single) — a binary32 receiver is never rounded through binary64). This is the device
+                // conversion, NOT a MOVE (GR1–GR4 are explicitly not the MOVE rules), so no EC-DATA-OVERFLOW; a
+                // WINDOWED receiver re-encodes its IEEE window bytes.
+                string fvalue = $"({fpic.ClrType})AcceptSource.DeviceFloat({(fpic.IsSingle ? "true" : "false")})";
                 w.Line(PlaceRenderer.Write(target, item.StoreAsImage
                     ? RuntimeApi.NumFormatImageFloat(fvalue, item.ProfileName, fpic.IsSingle)
                     : fvalue));
