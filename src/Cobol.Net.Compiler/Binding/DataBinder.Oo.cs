@@ -128,8 +128,22 @@ public sealed partial class DataBinder
         }
 
         if (oru.className()?.GetText() is not { } name) return ObjectRefDescriptor.Universal;
-        bool only = oru.ONLY() is not null;
+        return OoDescribeNamedReference(oru, name, factory, only: oru.ONLY() is not null,
+            $"{entryWhere}: USAGE OBJECT REFERENCE", "ISO §13.18.60.2/.4",
+            DiagnosticCatalog.ObjectReferenceInterfacePhrase, "ISO §13.18.60.2; §13.18.60.4 GR22 c)");
+    }
 
+    /// <summary>⛔ THE ONE READING OF A WRITTEN <c>[FACTORY OF] class-or-interface-name [ONLY]</c> DESCRIPTION — the
+    /// <c>USAGE OBJECT REFERENCE</c> clause (§13.18.60.2) and the object-view's AS phrase (§8.4.3.5.2, kb/Work PB1425)
+    /// print the same three axes over one word that may name a class or an interface, so both ask this: the name
+    /// resolves through the one funnel in the REFERRING source element's scope (§8.4.6.4), and FACTORY OF / ONLY on an
+    /// interface is refused by the asking format's own rule (<paramref name="interfacePhrase"/>). An unresolved name
+    /// keeps the word written (the funnel has reported why), so every later diagnostic still says what the program
+    /// wrote.</summary>
+    internal ObjectRefDescriptor OoDescribeNamedReference(Antlr4.Runtime.ParserRuleContext site, string name,
+        bool factory, bool only, string where, string resolveRule,
+        DiagnosticDescriptor interfacePhrase, string interfaceRule)
+    {
         // A TYPED reference (spine part 2 — LIVE): the declared name must resolve — its emitted C# field type
         // IS the named class's or interface's emitted type (PicInfo.ClrType), so an unresolved name would
         // surface as a Roslyn CS0246 on user source (a loud-failure violation). §13.18.60.2: the operand is
@@ -140,9 +154,8 @@ public sealed partial class DataBinder
         // REPOSITORY rule of its own, so §8.4.6.4 IS the rule). Resolving the name HERE, through the one
         // funnel, is what makes that scope travel with the descriptor: `oru` is the reference site the
         // ancestor walk starts from.
-        var resolved = Compiler.Oo.OoNameResolution.Resolve(OoClasses, Edition, oru, name,
-            Compiler.Oo.OoNameResolution.Want.Either,
-            $"{entryWhere}: USAGE OBJECT REFERENCE", "COBOLNET0813", "ISO §13.18.60.2/.4");
+        var resolved = Compiler.Oo.OoNameResolution.Resolve(OoClasses, Edition, site, name,
+            Compiler.Oo.OoNameResolution.Want.Either, where, "COBOLNET0813", resolveRule);
         bool isInterface = resolved.Interface is not null;
         if (!resolved.Ok)
             // The funnel has already reported WHICH of the two failures this is (defined in the group but out
@@ -155,11 +168,10 @@ public sealed partial class DataBinder
             // the object-class-name-1 alternative alone, and GR22 c) states the interface reading with no
             // subordinate rules at all ("the object referenced by this data item shall implement interface-1").
             if (factory || only)
-                Edition.Error(DiagnosticCatalog.ObjectReferenceInterfacePhrase, $"{entryWhere}: USAGE OBJECT "
-                    + $"REFERENCE names the interface '{name}' with "
+                Edition.Error(interfacePhrase, $"{where} names the interface '{name}' with "
                     + (factory && only ? "the FACTORY OF and ONLY phrases" : factory ? "the FACTORY OF phrase" : "the ONLY phrase")
                     + " — those phrases belong to the object-class-name-1 alternative of the general format; the "
-                    + "interface-name-1 alternative carries neither (ISO §13.18.60.2; §13.18.60.4 GR22 c))");
+                    + $"interface-name-1 alternative carries neither ({interfaceRule})");
             return ObjectRefDescriptor.Interface(resolved.Interface!.Name);
         }
         // ⛔ The descriptor carries the RESOLVED definition's name, not the word written: a REPOSITORY specifier's
@@ -601,6 +613,20 @@ public sealed partial class DataBinder
     /// constructor, three clients.</summary>
     internal DataItem OoCreateInvocationTemp(DataItem model, string method) =>
         CreateCompilerTemp(model, "__INV-TEMP-", "__inv", method);
+
+    /// <summary>Synthesize the temporary an OBJECT-VIEW references (§8.4.3.5.4 GR1, kb/Work PB1425): "This reference
+    /// of identifier-1 is treated at compile-time as though it had the description specified by the AS phrase", so the
+    /// temporary is a USAGE OBJECT REFERENCE item described <paramref name="view"/> — the description every
+    /// object-reference rule then asks of it. The same <see cref="CreateCompilerTemp"/> as the other temporaries.</summary>
+    internal DataItem OoCreateObjectViewTemp(ObjectRefDescriptor view)
+    {
+        var model = new DataItem
+        {
+            Level = 1, CobolName = "__VIEW", CsName = "__view",
+            Pic = PicInfo.ObjectReferenceItem(view),
+        };
+        return CreateCompilerTemp(model, "__VIEW-TEMP-", "__view", view.Name ?? "UNIVERSAL");
+    }
 
     /// <summary>The (temp, model) clone pairs <see cref="CreateCompilerTemp"/> produced — consumed by the
     /// run-unit emitter's post-bind re-sync: <c>StoreAsImage</c> is still MUTABLE while procedure bodies

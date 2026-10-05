@@ -460,6 +460,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         ("EC-FUNCTION-ARG-OMITTED", "FunctionArgOmittedChecking"),// §8.4.3.2.4 GR8 — the same reference in an activated function
         ("EC-OO-ARG-OMITTED", "OoArgOmittedChecking"),          // §14.9.23.4 GR10 — the same reference in an invoked method
         ("EC-OO-RESOURCE", "OoResourceChecking"),               // §16.2.1.2 GR2 — BASE's New could not create the object (kb/Work PB1524)
+        ("EC-OO-CONFORMANCE", "OoConformanceChecking"),         // §8.4.3.5.4 GR2–GR6 — an object-view's run-time conformance check (kb/Work PB1425)
         // ⛔ FLAG = null: these two raise sites are UNCONDITIONAL, so there is no checking flag to set. §14.9.23.4
         // GR5 ("If identifier-1 is null, the EC-OO-NULL exception condition is set to exist and execution of the
         // INVOKE statement is terminated") and GR7b (the method could not be located) describe crossings a

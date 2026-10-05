@@ -192,7 +192,8 @@ internal sealed class DataStatementBinder
     {
         // The D-U7 grammar widened the rule to `dataReference+` (ISO §14.9.39 F5 {identifier-3}…) for the
         // greenfield; the FROZEN legacy keeps its single-target scope — first target only (oracle-only code).
-        if (_ctx.Expression.BindDataReferenceWithSubscripts(ctx.dataReference(0))
+        if (ctx.setObjectReferenceReceiver(0).dataReference() is not { } firstTarget
+            || _ctx.Expression.BindDataReferenceWithSubscripts(firstTarget)
                 is not BoundIdentifierExpression target)
             return null;
         // Pointers (Stage-4): SET pointer TO NULL / SET pointer TO pointer stores into the target's managed
@@ -201,8 +202,8 @@ internal sealed class DataStatementBinder
         if (target.Symbol.ResolvedType?.Category != CobolCategory.Pointer)
             return null;
 
-        var objRef = ctx.objectReference().objectReferenceAtom();
-        if (objRef == null) return null; // a function-identifier or inline-invocation sender — post-oracle
+        var objRef = ctx.objectReference().objectReferenceAtom()?.objectReferenceTerm();
+        if (objRef == null) return null; // a function-identifier, inline-invocation or object-view sender — post-oracle
         if (objRef.predefinedNull() != null)
             return new BoundSetPointerStatement(target.Symbol, PointerSetSourceKind.Null);
         if (objRef.dataReference() != null

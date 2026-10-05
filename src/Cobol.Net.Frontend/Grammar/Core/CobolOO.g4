@@ -244,8 +244,12 @@ invokeArgument
     | arithmeticExpression
     ;
 
+// identifier-4 is a RECEIVING operand, so an `objectViewReceiver` here is the P3 superset parse of §8.4.3.5.3 SR2 ("An
+// object-view shall not be specified as a receiving operand"): admitted only so OoBinder refuses it by that rule
+// (COBOLNET2871) instead of COBOLNET0901 on AS (kb/Work PB1425; the SET Format-5 receiving twin is in CobolParserCore.g4).
 invokeReturning
     : RETURNING dataReference
+    | RETURNING objectViewReceiver
     ;
 
 // ── USAGE OBJECT REFERENCE (ISO §13.18.60.2 general format; §13.18.60.4 GR22) ──

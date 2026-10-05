@@ -142,6 +142,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     "INVOKE … USING BY REFERENCE NULL: ISO §14.9.23.3 SR9 — identifier-3 \"shall be an address-identifier "
                     + "or shall reference a data item defined in the file, working-storage, local-storage, or linkage "
                     + "section\", and the predefined NULL (§8.4.3.7 / §8.4.3.10) is neither; pass it BY CONTENT or BY VALUE");
+        // identifier-4 receives the result, and §8.4.3.5.3 SR2 forbids an object-view there (kb/Work PB1425).
+        if (inv.invokeReturning()?.objectViewReceiver() is { } returningView)
+            return RefuseObjectViewReceiver(returningView, "the RETURNING identifier of an INVOKE statement");
         // INVOKE (§14.9.23, OO) is a COBOL-2002 introduction; the edition gate fires on RECOGNITION in the
         // VersionConformancePass parse arm (VisitInvokeStatement), never on the BoundInvoke node this method
         // builds. It keyed on the node until kb/Work PB353, which was wrong BOTH ways: an INVOKE whose target
@@ -157,7 +160,8 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             && (computedReceiver = OoObjectReferenceTemporary(computed, target, "COBOLNET0824",
                 "identifier-1 shall be an object reference (ISO §14.9.23.3 SR1)")) is null)
             return BoundRejected.Reported(ctx.Edition);
-        var atom = target.objectReferenceAtom();
+        // The plain term — null for an inline invocation or an object-view, both of which are computed above.
+        var atom = target.objectReferenceAtom()?.objectReferenceTerm();
 
         // The method selector: an alphanumeric/national literal binds statically (§14.9.23.3 SR2);
         // identifier-2 (a method name held in a data item) is legal ONLY through a UNIVERSAL receiver
@@ -238,11 +242,18 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         operand.inlineMethodInvocation() is { } imi ? OoBindInlineInvocation(imi)
         : OoBindComputedAtom(operand.objectReferenceAtom());
 
-    /// <summary>The function-identifier half of <see cref="OoBindComputedObjectReference"/>, for the receiver an inline
-    /// invocation applies its first <c>::</c> segment to (§8.4.3.1.3 SR1 — identifier-1 is any identifier).</summary>
+    /// <summary>The object-view and function-identifier half of <see cref="OoBindComputedObjectReference"/>, for the
+    /// receiver an inline invocation applies its first <c>::</c> segment to (§8.4.3.1.3 SR1 — identifier-1 is any
+    /// identifier). An object-view (§8.4.3.1.2 Format 5) is an atom because §8.4.3.1.4 GR1 c) applies it before the
+    /// invocation operator (e): it is computed like a function-identifier, to the temporary it references.</summary>
     private BoundExpr? OoBindComputedAtom(Core.ObjectReferenceAtomContext atom) =>
-        atom.functionCall() is { } fc ? host.Intrinsic.BindIntrinsic(fc)
-        : atom.dataReference() is { } dref ? host.Intrinsic.KeywordOmittedFunction(dref)
+        atom.objectView() is { } ov ? OoBindObjectView(ov) : OoBindComputedTerm(atom.objectReferenceTerm());
+
+    /// <summary>A function-identifier term (Format 1, including the keyword-omitted spelling §8.4.3.2.3 SR2 parses as a
+    /// data reference), bound to its result; null for a data-name, a class-name or a predefined object reference.</summary>
+    private BoundExpr? OoBindComputedTerm(Core.ObjectReferenceTermContext term) =>
+        term.functionCall() is { } fc ? host.Intrinsic.BindIntrinsic(fc)
+        : term.dataReference() is { } dref ? host.Intrinsic.KeywordOmittedFunction(dref)
         : null;
 
     /// <summary>The temporary item a computed object-reference operand references, when that item is an object
@@ -265,7 +276,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// form's <c>{object-class-name-1 | identifier-1}</c>, which are the SAME operand: §8.4.3.4.4 GR1 defines
     /// the inline form as one of the INVOKE statements it writes out, and §8.4.3.4.3 SR3 requires that INVOKE
     /// to be valid by §14.9.23's own syntax rules. One activation mechanism, never a second.</summary>
-    private BoundStatement OoBindByReceiver(InvocationSite site, Core.ObjectReferenceAtomContext target,
+    private BoundStatement OoBindByReceiver(InvocationSite site, Core.ObjectReferenceTermContext target,
                                             string methodName)
     {
         // The written method name is FORMED once, here, where both invocation spellings meet: leading and trailing
@@ -280,9 +291,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             string written = selfOrSuper.cobolWord() is { } q0 ? $"{q0.GetText()} OF SUPER" : isSuper ? "SUPER" : "SELF";
             if (!host.InMethod || host.OoCurrentClass is not { } cur)
             {
-                return BoundRejected.Report(ctx.Edition, "COBOLNET0827",
-                    $"INVOKE {written} may be specified only within a method definition "
-                    + "(ISO §8.4.3.8.3 SR1 — the predefined object references of the current object)");
+                return RefusePredefinedObjectOutsideMethod($"INVOKE {written}");
             }
             OoClassSymbol searchRoot;
             if (!isSuper)
@@ -382,6 +391,13 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             $"INVOKE: '{DataBinder.WrittenText(dref)}' is neither a resolvable data item nor a class this source element "
             + "may reference (ISO §14.9.23.2 — identifier-1 or class-name-1; §8.4.6.4)");
     }
+
+    /// <summary>§8.4.3.8.3 SR1 — "This identifier format may be specified only in a method definition" — for SELF / SUPER
+    /// written outside one, as an INVOKE receiver or an object-view's identifier-1 (kb/Work PB1425): the one spelling of
+    /// the refusal those positions share. <paramref name="written"/> names the construct as the program wrote it.</summary>
+    internal BoundRejected RefusePredefinedObjectOutsideMethod(string written) =>
+        BoundRejected.Report(ctx.Edition, "COBOLNET0827", $"{written} may be specified only within a method definition "
+            + "(ISO §8.4.3.8.3 SR1 — the predefined object references of the current object)");
 
     /// <summary><c>INVOKE class-name-1 "m" …</c>: §14.9.23.3 SR3 — "The value of literal-1 shall be the name of a
     /// method defined in the factory interface of object-class-name-1". Resolution walks the INHERITS chain over

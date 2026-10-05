@@ -421,7 +421,7 @@ SR6/SR7/SR8/SR10 + Tier-C = **0866**. SET Format 5 is live (grammar `dataReferen
 dataReference SENDER parses as the Format-1 shape by alternative order, so `BindSetTo` re-routes
 SEMANTICALLY when either side is an object reference; NULL/SELF senders + SR13 class-name→factory-
 singleton senders come through the gated rule; SR8/SR9/SR12 = **0867**; universal-into-typed is rejected —
-the narrowing tool is an OBJECT VIEW, deferred to the EC-OO/object-view wave). Object relations are live
+the narrowing tool is the OBJECT VIEW, `SET B TO U AS C`, live (see "OBJECT-VIEW" below)). Object relations are live
 (Format 3 `=`/`<>` only + both-class-object = **0868**; identity renders
 `object.ReferenceEquals(l, r)` in the ConditionRenderer's object branch BEFORE the figurative branch, so
 NULL never width-materializes). ⚠ String equality is used as §9.3.6's MATCH test, which is not the same relation as the §14.8.2 conformance the
@@ -567,8 +567,34 @@ derivation of the emitted type (PicInfo.ClrType and StorageForm.ObjectRef both r
    the INVOKE temporary is the same universal type, narrowed back into the argument on copy-out. kb/Work PB1497.)
   SET G TO NULL → G = null;   IF G = NULL → G is null;   IF U = G → object.ReferenceEquals(U, G).
   ("IS class-name" is NOT ISO — no instance-of condition exists in the 2023 text; the runtime-type-test
-  surfaces are the Format-3 relations above and OBJECT VIEWS (§8.4.3.5, EC-OO-CONFORMANCE — the deferred
-  object-view surface). A vendor IS-class test would be dialect-gated extension surface, never default.)
+  surfaces are the Format-3 relations above and OBJECT VIEWS (§8.4.3.5, EC-OO-CONFORMANCE — see "OBJECT-VIEW"
+  below). A vendor IS-class test would be dialect-gated extension surface, never default.)
+
+OBJECT-VIEW (§8.4.3.5, identifier Format 5; live — kb/Work PB1425; golden 2002/pb1425_object_view):
+  `identifier-1 AS { [FACTORY OF] object-class-name-1 [ONLY] | interface-name-1 | UNIVERSAL }`.
+  GRAMMAR: `objectReferenceAtom : objectView | objectReferenceTerm` — the view is an ATOM because §8.4.3.1.4 GR1
+  applies it (c) before the inline invocation operator (e), so `U AS C :: "M"` invokes on the view; the phrase
+  repeats (a view of a view, §8.4.3.1.3 SR1). Every object-reference position (INVOKE receiver, inline receiver,
+  SET Format 5 sender, RAISE) reaches it through the one `objectReference` rule. The two object-reference RECEIVING
+  positions (SET Format 5 receivers, INVOKE RETURNING) parse it as a superset so §8.4.3.5.3 SR2 is COBOLNET2871.
+  UNIVERSAL is a token, §8.9-reserved 2002+ (a user word at 85). Edition gate `object-view-2002` on recognition.
+  BINDER (`OoBinder.OoBindObjectView`): GR1 "treated at compile-time as though it had the description specified
+  by the AS phrase" → a compiler temporary DESCRIBED by the phrase (`DataBinder.OoCreateObjectViewTemp`), filled
+  by a statement pre-op `BoundObjectView` and read as `BoundNumRef` — the inline invocation's carrier, so every
+  computed-operand position takes it with no arm of its own. SR1 (identifier-1 not of class object, NULL, SUPER)
+  = COBOLNET2870; SELF is admitted (class object). The phrase's name resolves through the one reading the USAGE
+  clause uses (`DataBinder.OoDescribeNamedReference`); FACTORY OF / ONLY on an interface = COBOLNET2872.
+  RUN TIME (`CobolObject.ObjectView<T>`): GR2 instance of the class or a subclass (`is T`), GR3 the factory object
+  of the class or a subclass (`is C__FACTORY`), GR4/GR5 ONLY = exactly that type, GR6 implements the interface
+  (`is I`), GR7 UNIVERSAL = no check (a reference conversion). A NULL reference references no object, so nothing is
+  checked. A non-conforming object sets EC-OO-CONFORMANCE (Table 13 fatal) when it is ENABLED (§14.8.1 NOTE 3) —
+  `EcEmitter.FatalAmbientGates` row `OoConformanceChecking`, precise on the `BoundObjectView` node. With checking off
+  nothing is set: an object that is still a `T` (it failed only ONLY's exact-class test) is viewed as one; an object
+  of an unrelated class cannot be held by typed code, so the run unit stops with `CobolImplementorFatalException`
+  (the NarrowUniversal posture).
+  NOT YET AN IDENTIFIER ELSEWHERE: the view, like SELF and SUPER, is reached only from the object-reference
+  positions; a relation operand, an INVOKE / CALL argument and an object property's identifier-3 join with the
+  identifier-tier step of kb/Work PB1425 / PB1782 (after kb/Work PB1551's receiving screen).
 
 DYNAMIC/UNIVERSAL dispatch (live; goldens oo_universal / _name / _inherit / _relation):
   INVOKE U MNAME USING X RETURNING R →

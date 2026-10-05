@@ -936,6 +936,10 @@ TYPE        : 'TYPE' ;
 TYPEDEF     : 'TYPEDEF' ;
 UNDERLINE_  : 'UNDERLINE' ;
 UNIT        : 'UNIT' ;
+// UNIVERSAL (ISO §8.4.3.5.2, the object-view `identifier-1 AS UNIVERSAL`) — a required word of the format, §8.9-reserved
+// 2002+ and a USER WORD at 85, so it rides the cobolWord reservation funnel like ACTIVE-CLASS (cobol-words.json). Before
+// kb/Work PB1425 it had NO token: the object-view had no grammar at all and `D AS UNIVERSAL` drew COBOLNET0901 on AS.
+UNIVERSAL   : 'UNIVERSAL' ;
 UNTIL       : 'UNTIL' ;
 UP          : 'UP' ;
 USAGE       : 'USAGE' ;

@@ -2147,6 +2147,24 @@ internal sealed class VersionConformancePass
             return base.VisitChildren(ctx);
         }
 
+        /// <summary>The object-view (ISO §8.4.3.5, identifier Format 5 — <c>identifier-1 AS …</c>; kb/Work PB1425), gated
+        /// on RECOGNITION like its Format-4 sibling above, and for the same three derived reasons: A.4.10's optional OO
+        /// list does not name it, Annex E's 2014→2023 delta does not list it, and it re-describes an object reference,
+        /// a 2002 introduction. The receiving superset parse (§8.4.3.5.3 SR2, <c>objectViewReceiver</c>) is the same
+        /// construct written where it is refused, so it is gated alike and a COBOL-85 program is told the edition.</summary>
+        public override object? VisitObjectView(CobolParserCore.ObjectViewContext ctx)
+        {
+            _p.Check(Constructs.ObjectView2002, "an object-view (identifier AS class, interface or UNIVERSAL)");
+            return base.VisitChildren(ctx);
+        }
+
+        /// <inheritdoc cref="VisitObjectView"/>
+        public override object? VisitObjectViewReceiver(CobolParserCore.ObjectViewReceiverContext ctx)
+        {
+            _p.Check(Constructs.ObjectView2002, "an object-view (identifier AS class, interface or UNIVERSAL)");
+            return base.VisitChildren(ctx);
+        }
+
         /// <summary>START … FIRST / … LAST (ISO §14.9.41.2 general format — <c>cite.py --check 14.9.41.2 "FIRST"</c>
         /// OK, the printed alternative stack <c>FIRST | LAST | KEY …</c>) — a COBOL-2002 introduction. FIRST and
         /// LAST are ONE construct gated once, and §14.9.41.3 SR2 ("If the organization of the file referenced by

@@ -1172,6 +1172,12 @@
    "note": "screen UNDERLINE attribute (token UNDERLINE_ = 'UNDERLINE'): a legal data-name in non-screen contexts"
   },
   {
+   "token": "UNIVERSAL",
+   "nameSlot": true,
+   "subscriptTrigger": true,
+   "note": "the object-view `identifier-1 AS UNIVERSAL` (8.4.3.5.2, 2002+): a required word of the format. ISO 8.9 reserves it from 2002 only (reserved-words.json r85 false), so at --std 85 it is an ordinary user word - RESERVATION-GATED (the ACTIVE-CLASS precedent, derived in gen-cobol-words.ps1 step 4b). kb/Work PB1425."
+  },
+  {
    "token": "UNLOCK",
    "nameSlot": true,
    "subscriptTrigger": true,

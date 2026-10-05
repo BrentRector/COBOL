@@ -6697,6 +6697,32 @@ public static class DiagnosticCatalog
         + "sections.' Put the leading sentences and paragraphs in a section, or remove the sections and DECLARATIVES.",
         "ISO §14.2.1; §14.4.1");
 
+    /// <summary>COBOLNET2870 — an object-view's identifier-1 is not of class object, or is the predefined NULL or SUPER
+    /// (kb/Work PB1425): <c>N AS C</c> over a non-object item, <c>NULL AS C</c>, <c>SUPER AS C</c>.</summary>
+    public static readonly DiagnosticDescriptor ObjectViewSubject = new(
+        "COBOLNET2870", "object-view-subject", EditionSeverity.Error,
+        "An object-view (identifier-1 AS …) re-describes an object reference, so identifier-1 shall be of class "
+        + "object — an object-reference data item, a function-identifier or inline invocation whose result is one, "
+        + "EXCEPTION-OBJECT or SELF — and shall be neither the predefined NULL nor SUPER.",
+        "ISO §8.4.3.5.3 SR1");
+
+    /// <summary>COBOLNET2871 — an object-view written as a receiving operand (kb/Work PB1425): a SET Format-5 receiver
+    /// or an INVOKE RETURNING identifier written <c>identifier-1 AS …</c>.</summary>
+    public static readonly DiagnosticDescriptor ObjectViewReceiving = new(
+        "COBOLNET2871", "object-view-receiving", EditionSeverity.Error,
+        "An object-view is a reference to identifier-1's object under another description; it is not a data item "
+        + "and shall not be specified as a receiving operand. Write identifier-1 itself as the receiver.",
+        "ISO §8.4.3.5.3 SR2");
+
+    /// <summary>COBOLNET2872 — an object-view's AS phrase names an interface with FACTORY OF or ONLY (kb/Work PB1425).
+    /// </summary>
+    public static readonly DiagnosticDescriptor ObjectViewInterfacePhrase = new(
+        "COBOLNET2872", "object-view-interface-phrase", EditionSeverity.Error,
+        "The object-view general format gives interface-name-1 its own alternative, written bare: FACTORY OF and ONLY "
+        + "belong to the object-class-name-1 alternative alone, and the interface reading (general rule 6) has no "
+        + "factory or exact-class variant.",
+        "ISO §8.4.3.5.2; §8.4.3.5.4 GR6");
+
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

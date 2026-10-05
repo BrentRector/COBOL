@@ -927,6 +927,21 @@ public sealed class ExceptionEngine
     public void OoResourceError(string detail)
         => FatalIfEnabled(OoResourceChecking, "EC-OO-RESOURCE", detail);
 
+    /// <summary>True while EC-OO-CONFORMANCE checking is enabled (fatal).</summary>
+    public bool OoConformanceChecking
+    {
+        get => _checking.OoConformance;
+        set => _checking.OoConformance = value;
+    }
+
+    /// <summary>Raise EC-OO-CONFORMANCE (§8.4.3.5.4 GR2–GR6: the object an object-view references is not an object
+    /// of the class, factory or interface its AS phrase names; Table 13 Fatal, "Failure for an object-view") when
+    /// checking is enabled — §14.8.1 NOTE 3: the object-view's rules "are checked at runtime if exception condition
+    /// EC-OO-CONFORMANCE is enabled"; otherwise return (kb/Work PB1425; the caller decides what it can do then,
+    /// <see cref="CobolObject.ObjectView{T}"/>).</summary>
+    public void OoConformanceError(string detail)
+        => FatalIfEnabled(OoConformanceChecking, "EC-OO-CONFORMANCE", detail);
+
     // ── EC-OO-UNIVERSAL: the ACTIVATOR half of the §14.9.23.4 GR7c "enabled in both" gate ─────────────────────
 
     /// <summary>True while the currently-executing INVOKE has EC-OO-UNIVERSAL checking enabled in the ACTIVATING
@@ -1863,6 +1878,16 @@ public static class ExceptionState
 
     /// <inheritdoc cref="ExceptionEngine.RangeInspectSizeError"/>
     public static void RangeInspectSizeError(string detail) => E.RangeInspectSizeError(detail);
+
+    /// <inheritdoc cref="ExceptionEngine.OoConformanceChecking"/>
+    public static bool OoConformanceChecking
+    {
+        get => E.OoConformanceChecking;
+        set => E.OoConformanceChecking = value;
+    }
+
+    /// <inheritdoc cref="ExceptionEngine.OoConformanceError"/>
+    public static void OoConformanceError(string detail) => E.OoConformanceError(detail);
 
     /// <inheritdoc cref="ExceptionEngine.OoUniversalChecking"/>
     public static bool OoUniversalChecking

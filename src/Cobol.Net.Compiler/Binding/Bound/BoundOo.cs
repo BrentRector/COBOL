@@ -180,6 +180,20 @@ public sealed record BoundSetObjectRef(IReadOnlyList<Place> Targets, Place? Sour
     public bool FromExceptionObject { get; init; }
 }
 
+/// <summary>⛔ AN OBJECT-VIEW (ISO §8.4.3.5, identifier Format 5) — the statement pre-op that gives one written
+/// <c>identifier-1 AS …</c> its value (kb/Work PB1425). §8.4.3.5.4 GR1: "This reference of identifier-1 is treated at
+/// compile-time as though it had the description specified by the AS phrase", so the view IS a reference to
+/// identifier-1's object under <see cref="View"/>; the binder gives it that description by storing the reference
+/// into <see cref="Target"/>, a compiler temporary DESCRIBED <see cref="View"/>, and every object-reference position
+/// then reads the temporary exactly as it reads an inline invocation's temporary. §8.4.3.5.4 GR2-GR6 are the run-time
+/// conformance check of the object against that description (EC-OO-CONFORMANCE, Table 13 fatal, checked when the
+/// condition is enabled — §14.8.1 NOTE 3); §8.4.3.5.4 GR7's UNIVERSAL view checks nothing.</summary>
+/// <param name="Target">The view's temporary (a USAGE OBJECT REFERENCE item described <see cref="View"/>).</param>
+/// <param name="Source">identifier-1's object reference; null when identifier-1 is SELF (§8.4.3.8).</param>
+/// <param name="View">The description the AS phrase specifies (GR2-GR7).</param>
+/// <param name="Written">The object-view as written, for the run-time diagnostic.</param>
+public sealed record BoundObjectView(Place Target, Place? Source, ObjectRefDescriptor View, string Written) : BoundStatement;
+
 /// <summary>A method-context <c>GOBACK</c> / (pre-2023) <c>EXIT METHOD</c> (ISO §14.9.18.4 GR4; deep-dive D8 —
 /// the one decision that silently miscompiles if missed): terminates the executing METHOD only, returning
 /// control to the INVOKE site — never the run unit (<see cref="BoundStop"/>) and never the program activation

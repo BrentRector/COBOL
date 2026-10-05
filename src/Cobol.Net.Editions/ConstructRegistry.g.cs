@@ -221,6 +221,7 @@ public static partial class ConstructRegistry
         new("call-on-overflow-removed-2023", "CALL … ON OVERFLOW", 85, 2023, null, "COBOLNET0882", "ISO 2023 Annex E.2 item 1c (removed 2023; use ON EXCEPTION)"),
         new("procedure-raising-2002", "PROCEDURE DIVISION RAISING", 2002, null, null, "COBOLNET0900", "ISO 14.2.2 (RAISING phrase, introduced 2002); grammar CobolParserCore.g4:487 {is2002()}? raisingClause"),
         new("inline-method-invocation-2002", "in-line method invocation id :: \"method\"", 2002, null, null, "COBOLNET0900", "ISO 8.4.3.4 / 8.4.3.1.2 Format 4 / 8.7.4 (OO, introduced 2002)"),
+        new("object-view-2002", "object-view identifier AS class / interface / UNIVERSAL", 2002, null, null, "COBOLNET0900", "ISO 8.4.3.5 / 8.4.3.1.2 Format 5 (OO, introduced 2002)"),
         new("arithmetic-intermediate-precision-2023", "compile-time arithmetic / intermediate-result mode", 2002, null, null, "COBOLNET0900", "ISO §7.3.6.3 GR2; Annex E.2 items 6 and 21 (compile-time arithmetic implementor-defined from 2023; standard arithmetic before); VCR row 12"),
         new("sync-on-group-2023", "SYNCHRONIZED on a group item", 2023, null, null, "COBOLNET0900", "ISO Annex E.3.2 item 6 / VCR row 43 (SYNCHRONIZED permitted on a group item, introduced 2023); §13.18.55"),
         new("call-returning-2002", "CALL ... RETURNING", 2002, null, null, "COBOLNET0884", "ISO §14.9.4 (the RETURNING phrase on CALL is 2002+)"),

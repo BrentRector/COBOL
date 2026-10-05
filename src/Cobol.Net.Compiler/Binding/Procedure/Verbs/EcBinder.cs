@@ -53,7 +53,8 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
             // RAISE identifier-1 — an exception OBJECT (§14.9.29.3 SR2/SR3; §14.6.13.1.5). NOT TURN-gated
             // (§7.3.25 takes exception-NAMES only) and never fatal by itself (GR2).
             var oref = r.objectReference();
-            var atom = oref.objectReferenceAtom();
+            // The plain term — null for an inline invocation or an object-view, which the computed arm below binds.
+            var atom = oref.objectReferenceAtom()?.objectReferenceTerm();
             if (atom?.predefinedNull() is not null || atom?.selfAndSuper()?.SUPER() is not null)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0848",
@@ -574,6 +575,11 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
                 // the onExceptionHandled fix threaded through (kb/Work PB141).
                 case BoundKeyedDeleteFile k: Query(IoNames, k.File); break;
                 case BoundKeyedStart k: Query(IoNames, k.File); break;
+                // §8.4.3.5.4 GR2–GR6 — PRECISE: an object-view's conformance check is raised only by its own pre-op
+                // (kb/Work PB1425), which the statement carries in its hoisted sequence (walked above).
+                case BoundObjectView { View.IsUniversal: false }:
+                    Query(["EC-OO-CONFORMANCE"]);
+                    break;
                 case BoundInvoke or BoundInvokeUniversal:
                     Query(OoInvokeNames);   // §14.9.23.4 GR5 / GR7b
                     Query(ExternalNames);   // §14.9.23.4 GR7 d) — a method activation is an EC-EXTERNAL raise point (§14.8.4; kb/Work PB1138)

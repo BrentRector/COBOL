@@ -79,6 +79,28 @@ public abstract class CobolObject
         throw new CobolImplementorFatalException(detail);
     }
 
+    /// <summary>⛔ THE OBJECT-VIEW'S RUN-TIME CONFORMANCE CHECK (ISO §8.4.3.5.4 GR2–GR6; kb/Work PB1425): the object
+    /// <paramref name="value"/> references, seen through an AS phrase whose description emits as
+    /// <typeparamref name="T"/> — an instance class (GR2), a factory class (GR3, the D11 sibling singleton type), an
+    /// interface (GR6) — and, with <paramref name="exactClass"/> (the ONLY phrase, GR4/GR5), of exactly that class.
+    /// A null reference references no object, so there is nothing for GR2–GR6 to find non-conforming.
+    /// <para>A non-conforming object sets EC-OO-CONFORMANCE (Table 13 fatal) when the condition is enabled
+    /// (§14.8.1 NOTE 3). With checking off the standard sets nothing and the view proceeds: an object that is
+    /// still a <typeparamref name="T"/> (it failed only ONLY's exact-class test) is viewed as one; an object of an
+    /// unrelated class cannot be held by typed code at all, so the run unit stops with an implementor-defined fatal
+    /// error — the <see cref="NarrowUniversal{T}"/> posture, never an unchecked cast's InvalidCastException.</para>
+    /// </summary>
+    public static T? ObjectView<T>(object? value, bool exactClass, string what) where T : class
+    {
+        if (value is null) return null;
+        if (value is T conforming && (!exactClass || value.GetType() == typeof(T))) return conforming;
+        string detail = $"{what}: the object referenced is of class '{value.GetType().Name}', which does not conform to "
+            + $"the object-view's description ('{typeof(T).Name}'{(exactClass ? " ONLY" : "")}) (ISO §8.4.3.5.4)";
+        ExceptionState.OoConformanceError(detail);
+        if (value is T lenient) return lenient;
+        throw new CobolImplementorFatalException(detail);
+    }
+
     // ── Per-object instance-file connectors (M2-OO-1i, ISO §9.1.4) ──────────────────────────────────────────
     // An OBJECT-paragraph (non-EXTERNAL) file connector belongs to the object instance: it is minted per object
     // (CobolFile.MintInstanceKey), registered in the emitted ctor, tracked here, and implicitly CLOSED when the

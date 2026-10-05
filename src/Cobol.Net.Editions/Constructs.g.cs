@@ -219,6 +219,7 @@ public static class Constructs
     public const string CallOnOverflowRemoved2023 = "call-on-overflow-removed-2023";
     public const string ProcedureRaising2002 = "procedure-raising-2002";
     public const string InlineMethodInvocation2002 = "inline-method-invocation-2002";
+    public const string ObjectView2002 = "object-view-2002";
     public const string ArithmeticIntermediatePrecision2023 = "arithmetic-intermediate-precision-2023";
     public const string SyncOnGroup2023 = "sync-on-group-2023";
     public const string CallReturning2002 = "call-returning-2002";

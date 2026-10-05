@@ -43,10 +43,10 @@ public sealed class InlineMethodInvocationOperandDriftTests
     ];
 
     /// <summary>The rule whose own DEFINITION is <c>functionCall</c>, the one that defines Format 4, and Format 4's
-    /// own receiver <c>objectReferenceAtom</c> (kb/Work PB1425) — a rule cannot be asked to offer itself as an
-    /// alternative, and the atom cannot offer the inline form without indirect left recursion; the operand rule built
-    /// on it (<c>objectReference</c>) offers both, and the pairing fact holds there.</summary>
-    private static readonly string[] Definitions = ["functionCall", "inlineMethodInvocation", "objectReferenceAtom"];
+    /// own receiver's TERM <c>objectReferenceTerm</c> (kb/Work PB1425) — a rule cannot be asked to offer itself as an
+    /// alternative, and the receiver cannot offer the inline form without indirect left recursion; the operand rule
+    /// built on it (<c>objectReference</c>) offers both, and the pairing fact holds there.</summary>
+    private static readonly string[] Definitions = ["functionCall", "inlineMethodInvocation", "objectReferenceTerm"];
 
     /// <summary>rule-name → its body text, over every grammar file, comments stripped.</summary>
     private static Dictionary<string, string> LoadRules()
@@ -110,8 +110,13 @@ public sealed class InlineMethodInvocationOperandDriftTests
         Assert.True(Mentions(operand, "inlineMethodInvocation"),
             "objectReference does not offer an inline method invocation (ISO §8.4.3.1.2 Format 4)");
         Assert.True(rules.TryGetValue("objectReferenceAtom", out string? atom), "the objectReferenceAtom rule is gone");
-        Assert.True(Mentions(atom, "functionCall"),
+        Assert.True(rules.TryGetValue("objectReferenceTerm", out string? term), "the objectReferenceTerm rule is gone");
+        Assert.True(Mentions(atom, "objectReferenceTerm") && Mentions(term, "functionCall"),
             "objectReferenceAtom does not offer a function-identifier (ISO §8.4.3.1.2 Format 1)");
+        // Format 5, the object-view (§8.4.3.5), is an atom: §8.4.3.1.4 GR1 c) applies it before the inline
+        // invocation operator (e), so it is what an inline invocation's segments apply to (kb/Work PB1425).
+        Assert.True(Mentions(atom, "objectView"),
+            "objectReferenceAtom does not offer an object-view (ISO §8.4.3.1.2 Format 5)");
         foreach (string position in new[] { "invokeTarget", "raiseStatement", "setObjectReferenceStatement" })
         {
             Assert.True(rules.TryGetValue(position, out string? body), $"the {position} rule is gone");

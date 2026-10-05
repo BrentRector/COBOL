@@ -1817,7 +1817,23 @@ freeStatement
 // target is an object-reference item; only NULL/SELF/SUPER senders (no arithmeticExpression prefix) reach
 // THIS rule. SUPER is admitted syntactically and rejected at bind (SR9 - 0867) for the better diagnostic.
 setObjectReferenceStatement
-    : SET dataReference+ TO objectReference   // introduction-gated at BIND time (StatementBinder.OoBindSetObjectRef → Check(SetObjectReference2002))
+    : SET setObjectReferenceReceiver+ TO objectReference   // introduction-gated at BIND time (StatementBinder.OoBindSetObjectRef → Check(SetObjectReference2002))
+    ;
+
+// identifier-3, the repeated receiving unit (named, never an inline group — PrintedFormatAlternativeDriftTests). An
+// `objectViewReceiver` is the P3 superset parse of §8.4.3.5.3 SR2 ("An object-view shall not be specified as a receiving
+// operand"): admitted here only so SetBinder refuses it by THAT rule (COBOLNET2871) — it drew COBOLNET0901 on AS, a
+// reserved word misused as a user word, which is not what the program did (kb/Work PB1425).
+setObjectReferenceReceiver
+    : dataReference
+    | objectViewReceiver
+    ;
+
+// The RECEIVING superset of an object-view, for §8.4.3.5.3 SR2's diagnostic only (SET Format 5's receivers, INVOKE
+// RETURNING). Its identifier-1 is a data reference, never the sending `objectReferenceTerm`: NULL / SELF / SUPER as a
+// receiver are the receiving screen's (kb/Work PB1551), and a term there would let `SET NULL TO X` predict this rule.
+objectViewReceiver
+    : dataReference objectViewPhrase+
     ;
 
 // ⛔ SELF AND SUPER ARE ONE RULE, `selfAndSuper`, AND THE QUALIFIED SUPER IS ITS ARM (kb/Work PB1425). §8.4.3.8.2
@@ -1842,11 +1858,39 @@ objectReference
     | objectReferenceAtom
     ;
 
+// ⛔ AN ATOM IS AN OBJECT-VIEW OR A TERM, AND THE VIEW IS AN ATOM BECAUSE OF §8.4.3.1.4 GR1's ORDER (kb/Work PB1425).
+// Identifier Format 5 (§8.4.3.1.3 SR6, "Object-view-1 is defined by 8.4.3.5, Object-view.") is `identifier-1 AS
+// { [FACTORY OF] object-class-name-1 [ONLY] | interface-name-1 | UNIVERSAL }`, and GR1 applies its components in a
+// fixed order: a) a data name, a predefined-object reference, a function-identifier; c) "an object-view applies to the
+// identifier on the left"; e) the inline invocation operator. So the view binds TIGHTER than `::` — `U AS C :: "M"`
+// invokes M on the view — which is exactly where the atom sits: it is what an inline invocation's segments apply to.
+// The view's own identifier-1 is a TERM (the four formats GR1 a) applies first), and the phrase REPEATS because a view
+// is itself an identifier (§8.4.3.1.3 SR1), the inline segment's precedent. NULL and SUPER are terms although §8.4.3.5.3
+// SR1 forbids them as identifier-1: the P3 superset parse, so OoBinder.OoBindObjectView refuses them by that rule.
 objectReferenceAtom
+    : objectView
+    | objectReferenceTerm
+    ;
+
+objectReferenceTerm
     : functionCall
     | selfAndSuper
     | dataReference
     | predefinedNull
+    ;
+
+objectView
+    : objectReferenceTerm objectViewPhrase+
+    ;
+
+// §8.4.3.5.2, rendered from the canonical PDF (printed page 134): ONE brace of three alternatives; AS, FACTORY, ONLY and
+// UNIVERSAL underlined, OF not (an optional word,
+// §5.2.3 — the `objectReferenceUsage` precedent). interface-name-1 and object-class-name-1 are both one word, so the
+// `className` arm is the superset (the USAGE OBJECT REFERENCE precedent, CobolOO.g4#objectReferenceUsage) and the binder
+// refuses FACTORY / ONLY on an interface-name once the name resolves.
+objectViewPhrase
+    : AS UNIVERSAL
+    | AS (FACTORY OF?)? className ONLY?
     ;
 
 selfAndSuper

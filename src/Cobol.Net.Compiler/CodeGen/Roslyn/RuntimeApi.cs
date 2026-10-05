@@ -1988,6 +1988,13 @@ internal static class RuntimeApi
         $"{nameof(CobolObject)}.{nameof(CobolObject.NarrowUniversal)}<{clrType}>({box}, "
         + $"{Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(what, quote: true)})";
 
+    /// <summary>An object-view's checked re-description (ISO §8.4.3.5.4 GR2–GR6) of <paramref name="source"/> as CLR type
+    /// <paramref name="clrType"/> (no trailing <c>?</c>), exact-class when the ONLY phrase was written — see
+    /// <see cref="CobolObject.ObjectView{T}"/>.</summary>
+    public static string ObjObjectView(string clrType, string source, bool exactClass, string what) =>
+        $"{nameof(CobolObject)}.{nameof(CobolObject.ObjectView)}<{clrType}>({source}, "
+        + $"{(exactClass ? "true" : "false")}, {Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(what, quote: true)})";
+
     /// <summary>An object-reference value AS AN EXCEPTION OBJECT — the <c>CobolObject?</c> the runtime's
     /// exception-object slots take (<c>ExceptionState.SetObject</c> for RAISE identifier-1, §14.9.29.4;
     /// <c>SetPropagatingObject</c> for GOBACK/EXIT RAISING identifier-1, §14.9.18.4 GR1 b) 2.). An

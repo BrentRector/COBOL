@@ -789,6 +789,19 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             w.Line(PlaceRenderer.Write(tp, $"({tp.Item.Pic!.ClrType})({src})") + "   // SET F5 (ISO §14.9.39.4 GR9 — reference copy)");
     }
 
+    /// <summary>An object-view's pre-op (ISO §8.4.3.5.4; kb/Work PB1425): store identifier-1's reference into the
+    /// view's temporary under the AS phrase's description. GR7's UNIVERSAL view checks nothing — every object is a
+    /// <c>CobolObject</c>, so the reference converts up; every other description takes the run-time conformance
+    /// check (GR2–GR6, EC-OO-CONFORMANCE).</summary>
+    public void EmitObjectView(BoundObjectView v)
+    {
+        string source = v.Source is { } s ? PlaceRenderer.Read(s) : "this";
+        string viewed = v.View.IsUniversal
+            ? $"({v.Target.Item.Pic!.ClrType})({source})"
+            : RuntimeApi.ObjObjectView(v.View.ClrTypeName, source, exactClass: v.View.Only, v.Written);
+        Ctx.Writer.Line(PlaceRenderer.Write(v.Target, viewed) + "   // object-view (ISO §8.4.3.5.4)");
+    }
+
     /// <summary>The spans of a FIXED-length group argument's tables that correspond to a variable-length group
     /// formal's dynamic-capacity tables (kb/Work PB965) — null when the argument is itself variable-length (it
     /// composes its own carrier) or is not a group place the correspondence can be stated for.</summary>

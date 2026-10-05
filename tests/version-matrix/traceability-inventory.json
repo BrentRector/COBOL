@@ -5841,13 +5841,13 @@
   "ordinal": 6,
   "subject": "Identifier",
   "rule-digest": "0d2df48012f3",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "test-ref": "conformance:2002/pb1425_object_view",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1425 (registrar 15b). SR6 (cite.py --check 8.4.3.1.3 6) OK): Format 5 is the 8.4.3.5 object-view `identifier-1 AS { [FACTORY OF] class [ONLY] | interface | UNIVERSAL }`. Searched src/Cobol.Net.Frontend/Grammar (no objectView rule; the only AS productions are the CLASS-ID/INTERFACE-ID/METHOD-ID/REPOSITORY [AS literal] phrases) and src/Cobol.Net.Compiler (no binder; EC-OO-CONFORMANCE has no raise site; OoBinder only mentions 'object-view-equivalent' in a comment). Probes o3.cob `INVOKE D AS KBASE \"SPEAK\"` and o4.cob `SET U TO D AS UNIVERSAL` (--std 2023) -> COBOLNET0901 \"'AS' is a reserved word ... cannot be used as a user-defined word\", a misleading diagnostic on legal source. CONFORMANCE.md A.4.10 claims only the three optional OO items as Partial and declares no object-view non-support; PHASE-13-plan-vs-spec-review.md R19 recorded this gap but no kb/Work note owns it. Probes under out/probe/ident with the pinned cobol.exe. || editions as written by the adjudicator: 2002, 2014, 2023 (object-view is OO core, not one of the three A.4.10 optional items)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1019a). \"Object-view-1 is defined by 8.4.3.5, Object-view.\" (cite.py --check 8.4.3.1.3 -> OK 6)). Identifier Format 5 now exists (rows FMT-8.4.3.5.2, GR-8.4.3.5.4-1..7) and composes with the other formats per 8.4.3.1.4 GR1 c): the view applies to the identifier on its left before the inline invocation operator (`OU AS PB1425VD :: \"GETNAME\"` -> VD-OBJ), and its identifier-1 may be a function-identifier or a view (repeated phrase). [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.1.3-7",
@@ -6546,13 +6546,13 @@
   "ordinal": 1,
   "subject": "Object-view",
   "rule-digest": "c2cc00a7c895",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "test-ref": "conformance:2002/pb1425_object_view; conformance:negative/pb1425-object-view-subject",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). NOT-IMPLEMENTED. Own search of src (the dossier found nothing): no grammar rule for object-view anywhere in src/Cobol.Net.Frontend/Grammar -- dataReference (CobolParserCore.g4:673) is cobolWord dataReferenceSuffix* with no AS arm, the token UNIVERSAL is not lexed, and no binder/codegen code names object-view. Probe with the pinned cobol.exe --std 2023 (probe/object-view/OV1-OV4): 'SET B TO U AS OVB', 'INVOKE U AS OVD \"SPEAK\"', 'SET D TO B AS UNIVERSAL' all refused COBOLNET0901 ('AS' is a reserved word ... cannot be used as a user-defined word) -- the identifier Format 5 (§8.4.3.1.2 'Format 5 (object-view)', cite.py OK) is unwritable. EC-OO-CONFORMANCE exists only as a catalog entry (Runtime/Exceptions/ExceptionCatalog.cs:166); no raise site. OO core is claimed mandatory surface (CONFORMANCE.md A.4.10 row), so this is not declined-module debt. cite.py --check 8.4.3.5.3 'the predefined object references SUPER and NULL shall not be specified' OK (SR1). No check exists because the construct does not parse; any rejection today is incidental (COBOLNET0901), not this rule. [editions as adjudicated: 2002, 2014, 2023 (OO introduced in 2002; §8.4.3.5 absent from 1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1019a). \"Identifier-1 shall be of class object; the predefined object references SUPER and NULL shall not be specified\" (cite.py --check 8.4.3.5.3 -> OK 1)). OoBindObjectView refuses NULL, SUPER and an identifier-1 whose item is not an object reference (a data item, or a function-identifier's temporary) with COBOLNET2870 naming identifier-1 as written; SELF (class object, 8.4.3.8.3 SR7) is admitted and viewed (golden: INVOKE SELF AS PB1425VA). [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.5.3-2",
@@ -6561,12 +6561,12 @@
   "ordinal": 2,
   "subject": "Object-view",
   "rule-digest": "7c8a46d9d1de",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "PARTIAL",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "test-ref": "conformance:negative/pb1425-object-view-receiving",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). NOT-IMPLEMENTED. Own search of src (the dossier found nothing): no grammar rule for object-view anywhere in src/Cobol.Net.Frontend/Grammar -- dataReference (CobolParserCore.g4:673) is cobolWord dataReferenceSuffix* with no AS arm, the token UNIVERSAL is not lexed, and no binder/codegen code names object-view. Probe with the pinned cobol.exe --std 2023 (probe/object-view/OV1-OV4): 'SET B TO U AS OVB', 'INVOKE U AS OVD \"SPEAK\"', 'SET D TO B AS UNIVERSAL' all refused COBOLNET0901 ('AS' is a reserved word ... cannot be used as a user-defined word) -- the identifier Format 5 (§8.4.3.1.2 'Format 5 (object-view)', cite.py OK) is unwritable. EC-OO-CONFORMANCE exists only as a catalog entry (Runtime/Exceptions/ExceptionCatalog.cs:166); no raise site. OO core is claimed mandatory surface (CONFORMANCE.md A.4.10 row), so this is not declined-module debt. cite.py --check 8.4.3.5.3 'An object-view shall not be specified as a receiving operand' OK (SR2). 'SET U AS OVB TO D' (OV4) is refused only incidentally by COBOLNET0901 on AS -- the rule itself has no enforcement site; once the object-view is added the receiving-operand screen must be added with it. [editions as adjudicated: 2002, 2014, 2023 (OO introduced in 2002; §8.4.3.5 absent from 1985)]",
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1019a). \"An object-view shall not be specified as a receiving operand\" (cite.py --check 8.4.3.5.3 -> OK 2)). The two object-reference RECEIVING positions parse the view as a superset and refuse it by this rule, COBOLNET2871: SET Format 5's receiving list and INVOKE RETURNING identifier-4. Any other receiving position (MOVE / INITIALIZE / CALL RETURNING receivers) still refuses `X AS C` as a parse error, not by SR2's name - that is the general receiving-operand screen of kb/Work PB1782 step 1 / PB1551, which enumerates every non-receivable identifier form. [editions: the OO facility, 2002+]",
   "state": "GAP"
  },
  {
@@ -6576,13 +6576,13 @@
   "ordinal": 1,
   "subject": "Object-view",
   "rule-digest": "c83d976d8d3b",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "test-ref": "conformance:2002/pb1425_object_view",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). NOT-IMPLEMENTED. Own search of src (the dossier found nothing): no grammar rule for object-view anywhere in src/Cobol.Net.Frontend/Grammar -- dataReference (CobolParserCore.g4:673) is cobolWord dataReferenceSuffix* with no AS arm, the token UNIVERSAL is not lexed, and no binder/codegen code names object-view. Probe with the pinned cobol.exe --std 2023 (probe/object-view/OV1-OV4): 'SET B TO U AS OVB', 'INVOKE U AS OVD \"SPEAK\"', 'SET D TO B AS UNIVERSAL' all refused COBOLNET0901 ('AS' is a reserved word ... cannot be used as a user-defined word) -- the identifier Format 5 (§8.4.3.1.2 'Format 5 (object-view)', cite.py OK) is unwritable. EC-OO-CONFORMANCE exists only as a catalog entry (Runtime/Exceptions/ExceptionCatalog.cs:166); no raise site. OO core is claimed mandatory surface (CONFORMANCE.md A.4.10 row), so this is not declined-module debt. cite.py --check 8.4.3.5.4 'treated at compile-time as though it had the description specified by the AS phrase' OK (GR1). No compile-time re-description exists. [editions as adjudicated: 2002, 2014, 2023 (OO introduced in 2002; §8.4.3.5 absent from 1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1019a). \"This reference of identifier-1 is treated at compile-time as though it had the description specified by the AS phrase\" (OK 1)). The view binds to a compiler temporary DESCRIBED by the phrase (DataBinder.OoCreateObjectViewTemp, PicInfo.ObjectReferenceItem(view)), filled by the BoundObjectView pre-op and read as a BoundNumRef, so every rule that asks an object reference's description (SET SR10-SR14, INVOKE roster selection, inline SR2) asks the view's: `SET OA TO OU AS PB1425VA` narrows a universal into a typed receiver, `INVOKE OU AS PB1425VD \"SPEAK\"` resolves statically, `OU AS UNIVERSAL` takes the dynamic path. [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.5.4-2",
@@ -6591,13 +6591,13 @@
   "ordinal": 2,
   "subject": "Object-view",
   "rule-digest": "17ec698f2a9d",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "test-ref": "conformance:2002/pb1425_object_view",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). NOT-IMPLEMENTED. Own search of src (the dossier found nothing): no grammar rule for object-view anywhere in src/Cobol.Net.Frontend/Grammar -- dataReference (CobolParserCore.g4:673) is cobolWord dataReferenceSuffix* with no AS arm, the token UNIVERSAL is not lexed, and no binder/codegen code names object-view. Probe with the pinned cobol.exe --std 2023 (probe/object-view/OV1-OV4): 'SET B TO U AS OVB', 'INVOKE U AS OVD \"SPEAK\"', 'SET D TO B AS UNIVERSAL' all refused COBOLNET0901 ('AS' is a reserved word ... cannot be used as a user-defined word) -- the identifier Format 5 (§8.4.3.1.2 'Format 5 (object-view)', cite.py OK) is unwritable. EC-OO-CONFORMANCE exists only as a catalog entry (Runtime/Exceptions/ExceptionCatalog.cs:166); no raise site. OO core is claimed mandatory surface (CONFORMANCE.md A.4.10 row), so this is not declined-module debt. Class arm without phrases: treat as OBJECT REFERENCE object-class-name-1 + runtime EC-OO-CONFORMANCE check (subclass admitted). Unwritable (OV1/OV2). [editions as adjudicated: 2002, 2014, 2023 (OO introduced in 2002; §8.4.3.5 absent from 1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1019a). Class view, no phrase: USAGE OBJECT REFERENCE class; an object not of the class or a subclass sets EC-OO-CONFORMANCE (OK 2)). CobolObject.ObjectView<T>: `value is T`; failure -> ExceptionState.OoConformanceError (Table 13 fatal; the FatalAmbientGates row OoConformanceChecking, precise on BoundObjectView). Golden: a subclass object conforms (DERIVED); an unrelated PB1425VX -> HANDLED=EC-OO-CONFORMANCE with RESUME AT NEXT STATEMENT. [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.5.4-3",
@@ -6606,13 +6606,13 @@
   "ordinal": 3,
   "subject": "Object-view",
   "rule-digest": "104a9b48849f",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "test-ref": "conformance:2002/pb1425_object_view",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). NOT-IMPLEMENTED. Own search of src (the dossier found nothing): no grammar rule for object-view anywhere in src/Cobol.Net.Frontend/Grammar -- dataReference (CobolParserCore.g4:673) is cobolWord dataReferenceSuffix* with no AS arm, the token UNIVERSAL is not lexed, and no binder/codegen code names object-view. Probe with the pinned cobol.exe --std 2023 (probe/object-view/OV1-OV4): 'SET B TO U AS OVB', 'INVOKE U AS OVD \"SPEAK\"', 'SET D TO B AS UNIVERSAL' all refused COBOLNET0901 ('AS' is a reserved word ... cannot be used as a user-defined word) -- the identifier Format 5 (§8.4.3.1.2 'Format 5 (object-view)', cite.py OK) is unwritable. EC-OO-CONFORMANCE exists only as a catalog entry (Runtime/Exceptions/ExceptionCatalog.cs:166); no raise site. OO core is claimed mandatory surface (CONFORMANCE.md A.4.10 row), so this is not declined-module debt. FACTORY OF arm: treat as OBJECT REFERENCE FACTORY OF class + EC-OO-CONFORMANCE check against factory object of class/subclass. Unwritable. [editions as adjudicated: 2002, 2014, 2023 (OO introduced in 2002; §8.4.3.5 absent from 1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1019a). FACTORY without ONLY: USAGE OBJECT REFERENCE FACTORY OF class; not the factory of the class or a subclass sets EC-OO-CONFORMANCE (OK 3)). The descriptor's CLR type is the D11 factory singleton type, which mirrors the INHERITS chain, so `is C__FACTORY` is the check. Golden: PB1425VD's factory viewed AS FACTORY OF PB1425VA, then New -> DERIVED. [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.5.4-4",
@@ -6621,13 +6621,13 @@
   "ordinal": 4,
   "subject": "Object-view",
   "rule-digest": "0059aa002886",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "test-ref": "conformance:2002/pb1425_object_view; conformance:2002/pb1425_object_view_unchecked",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). NOT-IMPLEMENTED. Own search of src (the dossier found nothing): no grammar rule for object-view anywhere in src/Cobol.Net.Frontend/Grammar -- dataReference (CobolParserCore.g4:673) is cobolWord dataReferenceSuffix* with no AS arm, the token UNIVERSAL is not lexed, and no binder/codegen code names object-view. Probe with the pinned cobol.exe --std 2023 (probe/object-view/OV1-OV4): 'SET B TO U AS OVB', 'INVOKE U AS OVD \"SPEAK\"', 'SET D TO B AS UNIVERSAL' all refused COBOLNET0901 ('AS' is a reserved word ... cannot be used as a user-defined word) -- the identifier Format 5 (§8.4.3.1.2 'Format 5 (object-view)', cite.py OK) is unwritable. EC-OO-CONFORMANCE exists only as a catalog entry (Runtime/Exceptions/ExceptionCatalog.cs:166); no raise site. OO core is claimed mandatory surface (CONFORMANCE.md A.4.10 row), so this is not declined-module debt. ONLY arm: exact-class check. Unwritable. [editions as adjudicated: 2002, 2014, 2023 (OO introduced in 2002; §8.4.3.5 absent from 1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1019a). ONLY without FACTORY: exactly the class (OK 4)) - `value.GetType() == typeof(T)`. Golden: OU AS PB1425VD ONLY conforms; a PB1425VD viewed AS PB1425VA ONLY -> HANDLED=EC-OO-CONFORMANCE. With checking OFF (14.8.1 NOTE 3) nothing is set and the object, still a PB1425VA, is viewed as one (golden 2002/pb1425_object_view_unchecked: DERIVED, AFTER). [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.5.4-5",
@@ -6636,13 +6636,13 @@
   "ordinal": 5,
   "subject": "Object-view",
   "rule-digest": "32095a439909",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "test-ref": "conformance:2002/pb1425_object_view",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). NOT-IMPLEMENTED. Own search of src (the dossier found nothing): no grammar rule for object-view anywhere in src/Cobol.Net.Frontend/Grammar -- dataReference (CobolParserCore.g4:673) is cobolWord dataReferenceSuffix* with no AS arm, the token UNIVERSAL is not lexed, and no binder/codegen code names object-view. Probe with the pinned cobol.exe --std 2023 (probe/object-view/OV1-OV4): 'SET B TO U AS OVB', 'INVOKE U AS OVD \"SPEAK\"', 'SET D TO B AS UNIVERSAL' all refused COBOLNET0901 ('AS' is a reserved word ... cannot be used as a user-defined word) -- the identifier Format 5 (§8.4.3.1.2 'Format 5 (object-view)', cite.py OK) is unwritable. EC-OO-CONFORMANCE exists only as a catalog entry (Runtime/Exceptions/ExceptionCatalog.cs:166); no raise site. OO core is claimed mandatory surface (CONFORMANCE.md A.4.10 row), so this is not declined-module debt. FACTORY OF ... ONLY arm: exact factory check. Unwritable. [editions as adjudicated: 2002, 2014, 2023 (OO introduced in 2002; §8.4.3.5 absent from 1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1019a). FACTORY and ONLY: exactly the class's factory object (OK 5)). Golden: PB1425VD's factory AS FACTORY OF PB1425VD ONLY conforms (New -> DERIVED); AS FACTORY OF PB1425VA ONLY -> HANDLED=EC-OO-CONFORMANCE. [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.5.4-6",
@@ -6651,13 +6651,13 @@
   "ordinal": 6,
   "subject": "Object-view",
   "rule-digest": "5dc3da2b9b33",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "test-ref": "conformance:2002/pb1425_object_view",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). NOT-IMPLEMENTED. Own search of src (the dossier found nothing): no grammar rule for object-view anywhere in src/Cobol.Net.Frontend/Grammar -- dataReference (CobolParserCore.g4:673) is cobolWord dataReferenceSuffix* with no AS arm, the token UNIVERSAL is not lexed, and no binder/codegen code names object-view. Probe with the pinned cobol.exe --std 2023 (probe/object-view/OV1-OV4): 'SET B TO U AS OVB', 'INVOKE U AS OVD \"SPEAK\"', 'SET D TO B AS UNIVERSAL' all refused COBOLNET0901 ('AS' is a reserved word ... cannot be used as a user-defined word) -- the identifier Format 5 (§8.4.3.1.2 'Format 5 (object-view)', cite.py OK) is unwritable. EC-OO-CONFORMANCE exists only as a catalog entry (Runtime/Exceptions/ExceptionCatalog.cs:166); no raise site. OO core is claimed mandatory surface (CONFORMANCE.md A.4.10 row), so this is not declined-module debt. interface-name-1 arm: EC-OO-CONFORMANCE if object does not implement the interface. Unwritable. [editions as adjudicated: 2002, 2014, 2023 (OO introduced in 2002; §8.4.3.5 absent from 1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1019a). Interface view: an object that does not implement interface-name-1 sets EC-OO-CONFORMANCE (OK 6)). An interface emits as its C# interface and IMPLEMENTS as the class's C# base list (inherited by subclasses), so `is I` is the check. Golden: PB1425VD (implements PB1425VI through PB1425VA) -> DERIVED; PB1425VX -> HANDLED=EC-OO-CONFORMANCE. [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.5.4-7",
@@ -6666,13 +6666,13 @@
   "ordinal": 7,
   "subject": "Object-view",
   "rule-digest": "82095da4c5b4",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "test-ref": "conformance:2002/pb1425_object_view",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). NOT-IMPLEMENTED. Own search of src (the dossier found nothing): no grammar rule for object-view anywhere in src/Cobol.Net.Frontend/Grammar -- dataReference (CobolParserCore.g4:673) is cobolWord dataReferenceSuffix* with no AS arm, the token UNIVERSAL is not lexed, and no binder/codegen code names object-view. Probe with the pinned cobol.exe --std 2023 (probe/object-view/OV1-OV4): 'SET B TO U AS OVB', 'INVOKE U AS OVD \"SPEAK\"', 'SET D TO B AS UNIVERSAL' all refused COBOLNET0901 ('AS' is a reserved word ... cannot be used as a user-defined word) -- the identifier Format 5 (§8.4.3.1.2 'Format 5 (object-view)', cite.py OK) is unwritable. EC-OO-CONFORMANCE exists only as a catalog entry (Runtime/Exceptions/ExceptionCatalog.cs:166); no raise site. OO core is claimed mandatory surface (CONFORMANCE.md A.4.10 row), so this is not declined-module debt. cite.py --check 8.4.3.5.4 'If UNIVERSAL is specified, identifier-1 is treated as though it were described as USAGE OBJECT REFERENCE' OK (GR7). UNIVERSAL not even lexed (OV3). [editions as adjudicated: 2002, 2014, 2023 (OO introduced in 2002; §8.4.3.5 absent from 1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1019a). UNIVERSAL: USAGE OBJECT REFERENCE with no phrase; EC-OO-CONFORMANCE is not set (OK 7)). OoEmitter.EmitObjectView emits a plain reference conversion, and EcBinder binds no EC-OO-CONFORMANCE guard for a universal view. Golden: `SET OU2 TO OD AS UNIVERSAL`, `INVOKE OU AS UNIVERSAL \"SPEAK\"` (the dynamic path) and a view of a view. [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.6.3-1",
@@ -57531,13 +57531,13 @@
   "ordinal": 0,
   "subject": "Object-view",
   "rule-digest": "c8ef3b5b5340",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView",
+  "test-ref": "conformance:2002/pb1425_object_view; conformance:negative/pb1425-object-view-interface-phrase; conformance:negative/pb1425-object-view-below-2002",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). NOT-IMPLEMENTED. Own search of src (the dossier found nothing): no grammar rule for object-view anywhere in src/Cobol.Net.Frontend/Grammar -- dataReference (CobolParserCore.g4:673) is cobolWord dataReferenceSuffix* with no AS arm, the token UNIVERSAL is not lexed, and no binder/codegen code names object-view. Probe with the pinned cobol.exe --std 2023 (probe/object-view/OV1-OV4): 'SET B TO U AS OVB', 'INVOKE U AS OVD \"SPEAK\"', 'SET D TO B AS UNIVERSAL' all refused COBOLNET0901 ('AS' is a reserved word ... cannot be used as a user-defined word) -- the identifier Format 5 (§8.4.3.1.2 'Format 5 (object-view)', cite.py OK) is unwritable. EC-OO-CONFORMANCE exists only as a catalog entry (Runtime/Exceptions/ExceptionCatalog.cs:166); no raise site. OO core is claimed mandatory surface (CONFORMANCE.md A.4.10 row), so this is not declined-module debt. Format: identifier-1 AS { [FACTORY OF] object-class-name-1 [ONLY] | interface-name-1 | UNIVERSAL } -- none of the three arms parses. [editions as adjudicated: 2002, 2014, 2023 (OO introduced in 2002; §8.4.3.5 absent from 1985)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1425 (w1019a). The general format, rendered from the canonical PDF (printed page 134): `identifier-1 AS { [FACTORY OF] object-class-name-1 [ONLY] | interface-name-1 | UNIVERSAL }`, one brace, AS/FACTORY/ONLY/UNIVERSAL underlined, OF not. Grammar `objectView : objectReferenceTerm objectViewPhrase+`, `objectViewPhrase : AS UNIVERSAL | AS (FACTORY OF?)? className ONLY?` (interface-name and class-name are one word; the binder refuses FACTORY/ONLY on an interface, COBOLNET2872). UNIVERSAL is a new token, 8.9-reserved 2002+ (cobol-words.json). The view is an object-reference ATOM, reached by every object-reference position (INVOKE receiver, inline receiver, SET Format 5 sender, RAISE). Was COBOLNET0901 on AS in every position. [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.4.3.6.2",
@@ -60126,13 +60126,13 @@
   "ordinal": 0,
   "subject": "RAISE statement",
   "rule-digest": "f6f2db223b18",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#raiseStatement; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs#BindRaise; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#RAISE",
-  "test-ref": "conformance-test:ExceptionConditionConformanceTests.Raise_Enabled_DeclarativeHandles_ResumeNextStatement_StatusPersists",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#raiseStatement; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.cs#BindRaise; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindComputedObjectReference",
+  "test-ref": "conformance-test:ExceptionConditionConformanceTests.Raise_Enabled_DeclarativeHandles_ResumeNextStatement_StatusPersists; conformance:2002/pb1425_object_view; conformance:2002/pb1425_computed_object_reference_operands",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1197 (registrar 14c). Format: RAISE { EXCEPTION exception-name-1 | identifier-1 }, exactly one alternative. Grammar `RAISE (EXCEPTION cobolWord | objectReference)` takes both alternatives; objectReference admits NULL/SUPER/SELF so SR2 gets a targeted diagnostic. Probed with the pinned cobol.exe: `RAISE EXCEPTION EC-USER-DEMO` (probe/raise/gr1.cob) and `RAISE E` / `RAISE U` / `RAISE EXCEPTION-OBJECT` / `RAISE SELF` (probe/raise/sr2b.cob) all compile and run at 2023, and at 2002/2014; at --std 85 a bare RAISE draws COBOLNET0876 'the RAISE statement requires COBOL-2002' (probe/raise/e85.cob). cite.py --check 14.9.29.2 \"RAISE\" -> OK §14.9.29.2 (General format). The named test covers the EXCEPTION alternative; the identifier alternative is covered by conformance-test:OoSpineTests.RaiseObject_NoDeclarative_ContinuesNextStatement. || REFUTED: PARTIAL — identifier-1 in the general format is ANY identifier (§8.4.3.1.2 Formats 1-9) that is an object reference, but the grammar narrows it to objectReference (dataReference|NULL|SELF|SUPER). Two legal identifier-1 shapes are rejected at the parse. The first is the inline method invocation (§8.4.3.1.2 Format 4). §8.4.3.4.3 SR1 bars it only as a receiving operand, and RAISE SR3 makes identifier-1 a sending operand. The second is the object-view (Format 5, §8.4.3.5.3 SR2, receiving-only ban). The compiler's own inlineMethodInvocation rule exists and parses in SET ... TO, so this is RAISE-specific for the inline invocation. The EXCEPTION alternative and plain data-name object references do conform. [editions as adjudicated: 2002, 2014, 2023 (the EC model is 2002+; VCR row 82 / E.3.3 item 39 is a 2023 clarification of processing, not syntax)]",
-  "state": "GAP"
+  "notes": "kb/Work PB1197 (landed with PB1425, w1019a). RAISE { EXCEPTION exception-name-1 | identifier-1 }: identifier-1 takes the shared objectReference rule, which now carries every identifier format that can yield an object reference - a data-name, SELF, an inline invocation and a function-identifier (w1018d) and the object-view (this landing): `RAISE OU AS PB1425VA` raises the object and the class's USE AFTER EXCEPTION OBJECT declarative selects it (RAISED-OBJECT). NULL and SUPER stay 14.9.29.3 SR2's COBOLNET0848. [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-14.9.30.2",

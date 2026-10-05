@@ -84,13 +84,18 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
             // ⛔ WITHOUT THE FUNCTION-POINTER ARM a declarable function-pointer falls through into the OO
             // Format-5 bind and, through BindSetTo, into the Format-1 arithmetic store — the silent wrong
             // answer PB817 filed as "the other end, which a fixer will otherwise miss".
-            var sorRefs = sor.dataReference();
+            // §8.4.3.5.3 SR2 — the receiving list admits an object-view only so it is refused by this rule (kb/Work PB1425).
+            var receivers = sor.setObjectReferenceReceiver();
+            if (receivers.FirstOrDefault(r => r.objectViewReceiver() is not null) is { } receivingView)
+                return host.Oo.RefuseObjectViewReceiver(receivingView.objectViewReceiver(), "a receiving operand of a SET statement");
+            var sorRefs = Array.ConvertAll(receivers, r => r.dataReference());
             var objRef = sor.objectReference();
             // The grammar spells NULL / SELF / SUPER here: a data-reference, function-identifier or inline-invocation
             // sender parses as setToValueStatement (it precedes this alternative), whose ONE classifier
             // (SetSenders.Classify) reads it. `objectReference` is the shared object-reference operand rule, so its
             // computed forms are read here by the shared binder too, never left to fall through unread.
-            var atom = objRef.objectReferenceAtom();
+            // The plain term — null for an inline invocation or an object-view, which the computed arm below binds.
+            var atom = objRef.objectReferenceAtom()?.objectReferenceTerm();
             SetSender? sorSender = null;
             if (host.Oo.OoBindComputedObjectReference(objRef) is { } computed)
             {

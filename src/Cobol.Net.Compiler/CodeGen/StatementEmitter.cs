@@ -365,6 +365,7 @@ internal sealed class StatementEmitter : IBoundStatementVisitor<bool>
     public bool Visit(BoundInvoke n) { _oo.EmitInvoke(n); return false; }                 // §14.9.23
     public bool Visit(BoundInvokeUniversal n) { _oo.EmitUniversalInvoke(n); return false; }   // D10 universal dispatch (GR7c)
     public bool Visit(BoundSetObjectRef n) { _oo.EmitSetObjectRef(n); return false; }      // SET F5 (§14.9.39; D-U7)
+    public bool Visit(BoundObjectView n) { _oo.EmitObjectView(n); return false; }          // object-view pre-op (§8.4.3.5; kb/Work PB1425)
 
     // ── Pointers: SET / ALLOCATE / FREE (ISO §14.9.39/§14.9.3/§14.9.15; Phase-4b) ────────────────────────────
     public bool Visit(BoundSetPointer n) { _set.EmitSetPointer(n); return false; }               // SET F7 (the whole printed receiving list)

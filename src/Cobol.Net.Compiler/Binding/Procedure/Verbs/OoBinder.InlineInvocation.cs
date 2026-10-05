@@ -192,18 +192,21 @@ internal sealed partial class OoBinder
         // (VisitInlineMethodInvocation → Check(InlineMethodInvocation2002)), never here: a below-2002 inline
         // invocation is an edition violation independent of whether its method resolves.
         var target = imi.objectReferenceAtom();
+        // The plain term; null for an object-view receiver (§8.4.3.1.4 GR1 c) applies the view first), which is bound
+        // below as a computed receiver — its SR2 screens are the view's own (§8.4.3.5.3), asked of its description.
+        var term = target.objectReferenceTerm();
 
         // §8.4.3.4.3 SR2, screened BEFORE resolution because both rejected shapes are RECEIVER shapes and the
         // general format admits them syntactically (the P3 superset parse: `objectReferenceAtom` is INVOKE's own
         // receiver rule — see CobolOO.g4).
-        if (target.predefinedNull() is not null)
+        if (term?.predefinedNull() is not null)
         {
             ctx.Edition.Error(DiagnosticCatalog.InlineInvocationReceiver,
                 "an inline method invocation's identifier-1 shall be of class object; the predefined object "
                 + "reference NULL shall not be specified (ISO §8.4.3.4.3 SR2)");
             return BoundExprError.Refused(ctx.Edition, "inline method invocation through NULL");
         }
-        if (target.dataReference() is { } dr0 && ctx.Refs.Probe(dr0) is not null
+        if (term?.dataReference() is { } dr0 && ctx.Refs.Probe(dr0) is not null
             && host.Expr.ResolveSending(dr0).Place is { } r0   // a non-place answer is bound (and answered) below
             && RefuseUniversalInlineReceiver(r0, dr0.GetText()) is { } refusedFirst)
             return refusedFirst;
@@ -241,7 +244,7 @@ internal sealed partial class OoBinder
             var site = InvocationSite.OfInlineSegment(seg);
             var activation = chained is { } prev
                 ? OoBindInstanceInvoke(site, prev, methodName, receiverText)
-                : OoBindByReceiver(site, target, methodName);
+                : OoBindByReceiver(site, term!, methodName);
             if (site.ImplicitReturningPlace is not { } result)
                 // Every failure path already reported (the receiver, roster, arity and conformance
                 // diagnostics are the INVOKE binder's own, re-worded by InvocationSite.Verb).

@@ -123,6 +123,10 @@ public struct CheckingFlags
     /// synchronously on the same run unit; the METHOD's half is a compile-time literal baked per method.</summary>
     public bool OoUniversal;
 
+    /// <summary>EC-OO-CONFORMANCE — an object-view's run-time conformance check failed (§8.4.3.5.4 GR2–GR6; checked
+    /// "if exception condition EC-OO-CONFORMANCE is enabled", §14.8.1 NOTE 3; kb/Work PB1425).</summary>
+    public bool OoConformance;
+
     /// <summary>EC-EXTERNAL-FORMAT-CONFLICT — the ACTIVATING element's half of §14.8.4.1's "enabled in both the
     /// activating and activated runtime elements" for §14.8.4.3 (kb/Work PB1138). Set around a CALL, an INVOKE or a
     /// statement carrying an activation by the emitted statement guard; read by the activation boundary

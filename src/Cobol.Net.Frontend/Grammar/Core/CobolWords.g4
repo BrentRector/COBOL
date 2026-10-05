@@ -208,6 +208,7 @@ reservedGatedWord
       | SUPER
       | TAPE
       | TYPEDEF
+      | UNIVERSAL
       | UNLOCK
       | VALID
       | VALIDATE
