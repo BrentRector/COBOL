@@ -23,6 +23,7 @@ internal sealed class NameAllocator
     private int _search;      // SEARCH loop labels
     private int _call;        // CALL activation temporaries
     private int _inspectTmp;  // INSPECT image/count/magnitude locals (__ins…)
+    private int _identTmp;    // item-identification hoists, shared by every verb (__ident…, PlaceIdentification.Hoister)
     private int _keyedSeq;    // keyed status/image temporaries (__kstN/__kimN)
     private int _ooInvoke;    // OO INVOKE temporaries
     private int _ptr;         // pointer temporaries (__ptrBy/__notAlloc)
@@ -40,6 +41,7 @@ internal sealed class NameAllocator
     public int NextSearch() => _search++;
     public int NextCall() => _call++;
     public int NextInspectTmp() => _inspectTmp++;
+    public int NextIdentTmp() => _identTmp++;
     public int NextKeyedSeq() => _keyedSeq++;
     public int NextOoInvoke() => _ooInvoke++;
     public int NextPtr() => _ptr++;

@@ -31956,13 +31956,13 @@
   "ordinal": 1,
   "subject": "Execution",
   "rule-digest": "0c1e8cd21902",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Control/RunUnit.cs#Locale; src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs",
-  "test-ref": "",
+  "test-ref": "conformance:2014/pb1123_locale_current_at_editing",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1123 (open). Rule: step 1 of item identification is 'locale identification' (cite.py --check 14.6.4 -> OK). The locale-dependent reads (PICTURE format 2 editing/de-editing, LOCALE-* functions) consult the run unit's ONE locale state at the time of the edit (§14.6.6 r6 'the locale current at the time of editing or de-editing'). Whether locale identification happens FIRST - before a subscript/function/refmod operand inside the SAME identifier that executes SET LOCALE (a user-defined function can) - was not probed and is not decided by reading: no code site models locale identification as an item-identification step, so the ordering against steps 2-7 is unverified. PARTIAL on an evidence burden, not a measured wrong answer. || editions as adjudicated: 2002, 2014, 2023 (locale facility, Annex A.4.9)",
-  "state": "GAP"
+  "notes": "LANDED kb/Work PB1123 (evidence). Locale identification is step 1 of item identification, and 14.6.6 GR6 says what it yields for an edited item: with no locale-name, category LC_MONETARY of the locale current AT THE TIME OF EDITING or de-editing - so nothing is captured before the identifier's later steps and the answer is the run unit's one locale state read at the edit. Probed: MOVE N TO A(FUNCTION SWLOC) where SWLOC runs SET LOCALE LC_MONETARY TO de-DE and A is a LOCALE-format item edits in de-DE (1.234,50) where the same MOVE under en-US gives 1,234.50 (witness 2014/pb1123_locale_current_at_editing).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.4-2",
@@ -32031,13 +32031,13 @@
   "ordinal": 6,
   "subject": "Execution",
   "rule-digest": "c15bbc7b9e31",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs#Read",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs#Resolve; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.SubscriptSegments.cs#FreezeOdoExtentBeforeRefMod; src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs#Read",
+  "test-ref": "conformance:2023/pb1123_odo_length_before_refmod",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1123 (open). Rule: item identification step 6 'length evaluation for an occurs-depending group item' precedes step 7 'reference modification', and 'If a step in the evaluation of an identifier requires evaluation of another identifier or an arithmetic expression, that evaluation is done in full before proceeding to the next step' (cite.py --check 14.6.4 -> OK, items 6 and 7). Probe E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d1\\out\\probe\\iid\\iid3.cob: 01 G. 05 GE PIC X OCCURS 1 TO 9 DEPENDING ON N (N EXTERNAL); N=5, G='ZZZZZ' over a storage tail of '----'; MOVE G(FUNCTION SETN(9):) TO X, where SETN sets N to 9 and returns 1. Spec: G's length is fixed at step 6 (N=5) BEFORE the reference modifier's start is evaluated at step 7, so G(1:) is 5 positions -> X = 'ZZZZZ    '. Observed (pinned cobol.exe, 2023): X = 'ZZZZZ----' (9 positions) - the ODO length is read AFTER the reference modifier's operand ran. WRONG ANSWER on legal source; contrived trigger (the ODO object changed by a side effect inside the same identifier). See finding 'ODO length read after the reference modifier'. [code-location note: (RefModPlace arm -> RuntimeApi.StrRefMod / RmLen)] || editions as adjudicated: 85, 2002, 2014, 2023 for ODO + reference modification; the side-effecting operand here (a user-defined function) is 2002+",
-  "state": "GAP"
+  "notes": "LANDED kb/Work PB1123 (the ODO-refmod arm). A reference modifier whose position carries a function activation has that activation hoisted ahead of the statement as a PRE-op, so the occurs-depending group's length used to be read after it ran. ReferenceResolver.Resolve now marks PendingPreOps before the reference modifier is read and, when the modifier registered pre-ops over an OdoGroupPlace, the FreezeOdoExtent hook (StatementBinder.FreezeOdoExtentBeforeRefMod) inserts a copy of the DEPENDING ON object into a compiler temp AHEAD of them and repoints the group's extent at the temp, so step 6 (length) is evaluated in full before step 7 (reference modification): G(FUNCTION SETN(9):) with N = 5 is 5 positions.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.4-7",
@@ -32046,13 +32046,13 @@
   "ordinal": 7,
   "subject": "Execution",
   "rule-digest": "17a73a7aeeba",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitUnstring",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitUnstring; src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitString; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#HoistOnceOnlyIdentification; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#IdentifyOperands; src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceIdentification.cs#Freeze",
+  "test-ref": "conformance:2023/pb1123_unstring_string_item_identification_once; conformance:2023/pb1123_returning_item_identification_once; conformance:2023/pb1123_inspect_item_identification_once",
   "derivation": "",
   "editions": "2023",
-  "notes": "OWNED BY kb/Work PB1123 (open). Rule (two halves): steps 1-7 end with reference modification as the last step, and 'Unless otherwise specified, item identification is done for an identifier as the first step in the evaluation of that identifier and the identifiers within a statement are evaluated in left to right order as the first operation of the execution of that statement.' (cite.py --check 14.6.4 -> OK, item 7). Half 1 (reference modification is LAST): verified by probes iid3 (subscript before refmod: X='b') and iid4 (function before refmod: X='x'). Half 2 (all identifiers identified at statement start unless a statement says otherwise): MOVE (§14.9.25.4 'immediately before'), arithmetic (§14.7.7 4b), SET and INITIALIZE (GR3) DO say otherwise; STRING does not and is right (probe iid.cob: STRING 'AB' DELIMITED SIZE INTO E(P) WITH POINTER P -> E(1)='AB..', P=3). UNSTRING does NOT say otherwise (§14.9.48.4 GR1-GR18 have no timing sentence; cite.py --check 14.9.48.4 GR11 -> OK) and is WRONG: probe E:\\Temp\\claude\\E--CobolSharp\\a700c052-f9e4-4942-84ff-a13c7505d6ec\\scratchpad\\adj-d1\\out\\probe\\iid\\iid2.cob, S='3,QQ,RR', I=1: (A) UNSTRING S DELIMITED ',' INTO I UE(I) -> spec UE(1)='QQ', U='QQ------'; observed U='----QQ--' (UE(3)). (B) ... INTO I DELIMITER IN DL(I) COUNT IN CE(I) UE(I) DELIMITER IN DL(I) COUNT IN CE(I) -> spec DT=',---', CT='2000', U='QQ------'; observed DT='--,-', CT='0020', U='----QQ--'. (C) UNSTRING S DELIMITED ',' INTO I WITH POINTER PE(I), PE all 01 -> spec PE(1)=03, PT='03010101'; observed PT='01010301'. Identical at --std 85 and 2023. EmitUnstring re-renders each receiver's subscripts at its store (move.Emit(r.Store), DelimiterStore, CountIn) and the POINTER/TALLYING write-back after the loop. See finding 'UNSTRING identifies its receivers at store time'. || editions as adjudicated: 2023 text (the §14.6.4 default and the 2023 UNSTRING GR11-GR14, which carry no 'otherwise specified' timing); an earlier edition's statement-specific subscript-timing rules are not in this document and are not asserted here",
-  "state": "GAP"
+  "notes": "LANDED kb/Work PB1123. Every verb that stores several operands of ONE statement with no verb-specific timing rule identifies them once, in source order, before the first read or store, through the ONE mechanism PlaceIdentification.Freeze (hoisted by PlaceIdentification.Hoister): UNSTRING (INTO, DELIMITER IN, COUNT IN, POINTER, TALLYING; its MOVE stores rebuilt over the frozen places by BoundMove.Retargeted), STRING (senders, receiver, POINTER), INSPECT, INVOKE (receiver, arguments, RETURNING, universal path) and CALL, whose private hoist copy is deleted in favour of the same mechanism. UNSTRING S INTO I UE(I) stores UE(1), WITH POINTER PE(I) delivers into PE(1).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.6.6-1",
@@ -38796,13 +38796,13 @@
   "ordinal": 4,
   "subject": "INSPECT statement",
   "rule-digest": "47bcb931d4c0",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#EmitStore; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#OperandTextOf; src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs#AsString; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassOfItem",
-  "test-ref": "conformance:2002/pb1128_inspect_identifier1_class_store; conformance:negative/pb1128-inspect-national-numeric-edited-mix",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#EmitStore; src/Cobol.Net.Compiler/Binding/Passes/UsageCollectionPass.cs; src/Cobol.Net.Runtime/Values/Numeric/CobolNum.cs#RetainSign",
+  "test-ref": "conformance:2002/pb1128_inspect_identifier1_class_store; conformance:negative/pb1128-inspect-national-numeric-edited-mix; conformance:85/pb1128_inspect_signed_sign_retained",
   "derivation": "",
-  "editions": "85, 2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1128 (half). GR4 c) FIXED w66k: a numeric-edited item of usage national is class NATIONAL (8.5.2.1 Table 2) - IntrinsicArgumentRules.ClassOfItem answers CobolClass.NumericEditedNational and AllOrNothingClass compares Table-2 classes, so INSPECT NE TALLYING C FOR ALL N\" \" binds (witness N5 = 02) and the alphanumeric \" \" is COBOLNET2306 (negative pb1128-inspect-national-numeric-edited-mix). GR4 d)'s second sentence STILL DIVERGES: when the replaced digits make a signed identifier-1 zero, the original NEGATIVE sign is lost (S9(3) -5 REPLACING ALL \"5\" BY \"0\" displays 00{ where 00} is required). A native-stored signed DISPLAY item is a C# long, which has no negative zero, so the fix is a data-model decision (a sign carried apart from the magnitude), not an emitter edit.",
-  "state": "GAP"
+  "editions": "85,2002,2014,2023",
+  "notes": "LANDED kb/Work PB1128 (GR4 d, the sign arm; GR4 c landed in w66k). A numeric DISPLAY / NATIONAL elementary identifier-1 that REPLACING / CONVERTING writes into is character-image stored (UsageCollectionPass.Visit(BoundInspect) makes INSPECT a character channel), and InspectEmitter.EmitStore re-signs the replaced digit run through CobolNum.RetainSign, which reads the ORIGINAL image's sign apart from the magnitude, so a negative item whose digits all become zeros stays a negative zero in every sign convention (separate leading / trailing, overpunch): S9(3) VALUE -5 REPLACING ALL 5 BY 0 holds 00} (witness 85/pb1128_inspect_signed_sign_retained S1-S5).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.22.4-5",
@@ -39621,13 +39621,13 @@
   "ordinal": 7,
   "subject": "INVOKE statement",
   "rule-digest": "ea0ca2e5c701",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitInstanceInvoke; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitUniversalInvoke; src/Cobol.Net.Runtime/Control/CobolObject.cs#RequireNonNull; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ConformanceDescriptor; src/Cobol.Net.Runtime/Control/ExternalTable.cs#Describe; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitMethod; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#MethodExternalCheck; src/Cobol.Net.Runtime/Control/ExternalStore.cs#DescribeAtMethodActivation; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ExternalMaskAt",
-  "test-ref": "conformance:2023/w68r_pb1138_method_external_check; conformance:negative/w68r-pb1138-method-external-below-2023; unit:ProgramActivationMaskTests.MethodActivation_PairsTheInvokeFlagsWithTheMethodMask_AndFailsAsAFatalCondition",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#IdentifyOperands; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitInstanceInvoke; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitUniversalInvoke; src/Cobol.Net.Runtime/Control/CobolObject.cs#RequireNonNull; src/Cobol.Net.Compiler/Oo/OoConformance.cs#ConformanceDescriptor; src/Cobol.Net.Runtime/Control/ExternalTable.cs#Describe; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitMethod; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#MethodExternalCheck; src/Cobol.Net.Runtime/Control/ExternalStore.cs#DescribeAtMethodActivation; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ExternalMaskAt",
+  "test-ref": "conformance:2023/w68r_pb1138_method_external_check; conformance:negative/w68r-pb1138-method-external-below-2023; unit:ProgramActivationMaskTests.MethodActivation_PairsTheInvokeFlagsWithTheMethodMask_AndFailsAsAFatalCondition; conformance:2023/pb1123_returning_item_identification_once",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "OWNED BY kb/Work PB1123 (open). Rule GR7 a)-g) (cite.py --check 14.9.23.4 'item identification is done for identifier-4 at the beginning of the execution of the INVOKE statement' OK; 'External items are checked to ensure that they comply with the following rules' OK; EC-OO-METHOD / EC-OO-UNIVERSAL / propagation sentences OK). VERIFIED: a) BY CONTENT values captured at the start (c1.cob: L2=0005 after L1 wrote A; N L2=0010 for T(I) with I bumped via arg 1); identifier-3 write-back subscript fixed at the start (g8.cob T1=ABCD); b) EC-OO-METHOD for an unknown universal method (u1.cob HANDLED=EC-OO-METHOD twice; conformance-test:OoSpineTests.Universal_UnknownMethod_EcOoMethod); c) EC-OO-UNIVERSAL for an ANY LENGTH formal through a universal receiver (a1.cob) and both-elements gating (golden ec_oo_universal_both; strictness delta owned by open PB480); f)/g) an exception propagated by GOBACK RAISING EXCEPTION reached the caller's declarative (f1.cob). DEFECTS: a) identifier-4's item identification happens AFTER the method returns — g7.cob `INVOKE OBJ \"BUMP\" USING I BY CONTENT V RETURNING T(I)` (I=1, method adds 1 to LK) printed T1=0000 T2=0050, spec requires T(1)=0050 (finding F2, wrong answer). d) no external-item check is performed at a method activation: ExternalStore.Describe is emitted only in a PROGRAM's ICobolProgram.Activate (ProgramEmitter/OoEmitter.WantsExternalDescribes); x3.cob (program EXX PIC X(8) EXTERNAL, object WS EXX PIC X(4) EXTERNAL, EC-EXTERNAL-FORMAT-CONFLICT enabled everywhere) ran the method silently (finding F3). || editions as adjudicated: 2002, 2014, 2023; sub-rule d) (EC-EXTERNAL-* conformance checks) is 2023 only (Annex E.2 item 9 'External items') || w68r 2026-09-27 (kb/Work PB1138, landed): finding F3 (GR7 d) is CLOSED: every method prologue now runs ExternalStore.DescribeAtMethodActivation(__DescribeExternals, <method mask>) before the module-stack push, i.e. before GR7 e)'s transfer. __DescribeExternals is the containing factory's or object's registrations (a method has no external items of its own - 13.4.3 SR1, and method WORKING-STORAGE EXTERNAL is refused); the activating half of 14.8.4.1 is the INVOKE statement guard's new EC-EXTERNAL checking flags (EcEmitter.FatalAmbientGates; EcBinder queries ExternalNames for BoundInvoke/BoundInvokeUniversal), the method half is OoMethodSymbol.ExternalCheckMaskHere folded before the method's Environment division (BinderDriver.ExternalMaskAt, shared with program units). A violation is a CobolFatalException the INVOKE guard selects on. The CALL boundary now reads the same flags (ProgramTable.CallProgram), retiring the pending CALL-site ExternalCheckMask register. Re-probed x3.cob on the w68r build: HANDLED=EC-EXTERNAL-FORMAT-CONFLICT then AFTER (was IN METHOD ABCD / AFTER); with checking off in the activating program the method runs (x3b.cob). The row stays DIVERGES on finding F2 (identifier-4 item identification after the method returns), owned by open kb/Work PB1123.",
-  "state": "GAP"
+  "notes": "LANDED kb/Work PB1123 (the F2 arm PB1138 left open). OoEmitter.EmitInvoke / EmitUniversalInvoke identify the receiver, every argument and RETURNING identifier-4 at the beginning of the statement (GR7 a) through PlaceIdentification, before the method is invoked, so INVOKE OBJ BUMP USING I RETURNING T(I) delivers into T(1) when the method bumps I through its BY REFERENCE argument.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.23.4-8",

@@ -88,6 +88,17 @@ public sealed class ReferenceResolver(DataBinder data)
     /// position, so an index-name in a ref-mod bound was wrongly admitted. One hook, two positions, one context
     /// was the defect; the position is now part of the hook's question.</remarks>
     internal Func<string, SegmentPosition, int, DataItem?>? MaterializeSegment { get; set; }
+
+    /// <summary>⛔ THE ODO LENGTH IS EVALUATED BEFORE THE REFERENCE MODIFIER (ISO §14.6.4 steps 6 then 7 — "length
+    /// evaluation for an occurs-depending group item", then "reference modification", each done in full before the
+    /// next; kb/Work PB1123). A reference modifier whose position carries a function activation has that activation
+    /// hoisted ahead of the statement as a PRE-op (<see cref="MaterializeSegment"/>), so it would run BEFORE the
+    /// occurs-depending group's length is read at the operand site. This hook — set by the statement binder, the
+    /// same one-way edge as <see cref="MaterializeSegment"/> — pins the length first: given the occurs-depending
+    /// group's place, the index in the pending pre-ops where the reference modifier's own pre-ops begin, and the
+    /// line, it registers a copy of the DEPENDING ON object into a compiler temp at that index and returns the place
+    /// whose extent reads the temp. Null when absent (a data-division resolver): the pre-D18 answer.</summary>
+    internal Func<OdoGroupPlace, int, int, Place>? FreezeOdoExtent { get; set; }
     /// <summary>The object-property reference BINDER (ISO §8.4.3.9; deep-dive D-P2): when normal
     /// qualification fails and the single qualifier is a class-name (factory form) or a TYPED object
     /// reference (instance form) whose roster carries an accessor for the head word under the PINNED
@@ -611,7 +622,13 @@ public sealed class ReferenceResolver(DataBinder data)
         // are the same item. The syntactic path, the data-division path (ResolveItemRefMod) and the resolved-place
         // path (RefModOf) all read it this way, so SR1 and the view are asked of one description.
         DataItem described = inner.Item;
+        int preOpMark = data.PendingPreOps.Count;   // the reference modifier's own pre-ops (function activations) start here
         if (ReadScreenedRefMod(dref, written, described, out var refusal) is not { } spec) return refusal!;
+        // §14.6.4 steps 6 → 7: an occurs-depending group's length is evaluated BEFORE the reference modifier, so when
+        // the modifier registered pre-ops (a function whose side effect may change the DEPENDING ON object) the length
+        // is pinned ahead of them (kb/Work PB1123).
+        if (inner is OdoGroupPlace odo && data.PendingPreOps.Count > preOpMark && FreezeOdoExtent is { } freeze)
+            inner = freeze(odo, preOpMark, dref.Start.Line);
         return RefModView(described, inner, spec) is { } view ? Resolved(view) : Deferred(DeferredShape.NumericRefModSubstrate);
     }
 

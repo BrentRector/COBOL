@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
+using CobolNet.CodeGen.Emit;
 
 namespace CobolNet.CodeGen;
 
@@ -26,6 +28,24 @@ namespace CobolNet.CodeGen;
 /// </summary>
 internal static class PlaceIdentification
 {
+    /// <summary>The ONE hoist every verb emitter hands <see cref="Freeze(Place, Func{string, string})"/>: it writes
+    /// <c>var __identN = &lt;fragment&gt;;</c> at the current point of the statement's emission and returns the local's
+    /// name. A verb freezes ALL of its operands before it reads or stores any (§14.6.4 7), so the locals are assigned
+    /// at the head of the statement. UNSTRING and INSPECT (kb/Work PB1123) share it, and so does any verb adopted
+    /// next.</summary>
+    public static Func<string, string> Hoister(EmitContext ctx) => fragment =>
+    {
+        string name = $"__ident{ctx.Names.NextIdentTmp()}";
+        ctx.Writer.Line($"var {name} = {fragment};");
+        return name;
+    };
+
+    /// <summary>The operand with its data reference frozen — a field operand's <see cref="Place"/>; a literal, a
+    /// figurative or a function result has no run-time address of its own (a function-identifier's argument
+    /// subscripts were hoisted at bind time, <c>DataBinder.PendingPreOps</c>) and is returned unchanged.</summary>
+    public static BoundOperand? Freeze(BoundOperand? op, Func<string, string> hoist) =>
+        op is BoundFieldOperand f ? f with { Place = Freeze(f.Place, hoist) } : op;
+
     /// <summary>The place with every run-time address fragment hoisted through <paramref name="hoist"/>.</summary>
     public static Place Freeze(Place place, Func<string, string> hoist) => place switch
     {

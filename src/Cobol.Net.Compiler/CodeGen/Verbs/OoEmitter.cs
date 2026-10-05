@@ -708,9 +708,10 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// identifier-2 value, then copy out every argument (SR6 — all BY REFERENCE) and deliver RETURNING (GR8)
     /// through the receiver's own storage form. No direct-<c>ref</c> fast path BY DESIGN — the box IS the
     /// crossing (the abstract dispatch signature cannot take refs without per-signature generics).</summary>
-    public void EmitUniversalInvoke(BoundInvokeUniversal u)
+    public void EmitUniversalInvoke(BoundInvokeUniversal statement)
     {
         var w = Ctx.Writer;
+        var u = IdentifyOperands(statement);
         int id = Ctx.Names.NextStoreTmp();
         // A spelled OMITTED argument boxes as the omitted sentinel; a forwarded formal (§8.8.4.8.4 GR1c) boxes its
         // presence and is read only when present (§14.9.23.4 GR10's "except as an argument") — kb/Work PB757.
@@ -1311,11 +1312,40 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         OoIsActiveClassFormal(formal) ? "CobolObject?" : OoCrossingType(formal);
 
 
+    /// <summary>⛔ ITEM IDENTIFICATION, ONCE, AT THE BEGINNING (ISO §14.9.23.4 GR7 a: "Arithmetic-expression-1,
+    /// boolean-expression-1, identifier-1, identifier-2, identifier-3, and identifier-5 are evaluated and item
+    /// identification is done for identifier-4 at the beginning of the execution of the INVOKE statement"; §14.6.4 7;
+    /// kb/Work PB1123): the receiver, every BY REFERENCE / BY CONTENT identifier argument and the RETURNING
+    /// identifier have their run-time address fragments frozen into locals by <see cref="PlaceIdentification"/>
+    /// before the call, so a method that changes the subscript of identifier-4 through a BY REFERENCE argument
+    /// (<c>INVOKE O "M" USING I RETURNING T(I)</c>) still delivers into the occurrence the statement identified.
+    /// The CALL lane owns the same rule (§14.9.4.4 GR3a) through the same mechanism.</summary>
+    private BoundInvoke IdentifyOperands(BoundInvoke inv)
+    {
+        var hoist = PlaceIdentification.Hoister(Ctx);
+        var receiver = inv.Receiver is null ? null : PlaceIdentification.Freeze(inv.Receiver, hoist);
+        var args = inv.Args?.Select(a => a.Source is { } src ? a with { Source = PlaceIdentification.Freeze(src, hoist) } : a).ToList();
+        var returning = inv.Returning is null ? null : PlaceIdentification.Freeze(inv.Returning, hoist);
+        return inv with { Receiver = receiver, Args = args, Returning = returning };
+    }
+
+    /// <summary>The universal-receiver INVOKE's item identification — the same GR7 a) rule, the same mechanism.</summary>
+    private BoundInvokeUniversal IdentifyOperands(BoundInvokeUniversal u)
+    {
+        var hoist = PlaceIdentification.Hoister(Ctx);
+        var receiver = PlaceIdentification.Freeze(u.Receiver, hoist);
+        var methodSource = u.MethodSource is null ? null : PlaceIdentification.Freeze(u.MethodSource, hoist);
+        var args = u.Args.Select(a => a.Source is { } src ? a with { Source = PlaceIdentification.Freeze(src, hoist) } : a).ToList();
+        var returning = u.Returning is null ? null : PlaceIdentification.Freeze(u.Returning, hoist);
+        return u with { Receiver = receiver, MethodSource = methodSource, Args = args, Returning = returning };
+    }
+
     /// <summary>Emit one bound INVOKE (deep-dive D5/D6 — the binder already resolved the call form and
     /// validated §14.8.2 strict conformance; this renders the type-preserving marshaling).</summary>
-    public void EmitInvoke(BoundInvoke inv)
+    public void EmitInvoke(BoundInvoke statement)
     {
         var w = Ctx.Writer;
+        var inv = IdentifyOperands(statement);
         switch (inv.Form)
         {
             case InvokeForm.New:

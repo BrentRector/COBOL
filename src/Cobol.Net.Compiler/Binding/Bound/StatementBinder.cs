@@ -187,6 +187,7 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
     private void AttachSegmentMaterializer()
     {
         refs.MaterializeSegment ??= MaterializeSubscriptSegment;
+        refs.FreezeOdoExtent ??= FreezeOdoExtentBeforeRefMod;   // §14.6.4 steps 6 → 7 (kb/Work PB1123)
         // The second edge, of the same shape: the literal reference-modification range screen asks whether
         // EC-BOUND-REF-MOD checking is enabled at the reference's line (kb/Work PB1707 part 1). Read through
         // Ctx.EcState.Turn AT CALL TIME, so an exception-checking PERFORM's GR14 overlay is the state it sees.

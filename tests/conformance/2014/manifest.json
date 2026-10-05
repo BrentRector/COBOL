@@ -103,6 +103,8 @@
   "seconds_past_midnight",
   "external_constant_record_weak_type",
   "pb64t4_locale_functions",
+  "pb1123_locale_current_at_editing",
+  "pb1128_inspect_dynamic_table_element",
   "pb470_locale_argument_substitute",
   "pb140_close_lock",
   "pb157_compute_sdidi_sole",

@@ -381,7 +381,8 @@
   "pb1217_block_contains_ordered_range",
   "pb1263_occurs_key_items_admitted",
   "pb1263_occurs_key_is_table_in_outer_table",
-  "pb1261_depending_attributes_and_area"
+  "pb1261_depending_attributes_and_area",
+  "pb1128_inspect_signed_sign_retained"
  ],
  "pending": []
 }

@@ -93,6 +93,21 @@ public sealed partial class StatementBinder
     /// numeric renderer and the ONE arithmetic store path, but the integrality question is asked of the value on
     /// its own carrier BEFORE the store, which a <c>BoundCompute</c> into a fixed-scale temp could not do (kb/Work
     /// PB1890). The temp is the saturated integer position, so a size error at the store is unreachable.</para></summary>
+    /// <summary>⛔ THE ODO LENGTH BEFORE THE REFERENCE MODIFIER (ISO §14.6.4 steps 6 and 7; the
+    /// <c>ReferenceResolver.FreezeOdoExtent</c> hook; kb/Work PB1123). The reference modifier's position was
+    /// materialized above as pre-ops from <paramref name="preOpMark"/> on, and a pre-op that activates a function can
+    /// change the DEPENDING ON object, so the object's value is copied into a compiler temp as a pre-op INSERTED at
+    /// <paramref name="preOpMark"/> — ahead of every one of them — and the group's extent reads the temp. The copy
+    /// is a plain MOVE of the object into a temp of its own description, so the length it pins is exactly the value
+    /// the operand site would have read had no pre-op run first.</summary>
+    private Place FreezeOdoExtentBeforeRefMod(OdoGroupPlace odo, int preOpMark, int line)
+    {
+        var temp = data.CreateCompilerTemp(odo.Depending.Item, "__REFODO-", "__refodo", $"L{line}");
+        if (Ctx.Refs.ResolveItem(temp) is not { } frozen) return odo;
+        data.PendingPreOps.Insert(preOpMark, new BoundMove(new BoundFieldOperand(odo.Depending), [frozen]));
+        return odo with { Depending = frozen };
+    }
+
     private DataItem? MaterializeSubscriptSegment(string text, SegmentPosition position, int line)
     {
         if (Frontend.Parsing.SubscriptExpressionFragment.Parse(text, Ctx.Edition.Edition, Ctx.Retypes) is not { } frag)

@@ -144,6 +144,14 @@ internal static class UsageCollectionPass
             // whole-GROUP references for the image mechanism, and a function's returned value is a temporary,
             // never a declared group.
             Op(n.Target);
+            // ⛔ REPLACING / CONVERTING WRITE CHARACTERS INTO identifier-1 (§14.9.22.4 GR7/GR20 — the replaced image is
+            // what the item then holds) AND GR4 d) RETAINS THE ORIGINAL SIGN OF A SIGNED NUMERIC ONE "upon completion
+            // of the INSPECT statement" — over a zero magnitude too, which is a NEGATIVE ZERO (`00}`), a sign no native
+            // value carrier holds. INSPECT is therefore a character channel of the elementary identifier-1 (kb/Work
+            // PB1128): a numeric DISPLAY / NATIONAL one stores its character image, the one representation that
+            // holds the sign and any non-digit the replacement deposits. TALLYING only reads it and promotes nothing.
+            if ((n.Replacing.Count > 0 || n.Converting is not null) && n.Target is BoundFieldOperand target)
+                Channel(target.Place);
             foreach (var t in n.Tallying) { P(t.Counter); Op(t.Pattern); Op(t.Before); Op(t.After); }
             foreach (var r in n.Replacing) { Op(r.Pattern); Op(r.Replacement); Op(r.Before); Op(r.After); }
             if (n.Converting is { } c) { Op(c.From); Op(c.To); Op(c.Before); Op(c.After); }

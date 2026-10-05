@@ -765,10 +765,14 @@ public static partial class CobolNum
     ///   <item><see cref="NumericSign.BinaryMinus"/> — a leading <c>-</c> only when negative (positive/zero bare).</item>
     /// </list>
     /// </summary>
-    public static string FormatDisplaySigned(Int128 unscaled, in NumProfile receiver)
+    public static string FormatDisplaySigned(Int128 unscaled, in NumProfile receiver) =>
+        FormatDisplaySigned(unscaled, unscaled < 0, receiver);
+
+    /// <summary>The signed DISPLAY image with the sign given APART from the magnitude — the only way to write a
+    /// NEGATIVE ZERO, which a value cannot be (<see cref="RetainSign"/>).</summary>
+    private static string FormatDisplaySigned(Int128 unscaled, bool neg, in NumProfile receiver)
     {
         string mag = FormatUnsignedDisplay(unscaled, receiver.Digits);
-        bool neg = unscaled < 0;
         return receiver.SignKind switch
         {
             NumericSign.BinaryMinus => neg ? "-" + mag : mag,
@@ -954,9 +958,37 @@ public static partial class CobolNum
     /// </summary>
     public static Int128 ParseDisplay(string image, in NumProfile receiver)
     {
+        Int128 mag = ParseDisplayMagnitude(image, receiver, out bool negative);
+        return negative ? -mag : mag;
+    }
+
+    /// <summary>The sign an item's DISPLAY image CARRIES — the one fact an <see cref="Int128"/> cannot hold for a
+    /// zero (there is no negative zero in a value). The same decode <see cref="ParseDisplay"/> performs, stopped
+    /// before the magnitude is signed: an unsigned item, an empty image and a positive or unpunched sign answer
+    /// false (ISO §14.9.22.4 GR4 d), kb/Work PB1128).</summary>
+    public static bool ImageIsNegative(string image, in NumProfile receiver)
+    {
+        ParseDisplayMagnitude(image, receiver, out bool negative);
+        return negative;
+    }
+
+    /// <summary>⛔ THE REPLACED IMAGE OF A SIGNED NUMERIC DISPLAY ITEM KEEPS ITS ORIGINAL SIGN, EVEN OVER A ZERO
+    /// MAGNITUDE (ISO §14.9.22.4 GR4 d: "if identifier-1 is a signed numeric item, the original value of the sign
+    /// is retained upon completion of the INSPECT statement"; kb/Work PB1128). <paramref name="digits"/> is the
+    /// digit run INSPECT produced (never signed), <paramref name="current"/> the item's image BEFORE the
+    /// statement. The result is the item's own signed image — in its own sign convention (over-punch, separate or
+    /// binary minus) — carrying <paramref name="current"/>'s sign. A negative item whose digits were all replaced by
+    /// zeros stays NEGATIVE ZERO (<c>00}</c>), which a value-carrying store (<c>FormatDisplay(-0)</c>) can never
+    /// write, since it takes the sign from the value.</summary>
+    public static string RetainSign(string digits, string current, in NumProfile receiver) =>
+        FormatDisplaySigned(DigitMagnitude(digits), ImageIsNegative(current, receiver), receiver);
+
+    /// <summary>The magnitude half of <see cref="ParseDisplay"/>, with the decoded sign returned apart from it.</summary>
+    private static Int128 ParseDisplayMagnitude(string image, in NumProfile receiver, out bool negative)
+    {
+        negative = false;
         if (string.IsNullOrEmpty(image)) return 0;
         var chars = image.ToCharArray();   // a mutable copy so a sign carrier can be reduced to its digit
-        bool negative = false;
 
         if (receiver.Signed)
         {
@@ -987,7 +1019,7 @@ public static partial class CobolNum
         foreach (char c in chars)
             if (c is >= '0' and <= '9')
                 mag = mag * 10 + (c - '0');
-        return negative ? -mag : mag;
+        return mag;
     }
 
     /// <summary>Reduce the over-punch character at <paramref name="pos"/> (in place) to its underlying digit, setting

@@ -61,14 +61,8 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     /// subscript variable again.</summary>
     private BoundInspect IdentifyOperands(BoundInspect ins)
     {
-        string Hoist(string fragment)
-        {
-            string name = $"__insId{ctx.Names.NextInspectTmp()}";
-            ctx.Writer.Line($"var {name} = {fragment};");
-            return name;
-        }
-        BoundOperand? Identify(BoundOperand? op) =>
-            op is BoundFieldOperand f ? f with { Place = PlaceIdentification.Freeze(f.Place, Hoist) } : op;
+        var Hoist = PlaceIdentification.Hoister(ctx);
+        BoundOperand? Identify(BoundOperand? op) => PlaceIdentification.Freeze(op, Hoist);
 
         var target = Identify(ins.Target)!;
         var tallying = new List<BoundInspectTally>(ins.Tallying.Count);
@@ -212,11 +206,12 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     };
 
     /// <summary>Store the replaced/converted image back into identifier-1 by its storage shape: a group through the
-    /// ONE group value writer in the alphabet it was read in (a Tier-B view group splices its window); a string-stored elementary
-    /// item (alphanumeric / numeric-edited / zoned image) takes the image directly; a native-stored numeric DISPLAY
-    /// item re-encodes the digit image — re-applying the RETAINED original sign for a signed item (§14.9.22.4
-    /// GR4d). A replacement that left a non-digit in a numeric item decodes by digit positions only — deterministic
-    /// where the spec leaves the result undefined (§14.6.13.2 incompatible data).</summary>
+    /// ONE group value writer in the alphabet it was read in (a Tier-B view group splices its window); an elementary
+    /// item (alphanumeric / numeric-edited / a numeric item's character image) takes the image directly — except a
+    /// SIGNED numeric item, whose replaced digits are re-signed with the RETAINED original sign, a zero magnitude
+    /// included (§14.9.22.4 GR4 d, <see cref="CobolNum.RetainSign"/>). A replacement that left a non-digit in a signed
+    /// item decodes by digit positions only — deterministic where the spec leaves the result undefined (§14.6.13.2
+    /// incompatible data).</summary>
     private void EmitStore(Place p, string img)
     {
         var w = ctx.Writer;
@@ -232,44 +227,49 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
             w.Line(PlaceRenderer.WriteGroupValue(p, img, "INSPECT REPLACING/CONVERTING into group", AccessDir.Sending));
             return;
         }
-        // ⛔ THE REPLACED IMAGE OF A NUMERIC ITEM IS NOT AN ALPHANUMERIC SENDING OPERAND. Every decode below
-        // takes CobolNum.DigitMagnitude, never the §14.9.25.4 GR6 d) 3 capped FromAlphanumeric: this image
-        // is the ITEM'S OWN and its PICTURE already fixes the size, so GR6 d) 3 asks nothing here. kb/Work PB426
-        // split the two decodes for that reason — MEASURED: pointing this site at the capped entry changed no
-        // answer on any shape probed (including a group-aliased PIC S9(31) SIGN TRAILING SEPARATE, whose image
-        // IS 32 characters), so this is rule hygiene, not a second bug fix.
+        // ⛔ A NUMERIC ELEMENTARY identifier-1 IS CHARACTER-IMAGE STORED — INSPECT is its character channel
+        // (UsageCollectionPass.Visit(BoundInspect), kb/Work PB1128). REPLACING / CONVERTING deposit characters, and
+        // GR4 d) says "if identifier-1 is a signed numeric item, the original value of the sign is retained upon
+        // completion of the INSPECT statement" — a native value carrier holds no negative zero, so the replaced
+        // image went through a `long` and `S9(3) VALUE -5` `REPLACING ALL "5" BY "0"` came back +0 (`00{` for `00}`).
+        // A Tier-B view, a promoted leaf and an OCCURS DYNAMIC element are the whole shape set (the invariant below).
         if (p.Item.Pic is { Category: PicCategory.Numeric, IsFloat: false } pic)
         {
-            bool stringStored = p.Item.StoreAsImage || p is RedefViewPlace || p is RefModPlace;
-            if (!stringStored)
+            if (!(p.Item.StoreAsImage || p is RedefViewPlace))
             {
-                if (pic.Signed)
-                {
-                    // GR4d: the original sign is retained — the (still-unmodified) field supplies it.
-                    string mag = $"__insMag{ctx.Names.NextInspectTmp()}";
-                    w.Line($"var {mag} = {ArithmeticEmitter.Narrow(RuntimeApi.NumDigitMagnitude(img), p.Item)};");
-                    w.Line(PlaceRenderer.Write(p, $"({PlaceRenderer.Read(p)} < 0 ? -{mag} : {mag})"));
-                }
-                else
-                    w.Line(PlaceRenderer.Write(p, ArithmeticEmitter.Narrow(RuntimeApi.NumDigitMagnitude(img), p.Item)));
+                // ⛔ AN OCCURS DYNAMIC ELEMENT IS A TYPED ELEMENT OF ITS CobolDynTable<T> (data-model D9), so no character
+                // channel promotes it (UsageCollectionPass.Channel skips a DynTablePlace, as every channel does) and it
+                // keeps its native carrier: the replaced digits are re-encoded as a VALUE with the original sign. The
+                // carrier holds no negative zero, so a negative element whose digits all become zeros reads back +0
+                // (kb/Work PB2004). Any other native shape here is a promotion the usage pass missed.
+                if (p is not DynTablePlace)
+                    throw new InvalidOperationException(
+                        $"INSPECT identifier-1 '{p.Item.CsName}' is a numeric item stored natively; UsageCollectionPass must have promoted it to its character image (PB1128)");
+                string mag = $"__insMag{ctx.Names.NextInspectTmp()}";
+                w.Line($"var {mag} = {ArithmeticEmitter.Narrow(RuntimeApi.NumDigitMagnitude(img), p.Item)};");
+                w.Line(PlaceRenderer.Write(p, pic.Signed ? $"({PlaceRenderer.Read(p)} < 0 ? -{mag} : {mag})" : mag));
                 return;
             }
+            // ⛔ THE REPLACED IMAGE OF A NUMERIC ITEM IS NOT AN ALPHANUMERIC SENDING OPERAND. The signed arm takes
+            // CobolNum.DigitMagnitude, never the §14.9.25.4 GR6 d) 3 capped FromAlphanumeric: this image is the ITEM'S
+            // OWN and its PICTURE already fixes the size, so GR6 d) 3 asks nothing here (kb/Work PB426 split the two
+            // decodes for that reason). A replacement that left a non-digit in a SIGNED item decodes by digit
+            // positions only — deterministic where the spec leaves the result undefined (§14.6.13.2 incompatible data);
+            // an unsigned item holds the replaced characters as they are.
             if (pic.Signed)
             {
-                // A string-stored signed zoned image (whole-group-aliased / Tier-B view): decode the original for
-                // its sign, re-encode the replaced magnitude with that sign in the item's sign convention (GR4d).
-                string mag = $"__insMag{ctx.Names.NextInspectTmp()}";
-                w.Line($"Int128 {mag} = {RuntimeApi.NumDigitMagnitude(img)};");
-                // sending: false — this decode is the STORE side re-deriving the ORIGINAL's sign so the replaced
-                // magnitude keeps it (GR4d), not INSPECT's sending read of the operand. §14.6.13.2 rule 2 attaches to
-                // the reference of the content, which is the image read above; checking it twice inside one statement
-                // would report one reference as two.
-                w.Line(PlaceRenderer.Write(p, RuntimeApi.NumFormatImage(
-                    $"{RuntimeApi.NumParseImage(PlaceRenderer.Read(p), p.Item.ProfileName, sending: false)} < 0 ? -{mag} : {mag}", p.Item.ProfileName)));
+                // Re-sign the replaced digit run with the sign the ORIGINAL image carries, in the item's sign
+                // convention (GR4 d). The sign is read off the image and handed to the formatter APART from the
+                // magnitude: a value cannot carry one over a zero, so formatting `parse(image) < 0 ? -mag : mag` turned
+                // a negative item whose digits became zeros into +0. The sign read is the STORE side re-deriving the
+                // ORIGINAL's sign, not INSPECT's sending read of the operand (§14.6.13.2 rule 2 attaches to the
+                // reference of the content, which is the image read above; a second check inside one statement
+                // would report one reference as two).
+                w.Line(PlaceRenderer.Write(p, RuntimeApi.NumRetainSign(img, PlaceRenderer.Read(p), p.Item.ProfileName)));
                 return;
             }
         }
-        w.Line(PlaceRenderer.Write(p, img));   // string-stored: alphanumeric, numeric-edited, unsigned zoned image, ref-mod slice
+        w.Line(PlaceRenderer.Write(p, img));   // character-image stored: alphanumeric, numeric-edited, a numeric item's image
     }
 
     /// <summary>An INSPECT operand as the runtime's C# string argument, or <c>null</c> when absent (a CHARACTERS

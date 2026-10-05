@@ -28,9 +28,10 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
     /// is latched across sendings by the kernel (GR8a) and dispatches ON / NOT ON OVERFLOW per GR8c/GR8e/GR9 (the
     /// 2002+ EC-OVERFLOW-STRING name, GR8b, awaits the EC model; with no phrase the nonfatal condition continues
     /// execution, §14.6.13.1.4, so no code is needed).</summary>
-    public void EmitString(BoundStringStmt s)
+    public void EmitString(BoundStringStmt statement)
     {
         var w = ctx.Writer;
+        var s = IdentifyOperands(statement);   // §14.6.4 7) — identified once, before the first character moves (kb/Work PB1123)
         int id = ctx.Names.NextStrUnstr();
         string ptr = $"__strPtr{id}", ptr0 = $"__strPtr0{id}", ovf = $"__strOvf{id}", acc = $"__strInto{id}";
         w.Line(s.Pointer is { } p0
@@ -98,9 +99,13 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
     /// sender characters with every receiver acted upon raise the GR15b overflow. Pointer/tally write back before
     /// the ON / NOT ON OVERFLOW dispatch (GR16c/GR16e/GR17; EC-OVERFLOW-UNSTRING, GR16b, awaits the EC model). A
     /// ZERO-LENGTH identifier-1 ends the statement first of all (GR2), outside every one of those steps.</summary>
-    public void EmitUnstring(BoundUnstringStmt s)
+    public void EmitUnstring(BoundUnstringStmt statement)
     {
         var w = ctx.Writer;
+        // ⛔ §14.6.4 7) — every identifier of the statement is identified ONCE, left to right, as its first operation
+        // (kb/Work PB1123): §14.9.48.4 states no other timing, so `UNSTRING S INTO I UE(I)` stores into UE(1), the
+        // occurrence I named before the first store changed it.
+        var s = IdentifyOperands(statement);
         int id = ctx.Names.NextStrUnstr();
         string src = $"__unsSrc{id}", dels = $"__unsDel{id}", alls = $"__unsAll{id}",
                ptr = $"__unsPtr{id}", tly = $"__unsTly{id}", ovf = $"__unsOvf{id}";
@@ -206,6 +211,51 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
             using (w.Block($"if ({ptr} != {ptr}__0)"))
                 arith.StoreArith(p, new NumX(ptr, 0), CobolRounding.Truncation);
         EmitOverflow(ovf, "EC-OVERFLOW-UNSTRING", s.OnOverflow, s.NotOnOverflow);   // GR16b
+    }
+
+    /// <summary>⛔ ITEM IDENTIFICATION, ONCE (ISO §14.6.4 7; kb/Work PB1123): the statement's identifiers in SOURCE order —
+    /// identifier-1, each DELIMITED BY identifier, each receiving area's INTO / DELIMITER IN / COUNT IN, then WITH
+    /// POINTER and TALLYING IN — have their run-time address fragments (subscripts, reference modifiers) frozen into
+    /// locals before anything is read or stored (<see cref="PlaceIdentification"/>), so a subscript that names an
+    /// EARLIER receiver of the same statement keeps the value it had at the start. The bound MOVEs that store into
+    /// the receivers are rebuilt over the frozen places (<see cref="BoundMove.Retargeted"/>).</summary>
+    private BoundUnstringStmt IdentifyOperands(BoundUnstringStmt s)
+    {
+        var hoist = PlaceIdentification.Hoister(ctx);
+        var source = PlaceIdentification.Freeze(s.Source, hoist)!;
+        var delimiters = s.Delimiters.Select(d => d with { Value = PlaceIdentification.Freeze(d.Value, hoist)! }).ToList();
+        var receivers = new List<BoundUnstringReceiver>(s.Receivers.Count);
+        foreach (var r in s.Receivers)
+        {
+            var target = PlaceIdentification.Freeze(r.Target, hoist);
+            var delimIn = r.DelimiterIn is null ? null : PlaceIdentification.Freeze(r.DelimiterIn, hoist);
+            var countIn = r.CountIn is null ? null : PlaceIdentification.Freeze(r.CountIn, hoist);
+            receivers.Add(new BoundUnstringReceiver(
+                target, delimIn, countIn,
+                r.Store.Retargeted([target]),
+                r.DelimiterStore?.Retargeted([delimIn!]),
+                r.ZeroFill?.Retargeted([target])));
+        }
+        var pointer = s.Pointer is null ? null : PlaceIdentification.Freeze(s.Pointer, hoist);
+        var tallying = s.Tallying is null ? null : PlaceIdentification.Freeze(s.Tallying, hoist);
+        return s with { Source = source, Delimiters = delimiters, Receivers = receivers, Pointer = pointer, Tallying = tallying };
+    }
+
+    /// <summary>The same item identification for STRING (§14.6.4 7; kb/Work PB1123): every sending and delimiter, the
+    /// receiver and the POINTER are identified before the first character moves, so a subscripted POINTER whose
+    /// subscript is the receiver (<c>STRING … INTO I WITH POINTER PE(I)</c>) is not re-identified after the
+    /// receiver was stored.</summary>
+    private BoundStringStmt IdentifyOperands(BoundStringStmt s)
+    {
+        var hoist = PlaceIdentification.Hoister(ctx);
+        var sendings = s.Sendings.Select(x => x with
+        {
+            Value = PlaceIdentification.Freeze(x.Value, hoist)!,
+            Delimiter = PlaceIdentification.Freeze(x.Delimiter, hoist),
+        }).ToList();
+        var into = PlaceIdentification.Freeze(s.Into, hoist);
+        var pointer = s.Pointer is null ? null : PlaceIdentification.Freeze(s.Pointer, hoist);
+        return s with { Sendings = sendings, Into = into, Pointer = pointer };
     }
 
     /// <summary>The sender's character image (GR11 — a field's raw image; DA4: an operand, which may be a function).

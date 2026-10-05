@@ -1156,6 +1156,19 @@ public sealed record BoundMove(BoundOperand Source, IReadOnlyList<Place> Targets
     /// move <c>MoveBinder.BindMoveOf</c> binds (READ / RETURN … INTO, WRITE / REWRITE / RELEASE … FROM, GOBACK …
     /// RETURNING), so a wrapper only the MOVE verb returned would leave those arms moving element images.</para></summary>
     public IReadOnlyList<TableElementMove> ElementMoves { get; init; } = [];
+
+    /// <summary>This move over the SAME sender with its receivers replaced by <paramref name="targets"/>, which
+    /// must be the receivers' own places with their run-time address fragments FROZEN (kb/Work PB1123;
+    /// <c>PlaceIdentification.Freeze</c>) — the same items, so every screen <c>MoveBinder.BindMoveOf</c> asked of this
+    /// move still holds, and <see cref="Stores"/> is recomputed over the new places by construction (a
+    /// <c>with</c> expression would copy the stale <see cref="Stores"/>). A verb that identifies its operands once
+    /// at the head of the statement (§14.6.4 7; UNSTRING's INTO / DELIMITER IN stores) renders its bound moves
+    /// through this. A move that owes §14.6.9.2 element moves cannot be retargeted — their places carry their own
+    /// subscripts — and that is refused loudly rather than answered with the unfrozen ones.</summary>
+    public BoundMove Retargeted(IReadOnlyList<Place> targets) =>
+        ElementMoves.Count == 0
+            ? new BoundMove(Source, targets) { ImplicitOf = ImplicitOf }
+            : throw new InvalidOperationException("a MOVE that owes element moves (ISO §14.6.9.2) cannot be retargeted to frozen places");
 }
 
 /// <summary>ONE corresponding table pair's element moves (ISO §14.6.9.2, kb/Work PB1144): for <see cref="Var"/> =

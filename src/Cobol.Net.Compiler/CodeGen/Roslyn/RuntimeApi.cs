@@ -451,6 +451,13 @@ internal static class RuntimeApi
     public static string NumDigitMagnitude(string image) =>
         $"{nameof(CobolNum)}.{nameof(CobolNum.DigitMagnitude)}({image})";
 
+    /// <summary>A signed numeric DISPLAY item's replaced digit image re-signed with the sign the item's CURRENT image
+    /// carries, a zero magnitude included — <c>CobolNum.RetainSign</c> (ISO §14.9.22.4 GR4 d; kb/Work PB1128).
+    /// <paramref name="digits"/> is the replaced digit run, <paramref name="current"/> the item's image before the
+    /// statement.</summary>
+    public static string NumRetainSign(string digits, string current, string profile) =>
+        $"{nameof(CobolNum)}.{nameof(CobolNum.RetainSign)}({digits}, {current}, {profile})";
+
     /// <summary>Rescale an unscaled value between fraction scales under a rounding mode — <c>CobolNum.Rescale</c>,
     /// or the size-error-latching <c>CobolNum.RescaleChecked</c> when <paramref name="checkedPath"/>.</summary>
     /// <summary>The §15.3 integer-argument landing (PB22) — <c>CobolIntrinsics.IntegerArg</c>, which RAISES on a
