@@ -427,6 +427,18 @@ picks them up). The installer moves the old script and the old `.cmd` to `%LOCAL
 nothing calls them. `test_autostart.ps1` proves the install, the idempotent re-install, the uninstall, and that STOP and a waiting
 owner question stop the start, all in temp directories.
 
+## 10b. Starting an ATTENDED session (and the context-full restart)
+
+The loop is headless and never needs an interactive session, but the owner works with one, and a session cannot start its own
+successor: something outside it must launch the new one. `scripts/start-session.ps1` is that launcher, in git, the only one (a
+copy in `%LOCALAPPDATA%` would be unversioned and would drift). It starts `claude -n COBOL` in the repository with a prompt that names
+no state: the memory index's START HERE note is the single source, so the same script serves a boot start (until the owner installs
+section 10a's entry, the Startup `.cmd` calls it) and a context-full restart. There is NO automatic context-full trigger. The attended
+session performs the procedure itself, in this order: wind running work down (`stop.ps1`: agents checkpoint, the unit hands off),
+save (a resume note marked START HERE, WIP checkpoint commits on the worktree branches), then ask the owner to run the script in a
+new terminal. A STOP file left on purpose by that procedure is named in the prompt so the new session clears it deliberately.
+`start-session.ps1 -DryRun` prints what would run.
+
 ## 11. Open decisions
 
 - **D1** DECIDED (owner 2026-10-04): permission mode for unattended units is `bypassPermissions` for the COBOL work; the
