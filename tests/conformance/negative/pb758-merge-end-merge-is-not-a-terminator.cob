@@ -1,7 +1,13 @@
-      *> PB1689 control - un-reserving END-MERGE must not break the vendor MERGE terminator
-      *>   after a GIVING file-name.
+      *> reject-at: 85 2002 2014 2023
+      *> kb/Work PB758 - END-MERGE is NOT COBOL, so `MERGE ... GIVING OUT1 END-MERGE` names a second
+      *> GIVING file that does not exist. ISO §14.5.1 (Table 12): the MERGE row has no conditional phrase
+      *> and no explicit scope terminator, so there is no scope for a terminator to delimit (§14.5.3.2);
+      *> END-MERGE is in no ISO word list (§8.9) and is a user-defined word (§8.3.2.1, kb/Work PB1689),
+      *> which the GIVING phrase's file-name list takes as file-name-4 (§14.9.24.2). Not a declined ISO
+      *> facility (§4.2.7) - there is no facility - so the answer is the ordinary undefined-name error.
+      *> Control: the same program with END-MERGE removed compiles and prints A1 B2 C1 D2.
        IDENTIFICATION DIVISION.
-       PROGRAM-ID. PB1689M.
+       PROGRAM-ID. P758NEGM.
        ENVIRONMENT DIVISION.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.

@@ -33,12 +33,12 @@ internal sealed class CallBinder
         // INVOKE SELF "m" — a virtual call to a sibling method on `this` (ISO §8.4.3.8); INVOKE SUPER "m" — a
         // non-virtual call to the base class's method (the override-calls-base pattern). Both have no data-reference
         // target (the receiver is `this`); the binder marks them so the emitter pushes ldarg.0 as the receiver.
-        bool isSelf = objRef?.selfAndSuper()?.SELF() != null;
-        bool isSuper = objRef?.selfAndSuper()?.SUPER() != null;
+        bool isSelf = objRef?.objectReferenceAtom()?.selfAndSuper()?.SELF() != null;
+        bool isSuper = objRef?.objectReferenceAtom()?.selfAndSuper()?.SUPER() != null;
         string targetText = "";
         if (!isSuper && !isSelf)
         {
-            var targetRef = objRef?.dataReference();
+            var targetRef = objRef?.objectReferenceAtom()?.dataReference();
             if (targetRef == null) return null; // NULL target / other forms — later slices
             targetText = targetRef.cobolWord().GetText();
         }

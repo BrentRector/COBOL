@@ -338,8 +338,6 @@ END_READ     : 'END-READ' ;
 END_SEND     : 'END-SEND' ;     // MCS scope terminator (ISO 14.9.38)
 END_SEARCH   : 'END-SEARCH' ;
 END_CALL     : 'END-CALL' ;
-END_SORT     : 'END-SORT' ;
-END_MERGE    : 'END-MERGE' ;
 END_RETURN   : 'END-RETURN' ;
 END_REWRITE  : 'END-REWRITE' ;
 END_DELETE   : 'END-DELETE' ;

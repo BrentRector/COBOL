@@ -298,8 +298,8 @@ objectReferenceUsage
 // OMITTED is the ONLY underlined word; `::` and the parentheses are required punctuation; the OUTER bracket
 // makes the whole parenthesised argument list optional and the `…` repeats the brace group INSIDE the one pair.
 //
-// ⛔ THE RECEIVER IS `objectReference`, THE SAME RULE INVOKE'S RECEIVER USES — one activation mechanism, never a
-// second (the dispatch's own words). §8.4.3.4.4 GR1 DEFINES this construct as the INVOKE statement it is
+// ⛔ THE RECEIVER IS `objectReferenceAtom`, THE RULE INVOKE'S RECEIVER (`objectReference`) IS BUILT ON — one activation
+// mechanism, never a second (the dispatch's own words). §8.4.3.4.4 GR1 DEFINES this construct as the INVOKE statement it is
 // equivalent to, so the two must not be able to disagree about what a receiver is: object-class-name-1 and
 // identifier-1 are both one `dataReference` syntactically (the binder partitions them by resolved symbol kind,
 // OoNameResolution.Lookup), and SELF/SUPER are §8.4.3.1.2 Format 6 identifiers of class object and therefore
@@ -311,7 +311,8 @@ objectReferenceUsage
 // format for an identifier allows another identifier to be specified, that other identifier may be any of the
 // formats for an identifier, INCLUDING THE ONE BEING DEFINED"): the temporary an invocation references is
 // itself an identifier-1, so `O :: "A" :: "B"` is conforming source. Writing the repetition here is what makes
-// the recursion expressible without indirect left recursion through `objectReference`.
+// the recursion expressible without indirect left recursion through `objectReference`. A function-identifier is a
+// legal identifier-1 too (§8.4.3.1.3 SR1 — `FUNCTION FOBJ (1) :: "M"`), so the atom carries `functionCall`.
 //
 // ⚠ `refModPart*` mirrors `functionCall`'s tail and is derived, not copied: §8.4.3.1.4 GR1 orders the
 // components — (e) the invocation operator applies "the literal method-name with optional arguments … on the
@@ -323,7 +324,7 @@ objectReferenceUsage
 // generated context would expose FLAT `literal()` and `argumentList()` lists, and `A::"M"::"N"(X)` could not
 // say which method the one argument belongs to.
 inlineMethodInvocation
-    : objectReference inlineInvocationSegment+ refModPart*
+    : objectReferenceAtom inlineInvocationSegment+ refModPart*
     ;
 
 inlineInvocationSegment

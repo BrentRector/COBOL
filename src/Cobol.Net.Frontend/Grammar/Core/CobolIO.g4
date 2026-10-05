@@ -854,6 +854,9 @@ startInvalidKeyPhrase
 // §14.9.40.3 SR15 — "The KEY phrase may be omitted only if the description of the table referenced by data-name-2
 // contains a KEY phrase" — is a rule about the RESOLVED table, so it is screened in SortBinder (with Format 1's
 // braced at-least-one), never by the parser. MERGE has no table format, so mergeKeyPhrase+ is correct as it is.
+// Neither SORT nor MERGE has an explicit scope terminator: Table 12 (§14.5.1) leaves both cells of their rows empty,
+// and END-SORT / END-MERGE occur nowhere in ISO/IEC 1989:2023 — so `SORT … END-SORT` is the ordinary syntax error and
+// both words are user-defined words (kb/Work PB758; R58 removed END-INVOKE on the same ISO text).
 sortStatement
     : SORT sortFileName
       sortKeyPhrase*
@@ -861,8 +864,6 @@ sortStatement
       sortCollatingPhrase?
       ( ( sortUsingPhrase | sortInputProcedurePhrase )
         ( sortGivingPhrase | sortOutputProcedurePhrase ) )?
-      END_SORT?
-
     ;
 
 sortFileName
@@ -938,8 +939,6 @@ mergeStatement
       sortCollatingPhrase?
       mergeUsingPhrase
       ( mergeGivingPhrase | mergeOutputProcedurePhrase )?
-      END_MERGE?
-
     ;
 
 mergeFileName

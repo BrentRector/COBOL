@@ -201,7 +201,8 @@ internal sealed class DataStatementBinder
         if (target.Symbol.ResolvedType?.Category != CobolCategory.Pointer)
             return null;
 
-        var objRef = ctx.objectReference();
+        var objRef = ctx.objectReference().objectReferenceAtom();
+        if (objRef == null) return null; // a function-identifier or inline-invocation sender — post-oracle
         if (objRef.predefinedNull() != null)
             return new BoundSetPointerStatement(target.Symbol, PointerSetSourceKind.Null);
         if (objRef.dataReference() != null

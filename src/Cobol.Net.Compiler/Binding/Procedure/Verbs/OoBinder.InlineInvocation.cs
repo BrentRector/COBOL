@@ -191,10 +191,10 @@ internal sealed partial class OoBinder
         // The INTRODUCTION gate fires on RECOGNITION in the VersionConformancePass parse arm
         // (VisitInlineMethodInvocation → Check(InlineMethodInvocation2002)), never here: a below-2002 inline
         // invocation is an edition violation independent of whether its method resolves.
-        var target = imi.objectReference();
+        var target = imi.objectReferenceAtom();
 
         // §8.4.3.4.3 SR2, screened BEFORE resolution because both rejected shapes are RECEIVER shapes and the
-        // general format admits them syntactically (the P3 superset parse: `objectReference` is INVOKE's own
+        // general format admits them syntactically (the P3 superset parse: `objectReferenceAtom` is INVOKE's own
         // receiver rule — see CobolOO.g4).
         if (target.predefinedNull() is not null)
         {
@@ -208,9 +208,18 @@ internal sealed partial class OoBinder
             && RefuseUniversalInlineReceiver(r0, dr0.GetText()) is { } refusedFirst)
             return refusedFirst;
 
-        // §8.4.3.1.3 SR1 recursion: each segment invokes on the temporary the previous one produced.
+        // §8.4.3.1.3 SR1 recursion: each segment invokes on the temporary the previous one produced. A
+        // function-identifier identifier-1 (`FUNCTION FOBJ (1) :: "M"`, kb/Work PB1425) is bound once, here, and its
+        // temporary is the first segment's receiver exactly as a chained segment's is — so SR2's universal half below
+        // asks it too, and it never reaches the receiver dispatch a second time.
         Place? chained = null;
-        string written = target.GetText();
+        if (OoBindComputedAtom(target) is { } computed
+            && (chained = OoObjectReferenceTemporary(computed, target, DiagnosticCatalog.InlineInvocationReceiver.Code,
+                "an inline method invocation's identifier-1 shall be of class object (ISO §8.4.3.4.3 SR2)")) is null)
+            return BoundExprError.Refused(ctx.Edition, "inline method invocation through a non-object identifier-1");
+        // The receiver AS WRITTEN (spaces kept), which every diagnostic about a chained receiver names — never the
+        // compiler's temporary.
+        string written = DataBinder.WrittenText(target);
         foreach (var seg in imi.inlineInvocationSegment())
         {
             // §8.4.3.4.3 SR2 binds EVERY segment's identifier-1, not only the written first one: identifier is
@@ -219,7 +228,8 @@ internal sealed partial class OoBinder
             // dynamic path, which never sets an implicit returning place, and ended in COBOLNET2362).
             if (chained is { } recv && RefuseUniversalInlineReceiver(recv, written) is { } refusedChained)
                 return refusedChained;
-            written += seg.GetText();
+            string receiverText = written;
+            written += " " + DataBinder.WrittenText(seg);
             if (OoMethodNameOf(seg.literal()) is not { Length: > 0 } methodName)
             {
                 ctx.Edition.Error(DiagnosticCatalog.InlineInvocationReceiver,
@@ -230,7 +240,7 @@ internal sealed partial class OoBinder
             }
             var site = InvocationSite.OfInlineSegment(seg);
             var activation = chained is { } prev
-                ? OoBindInstanceInvoke(site, prev, methodName)
+                ? OoBindInstanceInvoke(site, prev, methodName, receiverText)
                 : OoBindByReceiver(site, target, methodName);
             if (site.ImplicitReturningPlace is not { } result)
                 // Every failure path already reported (the receiver, roster, arity and conformance

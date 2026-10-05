@@ -1826,8 +1826,25 @@ setObjectReferenceStatement
 // INHERITS class, SR5 required with several — a multiple-INHERITS class is declined, Annex A.4.10 item 1). It precedes
 // `dataReference` because `K OF SUPER` begins like a qualified data reference; SUPER is reserved, so the two part on
 // the third token. Every consumer asks the ONE rule (OoBinder.OoBindByReceiver, SetBinder, EcBinder.BindRaise).
+//
+// ⛔ AN OBJECT-REFERENCE POSITION TAKES EVERY IDENTIFIER FORMAT THAT CAN YIELD AN OBJECT REFERENCE (kb/Work PB1425,
+// PB1197). §14.9.23.3 SR1 ("Identifier-1 shall be an object reference"), §14.9.29.3 SR2 and §14.9.39.3 SR9 ask the
+// identifier's CLASS, never its spelling, and §8.4.3.1.3 SR1 makes an identifier "any of the formats for an
+// identifier": a function-identifier (§8.4.3.1.2 Format 1 — a user function may RETURN an object reference) and an
+// inline method invocation (Format 4 — §8.4.3.4.4 GR1's temporary has the method's RETURNING description) are object
+// references exactly when the item they reference is one. So `INVOKE A1 :: "ME" "GETNAME"`, `RAISE A1 :: "ME"` and
+// `INVOKE FUNCTION FOBJ (1) "M"` are conforming, and were parse errors. ONE rule serves INVOKE's receiver, SET Format
+// 5's sender and RAISE, so a position cannot admit a format another refuses. `objectReferenceAtom` is the receiver an
+// inline invocation applies its `::` segments to; the inline form itself cannot be an alternative of the atom
+// (indirect left recursion), and needs not be: the segment REPEATS (`O :: "A" :: "B"`, §8.4.3.1.3 SR1's recursion).
 objectReference
-    : selfAndSuper
+    : inlineMethodInvocation
+    | objectReferenceAtom
+    ;
+
+objectReferenceAtom
+    : functionCall
+    | selfAndSuper
     | dataReference
     | predefinedNull
     ;

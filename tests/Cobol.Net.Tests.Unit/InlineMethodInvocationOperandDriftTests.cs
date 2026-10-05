@@ -42,9 +42,11 @@ public sealed class InlineMethodInvocationOperandDriftTests
         Path.Combine("src", "Cobol.Net.Frontend", "Grammar", "Core", "CobolOO.g4"),
     ];
 
-    /// <summary>The rule whose own DEFINITION is <c>functionCall</c> (and the one that defines Format 4) —
-    /// a rule cannot be asked to offer itself as an alternative.</summary>
-    private static readonly string[] Definitions = ["functionCall", "inlineMethodInvocation"];
+    /// <summary>The rule whose own DEFINITION is <c>functionCall</c>, the one that defines Format 4, and Format 4's
+    /// own receiver <c>objectReferenceAtom</c> (kb/Work PB1425) — a rule cannot be asked to offer itself as an
+    /// alternative, and the atom cannot offer the inline form without indirect left recursion; the operand rule built
+    /// on it (<c>objectReference</c>) offers both, and the pairing fact holds there.</summary>
+    private static readonly string[] Definitions = ["functionCall", "inlineMethodInvocation", "objectReferenceAtom"];
 
     /// <summary>rule-name → its body text, over every grammar file, comments stripped.</summary>
     private static Dictionary<string, string> LoadRules()
@@ -93,6 +95,31 @@ public sealed class InlineMethodInvocationOperandDriftTests
             + "proved nothing (feedback_verdict_evidence_invariant).");
     }
 
+    /// <summary>⛔ EVERY OBJECT-REFERENCE POSITION TAKES THE ONE OBJECT-REFERENCE OPERAND RULE, AND THAT RULE TAKES BOTH
+    /// COMPUTED IDENTIFIER FORMATS (kb/Work PB1425, PB1197). §14.9.23.3 SR1, §14.9.29.3 SR2 and §14.9.39.3 SR9 ask
+    /// the identifier's class, so an inline invocation (Format 4) or a function-identifier (Format 1) whose item is an
+    /// object reference is a legal INVOKE receiver, RAISE operand and SET Format 5 sender. They were parse errors
+    /// because <c>objectReference</c> offered neither — a position that the functionCall pairing above cannot see,
+    /// since the rule offered no functionCall either. Proved to guard: dropping either alternative, or giving one of
+    /// the three positions a private operand rule, fails this fact by name.</summary>
+    [Fact]
+    public void ObjectReferencePositions_AdmitBothComputedIdentifierFormats()
+    {
+        var rules = LoadRules();
+        Assert.True(rules.TryGetValue("objectReference", out string? operand), "the objectReference rule is gone");
+        Assert.True(Mentions(operand, "inlineMethodInvocation"),
+            "objectReference does not offer an inline method invocation (ISO §8.4.3.1.2 Format 4)");
+        Assert.True(rules.TryGetValue("objectReferenceAtom", out string? atom), "the objectReferenceAtom rule is gone");
+        Assert.True(Mentions(atom, "functionCall"),
+            "objectReferenceAtom does not offer a function-identifier (ISO §8.4.3.1.2 Format 1)");
+        foreach (string position in new[] { "invokeTarget", "raiseStatement", "setObjectReferenceStatement" })
+        {
+            Assert.True(rules.TryGetValue(position, out string? body), $"the {position} rule is gone");
+            Assert.True(Mentions(body, "objectReference"),
+                $"'{position}' no longer takes the shared objectReference operand rule");
+        }
+    }
+
     /// <summary>The purely receiving rules must admit NEITHER — for them §8.4.3.4.3 SR1 holds STRUCTURALLY, by
     /// the construct's absence, exactly as §8.4.3.2.3 SR1 holds for a function-identifier. A guard that only
     /// checked the sending side would be satisfied by a careless edit that added it everywhere.
@@ -128,7 +155,7 @@ public sealed class InlineMethodInvocationOperandDriftTests
         var rules = LoadRules();
         Assert.True(rules.TryGetValue("inlineMethodInvocation", out string? body),
             "the inlineMethodInvocation rule is gone — §8.4.3.1.2 Format 4 has no surface");
-        Assert.Contains("objectReference", body);
+        Assert.Contains("objectReferenceAtom", body);
         Assert.Contains("inlineInvocationSegment", body);
         Assert.Contains("refModPart", body);        // §8.4.3.1.4 GR1 g)
         Assert.True(rules.TryGetValue("inlineInvocationSegment", out string? seg));

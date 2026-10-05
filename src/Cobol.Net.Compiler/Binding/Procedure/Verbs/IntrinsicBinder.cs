@@ -230,6 +230,12 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         _ => new BoundComputedOperand(e),
     };
 
+    /// <summary>The temporary data item a bound function-identifier or inline method invocation REFERENCES — the item
+    /// whose class and category §8.4.3.2.1 / §8.4.3.4.4 GR1 give the identifier — or null for an intrinsic function
+    /// (a computed value with no item of its own) and for any other expression. The ONE reading every position that
+    /// asks an identifier's item asks (a SET sender, an object-reference operand).</summary>
+    public static Place? TemporaryItemOf(BoundExpr e) => OperandOf(e) is BoundFieldOperand f ? f.Place : null;
+
     /// <summary>The FUNCTION-POINTER data item <paramref name="name"/> resolves to in the active scope, as a Place,
     /// or null — the ONE §8.4.3.2.3 SR4 test ("Function-pointer-name-1 shall be defined as a function-pointer data
     /// item") both function-identifier forms ask (with and without the word FUNCTION; kb/Work PB847). A name that

@@ -1150,12 +1150,15 @@ of an unsupported facility.
   (`cobc/reserved.c`, no context test). CHANNEL, END-INVOKE, END-MERGE, END-METHOD, END-SORT, GENERIC, PACKED and
   REMARKS were on this list until 2026-09-29 and are NOT reserved: ISO §8.9 does not reserve them, GnuCOBOL 3.2
   has no entry (REMARKS: a context test normal code never meets), so they are user-defined words and the vendor
-  constructs they spell are recognized by position (owner: follow ISO) — except END-INVOKE, which spells NO
-  construct at all: §14.9.23.2's INVOKE format ends at `[ RETURNING identifier-4 ]` and Table 12 (§14.5.1) gives
-  INVOKE no explicit scope terminator (`cite.py --check 14.5.1 "Statement names are identified in Table 12"` → OK),
-  so `INVOKE … END-INVOKE` is not recognized and is the ordinary syntax error, and the word has no lexer token
-  (kb/Work PB758, decision R58; negatives `pb758-invoke-end-invoke-after-returning` and
-  `pb758-invoke-end-invoke-after-using-returning`). The single source is
+  constructs they spell are recognized by position (owner: follow ISO) — except END-INVOKE, END-SORT and
+  END-MERGE, which spell NO construct at all: Table 12 (§14.5.1) gives INVOKE, SORT and MERGE no explicit scope
+  terminator (`cite.py --check 14.5.1 "Statement names are identified in Table 12"` → OK; §14.9.23.2's INVOKE format
+  ends at `[ RETURNING identifier-4 ]`), so `INVOKE … END-INVOKE`, `SORT … END-SORT` and `MERGE … END-MERGE` are
+  not recognized — the word is an ordinary user word in the position after the statement (a syntax error after
+  INVOKE, an undefined GIVING file after SORT/MERGE) — and none of the three has a lexer token (kb/Work PB758,
+  decision R58 for END-INVOKE and the same ISO text for the other two; negatives
+  `pb758-invoke-end-invoke-after-returning`, `pb758-invoke-end-invoke-after-using-returning`,
+  `pb758-sort-end-sort-is-not-a-terminator` and `pb758-merge-end-merge-is-not-a-terminator`). The single source is
   `tests/version-matrix/cobol-words.json` `extensionReserved`; `CobolWordsDriftTests` fails when this list, that array and the lexer disagree.
   ⚠ DETERMINATION (owner may overturn): reserving them keeps the vendor forms recognizable by name; the rejected
   reading — admitting them as user words at every edition — would make each vendor construct ambiguous with a

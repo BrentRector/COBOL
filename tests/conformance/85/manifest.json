@@ -1,6 +1,7 @@
 {
  "enabled": [
   "pb351_delimited_conditional_operand",
+  "pb1446_comma_point_literal_value_and_size",
   "pb1146_procedure_division_formats",
   "pb1455_qualified_subscripted_subscript",
   "pb1283_renames_legal",

@@ -40,7 +40,7 @@ internal sealed record SetSender(string Text, Core.DataReferenceContext? Ref, Bo
     /// <summary>The temporary data item a user function or inline invocation RETURNS — the item whose class and
     /// category §8.4.3.2.1 / §8.4.3.4.4 GR1 give the identifier. Null for an intrinsic function (a computed value
     /// with no item of its own) and for every non-identifier sender.</summary>
-    public Place? TemporaryItem => Operand is BoundFieldOperand f ? f.Place : null;
+    public Place? TemporaryItem => Bound is { } b ? IntrinsicBinder.TemporaryItemOf(b) : null;
 
     /// <summary>The §8.5.2.1 CLASS of a function-identifier / invocation sender (null when not statically decidable,
     /// and for a <see cref="Ref"/>, whose class the resolved item answers). An INDEX function (§15.2 item 6) is class

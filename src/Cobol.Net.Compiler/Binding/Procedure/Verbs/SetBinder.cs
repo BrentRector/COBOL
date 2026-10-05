@@ -86,12 +86,22 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
             // answer PB817 filed as "the other end, which a fixer will otherwise miss".
             var sorRefs = sor.dataReference();
             var objRef = sor.objectReference();
-            // The grammar spells NULL / SELF / SUPER here (a data-reference sender parses as setToValueStatement), so
-            // a data reference is the rare spelling and a function-identifier cannot reach this arm at all.
-            var sorSender = objRef.dataReference() is { } sorRef ? SetSender.OfReference(sorRef) : null;
-            bool sorNull = objRef.predefinedNull() is not null;
-            bool sorSelf = objRef.selfAndSuper()?.SELF() is not null;
-            bool sorSuper = objRef.selfAndSuper()?.SUPER() is not null;
+            // The grammar spells NULL / SELF / SUPER here: a data-reference, function-identifier or inline-invocation
+            // sender parses as setToValueStatement (it precedes this alternative), whose ONE classifier
+            // (SetSenders.Classify) reads it. `objectReference` is the shared object-reference operand rule, so its
+            // computed forms are read here by the shared binder too, never left to fall through unread.
+            var atom = objRef.objectReferenceAtom();
+            SetSender? sorSender = null;
+            if (host.Oo.OoBindComputedObjectReference(objRef) is { } computed)
+            {
+                sorSender = new SetSender(DataBinder.WrittenText(objRef), null, computed, objRef);
+                if (SetSenders.IsRefused(sorSender)) return BoundRejected.Reported(ctx.Edition);
+            }
+            else if (atom?.dataReference() is { } sorRef)
+                sorSender = SetSender.OfReference(sorRef);
+            bool sorNull = atom?.predefinedNull() is not null;
+            bool sorSelf = atom?.selfAndSuper()?.SELF() is not null;
+            bool sorSuper = atom?.selfAndSuper()?.SUPER() is not null;
             return SetFormatSelection.Select(_fmt.KindsOf(sorRefs), SetDirections.To, out _) switch
             {
                 // ⛔ THE SENDER'S OWN WORD TRAVELS WITH THE FLAG (kb/Work PB388). `sorSelf || sorSuper` collapses

@@ -1,5 +1,7 @@
-      *> PB1689 control - un-reserving END-SORT and CHANNEL must not break the vendor SORT
-      *>   terminator after a GIVING file-name, nor the SPECIAL-NAMES CHANNEL n IS clause.
+      *> PB1689 control - un-reserving CHANNEL must not break the SPECIAL-NAMES CHANNEL n IS clause,
+      *>   and a SORT ending in a GIVING file-name is ended by the next statement (it has no explicit
+      *>   scope terminator: ISO 14.5.1 Table 12; `SORT ... END-SORT` is the PB758 negative
+      *>   pb758-sort-end-sort-is-not-a-terminator).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. VT.
        ENVIRONMENT DIVISION.
@@ -25,6 +27,5 @@
            MOVE "A1" TO IN1-REC WRITE IN1-REC
            CLOSE IN1
            SORT SF ON ASCENDING KEY SF-REC USING IN1 GIVING OUT1
-           END-SORT
            DISPLAY "SORTED"
            STOP RUN.

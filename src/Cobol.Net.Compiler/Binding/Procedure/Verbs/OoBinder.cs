@@ -149,6 +149,15 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // below-2002 INVOKE named no edition at all), and BoundInvoke is equally the bound form of a synthesized
         // property get/set and of NEW / SELF-NEW, none of which is "the INVOKE statement".
         var target = inv.invokeTarget().objectReference();
+        // identifier-1 written as a function-identifier or an inline invocation (kb/Work PB1425): bound ONCE, here, to
+        // the temporary item it references, which then IS the receiver — a typed one through the instance path, a
+        // universal one through the dynamic path, exactly as a data-name receiver of the same description.
+        Place? computedReceiver = null;
+        if (OoBindComputedObjectReference(target) is { } computed
+            && (computedReceiver = OoObjectReferenceTemporary(computed, target, "COBOLNET0824",
+                "identifier-1 shall be an object reference (ISO §14.9.23.3 SR1)")) is null)
+            return BoundRejected.Reported(ctx.Edition);
+        var atom = target.objectReferenceAtom();
 
         // The method selector: an alphanumeric/national literal binds statically (§14.9.23.3 SR2);
         // identifier-2 (a method name held in a data item) is legal ONLY through a UNIVERSAL receiver
@@ -159,7 +168,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // receiver resolves as identifier-1, because a class-name is not a data item and resolving it as one
             // drew the resolver's false "is not defined" (kb/Work PB1136). A data-name shadows a class-name, so the
             // class-name reading is taken only for a name that is not a data item (the OoBindByReceiver partition).
-            if (target.dataReference() is { } cref && ctx.Refs.Probe(cref) is null
+            if (computedReceiver is null && atom?.dataReference() is { } cref && ctx.Refs.Probe(cref) is null
                 && Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, cref, cref.GetText(),
                     Compiler.Oo.OoNameResolution.Want.Class).Class is { } namedClass)
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
@@ -167,8 +176,8 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + "shall be specified (ISO §14.9.23.3 SR3) — identifier-2 may be specified only when identifier-1 "
                     + "is a universal object reference (SR7)");
             // kb/Work PB1030: a reference that did not resolve is the resolver's diagnostic, never SR7's.
-            Place? urecv = null;
-            if (target.dataReference() is { } uref
+            Place? urecv = computedReceiver;
+            if (urecv is null && atom?.dataReference() is { } uref
                 && (urecv = host.Expr.ResolveSending(uref).PlaceOrReported(ctx.Edition)) is null)
                 return BoundRejected.Reported(ctx.Edition);
             if (urecv?.Item.Pic is not { Category: PicCategory.ObjectReference, ObjectRef.IsUniversal: true })
@@ -213,7 +222,42 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // ⛔ THE RECEIVER DISPATCH IS SHARED WITH THE INLINE FORM (kb/Work PB428): §8.4.3.4.4 GR1 says an
         // inline method invocation IS one of the four INVOKE statements it lists, so `O :: "M"` and
         // `INVOKE O "M"` shall not be able to resolve a receiver, a roster or a method differently.
-        return OoBindByReceiver(site, target, methodName);
+        return computedReceiver is { } temp
+            ? OoBindInstanceInvoke(site, temp, methodName, DataBinder.WrittenText(target))
+            : OoBindByReceiver(site, atom!, methodName);
+    }
+
+    /// <summary>⛔ AN OBJECT-REFERENCE OPERAND WRITTEN AS A COMPUTED IDENTIFIER (kb/Work PB1425, PB1197) — an inline
+    /// method invocation (§8.4.3.1.2 Format 4) or a function-identifier (Format 1, including the keyword-omitted
+    /// spelling §8.4.3.2.3 SR2 parses as a data reference) — bound ONCE to the expression that reads the temporary item
+    /// it references (§8.4.3.4.4 GR1; §8.4.3.2.1). Null when the operand is a data-name, a class-name or a predefined
+    /// object reference, which the position's own arms take. Every object-reference position asks it: the INVOKE
+    /// receiver, RAISE's identifier-1 and SET Format 5's sender, so no position can admit a format another
+    /// refuses.</summary>
+    internal BoundExpr? OoBindComputedObjectReference(Core.ObjectReferenceContext operand) =>
+        operand.inlineMethodInvocation() is { } imi ? OoBindInlineInvocation(imi)
+        : OoBindComputedAtom(operand.objectReferenceAtom());
+
+    /// <summary>The function-identifier half of <see cref="OoBindComputedObjectReference"/>, for the receiver an inline
+    /// invocation applies its first <c>::</c> segment to (§8.4.3.1.3 SR1 — identifier-1 is any identifier).</summary>
+    private BoundExpr? OoBindComputedAtom(Core.ObjectReferenceAtomContext atom) =>
+        atom.functionCall() is { } fc ? host.Intrinsic.BindIntrinsic(fc)
+        : atom.dataReference() is { } dref ? host.Intrinsic.KeywordOmittedFunction(dref)
+        : null;
+
+    /// <summary>The temporary item a computed object-reference operand references, when that item is an object
+    /// reference; otherwise null, with the position's own rule reported against the identifier AS WRITTEN — never
+    /// against the compiler's temporary, whose name the program never wrote. An intrinsic function has no item and
+    /// never an object result (§15), so it is refused by the same rule. A bound error was already reported by the
+    /// identifier's own binder.</summary>
+    internal Place? OoObjectReferenceTemporary(BoundExpr bound, Antlr4.Runtime.ParserRuleContext written,
+                                               string code, string rule)
+    {
+        if (bound is BoundExprError) return null;
+        if (IntrinsicBinder.TemporaryItemOf(bound) is { Item.Pic.Category: PicCategory.ObjectReference } temp)
+            return temp;
+        ctx.Edition.Error(code, $"'{DataBinder.WrittenText(written)}': {rule}");
+        return null;
     }
 
     /// <summary>Resolve an invocation's RECEIVER and dispatch to the roster it selects — the shared tail of
@@ -221,7 +265,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// form's <c>{object-class-name-1 | identifier-1}</c>, which are the SAME operand: §8.4.3.4.4 GR1 defines
     /// the inline form as one of the INVOKE statements it writes out, and §8.4.3.4.3 SR3 requires that INVOKE
     /// to be valid by §14.9.23's own syntax rules. One activation mechanism, never a second.</summary>
-    private BoundStatement OoBindByReceiver(InvocationSite site, Core.ObjectReferenceContext target,
+    private BoundStatement OoBindByReceiver(InvocationSite site, Core.ObjectReferenceAtomContext target,
                                             string methodName)
     {
         // The written method name is FORMED once, here, where both invocation spellings meet: leading and trailing
@@ -438,13 +482,22 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     }
     /// <summary><c>INVOKE identifier-1 "method" …</c>: virtual dispatch through a TYPED object reference; the
     /// method resolves over the declared class's hierarchy at COMPILE time (§14.9.23.3 SR4 a)/b) — for the typed
-    /// path a lookup failure is a compile-time diagnostic, the static analog of EC-OO-METHOD, GR7b).</summary>
-    private BoundStatement OoBindInstanceInvoke(InvocationSite site, Place receiver, string method)
+    /// path a lookup failure is a compile-time diagnostic, the static analog of EC-OO-METHOD, GR7b).
+    /// <paramref name="written"/> is the receiver as the program wrote it, for a receiver that is a TEMPORARY (a
+    /// function-identifier's or an inline invocation's item, kb/Work PB1425): a diagnostic names what the program
+    /// wrote, never the compiler's temporary (it used to say <c>INVOKE '__INV-TEMP-200003'</c>).</summary>
+    private BoundStatement OoBindInstanceInvoke(InvocationSite site, Place receiver, string method,
+                                                string? written = null)
     {
+        string? recvName = written ?? receiver.Item.CobolName;
+        // The written name FORMED (DOC-A.1-68, as OoBindByReceiver does): this path is also entered directly — by a
+        // receiver that is a function-identifier or an inline invocation, and by each chained `::` segment, whose
+        // receiver is the previous segment's temporary — so `A :: "ME" :: " GET "` names the method GET too.
+        method = CobolNet.Runtime.ExternalizedNames.Form(method);
         if (receiver.Item.Pic is not { Category: PicCategory.ObjectReference } pic)
         {
             return BoundRejected.Report(ctx.Edition, "COBOLNET0824",
-                $"INVOKE '{receiver.Item.CobolName}': identifier-1 shall be an object reference — a USAGE OBJECT "
+                $"INVOKE '{recvName}': identifier-1 shall be an object reference — a USAGE OBJECT "
                 + "REFERENCE data item (ISO §14.9.23.3 SR1)");
         }
         // The receiver's §13.18.60.2 DESCRIPTION picks the roster (kb/Work PB389): universal → the dynamic
@@ -465,7 +518,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             if (proto is null)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0825",
-                    $"INVOKE '{receiver.Item.CobolName}' \"{method}\": interface '{recvIface.Name}' (and "
+                    $"INVOKE '{recvName}' \"{method}\": interface '{recvIface.Name}' (and "
                     + "its INHERITS closure) does not declare a method named '" + method + "' "
                     + "(ISO §14.9.23.3 SR4 e))");
             }
@@ -476,7 +529,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         {
             // Unreachable when DataBinder validated the declared class (COBOLNET0813) — defensive, loud.
             return BoundRejected.Report(ctx.Edition, "COBOLNET0813",
-                $"INVOKE '{receiver.Item.CobolName}': its declared class '{className}' is not a class of the "
+                $"INVOKE '{recvName}': its declared class '{className}' is not a class of the "
                 + "compilation group (ISO §13.18.60.4)");
         }
         // §9.3.6: a class has TWO separate method interfaces, and which one a receiver selects is the FACTORY
@@ -498,7 +551,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                              + "of the class containing the INVOKE statement",
         };
         if (m is null && rdesc.Factory && IsStandardNew(method))
-            return NewWithoutBase($"INVOKE '{receiver.Item.CobolName}' \"{method}\"", cls, typedRule);
+            return NewWithoutBase($"INVOKE '{recvName}' \"{method}\"", cls, typedRule);
         if (m is null)
         {
             string other = rdesc.Factory ? "an INSTANCE" : "a FACTORY";
@@ -508,7 +561,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                   + (rdesc.Factory ? "factory" : "instance") + " one)"
                 : "";
             return BoundRejected.Report(ctx.Edition, "COBOLNET0825",
-                $"INVOKE '{receiver.Item.CobolName}' \"{method}\": class '{cls.Name}' (and its inheritance "
+                $"INVOKE '{recvName}' \"{method}\": class '{cls.Name}' (and its inheritance "
                 + $"chain) does not define {(rdesc.Factory ? "a factory" : "an instance")} method named '"
                 + method + $"' (ISO {typedRule}; compile-time for a typed receiver — the runtime analog is "
                 + $"EC-OO-METHOD, §14.9.23.4 GR7b){hint}");

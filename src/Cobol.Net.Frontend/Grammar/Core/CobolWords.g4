@@ -26,9 +26,7 @@ cobolWord
     | {!keywordContinuesHere()}? CHANNEL
     | {!keywordContinuesHere()}? CYCLE
     | {!keywordContinuesHere()}? DECIMAL_ENCODING
-    | {!keywordContinuesHere()}? END_MERGE
     | {!keywordContinuesHere()}? END_METHOD
-    | {!keywordContinuesHere()}? END_SORT
     | {!keywordContinuesHere()}? ENTRY_CONVENTION
     | {!keywordContinuesHere()}? EOL
     | {!keywordContinuesHere()}? EOS
