@@ -1416,13 +1416,13 @@
   "ordinal": 3,
   "subject": "Compiler directives",
   "rule-digest": "71c715ed933c",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Editions/CompilerDirectiveLine.cs#StripInlineComment; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#ParseTurn; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter",
-  "test-ref": "",
+  "test-ref": "conformance:2002/pb1365_turn_directive_in_program_text_area; conformance:2023/pb1365_turn_directive_inline_comment_is_legal; conformance:negative/pb1365-turn-directive-trailing-word; conformance:negative/pb806-else-trailing-word; conformance:negative/pb806-end-if-trailing-word; conformance:negative/pb806-end-evaluate-trailing-word; conformance:negative/pb794-source-format-unknown; unit:CompilerDirectiveCatalogDriftTests.EveryClosedOperandDirective_DiagnosesAMalformedOperand; unit:CompilerDirectiveCatalogDriftTests.EveryNoOperandWord_RejectsAnOperandAndAcceptsTheBareWord; unit:CompilerDirectiveCatalogDriftTests.InlineComment_IsNotPartOfTheOperand; unit:StageOwnedDirectiveOperandDriftTests.EveryStageDirectiveWord_RejectsAWordAfterItsOperand_AndAcceptsItsOperandAndAComment; unit:ReferenceFormatLogicalConversionTests.FixedFormDirective_IsRecognizedInTheProgramTextArea",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1365 (registrar 15a). §7.3.3 SR3 'When the reference format is fixed-form, a compiler directive shall be written in the program-text area and may be followed only by space characters and an optional inline comment.' (cite.py --check 7.3.3 OK). Two halves. (a) program-text area: in a file the normalizer classifies fixed-form, a directive at column 8 with any sequence-area content (S3G '00004X') and text past margin R (S3F, cols 73-80) is read correctly - CONFORMS; column-7 placement is rejected. (b) 'followed only by spaces and an inline comment': the inline comment is stripped quote-aware at the one parse (S4A: 12 directives each with '*> c' accepted) and the closed-word directives (PROPAGATE, LISTING, REF-MOD-ZERO-LENGTH, LEAP-SECOND, CALL-CONVENTION, PUSH, POP, SOURCE) and the expression directives (DEFINE, IF, EVALUATE, WHEN) reject trailing words (S4C, S4D, S4E, T3, T4, T6, T7, U3, U4, U6, U7) - but >>TURN DOES NOT: S4B '>>TURN EC-ALL CHECKING OFF JUNK', T1 '... CHECKING ON WITH LOCATION JUNK', T2 '... CHECKING ON JUNK' all compile clean (TurnDirectiveProcessor breaks out of its word loop at CHECKING ON/OFF and never looks at the rest) - finding 'turn-trailing-words'. >>ELSE/>>END-IF/>>END-EVALUATE trailing words are kb/Work PB806 (open) and >>DISPLAY's operand is PB807 (open); T8 re-measured PB806. Out-of-scope observation: the fixed/free AUTO-DETECTION (a documented extension, CONFORMANCE.md DOC-A.1-158) classifies a file free-form when a directive line carries a letter in the sequence area and the other lines have none (S3B/S3E) or text past column 72 with blank sequence areas (S3C), and the directive then fails - a §6.1/§6.3.2 defect, recorded as a dossier gap, not charged to this row. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5) retired-witness: src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs#ConvertFixedToFree (ConvertFixedToFree was deleted by PB1800; FixedFormConverter is the converter it named)",
-  "state": "GAP"
+  "notes": "kb/Work PB1365 (wave 1019 B). Both halves hold on a fresh build. (a) program-text area: a directive at column 8 with sequence-area content (cols 1-6) is read, a directive at column 7 is COBOLNET2616 (conformance:2002/pb1365_turn_directive_in_program_text_area; unit:ReferenceFormatLogicalConversionTests.FixedFormDirective_IsRecognizedInTheProgramTextArea; SR-7.3.3-2). (b) 'followed only by space characters and an optional inline comment': the one parse strips the inline comment quote-aware, the closed-word directives reject a trailing word through CheckOperand (COBOLNET1911: LISTING, PROPAGATE, REF-MOD-ZERO-LENGTH, LEAP-SECOND, CALL-CONVENTION, PUSH, POP, SOURCE FORMAT), ELSE / END-IF / END-EVALUATE reject any operand (PB806), and EVERY directive word of EVERY stage-owned row (TURN COBOLNET0718, FLAG-02/-14 COBOLNET1622, COBOL-WORDS COBOLNET1623, DEFINE/IF/EVALUATE/WHEN/DISPLAY COBOLNET1619) rejects a word after its conforming operand in fixed and free form and accepts its operand with an inline comment: StageOwnedDirectiveOperandDriftTests derives the word set from the Stage rows, so a new stage-owned directive without a witness line is a red test. The PB1365 hole was TURN's loop breaking at CHECKING.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.3-4",
@@ -1431,13 +1431,13 @@
   "ordinal": 4,
   "subject": "Compiler directives",
   "rule-digest": "873249b01de0",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Editions/CompilerDirectiveLine.cs#StripInlineComment; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#ParseTurn",
-  "test-ref": "",
+  "test-ref": "unit:StageOwnedDirectiveOperandDriftTests.EveryStageDirectiveWord_RejectsAWordAfterItsOperand_AndAcceptsItsOperandAndAComment; unit:CompilerDirectiveCatalogDriftTests.InlineComment_IsNotPartOfTheOperand; unit:CompilerDirectiveCatalogDriftTests.EveryClosedOperandDirective_DiagnosesAMalformedOperand; unit:CompilerDirectiveCatalogDriftTests.EveryNoOperandWord_RejectsAnOperandAndAcceptsTheBareWord; conformance:2023/pb794_directive_operands; conformance:negative/pb1365-turn-directive-trailing-word",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1365 (registrar 15a). §7.3.3 SR4 'When the reference format is free-form, a compiler directive may be followed only by space characters and an optional inline comment.' (cite.py --check 7.3.3 OK). Same one parse as SR3 (the fixed-form program-text area is normalized to free form before the directive stages run), so the same verdict: inline comment correctly accepted and removed (quote-aware: '>>DISPLAY \"a *> b\"' keeps the literal - unit:CompilerDirectiveCatalogDriftTests.InlineComment_IsNotPartOfTheOperand, conformance:2023/pb794_directive_operands, which has a free-form segment); trailing non-comment text rejected for every closed-word and expression directive but ACCEPTED after >>TURN ... CHECKING ON|OFF [WITH LOCATION] (finding 'turn-trailing-words'), and after >>ELSE/>>END-IF/>>END-EVALUATE (kb/Work PB806, open) and in >>DISPLAY (PB807, open). PARTIAL because one directive's stage parser skips the rule. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5)",
-  "state": "GAP"
+  "notes": "kb/Work PB1365 (wave 1019 B). Same one parse as SR-7.3.3-3: the free-form theory case of StageOwnedDirectiveOperandDriftTests drives every stage-owned directive word through the real front end with InitialFormat=Free; a free-form >>TURN ... CHECKING OFF JUNK, >>END-IF JUNK and >>LISTING ON JUNK are rejected and '*> c' is accepted (re-probed). PB806 (ELSE/END-IF/END-EVALUATE) and PB807 (DISPLAY) are landed, so no directive's stage parser skips the rule.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.3-5",
@@ -1461,13 +1461,13 @@
   "ordinal": 6,
   "subject": "Compiler directives",
   "rule-digest": "d22f1d00665b",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Editions/DirectiveOperandSyntax.cs; src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#ParseTurn; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
-  "test-ref": "",
+  "test-ref": "unit:StageOwnedDirectiveOperandDriftTests.EveryStageDirectiveWord_HasAWitnessLine; unit:StageOwnedDirectiveOperandDriftTests.EveryStageDirectiveWord_RejectsAWordAfterItsOperand_AndAcceptsItsOperandAndAComment; unit:CompilerDirectiveCatalogDriftTests.EveryDirectiveRow_DeclaresItsOperandSyntax; unit:CompilerDirectiveCatalogDriftTests.EveryClosedOperandDirective_DiagnosesAMalformedOperand; unit:CompilerDirectiveCatalogDriftTests.EveryClosedOperandDirective_AcceptsAConformingOperand; conformance:negative/pb1365-turn-directive-trailing-word; conformance:negative/pb1365-turn-file-name-is-directive-word; conformance:negative/pb806-else-trailing-word",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1365 (registrar 15a). §7.3.3 SR6 'Compiler-instruction is composed of compiler-directive words, system-names, and user-defined words as specified in the syntax of each directive.' (cite.py --check 7.3.3 OK). PB794 (landed) made the closed-word operand syntax DATA on each constructs.json row with ONE producer COBOLNET1911; Stage-owned operands (TURN, DEFINE/IF/EVALUATE, FLAG-02/14, COBOL-WORDS) are checked by their stages. Verified: T3/T6/T7/U3 COBOLNET1911, S4C/S4D/T4/U4/U6/U7 COBOLNET1619, U2 COBOLNET1622. Gaps: >>TURN accepts any words after its CHECKING phrase (finding 'turn-trailing-words'); >>ELSE/>>END-IF/>>END-EVALUATE accept an operand (kb/Work PB806, open); >>DISPLAY accepts any operand (kb/Work PB807, open; L14 '>>DISPLAY \"A\" & \"B\"' compiles). The per-directive syntax is each §7.3.x row's own; this row is PARTIAL because the general composition rule is not enforced for every directive. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5)",
-  "state": "GAP"
+  "notes": "kb/Work PB1365 (wave 1019 B). PB794 made each directive's operand syntax DATA on its constructs.json row (Words: one producer COBOLNET1911; Text: declared and cited; Stage: the named owner), and the composition rule 'as specified in the syntax of each directive' now holds for every row: TURN consumes its whole operand (PB1365), ELSE / END-IF / END-EVALUATE reject an operand (PB806), DISPLAY's operand is parsed (PB807), and StageOwnedDirectiveOperandDriftTests pins that every Stage row's words reject a trailing word, so the previously PARTIAL gaps (turn-trailing-words, PB806, PB807) are all closed.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.3-7",
@@ -57366,13 +57366,13 @@
   "ordinal": 0,
   "subject": "TURN directive",
   "rule-digest": "36efde4c0027",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#ParseTurn",
-  "test-ref": "",
+  "test-ref": "conformance:2023/pb1365_turn_checking_implied_on; conformance:2023/pb1365_turn_checking_with_location_implied_on; conformance:2023/pb1365_turn_checking_location_optional_with; conformance:negative/pb1365-turn-off-with-location; conformance:negative/pb1365-turn-directive-trailing-word; conformance:negative/pb1365-turn-file-name-is-directive-word; unit:StageOwnedDirectiveOperandDriftTests.EveryStageDirectiveWord_RejectsAWordAfterItsOperand_AndAcceptsItsOperandAndAComment",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1365 (registrar 15a). Rendered PDF p115 (the printed diagram): ON is NOT underlined, so it is an optional word, and WITH is not underlined either; OFF, CHECKING, TURN and LOCATION are. GR6 says so again: 'If the ON phrase is specified or implied' (cite.py --check 7.3.25.4 \"If the ON phrase is specified or implied\" OK). ParseTurn sets on=true ONLY when the word after CHECKING is literally ON, otherwise on stays null -> COBOLNET0718 'malformed directive'. Probes (pinned cobol.exe, out/probe/turn/): TRNP1 '>>TURN EC-SIZE CHECKING' -> error COBOLNET0718 (expected: compiles, checking ON; the ADD's ON SIZE ERROR shows EC-SIZE-TRUNCATION as TRNP2 with explicit ON does); TRNP3 '>>TURN EC-SIZE CHECKING WITH LOCATION' -> COBOLNET0718 (expected: ON implied + LOCATION). Under-rejection in the other direction: the parser 'break's after ON/OFF and never looks at the rest — TRNP5 '>>TURN EC-SIZE CHECKING ON JUNK' compiles clean and runs; TRNP4 '>>TURN EC-SIZE CHECKING OFF WITH LOCATION' compiles clean (the format has no [WITH LOCATION] under OFF). TRNP6 'CHECKING ON LOCATION' (WITH omitted) is accepted — correct, WITH is an optional word. The exception-name/file-name ellipses are parsed correctly (TRNF3 'EC-I-O-AT-END F1 F2' two files; multiple exception-names). || editions (adjudicator): 2002, 2014, 2023 (the TURN directive is a COBOL-2002 introduction; §7.3 compiler directives)",
-  "state": "GAP"
+  "notes": "kb/Work PB1365 (wave 1019 B re-probe on a fresh build). The printed diagram (PDF p115) underlines TURN, CHECKING, OFF and LOCATION only, so ON and WITH are optional words (cite.py --check 7.3.25.4 'If the ON phrase is specified or implied' OK 6)). ParseTurn reads { exception-name [file-name]... }... CHECKING [ON] [[WITH] LOCATION] | OFF and ends the operand there: CHECKING / CHECKING WITH LOCATION / CHECKING LOCATION / CHECKING ON LOCATION all select ON (checking takes effect: pb1365_turn_checking_implied_on); CHECKING OFF WITH LOCATION, CHECKING ON JUNK, CHECKING JUNK, CHECKING WITH and a directive with no CHECKING are COBOLNET0718; EC-I-O ON / LOCATION as file-name-1 is COBOLNET0718 (SR-7.3.25.3-1); the exception-name/file-name ellipses accept several of each. All re-run: turn_ok / turn_impl / turn_impl_loc / turn_on_loc_nowith / turn_comment run, the rest are rejected.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.3.3.2.2",

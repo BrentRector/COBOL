@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-271 drift tests.
+272 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -252,6 +252,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [SourceEncodingDriftTests](../tests/Cobol.Net.Tests.Unit/SourceEncodingDriftTests.cs) | ⛔ A UTF-8 BOM ON A `.g4` FILE BREAKS THE ANTLR BUILD, AND IT BROKE CI WHILE EVERY LOCAL GATE STAYED GREEN. | `src` |
 | [SpecTraceabilityInventoryDriftTests](../tests/Cobol.Net.Tests.Unit/SpecTraceabilityInventoryDriftTests.cs) | The battery gate over the PHASE-14 Step-0 spec-traceability inventory — the artifact whose GAP count DEFINES v1.0 (owner decision D13: zero GAP = P14 done). | `tests/version-matrix/inventory-schema.json`, `tests/version-matrix/traceability-inventory.json`, `docs/rearchitecture/spec-rule-catalog.json`, `tests/version-matrix/derivation-parity-cases.json`, `scripts/spec/audit_derivations.py`, `scripts/spec/build_inventory.py` … |
 | [SpecialNamesOrdinalReaderDriftTests](../tests/Cobol.Net.Tests.Unit/SpecialNamesOrdinalReaderDriftTests.cs) | ⛔ EVERY SPECIAL-NAMES ORDINAL IS READ BY THE ONE INTEGER READER (kb/Work PB1091, PB1557's sibling). | `src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs` |
+| [StageOwnedDirectiveOperandDriftTests](../tests/Cobol.Net.Tests.Unit/StageOwnedDirectiveOperandDriftTests.cs) | ⛔ A STAGE-OWNED DIRECTIVE OPERAND ENDS WHERE ITS GENERAL FORMAT ENDS (kb/Work PB1365). | — |
 | [StaleDeferralDriftTests](../tests/Cobol.Net.Tests.Unit/StaleDeferralDriftTests.cs) | ⛔ THE STALE-DEFERRAL INVENTORY. A LoudStmt whose message says a backend path is "deferred" is not a statement about COBOL — it is a CLAIM ABOUT THIS BACKEND, and the backend moves under it. | `src/Cobol.Net.Compiler/CodeGen` |
 | [StandardModeReturnedValueContainerDriftTests](../tests/Cobol.Net.Tests.Unit/StandardModeReturnedValueContainerDriftTests.cs) | Under a STANDARD arithmetic mode a numeric function's returned value is contained in an SDIDI in EVERY reference context — and the set of functions that has to hold for is read out of the CATALOG, not out of a list somebody remembered to update. | `src/Cobol.Net.Compiler/Binding/IntrinsicCatalog.cs` |
 | [StartKeyOfReferenceDriftTests](../tests/Cobol.Net.Tests.Unit/StartKeyOfReferenceDriftTests.cs) | ⛔ EVERY START FORMAT DECIDES THE KEY OF REFERENCE, AND THE EPILOGUE MAKES IT SAY SO (kb/Work PB356). | `src/Cobol.Net.Runtime/IO/IndexedConnector.cs` |

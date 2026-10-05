@@ -90,6 +90,7 @@
   "pb1427_null_operand_model",
   "pb1047_global_constant_nearer_data_name",
   "pb1381_turn_at_procedure_header",
+  "pb1365_turn_directive_in_program_text_area",
   "pb1084_repository_self_function_specifier",
   "pb1100_class_repository_function_program",
   "pb1357_replace_also_last",
