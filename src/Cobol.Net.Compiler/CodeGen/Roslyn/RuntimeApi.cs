@@ -1204,6 +1204,10 @@ internal static class RuntimeApi
     /// group (<see cref="Emit.OperandText.RecordAreaExtents"/> answered null).</summary>
     private static string AreaExtentsArg(string? areaExtents) => areaExtents is null ? "" : $", areaExtents: {areaExtents}";
 
+    /// <summary>The WRITE / REWRITE statement's record category argument (§14.9.51.4 GR21 / GR22, §14.9.35.4 GR17):
+    /// named, and present only for a NATIONAL record, the alphanumeric one being the parameter's default.</summary>
+    private static string NationalRecordArg(bool nationalRecord) => nationalRecord ? ", nationalRecord: true" : "";
+
     /// <summary>The ONE governed FORMAT-1 READ, every organization (§9.1.16 / §14.9.30.4 GR9–GR12 + the GR22
     /// ADVANCING ON LOCK skip-scan) — <c>CobolFile.ReadShared</c> (I-O status result, out image). Both READ
     /// emitters render this call: the keyed one takes the status straight, the sequential one wraps it in
@@ -1222,15 +1226,16 @@ internal static class RuntimeApi
     /// <c>CobolFile.WriteShared</c>. <paramref name="pageArg"/> is the executing element's LINAGE page
     /// (§13.18.34 GR6 b) — see <see cref="LinagePageExpr"/>; <paramref name="advance"/> is the statement's
     /// ADVANCING phrases as a <c>WriteAdvance</c> descriptor (omitted = none), never a separate entry
-    /// (kb/Work PB683).</summary>
+    /// (kb/Work PB683). <paramref name="nationalRecord"/> — record-name-1's category (§14.9.51.4 GR21 / GR22) — is
+    /// rendered only when true, so every alphanumeric WRITE renders as it always did (kb/Work PB1191).</summary>
     public static string FileWriteShared(string name, string image, string lenArg, string lockRef, string retryKind,
-        string retryAmount, string pageArg, string? advance = null, string? areaExtents = null) =>
-        $"{nameof(CobolFile)}.{nameof(CobolFile.WriteShared)}({name}, {image}, {lenArg}, {lockRef}, {retryKind}, {retryAmount}, {pageArg}{(advance is null ? "" : $", {advance}")}{AreaExtentsArg(areaExtents)})";
+        string retryAmount, string pageArg, string? advance = null, string? areaExtents = null, bool nationalRecord = false) =>
+        $"{nameof(CobolFile)}.{nameof(CobolFile.WriteShared)}({name}, {image}, {lenArg}, {lockRef}, {retryKind}, {retryAmount}, {pageArg}{(advance is null ? "" : $", {advance}")}{AreaExtentsArg(areaExtents)}{NationalRecordArg(nationalRecord)})";
 
     /// <summary>Governed REWRITE for a sharing-active file, any organization (§14.9.35 GR11/GR12) — <c>CobolFile.RewriteShared</c>.</summary>
     public static string FileRewriteShared(string name, string image, string lenArg, string lockRef, string retryKind, string retryAmount,
-        string? areaExtents = null) =>
-        $"{nameof(CobolFile)}.{nameof(CobolFile.RewriteShared)}({name}, {image}, {lenArg}, {lockRef}, {retryKind}, {retryAmount}{AreaExtentsArg(areaExtents)})";
+        string? areaExtents = null, bool nationalRecord = false) =>
+        $"{nameof(CobolFile)}.{nameof(CobolFile.RewriteShared)}({name}, {image}, {lenArg}, {lockRef}, {retryKind}, {retryAmount}{AreaExtentsArg(areaExtents)}{NationalRecordArg(nationalRecord)})";
 
     /// <summary>Governed DELETE RECORD for a sharing-active file (§14.9.10 GR6/GR7) — <c>CobolFile.DeleteShared</c>.</summary>
     public static string FileDeleteShared(string name, string areaImage, string retryKind, string retryAmount,

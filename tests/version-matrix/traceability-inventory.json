@@ -49746,13 +49746,13 @@
   "ordinal": 21,
   "subject": "WRITE statement",
   "rule-digest": "56df982cffc6",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Runtime/IO/FileConnector.cs#TrimRecordEnd; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitNationalAreaRegistration",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Runtime/IO/FileConnector.cs#TrimRecordEnd; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#Write; src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitWrite; src/Cobol.Net.Compiler/Binding/Model/FileModel.cs#IsNationalRecord",
+  "test-ref": "conformance:2023/pb1191_line_sequential_trailing_space_strip; conformance:2023/pb1191_line_sequential_record_category",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1191 (registrar 14c). GR21: 'For a line sequential file with a file description entry not containing a RECORD clause with the DEPENDING phrase, any spaces to the right of the rightmost non-space character are not transferred to file-name-1. If record-name-1 is specified implicitly or explicitly as alphanumeric, a space is defined to be the alphanumeric space character. If ... as national, a space is defined to be the national space character.' (cite.py --check 14.9.51.4 -> OK rule 21). The core case holds (PROBE pc.cob: PIC X(8) 'AB' -> line 'AB'; ' C D' keeps its interior/leading spaces; PIC N(4) N\"AB\" -> 00 41 00 42; VARYING without DEPENDING -> trimmed). TWO divergences: (1) the alphanumeric arm is string.TrimEnd(), which strips every Unicode White_Space character, not the alphanumeric space character. PROBE E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d1/out/probe/write-p2/pd.cob: LR PIC X(8) = 'AB' + X\"A0\" (U+00A0, a MEMBER of the line sequential character set per CONFORMANCE DOC-A.1-115, 'every character whose code point is U+0020 or above') -> the file holds 'AB' CRLF; the U+00A0 was dropped (expected 'AB' U+00A0 CRLF). (2) the national flag is per-CONNECTOR (EmitNationalAreaRegistration: any national record description marks the whole FD), while GR21 keys on record-name-1: PROBE pd.cob FD LM with 01 LMN PIC N(4) and 01 LMX PIC X(8); WRITE LMX with 'AB' -> 'AB' + six 0x20 + CRLF (expected 'AB' CRLF). The emitter's own comment records (2) as a known RESIDUAL. LINE SEQUENTIAL is a COBOL-2023 introduction (DOC-A.1-115).",
-  "state": "GAP"
+  "notes": "kb/Work PB1191: the strip is keyed on the three things GR21 names. A FD whose RECORD clause has the DEPENDING phrase is untouched (GR22); the alphanumeric space is the space character only (U+00A0 survives); and a WRITE or REWRITE carries record-name-1's own category (FileModel.IsNationalRecord, rendered as nationalRecord: true), so an FD with a national and an alphanumeric record description writes each with its own space, never the area's flag.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.51.4-22",

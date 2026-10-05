@@ -360,7 +360,7 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
             if (!output.RecordSizeVaries && output.Organization != FileOrganization.LineSequential)
                 w.Line($"{tmp} = {RuntimeApi.SortFillTo(tmp, $"{output.RecordWidth}", output.ShortRecordFillNational, RuntimeApi.SortLastReturnedExtents(sdLit))};   // GR16 / MERGE GR13 — the short-record fill");
             // The returned record is written with the extent table it was released with (D-FRA (v); kb/Work PB1053).
-            w.Line($"string {ws} = {RuntimeApi.FileWriteShared(f, tmp, "-1", "FileRecordLock.None", "FileRetryKind.None", "0", seqIo.LinageArg(output), areaExtents: RuntimeApi.SortLastReturnedExtents(sdLit))};   // implicit WRITE without optional phrases (GR15b)");
+            w.Line($"string {ws} = {RuntimeApi.FileWriteShared(f, tmp, "-1", "FileRecordLock.None", "FileRetryKind.None", "0", seqIo.LinageArg(output), areaExtents: RuntimeApi.SortLastReturnedExtents(sdLit), nationalRecord: output.RecordAreaIsNational)};   // implicit WRITE without optional phrases (GR15b); no record-name-1 exists, so the GIVING area's own category (§14.9.30.4 GR15; kb/Work PB1191)");
             // ⛔ EACH as-if WRITE owes its OWN status store and its OWN hook (kb/Work PB837, the GIVING twin of the
             // USING retrieval; kb/Work PB749): GR15's closing paragraph performs the implicit functions "such that any
             // associated USE AFTER EXCEPTION/ERROR procedures are executed", and the write has no phrase that could

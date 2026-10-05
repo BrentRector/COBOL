@@ -885,9 +885,12 @@ public abstract class FileConnector
         : FileCharacterSet.FromChannel(mediumImage, CodeSet);
 
     /// <summary>⛔ GR6 b — the STORAGE-MEDIUM form of a record image about to be written, encoded by the file's
-    /// <see cref="MediumEncoding"/>. Every physical write of record data passes through here.</summary>
-    protected string ToMedium(string nativeImage) => MediumEncoding is MediumEncoding.Utf8
-        ? LineSequentialEncoding.ToChannel(nativeImage, NationalRecordArea)
+    /// <see cref="MediumEncoding"/>. Every physical write of record data passes through here.
+    /// <para>⛔ <paramref name="national"/> is the category of the record being SENT (§14.9.51.4 GR21 / GR22: "If
+    /// record-name-1 is specified implicitly or explicitly as national …"), never the connector's area category —
+    /// an FD with a national and an alphanumeric record description writes each as what it is (kb/Work PB1191).</para></summary>
+    protected string ToMedium(string nativeImage, bool national) => MediumEncoding is MediumEncoding.Utf8
+        ? LineSequentialEncoding.ToChannel(nativeImage, national)
         : FileCharacterSet.ToChannel(nativeImage, CodeSet);
 
     /// <summary>⛔ THE ONE ANSWER TO "can this record be written in the file's coded character set?" for every
@@ -916,22 +919,26 @@ public abstract class FileConnector
     /// national positions of the area start at even offsets, and an odd short read leaves a half position whose
     /// content §14.9.30.4 GR14/GR15 do not define. Padding the bytes with 0x20 instead would have manufactured
     /// U+2020 characters — the identical trap <c>CobolBits.NatWriteWindow</c> documents on the write side.</para></summary>
-    protected string Fit(string s) => FitRecord(s, RecordWidth);
+    protected string Fit(string s) => FitRecord(s, RecordWidth, NationalRecordArea);
 
-    /// <summary>⛔ THE ONE RECORD-AREA FIT (kb/Work PB327): the alphanumeric fill (§14.9.30.4 GR15: "a trailing space
-    /// is defined to be the alphanumeric space character"), or GR15's national one when
-    /// <see cref="NationalRecordArea"/> — both <see cref="RecordFill.Fit"/>, which the SORT/MERGE transfers' own
-    /// short-record fill shares (kb/Work PB1140). Every site that pads a record image to a declared span routes
-    /// through it, so the two fills cannot diverge. Truncation is identical in both (GR15's over-length arm
-    /// truncates "on the right to the maximum size", in bytes).</summary>
-    protected string FitRecord(string s, int width) => RecordFill.Fit(s, width, NationalRecordArea);
+    /// <summary>⛔ THE ONE RECORD FIT (kb/Work PB327): the alphanumeric fill (§14.9.30.4 GR15: "a trailing space
+    /// is defined to be the alphanumeric space character"), or GR15's national one — both
+    /// <see cref="RecordFill.Fit"/>, which the SORT/MERGE transfers' own short-record fill shares (kb/Work PB1140).
+    /// Every site that pads a record image to a declared span routes through it, so the two fills cannot diverge.
+    /// Truncation is identical in both (GR15's over-length arm truncates "on the right to the maximum size", in bytes).
+    /// <para>⛔ <paramref name="national"/> says WHICH category the rule being applied keys on, and each caller names
+    /// it: the READ side and a record area at rest are the AREA's category (<see cref="NationalRecordArea"/>, GR15
+    /// — "the record-area associated with file-name-1"), while a WRITE or REWRITE is keyed on record-name-1
+    /// (§14.9.51.4 GR22, §14.9.35.4 GR17 c) — its own category, which an FD with both a national and an alphanumeric
+    /// record description does not share with the area (kb/Work PB1191).</para></summary>
+    protected static string FitRecord(string s, int width, bool national) => RecordFill.Fit(s, width, national);
 
     /// <summary>⛔ THE RECORD AREA IN ITS ALL-SPACES STATE — what an unsuccessful READ hands back in place of a
     /// record (§14.9.30.4 GR18: its content is then undefined, and the connector offers spaces). It is
     /// <see cref="FitRecord"/> of the empty image, so a NATIONAL record area holds national spaces and never
     /// U+2020 positions a byte-level <c>new string(' ', n)</c> manufactures (kb/Work PB679, the sibling of the key
     /// pad fixed in <see cref="IndexedConnector"/>): ONE pad, ONE trim, keyed on the area's category.</summary>
-    protected string BlankRecordArea() => FitRecord("", RecordWidth);
+    protected string BlankRecordArea() => FitRecord("", RecordWidth, NationalRecordArea);
 
     /// <summary>⛔ THE ONE TRAILING-SPACE TRIM of a record image on the way OUT to a line-oriented stream — the
     /// inverse of <see cref="FitRecord"/>'s pad, and it has to shed the SAME space (kb/Work PB327). A national
@@ -939,14 +946,19 @@ public abstract class FileConnector
     /// §13.18.60.4 GR8 / D-N1), so it sheds in PAIRS from the area's own even byte boundary: a plain
     /// <c>TrimEnd()</c> removed only the 0x20 of the last pair and stopped at its 0x00, leaving an odd-length
     /// record with half a national position on disk (measured: `01 L-REC PIC N(5).` holding N"AB" wrote nine
-    /// bytes, `00 41 00 42 00 20 00 20 00`).</summary>
-    protected string TrimRecordEnd(string image)
+    /// bytes, `00 41 00 42 00 20 00 20 00`).
+    /// <para>⛔ <paramref name="national"/> is the category of the record being WRITTEN — §14.9.51.4 GR21: "If
+    /// record-name-1 is specified implicitly or explicitly as alphanumeric, a space is defined to be the alphanumeric
+    /// space character. If record-name-1 is specified implicitly or explicitly as national, a space is defined to be
+    /// the national space character" — and not the connector's area flag: an FD that carries a national record
+    /// description AND an alphanumeric one writes each with its own space (kb/Work PB1191).</para></summary>
+    protected string TrimRecordEnd(string image, bool national)
     {
         // §14.9.51.4 GR22: a DEPENDING-phrase file keeps the record at data-name-1's length — GR21's strip does not apply.
         if (RecordLengthFromDepending) return image;
         // GR21's "spaces" are the alphanumeric SPACE CHARACTER only — <c>TrimEnd()</c> stripped every Unicode White_Space
         // character too, so a trailing U+00A0 (a member of the line sequential character set, DOC-A.1-115) vanished.
-        if (!NationalRecordArea) return image.TrimEnd(' ');
+        if (!national) return image.TrimEnd(' ');
         int n = image.Length & ~1;                                  // whole national positions only
         while (n >= 2 && image[n - 2] == '\0' && image[n - 1] == ' ') n -= 2;
         return image[..n];
@@ -977,7 +989,7 @@ public abstract class FileConnector
         if (!IsVarying) return Fit(image);
         int len = length >= 0 ? length : image.Length;
         if (len < VaryMin || len > VaryMax) return null;
-        return image.Length == len ? image : image.Length > len ? image[..len] : FitRecord(image, len);   // the ONE pad (kb/Work PB679)
+        return image.Length == len ? image : image.Length > len ? image[..len] : FitRecord(image, len, NationalRecordArea);   // the ONE pad (kb/Work PB679)
     }
 
     /// <summary>A record about to be stored, with the EXTENT TABLE it was sent with (determination D-FRA (v);

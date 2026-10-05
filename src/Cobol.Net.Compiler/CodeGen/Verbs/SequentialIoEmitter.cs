@@ -272,30 +272,25 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// specified implicitly or explicitly as NATIONAL, a trailing space is defined to be the national space
     /// character." The connector pads a short record to the record width, and it is the only place that knows how
     /// long the physical record was — so it, not the emitter, must know which space to use. The area is national
-    /// exactly when its OPERAND category is (an elementary national record, or a GROUP-USAGE NATIONAL group,
-    /// §13.18.29.4 GR2b) — THE ONE category reader, never a re-derivation from the leaves. Emitted only for a
-    /// national area, so every other program's registration is unchanged byte for byte.
+    /// exactly when a record description is (<see cref="FileModel.RecordAreaIsNational"/> over
+    /// <see cref="FileModel.IsNationalRecord"/>, the ONE category reader, never a re-derivation from the leaves).
+    /// Emitted only for a national area, so every other program's registration is unchanged byte for byte.
     /// <para>⛔ ANY record description of the FD, not merely the WIDEST one (kb/Work PB329). §13.18.33.4 GR3 —
     /// "Multiple level 1 entries subordinate to a FD or SD entry represent implicit redefinitions of the same
     /// area" (§9.1.2's NOTE says the same) — makes every record description of an FD describe the SAME record
-    /// area, so an area one of them declares national IS "specified … as national"; and §14.9.51.4 GR21/GR22 —
-    /// the trailing-space rule <c>TrimRecordEnd</c>
-    /// implements — key on <i>record-name-1</i>, so a WRITE naming the national record must shed national
-    /// spaces whatever the sibling descriptions say. Keying on <see cref="FileModel.AreaRecord"/> alone read the
+    /// area, so an area one of them declares national IS "specified … as national", which is what the READ's pad and
+    /// decoding key on. Keying on <see cref="FileModel.AreaRecord"/> alone read the
     /// category off whichever description happened to be widest: <c>01 L-REC PIC N(4). 01 L-BYTES PIC X(8).</c>
     /// (the shape of golden <c>2002/pb327_national_line_sequential_fill</c>) registered NOTHING, so that file's
-    /// line-sequential WRITE shed one 0x20 with <c>string.TrimEnd</c> and left a SEVEN-byte line ending in half
-    /// a national position — the exact trap PB327's own header describes — and the READ then re-padded it
-    /// alphanumerically back to the same eight bytes, so the defect was invisible in the golden's output.
-    /// It became visible the moment §14.9.51.4 GR23's character-set test needed the same flag.</para>
-    /// <para>⚠ RESIDUAL, and deliberately not modelled here: the flag is per-CONNECTOR while GR21/GR22 are per
-    /// record-name-1, so an FD carrying BOTH a national and an alphanumeric record description answers national
-    /// for both. Distinguishing them means carrying the category on the statement; no corpus program writes the
-    /// alphanumeric sibling of a national area, and inventing a second national axis to say so would be the
-    /// two-mechanism anti-pattern.</para></summary>
+    /// READ padded alphanumerically and the record area held half a national position.</para>
+    /// <para>⛔ THE FLAG IS THE AREA'S, NEVER A WRITE'S. §14.9.51.4 GR21/GR22 and §14.9.35.4 GR17 key on
+    /// <i>record-name-1</i>, which an FD carrying BOTH a national and an alphanumeric record description does not
+    /// share with its area, so a WRITE / REWRITE names its own category (<see cref="EmitWrite"/>,
+    /// <see cref="EmitRewrite"/>: <c>nationalRecord:</c>) and the connector's trailing-space strip, space fill,
+    /// character-set screen and on-medium encoding of a written record never read this flag (kb/Work PB1191).</para></summary>
     internal static void EmitNationalAreaRegistration(CodeWriter w, FileModel file)
     {
-        if (file.Records.Any(r => r.OperandPic is { Category: PicCategory.National }))
+        if (file.RecordAreaIsNational)
             w.Line($"{RuntimeApi.FileRegisterNationalArea(FileKeyExpr(file))};");
     }
 
@@ -577,7 +572,10 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // §14.9.51.4 GR4 — the released record is also available as a record of the other files of a SAME RECORD AREA
         // clause (kb/Work PB1195): held in a local so the statement and the store after it see the SAME record.
         string? released = BeginReleasedRecord(wr.File, wr.Record, ref image);
-        w.Line($"{RuntimeApi.FileWriteShared(name, image, lenArg, RuntimeRecordLock(wr.Lock), retryKind, retryAmount, LinageArg(wr.File), AdvanceArg(wr), OperandText.RecordSendExtents(wr.Record))};");
+        // §14.9.51.4 GR21 / GR22 key the line sequential strip, fill and character set on RECORD-NAME-1's category,
+        // so the statement carries it (kb/Work PB1191). The image sent is record-name-1's own on a line sequential
+        // file (FileModel.TransfersPastRecord is false for it), so the category is the Place's.
+        w.Line($"{RuntimeApi.FileWriteShared(name, image, lenArg, RuntimeRecordLock(wr.Lock), retryKind, retryAmount, LinageArg(wr.File), AdvanceArg(wr), OperandText.RecordSendExtents(wr.Record), FileModel.IsNationalRecord(wr.Record.Item))};");
         EndReleasedRecord(wr.File, wr.Record, released, lenArg, RuntimeApi.FileStatus(name));
         // The §9.1.14 status SNAPSHOT for a --permissive INVALID KEY phrase (kb/Work PB691). Taken HERE, before
         // the FILE STATUS store and the USE hook, for the same reason the end-of-page flag is read in the `if`
@@ -807,7 +805,8 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // §14.9.35.4 GR6 — the released record is also available as a record of the other files of a SAME RECORD AREA
         // clause: held in a local so the statement and the store after it see the SAME record (kb/Work PB1195).
         string? released = BeginReleasedRecord(rw.File, rw.Record, ref image);
-        w.Line($"{RuntimeApi.FileRewriteShared(FileKeyExpr(rw.File), image, rwLenArg, RuntimeRecordLock(rw.Lock), retryKind, retryAmount, OperandText.RecordSendExtents(rw.Record))};");
+        // §14.9.35.4 GR17 c)'s space fill keys on record-name-1's category, carried by the statement (kb/Work PB1191).
+        w.Line($"{RuntimeApi.FileRewriteShared(FileKeyExpr(rw.File), image, rwLenArg, RuntimeRecordLock(rw.Lock), retryKind, retryAmount, OperandText.RecordSendExtents(rw.Record), FileModel.IsNationalRecord(rw.Record.Item))};");
         EndReleasedRecord(rw.File, rw.Record, released, rwLenArg, RuntimeApi.FileStatus(FileKeyExpr(rw.File)));
         // The §9.1.14 status snapshot for a --permissive INVALID KEY phrase, taken before the status store and
         // the USE hook — the WRITE arm above carries the full reasoning (kb/Work PB691).

@@ -899,7 +899,7 @@ public sealed class IndexedConnector : KeyedConnector
         // (kb/Work PB679). The two defensive pads that note named were this one site after PB325 rewrote the
         // keyed connectors' base; the START operand and the stored key both come through here, so they cannot
         // be padded differently.
-        if (image.Length < off + len) image = FitRecord(image, off + len);
+        if (image.Length < off + len) image = FitRecord(image, off + len, NationalRecordArea);
         return image.Substring(off, len);
     }
 

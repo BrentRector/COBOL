@@ -1422,7 +1422,7 @@ public sealed class FileRegistry
     /// so the first attempt decides. Returns the I-O status.</summary>
     public string WriteShared(string name, string image, int length, FileRecordLock phrase,
         FileRetryKind retryKind, long retryAmount, LinagePage? page, WriteAdvance advance = default,
-        RecordExtents? extents = null)
+        RecordExtents? extents = null, bool nationalRecord = false)
     {
         _ = retryKind; _ = retryAmount;   // §14.9.51 GR16 — see the summary; kept in the signature as the bound RETRY carrier
         var c = Require(name);   // unregistered = compiler defect, never an invented '30' (kb/Work PB140/PB360)
@@ -1439,7 +1439,7 @@ public sealed class FileRegistry
         }
         // A file of FIXED-length records carries a variable-length record in its fixed form (D-FRA (vi)).
         var (medium, mediumExtents) = c.FixedForm(image, extents);
-        string status = WriteAnyOrg(c, medium, length, page, advance, mediumExtents);
+        string status = WriteAnyOrg(c, medium, length, page, advance, mediumExtents, nationalRecord);
         if (wantLock && status.Length > 0 && status[0] == '0' && c.LastWrittenRecordId is { Length: > 0 } recId)
             _physical.LockRecord(st, name, recId);   // GR11 — the just-released record's lock is set
         return status;
@@ -1450,7 +1450,7 @@ public sealed class FileRegistry
     /// → RETRY re-checks, else 51 with the record NOT rewritten, the record area unaffected and the FPI unchanged
     /// — GR11a-c/GR14), then the GR12 lock actions. Returns the I-O status.</summary>
     public string RewriteShared(string name, string image, int length, FileRecordLock phrase,
-        FileRetryKind retryKind, long retryAmount, RecordExtents? extents = null)
+        FileRetryKind retryKind, long retryAmount, RecordExtents? extents = null, bool nationalRecord = false)
     {
         var c = Require(name);   // unregistered = compiler defect, never an invented '30' (kb/Work PB140/PB360)
         var meta = ShareOf(name);             // §12.4.5.9.4 GR1 b) 2. for a clause-less connector — never an early exit
@@ -1476,7 +1476,7 @@ public sealed class FileRegistry
             }
         }
         var (medium, mediumExtents) = c.FixedForm(image, extents);   // D-FRA (vi), as WriteShared
-        string status = RewriteAnyOrg(c, medium, length, mediumExtents);
+        string status = RewriteAnyOrg(c, medium, length, mediumExtents, nationalRecord);
         if (status.Length > 0 && status[0] == '0' && target.Length > 0)
         {
             if (phrase == FileRecordLock.WithLock && LocksEffective(meta, st, name))
@@ -1524,25 +1524,28 @@ public sealed class FileRegistry
     /// keyed WRITE that carries one and those arms cannot see a non-<c>None</c> kind.</summary>
     /// <para><paramref name="extents"/> — the record's EXTENT TABLE (determination D-FRA (v); kb/Work PB1053) —
     /// rides every arm that frames a record; a print-control WRITE sends a line, which carries none.</para>
+    /// <para><paramref name="nationalRecord"/> — the category of record-name-1 (§14.9.51.4 GR21 / GR22) — reaches the
+    /// sequential arm alone: it is the only organization with a rule keyed on it (a line sequential file's trailing
+    /// spaces and its character set; kb/Work PB1191).</para>
     private static string WriteAnyOrg(FileConnector c, string image, int length, LinagePage? page,
-        WriteAdvance advance, RecordExtents? extents) => c switch
+        WriteAdvance advance, RecordExtents? extents, bool nationalRecord) => c switch
     {
         SequentialConnector f => advance.Kind is WriteAdvanceKind.None
-            ? f.Write(image, length, page, extents)
+            ? f.Write(image, length, page, extents, nationalRecord)
             // §14.9.51.4 GR25 e)/f) — ONE advance, placed by the statement's words; the combined COBOL-2023
             // BEFORE AFTER form arrives as Before, because GR25 f) puts its advance after the presentation
             // exactly as GR25 e) does (kb/Work PB712 deleted the third, two-amount arm). The record length rides
             // this arm too: §14.9.51.4 GR14's bound is an ALL FILES rule, not a plain-WRITE one (kb/Work PB1190).
-            : f.WriteAdvancing(image, advance.Lines, advance.Kind == WriteAdvanceKind.Before, page, length),
+            : f.WriteAdvancing(image, advance.Lines, advance.Kind == WriteAdvanceKind.Before, page, length, nationalRecord),
         RelativeConnector r => r.Write(image, length, extents),
         IndexedConnector ix => ix.Write(image, length, extents),
         _ => FileStatusCode.PermanentError,
     };
 
     /// <summary>The plain REWRITE body over any organization (the governed entry's operation half).</summary>
-    private static string RewriteAnyOrg(FileConnector c, string image, int length, RecordExtents? extents) => c switch
+    private static string RewriteAnyOrg(FileConnector c, string image, int length, RecordExtents? extents, bool nationalRecord) => c switch
     {
-        SequentialConnector f => f.Rewrite(image, length, extents),
+        SequentialConnector f => f.Rewrite(image, length, extents, nationalRecord),
         RelativeConnector r => r.Rewrite(image, length, extents),
         IndexedConnector ix => ix.Rewrite(image, length, extents),
         _ => FileStatusCode.PermanentError,

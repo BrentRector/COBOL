@@ -733,10 +733,26 @@ public sealed class FileModel
     /// <para>⚠ DETERMINATION — arm b) (several record descriptions WITH a SELECT WHEN clause, the clause choosing the
     /// description) cannot arise: SELECT WHEN is Annex A.4.8's declined module (<c>COBOLNET1705</c>), refused at bind,
     /// so a file with several record descriptions always takes c).</para></summary>
-    public bool ShortRecordFillNational =>
-        Records is [{ OperandPic: { } p }]
+    public bool ShortRecordFillNational => Records is [{ } only] && IsNationalRecord(only);
+
+    /// <summary>⛔ THE ONE ANSWER TO "IS THIS RECORD DESCRIPTION NATIONAL?" — the standard's own wording, "described as a
+    /// national data item or as an elementary data item of usage national and of category numeric, numeric-edited, or
+    /// boolean" (§14.9.40.4 GR7 a) / GR16 a)), over the item's OPERAND category (<see cref="DataItem.OperandPic"/>, which
+    /// answers a GROUP-USAGE NATIONAL group's as-if national picture, §13.18.29.4 GR2 b)). The same question decides
+    /// <see cref="ShortRecordFillNational"/> (a sort transfer's fill), a file's record-AREA category
+    /// (<see cref="RecordAreaIsNational"/>, §14.9.30.4 GR15) and a WRITE / REWRITE's record-name-1 category
+    /// (§14.9.51.4 GR21 / GR22, §14.9.35.4 GR17 — kb/Work PB1191), so the three cannot answer it differently.</summary>
+    public static bool IsNationalRecord(DataItem record) =>
+        record.OperandPic is { } p
         && (p.Category == PicCategory.National
             || (p.Usage == Usage.National && p.Category is PicCategory.Numeric or PicCategory.NumericEdited or PicCategory.Boolean));
+
+    /// <summary>⛔ §14.9.30.4 GR15's RECORD-AREA CATEGORY — "the record-area associated with file-name-1 is specified
+    /// implicitly or explicitly as national" — true when ANY record description of the FD is national, because every
+    /// level-1 entry under an FD redefines the same area (§13.18.33.4 GR3; kb/Work PB329). It is the category of the
+    /// AREA a READ fills and a SORT's implicit WRITE has no record-name for; a WRITE or REWRITE is keyed on
+    /// record-name-1 instead (<see cref="IsNationalRecord"/>).</summary>
+    public bool RecordAreaIsNational => Records.Any(IsNationalRecord);
 
     /// <summary>The record description whose view spans the WHOLE record area — the largest one (ISO §13.18.33.4
     /// GR3: level-1 entries under an FD are "implicit redefinitions of the same area"; §13.18.43.4 GR5 a) sizes it

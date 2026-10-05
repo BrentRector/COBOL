@@ -689,10 +689,10 @@ public sealed class SequentialConnector : FileConnector
     /// when this is the first thing written on the page (§13.18.34.4 GR4). ⛔ EVERY record that reaches a
     /// LINAGE file's medium goes through here or through <see cref="EmitLineSequentialRecord"/>, so a page's
     /// margin cannot be skipped by adding a write arm.</summary>
-    private void Present(string text, LinagePage? page)
+    private void Present(string text, LinagePage? page, bool national)
     {
         if (page is not null && HasLogicalPage) EmitTopMarginIfPending();
-        EmitRecord(text);
+        EmitRecord(text, national);
         _lineOpen = true;   // presented, not yet travelled past
     }
 
@@ -1018,8 +1018,8 @@ public sealed class SequentialConnector : FileConnector
     /// conversion travels with the question (kb/Work PB1542): a character a STANDARD-1 CODE-SET cannot represent
     /// is '71' on the WRITE, exactly as '91' on every other organization, and a medium byte outside that set is
     /// '09' on the READ.</para></summary>
-    private bool RecordAreaOutsideLineCharacterSet(ReadOnlySpan<char> recordArea) =>
-        _lineSequential && LineSequentialCharacterSet.HasCharacterOutside(recordArea, NationalRecordArea, CodeSet);
+    private bool RecordAreaOutsideLineCharacterSet(ReadOnlySpan<char> recordArea, bool national) =>
+        _lineSequential && LineSequentialCharacterSet.HasCharacterOutside(recordArea, national, CodeSet);
 
     // ── WRITE ────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -1031,9 +1031,9 @@ public sealed class SequentialConnector : FileConnector
     /// <param name="extents">The record's EXTENT TABLE when a variable-length group record is written
     /// (determination D-FRA (v); kb/Work PB1053) — framed beside a RECORD VARYING record-sequential record, and
     /// carried by no other shape (a line has no frame).</param>
-    public string Write(string image, int length, LinagePage? page, RecordExtents? extents = null)
+    public string Write(string image, int length, LinagePage? page, RecordExtents? extents = null, bool nationalRecord = false)
     {
-        try { return WriteRecord(image, length, page, extents); }
+        try { return WriteRecord(image, length, page, extents, nationalRecord); }
         catch (IOException refused) { return Status = FileStatusCode.ForWriteFailure(refused); }   // '34' / '30'
     }
 
@@ -1047,7 +1047,7 @@ public sealed class SequentialConnector : FileConnector
     /// <see cref="ReleaseRecord"/>), so the refusal surfaces on the WRITE whose record fills the buffer: that
     /// WRITE is the one the boundary is reported on, and a CLOSE whose final flush is refused answers '30'
     /// through <see cref="FileConnector.Close"/>'s own catch.</summary>
-    private string WriteRecord(string image, int length, LinagePage? page, RecordExtents? extents)
+    private string WriteRecord(string image, int length, LinagePage? page, RecordExtents? extents, bool national)
     {
         _endOfPage = null;   // an end-of-page condition is the CURRENT write's or none (§14.9.51.4 GR27)
         if (PermanentErrorReplay() is { } stuck) return Status = stuck;   // §9.1.13.1 — a permanent error in effect (kb/Work PB1541)
@@ -1068,14 +1068,14 @@ public sealed class SequentialConnector : FileConnector
         // nothing left OPEN. Where a line IS open (an AFTER write's record, presented after its advance), the one
         // implicit advance is placed FIRST, as GR25 f) places AFTER's: see ImplicitAdvanceIsBefore (kb/Work PB964).
         if ((_printControl || page is not null) && !_lineSequential)
-            return WriteAdvancingRecord(image, length, 1, before: ImplicitAdvanceIsBefore, page);
+            return WriteAdvancingRecord(image, length, 1, before: ImplicitAdvanceIsBefore, page, national);
         // §14.9.51.4 GR23: "For a line sequential file, if the record area contains one or more characters that
         // are not in the implementor-defined character set defined for a line sequential file, the execution of
         // the WRITE statement is unsuccessful and the I-O status in the write file connector is set to '71'."
         // Ahead of every shape branch because the rule is organization-scoped, not shape-scoped, and ahead of
         // any stream traffic because §9.1.13.10 item 1 requires the record area (and the medium) to be left
         // unchanged. This arm did not exist before kb/Work PB329 — only REWRITE's GR17 d) twin did.
-        if (RecordAreaOutsideLineCharacterSet(image)) return Status = FileStatusCode.LineRecordInvalidChar;
+        if (RecordAreaOutsideLineCharacterSet(image, national)) return Status = FileStatusCode.LineRecordInvalidChar;
         // Owner decision kb/Work R47 (Annex A.1 item 31): a record holding a character with no byte image in the
         // file coded character set is REFUSED, never written as '?' — the record sequential twin of the '71'
         // above, which already covers a line sequential file (its character set excludes the same characters).
@@ -1086,18 +1086,18 @@ public sealed class SequentialConnector : FileConnector
         if (OutsideVaryingBounds(len)) return Status = FileStatusCode.RecordSizeViolation;   // '44' §14.9.51.4 GR14
         if (IsVarying)
         {
-            if (_lineSequential) { if (!EmitLineSequentialRecord(TrimRecordEnd(FitRecord(image, len)), page)) return LinageViolationStatus(); }
+            if (_lineSequential) { if (!EmitLineSequentialRecord(TrimRecordEnd(FitRecord(image, len, national), national), page, national)) return LinageViolationStatus(); }
             else
             {
                 // The table describes the image the group composed; a record sent at another length (GR13 a) is
                 // not that image, so it goes without one rather than with a table that would misdescribe it.
-                string record = FitRecord(image, len);
+                string record = FitRecord(image, len, national);
                 RecordFraming.WriteFrameHead(_writer, len, Framed(record, image, extents).Extents);
-                EmitRecord(record);
+                EmitRecord(record, national);
             }
         }
-        else if (_lineSequential) { if (!EmitLineSequentialRecord(TrimRecordEnd(image), page)) return LinageViolationStatus(); }
-        else EmitRecord(Fit(image));
+        else if (_lineSequential) { if (!EmitLineSequentialRecord(TrimRecordEnd(image, national), page, national)) return LinageViolationStatus(); }
+        else EmitRecord(Fit(image), national);
         ReleaseRecord();   // §14.9.51.4 GR12 — released to the operating environment, and numbered there
         return WriteSucceeded();   // a LINE SEQUENTIAL LINAGE write travels the page too (EmitLineSequentialRecord)
     }
@@ -1138,7 +1138,7 @@ public sealed class SequentialConnector : FileConnector
     /// with no terminator.</para></summary>
     /// <returns><see langword="false"/> when the one-line travel's page transition broke the LINAGE page model
     /// (§13.18.34.4 GR6 b) — see <see cref="Position"/>).</returns>
-    private bool EmitLineSequentialRecord(string data, LinagePage? page)
+    private bool EmitLineSequentialRecord(string data, LinagePage? page, bool national)
     {
         if (page is null || !HasLogicalPage)
         {
@@ -1146,12 +1146,12 @@ public sealed class SequentialConnector : FileConnector
             // the travel that ENDS that line (§14.9.51.4 GR25 f)'s AFTER placement — kb/Work PB964, where the
             // record used to weld onto the AFTER write's line); otherwise it is the record's own delimiter.
             if (!ImplicitAdvanceIsBefore) AdvanceLines(1);
-            EmitRecordLine(data);
+            EmitRecordLine(data, national);
             return true;
         }
-        if (ImplicitAdvanceIsBefore) { Present(data, page); return Position(1, page); }
+        if (ImplicitAdvanceIsBefore) { Present(data, page, national); return Position(1, page); }
         if (!Position(1, page)) return false;
-        Present(data, page);
+        Present(data, page, national);
         return true;
     }
 
@@ -1177,16 +1177,16 @@ public sealed class SequentialConnector : FileConnector
     /// stream; the LOGICAL-page geometry lives in <see cref="Position"/> and <see cref="Present"/>.
     /// <paramref name="length"/> is the record length exactly as <see cref="Write"/> takes it (the DEPENDING
     /// item's content, −1 = the record's own size — <see cref="WrittenLength"/>).</summary>
-    public string WriteAdvancing(string image, int lines, bool before, LinagePage? page, int length = -1)
+    public string WriteAdvancing(string image, int lines, bool before, LinagePage? page, int length = -1, bool nationalRecord = false)
     {
-        try { return WriteAdvancingRecord(image, length, lines, before, page); }
+        try { return WriteAdvancingRecord(image, length, lines, before, page, nationalRecord); }
         catch (IOException refused) { return Status = FileStatusCode.ForWriteFailure(refused); }   // '34' / '30' — see Write
     }
 
     /// <summary>The body of <see cref="WriteAdvancing"/>, inside its medium-boundary catch — and the one
     /// <see cref="WriteRecord"/> reroutes a print or LINAGE file's plain WRITE to, so the reroute stays inside the
     /// catch that WRITE already opened.</summary>
-    private string WriteAdvancingRecord(string image, int length, int lines, bool before, LinagePage? page)
+    private string WriteAdvancingRecord(string image, int length, int lines, bool before, LinagePage? page, bool national)
     {
         _endOfPage = null;   // an end-of-page condition is the CURRENT write's or none (§14.9.51.4 GR27)
         if (PermanentErrorReplay() is { } stuck) return Status = stuck;   // §9.1.13.1 — a permanent error in effect (kb/Work PB1541)
@@ -1196,7 +1196,7 @@ public sealed class SequentialConnector : FileConnector
         // §14.9.51.4 GR23 again — the SECOND WRITE ARM. GR23 is a property of the FILE, so it binds every entry
         // point a WRITE statement can reach on a line sequential connector, not just the plain-record one; it is
         // tested on the raw record area.
-        if (RecordAreaOutsideLineCharacterSet(image)) return Status = FileStatusCode.LineRecordInvalidChar;
+        if (RecordAreaOutsideLineCharacterSet(image, national)) return Status = FileStatusCode.LineRecordInvalidChar;
         // Owner decision kb/Work R47 again, on the PRINT arm — the two-arm dispatch this connector has been bitten
         // by before. This is also the report writer's line (Annex A.1 item 159: '91' in the report file's
         // connector). ⛔ A print line is the file coded character set like any other record: one byte per column,
@@ -1210,7 +1210,7 @@ public sealed class SequentialConnector : FileConnector
             return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' §9.1.13.11 (DOC-A.1-110)
         if (OutsideVaryingBounds(len)) return Status = FileStatusCode.RecordSizeViolation;   // '44' §14.9.51.4 GR14/GR15
         _printControl = true;
-        string text = TrimRecordEnd(IsVarying ? FitRecord(image, len) : image);
+        string text = TrimRecordEnd(IsVarying ? FitRecord(image, len, national) : image, national);
         // §14.9.51.4 GR25 e)/f) — the ONE advance, placed before or after the presentation by the statement's
         // own word. On a LINAGE file both halves travel the LOGICAL page (GR25 g), GR26 a)); on any other print
         // file they are the plain stream. The pair is written once, and the page-awareness lives inside
@@ -1220,9 +1220,9 @@ public sealed class SequentialConnector : FileConnector
         // record (the positioning is what failed), and a BEFORE write keeps the line it had already presented on
         // the page whose values were still valid (GR25 e) puts the presentation first) but does not RELEASE it:
         // §14.9.51.4 GR12's release is of a SUCCESSFUL write, and this one is not.
-        if (before) { Present(text, page); if (!Position(lines, page)) return LinageViolationStatus(); }
+        if (before) { Present(text, page, national); if (!Position(lines, page)) return LinageViolationStatus(); }
         else if (!Position(lines, page)) return LinageViolationStatus();
-        else Present(text, page);
+        else Present(text, page, national);
         // §14.9.51.4 GR12 — "The successful execution of a WRITE statement releases a logical record to the
         // operating environment" — is an ALL FILES rule, so a print-control WRITE releases an ordinal-identified
         // record exactly as the plain one does, and GR11's WITH LOCK needs that identity. Released HERE and not
@@ -1250,12 +1250,12 @@ public sealed class SequentialConnector : FileConnector
     /// line sequential, print-control advancing, REWRITE). Everything else this connector writes — the
     /// §9.1.7.2 length prefix, the line delimiter, an ADVANCING newline or form feed — is FRAMING, not data of
     /// the record, and stays in the native encoding (see <see cref="CodeSetConversion"/>).</summary>
-    private void EmitRecord(string data) => _writer!.Write(ToMedium(data));
+    private void EmitRecord(string data, bool national) => _writer!.Write(ToMedium(data, national));
 
     /// <summary>— and the line sequential twin: the record's data converted, its delimiter native.</summary>
-    private void EmitRecordLine(string data)
+    private void EmitRecordLine(string data, bool national)
     {
-        _writer!.WriteLine(ToMedium(data));
+        _writer!.WriteLine(ToMedium(data, national));
         _lineOpen = false;   // the record's own delimiter ended the line
     }
 
@@ -1391,7 +1391,7 @@ public sealed class SequentialConnector : FileConnector
             // remainder of an over-length line belongs to the READ that DELIVERS it, not to this one. GR16 is
             // stated after GR15 and asks only that the read be successful, so it also lands on a truncated
             // ('06') read; the status arbitration below follows that order (kb/Work PB329).
-            lineBadChar = RecordAreaOutsideLineCharacterSet(image);
+            lineBadChar = RecordAreaOutsideLineCharacterSet(image, NationalRecordArea);
         }
         else if (NextFrame(out _, out RecordExtents? extents) is { } data)
         {
@@ -1586,9 +1586,9 @@ public sealed class SequentialConnector : FileConnector
     /// size (GR16), so it replaces the table the replaced frame carried only when it has as many components; a
     /// frame whose table cannot take it has that table VOIDED (it would otherwise describe the replaced record),
     /// and a frame that carried none stays without one — the record then reads back by the take step.</param>
-    public string Rewrite(string image, int length = -1, RecordExtents? extents = null)
+    public string Rewrite(string image, int length = -1, RecordExtents? extents = null, bool nationalRecord = false)
     {
-        try { return RewriteRecord(image, length, extents); }
+        try { return RewriteRecord(image, length, extents, nationalRecord); }
         catch (IOException refused) { return Status = FileStatusCode.ForWriteFailure(refused); }   // '34' / '30' — see Write
     }
 
@@ -1601,7 +1601,7 @@ public sealed class SequentialConnector : FileConnector
     /// REWRITE over a 20-byte record of a fixed file was padded and replaced the record with '00' — and it ran
     /// ahead of the line sequential arm, so a varying LINE SEQUENTIAL REWRITE of a shorter record got GR16's '44'
     /// where GR17 c) pads it and succeeds.</para></summary>
-    private string RewriteRecord(string image, int length, RecordExtents? extents)
+    private string RewriteRecord(string image, int length, RecordExtents? extents, bool national)
     {
         if (MutationOpenModeGuard() is { } notIO) return Status = notIO;   // '49' §14.9.35.4 GR3 / §14.9.10.4 GR1
         if (!PrevOpWasSuccessfulRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;
@@ -1611,7 +1611,7 @@ public sealed class SequentialConnector : FileConnector
         // §13.18.43.4 GR14 a) / §9.1.13.7 item 4 a) — a record outside the RECORD IS VARYING bounds, whatever
         // the organization.
         if (IsVarying && (len < VaryMin || len > VaryMax)) return Status = FileStatusCode.RecordSizeViolation;
-        return _lineSequential ? RewriteLine(image, len) : RewriteRecordSequential(image, len, extents);
+        return _lineSequential ? RewriteLine(image, len, national) : RewriteRecordSequential(image, len, extents, national);
     }
 
     /// <summary>§14.9.35.4 GR16 — <i>"For a record sequential file, if the number of bytes in the data item
@@ -1622,19 +1622,19 @@ public sealed class SequentialConnector : FileConnector
     /// integer-1 bytes (§13.18.43.4 GR6), so a shorter record description cannot replace one, and GR14 then
     /// leaves the record and the record area as they were. The frame therefore never changes size, which is
     /// what makes the overwrite in place exact.</summary>
-    private string RewriteRecordSequential(string image, int len, RecordExtents? extents)
+    private string RewriteRecordSequential(string image, int len, RecordExtents? extents, bool national)
     {
         if (len != LastReadLength) return Status = FileStatusCode.RecordSizeViolation;   // '44' GR16
         if (_lastReadBlockStart < 0 || _reader is not { BaseStream: { CanSeek: true, CanWrite: true } stream })
             return NotRewritableInPlace();
-        string record = FitRecord(image, len);
+        string record = FitRecord(image, len, national);
         if (RecordHasCharacterWithoutByteImage(record))
             return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' — the WRITE's rule (R47)
-        if (_lastReadTableCount < 0) return OverwriteInPlace(stream, _lastReadBlockStart, record);
+        if (_lastReadTableCount < 0) return OverwriteInPlace(stream, _lastReadBlockStart, record, national);
         RecordExtents? replacing = Framed(record, image, extents).Extents;
         string table = RecordFraming.ExtentTableChars(replacing is not null && replacing.Count == _lastReadTableCount
             ? replacing : RecordFraming.VoidExtents(_lastReadTableCount));
-        return OverwriteInPlace(stream, _lastReadBlockStart - table.Length, table, record);
+        return OverwriteInPlace(stream, _lastReadBlockStart - table.Length, table, record, national);
     }
 
     /// <summary>§14.9.35.4 GR17, the line sequential REWRITE, in its own order: a) a READ that transferred only
@@ -1647,23 +1647,23 @@ public sealed class SequentialConnector : FileConnector
     /// and comparing the trimmed content let a 10-byte record-name-1 replace a 2-byte line whenever its last
     /// eight bytes were spaces (kb/Work PB1168). The replacement is the record padded to the replaced line's
     /// length, so the physical byte span and the delimiter's position are unchanged.</para></summary>
-    private string RewriteLine(string image, int len)
+    private string RewriteLine(string image, int len, bool national)
     {
         if (_lastLineStart < 0 || _reader is not { BaseStream: { CanSeek: true, CanWrite: true } stream })
             return NotRewritableInPlace();
         if (_lastReadLinePartial) return Status = FileStatusCode.RecordSizeViolation;   // '44' GR17 a)
         // GR17 d) routes through the SHARED set (kb/Work PB329): a REWRITE and a WRITE of the identical record
         // area reach the identical verdict (Annex A.1 item 115).
-        if (RecordAreaOutsideLineCharacterSet(image)) return Status = FileStatusCode.LineRecordInvalidChar;   // '71' GR17 d)
+        if (RecordAreaOutsideLineCharacterSet(image, national)) return Status = FileStatusCode.LineRecordInvalidChar;   // '71' GR17 d)
         // b) and c) compare BYTES — the record's bytes ON THE MEDIUM against the bytes of the record it replaces in
         // place (DOC-A.1-115): under a one-byte encoding that is its length; a UTF-8 character may take two to four.
-        string record = FitRecord(image, len);
-        int bytes = ToMedium(record).Length;
+        string record = FitRecord(image, len, national);
+        int bytes = ToMedium(record, national).Length;
         if (bytes > _lastLineBytes) return Status = FileStatusCode.RecordSizeViolation;   // '44' GR17 b)
         // c) space-fills to the replaced record's byte length: one space per missing byte — the space is one byte in
         // every encoding, and a NATIONAL area's space is a two-char pair in the image but one UTF-8 byte on the medium.
-        int perByte = MediumEncoding is MediumEncoding.Utf8 && NationalRecordArea ? CobolBits.BytesPerNational : 1;
-        return OverwriteInPlace(stream, _lastLineStart, FitRecord(record, len + ((_lastLineBytes - bytes) * perByte)));   // '00' GR17 c)
+        int perByte = MediumEncoding is MediumEncoding.Utf8 && national ? CobolBits.BytesPerNational : 1;
+        return OverwriteInPlace(stream, _lastLineStart, FitRecord(record, len + ((_lastLineBytes - bytes) * perByte), national), national);   // '00' GR17 c)
     }
 
     /// <summary>A REWRITE whose record cannot be overwritten in place — a stream that cannot seek or write, or no
@@ -1684,13 +1684,13 @@ public sealed class SequentialConnector : FileConnector
     /// <para>The base stream is left where it was found. It is the buffer-fill boundary of the
     /// <see cref="StreamReader"/> above it, not the file position indicator, so restoring it is what keeps
     /// THIS connector's own buffered characters valid across its own REWRITE.</para></summary>
-    private string OverwriteInPlace(Stream stream, long anchor, string content) =>
-        OverwriteInPlace(stream, anchor, "", content);
+    private string OverwriteInPlace(Stream stream, long anchor, string content, bool national) =>
+        OverwriteInPlace(stream, anchor, "", content, national);
 
     /// <summary><see cref="OverwriteInPlace(Stream, long, string)"/> with a FRAME part ahead of the record: the
     /// replacing record's extent table (D-FRA (v); kb/Work PB1053), which is framing, not data of the record, so it
     /// goes to the medium as it is and is never converted to the file's coded character set.</summary>
-    private string OverwriteInPlace(Stream stream, long anchor, string framing, string content)
+    private string OverwriteInPlace(Stream stream, long anchor, string framing, string content, bool national)
     {
         long resume = stream.Position;
         stream.Seek(anchor, SeekOrigin.Begin);
@@ -1702,7 +1702,7 @@ public sealed class SequentialConnector : FileConnector
         // ⛔ The REWRITE arm's §13.18.13.4 GR6 b boundary, for the same reason EmitRecord is the WRITE arm's:
         // `content` is the record's data in the NATIVE character set, and what goes on the medium is the file's
         // coded character set. Being the ONE in-place overwrite makes this the one place either arm converts.
-        byte[] bytes = FileCharacterSet.Medium.GetBytes(ToMedium(content));
+        byte[] bytes = FileCharacterSet.Medium.GetBytes(ToMedium(content, national));
         stream.Write(bytes, 0, bytes.Length);
         stream.Flush();                 // §14.9.35.4 GR4 — released to the operating environment
         stream.Seek(resume, SeekOrigin.Begin);
