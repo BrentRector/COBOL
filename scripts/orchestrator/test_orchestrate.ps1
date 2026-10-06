@@ -202,6 +202,12 @@ Check 'cap: STOP-UNIT sent' $r.units[0].stop_unit_sent $true
 Check 'cap: not killed' $r.units[0].killed $false
 Check 'cap: handoff split' $r.units[0].handoff_outcome 'split'
 
+# 7b. a SUBAGENT's context past the cap is not the unit's context: the unit is not wound down
+$r = Run-Orch 'capsub' 'bigsubagent' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0', '-MaxContextTokens', '50000')
+Check 'capsub: no STOP-UNIT' $r.units[0].stop_unit_sent $false
+Check 'capsub: handoff done' $r.units[0].handoff_outcome 'done'
+Check 'capsub: subagent peak recorded' ($r.units[0].peak_subagent_context -gt 900000) $true
+
 # 8. an owner question stops the loop and is written down
 $r = Run-Orch 'owner' 'owner' @('-Unit', 'resume', '-FastFailSeconds', '0')
 Check 'owner exit' $r.code 5

@@ -155,7 +155,10 @@ Each iteration, in this order:
    While it runs, the supervisor reads every `assistant` event's `usage` (counting each message id once: the
    stream repeats a call's usage on each content block) and keeps the running context estimate =
    `input_tokens + cache_read_input_tokens + cache_creation_input_tokens` of the LATEST call (the size of the
-   context the model just read). When it passes `-MaxContextTokens`, or the owner creates `STOP`, the supervisor
+   context the model just read). Only the unit's OWN messages count: a subagent's messages stream into the same log
+   tagged with `parent_tool_use_id`, and that transcript is bounded by its own `maxTurns`, so the supervisor records
+   them as `peak_subagent_context` and never winds the unit down for them (a lander subagent legitimately reaches
+   200k+ while the unit that dispatched it sits near 100k). When it passes `-MaxContextTokens`, or the owner creates `STOP`, the supervisor
    creates `STOP-UNIT` and the fleet's `scratch\STOP` and waits for the session to end; after the grace period it
    kills the process tree.
    **The supervisor, not the model, decides when the unit is over.** The prompt is the first stream-json message
@@ -222,7 +225,7 @@ registered by this change (open decision D2).
 | two supervisors run at once | double dispatch, id collisions, two landers racing `push-main.sh` | `orchestrate.lock` with a live-PID check |
 | a unit crashes at start (auth, a bad flag, a hook refusing everything) | the loop spins and burns quota | the circuit breaker: three fast or failed units stop the loop and write an owner note |
 | a unit ends without a handoff | the next unit starts blind | schema validation; an invalid handoff is a failure and the next unit is `resume`, which rebuilds state from disk |
-| a unit's context grows without bound | each call costs more than a fresh start | `STOP-UNIT` at `-MaxContextTokens`, kill after the grace period |
+| a unit's context grows without bound | each call costs more than a fresh start | `STOP-UNIT` at `-MaxContextTokens` of the unit's own messages (not its subagents'), kill after the grace period |
 | a unit ends with a Workflow in flight | the agents die with the process | the wave unit stays alive until its lander landed; on a cap it stops the fleet gracefully first (section 3.1) |
 | a unit guesses an owner decision | a wrong irreversible landing | `owner_question` in the handoff stops the loop |
 | the quota runs out mid-week | the owner's other work (the TENET project) is starved | `budget.py`: `hold-day` at the cumulative daily allowance, `stop-week` at the weekly cap |

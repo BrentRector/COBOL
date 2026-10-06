@@ -13,6 +13,14 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1894 — 2026-10-05 17:40 PDT — The supervisor's context cap measured the lander subagent, not the unit (PB2081); PB2087 filed (group formals copy in and out)
+
+**What happened.** Three consecutive `land` units for train 1021 ended `split` with "context N > 150000". The owner asked why one unit kept hitting limits and never finished. The unit's own context peaked at 87,208 / 123,167 / 122,028 tokens; the cobol-lander subagent's peaked at 224,546 / 228,741 / 161,945. `orchestrate.ps1` assigned `$stats.context` from every `assistant` event in the stream, including events tagged `parent_tool_use_id`, so the cap saw the lander's size and each wind-down created `scratch\STOP`, which made the lander checkpoint and return SPLIT mid-train; the next unit re-read its checkpoint, status file, manifest and reports before doing new work.
+
+**Fix.** Only the unit's own messages count toward `context` and `peak_context`; subagent messages feed `peak_subagent_context`. `test_orchestrate.ps1` check 7b (fake mode `bigsubagent`) pins it (81/81); `DESIGN-orchestrator-loop.md` section 3 states the rule. The new check was not run against the old code. Also added `-OverrideHold`, the owner's explicit lift of a session or day quota hold (stop-week still ends the loop). Filed PB2081 (this defect) and PB2087 (the group and REDEFINED formals' copy-in/copy-out against ISO 14.2.3 GR8, with a fix that reuses the existing StorageCell forcer).
+
+**Lesson.** `-BorrowDays 4` was passed to every unit after the owner's 90 % allowance for the external-repository design, which applies to that design and an approved implementation only; the real meter (50 % weekly) was over the other-work cap. Read the meter before any unit, and never pass a blanket borrow.
+
 ## Entry 1893 — 2026-10-05 16:44 PDT — Train 1021: seven clusters from wave 1021 (F, E, C, D, A, B, B2), each with its review fixes folded in (PB1221, PB1408, PB609, PB1282, PB1421, PB1060, PB1112, PB1425, PB1783, PB781, PB858, PB1415, PB1039, PB1755, PB1042 landed; PB434 and PB480 split; PB2071-PB2074 and PB2076-PB2080 filed)
 
 Four landers carried this train. The first stopped before doing any work. The second brought the seven clusters in

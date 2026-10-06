@@ -3,6 +3,7 @@
 #   fastfail   exit 1 at once, no output
 #   nohandoff  one call, exit 0, no handoff
 #   bigcontext one call whose context exceeds any small -MaxContextTokens, then waits for STOP-UNIT and hands off split
+#   bigsubagent a subagent's calls exceed the cap while the unit's own context stays small; hands off done
 #   owner      a valid handoff carrying an owner question
 #   wakes      ends a turn with a background task running, is woken when it finishes, then hands off done
 # Like the real session, a mode that emits `result` then STAYS ALIVE until the supervisor closes stdin (eof.txt records it).
@@ -27,11 +28,13 @@ if ($env:FAKE_CLAUDE_MODE -eq 'silent') {
     exit 0
 }
 function Emit($o) { [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress -Depth 10)); [Console]::Out.Flush() }
-function Call([string]$id, [long]$cacheRead) {
+function Call([string]$id, [long]$cacheRead, [string]$parent = '') {
     $usage = @{ input_tokens = 3; output_tokens = 200; cache_read_input_tokens = $cacheRead; cache_creation_input_tokens = 1000 }
-    # Two content blocks of one model call, each repeating the usage, as the real stream does.
-    Emit @{ type = 'assistant'; session_id = $sid; message = @{ id = $id; content = @(@{ type = 'text'; text = 'working' }); usage = $usage } }
-    Emit @{ type = 'assistant'; session_id = $sid; message = @{ id = $id; content = @(@{ type = 'tool_use'; name = 'Bash'; input = @{ command = 'ls' } }); usage = $usage } }
+    # Two content blocks of one model call, each repeating the usage, as the real stream does. A subagent's messages carry
+    # the parent_tool_use_id of the Agent/Workflow call that started it.
+    $extra = if ($parent) { @{ parent_tool_use_id = $parent } } else { @{} }
+    Emit ($extra + @{ type = 'assistant'; session_id = $sid; message = @{ id = $id; content = @(@{ type = 'text'; text = 'working' }); usage = $usage } })
+    Emit ($extra + @{ type = 'assistant'; session_id = $sid; message = @{ id = $id; content = @(@{ type = 'tool_use'; name = 'Bash'; input = @{ command = 'ls' } }); usage = $usage } })
 }
 function WaitEof {
     [void][Console]::In.ReadToEnd()   # returns only when the supervisor closes stdin
@@ -48,6 +51,14 @@ switch ($env:FAKE_CLAUDE_MODE) {
         $deadline = (Get-Date).AddSeconds(60)
         while (-not (Test-Path (Join-Path $coord 'STOP-UNIT')) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
         Hand @{ schema_version = 1; unit = 'wave'; outcome = 'split'; summary = 'stopped at STOP-UNIT'; next_unit = 'resume' }
+        exit 0
+    }
+    'bigsubagent' {
+        # A subagent grows far past the cap while the unit's own context stays small: the unit must NOT be wound down.
+        Call 'msg_1' 5000
+        Call 'sub_1' 900000 'toolu_agent1'
+        Call 'msg_2' 6000
+        Hand @{ schema_version = 1; unit = 'wave'; outcome = 'done'; summary = 'subagent big, unit small'; next_unit = $null }
         exit 0
     }
     'owner' {

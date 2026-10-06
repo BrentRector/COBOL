@@ -28,6 +28,8 @@ pwsh -NoProfile -File scripts/orchestrator/orchestrate.ps1 -MaxUnits 1 -Unit met
 [CmdletBinding()]
 param(
     [switch]$DryRun,
+    # The owner lifts a quota hold for the named work (hold-session / hold-day only; stop-week still ends the loop).
+    [switch]$OverrideHold,
     # The executable to run. A test points it at a fake that emits canned stream-json (a test seam, not a wrapper).
     [string]$ClaudeExe = 'claude',
     [string]$CoordDir = $(if ($env:COBOL_COORD_DIR) { $env:COBOL_COORD_DIR } else { 'E:\COBOL-coord' }),
@@ -173,7 +175,7 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
     $psi.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
     $psi.Environment['COBOL_COORD_DIR'] = $CoordDir
 
-    $stats = [ordered]@{ calls = 0; input = 0; output = 0; cache_read = 0; cache_creation = 0; peak_context = 0;
+    $stats = [ordered]@{ calls = 0; input = 0; output = 0; cache_read = 0; cache_creation = 0; peak_context = 0; peak_subagent_context = 0;
         context = 0; cost_usd = $null; stop_unit_sent = $false; killed = $false }
     $seen = @{}
     $graceMin = if ($unit -eq 'wave') { 3 * $GraceMinutes } else { $GraceMinutes }
@@ -251,8 +253,15 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
                             $stats.output += & $g 'output_tokens'
                             $stats.cache_read += & $g 'cache_read_input_tokens'
                             $stats.cache_creation += & $g 'cache_creation_input_tokens'
-                            $stats.context = (& $g 'input_tokens') + (& $g 'cache_read_input_tokens') + (& $g 'cache_creation_input_tokens')
-                            $stats.peak_context = [Math]::Max($stats.peak_context, $stats.context)
+                            $ctx = (& $g 'input_tokens') + (& $g 'cache_read_input_tokens') + (& $g 'cache_creation_input_tokens')
+                            # A subagent's messages stream into this log too, tagged with parent_tool_use_id: they are another
+                            # transcript with its own turn cap (maxTurns), so only the unit's OWN messages measure its context.
+                            if ($ev.PSObject.Properties['parent_tool_use_id'] -and $ev.parent_tool_use_id) {
+                                $stats.peak_subagent_context = [Math]::Max($stats.peak_subagent_context, $ctx)
+                            } else {
+                                $stats.context = $ctx
+                                $stats.peak_context = [Math]::Max($stats.peak_context, $ctx)
+                            }
                         }
                     } elseif ($ev.type -eq 'result' -and $ev.PSObject.Properties['total_cost_usd']) {
                         $stats.cost_usd = $ev.total_cost_usd
@@ -338,6 +347,7 @@ try {
         Say "budget: weekly $($budget.weekly_est_pct) % of $($budget.allowance_pct) %, session $($budget.session_est_pct) % -> $($budget.decision)"
         if ($budget.decision -eq 'stop-week') { Say 'weekly cap reached: ending the loop'; break }
         $hold = $budget.decision -in @('hold-session', 'hold-day')
+        if ($hold -and $OverrideHold -and -not $DryRun) { Say "owner override: $($budget.decision) lifted (-OverrideHold)"; $hold = $false }
         if ($hold -and $DryRun) {
             Say "DRY RUN: would hold until $($budget.resume_at) (-BorrowDays moves a hold-day), then:"
         } elseif ($hold) {
