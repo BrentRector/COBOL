@@ -740,7 +740,9 @@
   "pb1252_linkage_section_four_entry_kinds",
   "pb1309_working_storage_four_entry_kinds",
   "pb1060_address_identifier_evaluate_argument",
-  "pb2087_by_reference_area_formals"
+  "pb2087_by_reference_area_formals",
+  "pb2087_invoke_by_reference_aliasing",
+  "pb2087_invoke_area_strong_recursion"
   ],
   "pending": []
 }

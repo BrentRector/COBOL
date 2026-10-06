@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Linq;
 using CobolNet.Binding.Model;
+using CobolNet.Binding.Procedure;
 using CobolNet.CodeGen.Emit;
 
 namespace CobolNet.CodeGen;
@@ -455,13 +456,93 @@ internal static class PlaceRenderer
         group is OdoGroupPlace o ? WriteFullGroupImage(o.Inner, image, context) : WriteGroupImage(group, image, context);
 
     /// <summary>The LEAF VECTOR of a strongly-typed group that has no character image — the activation-boundary carrier
-    /// <c>OoClassTable.LeafCarried</c> selects (kb/Work PB1116): its record struct's generated <c>AsLeaves()</c>.</summary>
-    public static string GroupLeaves(Place group) => $"{Read(group)}.AsLeaves()";
+    /// <c>OoClassTable.LeafCarried</c> selects (kb/Work PB1116): its record struct's generated <c>AsLeaves()</c>.
+    /// <para>⛔ A GROUP THAT LIVES IN A STORAGE CELL HAS NO RECORD STRUCT (kb/Work PB2087): an area formal, or a group the
+    /// activating element claimed onto a cell because it passes it BY REFERENCE (ISO §14.2.3 GR8: "the activated runtime
+    /// element operates as if the formal parameter occupies the same storage area as the argument"), is a Tier-B class
+    /// whose members are windows over the cell's image and its managed slots. Its vector is composed member by member
+    /// through <see cref="PlaceCursor"/> — the ONE walk from a resolved group place down to its subordinates, so a
+    /// subscripted group keeps its subscripts — in the order and the carrier forms <c>RecordStructEmitter.EmitLeafMethods</c>
+    /// boxes a record struct's physical fields, because §14.8.2.2 makes the two sides of the crossing "of the same type"
+    /// and the vector is the neutral carrier between their storage forms.</para></summary>
+    public static string GroupLeaves(Place group) =>
+        PlaceCursor.Over(group) is ViewCursor view ? CellLeaves(view, 0) : $"{Read(group)}.AsLeaves()";
 
     /// <summary>The inverse of <see cref="GroupLeaves"/>: a NEW record struct of the place's own type, built field for field
-    /// from <paramref name="leaves"/> by its generated <c>OfLeaves</c>, stored through the ONE place writer.</summary>
+    /// from <paramref name="leaves"/> by its generated <c>OfLeaves</c>, stored through the ONE place writer — or, for a
+    /// group in a storage cell, each member stored through its own window (the inverse walk of <see cref="CellLeaves"/>).</summary>
     public static string WriteGroupLeaves(Place group, string leaves) =>
-        Write(group, $"{group.Item.StructName}.OfLeaves({leaves})");
+        PlaceCursor.Over(group) is ViewCursor view
+            ? $"{{ {CellLeavesStore(view, leaves, 0)} }}"
+            : Write(group, $"{group.Item.StructName}.OfLeaves({leaves})");
+
+    /// <summary>The members of a leaf-carried group in the order its record struct declares them — every subordinate
+    /// group and elementary item (a condition-name or a RENAMES entry occupies no storage), exactly the
+    /// <c>PhysicalModel</c> field walk: no REDEFINES can collapse two of them into one field, because ISO §13.18.44.3 SR14
+    /// bars data-name-2 from being "an item subordinate to a strongly-typed group item" and only a strongly-typed group is
+    /// leaf-carried (<c>OoClassTable.LeafCarried</c>).</summary>
+    private static IEnumerable<DataItem> LeafFieldsOf(DataItem group) => group.Children.Where(c => c.IsGroup || c.IsElementary);
+
+    /// <summary>The leaf vector of the cell-backed group at <paramref name="cur"/> (see <see cref="GroupLeaves"/>): a
+    /// member is boxed in the carrier form its record-struct field has — a nested group as its own vector, a fixed table as
+    /// an array of its occurrences (a table of groups as an array of their vectors), an elementary item as its field value
+    /// (<see cref="LeafCarrierRead"/>). <paramref name="depth"/> keeps the occurrence variables of nested tables apart.</summary>
+    private static string CellLeaves(PlaceCursor cur, int depth)
+    {
+        var parts = new List<string>();
+        foreach (var c in LeafFieldsOf(cur.Item))
+        {
+            var at = cur.Child(c) ?? throw new InvalidOperationException($"no cursor reaches '{c.CobolName}' (kb/Work PB2087)");
+            if (c.Occurs is int n)
+            {
+                string k = $"__lk{depth}";
+                string elem = c.IsGroup ? $"(object?){CellLeaves(at.Indexed(k), depth + 1)}"
+                    : $"({c.ElementType})({LeafCarrierRead(at.Indexed(k).ToPlace())})";
+                parts.Add($"System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(1, {n}), {k} => {elem}))");
+            }
+            else parts.Add(c.IsGroup ? CellLeaves(at, depth + 1) : $"(object?)({LeafCarrierRead(at.ToPlace())})");
+        }
+        return $"new object?[] {{ {string.Join(", ", parts)} }}";
+    }
+
+    /// <summary>The statements that store the leaf vector <paramref name="leaves"/> into the cell-backed group at
+    /// <paramref name="cur"/> — the exact inverse of <see cref="CellLeaves"/>, member by member.</summary>
+    private static string CellLeavesStore(PlaceCursor cur, string leaves, int depth)
+    {
+        string v = $"__lv{depth}", k = $"__lk{depth}";
+        var stmts = new List<string> { $"var {v} = (object?[]){leaves}!;" };
+        int i = 0;
+        foreach (var c in LeafFieldsOf(cur.Item))
+        {
+            var at = cur.Child(c) ?? throw new InvalidOperationException($"no cursor reaches '{c.CobolName}' (kb/Work PB2087)");
+            string slot = $"{v}[{i++}]";
+            if (c.Occurs is int n)
+                stmts.Add(c.IsGroup
+                    ? $"for (int {k} = 1; {k} <= {n}; {k}++) {{ {CellLeavesStore(at.Indexed(k), $"((object?[]){slot}!)[{k} - 1]", depth + 1)} }}"
+                    : $"for (int {k} = 1; {k} <= {n}; {k}++) {{ {LeafCarrierWrite(at.Indexed(k).ToPlace(), $"(({c.ElementType}[]){slot}!)[{k} - 1]")} }}");
+            else
+                stmts.Add(c.IsGroup
+                    ? $"{{ {CellLeavesStore(at, slot, depth + 1)} }}"
+                    : LeafCarrierWrite(at.ToPlace(), $"({c.ElementType}){slot}!"));
+        }
+        return string.Join(" ", stmts);
+    }
+
+    /// <summary>An elementary member's value in its RECORD-STRUCT carrier form. A window over the cell's bytes reads a
+    /// native fixed-point or floating-point member as its storage image, so it is decoded to the native carrier through the
+    /// ONE crossing decode (<see cref="NumericRenderer.CarrierOfImage"/>); every other member's window already reads its
+    /// field's form (characters, a boolean string, a managed slot).</summary>
+    private static string LeafCarrierRead(Place p) =>
+        IsNativeImageWindow(p) ? NumericRenderer.CarrierOfImage(Read(p), p.Item) : Read(p);
+
+    /// <summary>The inverse of <see cref="LeafCarrierRead"/>: store a record-struct carrier value into the member.</summary>
+    private static string LeafCarrierWrite(Place p, string value) =>
+        Write(p, IsNativeImageWindow(p) ? NumericRenderer.ImageOfCarrier(value, p.Item) : value);
+
+    /// <summary>True for an identity-coded cell window over a member whose record-struct field is a native numeric
+    /// carrier (the <c>PhysicalModel</c> numeric-leaf test: not string-stored, with an image byte form).</summary>
+    private static bool IsNativeImageWindow(Place p) =>
+        p is RedefViewPlace { Coding: null } && p.Item is { StoreAsImage: false, Pic.HasImageByteForm: true };
 
     public static string WriteGroupImage(Place group, string image, string context) => group switch
     {

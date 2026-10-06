@@ -459,31 +459,7 @@ public sealed partial class DataBinder
             // (LinkageFormal.IsArea; PtrBindBasedAndAddressables claims the class — kb/Work PB2087). A BY VALUE
             // formal is carrier-resident over its DETACHED value-copy cell (§14.2.3 GR10 — same per-access
             // mechanism, different carrier: CobolArgAdapt.NumValue instead of the aliasing Num view).
-            bool redefined = LinkageRoots.Any(r => !ReferenceEquals(r, item)
-                && r.RedefinesTargetName is { } t
-                && CobolNames.Same(t, item.CobolName));
-            // ⛔ The elementary/group test here is STRUCTURAL (no subordinate entries), not `IsElementary`
-            // (Pic is not null). CallBindLinkage runs inside BindDeclarations, BEFORE the pipeline's
-            // UsageInheritancePass, and a level-01 that wrote a PICTURE-less usage — `01 L USAGE BINARY-SHORT.
-            // 05 LA.` — still carries at this moment the elementary profile entry bind synthesized for it,
-            // because the subordinates were not parsed yet. §13.18.60.4 GR1 then sheds that profile ("it applies
-            // only to each elementary item in the group … and not to the group itself"), so an `IsElementary`
-            // verdict taken here went stale: the formal was recorded CARRIER-RESIDENT and ProgramEmitter's
-            // resident arm dereferenced `f.Item.Pic!` on a group whose Pic was, correctly, null — a compiler
-            // NullReferenceException on legal source. The structural test cannot go stale: the forest under this
-            // root is complete when CallBindLinkage runs. kb/Work PB495.
-            // ⛔ AN ADDRESSED FORMAL IS NOT RESIDENT (kb/Work PB1019). ISO §8.4.3.11.3 SR1 admits a linkage-section
-            // item as identifier-1 of ADDRESS OF, and §8.4.3.11.4 GR1 makes the result "the address of
-            // identifier-1" — an address the BASED machinery dereferences to a StorageCell. A resident formal's
-            // storage is the caller's, reached only through the carrier's accessor, so it has no cell to address;
-            // forcing one used to build the cell's name from the accessor text (`_scell___lnkp0.Value` — Roslyn
-            // CS1003 on conforming source). An addressed formal is therefore an AREA formal like every group
-            // formal: its description is laid over the argument's own cell (kb/Work PB2087), so its address IS the
-            // argument's — §14.2.3 GR8's "as if the formal parameter occupies the same storage area as the
-            // argument" — and an argument with no cell gets a fresh one, filled at entry and stored back at return.
-            bool resident = item.Children.Count == 0 && item.IsElementary
-                && !redefined && item.Pic is { IsFloat: false }
-                && !addressed.Contains(item.CobolName ?? "");
+            bool resident = FormalIsCarrierResident(item, LinkageRoots, addressed);
             if (resident)
             {
                 // The item's C# "path" becomes the carrier's Value accessor: every Place built over it reads
@@ -893,6 +869,26 @@ public sealed partial class DataBinder
         return cls;
     }
 
+    /// <summary>⛔ THE ONE CARRIER-RESIDENCY TEST of a USING formal, for a program, a function AND a method (kb/Work
+    /// PB2087): carrier-resident = per-access aliasing of the caller's storage through the formal's carrier (design D1:
+    /// "refs to LK-CTR read/write LK_CTR.Value — the one unavoidable indirection"). Available for an elementary
+    /// fixed-point or character formal NOT overlaid by another linkage entry; a group formal (a different C# struct type
+    /// than the caller's — every cross-program group IS a category reinterpretation) and a redefined formal are AREA
+    /// formals instead, laid over the argument's own storage cell (PtrBindBasedAndAddressables claims the class).
+    /// <para>⛔ The elementary/group test is STRUCTURAL (no subordinate entries), not <c>IsElementary</c> alone: the
+    /// program arm runs inside BindDeclarations, BEFORE UsageInheritancePass, and a level-01 that wrote a PICTURE-less
+    /// usage — <c>01 L USAGE BINARY-SHORT. 05 LA.</c> — still carries the elementary profile bind synthesized for it
+    /// until §13.18.60.4 GR1 sheds it, so an <c>IsElementary</c> verdict alone went stale (a compiler
+    /// NullReferenceException on legal source, kb/Work PB495).</para>
+    /// <para>⛔ AN ADDRESSED FORMAL IS NOT RESIDENT (kb/Work PB1019). ISO §8.4.3.11.3 SR1 admits a linkage-section item
+    /// as identifier-1 of ADDRESS OF, and §8.4.3.11.4 GR1 makes the result "the address of identifier-1" — an address
+    /// the BASED machinery dereferences to a StorageCell, which a carrier accessor does not have; so an addressed formal
+    /// is an AREA formal and its address IS the argument's (§14.2.3 GR8).</para></summary>
+    internal static bool FormalIsCarrierResident(DataItem item, IEnumerable<DataItem> linkageRoots, IReadOnlySet<string> addressed) =>
+        item.Children.Count == 0 && item.IsElementary && item.Pic is { IsFloat: false }
+        && !addressed.Contains(item.CobolName ?? "")
+        && !linkageRoots.Any(r => !ReferenceEquals(r, item) && r.RedefinesTargetName is { } t && CobolNames.Same(t, item.CobolName));
+
     /// <summary>The first leaf of <paramref name="leaves"/> the shared byte cell cannot carry, as its residue clause, or
     /// null — <see cref="ByteWindowResidueOf"/> over a whole storage area, the ONE gate <see cref="ForceStringCanonical"/>
     /// applies.</summary>
@@ -904,8 +900,12 @@ public sealed partial class DataBinder
     /// class Rejected (every reference then fails loud) — right for a surface that cannot exist without the cell
     /// (EXTERNAL, BASED, ADDRESS OF), wrong for one that only gains aliasing from it (a boundary-aliased area). True
     /// when every leaf of the area rides the cell AND the area holds no variable-length component: a dynamic-capacity
-    /// table or a dynamic-length item crosses a boundary on its own §8.5.1.12 carrier (kb/Work PB204), and a data
-    /// pointer cannot address an area holding one (§13.18.5.3 SR2 — the BASED rule this storage shape is).</summary>
+    /// table or a dynamic-length item crosses a boundary on its own §8.5.1.12 carrier (kb/Work PB204), and the area-formal
+    /// description (a BASED-style class over the argument's cell) does not yet carry one. ⚠ That is an IMPLEMENTATION
+    /// limit, not a rule: §13.18.5.3 SR2 bars a dynamic-length item or a variable-length group as the subject of a WRITTEN
+    /// BASED clause and says nothing about a formal, and §14.2.3 GR8 still makes such a formal occupy its argument's
+    /// storage — so the copy a variable-length group formal keeps is an open defect (reported by the PB2087 finisher,
+    /// wave 1023 A), never latitude.</summary>
     private static bool CellCanCarry(DataItem root)
     {
         var members = root.Class?.Members ?? [root];

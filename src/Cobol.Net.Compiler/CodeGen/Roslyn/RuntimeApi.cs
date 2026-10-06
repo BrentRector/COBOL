@@ -1870,6 +1870,12 @@ internal static class RuntimeApi
     public static string ArgAdaptArea(string args, int position, int areaWidth, bool byValueFormal) =>
         $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Area)}({args}, {position}, {areaWidth}, {(byValueFormal ? "true" : "false")})";
 
+    /// <summary>The storage of a METHOD's area formal (§14.2.3 GR8; kb/Work PB2087) — <c>CobolArgAdapt.Area</c>'s one
+    /// decision over the method ABI's area parameter and presence: the argument's own area when it can hold
+    /// <paramref name="areaWidth"/> positions, else a fresh cell.</summary>
+    public static string ArgAdaptAreaOf(string sharedArea, string present, int areaWidth) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Area)}({sharedArea}, {present}, {areaWidth})";
+
     /// <summary>The storage area a carrier-resident BY REFERENCE formal occupies (§14.2.3 GR8; kb/Work PB2089) —
     /// <c>CobolArgAdapt.ArgumentArea</c>: its argument's <c>CobolArg.Area</c>, or null.</summary>
     public static string ArgAdaptArgumentArea(string args, int position) =>
@@ -2049,9 +2055,15 @@ internal static class RuntimeApi
     public static string ObjOmittedArgument => $"{nameof(CobolInvokeArg)}.{nameof(CobolInvokeArg.OmittedArgument)}()";
 
     /// <summary>A reference-modified argument through a universal receiver, described at its EVALUATED length
-    /// (ISO §8.4.3.3.4 GR5 c); kb/Work PB480) — <c>CobolInvokeArg.ReferenceModified(description, slice)</c>.</summary>
-    public static string ObjReferenceModifiedArgument(string descriptionExpr, string sliceExpr) =>
-        $"{nameof(CobolInvokeArg)}.{nameof(CobolInvokeArg.ReferenceModified)}({descriptionExpr}, {sliceExpr})";
+    /// (ISO §8.4.3.3.4 GR5 c); kb/Work PB480) and boxed LIVE over the slice (§14.2.3 GR8; kb/Work PB2087) —
+    /// <c>CobolInvokeArg.ReferenceModified(description, get, set, area)</c>.</summary>
+    public static string ObjReferenceModifiedArgument(string descriptionExpr, string getExpr, string setStatement, string areaExpr) =>
+        $"{nameof(CobolInvokeArg)}.{nameof(CobolInvokeArg.ReferenceModified)}({descriptionExpr}, () => {getExpr}, __v => {{ {setStatement} }}, {areaExpr})";
+
+    /// <summary>An identifier argument through a universal receiver, boxed LIVE over the argument's own storage
+    /// (§14.2.3 GR8; kb/Work PB2087) — <c>new CobolInvokeArg(description, get, set, area)</c>.</summary>
+    public static string ObjLiveArgument(string descriptionExpr, string getExpr, string setStatement, string areaExpr) =>
+        $"new {nameof(CobolInvokeArg)}({descriptionExpr}, () => {getExpr}, __v => {{ {setStatement} }}, {areaExpr})";
 
     /// <summary>⛔ THE ONE C# RENDERING OF AN <see cref="ActivationDescription"/> (kb/Work PB480): an object initializer
     /// naming every member that differs from its default, so the generated code rebuilds exactly the description the

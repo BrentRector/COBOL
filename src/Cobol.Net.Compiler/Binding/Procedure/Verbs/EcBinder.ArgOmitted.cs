@@ -61,7 +61,8 @@ internal sealed partial class EcBinder
         foreach (var m in methods)
             if (m.Binding is { } b)
                 foreach (var f in b.Formals)
+                    // A resident formal's root text is its carrier's `.Value` (kb/Work PB2087), passed through the guard.
                     f.Item.OmittedGuard = new OmittedFormalGuard(f.OmittedFlag, ActivatedElementKind.Method,
-                        f.Item.CobolName ?? "");
+                        f.Item.CobolName ?? "", f.CarrierResident ? f.CarrierLocal : null);
     }
 }

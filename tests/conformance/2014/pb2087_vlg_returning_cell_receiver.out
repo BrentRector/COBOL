@@ -1,0 +1,5 @@
+LF=[ghkl ij]
+SG=[tuvwxyz]
+VG=[qq][mn][ij] VCAP=0000000002
+VG2=[mn][opq][rs] VCAP=0000000003
+TOUCH tuvwxyz

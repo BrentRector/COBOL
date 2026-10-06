@@ -505,30 +505,40 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             ? LayoutArray(layout)
             : null;
 
-    /// <summary>⛔ THE STORAGE AREA OF A BY REFERENCE ARGUMENT (kb/Work PB2087) — the trailing named <c>Area</c> of its
-    /// <c>CobolArg</c>, or empty when its storage is not a cell. ISO §14.2.3 GR8: "If the argument is passed by reference,
+    /// <summary>⛔ THE STORAGE AREA OF A BY REFERENCE ARGUMENT (kb/Work PB2087) — the C# expression of the cell area it
+    /// occupies, or null when its storage is not a cell. ISO §14.2.3 GR8: "If the argument is passed by reference,
     /// the activated runtime element operates as if the formal parameter occupies the same storage area as the argument."
     /// An argument whose class lives in a <c>StorageCell</c> — a group a CALL claims (<c>DataBinder.PtrBindBasedAndAddressables</c>),
     /// an EXTERNAL, BASED or ADDRESS-OF-taken record, an area formal passed on — states the cell and the offset it begins
     /// at, the same pair <c>ADDRESS OF</c> renders (<c>PtrEmitter.AddressOfText</c>), and an area formal is laid over
     /// exactly those positions. A reference-modified operand is "a subset of the data item referenced by identifier-1" (§8.4.3.3.4 GR5) beginning at its leftmost-position — the inner
-    /// view's offset displaced by the checked zero-based start, as ADDRESS OF displaces it.</summary>
-    private static string AreaFact(Place p)
+    /// view's offset displaced by the checked zero-based start, as ADDRESS OF displaces it. A CALL states it as the
+    /// <c>CobolArg</c>'s <c>Area</c> (<see cref="AreaArgument"/>) and an INVOKE passes it as the method formal's area
+    /// parameter; a whole formal of the current source element answers through <see cref="ArgumentArea"/>.</summary>
+    internal static string? AreaOf(Place p)
     {
         string? start = null;
         if (p is RefModPlace rm)
         {
-            if (rm.Inner is not RedefViewPlace) return "";
+            if (rm.Inner is not RedefViewPlace) return null;
             start = rm.Start;
             p = rm.Inner;
         }
         // A bit item's positions are bits and a national one's two bytes each, so only an identity-coded view's start is
         // a character offset a reference-modified slice can be displaced by.
         if (FullAllocation(p) is not RedefViewPlace { Cell: { } cell } view || BitLayout.IsBitItem(view.ViewItem)
-            || start is not null && view.Coding is not null) return "";
+            || start is not null && view.Coding is not null) return null;
         string offset = start is null ? view.OffsetExpr : $"({view.OffsetExpr}) + ({start}) - 1";
-        return $", Area: {RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset)}";
+        return RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset);
     }
+
+    /// <summary>The area expression of a BY REFERENCE argument for any activation lane: a whole formal of the current
+    /// source element passes on the area it occupies (<c>CallUnitState.WholeFormalArea</c>), any other operand its own
+    /// cell area (<see cref="AreaOf"/>); "null" when it has none.</summary>
+    internal string ArgumentArea(Place p) => callState.WholeFormalArea(p) ?? AreaOf(p) ?? "null";
+
+    /// <summary>The trailing named <c>Area</c> argument of a BY REFERENCE <c>CobolArg</c>, or empty when it has none.</summary>
+    private string AreaArgument(Place p) => ArgumentArea(p) is var area && area != "null" ? $", Area: {area}" : "";
 
     /// <summary>The C# array literal of a §8.5.1.12 layout.</summary>
     internal static string LayoutArray(int[] layout) => $"new int[] {{ {string.Join(", ", layout)} }}";
@@ -645,7 +655,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 // formal of the next activation is laid over the same positions (kb/Work PB2089).
                 if (fwd is { CarrierResident: true } rf)
                     return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Reference)}, "
-                        + $"{rf.CarrierField}, {meta}{(rf.KeepsArgumentArea ? $", Area: {rf.ArgumentAreaField}" : "")})";
+                        + $"{rf.CarrierField}, {meta}{AreaArgument(p)})";
                 // A NON-resident formal (an AREA formal — a group, a REDEFINED or an addressed one — or a
                 // variable-length group's image) is passed on as a fresh view over its storage, and only the
                 // PRESENCE has to be taken from the incoming carrier. Rebuilding it unconditionally is what made an
@@ -653,11 +663,9 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 // OMITTED` → the inner `LH IS OMITTED` test answered false). An area formal's AREA is its carrier
                 // field itself — the argument's own cell area it was laid over (kb/Work PB2087) — read WITHOUT
                 // dereferencing it, because GR12 exempts this reference form even when the formal is omitted.
-                string area = fwd is { IsArea: true } af
-                    ? $", Area: {af.CarrierField} as {nameof(CobolNet.Runtime.CellPointer)}"
-                    : AreaFact(p);
+                // A method formal forwarded to a CALL passes the area it occupies the same way (kb/Work PB2087).
                 return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Reference)}, "
-                    + $"{Forwarded(probe, RefCarrier(p))}, {meta}{area})";
+                    + $"{Forwarded(probe, RefCarrier(p))}, {meta}{AreaArgument(p)})";
             }
             // BY CONTENT — "a record … allocated by the activating element" (§14.2.3 GR9) — and BY VALUE with
             // an identifier argument (a UDF BY VALUE formal, §8.4.3.2.4 GR5c): both are value snapshots at

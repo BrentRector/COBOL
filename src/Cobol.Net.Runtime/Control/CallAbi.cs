@@ -324,12 +324,22 @@ public static class CobolArgAdapt
     /// apart. An omitted argument (GR11) gets a fresh cell whose pointer answers <see cref="ManagedPointer.IsNull"/>
     /// true, so the omitted-argument condition (§8.8.4.8.4 GR1) reads the same carrier every other formal's does
     /// while an unchecked reference still has storage to read (the documented GR12 leniency).</para></summary>
-    public static CellPointer Area(CobolArg[] args, int i, int areaWidth, bool byValueFormal)
+    public static CellPointer Area(CobolArg[] args, int i, int areaWidth, bool byValueFormal) =>
+        Present(args, i)
+            ? Area(args[i].Mode is CobolPassMode.Reference && !byValueFormal ? args[i].Area : null, present: true, areaWidth)
+            : Area(null, present: false, areaWidth);
+
+    /// <summary>The ONE area decision behind <see cref="Area(CobolArg[], int, int, bool)"/>, for the program ABI and the
+    /// METHOD ABI alike (kb/Work PB2087 — a method formal crosses as its carrier, its <paramref name="sharedArea"/> and its
+    /// omitted flag): <paramref name="sharedArea"/> — the argument's own area, supplied only BY REFERENCE to a BY
+    /// REFERENCE formal — when it can hold <paramref name="areaWidth"/> positions in a live cell, else a FRESH cell, which
+    /// answers <see cref="ManagedPointer.IsNull"/> when the argument is not <paramref name="present"/> (§14.9.4.4 GR11 /
+    /// §14.9.23.4 GR9).</summary>
+    public static CellPointer Area(CellPointer? sharedArea, bool present, int areaWidth)
     {
-        if (!Present(args, i))
+        if (!present)
             return new CellPointer(new StorageCell { Ref = new string(' ', areaWidth) }, 0) { OmittedArgument = true };
-        if (!byValueFormal && args[i] is { Mode: CobolPassMode.Reference, Area: { } a }
-            && a.Generation == a.Cell.Generation && a.Offset >= 0 && a.Offset <= (long)a.Cell.Ref.Length - areaWidth)
+        if (sharedArea is { } a && a.Generation == a.Cell.Generation && a.Offset >= 0 && a.Offset <= (long)a.Cell.Ref.Length - areaWidth)
             return a;
         return new CellPointer(new StorageCell { Ref = new string(' ', areaWidth) }, 0);
     }

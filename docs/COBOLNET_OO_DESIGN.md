@@ -159,9 +159,28 @@ exactly `new C()`.
 
 **Rejected alternatives.** Route ALL invokes through a single `__CobolInvoke` string-switch (uniform but slow, unidiomatic, defeats Roslyn overload/type checks) — rejected; reserve __CobolInvoke only for the genuinely-dynamic cases. The legacy uniform `callvirt CobolProgramEntry.Invoke(ManagedPointer[])` ABI — rejected: not idiomatic C#, hides types from Roslyn.
 
-### D6. Parameter passing: BY REFERENCE → C# `ref` of the typed field (value-class items) or the reference itself (object/string); BY CONTENT → pass a copy; BY VALUE → value parameter; RETURNING → C# return value; OMITTED → a `bool` presence parameter beside every formal + the omitted-arg condition.
+### D6. Parameter passing: every formal crosses as its argument's CARRIER (`ManagedPointer<T>`), its AREA (`CellPointer?`) and a `bool` presence flag; BY REFERENCE → a VIEW over the argument itself plus the cell it lives in (§14.2.3 GR8 — no copy-in, no copy-out); BY CONTENT / BY VALUE → a detached cell and no area; RETURNING → C# return value; OMITTED → a placeholder cell + the presence flag + the omitted-arg condition.
 
-**⛔ The method ABI is a PAIR per formal: `ref T value, bool omitted` (kb/Work PB757).** §14.9.23.4 GR9: "If an
+**⛔ The method ABI is one shape per formal: `ManagedPointer<T> carrier, CellPointer? area, bool omitted` (kb/Work PB757, PB2087).**
+ISO §14.2.3 GR8: "If the argument is passed by reference, the activated runtime element operates as if the formal parameter
+occupies the same storage area as the argument." The carrier of a BY REFERENCE identifier argument is a view over the
+argument (the typed INVOKE's arm chain states the read, `InvokeArgumentStore` the write; the universal switch views the
+caller's LIVE `CobolInvokeArg` box), and the area is the cell the argument lives in (every BY REFERENCE operand is claimed onto
+a cell — `DataBinder.PtrBindBasedAndAddressables`). In the body a RESIDENT formal (`DataBinder.FormalIsCarrierResident`, the
+program arm's test) reads and writes through its carrier on every access — its path IS `__lnk{Uid}.Value` — and an AREA
+formal (group / REDEFINED / addressed) is described as a BASED item whose per-activation pointer `CobolArgAdapt.Area` sets to
+the argument's area; only an argument with no area gives it a fresh cell, filled from the carrier and, BY REFERENCE, stored
+back at return. A formal no cell carries (a variable-length group, `DataBinder.CellCanCarry`) keeps a local copied through
+the carrier (an open GR8 defect, kb/Work PB2094). A strongly-typed group with an object-reference or pointer leaf
+(`OoClassTable.LeafCarried` — no character image) crosses as its LEAF VECTOR; where one side lives in a cell (an area
+formal, or a group claimed onto a cell because it is passed BY REFERENCE) the vector is composed and distributed member by
+member through `PlaceCursor` (`PlaceRenderer.GroupLeaves` / `WriteGroupLeaves`), in its record struct's field order, so
+the managed slots cross whole (no REDEFINES can sit inside such a type, §13.18.44.3 SR14). The
+argument's storage is identified ONCE, when the statement begins (§14.6.4 7; §14.9.23.4 GR7 a): `PlaceIdentification.Freeze`
+holds a cell-backed class's `StorageCell` in a statement-local, so a recursive activation that re-seats a method's
+per-activation cell (LOCAL-STORAGE, §8.6.4) or an area formal's data-address pointer cannot redirect a view that is still
+another activation's formal — the CALL lane shares the mechanism. So `INVOKE O "M" USING G G` gives the method two
+descriptions of ONE storage area. §14.9.23.4 GR9: "If an
 OMITTED phrase is specified or a trailing argument is omitted, the omitted-argument condition for that parameter
 shall be true in the invoked method" — and a C# `ref T` has no omitted state, so the ABI carries one. It is
 EVERY formal's, not only an OPTIONAL one's: §8.8.4.8.4 GR1c makes omission transitive through a forwarded formal
@@ -169,8 +188,8 @@ whatever the receiving formal's own phrase, exactly as the program ABI's null ca
 alternative, a flag on OPTIONAL formals only, cannot carry that case). The flag is `OoFormal.OmittedFlag`
 (`__omittedN`, positional and outside every word-derived family, so no `__formal_` `ParamName` can collide); `OoSignatureOf` declares the pair and
 `OoArgPair` renders it at every caller — the typed INVOKE, the covariant adapter, the universal switch and the
-PROPERTY setter — so signature and argument lists cannot drift. In the body an omitted formal's local starts at
-its initial state (no copy-in) and is not copied out; every REFERENCE to it (or to a subordinate) renders through
+PROPERTY setter — so signature and argument lists cannot drift. In the body an omitted formal's carrier is a placeholder
+cell (an area formal's a blank cell whose pointer answers IsNull) and nothing is stored back; every REFERENCE to it (or to a subordinate) renders through
 `OmittedFormal.Ref(ref local, __omittedN, Method, …)`, which raises EC-OO-ARG-OMITTED under checking (§14.9.23.4
 GR10; kb/Work PB971 — COBOLNET_INTERPROGRAM_DESIGN's OMITTED paragraph holds the one mechanism for all three
 element kinds). The universal switch admits `__a.Length` down to one past

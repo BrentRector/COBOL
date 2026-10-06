@@ -26,7 +26,7 @@ public sealed class MethodAbiPairDriftTests
     private const string MemberDecl =
         @"^\s*(?:private|public|internal)(?:\s+(?:static|override|virtual|sealed))*\s+(?:\([^)]*\)|[\w<>\[\]?,.]+)\s+(\w+)\(";
 
-    private static readonly Regex RefSpelling = new(@"\$""ref (\{|__)", RegexOptions.Compiled);
+    private static readonly Regex RefSpelling = new(@"\$""ref (\{|__)|CellPointer\? \{", RegexOptions.Compiled);
 
     [Fact]
     public void MethodArgumentRefPair_IsSpelledOnlyByTheAbiBuilders()
@@ -49,7 +49,7 @@ public sealed class MethodAbiPairDriftTests
         }
         Assert.True(offenders.Count == 0,
             "a method argument/parameter `ref` is spelled outside OoEmitter.OoSignatureOf / OoArgPair — route it "
-            + "through OoArgPair so the (ref T, bool omitted) pair cannot drift (kb/Work PB757):\n"
+            + "through OoArgPair so the (carrier, area, omitted) shape cannot drift (kb/Work PB757, PB2087):\n"
             + string.Join("\n", offenders));
     }
 }

@@ -200,7 +200,8 @@
   "pb1265_occurs_printed_formats",
   "pb1374_flag02_defaults",
   "pb1073_dynamic_length_member_not_a_key_2014",
-  "pb480_universal_variable_length"
+  "pb480_universal_variable_length",
+  "pb2087_vlg_returning_cell_receiver"
  ],
  "pending": []
 }

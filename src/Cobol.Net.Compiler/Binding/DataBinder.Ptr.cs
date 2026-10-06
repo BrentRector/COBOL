@@ -112,12 +112,17 @@ public sealed partial class DataBinder
         // addresses, which the activation sets to the argument's area (CobolArgAdapt.Area). The pointer IS the formal's
         // carrier field, so the omitted-argument condition, the GLOBAL bridge and ADDRESS OF all read the one member.
         // A formal whose area the cell cannot carry keeps the image round trip at the boundary (CellCanCarry).
-        foreach (var f in _linkageFormals)
+        // A METHOD's formals take the same rule (the method arm, kb/Work PB2087): the pointer is the formal's per-activation
+        // data-address member (OoFormal.CarrierLocal), set at each activation to the argument's area.
+        var areaFormals = _linkageFormals.Where(f => !f.CarrierResident).Select(f => (f.Item, Pointer: f.CarrierField))
+            .Concat(OoBoundMethods.SelectMany(m => m.Binding?.Formals ?? []).Where(f => !f.CarrierResident)
+                .Select(f => (f.Item, Pointer: f.CarrierLocal)));
+        foreach (var (item, pointer) in areaFormals)
         {
-            if (f.CarrierResident || !CellCanCarry(f.Item)) continue;
-            if (ForceStringCanonical(f.Item, "LINKAGE formal parameter") is not { } cls) continue;
-            cls.BasedPointerField = f.CarrierField;
-            _ptrBasedBridges.Add((cls.BackingCsName, cls.BackingCellCsName, f.CarrierField, cls.Width));
+            if (!CellCanCarry(item)) continue;
+            if (ForceStringCanonical(item, "LINKAGE formal parameter") is not { } cls) continue;
+            cls.BasedPointerField = pointer;
+            _ptrBasedBridges.Add((cls.BackingCsName, cls.BackingCellCsName, pointer, cls.Width));
         }
 
         // The addressed names: this unit's own procedure division(s), plus — kb/Work PB1009 — every CONTAINED
@@ -159,18 +164,30 @@ public sealed partial class DataBinder
         // storage, so a program that passes nothing by reference pays nothing. An operand whose area the cell cannot
         // carry, or that is ambiguous here (the CALL bind reports it), keeps its ordinary storage and crosses through its
         // carrier alone — an area formal then holds a copy, stored back at return.
+        // A CLASS unit's statements live in its METHODS' procedure divisions, each resolved in its own method's scope
+        // (§11.7.4 GR5) — the ADDRESS OF scan's rule (PtrScanAddressOfTargets); the INVOKE operands are scanned with the
+        // CALL ones (the INVOKE arm of the same rule, kb/Work PB2087).
         bool IsUserFunction(string fn) => UserFunctionNames.Contains(fn) || UnitSelfName is { } self && CobolNames.Same(fn, self);
-        var own = program.procedureDivision() is { } opd ? CallScanByReferenceOperands(opd, IsUserFunction) : [];
-        var operands = own.Select(t => (t.Name, t.Qualifiers, Contained: false))
-            .Concat(program.nestedProgram().SelectMany(n => CallScanByReferenceOperands(n, IsUserFunction))
-                .Select(t => (t.Name, t.Qualifiers, Contained: true)));
-        foreach (var (name, quals, contained) in operands)
+        var own = OoIsClassUnit
+            ? OoBoundMethods.Where(m => m.Ctx?.procedureDivision() is not null)
+                .SelectMany(m => ScanByReferenceOperands(m.Ctx!.procedureDivision(), IsUserFunction).Select(t => (t.Name, t.Qualifiers, t.Invoke, Method: (OoMethodSymbol?)m)))
+            : program.procedureDivision() is { } opd
+                ? ScanByReferenceOperands(opd, IsUserFunction).Select(t => (t.Name, t.Qualifiers, t.Invoke, Method: (OoMethodSymbol?)null))
+                : [];
+        var operands = own.Select(t => (t.Name, t.Qualifiers, t.Invoke, t.Method, Contained: false))
+            .Concat(program.nestedProgram().SelectMany(n => ScanByReferenceOperands(n, IsUserFunction))
+                .Select(t => (t.Name, t.Qualifiers, t.Invoke, Method: (OoMethodSymbol?)null, Contained: true)));
+        foreach (var (name, quals, invoke, method, contained) in operands)
         {
-            if (CallResolveOperand(name, quals) is not { } hit) continue;
+            if (ResolveByReferenceOperand(name, quals, method) is not { } hit) continue;
             DataItem root = hit.Root;
             if (contained && !CallGlobalRoots.Contains(root)) continue;
             if (AlreadyInACell(root) || root.Section is EntrySection.Linkage || !CellCanCarry(root)) continue;
-            if (ForceStringCanonical(root, "CALL BY REFERENCE operand") is { } cls) ClaimAddressableCell(cls);
+            // Object data never crosses an INVOKE BY REFERENCE (§14.9.23.3 SR10: "Identifier-3 shall not reference a data
+            // item defined in the file or working-storage section of a factory or instance object"), so a bare one is
+            // passed BY CONTENT (GR6 a) 2.) and needs no cell.
+            if (invoke && OoIsObjectData(root)) continue;
+            if (ForceStringCanonical(root, "BY REFERENCE operand") is { } cls) ClaimAddressableCell(cls);
         }
     }
 
@@ -194,16 +211,23 @@ public sealed partial class DataBinder
         _ptrAddressableBackings.Add((cls.BackingCsName, cell, cls.Canonical, cls.Width));
     }
 
-    /// <summary>Resolve one scanned CALL operand in the unit's scope, or null when it names nothing or is ambiguous —
-    /// the CALL statement's bind reports both (§8.4.2.2.3 SR1); a storage claim never guesses between candidates.</summary>
-    private DataItem? CallResolveOperand(string name, List<string> quals)
+    /// <summary>Resolve one scanned BY REFERENCE operand in the scope its statement binds in — the owning METHOD's
+    /// (§11.7.4 GR5) when <paramref name="method"/> is set, else the unit's — or null when it names nothing or is
+    /// ambiguous: the statement's bind reports both (§8.4.2.2.3 SR1); a storage claim never guesses between candidates.</summary>
+    private DataItem? ResolveByReferenceOperand(string name, List<string> quals, OoMethodSymbol? method)
     {
-        if (quals.Count != 0) return new ReferenceResolver(this).FindItem(name, quals);
-        return Symbols.TryResolveUnqualified(name, Model.Scope.Program, out var candidates) && candidates.Count == 1
-            ? candidates[0] : null;
+        var scope = method is null ? Model.Scope.Program : new Model.Scope(method.DataScope);
+        if (quals.Count == 0)
+            return Symbols.TryResolveUnqualified(name, scope, out var candidates) && candidates.Count == 1 ? candidates[0] : null;
+        var saved = ActiveMethodScope;
+        ActiveMethodScope = method?.DataScope;
+        try { return new ReferenceResolver(this).FindItem(name, quals); }
+        finally { ActiveMethodScope = saved; }
     }
 
-    /// <summary>The data-name heads of every operand an activation may pass BY REFERENCE under one parse subtree: each
+    /// <summary>The data-name heads of every operand an activation may pass BY REFERENCE under one parse subtree, each tagged
+    /// with whether an INVOKE passes it (its object-data screen differs, §14.9.23.3 SR10): each INVOKE argument passed BY
+    /// REFERENCE (§14.9.23.4 GR6 a) 1.), each
     /// CALL USING operand in a BY REFERENCE phrase or before any phrase (ISO §14.9.4.4 GR5: "Both the BY CONTENT and BY
     /// REFERENCE phrases are transitive across the parameters that follow them until another BY CONTENT or BY REFERENCE
     /// phrase is encountered"; GR9 a) 1.: "BY REFERENCE is assumed"), and each argument of a USER-DEFINED function
@@ -212,16 +236,28 @@ public sealed partial class DataBinder
     /// identifier is yielded (<see cref="OperandIdentifier"/>): a subscript, a reference modifier's operands or an
     /// arithmetic expression's terms are SENDING operands of the reference, never passed — and an expression argument
     /// is passed by content. An address-identifier is ADDRESS OF's own surface.</summary>
-    internal static IEnumerable<(string Name, List<string> Qualifiers)> CallScanByReferenceOperands(IParseTree root,
+    internal static IEnumerable<(string Name, List<string> Qualifiers, bool Invoke)> ScanByReferenceOperands(IParseTree root,
         Func<string, bool> isUserFunction)
     {
         foreach (var node in PtrDescendants(root))
         {
+            // An INVOKE argument (§14.9.23.2): BY REFERENCE, or written with no BY phrase — which §14.9.23.4 GR6 a) 1.
+            // passes BY REFERENCE whenever the formal is BY REFERENCE and the argument is an identifier.
+            if (node is Core.InvokeUsingContext invokeUsing)
+            {
+                foreach (var ia in invokeUsing.invokeArgument())
+                {
+                    IParseTree? operand = ia.REFERENCE() is not null ? ia.dataReference()
+                        : ia.CONTENT() is null && ia.VALUE() is null ? ia.arithmeticExpression() : null;
+                    if (operand is not null && OperandIdentifier(operand) is { } ih) yield return (ih.Name, ih.Qualifiers, true);
+                }
+                continue;
+            }
             if (node is Core.FunctionCallContext fc && fc.functionArgList() is { } fargs && fc.functionName() is { } fname
                 && isUserFunction(fname.GetText()))
             {
                 foreach (var farg in fargs.functionArgument())
-                    if (OperandIdentifier(farg) is { } h) yield return h;
+                    if (OperandIdentifier(farg) is { } h) yield return (h.Name, h.Qualifiers, false);
                 continue;
             }
             if (node is not Core.CallUsingPhraseContext phrase) continue;
@@ -232,7 +268,7 @@ public sealed partial class DataBinder
                 if (arg.callByReference() is { } r) { byReference = true; operand = r.dataReference(); }
                 else if (arg.callByContent() is not null || arg.callByValue() is not null) { byReference = false; operand = null; }
                 else operand = byReference ? arg.arithmeticExpression() : null;
-                if (operand is not null && OperandIdentifier(operand) is { } h) yield return h;
+                if (operand is not null && OperandIdentifier(operand) is { } h) yield return (h.Name, h.Qualifiers, false);
             }
         }
 

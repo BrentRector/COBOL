@@ -367,6 +367,8 @@ public sealed partial class DataBinder
         var pd = m.Ctx.procedureDivision();
         int pos = 0;
         bool byValue = false;
+        // The formals whose ADDRESS OF the body takes are AREA formals (FormalIsCarrierResident — the program arm's test).
+        var addressed = (pd is null ? [] : PtrScanAddressOfSenders(pd)).Select(t => t.Name).ToHashSet(CobolNames.Comparer);
         var header = new ProcedureHeaderScreen(Edition, where);   // §14.2.2 SR1/SR2/SR5/SR6 — the ONE header screen (kb/Work PB1145)
         foreach (var prm in pd?.usingClause()?.usingParameter() ?? [])
         {
@@ -391,7 +393,17 @@ public sealed partial class DataBinder
             {
                 if (optional && byValue) header.OptionalNeedsByReference(pname);   // §14.2.1: OPTIONAL is a BY REFERENCE word
                 if (byValue) header.ByValueClass(pname, item);                      // §14.2.2 SR2
-                m.Binding!.Formals.Add(new OoFormal(item, pos, OoParamName(m, item, pos), optional, byValue));
+                // ⛔ A RESIDENT formal's every reference reads and writes its argument's storage through the method-local
+                // carrier (ISO §14.2.3 GR8; kb/Work PB2087, the method arm of CallBindLinkage's rule): its C# path IS
+                // `{CarrierLocal}.Value`, and no local of its own is declared.
+                bool resident = FormalIsCarrierResident(item, m.Binding!.LinkageRoots, addressed);
+                var formal = new OoFormal(item, pos, OoParamName(m, item, pos), optional, byValue, resident);
+                if (resident)
+                {
+                    item.CsName = formal.CarrierLocal + ".Value";
+                    _callSuppressedRootFields.Add(item.CsName);
+                }
+                m.Binding!.Formals.Add(formal);
             }
             pos++;
         }

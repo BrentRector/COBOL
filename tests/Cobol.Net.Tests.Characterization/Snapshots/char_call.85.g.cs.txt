@@ -45,7 +45,8 @@ internal sealed class _PRG_CHAR_CALL : ICobolProgram
             {
                 case 0:   // MAIN-PARA
                 {
-                    ProgramRegistry.CallProgram("CHAR-SUB", "CHAR-CALL", new CobolArg[] { new CobolArg(CobolPassMode.Reference, ManagedPointer<string>.OverField(() => CobolString.Window(_redef_WS_ARG, (int)(0 + 1), 4), __v => { _redef_WS_ARG = CobolString.WindowInto(_redef_WS_ARG, (int)(0 + 1), 4, CobolString.Store(__v, 4)); }), new NumProfile { Digits = 4, FractionDigits = 0, Signed = false, SignKind = NumericSign.TrailingOverpunch, Truncation = NumericTruncation.DigitCount, ByteForm = NumericByteForm.Zoned, StorageLength = 0 }, Area: new CellPointer(_scell_WS_ARG, 0)) }, null);
+                    var __ident0 = _scell_WS_ARG;
+                    ProgramRegistry.CallProgram("CHAR-SUB", "CHAR-CALL", new CobolArg[] { new CobolArg(CobolPassMode.Reference, ManagedPointer<string>.OverField(() => CobolString.Window(__ident0.Ref, (int)(0 + 1), 4), __v => { __ident0.Ref = CobolString.WindowInto(__ident0.Ref, (int)(0 + 1), 4, CobolString.Store(__v, 4)); }), new NumProfile { Digits = 4, FractionDigits = 0, Signed = false, SignKind = NumericSign.TrailingOverpunch, Truncation = NumericTruncation.DigitCount, ByteForm = NumericByteForm.Zoned, StorageLength = 0 }, Area: new CellPointer(__ident0, 0)) }, null);
                     System.Console.WriteLine(CobolNum.SendingImage(CobolString.Window(_redef_WS_ARG, (int)(0 + 1), 4), _P_0));
                     throw new StopRun();
                 }

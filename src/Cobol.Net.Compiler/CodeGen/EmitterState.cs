@@ -448,6 +448,24 @@ internal sealed class CallUnitState
     /// its omitted-presence flag on, per §8.8.4.8.4 GR1c. Set and cleared by <c>OoEmitter.EmitMethod</c>.</summary>
     public IReadOnlyList<CobolNet.Compiler.Oo.OoFormal> MethodFormals { get; set; } = [];
 
+    /// <summary>⛔ THE AREA A WHOLE FORMAL OF THIS SOURCE ELEMENT OCCUPIES, when <paramref name="p"/> is one (ISO §14.2.3
+    /// GR8; kb/Work PB2087, PB2089): the expression a forward of it BY REFERENCE states as its argument's area, so an area
+    /// formal of the next activation is laid over the same positions. A program formal: a resident one's kept
+    /// <c>ArgumentAreaField</c>, an area one's own pointer. A method formal: a resident one's area PARAMETER, an area
+    /// one's own pointer. Null when <paramref name="p"/> is not a whole formal; "null" text when the formal has no area
+    /// (a BY VALUE formal, a formal no cell carries).</summary>
+    public string? WholeFormalArea(Place p)
+    {
+        if (p is RefModPlace) return null;
+        foreach (var f in Formals)
+            if (ReferenceEquals(f.Item, p.Item))
+                return f.KeepsArgumentArea ? f.ArgumentAreaField : f.IsArea ? $"{f.CarrierField} as CellPointer" : "null";
+        foreach (var f in MethodFormals)
+            if (ReferenceEquals(f.Item, p.Item))
+                return f is { CarrierResident: true, ByValue: false } ? f.AreaParam : f.IsArea ? $"{f.CarrierLocal} as CellPointer" : "null";
+        return null;
+    }
+
     /// <summary>⛔ THE ONE "IS THIS ARGUMENT A WHOLE FORMAL PARAMETER?" RECOGNITION, over BOTH activation ABIs
     /// (§8.8.4.8.4 GR1c; kb/Work PB165 program arm, PB757 method arm): the presence fact to carry on, or null
     /// when the place is not a whole formal. A REFERENCE-MODIFIED view is never the formal itself (GR1c speaks

@@ -51,14 +51,7 @@ internal static class PlaceIdentification
     {
         MemberPlace m => m with { Path = FreezePath(m.Path, hoist) },
         DynTablePlace d => d with { Path = FreezePath(d.Path, hoist) },
-        RedefViewPlace v => v with
-        {
-            Backing = FreezePath(v.Backing, hoist),
-            OffsetExpr = HoistFragment(v.OffsetExpr, hoist),
-            Coding = FreezeCoding(v.Coding, hoist),
-            Cell = v.Cell is { } cell ? FreezePath(cell, hoist) : null,
-            DynOrdinal = v.DynOrdinal is { } ordinal ? HoistFragment(ordinal, hoist) : null,
-        },
+        RedefViewPlace v => FreezeView(v, hoist),
         // The decorations that carry an address of their own: the slice, and the occurs-depending wrapper whose INNER
         // is the addressed storage. A reference modifier is evaluated AFTER its identifier's subscripts (§14.6.4
         // steps 6/7), so the inner is frozen first.
@@ -68,6 +61,42 @@ internal static class PlaceIdentification
         PlaceDecorator => place,
         _ => place,
     };
+
+    /// <summary>A window's address fragments, and — for a window over a class's own STORAGE CELL — the CELL ITSELF.
+    /// ⛔ THE CELL A CLASS LIVES IN IS A RUN-TIME ADDRESS FRAGMENT TOO (kb/Work PB2087). The root that names it is a
+    /// member the activation machinery RE-SEATS: a method's per-activation cell (LOCAL-STORAGE claimed onto a cell) and an
+    /// area formal's data-address pointer are instance members saved and re-seeded at every activation of the method
+    /// (§8.6.4), and a BASED item's cell follows its pointer. A place that rendered the root at each access therefore
+    /// followed it: an INVOKE of the same method, while the argument's view was still live as the formal of the
+    /// activated element, redirected the view to the INNER activation's storage — although ISO §14.2.3 GR8 makes the
+    /// formal occupy "the same storage area as the argument", the area identified when the statement began (§14.6.4 7;
+    /// §14.9.23.4 GR7a / §14.9.4.4 GR3a). So the cell is held in a statement-local, and the backing — the cell's image,
+    /// <c>Ref</c>, in every cell-backed class — and every coding that names the same cell are re-anchored on it. A
+    /// formal's *-ARG-OMITTED guard stays on the new root (the hoist reads the cell without it, because §14.9.4.4 GR12 /
+    /// §14.9.23.4 GR10 exempt a reference "as an argument", and an omitted formal's cell is a real, blank one), so a
+    /// reference through the place is still checked where it was. A cell reached through a dynamic-capacity table's
+    /// element (more than a root) keeps its own rendering: its receiving accessor grows the table (§8.5.1.9.3).</summary>
+    private static RedefViewPlace FreezeView(RedefViewPlace v, Func<string, string> hoist)
+    {
+        var frozen = v with
+        {
+            Backing = FreezePath(v.Backing, hoist),
+            OffsetExpr = HoistFragment(v.OffsetExpr, hoist),
+            Coding = FreezeCoding(v.Coding, hoist),
+            Cell = v.Cell is { } cell ? FreezePath(cell, hoist) : null,
+            DynOrdinal = v.DynOrdinal is { } ordinal ? HoistFragment(ordinal, hoist) : null,
+        };
+        if (v.Cell is not { Segments: [RootFieldSegment root] }) return frozen;
+        string local = hoist(root.CsField);
+        var anchored = new AccessPath([new RootFieldSegment(local, root.Guard is { } g ? g with { CarrierPrefix = local } : null)]);
+        return frozen with
+        {
+            Backing = anchored.Add(new MemberSegment(nameof(CobolNet.Runtime.StorageCell.Ref))),
+            Cell = anchored,
+            Coding = frozen.Coding is CellWindowCoding c && c.Cell is { Segments: [RootFieldSegment cr] } && cr.CsField == root.CsField
+                ? c with { Cell = anchored } : frozen.Coding,
+        };
+    }
 
     private static RefModPlace FreezeRefMod(RefModPlace r, Func<string, string> hoist)
     {
