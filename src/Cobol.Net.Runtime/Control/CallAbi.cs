@@ -63,8 +63,17 @@ public enum CobolPassMode
 /// needs the RECEIVER's description as much as an argument's adapter needs the argument's — a group receiver's
 /// layout to meet a compatible group of a different shape (§14.8.3.2), a numeric receiver's profile. A bare
 /// carrier could state neither.</remarks>
+/// <param name="Area">⛔ THE ARGUMENT'S STORAGE AREA, when the activating element's storage for it lives in a
+/// <see cref="StorageCell"/> (kb/Work PB2087): the cell and the character offset at which the argument begins. ISO
+/// §14.2.3 GR8: "If the argument is passed by reference, the activated runtime element operates as if the formal
+/// parameter occupies the same storage area as the argument." An elementary formal already aliases through
+/// <see cref="Carrier"/>'s per-access accessors; a formal whose storage is an AREA (a group, a REDEFINED or an
+/// addressed formal — <see cref="CobolArgAdapt.Area"/>) is laid over this cell at this offset, so every store either
+/// side makes — through the formal, through a second formal passed the same argument, or through the activating
+/// element's own description while the activated one is active — is the same store. Null for an argument whose
+/// storage is not a cell (it then crosses through <see cref="Carrier"/> alone and an area formal holds a copy).</param>
 public readonly record struct CobolArg(CobolPassMode Mode, ManagedPointer Carrier, NumProfile? Num, int[]? Layout = null,
-    int Length = CobolArg.Unstated, BoundaryClass Class = BoundaryClass.Other)
+    int Length = CobolArg.Unstated, BoundaryClass Class = BoundaryClass.Other, CellPointer? Area = null)
 {
     /// <summary><see cref="Length"/> of an item with no fixed character length.</summary>
     public const int Unstated = -1;
@@ -296,6 +305,40 @@ public static class CobolArgAdapt
     /// <summary>True when argument <paramref name="i"/> was supplied and is not OMITTED (ISO §14.9.4.4 GR11 —
     /// the omitted-argument condition is the negation of this).</summary>
     public static bool Present(CobolArg[] args, int i) => i < args.Length && !args[i].Carrier.IsNull;
+
+    /// <summary>⛔ THE STORAGE OF A FORMAL WHOSE DESCRIPTION IS AN AREA (kb/Work PB2087) — a group formal, a formal
+    /// another LINKAGE entry REDEFINES, a formal whose ADDRESS OF is taken: the data pointer its description is laid
+    /// over, exactly as a BASED item's is (the emitter declares the formal's carrier as that item's implicit
+    /// data-address pointer, so every reference windows the cell this returns at its offset).
+    /// <para>ISO §14.2.3 GR8 — "If the argument is passed by reference, the activated runtime element operates as if
+    /// the formal parameter occupies the same storage area as the argument". When the argument is supplied BY
+    /// REFERENCE with an <see cref="CobolArg.Area"/> that can hold the formal's <paramref name="areaWidth"/>
+    /// positions, the answer IS that area: no copy is made, so a second formal passed the same argument, the
+    /// activating element's own references while this one is active, and an EXTERNAL record also passed all see
+    /// every store at once. §14.8.2.3.2 rule 1 gives a conforming pair "the same length", and a differently
+    /// structured group of that length describes the same positions (its own description laid over them).</para>
+    /// <para>Every other argument — BY CONTENT (§14.2.3 GR9's record "allocated by the activating runtime element"),
+    /// a BY VALUE formal (GR10's record allocated in the activated one), or a BY REFERENCE argument whose storage is
+    /// not a cell — gets a FRESH cell of <paramref name="areaWidth"/> positions, which the activated element fills
+    /// from the argument's carrier (and, BY REFERENCE, stores back at return); <see cref="Aliased"/> tells the two
+    /// apart. An omitted argument (GR11) gets a fresh cell whose pointer answers <see cref="ManagedPointer.IsNull"/>
+    /// true, so the omitted-argument condition (§8.8.4.8.4 GR1) reads the same carrier every other formal's does
+    /// while an unchecked reference still has storage to read (the documented GR12 leniency).</para></summary>
+    public static CellPointer Area(CobolArg[] args, int i, int areaWidth, bool byValueFormal)
+    {
+        if (!Present(args, i))
+            return new CellPointer(new StorageCell { Ref = new string(' ', areaWidth) }, 0) { OmittedArgument = true };
+        if (!byValueFormal && args[i] is { Mode: CobolPassMode.Reference, Area: { } a }
+            && a.Generation == a.Cell.Generation && a.Offset >= 0 && a.Offset <= (long)a.Cell.Ref.Length - areaWidth)
+            return a;
+        return new CellPointer(new StorageCell { Ref = new string(' ', areaWidth) }, 0);
+    }
+
+    /// <summary>True when <paramref name="area"/> — the formal's storage <see cref="Area"/> answered — IS argument
+    /// <paramref name="i"/>'s own storage (§14.2.3 GR8 realized by identity), so there is nothing to fill at entry and
+    /// nothing to store back at return.</summary>
+    public static bool Aliased(CobolArg[] args, int i, ManagedPointer area) =>
+        i < args.Length && ReferenceEquals(args[i].Area, area);
 
     /// <summary>Read any NATIVE NUMERIC carrier cell as its Int128-lane unscaled value, or null when the cell is
     /// not a native numeric (kb/Work R12 — the carrier set is the four <c>PicInfo.ClrType</c> integer carriers;

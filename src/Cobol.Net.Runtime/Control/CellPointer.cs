@@ -24,4 +24,14 @@ public sealed class CellPointer(StorageCell cell, long offset, int generation) :
     /// <summary>The character-position offset into <see cref="Cell"/> (0-based; byte = character in the
     /// alphanumeric/zoned character model).</summary>
     public long Offset { get; } = offset;
+
+    /// <summary>True for the storage of a formal whose argument was OMITTED (ISO §14.9.4.4 GR11; kb/Work PB2087 —
+    /// <see cref="CobolArgAdapt.Area"/>): the formal's carrier answers <see cref="IsNull"/>, which is the
+    /// omitted-argument condition every formal's presence test reads (§8.8.4.8.4 GR1), while its description still
+    /// windows a real cell — so an unchecked reference reads blank storage, the documented GR12 leniency, instead of
+    /// a null dereference.</summary>
+    public bool OmittedArgument { get; init; }
+
+    /// <inheritdoc/>
+    public override bool IsNull => OmittedArgument;
 }

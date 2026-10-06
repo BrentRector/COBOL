@@ -30,7 +30,9 @@ public static class CobolPtr
         // conditions fatal and otherwise SIGSEGV; Micro Focus traps to RTS 114; IBM abends S0C4; NetCOBOL
         // JMP0071I-U). The helper is still called FIRST when checking is on, so the last-exception status is set
         // and the statement guard's `catch … when (EcName == …)` can select a USE declarative.
-        if (p is null || p.IsNull)
+        // An OMITTED formal's area answers IsNull — its presence fact — yet addresses a real cell, so an unchecked
+        // reference reads blank storage (CellPointer.OmittedArgument; kb/Work PB2087).
+        if (p is null || p.IsNull && p is not CellPointer)
         {
             ExceptionState.DataPtrNullError(
                 "reference to a based item whose data-address pointer is NULL (ISO 13.18.5.4 GR3)");

@@ -55,18 +55,21 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     internal void CheckArgument(DataItem formal, BoundCallArg arg, int position, ActivationSite site)
     {
         if (arg.Omitted) return;
-        // ⛔ A CARRIER RESIDUE, NOT A CONFORMANCE RULE (kb/Work PB1116). Two strong groups of one type CONFORM
-        // (§14.8.2.2 — OoConformance decides it for every lane), and the INVOKE boundary carries one that has no
-        // character image as its leaf vector (OoClassTable.LeafCarried). The program ABI's CobolArg channel has no
-        // such carrier yet, so the CALL / function lanes still refuse it HERE, at compile time, naming the real reason —
-        // never at run time from a NotImplemented stand-in the emitter would otherwise plant.
-        if (CobolNet.Compiler.Oo.OoClassTable.LeafCarried(formal))
+        // ⛔ A CARRIER RESIDUE, NOT A CONFORMANCE RULE (kb/Work PB1116, PB2087). Two strong groups of one type CONFORM
+        // (§14.8.2.2 — OoConformance decides it for every lane). A group with a pointer or object-reference leaf has no
+        // character image: its managed values ride the MANAGED SLOTS of a StorageCell. BY REFERENCE from storage that IS
+        // a cell, the program ABI carries it whole — the argument's area, which the formal's description is laid over
+        // (§14.2.3 GR8; CobolArg.Area) — and the activating element claims every group it passes by reference onto a
+        // cell (DataBinder.PtrBindBasedAndAddressables). Any other crossing would copy the image and silently drop the
+        // references, so the CALL / function lanes refuse it HERE, at compile time, naming the real reason.
+        if (CobolNet.Compiler.Oo.OoClassTable.LeafCarried(formal)
+            && !(arg.Mode is CobolPassMode.Reference && arg.Place is { Item.Root.Class: { IsCellBacked: true } }))
         {
             ctx.Edition.Error(site.Conformance,
                 $"{site.Callee} argument {position}: formal parameter '{formal.CobolName}' is a strongly-typed group with "
                 + "an object-reference or pointer leaf and so no character image; the argument conforms (ISO §14.8.2.2 — "
-                + "both of the same type), but this activation boundary does not yet carry such a group (it crosses an "
-                + "INVOKE as its leaf vector; COBOLNET_DESIGN §4.2)");
+                + "both of the same type), but this activation boundary carries such a group only BY REFERENCE from "
+                + "storage that shares its managed slots (§14.2.3 GR8; COBOLNET_INTERPROGRAM_DESIGN, area formals)");
             return;
         }
         if (arg.DataAddress is not null || arg.ProgramAddress is not null)

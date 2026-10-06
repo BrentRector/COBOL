@@ -274,9 +274,10 @@ internal sealed class ProgramEmitter
                     _callState.InheritedStatusPlace[f] = pp;
         }
 
-        // Per-formal carrier shape, resolved once: a carrier-resident formal aliases per access; a group /
-        // redefined formal round-trips its character image at the activation boundary (deep-dive hard problem —
-        // the whole-struct round trip, realized at the call boundary).
+        // Per-formal carrier shape, resolved once: a carrier-resident formal aliases per access; an AREA formal (a
+        // group / redefined / addressed one) is laid over its argument's cell, and its crossing names the carrier it
+        // is FILLED from when the argument has no cell (kb/Work PB2087); a variable-length group formal round-trips
+        // its §8.5.1.12 image at the activation boundary.
         var formals = data.LinkageFormals
             .Select(f =>
             {
@@ -337,12 +338,27 @@ internal sealed class ProgramEmitter
                 w.Line($"private ref {type} {b.Field} => ref {b.Path};   // GLOBAL item of a containing program (ISO §13.18.27.4 GR2 — container storage, contained visibility)");
             }
             _oo.EmitExternalBackings(data, w);
-            _oo.EmitPointerBackings(data, w);   // BASED bridges + ADDRESS-OF cells — the ONE renderer the OO type-half shares (kb/Work PB956)
 
             new DataEmitter(Current.Ctx).Emit();
+            // BASED bridges + ADDRESS-OF cells — the ONE renderer the OO type-half shares (kb/Work PB956). AFTER the
+            // data fields: a RECURSIVE unit's cell is STATIC, and C# runs static field initializers in TEXTUAL order,
+            // so a cell declared above the NumProfile fields its seed image reads encoded every numeric leaf through a
+            // still-default profile — the type initializer threw (measured: a RECURSIVE program's ADDRESS-OF-taken
+            // `01 R. 05 N PIC 9.` failed before its first statement; kb/Work PB2087 made every group such a program
+            // passes by reference one).
+            _oo.EmitPointerBackings(data, w);
 
             foreach (var (f, _, crossing, carrier) in formals)
             {
+                // An AREA formal's carrier IS its class's implicit data-address pointer, which EmitPointerBackings
+                // declared above with the class's deref bridge (kb/Work PB2087); only its presence member is its own.
+                if (f.IsArea)
+                {
+                    if (f.Item.OmittedGuard is { } aog)
+                        w.Line($"private bool {aog.Presence} => {f.CarrierField}.IsNull;   "
+                            + "// the omitted-argument condition of this formal (ISO §8.8.4.8.4 GR1; §14.9.4.4 GR11)");
+                    continue;
+                }
                 // The UNBOUND seed (ISO §13.7.4 GR3 — a linkage item referenced outside an activation that
                 // supplied it). Native AND Managed default through the item's OWN PicInfo.DefaultInitializer
                 // (0L / 0UL / (Int128)0 / (UInt128)0 / ManagedPointer.Null / ProgramPointer.Null /
@@ -572,23 +588,40 @@ internal sealed class ProgramEmitter
                     w.Line($"{f.CarrierField} = {FormalAdopt(f, crossing, carrier, CallEmitter.ElementaryFormalWindow(f.Item))};");
                     continue;
                 }
-                // Boundary round-trip formal (group / redefined): adopt the carrier, copy the caller's image in.
-                // A REDEFINED fixed-point BY VALUE formal (still class numeric — SR2-legal) rides the image
-                // round trip over a DETACHED cell (§14.2.3 GR10): copy-in below, and NO copy-out at return.
-                w.Line($"{f.CarrierField} = {FormalAdopt(f, crossing, carrier, Math.Max(1, CallEmitter.BoundaryImageWidth(f.Item)))};");
-                using (w.Block($"if ({RuntimeApi.ArgAdaptPresent("__args", f.Position)})"))
+                // ⛔ AN AREA FORMAL IS LAID OVER ITS ARGUMENT'S STORAGE (kb/Work PB2087; §14.2.3 GR8 — "the activated
+                // runtime element operates as if the formal parameter occupies the same storage area as the
+                // argument"): its carrier is its class's data-address pointer, set to the argument's own cell area,
+                // so nothing is copied and every store either element makes is the other's. Only an argument with no
+                // cell area — BY CONTENT (GR9's record allocated by the activating element), a BY VALUE formal
+                // (GR10's), or storage that is not a cell — gets a fresh area FILLED from the argument's carrier
+                // below; a BY REFERENCE one is stored back at return. A variable-length group formal, whose area no
+                // cell carries (DataBinder.CellCanCarry), is the one shape whose carrier field takes that copy itself.
+                string copyCarrier = f.CarrierField;
+                string copyGuard = RuntimeApi.ArgAdaptPresent("__args", f.Position);
+                string adopt = FormalAdopt(f, crossing, carrier, Math.Max(1, CallEmitter.BoundaryImageWidth(f.Item)));
+                if (f.IsArea)
                 {
+                    copyCarrier = AreaCopyCarrier(f);
+                    w.Line($"{f.CarrierField} = {RuntimeApi.ArgAdaptArea("__args", f.Position, f.Item.Class!.Width, f.ByValue)};");
+                    w.Line($"ManagedPointer<{carrier}>? {copyCarrier} = null;");
+                    copyGuard += $" && !{RuntimeApi.ArgAdaptAliased("__args", f.Position, f.CarrierField)}";
+                }
+                else
+                    w.Line($"{f.CarrierField} = {adopt};");
+                using (w.Block($"if ({copyGuard})"))
+                {
+                    if (f.IsArea) w.Line($"{copyCarrier} = {adopt};");
                     if (place is null)
                         w.Line(LoudStmt($"LINKAGE formal '{f.Item.CobolName}' is not resolvable to storage"));
                     else if (crossing is CallCrossing.VarGroup)
-                        w.Line(PlaceRenderer.WriteVarGroupImage(place, $"{f.CarrierField}.Value",
+                        w.Line(PlaceRenderer.WriteVarGroupImage(place, $"{copyCarrier}.Value",
                             "LINKAGE formal copy-in of", formalStorage: true));
                     else if (crossing is CallCrossing.Text)
-                        w.Line(CallEmitter.CallStringWrite(place, $"{f.CarrierField}.Value"));
+                        w.Line(CallEmitter.CallStringWrite(place, $"{copyCarrier}.Value"));
                     else
                         // Native AND Managed write the storage's own value — for a managed slot that is the
                         // reference itself (kb/Work PB663), never an image of it.
-                        w.Line(PlaceRenderer.Write(place, $"{f.CarrierField}.Value"));
+                        w.Line(PlaceRenderer.Write(place, $"{copyCarrier}.Value"));
                 }
             }
             // An ANY LENGTH RETURNING item (§13.18.2.3 SR3 b)) has no length of its own: §13.18.2.4 GR1 b) makes it
@@ -609,22 +642,29 @@ internal sealed class ProgramEmitter
             foreach (var (f, place, crossing, _) in formals)
             {
                 if (f.CarrierResident || place is null || f.ByValue) continue;
-                // Copy the (possibly mutated) formal back to the caller's storage — the BY REFERENCE result
-                // becomes visible at activation end (§14.2.3 GR8/GR9; a BY CONTENT cell absorbs it invisibly;
-                // a BY VALUE formal is SKIPPED above — its stores must never reach the caller, §14.2.3 GR10).
-                using (w.Block($"if ({RuntimeApi.ArgAdaptPresent("__args", f.Position)})"))
+                // Store a COPIED formal back into the caller's storage at activation end (§14.2.3 GR8/GR9; a BY
+                // CONTENT cell absorbs it invisibly; a BY VALUE formal is SKIPPED above — its stores must never reach
+                // the caller, §14.2.3 GR10). An area formal laid over its argument's own cell has no copy: its local
+                // carrier was never set, so the guard below is false (kb/Work PB2087).
+                string copyCarrier = f.IsArea ? AreaCopyCarrier(f) : f.CarrierField;
+                string copyGuard = f.IsArea ? $"{copyCarrier} is not null" : RuntimeApi.ArgAdaptPresent("__args", f.Position);
+                using (w.Block($"if ({copyGuard})"))
                     w.Line(crossing switch
                     {
                         CallCrossing.VarGroup =>
-                            $"{f.CarrierField}.Value = {PlaceRenderer.VarGroupBoundaryImage(place, "LINKAGE formal copy-out of")};",
-                        CallCrossing.Text => $"{f.CarrierField}.Value = {CallEmitter.CallStringRead(place)};",
-                        _ => $"{f.CarrierField}.Value = {PlaceRenderer.Read(place)};",
+                            $"{copyCarrier}.Value = {PlaceRenderer.VarGroupBoundaryImage(place, "LINKAGE formal copy-out of")};",
+                        CallCrossing.Text => $"{copyCarrier}.Value = {CallEmitter.CallStringRead(place)};",
+                        _ => $"{copyCarrier}.Value = {PlaceRenderer.Read(place)};",
                     });
             }
             if (_callState.ReturningPlace is { } ret)
                 w.Line($"{ReturningDelivery(ret)};");
         }
     }
+
+    /// <summary>The local that holds an AREA formal's argument carrier for the one case its area is a copy (kb/Work
+    /// PB2087) — read at entry to fill the area and, BY REFERENCE, written at return.</summary>
+    private static string AreaCopyCarrier(LinkageFormal f) => $"__lc{f.Position}";
 
     /// <summary>⛔ THE RETURNING DELIVERY (ISO §14.6.5 — "The result of the execution of a program, function, or
     /// method that specifies a RETURNING phrase in its procedure division header, is the content of the data

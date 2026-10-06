@@ -21,10 +21,10 @@ using Core = CobolParserCore;
 /// contained program's ref-bridge of a GLOBAL formal cannot collide with its own formals; kb/Work PB1009).</param>
 /// <param name="CarrierResident">True when the formal is CARRIER-RESIDENT: an elementary formal whose every
 /// reference reads/writes the caller's storage through <c>carrier.Value</c> (the design's "one unavoidable
-/// indirection" — per-access aliasing per ISO §14.2.3 GR8). False for a group formal or a REDEFINED elementary
-/// formal: those keep a callee-local field and round-trip the caller's character image at the ACTIVATION
-/// boundary (copy-in at entry, copy-out at return — the deep-dive group hard problem's whole-struct round trip,
-/// realized at the call boundary).</param>
+/// indirection" — per-access aliasing per ISO §14.2.3 GR8). False for a group formal, a REDEFINED elementary
+/// formal and an addressed one: those are AREA formals (<see cref="IsArea"/>), whose description is laid over the
+/// argument's own storage cell — or, for a variable-length group the cell cannot carry, the one formal shape that
+/// still round-trips its §8.5.1.12 image at the activation boundary.</param>
 /// <param name="ByValue">True when the header names this formal in a BY VALUE phrase (ISO §14.2.2 using-phrase;
 /// §14.2.3 GR4 transitivity resolved at bind). The activated element then operates on a VALUE COPY — a detached
 /// cell conformed to the formal's description (§14.2.3 GR10: the argument is the sending operand of a COMPUTE
@@ -34,6 +34,14 @@ public sealed record LinkageFormal(DataItem Item, int Position, string CarrierFi
 {
     /// <summary>The presence fact every consumer reads (§8.8.4.8.4 GR1) — the program arm's null carrier.</summary>
     public OmittedProbe Probe => new OmittedProbe.Carrier(CarrierField);
+
+    /// <summary>⛔ True for an AREA formal (kb/Work PB2087): its class is described like a BASED item's, and its carrier
+    /// field IS that item's implicit data-address pointer, set at activation to the argument's own storage area
+    /// (<c>CobolArgAdapt.Area</c>) — ISO §14.2.3 GR8, "the activated runtime element operates as if the formal
+    /// parameter occupies the same storage area as the argument". Derived from the class the binder claimed
+    /// (<c>DataBinder.PtrBindBasedAndAddressables</c>), so the emitter and the binder cannot disagree about which
+    /// formals are areas.</summary>
+    public bool IsArea => !CarrierResident && Item.Class?.BasedPointerField == CarrierField;
 }
 
 /// <summary>The synthesized run-unit backing of one EXTERNAL record (ISO §13.18.22 / §8.6.7): the emitter
@@ -436,7 +444,8 @@ public sealed partial class DataBinder
             // read/write LK_CTR.Value — the one unavoidable indirection"). Available for an elementary
             // fixed-point/character formal NOT overlaid by another linkage entry; a group formal (a different
             // C# struct type than the caller's — every cross-program group IS a category reinterpretation) and
-            // a redefined formal round-trip the character image at the activation boundary instead. A BY VALUE
+            // a redefined formal are AREA formals instead, laid over the argument's own storage cell
+            // (LinkageFormal.IsArea; PtrBindBasedAndAddressables claims the class — kb/Work PB2087). A BY VALUE
             // formal is carrier-resident over its DETACHED value-copy cell (§14.2.3 GR10 — same per-access
             // mechanism, different carrier: CobolArgAdapt.NumValue instead of the aliasing Num view).
             bool redefined = LinkageRoots.Any(r => !ReferenceEquals(r, item)
@@ -457,10 +466,10 @@ public sealed partial class DataBinder
             // identifier-1" — an address the BASED machinery dereferences to a StorageCell. A resident formal's
             // storage is the caller's, reached only through the carrier's accessor, so it has no cell to address;
             // forcing one used to build the cell's name from the accessor text (`_scell___lnkp0.Value` — Roslyn
-            // CS1003 on conforming source). An addressed formal therefore takes the round-trip arm every group
-            // formal already takes: its storage is a callee-local cell (PtrBindBasedAndAddressables forces it),
-            // the caller's image copied in at entry and out at return — §14.2.3 GR8's "as if the formal parameter
-            // occupies the same storage area as the argument", realized at the activation boundary.
+            // CS1003 on conforming source). An addressed formal is therefore an AREA formal like every group
+            // formal: its description is laid over the argument's own cell (kb/Work PB2087), so its address IS the
+            // argument's — §14.2.3 GR8's "as if the formal parameter occupies the same storage area as the
+            // argument" — and an argument with no cell gets a fresh one, filled at entry and stored back at return.
             bool resident = item.Children.Count == 0 && item.IsElementary
                 && !redefined && item.Pic is { IsFloat: false }
                 && !addressed.Contains(item.CobolName ?? "");
@@ -823,7 +832,7 @@ public sealed partial class DataBinder
         // clause; §13.18.22 conditions EXTERNAL on nothing subordinate at all. A bit leaf is admitted by all
         // three, so the reject was rejects-legal-source — the same argument that retired the negative fixture
         // pb151-based-comp-leaf at the PB164 landing. Its residue clause now names the ACTUAL leaf.
-        if (leaves.Select(ByteWindowResidueOf).FirstOrDefault(r => r is not null) is { } residue)
+        if (CellResidueOf(leaves) is { } residue)
         {
             cls.Classify(RedefinesTier.Rejected, cls.Width,
                 $"{what} '{item.CobolName}' has {residue} — the shared byte cell cannot carry it");
@@ -871,6 +880,28 @@ public sealed partial class DataBinder
             if (leaf.Pic is { Category: PicCategory.Numeric, HasImageByteForm: true })
                 MarkImageForced(leaf);   // the collected image fact
         return cls;
+    }
+
+    /// <summary>The first leaf of <paramref name="leaves"/> the shared byte cell cannot carry, as its residue clause, or
+    /// null — <see cref="ByteWindowResidueOf"/> over a whole storage area, the ONE gate <see cref="ForceStringCanonical"/>
+    /// applies.</summary>
+    private static string? CellResidueOf(IEnumerable<DataItem> leaves) =>
+        leaves.Select(ByteWindowResidueOf).FirstOrDefault(r => r is not null);
+
+    /// <summary>⛔ CAN <paramref name="root"/>'s STORAGE AREA MOVE ONTO A CELL WITHOUT A DIAGNOSTIC (kb/Work PB2087)? The
+    /// question an OPTIONAL claim asks before calling <see cref="ForceStringCanonical"/>, which classifies a refused
+    /// class Rejected (every reference then fails loud) — right for a surface that cannot exist without the cell
+    /// (EXTERNAL, BASED, ADDRESS OF), wrong for one that only gains aliasing from it (a boundary-aliased area). True
+    /// when every leaf of the area rides the cell AND the area holds no variable-length component: a dynamic-capacity
+    /// table or a dynamic-length item crosses a boundary on its own §8.5.1.12 carrier (kb/Work PB204), and a data
+    /// pointer cannot address an area holding one (§13.18.5.3 SR2 — the BASED rule this storage shape is).</summary>
+    private static bool CellCanCarry(DataItem root)
+    {
+        var members = root.Class?.Members ?? [root];
+        return CellResidueOf(members.SelectMany(LeavesOf)) is null && !members.Any(HoldsVariableLengthComponent);
+
+        static bool HoldsVariableLengthComponent(DataItem n) =>
+            n.IsDynamicTable || DynSlotWindow.CarriedBySlot(n) || n.Children.Any(HoldsVariableLengthComponent);
     }
 
     /// <summary>Number <paramref name="node"/>'s variable-length COMPONENTS in its scope from ordinal

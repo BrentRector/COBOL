@@ -2436,7 +2436,8 @@
   "pb1060-convert-any-address-identifier",
   "pb1060-baseconvert-address-identifier",
   "pb1421-goto-depending-folded-numeric-function",
-  "pb1421-perform-times-folded-numeric-function"
+  "pb1421-perform-times-folded-numeric-function",
+  "pb2087-strong-pointer-group-by-content"
  ],
  "pending": []
 }

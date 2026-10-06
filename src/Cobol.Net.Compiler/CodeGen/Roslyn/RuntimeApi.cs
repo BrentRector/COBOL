@@ -1865,6 +1865,19 @@ internal static class RuntimeApi
     public static string ArgAdaptPresent(string args, int position) =>
         $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Present)}({args}, {position})";
 
+    /// <summary>The storage of an AREA formal (§14.2.3 GR8; kb/Work PB2087) — <c>CobolArgAdapt.Area</c>: the argument's
+    /// own cell area when it can hold <paramref name="areaWidth"/> positions BY REFERENCE, else a fresh cell.</summary>
+    public static string ArgAdaptArea(string args, int position, int areaWidth, bool byValueFormal) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Area)}({args}, {position}, {areaWidth}, {(byValueFormal ? "true" : "false")})";
+
+    /// <summary>Is an area formal's storage its argument's own (kb/Work PB2087)? — <c>CobolArgAdapt.Aliased</c>.</summary>
+    public static string ArgAdaptAliased(string args, int position, string area) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Aliased)}({args}, {position}, {area})";
+
+    /// <summary>The storage area of a cell-backed argument (kb/Work PB2087): a data pointer at <paramref name="offset"/>
+    /// characters into <paramref name="cell"/> — the <c>CobolArg.Area</c> an area formal is laid over.</summary>
+    public static string ArgArea(string cell, string offset) => $"new {nameof(CellPointer)}({cell}, {offset})";
+
     /// <summary>RETURNING delivery into the caller's item (§14.6.5) — <c>CobolArgAdapt.StoreReturn</c>.
     /// <paramref name="description"/> is the SENDING item's description when it has one — its
     /// <c>NumProfile</c> field, or a variable-length group's layout array (kb/Work PB962/PB965).</summary>

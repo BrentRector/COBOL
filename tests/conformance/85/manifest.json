@@ -388,7 +388,8 @@
   "pb1128_inspect_signed_sign_retained",
   "pb1525_flag_extensions_changes_nothing",
   "pb1281_redefines_data_name_2_bare",
-  "pb1421_goto_depending_function_identifier"
+  "pb1421_goto_depending_function_identifier",
+  "pb2087_by_reference_group_aliasing"
  ],
  "pending": []
 }

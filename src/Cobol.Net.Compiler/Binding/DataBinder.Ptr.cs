@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Antlr4.Runtime.Tree;
 using CobolNet.Editions.Diagnostics;
+using CobolNet.Runtime;
 using CobolNet.Frontend.Generated;
 
 using CobolNet.Binding.Model;
@@ -103,6 +104,22 @@ public sealed partial class DataBinder
             _ptrBasedBridges.Add((cls.BackingCsName, cls.BackingCellCsName, addr, cls.Width));
         }
 
+        // ⛔ A FORMAL WHOSE STORAGE IS AN AREA IS LAID OVER ITS ARGUMENT'S CELL (kb/Work PB2087). ISO §14.2.3 GR8: "If the
+        // argument is passed by reference, the activated runtime element operates as if the formal parameter occupies the
+        // same storage area as the argument." A non-resident formal — a group, a formal another LINKAGE entry REDEFINES,
+        // a formal whose ADDRESS OF is taken (CallBindLinkage) — is therefore described exactly as a BASED item is: its
+        // class moves onto a cell through the ONE forcer, and the cell is the one its implicit data-address pointer
+        // addresses, which the activation sets to the argument's area (CobolArgAdapt.Area). The pointer IS the formal's
+        // carrier field, so the omitted-argument condition, the GLOBAL bridge and ADDRESS OF all read the one member.
+        // A formal whose area the cell cannot carry keeps the image round trip at the boundary (CellCanCarry).
+        foreach (var f in _linkageFormals)
+        {
+            if (f.CarrierResident || !CellCanCarry(f.Item)) continue;
+            if (ForceStringCanonical(f.Item, "LINKAGE formal parameter") is not { } cls) continue;
+            cls.BasedPointerField = f.CarrierField;
+            _ptrBasedBridges.Add((cls.BackingCsName, cls.BackingCellCsName, f.CarrierField, cls.Width));
+        }
+
         // The addressed names: this unit's own procedure division(s), plus — kb/Work PB1009 — every CONTAINED
         // program's, restricted to this unit's GLOBAL names. §13.18.27.4 GR2 lets a contained program reference
         // a global name "without describing it again", and the storage it references is THIS unit's, so the
@@ -125,19 +142,117 @@ public sealed partial class DataBinder
             DataItem root = hit;
             while (root.Parent is { } p) root = p;
             if (contained && !CallGlobalRoots.Contains(root)) continue;   // not a global name — not this unit's to force
-            if (root.IsBased) continue;                 // ADDRESS OF a based item reads its implicit pointer (§8.6.5)
-            if (root.Class is { } existing && PtrAddressableCellOf.ContainsKey(existing)) continue;
-            if (root.Class is { Tier: RedefinesTier.StringCanonical } ext
-                && CallExternalBackings.Any(b => b.BackingCsName == ext.BackingCsName))
-                continue;                               // EXTERNAL — already cell-backed (ExternalStore); At() takes it directly
+            if (AlreadyInACell(root)) continue;
             if (ForceStringCanonical(root, "ADDRESS OF target record") is not { } cls) continue;   // rejected → loud
-            // ⛔ THE CLASS NAMES ITS OWN CELL (kb/Work PB231): the field used to carry an ad-hoc `_cell_{NAME}`
-            // spelling that only this list knew, so a place builder could not reach the cell to address the
-            // area's MANAGED SLOTS. It is now RedefinesClass.BackingCellCsName, the ONE name every cell surface
-            // uses and ReferenceResolver.BuildCellPath resolves.
-            string cell = cls.BackingCellCsName;
-            _ptrAddressableCellOf[cls] = cell;
-            _ptrAddressableBackings.Add((cls.BackingCsName, cell, cls.Canonical, cls.Width));
+            ClaimAddressableCell(cls);
+        }
+
+        // ⛔ A GROUP PASSED BY REFERENCE LIVES IN A CELL (kb/Work PB2087) — the activating half of §14.2.3 GR8. An
+        // argument whose storage is a cell crosses with its AREA (CobolArg.Area: the cell and the offset the argument
+        // begins at), and an area formal is laid over exactly those positions, so the two elements share ONE storage
+        // area for the whole activation. A group (or a member of a REDEFINES class, already a character backing) named
+        // as a BY REFERENCE operand of CALL USING is claimed by the same forcer ADDRESS OF uses; nothing else changes
+        // storage, so a program that never passes a group by reference pays nothing. An operand whose area the cell
+        // cannot carry, or that is ambiguous here (the CALL bind reports it), keeps its ordinary storage and crosses
+        // through its carrier alone — an area formal then holds a copy, stored back at return.
+        bool IsUserFunction(string fn) => UserFunctionNames.Contains(fn) || UnitSelfName is { } self && CobolNames.Same(fn, self);
+        var own = program.procedureDivision() is { } opd ? CallScanByReferenceOperands(opd, IsUserFunction) : [];
+        var operands = own.Select(t => (t.Name, t.Qualifiers, Contained: false))
+            .Concat(program.nestedProgram().SelectMany(n => CallScanByReferenceOperands(n, IsUserFunction))
+                .Select(t => (t.Name, t.Qualifiers, Contained: true)));
+        foreach (var (name, quals, contained) in operands)
+        {
+            if (CallResolveOperand(name, quals) is not { } hit || !ClaimsAnArea(hit)) continue;
+            DataItem root = hit.Root;
+            if (contained && !CallGlobalRoots.Contains(root)) continue;
+            if (AlreadyInACell(root) || root.Section is EntrySection.Linkage || !CellCanCarry(root)) continue;
+            if (ForceStringCanonical(root, "CALL BY REFERENCE operand") is { } cls) ClaimAddressableCell(cls);
+        }
+    }
+
+    /// <summary>Does a BY REFERENCE operand naming <paramref name="item"/> need its storage in a cell to be aliased by an
+    /// AREA formal (kb/Work PB2087)? A group always: its own storage is a record struct, and an area formal (a group, a
+    /// REDEFINED or an addressed formal) can only be laid over a cell. An elementary item whose storage is CHARACTERS
+    /// too — an alphanumeric, edited, national or boolean item, or any member of a REDEFINES class (already one
+    /// character backing) — because a group formal is commonly laid over one (§14.8.2.2 pairs an alphanumeric group with
+    /// an elementary alphanumeric item), and moving a character item onto a cell changes only where its string lives. A
+    /// NATIVE numeric or a pointer-class item keeps its native storage: an elementary formal aliases it through its
+    /// carrier, and an area formal over one holds a copy.</summary>
+    private static bool ClaimsAnArea(DataItem item) =>
+        item.IsGroup
+        || item.Class is { Tier: RedefinesTier.StringCanonical }
+        || item.Pic is { Category: not PicCategory.Numeric } && !SlotWindow.CarriedBySlot(item);
+
+    /// <summary>True when <paramref name="root"/>'s storage is ALREADY a cell (or the pointer-routed window over one), so
+    /// no claim may re-base it: a BASED item or an area formal (its implicit data-address pointer — §8.6.5), a record
+    /// another claim already put on a per-instance cell, or an EXTERNAL record (the run-unit <c>ExternalStore</c> cell).</summary>
+    private bool AlreadyInACell(DataItem root) =>
+        root.IsBased
+        || root.Class is { BasedPointerField: not null }
+        || root.Class is { } existing && PtrAddressableCellOf.ContainsKey(existing)
+        || root.Class is { Tier: RedefinesTier.StringCanonical } ext && CallExternalBackings.Any(b => b.BackingCsName == ext.BackingCsName);
+
+    /// <summary>Record a forced class's per-instance cell. ⛔ THE CLASS NAMES ITS OWN CELL (kb/Work PB231): the field used
+    /// to carry an ad-hoc <c>_cell_{NAME}</c> spelling that only this list knew, so a place builder could not reach the
+    /// cell to address the area's MANAGED SLOTS. It is now <see cref="RedefinesClass.BackingCellCsName"/>, the ONE name
+    /// every cell surface uses and <c>ReferenceResolver.BuildCellPath</c> resolves.</summary>
+    private void ClaimAddressableCell(RedefinesClass cls)
+    {
+        string cell = cls.BackingCellCsName;
+        _ptrAddressableCellOf[cls] = cell;
+        _ptrAddressableBackings.Add((cls.BackingCsName, cell, cls.Canonical, cls.Width));
+    }
+
+    /// <summary>Resolve one scanned CALL operand in the unit's scope, or null when it names nothing or is ambiguous —
+    /// the CALL statement's bind reports both (§8.4.2.2.3 SR1); a storage claim never guesses between candidates.</summary>
+    private DataItem? CallResolveOperand(string name, List<string> quals)
+    {
+        if (quals.Count != 0) return new ReferenceResolver(this).FindItem(name, quals);
+        return Symbols.TryResolveUnqualified(name, Model.Scope.Program, out var candidates) && candidates.Count == 1
+            ? candidates[0] : null;
+    }
+
+    /// <summary>The data-name heads of every operand an activation may pass BY REFERENCE under one parse subtree: each
+    /// CALL USING operand in a BY REFERENCE phrase or before any phrase (ISO §14.9.4.4 GR5: "Both the BY CONTENT and BY
+    /// REFERENCE phrases are transitive across the parameters that follow them until another BY CONTENT or BY REFERENCE
+    /// phrase is encountered"; GR9 a) 1.: "BY REFERENCE is assumed"), and each argument of a USER-DEFINED function
+    /// (<paramref name="isUserFunction"/>), whose identifier argument is passed by reference whenever its formal is — a
+    /// fact of the function's header, not of the reference, so every one is a candidate. Every identifier an operand's
+    /// expression holds is yielded; the claim keeps the ones <see cref="ClaimsAnArea"/> admits (a subscript is a native
+    /// numeric). An address-identifier is ADDRESS OF's own surface.</summary>
+    internal static IEnumerable<(string Name, List<string> Qualifiers)> CallScanByReferenceOperands(IParseTree root,
+        Func<string, bool> isUserFunction)
+    {
+        foreach (var node in PtrDescendants(root))
+        {
+            if (node is Core.FunctionCallContext fc && fc.functionArgList() is { } fargs && fc.functionName() is { } fname
+                && isUserFunction(fname.GetText()))
+            {
+                foreach (var dref in PtrDescendants(fargs).OfType<Core.DataReferenceContext>())
+                    if (HeadOf(dref) is { } h) yield return h;
+                continue;
+            }
+            if (node is not Core.CallUsingPhraseContext phrase) continue;
+            bool byReference = true;
+            foreach (var arg in phrase.callArgument())
+            {
+                IParseTree? operand;
+                if (arg.callByReference() is { } r) { byReference = true; operand = r.dataReference(); }
+                else if (arg.callByContent() is not null || arg.callByValue() is not null) { byReference = false; operand = null; }
+                else operand = byReference ? arg.arithmeticExpression() : null;
+                if (operand is null) continue;
+                foreach (var dref in PtrDescendants(operand).Prepend(operand).OfType<Core.DataReferenceContext>())
+                    if (HeadOf(dref) is { } h) yield return h;
+            }
+        }
+
+        static (string Name, List<string> Qualifiers)? HeadOf(Core.DataReferenceContext dref)
+        {
+            if (dref.cobolWord() is not { } head) return null;
+            var quals = new List<string>();
+            foreach (var suffix in dref.dataReferenceSuffix())
+                if (suffix.qualification() is { } q) quals.Add(q.cobolWord().GetText());
+            return (head.GetText(), quals);
         }
     }
 
