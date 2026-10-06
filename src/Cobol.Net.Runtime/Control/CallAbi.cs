@@ -334,6 +334,14 @@ public static class CobolArgAdapt
         return new CellPointer(new StorageCell { Ref = new string(' ', areaWidth) }, 0);
     }
 
+    /// <summary>The storage area a CARRIER-RESIDENT formal occupies when argument <paramref name="i"/> is supplied BY
+    /// REFERENCE from a cell (kb/Work PB2089) — its <see cref="CobolArg.Area"/>, else null. ISO §14.2.3 GR8 makes the
+    /// formal occupy "the same storage area as the argument", so when the activated element passes the formal on BY
+    /// REFERENCE this is the area the next argument states, and an area formal of the next activation is laid over
+    /// the same positions instead of holding a copy.</summary>
+    public static CellPointer? ArgumentArea(CobolArg[] args, int i) =>
+        Present(args, i) && args[i] is { Mode: CobolPassMode.Reference, Area: { } a } ? a : null;
+
     /// <summary>True when <paramref name="area"/> — the formal's storage <see cref="Area"/> answered — IS argument
     /// <paramref name="i"/>'s own storage (§14.2.3 GR8 realized by identity), so there is nothing to fill at entry and
     /// nothing to store back at return.</summary>
@@ -686,7 +694,13 @@ public static class CobolArgAdapt
                     // Through the shared Land, like every other arm: the decode is already at the formal's
                     // scale so the rescale is the identity, but the capacity conformance must not be the one
                     // arm that skips it (§14.2.3 GR11 — every reference resolves through the SAME description).
-                    () => T.CreateTruncating(Land(CobolNum.ParseImage(sp.Value, formal), formalScale, formalScale, formal)),
+                    // ⛔ …except a formal with NO digit positions — a USAGE INDEX item, whose profile states none
+                    // (Digits = 0; the Text arm's index case below): a digit-count landing would truncate every index
+                    // value to zero. Reached once an index data item passed BY REFERENCE lives in a cell (kb/Work
+                    // PB2089: NIST IC207A/IC106A's SET IN1 TO INDEX-1 read 0).
+                    () => T.CreateTruncating(formal.Digits == 0
+                        ? CobolNum.ParseImage(sp.Value, formal)
+                        : Land(CobolNum.ParseImage(sp.Value, formal), formalScale, formalScale, formal)),
                     v => sp.Value = CobolNum.FormatImage(Int128.CreateTruncating(v), formal));
             case { } fc when IsFloatFormal(formal) && (ReadRealCell(fc) is not null || ReadNumericCell(fc) is not null
                                                         || fc is ManagedPointer<UInt128>):

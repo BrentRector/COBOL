@@ -42,6 +42,17 @@ public sealed record LinkageFormal(DataItem Item, int Position, string CarrierFi
     /// (<c>DataBinder.PtrBindBasedAndAddressables</c>), so the emitter and the binder cannot disagree about which
     /// formals are areas.</summary>
     public bool IsArea => !CarrierResident && Item.Class?.BasedPointerField == CarrierField;
+
+    /// <summary>⛔ The member holding a BY REFERENCE carrier-resident formal's ARGUMENT AREA (kb/Work PB2089) — the
+    /// <c>CobolArg.Area</c> it arrived with, or null when its argument's storage is not a cell. The formal's storage IS
+    /// that area (ISO §14.2.3 GR8), so a forward of the formal BY REFERENCE passes it on and an area formal of the next
+    /// activated element is laid over the same positions; without it the forward crossed through the carrier alone and
+    /// that area formal held a copy whose copy-back undid every store made through another description meanwhile.</summary>
+    public string ArgumentAreaField => $"__lna{Item.Uid}";
+
+    /// <summary>True when the formal keeps <see cref="ArgumentAreaField"/>: a carrier-resident BY REFERENCE formal (an
+    /// area formal's carrier IS its area; a BY VALUE formal's storage is a detached copy, §14.2.3 GR10).</summary>
+    public bool KeepsArgumentArea => CarrierResident && !ByValue;
 }
 
 /// <summary>The synthesized run-unit backing of one EXTERNAL record (ISO §13.18.22 / §8.6.7): the emitter

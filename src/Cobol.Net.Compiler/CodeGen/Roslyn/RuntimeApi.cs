@@ -1870,6 +1870,11 @@ internal static class RuntimeApi
     public static string ArgAdaptArea(string args, int position, int areaWidth, bool byValueFormal) =>
         $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Area)}({args}, {position}, {areaWidth}, {(byValueFormal ? "true" : "false")})";
 
+    /// <summary>The storage area a carrier-resident BY REFERENCE formal occupies (§14.2.3 GR8; kb/Work PB2089) —
+    /// <c>CobolArgAdapt.ArgumentArea</c>: its argument's <c>CobolArg.Area</c>, or null.</summary>
+    public static string ArgAdaptArgumentArea(string args, int position) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.ArgumentArea)}({args}, {position})";
+
     /// <summary>Is an area formal's storage its argument's own (kb/Work PB2087)? — <c>CobolArgAdapt.Aliased</c>.</summary>
     public static string ArgAdaptAliased(string args, int position, string area) =>
         $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Aliased)}({args}, {position}, {area})";

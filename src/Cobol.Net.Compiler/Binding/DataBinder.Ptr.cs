@@ -147,14 +147,18 @@ public sealed partial class DataBinder
             ClaimAddressableCell(cls);
         }
 
-        // ⛔ A GROUP PASSED BY REFERENCE LIVES IN A CELL (kb/Work PB2087) — the activating half of §14.2.3 GR8. An
-        // argument whose storage is a cell crosses with its AREA (CobolArg.Area: the cell and the offset the argument
+        // ⛔ AN ITEM PASSED BY REFERENCE LIVES IN A CELL (kb/Work PB2087, PB2089) — the activating half of §14.2.3 GR8.
+        // An argument whose storage is a cell crosses with its AREA (CobolArg.Area: the cell and the offset the argument
         // begins at), and an area formal is laid over exactly those positions, so the two elements share ONE storage
-        // area for the whole activation. A group (or a member of a REDEFINES class, already a character backing) named
-        // as a BY REFERENCE operand of CALL USING is claimed by the same forcer ADDRESS OF uses; nothing else changes
-        // storage, so a program that never passes a group by reference pays nothing. An operand whose area the cell
-        // cannot carry, or that is ambiguous here (the CALL bind reports it), keeps its ordinary storage and crosses
-        // through its carrier alone — an area formal then holds a copy, stored back at return.
+        // area for the whole activation. EVERY item named as a BY REFERENCE operand is claimed by the same forcer ADDRESS
+        // OF uses — a group, a character item AND a native numeric or pointer item alike, because the activating element
+        // cannot know the formal's description: the activated element may lay a group, a REDEFINED or an addressed
+        // formal over the argument, and then only a shared cell is "the same storage area" (a native field cannot hold
+        // the characters a redefinition stores — kb/Work PB2089: with N native, `CALL "S" USING N N` against a REDEFINED
+        // LK-1 and an elementary LK-2 gave LK-1 a private copy whose copy-back undid LK-2's store). Nothing else changes
+        // storage, so a program that passes nothing by reference pays nothing. An operand whose area the cell cannot
+        // carry, or that is ambiguous here (the CALL bind reports it), keeps its ordinary storage and crosses through its
+        // carrier alone — an area formal then holds a copy, stored back at return.
         bool IsUserFunction(string fn) => UserFunctionNames.Contains(fn) || UnitSelfName is { } self && CobolNames.Same(fn, self);
         var own = program.procedureDivision() is { } opd ? CallScanByReferenceOperands(opd, IsUserFunction) : [];
         var operands = own.Select(t => (t.Name, t.Qualifiers, Contained: false))
@@ -162,26 +166,13 @@ public sealed partial class DataBinder
                 .Select(t => (t.Name, t.Qualifiers, Contained: true)));
         foreach (var (name, quals, contained) in operands)
         {
-            if (CallResolveOperand(name, quals) is not { } hit || !ClaimsAnArea(hit)) continue;
+            if (CallResolveOperand(name, quals) is not { } hit) continue;
             DataItem root = hit.Root;
             if (contained && !CallGlobalRoots.Contains(root)) continue;
             if (AlreadyInACell(root) || root.Section is EntrySection.Linkage || !CellCanCarry(root)) continue;
             if (ForceStringCanonical(root, "CALL BY REFERENCE operand") is { } cls) ClaimAddressableCell(cls);
         }
     }
-
-    /// <summary>Does a BY REFERENCE operand naming <paramref name="item"/> need its storage in a cell to be aliased by an
-    /// AREA formal (kb/Work PB2087)? A group always: its own storage is a record struct, and an area formal (a group, a
-    /// REDEFINED or an addressed formal) can only be laid over a cell. An elementary item whose storage is CHARACTERS
-    /// too — an alphanumeric, edited, national or boolean item, or any member of a REDEFINES class (already one
-    /// character backing) — because a group formal is commonly laid over one (§14.8.2.2 pairs an alphanumeric group with
-    /// an elementary alphanumeric item), and moving a character item onto a cell changes only where its string lives. A
-    /// NATIVE numeric or a pointer-class item keeps its native storage: an elementary formal aliases it through its
-    /// carrier, and an area formal over one holds a copy.</summary>
-    private static bool ClaimsAnArea(DataItem item) =>
-        item.IsGroup
-        || item.Class is { Tier: RedefinesTier.StringCanonical }
-        || item.Pic is { Category: not PicCategory.Numeric } && !SlotWindow.CarriedBySlot(item);
 
     /// <summary>True when <paramref name="root"/>'s storage is ALREADY a cell (or the pointer-routed window over one), so
     /// no claim may re-base it: a BASED item or an area formal (its implicit data-address pointer — §8.6.5), a record
@@ -217,9 +208,10 @@ public sealed partial class DataBinder
     /// REFERENCE phrases are transitive across the parameters that follow them until another BY CONTENT or BY REFERENCE
     /// phrase is encountered"; GR9 a) 1.: "BY REFERENCE is assumed"), and each argument of a USER-DEFINED function
     /// (<paramref name="isUserFunction"/>), whose identifier argument is passed by reference whenever its formal is — a
-    /// fact of the function's header, not of the reference, so every one is a candidate. Every identifier an operand's
-    /// expression holds is yielded; the claim keeps the ones <see cref="ClaimsAnArea"/> admits (a subscript is a native
-    /// numeric). An address-identifier is ADDRESS OF's own surface.</summary>
+    /// fact of the function's header, not of the reference, so every one is a candidate. Only an operand that IS one
+    /// identifier is yielded (<see cref="OperandIdentifier"/>): a subscript, a reference modifier's operands or an
+    /// arithmetic expression's terms are SENDING operands of the reference, never passed — and an expression argument
+    /// is passed by content. An address-identifier is ADDRESS OF's own surface.</summary>
     internal static IEnumerable<(string Name, List<string> Qualifiers)> CallScanByReferenceOperands(IParseTree root,
         Func<string, bool> isUserFunction)
     {
@@ -228,8 +220,8 @@ public sealed partial class DataBinder
             if (node is Core.FunctionCallContext fc && fc.functionArgList() is { } fargs && fc.functionName() is { } fname
                 && isUserFunction(fname.GetText()))
             {
-                foreach (var dref in PtrDescendants(fargs).OfType<Core.DataReferenceContext>())
-                    if (HeadOf(dref) is { } h) yield return h;
+                foreach (var farg in fargs.functionArgument())
+                    if (OperandIdentifier(farg) is { } h) yield return h;
                 continue;
             }
             if (node is not Core.CallUsingPhraseContext phrase) continue;
@@ -240,11 +232,17 @@ public sealed partial class DataBinder
                 if (arg.callByReference() is { } r) { byReference = true; operand = r.dataReference(); }
                 else if (arg.callByContent() is not null || arg.callByValue() is not null) { byReference = false; operand = null; }
                 else operand = byReference ? arg.arithmeticExpression() : null;
-                if (operand is null) continue;
-                foreach (var dref in PtrDescendants(operand).Prepend(operand).OfType<Core.DataReferenceContext>())
-                    if (HeadOf(dref) is { } h) yield return h;
+                if (operand is not null && OperandIdentifier(operand) is { } h) yield return h;
             }
         }
+
+        // The identifier an operand consists of, or null when the operand is anything more (an expression, a literal):
+        // the OUTERMOST data reference under it, when its text is the whole operand's.
+        static (string Name, List<string> Qualifiers)? OperandIdentifier(IParseTree operand) =>
+            PtrDescendants(operand).Prepend(operand).OfType<Core.DataReferenceContext>().FirstOrDefault() is { } dref
+            && dref.GetText() == operand.GetText()
+                ? HeadOf(dref)
+                : null;
 
         static (string Name, List<string> Qualifiers)? HeadOf(Core.DataReferenceContext dref)
         {

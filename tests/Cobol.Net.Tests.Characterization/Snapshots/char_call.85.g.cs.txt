@@ -10,7 +10,8 @@ internal sealed class _PRG_CHAR_CALL : ICobolProgram
 {
     private bool __asCalled;   // true during a CALL activation — EXIT PROGRAM is CONTINUE otherwise (ISO §14.9.14.4 GR2)
     internal static readonly NumProfile _P_0 = new NumProfile { Digits = 4, FractionDigits = 0, Signed = false, SignKind = NumericSign.TrailingOverpunch, Truncation = NumericTruncation.DigitCount, ByteForm = NumericByteForm.Zoned, StorageLength = 0 };
-    private string WS_ARG = CobolNum.FormatImage(55L, _P_0);   // WS-ARG
+    private readonly StorageCell _scell_WS_ARG = new StorageCell { Ref = CobolString.Store(CobolNum.FormatImage(55L, _P_0), 4) };   // ADDRESS-OF-taken record — cell storage (ISO §8.4.3.11; Phase-4b inc 2)
+    private ref string _redef_WS_ARG => ref _scell_WS_ARG.Ref;
 
     public void Call(CobolArg[] __args, CobolArg? __ret)
     {
@@ -18,6 +19,10 @@ internal sealed class _PRG_CHAR_CALL : ICobolProgram
         try { __Activate(); } finally { __asCalled = false; }
     }
     void ICobolProgram.Activate() => __Activate();
+    public void EndStorage(StorageEnd __why)   // §8.6.4 / §8.6.5: the instance's storage ends — pointers into it are no longer valid (§13.18.5.4 GR4)
+    {
+        _scell_WS_ARG.End(__why);
+    }
     public void CloseFiles()
     {
     }
@@ -40,8 +45,8 @@ internal sealed class _PRG_CHAR_CALL : ICobolProgram
             {
                 case 0:   // MAIN-PARA
                 {
-                    ProgramRegistry.CallProgram("CHAR-SUB", "CHAR-CALL", new CobolArg[] { new CobolArg(CobolPassMode.Reference, ManagedPointer<string>.OverField(() => WS_ARG, __v => { WS_ARG = CobolString.Store(__v, 4); }), new NumProfile { Digits = 4, FractionDigits = 0, Signed = false, SignKind = NumericSign.TrailingOverpunch, Truncation = NumericTruncation.DigitCount, ByteForm = NumericByteForm.Zoned, StorageLength = 0 }) }, null);
-                    System.Console.WriteLine(CobolNum.SendingImage(WS_ARG, _P_0));
+                    ProgramRegistry.CallProgram("CHAR-SUB", "CHAR-CALL", new CobolArg[] { new CobolArg(CobolPassMode.Reference, ManagedPointer<string>.OverField(() => CobolString.Window(_redef_WS_ARG, (int)(0 + 1), 4), __v => { _redef_WS_ARG = CobolString.WindowInto(_redef_WS_ARG, (int)(0 + 1), 4, CobolString.Store(__v, 4)); }), new NumProfile { Digits = 4, FractionDigits = 0, Signed = false, SignKind = NumericSign.TrailingOverpunch, Truncation = NumericTruncation.DigitCount, ByteForm = NumericByteForm.Zoned, StorageLength = 0 }, Area: new CellPointer(_scell_WS_ARG, 0)) }, null);
+                    System.Console.WriteLine(CobolNum.SendingImage(CobolString.Window(_redef_WS_ARG, (int)(0 + 1), 4), _P_0));
                     throw new StopRun();
                 }
                 default:

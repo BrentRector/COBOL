@@ -375,6 +375,9 @@ internal sealed class ProgramEmitter
                 };
                 w.Line($"private ManagedPointer<{carrier}> {f.CarrierField} = {init};   "
                     + $"// LINKAGE formal #{f.Position + 1} — the caller-storage carrier (ISO §13.7.1; design D1)");
+                if (f.KeepsArgumentArea)
+                    w.Line($"private {nameof(CellPointer)}? {f.ArgumentAreaField};   "
+                        + "// the argument's storage area this formal occupies, passed on by a forward (ISO §14.2.3 GR8; kb/Work PB2089)");
                 // The presence member every guarded reference to this formal reads (kb/Work PB971): Uid-keyed, so
                 // a contained program's GLOBAL bridge of it (BinderDriver) cannot collide with its own formals.
                 if (f.Item.OmittedGuard is { } og)
@@ -586,6 +589,8 @@ internal sealed class ProgramEmitter
                     // the carried shape to class numeric, object or pointer, so the text leg has no BY VALUE
                     // arm while the managed one does).
                     w.Line($"{f.CarrierField} = {FormalAdopt(f, crossing, carrier, CallEmitter.ElementaryFormalWindow(f.Item))};");
+                    if (f.KeepsArgumentArea)
+                        w.Line($"{f.ArgumentAreaField} = {RuntimeApi.ArgAdaptArgumentArea("__args", f.Position)};");
                     continue;
                 }
                 // ⛔ AN AREA FORMAL IS LAID OVER ITS ARGUMENT'S STORAGE (kb/Work PB2087; §14.2.3 GR8 — "the activated

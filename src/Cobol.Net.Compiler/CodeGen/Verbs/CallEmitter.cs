@@ -641,10 +641,11 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             if (a.Mode == CobolPassMode.Reference)
             {
                 // A CARRIER-RESIDENT formal's carrier IS the caller's storage (§14.2.3 GR8), so passing it
-                // through is both the presence fact and the aliasing.
+                // through is both the presence fact and the aliasing — and its argument's AREA rides along, so an area
+                // formal of the next activation is laid over the same positions (kb/Work PB2089).
                 if (fwd is { CarrierResident: true } rf)
                     return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Reference)}, "
-                        + $"{rf.CarrierField}, {meta})";
+                        + $"{rf.CarrierField}, {meta}{(rf.KeepsArgumentArea ? $", Area: {rf.ArgumentAreaField}" : "")})";
                 // A NON-resident formal (an AREA formal — a group, a REDEFINED or an addressed one — or a
                 // variable-length group's image) is passed on as a fresh view over its storage, and only the
                 // PRESENCE has to be taken from the incoming carrier. Rebuilding it unconditionally is what made an
