@@ -13,8 +13,8 @@
   "quota": {
     "weekly_reset": {"weekday": 6, "hour": 3, "minute": 0, "tz": "America/Los_Angeles", "_weekday": "Python weekday(): Monday 0 ... Sunday 6"},
     "daily_pct": 14.3,
-    "weekly_cap_pct": 98,
-    "weekly_cap_source": "owner 2026-10-02: may reach 98 % of the weekly quota",
+    "weekly_cap_pct": 85,
+    "weekly_cap_source": "owner 2026-10-07: run ALL work with the appropriate models up to 85 % of the weekly quota, then PAUSE (kb/Work R69 section 6); it replaced the 98 % ceiling of 2026-10-02 and the 44 % cap on other work of 2026-10-05",
     "session_soft_stop_pct": 70,
     "session_hard_stop_pct": 90,
     "session_window_hours": 5,

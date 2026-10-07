@@ -77,7 +77,7 @@ r = budget.estimate(now, [reading], source([ev(at(2026, 10, 5, 10), "sonnet", ou
 check("borrowing a day turns hold-day into go/hold-session", r["allowance_pct"], 42.9)
 
 r = budget.estimate(now, [reading], source([ev(at(2026, 10, 5, 10), "opus", out=32_000_000)]), RULES, borrow_days=6)
-check("stop-week at the cap", (r["decision"], r["allowance_pct"]), ("stop-week", 98.0))
+check("stop-week at the cap", (r["decision"], r["allowance_pct"]), ("stop-week", 85.0))  # the cap is model_rules.json weekly_cap_pct (owner 2026-10-07, kb/Work R69 section 6)
 
 hot = dict(reading, session_pct=65.0)
 r = budget.estimate(now, [hot], source([ev(at(2026, 10, 5, 10), "sonnet", out=1_000_000)]), RULES)
