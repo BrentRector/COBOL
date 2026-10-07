@@ -1,7 +1,9 @@
       *> OCCURS DYNAMIC review #1 regression (data-model D9; ISO 8.5.1.9.3): a whole-GROUP receiving MOVE into a group
       *> nested BELOW the dynamic level must grow the table through the RECEIVING accessor (RefReceiving), NOT the
       *> sending one (RefSending drops an out-of-capacity write into benign scratch = silent data loss). FROM 2:
-      *> MOVE to G(5) grows ELEM to 5 and the value lands.
+      *> MOVE to G(5) grows ELEM to 5 and the value lands. B holds the two SPACES the group MOVE leaves in it
+      *> (14.9.25.4 GR4, "without consideration for the individual elementary or group items"), as it does in a
+      *> fixed table; it read back 00 while a dynamic element's numeric member had a native carrier (kb/Work PB1939).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. DYN-NESTED-GROUP-MOVE.
        DATA DIVISION.

@@ -506,8 +506,14 @@ public sealed class DataItem
     /// sites are deleted; <c>StorageFormPass</c> computes the decision ONCE from the collected facts. NULL-Storage
     /// (i.e. pre-group-tail) reads answer <c>false</c>, exactly the flag's early value for every legal read (the
     /// bind-time early consumers use <see cref="DataBinder.IsImageBackedEarly"/> instead).</para>
+    /// <para>⛔ A PER-OCCURRENCE QUESTION, like <see cref="ElementType"/> (kb/Work PB1939, PB2004): for an OCCURS
+    /// DYNAMIC elementary item it asks the ELEMENT's form inside <see cref="Model.StorageForm.DynamicTable"/>, the
+    /// same answer a fixed-OCCURS item gives for each of its occurrences — every reader of it (the numeric
+    /// pipeline over a <c>DynTablePlace</c>, the table codec's element decode) holds one occurrence.</para>
     /// </summary>
-    public bool StoreAsImage => Storage is Model.StorageForm.CharImage { Category: PicCategory.Numeric };
+    public bool StoreAsImage =>
+        (Storage is Model.StorageForm.DynamicTable dt ? dt.Element : Storage)
+            is Model.StorageForm.CharImage { Category: PicCategory.Numeric };
 
     /// <summary>JUSTIFIED [RIGHT] (ISO §13.18.32): alphanumeric/alphabetic receives right-justify — space-fill on
     /// the LEFT when the sender is shorter, truncate from the LEFT when longer (§14.9.25.4 GR6c). Settable for

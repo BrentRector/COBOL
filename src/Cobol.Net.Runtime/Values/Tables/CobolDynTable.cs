@@ -321,7 +321,10 @@ public sealed class CobolDynTable<T>
     /// space-filled." It is §14.9.25.4 GR9b step 2 — the receiving group's EXCESS part — so it is deliberately
     /// NOT <see cref="FromCurrentImage"/> with an empty content: that one recreates the table at capacity zero,
     /// which is §14.6.9.2's rule for a sender that really did carry an empty table. The two cases arrive as the
-    /// same zero-length string and are told apart by <c>CobolVarGroup.HasDyn</c>.</summary>
+    /// same zero-length string and are told apart by <c>CobolVarGroup.HasDyn</c>.
+    /// <para>A NUMERIC element holds those spaces because the compiler stores it as its character image — a
+    /// <c>CobolDynTable&lt;string&gt;</c> whose <paramref name="store"/> passes the image through (kb/Work PB1939);
+    /// a native carrier would decode them to zero.</para></summary>
     public void SpaceFillElements(int elementWidth, Func<T, string, T> store)
     {
         string spaces = new(' ', Math.Max(0, elementWidth));

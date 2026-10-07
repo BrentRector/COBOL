@@ -66,7 +66,9 @@ public abstract record StorageForm
     // every numeric leaf kind's byte form was pinned (NumericByteForm; PB164 waves 1–2 + R40).
 
     /// <summary>An out-of-line OCCURS DYNAMIC table (<c>CobolDynTable&lt;T&gt;</c>, D9). <paramref name="Element"/> is
-    /// the per-occurrence element's form. Never character-image (an item-level query short-circuits on IsDynamicTable).</summary>
+    /// the per-occurrence element's form — image-PROMOTED by the same rule as any leaf, so a numeric element a
+    /// character channel writes is <see cref="CharImage"/> (kb/Work PB1939, PB2004). The table itself is never
+    /// character-image (an item-level query short-circuits on IsDynamicTable).</summary>
     public sealed record DynamicTable(StorageForm Element) : StorageForm
     {
         public override bool IsCharacterImage => false;

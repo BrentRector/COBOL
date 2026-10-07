@@ -232,24 +232,14 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
         // GR4 d) says "if identifier-1 is a signed numeric item, the original value of the sign is retained upon
         // completion of the INSPECT statement" — a native value carrier holds no negative zero, so the replaced
         // image went through a `long` and `S9(3) VALUE -5` `REPLACING ALL "5" BY "0"` came back +0 (`00{` for `00}`).
-        // A Tier-B view, a promoted leaf and an OCCURS DYNAMIC element are the whole shape set (the invariant below).
+        // A Tier-B view and a promoted leaf are the whole shape set (the invariant below). An OCCURS DYNAMIC element
+        // is a promoted leaf too: its occurrence is promoted by the same rule (StorageFormPass.Classify), so the
+        // table is a CobolDynTable<string> and the element holds the negative zero (kb/Work PB2004).
         if (p.Item.Pic is { Category: PicCategory.Numeric, IsFloat: false } pic)
         {
             if (!(p.Item.StoreAsImage || p is RedefViewPlace))
-            {
-                // ⛔ AN OCCURS DYNAMIC ELEMENT IS A TYPED ELEMENT OF ITS CobolDynTable<T> (data-model D9), so no character
-                // channel promotes it (UsageCollectionPass.Channel skips a DynTablePlace, as every channel does) and it
-                // keeps its native carrier: the replaced digits are re-encoded as a VALUE with the original sign. The
-                // carrier holds no negative zero, so a negative element whose digits all become zeros reads back +0
-                // (kb/Work PB2004). Any other native shape here is a promotion the usage pass missed.
-                if (p is not DynTablePlace)
-                    throw new InvalidOperationException(
-                        $"INSPECT identifier-1 '{p.Item.CsName}' is a numeric item stored natively; UsageCollectionPass must have promoted it to its character image (PB1128)");
-                string mag = $"__insMag{ctx.Names.NextInspectTmp()}";
-                w.Line($"var {mag} = {ArithmeticEmitter.Narrow(RuntimeApi.NumDigitMagnitude(img), p.Item)};");
-                w.Line(PlaceRenderer.Write(p, pic.Signed ? $"({PlaceRenderer.Read(p)} < 0 ? -{mag} : {mag})" : mag));
-                return;
-            }
+                throw new InvalidOperationException(
+                    $"INSPECT identifier-1 '{p.Item.CsName}' is a numeric item stored natively; UsageCollectionPass must have promoted it to its character image (PB1128)");
             // ⛔ THE REPLACED IMAGE OF A NUMERIC ITEM IS NOT AN ALPHANUMERIC SENDING OPERAND. The signed arm takes
             // CobolNum.DigitMagnitude, never the §14.9.25.4 GR6 d) 3 capped FromAlphanumeric: this image is the ITEM'S
             // OWN and its PICTURE already fixes the size, so GR6 d) 3 asks nothing here (kb/Work PB426 split the two

@@ -211,7 +211,9 @@
   "pb480_universal_variable_length",
   "pb480_universal_variable_length_shapes",
   "pb2087_vlg_returning_cell_receiver",
-  "pb2280_call_variable_length_shapes"
+  "pb2280_call_variable_length_shapes",
+  "pb1939_dyn_numeric_element_spaces",
+  "pb2004_dyn_element_character_channels"
  ],
  "pending": []
 }

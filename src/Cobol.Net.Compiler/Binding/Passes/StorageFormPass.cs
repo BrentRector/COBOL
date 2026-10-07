@@ -243,7 +243,12 @@ internal static class StorageFormPass
     private static StorageForm Classify(DataItem item, HashSet<DataItem> promoted)
     {
         // (1) OCCURS DYNAMIC — the out-of-line table wraps its element's own form (highest priority; §8.5.1.9.1, D9).
-        if (item.IsDynamicTable) return new StorageForm.DynamicTable(BaseElementary(item));
+        // ⛔ THE ELEMENT IS PROMOTED BY THE SAME RULE AS ANY LEAF (kb/Work PB1939, PB2004). An occurrence receives
+        // characters exactly as a fixed-table occurrence does — §14.6.9.4's space fill ("each element of the
+        // dynamic table is space-filled"), a group MOVE's characters (§14.9.25.4 GR4), INSPECT's retained sign
+        // over a zero magnitude (§14.9.22.4 GR4 d), a negative zero) — and a native carrier holds a VALUE, so
+        // the element whose item a channel writes stores its image: CobolDynTable<string>, not <long>.
+        if (item.IsDynamicTable) return new StorageForm.DynamicTable(Promoted(item, BaseElementary(item), promoted));
 
         // (1b) DYNAMIC LENGTH — a variable-length, min-0 native string (§8.5.1.10 / §13.18.19, COBOL-2014). The
         // category (X→Alphanumeric, N→National) comes from the PIC; the limit is the LIMIT phrase (-1 = implementor max).
@@ -270,17 +275,19 @@ internal static class StorageFormPass
         // (3) Base classification, then the numeric-image promotion for a whole-group / figurative / ref-mod /
         //     file-record / print-item leaf (the OO harmonize applies its flips AFTER classification, at the
         //     Storage level).
-        var form = BaseElementary(item);
-        // ⛔ The promotion admits every byte-form NATIVE shape, not only NativeInt (the Step D design scout's
-        // canonical-vs-view asymmetry: arm 2 above promotes ANY promoted view to CharImage, while this
-        // canonical-side arm promoted only NativeInt — a CANONICAL float/INDEX member of a widened Tier-B
-        // class kept its native form while its views were image-stored, splitting one storage in two).
-        // The predicate is the ONE image predicate: a promoted leaf whose Pic carries a pinned byte form.
-        if (promoted.Contains(item)
-            && form is StorageForm.NativeInt or StorageForm.NativeFloat or StorageForm.IndexCell)
-            return new StorageForm.CharImage(item.ImageWidth, PicCategory.Numeric);
-        return form;
+        return Promoted(item, BaseElementary(item), promoted);
     }
+
+    /// <summary>The numeric-image promotion of one leaf's (or one dynamic-table element's) base form.
+    /// ⛔ The promotion admits every byte-form NATIVE shape, not only NativeInt (the Step D design scout's
+    /// canonical-vs-view asymmetry: arm 2 of <see cref="Classify"/> promotes ANY promoted view to CharImage,
+    /// while the canonical-side arm promoted only NativeInt — a CANONICAL float/INDEX member of a widened Tier-B
+    /// class kept its native form while its views were image-stored, splitting one storage in two).
+    /// The predicate is the ONE image predicate: a promoted leaf whose Pic carries a pinned byte form.</summary>
+    private static StorageForm Promoted(DataItem item, StorageForm form, HashSet<DataItem> promoted) =>
+        promoted.Contains(item) && form is StorageForm.NativeInt or StorageForm.NativeFloat or StorageForm.IndexCell
+            ? new StorageForm.CharImage(item.ImageWidth, PicCategory.Numeric)
+            : form;
 
     /// <summary>The pre-promotion base form from (Pic.Category, Usage, tier, dynamic). <c>item.ImageWidth</c> is the
     /// character-image width (= <c>ElementaryImageWidth</c>: digits + separate-sign, or PIC length) — the source of

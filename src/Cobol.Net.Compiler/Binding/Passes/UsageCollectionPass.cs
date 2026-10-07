@@ -375,21 +375,23 @@ internal static class UsageCollectionPass
         }
 
         /// <summary>Record the item a character channel writes through <paramref name="place"/> (kb/Work PB992).
-        /// A Tier-B REDEFINES window already IS a character image, and an OCCURS DYNAMIC element stores through
-        /// its table codec; every other place — a reference-modified view included, whose store splices into
-        /// the item's own character positions (§8.4.3.3.4 GR6) — names the item whose storage it reaches.</summary>
+        /// A Tier-B REDEFINES window already IS a character image; every other place — a reference-modified view
+        /// included, whose store splices into the item's own character positions (§8.4.3.3.4 GR6), and an OCCURS
+        /// DYNAMIC element (<see cref="DynTablePlace"/>), whose occurrence is promoted by the same rule
+        /// (<c>StorageFormPass.Classify</c>; kb/Work PB2004) — names the item whose storage it reaches.</summary>
         private void Channel(Place? place)
         {
-            if (place is null or RedefViewPlace or DynTablePlace || place.Item.IsGroup) return;
+            if (place is null or RedefViewPlace || place.Item.IsGroup) return;
             channels.Add(place.Item);
         }
 
+        /// <summary>Record a group used as a WHOLE operand. An OCCURS DYNAMIC group element (a
+        /// <see cref="DynTablePlace"/> naming the table's group item, data-model D9) is one too: its record
+        /// struct's <c>FromImage</c> distributes the group image into its members exactly as a fixed occurrence's
+        /// does, so its numeric leaves must hold whatever characters arrive (kb/Work PB1939's sibling — a
+        /// <c>MOVE SPACES TO DT (1)</c> read back <c>000</c> where the element held spaces).</summary>
         private void P(Place? place)
         {
-            // An OCCURS DYNAMIC element access (data-model D9) stores the group as a typed element of a
-            // CobolDynTable<T> — a whole-group MOVE into it round-trips through the TABLE codec, never the item-level
-            // character-image mechanism. So the element group is NOT whole-image-referenced.
-            if (place is DynTablePlace) return;
             if (place?.Item is { IsGroup: true } g) set.Add(g);
         }
     }

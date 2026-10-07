@@ -275,7 +275,11 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 OperandText.NonElementaryMoveSender(source, num, "group MOVE into"), "")));
             return;
         }
-        if (!item.IsImageCapable)
+        // ⛔ THE OPERAND'S capability, not the declaring entry's (Place.ImageCapable, kb/Work PB189): one occurrence
+        // of an elementary OCCURS DYNAMIC table is an ordinary fixed-length item, while the table entry answers
+        // false on its dynamic axis — `MOVE G TO DN (1)` stopped the run unit as a Tier-C island (kb/Work PB2004's
+        // sibling sweep).
+        if (!target.ImageCapable)
         {
             ctx.Writer.Line(LoudStmt(TierCIsland.Reason(item, "group MOVE into")));
             return;

@@ -147,6 +147,14 @@ public abstract record StorageForm
 }
 ```
 
+**A dynamic-capacity table's ELEMENT is promoted by the same rule as any leaf (kb/Work PB1939, PB2004).**
+`DynamicTable(Element)` wraps the element's PROMOTED form: an elementary numeric table whose item a character channel
+writes, or that sits under a whole-group operand, is `DynamicTable(CharImage(Numeric))` — a `CobolDynTable<string>`
+— so an occurrence holds the spaces §14.6.9.2 2) / §14.6.9.4 leave in it and the negative zero §14.9.22.4 GR4 d)
+retains. `DataItem.StoreAsImage` asks the element form (a per-occurrence question, like `ElementType`), a
+`DynTablePlace` is a channel and a whole-group operand like any other place (`UsageCollectionPass`), and a group
+element's members are promoted through the ordinary whole-group recursion.
+
 **A dynamic-length elementary item (§8.5.1.10) is `StorageForm.DynamicString(Category, MaxSize)` — a native
 `string`, never a byte image.** Its MAXIMUM SIZE is §8.5.1.10.1's "smallest of" three candidates — the LIMIT phrase,
 the largest integer the PREFIXED length field of its dynamic-length-structure-name can hold, and the implementor

@@ -1,9 +1,9 @@
       *> kb/Work PB1128 (train 1018 lander review) - ISO 14.9.22.4 GR4 d): "If identifier-1 is a signed
       *>   numeric item, the original value of the sign is retained upon completion of the INSPECT
       *>   statement."  (cite.py --check 14.9.22.4 -> OK 4) d))
-      *> identifier-1 an ELEMENT OF AN OCCURS DYNAMIC TABLE (13.18.38): the element is a typed member of its
-      *> dynamic table, never promoted to its character image, and the INSPECT store used to crash the
-      *> compiler ("numeric item stored natively") once PB1128 made INSPECT a character channel.
+      *> identifier-1 an ELEMENT OF AN OCCURS DYNAMIC TABLE (13.18.38): the INSPECT store used to crash the
+      *> compiler ("numeric item stored natively") once PB1128 made INSPECT a character channel; the
+      *> element is now promoted to its character image like any channel receiver (kb/Work PB2004).
       *> X1 - signed member -105, REPLACING ALL "5" BY "7" => digits 107, sign retained => -107 (edited -999).
       *> Y1 - unsigned member 105, the same replacement => 107.
       *> D1 - elementary dynamic element 125, CONVERTING "25" TO "38" => 138.
