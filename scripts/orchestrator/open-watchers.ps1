@@ -14,7 +14,8 @@ wave unit ends; the tabs stay open). A tab that fails to open is reported and re
 failure never touches the agents.
 
 .EXAMPLE
-pwsh -NoProfile -File scripts/orchestrator/open-watchers.ps1 -WorkflowDir C:\Users\brent\.claude\projects\E--COBOL\<session>\subagents\workflows\wf_dcb48a76-667
+pwsh -NoProfile -File scripts/orchestrator/open-watchers.ps1 -WorkflowDir <config dir>\projects\E--COBOL\<session>\subagents\workflows\wf_dcb48a76-667
+(<config dir>: `python scripts/orchestrator/account.py --field config_dir`, the session's account; kb/Work PB2479)
 #>
 param(
     [string]$WorkflowDir = '',

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Estimate the weekly and 5-hour-session quota from local telemetry, anchored on the latest owner-meter reading.
 
-    python scripts/orchestrator/budget.py [--json] [--borrow-days N] [--now ISO]
+    python scripts/orchestrator/budget.py [--json] [--borrow-days N] [--now ISO] [--account NAME]
     python scripts/orchestrator/budget.py --record --weekly 52 --session 31 --session-reset 2026-10-04T17:00:00-07:00
 
 Design: docs/rearchitecture/DESIGN-orchestrator-loop.md section 8. Output (JSON with --json):
@@ -9,10 +9,17 @@ Design: docs/rearchitecture/DESIGN-orchestrator-loop.md section 8. Output (JSON 
 decision: `go` · `hold-session` (until the session reset) · `hold-day` (until the next day's reset + 5 min) ·
 `stop-week` (the weekly cap is reached).
 
-The ANCHOR is the newest reading in `<coord>/readings.json` (a list of {noted_at, weekly_pct, session_pct,
-session_reset}), which the `meter` unit appends with --record. Spend since the anchor comes from the telemetry sink
-through `usage_report.events()` (reused, never re-parsed), converted to weekly points per model with
-model_rules.json's calibration. A reading taken before the current week's reset anchors nothing.
+Every estimate is ONE ACCOUNT's (kb/Work PB2478): the account `account.py` resolves from CLAUDE_CONFIG_DIR, or
+--account NAME. Its week starts at ITS weekly reset (model_rules.json `accounts`), and its quota is the shared one with
+the row's overrides.
+The ANCHOR is that account's newest reading in `<coord>/readings.json` (a list of {noted_at, account, weekly_pct,
+session_pct, session_reset}), which the `meter` unit appends with --record, stamped with the account. A reading with
+no `account` (written before 2026-10-07, when two accounts first shared the file) is ambiguous and anchors nothing;
+the output counts them (`unstamped_readings`) so a fresh --record replaces them. Spend since the anchor comes from the
+telemetry sink through `usage_report.events()` (reused, never re-parsed), only the events whose `user.account_uuid`
+is the account's (an event without the attribute is counted: it cannot be attributed, and over-counting only holds
+early), converted to weekly points per model with model_rules.json's calibration. A reading taken before the
+account's current week's reset anchors nothing.
 """
 from __future__ import annotations
 
@@ -27,6 +34,7 @@ from zoneinfo import ZoneInfo
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "telemetry"))
+import account as accounts  # noqa: E402
 import coord  # noqa: E402
 import usage_report  # noqa: E402
 
@@ -40,9 +48,8 @@ def parse_ts(s: str) -> dt.datetime:
     return t
 
 
-def week_start(now: dt.datetime, q: dict[str, Any]) -> dt.datetime:
-    """The most recent weekly reset (Sunday 03:00 America/Los_Angeles by default) at or before `now`."""
-    r = q["weekly_reset"]
+def week_start(now: dt.datetime, r: dict[str, Any]) -> dt.datetime:
+    """The most recent weekly reset `r` (an account's `weekly_reset`: weekday, hour, minute, tz) at or before `now`."""
     local = now.astimezone(ZoneInfo(r["tz"]))
     back = (local.weekday() - r["weekday"]) % 7
     start = (local - dt.timedelta(days=back)).replace(hour=r["hour"], minute=r["minute"], second=0, microsecond=0)
@@ -83,12 +90,27 @@ def telemetry_events(tdir: pathlib.Path, since: dt.datetime, until: dt.datetime)
     return usage_report.events(files)
 
 
-def estimate(now: dt.datetime, readings: list[dict[str, Any]], events_for, rules: dict[str, Any],
-             borrow_days: int = 0) -> dict[str, Any]:
-    """The decision. `events_for(since, until)` yields telemetry events; injected so the tests need no sink."""
-    q, cal = rules["quota"], rules["calibration"]
-    start = week_start(now, q)
-    valid = sorted((r for r in readings if start <= parse_ts(r["noted_at"]) <= now), key=lambda r: r["noted_at"])
+def account_events(events: Iterable[dict[str, Any]], uuid: str | None) -> list[dict[str, Any]]:
+    """The events of the account `uuid` (None: every event, the account being unknown). An event that carries no
+    account attribute is kept: it cannot be attributed, and counting it only makes the estimate hold earlier."""
+    return [e for e in events if uuid is None or not e.get(usage_report.ACCOUNT_ATTR)
+            or e.get(usage_report.ACCOUNT_ATTR) == uuid]
+
+
+def estimate(now: dt.datetime, readings: list[dict[str, Any]], all_events_for, rules: dict[str, Any],
+             acct: accounts.Account, borrow_days: int = 0) -> dict[str, Any]:
+    """The decision for the account `acct`. `all_events_for(since, until)` yields the telemetry events of EVERY account
+    on the machine; injected so the tests need no sink."""
+    q, cal = acct.quota, rules["calibration"]
+    uuid = acct.uuid
+
+    def events_for(since: dt.datetime, until: dt.datetime) -> list[dict[str, Any]]:
+        return account_events(all_events_for(since, until), uuid)
+
+    start = week_start(now, acct.weekly_reset)
+    in_week = [r for r in readings if start <= parse_ts(r["noted_at"]) <= now]
+    unstamped = sum(1 for r in in_week if not r.get("account"))
+    valid = sorted((r for r in in_week if r.get("account") == acct.name), key=lambda r: r["noted_at"])
     anchor = valid[-1] if valid else None
     a_time = parse_ts(anchor["noted_at"]) if anchor else start
     spent, per_family = points(events_for(a_time, now), a_time, now, cal)
@@ -136,16 +158,18 @@ def estimate(now: dt.datetime, readings: list[dict[str, Any]], events_for, rules
         "decision": decision, "resume_at": resume.isoformat() if resume else None,
         "session_hard_stop_pct": q["session_hard_stop_pct"], "session_soft_stop_pct": q["session_soft_stop_pct"],
         "week_start": start.isoformat(), "day": day_n, "borrow_days": borrow_days,
+        "account": acct.name, "telemetry_account": uuid, "unstamped_readings": unstamped,
         "anchor": anchor, "spend": {"points": round(spent, 3), "counted_tokens": per_family},
     }
 
 
-def record(cdir: pathlib.Path, weekly: float, session: float, session_reset: str | None, now: dt.datetime) -> dict:
+def record(cdir: pathlib.Path, acct_name: str, weekly: float, session: float, session_reset: str | None,
+           now: dt.datetime) -> dict:
     if session_reset:
         parse_ts(session_reset)  # refuse a zoneless or malformed reset before it is stored
     path = cdir / "readings.json"
     readings = coord.read_json(path, [])
-    entry = {"noted_at": now.isoformat(), "weekly_pct": weekly, "session_pct": session, "session_reset": session_reset}
+    entry = {"noted_at": now.isoformat(), "account": acct_name, "weekly_pct": weekly, "session_pct": session, "session_reset": session_reset}
     readings.append(entry)
     coord.write_json(path, readings)
     return entry
@@ -157,6 +181,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--borrow-days", type=int, default=0, help="days of later allowance the owner allowed (never assumed)")
     ap.add_argument("--now", help="ISO time with a zone (tests); default now")
     ap.add_argument("--coord", help=f"coordination directory (default ${coord.ENV} or {coord.DEFAULT})")
+    ap.add_argument("--account", help="a named account from model_rules.json accounts (default: the one "
+                    f"${accounts.ENV} selects)")
     ap.add_argument("--telemetry-dir", default=str(usage_report.DIR))
     ap.add_argument("--record", action="store_true", help="append a meter reading instead of estimating")
     ap.add_argument("--weekly", type=float)
@@ -169,21 +195,30 @@ def main(argv: list[str] | None = None) -> int:
         pass
     now = parse_ts(a.now) if a.now else dt.datetime.now(dt.timezone.utc)
     cdir = coord.coord_dir(a.coord)
+    rules = coord.rules()
+    try:
+        acct = accounts.resolve(a.account, rules)
+    except accounts.UnknownAccount as e:
+        print(f"budget: {e}", file=sys.stderr)
+        return 2
     if a.record:
         if a.weekly is None or a.session is None:
             ap.error("--record needs --weekly and --session")
-        print(json.dumps(record(cdir, a.weekly, a.session, a.session_reset, now)))
+        print(json.dumps(record(cdir, acct.name, a.weekly, a.session, a.session_reset, now)))
         return 0
     tdir = pathlib.Path(a.telemetry_dir)
     out = estimate(now, coord.read_json(cdir / "readings.json", []),
-                   lambda s, u: telemetry_events(tdir, s, u), coord.rules(), a.borrow_days)
+                   lambda s, u: telemetry_events(tdir, s, u), rules, acct, a.borrow_days)
     if a.json:
         print(json.dumps(out, indent=1))
     else:
-        print(f"weekly ≈ {out['weekly_est_pct']} % of an allowance of {out['allowance_pct']} % (day {out['day']}"
+        print(f"{acct.name}: weekly ≈ {out['weekly_est_pct']} % of an allowance of {out['allowance_pct']} % (day {out['day']}"
               f"{', borrowing ' + str(a.borrow_days) if a.borrow_days else ''}); session ≈ {out['session_est_pct']} %"
               f" → {out['decision']}{' until ' + out['resume_at'] if out['resume_at'] else ''}"
-              f"{'' if out['anchor'] else ' (no meter reading this week: estimate from telemetry alone)'}")
+              f"{'' if out['anchor'] else f' (no {acct.name} meter reading this week: estimate from telemetry alone)'}"
+              f"{'' if out['telemetry_account'] else ' (account id unknown: every account telemetry counted)'}"
+              + (f" ({n} unstamped reading(s) this week anchor nothing: --record a fresh one)"
+                 if (n := out["unstamped_readings"]) else ""))
     return 0
 
 

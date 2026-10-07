@@ -4,6 +4,11 @@
     python scripts/telemetry/usage_report.py                  # today (UTC)
     python scripts/telemetry/usage_report.py 2026-09-25 ...   # named days
     python scripts/telemetry/usage_report.py --all
+    python scripts/telemetry/usage_report.py --account-uuid <id> [day ...]   # one Claude account only
+
+The sink is per MACHINE: every Claude account on it exports here, and each event names its account in
+`user.account_uuid` (`ACCOUNT_ATTR`; `python scripts/orchestrator/account.py --field account_uuid` prints the running
+account's). The header line counts the events per account, so a report that mixes accounts says so.
 
 Reads the `api_request` log events (one per model call: model, input/output/cache tokens, cost) and groups them by the
 identifying attributes Claude Code attaches (agent name, else query source; skill when present). Attribute names are
@@ -16,7 +21,9 @@ import json
 import pathlib
 import sys
 
-DIR = pathlib.Path.home() / ".claude" / "telemetry"
+from otlp_sink import OUT_DIR as DIR  # the sink writes it; one definition of the location
+
+ACCOUNT_ATTR = "user.account_uuid"
 TOKENS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_creation_tokens")
 
 
@@ -55,6 +62,13 @@ def events(files):
 
 
 def main(argv):
+    only = None
+    if "--account-uuid" in argv:
+        i = argv.index("--account-uuid")
+        if i + 1 >= len(argv):
+            print("--account-uuid needs a value")
+            return 2
+        only, argv = argv[i + 1], argv[:i] + argv[i + 2:]
     if "--all" in argv:
         files = sorted(DIR.glob("*.jsonl"))
     else:
@@ -65,7 +79,12 @@ def main(argv):
         return 1
     groups = collections.defaultdict(lambda: collections.Counter())
     n = 0
+    per_account = collections.Counter()
     for a in events(files):
+        acct = str(a.get(ACCOUNT_ATTR) or "-")
+        per_account[acct] += 1
+        if only is not None and acct != only:
+            continue
         n += 1
         who = a.get("agent.name") or a.get("agent_type") or a.get("query_source") or "-"
         key = (str(who), str(a.get("skill.name") or "-"), str(a.get("model") or "-"))
@@ -74,7 +93,9 @@ def main(argv):
         for t in TOKENS:
             c[t] += num(a.get(t))
         c["cost_usd"] += num(a.get("cost_usd"))
-    print(f"{n} api_request events in {len(files)} file(s)")
+    print(f"{n} api_request events in {len(files)} file(s)"
+          + (f" for account {only}" if only is not None else "")
+          + f"; per account: {', '.join(f'{k[:8]} {v}' for k, v in per_account.most_common())}")
     rows = sorted(groups.items(), key=lambda kv: -(kv[1]["cache_read_tokens"] + kv[1]["input_tokens"]))
     print(f"{'agent/source':32} {'skill':20} {'model':24} {'calls':>6} {'in':>10} {'out':>9} {'cache-rd':>12} "
           f"{'cache-wr':>11} {'usd':>9}")

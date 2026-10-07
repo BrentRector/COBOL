@@ -10,7 +10,7 @@ console to UTF-8, and runs watch_agent.py, the renderer that follows the file. I
 is restarted, so a renderer fault never closes the tab; Ctrl+C ends it.
 
 .EXAMPLE
-pwsh -NoProfile -File scripts/orchestrator/watch-agent.ps1 C:\Users\brent\.claude\projects\E--COBOL\<session>\subagents\workflows\wf_x\agent-a1.jsonl
+pwsh -NoProfile -File scripts/orchestrator/watch-agent.ps1 <config dir>\projects\E--COBOL\<session>\subagents\workflows\wf_x\agent-a1.jsonl
 #>
 param([Parameter(Mandatory)][string]$Transcript, [string]$Python = 'python')
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)

@@ -16,6 +16,11 @@
     2. save: a resume note in memory marked START HERE in MEMORY.md, WIP checkpoint commits on the worktree branches;
     3. tell the owner to run this script in a new terminal.
 
+  The ACCOUNT is a parameter (kb/Work PB2479): -ConfigDir names the Claude config dir of the account to start (default:
+  the one CLAUDE_CONFIG_DIR selects, resolved by scripts/orchestrator/account.py, the one resolver). The session is started
+  with exactly that account: CLAUDE_CONFIG_DIR set to the dir for a named account, UNSET for the default one.
+    pwsh -NoProfile -File scripts/start-session.ps1 -ConfigDir C:\Users\brent\.claude-acct2
+
   Rules this file keeps (each was an owner report):
   - `-n COBOL`, never `--resume COBOL`: --resume takes a SESSION ID, and any other value opens the interactive session picker and
     blocks forever (owner, 2026-09-20).
@@ -31,17 +36,25 @@
 param(
     # The Claude Code executable (a test seam; the default is the user-level install).
     [string]$ClaudeExe = (Join-Path $env:USERPROFILE '.local\bin\claude.exe'),
+    # The Claude account's config dir (default: account.py's resolution of CLAUDE_CONFIG_DIR).
+    [string]$ConfigDir = '',
     # Print what would run and start nothing.
     [switch]$DryRun
 )
 $ErrorActionPreference = 'Stop'
 $Repo = Split-Path $PSScriptRoot -Parent
+$acctArgs = @((Join-Path $PSScriptRoot 'orchestrator/account.py'), '--json') + $(if ($ConfigDir) { @('--config-dir', $ConfigDir) } else { @() })
+$acctOut = & python @acctArgs 2>&1
+if ($LASTEXITCODE -ne 0) { throw "start-session: $($acctOut -join ' ')" }
+$Account = ($acctOut -join "`n") | ConvertFrom-Json
 $Prompt = @'
 RESTART (owner-authorized auto-start; also used when the previous session's context filled). The previous session saved its state to disk and wound down running work. Do this, in order: (1) run the session-start skill; (2) read the memory index MEMORY.md and the note it marks START HERE, and follow that note's first steps; trust `pwsh scripts/session-probe.ps1` and `python scripts/spec/work.py next` over any remembered state; (3) do NOT start the orchestrator loop, dispatch a fleet or spend quota until you have read the note's quota and stop-file instructions: a STOP file may be present in E:\COBOL-coord and elsewhere on purpose, and the weekly allowance in force is stated in the note; (4) say in one short line what you found and what you are doing first, then continue autonomously. Agents of the previous session died with it; their worktrees, WIP commits and checkpoints survive on disk.
 '@
 if ($DryRun) {
-    Write-Host "would run in ${Repo}: $ClaudeExe -n COBOL --dangerously-skip-permissions <prompt of $($Prompt.Length) characters>"
+    Write-Host "would run in ${Repo} as account $($Account.name) (CLAUDE_CONFIG_DIR $(if ($Account.child_config_dir) { "= $($Account.child_config_dir)" } else { 'unset' })): $ClaudeExe -n COBOL --dangerously-skip-permissions <prompt of $($Prompt.Length) characters>"
     return
 }
 Set-Location $Repo
+if ($Account.child_config_dir) { $env:CLAUDE_CONFIG_DIR = $Account.child_config_dir } else { Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue }
+Write-Host "starting the attended session as account $($Account.name) (config dir $($Account.config_dir))"
 & $ClaudeExe -n COBOL --dangerously-skip-permissions $Prompt

@@ -6,6 +6,7 @@
 groups.json:
 {
   "wave": "58", "scratch": "E:\\\\Temp\\\\...\\\\scratchpad", "base": "c54434a8d or later — ...",
+  "stop_file": "E:\\\\Temp\\\\...\\\\scratchpad\\\\STOP-w58",   # REQUIRED: this fleet's own stop (kb/Work PB2483)
   "groups": [
     {"letter": "KA", "slug": "w58a", "group": "INTRINSICS BEYOND BINARY64", "notes": "PB999, PB1000", "lead": "PB999",
      "codes": "COBOLNET2400–COBOLNET2402", "root": "...", "files": "`kb/Work/PB999.md`, ...", "body": "...",
@@ -16,11 +17,29 @@ groups.json:
 }
 Writes <scratch>\\msg-w<wave>-<letter lower-cased>.txt per group (the file wf_rolling_wave.js opens) and runs
 check_practices.py over the specs AND the groups file (exit 1 on a miss).
+
+Every spec names TWO stop files (kb/Work PB2483): the owner's global stop (`coord.global_stop()`) and this fleet's own
+`stop_file` (`coord.fleet_stop(scratch, scope)`; plan_wave.py writes it). A fleet stopped by its own file never stops
+another session's agents.
 """
 import json, pathlib, subprocess, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 TEMPLATE = HERE / 'templates' / 'dispatch-spec-implementer.md'
+sys.path.insert(0, str(HERE.parents[2] / 'scripts' / 'orchestrator'))
+import coord  # noqa: E402  (the one definition of the stop files)
+
+
+def render(cfg, g, tpl=None):
+    """One group's spec: the template filled from the groups file `cfg` and the group `g` (the one render; the planner's
+    self-test calls it too). Raises KeyError naming a placeholder the inputs do not fill."""
+    tpl = tpl if tpl is not None else TEMPLATE.read_text(encoding='utf-8')
+    if not cfg.get('stop_file'):
+        raise KeyError("stop_file (this fleet's own STOP-<scope>, kb/Work PB2483; plan_wave.py writes it)")
+    pred = g.get('pred', '')
+    return tpl.format(wave=cfg['wave'], base=cfg['base'], S=str(cfg['scratch']), pred=(pred + '\n') if pred else '',
+                      global_stop=str(coord.global_stop()), stop_file=cfg['stop_file'],
+                      **{k: v for k, v in g.items() if k != 'pred'})
 
 
 def main():
@@ -29,9 +48,11 @@ def main():
     scratch = pathlib.Path(cfg['scratch'])
     out = []
     for g in cfg['groups']:
-        pred = g.get('pred', '')
-        body = tpl.format(wave=cfg['wave'], base=cfg['base'], S=str(scratch), pred=(pred + '\n') if pred else '',
-                          **{k: v for k, v in g.items() if k != 'pred'})
+        try:
+            body = render(cfg, g, tpl)
+        except KeyError as e:
+            print(f"{sys.argv[1]}: group {g.get('letter')}: no value for {e}")
+            return 1
         # Keyed on the FULL letter, lower-cased: the workflow opens msg-w<wave>-<letter.toLowerCase()>.txt, and a
         # multi-character letter (a same-file successor such as "V2") must not collide with another group's file.
         p = scratch / f"msg-w{cfg['wave']}-{g['letter'].lower()}.txt"

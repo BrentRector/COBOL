@@ -6,8 +6,9 @@ The unattended orchestrator loop: one fresh headless `claude -p` session per bou
 .DESCRIPTION
 Design: docs/rearchitecture/DESIGN-orchestrator-loop.md (kb/Work PB1981). Each iteration, in this order:
   1. single instance (orchestrate.lock holds the PID; a dead PID's lock is stale and taken over)
-  2. STOP file in the coordination directory ends the loop; during a unit it winds the unit down gracefully first
-     (STOP-UNIT plus the fleet STOP, so nothing is lost), see stop.ps1
+  2. STOP file in the coordination directory (or the owner's global scratch\STOP) ends the loop; during a unit it winds
+     the unit down gracefully first (STOP-UNIT plus the LOOP's own fleet stop scratch\STOP-loop, so nothing is lost and
+     no other session's agents are stopped; kb/Work PB2483), see stop.ps1
   3. circuit breaker: three consecutive units that fail (nonzero exit, invalid or missing handoff, or under
      -FastFailSeconds without a `done` handoff) stop the loop with an owner note; exponential backoff between failures
   4. budget.py decides go / hold-session / hold-day / stop-week
@@ -20,13 +21,19 @@ Design: docs/rearchitecture/DESIGN-orchestrator-loop.md (kb/Work PB1981). Each i
      -MaxContextTokens or on STOP; kill only after the grace period
   7. validate handoff.json against handoff.schema.json
   8. append one line to units.jsonl
+The Claude ACCOUNT the loop spends is a parameter (kb/Work PB2479; design section 2.1): -ConfigDir names its config dir,
+default the one account.py resolves from CLAUDE_CONFIG_DIR. The supervisor exports exactly that account to every child
+(CLAUDE_CONFIG_DIR set to the dir, or UNSET for the default account), finds the unit transcripts under that dir, and
+names the account in its log header and in every units.jsonl line.
 Exit codes: 0 stopped (STOP, -MaxUnits, stop-week, -DryRun), 3 another instance runs, 4 circuit breaker,
-5 an owner question is waiting in OWNER-QUESTIONS.md, 2 -Cluster names no kb/Work cluster (or -Unit campaign without it).
+5 an owner question is waiting in OWNER-QUESTIONS.md, 2 -Cluster names no kb/Work cluster (or -Unit campaign without it),
+or -ConfigDir names a config dir model_rules.json `accounts` does not know.
 
 .EXAMPLE
 pwsh -NoProfile -File scripts/orchestrator/orchestrate.ps1 -DryRun
 pwsh -NoProfile -File scripts/orchestrator/orchestrate.ps1 -MaxUnits 1 -Unit meter
 pwsh -NoProfile -File scripts/orchestrator/orchestrate.ps1 -Cluster PB2108 -DryRun
+pwsh -NoProfile -File scripts/orchestrator/orchestrate.ps1 -ConfigDir C:\Users\brent\.claude-acct2
 #>
 [CmdletBinding()]
 param(
@@ -52,6 +59,8 @@ param(
     [switch]$Watch,
     [string]$Python = 'python',
     [string]$TelemetryDir = '',
+    # The Claude account's config dir (default: account.py's resolution of CLAUDE_CONFIG_DIR, i.e. this process's account).
+    [string]$ConfigDir = '',
     [int]$FastFailSeconds = 120,
     [int]$IdleCloseSeconds = 20,
     [int]$CheckpointSeconds = 300,
@@ -72,6 +81,11 @@ $env:COBOL_COORD_DIR = $CoordDir
 $Lock = Join-Path $CoordDir 'orchestrate.lock'
 $StopFile = Join-Path $CoordDir 'STOP'
 $StopUnit = Join-Path $CoordDir 'STOP-UNIT'
+# The stop files are SCOPED (kb/Work PB2483; coord.py global_stop/fleet_stop; design section 4.6): the owner's GLOBAL stop
+# stops every agent of every session, and the loop's FLEET stop only the agents this loop dispatched. The supervisor
+# creates only its own fleet stop; a shared scratch\STOP split another session's refuter on 2026-10-07.
+$GlobalStop = Join-Path $CoordDir 'scratch/STOP'
+$FleetStop = Join-Path $CoordDir 'scratch/STOP-loop'
 $Handoff = Join-Path $CoordDir 'handoff.json'
 $LastHandoff = Join-Path $CoordDir 'handoff.last.json'
 $UnitsLog = Join-Path $CoordDir 'units.jsonl'
@@ -100,13 +114,16 @@ function Take-Lock {
     return $false
 }
 
+# The loop ends on its own STOP or on the owner's global stop (which stops every agent anyway).
+function Test-Stop { return (Test-Path $StopFile) -or (Test-Path $GlobalStop) }
+
 # Sleep until $until, waking every minute so STOP is honoured. Returns $false when STOP appeared.
 function Wait-Until([datetime]$until) {
     while ((Get-Date) -lt $until) {
-        if (Test-Path $StopFile) { return $false }
+        if (Test-Stop) { return $false }
         Start-Sleep -Seconds ([Math]::Max(1, [Math]::Min(60, ($until - (Get-Date)).TotalSeconds)))
     }
-    return -not (Test-Path $StopFile)
+    return -not (Test-Stop)
 }
 
 # The supervisor's own frequent handoff (checkpoint.py): never fatal, a missed checkpoint must not end the unit.
@@ -146,7 +163,7 @@ function Build-Prompt([string]$unit, [string]$scratch, [string]$sessionId) {
     $sub = {
         param($t)
         $t.Replace('{TASKS_DIR}', $tasksDir).Replace('{COORD}', $CoordDir).Replace('{HANDOFF}', $Handoff).Replace('{STOP_UNIT}', $StopUnit).
-           Replace('{PREV_HANDOFF}', $LastHandoff).Replace('{SCRATCH}', $scratch).
+           Replace('{PREV_HANDOFF}', $LastHandoff).Replace('{SCRATCH}', $scratch).Replace('{FLEET_STOP}', $FleetStop).Replace('{GLOBAL_STOP}', $GlobalStop).
            Replace('{BORROW_DAYS}', "$BorrowDays").Replace('{CLUSTER_ARG}', $(if ($unit -eq 'campaign') { " --cluster $Cluster" } else { '' }))
     }
     $common = & $sub (Get-Content (Join-Path $Here 'units/common.md') -Raw)
@@ -157,9 +174,8 @@ function Build-Prompt([string]$unit, [string]$scratch, [string]$sessionId) {
 function Get-PromptFile([string]$unit) { if ($PromptFile.ContainsKey($unit)) { $PromptFile[$unit] } else { $unit } }
 
 function Get-ProjectTranscriptDir([string]$sessionId) {
-    # Claude Code keeps a project's transcripts under ~/.claude/projects/<path with ':' '\' '/' as '-'>.
-    $key = ($RepoDir -replace '[:\\/]', '-')
-    return Join-Path $HOME ".claude/projects/$key/$sessionId"
+    # The account's config dir holds the unit transcripts (account.py project_dir: projects/<repo key>), never $HOME/.claude.
+    return Join-Path $Account.project_dir $sessionId
 }
 
 function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]$logBase) {
@@ -185,6 +201,9 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
     $psi.StandardInputEncoding = [System.Text.UTF8Encoding]::new($false)
     $psi.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
     $psi.Environment['COBOL_COORD_DIR'] = $CoordDir
+    # Exactly the loop's account: the dir for a named one; UNSET for the default (set to ~/.claude, Claude Code would look
+    # for its sign-in in ~/.claude/.claude.json and find none). account.py child_config_dir is the one rule.
+    if ($Account.child_config_dir) { $psi.Environment['CLAUDE_CONFIG_DIR'] = $Account.child_config_dir } else { [void]$psi.Environment.Remove('CLAUDE_CONFIG_DIR') }
 
     $stats = [ordered]@{ calls = 0; input = 0; output = 0; cache_read = 0; cache_creation = 0; peak_context = 0; peak_subagent_context = 0;
         context = 0; cost_usd = $null; stop_unit_sent = $false; killed = $false }
@@ -296,14 +315,15 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
                 $lastBgChecked = $bgTasks
             }
             # Two reasons to wind the unit down gracefully: its context passed the cap, or the owner created STOP. Both do
-            # the same thing, so no work is lost: STOP-UNIT (the unit hands off at its next step) and the fleet's own
-            # graceful-stop file (every implementer and lander checkpoints and returns SPLIT), then wait for the handoff.
+            # the same thing, so no work is lost: STOP-UNIT (the unit hands off at its next step) and the LOOP's own fleet
+            # stop (every implementer and lander it dispatched checkpoints and returns SPLIT), then wait for the handoff.
+            # Never the global scratch\STOP: that is the owner's, and every session's agents obey it (kb/Work PB2483).
             $windDown = $null
             if ($stats.context -gt $MaxContextTokens) { $windDown = "context $($stats.context) > ${MaxContextTokens}" }
-            elseif (Test-Path $StopFile) { $windDown = 'STOP file present' }
+            elseif (Test-Stop) { $windDown = 'STOP file present' }
             if (-not $stats.stop_unit_sent -and $windDown) {
-                Say "${windDown}: winding the unit down (STOP-UNIT and the fleet STOP; the unit checkpoints and hands off, the loop then ends if STOP is set)"
-                New-Item -ItemType File -Force -Path $StopUnit, (Join-Path $scratch 'STOP') | Out-Null
+                Say "${windDown}: winding the unit down (STOP-UNIT and the loop's fleet stop $FleetStop; the unit checkpoints and hands off, the loop then ends if STOP is set)"
+                New-Item -ItemType File -Force -Path $StopUnit, $FleetStop | Out-Null
                 $stats.stop_unit_sent = $true
                 $stopAt = Get-Date
             }
@@ -324,6 +344,14 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
     $stats.Remove('context')
     return @{ exit = $proc.ExitCode; stats = $stats }
 }
+
+# The account this loop spends: resolved once, exported to every child (the Python tools resolve the same one from it).
+$acctArgs = @((Join-Path $Here 'account.py'), '--json', '--repo', $RepoDir) + $(if ($ConfigDir) { @('--config-dir', $ConfigDir) } else { @() })
+$acctOut = & $Python @acctArgs 2>&1
+if ($LASTEXITCODE -ne 0) { Say "$($acctOut -join ' '); refusing to start"; exit 2 }
+$Account = ($acctOut -join "`n") | ConvertFrom-Json
+if ($Account.child_config_dir) { $env:CLAUDE_CONFIG_DIR = $Account.child_config_dir } else { Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue }
+Say "account: $($Account.name) (config dir $($Account.config_dir); week resets weekday $($Account.weekly_reset.weekday) $($Account.weekly_reset.hour):$('{0:d2}' -f [int]$Account.weekly_reset.minute) $($Account.weekly_reset.tz))"
 
 # The campaign lane needs a cluster the register knows: a misspelled one would quietly run the fix lane alone.
 if ($Unit -eq 'campaign' -and -not $Cluster) { Say '-Unit campaign needs -Cluster <lead>'; exit 2 }
@@ -353,7 +381,7 @@ try {
     $lastFailed = $false
     $lastStarted = $null
     while ($true) {
-        if (Test-Path $StopFile) { Say "STOP file present: ending the loop"; break }
+        if (Test-Stop) { Say "STOP file present ($(if (Test-Path $StopFile) { $StopFile } else { "the owner's global $GlobalStop" })): ending the loop"; break }
         if ($failures -ge 3) {
             $note = Join-Path $CoordDir "logs/BREAKER-$(Get-Date -Format 'yyyyMMdd-HHmmss').md"
             $tail = Get-Content $UnitsLog -Tail 3 -ErrorAction SilentlyContinue
@@ -366,7 +394,7 @@ try {
         $budgetArgs = @((Join-Path $Here 'budget.py'), '--json', '--borrow-days', "$BorrowDays")
         if ($TelemetryDir) { $budgetArgs += @('--telemetry-dir', $TelemetryDir) }
         $budget = Invoke-Py $budgetArgs | ConvertFrom-Json
-        Say "budget: weekly $($budget.weekly_est_pct) % of $($budget.allowance_pct) %, session $($budget.session_est_pct) % -> $($budget.decision)"
+        Say "budget ($($budget.account)): weekly $($budget.weekly_est_pct) % of $($budget.allowance_pct) %, session $($budget.session_est_pct) % -> $($budget.decision)$(if (-not $budget.anchor) { " (no $($budget.account) meter reading this week)" })$(if ($budget.unstamped_readings) { " ($($budget.unstamped_readings) unstamped reading(s) anchor nothing)" })"
         if ($budget.decision -eq 'stop-week') { Say 'weekly cap reached: ending the loop'; break }
         $hold = $budget.decision -in @('hold-session', 'hold-day')
         if ($hold -and $OverrideHold -and -not $DryRun) { Say "owner override: $($budget.decision) lifted (-OverrideHold)"; $hold = $false }
@@ -409,13 +437,14 @@ try {
         $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
         $logBase = Join-Path $CoordDir "logs/$stamp-$($choice.unit)"
         if ($DryRun) {
-            Say "DRY RUN: would run unit '$($choice.unit)' ($($choice.reason)) on $model, session $sessionId"
+            Say "DRY RUN: would run unit '$($choice.unit)' ($($choice.reason)) on $model, session $sessionId, account $($Account.name) (transcripts under $(Get-ProjectTranscriptDir $sessionId))"
             Say "DRY RUN: $ClaudeExe -p <units/common.md + units/$(Get-PromptFile $choice.unit).md$(if ($choice.unit -eq 'campaign') { " with --cluster $Cluster" })> --model $model --permission-mode $PermissionMode --permission-prompts none --output-format stream-json --verbose --session-id $sessionId$(if ($choice.unit -eq 'meter') { ' --chrome' }) > $logBase.jsonl"
             break
         }
 
-        # A fleet STOP left by a previous wind-down would stop this unit's fleet at its first step.
-        Remove-Item $StopUnit, $Handoff, (Join-Path $CoordDir 'scratch/STOP'), (Join-Path $CoordDir 'milestones.jsonl'), (Join-Path $CoordDir 'checkpoint.json') -Force -ErrorAction SilentlyContinue
+        # The loop's fleet stop left by a previous wind-down would stop this unit's fleet at its first step. Only the
+        # loop's own: the owner's global stop is never the supervisor's to remove.
+        Remove-Item $StopUnit, $Handoff, $FleetStop, (Join-Path $CoordDir 'milestones.jsonl'), (Join-Path $CoordDir 'checkpoint.json') -Force -ErrorAction SilentlyContinue
         Say "unit '$($choice.unit)' ($($choice.reason)) on $model, session $sessionId"
         $started = Get-Date
         $r = Invoke-Unit $choice.unit $model $sessionId $logBase
@@ -451,7 +480,7 @@ try {
         $failures = if ($failed) { $failures + 1 } else { 0 }
         $lastFailed = $failed
         $lastStarted = $started
-        $line = [ordered]@{ unit = $choice.unit; reason = $choice.reason; model = $model; session_id = $sessionId
+        $line = [ordered]@{ unit = $choice.unit; reason = $choice.reason; model = $model; account = $Account.name; session_id = $sessionId
             started_at = $started.ToString('o'); ended_at = (Get-Date).ToString('o'); duration_s = [Math]::Round($duration, 1)
             exit_code = $r.exit; handoff_outcome = $outcome; next_unit = $(if ($h -and $h.PSObject.Properties['next_unit']) { $h.next_unit } else { $null })
             failed = $failed; log = "$logBase.jsonl" }
@@ -463,7 +492,17 @@ try {
         # so the attended session does it (ledger_state.py compares the page's stamp with the last published one).
         try {
             $ls = Invoke-Py @((Join-Path $Here 'ledger_state.py'), 'owed', '--repo', $RepoDir)
-            if ($ls -match '^owed') { Say "LEDGER PUBLISH OWED ($ls): render with gen_ledger.py --out $CoordDir\ledger.html, publish it to the owner's artifact, then ledger_state.py mark-published" }
+            if ($ls -match '^owed') {
+                Say "LEDGER PUBLISH OWED ($ls): render with gen_ledger.py (it writes $CoordDir\ledger.html and prints this account's artifact URL), publish it there, then ledger_state.py mark-published (--url the first time an account publishes)"
+                # The attended operator session is woken by its mailbox, not by this log (kb/Work PB2482): one open
+                # `publish` message per stamp (--unless-pending), pointing at this unit's log.
+                $stampOwed = ($ls -split ' ')[1]
+                try { [void](Invoke-Py @((Join-Path $Here 'mailbox.py'), '--coord', $CoordDir, 'send', '--to', 'operator', '--from', 'loop',
+                    '--kind', 'publish', '--subject', "Ledger publish owed at $stampOwed ($($Account.name))",
+                    '--body', "The supervisor found the ledger publish owed after unit '$($choice.unit)': $ls. Render with gen_ledger.py, publish to this account's artifact, then ledger_state.py mark-published.",
+                    '--ref', "$logBase.jsonl", '--session', "orchestrate.ps1 pid $PID", '--unless-pending')) }
+                catch { Say "publish message not posted to the operator's mailbox (the loop continues): $_" }
+            }
         } catch { Say "ledger state not read (the loop continues): $_" }
 
         if ($valid -and $outcome -eq 'owner-question') {

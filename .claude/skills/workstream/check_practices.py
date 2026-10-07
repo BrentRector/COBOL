@@ -32,9 +32,10 @@ BRIEFS = {
     'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'-Mode lander'],  # PB1732 (L10); PB1721 (L2)
     'golden-lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'-Mode lander'],  # PB1721 (L2)
     'registrar-brief.md': [r'claude-skills', POINTER, r'code site'],
-    'wf_lane3_adjudicate.js': [r'claude-skills', r'args\.stopFile', r'GRACEFUL STOP', r'CHECKPOINT PER RULE', r"model: 'opus'", r"agentType: 'cobol-adjudicator'", r"agentType: 'cobol-refuter'"],
-    'wf_lane3_refute.js': [r'claude-skills', r'args\.stopFile', r'GRACEFUL STOP', r"model: 'opus'", r"agentType: 'cobol-refuter'"],
-    'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'-Mode implementer', r'\\STOP',
+    # PB2483: a stop is scoped; every workflow names the owner's global stop AND the fleet's own.
+    'wf_lane3_adjudicate.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r'CHECKPOINT PER RULE', r"model: 'opus'", r"agentType: 'cobol-adjudicator'", r"agentType: 'cobol-refuter'"],
+    'wf_lane3_refute.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r"model: 'opus'", r"agentType: 'cobol-refuter'"],
+    'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'-Mode implementer', r'\{global_stop\}', r'\{stop_file\}',
                                      r'until grep -q', r'where\.py', r'orient\.py', r'semgrep/verify\.py', r'cite\.py --check',
                                      r'Turn cap 220', r'code site', r'leg-1-Conformance\.trx', r'drift_rules\.py', r'STATUS-AT:',
                                      r'status_delta\.py',
@@ -46,15 +47,20 @@ BRIEFS = {
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit
     # final StructuredOutput reminder (three agents in waves 65-67 ended without it and stranded finished branches).
     # PB1703 / PB1704: a dead agent (rejection) and a hung agent (ceiling) must not hold the wave.
-    'wf_rolling_wave.js': [r'STOP', r"agentType: 'cobol-implementer'", r"agentType: 'cobol-lander'", r'StructuredOutput',
+    'wf_rolling_wave.js': [r'args\.stop_file', r'args\.global_stop', r"agentType: 'cobol-implementer'", r"agentType: 'cobol-lander'", r'StructuredOutput',
                            r'g\.after', r'held\[', r'push-main\.sh', r'status_delta\.py', r'withCeiling\(',
                            r"status: 'NO-RESULT', error"],
     # O8: every fleet workflow runs with the stall watchdog beside it (PB1704).
-    'MANDATORY-PRACTICES.md': [r'stall_watch\.py', r'linux-gate\.sh', r'I9', r'dispatch_guard\.py', r'prune_worktrees\.py'],  # O8; PB1732; I9, O9, O10
+    'MANDATORY-PRACTICES.md': [r'stall_watch\.py', r'linux-gate\.sh', r'I9', r'dispatch_guard\.py', r'prune_worktrees\.py',  # O8; PB1732; I9, O9, O10
+                               r'STOP-<scope>'],  # P3, PB2483: the scoped stop
 }
 # The group slug is w<wave><letter>, optionally followed by a successor ordinal (w68v2 = the second same-file
 # cluster after group V), so the report path stays wave-and-group prefixed.
-SPEC = BRIEFS['dispatch-spec-implementer.md'] + [r'reports\\w\d+[a-z]\d*-PB\d+-report\.md']
+# A RENDERED spec names the two stop files themselves (PB2483): the owner's global `...\scratch\STOP` and the fleet's own
+# `...\STOP-<scope>`, never a bare shared `{S}\STOP` that another session's wind-down would trip.
+RENDERED_STOPS = [r'scratch[\\/]STOP(?![-\w])', r'[\\/]STOP-[A-Za-z0-9][A-Za-z0-9._-]*']
+SPEC = [p for p in BRIEFS['dispatch-spec-implementer.md'] if p not in (r'\{global_stop\}', r'\{stop_file\}')] + \
+    RENDERED_STOPS + [r'reports\\w\d+[a-z]\d*-PB\d+-report\.md']
 
 
 # P2: the blocking wait must RETURN when the verdict appears. `tail -f <log> | grep -m1 <verdict>` does not: grep exits
@@ -186,6 +192,10 @@ def main():
         print(f'FAIL     mechanical role given a per-call model (P1 — it overrides its Sonnet frontmatter): {over}')
     groups_files = [pathlib.Path(a) for a in sys.argv[1:] if a.endswith('.json')]
     for gp in groups_files:
+        stop = json.loads(gp.read_text(encoding='utf-8')).get('stop_file') or ''
+        if not re.search(RENDERED_STOPS[1] + r'$', stop):
+            bad += 1
+            print(f'FAIL     {gp.name}: `stop_file` {stop!r} is not a fleet-scoped STOP-<scope> file (P3, kb/Work PB2483)')
         clash = same_file_without_successor(gp)
         if clash:
             bad += 1

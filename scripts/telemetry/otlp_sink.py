@@ -7,9 +7,14 @@ hand-kept usage tally. Claude Code exports with
     CLAUDE_CODE_ENABLE_TELEMETRY=1  OTEL_METRICS_EXPORTER=otlp  OTEL_LOGS_EXPORTER=otlp
     OTEL_EXPORTER_OTLP_PROTOCOL=http/json  OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
 
-(set per machine in the USER settings ~/.claude/settings.json; Claude Code ignores telemetry-enabling variables in
-project settings files) and this process appends every POSTed body, one JSON line per export,
-to ~/.claude/telemetry/<UTC date>.jsonl. `python scripts/telemetry/usage_report.py` summarizes it.
+(set in each Claude account's USER settings, `<config dir>/settings.json`, where the config dir is CLAUDE_CONFIG_DIR or
+~/.claude; Claude Code ignores telemetry-enabling variables in project settings files) and this process appends every
+POSTed body, one JSON line per export, to ~/.claude/telemetry/<UTC date>.jsonl (`OUT_DIR`).
+`python scripts/telemetry/usage_report.py` summarizes it.
+
+The sink is per MACHINE, never per account (kb/Work PB2479): one listener on the one port receives every account's
+export, so OUT_DIR is deliberately NOT the account's config dir. Each event names its account (`user.account_uuid`),
+and a consumer that needs one account filters on it (`usage_report.py --account-uuid`, `budget.py`).
 
     python scripts/telemetry/otlp_sink.py --ensure   # start detached unless something already listens (SessionStart)
     python scripts/telemetry/otlp_sink.py            # run in the foreground

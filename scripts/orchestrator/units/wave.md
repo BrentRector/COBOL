@@ -2,7 +2,7 @@ UNIT: wave.
 
 1. Load the `workstream` skill (dispatch_guard.py refuses the Workflow call otherwise) and follow
    .claude/skills/workstream/templates/MANDATORY-PRACTICES.md.
-2. `python scripts/orchestrator/plan_wave.py --from-budget --borrow-days {BORROW_DAYS} --scratch {SCRATCH}{CLUSTER_ARG}` plans the wave deterministically,
+2. `python scripts/orchestrator/plan_wave.py --from-budget --borrow-days {BORROW_DAYS} --scratch {SCRATCH} --stop-file {FLEET_STOP}{CLUSTER_ARG}` plans the wave deterministically,
    allocates codes and lead ids, renders the specs with make_dispatch_specs.py and runs check_practices.py. Read its
    table. Change the plan only for a reason you write into the handoff; re-run it rather than editing groups.json.
 3. Start `.claude/skills/workstream/templates/wf_rolling_wave.js` with the args file it wrote

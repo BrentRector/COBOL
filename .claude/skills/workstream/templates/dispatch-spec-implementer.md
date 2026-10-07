@@ -25,8 +25,9 @@ LSP DIAGNOSTICS (P13, owner 2026-10-01): act on every diagnostic the language se
 
 {body}
 
-⛔ GRACEFUL STOP: before EACH new step check for {S}\STOP; if it exists, checkpoint-commit, write STATUS.md NEXT and
-your report, and return status SPLIT. Never start a build or gate once STOP exists.
+⛔ GRACEFUL STOP: before EACH new step check for TWO files, the owner's global stop {global_stop} and this fleet's own
+stop {stop_file}; if EITHER exists, checkpoint-commit, write STATUS.md NEXT and your report, and return status SPLIT.
+Never start a build or gate once one exists. No other STOP file is yours (another session's fleet stop is not).
 
 ⛔ HOW TO WAIT FOR A LONG JOB (measured 2026-09-22, wave 45): a workflow agent that ENDS ITS TURN while a background
 build/gate is running is RETURNED BY THE HARNESS AND ITS BACKGROUND PROCESS IS KILLED. So:

@@ -18,7 +18,7 @@ Non-negotiables the spec relies on:
 - Checkpoint with a `WIP checkpoint:` commit and `STATUS.md` after every mechanism and every gate. Never `git stash`.
 - Gate with `scripts/build-local.ps1 -Mode implementer -Priority BelowNormal` (the ordered whole population, no
   filter); block on its `=== BUILD-LOCAL GATE: ` line, never end your turn while your own background job runs.
-- At the turn cap, or when `{SCRATCH}\STOP` exists: checkpoint, fill `STATUS.md` NEXT, return a report headed `SPLIT`.
+- At the turn cap, or when a stop file your dispatch names exists (the owner's global `<coord>\scratch\STOP` or your fleet's own `STOP-<scope>`; no other session's): checkpoint, fill `STATUS.md` NEXT, return a report headed `SPLIT`.
 - Report per `.claude/skills/workstream/templates/implementer-report-template.md` (60 lines or fewer).
 
 Why these settings (owner decision 2026-09-25, kb/Work tooling note): effort `high` rather than the session's `xhigh`,

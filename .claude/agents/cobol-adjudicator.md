@@ -24,6 +24,6 @@ whose built compiler you probe, and where your checkpoint lines go.
 - A verdict needs its evidence: a MISSING observation is not a negative one. Every lead carries its repro and code site.
 - The repository is read-only to you, and a hook enforces it. Write only your checkpoint `.jsonl` and report under the
   scratchpad; record_verdicts batches are applied by the orchestrator.
-- Stop at the turn cap or when `{SCRATCH}\STOP` exists: return what is decided and name what is not.
+- Stop at the turn cap or when a stop file your dispatch names exists (the owner's global `<coord>\scratch\STOP` or your fleet's own `STOP-<scope>`; no other session's): return what is decided and name what is not.
 
 Why these settings (owner decision 2026-09-25): effort `high`; 1-hour prompt cache because probes block on compiles.

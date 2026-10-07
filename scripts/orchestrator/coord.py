@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import re
 from typing import Any
 
 DEFAULT = r"E:\COBOL-coord"
@@ -32,10 +33,36 @@ def family(model: str) -> str:
     return next((f for f in ("opus", "sonnet", "haiku", "fable", "mythos") if f in m), "")
 
 
+def coord_path(override: str | None = None) -> pathlib.Path:
+    """The coordination directory's path, WITHOUT creating it (a reader on a machine without one stays read-only)."""
+    return pathlib.Path(override or os.environ.get(ENV) or DEFAULT)
+
+
 def coord_dir(override: str | None = None) -> pathlib.Path:
-    d = pathlib.Path(override or os.environ.get(ENV) or DEFAULT)
+    """The coordination directory, created when missing (the tools that write into it)."""
+    d = coord_path(override)
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+# THE GRACEFUL-STOP FILES (kb/Work PB2483, design section 4.6). A stop is SCOPED: one session's stop must never abort
+# another session's agents (2026-10-07 13:26, the loop's wind-down split the Mythos session's refuter).
+#   global  <coord>\scratch\STOP           the OWNER's stop: every agent of every session and the loop obey it
+#   fleet   <scratch>\STOP-<scope>          ONE fleet's stop: only the agents whose dispatch names it obey it
+# Every dispatch names both (make_dispatch_specs.py, wf_rolling_wave.js args); the loop's fleet uses the scope `loop`.
+STOP_SCOPE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
+def global_stop(override: str | None = None) -> pathlib.Path:
+    """The owner's global stop file. Never creates the directory (a check on a machine without one stays read-only)."""
+    return coord_path(override) / "scratch" / "STOP"
+
+
+def fleet_stop(scratch: pathlib.Path | str, scope: str) -> pathlib.Path:
+    """One fleet's own stop file in its scratch directory: `STOP-<scope>` (a wave `w1033`, the loop's `loop`)."""
+    if not STOP_SCOPE.fullmatch(scope):
+        raise ValueError(f"stop scope {scope!r} is not a plain name ([A-Za-z0-9._-])")
+    return pathlib.Path(scratch) / f"STOP-{scope}"
 
 
 def read_json(path: pathlib.Path, default: Any) -> Any:

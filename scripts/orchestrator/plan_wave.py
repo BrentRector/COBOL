@@ -555,6 +555,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--borrow-days", type=int, default=0, help="with --from-budget")
     ap.add_argument("--scratch", help="where groups.json, the specs and the args go (required without --dry-run)")
     ap.add_argument("--reports", help="the reports directory (default <scratch>/reports)")
+    ap.add_argument("--stop-file", help="this fleet's own graceful-stop file (default <scratch>/STOP-w<wave>; the loop's "
+                    "wave unit passes the supervisor's <scratch>/STOP-loop). Never the owner's global STOP (kb/Work PB2483)")
     ap.add_argument("--clusters-json", help="a fix_clusters.py --json output (open notes) to use instead of running it")
     ap.add_argument("--half-clusters-json", help="the same for --open-status half")
     ap.add_argument("--no-branches", action="store_true", help="skip the UNLANDED-branch scan and treat every "
@@ -671,9 +673,15 @@ def main(argv: list[str] | None = None) -> int:
     head = subprocess.run(["git", "rev-parse", "--short", "origin/main"], cwd=REPO, capture_output=True,
                           text=True).stdout.strip()
     gfile = scratch / "groups.json"
+    stop_file = pathlib.Path(a.stop_file) if a.stop_file else coord.fleet_stop(scratch, f"w{wave}")
+    if stop_file == coord.global_stop(a.coord):
+        print(f"--stop-file {stop_file} is the owner's GLOBAL stop; a fleet's stop is its own STOP-<scope> (kb/Work PB2483)")
+        return 2
     gfile.write_text(json.dumps({"wave": wave, "scratch": str(scratch), "base": f"{head} (origin/main when planned)",
-                                 "groups": gjson}, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    args = {"scratch": str(scratch), "wave": wave, "concurrency": rules["wave"]["concurrency"], "train_size": train,
+                                 "stop_file": str(stop_file), "groups": gjson}, indent=1, ensure_ascii=False) + "\n",
+                     encoding="utf-8")
+    args = {"scratch": str(scratch), "wave": wave, "stop_file": str(stop_file), "global_stop": str(coord.global_stop(a.coord)),
+            "concurrency": rules["wave"]["concurrency"], "train_size": train,
             "min_final_train": rules["wave"]["min_final_train"], "devlog_n": alloc.peek("devlog", REPO, cdir),
             "previous_train": previous_train(REPO), "lead_id_blocks": blocks,
             "implementer_model": rules["wave"]["implementer_model"], "authorization": a.authorization,

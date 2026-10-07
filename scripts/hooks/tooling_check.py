@@ -21,10 +21,15 @@ import subprocess
 import sys
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "scripts" / "orchestrator"))
+import account  # noqa: E402  (the one resolver of Claude's config dir, kb/Work PB2479)
+import coord  # noqa: E402
+
 HOME = pathlib.Path.home()
+CONFIG = account.config_dir()   # THIS session's account: its user settings, skills and plugins live here
 CLOUD = os.environ.get("CLAUDE_CODE_REMOTE") == "true"
 ROLES = ["cobol-implementer", "cobol-lander", "cobol-refuter", "cobol-adjudicator", "cobol-clerk", "cobol-locator"]
-SKILL_DOCTOR_STAMP = HOME / ".claude" / "cobolsharp-skill-doctor.stamp"
+SKILL_DOCTOR_STAMP = CONFIG / "cobolsharp-skill-doctor.stamp"
 SKILL_DOCTOR_DAYS = 7
 
 
@@ -54,10 +59,10 @@ def check():
         add("N/A", "telemetry sink", "cloud session")
     else:
         # Claude Code IGNORES telemetry-enabling variables in project settings files (they may only turn it off),
-        # so the switch lives in the USER settings, ~/.claude/settings.json.
-        env = load(HOME / ".claude" / "settings.json").get("env", {})
+        # so the switch lives in the account's USER settings, <config dir>/settings.json.
+        env = load(CONFIG / "settings.json").get("env", {})
         if env.get("CLAUDE_CODE_ENABLE_TELEMETRY") != "1":
-            add("ASK-OWNER", "telemetry", "not enabled in ~/.claude/settings.json on this machine — ask to enable "
+            add("ASK-OWNER", "telemetry", f"not enabled in {CONFIG / 'settings.json'} for this account — ask to enable "
                 "(CLAUDE_CODE_ENABLE_TELEMETRY=1, OTLP http/json → 127.0.0.1:4318); effective from the next session")
         else:
             sink = REPO / "scripts" / "telemetry" / "otlp_sink.py"
@@ -73,7 +78,23 @@ def check():
             except Exception as exc:  # noqa: BLE001
                 add("ASK-OWNER", "telemetry sink", f"could not start: {exc}")
 
-    user = load(HOME / ".claude" / "settings.json")
+    # PB2480: a named account's config dir carries its seed (model_rules.json accounts.seed: settings, plugins, skills,
+    # the shared memory junction, the Claude in Chrome flags). Seeding rewrites its .claude.json, which the running
+    # session also writes, so the check asks rather than repairs.
+    if CLOUD:
+        add("N/A", "Claude account seed", "cloud session")
+    else:
+        try:
+            acct = account.current()
+            missing = account.seed_problems(acct, coord.rules(), REPO)
+            add("OK" if not missing else "ASK-OWNER", f"Claude account seed ({acct.name})",
+                ("the default account, the source of every seed" if not acct.explicit else f"{CONFIG} is seeded")
+                if not missing else f"{'; '.join(missing)} — ask the owner to run `pwsh scripts/account-profile.ps1 "
+                f"-ConfigDir {CONFIG}` with no session of that account running; effective from the next session")
+        except account.UnknownAccount as exc:
+            add("ASK-OWNER", "Claude account", f"{exc} — ask the owner which account this is")
+
+    user = load(CONFIG / "settings.json")
     lsp_plugin = any(k.startswith("csharp-lsp@") and v for k, v in (user.get("enabledPlugins") or {}).items())
     ls = shutil.which("csharp-ls") or next((str(p) for p in [HOME / ".dotnet" / "tools" / "csharp-ls.exe",
                                                              HOME / ".dotnet" / "tools" / "csharp-ls"] if p.exists()), None)

@@ -11,10 +11,11 @@
 
 ⭐ **GRACEFUL STOP — the quota-suspend signal (owner 2026-09-22: "attempt to not lose work due to a quota kill").**
 Workflow agents cannot be messaged, so every dispatch prompt carries this line: *"Before starting each new step,
-check for the file `{SCRATCH}\STOP`; if it exists, checkpoint-commit, write STATUS.md NEXT, and return your
-structured result with status SPLIT."* At ~80–85 % of the SESSION or ~90 % of the WEEKLY meter the orchestrator
-creates `STOP`, waits for the returns, and only then `TaskStop`s stragglers and WIP-commits their worktrees — so a
-quota kill never lands mid-step. Delete `STOP` before resuming.
+check for the owner's global stop `<coord>\scratch\STOP` and this fleet's own `<scratch>\STOP-<scope>`; if either
+exists, checkpoint-commit, write STATUS.md NEXT, and return your structured result with status SPLIT."* At the
+session or weekly soft stop the orchestrator creates ITS FLEET's `STOP-<scope>` (never the global one: another
+session's agents obey that, kb/Work PB2483), waits for the returns, and only then `TaskStop`s stragglers and
+WIP-commits their worktrees — so a quota kill never lands mid-step. Delete that `STOP-<scope>` before resuming.
 
 ⛔ **A WORKFLOW AGENT NEVER ENDS ITS TURN WHILE A BACKGROUND JOB RUNS.** Measured 2026-09-22 (wave 45): an agent told
 "run the gate in the background and wait for the notification" ENDS its turn, is RETURNED by the harness, and its

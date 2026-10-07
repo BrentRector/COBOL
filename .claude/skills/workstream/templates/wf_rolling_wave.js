@@ -8,11 +8,17 @@ export const meta = {
   ],
 }
 
-// args: { scratch, wave, concurrency (6), train_size (5), min_final_train (3), devlog_n, previous_train,
-//         lead_id_blocks: ["PB1665-PB1669", ...] (one block per train), groups: [{letter, lead, notes, codes}] }
+// args: { scratch, wave, stop_file, global_stop, concurrency (6), train_size (5), min_final_train (3), devlog_n,
+//         previous_train, lead_id_blocks: ["PB1665-PB1669", ...] (one block per train), groups: [{letter, lead, notes, codes}] }
 // Specs are pre-rendered by make_dispatch_specs.py as <scratch>\msg-w<wave>-<letter>.txt.
 const S = args.scratch
 const W = args.wave
+// GRACEFUL STOP IS SCOPED (MANDATORY-PRACTICES P3, kb/Work PB2483): every agent obeys this fleet's own stop file
+// (args.stop_file, <scratch>\STOP-<scope>) and the owner's global one (args.global_stop, <coord>\scratch\STOP), and no
+// other. A shared <scratch>\STOP let the loop's wind-down split another session's refuter (2026-10-07 13:26).
+// plan_wave.py writes both; a hand-written args file must too.
+if (!args.stop_file || !args.global_stop) throw new Error('pass args.stop_file (this fleet\'s STOP-<scope>) and args.global_stop (plan_wave.py writes both)')
+const STOP_LINE = `check for ${args.global_stop} (the owner's global stop) and ${args.stop_file} (this fleet's own stop); if EITHER exists, `
 const CONC = args.concurrency || 6
 const TRAIN = args.train_size || 5
 const MIN_FINAL = args.min_final_train || 3
@@ -90,7 +96,7 @@ function runGroup(g) {
     AUTH + `You are the wave-${W} fix-lane implementer for group ${g.letter} (${g.notes}). ` + successorNote(g) +
     `Your dispatch spec is the file ${S}\\msg-w${W}-${g.letter.toLowerCase()}.txt — read it WHOLE and follow it exactly; ` +
     `it names your brief, codes, report path, scratch dir, gate and checkpoint protocol. ` +
-    `Before EACH new step check for ${S}\\STOP; if it exists, checkpoint-commit, write STATUS.md NEXT and your report, and return status SPLIT. ` +
+    `Before EACH new step ${STOP_LINE}checkpoint-commit, write STATUS.md NEXT and your report, and return status SPLIT. ` +
     `⛔ YOUR LAST ACTION MUST BE THE StructuredOutput CALL — never end on a report file or a summary message (three agents in waves 65-67 did, and their finished branches were stranded): ` +
     `status, your ACTUAL branch (git branch --show-current), your worktree path, base sha, head sha, report path, your last gate's run directory (TestResults/build-local/<run>, whose verdict.json records its timings) and its verdict line, the notes you landed, the codes you used, and any new leads (text; do NOT allocate PB ids). ` +
     `⛔ KEEP THE RETURN SHORT: summary at most 900 characters, at most 6 leads of at most 500 characters each (each lead: repro path and code site), and every detail goes in your report file, which the orchestrator reads only on demand.`,
@@ -123,7 +129,7 @@ function land(batch) {
     `{TRAIN_MANIFEST} = ${S}\\train${label}-manifest.json — FIRST write that file with exactly this JSON:\n${manifest}\n` +
     `PIPELINED: ${prev} may have just landed; fetch origin and rebase onto it before gating, and before push-main confirm origin/main has not moved again (rebase and re-gate per the brief if it has). ` +
     `New leads found in the reports get kb/Work notes with ids from ${leadIds} (orchestrator-allocated; use in order, return the unused). ` +
-    `Before EACH new step check for ${S}\\STOP; if it exists, checkpoint-commit in your worktree, write STATUS.md NEXT, and return. ` +
+    `Before EACH new step ${STOP_LINE}checkpoint-commit in your worktree, write STATUS.md NEXT, and return. ` +
     `Land ONLY through bash scripts/push-main.sh. Run the CI audits locally before it (audit_code_citations, audit_doc_citations, audit_evidence_supersession, audit_witness_loss, drift_rules --check, work.py check). ` +
     `Your final text, at most 25 lines (the orchestrator re-reads it every turn; the detail is in the DEVLOG entry and the PB notes you wrote): the landed sha (or why not), the DEVLOG entry number, GAP before -> after, clusters landed/dropped with a one-line reason each, lead ids used, and the unused codes.`,
     { label: `lander-train${label}`, phase: 'Land', agentType: 'cobol-lander', isolation: 'worktree', model: 'opus' }

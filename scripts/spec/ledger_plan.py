@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import argparse
 import collections
-import os
+import datetime
 import pathlib
 import re
 import subprocess
@@ -221,18 +221,26 @@ def measure(items: list[dict], prefixes: dict[str, str], gap: int, evidence: boo
 
 
 def measure_pacing() -> dict | None:
-    """The newest meter reading against the owner's caps, or None when this machine has no coordination directory
-    (CI, a fresh clone). The directory and the readings file are the orchestrator's (`coord.py`, `budget.py`)."""
+    """The RUNNING account's newest meter reading against its caps, or None when this machine has no coordination
+    directory (CI, a fresh clone) or that account has no reading. The directory, the readings file and the account are
+    the orchestrator's (`coord.py`, `budget.py`, `account.py`): two Claude accounts record into the one file, and a
+    reading of the other account is not this one's meter (kb/Work PB2478)."""
     sys.path.insert(0, str(REPO / "scripts" / "orchestrator"))
+    import account  # noqa: PLC0415
     import coord  # noqa: PLC0415
-    d = pathlib.Path(os.environ.get(coord.ENV) or coord.DEFAULT)
-    readings = coord.read_json(d / "readings.json", []) if d.is_dir() else []
+    d = coord.coord_path()
+    acct = account.current()
+    readings = [r for r in (coord.read_json(d / "readings.json", []) if d.is_dir() else [])
+                if r.get("account") == acct.name]
     if not readings:
         return None
-    q = coord.rules()["quota"]
-    newest = max(readings, key=lambda r: r["noted_at"])
-    return {"reading": newest, "weekly_cap": q["weekly_cap_pct"], "soft": q["session_soft_stop_pct"],
-            "hard": q["session_hard_stop_pct"], "cap_source": q.get("weekly_cap_source", "")}
+    q = acct.quota
+    newest = max(readings, key=lambda r: datetime.datetime.fromisoformat(r["noted_at"]))
+    return {"reading": newest, "account": acct.name, "weekly_cap": q["weekly_cap_pct"],
+            "soft": q["session_soft_stop_pct"], "hard": q["session_hard_stop_pct"],
+            "cap_source": q.get("weekly_cap_source", ""),
+            "noted_utc": datetime.datetime.fromisoformat(newest["noted_at"]).astimezone(datetime.timezone.utc)
+            .strftime("%Y-%m-%d %H:%M")}
 
 
 def problems(items: list[dict], prefixes: dict[str, str], plan: dict) -> list[str]:

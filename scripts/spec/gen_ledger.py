@@ -23,9 +23,11 @@ failure modes follow from that shape and both had already happened elsewhere in 
     only way to keep it that way is to make it impossible to author anything here that is not read off a
     measured artifact. Everything on the rendered page except the in-flight narrative is computed by this file.
 
-So a refresh is now: run this script, then publish `--out` to the artifact's existing URL. No retyping.
+So a refresh is now: run this script, then publish `--out` to the artifact's existing URL. No retyping. The URL is the
+running Claude account's (an artifact belongs to the account that published it): `ledger_state.py` keeps one per
+account in the coordination directory, and this script prints it after a render (kb/Work PB2481).
 
-    python scripts/spec/gen_ledger.py                       # write the default --out
+    python scripts/spec/gen_ledger.py                       # write the default --out, <coord>/ledger.html
     python scripts/spec/gen_ledger.py --out ledger.html     # write somewhere else
     python scripts/spec/gen_ledger.py --check               # non-zero if --out is stale (mirrors
                                                             # gen_conformance_notes.py --check); this and a
@@ -92,6 +94,8 @@ import sys
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "orchestrator"))
+import coord  # noqa: E402  (names the coordination directory)
 import ledger_plan  # noqa: E402  (the plan's lanes: measured there, rendered here)
 
 INVENTORY = REPO / "tests" / "version-matrix" / "traceability-inventory.json"
@@ -102,7 +106,10 @@ VCR = REPO / "docs" / "VERSION_CHANGE_REFERENCE.md"
 CORPUS = REPO / "tests" / "conformance"
 TREND = REPO / "docs" / "rearchitecture" / "evidence" / "ledger-trend.json"
 IN_FLIGHT = REPO / "docs" / "rearchitecture" / "evidence" / "ledger-in-flight.md"
-DEFAULT_OUT = REPO / "docs" / "rearchitecture" / "evidence" / "conformance-ledger.html"
+# The page is the orchestrator's: rendered into the coordination directory beside ledger-published.json, where the
+# units render it and the attended session publishes it (design section 14). Named without creating the directory.
+COORD_DIR = coord.coord_path()
+DEFAULT_OUT = COORD_DIR / "ledger.html"
 
 TITLE = "WiseOwl COBOL Completion Ledger"
 
@@ -760,10 +767,10 @@ def render_gates(plan: dict) -> str:
 def render_pacing(pacing: dict | None) -> str:
     if pacing is None:
         return ('<p>Not available: the machine that rendered this page has no coordination directory with a meter '
-                'reading (<span class="mono">readings.json</span>). The owner\'s caps are in '
-                '<span class="mono">scripts/orchestrator/model_rules.json</span>.</p>')
+                'reading of the account that rendered it (<span class="mono">readings.json</span>). The owner\'s caps '
+                'are in <span class="mono">scripts/orchestrator/model_rules.json</span>.</p>')
     r = pacing["reading"]
-    return f"""<p>The owner's rules (kb/Work R69 §5-§6): {e(pacing["cap_source"])}. The newest meter reading, noted <span class="mono">{e(r["noted_at"][:16].replace("T", " "))} UTC</span>, against the caps in <span class="mono">model_rules.json</span>.</p>
+    return f"""<p>The owner's rules (kb/Work R69 §5-§6): {e(pacing["cap_source"])}. The newest meter reading of <span class="mono">{e(pacing["account"])}</span>, the Claude account that rendered this page, noted <span class="mono">{e(pacing["noted_utc"])} UTC</span>, against the caps in <span class="mono">model_rules.json</span>.</p>
   <div class="meter-row">
     <div class="meter-card">
       <div class="meter-head"><span class="t">Weekly quota used</span><span class="v num">{r["weekly_pct"]:g} % · cap {pacing["weekly_cap"]:g} %</span></div>
@@ -1135,7 +1142,7 @@ def build(in_flight_path: pathlib.Path | None) -> tuple[str, dict]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=pathlib.Path, default=DEFAULT_OUT,
-                    help=f"HTML to write (default {DEFAULT_OUT.relative_to(REPO)})")
+                    help=f"HTML to write (default {DEFAULT_OUT})")
     ap.add_argument("--in-flight", type=pathlib.Path, default=IN_FLIGHT,
                     help="the ONE hand-written section, inserted verbatim (default "
                          f"{IN_FLIGHT.relative_to(REPO)}); pass a missing path to omit it")
@@ -1192,8 +1199,9 @@ def main() -> int:
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(text, encoding="utf-8")
     print(f"wrote  : {a.out} ({len(text):,} bytes)")
-    print("publish: Artifact tool, action publish, url https://claude.ai/code/artifact/"
-          "7677f3c0-d6cf-41a2-a7c3-7d83c5fdbaee — same url, no favicon on redeploy")
+    import account  # noqa: PLC0415
+    import ledger_state  # noqa: PLC0415  (imports this module for STAMP_PATHS; loaded only here, after a render)
+    print(ledger_state.publish_hint(COORD_DIR, account.current().name))
     return 0
 
 

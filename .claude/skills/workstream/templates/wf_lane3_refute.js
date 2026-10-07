@@ -38,10 +38,12 @@ const REF_OUT = { type: 'object', properties: {
   deferred: { type: 'array', items: { type: 'string' } },
 }, required: ['slug', 'verdicts', 'what_i_tried', 'closing_count_read'] }
 
-const STOP = args.stopFile || ''
+// A stop is SCOPED (MANDATORY-PRACTICES P3, kb/Work PB2483): args.stopFile is THIS fleet's own STOP-<scope> file and
+// args.globalStopFile the owner's global stop (<coord>\\scratch\\STOP); an agent obeys either, and no other session's.
+const STOPS = [args.stopFile, args.globalStopFile].filter(Boolean)
 const COMMON = `
 ⛔ PUBLIC SKILLS (MANDATORY-PRACTICES P10): read E:\\claude-skills\\skills\\spec-compliance-audit\\SKILL.md and E:\\claude-skills\\skills\\spec-oracle\\SKILL.md first; the project's spec-lookup skill and this prompt win on conflict.
-${STOP ? `⛔ GRACEFUL STOP (MANDATORY-PRACTICES P3): before EACH rule check for the file ${STOP}; if it exists, make sure every decided rule is
+${STOPS.length ? `⛔ GRACEFUL STOP (MANDATORY-PRACTICES P3): before EACH rule check for the file(s) ${STOPS.join(' and ')}; if one exists, make sure every decided rule is
 in your checkpoint file and return at once with what is decided (summary starting "STOPPED"). Never start a probe once it exists.
 ` : ''}You work in the WiseOwl COBOL project. SOURCE OF TRUTH FOR CODE: the PINNED worktree ${PIN} (read-only snapshot; it carries its
 OWN built compiler at ${PIN}/src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe — use THAT for probes, never the main tree's).

@@ -1,17 +1,32 @@
 {
   "_doc": "Routing, cost and quota constants for the orchestrator loop (docs/rearchitecture/DESIGN-orchestrator-loop.md sections 8 and 9). Read by budget.py and plan_wave.py. A constant changes only by an explicit edit that restates its date and source.",
   "calibration": {
-    "measured": "2026-10-04",
-    "source": "waves 1011-1015: weekly-meter movement against the subagent tokens the Workflow tool reported per wave (orchestrator session, 2026-10-04). The Workflow's token count and the telemetry sum below may not be the same measure: refit from units.jsonl and usage_report.py (kb/Work PB1981 item 9; design open decision D6).",
+    "measured": "2026-10-07",
+    "source": "REFIT 2026-10-07 from the first two meter readings of ONE account inside ONE session window (kb/Work PB2478; design D6/D7): account 2 read week 0 % / session 0 % at 13:26-13:34 PDT and week 6 % / session 24 % at 14:54 PDT (session window 10:09-15:09); its OWN telemetry between them (user.account_uuid filtered) counted 9,481,140 Opus, 108,118 Sonnet and 646,023 Haiku tokens of the counted kinds ($177 of Opus). The 2026-10-04 constants (Opus 400,000 per point, fitted to the Workflow tool's subagent token counts, not to telemetry) made that 25.4 points and a 127 % session, and held the loop while the meter read 6 % and 24 %. The refit is the old rates times 4 (Opus 1.6 M; 9.48 M / 1.6 M + the rest = 6.0 points), every ratio between families kept; the per-group and lander token costs below are scaled by the same 4 so a planned wave costs the same points as before. Refit again whenever two readings of one account bracket a measured spend.",
     "counted_token_kinds": ["input_tokens", "output_tokens", "cache_creation_tokens"],
-    "tokens_per_point": {"sonnet": 1000000, "opus": 400000, "fable": 160000, "mythos": 160000},
-    "tokens_per_point_frontier_source": "fable and mythos: 2.5x the Opus rate, the published price ratio ($10/$50 against $4/$20 per MTok; kb/Work R69, 2026-10-06), until a meter reading refits it",
+    "tokens_per_point": {"haiku": 12000000, "sonnet": 4000000, "opus": 1600000, "fable": 640000, "mythos": 640000},
+    "tokens_per_point_frontier_source": "fable and mythos: 2.5x the Opus rate, the published price ratio ($10/$50 against $4/$20 per MTok; kb/Work R69, 2026-10-06), until a meter reading refits it; haiku: a third of the Sonnet rate's cost, the published price ratio ($1/$5 against $3/$15 per MTok; 2026-10-07), where it was priced at the Opus fallback before",
     "unknown_model_rate": "opus",
-    "session_pct_per_weekly_pct": 5.0,
-    "session_pct_per_weekly_pct_source": "a guess (design open decision D7) until two readings inside one session window measure it"
+    "session_pct_per_weekly_pct": 4.0,
+    "session_pct_per_weekly_pct_source": "measured 2026-10-07 (kb/Work PB2478): account 2's session moved 0 -> 24 % while its week moved 0 -> 6 % inside one session window (13:34 -> 14:54 PDT); the 5.0 before was a guess (design D7)"
+  },
+  "accounts": {
+    "_doc": "The Claude accounts the loop runs from (owner 2026-10-07 13:17 PDT: the OPERATOR session on a second Max 20x account, the Mythos work on the first; kb/Work PB2478). account.py resolves the running account from CLAUDE_CONFIG_DIR (unset = the row whose config_dir is null); a config dir no row names is an error. Each row: name, config_dir (~ expands; null = ~/.claude), weekly_reset (Python weekday(): Monday 0 ... Sunday 6), and optionally `quota` keys that differ from the shared quota below. budget.py stamps every reading with the account and reads only that account's readings and telemetry (user.account_uuid).",
+    "list": [
+      {"name": "account1", "config_dir": null, "weekly_reset": {"weekday": 6, "hour": 3, "minute": 0, "tz": "America/Los_Angeles"},
+       "_source": "the default config dir; its week resets Sunday 03:00 America/Los_Angeles (the owner's meter since 2026-09)"},
+      {"name": "account2", "config_dir": "~/.claude-acct2", "weekly_reset": {"weekday": 5, "hour": 10, "minute": 0, "tz": "America/Los_Angeles"},
+       "_source": "owner 2026-10-07 13:36 PDT: 'your usage resets on Saturday at 10 AM'; its /usage at 13:34 read 'Resets Oct 10, 9:59am'"}
+    ],
+    "seed": {
+      "_doc": "What a named account's config dir carries (kb/Work PB2480): scripts/account-profile.ps1 makes it so, account.py --seed-check (and tooling_check.py at every session start) verifies it. `copy`: taken from the default account's dir when missing (a directory: each missing child); `junction`: the default account's folder, linked so both accounts share it ({repo_key} = the main checkout's projects key); `flags`: non-secret feature flags set in the account's .claude.json (Claude in Chrome on: the meter unit reads the usage page through it). `never`: credentials are never copied, the owner signs the account in (/login).",
+      "copy": ["settings.json", "config.json", "plugins", "skills"],
+      "junction": ["projects/{repo_key}/memory"],
+      "flags": {"claudeInChromeDefaultEnabled": true, "hasCompletedClaudeInChromeOnboarding": true},
+      "never": [".credentials.json"]
+    }
   },
   "quota": {
-    "weekly_reset": {"weekday": 6, "hour": 3, "minute": 0, "tz": "America/Los_Angeles", "_weekday": "Python weekday(): Monday 0 ... Sunday 6"},
     "daily_pct": 14.3,
     "weekly_cap_pct": 97,
     "weekly_cap_source": "owner 2026-10-07 09:40 PDT: \"raise session and weekly quota limits to 97%\" (kb/Work R69 section 6); it replaced the 85 % cap of the same morning (06:00), which had replaced the 98 % ceiling of 2026-10-02 and the 44 % cap on other work of 2026-10-05. Owner 10:15 PDT: \"You can push it to 100% as long as you do not cause any work to abort due to lack of quota\" — 100 is the CEILING; 97 is the DISPATCH cap, 100 minus the margin one wave's estimate can be wrong by (tokens_per_point and session_pct_per_weekly_pct are unrefit guesses), so what is in flight at 97 finishes inside the quota instead of dying at 100. Refitting the estimator shrinks the margin; the ceiling does not move",
@@ -36,11 +51,11 @@
     "_why": "Opus where the work is design-heavy (OO, grammar), where a note says a design question is open, or where a note has already failed twice (a note that fails twice is a task-spec problem, kb/Work PB1981). Opus also for the legacy-retirement cuts (CI and gate wiring carry the CI invariant) and the architecture review's R0/R1 items (kb/Work R69). Fable and Mythos are never values here: each needs explicit owner approval per dispatch (owner 2026-10-02; R69 2026-10-06)."
   },
   "cost": {
-    "per_group_tokens": {"sonnet": 100000, "opus": 40000},
-    "per_note_tokens": {"sonnet": 60000, "opus": 24000},
-    "lander_tokens": 120000,
+    "per_group_tokens": {"sonnet": 400000, "opus": 160000},
+    "per_note_tokens": {"sonnet": 240000, "opus": 96000},
+    "lander_tokens": 480000,
     "lander_model": "opus",
-    "source": "seeded 2026-10-04 so that a five-note group costs about 0.4 weekly points on either model, a lander about 0.3, and a six-group wave of five-note groups about 3 points with its landers, matching waves 1011-1015 (kb/Work PB1981: a six-group wave already costs about 3 weekly points); refit from units.jsonl"
+    "source": "seeded 2026-10-04 so that a five-note group costs about 0.4 weekly points on either model, a lander about 0.3, and a six-group wave of five-note groups about 3 points with its landers, matching waves 1011-1015 (kb/Work PB1981: a six-group wave already costs about 3 weekly points); refit from units.jsonl. Scaled x4 on 2026-10-07 with tokens_per_point (kb/Work PB2478), so the points a group costs are unchanged"
   },
   "campaign": {
     "src": ["src", "tests", "scripts", ".github", "docs"],

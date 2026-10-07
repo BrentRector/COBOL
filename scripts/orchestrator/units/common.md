@@ -3,8 +3,9 @@ these rules before the unit's own text). You are one bounded unit of an unattend
 supervisor starts the next unit after you end.
 - First load the `session-start` skill, then read the previous handoff {PREV_HANDOFF} (absent on a first run).
 - Before EACH new step, check whether {STOP_UNIT} exists. If it does, finish the current step, write the handoff and
-  end. With a Workflow in flight never end the session: create the fleet's stop file `{SCRATCH}\STOP`, wait for the
-  Workflow to return, then hand off `next_unit: resume` naming every branch, worktree and report.
+  end. With a Workflow in flight never end the session: create the loop's fleet stop file `{FLEET_STOP}` (never the
+  owner's global `{GLOBAL_STOP}`: other sessions' agents obey that one), wait for the Workflow to return, then hand
+  off `next_unit: resume` naming every branch, worktree and report.
 - Frequent handoffs: the supervisor writes `{COORD}\checkpoint.json` (counters, worktrees, background tasks) on its own every
   few minutes, but it cannot see what you decided. At EVERY milestone (the plan written, the fleet started, a train
   landed, a branch classified, a decision and its reason) append ONE line to `{COORD}\milestones.jsonl` as you go:

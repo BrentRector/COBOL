@@ -30,14 +30,16 @@ description: Use BEFORE dispatching any fleet, lander, implementer or adjudicati
 >   a one-shot `claude -p` terminates background tasks 600 s after its model ends a turn (wave 1017's fleet died that way).
 > - **Frequent handoffs** (PB2015): `checkpoint.json` every 5 minutes and on background-task changes, the model's
 >   `milestones.jsonl`, and a synthesized `split`/`resume` handoff when a unit dies or the supervisor does.
-> - **STOP** (`pwsh scripts/orchestrator/stop.ps1`, `-Status`, `-Clear`) winds a running unit and its fleet down without
->   losing work: agents checkpoint-commit and return `SPLIT`; a kill only after the grace period.
+> - **STOP** (`pwsh scripts/orchestrator/stop.ps1`, `-Status`, `-Clear`) winds a running unit and the LOOP's fleet down
+>   without losing work (its own `scratch\STOP-loop`): agents checkpoint-commit and return `SPLIT`; a kill only after the
+>   grace period. `-Global` adds the owner's `scratch\STOP`, which stops every session's agents (kb/Work PB2483).
 > - **One allocator** (`alloc.py`), the quota estimate (`budget.py`, with the owner's `-BorrowDays`), the closed-rows ratchet,
 >   the planner (`plan_wave.py`, which plans from branches and worktrees, never from remembered reports).
 >
 > **The attended session's duties while the loop runs**: publish the ledger whenever the supervisor logs `LEDGER PUBLISH
-> OWED` (a headless unit has no Artifact tool): render `{COORD}\ledger.html`, publish it to the owner's artifact, then
-> `python scripts/orchestrator/ledger_state.py mark-published` (PB2016, owner 2026-10-04: "Publish ledger each time");
+> OWED`, which it also posts as a `publish` message to the operator's mailbox (`mailbox.py`, PB2482; a headless unit has no Artifact tool): render `{COORD}\ledger.html`, publish it to THIS account's artifact
+> (`python scripts/orchestrator/ledger_state.py url`; an artifact belongs to the account that published it, PB2481), then
+> `python scripts/orchestrator/ledger_state.py mark-published` (`--url` the first time an account publishes) (PB2016, owner 2026-10-04: "Publish ledger each time");
 > read each unit's handoff; prune with `scripts/prune_worktrees.py`; run the battery on its cadence. Hand-dispatching a
 > Workflow stays legal for a supervised one-off, and everything below still governs it. Do not edit the main checkout
 > while a unit runs: work in a worktree.
@@ -61,7 +63,7 @@ and — for the read-only roles — a hook that refuses writes inside any git tr
 - Commit WIP on the worktree branch after every mechanism and every gate, and keep `<worktree>/STATUS.md` (first line `STATUS-AT: <sha>`; DONE · NEXT · BLOCKED · GATE).
 - A workflow stage appends one JSON line per decided rule to `<out>/<stage>-<slug>.jsonl` and skips what is already there on start.
 - Reports and briefs are files under the scratchpad; the conversation carries pointers only.
-- Every dispatch prompt carries the graceful-stop line: before each new step check for `{SCRATCH}\STOP`; if it exists, checkpoint-commit, write STATUS.md NEXT, return status SPLIT.
+- Every dispatch prompt carries the graceful-stop line naming TWO files, the owner's global `<coord>\scratch\STOP` and the fleet's own `<scratch>\STOP-<scope>` (MANDATORY-PRACTICES P3, kb/Work PB2483): before each new step check both; if either exists, checkpoint-commit, write STATUS.md NEXT, return status SPLIT. Wind your own fleet down with its `STOP-<scope>`, never the global file.
 - A workflow agent never ends its turn while a background job runs: start the job in the background to a log, then block in the foreground on `timeout 580 bash -c 'until grep -qE "<verdict pattern>" <log>; do sleep 5; done'`.
 - A killed agent is replaced by a FRESH agent that reads the checkpoint; resume via `SendMessage` only within a step of finishing.
 - Every fleet-optimization experiment is recorded under `docs/rearchitecture/evidence/fleet-optimization/`.

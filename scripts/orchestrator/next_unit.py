@@ -7,7 +7,7 @@
 Prints JSON {unit, reason}. The order (docs/rearchitecture/DESIGN-orchestrator-loop.md section 3.2), first match wins:
   1. the handoff carries owner_question            -> owner-question
   2. the handoff names next_unit                    -> that unit
-  3. no meter reading in the last 3 hours            -> meter
+  3. no meter reading of THIS account in 3 hours   -> meter (two accounts share readings.json; kb/Work PB2478)
   4. the repository is dirty or has unpushed commits -> resume
   5. the last unit failed or ended split, or a branch classified UNLANDED got a commit after the last unit
      started (an agent of a unit that died)          -> resume
@@ -32,6 +32,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "spec"))
+import account  # noqa: E402
 import coord  # noqa: E402
 import work  # noqa: E402  (cluster_order: the one reader of cluster: and blocked_by:)
 
@@ -42,8 +43,9 @@ def git(repo: pathlib.Path, *args: str) -> subprocess.CompletedProcess:
                           errors="replace")
 
 
-def meter_age_hours(cdir: pathlib.Path, now: dt.datetime) -> float | None:
-    readings = coord.read_json(cdir / "readings.json", [])
+def meter_age_hours(cdir: pathlib.Path, now: dt.datetime, acct_name: str) -> float | None:
+    """Hours since the account's newest reading (None: it has none). Another account's reading is not this meter."""
+    readings = [r for r in coord.read_json(cdir / "readings.json", []) if r.get("account") == acct_name]
     if not readings:
         return None
     newest = max(dt.datetime.fromisoformat(r["noted_at"].replace("Z", "+00:00")) for r in readings)
@@ -110,16 +112,17 @@ def campaign_choice(cluster: str, cdir: pathlib.Path, work_dir: pathlib.Path) ->
 
 
 def choose(handoff: dict | None, cdir: pathlib.Path, repo: pathlib.Path, now: dt.datetime, last_failed: bool,
-           last_started: dt.datetime | None, max_meter_age_h: float, cluster: str | None = None,
+           last_started: dt.datetime | None, max_meter_age_h: float, acct_name: str, cluster: str | None = None,
            work_dir: pathlib.Path = work.WORK) -> dict[str, str]:
     h = handoff or {}
     if h.get("owner_question"):
         return {"unit": "owner-question", "reason": "the last handoff asks the owner"}
     if h.get("next_unit"):
         return {"unit": h["next_unit"], "reason": "named by the last handoff: " + h.get("next_unit_reason", "")}
-    age = meter_age_hours(cdir, now)
+    age = meter_age_hours(cdir, now, acct_name)
     if age is None or age > max_meter_age_h:
-        return {"unit": "meter", "reason": "no meter reading" if age is None else f"meter reading {age:.1f} h old"}
+        return {"unit": "meter", "reason": f"no {acct_name} meter reading" if age is None
+                else f"{acct_name} meter reading {age:.1f} h old"}
     state = repo_state(repo)
     if state:
         return {"unit": "resume", "reason": state}
@@ -156,9 +159,9 @@ def main(argv: list[str] | None = None) -> int:
             handoff = None
     now = dt.datetime.fromisoformat(a.now) if a.now else dt.datetime.now(dt.timezone.utc)
     started = dt.datetime.fromisoformat(a.last_started) if a.last_started else None
-    rules = coord.rules()
+    acct = account.current()
     print(json.dumps(choose(handoff, coord.coord_dir(a.coord), pathlib.Path(a.repo), now, a.last_failed, started,
-                            rules["quota"]["meter_max_age_hours"], a.cluster, pathlib.Path(a.work))))
+                            acct.quota["meter_max_age_hours"], acct.name, a.cluster, pathlib.Path(a.work))))
     return 0
 
 

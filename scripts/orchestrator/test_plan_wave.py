@@ -19,6 +19,7 @@ import plan_wave as pw  # noqa: E402
 
 sys.path.insert(0, str(coord.REPO / ".claude" / "skills" / "workstream"))
 import check_practices  # noqa: E402
+import make_dispatch_specs as mds  # noqa: E402
 
 RULES = coord.rules()
 TMP = pathlib.Path(tempfile.mkdtemp(prefix="plan-wave-test-"))
@@ -148,18 +149,37 @@ check("max groups", len(p4["groups"]), 2)
 check("trains", p["trains"], -(-len(p["groups"]) // RULES["wave"]["train_size"]))
 
 # 7. the group JSON renders through the real template and passes check_practices' same-file rule
-tpl = (coord.REPO / ".claude/skills/workstream/templates/dispatch-spec-implementer.md").read_text(encoding="utf-8")
 gjson = [pw.as_group_json(g, "77", notes, "COBOLNET0001-COBOLNET0003") for g in p["groups"]]
+CFG77 = {"wave": "77", "base": "abc", "scratch": str(TMP), "stop_file": str(coord.fleet_stop(TMP, "w77"))}
 try:
-    for g in gjson:
-        tpl.format(wave="77", base="abc", S="X", pred=g.get("pred", ""), **{k: v for k, v in g.items() if k != "pred"})
+    specs = [mds.render(CFG77, g) for g in gjson]
     rendered = True
 except (KeyError, IndexError) as e:
-    rendered = f"template placeholder missing: {e}"
+    specs, rendered = [], f"template placeholder missing: {e}"
 check("renders through the template", rendered, True)
+# 7b. THE STOP IS SCOPED (kb/Work PB2483): every spec names the owner's global stop and this fleet's own, and passes
+#     check_practices' rendered-spec rule; a groups file without a fleet stop renders nothing
+spec_file = TMP / "msg-w77-x.txt"
+spec_file.write_text(specs[0] if specs else "", encoding="utf-8")
+check("a rendered spec names the global stop", str(coord.global_stop()) in (specs or [""])[0], True)
+check("a rendered spec names the fleet's own stop", str(coord.fleet_stop(TMP, "w77")) in (specs or [""])[0], True)
+check("a rendered spec passes check_practices", [m for m in check_practices.check(spec_file, check_practices.SPEC)
+                                                 if "report" not in m], [])
+try:
+    mds.render({k: v for k, v in CFG77.items() if k != "stop_file"}, gjson[0])
+    check("no stop_file, no spec", "rendered", "KeyError")
+except KeyError:
+    check("no stop_file, no spec", True, True)
+check("a fleet stop is STOP-<scope>", coord.fleet_stop(pathlib.Path("S"), "loop").name, "STOP-loop")
+try:
+    coord.fleet_stop(TMP, "../x")
+    check("a scope with a path in it is refused", "accepted", "ValueError")
+except ValueError:
+    check("a scope with a path in it is refused", True, True)
 check("lead is the note with most rows", next(j["lead"] for j in gjson if j["letter"] == G[("PB3", "PB6", "PB7", "PB12")].letter), "PB6")
 gfile = TMP / "groups.json"
-gfile.write_text(__import__("json").dumps({"wave": "77", "scratch": "X", "base": "abc", "groups": gjson}), encoding="utf-8")
+gfile.write_text(__import__("json").dumps({"wave": "77", "scratch": "X", "base": "abc", "stop_file": CFG77["stop_file"],
+                                          "groups": gjson}), encoding="utf-8")
 check("check_practices O2 same-file rule", check_practices.same_file_without_successor(gfile), [])
 
 # 8. THE FIX LANE WITHOUT --cluster IS UNCHANGED (kb/Work PB2120): the whole plan of this fixture, every group's
@@ -265,7 +285,7 @@ if fc:
     cfile.write_text(JSON.dumps({"wave": "78", "scratch": "X", "base": "abc", "groups": cg}), encoding="utf-8")
     check("campaign groups pass check_practices' successor rule", check_practices.same_file_without_successor(cfile), [])
     for g in cg:
-        tpl.format(wave="78", base="abc", S="X", pred=g.get("pred", ""), **{k: v for k, v in g.items() if k != "pred"})
+        mds.render(dict(CFG77, wave="78"), g)
     only_b = pw.group_cost("opus", 1, RULES) + pw.lander_cost(RULES)
     cp2 = pw.plan(cnotes, copen, chalf, [], lambda b: "ABSENT", {}, RULES, budget_points=only_b * 1.5, deps=cdeps)
     check("a dependent is never chosen without its blocker's group",

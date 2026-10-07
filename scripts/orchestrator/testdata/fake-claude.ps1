@@ -7,7 +7,8 @@
 #   owner      a valid handoff carrying an owner question
 #   wakes      ends a turn with a background task running, is woken when it finishes, then hands off done
 # Like the real session, a mode that emits `result` then STAYS ALIVE until the supervisor closes stdin (eof.txt records it).
-# Every invocation appends its arguments to FAKE_CLAUDE_MARK, so a test can prove whether it ran and with what.
+# Every invocation appends its arguments and its CLAUDE_CONFIG_DIR (the account it runs as) to FAKE_CLAUDE_MARK, so a
+# test can prove whether it ran and with what.
 $ErrorActionPreference = 'Stop'
 if ($env:FAKE_CLAUDE_MODE -eq 'bigstart') {
     # The real CLI writes a large `init` event (tools, MCP servers, slash commands) to stdout BEFORE it reads stdin. When
@@ -18,7 +19,7 @@ if ($env:FAKE_CLAUDE_MODE -eq 'bigstart') {
 }
 # The prompt arrives as the first stream-json line on stdin (the supervisor keeps stdin open); one mark line carries both.
 $firstLine = [Console]::In.ReadLine()
-if ($env:FAKE_CLAUDE_MARK) { Add-Content -Path $env:FAKE_CLAUDE_MARK -Value ((($args -join ' | ') + ' | STDIN ' + $firstLine) -replace '[\r\n]+', ' ') -Encoding utf8 }
+if ($env:FAKE_CLAUDE_MARK) { Add-Content -Path $env:FAKE_CLAUDE_MARK -Value ((($args -join ' | ') + " | CONFIG_DIR <$env:CLAUDE_CONFIG_DIR>" + ' | STDIN ' + $firstLine) -replace '[\r\n]+', ' ') -Encoding utf8 }
 $coord = $env:COBOL_COORD_DIR
 $handoff = Join-Path $coord 'handoff.json'
 $sid = $args[[array]::IndexOf($args, '--session-id') + 1]
@@ -79,7 +80,9 @@ switch ($env:FAKE_CLAUDE_MODE) {
         Set-Content -Path (Join-Path $coord 'STOP') -Value 'owner'
         $deadline = (Get-Date).AddSeconds(60)
         while (-not (Test-Path (Join-Path $coord 'STOP-UNIT')) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
-        Set-Content -Path (Join-Path $coord 'fleet-stop-seen.txt') -Value (Test-Path (Join-Path $coord 'scratch/STOP'))
+        Set-Content -Path (Join-Path $coord 'fleet-stop-seen.txt') -Value (Test-Path (Join-Path $coord 'scratch/STOP-loop'))
+        # The wind-down must never create the owner's GLOBAL stop: other sessions' agents obey it (kb/Work PB2483).
+        Set-Content -Path (Join-Path $coord 'global-stop-seen.txt') -Value (Test-Path (Join-Path $coord 'scratch/STOP'))
         Hand @{ schema_version = 1; unit = 'wave'; outcome = 'split'; summary = 'wound down by STOP'; next_unit = 'resume' }
         Emit @{ type = 'result'; subtype = 'success'; session_id = $sid }
         WaitEof

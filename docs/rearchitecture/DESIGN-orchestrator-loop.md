@@ -30,6 +30,9 @@ closed per weekly-quota point.
 | `scripts/orchestrator/budget.py` | the weekly and session quota estimator (section 8) |
 | `scripts/orchestrator/plan_wave.py` + `model_rules.json` | the deterministic wave planner and its routing and cost constants (section 9) |
 | `scripts/orchestrator/coord.py` | names the coordination directory, loads `model_rules.json`, writes JSON atomically |
+| `scripts/orchestrator/mailbox.py` | the two attended sessions' mailbox: send, list, take, finish and watch messages, and `operator-session.json` (section 15) |
+| `scripts/account-profile.ps1` | seeds a named account's config dir from the default one (section 2.1) |
+| `scripts/orchestrator/account.py` | the ONE resolver of the Claude account a script runs as: its config dir, its global config and account id, its row of `model_rules.json` `accounts` (section 2.1) |
 | `scripts/orchestrator/watch_agent.py`, `watch-agent.ps1`, `open-watchers.ps1` | the token-free view of running agents in Windows Terminal tabs (section 13) |
 | `scripts/orchestrator/test_*.py`, `test_orchestrate.ps1`, `testdata/` | the self-tests and their fakes (section 12) |
 
@@ -42,13 +45,14 @@ the tools it runs). Contents:
 |---|---|---|
 | `alloc.json` | `alloc.py` | the highest value reserved so far per kind |
 | `alloc.lock` | `alloc.py` | the allocator's lock (atomic create; stale after 60 s) |
-| `readings.json` | the `meter` unit (via `budget.py --record`) | owner-meter readings, a list of `{noted_at, weekly_pct, session_pct, session_reset}` |
+| `readings.json` | the `meter` unit (via `budget.py --record`) | owner-meter readings, a list of `{noted_at, account, weekly_pct, session_pct, session_reset}`; each account reads only its own (section 8) |
 | `orchestrate.lock` | the supervisor | one instance only: `{pid, started_at, host}` |
 | `STOP` | the owner (`stop.ps1`) | closes work down as soon as possible without losing any: a running unit is wound down (below), then the loop ends; `stop.ps1 -Clear` removes it |
 | `checkpoint.json` | the supervisor (`checkpoint.py`) | the running unit's frequent handoff (section 5.1); moved to `logs\` when the unit ends, so a survivor means the supervisor died |
 | `milestones.jsonl` | the running unit's model | one line per milestone; moved to `logs\` when the unit ends |
 | `STOP-UNIT` | the supervisor | asks the running unit to write its handoff and end (section 4.3); created for the context cap and for `STOP` |
-| `scratch\STOP` | the supervisor | the fleet's graceful-stop file, created with `STOP-UNIT`: every implementer and lander checkpoints, commits and returns `SPLIT`; removed at the start of the next unit |
+| `scratch\STOP-loop` | the supervisor | the LOOP's fleet stop (section 4.6), created with `STOP-UNIT`: every implementer and lander the loop dispatched checkpoints, commits and returns `SPLIT`; removed at the start of the next unit |
+| `scratch\STOP` | the owner (`stop.ps1 -Global`) | the GLOBAL stop (section 4.6): every agent of every session obeys it, and the loop ends; nothing but the owner's `stop.ps1 -Clear -Global` removes it |
 | `handoff.json` | the running unit | its handoff (section 5); the supervisor archives it per unit |
 | `handoff.last.json` | the supervisor | the newest VALID handoff, which the next unit reads and `next_unit.py` decides from |
 | `scratch\` | the units and their fleets | the fleet scratch directory (`{SCRATCH}`): specs, `groups.json`, the Workflow args, and `reports\`, which `plan_wave.py` reads for finishers; it persists across units |
@@ -57,6 +61,34 @@ the tools it runs). Contents:
 | `units.jsonl` | the supervisor | one line per unit (section 4.5) |
 | `OWNER-QUESTIONS.md` | the supervisor | questions only the owner can answer; the loop stops after writing one |
 | `logs\` | the supervisor | the raw stream-json of every unit, its archived handoff, and the breaker's notes |
+
+### 2.1 Two Claude accounts (kb/Work PB2478-PB2483)
+
+Owner 2026-10-07 13:17 PDT: the fix lane runs from TWO Claude accounts at once. The OPERATOR session
+(`CLAUDE_CONFIG_DIR=C:\Users\brent\.claude-acct2`, account 2) runs the loop, every Opus and Sonnet dispatch and the
+landings; the MYTHOS session (the default config dir, account 1) keeps the Mythos work. So the account is a PARAMETER of
+every coordination tool, never an assumption:
+- **One resolver.** `account.py` is the only code that knows where Claude keeps its own files: the config dir is
+  `CLAUDE_CONFIG_DIR` or `~/.claude`; the global config that names the signed-in account (`oauthAccount.accountUuid`) is
+  `<config dir>\.claude.json` when the variable is set and `~\.claude.json` when it is not; a repository's transcripts are
+  `<config dir>\projects\<repo key>\<session>`. PowerShell callers ask it (`account.py --field config_dir`), they never
+  join `$HOME\.claude` themselves.
+- **The accounts table** is `model_rules.json` `accounts.list`: per account its name, config dir (null = the default)
+  and weekly reset, plus any `quota` keys that differ. A config dir no row names is an error, so a third account is one
+  row, and every tool picks it up.
+- **Seeding a named account** (kb/Work PB2480): `model_rules.json` `accounts.seed` lists what its config dir carries
+  (settings, plugins, skills copied from the default account when missing; the project memory junctioned to the
+  default account's; the Claude in Chrome flags in its `.claude.json`; never the credentials).
+  `scripts/account-profile.ps1 -ConfigDir <dir>` carries out `account.py --seed-plan` idempotently, and
+  `account.py --seed-check` (run by `tooling_check.py` at every session start) says what is missing. The Chrome bridge
+  is the named pipe `claude-mcp-browser-bridge-<Windows user>`, per Windows user, so one pairing serves either account;
+  the page it reads is whichever claude.ai account the browser is signed into, which the `meter` unit checks.
+- **Telemetry is per MACHINE.** Every account's user settings export to the one sink (`otlp_sink.py`, 127.0.0.1:4318,
+  `~\.claude\telemetry`), and each `api_request` event names its account in `user.account_uuid`. A consumer that needs
+  one account's spend filters on it (`budget.py`, `usage_report.py --account-uuid`).
+- **Coordination state is per account where it belongs to the account**: readings (`account` field), the published
+  ledger artifact (`ledger-published.json` `accounts.<name>`, section 14). The STOP files are scoped by fleet, not by
+  account (section 4.6). The two sessions pass work through `E:\COBOL-coord\mailbox` with `mailbox.py` (section 15).
 
 ## 3. Unit types
 
@@ -83,7 +115,7 @@ pointers (the rolling wave's `summary` is capped at 900 characters and the foren
 and the unit polls nothing (it waits for the Workflow's completion signal).
 
 If the context cap fires (section 4.3) or the owner creates `STOP` while a Workflow runs, the unit does NOT end the
-session: the supervisor creates the fleet's graceful-stop file `{SCRATCH}\STOP` (with `STOP-UNIT`), so every implementer checkpoints and returns `SPLIT` and every lander
+session: the supervisor creates the loop's fleet stop `{FLEET_STOP}` (`scratch\STOP-loop`, with `STOP-UNIT`), so every implementer it dispatched checkpoints and returns `SPLIT` and every lander
 finishes or abandons its train at a cluster boundary, waits for the Workflow to return, writes a handoff with
 `next_unit: resume` that names every branch, worktree and report, and ends. The next unit is a fresh `resume`.
 A kill (after `-GraceMinutes`) is the last resort, and it loses only uncheckpointed agent work: every agent
@@ -130,7 +162,7 @@ seam pointing at a fake that emits canned stream-json, not a wrapper; a `.ps1` o
 shell), `-CoordDir`, `-RepoDir` (default the repository containing the script), `-MaxContextTokens` (default
 150000), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave` or `campaign`
 unit gets three times this, because a lander train must be allowed to finish), `-BorrowDays` (passed to
-`budget.py`), `-Unit` (the first unit, overriding `next_unit.py` once), `-Cluster <lead>` (the campaign lane, section 9.1; validated at start), `-Watch` (section 13), `-Python`, and the
+`budget.py`), `-Unit` (the first unit, overriding `next_unit.py` once), `-Cluster <lead>` (the campaign lane, section 9.1; validated at start), `-ConfigDir` (the Claude account the loop spends, section 2.1: default `account.py`'s resolution of `CLAUDE_CONFIG_DIR`; an unknown dir exits 2 before anything starts; every child runs with exactly that account's `CLAUDE_CONFIG_DIR`, unset for the default account; the log header and every `units.jsonl` line name the account), `-Watch` (section 13), `-Python`, and the
 test seams `-TelemetryDir` (passed to `budget.py`), `-WorkDir` (the register `next_unit.py` and `work.py` read for `-Cluster`), `-IdleCloseSeconds` (default 20, section 4.6), `-CheckpointSeconds` (default 300, section 5.1) and `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
 (default 60). Exit codes: 0 stopped (`STOP`, `-MaxUnits`, `stop-week`, `-DryRun`), 3 another instance runs,
 4 circuit breaker, 5 an owner question is waiting, 2 `-Cluster` names no cluster any kb/Work note names (or `-Unit campaign` without `-Cluster`).
@@ -139,10 +171,10 @@ Each iteration, in this order:
 
 1. **Single instance.** `orchestrate.lock` is created atomically holding the PID. An existing lock whose PID is a
    live process refuses the start (exit 3); a lock whose PID is gone is stale and is taken over.
-2. **STOP.** `STOP` in the coordination directory ends the loop (exit 0), and it does so ASAP WITHOUT LOSING WORK
+2. **STOP.** `STOP` in the coordination directory (or the owner's global `scratch\STOP`) ends the loop (exit 0), and it does so ASAP WITHOUT LOSING WORK
    (owner 2026-10-04: "close down work asap when needed without losing any"). Between units the loop ends at once;
    a hold or a backoff is interrupted within a minute; a RUNNING unit is wound down by the supervisor itself, not left
-   to finish: it creates `STOP-UNIT` and the fleet's `scratch\STOP`, every agent checkpoint-commits its WIP and returns
+   to finish: it creates `STOP-UNIT` and the loop's fleet stop `scratch\STOP-loop` (section 4.6), every agent it dispatched checkpoint-commits its WIP and returns
    `SPLIT`, the unit writes a handoff (`next_unit: resume`, naming every branch), and only then does the loop end. A
    unit that ignores the wind-down for `-GraceMinutes` is killed (the last resort, losing only uncheckpointed agent
    work). The owner runs `pwsh scripts/orchestrator/stop.ps1` (`-Status` to watch, `-Clear` to run again); the loop
@@ -157,7 +189,7 @@ Each iteration, in this order:
 6. **Run it**: `claude -p <prompt> --model <unit model> --permission-mode <mode> --permission-prompts none
    --output-format stream-json --verbose --session-id <fresh GUID>` from the repository root (plus `--chrome` for
    `meter`). The prompt is `units/common.md` followed by `units/<unit>.md` (`units/wave.md` for a `campaign` unit), with the substitutions `{COORD}`,
-   `{HANDOFF}`, `{STOP_UNIT}`, `{PREV_HANDOFF}`, `{SCRATCH}`, `{TASKS_DIR}`, `{CLUSTER_ARG}` (` --cluster <lead>` for a `campaign` unit, empty otherwise) and `{BORROW_DAYS}` (the supervisor's `-BorrowDays`, so the
+   `{HANDOFF}`, `{STOP_UNIT}`, `{PREV_HANDOFF}`, `{SCRATCH}`, `{FLEET_STOP}`, `{GLOBAL_STOP}` (section 4.6), `{TASKS_DIR}`, `{CLUSTER_ARG}` (` --cluster <lead>` for a `campaign` unit, empty otherwise) and `{BORROW_DAYS}` (the supervisor's `-BorrowDays`, so the
    `wave` unit's `plan_wave.py --from-budget` sees the same allowance the supervisor's gate used). The stream goes to `logs\<time>-<unit>.jsonl`,
    stderr to `logs\<time>-<unit>.stderr.txt`.
    While it runs, the supervisor reads every `assistant` event's `usage` (counting each message id once: the
@@ -167,7 +199,7 @@ Each iteration, in this order:
    tagged with `parent_tool_use_id`, and that transcript is bounded by its own `maxTurns`, so the supervisor records
    them as `peak_subagent_context` and never winds the unit down for them (a lander subagent legitimately reaches
    200k+ while the unit that dispatched it sits near 100k). When it passes `-MaxContextTokens`, or the owner creates `STOP`, the supervisor
-   creates `STOP-UNIT` and the fleet's `scratch\STOP` and waits for the session to end; after the grace period it
+   creates `STOP-UNIT` and the loop's fleet stop `scratch\STOP-loop` and waits for the session to end; after the grace period it
    kills the process tree.
    **The supervisor, not the model, decides when the unit is over.** The prompt is the first stream-json message
    (`--input-format stream-json`) and stdin stays open, because a one-shot `claude -p` waits for background tasks after its
@@ -243,6 +275,30 @@ registered by this change (open decision D2).
 | the owner wants it stopped | losing agent work if the process were killed | `STOP` (`stop.ps1`): a graceful wind-down of the running unit and its fleet, a kill only after the grace period |
 | a unit's model ends a turn with a fleet in flight | a one-shot `claude -p` terminates background tasks 600 s later and the fleet dies (wave 1017) | the supervisor holds stdin open and closes it only when idle with no background task |
 | a unit runs a WSL lifecycle command | every other session's Linux gate dies | the unit prompts forbid it; `forbidden_commands.py` is the hook-level guard (open decision D4: add these shapes there) |
+
+### 4.6 Scoped stop files (kb/Work PB2483)
+
+On 2026-10-07 13:26 the operator moved the loop to account 2 (`stop.ps1`); the supervisor's wind-down created the one
+shared `scratch\STOP`, and the OTHER session's in-flight refuter, whose brief also named `scratch\STOP`, read it and
+split with a claim undecided. One session's stop must never abort another session's work, so a stop is SCOPED:
+
+| File | Who creates it | Who obeys it |
+|---|---|---|
+| `<coord>\scratch\STOP` (GLOBAL) | the owner (`stop.ps1 -Global`, or by hand) | every agent of every session, and the loop (it ends) |
+| `<scratch>\STOP-<scope>` (FLEET) | the fleet's own dispatcher: the supervisor's wind-down (`STOP-loop`), an attended session winding down its wave (`STOP-w<wave>`) | only the agents whose dispatch names it |
+
+- **One definition.** `coord.py` `global_stop()` and `fleet_stop(scratch, scope)` name the files for every Python tool;
+  `orchestrate.ps1` and `stop.ps1` use the same two names (`$GlobalStop`, `$FleetStop`), and `test_orchestrate.ps1` proves
+  they agree (the supervisor's wind-down is exactly what `stop.ps1 -Clear` removes).
+- **Every dispatch names both.** `plan_wave.py --stop-file` (default `<scratch>\STOP-w<wave>`; the wave unit passes
+  `{FLEET_STOP}`, the loop's) writes `stop_file` into `groups.json` and the Workflow args together with `global_stop`;
+  `make_dispatch_specs.py` renders both into every spec (and renders nothing without `stop_file`); `wf_rolling_wave.js`
+  refuses args without them; the lane-3 workflows take `stopFile` and `globalStopFile`.
+- **The check.** `check_practices.py` refuses a template without the `{global_stop}`/`{stop_file}` placeholders, a
+  rendered spec that does not name a `scratch\STOP` and a `STOP-<scope>` file, and a groups file whose `stop_file` is
+  not a `STOP-<scope>` file; MANDATORY-PRACTICES P3 states the rule and the agent definitions repeat it.
+- **Clearing.** The supervisor removes only `STOP-loop` at a unit's start; `stop.ps1 -Clear` removes the loop's files,
+  and only `-Clear -Global` removes the global one.
 
 ## 5. The handoff (`handoff.schema.json`)
 
@@ -334,15 +390,22 @@ D5), because it changes the landing contract.
 `python scripts/orchestrator/budget.py [--json] [--borrow-days N] [--now ISO]` and
 `python scripts/orchestrator/budget.py --record --weekly W --session S --session-reset ISO` (appends a reading).
 
-- **Anchor.** The newest reading in `readings.json` (owner-meter values read by the `meter` unit). Readings from
-  before the current week's reset (Sunday 03:00 America/Los_Angeles) anchor nothing; the weekly base is then 0 from
-  the reset.
+- **One account.** Every estimate is one account's (section 2.1): the account `account.py` resolves from
+  `CLAUDE_CONFIG_DIR`, or `--account NAME`. Its week starts at ITS weekly reset (account 1 Sunday 03:00, account 2
+  Saturday 10:00, America/Los_Angeles) and its quota is the shared `quota` with the row's overrides. `--record` stamps
+  the reading with the account.
+- **Anchor.** That account's newest reading in `readings.json` (owner-meter values read by the `meter` unit). Readings
+  from before the account's current week's reset anchor nothing; the weekly base is then 0 from the reset. A reading
+  with no `account` (written before 2026-10-07) is ambiguous: it anchors nothing, and the output counts it
+  (`unstamped_readings`) so a fresh `--record` replaces it.
 - **Spend since the anchor** comes from the local telemetry sink (`usage_report.py`'s `events()` over
-  `~/.claude/telemetry/<day>.jsonl`, reused, not re-parsed): every `api_request` after the anchor, converted to
-  weekly points per model with `model_rules.json`'s calibration (`tokens_per_point`, counting the token kinds named
-  in `counted_token_kinds`).
+  `~/.claude/telemetry/<day>.jsonl`, reused, not re-parsed): every `api_request` after the anchor whose
+  `user.account_uuid` is the account's (an event without the attribute is counted: it cannot be attributed, and
+  over-counting only holds early; an unknown account id counts every event and says so), converted to weekly points
+  per model with `model_rules.json`'s calibration (`tokens_per_point`, counting the token kinds named in
+  `counted_token_kinds`).
 - **Weekly estimate** = anchor weekly % + points since the anchor.
-- **Allowance** = day N × 14.3 % (day 1 starts at the Sunday 03:00 reset), plus `--borrow-days` days the owner
+- **Allowance** = day N × 14.3 % (day 1 starts at the account's weekly reset), plus `--borrow-days` days the owner
   allowed, capped at the weekly cap (`weekly_cap_pct`, 97 by the owner's 2026-10-07 instruction, kb/Work R69 §6).
 - **Session estimate** = the anchor's session % (when its `session_reset` is still in the future) plus points since
   the anchor × `session_pct_per_weekly_pct`; after the reset it starts from 0 at the reset.
@@ -351,15 +414,19 @@ D5), because it changes the landing contract.
   (the supervisor does not yet act on it inside a unit; the soft stop before each unit is the guard). `resume_at`
   names when a hold ends.
 - Output: `{weekly_est_pct, allowance_pct, headroom_pct, session_est_pct, decision, resume_at, week_start, day,
-  anchor, spend}`.
+  account, telemetry_account, unstamped_readings, anchor, spend}`.
 
 The estimate drifts from the meter between readings; the 3-hour `meter` unit re-anchors it. A reading refits nothing
 automatically: the constants change only by an explicit edit of `model_rules.json` with its date and source (open
-decision D6). **The calibration is unverified against telemetry.** The 2026-10-04 constants were fitted to the
-subagent tokens the Workflow tool reports; `budget.py` counts input, output and cache-write tokens from telemetry
-(cache reads excluded). On 2026-10-04 at 14:50 PDT, with no anchor, it estimated 28.4 points spent since that
-morning's reset (13.4 M Sonnet and 5.8 M Opus counted tokens). Until the first meter readings confirm or correct
-that, treat the weekly estimate as a rough guide (open decision D8).
+decision D6). **The calibration was refit to telemetry on 2026-10-07** (kb/Work PB2478): the 2026-10-04 constants
+were fitted to the subagent tokens the Workflow tool reports, and against telemetry (input, output and cache-write
+tokens; cache reads excluded) they overcounted about four-fold: account 2's own spend between its 0 % reading (13:34
+PDT) and its 6 % week / 24 % session reading (14:54) estimated 25.4 points and a 127 % session, and held the loop.
+The refit multiplies every rate by 4 (Opus 1.6 M counted tokens per point, ratios between families kept, Haiku priced
+at its own rate instead of the Opus fallback) and measures `session_pct_per_weekly_pct` at 4.0; the planner's token
+costs scale by the same 4, so a planned wave costs the same points. `test_budget.py` section 8 pins the fit to those
+two readings. One interval on one account is a thin fit (the meter shows whole percents): refit whenever two readings
+of one account bracket a measured spend (open decisions D6, D8).
 
 ## 9. The wave planner (`plan_wave.py`)
 
@@ -497,7 +564,7 @@ section 10a's entry, the Startup `.cmd` calls it) and a context-full restart. Th
 session performs the procedure itself, in this order: wind running work down (`stop.ps1`: agents checkpoint, the unit hands off),
 save (a resume note marked START HERE, WIP checkpoint commits on the worktree branches), then ask the owner to run the script in a
 new terminal. A STOP file left on purpose by that procedure is named in the prompt so the new session clears it deliberately.
-`start-session.ps1 -DryRun` prints what would run.
+`start-session.ps1 -DryRun` prints what would run; `-ConfigDir` starts another account's session (section 2.1).
 
 ## 11. Open decisions
 
@@ -511,8 +578,8 @@ new terminal. A STOP file left on purpose by that procedure is named in the prom
   the same change stopped the verdict-chain rule from firing on a command that merely names a gate script.
 - **D5** Wire the ratchet into the lander gate and CI's `audits` job.
 - **D6** Refit the token-to-point calibration automatically from consecutive meter readings, or by hand only.
-- **D7** The `session_pct_per_weekly_pct` constant (seeded at 5.0, i.e. one weekly point ≈ 5 % of a 5-hour window)
-  is a guess until two readings inside one session window measure it.
+- **D7** The `session_pct_per_weekly_pct` constant (seeded at 5.0; measured 4.0 on 2026-10-07 from one interval of account 2, kb/Work PB2478)
+  was a guess until those two readings inside one session window measured it; more intervals refine it.
 - **D8** Which token kinds the calibration counts (section 8): the first meter readings decide whether
   `counted_token_kinds` and `tokens_per_point` match the meter.
 
@@ -521,8 +588,9 @@ new terminal. A STOP file left on purpose by that procedure is named in the prom
 Python self-tests in the style of `scripts/hooks/test_dispatch_guard.py` (a script that prints a case count and
 exits nonzero on a failure; no framework): `test_alloc.py` (including two real parallel processes allocating
 concurrently with no duplicate), `test_inventory_ratchet.py` (a fabricated reopen, a GAP rise, the marker),
-`test_budget.py`, `test_ledger_state.py` (owed until the current stamp is marked, owed again after an input-touching commit,
-not after an unrelated one), `test_checkpoint.py` (real linked worktrees: committed, dirty, clean; a synthesized handoff checked
+`test_budget.py` (with each account's reset, readings and telemetry), `test_ledger_state.py` (owed until the current stamp is
+marked, owed again after an input-touching commit, not after an unrelated one; per account, the first mark needs `--url`),
+`account.py --self-test`, `mailbox.py --self-test` (section 15), `test_checkpoint.py` (real linked worktrees: committed, dirty, clean; a synthesized handoff checked
 against the schema's required and permitted keys), `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
 real dispatch-spec template and `check_practices.py`'s same-file rule; the fix lane's whole plan against a golden the pre-campaign planner wrote; the campaign lane's selection, `blocked_by` order, `after:` derivation and waits, and `work.py check`'s topology rules, section 9.1), `test_watch_agent.py` (a transcript with a
 partial last line). CI runs the hook self-tests in the `audits` job (`python3 scripts/hooks/test_forbidden_commands.py
@@ -532,7 +600,8 @@ partial last line). CI runs the hook self-tests in the `audits` job (`python3 sc
 inventory at `HEAD`, which the job's full-history checkout provides. The supervisor's self-test,
 `pwsh scripts/orchestrator/test_orchestrate.ps1`, drives the loop with a fake `-ClaudeExe`
 (`testdata/fake-claude.ps1`) and `open-watchers.ps1` with a fake `wt.exe` (`testdata/fake-wt.ps1`); it needs
-PowerShell 7 and git, so it would run in the `windows-build-test` job. The workflow file is not edited by this change.
+PowerShell 7 and git, so it would run in the `windows-build-test` job; it also covers `start-session.ps1 -ConfigDir`,
+`stop.ps1` and `account-profile.ps1` (in a temp HOME). The workflow file is not edited by this change.
 
 ## 14. Publishing the ledger after every landing
 
@@ -546,7 +615,12 @@ wrapper around the claude.ai API would be a second author of the page. So the wo
   last commit touching an input of the page, `gen_ledger.STAMP_PATHS`, imported so the two cannot disagree) with
   `ledger-published.json`, and prints `LEDGER PUBLISH OWED` in its log when they differ. `stop.ps1 -Status` shows the same.
 - **The attended session publishes** and records it: `Artifact` publish of the rendered page to the existing URL, then
-  `python scripts/orchestrator/ledger_state.py mark-published`. In an attended session a unit's end arrives as a
+  `python scripts/orchestrator/ledger_state.py mark-published`.
+- **Per account** (kb/Work PB2481, section 2.1): an artifact belongs to the claude.ai account that published it, and
+  another account cannot update it. `ledger-published.json` is therefore `{"accounts": {<name>: {url, stamp,
+  published_at}}}`; `owed` compares the running account's stamp; `mark-published --url <url>` records the account's
+  artifact the first time (later marks keep it); `ledger_state.py url` and the last line of `gen_ledger.py` name it, or
+  say to publish a new one. `gen_ledger.py` writes `<coord>\ledger.html` by default. In an attended session a unit's end arrives as a
   notification, and the publish is the first action after the landing report.
 The limit, stated plainly: in a fully unattended run the publish waits for the next attended session, and the log line and
 `stop.ps1 -Status` are how it is seen. `next_unit.py` no longer starts a `land` unit for a stale page.
@@ -560,7 +634,8 @@ started and stopped at will.
 ### 13.1 The view (built)
 
 - `watch_agent.py <agent-*.jsonl>` follows one subagent transcript (Workflow transcripts live under
-  `~/.claude/projects/<repo key>/<session>/subagents/workflows/wf_*/`, each with a sibling `agent-*.meta.json`
+  `<config dir>/projects/<repo key>/<session>/subagents/workflows/wf_*/` (the loop's account's config dir, `account.py`
+  `project_dir`), each with a sibling `agent-*.meta.json`
   carrying `description` such as `impl-X-PB1407` and `model`). Per line: local time, the running count of model
   calls (one per message id), the latest call's context size, and each tool use's name with a 120-character summary
   of its input, or the first 200 characters of assistant text. It reads only complete lines; a partial last line
@@ -585,3 +660,21 @@ transcript view. It is the section 3.1 alternative with a terminal attached, and
 `scripts/telemetry/usage_report.py`; adopt it only if it is within 5 % of the background cost. The measured agent
 context averages about 340k tokens per call, and startup is under 10 % of an agent's cost, so the difference should
 be small, but it is unmeasured. The default stays background.
+
+## 15. The session mailbox (`mailbox.py`, kb/Work PB2482)
+
+Owner 2026-10-07 13:35 PDT: the two attended sessions (section 2.1) "pass work to each other without me in the loop unless
+needed". `<coord>\mailbox\README.md` is the protocol (kinds, processing, the wake-up watcher, the doorbell); this tool
+enforces its message shape, which hand-built JSON did not (13:47: a `\b` escape turned a path in `refs` into a
+backspace; `operator-session.json` was invalid JSON with unescaped backslashes).
+- `send` writes one whole message atomically into `to-<recipient>\` as `<yyyyMMdd-HHmmss>-<from>-<kind>-<slug>.json`;
+  it refuses an unknown kind, a body over 900 characters, empty `refs`, a path ref that does not exist, any control
+  character, and a `task` or a Mythos `dispatch` without the owner's approval quote or `--needs-owner`.
+  `--unless-pending` sends nothing while the same kind and subject is open.
+- `list`, `take` (prints the message; a malformed one is declined into `done\` with the reason, never acted on), `done`
+  (adds `result` and MOVES the file, so an inbox is the open set), `watch` (returns when the inbox holds a message:
+  the background watcher's body), `session` (reads or updates `operator-session.json` with the account from `account.py`).
+- `from` is `mythos`, `operator` or `loop`: after every unit with the ledger publish owed, the supervisor posts one
+  `publish` message (per stamp) to the operator, pointing at the unit's log (section 14), so the attended session is
+  woken by its watcher rather than by reading the supervisor's log.
+- It is a transport of pointers, never a work register (CLAUDE.md rule 8).

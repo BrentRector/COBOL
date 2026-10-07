@@ -74,6 +74,9 @@ import sys
 import tempfile
 import time
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "orchestrator"))
+import account  # noqa: E402  (the one resolver of Claude's config dir, kb/Work PB2479)
+
 WINDOW_SECONDS = 120
 
 # ⛔ An agent inside a LONG TOOL CALL writes nothing to its transcript until the tool returns (kb/Work PB1702). The
@@ -331,9 +334,7 @@ def effective_cwd(data: dict) -> str:
 
 
 def live_agent_transcripts(session_id: str) -> list:
-    cfg = os.environ.get("CLAUDE_CONFIG_DIR")
-    root = pathlib.Path(cfg) if cfg else pathlib.Path.home() / ".claude"
-    projects = root / "projects"
+    projects = account.config_dir() / "projects"
     if not projects.is_dir():
         return []
 
