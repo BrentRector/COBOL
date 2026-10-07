@@ -4,7 +4,6 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using CobolNet.Tests.Shared;
 using Xunit;
-using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -194,6 +193,23 @@ public sealed class CompiledProgramCacheDriftTests : IDisposable
         Assert.Equal(first.Result.Warnings, second.Result.Warnings);
     }
 
+    /// <summary>A hit replays the compilation's OWN output — the lines its DISPLAY directives transferred (ISO
+    /// §7.3.12.4 1): "The DISPLAY directive causes the contents of each operand to be transferred to the source
+    /// listing or compile-time-device-1") — exactly as the cold compile produced them. Before the entry carried them,
+    /// a hit returned none, and a test reading them would have passed cold and failed warm.</summary>
+    [Fact]
+    public void AHit_ReplaysTheCompilationsOwnOutput()
+    {
+        string src = Write("src/prog.cob", Plain.Replace(
+            "       IDENTIFICATION DIVISION.", "       >>DISPLAY \"PB2116 COMPILE-TIME\" 42\n       IDENTIFICATION DIVISION."));
+        var first = Through(Options(src));
+        Assert.True(first.Result.Success, string.Join("\n", first.Result.Errors));
+        Assert.NotEmpty(first.Result.CompileOutput);
+        var second = Through(Options(src, runDir: "run2"));
+        Assert.True(second.Hit);
+        Assert.Equal(first.Result.CompileOutput, second.Result.CompileOutput);
+    }
+
     /// <summary>Every option changes the key — by REFLECTION over <see cref="CompilerDriver.Options"/>, with the flip
     /// derived from the property's TYPE, so an option added tomorrow is flipped here without an edit (and a property
     /// of a type with no flip fails, naming it). The one exemption is the output DIRECTORY, which must NOT change the
@@ -314,15 +330,13 @@ public sealed class CompiledProgramCacheDriftTests : IDisposable
             string path = Path.Combine(ConformanceCorpus.Root, (string)row[0], (string)row[1] + ".cob");
             string text = File.ReadAllText(path);
             if (!Regex.IsMatch(text, "EXCEPTION-LOCATION|DEBUG-ITEM|DEBUG-LINE", RegexOptions.IgnoreCase)) continue;
-            sources.Add(ConformanceCorpus.ApplySourceOptions(text,
-                new CompilerDriver.Options(path, "x.dll", DialectLevel: int.Parse((string)row[0]), SourceFormat: InitialReferenceFormat.Auto)));
+            sources.Add(ConformanceCorpus.PositiveOptions((string)row[0], (string)row[1], "x.dll"));
             if (sources.Count == 12) break;
         }
         Assert.NotEmpty(sources);
         Write("cp/PB985CPY.cpy", Copybook("DIR"));
         sources.Add(Options(Write("cp/prog.cob", WithCopy), copyPaths: [Path.Combine(_dir, "cp")]));
-        sources.Add(new CompilerDriver.Options(TestRepo.Nist("programs", "NC101A.cob"), "x.dll", NistTestName: "NC101A",
-            DialectLevel: 85));
+        sources.Add(CorpusManifest.CompileOptions("NC101A", "x.dll", 85, permissive: false, checkOnly: false));
 
         int i = 0;
         foreach (var o in sources)

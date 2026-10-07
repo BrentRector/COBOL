@@ -69,7 +69,7 @@ Every finding is a `kb/Work` note (CLAUDE.md rule 8), never a list in this docum
   `.Linkage` partials); `DiagnosticCatalog` (5,612, a data table written as code); `IntrinsicBinder` (2,826);
   `ReferenceResolver` (2,660); `VersionConformancePass` (2,535); `ExceptionState` (2,201); `BoundTree` (1,985);
   `RuntimeApi` (1,949).
-- **The oracle** (§4) is recorded at the baseline commit.
+- **The oracle** (§4.1) is recorded at the baseline commit: `python scripts/arch/capture_oracle.py --record`.
 - **Performance baseline** (`brent-tools:performance-diagnosis`): the compile-throughput benchmark and the
   whole-population gate time, so no refactor regresses speed unseen.
 
@@ -165,6 +165,64 @@ A refactor is proven neutral by ALL of these, compared case by case, never by to
    channel, offsets, line, column, text and final mode) plus a parse-tree shape differential.
 4. **Program output.** The whole-population gate (Conformance, Unit, Characterization), the Linux gate, and CI.
 5. **Performance** not worse than the R0 baseline beyond noise, with conditions recorded.
+
+### 4.1 The oracle of items 1 and 2 (kb/Work PB2116)
+
+**What is recorded is a manifest of hashes, not the emitted C#.** Thousands of programs at up to four editions would
+put tens of megabytes of generated C# into the repository on every re-baseline, so the committed record is one
+manifest, `docs/rearchitecture/evidence/arch-oracle/<commit12>.manifest.json`: one line per case with the SHA-256
+of its emitted C# (null when the backend never ran) and of its diagnostic stream. The blobs themselves go to the
+gitignored `TestResults/arch-oracle/<commit12>/` (`<id>.g.cs`, `<id>.diag.txt`), so a difference is diffed locally.
+That directory holds exactly one manifest, the current baseline; re-recording replaces it and git history keeps the
+old one.
+
+**The population is the suites' own, by construction.** The cases and their compiles live in the Conformance
+assembly (`tests/Cobol.Net.Tests.Conformance/ArchOracle.cs`), beside the theory families they mirror. Each case comes
+from a `[PartitionedRowSource]` row member and is compiled through the same option builder or harness path its
+theory calls (`ConformanceCorpus.PositiveOptions` and `NegativeCase`, `CorpusManifest.CompileOptions`,
+`EditionHarness.CompileStaged` and `CompileNistObserved`), so a golden added to a manifest is captured with no edit.
+The cases are:
+- `corpus/<edition>/<name>`: each enabled positive golden at its edition directory's edition.
+- `negative/<name>`: one per fixture, every edition its `*> reject-at:` header names, folded into one stream.
+- `nist/<name>`: each green or divergent CCVS program at the golden run's edition (85), plus the chain predecessors
+  its run compiles first.
+- `nist-continuity/<name>@<edition>`: the INV-1 cells, check-only, permissive then strict.
+- `matrix/<construct>@<edition>[+permissive]`: every compile the version-matrix theories perform. The obsolete
+  theory's strict compiles are the strict matrix cells, so they count once.
+
+The characterization corpus is not enrolled. It is already a byte-for-byte emitted-C# and diagnostic snapshot
+oracle of its own (`EmittedCSharpSnapshotTests`, `DiagnosticSnapshotTests`). Programs written inline in test
+classes are not enumerable from a row source and are covered by item 4 alone.
+
+**A diagnostic stream** is the outcome, the compile-time DISPLAY output, every error and warning in the order the
+driver produced them (code, severity, line, column and message, as the driver formats them), and whether the
+compilation read the compile clock. **Portability:** the repository root and each scratch directory are written
+`<repo>` and `<scratch>` with forward slashes, line endings are LF, and a compilation that read the compile clock has
+its WHEN-COMPILED stamp masked. The capture also runs with every `COBOL*` variable scrubbed, the compiled-program
+cache off (the oracle observes the compiler, never a stored result), and the repository root as its working
+directory. Two captures of one commit are therefore identical. Windows and Linux captures of that commit differ
+only in cases whose diagnostic names a COPY text found by a case-insensitive probe. The compiler names the text
+as probed (`K1FDA.CPY` on Windows, the on-disk `K1FDA.cpy` on Linux), which affects 19 NIST continuity cells at the
+first baseline. So the manifest records its `platform`, `compare_oracle.py` prints a NOTE when the two differ, and
+a wave compares captures from one platform.
+
+**Commands.** `python scripts/arch/capture_oracle.py --record` records the baseline (a clean tree only). It is run
+once in R0 and again after each landed fix-lane train, because a fix legitimately changes emitted C#. The oracle is
+re-based by that script, never by hand. A wave runs `python scripts/arch/compare_oracle.py`, which captures the
+current tree and compares it with the recorded baseline case by case, printing `CSHARP`, `DIAGNOSTICS`, `ADDED`
+or `REMOVED` per case and the verdict line `=== ARCH-ORACLE: IDENTICAL|DIFFERENT …`. Add `--diff` for unified
+diffs. The wave's DEVLOG entry shows the IDENTICAL line or explains every listed case. The host process is
+`tests/Cobol.Net.ArchOracle`, a member of the solution that holds no logic of its own.
+
+**Drift.** `ArchOracleDriftTests` holds every `[PartitionedRowSource]` of the Conformance assembly enrolled, every
+non-sentinel row a case, no two rows one case, an observation free of machine paths and the clock, and the recorded
+baseline one well-formed manifest. It pins the enumerator, not the recorded manifest, which every golden-adding fix
+outgrows until the next re-record.
+
+**Item 3 is not yet built.** The token-stream and parse-tree differential for grammar changes is the next step, and
+kb/Work PB2113 and PB2114 are its first consumers. It needs a capture of the lexer's token stream and the parse
+tree's shape over the same population. That is a second observation per case on this same enumerator (a `tokens`
+mode of the host), not a second population.
 
 ## 5. Standards applied
 

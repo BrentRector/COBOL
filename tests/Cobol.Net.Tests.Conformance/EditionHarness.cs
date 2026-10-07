@@ -25,7 +25,19 @@ public static class EditionHarness
     /// COBOL library never includes the source file's own directory — DOC-A.1-40, kb/Work PB1355).</summary>
     public static (bool Ok, IReadOnlyList<string> Errors, IReadOnlyList<string> Warnings) CompileFull(
         string source, int edition, bool permissive = false, IReadOnlyDictionary<string, string>? copybooks = null,
-        bool flagExtensions = false)
+        bool flagExtensions = false) =>
+        CompileStaged(source, edition, permissive, copybooks, flagExtensions, static (_, r) => Outcome(r));
+
+    /// <summary>
+    /// THE staging-and-compile path every source-text compile of this harness takes: stage
+    /// <paramref name="source"/> (and its copybooks) in a fresh directory, compile it at <paramref name="edition"/>,
+    /// and hand the staging directory and the WHOLE driver result to <paramref name="observe"/> BEFORE the directory
+    /// is removed — so a caller that needs more than the verdict (the architecture review's oracle reads the emitted
+    /// <c>.g.cs</c>, kb/Work PB2116) observes the very compile the tests assert on, not a re-implementation of it.
+    /// </summary>
+    internal static T CompileStaged<T>(string source, int edition, bool permissive,
+        IReadOnlyDictionary<string, string>? copybooks, bool flagExtensions,
+        Func<string, CompilerDriver.Result, T> observe)
     {
         string dir = Path.Combine(Path.GetTempPath(), "CobolNet_Ed_" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(dir);
@@ -37,10 +49,16 @@ public static class EditionHarness
                 src, Path.Combine(dir, "prog.dll"), DialectLevel: edition, Permissive: permissive,
                 CopyPaths: copybooks is null ? null : [Path.GetDirectoryName(src)!], SourceFormat: InitialReferenceFormat.Auto,
                 FlagExtensions: flagExtensions));
-            return (r.Success, r.Success ? [] : [.. r.Errors.DefaultIfEmpty($"status {r.Status}")], r.Warnings);
+            return observe(dir, r);
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }
     }
+
+    /// <summary>The harness's verdict of one compile: success, the failing errors (a failure that carries no error
+    /// text reports its status), and the non-failing warnings.</summary>
+    private static (bool Ok, IReadOnlyList<string> Errors, IReadOnlyList<string> Warnings) Outcome(
+        CompilerDriver.Result r) =>
+        (r.Success, r.Success ? [] : [.. r.Errors.DefaultIfEmpty($"status {r.Status}")], r.Warnings);
 
     /// <summary>Compile <paramref name="source"/> targeting <paramref name="edition"/> (strict); returns success
     /// and the diagnostics (empty on success). Delegates to <see cref="CompileFull"/>.</summary>
@@ -55,20 +73,29 @@ public static class EditionHarness
     /// optionally on the permissive axis (the INV-1 continuity legs at ≥2002 run permissive — the §10 #1
     /// migration posture — once removal gating exists).</summary>
     public static (bool Ok, IReadOnlyList<string> Diagnostics) CompileNist(
-        string testName, int edition, bool permissive = false, bool checkOnly = false)
+        string testName, int edition, bool permissive = false, bool checkOnly = false) =>
+        CompileNistObserved(testName, edition, permissive, checkOnly, static (_, r) =>
+        {
+            var (ok, errors, _) = Outcome(r);
+            return (ok, errors);
+        });
+
+    /// <summary>The NIST arm of <see cref="CompileStaged{T}"/>: compile the CCVS program at
+    /// <paramref name="edition"/> in a fresh output directory and hand that directory and the whole driver result to
+    /// <paramref name="observe"/> before the directory is removed. <paramref name="checkOnly"/> = parse +
+    /// edition-validate + bind (NO Roslyn backend) — the compile VERDICT is settled pre-backend, so the INV-1
+    /// continuity sweep uses it (the ~29-min→&lt;1-min speedup, DEVLOG 627).</summary>
+    internal static T CompileNistObserved<T>(string testName, int edition, bool permissive, bool checkOnly,
+        Func<string, CompilerDriver.Result, T> observe)
     {
-        string src = TestRepo.Nist("programs", testName + ".cob");
-        Assert.True(File.Exists(src), $"NIST source not found: {src}");
+        var options = CorpusManifest.CompileOptions(testName, "", edition, permissive, checkOnly);
+        if (!File.Exists(options.SourcePath))
+            throw new FileNotFoundException($"NIST source not found: {options.SourcePath}", options.SourcePath);
         string dir = Path.Combine(Path.GetTempPath(), "CobolNet_Ed_" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(dir);
         try
         {
-            // checkOnly = parse + edition-validate + bind (NO Roslyn backend) — the compile VERDICT is settled
-            // pre-backend, so the INV-1 continuity sweep uses it (the ~29-min→<1-min speedup, DEVLOG 627).
-            var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, testName + ".dll"), NistTestName: testName, DialectLevel: edition,
-                Permissive: permissive, CheckOnly: checkOnly));
-            return (r.Success, r.Success ? [] : [.. r.Errors.DefaultIfEmpty($"status {r.Status}")]);
+            return observe(dir, CompiledProgramCache.Compile(options with { OutputPath = Path.Combine(dir, testName + ".dll") }));
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }
     }

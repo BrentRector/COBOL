@@ -71,6 +71,38 @@ internal static class ConformanceCorpus
     }
 
     /// <summary>
+    /// THE compile options of an enabled positive golden — written once, so the corpus runner and the architecture
+    /// review's behavior-neutrality oracle (<see cref="ArchOracle"/>, kb/Work PB2116) compile it identically.
+    /// <para>kb/Work PB803 — a golden may declare its own compile options in its leading comment block
+    /// (<c>*&gt; options: sign-encoding=ascii</c>); one with no header compiles exactly as it always did. A golden's
+    /// library text sits beside it, and the edition directory is named as a COPY search path (<c>--copy DIR</c>)
+    /// exactly as a user names theirs: the default COBOL library (DOC-A.1-40, kb/Work PB1355) is the working
+    /// directory plus the --copy directories, never the source file's own. kb/Work PB1362: the corpus was authored
+    /// against reference-format DETECTION, so it compiles under the <c>--source-format auto</c> extension; a golden
+    /// pinning the standard default says <c>source-format=fixed</c>.</para>
+    /// </summary>
+    internal static CobolNet.CompilerDriver.Options PositiveOptions(string edition, string name, string dll)
+    {
+        string dir = Path.Combine(Root, edition);
+        string src = Path.Combine(dir, name + ".cob");
+        return ApplySourceOptions(File.ReadAllText(src),
+            new CobolNet.CompilerDriver.Options(src, dll, DialectLevel: int.Parse(edition), CopyPaths: [dir],
+                SourceFormat: InitialReferenceFormat.Auto));
+    }
+
+    /// <summary>An enabled negative fixture's source text and the editions it must be REJECTED at. Convention:
+    /// <c>&lt;name&gt;.cob</c>'s first line is a comment naming them — <c>*&gt; reject-at: 2002 2014 2023</c> — and a
+    /// fixture without that header THROWS (a negative that names no edition would assert nothing).</summary>
+    internal static (string Source, IReadOnlyList<int> Editions) NegativeCase(string name)
+    {
+        string src = File.ReadAllText(Path.Combine(Root, "negative", name + ".cob"));
+        string first = src.Split('\n')[0];
+        return first.Contains("reject-at:")
+            ? (src, [.. first.Split("reject-at:")[1].Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse)])
+            : throw new InvalidOperationException($"{name}.cob missing the '*> reject-at:' header");
+    }
+
+    /// <summary>
     /// ⛔ PER-GOLDEN COMPILE OPTIONS, declared in the PROGRAM'S OWN leading comment block (kb/Work PB803):
     /// <code>      *&gt; options: sign-encoding=ascii</code>
     /// Applied to <paramref name="baseline"/> and returned; a program with no such header compiles exactly as
@@ -187,16 +219,7 @@ public abstract class CorpusRunnerTestsBase<TSlot>
         try
         {
             string dll = Path.Combine(tmp, name + ".dll");
-            // kb/Work PB803 — a golden may declare its own compile options in its leading comment block
-            // (`*> options: sign-encoding=ascii`); one with no header compiles exactly as it always did.
-            // A golden's library text sits beside it, and the edition directory is named as a COPY search path
-            // (`--copy DIR`) exactly as a user names theirs: the default COBOL library (DOC-A.1-40, kb/Work
-            // PB1355) is the working directory plus the --copy directories, never the source file's own.
-            // kb/Work PB1362: the corpus was authored against reference-format DETECTION, so it compiles under the
-            // `--source-format auto` extension; a golden pinning the standard default says `source-format=fixed`.
-            var r = CompiledProgramCache.Compile(ConformanceCorpus.ApplySourceOptions(
-                File.ReadAllText(src),
-                new CobolNet.CompilerDriver.Options(src, dll, DialectLevel: int.Parse(edition), CopyPaths: [dir], SourceFormat: InitialReferenceFormat.Auto)));
+            var r = CompiledProgramCache.Compile(ConformanceCorpus.PositiveOptions(edition, name, dll));
             Assert.True(r.Success, $"[{edition}/{name}] must compile strict: {string.Join("\n", r.Errors)}");
             if (!File.Exists(outFile)) return;   // compile-only entry (no expected output recorded)
             var (ran, stdout, detail) = CutRunner.Run(dll, tmp);
@@ -222,11 +245,7 @@ public abstract class CorpusRunnerTestsBase<TSlot>
         if (name == "sentinel") return;
         string dir = Path.Combine(ConformanceCorpus.Root, "negative");
         string expected = File.ReadAllText(Path.Combine(dir, name + ".err")).Trim();
-        // Convention: <name>.cob's first line is a comment naming the editions: *> reject-at: 2002 2014 2023
-        string src = File.ReadAllText(Path.Combine(dir, name + ".cob"));
-        var editions = src.Split('\n')[0].Contains("reject-at:")
-            ? src.Split('\n')[0].Split("reject-at:")[1].Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse)
-            : throw new InvalidOperationException($"{name}.cob missing the '*> reject-at:' header");
+        var (src, editions) = ConformanceCorpus.NegativeCase(name);
         foreach (int ed in editions)
         {
             var (ok, errors, _) = EditionHarness.CompileFull(src, ed);

@@ -1,6 +1,5 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-using CobolNet;
 using CobolNet.Tests.Shared;
 using Xunit;
 
@@ -69,16 +68,6 @@ public abstract class NistDifferentialTestsBase<TSlot>
     // create, so RunNist compiles and runs the predecessors (in order) inside the consumer's OWN isolated directory
     // first — deterministic start-clean, zero cross-test coupling under xunit parallelism.
 
-    /// <summary>The per-edition override for the INV-1-STRONG behavioral leg (the roadmap's fatal-challenge fix,
-    /// attached to the P2.7 flip; promoted to a G7 exit criterion at Phase 8): <c>COBOLNET_NIST_STD</c>
-    /// (85|2002|2014|2023, default 85) + <c>COBOLNET_NIST_PERMISSIVE=1</c> re-target the WHOLE golden run — e.g.
-    /// <c>COBOLNET_NIST_STD=2023 COBOLNET_NIST_PERMISSIVE=1</c> compiles AND RUNS all 318 goldens at the
-    /// shipping default edition in migration mode, asserting byte-identical output.</summary>
-    private static readonly int NistStd =
-        int.TryParse(Environment.GetEnvironmentVariable("COBOLNET_NIST_STD"), out int v) ? v : 85;
-    private static readonly bool NistPermissive =
-        Environment.GetEnvironmentVariable("COBOLNET_NIST_PERMISSIVE") == "1";
-
     /// <summary>Compile a NIST program (with CCVS X-card preprocessing) and run it in an isolated temp directory —
     /// chain predecessors first, when <c>chains.tsv</c> lists any — returning the program's output read from its
     /// print file (the CCVS report) — or stdout for a DISPLAY-only program — normalized to the NIST acceptance
@@ -107,8 +96,7 @@ public abstract class NistDifferentialTestsBase<TSlot>
                 {
                     string pSrc = TestRepo.Nist("programs", p + ".cob");
                     string pDll = Path.Combine(dir, p + ".dll");
-                    var pResult = CompiledProgramCache.Compile(new CompilerDriver.Options(pSrc, pDll, NistTestName: p,
-                        DialectLevel: NistStd, Permissive: NistPermissive));
+                    var pResult = CompiledProgramCache.Compile(CorpusManifest.CompileOptions(p, pDll));
                     if (!pResult.Success)
                         return (false, "", $"[chain {p}] compile {pResult.Status}: {string.Join("\n", pResult.Errors)}");
                     string pDat = TestRepo.Nist("data", p + ".dat");
@@ -116,8 +104,7 @@ public abstract class NistDifferentialTestsBase<TSlot>
                     if (!pOk) return (false, "", $"[chain {p}] run exit non-zero: {pDetail}");
                 }
 
-            var result = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, NistTestName: testName,
-                DialectLevel: NistStd, Permissive: NistPermissive));
+            var result = CompiledProgramCache.Compile(CorpusManifest.CompileOptions(testName, dll));
             if (!result.Success)
                 return (false, "", $"[compile] {result.Status}: {string.Join("\n", result.Errors)}");
 

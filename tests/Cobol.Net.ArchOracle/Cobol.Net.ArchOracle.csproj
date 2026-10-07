@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Cobol.Net.ArchOracle: the process that runs the architecture review's behavior-neutrality oracle (kb/Work
+    PB2116; docs/rearchitecture/DESIGN-architecture-review.md section 4). NOT a test project: nothing in a gate runs
+    it, and it asserts nothing. scripts/arch/capture_oracle.py builds and runs it; scripts/arch/compare_oracle.py
+    compares two of its captures case by case.
+
+    It holds no logic of its own. The population and the compile of every case live in the Conformance assembly
+    (Cobol.Net.Tests.Conformance/ArchOracle.cs), beside the theory families whose rows they enumerate and the
+    option builders those theories call, so the oracle and the suites cannot drift apart; ArchOracleDriftTests
+    holds every row source enrolled. This host only gives that code a process to run in outside xunit.
+
+    A member of CobolSharp.sln, so a solution build keeps it compiling. TFM / LangVersion / Nullable /
+    ImplicitUsings / TreatWarningsAsErrors come from the repository-root Directory.Build.props (imported by
+    tests/Directory.Build.props); nothing here re-declares them.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cobol.Net.Tests.Conformance\Cobol.Net.Tests.Conformance.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      tests/Directory.Build.props links tests/_shared/*.cs into every project under tests/. The oracle's code reaches
+      them through the Conformance assembly, which compiles its own copy; a second copy here would only be one more
+      thing that can fail to compile for reasons unrelated to the oracle (the Cobol.Net.Benchmarks precedent).
+    -->
+    <Compile Remove="$(MSBuildThisFileDirectory)../_shared/*.cs" />
+  </ItemGroup>
+
+</Project>

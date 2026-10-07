@@ -44,7 +44,7 @@ internal static class CompiledProgramCache
     internal const string MaxMbVariable = "COBOLNET_COMPILE_CACHE_MAX_MB";
 
     /// <summary>Bumped whenever the entry layout or the key recipe changes — an old store then misses whole.</summary>
-    private const int FormatVersion = 1;
+    private const int FormatVersion = 2;   // 2: an entry carries the compilation's own output (kb/Work PB2116)
 
     /// <summary>Whether this process uses the cache (see the class remarks).</summary>
     internal static bool Enabled { get; } =
@@ -295,9 +295,11 @@ internal static class CompiledProgramCache
 
     // ───────────────────────────── the store ─────────────────────────────
 
+    /// <summary>A stored compilation. <paramref name="CompileOutput"/> is what the compilation itself transferred
+    /// (the DISPLAY directive's lines, ISO §7.3.12.4 1)): part of the result, so a hit replays it.</summary>
     private sealed record Entry(int Format, string Status, List<string> Errors, List<string> Warnings,
         string? GeneratedSource, List<StoredFile> Files, List<ReadInput> Reads, List<InputProbe> Probes,
-        List<EnvironmentRead> Environment);
+        List<EnvironmentRead> Environment, List<Frontend.Diagnostics.CompileOutputLine> CompileOutput);
 
     private sealed record StoredFile(string Name, string Blob);
 
@@ -350,6 +352,7 @@ internal static class CompiledProgramCache
                 entry.GeneratedSource is { } cs ? Path.Combine(outDir, cs) : null, entry.Errors, entry.Warnings)
             {
                 OutputFiles = written,
+                CompileOutput = entry.CompileOutput,
             };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
@@ -386,7 +389,8 @@ internal static class CompiledProgramCache
                 [.. result.Inputs.FilesRead.Distinct(StringComparer.OrdinalIgnoreCase)
                     .Select(p => new ReadInput(p, Sha256Hex(File.ReadAllBytes(p))))],
                 [.. result.Inputs.Probes.Distinct()],
-                [.. result.Inputs.EnvironmentReads.Distinct()]);
+                [.. result.Inputs.EnvironmentReads.Distinct()],
+                [.. result.CompileOutput]);
             string path = EntryPath(root, key);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             string tmpEntry = path + "." + Guid.NewGuid().ToString("N") + ".tmp";

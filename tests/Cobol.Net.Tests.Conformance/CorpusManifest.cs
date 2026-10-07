@@ -70,4 +70,30 @@ public static class CorpusManifest
 
     /// <summary>xunit <c>[MemberData]</c> source: the green∪divergent names (the NistDifferentialTests theory rows).</summary>
     public static IEnumerable<object[]> GreenData() => Green().Select(r => new object[] { r.Name });
+
+    /// <summary>The per-edition override for the INV-1-STRONG behavioral leg (the roadmap's fatal-challenge fix,
+    /// attached to the P2.7 flip; promoted to a G7 exit criterion at Phase 8): <c>COBOLNET_NIST_STD</c>
+    /// (85|2002|2014|2023, default 85) + <c>COBOLNET_NIST_PERMISSIVE=1</c> re-target the WHOLE golden run — e.g.
+    /// <c>COBOLNET_NIST_STD=2023 COBOLNET_NIST_PERMISSIVE=1</c> compiles AND RUNS all 318 goldens at the
+    /// shipping default edition in migration mode, asserting byte-identical output.</summary>
+    internal static int GoldenRunEdition { get; } =
+        int.TryParse(Environment.GetEnvironmentVariable("COBOLNET_NIST_STD"), out int v) ? v : 85;
+
+    /// <summary>The golden run's severity axis (<c>COBOLNET_NIST_PERMISSIVE=1</c>; see <see cref="GoldenRunEdition"/>).</summary>
+    internal static bool GoldenRunPermissive { get; } =
+        Environment.GetEnvironmentVariable("COBOLNET_NIST_PERMISSIVE") == "1";
+
+    /// <summary>The compile options of the golden run (<c>NistDifferentialTests</c>, chain predecessors included) —
+    /// <see cref="GoldenRunEdition"/> on <see cref="GoldenRunPermissive"/>'s axis.</summary>
+    internal static CompilerDriver.Options CompileOptions(string testName, string dll) =>
+        CompileOptions(testName, dll, GoldenRunEdition, GoldenRunPermissive, checkOnly: false);
+
+    /// <summary>THE compile options of a NIST CCVS program — the X-card preprocessing its name switches on, its
+    /// edition and severity axis, and whether the Roslyn backend runs — written once, so the golden run, the
+    /// per-edition harness (<see cref="EditionHarness.CompileNist"/>) and the architecture review's oracle
+    /// (<see cref="ArchOracle"/>, kb/Work PB2116) compile a NIST program identically.</summary>
+    internal static CompilerDriver.Options CompileOptions(
+        string testName, string dll, int edition, bool permissive, bool checkOnly) =>
+        new(TestRepo.Nist("programs", testName + ".cob"), dll, NistTestName: testName, DialectLevel: edition,
+            Permissive: permissive, CheckOnly: checkOnly);
 }

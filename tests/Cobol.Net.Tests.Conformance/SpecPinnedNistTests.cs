@@ -1,7 +1,5 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-using CobolNet;
-using CobolNet.Tests.Shared;
 using Xunit;
 
 namespace CobolNet.Tests.Conformance;
@@ -28,13 +26,11 @@ public sealed class SpecPinnedNistTests
     [Fact]
     public void NC236A_SearchVaryingOtherTableIndex_ExecutesAllTests()
     {
-        string src = TestRepo.Nist("programs", "NC236A.cob");
         string dir = Path.Combine(Path.GetTempPath(), "CobolNet_Pin_" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(dir);
         try
         {
-            var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "NC236A.dll"), NistTestName: "NC236A", DialectLevel: 85));
+            var r = CompiledProgramCache.Compile(CorpusManifest.CompileOptions("NC236A", Path.Combine(dir, "NC236A.dll"), 85, permissive: false, checkOnly: false));
             Assert.True(r.Success, string.Join("\n", r.Errors));
             var (runOk, _, detail) = CutRunner.Run(Path.Combine(dir, "NC236A.dll"), dir);
             Assert.True(runOk, detail);
@@ -56,13 +52,11 @@ public sealed class SpecPinnedNistTests
     [Fact]
     public void NC235A_SearchAllConditionNameOverOdo_ExecutesAllTests()
     {
-        string src = TestRepo.Nist("programs", "NC235A.cob");
         string dir = Path.Combine(Path.GetTempPath(), "CobolNet_Pin_" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(dir);
         try
         {
-            var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "NC235A.dll"), NistTestName: "NC235A", DialectLevel: 85));
+            var r = CompiledProgramCache.Compile(CorpusManifest.CompileOptions("NC235A", Path.Combine(dir, "NC235A.dll"), 85, permissive: false, checkOnly: false));
             Assert.True(r.Success, string.Join("; ", r.Errors));
             var (runOk, _, detail) = CutRunner.Run(Path.Combine(dir, "NC235A.dll"), dir);
             Assert.True(runOk, detail);
@@ -93,13 +87,11 @@ public sealed class SpecPinnedNistTests
     [Fact]
     public void ST127A_SortDuplicatesInOrder_IsNotAReservedWordViolationAt2002()
     {
-        string src = TestRepo.Nist("programs", "ST127A.cob");
         string dir = Path.Combine(Path.GetTempPath(), "CobolNet_Pin_" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(dir);
         try
         {
-            var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "ST127A.dll"), NistTestName: "ST127A", DialectLevel: 2002));
+            var r = CompiledProgramCache.Compile(CorpusManifest.CompileOptions("ST127A", Path.Combine(dir, "ST127A.dll"), 2002, permissive: false, checkOnly: false));
             string all = string.Join("\n", r.Errors);
             Assert.DoesNotContain("COBOLNET0901", all, StringComparison.Ordinal);
             Assert.DoesNotContain("'ORDER'", all, StringComparison.Ordinal);
@@ -135,13 +127,11 @@ public sealed class SpecPinnedNistTests
     [Fact]
     public void NC201A_VaryingAfterFromOuterInductionVariable_RunsEightBodies()
     {
-        string src = TestRepo.Nist("programs", "NC201A.cob");
         string dir = Path.Combine(Path.GetTempPath(), "CobolNet_Pin_" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(dir);
         try
         {
-            var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
-                src, Path.Combine(dir, "NC201A.dll"), NistTestName: "NC201A", DialectLevel: 85));
+            var r = CompiledProgramCache.Compile(CorpusManifest.CompileOptions("NC201A", Path.Combine(dir, "NC201A.dll"), 85, permissive: false, checkOnly: false));
             Assert.True(r.Success, string.Join("\n", r.Errors));
             var (runOk, _, detail) = CutRunner.Run(Path.Combine(dir, "NC201A.dll"), dir);
             Assert.True(runOk, detail);

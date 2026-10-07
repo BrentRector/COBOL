@@ -6,14 +6,15 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-275 drift tests.
+276 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
 | [GateLegDriftTests](../tests/Cobol.Net.Tests.Characterization/GateLegDriftTests.cs) | ⛔ THIS ASSEMBLY RUNS UNDER THE GATE'S LEG FILTER, AND ITS NAMES ARE PLANNABLE (kb/Work PB1719; DESIGN-test-build-ci.md section 3.14.4 arms (4) and (5)): it names GateTestFramework as its xunit framework, and no discovered case carries the repository root. | — |
+| [ArchOracleDriftTests](../tests/Cobol.Net.Tests.Conformance/ArchOracleDriftTests.cs) | ⛔ THE ORACLE'S POPULATION IS THE SUITES' POPULATION (kb/Work PB2116; docs/rearchitecture/ DESIGN-architecture-review.md §4): every [PartitionedRowSource] of this assembly is enrolled in Sources, every row it yields is an oracle case (only the empty-manifest sentinel is not), two rows of one source are never one case, an observation carries no machine-specific path or clock reading, and the recorde… | `docs/rearchitecture/evidence/arch-oracle` |
 | [BitRunImageDriftTests](../tests/Cobol.Net.Tests.Conformance/BitRunImageDriftTests.cs) | ⛔ ONE GROUP, TWO COMPOSERS, ONE ANSWER — the drift net under kb/Work PB584's mechanism. | `src`, `src/Cobol.Net.Compiler/Binding/Model/BitLayout.cs`, `src/Cobol.Net.Compiler/Binding/DataBinder.cs` |
 | [ByteWindowResidueDriftTests](../tests/Cobol.Net.Tests.Conformance/ByteWindowResidueDriftTests.cs) | ⛔ THE DRIFT PIN FOR THE ONE BYTE-WINDOW CARRIAGE GATE (DataBinder.ByteWindowResidueOf; kb/Work PB231). | — |
-| [CompiledProgramCacheDriftTests](../tests/Cobol.Net.Tests.Conformance/CompiledProgramCacheDriftTests.cs) | ⛔ THE KEY OF CompiledProgramCache IS COMPLETE (kb/Work PB985 obligation 2; DESIGN-test-build-ci.md §3.12). | `tests/nist/programs/NC101A.cob`, `tests/Cobol.Net.Tests.Conformance`, `src`, `src/prog.cob`, `src/PB985CPY.cpy` |
+| [CompiledProgramCacheDriftTests](../tests/Cobol.Net.Tests.Conformance/CompiledProgramCacheDriftTests.cs) | ⛔ THE KEY OF CompiledProgramCache IS COMPLETE (kb/Work PB985 obligation 2; DESIGN-test-build-ci.md §3.12). | `tests/Cobol.Net.Tests.Conformance`, `src`, `src/prog.cob`, `src/PB985CPY.cpy` |
 | [DifferentialGoldenDriftTests](../tests/Cobol.Net.Tests.Conformance/DifferentialGoldenDriftTests.cs) | The differential-golden drift guard (rearchitecture P0 step 11) — the "nothing silently orphaned" backstop for the committed differential goldens, mirroring CorpusManifestTests/ConstructRegistryDriftTests. | `tests/Cobol.Net.Tests.Conformance`, `tests/differential` |
 | [EditionGateArmDriftTests](../tests/Cobol.Net.Tests.Conformance/EditionGateArmDriftTests.cs) | ⛔ AN EDITION GATE KEYED ON A BOUND NODE'S SHAPE IS SILENTLY UN-GATED ON EVERY PATH THAT BAILS OUT BEFORE THE NODE IS BUILT (kb/Work PB353). | — |
 | [EvaluateOperandClassifierDriftTests](../tests/Cobol.Net.Tests.Conformance/EvaluateOperandClassifierDriftTests.cs) | ⛔ THE EVALUATE OPERAND CLASSIFIER IS SYMMETRIC, AND THIS IS WHAT MEASURES IT. | — |
