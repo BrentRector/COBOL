@@ -182,7 +182,7 @@ of an unsupported facility.
   a boolean receiver "with zero fill or truncation to the right"; §8.3.3.6.4 GR4 gives the ZERO format "one or
   more of the boolean character '0'"), and the same answer GR3 gives a boolean zero-length literal, so the two
   GR arms agree. Written once, in `FigurativeConstants.FillChar` — the compiler's one fill-character
-  computation; witnessed by `conformance:2002/pb425_zero_length_literal_move` (`A-BOOL=[0000]`).
+  computation; witnessed by `conformance:2014/pb425_zero_length_literal_move` (`A-BOOL=[0000]`).
   *(Unrelated to the superseded D-B1 boolean-representation determination in `COBOLNET_DATA_MODEL_DESIGN.md`.)*
 - **D-DL1 — §14.9.20.4 GR7's length-zeroing is the GR6c arm's rule, not a post-pass over all three
   sending-operand arms** (2026-09-20; kb/Work PB418 + PB415, rows `GR-14.9.20.4-7` and `SR-14.9.20.3-8`).

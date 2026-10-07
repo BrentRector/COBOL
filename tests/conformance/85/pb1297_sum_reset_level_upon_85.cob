@@ -39,6 +39,10 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1297T.
        ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           SYMBOLIC CHARACTERS SYM-X0A SYM-X0C SYM-X0D
+               ARE 11 13 14.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
            SELECT PRA ASSIGN TO "pb1297a.txt".
@@ -118,17 +122,17 @@
            PERFORM END-FILE.
            STOP RUN.
        TAKE-BYTE.
-           IF WS-B = X"0A"
+           IF WS-B = SYM-X0A
                PERFORM SHOW-LINE
            ELSE
-               IF WS-B = X"0C"
+               IF WS-B = SYM-X0C
                    IF WS-I > 0
                        PERFORM SHOW-LINE
                    END-IF
                    DISPLAY "(page)"
                    MOVE 0 TO WS-LN
                ELSE
-                   IF WS-B NOT = X"0D"
+                   IF WS-B NOT = SYM-X0D
                        ADD 1 TO WS-I
                        MOVE WS-B TO WS-LINE(WS-I:1)
                    END-IF

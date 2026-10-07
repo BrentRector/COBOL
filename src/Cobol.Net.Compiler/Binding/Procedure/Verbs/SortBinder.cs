@@ -155,7 +155,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         if (!ScreenTransferRecordSizes(file, usingFiles, givingFiles, merge: false)) return BoundRejected.Reported(ctx.Edition);   // SR5, SR11
 
         return new BoundSort(file, keys, s.sortDuplicatesPhrase() is not null, collating,
-            usingFiles, inputProc, givingFiles, outputProc, SortVaryingOf(file));
+            usingFiles, inputProc, givingFiles, outputProc, SortVaryingOf(file)) { At = ctx.Edition.Cursor };
     }
 
     /// <summary>Bind the Format-2 in-place TABLE sort (ISO §14.9.40 GR18–GR24) over the typed element array.
@@ -428,7 +428,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         // procedure-range cross-pass in VersionConformancePass.GateSortMergeProcedures (the paragraph-pc ranges are
         // available on this BoundMerge/BoundSort). Below 2023 the runtime EC-SORT-MERGE-ACTIVE raise in
         // CobolSort.Init covers the dynamic case when checking is enabled (kb/Work PB1036).
-        return new BoundMerge(file, keys, collating, usingFiles, givingFiles, outputProc, SortVaryingOf(file));
+        return new BoundMerge(file, keys, collating, usingFiles, givingFiles, outputProc, SortVaryingOf(file))
+            { At = ctx.Edition.Cursor };
     }
 
     // ── RELEASE (ISO §14.9.32) ─────────────────────────────────────────────────────────────────────────────

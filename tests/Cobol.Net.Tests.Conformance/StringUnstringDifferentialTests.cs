@@ -44,9 +44,10 @@ public sealed class StringUnstringDifferentialTests
     // §14.9.43.2 format + SR9: a DELIMITED phrase governs the whole run of senders before it; the trailing
     // phraseless run (legal only immediately before INTO) is DELIMITED BY SIZE. GR3b: the delimiter cuts each
     // governed sender and is itself never transferred. Expected: "AB" + "EF" + "IJK".
+    // Compiled at 2002: the omitted trailing DELIMITED phrase is a post-1985 form (kb/Work PB1567, VCR row 7.31).
     [Fact]
     public void String_DelimitedPhraseGovernsItsRun_TrailingRunIsSize()
-        => AssertMatchesGolden(Program("STRRUN", """
+        => DifferentialGolden.Assert(Program("STRRUN", """
             01 WS-A PIC X(5) VALUE "AB*CD".
             01 WS-B PIC X(5) VALUE "EF*GH".
             01 WS-C PIC X(3) VALUE "IJK".
@@ -55,7 +56,7 @@ public sealed class StringUnstringDifferentialTests
                 STRING WS-A WS-B DELIMITED BY "*" WS-C INTO WS-R.
                 DISPLAY WS-R.
                 STOP RUN.
-            """));
+            """), edition: 2002, goldenName: "string_delimited_run_trailing_size");
 
     // §14.9.43.4 GR3b: a delimiter that is never encountered — here one LONGER than the sender — moves the whole
     // sender (the NC217A "ABCDEFG" case).

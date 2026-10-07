@@ -1304,6 +1304,42 @@
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. NEQ.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 A PIC 9 VALUE 7.\nPROCEDURE DIVISION.\nMAIN.\n    IF A <> 3 DISPLAY \"NE\".\n    STOP RUN.\n"
   },
   {
+   "id": "hex-alphanumeric-literal-2002",
+   "description": "The hexadecimal alphanumeric literal X\"...\" (ISO §8.3.3.2.2 format 2: X followed by hex-character-sequence-1 between quotation symbols; §8.3.3.2.3 SR5/SR6 its digits and pairing). ANSI X3.23-1985 has no hexadecimal literal - its nonnumeric literal is the quoted form only - so X\"...\" in a COBOL-85 source is a later edition's construct, exactly as its national and boolean twins NX\"...\" / BX\"...\" are (national-data-2002 / boolean-data-2002). THE EDGE IS DERIVED, NOT QUOTED (VCR row 7.29; the repo holds no 1985/2002/2014 text, ratified decision #1): the 2002/2014 standards' substantive-changes list (as IBM reproduces it) carries 'Hexadecimal literals: The ability was added to specify alphanumeric, boolean, and national literals using hexadecimal (radix 16) notation' - ONE item for all three forms, whose national and boolean members GnuCOBOL's dialect files place at 2002 (cobol85.conf hexadecimal-national-literals / hexadecimal-boolean: unconformable; cobol2002.conf: ok); and none of the 459 NIST CCVS-85 programs writes one. Gated position-blind on the TOKEN by LiteralScreenPass.GateFormat (kb/Work PB1545), because no data gate covers an X literal in the VALUE clause of an alphanumeric item.",
+   "display": "the hexadecimal alphanumeric literal X\"...\"",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §8.3.3.2.2 format 2; a COBOL-2002 introduction (derived: VCR row 7.29)",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "hexadecimal literals (2002 substantive change); VCR row 7.29",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMHEXL.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 W PIC XX VALUE X\"4142\".\nPROCEDURE DIVISION.\nMAIN.\n    DISPLAY W.\n    STOP RUN.\n"
+  },
+  {
+   "id": "zero-length-literal-2014",
+   "description": "The zero-length literal (ISO §8.3.3.1: 'If the opening and closing delimiters are contiguous, the length of the literal is zero, and it is known as a zero-length literal') in every spelling the alphanumeric, national and boolean formats admit - \"\", '', X\"\", N\"\", NX\"\", B\"\", BX\"\" (CobolLiteral.IsZeroLength). Not the same construct as ref-mod-zero-length-2023 (a reference modification of length zero). THE EDGE IS DERIVED, NOT QUOTED (VCR row 7.30; the repo holds no 1985/2002/2014 text, ratified decision #1): GnuCOBOL 3.2's per-standard dialect files carry zero-length-literals: unconformable in cobol85.conf AND cobol2002.conf and ok in cobol2014.conf - the method owner decision kb/Work R61 used for the debugging-mode window - and cobc -std=cobol2002 refuses MOVE \"\" TO X with 'zero-length literal does not conform to COBOL 2002'; Annex E (2014->2023) does not list it, so it predates 2023. Gated position-blind on the TOKEN by LiteralScreenPass.GateFormat (kb/Work PB895).",
+   "display": "the zero-length literal",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §8.3.3.1; a COBOL-2014 introduction (derived: VCR row 7.30)",
+   "introducedIn": 2014,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "zero-length literals (2014 introduction, GnuCOBOL dialect-file evidence); VCR row 7.30",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMZLEN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 W PIC X(3) VALUE \"ABC\".\nPROCEDURE DIVISION.\nMAIN.\n    MOVE \"\" TO W.\n    DISPLAY \"[\" W \"]\".\n    STOP RUN.\n"
+  },
+  {
+   "id": "string-delimited-omitted-2002",
+   "description": "A STRING statement with its DELIMITED phrase omitted before INTO (ISO §14.9.43.3 SR9: 'The DELIMITED phrase may be omitted only immediately preceding the INTO phrase. If it is omitted, DELIMITED BY SIZE is implied'). COBOL-85's STRING closes every sending group with DELIMITED BY {identifier-2 | literal-2 | SIZE} - every one of the 34 STRING statements in the NIST CCVS-85 suite writes it - so the omission is a post-1985 form. THE EDGE IS DERIVED, NOT QUOTED (VCR row 7.31; the repo holds no 1985/2002/2014 text, ratified decision #1): Annex E (2014->2023) does not list it, so it predates 2023; the 2002-versus-2014 split is not derivable in-repo (GnuCOBOL has no dialect option and accepts the omission everywhere) and takes the provisional 2002 edge rows 7.21/7.26 carry - the edge that never refuses a legal 2002 program. Gated in ONE place, VersionConformancePass.VisitStringStatement, on the last sending phrase (kb/Work PB1567).",
+   "display": "a STRING statement with the DELIMITED phrase omitted",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §14.9.43.3 SR9; a post-1985 form (derived: VCR row 7.31)",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "STRING DELIMITED phrase optional (post-85; provisional 2002 edge); VCR row 7.31",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMSTRD.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 A PIC X(3) VALUE \"ABC\".\n01 B PIC X(6) VALUE SPACES.\nPROCEDURE DIVISION.\nMAIN.\n    STRING A A INTO B.\n    DISPLAY B.\n    STOP RUN.\n"
+  },
+  {
    "id": "label-records-removed-2002",
    "description": "LABEL RECORDS clause (FD) — obsolete '85 element DELETED by ISO/IEC 1989:2002; the 2023 FD clause set (§13.18) has no LABEL clause. The FIRST removal gate, shipped with the permissive flip (every NIST FD writes this clause).",
    "display": "the LABEL RECORDS clause",

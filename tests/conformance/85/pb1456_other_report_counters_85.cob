@@ -27,6 +27,10 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1456O85.
        ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           SYMBOLIC CHARACTERS SYM-X0A SYM-X0D
+               ARE 11 14.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
            SELECT P1 ASSIGN TO "pb1456o85a.txt".
@@ -89,10 +93,10 @@
            PERFORM SHOW-LINE.
            STOP RUN.
        TAKE-BYTE.
-           IF WS-BYTE = X"0A"
+           IF WS-BYTE = SYM-X0A
                PERFORM SHOW-LINE
            ELSE
-               IF WS-BYTE NOT = X"0D"
+               IF WS-BYTE NOT = SYM-X0D
                    ADD 1 TO WS-I
                    MOVE WS-BYTE TO WS-LINE(WS-I:1)
                END-IF

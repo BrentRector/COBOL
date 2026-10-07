@@ -18,7 +18,7 @@ namespace CobolNet.Tests.Conformance;
 /// SPECIAL-NAMES literal is COBOLNET2474; a numeric constant-name and a figurative with no character value in the
 /// pair's class are SR1's COBOLNET1540; an ALL figurative operand stays COBOLNET1541.</item>
 /// </list>
-/// The positive VALUES are pinned by the <c>2002/pb1406_concat_word_operands</c> golden; this class pins the
+/// The positive VALUES are pinned by the <c>2014/pb1406_concat_word_operands</c> golden; this class pins the
 /// verdicts, one diagnostic per case.
 /// </summary>
 public sealed class ConcatOperandTests

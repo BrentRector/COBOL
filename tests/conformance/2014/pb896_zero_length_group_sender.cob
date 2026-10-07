@@ -17,9 +17,9 @@
       *> ISO 13.18.38.4 GR8 a) - with data-name-1 outside the group, only the part of the table area the
       *>   DEPENDING item specifies is used, which is what makes L3/L4's non-zero extent "125".
       *>
-      *> EDITION: --std 85. Neither 8.5.4 nor 13.18.38 SR16's zero integer-1 carries an edition marker and Annex
-      *> E lists no change to either, so the shape is live at 85/2002/2014/2023 and the oldest edition is where a
-      *> mis-gated screen would show first.
+      *> EDITION: --std 2014. Neither 8.5.4 nor 13.18.38 SR16's zero integer-1 carries an edition marker and
+      *> Annex E lists no change to either, but the zero-length literal the program also moves is a COBOL-2014
+      *> introduction (kb/Work PB895, VCR row 7.30), so 2014 is the oldest edition that can compile it.
       *>
       *> EXPECTED OUTPUT, DERIVED FROM THE SPEC:
       *>

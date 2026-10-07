@@ -4,6 +4,7 @@ using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using CobolNet.Binding;              // EditionContext, DiagnosticCursorAt
 using CobolNet.Common;               // CobolLiteral — the ONE literal codec and its shape rules
+using CobolNet.Editions;             // Constructs, ConstructRegistry — the literal-format edition gates
 using CobolNet.Editions.Diagnostics; // DiagnosticCatalog
 using CobolNet.Frontend.Expressions; // ArithmeticFormationRules — the ONE §8.3.3.3.2 rule-2 contiguity test
 using CobolNet.Frontend.Generated;   // CobolParserCore contexts of the signed literal slots
@@ -47,8 +48,10 @@ namespace CobolNet.Validation;
 /// that fragment tree is never walked here, and does not need to be, because each of its literals is already a token
 /// of this tree. <c>LiteralScreenDriftTests</c> derives <see cref="LiteralTokens.Types"/> from the lexer grammar
 /// (every token whose body is a literal fragment), so a new literal token cannot escape the screen.</para>
-/// <para>Edition-invariant: the rules carry no edition qualifier in the text the repository holds, and the checks
-/// they replace ran at every <c>--std</c>. It is a sibling of <see cref="ExpressionFormationPass"/> on the same
+/// <para>The syntax rules are edition-invariant: they carry no edition qualifier in the text the repository holds, and
+/// the checks they replace ran at every <c>--std</c>. The one edition question asked here is which literal FORMATS the
+/// targeted edition HAS (<see cref="GateFormat"/>) — the same property of the token as written, so the same walk. It is
+/// a sibling of <see cref="ExpressionFormationPass"/> on the same
 /// "orthogonal axis ⇒ separate pass" footing (<c>BinderDriver</c>), and — unlike a <see cref="CursorFollowingVisitor"/>
 /// — a plain walk, so no visitor override that declines to descend can hide a literal from it.</para>
 /// </remarks>
@@ -103,18 +106,43 @@ internal static class LiteralScreenPass
             + $"separator (ISO §8.3.5). Write `{sign.Text}{first.Text}` if the sign belongs to the literal.");
     }
 
-    /// <summary>The first of the three rules the literal violates, in <see cref="CobolLiteral.SyntaxViolation"/>'s one
-    /// order, reported at the token under the rule's own descriptor.</summary>
+    /// <summary>The edition gates of the literal's FORMAT, then the first of the three rules the literal violates, in
+    /// <see cref="CobolLiteral.SyntaxViolation"/>'s one order, reported at the token under the rule's own descriptor.</summary>
     private static void Screen(ITerminalNode t, EditionContext edition)
     {
         string raw = t.GetText();
-        if (CobolLiteral.SyntaxViolation(raw) is not { } v) return;
         using var _ = edition.At(t.Symbol);
+        GateFormat(raw, edition);
+        if (CobolLiteral.SyntaxViolation(raw) is not { } v) return;
         edition.Error(v.Rule switch
         {
             LiteralRule.Repertoire => DiagnosticCatalog.LiteralContentRepertoire,
             LiteralRule.HexGrouping => DiagnosticCatalog.HexLiteralDigitGrouping,
             _ => DiagnosticCatalog.LiteralTooLong,
         }, $"the literal {CobolLiteral.Abbreviated(raw)} {v.Message}");
+    }
+
+    /// <summary>⛔ THE LITERAL FORMATS A LATER EDITION INTRODUCED — asked of the token, position-blind, because a format is
+    /// a property of the literal as WRITTEN whatever consumes it (a VALUE clause of an alphanumeric item has no data
+    /// gate to carry it, unlike a national or boolean literal, whose item's category is gated in
+    /// <c>VersionConformancePass.GateData</c>):
+    /// <list type="bullet">
+    /// <item>the HEXADECIMAL ALPHANUMERIC literal <c>X"…"</c> — §8.3.3.2.2 format 2, a COBOL-2002 introduction
+    /// (<see cref="Constructs.HexAlphanumericLiteral2002"/>; VCR row 7.29, kb/Work PB1545). Its national and boolean
+    /// twins <c>NX"…"</c> / <c>BX"…"</c> arrive with their classes and are gated as those classes are;</item>
+    /// <item>the ZERO-LENGTH literal — §8.3.3.1, "If the opening and closing delimiters are contiguous, the length of
+    /// the literal is zero, and it is known as a zero-length literal", in every one of its spellings
+    /// (<see cref="CobolLiteral.IsZeroLength"/>), a COBOL-2014 introduction (<see cref="Constructs.ZeroLengthLiteral2014"/>;
+    /// VCR row 7.30, kb/Work PB895).</item>
+    /// </list>
+    /// Both edges are DERIVED, the repository holding no 1985, 2002 or 2014 text; the derivation is the VCR row's.</summary>
+    private static void GateFormat(string raw, EditionContext edition)
+    {
+        if (CobolLiteral.IsHexadecimalFormat(raw) && CobolLiteral.ClassOf(raw) is LiteralClass.Alphanumeric)
+            ConstructRegistry.Check(edition.Edition, edition, Constructs.HexAlphanumericLiteral2002,
+                $"the hexadecimal alphanumeric literal {CobolLiteral.Abbreviated(raw)}");
+        if (CobolLiteral.IsZeroLength(raw))
+            ConstructRegistry.Check(edition.Edition, edition, Constructs.ZeroLengthLiteral2014,
+                $"the zero-length literal {raw}");
     }
 }

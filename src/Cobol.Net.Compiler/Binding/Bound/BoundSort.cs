@@ -47,7 +47,13 @@ public sealed record BoundSort(
     IReadOnlyList<BoundSortMergeKey> Keys, bool DuplicatesInOrder, SortCollation Collating,
     IReadOnlyList<FileModel> Using, PcRange? InputProcedure,
     IReadOnlyList<FileModel> Giving, PcRange? OutputProcedure,
-    SortVaryingInfo? Varying) : BoundStatement;
+    SortVaryingInfo? Varying) : BoundStatement
+{
+    /// <summary>The statement's source position, captured from the binder's diagnostic cursor when the node is built,
+    /// so a placement rule asked AFTER binding (<c>VersionConformancePass.GateSortMergeProcedures</c>) reports at the
+    /// statement and not at no position at all (kb/Work PB812).</summary>
+    public CobolNet.Editions.DiagnosticCursor At { get; init; }
+}
 
 /// <summary><c>SORT data-name-2 …</c> (ISO §14.9.40 Format 2, COBOL-2002+): the in-place table sort over the typed
 /// element array (COBOLNET_DESIGN §8.2 — the one sanctioned divergence from the image store: Format 2 operates on
@@ -105,7 +111,11 @@ public sealed record BoundMerge(
     IReadOnlyList<BoundSortMergeKey> Keys, SortCollation Collating,
     IReadOnlyList<FileModel> Using,
     IReadOnlyList<FileModel> Giving, PcRange? OutputProcedure,
-    SortVaryingInfo? Varying) : BoundStatement;
+    SortVaryingInfo? Varying) : BoundStatement
+{
+    /// <summary>The statement's source position (as <see cref="BoundSort.At"/>; kb/Work PB812).</summary>
+    public CobolNet.Editions.DiagnosticCursor At { get; init; }
+}
 
 /// <summary><c>RELEASE record-name-1 [FROM x]</c> (ISO §14.9.32): release the SD record's image to the initial
 /// phase of the active sort (GR2). FROM ≡ <c>MOVE x TO record-name-1</c> then the same RELEASE (GR4). A varying SD

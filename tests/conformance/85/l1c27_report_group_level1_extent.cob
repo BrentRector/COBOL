@@ -32,6 +32,10 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1C27D.
        ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           SYMBOLIC CHARACTERS SYM-X0A SYM-X0D
+               ARE 11 14.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
            SELECT PRT ASSIGN TO "L1C27D.TXT".
@@ -78,10 +82,10 @@
            END-IF.
            STOP RUN.
        TAKE-BYTE.
-           IF CHK-REC = X"0A"
+           IF CHK-REC = SYM-X0A
                PERFORM SHOW-LINE
            ELSE
-               IF CHK-REC NOT = X"0D"
+               IF CHK-REC NOT = SYM-X0D
                    ADD 1 TO WS-I
                    MOVE CHK-REC TO WS-LINE(WS-I:1)
                END-IF

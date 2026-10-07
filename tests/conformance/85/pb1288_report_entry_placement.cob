@@ -21,6 +21,10 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1288P.
        ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           SYMBOLIC CHARACTERS SYM-X0A SYM-X0C SYM-X0D
+               ARE 11 13 14.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
            SELECT PRT ASSIGN TO "PB1288P.TXT".
@@ -72,14 +76,14 @@
            STOP RUN.
        TAKE-BYTE.
            EVALUATE TRUE
-               WHEN WS-BYTE = X"0A"
+               WHEN WS-BYTE = SYM-X0A
                    PERFORM SHOW-LINE
-               WHEN WS-BYTE = X"0C"
+               WHEN WS-BYTE = SYM-X0C
                    IF WS-I > 0
                        PERFORM SHOW-LINE
                    END-IF
                    MOVE 0 TO WS-LN
-               WHEN WS-BYTE = X"0D"
+               WHEN WS-BYTE = SYM-X0D
                    CONTINUE
                WHEN OTHER
                    ADD 1 TO WS-I

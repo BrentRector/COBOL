@@ -734,6 +734,6 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
                 $"{verb} shall not be specified in a recursive source element (ISO {cite}; a function or "
                 + "method is always recursive, §8.6.6)");
         }
-        return new BoundCommitRollback(isCommit);
+        return new BoundCommitRollback(isCommit) { At = Ctx.Edition.Cursor };
     }
 }

@@ -38,6 +38,10 @@
       *>             U+20AC; U+00E9 is written as its OWN byte 0xE9 —
       *>             never '?' — and the file holds that line alone.
        ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           SYMBOLIC CHARACTERS SYM-X0D SYM-X0A
+               ARE 14 11.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
            SELECT SQ ASSIGN TO "pb690fcs-s.dat"
@@ -144,7 +148,7 @@
                READ CK
                IF FC = "00"
                    ADD 1 TO N
-                   IF CR NOT = X"0D" AND CR NOT = X"0A"
+                   IF CR NOT = SYM-X0D AND CR NOT = SYM-X0A
                        DISPLAY "PR-BYTE " N "=" FUNCTION ORD(CR)
                    END-IF
                END-IF

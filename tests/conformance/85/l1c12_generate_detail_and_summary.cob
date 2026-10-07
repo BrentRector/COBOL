@@ -74,6 +74,10 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1C12A.
        ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           SYMBOLIC CHARACTERS SYM-X0A SYM-X0D SYM-X0C
+               ARE 11 14 13.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
            SELECT PRT ASSIGN TO "L1C12A.RPT".
@@ -121,10 +125,10 @@
            PERFORM SHOW-LINE.
            STOP RUN.
        TAKE-BYTE.
-           IF CHK-REC = X"0A"
+           IF CHK-REC = SYM-X0A
                PERFORM SHOW-LINE
            ELSE
-               IF CHK-REC NOT = X"0D" AND CHK-REC NOT = X"0C"
+               IF CHK-REC NOT = SYM-X0D AND CHK-REC NOT = SYM-X0C
                    ADD 1 TO WS-I
                    MOVE CHK-REC TO WS-LINE(WS-I:1)
                END-IF

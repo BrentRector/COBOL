@@ -97,7 +97,8 @@ public sealed class NationalBooleanMoveTests
             MOVE N"" TO NW.
             DISPLAY "Z=" NW "!".
             """);
-        var (ok, stdout, detail) = new CobolNetCompiler(2002).CompileAndRun(src);
+        // 2014: the zero-length N"" sender is a COBOL-2014 literal format (kb/Work PB895, VCR row 7.30).
+        var (ok, stdout, detail) = new CobolNetCompiler(2014).CompileAndRun(src);
         Assert.True(ok, detail);
         Assert.Equal("A=AB  !\nX=XY  !\nE=P Q !\nN=042 !\nD= 42 !\nB=101 !\nS=OK  !\nZ=    !", stdout);
     }

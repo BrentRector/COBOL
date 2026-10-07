@@ -1440,7 +1440,11 @@ public sealed record BoundImplicitSeries(IReadOnlyList<BoundStatement> Members) 
 /// CONTINUE-equivalent — but the node carries its IDENTITY, so §14.9.7.3/§14.9.36.3 SR2's SORT/MERGE
 /// procedure ban is enforceable in the cross-pass where the old payload-free BoundNop made the statement
 /// indistinguishable from CONTINUE forever.</summary>
-public sealed record BoundCommitRollback(bool IsCommit) : BoundStatement;
+public sealed record BoundCommitRollback(bool IsCommit) : BoundStatement
+{
+    /// <summary>The statement's source position (as <see cref="BoundSort.At"/>; kb/Work PB812).</summary>
+    public CobolNet.Editions.DiagnosticCursor At { get; init; }
+}
 
 /// <summary><c>NEXT SENTENCE</c> (ISO §14.9.19.4 GR4 in an IF's THEN phrase and GR6 in its ELSE phrase — ONE
 /// node for both, since the two rules state the same transfer and nothing downstream may diverge on the arm; also

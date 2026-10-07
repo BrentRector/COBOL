@@ -9,8 +9,9 @@
       *> receiver stays legal.
       *> SR1: "Literal-1 and literal-2 shall be literals of the category alphanumeric or national and shall be
       *> neither a figurative constant that begins with the word ALL nor a zero-length literal." ALL "," is the ALL
-      *> PHRASE followed by an ordinary literal-1, a hexadecimal literal is alphanumeric, and SPACE is a figurative
-      *> constant that does NOT begin with ALL.
+      *> PHRASE followed by an ordinary literal-1, and SPACE is a figurative constant that does NOT begin with ALL.
+      *> (The hexadecimal-literal neighbour, X"2C", is a COBOL-2002 literal format - kb/Work PB1545 - and lives
+      *> in 2002/pb1545_hex_alphanumeric_literal.)
       *>
       *> EXPECTED OUTPUT, DERIVED FROM THE RULES (14.9.43.4 GR1/GR3, 14.9.48.4 GR3-GR11) - NOT FROM A RUN:
       *>   1) STRING N3 "-" "AB5CD" DELIMITED BY D2: each sending item is moved up to the first "5" it holds; N3 is
@@ -18,7 +19,7 @@
       *>   2) UNSTRING "AB,,CD,EF" DELIMITED BY ALL ",": the run of commas is ONE delimiter -> AB / CD / EF.
       *>   3) UNSTRING "12,34" INTO NV (PIC 9V9) M (PIC 9(4)): "12" is moved as the integer 12 to 9V9, keeping the low
       *>      order digits -> 2.0, shown "20"; "34" -> 0034.
-      *>   4) UNSTRING "AB,CD" DELIMITED BY X"2C" (the comma): AB / CD.
+      *>   4) UNSTRING "AB,CD" DELIMITED BY "," into alphanumeric receivers: AB / CD.
       *>   5) UNSTRING "AB,CD5EF" DELIMITED BY "," OR "5": AB / CD / EF.
       *>   6) UNSTRING FUNCTION UPPER-CASE("a,b") DELIMITED BY ",": a function-identifier is an identifier-1 -> A / B.
       *>   7) UNSTRING "A   B" DELIMITED BY ALL SPACE: A / B.
@@ -46,7 +47,7 @@
            UNSTRING S DELIMITED BY "," INTO NV M.
            DISPLAY "3=[" NV "][" M "]".
            MOVE "AB,CD" TO S.
-           UNSTRING S DELIMITED BY X"2C" INTO A B.
+           UNSTRING S DELIMITED BY "," INTO A B.
            DISPLAY "4=[" A "][" B "]".
            MOVE "AB,CD5EF" TO S.
            UNSTRING S DELIMITED BY "," OR "5" INTO A B C.

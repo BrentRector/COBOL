@@ -83,9 +83,13 @@ public readonly record struct PcRange
     /// End</c> read as a numeric interval — for a legal INVERTED THRU range (§14.9.28.4 GR6, <see cref="End"/> physically
     /// before <see cref="Start"/>) that interval is the empty set, which is how a MERGE written inside an inverted
     /// SORT input procedure escaped its prohibition (kb/Work PB812). The EMPTY range has no paragraph.
-    /// <para>This is the LEXICAL model, not the executed one: GR10 defines the range of a sort procedure by the
-    /// statements EXECUTED as the result of a transfer of control, which a PERFORM out of the range and back extends
-    /// beyond any span of the text. A reachability walk would replace this one method (kb/Work PB812).</para></summary>
+    /// <para>This is the LEXICAL model, and it is the right one for a syntax rule. §14.9.40.4 GR10 defines the RANGE of
+    /// a sort procedure by the statements EXECUTED as the result of a transfer of control (a PERFORM out of the procedure
+    /// and back extends it beyond any span of the text), but GR10 attaches its own consequence to that dynamic range —
+    /// the EC-SORT-MERGE-ACTIVE exception condition, raised at run time (kb/Work PB1036) — and a paragraph reached from
+    /// both inside and outside the procedure is not "in" it for the syntax rules. No reachability walk replaces this
+    /// method (kb/Work PB812's determination). A rule that IS about execution (§14.9.28.3 SR8's "under") builds its
+    /// closure in <c>ProcedureReach.Closure</c>, seeded from <see cref="SpannedPcs"/>.</para></summary>
     public bool Spans(int pc) => !IsEmpty && pc >= SpanLow && pc <= SpanHigh;
 
     /// <summary>The paragraphs <see cref="Spans"/> answers membership of, lowest pc first — the seed set of the

@@ -82,7 +82,7 @@ public sealed class ZeroLengthLiteralMoveTests
             DISPLAY "NU=[" R-NUM "]".
             DISPLAY "NE=[" R-NUM-ED "]".
             """);
-        Assert.Equal("AB=[   ]\nAN=[   ]\nAE=[  /  ]\nBO=[0000]\nNA=[   ]\nNU=[   ]\nNE=[   ]", Run(src, 2002));
+        Assert.Equal("AB=[   ]\nAN=[   ]\nAE=[  /  ]\nBO=[0000]\nNA=[   ]\nNU=[   ]\nNE=[   ]", Run(src, 2014));
     }
 
     /// <summary>GR2's NATIONAL arm — <c>N""</c> is the same substitution, at the three receiver categories
@@ -102,7 +102,7 @@ public sealed class ZeroLengthLiteralMoveTests
             DISPLAY "NA=[" R-NAT "]".
             DISPLAY "NU=[" R-NUM "]".
             """);
-        Assert.Equal("BO=[0000]\nNA=[   ]\nNU=[   ]", Run(src, 2002));
+        Assert.Equal("BO=[0000]\nNA=[   ]\nNU=[   ]", Run(src, 2014));
     }
 
     /// <summary>⭐ THE EQUIVALENCE GR2 STATES, measured as one: whatever <c>MOVE SPACE TO x</c> produces,
@@ -156,7 +156,7 @@ public sealed class ZeroLengthLiteralMoveTests
             DISPLAY "BO=[" R-BOOL "]".
             DISPLAY "NA=[" R-NAT "]".
             """);
-        Assert.Equal("AN=[000]\nAE=[00/00]\nBO=[0000]\nNA=[000]", Run(src, 2002));
+        Assert.Equal("AN=[000]\nAE=[00/00]\nBO=[0000]\nNA=[000]", Run(src, 2014));
     }
 
     // ── The EXCLUSION, kept beside the rule ──────────────────────────────────────────────────────────────────
@@ -308,7 +308,7 @@ public sealed class ZeroLengthLiteralMoveTests
     [InlineData("ZLM12", "01 R PIC X(3) VALUE \"???\".", "MOVE N\"\" TO R.")]
     public void ZeroLengthLiteral_KeepsItsOwnTable16Row(string pid, string ws, string proc)
     {
-        var (ok, diagnostics) = EditionHarness.Compile(Prog(pid, ws, proc), 2002);
+        var (ok, diagnostics) = EditionHarness.Compile(Prog(pid, ws, proc), 2014);
         Assert.False(ok, "the zero-length literal's OWN category decides Table 16 (ISO §14.9.25.3 SR10)");
         EditionHarness.AssertHasDiagnostic(diagnostics, "COBOLNET0819");
     }

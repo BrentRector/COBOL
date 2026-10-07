@@ -36,6 +36,10 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB957NGC.
        ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           SYMBOLIC CHARACTERS SYM-X0A SYM-X0C SYM-X0D
+               ARE 11 13 14.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
            SELECT PRT ASSIGN TO "pb957ngc.txt".
@@ -102,15 +106,15 @@
            STOP RUN.
        TAKE-BYTE.
            EVALUATE TRUE
-               WHEN CHK-REC = X"0A"
+               WHEN CHK-REC = SYM-X0A
                    PERFORM SHOW-LINE
-               WHEN CHK-REC = X"0C"
+               WHEN CHK-REC = SYM-X0C
                    IF WS-I > 0
                        PERFORM SHOW-LINE
                    END-IF
                    DISPLAY "---- PAGE ----"
                    MOVE 0 TO WS-LN
-               WHEN CHK-REC = X"0D"
+               WHEN CHK-REC = SYM-X0D
                    CONTINUE
                WHEN OTHER
                    ADD 1 TO WS-I

@@ -182,10 +182,17 @@ internal sealed class VersionConformancePass
     /// A bind-time cross-pass over the paragraph-pc ranges — a paragraph's pc IS its index in
     /// <see cref="BoundProgram.Paragraphs"/>, the same pc space as the SORT/MERGE procedure ranges
     /// (<c>SortRange</c> → the ProcedureTable). The membership test is <see cref="PcRange.Spans"/>, the LEXICAL reading
-    /// the SYNTAX rule asks ("shall not appear in"), written once so the four arms cannot disagree — and so the
-    /// reachability model kb/Work PB812 asks for (control that reaches a statement through a PERFORM out and back)
-    /// replaces one function, not four. The other two regions of the same rules are the exception-checking PERFORM's
-    /// (<c>EcBinder.CheckCrossStatementBans</c>) and the declarative procedure's (<c>SortBinder.ScreenDeclarativePlacement</c>).</summary>
+    /// the SYNTAX rules ask ("shall not appear in", "shall not be specified in"), written once so the four arms cannot
+    /// disagree. ⚖ The region is the procedure AS WRITTEN, never the set of paragraphs control can reach from it
+    /// (kb/Work PB812): §14.9.40.4 GR10 and GR13 define the procedure's RANGE dynamically ("all statements that are
+    /// executed as the result of a transfer of control in the range") and give a MERGE, RETURN/RELEASE or file SORT
+    /// executed through that range its OWN consequence — the EC-SORT-MERGE-ACTIVE exception condition, raised by
+    /// <c>CobolSort.Init</c> and the RELEASE/RETURN statements (kb/Work PB1036). A paragraph PERFORMed out of the
+    /// procedure is not written in it, so a static reachability walk here would refuse a MERGE that the syntax rules
+    /// permit wherever that paragraph is also reached from outside the procedure. Each diagnostic is positioned at its
+    /// statement through the cursor the binder captured on the node. The other two regions of the same rules are the
+    /// exception-checking PERFORM's (<c>EcBinder.CheckCrossStatementBans</c>) and the declarative procedure's
+    /// (<c>SortBinder.ScreenDeclarativePlacement</c>).</summary>
     private void GateSortMergeProcedures(BoundProgram prog)
     {
         // Pass A — the prohibited paragraph-pc ranges.
@@ -209,27 +216,36 @@ internal sealed class VersionConformancePass
         void Flag(BoundStatement s, int paraPc)
         {
             if (s is BoundSort so && InProcedure(paraPc))
+            {
+                using var _ = _sink.At(so.At);
                 _sink.Report(new EditionDiagnostic(DiagnosticCatalog.SortMergePlacement.Code, EditionSeverity.Error,
                     "sort-merge-placement",
                     $"a file SORT of '{so.File.CobolName}' shall not appear in an input or output procedure of a SORT or "
                     + "MERGE statement (ISO §14.9.40.3 SR3)",
                     $"SORT '{so.File.CobolName}'", "ISO §14.9.40.3 SR3"));
+            }
             if (_edition.Year >= 2023)
             {
                 if (s is BoundMerge m && InProcedure(paraPc))
+                {
+                    using var _ = _sink.At(m.At);
                     _sink.Report(new EditionDiagnostic("COBOLNET1572", mergeSeverity, "merge-in-sort-merge-proc",
                         $"MERGE '{m.File.CobolName}' is prohibited in the output procedure of another MERGE or the input "
                         + "or output procedure of a file SORT (ISO §14.9.24; COBOL-2023, Annex E.2 item 20)",
                         $"MERGE '{m.File.CobolName}'", "ISO §14.9.24; Annex E.2 item 20"));
+                }
                 // kb/Work PB137 — the batch-8 finding verbatim: this pass implemented exactly the SR2 ban with a
                 // MERGE-only predicate; COMMIT (§14.9.7.3 SR2) and ROLLBACK (§14.9.36.3 SR2) are its siblings,
                 // reachable only now that the bind produces an identity-bearing node.
                 if (s is BoundCommitRollback cr && InProcedure(paraPc))
+                {
+                    using var _ = _sink.At(cr.At);
                     _sink.Report(new EditionDiagnostic(DiagnosticCatalog.CommitRollbackContext.Code,
                         EditionSeverity.Error, "commit-rollback-context",
                         $"{(cr.IsCommit ? "COMMIT" : "ROLLBACK")} shall not be specified in the input or output "
                         + $"procedure of a MERGE or file SORT statement (ISO {(cr.IsCommit ? "§14.9.7.3" : "§14.9.36.3")} SR2)",
                         cr.IsCommit ? "COMMIT" : "ROLLBACK", "ISO §14.9.7.3 SR2 / §14.9.36.3 SR2"));
+                }
             }
             foreach (var c in s.StatementChildren()) Flag(c, paraPc);
         }
@@ -2428,6 +2444,22 @@ internal sealed class VersionConformancePass
         public override object? VisitConcatenationExpression(CobolParserCore.ConcatenationExpressionContext ctx)
         {
             _p.Check(Constructs.ConcatOperator2002, "a concatenation expression (the & operator)");
+            return base.VisitChildren(ctx);
+        }
+
+        /// <summary>A STRING statement whose DELIMITED phrase is OMITTED — ISO §14.9.43.3 SR9, "The DELIMITED phrase may
+        /// be omitted only immediately preceding the INTO phrase. If it is omitted, DELIMITED BY SIZE is implied" — is a
+        /// post-1985 form (string-delimited-omitted-2002; VCR row 7.31, kb/Work PB1567): COBOL-85's STRING closes every
+        /// sending group with its DELIMITED phrase. The omission is visible in exactly one place, the LAST sending phrase
+        /// (an earlier phrase with no DELIMITED of its own belongs to the next one's, SR9's own reading), and is
+        /// reported there.</summary>
+        public override object? VisitStringStatement(CobolParserCore.StringStatementContext ctx)
+        {
+            if (ctx.stringSendingPhrase() is [.., { } last] && last.delimitedByPhrase() is null)
+            {
+                using var _ = Sink.At(last);
+                _p.Check(Constructs.StringDelimitedOmitted2002, "a STRING statement with no DELIMITED phrase before INTO");
+            }
             return base.VisitChildren(ctx);
         }
 
