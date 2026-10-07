@@ -607,14 +607,10 @@ writeStatement
 
     ;
 
-// ⛔ ADDITIVE, not a rewrite to `moveSendingOperand` — and the reason is worth recording. §14.9.51.4 GR5a makes this phrase equivalent to `MOVE identifier-1 TO record-name-1`,
-// so a function-identifier belongs here: §8.4.3.1.2 Format 1 makes one an IDENTIFIER and §8.4.3.2.3 SR1
-// bars it only from RECEIVING operands, so `FROM FUNCTION UPPER-CASE(X)` was legal source we rejected
-// with COBOL0001 (fix-queue PB10). Replacing the alternatives with a single shared rule is the tidier
-// shape; it deletes the generated `.dataReference()`/`.literal()` accessors and so moves every binder that
-// reads them. That unification is kb/Work PB2114.
+// §14.9.51.4 GR5a makes this phrase `MOVE identifier-1 TO record-name-1`, so its operand is MOVE's sending
+// operand, function-identifier included (fix-queue PB10; the one rule, kb/Work PB2114).
 writeFrom
-    : FROM (functionCall | inlineMethodInvocation | dataReference | literal)
+    : FROM sendingOperand
     ;
 
 // ⛔ THIS RULE READ `writeAdvancePhrase writeAdvancePhrase?` — THE WHOLE PHRASE REPEATED — UNTIL kb/Work PB712,
@@ -706,14 +702,10 @@ rewriteStatement
 
     ;
 
-// ⛔ ADDITIVE, not a rewrite to `moveSendingOperand` — and the reason is worth recording. §14.9.35.4 makes this phrase the same MOVE,
-// so a function-identifier belongs here: §8.4.3.1.2 Format 1 makes one an IDENTIFIER and §8.4.3.2.3 SR1
-// bars it only from RECEIVING operands, so `FROM FUNCTION UPPER-CASE(X)` was legal source we rejected
-// with COBOL0001 (fix-queue PB10). Replacing the alternatives with a single shared rule is the tidier
-// shape; it deletes the generated `.dataReference()`/`.literal()` accessors and so moves every binder that
-// reads them. That unification is kb/Work PB2114.
+// §14.9.35.4 makes this phrase the same implicit MOVE as WRITE's FROM, so its operand is MOVE's sending operand,
+// function-identifier included (fix-queue PB10; the one rule, kb/Work PB2114).
 rewriteFrom
-    : FROM (functionCall | inlineMethodInvocation | dataReference | literal)
+    : FROM sendingOperand
     ;
 
 // ISO 5.2.6.4: the positive and negative phrases are enclosed in CHOICE INDICATORS (| bars inside the
@@ -1003,14 +995,10 @@ releaseStatement
 
     ;
 
-// ⛔ ADDITIVE, not a rewrite to `moveSendingOperand` — and the reason is worth recording. §14.9.32.4 makes this phrase the same MOVE,
-// so a function-identifier belongs here: §8.4.3.1.2 Format 1 makes one an IDENTIFIER and §8.4.3.2.3 SR1
-// bars it only from RECEIVING operands, so `FROM FUNCTION UPPER-CASE(X)` was legal source we rejected
-// with COBOL0001 (fix-queue PB10). Replacing the alternatives with a single shared rule is the tidier
-// shape; it deletes the generated `.dataReference()`/`.literal()` accessors and so moves every binder that
-// reads them. That unification is kb/Work PB2114.
+// §14.9.32.4 makes this phrase the same implicit MOVE as WRITE's FROM, so its operand is MOVE's sending operand,
+// function-identifier included (fix-queue PB10; the one rule, kb/Work PB2114).
 releaseFrom
-    : FROM (functionCall | inlineMethodInvocation | dataReference | literal)
+    : FROM sendingOperand
     ;
 
 // ==========================================
@@ -1170,22 +1158,14 @@ inspectCountPhrase
     | (ALL | LEADING | FIRST | TRAILING) inspectCountOperand ({IsBareInspectOperand()}? inspectCountOperand)*
     ;
 
+// ⛔ EVERY INSPECT OPERAND AFTER identifier-1 IS A SENDING OPERAND. §14.9.22.2 writes each as `identifier-n |
+// literal-n` — the TALLYING pattern, both sides of a REPLACING pair, both CONVERTING operands and the BEFORE/AFTER
+// delimiters; identifier-1, the item inspected, is the only receiver and is its own rule. So each is the one
+// `sendingOperand` (kb/Work PB2114), function-identifier included (fix-queue PB45: `INSPECT S TALLYING N FOR ALL
+// FUNCTION TRIM(X)` was a parse error). The figurative constants arrive through its `literal` arm. FUNCTION heads
+// no other alternative, so the function arm cannot meet the {IsBareInspectOperand()}? bare form above.
 inspectCountOperand
-    : inspectChar inspectDelimiters?
-    ;
-
-// ⛔ A FUNCTION-IDENTIFIER IS ADMISSIBLE HERE (ISO §8.4.3.1.2 Format 1 makes it an identifier; fix-queue PB45).
-// §14.9.22.2 writes every one of these operands as `identifier-n | literal-n`, and each use of inspectChar is a
-// SENDING position — the TALLYING pattern, and BOTH sides of REPLACING (the item being inspected, identifier-1, is
-// the only receiver and is a separate rule). So `INSPECT S TALLYING N FOR ALL FUNCTION TRIM(X)` is conforming
-// source that was a PARSE error. Additive and unambiguous: functionCall begins with the FUNCTION token, so it
-// cannot be confused with the dataReference alternative or with the {IsBareInspectOperand()}? bare form above.
-inspectChar
-    : literal
-    | functionCall
-    | inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4 (8.4.3.4) - the Format-1 twin above; kb/Work PB428
-    | dataReference
-    | figurativeConstant
+    : sendingOperand inspectDelimiters?
     ;
 
 // ----- REPLACING -----
@@ -1199,12 +1179,12 @@ inspectReplacingPhrase
 // and only the pairs AFTER it are bare (GR16's transitivity); a CHARACTERS phrase repeats nothing. The grammar used
 // to make the adjective optional at every pair, so `REPLACING "A" BY "Z"` and a bare pair after CHARACTERS parsed.
 inspectReplacingItem
-    : CHARACTERS BY inspectChar inspectDelimiters?
+    : CHARACTERS BY sendingOperand inspectDelimiters?
     | (ALL | LEADING | FIRST | TRAILING) inspectReplacingPair ({IsBareInspectReplacingPair()}? inspectReplacingPair)*
     ;
 
 inspectReplacingPair
-    : inspectChar BY inspectChar inspectDelimiters?
+    : sendingOperand BY sendingOperand inspectDelimiters?
     ;
 
 // ----- CONVERTING -----
@@ -1213,12 +1193,12 @@ inspectReplacingPair
 // order) — the same inspectDelimiters the TALLYING and REPLACING phrases use. CONVERTING used to spell its own
 // `inspectBeforeAfterPhrase*`, which let BEFORE or AFTER repeat (the last one silently won).
 inspectConvertingPhrase
-    : CONVERTING inspectChar
-      TO inspectChar
+    : CONVERTING sendingOperand
+      TO sendingOperand
       inspectDelimiters?
     ;
 
 inspectDelimiters
-    : BEFORE INITIAL_? inspectChar (AFTER INITIAL_? inspectChar)?
-    | AFTER INITIAL_? inspectChar (BEFORE INITIAL_? inspectChar)?
+    : BEFORE INITIAL_? sendingOperand (AFTER INITIAL_? sendingOperand)?
+    | AFTER INITIAL_? sendingOperand (BEFORE INITIAL_? sendingOperand)?
     ;

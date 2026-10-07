@@ -197,7 +197,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                     foreach (var operand in cp.inspectCountOperand())
                     {
                         var (before, after) = InspectDelimiters(operand.inspectDelimiters());
-                        tallying.Add(new BoundInspectTally(counter, kind, InspectCharOperand(operand.inspectChar()).Op, before, after));
+                        tallying.Add(new BoundInspectTally(counter, kind, InspectCharOperand(operand.sendingOperand()).Op, before, after));
                     }
                 }
             }
@@ -212,7 +212,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                 if (item.CHARACTERS() is not null)
                 {
                     var (cBefore, cAfter) = InspectDelimiters(item.inspectDelimiters());
-                    var (rep, repFigurative) = InspectCharOperand(item.inspectChar());
+                    var (rep, repFigurative) = InspectCharOperand(item.sendingOperand());
                     ctx.Validation.CheckInspectCharactersReplacement(rep);   // SR7 — pure check
                     replacing.Add(new BoundInspectReplace(InspectReplaceKind.Characters, null, rep, cBefore, cAfter, repFigurative));
                     continue;
@@ -227,8 +227,8 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                 foreach (var pair in item.inspectReplacingPair())
                 {
                     var (before, after) = InspectDelimiters(pair.inspectDelimiters());
-                    var (pat, _) = InspectCharOperand(pair.inspectChar(0));
-                    var (rep2, figurative) = InspectCharOperand(pair.inspectChar(1));
+                    var (pat, _) = InspectCharOperand(pair.sendingOperand(0));
+                    var (rep2, figurative) = InspectCharOperand(pair.sendingOperand(1));
                     // SR6 / GR14: a figurative literal-3 "is expanded or contracted to be the size of literal-1", and
                     // GR14 says the same of identifier-3 — whose size is a RUN-TIME fact for a function-identifier or a
                     // dynamic-length item. So the runtime sizes it, for every pattern shape alike (kb/Work PB1126: a
@@ -250,7 +250,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
             // edition. The reference kept the honest declared-as-alphabet-name STAGING pending this
             // adjudication (R32/R38's diagnostic half); the adjudicated posture is the R37-family
             // compile-time rejection, at the position whose format decides.
-            foreach (var ch in conv.inspectChar())
+            foreach (var ch in conv.sendingOperand())
                 if (ch.dataReference()?.cobolWord()?.GetText() is { } w
                     && !ctx.Symbols.TryResolve(w, ctx.ActiveScope, out _)
                     && (ctx.Data.Alphabets.ContainsKey(w) || ctx.Data.NationalAlphabets.ContainsKey(w)))
@@ -259,9 +259,9 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                         + "an identifier or a literal (ISO §14.9.22.2), and an alphabet-name is neither "
                         + "(the CONVERTING-alphabet form is a GnuCOBOL extension). Write the character "
                         + "strings, or a data item holding them");
-            var (from, _) = InspectCharOperand(conv.inspectChar(0));
+            var (from, _) = InspectCharOperand(conv.sendingOperand(0));
             // Literal-5 is the ONE INSPECT literal SR3 does not bar from beginning with the word ALL (kb/Work PB1128).
-            var (to, figurative) = InspectCharOperand(conv.inspectChar(1), literal5: true);
+            var (to, figurative) = InspectCharOperand(conv.sendingOperand(1), literal5: true);
             // SR9 / GR22: a figurative literal-5 takes literal-4's / identifier-6's size — at RUN time, the same
             // reason as SR6 above (kb/Work PB1126).
             ctx.Validation.CheckInspectConvertingSize(from, to, figurative);   // SR9 — pure check
@@ -279,7 +279,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
     private (BoundOperand? Before, BoundOperand? After) InspectDelimiters(Core.InspectDelimitersContext? c)
     {
         if (c is null) return (null, null);
-        var chars = c.inspectChar();
+        var chars = c.sendingOperand();
         if (c.BEFORE() is { } b && c.AFTER() is { } a)
         {
             var first = InspectCharOperand(chars[0]).Op;
@@ -296,7 +296,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
     /// an identifier reads its FULL raw image at run time (GR5/GR6 — no trimming; GR4d de-signs a signed numeric
     /// operand at the read). <c>Figurative</c> reports the figurative origin so SR6/SR9 can expand a replacement
     /// to the pattern size.</summary>
-    private (BoundOperand Op, bool Figurative) InspectCharOperand(Core.InspectCharContext c, bool literal5 = false)
+    private (BoundOperand Op, bool Figurative) InspectCharOperand(Core.SendingOperandContext c, bool literal5 = false)
     {
         var bound = InspectCharOperandOf(c, literal5);
         // ⛔ SR3: "when identifier-1 is of class boolean, the figurative constant is of class boolean and only the
@@ -339,7 +339,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
     /// literal-3, literal-4, or literal-5 shall not be a zero-length literal" — a zero-length literal has no
     /// character to tally, replace or convert, and as a BEFORE/AFTER delimiter it silently changed the answer
     /// (BEFORE '' counted the whole item). Edition-invariant: the rule names no edition.</summary>
-    private BoundOperand ScreenZeroLength(BoundOperand literal, Core.InspectCharContext c) =>
+    private BoundOperand ScreenZeroLength(BoundOperand literal, Core.SendingOperandContext c) =>
         literal is BoundStringLiteral { Value.Length: 0 }
             ? BoundOperandError.Report(ctx.Edition, DiagnosticCatalog.StatementOperandRule,
                 $"INSPECT operand '{c.GetText()}' is a zero-length literal, which literal-1 through literal-5 shall "
@@ -347,9 +347,9 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                 $"INSPECT operand '{c.GetText()}' (ISO §14.9.22.3 SR3)")
             : literal;
 
-    private (BoundOperand Op, bool Figurative) InspectCharOperandOf(Core.InspectCharContext c, bool literal5)
+    private (BoundOperand Op, bool Figurative) InspectCharOperandOf(Core.SendingOperandContext c, bool literal5)
     {
-        var fig = c.figurativeConstant() ?? c.literal()?.nonNumericLiteral()?.figurativeConstant();
+        var fig = c.literal()?.nonNumericLiteral()?.figurativeConstant();
         if (fig is not null)
         {
             // ⛔ SR3: "Literal-1, literal-2, literal-3, and literal-4 shall not be a figurative constant that begins
@@ -377,7 +377,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
             return (host.Expr.FigurativeOperand(fig), true);
         }
         // ⛔ A FUNCTION-IDENTIFIER OPERAND (ISO §8.4.3.1.2 Format 1; fix-queue PB45). §14.9.22.2 writes these as
-        // `identifier-n | literal-n` and every inspectChar use is SENDING, so `INSPECT S TALLYING N FOR ALL
+        // `identifier-n | literal-n` and every one is a SENDING operand, so `INSPECT S TALLYING N FOR ALL
         // FUNCTION UPPER-CASE(P)` is conforming. It used to be a PARSE error; once the grammar admitted it, this
         // arm was still missing and the operand fell through to the not-implemented tail, which reported a
         // MISLEADING reason — "a numeric literal is not a valid INSPECT literal" — for something that is neither

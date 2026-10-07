@@ -240,9 +240,7 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
         // The FROM phrase is an implicit MOVE and is BOUND as one (§14.9.51.4 GR5 a); §14.9.51.3 SR6 —
         // kb/Work PB348), so it carries the MOVE statement's syntax rules and the storage facts codegen needs.
         return new BoundWrite(file, record,
-            host.Move.BindFromPhrase(FromPhraseRules.Write, record, w.writeFrom()?.dataReference(),
-                                     w.writeFrom()?.literal(), w.writeFrom()?.functionCall(),
-                                     w.writeFrom()?.inlineMethodInvocation()),
+            host.Move.BindFromPhrase(FromPhraseRules.Write, record, w.writeFrom()?.sendingOperand()),
             BindAdvancing(adv), UnsupportedOrg(file, "WRITE"), atEop, notAtEop)
         { Lock = wlock, Retry = wretry, InvalidKey = winvalid };
     }
@@ -370,9 +368,7 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
             rinvalid = keyedIo.KeyedInvalidPhrase(ik.statementBlock(), PhraseBlocks.StartsWithNot(ik));
         }
         return new BoundRewrite(file, record,
-            host.Move.BindFromPhrase(FromPhraseRules.Rewrite, record, rw.rewriteFrom()?.dataReference(),
-                                     rw.rewriteFrom()?.literal(), rw.rewriteFrom()?.functionCall(),
-                                     rw.rewriteFrom()?.inlineMethodInvocation()),
+            host.Move.BindFromPhrase(FromPhraseRules.Rewrite, record, rw.rewriteFrom()?.sendingOperand()),
             UnsupportedOrg(file, "REWRITE"))
         { Lock = rlock, Retry = rretry, InvalidKey = rinvalid };
     }

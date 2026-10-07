@@ -105,18 +105,10 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         // alternative admitted and this loud stage then answered AT RUN TIME. Format 2 is handled whole at the
         // CORRESPONDING test above, so what remains here is a defensive arm over the one printed receiving
         // shape, and it must not claim an unimplemented feature that this binder in fact implements.
-        if (move.moveSendingOperand() is not { } send || move.moveReceivingPhrase()?.dataReferenceList() is not { } targets)
+        if (move.sendingOperand() is not { } send || move.moveReceivingPhrase()?.dataReferenceList() is not { } targets)
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, $"MOVE '{move.GetText()}': Format 1 prints one sending operand and "
                 + "TO identifier-2 … (ISO §14.9.25.2)");
-        BoundOperand source = send.literal() is { } lit ? host.Expr.LiteralOperand(lit)
-            : send.dataReference() is { } dref ? host.Expr.FieldOperand(dref)
-            // MOVE FUNCTION … TO targets (ISO §14.9.25 + §15.2 — a function is a sending item of its category).
-            : send.functionCall() is { } sfc ? host.Intrinsic.IntrinsicOperand(sfc)
-            // MOVE {inline method invocation} TO targets — §14.9.25.3 SR3 designates identifier-1 as a
-            // sending operand, and §8.4.3.1.2 Format 4 is one of the eleven identifiers that designation
-            // reaches (kb/Work PB428). §8.4.3.4.3 SR1 keeps it off the RECEIVING side structurally.
-            : send.inlineMethodInvocation() is { } simi ? host.Oo.OoInlineInvocationOperand(simi)
-            : BoundOperandError.Refused(ctx.Edition, "MOVE source");
+        BoundOperand source = SendingOperand(send, "MOVE source");
         // An INDEX-NAME sending operand (kb/Work R16): MOVE is not among §13.18.38.3 r7's five index-name
         // contexts — the same judgment the SR1 arm below applies to class-index DATA ITEMS (COBOLNET0809).
         // Before this, a string-category receiver aborted at RUN time and a numeric one silently computed.
@@ -278,6 +270,23 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     private static Place ElementPlace(PlaceCursor tableCursor, DataItem table, string v) =>
         (table.IsDynamicTable ? tableCursor.DynamicElement(v) : null)?.ToPlace() ?? tableCursor.Indexed(v).ToPlace();
 
+    /// <summary>
+    /// ⛔ THE ONE BINDING OF A <c>{identifier | literal}</c> SENDING OPERAND (kb/Work PB2114) — the grammar's one
+    /// <c>sendingOperand</c> rule, as MOVE's identifier-1 / literal-1 (§14.9.25.2), the FROM phrases of WRITE,
+    /// REWRITE and RELEASE (their implicit MOVE, <see cref="BindFromPhrase"/>) and INITIALIZE's REPLACING item
+    /// (§14.9.20.3 SR4's "MOVE statement with identifier-2 or literal-1 as the sending item"). A function-identifier
+    /// is a sending item of its function's category (§15.2), and an inline method invocation is one of the
+    /// identifier formats §14.9.25.3 SR3's designation reaches (§8.4.3.1.2 Format 4; kb/Work PB428);
+    /// §8.4.3.2.3 SR1 and §8.4.3.4.3 SR1 keep both off the receiving side, where no rule offers them.
+    /// <paramref name="position"/> names the operand in the refusal of a shape the rule cannot produce.
+    /// </summary>
+    public BoundOperand SendingOperand(Core.SendingOperandContext send, string position) =>
+        send.literal() is { } lit ? host.Expr.LiteralOperand(lit)
+        : send.dataReference() is { } dref ? host.Expr.FieldOperand(dref)
+        : send.functionCall() is { } fc ? host.Intrinsic.IntrinsicOperand(fc)
+        : send.inlineMethodInvocation() is { } imi ? host.Oo.OoInlineInvocationOperand(imi)
+        : BoundOperandError.Refused(ctx.Edition, position);
+
     // ── The … FROM and … INTO phrases (kb/Work PB348) ───────────────────────────────────────────────────────
 
     /// <summary>
@@ -295,20 +304,15 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     /// The home moved here because this class is where a MOVE's rules live; the sort binder no longer reaches
     /// across into the sequential I-O binder for it.</para>
     /// </summary>
-    public BoundMove? BindFromPhrase(FromPhraseRules rules, Place record, Core.DataReferenceContext? dref,
-                                     Core.LiteralContext? lit, Core.FunctionCallContext? fc,
-                                     Core.InlineMethodInvocationContext? imi)
+    public BoundMove? BindFromPhrase(FromPhraseRules rules, Place record, Core.SendingOperandContext? send)
     {
-        if (dref is null && lit is null && fc is null && imi is null) return null;   // no FROM phrase
-        BoundOperand source =
-            // §8.4.3.1.2 Format 4 (kb/Work PB428). The per-verb FunctionCategories screen below is
-            // deliberately NOT extended to it: §14.9.51.3 SR4, §14.9.35.3 SR9 and §14.9.32.3 SR2 each
-            // restrict "a FUNCTION-IDENTIFIER" by name, and none states a rule for an inline invocation —
-            // so what governs it is the phrase's own implicit MOVE, which BindMoveOf applies.
-            imi is not null ? host.Oo.OoInlineInvocationOperand(imi)
-            : fc is not null ? host.Intrinsic.IntrinsicOperand(fc)
-            : lit is not null ? host.Expr.LiteralOperand(lit)
-            : host.Expr.FieldOperand(dref!);
+        if (send is null) return null;   // no FROM phrase
+        BoundOperand source = SendingOperand(send, rules.Statement);
+        // §8.4.3.1.2 Format 4 (kb/Work PB428): the per-verb FunctionCategories screen below is deliberately NOT
+        // extended to an inline method invocation. §14.9.51.3 SR4, §14.9.35.3 SR9 and §14.9.32.3 SR2 each restrict
+        // "a FUNCTION-IDENTIFIER" by name, and none states a rule for an inline invocation, so what governs it is
+        // the phrase's own implicit MOVE, which BindMoveOf applies.
+        var fc = send.functionCall();
 
         // ── The FUNCTION-IDENTIFIER class restriction, a SET per verb because the rules name different sets:
         // RELEASE §14.9.32.3 SR2 and WRITE §14.9.51.3 SR4 admit "an alphanumeric or national function";

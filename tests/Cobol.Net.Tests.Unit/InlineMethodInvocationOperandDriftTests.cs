@@ -18,14 +18,13 @@ namespace CobolNet.Tests.Unit;
 /// invocation shall not be specified as a receiving operand" — so the set of positions that admits one
 /// admits the other, and the receiving rules admit neither.</para>
 ///
-/// <para><b>Why a test and not a shared rule.</b> The obvious shape is ONE <c>sendingIdentifier</c> rule used
-/// everywhere, and it has not landed for the reason <c>ArithmeticSendingOperandDriftTests</c> records:
-/// the generated <c>.dataReference()</c> / <c>.literal()</c> / <c>.functionCall()</c> accessors are read off
-/// these contexts BY NAME, so a collapse or an alias is a grammar unification (kb/Work PB2114), not an edit.
-/// The alternatives therefore stay per-site and this test is what makes the
-/// pairing mechanical instead of a hand-maintained list (CLAUDE.md rule 5): the next rule to gain
-/// <c>functionCall</c> fails here until it gains Format 4 too. Collapse both in the PB2114 unification and delete this with
-/// <c>ArithmeticSendingOperandDriftTests</c>.</para>
+/// <para><b>Why a test as well as a shared rule.</b> The <c>{identifier | literal}</c> sending positions share ONE
+/// rule, <c>sendingOperand</c>, which offers both formats (kb/Work PB2114; <c>SendingOperandDriftTests</c> keeps it
+/// the only copy). The positions with a DIFFERENT operand set still name the two formats per site: the expression
+/// spine's primary, an identifier-only position (INSPECT's identifier-1, GO TO DEPENDING, STRING/UNSTRING's
+/// sender), an identifier-or-integer one (PERFORM TIMES, WRITE ADVANCING) and the arithmetic receiver-or-sender
+/// unions. This test makes their pairing mechanical instead of a hand-maintained list (CLAUDE.md rule 5): the next
+/// rule to gain <c>functionCall</c> fails here until it gains Format 4 too.</para>
 ///
 /// <para>⚠ It reads the GRAMMAR SOURCE, not the generated parser: the property is about what the <c>.g4</c>
 /// admits, and a generated-parser check would pass on a rule that merely happens not to be exercised.</para>
@@ -101,7 +100,7 @@ public sealed class InlineMethodInvocationOperandDriftTests
             + "admits both or neither. Add `| inlineMethodInvocation` and the binder arm that reads it.");
         // The guard is worthless if the pairing is vacuous, so assert the population it measured.
         int paired = rules.Count(kv => !Definitions.Contains(kv.Key) && Mentions(kv.Value, "functionCall"));
-        Assert.True(paired >= 18,
+        Assert.True(paired >= 12,
             $"only {paired} operand rules offer functionCall — the sweep lost sites, so the pairing above "
             + "proved nothing (feedback_verdict_evidence_invariant).");
     }
@@ -139,8 +138,8 @@ public sealed class InlineMethodInvocationOperandDriftTests
     /// <summary>The purely receiving rules must admit NEITHER — for them §8.4.3.4.3 SR1 holds STRUCTURALLY, by
     /// the construct's absence, exactly as §8.4.3.2.3 SR1 holds for a function-identifier. A guard that only
     /// checked the sending side would be satisfied by a careless edit that added it everywhere.
-    /// <para>⚠ This does NOT cover the four MIXED-ROLE arithmetic rules (<c>addToPhrase</c>,
-    /// <c>subtractFromOperand</c>, <c>multiplyByOperand</c>, <c>divideIntoOperand</c>), which admit both forms
+    /// <para>⚠ This does NOT cover the two MIXED-ROLE arithmetic rules (<c>receiversOrSendingOperand</c>, ADD /
+    /// SUBTRACT / DIVIDE's, and <c>multiplyByOperand</c>), which admit both forms
     /// because Format 2 needs them as senders; there SR1 is the binder's Format-1 check, pinned by
     /// <c>ArithmeticOperandRoleDriftTests</c> (kb/Work PB1142 — crediting this fact with them is how an inline
     /// invocation receiver went silently dropped).</para></summary>

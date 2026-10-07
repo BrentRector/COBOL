@@ -1838,7 +1838,7 @@ internal sealed class VersionConformancePass
         /// FROM operand; the literal form is 2002+.</summary>
         public override object? VisitReleaseFrom(CobolParserCore.ReleaseFromContext ctx)
         {
-            if (ctx.literal() is not null)
+            if (ctx.sendingOperand()?.literal() is not null)
                 _p.Check(Constructs.ReleaseFromLiteral2002, "RELEASE … FROM literal-1");
             return base.VisitChildren(ctx);
         }

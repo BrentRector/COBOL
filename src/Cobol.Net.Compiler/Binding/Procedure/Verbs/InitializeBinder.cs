@@ -102,25 +102,23 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
             {
                 var cats = CategorySetOf(item.initializeCategory(), ref namedSoFar);
                 if (cats.IsEmpty) continue;   // every word was a repeat — reported by the pure check
-                // §14.9.20.3 SR4 makes identifier-2 "the SENDING item" of a MOVE, so a function-identifier
-                // is admissible (§8.4.3.1.2 Format 1; §8.4.3.2.3 SR1 bars one only from a RECEIVING
-                // operand). It was a COBOL0001 parse error before — fix-queue PB10.
-                var lit = item.literal();
-                BoundOperand value = item.inlineMethodInvocation() is { } iimi
-                        ? host.Oo.OoInlineInvocationOperand(iimi)   // §8.4.3.1.2 Format 4; kb/Work PB428
-                    : item.functionCall() is { } ifc ? host.Intrinsic.IntrinsicOperand(ifc)
-                    // §8.4.3.10.3 SR1 a)/b): NULL "may be used only as a sending operand in an INITIALIZE …
-                    // statement" — it is identifier-2 (§8.4.3.1.2 Format 8), carried on the literal slot.
-                    : lit is not null ? host.Expr.NullAdmittingOperand(lit)
-                    : item.dataReference() is { } sref ? host.Expr.FieldOperand(sref)
+                // §14.9.20.3 SR4 makes identifier-2 "the SENDING item" of a MOVE, so it binds as MOVE's sending
+                // operand does, function-identifier included (§8.4.3.1.2 Format 1; §8.4.3.2.3 SR1 bars one only from
+                // a RECEIVING operand; fix-queue PB10) — with ONE difference on the literal slot: §8.4.3.10.3 SR1 a)/b)
+                // lets NULL "be used only as a sending operand in an INITIALIZE … statement", and NULL is identifier-2
+                // (§8.4.3.1.2 Format 8) carried on that slot.
+                var send = item.sendingOperand();
+                var lit = send?.literal();
+                BoundOperand value = lit is not null ? host.Expr.NullAdmittingOperand(lit)
+                    : send is not null ? host.Move.SendingOperand(send, "INITIALIZE REPLACING sending operand")
                     : BoundOperandError.Refused(ctx.Edition, "INITIALIZE REPLACING sending operand");
                 // ISO §14.9.20.3 SR3 — "for each DATA-POINTER, FUNCTION-POINTER, MESSAGE-TAG, OBJECT-REFERENCE,
                 // or PROGRAM-POINTER phrase specified as the category-name in the REPLACING phrase, identifier-2
                 // shall be specified". literal-1 is what the rule excludes, and it excludes it because GR4 makes
                 // the implicit statement a SET for exactly these five categories and no literal is a SET sending
                 // operand (§14.9.39). Unreachable until the words became spellable (kb/Work PB415).
-                string senderText = lit?.GetText() ?? item.dataReference()?.GetText()
-                    ?? item.functionCall()?.GetText() ?? "the sending operand";
+                string senderText = lit?.GetText() ?? send?.dataReference()?.GetText()
+                    ?? send?.functionCall()?.GetText() ?? "the sending operand";
                 // NULL is identifier-2, not literal-1 (kb/Work PB1427): SR3 is satisfied, and SR4's SET is valid for
                 // every SET-form category (CheckSetFormCategoryAgreement), so only a real literal takes SR3.
                 if (lit is not null && value is not BoundPredefinedNull)

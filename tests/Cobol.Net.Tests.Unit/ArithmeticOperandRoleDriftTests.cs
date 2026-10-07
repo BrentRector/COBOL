@@ -19,7 +19,8 @@ namespace CobolNet.Tests.Unit;
 ///
 /// <para><b>The defect this exists for.</b> ISO §14.9.2.2 / §14.9.44.2 / §14.9.26.2 / §14.9.12.2 print the
 /// TO / FROM / BY / INTO operand as a RECEIVER in Format 1 and as ONE sending operand in Format 2, and the grammar
-/// parses the union in four mixed rules. Each verb binder used to screen Format 1 with its own hand-written list of
+/// parses the union in mixed rules (four then; two since kb/Work PB2114 made ADD, SUBTRACT and DIVIDE share one).
+/// Each verb binder used to screen Format 1 with its own hand-written list of
 /// NON-receivers — <c>literal() || functionCall()</c> — and when kb/Work PB428 gave all four rules an
 /// <c>inlineMethodInvocation</c> alternative, none of the four lists grew: <c>ADD A TO O :: "M"</c> compiled clean
 /// with the receiver silently dropped, and the DIVIDE twin crashed the emitter. §8.4.3.4.3 SR1 ("Inline method
@@ -28,7 +29,7 @@ namespace CobolNet.Tests.Unit;
 ///
 /// <para><b>The property, stated exactly:</b> <c>ArithmeticOperandRole</c> defines the receiver POSITIVELY — a
 /// node produced through a receiving rule, and nothing else — so a sending alternative any mixed rule gains is a
-/// non-receiver with no edit. What can still drift is the classifier's two lists: a FIFTH mixed rule the verbs do
+/// non-receiver with no edit. What can still drift is the classifier's two lists: a NEW mixed rule the verbs do
 /// not hand it, or a NEW receiving rule it would misread as sending (a loud rejection of legal source). Both are
 /// pinned here against the <c>.g4</c>, and the partition itself is pinned on real parse trees for every verb and
 /// every operand arm.</para>
@@ -72,11 +73,11 @@ public sealed class ArithmeticOperandRoleDriftTests
     private static readonly string[] SendingIdentifierFormats = ["functionCall", "inlineMethodInvocation"];
 
     /// <summary>⛔ THE SET OF MIXED RULES IS THE GRAMMAR'S, NOT A HAND-KEPT LIST. A rule is mixed when it offers a
-    /// receiving rule beside a sending identifier format (§8.4.3.1.2 Format 1 or Format 4). A fifth one added to
+    /// receiving rule beside a sending identifier format (§8.4.3.1.2 Format 1 or Format 4). A new one added to
     /// the grammar fails here until it joins <c>ArithmeticOperandRole.MixedRules</c> — the point at which its
     /// author is told the rule needs its verb binder's <c>Format1Receivers</c> call (this fact cannot see the call
     /// itself; <c>TheClassifier_PartitionsEveryOperandArm</c> and the Conformance matrix cover behaviour). Proved
-    /// to guard: dropping <c>DivideIntoOperandContext</c> from <c>MixedRules</c> fails this fact by name.</summary>
+    /// to guard: dropping <c>MultiplyByOperandContext</c> from <c>MixedRules</c> fails this fact by name.</summary>
     [Fact]
     public void MixedRules_AreExactlyTheGrammarRulesOfferingBothRoles()
     {
@@ -87,7 +88,7 @@ public sealed class ArithmeticOperandRoleDriftTests
             .Order(StringComparer.Ordinal)
             .ToList();
         var classified = ArithmeticOperandRole.MixedRules.Select(RuleName).Order(StringComparer.Ordinal).ToList();
-        Assert.True(fromGrammar.Count >= 4,
+        Assert.True(fromGrammar.Count >= 2,
             $"only {fromGrammar.Count} mixed-role rules found — the grammar scan lost sites, so the comparison below "
             + "proves nothing (feedback_verdict_evidence_invariant)");
         Assert.True(fromGrammar.SequenceEqual(classified),
@@ -128,7 +129,7 @@ public sealed class ArithmeticOperandRoleDriftTests
     [InlineData("ADD A TO FUNCTION SQRT(4).", typeof(CobolParserCore.FunctionCallContext))]
     [InlineData("ADD A TO O :: \"M\".", typeof(CobolParserCore.InlineMethodInvocationContext))]
     [InlineData("SUBTRACT A FROM B.", null)]
-    [InlineData("SUBTRACT A FROM 3.", typeof(CobolParserCore.ReceivingOperandContext))]
+    [InlineData("SUBTRACT A FROM 3.", typeof(CobolParserCore.LiteralContext))]
     [InlineData("SUBTRACT A FROM FUNCTION SQRT(4).", typeof(CobolParserCore.FunctionCallContext))]
     [InlineData("SUBTRACT A FROM O :: \"M\".", typeof(CobolParserCore.InlineMethodInvocationContext))]
     [InlineData("MULTIPLY A BY B.", null)]

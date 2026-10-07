@@ -467,8 +467,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         // VERSION_CHANGE_REFERENCE ledger instructs gating pending verification against the 2002/2014 texts).
         // release-from-literal-2002: the pass owns the edition gate (Exec Step E).
         BoundMove? from = rel.releaseFrom() is { } rf
-            ? host.Move.BindFromPhrase(FromPhraseRules.Release, record, rf.dataReference(), rf.literal(),
-                                       rf.functionCall(), rf.inlineMethodInvocation())
+            ? host.Move.BindFromPhrase(FromPhraseRules.Release, record, rf.sendingOperand())
             : null;
         // ⛔ THE SIZE OF A FIXED-LENGTH SD'S RECORD IS THE LARGEST RECORD DESCRIPTION'S (kb/Work PB322 determination F;
         // docs/CONFORMANCE.md DOC-A.1-147). With no RECORD clause the implicit clause is implementor-defined

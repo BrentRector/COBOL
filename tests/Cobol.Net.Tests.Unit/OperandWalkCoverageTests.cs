@@ -37,15 +37,14 @@ public sealed class OperandWalkCoverageTests
 {
     /// <summary>The rules whose subtree reaches <c>BindOperandExprCore</c>: the public
     /// <c>BindOperandExpr</c> entry (ConditionBinder's sign condition, via <c>comparisonOperand</c>) and
-    /// <c>BindExprCore</c>'s <c>_ =&gt;</c> default arm (the arithmetic operand wrappers — all four mixed-role
-    /// rules included, since their Format-2 sending operand binds through the wrapper: ADD's
-    /// <c>addToPhrase</c> and SUBTRACT's <c>subtractFromOperand</c> as well as the BY / INTO twins; kb/Work
-    /// PB1142).</summary>
+    /// <c>BindExprCore</c>'s <c>_ =&gt;</c> default arm (the arithmetic operand wrappers: the one
+    /// <c>sendingOperand</c>, and both mixed-role rules, since their Format-2 sending operand binds through the
+    /// wrapper — <c>receiversOrSendingOperand</c> for ADD's TO, SUBTRACT's FROM and DIVIDE's INTO, and MULTIPLY's
+    /// <c>multiplyByOperand</c>; kb/Work PB1142, PB2114).</summary>
     private static readonly string[] ServedRules =
     [
         "comparisonOperand", "valueOperand",
-        "addOperand", "subtractOperand", "multiplyOperand", "divideOperand",
-        "addToPhrase", "subtractFromOperand", "divideIntoOperand", "multiplyByOperand",
+        "sendingOperand", "receiversOrSendingOperand", "multiplyByOperand",
     ];
 
     /// <summary>The walk's arms, in <c>BindOperandExprCore</c>'s own order. Keep this list in step with that

@@ -13,10 +13,11 @@ using Core = CobolParserCore;
 /// ISO §14.9.2.2 / §14.9.44.2 / §14.9.26.2 / §14.9.12.2 print the TO / FROM / BY / INTO operand TWICE: Format 1
 /// writes <c>{identifier-2 [rounded-phrase]}</c> — the RECEIVER, "stored as the new value of the data item
 /// referenced by identifier-2" (§14.9.26.4 GR1) — and Format 2 writes ONE <c>{identifier-2 | literal-2}</c> in
-/// a SENDING role. The grammar parses the union in four rules (<c>addToPhrase</c>, <c>subtractFromOperand</c>,
-/// <c>multiplyByOperand</c>, <c>divideIntoOperand</c>; kb/Work PB134), each carrying a receiver alternative
-/// beside the sending-only ones (a literal, §8.4.3.1.2 Format 1's function-identifier, Format 4's inline method
-/// invocation — kb/Work PB428), and the binder narrows it back per format.
+/// a SENDING role. The grammar parses the union in two rules (kb/Work PB134, PB2114): <c>receiversOrSendingOperand</c>,
+/// the TO / FROM / INTO operand of ADD, SUBTRACT and DIVIDE, and <c>multiplyByOperand</c>, MULTIPLY's BY operand.
+/// Each carries a receiver alternative beside the sending-only ones (a literal, §8.4.3.1.2 Format 1's
+/// function-identifier, Format 4's inline method invocation — kb/Work PB428), and the binder narrows it back per
+/// format.
 /// </para>
 /// <para>
 /// ⛔ WHY THE RECEIVER IS DEFINED POSITIVELY. The per-verb screens used to enumerate the NON-receivers by hand —
@@ -28,7 +29,7 @@ using Core = CobolParserCore;
 /// alternative a mixed rule ever gains is a non-receiver without an edit — §8.4.3.2.3 SR1 ("A function-identifier
 /// shall not be specified as a receiving operand") and §8.4.3.4.3 SR1 ("Inline method invocation shall not be
 /// specified as a receiving operand") hold by construction. <c>ArithmeticOperandRoleDriftTests</c> pins
-/// <see cref="MixedRules"/> and <see cref="ReceiverRules"/> against the <c>.g4</c>, so a fifth mixed rule or a new
+/// <see cref="MixedRules"/> and <see cref="ReceiverRules"/> against the <c>.g4</c>, so a new mixed rule or a new
 /// receiving rule fails at build time rather than as a dropped receiver.
 /// </para>
 /// </summary>
@@ -38,15 +39,13 @@ internal static class ArithmeticOperandRole
     /// identifier format. Each verb binder hands its node to <see cref="FirstNonReceiver"/> in Format 1.</summary>
     internal static readonly IReadOnlyList<Type> MixedRules =
     [
-        typeof(Core.AddToPhraseContext),
-        typeof(Core.SubtractFromOperandContext),
+        typeof(Core.ReceiversOrSendingOperandContext),
         typeof(Core.MultiplyByOperandContext),
-        typeof(Core.DivideIntoOperandContext),
     ];
 
     /// <summary>The rules whose node denotes the receiver role inside a mixed rule (<see cref="IsReceiver"/>'s
-    /// two arms). <c>receivingOperand</c> is <c>dataReference | literal</c>, so only its data-reference arm
-    /// is a receiver.</summary>
+    /// two arms). <c>receivingOperand</c> (MULTIPLY's BY operand) is <c>dataReference | literal</c>, so only its
+    /// data-reference arm is a receiver.</summary>
     internal static readonly IReadOnlyList<Type> ReceiverRules =
     [
         typeof(Core.ReceivingArithmeticOperandContext),

@@ -613,7 +613,7 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
             var d = ctx.dataReference();
             return d.Length >= 2 ? (d[0], [d[1]]) : (null, []);
         }
-        var send = ctx.moveSendingOperand()?.dataReference();
+        var send = ctx.sendingOperand()?.dataReference();
         IReadOnlyList<CobolParserCore.DataReferenceContext> recvs =
             ctx.moveReceivingPhrase()?.dataReferenceList()?.dataReference() ?? [];
         return (send, recvs);

@@ -997,7 +997,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         Core.PrimaryExpressionContext pe => BindPrimary(pe, context),
         Core.LiteralContext l => NumLiteral(l),
         Core.DataReferenceContext d => RefExpr(d, context),
-        _ => BindOperandExprCore(node, context),   // operand wrappers (addOperand, multiplyByOperand, …)
+        _ => BindOperandExprCore(node, context),   // operand wrappers (sendingOperand, multiplyByOperand, …)
     };
 
     /// <summary>A numeric literal expression from a <c>literal</c> node, mapping a figurative ZERO (incl. <c>ALL ZEROS</c>)

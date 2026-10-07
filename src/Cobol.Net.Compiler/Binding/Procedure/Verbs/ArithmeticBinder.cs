@@ -24,21 +24,21 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
 {
     public BoundStatement BindAdd(Core.AddStatementContext add)
     {
-        if (add.addOperandList() is not { } operands) return host.Corr.BindAddCorresponding(add);   // Format 3 (§14.9.2.2)
-        var addends = operands.addOperand().Select(host.Expr.BindExpr).ToList();
+        if (add.sendingOperand() is not { Length: > 0 } operands) return host.Corr.BindAddCorresponding(add);   // Format 3 (§14.9.2.2)
+        var addends = operands.Select(host.Expr.BindExpr).ToList();
         var sizeErr = host.BindSizeError(add.arithmeticOnSizeError());
-        if (add.addGivingPhrase() is { } giving)
+        if (add.arithmeticGivingPhrase() is { } giving)
         {
             // ADD a… [TO b] GIVING c…  →  c = (b +) Σa  (ISO §14.9.2.2 Format 2: the TO operand is an addend,
             // NOT a receiver — ONE `{identifier-2 | literal-2}` with no ROUNDED; kb/Work PB134 widened the
             // grammar to the figure and this narrows the union back per format).
-            if (add.addToPhrase() is { } toAddend)
+            if (add.addToPhrase()?.receiversOrSendingOperand() is { } toAddend)
             {
                 Format2SendingOperand("ADD", "§14.9.2.2", toAddend.receivingArithmeticOperand());
                 if (toAddend.receivingArithmeticOperand() is { Length: > 0 } tors)
                     addends.AddRange(tors.Select(r => host.Expr.BindExpr(r.dataReference())));
                 else
-                    // The literal / functionCall arm binds through the PHRASE so the operand walk's
+                    // The literal / functionCall arm binds through the WRAPPER so the operand walk's
                     // function-call arm fires — passing the raw FunctionCallContext re-springs PB45's
                     // documented trap (the walk descends into the ARGUMENT and drops the function; the
                     // first probe of this very fix computed 1 + 9 for `ADD 1 TO FUNCTION SQRT(9)`).
@@ -52,7 +52,7 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
             ctx.Validation.CheckComposite("ADD", addends, []);
             return new BoundAddGiving(addends, givingRecv, sizeErr);
         }
-        if (add.addToPhrase() is { } to)
+        if (add.addToPhrase()?.receiversOrSendingOperand() is { } to)
         {
             if (!Format1Receivers("ADD", "§14.9.2.2", [to]))
                 return BoundRejected.Reported(ctx.Edition);
@@ -68,10 +68,10 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
 
     public BoundStatement BindSubtract(Core.SubtractStatementContext sub)
     {
-        if (sub.subtractOperandList() is not { } operands) return host.Corr.BindSubtractCorresponding(sub);   // Format 3 (§14.9.44.2)
-        var minuends = operands.subtractOperand().Select(host.Expr.BindExpr).ToList();
+        if (sub.sendingOperand() is not { Length: > 0 } operands) return host.Corr.BindSubtractCorresponding(sub);   // Format 3 (§14.9.44.2)
+        var minuends = operands.Select(host.Expr.BindExpr).ToList();
         var sizeErr = host.BindSizeError(sub.arithmeticOnSizeError());
-        if (sub.subtractGivingPhrase() is { } giving && sub.subtractFromPhrase()?.subtractFromOperand() is { } from)
+        if (sub.arithmeticGivingPhrase() is { } giving && sub.subtractFromPhrase()?.receiversOrSendingOperand() is { } from)
         {
             Format2SendingOperand("SUBTRACT", "§14.9.44.2", from.receivingArithmeticOperand());
             var fromX = host.Expr.BindExpr(from);
@@ -81,7 +81,7 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
             ctx.Validation.CheckComposite("SUBTRACT", [.. minuends, fromX], []);
             return new BoundSubtractGiving(minuends, fromX, recv, sizeErr);
         }
-        if (sub.subtractFromPhrase()?.subtractFromOperand() is { } targets)
+        if (sub.subtractFromPhrase()?.receiversOrSendingOperand() is { } targets)
         {
             if (!Format1Receivers("SUBTRACT", "§14.9.44.2", [targets]))
                 return BoundRejected.Reported(ctx.Edition);
@@ -96,13 +96,13 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
 
     public BoundStatement BindMultiply(Core.MultiplyStatementContext mul)
     {
-        if (mul.multiplyOperand() is not { } aCtx)
+        if (mul.sendingOperand() is not { } aCtx)
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "MULTIPLY with no multiplicand: every MULTIPLY format prints identifier-1 or "
                 + "literal-1 after the verb (ISO §14.9.26.2)");
         var a = host.Expr.BindExpr(aCtx);
         var byOps = mul.multiplyByOperand();
         var sizeErr = host.BindSizeError(mul.arithmeticOnSizeError());
-        if (mul.multiplyGivingPhrase() is { } giving && byOps.Length > 0)
+        if (mul.arithmeticGivingPhrase() is { } giving && byOps.Length > 0)
         {
             // §14.9.26.2 Format 2: ONE `BY {identifier-2 | literal-2}` sending operand, no ROUNDED.
             if (byOps.Length > 1 || byOps[0].roundedPhrase() is not null)
@@ -124,14 +124,14 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
 
     public BoundStatement BindDivide(Core.DivideStatementContext div)
     {
-        if (div.divideOperand() is not { } aCtx) return DivideShape();
+        if (div.sendingOperand() is not { } aCtx) return DivideShape();
         var a = host.Expr.BindExpr(aCtx);   // INTO: the divisor; BY: the dividend
         var sizeErr = host.BindSizeError(div.arithmeticOnSizeError());
 
         // DIVIDE … GIVING q REMAINDER r (ISO §14.9.12 Formats 4–5): exactly one GIVING receiver (§14.9.12.2 — identifier-3 carries no ellipsis in either format).
         if (div.divideRemainderPhrase() is { } rem)
         {
-            if (div.divideGivingPhrase() is not { } g)
+            if (div.arithmeticGivingPhrase() is not { } g)
             {
                 // §14.9.12.2 Formats 4–5 print GIVING before REMAINDER — no format has REMAINDER without it.
                 return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.ArithmeticFormatOperand,
@@ -153,11 +153,11 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
             if (host.Expr.ResolveReceiving(rem.dataReference()) is not { } r0
                 || host.Expr.ScreenResultant(r0, rem.dataReference().GetText(), editedOk: true, "§14.9.12.3 SR2") is not { } r)
                 return new BoundUnsupported($"DIVIDE REMAINDER receiver '{rem.dataReference().GetText()}'");
-            BoundExpr dividend = div.divideIntoPhrase() is { } i ? host.Expr.BindExpr(i.divideIntoOperand())
+            BoundExpr dividend = div.divideIntoPhrase() is { } i ? host.Expr.BindExpr(i.receiversOrSendingOperand())
                 : div.divideByPhrase() is not null ? a
                 : a;
             BoundExpr divisor = div.divideIntoPhrase() is not null ? a
-                : div.divideByPhrase() is { } b ? host.Expr.BindExpr(b.divideOperand())
+                : div.divideByPhrase() is { } b ? host.Expr.BindExpr(b.sendingOperand())
                 : a;
             ctx.Validation.CheckComposite("DIVIDE", [dividend, divisor], quotients);
             return new BoundDivideRemainder(dividend, divisor, quotients[0], r, sizeErr);
@@ -165,23 +165,23 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
 
         if (div.divideIntoPhrase() is { } into)
         {
-            if (div.divideGivingPhrase() is { } giving)
+            if (div.arithmeticGivingPhrase() is { } giving)
             {
-                Format2SendingOperand("DIVIDE", "§14.9.12.2", into.divideIntoOperand().receivingArithmeticOperand());
-                var dividendX = host.Expr.BindExpr(into.divideIntoOperand());
+                Format2SendingOperand("DIVIDE", "§14.9.12.2", into.receiversOrSendingOperand().receivingArithmeticOperand());
+                var dividendX = host.Expr.BindExpr(into.receiversOrSendingOperand());
                 var recv = host.Expr.Receivers(giving.receivingArithmeticOperand(), editedOk: true, "§14.9.12.3 SR2");
                 ctx.Validation.CheckComposite("DIVIDE", [dividendX, a], recv);
                 return new BoundDivideGiving(dividendX, a, recv, sizeErr);
             }
-            if (!Format1Receivers("DIVIDE", "§14.9.12.2", [into.divideIntoOperand()]))
+            if (!Format1Receivers("DIVIDE", "§14.9.12.2", [into.receiversOrSendingOperand()]))
                 return BoundRejected.Reported(ctx.Edition);   // a receiver-less BoundDivideInto crashed the emitter (targets.Max on empty)
-            var intoRecv = host.Expr.Receivers(into.divideIntoOperand().receivingArithmeticOperand(), editedOk: false, "§14.9.12.3 SR1");
+            var intoRecv = host.Expr.Receivers(into.receiversOrSendingOperand().receivingArithmeticOperand(), editedOk: false, "§14.9.12.3 SR1");
             ctx.Validation.CheckComposite("DIVIDE", [a], intoRecv);
             return new BoundDivideInto(a, intoRecv, sizeErr);   // target ← target ÷ a
         }
-        if (div.divideByPhrase() is { } byPhrase && div.divideGivingPhrase() is { } gv)
+        if (div.divideByPhrase() is { } byPhrase && div.arithmeticGivingPhrase() is { } gv)
         {
-            var divisorX = host.Expr.BindExpr(byPhrase.divideOperand());
+            var divisorX = host.Expr.BindExpr(byPhrase.sendingOperand());
             var recv = host.Expr.Receivers(gv.receivingArithmeticOperand(), editedOk: true, "§14.9.12.3 SR2");
             ctx.Validation.CheckComposite("DIVIDE", [a, divisorX], recv);
             return new BoundDivideGiving(a, divisorX, recv, sizeErr);

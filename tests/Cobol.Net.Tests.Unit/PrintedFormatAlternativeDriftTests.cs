@@ -113,7 +113,7 @@ public sealed class PrintedFormatAlternativeDriftTests
     /// <summary>⛔ A FORMAT-SELECTING KEYWORD IS SPELLED BY THE STATEMENT RULE, NEVER BY A PHRASE RULE IT
     /// COMPOSES WITH. <c>moveReceivingPhrase</c> carried a second alternative
     /// <c>(CORRESPONDING | CORR) dataReference TO dataReference</c>, which composed with
-    /// <c>MOVE moveSendingOperand moveReceivingPhrase</c> to admit
+    /// <c>MOVE sendingOperand moveReceivingPhrase</c> to admit
     /// <c>MOVE &lt;sending-operand&gt; CORRESPONDING id-3 TO id-4</c> — a shape NEITHER §14.9.25.2 format
     /// prints, because a phrase rule cannot know what the statement rule already spelled.
     /// <para>The invariant is stated over the WHOLE grammar rather than over the one rule that broke it: the

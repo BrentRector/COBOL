@@ -1442,6 +1442,34 @@ header; §14.4.1 adds "If one paragraph is in a section, all paragraphs shall be
 a section or a DECLARATIVES portion, a leading sentence, a paragraph outside every section, or a second DECLARATIVES
 portion is refused — one diagnostic per violation kind, at its first occurrence.
 
+### 3.15 One rule per printed operand shape (kb/Work PB2114)
+
+A general format names its operands by metalanguage (`identifier-n`, `literal-n`, `integer-n`), and the grammar
+writes each SHAPE of operand once, as a rule every position with that shape names. A copy written inline at a second
+position accepts the same input, so nothing but the `.g4` shows it, and each copy grows its own binder dispatch over
+its own generated accessors.
+
+| Rule | Shape | Positions | Bound by |
+|---|---|---|---|
+| `sendingOperand` | `literal \| functionCall \| inlineMethodInvocation \| dataReference`: a SENDING `{identifier-n \| literal-n}` (§8.4.3.1.2 Formats 1 and 4 are identifiers) | the operands of ADD, SUBTRACT, MULTIPLY, DIVIDE ahead of TO / FROM / BY / INTO, DIVIDE's BY operand, MOVE, the WRITE / REWRITE / RELEASE FROM phrases, INITIALIZE REPLACING, every INSPECT operand after identifier-1 | `MoveBinder.SendingOperand` (INITIALIZE first admits NULL on the literal slot, §8.4.3.10.3 SR1; INSPECT applies its own §14.9.22.3 SR3 screens); the arithmetic verbs bind it through the expression spine |
+| `receiversOrSendingOperand` | Format 1's receivers `{identifier [rounded-phrase]} …` or Format 2's one sending operand | ADD TO, SUBTRACT FROM, DIVIDE INTO | `ArithmeticBinder.Format1Receivers` / `Format2SendingOperand`, through `ArithmeticOperandRole` |
+| `arithmeticGivingPhrase` | `GIVING {identifier [rounded-phrase]} …` | ADD, SUBTRACT, MULTIPLY, DIVIDE | `ArithmeticBinder` |
+
+MULTIPLY's BY operand prints the same two shapes as `receiversOrSendingOperand` but keeps its own rule,
+`multiplyByOperand+`, which admits a repeated sending operand and a ROUNDED literal; the binder names those
+(COBOLNET1689) where the shared rule's three users take a parse error, so folding MULTIPLY in would change what
+parses. A position whose printed shape differs is not a copy: an identifier only (INSPECT's identifier-1, GO TO
+DEPENDING, STRING / UNSTRING's sender), an identifier or an integer (PERFORM TIMES, WRITE ADVANCING), and the
+argument forms of CALL and INVOKE. DISPLAY's `{identifier-1 | literal-1} …` IS this shape but still writes the set
+inline: naming the rule parses every legal DISPLAY identically and moves the error-recovery boundary, so `DISPLAY
+COLUMN.` (a data item named by a reserved word) counts more syntax errors on its way to the §8.9 funnel's named
+diagnostic. It is the drift test's one recorded exemption until that recovery is settled.
+
+`SendingOperandDriftTests` fails when any rule other than `sendingOperand` offers its four shapes as sibling
+alternatives, and `ArithmeticOperandRoleDriftTests` pins the two mixed-role rules. A unification is proven
+behavior-neutral by a token-stream and parse-tree-shape differential over every lexer input the three test
+assemblies produce, with the new wrapper rules flattened (DESIGN-architecture-review §4 item 3).
+
 ## 4. Current → target module changes
 
 | Action | From | To | Why |

@@ -108,7 +108,7 @@ identificationBody
 // DEVLOG 615). Format 2 — `IS PROTOTYPE` (ISO §11.5 :13127 / §10.6) — is a signature-only prototype unit
 // (LINKAGE-only data + a header-only procedure division, §10.6.2 SR4): it registers a signature but emits NO
 // body, so a caller resolves a separately-compiled definition across the run unit (M2-UDF-3). The optional tail
-// is a unique-leading-token additive change on a LOCAL rule (never a shared core), gated 2002+.
+// starts with a unique leading token, so it changes no other parse; it is gated 2002+.
 functionIdParagraph
     : FUNCTION_ID DOT programName externalizedNamePhrase? prototypePhrase? DOT  // [AS literal-1] rides BOTH formats (ISO §11.5.2 F1/F2 print it between the name and IS PROTOTYPE); IS PROTOTYPE introduction-gated by VersionConformancePass ParseArm.VisitPrototypePhrase (kb/Work PB894); position-safe (dedicated tail, programName consumes a bare name)
     ;
@@ -1057,9 +1057,8 @@ statementBlock
 // SHARED ARITHMETIC RULES
 // ==========================================
 
-// Unified GIVING-form receiving operand.
-// COBOL-85: in any arithmetic GIVING form, the receiving operand may be
-// either an dataReference or a literal. One rule, one source of truth.
+// MULTIPLY's BY operand (§14.9.26.2): a receiver `identifier-2` in Format 1, or the literal-2 of the GIVING
+// format's one sending operand. Only its dataReference arm is a receiver (ArithmeticOperandRole.IsReceiver).
 receivingOperand
     : dataReference
     | literal
@@ -1067,6 +1066,47 @@ receivingOperand
 
 receivingArithmeticOperand
     : dataReference roundedPhrase?
+    ;
+
+// ⛔ THE SENDING OPERAND `{identifier-n | literal-n}` IS ONE RULE (kb/Work PB2114). Every general format that writes
+// an operand as `identifier-n | literal-n` in a SENDING role parses it here: the operands of ADD, SUBTRACT, MULTIPLY
+// and DIVIDE ahead of their TO / FROM / BY / INTO phrases and DIVIDE's BY operand (§14.9.2.2, §14.9.44.2,
+// §14.9.26.2, §14.9.12.2); MOVE's identifier-1 / literal-1 (§14.9.25.2); the FROM phrases of WRITE, REWRITE and
+// RELEASE, each the implicit MOVE that §14.9.51.4 GR5a, §14.9.35.4 and §14.9.32.4 make it; INITIALIZE's REPLACING
+// item (§14.9.20.3 SR4: "a MOVE statement with identifier-2 or literal-1 as the sending item"); and every INSPECT
+// operand after identifier-1 (§14.9.22.2). A function-identifier is an identifier (§8.4.3.1.2 Format 1), and so is
+// an inline method invocation (Format 4); each is barred only from a RECEIVING operand (§8.4.3.2.3 SR1, §8.4.3.4.3
+// SR1), so both are arms here and in no receiving rule. These positions used to be NINE copies of this rule, kept
+// apart while the deleted legacy compiler read each copy's generated accessors by name; the binders read the one
+// SendingOperandContext (MoveBinder.SendingOperand), and SendingOperandDriftTests keeps a copy from reappearing.
+sendingOperand
+    : literal
+    | functionCall
+    | inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4 (8.4.3.4); kb/Work PB428
+    | dataReference
+    ;
+
+// ⛔ THE TO / FROM / INTO OPERAND OF ADD, SUBTRACT AND DIVIDE IS ONE RULE (kb/Work PB2114). §14.9.2.2, §14.9.44.2 and
+// §14.9.12.2 each print the position twice: Format 1 as receivers, `{identifier-2 [rounded-phrase]} …`, and the GIVING
+// format as ONE sending `{identifier-2 | literal-2}` (kb/Work PB134). The rule parses the union and ArithmeticBinder
+// narrows it per format (Format1Receivers / Format2SendingOperand, through the one ArithmeticOperandRole
+// classification). The sending operand's identifier arm IS the receiver arm's dataReference, so only the other arms
+// of `sendingOperand` are written here.
+// MULTIPLY's BY operand prints the same two shapes (§14.9.26.2) but stays `multiplyByOperand+`: that rule admits a
+// REPEATED sending operand and a ROUNDED literal, which ArithmeticBinder names (COBOLNET1689) where this rule's three
+// users take a parse error, so folding it in would change what parses.
+receiversOrSendingOperand
+    : receivingArithmeticOperand+
+    | literal
+    | functionCall             // §8.4.3.1.2 Format 1; kb/Work PB134
+    | inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4 (8.4.3.4); kb/Work PB428
+    ;
+
+// The GIVING phrase of ADD, SUBTRACT, MULTIPLY and DIVIDE: `GIVING {identifier-3 [rounded-phrase]} …` in all four
+// figures (§14.9.2.2, §14.9.44.2, §14.9.26.2, §14.9.12.2). DIVIDE's REMAINDER formats print ONE identifier-3, which
+// ArithmeticBinder enforces (kb/Work PB388).
+arithmeticGivingPhrase
+    : GIVING receivingArithmeticOperand+
     ;
 
 // ROUNDED [MODE IS rounding-mode] (§14.7.4, COBOL-2002). The MODE phrase selects one of the
@@ -1106,47 +1146,15 @@ arithmeticOnSizeError
 // ADD (§14.9.2)
 // ==========================================
 
+// Format 1 `ADD {identifier-1 | literal-1} … TO {identifier-2 [rounded]} …`, Format 2 `… [TO {identifier-2 |
+// literal-2}] GIVING …` and Format 3 CORRESPONDING. ArithmeticBinder narrows the union per format.
 addStatement
     : ADD (CORRESPONDING | CORR) dataReference TO dataReference roundedPhrase? arithmeticOnSizeError? END_ADD?
-    | ADD addOperandList addToPhrase? addGivingPhrase? arithmeticOnSizeError? END_ADD?
+    | ADD sendingOperand+ addToPhrase? arithmeticGivingPhrase? arithmeticOnSizeError? END_ADD?
     ;
 
-addOperandList
-    : addOperand+
-    ;
-
-// ⛔ THE FOUR SENDING ARITHMETIC OPERANDS BELOW ARE ONE RULE WRITTEN FOUR TIMES, AND ALL FOUR WERE WRONG
-// (fix-queue PB45). ISO §8.4.3.1.2 Format 1 makes a function-identifier an identifier, so every position a
-// format writes as `identifier-n | literal-n` in a SENDING role admits one — yet `ADD FUNCTION SQRT(X) TO Y`
-// was a PARSE error across the WHOLE arithmetic family (ADD/SUBTRACT/MULTIPLY/DIVIDE, every format), while
-// COMPUTE accepted it because its RHS is an arithmeticExpression.
-// ⚠ THEY ARE NOT YET COLLAPSED INTO ONE RULE. The fix was made ADDITIVE while a second consumer of the
-// generated `.dataReference()`/`.literal()` accessors on AddOperandContext / SubtractOperandContext /
-// MultiplyOperandContext / DivideOperandContext existed; that consumer is gone, and collapsing the four to ONE
-// rule is kb/Work PB2114. Until then ArithmeticSendingOperandDriftTests pins the four alternative sets IDENTICAL
-// so they cannot drift apart.
-addOperand
-    : literal
-    | functionCall
-    | inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4 (8.4.3.4) - the Format-1 twin above; kb/Work PB428
-    | dataReference
-    ;
-
-// §14.9.2.2 (kb/Work PB134): Format 1 prints `TO {identifier-2 [rounded]}…` (receivers); Format 2 prints
-// `TO {identifier-2 | literal-2}` — ONE operand in a SENDING role, which §8.4.3.1.2 lets a
-// function-identifier fill. Parsed WIDE (the union of the three ADDITIVE alternatives, kept apart until the grammar
-// unification, kb/Work PB2114);
-// ArithmeticBinder narrows by the GIVING phrase. functionCall sits OUTSIDE the receiving rules so the
-// §8.4.3.2.3 SR1 drift guard keeps holding the receiving side clean.
 addToPhrase
-    : TO receivingArithmeticOperand+
-    | TO literal
-    | TO functionCall
-    | TO inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4; kb/Work PB428
-    ;
-
-addGivingPhrase
-    : GIVING receivingArithmeticOperand+
+    : TO receiversOrSendingOperand
     ;
 
 // ==========================================
@@ -1155,33 +1163,11 @@ addGivingPhrase
 
 subtractStatement
     : SUBTRACT (CORRESPONDING | CORR) dataReference FROM dataReference roundedPhrase? arithmeticOnSizeError? END_SUBTRACT?
-    | SUBTRACT subtractOperandList subtractFromPhrase? subtractGivingPhrase? arithmeticOnSizeError? END_SUBTRACT?
-    ;
-
-subtractOperandList
-    : subtractOperand+
-    ;
-
-subtractOperand
-    : literal
-    | functionCall
-    | inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4 (8.4.3.4) - the Format-1 twin above; kb/Work PB428
-    | dataReference
+    | SUBTRACT sendingOperand+ subtractFromPhrase? arithmeticGivingPhrase? arithmeticOnSizeError? END_SUBTRACT?
     ;
 
 subtractFromPhrase
-    : FROM subtractFromOperand
-    ;
-
-subtractFromOperand
-    : receivingArithmeticOperand (receivingArithmeticOperand)*
-    | receivingOperand
-    | functionCall      // §14.9.44.2 Format 2's sending `FROM {identifier-2 | literal-2}` (§8.4.3.1.2; kb/Work PB134)
-    | inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4 (8.4.3.4) - the Format-1 twin above; kb/Work PB428
-    ;
-
-subtractGivingPhrase
-    : GIVING receivingArithmeticOperand (receivingArithmeticOperand)*
+    : FROM receiversOrSendingOperand
     ;
 
 // ==========================================
@@ -1189,14 +1175,7 @@ subtractGivingPhrase
 // ==========================================
 
 multiplyStatement
-    : MULTIPLY multiplyOperand BY multiplyByOperand+ multiplyGivingPhrase? arithmeticOnSizeError? END_MULTIPLY?
-    ;
-
-multiplyOperand
-    : literal
-    | functionCall
-    | inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4 (8.4.3.4) - the Format-1 twin above; kb/Work PB428
-    | dataReference
+    : MULTIPLY sendingOperand BY multiplyByOperand+ arithmeticGivingPhrase? arithmeticOnSizeError? END_MULTIPLY?
     ;
 
 multiplyByOperand
@@ -1205,43 +1184,21 @@ multiplyByOperand
     | inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4 (8.4.3.4) - the Format-1 twin above; kb/Work PB428
     ;
 
-multiplyGivingPhrase
-    : GIVING receivingArithmeticOperand+
-    ;
-
 // ==========================================
 // DIVIDE (§14.9.12)
 // ==========================================
 
 divideStatement
-    : DIVIDE divideOperand (divideIntoPhrase | divideByPhrase)
-      divideGivingPhrase? divideRemainderPhrase? arithmeticOnSizeError? END_DIVIDE?
-    ;
-
-divideOperand
-    : literal
-    | functionCall
-    | inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4 (8.4.3.4) - the Format-1 twin above; kb/Work PB428
-    | dataReference
+    : DIVIDE sendingOperand (divideIntoPhrase | divideByPhrase)
+      arithmeticGivingPhrase? divideRemainderPhrase? arithmeticOnSizeError? END_DIVIDE?
     ;
 
 divideIntoPhrase
-    : INTO divideIntoOperand
-    ;
-
-divideIntoOperand
-    : receivingArithmeticOperand+   // dataReference ROUNDED? (non-GIVING form, multiple targets)
-    | literal             // numeric literal (GIVING form only)
-    | functionCall        // §14.9.12.2 Format 2's sending `INTO {identifier-2 | literal-2}` (§8.4.3.1.2; kb/Work PB134)
-    | inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4 (8.4.3.4) - the Format-1 twin above; kb/Work PB428
+    : INTO receiversOrSendingOperand
     ;
 
 divideByPhrase
-    : BY divideOperand
-    ;
-
-divideGivingPhrase
-    : GIVING receivingArithmeticOperand+
+    : BY sendingOperand
     ;
 
 divideRemainderPhrase
@@ -1276,21 +1233,14 @@ computeOnSizeError
 
 moveStatement
     : MOVE (CORRESPONDING | CORR) dataReference TO dataReference
-    | MOVE moveSendingOperand moveReceivingPhrase
-    ;
-
-moveSendingOperand
-    : literal
-    | functionCall
-    | inlineMethodInvocation   // ISO 8.4.3.1.2 Format 4 (8.4.3.4) - the Format-1 twin above; kb/Work PB428
-    | dataReference
+    | MOVE sendingOperand moveReceivingPhrase
     ;
 
 // ⛔ ONE ALTERNATIVE, BECAUSE THE RECEIVING PHRASE HAS ONE PRINTED SHAPE (kb/Work PB421). §14.9.25.2 prints
 // exactly two general formats — `MOVE { identifier-1 | literal-1 } TO { identifier-2 } …` and
 // `MOVE { CORRESPONDING | CORR } identifier-3 TO identifier-4` — and the SECOND is spelled WHOLE by
 // `moveStatement`'s first alternative above. This rule used to carry a second alternative
-// `(CORRESPONDING | CORR) dataReference TO dataReference`, which composed with `MOVE moveSendingOperand
+// `(CORRESPONDING | CORR) dataReference TO dataReference`, which composed with `MOVE sendingOperand
 // moveReceivingPhrase` to admit `MOVE <sending-operand> CORRESPONDING id-3 TO id-4` — a shape NEITHER format
 // prints, and one the binder could not build, so `MoveBinder.Bind` fell through to a BoundUnsupported and the
 // program COMPILED CLEAN and died at run time claiming a COBOL feature was not yet implemented. §4.2.2's first
@@ -1415,8 +1365,6 @@ callByReference
 // residue the expression spine cannot reach: a NON-numeric literal-2. Its identifier-4 and numeric-literal-2
 // arms need no alternative at all — the spine subsumes both, and CallBinder RECOVERS them before it binds
 // (the GR8 reduction, `Gr8Classify`), which is `callByContent`'s discipline rather than its alternation.
-// ⚠ ADDITIVE: `arithmeticExpression()` still exists as a generated accessor and merely returns null on the
-// new arm; the grammar unification is kb/Work PB2114.
 callByValue
     : BY? VALUE (addressIdentifier | arithmeticExpression | literal)   // introduction-gated at BIND time (StatementBinder.Call → ConstructRegistry.Check(CallByValue2002))
     ;
@@ -1432,10 +1380,9 @@ callByValue
 // because `arithmeticExpression` subsumes numeric literals; `dataReference` deliberately ABSENT because
 // `arithmeticExpression` subsumes it and the identifier case is recovered in the binder from a sole-dataReference
 // expression (Gr8Classify); and the boolean arm behind `{boolExprAhead()}?` because booleanExpression's leaf is
-// valueOperand and an unguarded alternative is ambiguous with the arithmetic one. ⛔ The `dataReference` arm this
-// rule used to keep for a second binder's accessor is what made `BY CONTENT N + 1` read as the two arguments
-// N and +1 (ANTLR resolves the ambiguity to the lower alternative); it is gone and the binder recovers the
-// sole identifier from the expression (kb/Work PB1135, decision R59).
+// valueOperand and an unguarded alternative is ambiguous with the arithmetic one. ⛔ A bare `dataReference` arm is
+// what made `BY CONTENT N + 1` read as the two arguments N and +1 (ANTLR resolves the ambiguity to the lower
+// alternative); the binder recovers the sole identifier from the expression instead (kb/Work PB1135, decision R59).
 callByContent
     : BY? CONTENT (addressIdentifier | {boolExprAhead()}? booleanExpression | {!numericLiteralIsLeftOperand()}? literal | arithmeticExpression)
     ;
@@ -1629,9 +1576,8 @@ setContentSign
 //   python scripts/spec/cite.py --check 14.9.39.2 "The outer braces enclose the single repeated unit; the trailing"
 //   OK  §14.9.39.2   (General formats)  — Format 4's figure note
 // ⛔ AND THE REPEATED UNIT IS A RULE, NOT AN INLINE `( … )+` GROUP. An inline group flattens the phrases into
-// one list of `dataReference()` plus one list of `TO()`, which forced BOTH binders (the greenfield
-// SetAlterBinder.SwitchBindSet and the legacy DataStatementBinder.BindSetSwitch) to re-derive the grouping by
-// comparing token indices — two hand-written copies of a structure the parser already knew. One phrase rule per
+// one list of `dataReference()` plus one list of `TO()`, which forced the binder (SetAlterBinder.SwitchBindSet) to
+// re-derive the grouping by comparing token indices — a hand-written copy of a structure the parser already knew. One phrase rule per
 // printed unit gives each group its own node, so the binder loops over groups and the NEXT format that prints an
 // outer ellipsis needs no re-assembler at all (CLAUDE.md rule 5).
 // `PrintedFormatAlternativeDriftTests.EverySetStatementRule_NamesItsRepeatedUnitInsteadOfInliningIt` holds it.
@@ -1972,6 +1918,11 @@ acceptSource
 // `left_edge_predicates`). Requiring one operand unconditionally and guarding only the CONTINUATION keeps
 // both answers: `DISPLAY COLUMN.` binds COLUMN as a dataReference and the funnel names it, while
 // `DISPLAY SG COLUMN 5` still takes SG as its one operand and hands COLUMN 5 to screenTail.
+// ⚠ THE OPERAND SET IS `sendingOperand`'s, WRITTEN INLINE ON PURPOSE (kb/Work PB2114). Naming the rule parses every
+// legal DISPLAY identically, but it moves the error-recovery boundary: `DISPLAY COLUMN.` / `DISPLAY COLS.` (a data
+// item named by a word the edition reserves) then count one to three more syntax errors on the way to the §8.9
+// funnel's named diagnostic. A unification that changes a parse is not a unification, so the set stays here until
+// that recovery is settled; SendingOperandDriftTests names this rule as its one recorded exemption.
 displayStatement
     : DISPLAY (inlineMethodInvocation | dataReference | literal | functionCall)
       ({!screenPositionAhead()}? (inlineMethodInvocation | dataReference | literal | functionCall))*
