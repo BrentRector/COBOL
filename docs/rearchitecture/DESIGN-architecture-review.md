@@ -226,7 +226,10 @@ once in R0 and again after each landed fix-lane train, because a fix legitimatel
 re-based by that script, never by hand. A wave runs `python scripts/arch/compare_oracle.py`, which captures the
 current tree and compares it with the recorded baseline case by case, printing `CSHARP`, `DIAGNOSTICS`, `ADDED`
 or `REMOVED` per case and the verdict line `=== ARCH-ORACLE: IDENTICAL|DIFFERENT …`. Add `--diff` for unified
-diffs. The wave's DEVLOG entry shows the IDENTICAL line or explains every listed case. The host process is
+diffs: the recorded baseline is hashes only, so when this machine never captured the baseline commit, `--diff`
+captures it first, running that commit's own `capture_oracle.py` in a detached worktree of it, and keeps the blobs
+under `TestResults/arch-oracle/<commit12>/`; a capture that does not reproduce the recorded hashes diffs nothing
+(kb/Work PB2152, where the first explanation of a difference needed that capture by hand). The wave's DEVLOG entry shows the IDENTICAL line or explains every listed case. The host process is
 `tests/Cobol.Net.ArchOracle`, a member of the solution that holds no logic of its own.
 
 **Drift.** `ArchOracleDriftTests` holds every `[PartitionedRowSource]` of the Conformance assembly enrolled, every

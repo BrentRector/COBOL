@@ -1081,8 +1081,16 @@ target:
   recogniser. It hosts the token-keyed vendor JSON/XML→COBOL0313 hint (§3.4), and the two §3.11 arms.
 - The `[code] message` construction (`CobolErrorStrategy.cs:93-95`) is retargeted to build a structured
   `Diagnostic` (descriptor + span) rather than a pre-formatted string, so downstream layers keep structure.
-- Recovery beyond the current sync-point behavior is out of scope for this rearchitecture (the battery does
-  not exercise multi-error recovery quality; changing it risks the green net for no measured gain).
+- ⛔ **A parenthesized group is atomic to recovery** (kb/Work PB2152; ISO §8.3.5 4), parentheses only in balanced
+  pairs). `CobolErrorStrategy.ConsumeUntil` consumes a group it meets while resynchronizing WHOLE, through its
+  balancing ')' of any of the three paren twins (stopping early at the separator period or end of file), and
+  `SingleTokenDeletion` never deletes a '('. Once the reference paren became its own token (kb/Work PB2113) the
+  integer inside `05 A(1)` or `X(3)` resynced as a level-number and the orphaned ')' reported a second, spurious
+  error; the behavior-neutrality oracle caught it, and `ParseRecoveryParenGroupTests` pins the count.
+- Recovery beyond that and the sync-point behavior is out of scope for this rearchitecture (the battery does
+  not exercise multi-error recovery quality; changing it risks the green net for no measured gain) — but a
+  change in the diagnostics a negative fixture produces is visible to the oracle
+  (`DESIGN-architecture-review.md` §4.1), so a recovery regression no longer passes unseen.
 
 ### 3.10 Closed general formats, and the ONE ERROR PRODUCTION that replaced the vendor catch-all (kb/Work PB487, PB829)
 

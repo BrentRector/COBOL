@@ -61,6 +61,51 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
         recognizer.NotifyErrorListeners(token, message, null);
     }
 
+    /// <summary>⛔ A PARENTHESIZED GROUP IS NEVER A RESYNCHRONIZATION POINT (kb/Work PB2152). ISO §8.3.5 4): "Except in
+    /// pseudo-text, parentheses may appear only in balanced pairs of left and right parentheses" — so a '(' the parser
+    /// skips while recovering opens a group whose content belongs to the construct that failed, never to the next one.
+    /// ANTLR's resync consumes token by token until one is in the recovery set, and a token INSIDE the group can be in
+    /// it: since the reference paren became its own token (kb/Work PB2113) the integer in <c>05 A(1) PIC X(3).</c> or
+    /// <c>01 X PICTURE X(3).</c> resyncs as a level-number, and its ')' then reports a second, spurious
+    /// "unexpected ')'" for the one error the source holds. So a group met while consuming is consumed WHOLE, through
+    /// its balancing ')' of any flavour (the three paren twins), and stops early at the separator period or end of
+    /// file, so an unbalanced '(' cannot swallow the rest of the program. A paren that IS in the recovery set is still
+    /// the resync point: the set is asked first.</summary>
+    protected override void ConsumeUntil(Parser recognizer, IntervalSet set)
+    {
+        var input = (ITokenStream)recognizer.InputStream;
+        for (int ttype = input.LA(1); ttype != TokenConstants.EOF && !set.Contains(ttype); ttype = input.LA(1))
+        {
+            if (!IsOpenParen(ttype))
+            {
+                recognizer.Consume();
+                continue;
+            }
+            int depth = 0;
+            do
+            {
+                if (IsOpenParen(ttype)) depth++;
+                else if (IsCloseParen(ttype)) depth--;
+                recognizer.Consume();
+                ttype = input.LA(1);
+            }
+            while (depth > 0 && ttype != TokenConstants.EOF && ttype != CobolLexer.DOT);
+        }
+    }
+
+    /// <summary>The other half of the same rule: single-token deletion never deletes a '(' (kb/Work PB2152). Deleting
+    /// one paren of a balanced pair (§8.3.5 4) orphans the other, so <c>DISPLAY (W-S).</c> recovered by dropping the
+    /// '(' and then reported its ')' as a second error. Declining here sends the error to <see cref="ConsumeUntil"/>,
+    /// which consumes the group whole.</summary>
+    protected override IToken? SingleTokenDeletion(Parser recognizer) =>
+        IsOpenParen(((ITokenStream)recognizer.InputStream).LA(1)) ? null : base.SingleTokenDeletion(recognizer);
+
+    private static bool IsOpenParen(int ttype) =>
+        ttype is CobolLexer.LPAREN or CobolLexer.FNARG_LPAREN or CobolLexer.REF_LPAREN;
+
+    private static bool IsCloseParen(int ttype) =>
+        ttype is CobolLexer.RPAREN or CobolLexer.FNARG_RPAREN or CobolLexer.REF_RPAREN;
+
     // ── Message construction ──
 
     private enum ErrorKind { NoViableAlternative, InputMismatch, MissingToken, UnwantedToken }

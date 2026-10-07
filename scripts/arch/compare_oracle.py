@@ -14,7 +14,8 @@ USAGE
   <new-manifest>       default: capture the current tree now (scripts/arch/capture_oracle.py, into TestResults/)
   --diff               print a unified diff of each differing case from the two captures' blob directories (the
                        directory a TestResults manifest sits in; for a recorded baseline,
-                       TestResults/arch-oracle/<commit12>/ when that commit was captured on this machine)
+                       TestResults/arch-oracle/<commit12>/ — and when this machine never captured that commit, the
+                       comparison captures it first, in a detached worktree of the commit, and keeps the blobs there)
 
 OUTPUT
   CSHARP <id>       the emitted C# differs
@@ -29,7 +30,10 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -60,7 +64,43 @@ def blob_dir(manifest_path: Path, data: dict) -> Path | None:
     if manifest_path.name == "manifest.json":
         return manifest_path.parent
     candidate = capture_oracle.RESULTS / data["commit"][:12]
-    return candidate if candidate.is_dir() else None
+    if candidate.is_dir():
+        return candidate
+    return capture_recorded(data, candidate)
+
+
+def capture_recorded(data: dict, target: Path) -> Path | None:
+    """The blobs of a RECORDED baseline this machine never captured (kb/Work PB2152): the committed record is hashes
+    only, so explaining a difference needs the baseline commit's own capture. It runs that commit's capture_oracle.py
+    in a detached worktree of the commit, keeps the blob directory at `target`, and holds the capture to the record:
+    a capture whose hashes differ from the recorded manifest is not the baseline's, so it diffs nothing."""
+    if data["dirty"]:
+        print("    (the baseline was recorded from a dirty tree; no commit reproduces its blobs)")
+        return None
+    commit = data["commit"]
+    print(f"compare_oracle: capturing the baseline {commit[:12]} in a detached worktree for --diff ...", flush=True)
+    with tempfile.TemporaryDirectory(prefix="arch-oracle-baseline-", ignore_cleanup_errors=True) as scratch:
+        tree = Path(scratch) / "tree"
+        capture_oracle.git("worktree", "add", "--detach", str(tree), commit)
+        try:
+            r = subprocess.run([sys.executable, str(tree / "scripts" / "arch" / "capture_oracle.py")], cwd=tree,
+                               env=capture_oracle.oracle_environment())
+            captured = tree / "TestResults" / "arch-oracle" / commit[:12]
+            if r.returncode != 0 or not (captured / "manifest.json").is_file():
+                print(f"    (capturing {commit[:12]} failed, exit {r.returncode}; no baseline blobs to diff)")
+                return None
+            if load(captured / "manifest.json")["cases"] != data["cases"]:
+                print(f"    (the capture of {commit[:12]} does not reproduce the recorded hashes; no baseline blobs)")
+                return None
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(captured, target)
+        finally:
+            # No --force: the tree holds only ignored build and capture outputs, so a refusal means something else
+            # wrote into it, and that is reported (the scratch directory itself is still cleaned up below).
+            if subprocess.run(["git", "-C", str(capture_oracle.REPO), "worktree", "remove", str(tree)]).returncode:
+                print(f"    (git refused to remove the baseline worktree {tree}; run `git worktree prune`)")
+    return target
 
 
 def show_diff(case_id: str, suffix: str, old_dir: Path | None, new_dir: Path | None) -> None:
