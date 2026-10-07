@@ -16,7 +16,10 @@ evaluator enforces (COBOLNET1619) — and the reason the shared arithmetic core 
 * **No floating-point literal** as a directive operand — even a *sole* one. (The CONSTANT data entry `01 c CONSTANT
   AS …`, §13.10.3, is NOT a compiler directive, so it DOES admit a sole floating-point literal — `EvaluateArithmeticOperand`
   keeps that behavior; the §7.3.3 SR10 bar lives in the frontend-only `EvaluateOperand`/`EvaluateDirectiveArithmetic`,
-  never in the shared arithmetic core.)
+  never in the shared arithmetic core.) The figurative `ZERO` is barred in BOTH consumers, by two rules: the directive
+  entry states §7.3.3 SR10 (COBOLNET1619) before the core runs, and the core's `EvalArith` itself refuses a
+  `ZERO_ARITH` operand under §7.3.6.2 SR1b / §13.10.3 SR6 (the CONSTANT entry's COBOLNET1547) — an operand that is
+  not a fixed-point numeric literal is no operand of ANY compile-time arithmetic expression (kb/Work PB1229).
 * **No figurative constant** (`ZERO`/`SPACE`/`HIGH-VALUE`/`LOW-VALUE`/`QUOTE`/`ALL "literal"`) — in an arithmetic
   operand (`ZERO_ARITH`), a non-numeric operand (`figurativeConstant`), or a boolean operand. So a compile-time
   BOOLEAN operand is a boolean LITERAL only (§7.3.7.2 SR1) — the runtime §8.8.2 figurative operands (`ZERO`,

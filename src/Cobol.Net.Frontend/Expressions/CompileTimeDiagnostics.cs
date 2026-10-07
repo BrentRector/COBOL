@@ -48,5 +48,5 @@ public interface ICtDiagnostics
 /// constant-names substituting them" (binder) or "previously defined numeric compilation variables"
 /// (frontend).</param>
 /// <param name="GoverningCitation">The section citation for the operand-source rule, e.g.
-/// "ISO §13.10.3 SR7 / §7.3.6.2 SR1b" (binder) or "ISO §7.3.6.2 SR1b" (frontend).</param>
+/// "ISO §13.10.3 SR6, SR7 / §7.3.6.2 SR1b" (binder) or "ISO §7.3.6.2 SR1b" (frontend).</param>
 public sealed record CtOperandVocabulary(string OperandSource, string GoverningCitation);

@@ -1611,13 +1611,13 @@
   "ordinal": 1,
   "subject": "Compile-time arithmetic expressions",
   "rule-digest": "417f3f7d60ed",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvalArith; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvaluateDirectiveArithmetic; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantArithmetic",
-  "test-ref": "",
+  "test-ref": "conformance:negative/constant-figurative-arith-operand; unit:CompileTimeExpressionEvaluatorTests.Rejects_FigurativeZeroOperand; unit:CompileTimeExpressionEvaluatorTests.Rejects_Exponentiation; unit:CompileTimeExpressionEvaluatorTests.Rejects_DivisionByZero",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1229 (registrar 15a). Rule: formed per 8.8.1 except a) no exponentiation, b) 'All operands shall be fixed-point numeric literals or arithmetic expressions in which all operands are fixed-point numeric literals', c) no division by zero (--check 7.3.6.2 -> OK 1) a), 1) b), 1) c)). a) CONFORMS: CONSTANT AS 2 ** 3 -> COBOLNET1547, >>DEFINE D1 AS 2 ** 3 -> COBOLNET1619 (unit Rejects_Exponentiation). c) CONFORMS: 1 / 0, 1 / (2 - 2), 0 * (1 / 0), 1 / (0.4 - 0.4) all COBOLNET1547; >>DEFINE D1 AS 5 / (3 - 3) COBOLNET1619 (unit Rejects_DivisionByZero; unit:ConditionalCompilationDefineTests.Define_DivByZero_Rejected1619). b) DIVERGES in the CONSTANT-entry arm: EvalArith maps the figurative ZERO_ARITH token to 0m, and only the DIRECTIVE arm (EvaluateDirectiveArithmetic, §7.3.3 SR10) screens it first. Probes: '01 K CONSTANT AS ZERO + 1.' compiles clean and DISPLAYs 1; 'ZEROS * 5 + 2' -> 2. ZERO is a figurative constant, not a fixed-point numeric literal, and §13.10.3 SR6 (--check OK: 'Neither literal-1 nor any of the literals in arithmetic-expression-1 shall be a figurative constant') independently forbids it; the sole-literal form 'AS ZERO' IS rejected (COBOLNET1547 SR6), so the screen exists for literal-1 and is missing for arithmetic-expression-1 (two-arm dispatch). Other b) edges conform: 1.5E1 + 1 rejected (COBOLNET1547), >>DEFINE 1.0E1 + 1 and ZERO + 1 rejected (1619), FUNCTION ABS(1) + 1 rejected, a non-numeric operand fails to parse. Secondary: a 31-digit fixed-point literal operand ('1234567890123456789012345678901 + 0') IS a fixed-point numeric literal but is rejected with a message claiming it violates SR1b -- the real cause is the SR2 decimal-range limit (see SR-7.3.6.2-2). No open kb/Work note owns the ZERO case (PB218/PB238/PB432 are landed and concern other statements). || code-location detail: src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvalArith (PrimaryExpressionContext arm: 'if (pe.ZERO_ARITH() is not null) return 0m'); src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvaluateDirectiveArithmetic; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantArithmetic",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1229 (wave 1031 D, registrar 15a's row). a) exponentiation and c) division by zero were already enforced in both arms; b) 'All operands shall be fixed-point numeric literals' now holds in the CONSTANT-entry arm too: EvalArith refuses the figurative ZERO_ARITH operand it used to evaluate as 0, so the shared recursion enforces SR1b for every consumer and the directive entry's earlier §7.3.3 SR10 scan states the master constraint under COBOLNET1619.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.6.2-2",
@@ -18291,13 +18291,13 @@
   "ordinal": 6,
   "subject": "Constant entry",
   "rule-digest": "eaf9316301d3",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantStringLiteral; src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvalArith",
-  "test-ref": "",
+  "test-ref": "conformance:negative/constant-figurative; conformance:negative/constant-figurative-arith-operand; unit:CompileTimeExpressionEvaluatorTests.Rejects_FigurativeZeroOperand",
   "derivation": "",
-  "editions": "2002",
-  "notes": "(kb/Work PB1229, 14d). SR6 (cite OK: 'Neither literal-1 nor any of the literals in arithmetic-expression-1 shall be a figurative constant'). literal-1 half enforced: AS ZERO, AS SPACE, AS ALL \"A\" -> COBOLNET1547 SR6 (negative/constant-figurative). arithmetic-expression-1 half NOT enforced: `01 K CONSTANT AS ZERO + 1.` and `01 K2 CONSTANT AS ZEROES * 3.` compile clean and print 1 and 0 — EvalArith maps ZERO_ARITH to 0m; the §7.3.3 SR10 figurative scan exists only on the DIRECTIVE entry point. F-ZERO-OPERAND. || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1229 (wave 1031 D). Both halves of SR6 are enforced: literal-1 (AS ZERO / SPACE / ALL \"A\", BindConstantStringLiteral, COBOLNET1547) and every literal of arithmetic-expression-1 — the figurative ZERO/ZEROS/ZEROES the token rewriter turns into ZERO_ARITH next to an arithmetic operator (`AS ZERO + 1`, `AS ZEROES * 3`, `AS 2 - (ZEROS)`, `AS -ZERO`) is refused by EvalArith (COBOLNET1547, negative constant-figurative-arith-operand); EvalArith used to return 0 for it. The directive twin (>>DEFINE / >>IF operands) was already barred by EvaluateDirectiveArithmetic (COBOLNET1619, §7.3.3 SR10). Editions: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 band follows the row's earlier adjudication.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.10.3-7",
@@ -18306,13 +18306,13 @@
   "ordinal": 7,
   "subject": "Constant entry",
   "rule-digest": "52b7ee228fc4",
-  "verdict": "DIVERGES",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Expressions/CompileTimeExpressionEvaluator.cs#EvalArith; src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs#BindConstantArithmetic",
-  "test-ref": "",
+  "test-ref": "conformance:negative/constant-figurative-arith-operand; unit:CompileTimeExpressionEvaluatorTests.Rejects_FigurativeZeroOperand; unit:CompileTimeExpressionEvaluatorTests.Rejects_UndefinedName",
   "derivation": "",
-  "editions": "2002",
-  "notes": "(kb/Work PB1229, 14d). SR7 (cite OK) + §7.3.6.2 SR1b (cite OK: 'All operands shall be fixed-point numeric literals'). Enforced: data-name operand, floating-point literal operand (1.5E2 + 1), exponentiation (SR1a), division by zero (SR1c), alphanumeric constant operand, and a >>DEFINE compilation-variable-name operand (MYV + 1 -> COBOLNET1547). Not enforced: the figurative ZERO/ZEROS/ZEROES operand is not a fixed-point numeric literal yet evaluates as 0 (F-ZERO-OPERAND). Forward constant-name operands are rejected (F-FORWARD-REF). || Editions (adjudicator): 2002+/2014/2023: §13.10 is unchanged 2014->2023 (Annex E lists no constant-entry change); the 2002 introduction and which AS legs 2002 carried are not derivable from the 2023 text (dossier gap)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1229 (wave 1031 D). SR7 makes every operand of arithmetic-expression-1 a literal formed per 7.3.6. The last hole, the figurative ZERO operand (F-ZERO-OPERAND), is closed in EvalArith; the other operand screens (data-name, floating-point literal, exponentiation, division by zero, alphanumeric constant, compilation-variable-name) were already enforced and are re-probed on this build. Re-probed on this build (probe p6): DN + 1, 1.5E2 + 1, 2 ** 3, 1 / 0 and AC + 1 (AC an alphanumeric constant) each draw COBOLNET1547, while 1 + (2 * 3) compiles. The forward constant-name operand (F-FORWARD-REF) is unchanged by this landing.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.10.3-8",

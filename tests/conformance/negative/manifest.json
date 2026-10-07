@@ -973,6 +973,7 @@
   "constant-at-85",
   "constant-dup-mismatch",
   "constant-figurative",
+  "constant-figurative-arith-operand",
   "constant-from-compilation-variable",
   "constant-occurs-noninteger",
   "pb1947-report-constant-operand-at-85",

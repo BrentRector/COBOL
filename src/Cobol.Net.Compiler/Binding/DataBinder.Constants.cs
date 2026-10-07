@@ -572,7 +572,7 @@ public sealed partial class DataBinder
             resolveName: ResolveConstantName,
             diag: new ConstantEvaluatorDiagnostics(this),
             vocab: new CtOperandVocabulary(
-                "numeric constant-names substituting them", "ISO §13.10.3 SR7 / §7.3.6.2 SR1b"),
+                "numeric constant-names substituting them", "ISO §13.10.3 SR6, SR7 / §7.3.6.2 SR1b"),
             decimalPointIsComma: DecimalPointIsComma);
         if (evaluator.EvaluateArithmeticOperand(expr, where) is not { } n) return null;
         // The constant carries the literal AS WRITTEN (§13.10.4 GR1 — kb/Work PB1230), never a normalized form; its

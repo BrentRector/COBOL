@@ -140,7 +140,7 @@ public sealed class CompileTimeExpressionEvaluator
     // ── The §7.3.6 raw-value recursion (lifted from the CONSTANT binder's battery-tested EvalConstExpr) ──────────
 
     /// <summary>Evaluate a compile-time arithmetic expression to its raw (un-truncated) value (ISO §7.3.6):
-    /// operands are fixed-point numeric literals (§7.3.6.2 SR1b) or previously-defined numeric names substituting
+    /// operands are fixed-point numeric literals (§7.3.6.2 SR1b; never the figurative ZERO) or previously-defined numeric names substituting
     /// them; exponentiation is rejected (SR1a); division by zero is rejected (SR1c); every operand enters, and every
     /// operation runs in, the edition's <see cref="CompileTimeArithmetic"/> mode (§7.3.6.3 GR2), whose range bounds
     /// the intermediate results. <see langword="null"/> (already reported) on any violation.</summary>
@@ -199,7 +199,19 @@ public sealed class CompileTimeExpressionEvaluator
             case Core.PrimaryExpressionContext pe:
             {
                 if (pe.numericLiteral() is { } num) return ParseLiteral(num.GetText(), where);
-                if (pe.ZERO_ARITH() is not null) return new CobolDec(0, 0);
+                // ⛔ The figurative ZERO (the ZERO_ARITH token ZeroTokenRewriter mints next to an arithmetic operator)
+                // is NOT a numeric literal: §7.3.6.2 SR1b admits only fixed-point numeric literals, and §13.10.3 SR6
+                // adds that none of the literals of arithmetic-expression-1 shall be a figurative constant (kb/Work
+                // PB1229 — this arm used to return 0, so `AS ZERO + 1` compiled). The rule lives HERE, in the one
+                // raw-value recursion, so every consumer of an arithmetic operand inherits it; the directive entry's
+                // earlier §7.3.3 SR10 scan states that master constraint under its own code and stays in front.
+                if (pe.ZERO_ARITH() is not null)
+                {
+                    _diag.Report(CtDiagCode.ArithmeticRule, $"{where}: the figurative constant ZERO (ZEROS, ZEROES) is not a numeric literal, and "
+                        + "no operand of a compile-time arithmetic expression shall be one — all operands shall be "
+                        + $"fixed-point numeric literals ({_vocab.GoverningCitation})");
+                    return null;
+                }
                 if (pe.arithmeticExpression() is { } paren) return EvalArith(paren, where);
                 if (pe.dataReference() is { } dref)
                 {

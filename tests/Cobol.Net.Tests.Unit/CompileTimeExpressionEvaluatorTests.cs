@@ -205,6 +205,23 @@ public sealed class CompileTimeExpressionEvaluatorTests
         Assert.Contains(diag.Reports, x => x.Code == CtDiagCode.ArithmeticRule && x.Message.Contains("SR1b"));
     }
 
+    [Theory] // §7.3.6.2 SR1b / §13.10.3 SR6 — the figurative ZERO is no numeric literal, so no operand position takes it
+    // (kb/Work PB1229: the ZERO_ARITH arm used to evaluate to 0, and an expression with ZERO in it compiled).
+    [InlineData("ZERO + 1")]
+    [InlineData("1 + ZERO")]
+    [InlineData("ZEROS * 3")]
+    [InlineData("(ZERO)")]
+    [InlineData("- ZERO")]
+    [InlineData("5 / ZERO")]   // the figurative is refused, not read as a zero divisor (SR1c)
+    public void Rejects_FigurativeZeroOperand(string src)
+    {
+        var (r, diag) = Eval(src);
+        Assert.Null(r);
+        var report = Assert.Single(diag.Reports, x => x.Code == CtDiagCode.ArithmeticRule);
+        Assert.Contains("figurative constant ZERO", report.Message);
+        Assert.Contains("SR1b", report.Message);
+    }
+
     private sealed class ErrorFlag : BaseErrorListener, IAntlrErrorListener<int>
     {
         public bool HasError { get; private set; }
