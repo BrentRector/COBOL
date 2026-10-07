@@ -149,14 +149,17 @@ public sealed partial class DataBinder
         // says nothing about group categories. "Alphanumeric group item" is defined in §3.11 — "group item
         // except for a bit group item, a national group item, a strongly-typed group item, or a variable-length
         // group item" — and made one by §13.18.29.4 GR3. ⚠ THE PREDICATE BELOW IS THE TWO-EXCLUSION READING the
-        // wrong citation carried: it excludes the bit and national groups and not the STRONGLY-TYPED or
-        // VARIABLE-LENGTH ones, so it over-includes. Registered as a lead rather than changed here — in this
-        // model, IsGroup with GroupUsage.None. The membership test reaches EVERY depth: the rule says
-        // "containing", not "immediately containing", and a COMP item two levels down denies the group a
-        // character image exactly as one level down does.
+        // wrong citation carried (kb/Work PB947): it asked `IsGroup && GroupUsage is None`, which excludes the bit
+        // and national groups and not the STRONGLY-TYPED or VARIABLE-LENGTH ones, so a variable-length group was
+        // refused under THIS letter and quoted a sentence it does not violate (h) is the letter it violates, and
+        // the first-match walk never reached it). The subject is now asked of ItemCategory.IsAlphanumericGroup,
+        // the ONE spelling of §3.11's four-exclusion definition (§13.18.29.4 GR3), so c) and h) are disjoint
+        // for a variable-length group and the letter the programmer looks up is the one that applies. The
+        // membership test reaches EVERY depth: the rule says "containing", not "immediately containing", and a
+        // COMP item two levels down denies the group a character image exactly as one level down does.
         new('c', "An alphanumeric group containing items with a usage other than display.",
             "an alphanumeric group containing an item whose usage is not DISPLAY",
-            static d => d.IsGroup && d.GroupUsage is GroupUsage.None
+            static d => ItemCategory.IsAlphanumericGroup(d)
                 && AnySubordinate(d, static x => UsageOtherThanDisplay(x))),
 
         // d) A group containing items described with a JUSTIFIED or SYNCHRONIZED clause.
@@ -206,9 +209,11 @@ public sealed partial class DataBinder
         // (§13.18.12.3 SR2: "Identifier-1 shall reference an alphanumeric data item that shall not be an
         // occurs-depending-on group item, a variable-length group, or a dynamic-length elementary item" —
         // three things, listed side by side), and reading ODO into this letter would reject legal COBOL-85.
-        // ReferenceResolver.HasVariableLengthSubordinate IS §8.5.1.12.1's definition; this is the delegation.
+        // VariableLengthCompatibility.IsVariableLength IS §8.5.1.12.1's definition, and the very test
+        // ItemCategory.GroupKindsOf subtracts from the alphanumeric group, so c) and h) are disjoint for it;
+        // this is the delegation.
         new('h', "A variable-length group.", "a variable-length group",
-            static d => d.IsGroup && ReferenceResolver.HasVariableLengthSubordinate(d)),
+            static d => VariableLengthCompatibility.IsVariableLength(d)),
     ];
 
     /// <summary>"an item with a usage other than display", for SR24 c). A BIT or NATIONAL group counts: it is

@@ -623,6 +623,7 @@
   "pb488-cond-var-none",
   "pb488-cond-var-after-constant-entry",
   "pb488-cond-var-alphanumeric-group-usage",
+  "pb947-cond-var-variable-length-group-with-comp-member",
   "pb488-cond-var-group-justified",
   "pb488-cond-var-group-synchronized-member",
   "pb488-cond-var-group-synchronized-self",

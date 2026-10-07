@@ -157,6 +157,40 @@ public sealed class ConditionNameAssociationDriftTests
             new DataItem { Level = 1, CobolName = "W", CsName = "W", IsTypedef = true }));
     }
 
+    /// <summary>⛔ c)'s SUBJECT IS §3.11's "ALPHANUMERIC GROUP ITEM", WHICH EXCLUDES FOUR KINDS (kb/Work PB947). The
+    /// predicate was "a group with no GROUP-USAGE clause" — two of the four — so a VARIABLE-LENGTH group holding a
+    /// non-DISPLAY member answered c) and the first-match walk never reached h), the letter it violates; a
+    /// STRONGLY-TYPED group instance answered c) too, though SR24 letter g) is the type DECLARATION's and the
+    /// instance is barred by §13.18.57.3 SR2. Both now come out of c), and the ONE spelling that says so is
+    /// <c>ItemCategory.IsAlphanumericGroup</c>.</summary>
+    [Fact]
+    public void LetterCAsksTheAlphanumericGroupNotTheGroupWithoutGroupUsage()
+    {
+        static DataItem Comp(string name, int level = 5) =>
+            Elem(name, new PicInfo(PicCategory.Numeric, Usage.Binary, 4, 4, 0, false), level);
+        static DataItem Dyn(string name)
+        {
+            var d = Elem(name, Alnum(), 5);
+            d.IsDynamicLength = true;
+            return d;
+        }
+
+        // A variable-length group: letter h), never c) — the non-DISPLAY member is beside the dynamic one.
+        Assert.Equal('h', Excl(Group("VG", 1, Comp("X"), Dyn("D"))));
+        // …and nested one level down, where the HasVariableLengthSubordinate walk and the c) walk both recurse.
+        var inner = Group("IN", 5, Comp("Y", 10), Dyn("D2"));
+        Assert.Equal('h', Excl(Group("OUTER", 1, inner)));
+
+        // A strongly-typed group instance (it carries StrongType from its TYPE clause) is no alphanumeric group, and
+        // g) is the declaration's letter, so SR24 excludes it by no letter; COBOLNET1537 owns the instance.
+        var strongInstance = Group("SG", 1, Comp("P1"));
+        strongInstance.StrongType = true;
+        Assert.Null(DataBinder.ConditionalVariableExclusion(strongInstance));
+
+        // The plain alphanumeric group keeps c).
+        Assert.Equal('c', Excl(Group("AG", 1, Comp("X2"))));
+    }
+
     /// <summary>⛔ AN OCCURS DEPENDING ON GROUP IS NOT A VARIABLE-LENGTH GROUP. §8.5.1.12.1: "A variable-length
     /// group is a group item whose data description has at least one dynamic-length elementary item or
     /// dynamic-capacity table as a subordinate item." The standard names the occurs-depending-on group
