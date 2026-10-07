@@ -269,9 +269,9 @@ jobs:
       - name: Citation gate self-test — cite.py refuses an empty quotation and accepts the printed form (cite.py --self-test)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/cite.py --self-test
-      - name: Ledger program self-test — the re-architecture section's phase notes, wave kinds and cluster totals agree with the register (gen_ledger.py --self-test)
+      - name: Ledger plan self-test — the completion ledger's lanes, phase and gate notes, wave kinds and cluster totals agree with the register (ledger_plan.py --self-test)
         if: ${{ !cancelled() }}
-        run: python3 scripts/spec/gen_ledger.py --self-test
+        run: python3 scripts/spec/ledger_plan.py --self-test
       - name: Work register — every kb/Work note well-formed (work.py check)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/work.py check

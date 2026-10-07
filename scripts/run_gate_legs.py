@@ -92,7 +92,7 @@ AUDITS = (
     ("RULE CATALOG", ["scripts/spec/extract_rule_catalog.py", "--check"]),
     ("SPEC CORRECTIONS", ["scripts/spec/verify_publishable.py"]),
     ("CITE SELF-TEST", ["scripts/spec/cite.py", "--self-test"]),
-    ("LEDGER PROGRAM SELF-TEST", ["scripts/spec/gen_ledger.py", "--self-test"]),
+    ("LEDGER PLAN SELF-TEST", ["scripts/spec/ledger_plan.py", "--self-test"]),
 )
 #: The git-ignored GPL corpus ExternalCorpusPopulationDriftTests measure (kb/Work PB209, PB897): absent in a fresh
 #: worktree, so the gate fetches it; a failed fetch makes the gate RED, attributed to the fetch.

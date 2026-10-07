@@ -3177,7 +3177,7 @@ already-derivable coverage; none change the pipeline.
   burn-down reports). `python scripts/spec/backfill_closes_rows.py`
   re-derives the back-link from the inventory's own commit history — idempotent, and it never overwrites an
   answer a human wrote.
-- Owner status page: `python scripts/spec/gen_ledger.py` renders the **WiseOwl COBOL Conformance Ledger** artifact
+- Owner status page: `python scripts/spec/gen_ledger.py` renders the **WiseOwl COBOL Completion Ledger** artifact (kb/Work R69's plan lane by lane, measured by `scripts/spec/ledger_plan.py`; PB2462)
   from the repo — inventory, `kb/Work` (through `work.py`'s own predicate), `audit_annex_a1.py --json`, `CONFORMANCE.md`
   §2/§4/§5 and §0's CURRENT battery bullet — so a refresh is one run plus one publish to the artifact's existing URL,
   never a hand rewrite; `--check` reports staleness and the GAP series lives in `docs/rearchitecture/evidence/ledger-trend.json`.

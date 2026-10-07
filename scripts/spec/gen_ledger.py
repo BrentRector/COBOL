@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""Render the owner's **WiseOwl COBOL Conformance Ledger** artifact from the repo — every figure COMPUTED.
+"""Render the owner's **WiseOwl COBOL Completion Ledger** artifact from the repo — every figure COMPUTED.
+
+⭐ WHAT THE PAGE IS (kb/Work PB2462, owner 2026-10-07: "Rewrite the ledger as necessary to clearly and accurately
+track all aspects of the new plan and progress towards completing it"). The completion plan of kb/Work R69, lane by
+lane: a headline with the two meters that matter (rules closed with GAP; re-architecture program notes landed), the
+six lanes as cards with each one's definition of done and measured progress, then one section per lane — 1 legacy
+retirement, 2 conformance to zero GAP (the original conformance ledger's hero, tiles and GAP trend), 3 the external
+repository's slices, 4 the architecture review R0-R5 with the review program by wave kind x status and what its
+notes wait on, 5 the gates between the lanes — then the conformance detail (gates proven green, verdicts, burn-down
+by clause, the three veins, the §4.2.16 posture), the in-flight narrative, and 6 pacing. The lanes are MEASURED in
+`ledger_plan.py` (structures, register reads, its own `--self-test`) and RENDERED here.
 
 ⛔ WHY THIS EXISTS. The ledger is the owner's live status page, and it was maintained by HAND: a session read the
 inventory, the work register, the A.1 audit and plan §0, then retyped ~60 numbers into a 460-line HTML file. Two
@@ -18,10 +28,9 @@ So a refresh is now: run this script, then publish `--out` to the artifact's exi
     python scripts/spec/gen_ledger.py                       # write the default --out
     python scripts/spec/gen_ledger.py --out ledger.html     # write somewhere else
     python scripts/spec/gen_ledger.py --check               # non-zero if --out is stale (mirrors
-                                                            # gen_conformance_notes.py --check) or the
-                                                            # program section's drift check fails
-    python scripts/spec/gen_ledger.py --self-test           # that drift check's arms on planted registers,
-                                                            # then on the real one (the gate's audits, CI)
+                                                            # gen_conformance_notes.py --check); this and a
+                                                            # write both refuse when ledger_plan.problems()
+                                                            # finds the lanes unreadable
 
 ⭐ INPUTS, each one an artifact something else already gates:
 
@@ -37,14 +46,17 @@ So a refresh is now: run this script, then publish `--out` to the artifact's exi
     docs/VERSION_CHANGE_REFERENCE.md                   the anchor dispositions (todo · gated · ref-only · pinned)
     tests/version-matrix/constructs.json               the matrix registry size
     tests/conformance/**                               the golden corpus, by edition
-    kb/Work clusters PB2108 · PB2119 + the phase notes  "The re-architecture program" (kb/Work R69's completion
-                                                       plan, PB2462): the phases R0-R5 of
-                                                       DESIGN-architecture-review.md §3 (the PHASES structure), the
-                                                       retirement cluster, and the review program by wave kind (the
-                                                       title prefixes of scripts/arch/file_census_notes.py, imported)
-                                                       x status, all through work.py's `cluster_members`
+    kb/Work, through ledger_plan.py                    the plan's lanes: clusters PB2108 and PB2119 (work.py's
+                                                       `cluster_members`), phase, slice and gate notes found by
+                                                       title or by ledger_plan's small self-tested structures, wave
+                                                       kinds by file_census_notes.py's title prefixes (imported)
+    DESIGN-architecture-review.md §8                   R1's draft status line, when the design carries one
     docs/rearchitecture/evidence/arch-census ·         R0's records: the newest file in each, by commit date
       arch-oracle · perf-baseline
+    <coord>/readings.json + model_rules.json          pacing: the newest meter reading against the owner's caps,
+                                                       or "not available" where there is no coordination directory
+                                                       (so a page rendered in CI says so; NOT a stamp input — a new
+                                                       reading makes --check report the page stale, which it is)
     git                                                HEAD sha + date, and how far HEAD has drifted from the
                                                        battery's tree (which is what makes "a battery is owed"
                                                        a measurement rather than an opinion)
@@ -80,6 +92,7 @@ import sys
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import ledger_plan  # noqa: E402  (the plan's lanes: measured there, rendered here)
 
 INVENTORY = REPO / "tests" / "version-matrix" / "traceability-inventory.json"
 CONSTRUCTS = REPO / "tests" / "version-matrix" / "constructs.json"
@@ -91,7 +104,7 @@ TREND = REPO / "docs" / "rearchitecture" / "evidence" / "ledger-trend.json"
 IN_FLIGHT = REPO / "docs" / "rearchitecture" / "evidence" / "ledger-in-flight.md"
 DEFAULT_OUT = REPO / "docs" / "rearchitecture" / "evidence" / "conformance-ledger.html"
 
-TITLE = "WiseOwl COBOL Conformance Ledger"
+TITLE = "WiseOwl COBOL Completion Ledger"
 
 #: Verdicts that RESOLVE a row — the row still needs a spec-derived witness to close, but no further
 #: adjudication. Mirrors `inventory-schema.json`'s `resolves` flag; kept as a literal here because this script
@@ -145,6 +158,7 @@ STAMP_PATHS = (
     "docs/rearchitecture/evidence/arch-census",
     "docs/rearchitecture/evidence/arch-oracle",
     "docs/rearchitecture/evidence/perf-baseline",
+    "docs/rearchitecture/DESIGN-architecture-review.md",
 )
 
 
@@ -223,232 +237,6 @@ def measure_work() -> dict:
         "actionable": work.actionable(items),
         "owner_parked": [i for i in items if i.get("status") == "owner"],
     }
-
-
-# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
-# the re-architecture program (kb/Work R69's completion plan, kb/Work PB2462) — read off the register
-# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
-#
-# ⭐ WHAT THE SECTION IS. R69 split the completion plan into named CLUSTERS of the register (work.py's
-# `cluster_members`, the one membership rule `cluster_order` also uses): the legacy retirement
-# (`cluster: ["PB2108"]`) and the review program's R3 waves (`cluster: ["PB2119"]`), plus the architecture review's
-# phases R0-R5 (DESIGN-architecture-review.md §3). Every status here is READ from a note; nothing in this block
-# writes or remembers one.
-#
-# ⛔ THE ONE HAND-KEPT STRUCTURE IS THE SIX PHASES, and it holds as few ids as it can: a note whose title names its
-# phase (`PB2115 — R0 census …`) is found by its title, so a phase note filed tomorrow appears with no edit here;
-# a phase's tuple lists only the notes whose titles do not say so. `program_problems` refuses an id the register
-# lacks, so a renumbered or retired note cannot silently drop out of its phase.
-
-RETIREMENT = "PB2108"
-REVIEW_PROGRAM = "PB2119"
-
-#: The phases of DESIGN-architecture-review.md §3, in order: (key, name, the phase notes whose titles do not name it).
-PHASES = (
-    ("R0", "Baseline and oracle", ()),
-    ("R1", "Target architecture", ()),
-    ("R2", "Review fleet", ()),
-    ("R3", "Restructuring waves", (REVIEW_PROGRAM,)),
-    ("R4", "Modernization", ()),
-    ("R5", "Close", ()),
-)
-#: A title that names its phase: `<id> — R0 census`, `<id> — R1, the target architecture`. The lookahead keeps
-#: `R69` (an owner-decision id) and `R0-0053` (a census finding id) out.
-PHASE_IN_TITLE = re.compile(r"\A\S+ — (?P<phase>R\d)(?=[ ,:])")
-
-#: R0's instruments write their records here, one file per measured commit, named by that commit's sha:
-#: (label, folder, glob, a suffix the glob also matches that is NOT a record).
-ARCH_EVIDENCE = REPO / "docs" / "rearchitecture" / "evidence"
-R0_EVIDENCE = (("census", "arch-census", "*.json", ".findings.json"),
-               ("oracle", "arch-oracle", "*.manifest.json", None),
-               ("perf baseline", "perf-baseline", "*.md", None))
-
-#: The status columns the review program's table always shows; any other status appears when a note carries it.
-BASE_STATUSES = ("open", "blocked", "landed")
-OTHER_WAVE = "other"
-
-
-def wave_prefixes() -> dict[str, str]:
-    """The R3 wave kinds, as the filing generator spells them at the head of a note's title (`Delete:`, `Unify:` …).
-
-    ⛔ IMPORTED, NEVER COPIED: `scripts/arch/file_census_notes.py` PREFIX is the contract the notes are written to,
-    so a wave kind it gains (Extract, Data-ize) is counted here the day it files its first note."""
-    sys.path.insert(0, str(REPO / "scripts" / "arch"))
-    import file_census_notes  # noqa: PLC0415
-    return dict(file_census_notes.PREFIX)
-
-
-def wave_kind(item: dict, prefixes: dict[str, str]) -> str | None:
-    """The note's wave kind (its prefix without the colon), `other` when the title carries none, or None when the
-    title is not `<id> — …` at all, so no kind can be read from it."""
-    head = f"{item.get('id')} — "
-    title = str(item.get("title", ""))
-    if not title.startswith(head):
-        return None
-    rest = title[len(head):]
-    return next((p.rstrip(":") for p in prefixes.values() if rest.startswith(p)), OTHER_WAVE)
-
-
-def newest_record(folder: str, pattern: str, exclude: str | None) -> dict | None:
-    """The newest record in an R0 evidence folder, by the date of the commit that added it (a checkout's mtimes are
-    the checkout's, not the record's)."""
-    files = [p for p in (ARCH_EVIDENCE / folder).glob(pattern) if not (exclude and p.name.endswith(exclude))]
-    if not files:
-        return None
-    dated = [(git("log", "-1", "--format=%cI", "--", p.relative_to(REPO).as_posix()), p.name, p) for p in files]
-    when, _, p = max(dated)
-    return {"sha": p.name.split(".")[0][:12], "date": when[:10], "path": p.relative_to(REPO).as_posix()}
-
-
-def measure_program(items: list[dict], prefixes: dict[str, str], evidence: bool = True) -> dict:
-    """The program's standing, read off `items` (the register): phases, the two clusters, the wave table."""
-    import work  # noqa: PLC0415
-    by_id = {i.get("id"): i for i in items}
-
-    def status(nid: str) -> str:
-        return str(by_id.get(nid, {}).get("status", "missing"))
-
-    phases = []
-    for key, name, listed in PHASES:
-        titled = {str(i.get("id")) for i in items
-                  if (m := PHASE_IN_TITLE.match(str(i.get("title", "")))) and m["phase"] == key}
-        ids = sorted(titled | set(listed), key=work.id_order)
-        phases.append({"key": key, "name": name, "notes": [(nid, status(nid)) for nid in ids]})
-
-    def cluster(lead: str) -> dict:
-        members = sorted(work.cluster_members(items, lead), key=lambda i: work.id_order(str(i.get("id"))))
-        live = [i for i in members if i.get("status") not in work.TERMINAL_STATUSES]
-        return {"lead": lead, "members": members,
-                "notes": [(str(i.get("id")), str(i.get("status"))) for i in members],
-                "total": len(members), "unfinished": len(live),
-                "waiting": sum(1 for i in live if work.open_blockers(i, by_id))}
-
-    retire, review = cluster(RETIREMENT), cluster(REVIEW_PROGRAM)
-    grid: dict[str, collections.Counter] = {k: collections.Counter()
-                                            for k in [*(p.rstrip(":") for p in prefixes.values()), OTHER_WAVE]}
-    unreadable = []
-    for it in review["members"]:
-        k = wave_kind(it, prefixes)
-        if k is None:
-            unreadable.append(str(it.get("id")))
-        else:
-            grid.setdefault(k, collections.Counter())[str(it.get("status"))] += 1
-    present = {s for c in grid.values() for s in c}
-    statuses = [*BASE_STATUSES, *sorted(present - set(BASE_STATUSES), key=lambda s: (s in work.TERMINAL_STATUSES, s))]
-    review.update(grid=grid, statuses=statuses, unreadable=unreadable,
-                  table_total=sum(sum(c.values()) for c in grid.values()))
-
-    every = {nid for p in phases for nid, _ in p["notes"]} | {nid for nid, _ in retire["notes"] + review["notes"]}
-    landed = sum(1 for nid in every if status(nid) in work.TERMINAL_STATUSES)
-    return {"phases": phases, "retire": retire, "review": review,
-            "evidence": ([(label, newest_record(folder, pat, exc)) for label, folder, pat, exc in R0_EVIDENCE]
-                         if evidence else []),
-            "counts": {"total": len(every), "landed": landed, "open": len(every) - landed}}
-
-
-def program_problems(items: list[dict], prefixes: dict[str, str], prog: dict) -> list[str]:
-    """Why the program section cannot be trusted, or [] — the drift test CLAUDE.md rule 5 asks of its structure.
-
-    Each arm is one way the section could render a tidy, wrong answer: a phase pointing at a note the register
-    lacks, a note whose wave kind cannot be read (or a kind rule that reads EVERY note as other, the same failure
-    hidden), and a table whose totals are not work.py's count of the cluster it claims to show."""
-    import work  # noqa: PLC0415
-    bad = []
-    if [k for k, _, _ in PHASES] != [f"R{i}" for i in range(6)]:
-        bad.append(f"phases: PHASES must be R0-R5 in order, got {[k for k, _, _ in PHASES]}")
-    ids = {i.get("id") for i in items}
-    for key, _, listed in PHASES:
-        bad += [f"phase-note-missing: {key} names {nid}, which is not a kb/Work note" for nid in listed if nid not in ids]
-    bad += [f"status-vocabulary: {s!r} is not a work.py status" for s in BASE_STATUSES if s not in work.STATUSES]
-    if not prefixes or any(not p.endswith(":") for p in prefixes.values()):
-        bad.append(f"wave-prefixes: file_census_notes.PREFIX must be non-empty `Kind:` spellings, got {prefixes}")
-    rv = prog["review"]
-    bad += [f"wave-kind-unreadable: {nid}'s title is not '<id> — …', so no wave kind can be read"
-            for nid in rv["unreadable"]]
-    readable = rv["table_total"]
-    if readable and sum(rv["grid"].get(OTHER_WAVE, collections.Counter()).values()) == readable:
-        bad.append(f"wave-kind-all-other: all {readable} notes of cluster {REVIEW_PROGRAM} read as '{OTHER_WAVE}' — "
-                   f"their titles no longer carry file_census_notes.PREFIX")
-    for c in (prog["retire"], rv):
-        order = work.cluster_order(items, c["lead"])
-        if c["total"] != order["named"] or c["unfinished"] != len(order["notes"]):
-            bad.append(f"cluster-total: {c['lead']} shows {c['total']} notes, {c['unfinished']} unfinished; work.py "
-                       f"counts {order['named']}, {len(order['notes'])} unfinished")
-    if readable + len(rv["unreadable"]) != rv["total"]:
-        bad.append(f"cluster-total: the wave table holds {readable} of the {rv['total']} notes of {REVIEW_PROGRAM}")
-    return bad
-
-
-def live_program_problems() -> list[str]:
-    import work  # noqa: PLC0415
-    items, prefixes = work.load(), wave_prefixes()
-    return program_problems(items, prefixes, measure_program(items, prefixes, evidence=False))
-
-
-def self_test() -> int:
-    """Fire every arm of `program_problems` on planted registers, then run it on the real one."""
-
-    def note(nid, title, cluster, status="open", blocked_by=()):
-        return {"id": nid, "title": f"{nid} — {title}", "cluster": list(cluster), "status": status,
-                "blocked_by": list(blocked_by), "_file": f"{nid}.md"}
-
-    prefixes = {"delete": "Delete:", "unify": "Unify:"}
-    good = [note(RETIREMENT, "lead", [RETIREMENT], "landed"), note(REVIEW_PROGRAM, "the Delete program", []),
-            note("PB9001", "Delete: x", [REVIEW_PROGRAM]), note("PB9002", "Unify: y", [REVIEW_PROGRAM], "landed"),
-            note("PB9003", "R0 census", []), note("PB9004", "something", [REVIEW_PROGRAM], blocked_by=["PB9001"])]
-    results = []
-
-    def case(name, items, expect, mutate=None):
-        prog = measure_program(items, prefixes, evidence=False)
-        if mutate:
-            mutate(prog)
-        got = program_problems(items, prefixes, prog)
-        ok = (not got) if expect is None else any(g.startswith(expect) for g in got)
-        results.append(ok)
-        print(f"{'✓' if ok else '✗'} {name}: {got or 'clean'}")
-
-    case("clean planted register", good, None)
-    p = measure_program(good, prefixes, evidence=False)
-    g = p["review"]["grid"]
-    shape = (g["Delete"]["open"], g["Unify"]["landed"], g[OTHER_WAVE]["open"], p["review"]["waiting"],
-             p["phases"][0]["notes"], p["phases"][3]["notes"], p["counts"])
-    want = (1, 1, 1, 1, [("PB9003", "open")], [(REVIEW_PROGRAM, "open")], {"total": 6, "landed": 2, "open": 4})
-    results.append(shape == want)
-    print(f"{'✓' if shape == want else '✗'} measured: wave grid, waiting, phase by title and by structure, "
-          f"program counts: {shape}")
-    case("phase-note-missing", [i for i in good if i["id"] != REVIEW_PROGRAM], "phase-note-missing")
-    case("wave-kind-unreadable", [*good, {**note("PB9005", "x", [REVIEW_PROGRAM]), "title": "no dash"}],
-         "wave-kind-unreadable")
-    case("wave-kind-all-other", [i for i in good if i["id"] not in ("PB9001", "PB9002")], "wave-kind-all-other")
-    case("cluster-total", good, "cluster-total", lambda q: q["review"].update(total=q["review"]["total"] + 1))
-
-    live = live_program_problems()
-    results.append(not live)
-    print(f"{'✓' if not live else '✗'} the real register: {live or 'clean'}")
-    if all(results):
-        print(f"✓ gen_ledger self-test: {len(results)} cases")
-        return 0
-    print(f"⛔ gen_ledger self-test: {results.count(False)} of {len(results)} cases failed")
-    return 1
-
-
-def program_series(prog: dict, head: dict) -> tuple[list[dict], bool]:
-    """The program's counts over time — the trend file's `program` series, beside the GAP `points`.
-
-    ⛔ A SEPARATE SERIES, NOT THREE MORE KEYS ON A GAP POINT. A GAP point is appended only when the inventory moves,
-    and the program is behavior-neutral by contract (DESIGN-architecture-review.md §4): its waves close no row, so
-    its counts riding on GAP points would almost never be recorded, and adding them to the GAP point's trigger would
-    fill the burn-down with flat steps the chart's note says are inventory landings. A point is appended when the
-    counts move, exactly as `trend_series` does for GAP, and `--check` renders without writing."""
-    doc = json.loads(TREND.read_text(encoding="utf-8")) if TREND.exists() else {}
-    pts = doc.get("program", [])
-    cur = {"sha": head["sha"], "date": head["date"], **prog["counts"]}
-    last = pts[-1] if pts else None
-    if last is not None and all(cur[k] == last.get(k) for k in ("total", "landed", "open")):
-        return pts, False
-    if last is not None and last.get("sha") == cur["sha"]:
-        return [*pts[:-1], cur], True
-    return [*pts, cur], True
 
 
 def measure_annex_a1() -> dict:
@@ -654,6 +442,25 @@ def trend_series(inv: dict, head: dict, battery: dict) -> tuple[list[dict], bool
     return [*pts, cur], True
 
 
+def program_series(prog: dict, head: dict) -> tuple[list[dict], bool]:
+    """The program's counts over time — the trend file's `program` series, beside the GAP `points`.
+
+    ⛔ A SEPARATE SERIES, NOT THREE MORE KEYS ON A GAP POINT. A GAP point is appended only when the inventory moves,
+    and the program is behavior-neutral by contract (DESIGN-architecture-review.md §4): its waves close no row, so
+    its counts riding on GAP points would almost never be recorded, and adding them to the GAP point's trigger would
+    fill the burn-down with flat steps the chart's note says are inventory landings. A point is appended when the
+    counts move, exactly as `trend_series` does for GAP, and `--check` renders without writing."""
+    doc = json.loads(TREND.read_text(encoding="utf-8")) if TREND.exists() else {}
+    pts = doc.get("program", [])
+    cur = {"sha": head["sha"], "date": head["date"], **prog["counts"]}
+    last = pts[-1] if pts else None
+    if last is not None and all(cur[k] == last.get(k) for k in prog["counts"]):
+        return pts, False
+    if last is not None and last.get("sha") == cur["sha"]:
+        return [*pts[:-1], cur], True
+    return [*pts, cur], True
+
+
 def write_trend(series: list[dict], program: list[dict]) -> None:
     doc = json.loads(TREND.read_text(encoding="utf-8")) if TREND.exists() else {}
     doc["points"] = series
@@ -779,7 +586,7 @@ def clause_rows(buckets: dict) -> str:
 
 
 #: A status's pill: finished is good, held on something is critical, everything else is still owed.
-PILL = {"landed": "good", "retired": "good", "blocked": "crit", "owner": "crit"}
+PILL = {"landed": "good", "retired": "good", "blocked": "crit", "owner": "crit", "missing": "crit"}
 
 
 def status_pill(s: str) -> str:
@@ -787,40 +594,113 @@ def status_pill(s: str) -> str:
 
 
 def note_list(notes: list[tuple[str, str]]) -> str:
-    """`PB2115 landed · PB2118 open`, grouped by status so a long cluster reads as three runs, not a roll call."""
+    """`open PB2151 PB2152 landed PB2108 …`: grouped by status, so a long cluster reads as runs, not a roll call."""
     if not notes:
         return '<span class="dim">no note filed yet</span>'
     by: dict[str, list[str]] = collections.defaultdict(list)
     for nid, s in notes:
         by[s].append(nid)
     return " ".join(f'{status_pill(s)} <span class="mono">{e(" ".join(ids))}</span>'
-                    for s, ids in sorted(by.items(), key=lambda kv: (kv[0] in ("landed", "retired"), kv[0])))
+                    for s, ids in sorted(by.items(), key=lambda kv: (ledger_plan.finished(kv[0]), kv[0])))
 
 
-def render_program(prog: dict, series: list[dict]) -> str:
+def phase_state(p: dict) -> str:
+    if not p["notes"]:
+        return "not started"
+    return "landed" if all(ledger_plan.finished(s) for _, s in p["notes"]) else "open"
+
+
+def lane_cards(inv: dict, plan: dict, pacing: dict | None) -> str:
+    """The six lanes as cards: each one's definition of done and its measured progress."""
+    rt, c = plan["retire"], plan["counts"]
+    gates_passed = sum(1 for g in plan["gates"] if ledger_plan.finished(g["status"]))
+    nxt = next((g["label"] for g in plan["gates"] if not ledger_plan.finished(g["status"])), None)
+    review = " · ".join(
+        f'{p["key"]} {e(phase_state(p))}'
+        + (f' ({e(plan["r1_status"])})' if p["key"] == "R1" and plan["r1_status"] else "")
+        for p in plan["phases"])
+    if pacing:
+        r = pacing["reading"]
+        pace = (f'week <span class="num">{r["weekly_pct"]:g} %</span> of the {pacing["weekly_cap"]:g} % cap · session '
+                f'<span class="num">{r["session_pct"]:g} %</span> (soft stop {pacing["soft"]:g} %)')
+        stop = ("crit", "paused") if r["weekly_pct"] >= pacing["weekly_cap"] else (
+            ("warn", "session stop") if r["session_pct"] >= pacing["soft"] else ("good", "within limits"))
+    else:
+        pace, stop = "no meter reading on the machine that rendered this page", ("warn", "no reading")
+
+    def done(finished: bool) -> tuple[str, str]:
+        return ("good", "done") if finished else ("warn", "open")
+
+    progress = {
+        "retirement": (f'<span class="num">{n(rt["total"] - rt["unfinished"])}</span> of {n(rt["total"])} notes landed',
+                       *done(not rt["unfinished"])),
+        "conformance": (f'<span class="num">{n(inv["closed"])}</span> of {n(inv["rows"])} rules closed · GAP '
+                        f'<span class="num">{n(inv["gap"])}</span>', *done(not inv["gap"])),
+        "external": (f'<span class="num">{n(c["external_landed"])}</span> of {n(c["external_total"])} slices landed',
+                     *done(c["external_landed"] == c["external_total"])),
+        "review": (review, *done(phase_state(plan["phases"][-1]) == "landed")),
+        "gates": (f'<span class="num">{n(gates_passed)}</span> of {n(len(plan["gates"]))} passed'
+                  + (f"; next: {e(nxt)}" if nxt else ""), *done(nxt is None)),
+        "pacing": (pace, *stop),
+    }
+    out = []
+    for i, (key, name, definition) in enumerate(ledger_plan.LANES, 1):
+        text, pill, word = progress[key]
+        out.append(f'<div class="card"><h3>{i} · {e(name)} <span class="pill {pill}">{e(word)}</span></h3>'
+                   f'<p>{text}</p><p>Done when: {e(definition)}</p></div>')
+    return "\n    ".join(out)
+
+
+def render_retirement(plan: dict) -> str:
+    rt = plan["retire"]
+    tag = (f'The annotated tag <span class="mono">{e(ledger_plan.LEGACY_TAG)}</span> keeps the engine\'s last commit, '
+           f'<span class="mono">{e(plan["legacy_tag"])}</span>.' if plan["legacy_tag"] else
+           f'The tag <span class="mono">{e(ledger_plan.LEGACY_TAG)}</span> is not in this clone.')
+    return (f'<p>The legacy CobolSharp engine, deleted ahead of v1.0 (kb/Work R69 §1). Cluster '
+            f'<span class="mono">{e(rt["lead"])}</span>: <strong class="num">{n(rt["total"] - rt["unfinished"])}</strong> '
+            f'of {n(rt["total"])} notes landed, {n(rt["waiting"])} unfinished note(s) waiting on another note. {tag}</p>\n'
+            f'  <div class="tablecard"><table><tbody><tr><td>{note_list(rt["notes"])}</td></tr></tbody></table></div>')
+
+
+def render_external(plan: dict) -> str:
+    rows = "\n        ".join(
+        f'<tr><td class="r num">{num}</td><td class="mono">{e(nid)}</td><td>{e(title.split(": ", 1)[-1])}</td>'
+        f'<td>{status_pill(s)}</td></tr>' for num, nid, s, title in plan["slices"])
+    c = plan["counts"]
+    return (f'<p>The owner-approved §8.13 external-repository design, landed slice by slice; R1 takes it as given. '
+            f'<strong class="num">{n(c["external_landed"])}</strong> of {n(c["external_total"])} slices landed.</p>\n'
+            f'  <div class="tablecard"><table>\n'
+            f'      <thead><tr><th class="r">Slice</th><th>Note</th><th>What it lands</th><th>Status</th></tr></thead>\n'
+            f'      <tbody>\n        {rows}\n      </tbody>\n    </table></div>')
+
+
+def render_review(plan: dict, series: list[dict]) -> str:
     ev = "<br>".join(f'{e(label)} <span class="mono">{e(r["sha"])}</span> <span class="dim">{e(r["date"])}</span>'
-                     if r else f'{e(label)} <span class="dim">no record</span>' for label, r in prog["evidence"])
+                     if r else f'{e(label)} <span class="dim">no record</span>' for label, r in plan["evidence"])
+    r1 = (f'design §8: <span class="mono">{e(plan["r1_status"])}</span>' if plan["r1_status"]
+          else '<span class="dim">§8 not on this tree yet</span>')
+    evidence = {"R0": ev, "R1": r1}
     phase_rows = "\n        ".join(
         f'<tr><td class="mono">{e(p["key"])} <span class="dim">{e(p["name"])}</span></td>'
-        f'<td>{note_list(p["notes"])}</td><td>{ev if p["key"] == "R0" else ""}</td></tr>' for p in prog["phases"])
-    rt, rv = prog["retire"], prog["review"]
-
-    def counted(c: dict) -> str:
-        return (f'<strong class="num">{n(c["total"] - c["unfinished"])}</strong> of {n(c["total"])} landed · '
-                f'{n(c["unfinished"])} unfinished, {n(c["waiting"])} of them waiting on an unlanded note')
-
+        f'<td>{status_pill(phase_state(p)) if not p["notes"] else note_list(p["notes"])}</td>'
+        f'<td>{evidence.get(p["key"], "")}</td></tr>' for p in plan["phases"])
+    rv = plan["review"]
     cols = rv["statuses"]
     grid_rows = "\n        ".join(
         f'<tr><td>{e(k)}</td>' + "".join(f'<td class="r num">{n(c[s])}</td>' for s in cols)
         + f'<td class="r num">{n(sum(c.values()))}</td></tr>' for k, c in rv["grid"].items())
     col_tot = "".join(f'<td class="r num">{n(sum(c[s] for c in rv["grid"].values()))}</td>' for s in cols)
+    gate_of = {g["id"]: g["label"] for g in plan["gates"] if g.get("id")}
+    blockers = ("\n        ".join(
+        f'<tr><td class="mono">{e(b)}</td><td>{e(gate_of.get(b) or title[:110])}</td><td class="r num">{n(k)}</td></tr>'
+        for b, title, k in rv["blockers"])
+        or '<tr><td colspan="3" class="dim">No unfinished note of the cluster waits on another note.</td></tr>')
     recent = series[-8:]
     trend_rows = "\n        ".join(
         f'<tr><td class="mono">{e(p["date"])} {e(p["sha"])}</td><td class="r num">{n(p["open"])}</td>'
-        f'<td class="r num">{n(p["landed"])}</td><td class="r num">{n(p["total"])}</td></tr>' for p in recent)
-    return f"""<section aria-label="Re-architecture program">
-  <h2>The re-architecture program</h2>
-  <p>kb/Work R69's completion plan, read off the register: the architecture review's phases (<span class="mono">DESIGN-architecture-review.md</span> §3), the legacy retirement (cluster <span class="mono">{e(RETIREMENT)}</span>) and the review program's restructuring waves (cluster <span class="mono">{e(REVIEW_PROGRAM)}</span>). Every status is the note's own; the program is behavior-neutral by contract, so none of it moves the GAP above.</p>
+        f'<td class="r num">{n(p.get("waiting", 0))}</td><td class="r num">{n(p["landed"])}</td>'
+        f'<td class="r num">{n(p["total"])}</td></tr>' for p in recent)
+    return f"""<p>The comprehensive architecture review (<span class="mono">DESIGN-architecture-review.md</span> §3), started ahead of zero GAP by kb/Work R69 §2: R0 and R1 now, R3's leaf waves and the Delete program (cluster <span class="mono">{e(ledger_plan.REVIEW_PROGRAM)}</span>) between fix-lane trains, R2 and R3 over binding and code generation once GAP is near zero. Every wave is behavior-neutral by contract, so none of it moves the GAP.</p>
   <div class="tablecard">
     <table>
       <thead><tr><th>Phase</th><th>Notes in the register</th><th>Evidence</th></tr></thead>
@@ -829,18 +709,9 @@ def render_program(prog: dict, series: list[dict]) -> str:
       </tbody>
     </table>
   </div>
-  <div class="cardgrid" style="margin-top:14px">
-    <div class="card">
-      <h3>Legacy retirement · cluster {e(RETIREMENT)}</h3>
-      <p>{counted(rt)}.</p>
-      <p>{note_list(rt["notes"])}</p>
-    </div>
-    <div class="card">
-      <h3>Review program · cluster {e(REVIEW_PROGRAM)}</h3>
-      <p>{counted(rv)}. One note is one wave; the wave kind is the title prefix <span class="mono">file_census_notes.py</span> files it under.</p>
-    </div>
-  </div>
-  <div class="tablecard" style="margin-top:14px">
+  <h3>R3 · the program's waves (cluster {e(ledger_plan.REVIEW_PROGRAM)}), by wave kind</h3>
+  <p>One note is one wave; its kind is the title prefix <span class="mono">scripts/arch/file_census_notes.py</span> files it under. <strong class="num">{n(rv["total"] - rv["unfinished"])}</strong> of {n(rv["total"])} landed; {n(rv["waiting"])} unfinished note(s) wait on another note.</p>
+  <div class="tablecard">
     <table>
       <thead><tr><th>Wave kind</th>{"".join(f'<th class="r">{e(s)}</th>' for s in cols)}<th class="r">Total</th></tr></thead>
       <tbody>
@@ -851,19 +722,63 @@ def render_program(prog: dict, series: list[dict]) -> str:
   </div>
   <div class="tablecard" style="margin-top:14px">
     <table>
-      <thead><tr><th>Program notes, last {len(recent)} recorded points</th><th class="r">Unfinished</th><th class="r">Landed</th><th class="r">Total</th></tr></thead>
+      <thead><tr><th>Waits on</th><th>Gate or note</th><th class="r">Notes</th></tr></thead>
+      <tbody>
+        {blockers}
+      </tbody>
+    </table>
+  </div>
+  <div class="tablecard" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Program notes, last {len(recent)} recorded points</th><th class="r">Unfinished</th><th class="r">Waiting</th><th class="r">Landed</th><th class="r">Total</th></tr></thead>
       <tbody>
         {trend_rows}
       </tbody>
     </table>
   </div>
-  <p>Program notes are the phase notes plus both clusters' notes, counted once. The series is the trend file's <span class="mono">program</span> list, appended by <span class="mono">gen_ledger.py</span> when those counts move.</p>
-</section>"""
+  <p>Program notes are the phase notes plus both clusters' notes ({e(ledger_plan.RETIREMENT)}, {e(ledger_plan.REVIEW_PROGRAM)}), counted once. The series is the trend file's <span class="mono">program</span> list, a point appended whenever those counts move: a numeric table rather than a second chart, because its scale and cadence share nothing with the GAP line's.</p>"""
+
+
+def render_gates(plan: dict) -> str:
+    rows = []
+    for i, g in enumerate(plan["gates"], 1):
+        if "gap" in g:
+            what = f'GAP <span class="num">{n(g["gap"])}</span>' + (
+                " — the owner judges “near”" if g["threshold"] is None else f' — passes at {n(g["threshold"])}')
+        elif g["id"]:
+            what = f'<span class="mono">{e(g["id"])}</span>'
+        else:
+            what = '<span class="dim">its note is not filed yet</span>'
+        rows.append(f'<tr><td class="r num">{i}</td><td>{e(g["label"])}</td><td>{what}</td>'
+                    f'<td>{status_pill(g["status"])}</td></tr>')
+    return ('<p>The points where one lane waits for another, in order. Each is measured from its note, or from the '
+            'inventory for the GAP gates.</p>\n  <div class="tablecard"><table>\n'
+            '      <thead><tr><th class="r">#</th><th>Gate</th><th>Measured by</th><th>State</th></tr></thead>\n'
+            '      <tbody>\n        ' + "\n        ".join(rows) + '\n      </tbody>\n    </table></div>')
+
+
+def render_pacing(pacing: dict | None) -> str:
+    if pacing is None:
+        return ('<p>Not available: the machine that rendered this page has no coordination directory with a meter '
+                'reading (<span class="mono">readings.json</span>). The owner\'s caps are in '
+                '<span class="mono">scripts/orchestrator/model_rules.json</span>.</p>')
+    r = pacing["reading"]
+    return f"""<p>The owner's rules (kb/Work R69 §5-§6): {e(pacing["cap_source"])}. The newest meter reading, noted <span class="mono">{e(r["noted_at"][:16].replace("T", " "))} UTC</span>, against the caps in <span class="mono">model_rules.json</span>.</p>
+  <div class="meter-row">
+    <div class="meter-card">
+      <div class="meter-head"><span class="t">Weekly quota used</span><span class="v num">{r["weekly_pct"]:g} % · cap {pacing["weekly_cap"]:g} %</span></div>
+      <div class="meter"><div class="fill" style="width:{min(100.0, float(r["weekly_pct"])):.1f}%"></div></div>
+    </div>
+    <div class="meter-card">
+      <div class="meter-head"><span class="t">Session window used</span><span class="v num">{r["session_pct"]:g} % · soft stop {pacing["soft"]:g} % · hard stop {pacing["hard"]:g} %</span></div>
+      <div class="meter"><div class="fill" style="width:{min(100.0, float(r["session_pct"])):.1f}%"></div></div>
+    </div>
+  </div>"""
 
 
 def render(ctx: dict) -> str:
     inv, wk, a1, cf, bat, cp = (ctx["inv"], ctx["work"], ctx["a1"], ctx["conf"], ctx["battery"], ctx["corpus"])
-    head, pts = ctx["head"], ctx["trend"]
+    head, pts, plan, pacing = ctx["head"], ctx["trend"], ctx["plan"], ctx["pacing"]
     pct = 100.0 * inv["closed"] / inv["rows"]
     kinds = " · ".join(f'{n(v)} {k}' for k, v in inv["kind"].most_common())
     top = " · ".join(i["id"] for i in wk["actionable"][:3])
@@ -872,6 +787,7 @@ def render(ctx: dict) -> str:
     a3 = cf["a3"]
     bat_gap = gap_at(str(bat.get("sha", "")))
     gap_delta = None if bat_gap is None else inv["gap"] - bat_gap
+    pc = plan["counts"]
 
     return TEMPLATE.format(
         title=TITLE,
@@ -937,7 +853,12 @@ def render(ctx: dict) -> str:
         trend_from=n(pts[0]["gap"]) if pts else "—", trend_to=n(pts[-1]["gap"]) if pts else "—",
         trend_points=n(len(pts)),
         gap_delta_word=("not recorded" if gap_delta is None else "unchanged" if gap_delta == 0 else f"{gap_delta:+d}"),
-        program=ctx["program"],
+        p_landed=n(pc["landed"]), p_total=n(pc["total"]), p_waiting=n(pc["waiting"]),
+        p_pct=f'{100.0 * pc["landed"] / pc["total"]:.1f}' if pc["total"] else "0",
+        lane_cards=lane_cards(inv, plan, pacing),
+        lane_retirement=render_retirement(plan), lane_external=render_external(plan),
+        lane_review=render_review(plan, ctx["program_series"]), lane_gates=render_gates(plan),
+        pacing=render_pacing(pacing),
         in_flight=ctx["in_flight"],
     )
 
@@ -962,13 +883,41 @@ TEMPLATE = """<title>{title}</title>
 <div class="wrap">
 
 <header>
-  <p class="eyebrow">ISO/IEC 1989:2023 · Four editions · Owner decision D13</p>
+  <p class="eyebrow">The completion plan · kb/Work R69 · ISO/IEC 1989:2023 · Four editions</p>
   <h1>{title}</h1>
   <p class="asof">As of <b>{head_date}</b> · measured tree <b class="mono">{head_sha}</b> · last comprehensive battery <b>#{bat_n}</b> on <b class="mono">{bat_sha}</b> — <b>{bat_since} commits back</b>, {bat_since_code} of them touching <span class="mono">src/</span> or <span class="mono">tests/</span></p>
-  <p class="mission">v1.0 is <strong>a conforming implementation of the whole of ISO/IEC 1989 in each of its four editions</strong> (85 / 2002 / 2014 / 2023), as §4.2.1 defines conformance: every required normative element of Clause 6 (Reference format) through Clause 16 (Standard classes), and every criterion of §4.2.2 through §4.2.17 — acceptance of standard source, implementor-defined and processor-dependent elements, limits, and the §4.2.16 user documentation among them. The optional modules of Annex A.4 are either implemented or documented as not provided, as §4.2.1 permits. Done is measured by one instrument: every normative rule as a row of the traceability inventory, at <strong>zero GAP</strong>.</p>
+  <p class="mission">v1.0 is <strong>a conforming implementation of the whole of ISO/IEC 1989 in each of its four editions</strong> (85 / 2002 / 2014 / 2023), as §4.2.1 defines conformance, measured by one instrument: every normative rule as a row of the traceability inventory, at <strong>zero GAP</strong>. The completion plan the owner decided on 2026-10-06 (kb/Work R69) runs six lanes toward it at once: the legacy engine's retirement, conformance to zero GAP, the external repository, the architecture review, the gates between them, and the owner's pacing. This page measures each lane from the register and the evidence folders.</p>
 </header>
 
-<section aria-label="Headline meter">
+<section aria-label="Headline">
+  <div class="meter-row">
+    <div class="meter-card">
+      <div class="meter-head"><span class="t">Conformance: rules closed</span><span class="v num">{closed} of {rows} · GAP {gap}</span></div>
+      <div class="meter"><div class="fill" style="width:{pct}%"></div></div>
+      <p class="note">v1.0's conformance half is GAP at zero.</p>
+    </div>
+    <div class="meter-card">
+      <div class="meter-head"><span class="t">Re-architecture program: notes landed</span><span class="v num">{p_landed} of {p_total} · {p_waiting} waiting</span></div>
+      <div class="meter"><div class="fill" style="width:{p_pct}%"></div></div>
+      <p class="note">The retirement cluster, the review's phase notes and the review program's waves, counted once.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-label="Lanes">
+  <h2>The plan, lane by lane</h2>
+  <div class="cardgrid">
+    {lane_cards}
+  </div>
+</section>
+
+<section aria-label="Lane 1">
+  <h2>1 · Legacy retirement</h2>
+  {lane_retirement}
+</section>
+
+<section aria-label="Lane 2">
+  <h2>2 · Conformance to zero GAP</h2>
   <div class="hero">
     <div class="hero-figure">
       <span class="big num">{closed}</span>
@@ -1028,8 +977,23 @@ TEMPLATE = """<title>{title}</title>
   </div>
 </section>
 
+<section aria-label="Lane 3">
+  <h2>3 · The external repository</h2>
+  {lane_external}
+</section>
+
+<section aria-label="Lane 4">
+  <h2>4 · The architecture review R0-R5</h2>
+  {lane_review}
+</section>
+
+<section aria-label="Lane 5">
+  <h2>5 · The gates between the lanes</h2>
+  {lane_gates}
+</section>
+
 <section aria-label="Gates">
-  <h2>What is proven green</h2>
+  <h2>Conformance detail · what is proven green</h2>
   <p><strong>Battery #{bat_n} ({bat_date}, tree <span class="mono">{bat_sha}</span>) is the last comprehensive run.</strong> The tree above is {bat_since} commits past it, and <strong>{bat_since_code}</strong> of those touch <span class="mono">src/</span> or <span class="mono">tests/</span> — which is what decides whether another battery is owed, rather than a judgement about how big the changes felt. Everything since was gated <em>wave-locally</em> only.{bat_totals}</p>
   <div class="tablecard">
     <table>
@@ -1044,7 +1008,7 @@ TEMPLATE = """<title>{title}</title>
 </section>
 
 <section aria-label="Verdicts">
-  <h2>How the {rows} rows stand</h2>
+  <h2>Conformance detail · how the {rows} rows stand</h2>
   <div class="tablecard">
     <table>
       <thead><tr><th>Verdict</th><th class="r">Rows</th><th>Can it close a row?</th><th>Standing</th></tr></thead>
@@ -1064,7 +1028,7 @@ TEMPLATE = """<title>{title}</title>
 </section>
 
 <section aria-label="Burn-down by clause">
-  <h2>Burn-down by clause</h2>
+  <h2>Conformance detail · burn-down by clause</h2>
   <p>Bar length is the clause's share of the largest clause; fill shows its state — closed, adjudicated-but-open, never looked at.</p>
   <div class="tablecard">
     <table>
@@ -1078,7 +1042,7 @@ TEMPLATE = """<title>{title}</title>
 </section>
 
 <section aria-label="Remaining work">
-  <h2>The three veins of remaining work</h2>
+  <h2>Conformance detail · the three veins of remaining work</h2>
   <div class="cardgrid">
     <div class="card">
       <h3>1 · Adjudication mass</h3>
@@ -1108,15 +1072,8 @@ TEMPLATE = """<title>{title}</title>
   </div>
 </section>
 
-{program}
-
-<section aria-label="In flight">
-  <h2>In flight right now</h2>
-{in_flight}
-</section>
-
 <section aria-label="Documentation posture">
-  <h2>The §4.2.16 documentation posture</h2>
+  <h2>Conformance detail · the §4.2.16 documentation posture</h2>
   <div class="tablecard">
     <table>
       <thead><tr><th>Register</th><th>Standing</th></tr></thead>
@@ -1130,8 +1087,19 @@ TEMPLATE = """<title>{title}</title>
   </div>
 </section>
 
+<section aria-label="In flight">
+  <h2>In flight right now</h2>
+{in_flight}
+</section>
+
+<section aria-label="Pacing">
+  <h2>6 · Pacing</h2>
+  {pacing}
+</section>
+
+
 <footer>
-  <p><strong>Every number on this page is computed from the tree it names — none is remembered.</strong> Inventory from <span class="mono">tests/version-matrix/traceability-inventory.json</span>, work standing from <span class="mono">kb/Work</span> through <span class="mono">work.py</span>'s own predicate, the re-architecture program from the register's clusters and the R0 evidence folders, gates from plan §0's battery reference, documentation posture from <span class="mono">docs/CONFORMANCE.md</span> §2/§4/§5 and <span class="mono">audit_annex_a1.py --json</span>, the corpus and anchor counts from the trees themselves, the trend series from <span class="mono">docs/rearchitecture/evidence/ledger-trend.json</span>. Rendered by <span class="mono">scripts/spec/gen_ledger.py</span>; the only hand-written section is “In flight right now”. The work register remains <span class="mono">kb/Work/</span> — this ledger is a derived view, never a tracker.</p>
+  <p><strong>Every number on this page is computed from the tree it names — none is remembered.</strong> Inventory from <span class="mono">tests/version-matrix/traceability-inventory.json</span>, work standing from <span class="mono">kb/Work</span> through <span class="mono">work.py</span>'s own predicate, the plan's lanes from the register's clusters and notes through <span class="mono">ledger_plan.py</span>, the R0 evidence folders and the orchestrator's newest meter reading, gates from plan §0's battery reference, documentation posture from <span class="mono">docs/CONFORMANCE.md</span> §2/§4/§5 and <span class="mono">audit_annex_a1.py --json</span>, the corpus and anchor counts from the trees themselves, the trend series from <span class="mono">docs/rearchitecture/evidence/ledger-trend.json</span>. Rendered by <span class="mono">scripts/spec/gen_ledger.py</span>; the only hand-written section is “In flight right now”. The work register remains <span class="mono">kb/Work/</span> — this ledger is a derived view, never a tracker.</p>
   <p class="mono">Snapshot: {head_date} · measured tree {head_sha} — the last commit that touched an input this page reports, so an unrelated commit cannot make a correct page look stale · {rows} rows · {closed} closed · {gap} GAP · {adjudicated} adjudicated · battery #{bat_n} on {bat_sha} · A.1 {a1_discharged}/{a1_scope} · register {work_items} notes, {work_open} open, {work_actionable} actionable.</p>
 </footer>
 
@@ -1148,9 +1116,8 @@ def build(in_flight_path: pathlib.Path | None) -> tuple[str, dict]:
     head = measure_head()
     bat = measure_battery(head["sha"])
     pts, is_new = trend_series(inv, head, bat)
-    prefixes = wave_prefixes()
-    prog = measure_program(work.load(), prefixes)
-    prog_pts, prog_new = program_series(prog, head)
+    plan = ledger_plan.measure(work.load(), ledger_plan.wave_prefixes(), inv["gap"])
+    prog_pts, prog_new = program_series(plan, head)
     frag = ""
     if in_flight_path is not None and in_flight_path.exists():
         # VERBATIM. The fragment lands inside <section aria-label="In flight"> after its <h2>; it is narrative,
@@ -1161,7 +1128,7 @@ def build(in_flight_path: pathlib.Path | None) -> tuple[str, dict]:
         frag = frag.rstrip("\n")
     ctx = {"inv": inv, "work": measure_work(), "a1": measure_annex_a1(), "conf": measure_conformance(),
            "battery": bat, "corpus": measure_corpus(), "head": head, "trend": pts,
-           "program": render_program(prog, prog_pts), "in_flight": frag}
+           "plan": plan, "program_series": prog_pts, "pacing": ledger_plan.measure_pacing(), "in_flight": frag}
     return render(ctx), {"points": pts, "is_new": is_new, "program": prog_pts, "prog_new": prog_new}
 
 
@@ -1174,21 +1141,16 @@ def main() -> int:
                          f"{IN_FLIGHT.relative_to(REPO)}); pass a missing path to omit it")
     ap.add_argument("--check", action="store_true",
                     help="do not write; exit non-zero if --out differs from what the repo would render now, or if "
-                         "the program section's self-check fails on the register")
-    ap.add_argument("--self-test", action="store_true",
-                    help="fire every arm of the program section's drift check on planted registers, then run it on "
-                         "the real one (the gate's audits and CI's audits job run this)")
+                         "the plan's lanes do not read cleanly off the register (ledger_plan.problems)")
     a = ap.parse_args()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:  # noqa: BLE001
         pass
 
-    if a.self_test:
-        return self_test()
-    bad = live_program_problems()
+    bad = ledger_plan.live_problems()
     if bad:
-        print("⛔ THE RE-ARCHITECTURE PROGRAM SECTION CANNOT BE TRUSTED:")
+        print("⛔ THE PLAN'S LANES CANNOT BE TRUSTED (scripts/spec/ledger_plan.py --self-test):")
         for b in bad:
             print(f"   {b}")
         return 1
