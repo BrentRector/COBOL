@@ -132,8 +132,19 @@ performTimes
     ;
 
 performUntil
-    : (WITH? TEST (BEFORE | AFTER))? UNTIL condition
-    | UNTIL EXIT                                       // §14.9.28.4 GR11 (2023) — an infinite loop; SR8 forbids TEST here
+    : (WITH? TEST (BEFORE | AFTER))? UNTIL performUntilTarget
+    ;
+
+// The until-phrase's brace group `UNTIL { condition-1 | EXIT }` (§14.9.28.2 until-phrase; EXIT is §14.9.28.4 GR11,
+// COBOL-2023, an infinite loop). ⛔ ONE RULE FOR EVERY UNTIL OF A PERFORM, AND IT IS A SUPERSET ON PURPOSE
+// (kb/Work PB434): the varying-phrase prints `UNTIL condition-1` and `UNTIL condition-2` only, and §14.9.28.3 SR8
+// says "The UNTIL EXIT phrase shall not be specified in a PERFORM statement with or under a PERFORM statement with
+// the VARYING phrase or either the TEST BEFORE or TEST AFTER phrase". Spelling EXIT here for all three UNTILs lets
+// the binder NAME that rule (COBOLNET2954, ControlFlowBinder.CheckUntilExitPlacement) where the grammar used to
+// refuse `WITH TEST BEFORE UNTIL EXIT` and `VARYING … UNTIL EXIT` with a bare COBOL0001 naming nothing.
+performUntilTarget
+    : EXIT
+    | condition
     ;
 
 // §14.9.28.2's varying-phrase, rendered from the printed page 683 / PDF 713 (the OCR'd diagrams are lossy toward
@@ -159,14 +170,14 @@ performVarying
     : (WITH? TEST (BEFORE | AFTER))?
       VARYING dataReference FROM valueOperand
       (BY valueOperand)?    // BY is optional per COBOL-85 spec (default = 1, §14.9.28.4 GR12)
-      UNTIL condition
+      UNTIL performUntilTarget    // EXIT is the superset spelling §14.9.28.3 SR8 refuses at bind
       performVaryingAfter*
     ;
 
 performVaryingAfter
     : AFTER dataReference FROM valueOperand
       (BY valueOperand)?    // BY is optional per COBOL-85 spec (default = 1, §14.9.28.4 GR12)
-      UNTIL condition
+      UNTIL performUntilTarget    // EXIT is the superset spelling §14.9.28.3 SR8 refuses at bind
     ;
 
 // ==========================================

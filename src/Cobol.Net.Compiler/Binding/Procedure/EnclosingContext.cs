@@ -65,6 +65,13 @@ internal enum EnclosingConstruct
     PerformFinally,
 }
 
+/// <summary>One frame of <see cref="EnclosingContext"/>'s stack: the construct, and — for an inline PERFORM — whether
+/// that PERFORM is written "with the VARYING phrase or either the TEST BEFORE or TEST AFTER phrase", the one fact
+/// ISO §14.9.28.3 SR8 asks of every PERFORM a statement is UNDER (kb/Work PB434; the fact itself is
+/// <c>PerformFormat.SpecifiesVaryingOrTest</c>). A frame, not a second stack beside the first, so the lexical
+/// "where am I bound?" answer stays one structure.</summary>
+internal readonly record struct EnclosingFrame(EnclosingConstruct Construct, bool SpecifiesVaryingOrTest = false);
+
 /// <summary>
 /// ⛔ THE ONE "WHERE AM I BOUND?" PROBE — the answer every PLACEMENT syntax rule needs, computed once at the bind
 /// cursor instead of re-derived by hand at each verb (kb/Work PB403, PB404).
@@ -85,9 +92,9 @@ internal enum EnclosingConstruct
 /// </summary>
 internal readonly struct EnclosingContext
 {
-    private readonly List<EnclosingConstruct>? _stack;
+    private readonly List<EnclosingFrame>? _stack;
 
-    internal EnclosingContext(SourceElementKind element, List<EnclosingConstruct> stack, BoundDeclarative? declarative)
+    internal EnclosingContext(SourceElementKind element, List<EnclosingFrame> stack, BoundDeclarative? declarative)
     {
         SourceElement = element;
         _stack = stack;
@@ -128,8 +135,8 @@ internal readonly struct EnclosingContext
         {
             if (_stack is null) return null;
             for (int i = _stack.Count - 1; i >= 0; i--)
-                if (_stack[i] is EnclosingConstruct.InlinePerform or EnclosingConstruct.ExceptionCheckingPerform)
-                    return _stack[i];
+                if (_stack[i].Construct is EnclosingConstruct.InlinePerform or EnclosingConstruct.ExceptionCheckingPerform)
+                    return _stack[i].Construct;
             return null;
         }
     }
@@ -146,7 +153,14 @@ internal readonly struct EnclosingContext
     /// <summary>Is this statement in "a WHEN phrase in a PERFORM statement" (ISO §14.9.14.3 SR6, §14.9.18.3 SR5,
     /// §14.9.33.3 SR1)? ANY enclosing WHEN frame counts — a statement nested in an inline PERFORM written inside
     /// a WHEN phrase is still an imperative statement in that WHEN phrase.</summary>
-    public bool InPerformWhen => _stack is not null && _stack.Contains(EnclosingConstruct.PerformWhen);
+    public bool InPerformWhen => _stack is not null && _stack.Exists(f => f.Construct == EnclosingConstruct.PerformWhen);
+
+    /// <summary>Is this statement lexically UNDER an inline PERFORM "with the VARYING phrase or either the TEST
+    /// BEFORE or TEST AFTER phrase" (ISO §14.9.28.3 SR8)? ANY enclosing such frame counts, however deep — an inline
+    /// PERFORM's imperative-statement-1 is its specified set (§14.9.28.4 GR4), so everything nested in it is in its
+    /// range. The OUT-OF-LINE half of "under" (a statement reached through a PERFORM of a procedure) is not lexical
+    /// and is answered over the bound procedures by <c>UntilExitPlacement</c>.</summary>
+    public bool UnderVaryingOrTestPerform => _stack is not null && _stack.Exists(f => f.SpecifiesVaryingOrTest);
 
     /// <summary>⛔ THE ONE PREDICATE BEHIND "only in a declarative procedure or a WHEN phrase of a PERFORM
     /// statement" — the position THREE rules name, once per statement: the RAISING LAST phrase of GOBACK

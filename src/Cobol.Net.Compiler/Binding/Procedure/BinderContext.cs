@@ -67,6 +67,10 @@ internal sealed class BinderContext(DataBinder data, ReferenceResolver refs)
     /// EcFeatures accumulator bits), shared by <c>EcBinder</c> and the Declaratives half.</summary>
     public EcBindState EcState { get; } = new();
 
+    /// <summary>The out-of-line half of ISO §14.9.28.3 SR8 (kb/Work PB434): the UNTIL EXIT statements and the
+    /// VARYING / TEST PERFORM ranges recorded while the unit binds, answered once its procedures are bound.</summary>
+    public UntilExitPlacement UntilExit { get; } = new();
+
     /// <summary>The pc whose sentences are being bound (RESUME SR1/SR2 declarative context + the §15.30.3 r2
     /// location anchoring; 10r — the host's <c>_currentBindPc</c> relocated). −1 outside the bind loop.</summary>
     public int BindCursor { get; set; } = -1;
@@ -104,7 +108,7 @@ internal sealed class BinderContext(DataBinder data, ReferenceResolver refs)
     /// <summary>The lexical enclosing-construct stack (innermost last) — pushed by <see cref="EnterConstruct"/>.
     /// A field rather than a local because the constructs nest across binder collaborators (an inline PERFORM in
     /// <c>ControlFlowBinder</c>, a WHEN phrase in <c>EcBinder</c>) and every verb must see the same stack.</summary>
-    private readonly List<EnclosingConstruct> _constructs = [];
+    private readonly List<EnclosingFrame> _constructs = [];
 
     /// <summary>⛔ THE PLACEMENT-RULE PROBE. Recomputed per read from the live bind position, never cached.</summary>
     public EnclosingContext Enclosing => new(SourceElement, _constructs, DeclarativeAtCursor());
@@ -126,9 +130,9 @@ internal sealed class BinderContext(DataBinder data, ReferenceResolver refs)
     /// <summary>Push one lexical construct onto <see cref="Enclosing"/>'s stack for the extent of the returned
     /// token — <c>using var _ = ctx.EnterConstruct(EnclosingConstruct.InlinePerform);</c> around the bind of the
     /// construct's statement block.</summary>
-    public ConstructScope EnterConstruct(EnclosingConstruct construct)
+    public ConstructScope EnterConstruct(EnclosingConstruct construct, bool specifiesVaryingOrTest = false)
     {
-        _constructs.Add(construct);
+        _constructs.Add(new EnclosingFrame(construct, specifiesVaryingOrTest));
         return new ConstructScope(this);
     }
 

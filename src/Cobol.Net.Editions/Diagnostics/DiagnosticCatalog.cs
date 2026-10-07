@@ -5444,6 +5444,22 @@ public static class DiagnosticCatalog
         + "FINALLY phrase early.",
         "ISO §14.9.28.4 GR16");
 
+    /// <summary>COBOLNET2954 — the UNTIL EXIT phrase is specified in a PERFORM statement that also carries the
+    /// VARYING phrase or a written TEST BEFORE / TEST AFTER phrase, or in a PERFORM that is UNDER one (in its range:
+    /// lexically inside an inline PERFORM's imperative-statement-1, or in a procedure the PERFORM's range reaches
+    /// through an out-of-line PERFORM, a SORT/MERGE procedure or an exception-checking PERFORM handler). §14.9.28.3
+    /// SR8: "The UNTIL EXIT phrase shall not be specified in a PERFORM statement with or under a PERFORM statement
+    /// with the VARYING phrase or either the TEST BEFORE or TEST AFTER phrase" (kb/Work PB434). The ONE screen is
+    /// <c>ControlFlowBinder.CheckUntilExitPlacement</c>; the out-of-line half reports from
+    /// <c>UntilExitPlacement.Report</c> once every procedure of the source element is bound.</summary>
+    public static readonly DiagnosticDescriptor PerformUntilExitPlacement = new(
+        "COBOLNET2954", "perform-until-exit-placement", EditionSeverity.Error,
+        "The UNTIL EXIT phrase is specified in a PERFORM statement with, or under, a PERFORM statement with the "
+        + "VARYING phrase or a TEST BEFORE or TEST AFTER phrase. §14.9.28.3 SR8: \"The UNTIL EXIT phrase shall not be "
+        + "specified in a PERFORM statement with or under a PERFORM statement with the VARYING phrase or either the "
+        + "TEST BEFORE or TEST AFTER phrase.\"",
+        "ISO §14.9.28.3 SR8");
+
     /// <summary>COBOLNET2297 — an UNSUCCESSFUL <c>&gt;&gt;POP directive-name</c>: the named directive's state was
     /// never saved by a PUSH in this compilation group, or every saved state was already restored. ISO §7.3.20.4
     /// GR2 makes the warning an implementor OBLIGATION — "the POP directive is unsuccessful and the implementor

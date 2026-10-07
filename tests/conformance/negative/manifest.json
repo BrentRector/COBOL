@@ -2435,6 +2435,8 @@
   "pb1060-evaluate-address-identifier-85",
   "pb434-finally-transfer-out",
   "pb434-finally-stop-run",
+  "pb434-until-exit-under-varying",
+  "pb434-varying-until-exit",
   "pb1060-convert-any-address-identifier",
   "pb1060-baseconvert-address-identifier",
   "pb1421-goto-depending-folded-numeric-function",

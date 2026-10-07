@@ -86,7 +86,18 @@ public readonly record struct PcRange
     /// <para>This is the LEXICAL model, not the executed one: GR10 defines the range of a sort procedure by the
     /// statements EXECUTED as the result of a transfer of control, which a PERFORM out of the range and back extends
     /// beyond any span of the text. A reachability walk would replace this one method (kb/Work PB812).</para></summary>
-    public bool Spans(int pc) => !IsEmpty && pc >= Math.Min(Start, End) && pc <= Math.Max(Start, End);
+    public bool Spans(int pc) => !IsEmpty && pc >= SpanLow && pc <= SpanHigh;
+
+    /// <summary>The paragraphs <see cref="Spans"/> answers membership of, lowest pc first — the seed set of the
+    /// reachability model (<c>ProcedureReach.Closure</c>), so the lexical span is computed in ONE place.</summary>
+    public IEnumerable<int> SpannedPcs()
+    {
+        if (IsEmpty) yield break;
+        for (int pc = SpanLow; pc <= SpanHigh; pc++) yield return pc;
+    }
+
+    private int SpanLow => Math.Min(Start, End);
+    private int SpanHigh => Math.Max(Start, End);
 
     public override string ToString() => IsEmpty ? $"[empty @{Start}]" : $"[{Start}..{End}]";
 }

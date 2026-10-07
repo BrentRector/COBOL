@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-278 drift tests.
+279 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -279,6 +279,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [UsageWordDriftTests](../tests/Cobol.Net.Tests.Unit/UsageWordDriftTests.cs) | The drift guard behind DataBinder.UsageWord's DERIVED default arm (kb/Work PB184's landing): the §13.18.63.3 SR14 diagnostic names the usage the programmer wrote, so every Usage member has to render as words a COBOL program can contain. | — |
 | [UserWordDeclarationDriftTests](../tests/Cobol.Net.Tests.Unit/UserWordDeclarationDriftTests.cs) | ⛔ EVERY TYPE OF USER-DEFINED WORD IS DECLARED THROUGH THE ONE FUNNEL (kb/Work PB1083; ISO §8.3.2.2). | `src/Cobol.Net.Compiler`, `src/Cobol.Net.Compiler/Binding/UserWordKind.cs` |
 | [V59ImagePredicateDriftTests](../tests/Cobol.Net.Tests.Unit/V59ImagePredicateDriftTests.cs) | ⛔ THE V59 IMAGE-PREDICATE INVENTORY. Two predicates decide "does this group have a whole-group image?": DataItem.IsImageCapable — V59's. | `src/Cobol.Net.Compiler` |
+| [VacuousTestDriftTests](../tests/Cobol.Net.Tests.Unit/VacuousTestDriftTests.cs) | ⛔ A TEST THAT CANNOT FAIL IS NOT A TEST, AND A SECTION WITH NO TEST IN IT IS NOT COVERAGE (kb/Work PB387). | `tests` |
 | [ValueClauseUsageSetDriftTests](../tests/Cobol.Net.Tests.Unit/ValueClauseUsageSetDriftTests.cs) | ⛔ AdmitsNoValueLiteral AGAINST ITS OWN SOURCES — ISO §13.16.3 SR10 (the classes, through §8.5.2.1 Table 2) and §13.18.63.3 SR9 (four of them by usage), re-read out of specs/ISO_COBOL.md on every run. | `specs/ISO_COBOL.md` |
 | [VariableLengthBoundaryDriftTests](../tests/Cobol.Net.Tests.Unit/VariableLengthBoundaryDriftTests.cs) | ⛔ THE VARIABLE-LENGTH ACTIVATION-BOUNDARY DRIFT LOCK (kb/Work PB204). | `src/Cobol.Net.Compiler`, `src/Cobol.Net.Compiler/Oo/OoConformance.cs`, `src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs` |
 | [VaultReferenceGeneratorDriftTests](../tests/Cobol.Net.Tests.Unit/VaultReferenceGeneratorDriftTests.cs) | "Generator runs clean" check for scripts/gen-vault-reference.ps1 — the Obsidian code-reference layer (kb/Reference/), which mirrors every greenfield type's summary into a per-type note. | `scripts/gen-vault-reference.ps1` |

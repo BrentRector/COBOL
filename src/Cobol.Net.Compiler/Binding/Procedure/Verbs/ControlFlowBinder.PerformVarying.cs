@@ -81,12 +81,12 @@ internal sealed partial class ControlFlowBinder
     private BoundPerformControl BindVarying(Core.PerformVaryingContext v)
     {
         var levels = new List<VaryingLevel>();
-        if (BindVaryingLevel(v.dataReference(), v.valueOperand(), v.condition(), firstLevel: true) is not { } head)
+        if (BindVaryingLevel(v.dataReference(), v.valueOperand(), v.performUntilTarget(), firstLevel: true) is not { } head)
             return Unsupported($"PERFORM VARYING induction variable '{v.dataReference().GetText()}'");
         levels.Add(head);
         foreach (var a in v.performVaryingAfter())
         {
-            if (BindVaryingLevel(a.dataReference(), a.valueOperand(), a.condition(), firstLevel: false) is not { } level)
+            if (BindVaryingLevel(a.dataReference(), a.valueOperand(), a.performUntilTarget(), firstLevel: false) is not { } level)
                 return Unsupported($"PERFORM VARYING AFTER induction variable '{a.dataReference().GetText()}'");
             levels.Add(level);
         }
@@ -147,7 +147,7 @@ internal sealed partial class ControlFlowBinder
     /// <summary>One induction level: the variable is a SET-style target (index-name or data item); the operand
     /// array is [FROM] or [FROM, BY].</summary>
     private VaryingLevel? BindVaryingLevel(
-        Core.DataReferenceContext dref, Core.ValueOperandContext[] ops, Core.ConditionContext cond,
+        Core.DataReferenceContext dref, Core.ValueOperandContext[] ops, Core.PerformUntilTargetContext until,
         bool firstLevel)
     {
         if (host.Set.SetTargetOf(dref) is not { } var) return null;
@@ -160,8 +160,13 @@ internal sealed partial class ControlFlowBinder
         var by = ops.Length > 1 ? BindVaryingOperand(ops[1], VaryingSlot.By) : OmittedBy;
         CheckVaryingOperandRules(dref, var, from, by);
         var untilMark = host.Udf.Mark;
-        return new VaryingLevel(var, from.Expr, by.Expr,
-            host.Udf.UdfAttachPerEvaluation(host.Cond.BindCondition(cond), untilMark), from.Kind);
+        // The varying-phrase prints `UNTIL condition-1` / `UNTIL condition-2`: an EXIT here is the superset
+        // spelling CheckUntilExitPlacement has already refused under §14.9.28.3 SR8 (COBOLNET2954), so the level
+        // carries a refused condition rather than a loop the program never asked for.
+        var cond = until.condition() is { } c
+            ? host.Cond.BindCondition(c)
+            : host.Cond.Refused("an UNTIL EXIT in the varying-phrase (ISO §14.9.28.3 SR8)");
+        return new VaryingLevel(var, from.Expr, by.Expr, host.Udf.UdfAttachPerEvaluation(cond, untilMark), from.Kind);
     }
 
     /// <summary>Bind ONE operand of the varying phrase and classify it against the brace group §14.9.28.2 prints.

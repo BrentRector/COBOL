@@ -424,9 +424,17 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
             // EXIT PERFORM written in it can see the PERFORM that gives it meaning (§14.9.14.3 SR8 / §14.9.14.4
             // GR5) — and one written OUTSIDE every PERFORM sees no frame and is refused. The control phrase is
             // bound first and outside the frame: it is the PERFORM's own operand, not part of its body.
+            CheckUntilExitPlacement(p);
             var control = BindPerformControl(p);
-            using var inlineFrame = ctx.EnterConstruct(EnclosingConstruct.InlinePerform);
-            return new BoundInlinePerform(control, host.BindBlocks([p.statementBlock()]));
+            bool varyingOrTest = PerformFormat.SpecifiesVaryingOrTest(p);
+            IReadOnlyList<BoundStatement> body;
+            using (ctx.EnterConstruct(EnclosingConstruct.InlinePerform, varyingOrTest))
+                body = host.BindBlocks([p.statementBlock()]);
+            // §14.9.28.3 SR8's out-of-line "under": every procedure this body performs and returns from is in this
+            // PERFORM's range (§14.9.28.4 GR1), so an UNTIL EXIT anywhere in those procedures is under it.
+            if (varyingOrTest)
+                ctx.UntilExit.AddBarringRanges(ProcedureReach.ReturningTransfersIn(body), ctx.SourceLine(p));
+            return new BoundInlinePerform(control, body);
         }
 
         // Out-of-line: the resolved procedure range — a paragraph, a SECTION (its whole paragraph range, ISO
@@ -438,6 +446,7 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
         // the first binder, but delivered as a BoundUnsupported, i.e. compiled into the program as a run-time
         // abort blaming WiseOwl COBOL for a gap. Each arm names its OWN rule number; fixing one and not the other is
         // the two-arm defect this project keeps finding.
+        CheckUntilExitPlacement(p);   // §14.9.28.3 SR8 — a phrase rule, decided whether or not the names resolve
         if (ctx.Table.ResolveProcedureOperand(names[0], "PERFORM", PerformNameRule("Procedure-name-1", "SR12"),
                 ProcedureReferenceKind.Perform) is not { } first)
             return BoundRejected.Reported(ctx.Edition);
@@ -471,7 +480,43 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
         // (SR11 has already put both THRU ends in the one declarative section). A PERFORM written INSIDE a
         // declarative is not it — a RESUME under that one belongs to whatever ran the enclosing declarative.
         bool entersDeclarative = first.IsDeclarative && ctx.Enclosing.Declarative is null;
+        if (PerformFormat.SpecifiesVaryingOrTest(p))
+            ctx.UntilExit.AddBarringRanges([range], ctx.SourceLine(p));   // §14.9.28.3 SR8 — its range is "under" it
         return new BoundOutOfLinePerform(range, BindPerformControl(p), ctx.SourceLine(p), entersDeclarative);
+    }
+
+    /// <summary>⛔ ISO §14.9.28.3 SR8, THE ONE SCREEN — "The UNTIL EXIT phrase shall not be specified in a PERFORM
+    /// statement with or under a PERFORM statement with the VARYING phrase or either the TEST BEFORE or TEST AFTER
+    /// phrase" (kb/Work PB434). Asked of every Format-1 and Format-2 PERFORM before its control phrase binds; a
+    /// Format-3 PERFORM carries no loop-control phrase (COBOLNET2118). Three arms, one code (COBOLNET2954):
+    /// <list type="bullet">
+    ///   <item><b>with</b> — this statement also writes VARYING or a TEST phrase. The grammar spells EXIT in every
+    ///     UNTIL of a PERFORM (<c>performUntilTarget</c>) so <c>WITH TEST BEFORE UNTIL EXIT</c> and
+    ///     <c>VARYING … UNTIL EXIT</c> reach this rule instead of a bare COBOL0001;</item>
+    ///   <item><b>under, lexically</b> — it is inside an inline PERFORM that writes one
+    ///     (<see cref="EnclosingContext.UnderVaryingOrTestPerform"/>);</item>
+    ///   <item><b>under, out of line</b> — its paragraph is reached from such a PERFORM's range: recorded here and
+    ///     decided by <see cref="UntilExitPlacement.Report"/> once every procedure is bound.</item>
+    /// </list>
+    /// "Specified" in a TEST phrase means WRITTEN (<see cref="PerformFormat.SpecifiesVaryingOrTest"/>): SR1's
+    /// assumed TEST BEFORE would otherwise make SR8 forbid every UNTIL EXIT.</summary>
+    private void CheckUntilExitPlacement(Core.PerformStatementContext p)
+    {
+        if (!PerformFormat.SpecifiesUntilExit(p)) return;
+        if (PerformFormat.SpecifiesVaryingOrTest(p))
+            ctx.Edition.Error(DiagnosticCatalog.PerformUntilExitPlacement,
+                "the UNTIL EXIT phrase is specified in a PERFORM statement with the VARYING phrase or a TEST BEFORE / "
+                + "TEST AFTER phrase: \"The UNTIL EXIT phrase shall not be specified in a PERFORM statement with or "
+                + "under a PERFORM statement with the VARYING phrase or either the TEST BEFORE or TEST AFTER phrase\" "
+                + "(ISO §14.9.28.3 SR8)");
+        else if (ctx.Enclosing.UnderVaryingOrTestPerform)
+            ctx.Edition.Error(DiagnosticCatalog.PerformUntilExitPlacement,
+                "the UNTIL EXIT phrase is specified in a PERFORM statement under an inline PERFORM statement with the "
+                + "VARYING phrase or a TEST BEFORE / TEST AFTER phrase: \"The UNTIL EXIT phrase shall not be specified "
+                + "in a PERFORM statement with or under a PERFORM statement with the VARYING phrase or either the TEST "
+                + "BEFORE or TEST AFTER phrase\" (ISO §14.9.28.3 SR8)");
+        else
+            ctx.UntilExit.AddSite(ctx.BindCursor, ctx.Edition.Cursor);
     }
 
 
@@ -502,15 +547,15 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
         if ((p.performTimes() ?? opt?.performTimes()) is { } t) return new PerformTimes(CountOperand(t));
         if ((p.performUntil() ?? opt?.performUntil()) is { } u)
         {
-            // UNTIL EXIT (§14.9.28.4 GR11, 2023): an infinite loop (a condition that never becomes true). The
-            // grammar gives EXIT its own alternative, so SR8's "no TEST with EXIT" is structural; escape is the
-            // programmer's job (inline: EXIT PERFORM; out-of-line: GOBACK/STOP). Introduction-gated in the pass.
-            if (u.EXIT() is not null) return new PerformForever();
+            // UNTIL EXIT (§14.9.28.4 GR11, 2023): an infinite loop (a condition that never becomes true); escape
+            // is the programmer's job (inline: EXIT PERFORM; out-of-line: GOBACK/STOP). Introduction-gated in the
+            // pass; §14.9.28.3 SR8's placement was screened by CheckUntilExitPlacement before this runs.
+            if (u.performUntilTarget().condition() is not { } condition) return new PerformForever();
             // The UNTIL condition is evaluated per iteration (§14.9.28 GR6/GR13), so a user-function
             // reference inside it activates per evaluation — the drained-suffix wrapper, never the
             // once-per-statement hoist (§8.4.3.2.4 GR1/GR6a; §8.8.4.13 r2).
             var udfMark = host.Udf.Mark;
-            var cond = host.Cond.BindCondition(u.condition());
+            var cond = host.Cond.BindCondition(condition);
             return new PerformUntil(host.Udf.UdfAttachPerEvaluation(cond, udfMark), u.AFTER() is not null);
         }
         if ((p.performVarying() ?? opt?.performVarying()) is { } v) return BindVarying(v);

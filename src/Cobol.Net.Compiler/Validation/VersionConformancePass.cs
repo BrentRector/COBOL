@@ -805,9 +805,12 @@ internal sealed class VersionConformancePass
         }
 
         /// <summary>PERFORM … UNTIL EXIT (ISO §14.9.28.4 GR11) — the infinite-loop phrase is a COBOL-2023 addition
-        /// (plain UNTIL condition is edition-invariant). Recognition-based on the EXIT alternative of performUntil;
-        /// parse-arm so a below-2023 occurrence names its edition even though it drops to a bound control node.</summary>
-        public override object? VisitPerformUntil(CobolParserCore.PerformUntilContext ctx)
+        /// (plain UNTIL condition is edition-invariant). Recognition-based on the EXIT alternative of the ONE
+        /// <c>performUntilTarget</c> rule every UNTIL of a PERFORM shares (the until-phrase's, and the superset EXIT
+        /// after a varying-phrase or AFTER level that §14.9.28.3 SR8 refuses at bind — kb/Work PB434), so a
+        /// below-2023 occurrence names its edition in every position. Parse-arm, so it reports even though the
+        /// statement drops to a bound control node.</summary>
+        public override object? VisitPerformUntilTarget(CobolParserCore.PerformUntilTargetContext ctx)
         {
             if (ctx.EXIT() is not null)
                 _p.Check(Constructs.PerformUntilExit2023, "the PERFORM UNTIL EXIT phrase");
