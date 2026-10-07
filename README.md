@@ -13,7 +13,7 @@ implementor is documented, with its rationale, in [docs/CONFORMANCE.md](docs/CON
 ```bash
 git clone https://github.com/BrentRector/COBOL.git
 cd COBOL
-dotnet build CobolSharp.sln
+dotnet build Cobol.Net.sln
 
 # compile a COBOL program (the source is a positional argument)
 dotnet run --project src/Cobol.Net.Cli -- hello.cob -o hello.dll
@@ -85,7 +85,7 @@ tests/
 Requires the .NET 10 SDK, PowerShell 7+, Python 3.14+ and Java 21+ (ANTLR parser generation).
 
 ```bash
-dotnet build CobolSharp.sln
+dotnet build Cobol.Net.sln
 pwsh scripts/build-local.ps1 -Mode implementer   # build + every Conformance, Unit and Characterization test, likely reds first
 ```
 

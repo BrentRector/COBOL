@@ -18,7 +18,7 @@ What it measures (the facts come from a Roslyn semantic model, never from grep):
 
 How:
   1. a DETACHED worktree at the commit (default HEAD) — a record describes exactly one tree, never a dirty one;
-  2. `dotnet build CobolSharp.sln -c Debug` there (the population check reads the BUILT assemblies);
+  2. `dotnet build Cobol.Net.sln -c Debug` there (the population check reads the BUILT assemblies);
   3. the Roslyn host `tools/ArchCensus` (built from THIS checkout, so an older commit can be measured) loads the
      solution through MSBuildWorkspace and writes the raw facts; it REFUSES a solution whose projects the scope does
      not partition, a workspace load failure, and a compilation with errors;
@@ -94,7 +94,7 @@ CLOSED_STATUSES = {"landed", "retired", "discharged", "closed", "superseded", "d
 CONVENTIONAL = {"README.md", "LICENSE", "LICENSE.md", "LICENSE.txt", "__init__.py", ".gitignore", ".gitattributes",
                 ".gitmodules", "CLAUDE.md", "AGENTS.md", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md",
                 "CLA.md", "global.json", "nuget.config", "Directory.Build.props", "Directory.Packages.props",
-                "Directory.Build.targets", "CobolSharp.sln", "PROMPT.md", "DEVLOG.md", ".agent-fleet.json",
+                "Directory.Build.targets", "Cobol.Net.sln", "PROMPT.md", "DEVLOG.md", ".agent-fleet.json",
                 "conftest.py"}
 # ...and any file whose name, or whose folder's name, says it is a notice for people (a README, a LICENSE, a NOTICE).
 NOTICE = re.compile(r"(?i)readme|license|notice")
@@ -617,12 +617,12 @@ def measure(commit: str, work: Path, out_dir: Path) -> Path:
     print(f"census: {sha[:12]} ({date}) in {wt}", flush=True)
     git("worktree", "add", "--detach", str(wt), sha)
     try:
-        sln = (wt / "CobolSharp.sln").read_text(encoding="utf-8-sig")
+        sln = (wt / "Cobol.Net.sln").read_text(encoding="utf-8-sig")
         scope = scope_of(solution_projects(sln))
         print(f"census: scope census={scope['census']} readers={scope['readers']} excluded={scope['excluded']}",
               flush=True)
         t0 = time.time()
-        run_logged(["dotnet", "build", "CobolSharp.sln", "-c", "Debug", "-v", "quiet"], wt, logs / "build.log")
+        run_logged(["dotnet", "build", "Cobol.Net.sln", "-c", "Debug", "-v", "quiet"], wt, logs / "build.log")
         host = work / "host"
         run_logged(["dotnet", "build", str(REPO / HOST), "-c", "Release", "-o", str(host), "-v", "quiet"], REPO,
                    logs / "host-build.log")
@@ -631,7 +631,7 @@ def measure(commit: str, work: Path, out_dir: Path) -> Path:
         scope_file.write_text(json.dumps(scope), encoding="utf-8")
         raw_file = work / "raw.json"
         t1 = time.time()
-        run_logged(["dotnet", str(host / "ArchCensus.dll"), "--solution", str(wt / "CobolSharp.sln"), "--scope",
+        run_logged(["dotnet", str(host / "ArchCensus.dll"), "--solution", str(wt / "Cobol.Net.sln"), "--scope",
                     str(scope_file), "--out", str(raw_file)], wt, logs / "host.log")
         print(f"census: measured in {time.time() - t1:.0f}s", flush=True)
         raw = json.loads(raw_file.read_text(encoding="utf-8"))
@@ -690,9 +690,9 @@ def self_test() -> int:
             return str(e)
         return ""
 
-    real = solution_projects((REPO / "CobolSharp.sln").read_text(encoding="utf-8-sig"))
+    real = solution_projects((REPO / "Cobol.Net.sln").read_text(encoding="utf-8-sig"))
     scope = scope_of(real)
-    arm("the scope rule partitions the real CobolSharp.sln (no unclassified project, a census and a reader each)",
+    arm("the scope rule partitions the real Cobol.Net.sln (no unclassified project, a census and a reader each)",
         bool(scope["census"]) and bool(scope["readers"])
         and sorted(scope["census"] + scope["readers"] + scope["excluded"]) == sorted(n for n, _ in real), str(scope))
     planted = real + [("Cobol.Net.Planted", "src/Cobol.Net.Planted/Cobol.Net.Planted.csproj")]

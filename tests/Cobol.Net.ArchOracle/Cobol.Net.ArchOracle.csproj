@@ -11,7 +11,7 @@
     option builders those theories call, so the oracle and the suites cannot drift apart; ArchOracleDriftTests
     holds every row source enrolled. This host only gives that code a process to run in outside xunit.
 
-    A member of CobolSharp.sln, so a solution build keeps it compiling. TFM / LangVersion / Nullable /
+    A member of Cobol.Net.sln, so a solution build keeps it compiling. TFM / LangVersion / Nullable /
     ImplicitUsings / TreatWarningsAsErrors come from the repository-root Directory.Build.props (imported by
     tests/Directory.Build.props); nothing here re-declares them.
   -->

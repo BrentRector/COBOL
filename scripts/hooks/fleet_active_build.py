@@ -540,7 +540,7 @@ def self_test() -> int:
         )
         check(
             "scope: no `cd` -> the payload cwd stands",
-            effective_cwd({"cwd": str(fx["wtA"]), "tool_input": {"command": "dotnet build CobolSharp.sln"}}),
+            effective_cwd({"cwd": str(fx["wtA"]), "tool_input": {"command": "dotnet build Cobol.Net.sln"}}),
             str(fx["wtA"]),
         )
 
@@ -595,7 +595,7 @@ def self_test() -> int:
 
     # ── 3. The verb matcher, both ways — `dotnet --version` must stay OUT of scope ─────────────────────────
     for cmd, expected in [
-        ("dotnet build CobolSharp.sln", True),
+        ("dotnet build Cobol.Net.sln", True),
         ("timeout 900 dotnet test x.csproj", True),
         ("dotnet --version", False),
         ("dotnet tool list", False),

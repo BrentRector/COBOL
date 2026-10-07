@@ -11,7 +11,7 @@ Work in `/home/user/CobolSharp`. Read `CLAUDE.md` first; its eight rules bind yo
 (`specs/ISO_COBOL.md`) and `cite.py` are in this repo. The `specs-private` submodule holds only the licensed PDF,
 needed to RENDER a page when a general-format diagram is load-bearing (`scripts/render-spec-page.py`); it is checked
 out only when BrentRector/COBOL-private is attached (web-page sessions; `claude --cloud` attaches one repo).
-Without it, a verdict that hinges on a diagram is PARTIAL with "diagram not rendered" in notes. Record `git rev-parse HEAD` as the PINNED sha. Build once: `dotnet build CobolSharp.sln -c Debug` (probe
+Without it, a verdict that hinges on a diagram is PARTIAL with "diagram not rendered" in notes. Record `git rev-parse HEAD` as the PINNED sha. Build once: `dotnet build Cobol.Net.sln -c Debug` (probe
 compiler: `src/Cobol.Net.Cli/bin/Debug/net10.0/cobol`, usage `cobol prog.cob --run [--std 85|2002|2014|2023]`; write
 probes under `/tmp/adj/{BATCH}/probe/`). Inputs: `python scripts/spec/phase_b_batch.py <clauses> --max-rules 10
 --out /tmp/adj/{BATCH}/in` and use ONLY the files `in-<slug>.json` for:

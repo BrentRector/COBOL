@@ -4,7 +4,7 @@
     MSBuild's CustomAfterMicrosoftCommonTargets hook, which scripts/spec/record_impact_map.py passes on the command
     line of the build it runs in its OWN detached worktree:
 
-        dotnet build CobolSharp.sln -c Debug -p:CustomAfterMicrosoftCommonTargets=<repo>/tools/impact/ImpactRecording.targets
+        dotnet build Cobol.Net.sln -c Debug -p:CustomAfterMicrosoftCommonTargets=<repo>/tools/impact/ImpactRecording.targets
 
     Nothing in the tree imports it, so no gated, battery or shipped build ever contains the probe. It adds:
       * ImpactProbe.cs to every assembly the impact map covers (the compiler, runtime, front end, editions and CLI,

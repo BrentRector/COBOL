@@ -652,7 +652,7 @@ jobs:
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
           restore-keys: ${{ runner.os }}-nuget-
       - name: Build (Release, warnings-as-errors)
-        run: dotnet build CobolSharp.sln --configuration Release
+        run: dotnet build Cobol.Net.sln --configuration Release
       # Greenfield conformance moved to the windows-conformance SHARDED job (kb/Work A14) — same coverage,
       # a third of the wall time; the population guard proves nothing fell between the shards.
       # GPL corpus fetched on demand for the PB209 population drift gate — see the Linux job's twin. (PB277)

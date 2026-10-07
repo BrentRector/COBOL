@@ -3,7 +3,7 @@
   <!--
     The architecture census's Roslyn host (kb/Work PB2115; docs/rearchitecture/DESIGN-architecture-review.md §3 R0).
     Built and run ONLY by scripts/arch/census.py, which owns the scope rule, the population check, the dead-artifact
-    queries and the record; this host only reports compiler facts. Never part of CobolSharp.sln, never shipped.
+    queries and the record; this host only reports compiler facts. Never part of Cobol.Net.sln, never shipped.
     TFM, nullable and warnings-as-errors come from Directory.Build.props; versions from Directory.Packages.props.
   -->
   <PropertyGroup>

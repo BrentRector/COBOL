@@ -3,7 +3,7 @@
 #     pwsh -File run-leg.ps1 -Label E1 -Filter 'FullyQualifiedName~Cobol85Program_StillCompilesAtLaterEdition'
 #     pwsh -File run-leg.ps1 -Label E2 -Filter '…' -EnvPairs 'DOTNET_gcServer=1'
 #
-# Build the solution first (`dotnet build CobolSharp.sln`). Appends "<label> rc=<rc> wall=<s>" to walls.txt in -Out
+# Build the solution first (`dotnet build Cobol.Net.sln`). Appends "<label> rc=<rc> wall=<s>" to walls.txt in -Out
 # (default: the system temp directory). The shards of walls.txt were launched CONCURRENTLY, one process each, e.g.
 #   '…&(FullyQualifiedName~_P0.|FullyQualifiedName~_P1.|FullyQualifiedName~_P2.)'  (P0..P2; the dot keeps _P1 off _P10)
 param([Parameter(Mandatory)][string]$Label, [Parameter(Mandatory)][string]$Filter, [string[]]$EnvPairs = @(),

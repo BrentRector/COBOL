@@ -12,7 +12,7 @@
 
     BenchmarkDotNet insists on Release. A Debug build still compiles and still runs, but it measures a Debug JIT
     and the harness prints a validation warning saying so, which is not the number anyone wants. The project is
-    a member of CobolSharp.sln, so a solution build keeps it compiling in BOTH configurations; only the measured
+    a member of Cobol.Net.sln, so a solution build keeps it compiling in BOTH configurations; only the measured
     run is Release-only.
 
     Results land in ./BenchmarkDotNet.Artifacts/results/ (GitHub-flavoured Markdown, HTML and CSV, per

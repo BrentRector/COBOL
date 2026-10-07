@@ -52,7 +52,7 @@ scripts), **Python 3.14+** and **Java 21+** (for ANTLR).
 ```bash
 git clone https://github.com/BrentRector/COBOL.git
 cd COBOL
-dotnet build CobolSharp.sln
+dotnet build Cobol.Net.sln
 ```
 
 Always build the **solution**, not a single project, before running tests with `--no-build`; otherwise you test a

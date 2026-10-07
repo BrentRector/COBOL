@@ -54,7 +54,7 @@ py="$(command -v python3 || command -v python)"
 if [ -z "$py" ]; then
   echo "=== LINUX GATE: NOT RUN (no python in this Linux environment — run scripts/wsl/setup-wsl.sh once) ==="; exit 2
 fi
-if [ ! -f CobolSharp.sln ]; then
+if [ ! -f Cobol.Net.sln ]; then
   echo "=== LINUX GATE: NOT RUN (not at a repository root: $(pwd)) ==="; exit 2
 fi
 tree="$(pwd)"

@@ -10,7 +10,7 @@ CONFORMS 3 (125, 170, 128) · DIVERGES 6 (12, 20, 74, 213, 153, 197) · NOT-IMPL
 ## Wall-clock per phase
 | Phase | Seconds |
 |---|---|
-| Setup + `dotnet build CobolSharp.sln -c Debug` | 53 |
+| Setup + `dotnet build Cobol.Net.sln -c Debug` | 53 |
 | Adjudication (inputs, spec, code, probes, cite.py, write-up) | 393 |
 | Refute (one subagent, 3 rows) | 231 |
 | **Total** | 677 |

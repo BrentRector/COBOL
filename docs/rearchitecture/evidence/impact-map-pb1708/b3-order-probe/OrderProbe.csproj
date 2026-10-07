@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- PB1708 pivot evidence (b3): do xunit 2.9.2 / xunit.runner.visualstudio 2.8.2 honour an assembly-level
        collection orderer and test-case orderer UNDER PARALLEL COLLECTIONS, and what does StopOnFail do? Not in
-       CobolSharp.sln; run.ps1 drives it. -->
+       Cobol.Net.sln; run.ps1 drives it. -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>

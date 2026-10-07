@@ -92,7 +92,7 @@ note "$(printf '%-16s %s' 'witnesses:' "$(grep -E '^=== WITNESS LOSS' "$OUT/cita
 [ "$WLOSS" -eq 0 ] || { note "witnesses:       ⛔ inventory evidence lost — see $OUT/citations.log"; RC=1; }
 
 el "=== PHASE 0: build the solution (once) ==="
-if ! dotnet build CobolSharp.sln -v quiet > "$OUT/build.log" 2>&1; then
+if ! dotnet build Cobol.Net.sln -v quiet > "$OUT/build.log" 2>&1; then
     note "BUILD: FAILED — see $OUT/build.log"; tail -20 "$OUT/build.log"; exit 1
 fi
 note "BUILD: ok"

@@ -1,6 +1,6 @@
 # adj-a1-w1-s3 — Annex A.1 documentation rows, wave 1 session 3 of 4
 
-- **Pinned sha:** `0a83d2d22836ddf39644d0a32d5303542edbdb94` (probe compiler: Debug build of `CobolSharp.sln` at that sha)
+- **Pinned sha:** `0a83d2d22836ddf39644d0a32d5303542edbdb94` (probe compiler: Debug build of `Cobol.Net.sln` at that sha)
 - **Inputs:** `scripts/spec/phase_b_batch.py A.1 --max-rules 10`, the 20 assigned slugs only (DOC-A.1-53/54/55/60/61/63/65/66/67/68/69/72/75/76/77/78/79/80/81/83)
 - **Wall-clock (UTC 2026-09-24):** setup + build 21:06–21:09 · adjudication 21:09–21:25 · refute 21:25–21:32 · deliver 21:32–21:34
 

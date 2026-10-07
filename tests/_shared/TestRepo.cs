@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Shared;
 /// <remarks>
 /// <para>
 /// Before this type there were SIXTEEN private <c>RepoRoot()</c> walkers across five test projects, answering the
-/// same question with FIVE different sentinels: <c>CobolSharp.sln</c>, <c>tests/version-matrix</c>,
+/// same question with FIVE different sentinels: <c>Cobol.Net.sln</c>, <c>tests/version-matrix</c>,
 /// <c>tests/nist</c>, <c>src/Cobol.Net.Compiler</c> and <c>PROMPT.md</c>. Every one of those is a PROXY for "the
 /// repo root", and each proxy is a separate way for the answer to drift: move or rename any one of them and only
 /// the tests keyed on that proxy break, silently and locally. That is the duplication anti-pattern the DA wave
@@ -28,7 +28,7 @@ internal static class TestRepo
     /// The repository root, located once per test assembly.
     /// </summary>
     /// <remarks>
-    /// The marker is <c>CobolSharp.sln</c> — the one file that genuinely defines the root rather than merely
+    /// The marker is <c>Cobol.Net.sln</c> — the one file that genuinely defines the root rather than merely
     /// living at it — CORROBORATED by the co-presence of <c>src/</c> and <c>tests/</c>. The corroboration is not
     /// ceremony: a lone <c>.sln</c> can be copied anywhere (a build drop, a packaging staging directory), and a
     /// walker that accepted it would resolve to a tree with no sources in it, then fail with a file-not-found
@@ -88,7 +88,7 @@ internal static class TestRepo
     {
         for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null; d = d.Parent)
         {
-            if (File.Exists(Path.Combine(d.FullName, "CobolSharp.sln"))
+            if (File.Exists(Path.Combine(d.FullName, "Cobol.Net.sln"))
                 && Directory.Exists(Path.Combine(d.FullName, "src"))
                 && Directory.Exists(Path.Combine(d.FullName, "tests")))
             {
@@ -98,6 +98,6 @@ internal static class TestRepo
 
         throw new InvalidOperationException(
             $"repo root not found above '{AppContext.BaseDirectory}' — looked for a directory holding "
-            + "CobolSharp.sln alongside src/ and tests/.");
+            + "Cobol.Net.sln alongside src/ and tests/.");
     }
 }

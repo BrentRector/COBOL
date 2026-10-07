@@ -135,11 +135,11 @@ The new `Cobol.Net.Frontend.csproj`:
 
 ### 1.5 Ordered git-mv sequence (build + guard green per step)
 
-Each step is a self-contained commit; `dotnet build CobolSharp.sln` (and the guard, once scripts are repointed) is green at the end of each. `git mv` preserves history.
+Each step is a self-contained commit; `dotnet build Cobol.Net.sln` (and the guard, once scripts are repointed) is green at the end of each. `git mv` preserves history.
 
 **Step 1 — Extract the front-end (kills the legacy-assembly dependency).**
 1. `git mv` `Parsing/ Preprocessor/ Diagnostics/ Common/ Generated/ Grammar/ ANTLR4/ GenerateIfNewer.ps1 Invoke-Antlr4CSharp.ps1` from `src/CobolSharp.Compiler/` → `src/Cobol.Net.Frontend/`.
-2. Create `Cobol.Net.Frontend.csproj` (with the ANTLR targets); add it to `CobolSharp.sln`.
+2. Create `Cobol.Net.Frontend.csproj` (with the ANTLR targets); add it to `Cobol.Net.sln`.
 3. Repoint the **four** consumers' `ProjectReference` from `CobolSharp.Compiler.csproj` → `Cobol.Net.Frontend.csproj` **and add** a `CobolSharp.Compiler → Cobol.Net.Frontend` reference (the byte engine now consumes the extracted front-end). Consumers: `src/CobolNet`, `src/CobolSharp.CLI`, both `tests/CobolSharp.Tests.*`. (`CobolSharp.Compiler` keeps its `Cobol.Net.Frontend` ref + its own `Mono.Cecil`/`CobolSharp.Runtime` refs for the byte engine.)
 4. Build. The new compiler no longer references `CobolSharp.Compiler.dll`. ✅ *Goal "stop depending on the legacy assembly" met here, with zero namespace churn.*
 
@@ -150,9 +150,9 @@ Each step is a self-contained commit; `dotnet build CobolSharp.sln` (and the gua
 **Step 4 — Add the new test projects.** Create `tests/Cobol.Net.Tests.Unit` + `tests/Cobol.Net.Tests.Conformance`, referencing the new compiler library + the in-place `tests/nist`/`tests/conformance` corpus; add `InternalsVisibleTo`. Legacy test projects untouched (still guarding the oracle). ✅
 
 **Step 5 — Solution / scripts / CI / props (one commit).**
-- `CobolSharp.sln`: as executed the filename was KEPT (entries updated in place); the `Cobol.Net.sln` brand rename remains an owner-taste option, best bundled with the G8 big-bang.
+- `Cobol.Net.sln`: as executed the filename was KEPT (entries updated in place); the `Cobol.Net.sln` brand rename remains an owner-taste option, best bundled with the G8 big-bang.
 - Update the **five** scripts that hardcode paths: `scripts/guard.sh`, `guard-fast.sh`, `guard-run-group.sh`, `nist-batch.sh`, `run-suite.sh` (the `.sln` name and any `src/CobolNet*`/`CobolSharp.*` project paths and the runtime-DLL copy target).
-- Update CI `.github/workflows/build-and-test.yml` (it hardcodes `CobolSharp.sln` and the two `tests/CobolSharp.Tests.*` paths) in this same commit so CI tracks the rename.
+- Update CI `.github/workflows/build-and-test.yml` (it hardcodes `Cobol.Net.sln` and the two `tests/CobolSharp.Tests.*` paths) in this same commit so CI tracks the rename.
 - `Directory.Build.props` / `Directory.Packages.props` need **no functional change** (TFM/lang/central-versions are name-agnostic); confirm the package-id list still covers `Antlr4.Runtime.Standard`, `Microsoft.CodeAnalysis.CSharp`, the test packages. (`Mono.Cecil` becomes legacy-only; keep its `PackageVersion` until G8.)
 - Full guard green. ✅
 

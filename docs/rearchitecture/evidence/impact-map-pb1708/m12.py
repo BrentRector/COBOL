@@ -1,6 +1,6 @@
 """PB1719 (PB1708 pivot M12) acceptance: the in-assembly leg filter on the REAL test hosts.
 
-    python m12.py <work dir>          (from this directory, on a built tree: dotnet build CobolSharp.sln -c Debug)
+    python m12.py <work dir>          (from this directory, on a built tree: dotnet build Cobol.Net.sln -c Debug)
 
 Measures, on the three gated assemblies of THIS build (DESIGN-test-build-ci.md section 3.14.9, row M12):
   A. no handshake: every assembly's trx TEST DEFINITIONS equal its `--list-tests` as a multiset, every case passed;

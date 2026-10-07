@@ -1,6 +1,6 @@
 # adj-a1-w1-s1 — Annex A.1 documentation rows, wave 1 session 1 of 4
 
-- **Pinned sha:** `0a83d2d22836ddf39644d0a32d5303542edbdb94` (Debug build of CobolSharp.sln, 0 errors)
+- **Pinned sha:** `0a83d2d22836ddf39644d0a32d5303542edbdb94` (Debug build of Cobol.Net.sln, 0 errors)
 - **Rows:** 20 DOC-A.1 rows: 3, 4, 6, 7, 8, 9, 11, 13, 14, 15, 16, 17, 21, 23, 24, 25, 26, 27, 28, 29
 - **Wall-clock (UTC 2026-09-24):**
 

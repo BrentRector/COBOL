@@ -10,7 +10,7 @@ namespace CobolNet.Tests.Unit;
 /// <summary>
 /// ⛔ THE ARCHITECTURE CENSUS CANNOT SILENTLY SKIP A PROJECT (kb/Work PB2115; docs/rearchitecture/DESIGN-architecture-review.md
 /// §3 R0): the newest committed census record under <c>docs/rearchitecture/evidence/arch-census/</c> covers every product
-/// project of <c>CobolSharp.sln</c> (each <c>src/Cobol.Net.*</c> project), its census population equals the built
+/// project of <c>Cobol.Net.sln</c> (each <c>src/Cobol.Net.*</c> project), its census population equals the built
 /// assembly's compiled type population for each, and its type table holds exactly that many rows per project; and
 /// <c>scripts/arch/census.py --self-test</c> still drives every arm of the scope rule, the population check and the
 /// dead-artifact queries.
@@ -61,7 +61,7 @@ public sealed class ArchCensusDriftTests
     [Fact]
     public void TheNewestRecord_CoversEveryProductProject_AndItsWholeCompiledPopulation()
     {
-        var product = SolutionProject.Matches(File.ReadAllText(TestRepo.At("CobolSharp.sln")))
+        var product = SolutionProject.Matches(File.ReadAllText(TestRepo.At("Cobol.Net.sln")))
             .Where(m => m.Groups["name"].Value.StartsWith("Cobol.Net.", StringComparison.Ordinal)
                         && m.Groups["path"].Value.Replace('\\', '/').StartsWith("src/", StringComparison.Ordinal))
             .Select(m => m.Groups["name"].Value)
@@ -75,7 +75,7 @@ public sealed class ArchCensusDriftTests
         var census = root.GetProperty("scope").GetProperty("census").EnumerateArray()
             .Select(e => e.GetString()!).Order(StringComparer.Ordinal).ToList();
         Assert.True(product.SequenceEqual(census),
-            $"the census record {commit[..12]} measured [{string.Join(", ", census)}] but CobolSharp.sln's product projects "
+            $"the census record {commit[..12]} measured [{string.Join(", ", census)}] but Cobol.Net.sln's product projects "
             + $"are [{string.Join(", ", product)}] — re-run `python scripts/arch/census.py` and commit its record");
 
         var rowsPerProject = new Dictionary<string, int>(StringComparer.Ordinal);

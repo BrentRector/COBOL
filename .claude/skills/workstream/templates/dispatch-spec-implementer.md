@@ -40,7 +40,7 @@ build/gate is running is RETURNED BY THE HARNESS AND ITS BACKGROUND PROCESS IS K
 ⚠ SIZING: if the group proves to be two mechanisms, finish the first at its root, checkpoint at the note boundary, and
 return SPLIT rather than pass the 220-turn cap.
 
-⛔ RE-PROBE FIRST, EVERY NOTE, on YOUR build (`dotnet build CobolSharp.sln -c Debug`, expect 0/0). A note that no longer
+⛔ RE-PROBE FIRST, EVERY NOTE, on YOUR build (`dotnet build Cobol.Net.sln -c Debug`, expect 0/0). A note that no longer
 reproduces is re-verdicted and reported DISCHARGED with the evidence — a real outcome, not a failure.
 
 ⛔ CITATIONS: `python scripts/spec/cite.py --check <clause> "<text>"` for EVERY § you write into code, a golden or the

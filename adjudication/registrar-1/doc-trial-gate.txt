@@ -1,5 +1,5 @@
 # DOC trial gate — batch-doc.json (126 DOC-A.1 records) applied for real, then RESTORED (kb/Work PB1522 registrar-1 step 2)
-# 2026-09-24 22:41 UTC on 644a7d0 + batch-doc applied; dotnet build CobolSharp.sln -c Debug = Build succeeded (0 warnings, 0 errors)
+# 2026-09-24 22:41 UTC on 644a7d0 + batch-doc applied; dotnet build Cobol.Net.sln -c Debug = Build succeeded (0 warnings, 0 errors)
 # record_verdicts: GAP 1664 -> 1653 (+11 closed); histogram DIVERGES 76 / PARTIAL 26 / CONFORMS 14 (11 closed, 3 test-needed) / NOT-IMPLEMENTED 10
 # filter: FullyQualifiedName~SpecTraceabilityInventory|~DefectiveRowCoverage|~DerivedVerdict|~AnnexA1|~WorkRegister
 

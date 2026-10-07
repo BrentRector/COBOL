@@ -117,7 +117,7 @@ once. A lander runs `-Mode lander`: the whole population in one leg, with no slo
 changes the order, never what runs, and impact maps are recorded on demand, never per commit. Run the comprehensive
 battery plus the GnuCOBOL differential once per accumulated batch, pre-merge, in its own worktree. **CI also runs on
 Linux, so every gate runs CI's Linux legs under WSL before a push** (`scripts/linux-gate.sh`, kb/Work PB1732). Every
-implementer and lander runs all four legs (unit, characterization, conformance, and CI's `guard` job), about 6 minutes. Build `CobolSharp.sln` (not a single project) before
+implementer and lander runs all four legs (unit, characterization, conformance, and CI's `guard` job), about 6 minutes. Build `Cobol.Net.sln` (not a single project) before
 any `--no-build` run. Commands and the current battery baseline are in plan §0 "Gates" and §9.
 ⛔ **THE CI INVARIANT (owner 2026-10-04): GitHub CI must never fail when the same code was tested locally by the same
 processes.** CI is the verification of the local process, never its first run. A CI red is therefore ALSO a defect in the

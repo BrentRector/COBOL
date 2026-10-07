@@ -283,7 +283,7 @@ def record(args: argparse.Namespace, sha: str, store: Path, wt: Path, raw: Path,
                    wt, slot, priority=args.priority) != 0:
                 print("  ⚠ the GnuCOBOL corpus fetch failed — ExternalCorpusPopulationDriftTests will be red in the "
                       "Unit leg for that reason (their hits are still recorded)")
-        rc = run(["dotnet", "build", "CobolSharp.sln", "-c", "Debug", "-v", "quiet",
+        rc = run(["dotnet", "build", "Cobol.Net.sln", "-c", "Debug", "-v", "quiet",
                   f"-p:CustomAfterMicrosoftCommonTargets={targets}"], logs / "build.log", wt, slot,
                  priority=args.priority)
         if rc != 0:

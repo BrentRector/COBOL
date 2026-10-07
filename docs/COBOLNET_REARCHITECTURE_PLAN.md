@@ -1912,7 +1912,7 @@ result. Run the long legs ONE AT A TIME.
     `ExternalCorpusPopulationDriftTests`.
   ⛔ A failed population check makes the sweep **REFUSE to report hit counts** rather than return a clean zero;
   a zero from a reader that opened nothing is the defect, not the answer.
-- **Mechanics that have burned us:** build `CobolSharp.sln` (not one project) before ANY `--no-build` test or CLI
+- **Mechanics that have burned us:** build `Cobol.Net.sln` (not one project) before ANY `--no-build` test or CLI
   smoke — a stale test-bin compiler DLL hides regressions. Never `| tail -N` a guard verdict: redirect the FULL
   output to a file, then `grep 'ALL GREEN'` + `grep -iE 'crash|abort|Failed: *[1-9]'`. A high-JOBS parallel NIST
   leg can FALSE-RED — re-run the NAMED test serially before believing a regression, and never `taskkill
@@ -2873,7 +2873,7 @@ Part II §PHASE-16 of this document.
 
 ## §3 EXECUTION MODEL — tiered testing + batching + parallelism (owner-directed; use it every session)
 
-- **Tiered testing.** *Wave-local gate* (~2–3 min): fresh `CobolSharp.sln` build → characterization +
+- **Tiered testing.** *Wave-local gate* (~2–3 min): fresh `Cobol.Net.sln` build → characterization +
   `CorpusRunnerTests` filtered to the wave + targeted unit tests + a CLI probe. *Comprehensive gate*
   (~12–17 min; the Conformance leg itself is ~10 min since the [[A13]] collection split — §0 Gates):
   FULL greenfield Conformance + (when forced) the FULL legacy guard — once per BATCH of waves and
@@ -3330,7 +3330,7 @@ Files created / changed by P14 (real paths):
 Before touching anything, prove the battery is green from a clean build (incremental builds can mask a regression):
 
 ```
-dotnet build CobolSharp.sln -c Debug
+dotnet build Cobol.Net.sln -c Debug
 dotnet build src/Cobol.Net.Cli/Cobol.Net.Cli.csproj -c Debug
 dotnet test tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj
 dotnet test tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj
@@ -3735,7 +3735,7 @@ Run all of the following from a clean build; every one must be green before decl
 
 ```
 # 1. Clean build (no incremental masking)
-dotnet build CobolSharp.sln -c Release          # warnings-as-errors on Release
+dotnet build Cobol.Net.sln -c Release          # warnings-as-errors on Release
 dotnet build src/Cobol.Net.Cli/Cobol.Net.Cli.csproj -c Debug
 
 # 2. In-process greenfield battery
@@ -3832,7 +3832,7 @@ is preserved at an annotated git tag with a WSL reproduction recipe before it is
    separated-args/nested-FUNCTION corpus (the §9.5 D10.1 set) is green. (Sequenced after Cut 2; see §"CUT 2.5".)
 1. **Grep-clean of legacy references:** no `src/CobolSharp.*` project, no `ProjectReference` to a `CobolSharp.*`
    project anywhere, no `CobolSharp.Compiler`/`CobolSharp.Runtime` type reference in any `src/Cobol.Net.*` or
-   `tests/Cobol.Net.*` file, no `CobolSharp.sln` entry for a legacy project, and no `scripts/guard*.sh` /
+   `tests/Cobol.Net.*` file, no `Cobol.Net.sln` entry for a legacy project, and no `scripts/guard*.sh` /
    `compliance.sh` / `nist-batch.sh` / `run-suite.sh` in the tree.
 2. **One greenfield guard exits 0:** the greenfield-only battery (below) is green from a clean checkout on Windows and
    Linux; a single authoritative guard command (`scripts/guard.ps1`, cross-platform) returns exit 0.
@@ -3956,7 +3956,7 @@ Files/dirs **changed:**
 - Every `src/Cobol.Net.Runtime/**/*.cs`: `namespace CobolNet.Runtime[.X]` → `namespace Cobol.Net.Runtime[.X]`.
 - The `RuntimeApi` façade (`src/Cobol.Net.Compiler/CodeGen/.../RuntimeApi.cs`): the ONE place the emitted `using`
   namespace(s) is produced flips to `Cobol.Net.Runtime`. Every runtime member reference in generated code follows.
-- `CobolSharp.sln`: legacy project entries removed; solution builds only the `Cobol.Net.*` projects + the two
+- `Cobol.Net.sln`: legacy project entries removed; solution builds only the `Cobol.Net.*` projects + the two
   greenfield test projects.
 - `.github/workflows/build-and-test.yml`: reduced to an OS-matrix `build-test` job (build `-warnaserror`; conformance +
   unit `--no-build`) + the `version-sweep` (INV-1) job. No legacy job.
@@ -4005,7 +4005,7 @@ The engine files still exist on disk after Cut 1; only their edges into the gree
   - File: `.github/workflows/build-and-test.yml`. Delete the `guard` job (runs `scripts/guard-fast.sh` over the legacy
     engine). Confirm `greenfield-tests` (conformance+unit) and `inv1-sweep` remain and are green. Collapse
     `windows-build-test` into an OS-matrix `build-test` per DESIGN-test-build-ci §3.8 (matrix `[ubuntu-latest,
-    windows-latest]`; `dotnet build CobolSharp.sln -warnaserror` — but see step 6, the sln still contains legacy at
+    windows-latest]`; `dotnet build Cobol.Net.sln -warnaserror` — but see step 6, the sln still contains legacy at
     this point, so for THIS step keep building the greenfield test projects explicitly; the sln slim-down in step 6
     lets a later edit switch to a whole-sln build). Remove `InternalsVisibleTo` for `CobolSharp.Tests.Unit` from
     greenfield csprojs so nothing references the legacy test assembly name.
@@ -4023,7 +4023,7 @@ The engine files still exist on disk after Cut 1; only their edges into the gree
     the `CobolSharp.*` `ProjectReference` and gate the legacy code path out. Prefer (a).
   - Why: DESIGN-test-build-ci §"Cut 1 … sever tools/DifferentialBakeTool's legacy dependency". A dangling legacy
     reference here would block Cut 2.
-  - Verify: `grep -rn "CobolSharp" tools/ ; echo "expect: NO hits"`; `dotnet build CobolSharp.sln` still succeeds
+  - Verify: `grep -rn "CobolSharp" tools/ ; echo "expect: NO hits"`; `dotnet build Cobol.Net.sln` still succeeds
     (legacy projects still present but now referenced only by themselves).
   - **COMMIT BOUNDARY.** Suggested message: `chore(cobolnet): P15 Cut 1c — remove DifferentialBakeTool legacy oracle dependency`
 
@@ -4053,7 +4053,7 @@ only remaining references are the legacy projects referencing each other, and th
     ```bash
     git tag -a legacy-byte-engine-final <last pre-delete commit of main> -m "Final commit containing the CobolSharp byte engine (P15 Cut 2, kb/Work PB2110).
     To run it on WSL/Linux: clone, check out this tag, then
-      dotnet build CobolSharp.sln
+      dotnet build Cobol.Net.sln
       dotnet src/CobolSharp.CLI/bin/Debug/net10.0/cobolsharp.dll -o out/PROG.dll prog.cbl
       dotnet out/PROG.dll
     See docs/rearchitecture/LEGACY-ARCHIVE.md."
@@ -4068,17 +4068,17 @@ only remaining references are the legacy projects referencing each other, and th
   - **COMMIT BOUNDARY.** Suggested message: `docs(cobolnet): P15 Cut 2a — archive the legacy byte engine at tag legacy-byte-engine-final + WSL recipe`
 
 - [x] **Step 6 — Remove legacy projects from the solution and delete the legacy trees.** DONE by kb/Work PB2110
-  (wave 1027): the five trees and their five `CobolSharp.sln` entries, with every `InternalsVisibleTo`, impact-map,
+  (wave 1027): the five trees and their five `Cobol.Net.sln` entries, with every `InternalsVisibleTo`, impact-map,
   drift-test and CI reference; the solution file keeps its name until PB2112.
-  - Files: remove from `CobolSharp.sln` the entries for `src\CobolSharp.Compiler`, `src\CobolSharp.Runtime`,
+  - Files: remove from `Cobol.Net.sln` the entries for `src\CobolSharp.Compiler`, `src\CobolSharp.Runtime`,
     `src\CobolSharp.CLI`, `tests\CobolSharp.Tests.Unit`, `tests\CobolSharp.Tests.Integration` (use
-    `dotnet sln CobolSharp.sln remove <path>` for each). Then delete the directories:
+    `dotnet sln Cobol.Net.sln remove <path>` for each). Then delete the directories:
     `src/CobolSharp.Compiler/`, `src/CobolSharp.Runtime/`, `src/CobolSharp.CLI/`,
     `tests/CobolSharp.Tests.Unit/`, `tests/CobolSharp.Tests.Integration/`.
-  - Note the solution FILE is named `CobolSharp.sln`. Renaming the solution file to `Cobol.Net.sln` is a nicety but is
-    a wider ripple (CI + docs reference it). Recommendation: **keep the filename `CobolSharp.sln` in P15** to avoid
+  - Note the solution FILE is named `Cobol.Net.sln`. Renaming the solution file to `Cobol.Net.sln` is a nicety but is
+    a wider ripple (CI + docs reference it). Recommendation: **keep the filename `Cobol.Net.sln` in P15** to avoid
     churn, and record the optional rename as a follow-on in the post-G8 architectural review (owner decision 11, out of
-    scope here). If renamed, do it as its own step + `git mv` and update every `CobolSharp.sln` reference in CI/docs.
+    scope here). If renamed, do it as its own step + `git mv` and update every `Cobol.Net.sln` reference in CI/docs.
   - Why: DESIGN-module-topology §10 / COBOLNET_DESIGN §16 G8. Cut 2 is the actual removal of the byte substrate the
     PIVOT mandated never to fall back to.
   - Verify:
@@ -4086,7 +4086,7 @@ only remaining references are the legacy projects referencing each other, and th
     ls src/ ; echo "expect: only Cobol.Net.* dirs"
     grep -rn "CobolSharp\.\(Compiler\|Runtime\|CLI\)" --include=*.csproj --include=*.sln --include=*.cs \
         src tests tools ; echo "expect: NO hits"
-    dotnet build CobolSharp.sln            # builds only Cobol.Net.* now
+    dotnet build Cobol.Net.sln            # builds only Cobol.Net.* now
     dotnet test tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj
     dotnet test tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj
     pwsh scripts/guard.ps1                 # exit 0
@@ -4096,7 +4096,7 @@ only remaining references are the legacy projects referencing each other, and th
     `feat(cobolnet)!: P15 Cut 2b — DELETE the src/CobolSharp.* byte engine + legacy test suites (G8; archived at tag)`
 
 - [x] **Step 7 — Grep-clean sweep for legacy residue.** The code half is DONE by kb/Work PB2110: `grep -rn
-  "CobolSharp\.\(Compiler\|Runtime\|CLI\)\|CobolSharp.Tests" src tests scripts .github CobolSharp.sln` is empty except
+  "CobolSharp\.\(Compiler\|Runtime\|CLI\)\|CobolSharp.Tests" src tests scripts .github Cobol.Net.sln` is empty except
   the traceability inventory's adjudication notes, which are verdict records naming legacy tests as historical
   evidence; no repo-root script names the engine (the legacy-only `Run-Cobol85Audit.ps1` is deleted). The prose half (the docs, plan §0's additive-grammar caution, open notes' code sites) is kb/Work PB2111.
   - Search the whole repo (excluding `bin/`, `obj/`, `.git/`) for stale references and fix each: doc comments naming
@@ -4107,10 +4107,10 @@ only remaining references are the legacy projects referencing each other, and th
   - Verify:
     ```bash
     grep -rn "CobolSharp" --include=*.cs --include=*.csproj --include=*.md --include=*.yml \
-        --include=*.ps1 --include=*.sh . | grep -v "legacy-byte-engine-final\|LEGACY-ARCHIVE\|CobolSharp.sln"
+        --include=*.ps1 --include=*.sh . | grep -v "legacy-byte-engine-final\|LEGACY-ARCHIVE\|Cobol.Net.sln"
     ```
     Expected: the only surviving `CobolSharp` mentions are the intentional archive references (tag name, `LEGACY-ARCHIVE.md`,
-    the `CobolSharp.sln` filename if kept) and historical DEVLOG entries (DEVLOG is an append-only ledger — do NOT
+    the `Cobol.Net.sln` filename if kept) and historical DEVLOG entries (DEVLOG is an append-only ledger — do NOT
     rewrite history; leaving past entries is correct).
   - **COMMIT BOUNDARY** (if any fixes were needed). Suggested message:
     `docs(cobolnet): P15 Cut 2c — scrub stale legacy-oracle references from banners/live docs`
@@ -4179,7 +4179,7 @@ This is the only step here that changes emitted code; it is a coordinated flip m
     flip instead of corpus-wide churn.
   - Verify:
     ```bash
-    dotnet build CobolSharp.sln
+    dotnet build Cobol.Net.sln
     # Compile a representative program and inspect the emitted .g.cs + run it.
     cat > /tmp/p15.cob <<'EOF'
     IDENTIFICATION DIVISION.
@@ -4218,9 +4218,9 @@ This is the only step here that changes emitted code; it is a coordinated flip m
     per P1/P4 — unaffected by the runtime flip, but re-verify a cold build).
   - Verify:
     ```bash
-    dotnet clean CobolSharp.sln
+    dotnet clean Cobol.Net.sln
     rm -rf src/Cobol.Net.Frontend/Generated
-    dotnet build CobolSharp.sln           # regenerates Generated/, builds green
+    dotnet build Cobol.Net.sln           # regenerates Generated/, builds green
     pwsh scripts/guard.ps1                 # exit 0
     ```
   - No commit needed if nothing tracked changed (Generated/ is untracked). If the regen surfaced a tracked drift, fix
@@ -4276,7 +4276,7 @@ itself — but items 1's language-support statement and 4 DO gate the v1.0 relea
 Run all of these from a clean checkout on BOTH Windows and Linux (WSL) — cross-platform parity is now the whole gate:
 
 ```bash
-dotnet clean CobolSharp.sln && dotnet build CobolSharp.sln            # green, warnings-as-errors in Release
+dotnet clean Cobol.Net.sln && dotnet build Cobol.Net.sln            # green, warnings-as-errors in Release
 dotnet test tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj   # == §1 baseline (~2028+)
 dotnet test tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj                 # == §1 baseline (~213+)
 pwsh scripts/guard.ps1                                                # exit 0 (greenfield NIST corpus all green)
@@ -4885,7 +4885,7 @@ lowering **privately**, and the bound tree it consumes is the SAME neutral tree 
 > reverted to bind-time Check (byte-identical, CI green).** **14h ROOT-CAUSE FIX (revised): move ALL introduction/removal gates
 > to the presence-based POST-BIND PARSE-ARM** (a parse-tree walk over `BoundRunUnit.Tree`, after bind — fires 0900 on syntactic
 > presence, semantic errors also accumulate); only genuinely-semantic gates (MOVE-category, attribute phrases that ARE the
-> construct) stay bound-arm. ALSO: **verify against a FRESH `dotnet build CobolSharp.sln` before `dotnet test --no-build`** —
+> construct) stay bound-arm. ALSO: **verify against a FRESH `dotnet build Cobol.Net.sln` before `dotnet test --no-build`** —
 > a stale test-bin compiler hid these locally.
 > **Step 14e DONE (DEVLOG 722):** END-ACCEPT + INVOKE. **Step 14f DONE (DEVLOG 723):** MOVE-category (`GateMove`
 > re-derives the SR5 classification) + UDF-invocation (hoisted `BoundCallProgram.IsFunction`) — the two genuinely-semantic
@@ -5118,7 +5118,7 @@ lowering **privately**, and the bound tree it consumes is the SAME neutral tree 
 > walk (byte-exact to the two former inline sites); regression witness added. Battery: conformance 3157 · unit 223 ·
 > characterization 32 · INV-1 349/349 · guard 353 MATCH. —
 > **RESUME AT Step 15 (phase close):** exit-criteria checklist 1–9; 14g.6 snapshot re-baseline is a NO-OP (characterization
-> byte-exact throughout 14g). Guard per commit: fresh `CobolSharp.sln` build → greenfield conformance+unit+characterization
+> byte-exact throughout 14g). Guard per commit: fresh `Cobol.Net.sln` build → greenfield conformance+unit+characterization
 > + INV-1 + FULL legacy guard. Full synthesis is in the recon transcript.
 > 
 > > The executing session updates this line to `IN PROGRESS @ step N` after each step and `DONE` at phase end.

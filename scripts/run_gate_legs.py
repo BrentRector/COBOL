@@ -146,7 +146,7 @@ class Host:
         return reds
 
     def build(self, spawn: Spawn) -> bool:
-        return subprocess.run(["dotnet", "build", "CobolSharp.sln", "-v", "quiet"], cwd=self.repo,
+        return subprocess.run(["dotnet", "build", "Cobol.Net.sln", "-v", "quiet"], cwd=self.repo,
                               **spawn()).returncode == 0
 
     def binaries(self) -> dict[str, dict[str, str]]:

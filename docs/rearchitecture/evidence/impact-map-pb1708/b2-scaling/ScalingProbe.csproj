@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- PB1708 pivot evidence (b2): does ONE process scale the continuity-cell compile across threads? Not in
-       CobolSharp.sln and not a test: `dotnet run` (Debug, like the gate; see Program.cs). -->
+       Cobol.Net.sln and not a test: `dotnet run` (Debug, like the gate; see Program.cs). -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>

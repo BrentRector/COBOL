@@ -8,7 +8,7 @@ related_files:
   - Directory.Packages.props
   - global.json
   - nuget.config
-  - CobolSharp.sln
+  - Cobol.Net.sln
   - src/Cobol.Net.Frontend/GenerateIfNewer.ps1
   - src/Cobol.Net.Frontend/Invoke-Antlr4CSharp.ps1
   - scripts/guard.sh
@@ -42,7 +42,7 @@ from the csproj `<AntlrNamespace>` property.
   dirs using the *platform* separator). Lexer generates first; the parser's `-lib` inputs (imported `Core/*.g4` +
   `CobolLexer.tokens`) stage under `obj/antlr-lib/`.
 
-## Solution project list (`CobolSharp.sln`)
+## Solution project list (`Cobol.Net.sln`)
 Greenfield `Cobol.Net.*`: **Frontend**, **Editions** (shared lowest leaf), **Compiler**, **Compiler.SourceGen**
 (source generator), **Cli** (exe `cobol`), **Runtime**, and tests **Unit / Conformance / Characterization**. Legacy
 (differential oracle until G8): `CobolSharp.Compiler / Runtime / CLI` + `CobolSharp.Tests.Unit / Integration`. See

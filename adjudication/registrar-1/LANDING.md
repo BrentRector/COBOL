@@ -63,7 +63,7 @@ selector data, 126 A.1 rows held on an owner decision, 14 new kb/Work notes.
   PB1524 by code reading); PB1529 and PB1531 re-probed too.
 - **CONFORMS test-needed** (golden lane): recorded — none (SR-13.18.27.3-1 closed on its witnesses). Held in
   `batch-doc.json`: DOC-A.1-69, DOC-A.1-169, DOC-A.1-220.
-- **Gate.** `work.py check` clean; `dotnet build CobolSharp.sln -c Debug` green; filtered gate
+- **Gate.** `work.py check` clean; `dotnet build Cobol.Net.sln -c Debug` green; filtered gate
   `SpecTraceabilityInventory|DefectiveRowCoverage|DerivedVerdict|AnnexA1|WorkRegister` **50/50**; Unit
   `~Drift|~Inventory|~Schema|~Derivation` **26586/26586**; `audit_annex_a1 --self-test` all green;
   `gen_conformance_notes --check` 15 notes match; `work.py parity` no findings. The full Conformance assembly was NOT run
@@ -119,7 +119,7 @@ over-rejection the refuter proved for 42) and replaced row 187's "PB-new" placeh
 - **Drift test moved, not weakened:** `DerivedVerdictDriftTests.TheA1OptionalNotProvidedSelector_IsStillSharp` used item 7 as its
   "optional but undetermined" anchor and turned red when item 7's row landed — exactly its own message's instruction; the anchor is
   now item 67, and item 7's selection is asserted. `inventory-schema.json`'s selector narrative re-measured (8 selected).
-- **Gate (this branch):** `dotnet build CobolSharp.sln -c Debug` 0 warnings 0 errors; filtered unit gate
+- **Gate (this branch):** `dotnet build Cobol.Net.sln -c Debug` 0 warnings 0 errors; filtered unit gate
   (SpecTraceabilityInventory|DefectiveRowCoverage|DerivedVerdict|AnnexA1|WorkRegister|Conformance) **Passed 80 / 80**;
   ClosesRowsBackLink|VaultReference|WorkFrontmatter 5 / 5; `work.py check` well-formed; `gen_conformance_notes.py` regenerated
   (1627 GAP); `audit_witness_loss.py --check` GREEN.

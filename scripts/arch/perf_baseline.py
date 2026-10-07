@@ -231,7 +231,7 @@ def load_sample() -> dict:
 def release_exe(project_dir: str, name: str) -> str:
     exe = os.path.join(project_dir, "bin", "Release", "net10.0", name + (".exe" if os.name == "nt" else ""))
     if not os.path.exists(exe):
-        raise MeasurementError(f"{exe} is missing: build CobolSharp.sln in Release first (or drop --no-build)")
+        raise MeasurementError(f"{exe} is missing: build Cobol.Net.sln in Release first (or drop --no-build)")
     return exe
 
 
@@ -749,8 +749,8 @@ def main(argv: list[str]) -> int:
     sessions = args.sessions or (1 if args.against else 2)
     try:
         if not args.no_build:
-            print("building CobolSharp.sln (Release) ...", flush=True)
-            run_cmd(["dotnet", "build", os.path.join(ROOT, "CobolSharp.sln"), "-c", "Release", "-nologo", "-v:q"], cwd=ROOT)
+            print("building Cobol.Net.sln (Release) ...", flush=True)
+            run_cmd(["dotnet", "build", os.path.join(ROOT, "Cobol.Net.sln"), "-c", "Release", "-nologo", "-v:q"], cwd=ROOT)
         cond = conditions()
         if cond["dirty_src"]:
             raise MeasurementError("src/ has uncommitted changes: a baseline must name the product it measured")

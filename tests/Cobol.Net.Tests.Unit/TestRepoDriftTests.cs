@@ -11,7 +11,7 @@ namespace CobolNet.Tests.Unit;
 /// <remarks>
 /// <para>
 /// This existed as NINETEEN private root-finders across five test projects, in SEVEN mechanisms: walkers keyed on
-/// <c>CobolSharp.sln</c>, on <c>tests/version-matrix</c>, on <c>tests/nist</c>, on <c>src/Cobol.Net.Compiler</c>,
+/// <c>Cobol.Net.sln</c>, on <c>tests/version-matrix</c>, on <c>tests/nist</c>, on <c>src/Cobol.Net.Compiler</c>,
 /// on <c>PROMPT.md</c> and on <c>.git</c>, plus two sites that counted <c>".."</c> hops up from the output
 /// directory. None was wrong on the day it was written; they accumulated, because writing a six-line walker is
 /// cheaper in the moment than finding the one that already exists. That is how a duplicated rule grows back, so
@@ -72,7 +72,7 @@ public sealed class TestRepoDriftTests
     [Fact]
     public void TestRepoRoot_IsThisRepository()
     {
-        Assert.True(File.Exists(TestRepo.At("CobolSharp.sln")), $"no CobolSharp.sln at {TestRepo.Root}");
+        Assert.True(File.Exists(TestRepo.At("Cobol.Net.sln")), $"no Cobol.Net.sln at {TestRepo.Root}");
         Assert.True(Directory.Exists(TestRepo.Src("Cobol.Net.Compiler")), "src/Cobol.Net.Compiler is missing");
         Assert.True(File.Exists(TestRepo.VersionMatrix("constructs.json")), "constructs.json is missing");
         Assert.True(File.Exists(TestRepo.Nist("corpus.tsv")), "tests/nist/corpus.tsv is missing");

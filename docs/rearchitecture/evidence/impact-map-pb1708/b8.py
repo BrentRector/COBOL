@@ -3,7 +3,7 @@
     python b8.py <Assembly.list.txt> <Assembly.trx> [<Assembly.list.txt> <Assembly.trx> ...] > b8.txt
 
 INPUTS NOT IN THE REPOSITORY: produced on ONE build of this checkout (2026-09-28, the reviser's worktree):
-    dotnet build CobolSharp.sln
+    dotnet build Cobol.Net.sln
     dotnet test tests/Cobol.Net.Tests.<A> --no-build --list-tests > <A>.list.txt
     dotnet test tests/Cobol.Net.Tests.<A> --no-build --logger "trx;LogFileName=<A>.trx"
 The gate's population check (DESIGN-test-build-ci.md §3.14.4) compares exactly these two multisets, so any

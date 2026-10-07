@@ -3,7 +3,7 @@
   <!--
     The impact recorder's IL rewriter (kb/Work PB1683; docs/rearchitecture/DESIGN-test-build-ci.md §3.13). Built and
     run ONLY by scripts/spec/record_impact_map.py, in its own detached worktree, over a recording build — never part
-    of CobolSharp.sln, never shipped. TFM, nullable and warnings-as-errors come from Directory.Build.props.
+    of Cobol.Net.sln, never shipped. TFM, nullable and warnings-as-errors come from Directory.Build.props.
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>

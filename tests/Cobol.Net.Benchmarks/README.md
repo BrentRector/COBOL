@@ -29,7 +29,7 @@ BenchmarkDotNet requires **Release**. A Debug build compiles and runs, but it me
 harness says so; the numbers below are Release only. From the repository root:
 
 ```
-dotnet build CobolSharp.sln -c Release
+dotnet build Cobol.Net.sln -c Release
 dotnet run -c Release --project tests/Cobol.Net.Benchmarks -- --filter *Collation*
 ```
 
@@ -150,7 +150,7 @@ Unlike `Compare`, this **must** allocate: every level is materialized and nothin
 
 ## Results
 
-Two runs on **2026-08-18**, same host, `dotnet build CobolSharp.sln -c Release` followed by the filtered run above,
+Two runs on **2026-08-18**, same host, `dotnet build Cobol.Net.sln -c Release` followed by the filtered run above,
 on an otherwise-idle developer workstation. **Run 1** is the engine as first landed (DEVLOG 1326); it found the
 long-key outlier that became the identical-prefix skip (DEVLOG 1327). **Run 2** is the engine after that skip, with
 the COBOL-layer carrier category added. Both pasted verbatim, including the host description BenchmarkDotNet prints.

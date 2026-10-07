@@ -1,6 +1,6 @@
 # registrar-1 gate — 2026-09-24 22:59 UTC — batch-nondoc + batch-r42 recorded, R42 selector arms, notes PB1523-PB1536
 python scripts/spec/work.py check: ✓ 1473 work items, all well-formed
-dotnet build CobolSharp.sln -c Debug: Build succeeded, 0 errors
+dotnet build Cobol.Net.sln -c Debug: Build succeeded, 0 errors
 
 ## filtered gate: SpecTraceabilityInventory|DefectiveRowCoverage|DerivedVerdict|AnnexA1|WorkRegister
 ### before the R42 selector arms (batches applied only):

@@ -69,6 +69,6 @@ try { Directory.Delete(scratch, recursive: true); } catch (IOException) { }
 static string FindRepo(string dir)
 {
     for (var d = new DirectoryInfo(dir); d is not null; d = d.Parent)
-        if (File.Exists(Path.Combine(d.FullName, "CobolSharp.sln"))) return d.FullName;
-    throw new DirectoryNotFoundException("CobolSharp.sln not found above " + dir);
+        if (File.Exists(Path.Combine(d.FullName, "Cobol.Net.sln"))) return d.FullName;
+    throw new DirectoryNotFoundException("Cobol.Net.sln not found above " + dir);
 }

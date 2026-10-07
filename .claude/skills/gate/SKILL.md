@@ -20,7 +20,7 @@ in minutes, and a gate slot caps how many run at once.
 ## Always first
 
 ```
-dotnet build CobolSharp.sln -c Debug
+dotnet build Cobol.Net.sln -c Debug
 ```
 
 Build the **solution**, not one project. Building only the compiler project and then running `dotnet test
