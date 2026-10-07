@@ -18,21 +18,17 @@
   Classes available: .flight (the accent panel), .cardgrid + .card, .pill.good/.warn/.crit, .mono, .num, .dim.
 -->
   <div class="flight">
-    <h3>In flight — Wednesday 2026-10-07, before dawn</h3>
-    <p><strong>The legacy byte engine is gone from <span class="mono">main</span>.</strong> On Monday night the owner decided the completion plan (<span class="mono">kb/Work R69</span>): delete the CobolSharp engine now rather than at v1.0, start the architecture review's measurement and design ahead of zero GAP, mandate the removal of dead and obsolete code, and keep the frontier model to the one design artifact that earns it. Trains <span class="pill good">1025</span> and <span class="pill good">1027</span> carried the two cuts: no test, script or CI job runs the engine, and then its five project trees and every reference to them. The annotated tag <span class="mono">legacy-byte-engine-final</span> marks the last commit that holds it; nothing in the build depends on it any more.</p>
-    <p><strong>The review's instruments landed in train <span class="pill good">1026</span>:</strong> a Roslyn census of every type, clone family, unreachable member and dead artifact in the greenfield compiler; a behavior-neutrality oracle that hashes the emitted C# of every program the suites compile and the diagnostics of every negative fixture, so a restructuring wave can prove it changed nothing; a performance baseline measured against GnuCOBOL, which already shows where the typed-native storage model and the unindexed indexed-file connector cost; and a planner that can dispatch a named campaign cluster, not only harm-flagged defects.</p>
-    <p><strong>Running now:</strong> the second retirement wave — the prose and comment sweep, the solution file's rename, the SUBSCRIPT lexer mode's removal in favour of interpreted grammar rules (the D10 ruling, blocked for months by the frozen oracle), and the unification of the grammar alternatives that oracle forced. The Sonnet and Opus groups are sized per item; one lander lands them as a train.</p>
-    <p><strong>Waiting on the owner:</strong> the review's target architecture (R1) is to be authored by Mythos 5.1 and needs the owner's explicit approval for that one dispatch; PB643 (RESERVE areas at run time) still needs a reading of the unbuffered shared-writer posture.</p>
-    <p><strong>Then:</strong> the orchestrator loop takes the fix lane and the external-repository slices, within the owner's pacing for this week — all lanes until the weekly meter reads 85 %, and never past the session window.</p>
+    <h3>In flight — Wednesday 2026-10-07, morning</h3>
+    <p><strong>The legacy byte engine is gone from <span class="mono">main</span>.</strong> The retirement the owner decided on Monday night (<span class="mono">kb/Work R69</span>) has landed except for two pieces, both running in the orchestrator loop's campaign lane: the second half of the D10 ruling, which moves subscript and reference-modification positions off a bind-time C# string and onto the bound tree (<span class="mono">PB2151</span>), and the behavior-neutrality oracle's 39 differences from the two trains that carried D10 and the grammar unification, each to be explained or fixed before the baseline is trusted (<span class="mono">PB2152</span>). The tag <span class="mono">legacy-byte-engine-final</span> keeps the engine's last commit.</p>
+    <p><strong>The architecture review's instruments are in.</strong> R0's census, oracle and performance baseline landed, and the census's findings were filed as the review program's waves; the section above reads their standing straight off the register.</p>
+    <p><strong>R1, the target architecture, is in its third draft.</strong> Mythos 5.1 wrote it on the owner's approval for that one dispatch. An Opus refuter broke it twice and it was revised twice; Draft 3 is being written now. The owner took one decision on it this morning: the namespace roots become the project names (<span class="mono">Cobol.Net.Compiler</span>, <span class="mono">Cobol.Net.Frontend</span>, <span class="mono">Cobol.Net.Editions</span>, <span class="mono">Cobol.Net.Cli</span>), reversing PROJECT_ORG §1.1.</p>
+    <p><strong>Running now:</strong> the orchestrator loop runs the fix lane, train after train, up to the owner's 85 % weekly cap and never past the session window.</p>
+    <p><strong>Queued:</strong> R1 lands once the owner approves Draft 3, and the Delete program's first waves follow it.</p>
   </div>
   <div class="cardgrid">
     <div class="card">
-      <h3>Measured this night</h3>
-      <p>The retirement's two cuts and the four review instruments ran as four hand-dispatched waves beside each other; each landed green on Windows, Linux and CI. One launch collided with a commit in the main checkout and was re-dispatched alone, which is now a written rule.</p>
-    </div>
-    <div class="card">
       <h3>Owner decisions this week</h3>
-      <p>Delete the legacy engine now; split the review's start; dead code goes; Mythos follows the Fable rule; run all work to 85 % of the week then pause; never exceed the session window; remove a worktree only after its work is committed and landed; a scoped rule lets an agent remove a tree inside its own worktree.</p>
+      <p>Delete the legacy engine now; split the review's start; dead code goes; Mythos follows the Fable rule; every model is dispatched at its latest version; run all work to 85 % of the week, then pause; never exceed the session window; remove a worktree only after its work is committed and landed.</p>
     </div>
     <div class="card">
       <h3>History</h3>
