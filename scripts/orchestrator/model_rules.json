@@ -14,7 +14,7 @@
     "weekly_reset": {"weekday": 6, "hour": 3, "minute": 0, "tz": "America/Los_Angeles", "_weekday": "Python weekday(): Monday 0 ... Sunday 6"},
     "daily_pct": 14.3,
     "weekly_cap_pct": 97,
-    "weekly_cap_source": "owner 2026-10-07 09:40 PDT: \"raise session and weekly quota limits to 97%\" (kb/Work R69 section 6); it replaced the 85 % cap of the same morning (06:00), which had replaced the 98 % ceiling of 2026-10-02 and the 44 % cap on other work of 2026-10-05",
+    "weekly_cap_source": "owner 2026-10-07 09:40 PDT: \"raise session and weekly quota limits to 97%\" (kb/Work R69 section 6); it replaced the 85 % cap of the same morning (06:00), which had replaced the 98 % ceiling of 2026-10-02 and the 44 % cap on other work of 2026-10-05. Owner 10:15 PDT: \"You can push it to 100% as long as you do not cause any work to abort due to lack of quota\" — 100 is the CEILING; 97 is the DISPATCH cap, 100 minus the margin one wave's estimate can be wrong by (tokens_per_point and session_pct_per_weekly_pct are unrefit guesses), so what is in flight at 97 finishes inside the quota instead of dying at 100. Refitting the estimator shrinks the margin; the ceiling does not move",
     "session_soft_stop_pct": 97,
     "session_hard_stop_pct": 99,
     "session_stop_source": "owner 2026-10-07 09:40 PDT: the session limit is 97 % (the soft stop, where dispatching holds and in-flight agents checkpoint); the hard stop stays two points above it so a hold always precedes a kill; before that 70/90 from the 2026-10-04 design (kb/Work PB1981)",

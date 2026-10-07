@@ -26,7 +26,7 @@ predecessors.
 PB2118 and the loop's wave of six Opus implementers were running together), so the attended session set the STOP under the
 70 % rule; the loop wound its wave unit down and the reviser finished with a green gate before the stop reached it. The owner
 raised both limits at 09:40 and the STOP was cleared at 09:45 (meter: weekly 79 %, session 76 %). The rule the limits serve
-is unchanged: never exceed the session window, because an aborted job wastes the quota it spent.
+is unchanged: never exceed the session window, because an aborted job wastes the quota it spent. At 10:15 the owner added "You can push it to 100% as long as you do not cause any work to abort due to lack of quota": 100 is the ceiling, 97 the dispatch cap (the ceiling minus one wave's estimation margin), so in-flight work finishes inside the last three points.
 
 ## Entry 1916 — 2026-10-07 07:57 PDT — Train 1031b: three wave-1031 clusters land (G PB2040+PB1291+PB1189+PB666, F PB989 external-repository slice 6, H PB812+PB1545+PB895+PB1567); PB600 retired, PB733 discharged; GAP 162 → 158
 
