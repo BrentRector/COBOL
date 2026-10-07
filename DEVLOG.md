@@ -13,6 +13,21 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1917 — 2026-10-07 09:49 PDT — Quota limits raised to 97 % (owner): the weekly cap and the session soft stop; the 09:06 STOP cleared
+
+**What changed.** The owner at 09:40: "raise session and weekly quota limits to 97%". `scripts/orchestrator/model_rules.json`
+now carries `weekly_cap_pct` 97 (was 85 since 06:00 today) and `session_soft_stop_pct` 97 (was 70), with `session_hard_stop_pct`
+99 so a hold still precedes a kill; each constant restates its date and source. `test_budget.py` checks the cap at 97 and the
+hold-session at a 95 % anchor. MANDATORY-PRACTICES O3 names the two constants instead of the old "~85 % session STOP";
+`DESIGN-orchestrator-loop.md` and plan §0 read the new numbers; kb/Work R69 §6 records the decision under its two
+predecessors.
+
+**Why it mattered this morning.** At 08:50 the session meter read 71 % (53 % twenty minutes earlier: the Draft 3 reviser of
+PB2118 and the loop's wave of six Opus implementers were running together), so the attended session set the STOP under the
+70 % rule; the loop wound its wave unit down and the reviser finished with a green gate before the stop reached it. The owner
+raised both limits at 09:40 and the STOP was cleared at 09:45 (meter: weekly 79 %, session 76 %). The rule the limits serve
+is unchanged: never exceed the session window, because an aborted job wastes the quota it spent.
+
 ## Entry 1916 — 2026-10-07 07:57 PDT — Train 1031b: three wave-1031 clusters land (G PB2040+PB1291+PB1189+PB666, F PB989 external-repository slice 6, H PB812+PB1545+PB895+PB1567); PB600 retired, PB733 discharged; GAP 162 → 158
 
 **Group G (sequential I-O binder, lead PB1189).** Four mechanisms, one shared theme: an operand position that the grammar parses as a superset. *PB2040*: a file-name operand was resolved from ANTLR's glued `GetText()`, so `OPEN OUTPUT A OF B` opened the file `AOFB` and `SORT S OF X … USING F OF Y` dropped both qualifiers in silence. `StatementValidation.ResolveFile` now takes the parse node (a `fileName` overload and a `dataReference` overload), and the one `ScreenFileNameOperand` refuses a qualified, subscripted, reference-modified or special-register file-name by name (COBOLNET2972; §8.4.2.2.2 gives a file-name no qualified format). The arms it fixed: OPEN, MERGE, the SORT subject (the base word decides file or table first, then the screen runs), SORT/MERGE USING/GIVING, EXCEPTION-FILE(-N) and the APPLY COMMIT operand list. *PB1291*: §13.4.6.3 SR4 ("A record description entry associated with file-name-1 shall not be specified in an input-output statement other than following the word FROM or the word INTO") is asked once per input-output statement from the `StatementBinder` funnel (COBOLNET2973). The implementer's determination, which I accept: "input-output statement" means §9.1.13.1's eight, since otherwise SR4 would forbid `RELEASE sd-record` itself. *PB1189*: `WRITE … ADVANCING mnemonic-name LINES` is refused (COBOLNET2269) instead of the word being dropped. *PB666*: the PB371 APPLY COMMIT family turned out to be live under `--permissive`, because COBOLNET1709 is PermissiveInert, so its six syntax rules now report through `DataBinder.ScreenApplyCommitSubject` (COBOLNET2974). *PB600* did not reproduce (PB347 refuses it with COBOLNET1757) and is retired; its REWRITE twin golden is added. Rows: FMT-14.9.51.2 and SR-13.4.6.3-4 DIVERGES → CONFORMS, seven more restated with code and witness.

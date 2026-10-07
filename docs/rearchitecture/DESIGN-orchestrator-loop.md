@@ -237,7 +237,7 @@ registered by this change (open decision D2).
 | a unit ends with a Workflow in flight | the agents die with the process | the wave unit stays alive until its lander landed; on a cap it stops the fleet gracefully first (section 3.1) |
 | a unit guesses an owner decision | a wrong irreversible landing | `owner_question` in the handoff stops the loop |
 | the quota runs out mid-week | the owner's other work (the TENET project) is starved | `budget.py`: `hold-day` at the cumulative daily allowance, `stop-week` at the weekly cap |
-| the 5-hour session window runs out mid-unit | a unit killed at the limit | `hold-session` at the soft stop (70 %) before a unit starts |
+| the 5-hour session window runs out mid-unit | a unit killed at the limit | `hold-session` at the soft stop (`session_soft_stop_pct`, 97 % since 2026-10-07) before a unit starts |
 | two sessions allocate the same id or code | a renumbering pass (five collisions in one day, 2026-09) | `alloc.py`: one lock, reservations outside every worktree |
 | a landing reopens a closed inventory row | silent conformance regression | `inventory_ratchet.py` (section 7) |
 | the owner wants it stopped | losing agent work if the process were killed | `STOP` (`stop.ps1`): a graceful wind-down of the running unit and its fleet, a kill only after the grace period |
@@ -343,11 +343,11 @@ D5), because it changes the landing contract.
   in `counted_token_kinds`).
 - **Weekly estimate** = anchor weekly % + points since the anchor.
 - **Allowance** = day N × 14.3 % (day 1 starts at the Sunday 03:00 reset), plus `--borrow-days` days the owner
-  allowed, capped at the weekly cap (`weekly_cap_pct`, 98 by the owner's 2026-10-02 instruction).
+  allowed, capped at the weekly cap (`weekly_cap_pct`, 97 by the owner's 2026-10-07 instruction, kb/Work R69 §6).
 - **Session estimate** = the anchor's session % (when its `session_reset` is still in the future) plus points since
   the anchor × `session_pct_per_weekly_pct`; after the reset it starts from 0 at the reset.
 - **Decision**: `stop-week` when weekly ≥ the cap; `hold-day` when weekly ≥ the allowance; `hold-session` when the
-  session estimate ≥ the soft stop (70 %); else `go`. The hard stop (90 %) is reported as `session_hard_stop_pct`
+  session estimate ≥ the soft stop (97 %); else `go`. The hard stop (99 %) is reported as `session_hard_stop_pct`
   (the supervisor does not yet act on it inside a unit; the soft stop before each unit is the guard). `resume_at`
   names when a hold ends.
 - Output: `{weekly_est_pct, allowance_pct, headroom_pct, session_est_pct, decision, resume_at, week_start, day,
