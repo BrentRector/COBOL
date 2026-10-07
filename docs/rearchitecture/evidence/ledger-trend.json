@@ -1360,6 +1360,83 @@
       "dns": 457,
       "label": "PB1042: dynamic tables and d",
       "battery": null
+    },
+    {
+      "sha": "22a4f183",
+      "date": "2026-10-07",
+      "gap": 170,
+      "closed": 4177,
+      "dns": 457,
+      "label": "PB1229: compile-time arithme",
+      "battery": null
+    },
+    {
+      "sha": "cad6957d",
+      "date": "2026-10-07",
+      "gap": 167,
+      "closed": 4180,
+      "dns": 457,
+      "label": "PB434+PB387: UNTIL EXIT with",
+      "battery": null
+    },
+    {
+      "sha": "8a22e2a3",
+      "date": "2026-10-07",
+      "gap": 164,
+      "closed": 4183,
+      "dns": 457,
+      "label": "PB397: EXIT alone, GO TO and",
+      "battery": null
+    },
+    {
+      "sha": "911246a6",
+      "date": "2026-10-07",
+      "gap": 162,
+      "closed": 4185,
+      "dns": 457,
+      "label": "PB2093+PB545+PB552: one C# n",
+      "battery": null
+    },
+    {
+      "sha": "86111033",
+      "date": "2026-10-07",
+      "gap": 160,
+      "closed": 4187,
+      "dns": 457,
+      "label": "PB2040+PB1291+PB1189+PB666+P",
+      "battery": null
+    },
+    {
+      "sha": "7c72ac5e",
+      "date": "2026-10-07",
+      "gap": 159,
+      "closed": 4188,
+      "dns": 457,
+      "label": "PB989 (F): REPOSITORY detail",
+      "battery": null
+    },
+    {
+      "sha": "2851c3d3",
+      "date": "2026-10-07",
+      "gap": 158,
+      "closed": 4189,
+      "dns": 457,
+      "label": "PB812+PB1545+PB895+PB1567+PB",
+      "battery": null
+    }
+  ],
+  "program": [
+    {
+      "sha": "c67dec7c",
+      "date": "2026-10-07",
+      "total": 118,
+      "landed": 11,
+      "open": 107,
+      "waiting": 0,
+      "retire_landed": 8,
+      "retire_total": 10,
+      "external_landed": 2,
+      "external_total": 8
     }
   ]
 }
