@@ -26,6 +26,7 @@ BRIEFS = {
     'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'BUILD-LOCAL GATE: GREEN',
                              r'FIX WHAT YOU FIND'],  # I9
     'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN',
+                              r'compare_oracle',  # PB2152 (L11): the R0 oracle runs after every train's gate
                               r'-Mode lander',  # PB1721 (L2): the lander's gate is the whole population, one leg
                               r'linux-gate\.sh'],  # PB1732 (L10): CI's Linux legs under WSL before push-main
     'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'-Mode lander'],  # PB1732 (L10); PB1721 (L2)
