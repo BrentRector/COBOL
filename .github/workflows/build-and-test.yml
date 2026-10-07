@@ -23,9 +23,7 @@ on:
     branches: [ main, 'ci/**' ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:        # manual trigger — lets the opt-in legacy-oracle bake-verify cross-check be run on demand
-  schedule:
-    - cron: '0 6 * * *'     # nightly 06:00 UTC — runs the legacy-oracle cross-check without a legacy run on every PR
+  workflow_dispatch:        # manual trigger — a full-matrix run on demand
 
 # ⛔ A PUSH IS NEVER CANCELLED — ITS RUN IS THAT COMMIT'S ONLY VERDICT. With a required per-commit check a
 # cancelled run leaves its sha permanently unlandable (`cancelled` is not `success`), and it is the failure mode
@@ -105,7 +103,7 @@ jobs:
           ZERO=0000000000000000000000000000000000000000
           code=true; verified=false; reason=""; BASE=""
           if [ "$EVENT" != "push" ]; then
-            reason="event=$EVENT — a pull_request / schedule / dispatch run is always the full matrix"
+            reason="event=$EVENT — a pull_request / dispatch run is always the full matrix"
           else
             if [ -n "${BEFORE:-}" ] && [ "$BEFORE" != "$ZERO" ] \
                && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null \
@@ -292,14 +290,13 @@ jobs:
   # runner's cores (JOBS defaults to nproc) with a per-suite isolation model PROVEN equivalent to the serial
   # guard by scripts/guard-verify.sh (which diffs the per-test verdicts). Linux only — the NIST loop is bash. A
   # non-zero exit (any REGRESSION, DIFF, FAIL*, or build warning) fails the job.
-  # ⛔ IT MEASURES WiseOwl COBOL SINCE kb/Work/PB750. The NIST leg used to drive the LEGACY `cobolsharp.dll`, whose
+  # ⛔ IT MEASURES WiseOwl COBOL SINCE kb/Work/PB750. The NIST leg used to drive the legacy byte engine's CLI, whose
   # project graph has no code generator, so this job's green said nothing about the shipping compiler; it now
   # drives `cobol` (src/Cobol.Net.Cli), refuses to start if the resolved binary does not reference
-  # Cobol.Net.Compiler, and names the compiler in its `=== NIST (cobol): … ===` line. The legacy oracle is
-  # reachable through the same leg with COBOLSHARP_LEGACY_DIFFERENTIAL=1 — a differential, never the gate.
-  # The legacy unit + integration legs remain: they gate CobolSharp.Compiler and the SHARED Cobol.Net.Frontend. ──
+  # Cobol.Net.Compiler, and names the compiler in its `=== NIST (cobol): … ===` line. The legacy engine's own
+  # Unit and Integration legs and its exemption list were retired from this job with the engine (kb/Work PB2109). ──
   guard:
-    name: Guard (WiseOwl COBOL NIST + legacy unit + integration, parallel)
+    name: Guard (WiseOwl COBOL NIST, parallel)
     needs: changes
     if: needs.changes.outputs.run_matrix == 'true'
     runs-on: ubuntu-26.04
@@ -319,13 +316,13 @@ jobs:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
           restore-keys: ${{ runner.os }}-nuget-
-      # guard-fast.sh restores + builds the compiler under test AND the legacy test projects itself, creates
-      # tests/nist/output, and copies the runtime DLL there; a fresh checkout needs no extra prep.
+      # guard-fast.sh restores + builds the compiler under test itself, creates tests/nist/output, and copies the
+      # runtime DLL there; a fresh checkout needs no extra prep.
       - name: Run parallel guard (scripts/guard-fast.sh)
         run: bash scripts/guard-fast.sh
 
-  # ── The greenfield WiseOwl COBOL compiler (src/Cobol.Net.*) suites — the ACTIVE work (differential vs the legacy
-  # oracle + the NIST byte-baselines + the version matrix + unit). The guard job's NIST leg drives the same
+  # ── The greenfield WiseOwl COBOL compiler (src/Cobol.Net.*) suites — the ACTIVE work (the committed differential
+  # goldens + the NIST byte-baselines + the version matrix + unit). The guard job's NIST leg drives the same
   # compiler (PB750) over the CLI, from bash, on Linux only; these jobs cover the in-process compile path, both
   # OSes, and everything outside NIST, so they stay a separate gate (DEVLOG 515). Each job builds its own test project(s) then runs --no-build. The
   # Frontend's ANTLR generation needs java + pwsh (both preinstalled on the runner images); Generated/ is a PURE
@@ -635,8 +632,8 @@ jobs:
           retention-days: 14
 
   # ── Cross-platform sanity: a clean Release build (TreatWarningsAsErrors — a new analyzer warning fails the
-  # build) plus the legacy + greenfield suites on Windows. The NIST guard is Linux-only (bash), so this job gives
-  # the Windows build + managed-test coverage the guard job cannot. ──
+  # build) plus the greenfield suites on Windows. The NIST guard is Linux-only (bash), so this job gives the
+  # Windows build + managed-test coverage the guard job cannot. ──
   windows-build-test:
     name: Windows build + tests
     needs: changes
@@ -658,10 +655,6 @@ jobs:
           restore-keys: ${{ runner.os }}-nuget-
       - name: Build (Release, warnings-as-errors)
         run: dotnet build CobolSharp.sln --configuration Release
-      - name: Unit tests
-        run: dotnet test tests/CobolSharp.Tests.Unit/CobolSharp.Tests.Unit.csproj --no-build --configuration Release --logger "trx;LogFileName=legacy-unit.trx" --results-directory TestResults/${{ runner.os }}-build-test
-      - name: Integration tests
-        run: dotnet test tests/CobolSharp.Tests.Integration/CobolSharp.Tests.Integration.csproj --no-build --configuration Release --logger "trx;LogFileName=legacy-integration.trx" --results-directory TestResults/${{ runner.os }}-build-test
       # Greenfield conformance moved to the windows-conformance SHARDED job (kb/Work A14) — same coverage,
       # a third of the wall time; the population guard proves nothing fell between the shards.
       # GPL corpus fetched on demand for the PB209 population drift gate — see the Linux job's twin. (PB277)
@@ -686,56 +679,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # ── The opt-in legacy-oracle bake-verify cross-check (rearch P0). The normal battery now compares WiseOwl COBOL to the
-  # COMMITTED goldens under tests/differential/ (COBOLNET_DIFF_MODE=golden, the default) and never runs the legacy
-  # engine — so the greenfield jobs above stay green after the G8 deletion of CobolSharp.Compiler. This job re-proves
-  # the goldens still equal a LIVE legacy run (COBOLNET_DIFF_MODE=verify asserts cobolnet == legacy AND cobolnet ==
-  # golden for every converted differential case), which is the whole point of keeping the legacy engine alive through
-  # the rearchitecture. It runs NIGHTLY + on manual dispatch (NOT on every PR — that would re-couple CI to the legacy
-  # engine, undoing this phase). DELETED at G8 together with the legacy projects, not now. ──
-  legacy-oracle:
-    name: Legacy-oracle bake-verify cross-check (opt-in — nightly / manual)
-    needs: changes
-    if: needs.changes.outputs.run_matrix == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-26.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: false
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: 10.0.x
-      - name: Cache NuGet packages
-        uses: actions/cache@v6
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
-          restore-keys: ${{ runner.os }}-nuget-
-      - name: Build the conformance project (drives both engines)
-        run: dotnet build tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj
-      # ⛔ THE EXCLUSION IS THE HALF THAT ROTS SILENTLY (kb/Work PB752). A dead POSITIVE term makes this leg run
-      # nothing and still exit 0; a dead NEGATION quietly stops excluding and drags the NIST families back in.
-      # The guard probes a negated term through its POSITIVE form — asking vstest for `!~X` returns the whole
-      # assembly and would call a stale exclusion live — so both halves of this two-term filter are asserted.
-      # This leg runs on schedule/dispatch only, so a silent zero-test run here is seen by fewer people.
-      - name: Assert the legacy-oracle filter selects a real population (kb/Work PB752)
-        run: python3 scripts/filter_population.py --filter "FullyQualifiedName~DifferentialTests&FullyQualifiedName!~NistDifferentialTests" --filtered tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj
-      # verify mode: each converted funnel asserts cobolnet == legacy AND cobolnet == golden — a live-legacy run must
-      # still match every baked golden. Nist* excluded (it compares to NIST goldens directly, not via DifferentialGolden).
-      - name: Differential verify (cobolnet == legacy == golden)
-        env:
-          COBOLNET_DIFF_MODE: verify
-        run: dotnet test tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj --no-build --filter "FullyQualifiedName~DifferentialTests&FullyQualifiedName!~NistDifferentialTests" --logger "trx;LogFileName=legacy-oracle.trx" --results-directory TestResults/${{ runner.os }}-legacy-oracle
-      - name: Upload test results (TRX)
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-results-${{ runner.os }}-legacy-oracle
-          path: TestResults/${{ runner.os }}-legacy-oracle/*.trx
-          if-no-files-found: ignore
-          retention-days: 14
-
   # ── ⛔ `ci-gate` IS THE ONE STABLE CHECK NAME `main`'s branch protection REQUIRES (owner decision 2026-09-06
   # on question 23, kb/Work/PB796). Nothing else in this file can be that name:
   #   • the conformance jobs are MATRICES — their check names carry the shard value (`Greenfield conformance
@@ -751,7 +694,7 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [changes, audits, guard, greenfield-conformance, greenfield-unit, windows-conformance, conformance-population, inv1-strong-2023, windows-build-test, legacy-oracle]
+    needs: [changes, audits, guard, greenfield-conformance, greenfield-unit, windows-conformance, conformance-population, inv1-strong-2023, windows-build-test]
     runs-on: ubuntu-26.04
     steps:
       - name: Verdict

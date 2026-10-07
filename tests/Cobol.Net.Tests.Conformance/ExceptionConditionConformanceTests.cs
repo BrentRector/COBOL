@@ -16,7 +16,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class ExceptionConditionConformanceTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(2023);
+    private static readonly CobolNetCompiler CobolNet = new(2023);
 
     /// <summary>Compile-and-run on the greenfield compiler at 2023; assert the spec-derived stdout.</summary>
     private static void AssertSpec(string source, string expected)

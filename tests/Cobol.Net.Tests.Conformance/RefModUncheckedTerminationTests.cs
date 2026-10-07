@@ -21,7 +21,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class RefModUncheckedTerminationTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(2023);
+    private static readonly CobolNetCompiler CobolNet = new(2023);
 
     /// <summary>A program holding CX = "ABCDE" and the position data items, running <paramref name="statements"/>
     /// between a BEFORE and an AFTER marker.</summary>

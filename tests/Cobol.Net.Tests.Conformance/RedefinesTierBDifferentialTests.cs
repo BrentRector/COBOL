@@ -13,7 +13,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class RedefinesTierBDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string ws, string proc) => $"""
         IDENTIFICATION DIVISION.
@@ -29,31 +29,31 @@ public sealed class RedefinesTierBDifferentialTests
 
     [Fact]
     public void NumericViewWrite_VisibleThroughAlphanumericOriginal()
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 WS-A PIC X(6).\n01 WS-B REDEFINES WS-A PIC 9(6).",
             "    MOVE 42 TO WS-B.\n    DISPLAY WS-A."));   // 000042 — numeric view formats into the shared backing
 
     [Fact]
     public void NumericViewRead_DecodesTheBacking()
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 WS-A PIC X(4) VALUE \"0025\".\n01 WS-B REDEFINES WS-A PIC 9(4).\n01 WS-C PIC 9(4).",
             "    MOVE WS-B TO WS-C.\n    ADD 5 TO WS-C.\n    DISPLAY WS-C."));   // 0030 — view read via ParseDisplay, then +5
 
     [Fact]
     public void AlphanumericView_OverNumericCanonical()
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 WS-A PIC 9(6) VALUE 123456.\n01 WS-B REDEFINES WS-A PIC X(6).",
             "    DISPLAY WS-B."));   // 123456 — the numeric canonical's image read as characters
 
     [Fact]
     public void WriteAlphanumericView_ReadNumericView_Coherent()
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 WS-A PIC X(6).\n01 WS-B REDEFINES WS-A PIC 9(6).",
             "    MOVE \"012345\" TO WS-A.\n    DISPLAY WS-B."));   // 012345 — one backing, both views agree
 
     [Fact]
     public void GroupView_PartialFields_AlphaAndNumeric()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-A PIC X(6) VALUE "AB1234".
             01 WS-B REDEFINES WS-A.
                05 WS-B1 PIC X(2).
@@ -63,7 +63,7 @@ public sealed class RedefinesTierBDifferentialTests
     [Fact]
     public void LargerRedefiner_SR8_ClassMaxWidth()
         // SR8: a level-01 non-EXTERNAL item may be redefined larger; the backing is sized to the class max (8).
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 WS-A PIC X(4) VALUE \"ABCD\".\n01 WS-B REDEFINES WS-A PIC X(8).",
             "    MOVE \"ABCDEFGH\" TO WS-B.\n    DISPLAY WS-B \"|\" WS-A."));   // ABCDEFGH|ABCD
 
@@ -71,7 +71,7 @@ public sealed class RedefinesTierBDifferentialTests
     public void InGroup_TierBBacking_NestedImage()
         // The CCVS COMPUTED-X shape: a REDEFINES class nested inside a group — the backing is a struct member, and the
         // outer group's AsImage counts it once (not the views).
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-REC.
                05 WS-HEAD PIC X(2) VALUE "HD".
                05 WS-X.
@@ -82,7 +82,7 @@ public sealed class RedefinesTierBDifferentialTests
 
     [Fact]
     public void OriginalValueSeedsTheBacking()
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 WS-A PIC X(6) VALUE \"SEEDED\".\n01 WS-B REDEFINES WS-A PIC X(3).",
             "    DISPLAY WS-A \"|\" WS-B."));   // SEEDED|SEE — only the original's VALUE inits (SR9)
 
@@ -90,7 +90,7 @@ public sealed class RedefinesTierBDifferentialTests
     public void FixedOccursValue_SeedsEveryOccurrence()
         // §13.18.63 GR9: every occurrence of a fixed-OCCURS entry takes the VALUE — the Tier-B backing seeds the
         // WHOLE canonical image ("ABABAB"), not one occurrence padded ("AB    "). Regression for ImageInitOf.
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 WS-G.\n   05 WS-E PIC XX OCCURS 3 VALUE \"AB\".\n01 WS-V REDEFINES WS-G PIC X(6).",
             "    DISPLAY WS-V."));   // ABABAB
 
@@ -99,7 +99,7 @@ public sealed class RedefinesTierBDifferentialTests
         // The CCVS BAIL-OUT shape: a nested Tier-B canonical referenced DIRECTLY from the PROCEDURE DIVISION (not via
         // the outer group's AsImage). The backing is a struct member, so its access must be qualified
         // (OUTER.GROUP._redef_X), not the bare field name — the bug NC101A's COMPUTED-A/CORRECT-A exposed.
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-REC.
                05 WS-X.
                   10 WS-A PIC X(4) VALUE "0042".
@@ -110,7 +110,7 @@ public sealed class RedefinesTierBDifferentialTests
     public void InGroup_WriteNestedNumericView_ReadNestedAlphaCanonical()
         // Write through a nested numeric view, read through the nested alphanumeric canonical — both directly from the
         // PROCEDURE DIVISION (the CCVS COMPUTED-N ← value, then COMPUTED-A read pattern).
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-REC.
                05 WS-X.
                   10 WS-A PIC X(6).
@@ -121,7 +121,7 @@ public sealed class RedefinesTierBDifferentialTests
     public void InGroup_CompareNestedViewToSpace()
         // The CCVS BAIL-OUT comparison: IF nested-canonical NOT EQUAL TO SPACE — a direct relational over a nested
         // Tier-B view, the exact form that drove NC101A's 304 unqualified-backing errors.
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-REC.
                05 WS-X.
                   10 WS-A PIC X(4) VALUE SPACE.

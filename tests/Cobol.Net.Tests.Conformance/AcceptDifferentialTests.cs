@@ -9,11 +9,10 @@ using CobolNet.Frontend.Preprocessor;
 namespace CobolNet.Tests.Conformance;
 
 /// <summary>
-/// ACCEPT (ISO §14.9.1) — SPEC-PINNED facts. These are not legacy-differential: the device form needs a piped
-/// stdin and the temporal forms a pinned clock (two seams the shared <c>ICompilerUnderTest</c> runner does not
-/// thread), and the temporal STORE rule is a place where the legacy deviates from the spec (it stored the
-/// temporal text left-justified-raw for every receiver; §14.9.1.4 GR6 says BY THE MOVE RULES — a numeric receiver
-/// decimal-aligns and keeps LOW-order digits). Every expected value below is derived from the cited general rule.
+/// ACCEPT (ISO §14.9.1) — SPEC-PINNED facts. These do not go through the shared <c>CobolNetCompiler</c> runner:
+/// the device form needs a piped stdin and the temporal forms a pinned clock, two seams it does not thread. The
+/// temporal STORE rule is §14.9.1.4 GR6: the text is stored BY THE MOVE RULES, so a numeric receiver
+/// decimal-aligns and keeps LOW-order digits. Every expected value below is derived from the cited general rule.
 /// The clock pins through the <c>COBOLNET_CLOCK</c> process seam (<c>AcceptSource.Now</c>'s default).
 /// </summary>
 public sealed class AcceptDifferentialTests

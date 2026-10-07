@@ -7,17 +7,11 @@ using CobolNet.Frontend.Preprocessor;
 namespace CobolNet.Tests.Conformance;
 
 /// <summary>
-/// Scaffold for the WiseOwl COBOL conformance / differential harness (docs/COBOLNET_DESIGN.md §2, §18.7).
+/// The conformance harness's smoke: the greenfield compiler driver compiles a trivial program through the
+/// compiled-program cache. The NIST corpus runs in <see cref="NistDifferentialTests"/> against
+/// <c>tests/nist/valid/*.txt</c>, and the differential cases in the <c>*DifferentialTests</c> classes against
+/// <c>tests/differential/</c> (<see cref="DifferentialGolden"/>).
 /// </summary>
-/// <remarks>
-/// The G5 build-out: an <c>ICompilerUnderTest { Compile+Run(src, dialect, nist?) }</c> abstraction with a
-/// <c>LegacyCompiler</c> (the byte-engine oracle, 364 NIST-green) and a <c>CobolNetCompiler</c> implementation,
-/// driven by a <c>DifferentialNistTests</c> theory that asserts
-/// <c>CobolNet stdout == Legacy stdout == tests/nist/valid/*.txt</c> for every NIST program — turning the legacy's
-/// 364 passing programs into an instant regression net for the greenfield compiler. Until the PC-dispatcher (G4)
-/// and the files/interprogram subsystems (G5) exist, the new compiler cannot run the CCVS corpus, so this file
-/// holds only a build-anchoring smoke. Do not add red NIST theories here before G5.
-/// </remarks>
 public sealed class DifferentialHarness
 {
     [Fact]

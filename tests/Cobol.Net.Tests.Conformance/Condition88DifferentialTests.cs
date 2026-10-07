@@ -11,7 +11,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class Condition88DifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string ws, string proc) => $"""
         IDENTIFICATION DIVISION.
@@ -27,7 +27,7 @@ public sealed class Condition88DifferentialTests
 
     [Fact]
     public void BooleanFlag_AndSetToTrue()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-FLAG PIC X VALUE "N".
                88 FLAG-YES VALUE "Y".
                88 FLAG-NO  VALUE "N".
@@ -43,7 +43,7 @@ public sealed class Condition88DifferentialTests
     // PICTURE (ISO §13.18.63.3 SR2; kb/Work PB586) — under 9(2) the program is illegal and draws COBOLNET1625.
     [Fact]
     public void NumericRange_Thru()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-GRADE PIC 9(3) VALUE 75.
                88 PASSING VALUE 60 THRU 100.
                88 FAILING VALUE 0 THRU 59.
@@ -56,7 +56,7 @@ public sealed class Condition88DifferentialTests
 
     [Fact]
     public void MultipleValues()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-CODE PIC X VALUE "E".
                88 VOWEL VALUE "A", "E", "I", "O", "U".
             """, """
@@ -67,7 +67,7 @@ public sealed class Condition88DifferentialTests
 
     [Fact]
     public void ConditionInCompoundExpression()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-A PIC 9 VALUE 5.
                88 A-IS-FIVE VALUE 5.
             01 WS-B PIC X VALUE "Q".
@@ -84,7 +84,7 @@ public sealed class Condition88DifferentialTests
     // (the same item→Place builder a verb operand uses), so a condition test — and SET cond TO TRUE — sees the storage
     // through every view (ISO §13.18.44, §8.8.4.5). The NC211A/NC250A IF-D35 shape.
     public void ConditionName_OverRedefinesView()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 IF-D35.
                02 AA PIC X(2).
                02 BB PIC X(2).
@@ -110,7 +110,7 @@ public sealed class Condition88DifferentialTests
     // condition rules, and §8.8.4.1 treats an alphanumeric group as an elementary alphanumeric item — so the group's
     // character IMAGE is compared, not the raw struct (the NC211A/NC250A TABLE-86 shape).
     public void ConditionName_OnGroupItem()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 TABLE-86.
                88 A86 VALUE "ABC".
                88 B86 VALUE "ABCABC".
@@ -129,5 +129,5 @@ public sealed class Condition88DifferentialTests
     [InlineData("01 N PIC S9(3) VALUE -5.", "    IF N IS NEGATIVE DISPLAY \"NEG\" END-IF.\n    IF N IS NOT POSITIVE DISPLAY \"NOTPOS\" END-IF.")]
     [InlineData("01 N PIC S9(3) VALUE 0.", "    IF N IS ZERO DISPLAY \"ZERO\" END-IF.\n    IF N IS POSITIVE DISPLAY \"POS\" ELSE DISPLAY \"NOTPOS\" END-IF.")]
     [InlineData("01 N PIC 9(3) VALUE 7.", "    IF N IS POSITIVE DISPLAY \"POS\" END-IF.")]
-    public void SignConditions(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void SignConditions(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 }

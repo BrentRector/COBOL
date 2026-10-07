@@ -14,13 +14,13 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class UseDeclarativeDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>§14.9.30 GR24d + §9.1.13.1: READ at end WITHOUT an AT END phrase invokes the file-scoped
     /// declarative — and the FILE STATUS item already holds "10" inside it (the status stores FIRST, GR6).</summary>
     [Fact]
     public void ReadAtEnd_NoPhrase_FileScopedDeclarativeRuns()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. UD1.
             ENVIRONMENT DIVISION.
@@ -59,7 +59,7 @@ public sealed class UseDeclarativeDifferentialTests
     /// declarative — the imperative runs instead.</summary>
     [Fact]
     public void ReadAtEnd_WithPhrase_DeclarativeSuppressed()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. UD2.
             ENVIRONMENT DIVISION.
@@ -97,7 +97,7 @@ public sealed class UseDeclarativeDifferentialTests
     /// MODE-scoped USE … ON INPUT — the file was "in the process of being opened" in that mode.</summary>
     [Fact]
     public void FailedOpen_ReachesModeScopedDeclarative()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. UD3.
             ENVIRONMENT DIVISION.
@@ -127,7 +127,7 @@ public sealed class UseDeclarativeDifferentialTests
     /// exception — exactly ONE declarative runs.</summary>
     [Fact]
     public void FileScope_BeatsModeScope_OneDeclarativeOnly()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. UD4.
             ENVIRONMENT DIVISION.
@@ -159,7 +159,7 @@ public sealed class UseDeclarativeDifferentialTests
     /// re-entered (the RL111A re-entrancy shape — without the guard this recurses to a stack overflow).</summary>
     [Fact]
     public void Declarative_SelfExceptionDoesNotReenter()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. UD5.
             ENVIRONMENT DIVISION.
@@ -191,7 +191,7 @@ public sealed class UseDeclarativeDifferentialTests
     /// non-fatal declarative return execution continues after the failing statement (GR7b).</summary>
     [Fact]
     public void SuccessNeverInvokes_AndExecutionContinuesAfterReturn()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. UD6.
             ENVIRONMENT DIVISION.
@@ -227,7 +227,7 @@ public sealed class UseDeclarativeDifferentialTests
     /// procedure (declaratives share the one pc space).</summary>
     [Fact]
     public void PerformIntoDeclarative_RunsAsPlainProcedure()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. UD7.
             ENVIRONMENT DIVISION.

@@ -22,8 +22,7 @@ set -u
 
 ROOT="$1"; GROUP="$2"; TESTS="$3"
 OUT="$ROOT/tests/nist/output"
-# The COBOL runtime the compiled programs bind to — the compiler under test decides which one (PB750):
-# WiseOwl COBOL's `Cobol.Net.Runtime` by default, `CobolSharp.Runtime` under COBOLSHARP_LEGACY_DIFFERENTIAL=1.
+# The COBOL runtime the compiled programs bind to, `Cobol.Net.Runtime` (scripts/guard-compiler.sh selects it).
 # guard-fast.sh exports GUARD_RUNTIME_DLL (a repo-relative path); the default keeps a standalone invocation —
 # and scripts/guard-verify.sh's witnesses — working without the caller.
 RUNTIME="${GUARD_RUNTIME_DLL:-src/Cobol.Net.Runtime/bin/Debug/net10.0/Cobol.Net.Runtime.dll}"
@@ -82,7 +81,7 @@ for test in $TESTS; do
     fi
 
     # A row corpus.tsv declares TERMINATES (kb/Work PB1955): the run unit's end on the named exception is the
-    # observation, not the report. guard-fast.sh exports GUARD_TERMINATES for WiseOwl COBOL only.
+    # observation, not the report. guard-fast.sh exports GUARD_TERMINATES.
     ec="$(guard_declared_termination "$test")"
     if [ -n "$ec" ]; then
         guard_termination_verdict "$test" "$ec" "$rrc" "$errfile" "$RUN_TIMEOUT"
@@ -92,13 +91,6 @@ for test in $TESTS; do
         fi
         continue
     fi
-
-    # An ISO-re-baselined golden the legacy legitimately diverges from (derived from corpus.tsv by
-    # guard-population.sh; guard-fast exports it): compiled and ran above; the diff is expected — never a regression.
-    case " ${LEGACY_DIVERGENT:-} " in *" $test "*)
-        echo "$test: LEGACY DIVERGENT (golden = ISO-conforming baseline; expected diff)"
-        continue ;;
-    esac
 
     # RUN + COMPARE arms, scored by the shared evidence rules (candidates in preference order).
     guard_output_verdict "$test" "$validfile" "$rrc" "$errfile" "$RUN_TIMEOUT" "$CMP" \

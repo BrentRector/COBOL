@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// G2 verification checkpoint: a program that declares elementary data and <c>DISPLAY</c>s it (COBOLNET_DESIGN
 /// §16 G2). Two kinds of assertion, both grounded in the ISO/IEC 1989:2023 specification:
 /// <list type="bullet">
-///   <item><see cref="AssertSameAsLegacy"/> — the legacy byte-engine oracle (364-NIST-green) is a sound reference
+///   <item><see cref="AssertMatchesGolden"/> — the legacy byte-engine oracle (364-NIST-green) is a sound reference
 ///         here, so WiseOwl COBOL stdout must equal legacy stdout <b>on the NIST acceptance basis</b> (per-line
 ///         trailing-space stripped — the guard's <c>normalize()</c>). Used wherever that normalization makes the
 ///         two agree (single/trailing operand, numeric).</item>
@@ -25,10 +25,10 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class DataDisplayDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
     /// <summary>Compile + run <paramref name="source"/> on both engines; assert identical stdout (NIST basis).</summary>
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>
     /// Compile + run <paramref name="source"/> on WiseOwl COBOL and assert its stdout equals the <b>spec-correct</b>
@@ -56,7 +56,7 @@ public sealed class DataDisplayDifferentialTests
 
     [Fact]
     public void Display_Literal()
-        => AssertSameAsLegacy(Program("01 FILLER PIC X.", """    DISPLAY "HELLO, COBOL.NET".  """));
+        => AssertMatchesGolden(Program("01 FILLER PIC X.", """    DISPLAY "HELLO, COBOL.NET".  """));
 
     [Theory]
     // Alphanumeric: VALUE padding, value shorter/equal than capacity (trailing-trim makes legacy a valid oracle).
@@ -71,7 +71,7 @@ public sealed class DataDisplayDifferentialTests
     [InlineData("01 WS-N PIC 9(3)V99 VALUE 12.34.", "    DISPLAY WS-N.")]
     // Multiple operands, all trailing-clean: numeric + trailing literal.
     [InlineData("01 WS-N PIC 9(3) VALUE 7.", "    DISPLAY \"N=\" WS-N \" END\".")]
-    public void Display_Data(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void Display_Data(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Theory]
     // Full-field-width DISPLAY: a trailing "]" exposes the operand's internal trailing spaces, which ISO
@@ -90,7 +90,7 @@ public sealed class DataDisplayDifferentialTests
     // Numeric → numeric MOVE with a scale change (the source fraction is truncated).
     [InlineData("01 WS-A PIC 9(3)V99 VALUE 12.34.\n01 WS-B PIC 9(3).",
                 "    MOVE WS-A TO WS-B.\n    DISPLAY WS-B.")]
-    public void MoveThenDisplay(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void MoveThenDisplay(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Theory]
     // Alphanumeric → alphanumeric MOVE: left-justified, space-filled to the receiver width (ISO §14.9.24 GR4).

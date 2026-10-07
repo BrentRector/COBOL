@@ -13,9 +13,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class WholeGroupDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static void AssertSpec(string source, string expected)
     {
@@ -43,16 +43,16 @@ public sealed class WholeGroupDifferentialTests
         """;
 
     [Fact]
-    public void DisplayGroup() => AssertSameAsLegacy(Program(Rec, "    DISPLAY WS-REC."));   // ABCDEF
+    public void DisplayGroup() => AssertMatchesGolden(Program(Rec, "    DISPLAY WS-REC."));   // ABCDEF
 
     [Fact]
     public void GroupToAlphanumeric()
-        => AssertSameAsLegacy(Program(Rec + "\n01 WS-LINE PIC X(6).",
+        => AssertMatchesGolden(Program(Rec + "\n01 WS-LINE PIC X(6).",
             "    MOVE WS-REC TO WS-LINE.\n    DISPLAY WS-LINE."));   // ABCDEF
 
     [Fact]
     public void AlphanumericToGroup()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-DST.
                05 D1 PIC X(3).
                05 D2 PIC X(3).
@@ -61,7 +61,7 @@ public sealed class WholeGroupDifferentialTests
 
     [Fact]
     public void GroupToGroup()
-        => AssertSameAsLegacy(Program(Rec + """
+        => AssertMatchesGolden(Program(Rec + """
 
             01 WS-DST.
                05 P1 PIC X(2).
@@ -70,7 +70,7 @@ public sealed class WholeGroupDifferentialTests
 
     [Fact]
     public void NestedGroupImage()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-OUTER.
                05 WS-HEAD PIC X(2) VALUE "HD".
                05 WS-MID.
@@ -81,7 +81,7 @@ public sealed class WholeGroupDifferentialTests
     [Theory]
     [InlineData("    IF WS-REC = \"ABCDEF\" DISPLAY \"EQ\" ELSE DISPLAY \"NE\" END-IF.")]
     [InlineData("    IF WS-REC = \"ABCXXX\" DISPLAY \"EQ\" ELSE DISPLAY \"NE\" END-IF.")]
-    public void GroupCompare(string proc) => AssertSameAsLegacy(Program(Rec, proc));
+    public void GroupCompare(string proc) => AssertMatchesGolden(Program(Rec, proc));
 
     [Fact]
     public void MoveSpacesToGroup_FillsToWidth()

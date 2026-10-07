@@ -2,10 +2,9 @@
 
   <!--
     Cobol.Net.Tests.Conformance — the conformance/differential harness for the greenfield WiseOwl COBOL compiler.
-    Added as a scaffold at G0 (docs/COBOLNET_DESIGN.md §17 §1.5 step 4). At G5 this grows the differential NIST
-    harness (§2): run the legacy oracle + WiseOwl COBOL on each of the 364 NIST programs and assert identical stdout;
-    at G7 it runs the post-85 conformance corpus (tests/conformance/<ver>/). For now it holds a thin smoke so the
-    project is real and in the build.
+    It compiles and runs the NIST CCVS corpus against its committed goldens (tests/nist/corpus.tsv), the
+    differential cases against their committed goldens (tests/differential/), and the per-edition conformance
+    corpus (tests/conformance/<ver>/). It references only the greenfield projects.
   -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
@@ -24,15 +23,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cobol.Net.Compiler\Cobol.Net.Compiler.csproj" />
     <ProjectReference Include="..\..\src\Cobol.Net.Runtime\Cobol.Net.Runtime.csproj" />
-    <!--
-      The legacy byte-engine compiler + runtime are referenced ONLY as the differential oracle (settled:
-      COBOLNET_DESIGN §18 #7 / Q13) — the harness compiles the same COBOL with both and asserts identical stdout,
-      turning the legacy's 364-NIST-green behavior into a free regression net for the greenfield compiler. Both
-      reference graphs deploy side-by-side (distinct namespaces + distinct runtime DLLs) and never interact at run
-      time (each compiled program loads only its own runtime). Deleted at the G8 cut-over.
-    -->
-    <ProjectReference Include="..\..\src\CobolSharp.Compiler\CobolSharp.Compiler.csproj" />
-    <ProjectReference Include="..\..\src\CobolSharp.Runtime\CobolSharp.Runtime.csproj" />
   </ItemGroup>
 
 </Project>

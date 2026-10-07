@@ -19,9 +19,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class IntrinsicFunctionDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static void AssertSpec(string source, string expected, int dialect = 85)
     {
@@ -66,7 +66,7 @@ public sealed class IntrinsicFunctionDifferentialTests
     [InlineData("COMPUTE R = FUNCTION ANNUITY(0, 4).")]                 // §15.9.4 rate 0 ⇒ 1/n = 0.25 exact
     [InlineData("COMPUTE R = FUNCTION SQRT(2) * 0.")]                   // intrinsic inside a larger expression
     public void FloatFamily_MatchesLegacy(string stmt) =>
-        AssertSameAsLegacy(Program("01 R PIC S9(5)V9(4).", $"    {stmt}\n    DISPLAY R."));
+        AssertMatchesGolden(Program("01 R PIC S9(5)V9(4).", $"    {stmt}\n    DISPLAY R."));
 
     // ── Differential: exact statistics + the channel matrix ─────────────────────────────────────────────────
 
@@ -81,13 +81,13 @@ public sealed class IntrinsicFunctionDifferentialTests
     [InlineData("01 R PIC S9(9).", "COMPUTE R = FUNCTION INTEGER(-1.5).")]                  // §15.44 floor → −2
     [InlineData("01 R PIC S9(9).", "COMPUTE R = FUNCTION INTEGER-PART(-1.5).")]             // §15.49 truncate → −1
     public void ExactFamily_MatchesLegacy(string ws, string stmt) =>
-        AssertSameAsLegacy(Program(ws, $"    {stmt}\n    DISPLAY R."));
+        AssertMatchesGolden(Program(ws, $"    {stmt}\n    DISPLAY R."));
 
     [Fact]
     public void ChannelMatrix_IfEvaluateMove_MatchesLegacy() =>
         // The three non-COMPUTE channels the NIST suite exercises: a FUNCTION in an IF relation, as an EVALUATE
         // subject, and as a MOVE source (§15.2 — usable wherever a sending item of its category is).
-        AssertSameAsLegacy(Program("01 R PIC S9(5)V9(4).\n01 T PIC X(5).", """
+        AssertMatchesGolden(Program("01 R PIC S9(5)V9(4).\n01 T PIC X(5).", """
                 IF FUNCTION SQRT(625) = 25 DISPLAY "REL-OK" END-IF.
                 EVALUATE FUNCTION MAX(3, 9, 4)
                     WHEN 9 DISPLAY "EVAL-OK"
@@ -100,7 +100,7 @@ public sealed class IntrinsicFunctionDifferentialTests
     [Fact]
     public void TableAllExpansion_MatchesLegacy() =>
         // table(ALL): each occurrence becomes a separate argument, left to right (§15.3).
-        AssertSameAsLegacy(Program("""
+        AssertMatchesGolden(Program("""
             01 P PIC S9(4) VALUE 2.
             01 ARR VALUE "40537".
                 02 IND OCCURS 5 TIMES PIC 9.
@@ -1137,7 +1137,7 @@ public sealed class IntrinsicFunctionDifferentialTests
     [InlineData("COMPUTE R = FUNCTION MIN(A * B, (3 + 1) / 2, 3 + 4).")]    // the IF123A paren-arg-after-separator shape
     [InlineData("COMPUTE R = FUNCTION SQRT(FUNCTION MAX(A / B, 4)).")]      // nested FUNCTION with a compound inner arg
     public void CompoundArgs_MatchLegacy(string stmt) =>
-        AssertSameAsLegacy(Program(
+        AssertMatchesGolden(Program(
             "01 A PIC 9(3) VALUE 12.\n01 B PIC 9(3) VALUE 4.\n01 C PIC 9(3) VALUE 5.\n01 R PIC S9(5)V9(4).",
             $"    {stmt}\n    DISPLAY R."));
 

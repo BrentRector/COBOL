@@ -14,8 +14,8 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class SortMergeDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
-    private static readonly ICompilerUnderTest CobolNet2002 = new CobolNetCompiler(2002);
+    private static readonly CobolNetCompiler CobolNet = new();
+    private static readonly CobolNetCompiler CobolNet2002 = new(2002);
 
     /// <summary>Spec-pinned facts (memory feedback_use_the_spec): the LEGACY oracle truncates a GO-TO loop
     /// inside a SORT INPUT/OUTPUT PROCEDURE to a single iteration (the same loop in a plain section works — see
@@ -28,7 +28,7 @@ public sealed class SortMergeDifferentialTests
         Assert.Equal(expected, cout);
     }
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>A SORT program over one SD with an input and an output procedure (both SECTIONs — the procedure
     /// range is the WHOLE section, first paragraph through last, like PERFORM section). The output procedure
@@ -166,7 +166,7 @@ public sealed class SortMergeDifferentialTests
     /// the GIVING file back.</summary>
     [Fact]
     public void Sort_UsingGiving_SingleAscendingKey()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. SRTUSG.
             ENVIRONMENT DIVISION.
@@ -212,7 +212,7 @@ public sealed class SortMergeDifferentialTests
     /// rewinds per file).</summary>
     [Fact]
     public void Sort_GivingMultipleFiles_EachReceivesFullResult()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. SRTGV2.
             ENVIRONMENT DIVISION.
@@ -270,7 +270,7 @@ public sealed class SortMergeDifferentialTests
     /// records before file-2's. The two inputs are written pre-sorted (GR6's ordering requirement).</summary>
     [Fact]
     public void Merge_EqualKeys_KeepUsingFileOrder()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. MRGORD.
             ENVIRONMENT DIVISION.

@@ -13,14 +13,14 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class KeyedIoDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>§14.9.51 GR29a: sequential-access relative WRITE releases consecutive RRNs from 1 and MOVEs each
     /// into the RELATIVE KEY item; §14.9.30 GR25: each sequential READ MOVEs the RRN of the record made
     /// available; §14.9.30 GR24a: exhaustion sets '10' and takes AT END.</summary>
     [Fact]
     public void Relative_SequentialWriteReadBack_StoresRrnInKeyItem()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. KRSEQ1.
             ENVIRONMENT DIVISION.
@@ -63,7 +63,7 @@ public sealed class KeyedIoDifferentialTests
     /// of a nonexistent slot → '23' + INVALID KEY; an existing slot reads back its record.</summary>
     [Fact]
     public void Relative_RandomWriteAndRead_InvalidKeyStatuses()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. KRRND2.
             ENVIRONMENT DIVISION.
@@ -104,7 +104,7 @@ public sealed class KeyedIoDifferentialTests
     /// slot → '23'; §9.1.14: NOT INVALID KEY runs only on SUCCESSFUL completion.</summary>
     [Fact]
     public void Relative_RandomRewriteDelete_StatusAndNotInvalidContract()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. KRUPD3.
             ENVIRONMENT DIVISION.
@@ -160,7 +160,7 @@ public sealed class KeyedIoDifferentialTests
     /// '23'); §14.9.35 GR23: random REWRITE replaces by prime key; §14.9.10 GR3: DELETE by prime key.</summary>
     [Fact]
     public void Indexed_RandomCrudByPrimeKey()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. KXCRD4.
             ENVIRONMENT DIVISION.
@@ -219,7 +219,7 @@ public sealed class KeyedIoDifferentialTests
     /// affected); the sequential read-back proves it.</summary>
     [Fact]
     public void Indexed_SequentialWrite_AscendingKeyOrder21()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. KXSEQ5.
             ENVIRONMENT DIVISION.
@@ -266,7 +266,7 @@ public sealed class KeyedIoDifferentialTests
     /// INVALID KEY (GR9c).</summary>
     [Fact]
     public void Relative_StartKeyGreaterOrEqual_PositionsThenWalks()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. KRSTA6.
             ENVIRONMENT DIVISION.
@@ -316,7 +316,7 @@ public sealed class KeyedIoDifferentialTests
     /// GR16: the key becomes the key of reference for subsequent sequential READs.</summary>
     [Fact]
     public void Indexed_StartGenericPartialKey_PositionsAtFirstMatch()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. KXSTA7.
             ENVIRONMENT DIVISION.
@@ -369,7 +369,7 @@ public sealed class KeyedIoDifferentialTests
     /// STATUS item still records the condition.</summary>
     [Fact]
     public void Keyed_NotInvalidKey_RunsOnlyOnSuccess()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. KRNIK8.
             ENVIRONMENT DIVISION.
@@ -408,7 +408,7 @@ public sealed class KeyedIoDifferentialTests
     /// by storage position).</summary>
     [Fact]
     public void Indexed_QualifiedRecordAndAlternateKeys_ResolveByQualifier()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. KIQUAL1.
             ENVIRONMENT DIVISION.

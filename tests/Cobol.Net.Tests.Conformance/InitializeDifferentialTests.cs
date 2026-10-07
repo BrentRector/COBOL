@@ -15,7 +15,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class InitializeDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string working, string procedure) => $$"""
         IDENTIFICATION DIVISION.
@@ -34,7 +34,7 @@ public sealed class InitializeDifferentialTests
     // alphanumeric SPACES for alphabetic / alphanumeric / alphanumeric-edited (plain spaces, NO editing).
     [Fact]
     public void Initialize_BareGroup_CategoryDefaults()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 G1.
                05 N1 PIC 9(4).
                05 E1 PIC $(3)9.99.
@@ -59,7 +59,7 @@ public sealed class InitializeDifferentialTests
     // other item is left UNCHANGED (the GR5c filter; '85 and 2023 agree).
     [Fact]
     public void Initialize_Replacing_LeavesOtherCategoriesUntouched()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 G1.
                05 N1 PIC 9(4) VALUE 1234.
                05 X1 PIC X(4) VALUE "QQQQ".
@@ -75,7 +75,7 @@ public sealed class InitializeDifferentialTests
     // alphanumeric-edited receiver places characters through the B-insertion mask (§13.18.40).
     [Fact]
     public void Initialize_Replacing_AllFiveCategories_FullMoveSemantics()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 G2.
                05 R-NUM PIC 9(4).
                05 R-NED PIC $(3)9.99.
@@ -101,7 +101,7 @@ public sealed class InitializeDifferentialTests
     // whole-group display shows the FILLER bytes intact between the cleared neighbors.
     [Fact]
     public void Initialize_FillerExcluded()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 G0.
                05 P1 PIC X(2) VALUE "AA".
                05 FILLER PIC XX VALUE "FF".
@@ -116,7 +116,7 @@ public sealed class InitializeDifferentialTests
     // string-canonical window store: X(4) redefined by 9(4) shares ONE backing.)
     [Fact]
     public void Initialize_RedefinesSubtreeExcluded()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 G3.
                05 RA PIC X(4) VALUE "QQQQ".
                05 RB REDEFINES RA PIC 9(4).
@@ -132,7 +132,7 @@ public sealed class InitializeDifferentialTests
     // integers, not one byte run).
     [Fact]
     public void Initialize_Occurs_EveryOccurrence()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 GT.
                03 TN PIC S9(3) COMP OCCURS 5.
             01 SHOW-N PIC 9(3).
@@ -154,7 +154,7 @@ public sealed class InitializeDifferentialTests
     // numeric-edited elementary gets the edited zero, the alphanumeric elementary spaces.
     [Fact]
     public void Initialize_MultipleIdentifiers_AndElementaryTargets()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 D1 PIC $(3)9.99.
             01 G4.
                05 GN PIC 99.

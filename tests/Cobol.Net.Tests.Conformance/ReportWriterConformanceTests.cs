@@ -26,7 +26,7 @@ public sealed class ReportWriterConformanceTests
     /// WiseOwl COBOL report file is not readable at all below 2023. The report-writer BEHAVIOR under test is
     /// edition-invariant, so 2023 costs nothing; what is lost is only the (unobtainable) claim that these
     /// assertions were observed at 85.</summary>
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(2023);
+    private static readonly CobolNetCompiler CobolNet = new(2023);
 
     /// <summary>Compile-and-run on the greenfield compiler; assert the spec-derived stdout.</summary>
     private static void AssertSpec(string source, string expected)

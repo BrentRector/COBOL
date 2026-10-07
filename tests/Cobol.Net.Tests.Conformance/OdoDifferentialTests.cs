@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class OdoDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string id, string workingStorage, string procedure) => $"""
         IDENTIFICATION DIVISION.
@@ -43,7 +43,7 @@ public sealed class OdoDifferentialTests
 
     [Fact] // §13.18.38 GR8b (sending side): depending item INSIDE the sending group → the current-count extent.
     public void Gr8b_GroupSend_DependingInside_UsesCurrentCount()
-        => AssertSameAsLegacy(Program("ODOT1", OdoRecord, """
+        => AssertMatchesGolden(Program("ODOT1", OdoRecord, """
                 MOVE "123456789" TO TAIL-GRP.
                 MOVE 3 TO CNT.
                 MOVE REC TO OUT-19.
@@ -53,7 +53,7 @@ public sealed class OdoDifferentialTests
     [Fact] // §13.18.38 GR8a: depending item OUTSIDE the operand group → the current-count part is used in BOTH
            // directions; INSPECT (§14.9.22, item identification §14.6.4 step 6) sees only the live occurrences.
     public void Gr8a_Inspect_DependingOutside_CurrentCountBothWays()
-        => AssertSameAsLegacy(Program("ODOT2", OdoRecord + "\n01 N1 PIC 9.", """
+        => AssertMatchesGolden(Program("ODOT2", OdoRecord + "\n01 N1 PIC 9.", """
                 MOVE "123456789" TO TAIL-GRP.
                 MOVE 3 TO CNT.
                 MOVE 0 TO N1.
@@ -68,7 +68,7 @@ public sealed class OdoDifferentialTests
     [Fact] // §13.18.38 GR8b (receiving side): depending item INSIDE the receiving group → "the maximum length of
            // the group will be used" — all MAX occurrences receive (NC247A MOV-TEST-F1-6 reduction).
     public void Gr8b_GroupReceive_DependingInside_UsesMaximumLength()
-        => AssertSameAsLegacy(Program("ODOT3", """
+        => AssertMatchesGolden(Program("ODOT3", """
             01 SRC-REC.
                05 S-CNT PIC 9 VALUE 9.
                05 S-GRP.
@@ -87,7 +87,7 @@ public sealed class OdoDifferentialTests
     [Fact] // §13.18.38 GR8a (receiving side): depending item OUTSIDE the receiving group → only the current-count
            // part is used; character positions past the count are NOT modified.
     public void Gr8a_GroupReceive_DependingOutside_PastCountUnchanged()
-        => AssertSameAsLegacy(Program("ODOT4", OdoRecord, """
+        => AssertMatchesGolden(Program("ODOT4", OdoRecord, """
                 MOVE "123456789" TO TAIL-GRP.
                 MOVE 3 TO CNT.
                 MOVE "XYZ" TO TAIL-GRP.
@@ -99,7 +99,7 @@ public sealed class OdoDifferentialTests
            // (current..max] is legal to reference (bound is MAX, not the current count). Writing ITM(9) with the
            // count at 3, then raising the count, surfaces the stored value (NC247A INIT-WRK-AREA fills all 9).
     public void Allocation_AtMaximumOccurrences_HighSubscriptIsAddressable()
-        => AssertSameAsLegacy(Program("ODOT5", OdoRecord, """
+        => AssertMatchesGolden(Program("ODOT5", OdoRecord, """
                 MOVE "123456789" TO TAIL-GRP.
                 MOVE 3 TO CNT.
                 MOVE "Q" TO ITM (9).
@@ -110,7 +110,7 @@ public sealed class OdoDifferentialTests
     [Fact] // §14.9.37.4 GR4 + §13.18.38 GR7: a serial SEARCH of an occurs-depending table reaches AT END past the
            // CURRENT count, not the maximum (NC247A SCH-TEST-F1-1/-F1-2 reduction).
     public void SerialSearch_AtEnd_PastCurrentCount()
-        => AssertSameAsLegacy(Program("ODOT6", OdoRecord, """
+        => AssertMatchesGolden(Program("ODOT6", OdoRecord, """
                 MOVE "123456789" TO TAIL-GRP.
                 MOVE 3 TO CNT.
                 SET IX-A TO 1.
@@ -129,7 +129,7 @@ public sealed class OdoDifferentialTests
     [Fact] // §14.9.37.4 GR9: SEARCH ALL of an occurs-depending table is bounded by the last element of the
            // table — the CURRENT depending count (NC247A SCH-TEST-F2-3/-4 reduction).
     public void SearchAll_BoundedByCurrentCount()
-        => AssertSameAsLegacy(Program("ODOT7", OdoRecord, """
+        => AssertMatchesGolden(Program("ODOT7", OdoRecord, """
                 MOVE "123456789" TO TAIL-GRP.
                 MOVE 3 TO CNT.
                 SEARCH ALL ITM
@@ -146,7 +146,7 @@ public sealed class OdoDifferentialTests
     [Fact] // §14.9.43.4 GR3a + §13.18.38 GR8: a STRING sending group with an ODO tail contributes its
            // current-count content under DELIMITED BY SIZE (NC247A STR-TEST-GF-2 reduction).
     public void String_OdoGroupSender_CurrentExtent()
-        => AssertSameAsLegacy(Program("ODOT8", OdoRecord, """
+        => AssertMatchesGolden(Program("ODOT8", OdoRecord, """
                 MOVE "123456789" TO TAIL-GRP.
                 MOVE 3 TO CNT.
                 MOVE SPACES TO OUT-19.
@@ -158,7 +158,7 @@ public sealed class OdoDifferentialTests
     [Fact] // §14.9.48.4 GR11 + §13.18.38 GR8: the UNSTRING sending item's size is its current-count extent —
            // receiver-sized segmentation stops at the live data (NC247A UST-TEST-GF-2 reduction).
     public void Unstring_OdoRecordSource_CurrentExtent()
-        => AssertSameAsLegacy(Program("ODOT9", OdoRecord + "\n01 W10 PIC X(10).\n01 W20 PIC X(20).", """
+        => AssertMatchesGolden(Program("ODOT9", OdoRecord + "\n01 W10 PIC X(10).\n01 W20 PIC X(20).", """
                 MOVE "123456789" TO TAIL-GRP.
                 MOVE 3 TO CNT.
                 MOVE SPACES TO W10 W20.

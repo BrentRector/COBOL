@@ -85,11 +85,11 @@ public sealed class TestLegReportDriftTests
             }
         }
 
-        // ⛔ THE POPULATION: the two scripts that run and print `dotnet test` legs — the gate driver (both
-        // build-local twins call it, kb/Work PB1721) and guard-fast.sh — must each route through the reporter. A scan
-        // that stopped seeing them would otherwise report a clean tree over nothing.
+        // ⛔ THE POPULATION: the script that runs and prints `dotnet test` legs — the gate driver (both build-local
+        // twins call it, kb/Work PB1721) — must route through the reporter. A scan that stopped seeing it would
+        // otherwise report a clean tree over nothing. (guard-fast.sh ran the legacy Unit and Integration legs
+        // through it until kb/Work PB2109 retired them; it runs no `dotnet test` leg now.)
         Assert.Contains("scripts/run_gate_legs.py", callers);
-        Assert.Contains("scripts/guard-fast.sh", callers);
 
         Assert.True(offenders.Count == 0,
             "A script selects lines out of a test run's output by keyword — the filter that kept a failing test's "

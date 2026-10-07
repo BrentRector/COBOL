@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class DataLevelDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string ws, string proc) => $"""
         IDENTIFICATION DIVISION.
@@ -29,20 +29,20 @@ public sealed class DataLevelDifferentialTests
     [Fact]
     public void Level77_AfterGroup_IsARoot_NotNested()
         // STANDALONE (77) follows a group whose last subordinate is level 05; 77 > 05 must NOT nest it under the group.
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 G.\n   05 A PIC X(3) VALUE \"ABC\".\n   05 B PIC 9(3) VALUE 123.\n77 STANDALONE PIC 9(5) VALUE 42.",
             "    ADD 1 TO STANDALONE.\n    DISPLAY STANDALONE."));   // 00043 — resolved as the root, not G.STANDALONE
 
     [Fact]
     public void Level77_AfterElementary01_IsARoot()
         // The exact NC102A shape: a 77 numeric item right after a numeric-edited elementary 01.
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 EDF PIC $*9.99 VALUE ZERO.\n77 THREE PIC 9 VALUE 3.\n77 P-COUNT PIC 9(6).",
             "    MOVE THREE TO P-COUNT.\n    DISPLAY P-COUNT."));   // 000003
 
     [Fact]
     public void Level77_BetweenGroups_EachResolvesIndependently()
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 G1.\n   05 X PIC 9(3) VALUE 111.\n77 MIDDLE PIC 9(3) VALUE 222.\n01 G2.\n   05 Y PIC 9(3) VALUE 333.",
             "    DISPLAY X \"-\" MIDDLE \"-\" Y."));   // 111-222-333 — three independent items
 }

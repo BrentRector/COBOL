@@ -27,7 +27,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class LinageConformanceTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
     /// <summary>Compile-and-run on the greenfield compiler; assert the spec-derived stdout.</summary>
     private static void AssertSpec(string source, string expected)
@@ -64,15 +64,10 @@ public sealed class LinageConformanceTests
 
     // ── The BYTES on the medium (§13.18.34.4 GR1/GR4/GR5/GR8, §14.9.51.4 GR25 g)/GR26 a)) ─────────────────
 
-    /// <summary>The same compiler as <see cref="CobolNet"/>, typed concretely so the file-reading entry is
-    /// reachable — <see cref="ICompilerUnderTest"/> is the DIFFERENTIAL contract (both engines implement it) and
-    /// a run-directory read is a greenfield-only capability.</summary>
-    private static readonly CobolNetCompiler CobolNetBytes = new();
-
-    /// <summary>…and at the shipping default edition, for the one fixture that needs a post-85 construct:
+    /// <summary><see cref="CobolNet"/> at the shipping default edition, for the one fixture that needs a post-85 construct:
     /// ORGANIZATION IS LINE SEQUENTIAL is COBOL-2023 (§12.4.5.10.3; COBOLNET0900 rejects it at --std 85). The
     /// LINAGE rules under test are identical across all four editions, so the arm is exercised where it exists.</summary>
-    private static readonly CobolNetCompiler CobolNetBytes2023 = new(2023);
+    private static readonly CobolNetCompiler CobolNet2023 = new(2023);
 
     /// <summary>Compile-and-run, then assert the EXACT bytes the program left on the medium. The expected string
     /// is written with explicit <c>\r\n</c> for every line end: a record sequential PRINT stream ends its lines
@@ -83,7 +78,7 @@ public sealed class LinageConformanceTests
     private static void AssertBytes(string source, string fileName, string expected, int edition = 85, string org = "")
     {
         var (ok, _, detail, bytes) =
-            (edition == 85 ? CobolNetBytes : CobolNetBytes2023).CompileRunAndReadFile(source, fileName);
+            (edition == 85 ? CobolNet : CobolNet2023).CompileRunAndReadFile(source, fileName);
         Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.NotNull(bytes);
         if (org.Contains("LINE SEQUENTIAL", StringComparison.Ordinal))

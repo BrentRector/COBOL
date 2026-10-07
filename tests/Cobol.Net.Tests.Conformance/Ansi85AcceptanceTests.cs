@@ -17,7 +17,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class Ansi85AcceptanceTests
 {
-    private static readonly ICompilerUnderTest CobolNet85 = new CobolNetCompiler();   // dialect 85 (default)
+    private static readonly CobolNetCompiler CobolNet85 = new();   // dialect 85 (default)
 
     private static void AssertRuns(string source, string expected)
     {

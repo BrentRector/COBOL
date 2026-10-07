@@ -13,9 +13,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class DecimalPointDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>Spec-pinned (no oracle): asserted against the ISO-derived expected output directly. The optional
     /// <paramref name="dialect"/> targets a specific edition (a numeric literal VALUE on a numeric-edited item is a
@@ -32,7 +32,7 @@ public sealed class DecimalPointDifferentialTests
     /// its periods are grouping separators, INSERTED as written (NC107A's DATA-K → DATA-L shape).</summary>
     [Fact]
     public void CommaDecimal_ValueInit_And_GroupedEditedMask()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. DPC1.
             ENVIRONMENT DIVISION.
@@ -53,7 +53,7 @@ public sealed class DecimalPointDifferentialTests
     /// <summary>§12.3.7 GR14a: comma literals in MOVE and in a relation condition (NC107A's 9116,44 shape).</summary>
     [Fact]
     public void CommaDecimal_MoveAndCompareLiterals()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. DPC2.
             ENVIRONMENT DIVISION.
@@ -76,7 +76,7 @@ public sealed class DecimalPointDifferentialTests
     /// 'W' masks classify and edit exactly like '$' masks (NC107A's DATA-J/DATA-M shape).</summary>
     [Fact]
     public void CurrencySign_W_FloatingAndFixedMasks()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. DPC3.
             ENVIRONMENT DIVISION.
@@ -103,7 +103,7 @@ public sealed class DecimalPointDifferentialTests
     /// grouping and '.' decimal inserts per §13.18.40.4.</summary>
     [Fact]
     public void CurrencySign_AngleBracket_DefaultSeparators()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. DPC4.
             ENVIRONMENT DIVISION.
@@ -126,7 +126,7 @@ public sealed class DecimalPointDifferentialTests
     /// ABR-TEST-GF-4 shapes).</summary>
     [Fact]
     public void BlankWhenZero_OnPlainNumeric_StoresSpaces()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. DPC5.
             DATA DIVISION.
@@ -209,7 +209,7 @@ public sealed class DecimalPointDifferentialTests
     /// USAGE-TEST-4/6: MOVE U5 TO U9 copies positionally; IF U22 &gt; U12 compares the representation).</summary>
     [Fact]
     public void GroupUsageComp_WholeGroupMoveAndCompare()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. DPC9.
             DATA DIVISION.

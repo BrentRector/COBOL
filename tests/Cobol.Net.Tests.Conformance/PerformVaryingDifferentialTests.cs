@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 /// <para>⛔ THESE TESTS DO NOT MEASURE THE RESET/AUGMENT ORDERING, and this comment used to claim they did.
 /// Every FROM operand below is a LITERAL, and GR13 e) 2's order — reset the inner induction variable, THEN
 /// augment the one to its left — is invisible unless an AFTER level's FROM READS the level to its left. The
-/// claim stood over a body of <c>AssertSameAsLegacy</c> differentials for as long as the emitter implemented the
+/// claim stood over a body of <c>AssertMatchesGolden</c> differentials for as long as the emitter implemented the
 /// opposite order (kb/Work PB436). The ordering is measured by the spec-derived golden
 /// <c>conformance:85/pb436_varying_after_from_outer</c>, which writes <c>AFTER B FROM A</c> in both the inline
 /// and out-of-line spellings, at two and three levels, with index-name levels, and pins the TEST AFTER arm
@@ -22,7 +22,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class PerformVaryingDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string workingStorage, string procedure) => $"""
         IDENTIFICATION DIVISION.
@@ -36,7 +36,7 @@ public sealed class PerformVaryingDifferentialTests
 
     [Fact]
     public void Varying_OneLevel_TestBefore()
-        => AssertSameAsLegacy(Program("01 WS-I PIC 99.\n01 WS-OUT PIC X(10) VALUE SPACES.", """
+        => AssertMatchesGolden(Program("01 WS-I PIC 99.\n01 WS-OUT PIC X(10) VALUE SPACES.", """
             MAIN-PARA.
                 PERFORM SHOW VARYING WS-I FROM 1 BY 2 UNTIL WS-I > 9.
                 DISPLAY WS-I.
@@ -47,7 +47,7 @@ public sealed class PerformVaryingDifferentialTests
 
     [Fact]
     public void Varying_OneLevel_TestAfter()
-        => AssertSameAsLegacy(Program("01 WS-I PIC 99.", """
+        => AssertMatchesGolden(Program("01 WS-I PIC 99.", """
             MAIN-PARA.
                 PERFORM SHOW WITH TEST AFTER VARYING WS-I FROM 5 BY 1 UNTIL WS-I >= 5.
                 DISPLAY WS-I.
@@ -58,7 +58,7 @@ public sealed class PerformVaryingDifferentialTests
 
     [Fact]
     public void Varying_TwoLevels_IterationOrder()
-        => AssertSameAsLegacy(Program("01 WS-I PIC 9.\n01 WS-J PIC 9.", """
+        => AssertMatchesGolden(Program("01 WS-I PIC 9.\n01 WS-J PIC 9.", """
             MAIN-PARA.
                 PERFORM SHOW VARYING WS-I FROM 1 BY 1 UNTIL WS-I > 2
                     AFTER WS-J FROM 1 BY 1 UNTIL WS-J > 3.
@@ -91,7 +91,7 @@ public sealed class PerformVaryingDifferentialTests
 
     [Fact]
     public void Varying_IndexInduction_TableSearch()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-TBL.
                05 ITM PIC XX OCCURS 4 TIMES INDEXED BY IX-1.
             01 WS-FOUND PIC X VALUE "N".
@@ -107,7 +107,7 @@ public sealed class PerformVaryingDifferentialTests
 
     [Fact]
     public void Varying_Inline()
-        => AssertSameAsLegacy(Program("01 WS-I PIC 99.\n01 WS-N PIC 999 VALUE 0.", """
+        => AssertMatchesGolden(Program("01 WS-I PIC 99.\n01 WS-N PIC 999 VALUE 0.", """
             MAIN-PARA.
                 PERFORM VARYING WS-I FROM 2 BY 3 UNTIL WS-I > 11
                     ADD WS-I TO WS-N
@@ -118,7 +118,7 @@ public sealed class PerformVaryingDifferentialTests
 
     [Fact]
     public void AllLiteral_RepeatsToGroupWidth()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-GRP.
                05 PART PIC X(5) OCCURS 3 TIMES.
             """, """
@@ -130,7 +130,7 @@ public sealed class PerformVaryingDifferentialTests
 
     [Fact]
     public void OutOfRangeSubscript_ReadContinuesBenignly()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-TBL.
                05 ITM PIC XX OCCURS 3 TIMES INDEXED BY IX-1.
             """, """

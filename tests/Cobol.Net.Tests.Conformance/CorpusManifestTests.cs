@@ -120,9 +120,8 @@ public sealed class CorpusManifestTests
             $"guard-only programs that are not `pending` in corpus.tsv: {string.Join(", ", wrong)}");
     }
 
-    /// <summary>⛔ THE PB750 REGRESSION TEST. Both guards resolved
-    /// <c>src/CobolSharp.CLI/bin/Debug/net10.0/cobolsharp.dll</c> — the LEGACY byte engine, whose project graph
-    /// contains no <c>Cobol.Net.Compiler</c> — and drove the whole NIST leg through it, so every battery's
+    /// <summary>⛔ THE PB750 REGRESSION TEST. Both guards once resolved the legacy byte engine's CLI, whose project
+    /// graph contains no <c>Cobol.Net.Compiler</c>, and drove the whole NIST leg through it, so every battery's
     /// <c>guard NIST: 353 MATCH</c> was a true statement about the ORACLE and no statement at all about the
     /// shipping compiler. This fact fails the moment either guard grows its own CLI path again instead of
     /// asking <c>scripts/guard-compiler.sh</c>, which asserts the binary's identity against its own
@@ -130,20 +129,50 @@ public sealed class CorpusManifestTests
     [Fact]
     public void BothGuards_ResolveTheCompilerThroughOnePlace()
     {
-        foreach (string script in new[] { "guard.sh", "guard-fast.sh", "run-suite.sh" })
+        foreach (string script in new[] { "guard.sh", "guard-fast.sh" })
         {
             string text = File.ReadAllText(TestRepo.Scripts(script));
-            Assert.True(text.Contains("guard-compiler.sh", StringComparison.Ordinal),
+            Assert.True(text.Contains("guard_select_compiler", StringComparison.Ordinal),
                 $"scripts/{script} does not resolve its compiler through scripts/guard-compiler.sh (PB750)");
-            // A hard-coded PATH, not a mention: guard.sh's run-isolation prose legitimately names both binaries.
-            Assert.False(text.Contains("CobolSharp.CLI/bin", StringComparison.OrdinalIgnoreCase),
-                $"scripts/{script} hard-codes the LEGACY CLI's bin path again — that is exactly kb/Work/PB750");
+            Assert.True(text.Contains("guard_assert_compiler_identity", StringComparison.Ordinal),
+                $"scripts/{script} no longer asserts the resolved binary's identity before measuring (PB750)");
+            // A hard-coded output PATH, not a mention: the selection's paths live in guard-compiler.sh alone.
+            Assert.False(text.Contains("bin/Debug/net10.0", StringComparison.OrdinalIgnoreCase),
+                $"scripts/{script} hard-codes a compiler's bin path again — that is exactly kb/Work/PB750");
         }
 
-        // And the default is WiseOwl COBOL: the legacy path exists ONLY behind the opt-in differential switch.
+        // And the one place resolves WiseOwl COBOL.
         string resolver = File.ReadAllText(TestRepo.Scripts("guard-compiler.sh"));
-        Assert.Contains("COBOLSHARP_LEGACY_DIFFERENTIAL", resolver, StringComparison.Ordinal);
         Assert.Contains("src/Cobol.Net.Cli", resolver, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// ⛔ THE GUARD DRIVES ONE COMPILER (kb/Work R69, PB2109). The legacy byte engine was reachable from the guard
+    /// scripts through a selector arm (<c>GUARD_COMPILER=legacy</c>, <c>COBOLSHARP_LEGACY_DIFFERENTIAL=1</c>), an
+    /// exemption list for the programs it diverged on (<c>LEGACY_DIVERGENT</c>, <c>GUARD_DIVERGENT</c>) and its own
+    /// Unit and Integration legs. All of it is retired with the engine, and this fact keeps every guard script from
+    /// naming any of it again: a gate that can be pointed at another compiler is the PB750 shape.
+    /// </summary>
+    [Fact]
+    public void GuardScripts_NameNoLegacyEngine()
+    {
+        string[] retired = ["CobolSharp", "cobolsharp", "COBOLSHARP_LEGACY_DIFFERENTIAL", "LEGACY_DIVERGENT", "GUARD_DIVERGENT"];
+        var offenders = new List<string>();
+        var scripts = Directory.EnumerateFiles(TestRepo.Scripts(), "guard*.sh").Order().ToList();
+        Assert.True(scripts.Count >= 8, $"expected the guard family under scripts/, found {scripts.Count} — the scan would assert over nothing");
+        foreach (string script in scripts)
+        {
+            int lineNo = 0;
+            foreach (string line in File.ReadLines(script))
+            {
+                lineNo++;
+                foreach (string word in retired)
+                    if (line.Contains(word, StringComparison.Ordinal))
+                        offenders.Add($"{Path.GetFileName(script)}:{lineNo} names {word}: {line.Trim()}");
+            }
+        }
+        Assert.True(offenders.Count == 0,
+            "a guard script names the retired legacy engine or its exemption (kb/Work PB2109):\n  " + string.Join("\n  ", offenders));
     }
 
     /// <summary>
@@ -151,19 +180,19 @@ public sealed class CorpusManifestTests
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <c>corpus.tsv</c>’s own header says it "folds … scripts/guard.sh LEGACY_DIVERGENT", and
-    /// <c>scripts/guard-nist-audit.sh</c> already derives each row’s EXPECTED verdict straight out of the
-    /// <c>divergent</c> column. The RUNNER, though, carried the set as a hand-written string that
+    /// <c>scripts/guard-nist-audit.sh</c> derived each row's EXPECTED verdict straight out of the <c>divergent</c>
+    /// column of <c>corpus.tsv</c>, while the RUNNER carried the divergent set as a hand-written string that
     /// <c>guard-fast.sh</c> then <c>sed</c>-extracted — so the fact was written down three times and nothing
-    /// compared them. It had drifted: THIRTEEN divergent rows, TWELVE names, <c>SQ212A</c> missing, and under
-    /// <c>GUARD_DIVERGENT=1</c> its expected legacy difference therefore scored as a REGRESSION while the audit
-    /// beside it expected <c>LEGACY DIVERGENT</c>.
+    /// compared them. It had drifted: THIRTEEN divergent rows, TWELVE names, <c>SQ212A</c> missing, and its
+    /// expected difference therefore scored as a REGRESSION while the audit beside it expected an exemption.
+    /// (That exemption list is itself retired with the legacy engine, kb/Work PB2109; the shape this fact
+    /// forbids is not.)
     /// </para>
     /// <para>
     /// The repair is the derivation (<c>scripts/guard-population.sh</c>), which makes the equality true BY
     /// CONSTRUCTION; this fact is what keeps "by construction" true (CLAUDE.md rule 5 — pair the structure with
     /// a drift test). It is deliberately stated over ANY NIST-shaped name list in ANY guard script rather than
-    /// over <c>LEGACY_DIVERGENT</c> alone, because the defect is the SHAPE — a hand-maintained list where a
+    /// over one variable, because the defect is the SHAPE — a hand-maintained list where a
     /// manifest column exists — and the next one will have a different variable name
     /// (<c>feedback_scan_all_similar</c>). <c>NIST_TESTS</c> is the one population still written out, and it is a
     /// multi-line block already asserted against the manifest by the three <c>GuardNistPopulation_*</c> facts
@@ -199,23 +228,9 @@ public sealed class CorpusManifestTests
             + "scripts/guard-nist-audit.sh derives the same column to decide each row's expected verdict:\n  "
             + string.Join("\n  ", offenders));
 
-        // ⛔ AND THE EXTRACTION-BY-sed IS THE SAME DEFECT ONE LEVEL DOWN: guard-fast.sh used to lift the string
-        // out of guard.sh, which made the copy invisible to a reader of either file alone.
-        foreach (string script in Directory.EnumerateFiles(TestRepo.Scripts(), "guard*.sh"))
-        {
-            foreach (string line in File.ReadLines(script))
-            {
-                Assert.False(
-                    line.Contains("LEGACY_DIVERGENT=", StringComparison.Ordinal)
-                    && (line.Contains("sed ", StringComparison.Ordinal) || line.Contains("grep ", StringComparison.Ordinal)),
-                    $"{Path.GetFileName(script)} extracts the divergent set out of another SCRIPT instead of "
-                    + $"deriving it from tests/nist/corpus.tsv (kb/Work PB898):\n{line}");
-            }
-        }
-
         // The derivation exists, reads the manifest, and keys on the status column the manifest actually uses.
         string helper = TestRepo.Scripts("guard-population.sh");
-        Assert.True(File.Exists(helper), $"the ONE divergent-set reader is missing: {helper}");
+        Assert.True(File.Exists(helper), $"the ONE reader of the manifest's divergent column is missing: {helper}");
         string text = File.ReadAllText(helper);
         Assert.Contains("tests/nist/corpus.tsv", text, StringComparison.Ordinal);
         Assert.Contains("\"divergent\"", text, StringComparison.Ordinal);
@@ -228,7 +243,7 @@ public sealed class CorpusManifestTests
         }
 
         // And the manifest really has divergent rows to derive — a reader over an empty column would pass every
-        // check above while exempting nothing (feedback_a_dead_lookup_is_also_unverified).
+        // check above while reading nothing (feedback_a_dead_lookup_is_also_unverified).
         Assert.True(CorpusManifest.Rows.Count(r => r.Status == "divergent") > 0,
             "tests/nist/corpus.tsv declares no `divergent` rows, so this fact is asserting over an empty set.");
     }
@@ -238,9 +253,9 @@ public sealed class CorpusManifestTests
     /// (kb/Work PB1955).
     /// </summary>
     /// <remarks>
-    /// A note beginning <c>TERMINATES EC-…</c> inverts both readings of a <c>divergent</c> row: the golden records a
-    /// run that continued past a fatal I-O status nothing covers, WiseOwl COBOL's ISO §9.1.13.1 choice (Annex A.1
-    /// item 103) ends the run unit there, and the legacy, which continues, reproduces the golden. The CLI guard read
+    /// A note beginning <c>TERMINATES EC-…</c> inverts the reading of a <c>divergent</c> row: the golden records a
+    /// run that continued past a fatal I-O status nothing covers, and WiseOwl COBOL's ISO §9.1.13.1 choice (Annex A.1
+    /// item 103) ends the run unit there, so the run must end naming that exception. The CLI guard read
     /// every <c>divergent</c> row the plain way, so PB322's two TERMINATES rows turned CI's guard red (CI run
     /// 37217227958) while this assembly's NistDifferentialTests, which knew the marker, was green. The shell has
     /// ONE reader (<c>scripts/guard-population.sh</c>, which both runners and the audit ask) and C# has one
@@ -259,11 +274,11 @@ public sealed class CorpusManifestTests
         string csharpGrammar = CorpusRow.TerminatesMarkerPattern.Replace("(", "", StringComparison.Ordinal).Replace(")", "", StringComparison.Ordinal);
         Assert.Equal(csharpGrammar, shell.Groups[1].Value);
 
-        // The C# reader on the shapes guard-population.sh's self-test feeds the shell reader (its case 5).
+        // The C# reader on the shapes guard-population.sh's self-test feeds the shell reader (its case 3).
         static string? Ec(string status, string note) => new CorpusRow("ZZ999A", "ZZ", status, [], true, note).ExpectedTermination;
         Assert.Equal("EC-I-O-PERMANENT-ERROR", Ec("divergent", "TERMINATES EC-I-O-PERMANENT-ERROR - ISO 9.1.13.1: the run unit ends"));
         Assert.Null(Ec("divergent", "ISO 14.9.28.4 CCVS-DEFECT: the golden carries one failure"));
-        Assert.Null(Ec("divergent", "ISO 9.1.13.1: the legacy TERMINATES EC-I-O where this does not"));
+        Assert.Null(Ec("divergent", "ISO 9.1.13.1: another compiler TERMINATES EC-I-O where this does not"));
         Assert.Null(Ec("green", "TERMINATES EC-I-O-LOGIC-ERROR - a green row is never a TERMINATES row"));
 
         // Both runners and the audit read the declaration through that file, never on their own (the two-arm check).
@@ -323,8 +338,8 @@ public sealed class CorpusManifestTests
 
     /// <summary>The token a <c>corpus.tsv</c> note carries to declare that the CCVS PROGRAM'S OWN EXPECTATION,
     /// not the compiler, is what the ISO text contradicts — so its golden legitimately records a failing CCVS
-    /// test. Distinct from the ordinary <c>divergent</c> reason (the LEGACY diverges from an ISO-conforming
-    /// golden), which never changes a report's PASS/FAIL column.</summary>
+    /// test. Distinct from the ordinary <c>divergent</c> reason (the golden was re-baselined to the ISO-conforming
+    /// output), which never changes a report's PASS/FAIL column.</summary>
     private const string CcvsDefectMarker = "CCVS-DEFECT";
 
     /// <summary>⛔ THE GOLDEN-BASELINE INVARIANT, IN BOTH DIRECTIONS. A CCVS report footer reading

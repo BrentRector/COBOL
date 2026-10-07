@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class CorrespondingDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
     private static void AssertOutput(string source, string expected)
     {
@@ -23,7 +23,7 @@ public sealed class CorrespondingDifferentialTests
         Assert.Equal(expected, outp);
     }
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string ws, string proc) => $"""
         IDENTIFICATION DIVISION.
@@ -40,7 +40,7 @@ public sealed class CorrespondingDifferentialTests
     // ── Pair selection over nested groups, rule 1 (name + relative qualification path), D1 order. ───────────────
     [Fact]
     public void MoveCorresponding_NestedPairs_PartialMatch()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 SRC-G.
                02 HDR PIC XX VALUE "SH".
                02 SUB-G.
@@ -66,7 +66,7 @@ public sealed class CorrespondingDifferentialTests
     // ── Rules 1/4: FILLER, an OCCURS child, and a REDEFINES child do not correspond (§14.7.6 r1/r4). ────────────
     [Fact]
     public void MoveCorresponding_ExcludesFillerOccursAndRedefinesChildren()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 SRC-G.
                02 BASE PIC 99 VALUE 33.
                02 OVR REDEFINES BASE PIC 99.
@@ -139,7 +139,7 @@ public sealed class CorrespondingDifferentialTests
             """);
         // 1.0+1.25 = 2.25 → 2.3 and 1.0+2.34 = 3.34 → 3.3, each rounded NEAREST-AWAY-FROM-ZERO (§14.7.4.3 r1).
         AssertOutput(src, "23\n33");
-        AssertSameAsLegacy(src);
+        AssertMatchesGolden(src);
     }
 
     // ── SIZE ERROR is STATEMENT-level (§14.7.6, "after all of the implied statements are completed"): one flag
@@ -180,7 +180,7 @@ public sealed class CorrespondingDifferentialTests
     //    qualified table elements; the exclusions apply only to items WITHIN them, §14.7.6). ─────────────────────
     [Fact]
     public void MoveCorresponding_QualifiedGroup_SubscriptedReceiver()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 SRC-TOP.
                02 SUB-G.
                   03 NAM PIC XX VALUE "PP".
@@ -233,7 +233,7 @@ public sealed class CorrespondingDifferentialTests
     //    siblings pair — RECORD1: 8+6=14, RECORD3: 9+7=16, RECORD2 occurrences untouched. ────────────────────────
     [Fact]
     public void AddCorresponding_TableShape_OccursChildExcluded()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 TABLE1.
                02 RECORD1 PIC 99 VALUE 6.
                02 RECORD2 PIC 99 OCCURS 2.

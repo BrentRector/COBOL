@@ -12,9 +12,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class FigurativeDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static void AssertSpec(string source, string expected)
     {
@@ -43,7 +43,7 @@ public sealed class FigurativeDifferentialTests
     // DISPLAY of a figurative → one occurrence (GR3).
     [InlineData("01 FILLER PIC X.", "    DISPLAY \"[\" ZERO \"]\".")]
     [InlineData("01 FILLER PIC X.", "    DISPLAY \"[\" SPACE \"]\".")]
-    public void FigurativeMoveDisplay(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void FigurativeMoveDisplay(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Theory]
     // MOVE SPACES to alphanumeric, exposed by a trailing "]" → spec-pinned (legacy trims trailing spaces).
@@ -57,7 +57,7 @@ public sealed class FigurativeDifferentialTests
     [InlineData("01 X PIC X(3) VALUE SPACES.", "    IF X = SPACES DISPLAY \"ALLSPACE\" ELSE DISPLAY \"NOT\" END-IF.")]
     [InlineData("01 X PIC X(3) VALUE \"AB\".", "    IF X = SPACES DISPLAY \"ALLSPACE\" ELSE DISPLAY \"NOT\" END-IF.")]
     [InlineData("01 N PIC 9(3) VALUE 0.", "    IF N IS ZERO DISPLAY \"SIGNZERO\" END-IF.")]
-    public void FigurativeComparison(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void FigurativeComparison(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Theory]
     // Figurative ZERO as a numeric-expression operand (ISO §8.3.3.6.3 r1a / §8.3.3.6.4 r4 — ZERO is the numeric value 0). Previously the
@@ -66,7 +66,7 @@ public sealed class FigurativeDifferentialTests
     [InlineData("01 N PIC 9(3) VALUE 5.", "    COMPUTE N = N + ZERO.\n    DISPLAY N.")]                // 005
     [InlineData("01 N PIC 9(3) VALUE 8.", "    SUBTRACT ZERO FROM N.\n    DISPLAY N.")]                // 008
     [InlineData("01 N PIC 9(3) VALUE 4.", "    COMPUTE N = ZERO + N * 2.\n    DISPLAY N.")]            // 008 — ZERO as a leaf
-    public void FigurativeZero_InArithmetic(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void FigurativeZero_InArithmetic(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Theory]
     // ALL <figurative-word> VALUE init (equivalent to the bare figurative): ALL ZEROS on a numeric → 0; ALL ZEROS /
@@ -74,7 +74,7 @@ public sealed class FigurativeDifferentialTests
     [InlineData("01 N PIC 9(5) VALUE ALL ZEROS.", "    ADD 7 TO N.\n    DISPLAY N.")]                  // 00007
     [InlineData("01 X PIC X(4) VALUE ALL ZEROS.", "    DISPLAY X.")]                                   // 0000
     [InlineData("01 X PIC X(4) VALUE ALL SPACES.", "    DISPLAY \"[\" X.")]                            // [
-    public void FigurativeAll_ValueInit(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void FigurativeAll_ValueInit(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Theory]
     // A figurative ZERO in a level-88 VALUE on a NUMERIC conditional variable: the membership test must compare the
@@ -82,5 +82,5 @@ public sealed class FigurativeDifferentialTests
     [InlineData("01 N PIC 9(3) VALUE 0.\n   88 IS-Z VALUE ZERO.", "    IF IS-Z DISPLAY \"Z\" ELSE DISPLAY \"NZ\".")]     // Z
     [InlineData("01 N PIC 9(3) VALUE 5.\n   88 IS-Z VALUE ZERO.", "    IF IS-Z DISPLAY \"Z\" ELSE DISPLAY \"NZ\".")]     // NZ
     [InlineData("01 N PIC 9V99 VALUE 0.\n   88 IS-Z VALUE ZERO.", "    IF IS-Z DISPLAY \"Z\" ELSE DISPLAY \"NZ\".")]     // Z (scaled)
-    public void FigurativeZero_InLevel88Value(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void FigurativeZero_InLevel88Value(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 }

@@ -17,9 +17,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class GroupNumericLeafDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static void AssertSpec(string source, string expected)
     {
@@ -49,7 +49,7 @@ public sealed class GroupNumericLeafDifferentialTests
     [Fact]
     public void NumericValueFormatsInGroupImage()
         // MOVE 7 TO WS-N → "07"; the whole-group DISPLAY shows "AB07" (DISPLAY WS-REC forces WS-N's image storage).
-        => AssertSameAsLegacy(Program(Rec, "    MOVE 7 TO WS-N.\n    DISPLAY WS-REC."));   // AB07
+        => AssertMatchesGolden(Program(Rec, "    MOVE 7 TO WS-N.\n    DISPLAY WS-REC."));   // AB07
 
     [Fact]
     public void SpacesLandInNumericPosition_TheCcvsDotvalueCase()
@@ -71,12 +71,12 @@ public sealed class GroupNumericLeafDifferentialTests
     [Fact]
     public void NumericUseOfAnImageStoredLeaf_RoundTripsViaParseDisplay()
         // WS-N is stored as its image (DISPLAY WS-REC makes WS-REC whole-referenced); numeric ADD must decode it.
-        => AssertSameAsLegacy(Program(Rec,
+        => AssertMatchesGolden(Program(Rec,
             "    MOVE 25 TO WS-N.\n    ADD 1 TO WS-N.\n    DISPLAY WS-REC."));   // AB26
 
     [Fact]
     public void GroupToGroupCopyPreservesNumericLeafImage()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-SRC.
                05 S-A PIC X(2) VALUE "AB".
                05 S-N PIC 99 VALUE 12.
@@ -87,7 +87,7 @@ public sealed class GroupNumericLeafDifferentialTests
 
     [Fact]
     public void SignedNumericLeafShowsOverpunchInGroupImage()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-REC.
                05 WS-A PIC X(2) VALUE "AB".
                05 WS-N PIC S99 VALUE -42.
@@ -95,7 +95,7 @@ public sealed class GroupNumericLeafDifferentialTests
 
     [Fact]
     public void NestedGroupWithNumericLeaf()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-OUTER.
                05 WS-HEAD PIC X(2) VALUE "HD".
                05 WS-MID.
@@ -106,5 +106,5 @@ public sealed class GroupNumericLeafDifferentialTests
     [Fact]
     public void NumericLeafNotWholeReferenced_StaysNativeAndUnaffected()
         // WS-REC is never used as a whole, so WS-N stays a native long; ordinary numeric DISPLAY still works.
-        => AssertSameAsLegacy(Program(Rec, "    MOVE 9 TO WS-N.\n    DISPLAY WS-N."));   // 09
+        => AssertMatchesGolden(Program(Rec, "    MOVE 9 TO WS-N.\n    DISPLAY WS-N."));   // 09
 }

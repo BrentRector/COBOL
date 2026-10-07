@@ -17,9 +17,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class InterProgramFileDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>Spec-pinned (no oracle): asserted against the ISO-derived expected output directly — used where
     /// the legacy has a verified hole (every use documents the hole + the deciding §).</summary>
@@ -39,7 +39,7 @@ public sealed class InterProgramFileDifferentialTests
     /// caller's storage (IC207A's CONTENTS-OF-TABLE check).</summary>
     [Fact]
     public void CallByReference_OdoGroup_FullAllocationCrossesBoundary()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ODOREF1.
             DATA DIVISION.
@@ -127,7 +127,7 @@ public sealed class InterProgramFileDifferentialTests
     /// connector; the container reads the data back (the IC233A file-visibility half).</summary>
     [Fact]
     public void GlobalFd_ContainedProgramReachesOwnersConnectorAndRecord()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. GLFD1.
             ENVIRONMENT DIVISION.
@@ -210,7 +210,7 @@ public sealed class InterProgramFileDifferentialTests
     /// COBOLNET0897) is selected over the outer's GLOBAL one.</summary>
     [Fact]
     public void GlobalFd_ContainedOwnUseOnInheritedFile_BeatsOuterGlobal()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. GLUSE2.
             ENVIRONMENT DIVISION.

@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class DisplayUponTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(2023);
+    private static readonly CobolNetCompiler CobolNet = new(2023);
 
     /// <summary>A program whose SPECIAL-NAMES binds the output device-names to mnemonics, then runs
     /// <paramref name="body"/>. <c>CompileAndRun</c> returns (ok, STDOUT, STDERR-as-detail).</summary>

@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class OccursDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string workingStorage, string procedure) => $"""
         IDENTIFICATION DIVISION.
@@ -30,7 +30,7 @@ public sealed class OccursDifferentialTests
 
     [Fact]
     public void ElementaryTable_LiteralSubscripts()
-        => AssertSameAsLegacy(Program("01 WS-TBL.\n   05 ITM OCCURS 3 PIC 9(2).", """
+        => AssertMatchesGolden(Program("01 WS-TBL.\n   05 ITM OCCURS 3 PIC 9(2).", """
                 MOVE 11 TO ITM(1).
                 MOVE 22 TO ITM(2).
                 MOVE 33 TO ITM(3).
@@ -39,7 +39,7 @@ public sealed class OccursDifferentialTests
 
     [Fact]
     public void ElementaryTable_VariableSubscript()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-TBL.
                05 ITM OCCURS 3 PIC 9(2).
             01 WS-I PIC 9 VALUE 2.
@@ -52,7 +52,7 @@ public sealed class OccursDifferentialTests
 
     [Fact]
     public void ElementaryTable_RelativeSubscript()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-TBL.
                05 ITM OCCURS 3 PIC 9(2).
             01 WS-I PIC 9 VALUE 1.
@@ -66,7 +66,7 @@ public sealed class OccursDifferentialTests
 
     [Fact]
     public void GroupTable_SubscriptedMemberAccess()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-GRP.
                05 ROW OCCURS 2.
                   10 A PIC 9(2).
@@ -82,7 +82,7 @@ public sealed class OccursDifferentialTests
 
     [Fact]
     public void Table_ArithmeticWithSubscripts()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-TBL.
                05 ITM OCCURS 3 PIC 9(3).
             01 WS-R PIC 9(4).
@@ -97,6 +97,6 @@ public sealed class OccursDifferentialTests
 
     [Fact]
     public void Table_ValueInitializedElements()
-        => AssertSameAsLegacy(Program("01 WS-TBL.\n   05 ITM OCCURS 3 PIC 9(2) VALUE 5.",
+        => AssertMatchesGolden(Program("01 WS-TBL.\n   05 ITM OCCURS 3 PIC 9(2) VALUE 5.",
             "    DISPLAY ITM(1) ITM(2) ITM(3)."));
 }

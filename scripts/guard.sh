@@ -4,11 +4,8 @@
 #
 # ⛔ WHICH COMPILER THIS MEASURES (kb/Work/PB750). The NIST leg drives `cobol` (src/Cobol.Net.Cli) — the compiler
 # this project ships — and refuses to start unless the resolved binary really references Cobol.Net.Compiler.
-# Until 2026-09-06 it hard-coded the LEGACY `cobolsharp.dll`, whose project graph contains no code generator, so
-# its headline MATCH count was a true statement about the ORACLE and no statement at all about WiseOwl COBOL.
-# `GUARD_COMPILER=legacy` runs the identical leg through the legacy oracle instead — a differential observation,
-# never the gate (`COBOLSHARP_LEGACY_DIFFERENTIAL=1` does too, and ALSO flips the Integration suite's opt-in
-# differential corpus; see scripts/guard-compiler.sh). Every summary line names the compiler it drove.
+# Until 2026-09-06 it hard-coded the legacy byte engine's CLI, whose project graph contains no code generator, so
+# its headline MATCH count said nothing about WiseOwl COBOL. Every summary line names the compiler it drove.
 set -e
 
 # WHICH COMPILER, asserted against the binary's own dependency graph (scripts/guard-compiler.sh).
@@ -18,15 +15,7 @@ guard_announce_compiler
 
 echo "=== Building ==="
 dotnet build "$GUARD_CLI_PROJECT" -v quiet
-guard_assert_compiler_identity "$GUARD_CLI_DLL" "$GUARD_COMPILER"
-
-# SCRUBBED (kb/Work PB1718): no gate leg handshake or VSTest*/RunSettingsFilePath property reaches a test host.
-. "$(dirname "$0")/python-resolve.sh"
-echo "=== Unit tests ==="
-"$PY" scripts/test_population.py scrubbed dotnet test tests/CobolSharp.Tests.Unit/CobolSharp.Tests.Unit.csproj --verbosity quiet
-
-echo "=== Integration tests ==="
-"$PY" scripts/test_population.py scrubbed dotnet test tests/CobolSharp.Tests.Integration/CobolSharp.Tests.Integration.csproj --verbosity quiet
+guard_assert_compiler_identity "$GUARD_CLI_DLL"
 
 echo "=== NIST regression ==="
 
@@ -55,8 +44,8 @@ cp "$GUARD_RUNTIME_DLL" "$GUARD_WORK/output/"
 # The SNAPSHOT is what runs — that is the whole point of the run-scoped work dir — so GUARD_CLI_DLL is
 # re-pointed at it (and re-asserted: a snapshot copy is still a binary whose identity must hold).
 CLI="$GUARD_WORK/cli/$(basename "$GUARD_CLI_DLL")"
-export GUARD_CLI_DLL="$CLI" GUARD_COMPILER
-guard_assert_compiler_identity "$CLI" "$GUARD_COMPILER"
+export GUARD_CLI_DLL="$CLI"
+guard_assert_compiler_identity "$CLI"
 NIST_OUT="$GUARD_WORK/output"
 NIST_PROGS="$GUARD_WORK/programs"
 NIST_VALID="$GUARD_WORK/valid"
@@ -170,38 +159,16 @@ RW101A RW102A RW103A RW104A
 # NIST convention: SWITCH-1 ON, SWITCH-2 OFF (default)
 export COBOL_SWITCH_1=ON
 
-# ── THE LEGACY-DIVERGENT EXEMPTION, DERIVED (kb/Work PB898) ───────────────────────────────────────────────
-# Programs whose golden was RE-BASELINED to the ISO-conforming output (owner-approved, DEVLOG 569/570): the
-# LEGACY's output legitimately differs — either a verified legacy NON-CONFORMANCE (process rule #1 — the ISO
-# spec is authority; the legacy is a regression net with holes) or a different implementor choice of
-# spec-UNDEFINED behavior. The guard still compiles and runs them, but the output diff is EXPECTED and is
-# reported, never counted as a regression; the greenfield differential suite (NistDifferentialTests) locks the
-# conforming goldens byte-exact.
-#
-# ⛔ THE SET AND ITS PER-PROGRAM RATIONALE LIVE IN tests/nist/corpus.tsv — status `divergent`, with the ISO
-# citation in the note column, which CorpusManifestTests.EveryDivergent_CitesSpec enforces. This file used to
-# carry BOTH a hand-written name list and a hand-written digest of those rationales, and the list had already
-# drifted a program behind the manifest (THIRTEEN rows, TWELVE names; SQ212A missing), so its expected legacy
-# difference scored as a REGRESSION. Read the set with its reasons:
-#     awk -F'\t' '$3=="divergent"{print $1"\t"$6}' tests/nist/corpus.tsv
-#
-# ⭐ THE SET APPLIES TO THE LEGACY ONLY (kb/Work/PB750). Every divergence is one the LEGACY exhibits, so under
-# the default compiler (`cobol`) these goldens are exactly what WiseOwl COBOL must reproduce —
-# NistDifferentialTests already locks them byte-exact — and exempting them would blind the guard on the very
-# programs a codegen regression is most likely to break. The variable is therefore emptied unless the run is
-# the opt-in legacy differential. Both guards derive it from the ONE manifest, through the ONE reader in
-# scripts/guard-population.sh, which is the same fact scripts/guard-nist-audit.sh already reads to decide what
-# verdict each row is expected to produce.
-#
-# ⛔ A `TERMINATES` DIVERGENT ROW IS THE OTHER WAY ROUND (kb/Work PB1955): its golden records a run that continued
-# past a fatal I-O status nothing covers, which WiseOwl COBOL's Annex A.1 item 103 choice ends. So GUARD_TERMINATES
-# (`NAME=EC-…`, from the same reader) applies to `cobol` only: the run must end naming that exception. Under the
-# legacy it is emptied and the row is compared with its golden like a green one; guard_legacy_divergent leaves
-# TERMINATES rows out of the legacy exemption for the same reason.
+# ── THE TERMINATES ROWS, DERIVED (kb/Work PB898, PB1955) ──────────────────────────────────────────────────
+# Every program is compared with its golden; a `divergent` row's golden is the ISO-conforming output, which
+# WiseOwl COBOL must reproduce byte-exact (its rationale is the ISO citation in tests/nist/corpus.tsv's note
+# column, which CorpusManifestTests.EveryDivergent_CitesSpec enforces). The one exception is a `divergent` row
+# whose note begins `TERMINATES EC-…`: its golden records a run that continued past a fatal I-O status nothing
+# covers, which WiseOwl COBOL's Annex A.1 item 103 choice ends, so the run must end naming that exception.
+# GUARD_TERMINATES (`NAME=EC-…`) is read from the ONE manifest through the ONE reader both guards and the audit
+# share (scripts/guard-population.sh).
 . "$(dirname "$0")/guard-population.sh"
-LEGACY_DIVERGENT="$(guard_legacy_divergent)" || exit 1
 GUARD_TERMINATES="$(guard_terminating)" || exit 1
-if [ "$GUARD_DIVERGENT" != "1" ]; then LEGACY_DIVERGENT=""; else GUARD_TERMINATES=""; fi
 
 # ⛔ THE EVIDENCE RULES + THE VERDICT AUDIT (plan §11 A12b/A12c; DESIGN-test-build-ci.md §3.10). A verdict is
 # produced only from an observation actually made: a compile is FAILED only with a non-zero rc AND diagnostic
@@ -279,13 +246,6 @@ for test in $NIST_TESTS; do
         continue
     fi
 
-    # An ISO-re-baselined golden the legacy legitimately diverges from: compiled and ran above; the diff is
-    # expected (see LEGACY_DIVERGENT) — never a regression.
-    case " $LEGACY_DIVERGENT " in *" $test "*)
-        v "$test" "LEGACY DIVERGENT (golden = ISO-conforming baseline; expected diff)"
-        continue ;;
-    esac
-
     # RUN + COMPARE arms — normalization, candidate resolution (outfile, print-file, stdout), the FAIL*/footer
     # rules and the evidence rules all live in scripts/guard-verdict.sh, which guard-run-group.sh calls too.
     guard_output_verdict "$test" "$validfile" "$rrc" "$errfile" "$RUN_TIMEOUT" "$CMPDIR" \
@@ -304,7 +264,7 @@ done
 # population and that each verdict is the one tests/nist/corpus.tsv predicts.
 echo "$NIST_TESTS" | tr ' ' '\n' | grep . | sort > "$GUARD_WORK/population.txt"
 NIST_AUDIT=0
-bash "$(dirname "$0")/guard-nist-audit.sh" "$VERDICTS" "$GUARD_WORK/population.txt" "$GUARD_COMPILER" || NIST_AUDIT=$?
+bash "$(dirname "$0")/guard-nist-audit.sh" "$VERDICTS" "$GUARD_WORK/population.txt" || NIST_AUDIT=$?
 
 if [ $FAILURES -gt 0 ] || [ $NIST_AUDIT -ne 0 ]; then
     echo "=== NIST ($GUARD_COMPILER): $FAILURES REGRESSION(S), audit rc=$NIST_AUDIT ==="

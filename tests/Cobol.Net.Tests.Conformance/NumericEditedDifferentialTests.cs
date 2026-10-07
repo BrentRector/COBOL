@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class NumericEditedDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string workingStorage, string procedure) => $"""
         IDENTIFICATION DIVISION.
@@ -30,7 +30,7 @@ public sealed class NumericEditedDifferentialTests
 
     [Fact]
     public void ZeroSuppression_AndPoint()
-        => AssertSameAsLegacy(Program("01 E1 PIC ZZ,ZZ9.99.\n01 N1 PIC 9(5)V99 VALUE 1234.5.", """
+        => AssertMatchesGolden(Program("01 E1 PIC ZZ,ZZ9.99.\n01 N1 PIC 9(5)V99 VALUE 1234.5.", """
                 MOVE N1 TO E1.
                 DISPLAY ">" E1 "<".
                 MOVE ZERO TO E1.
@@ -39,7 +39,7 @@ public sealed class NumericEditedDifferentialTests
 
     [Fact]
     public void AsteriskFill_CheckProtect()
-        => AssertSameAsLegacy(Program("01 E1 PIC **,**9.99.\n01 N1 PIC 9(5)V99 VALUE 42.5.", """
+        => AssertMatchesGolden(Program("01 E1 PIC **,**9.99.\n01 N1 PIC 9(5)V99 VALUE 42.5.", """
                 MOVE N1 TO E1.
                 DISPLAY ">" E1 "<".
             """));
@@ -64,14 +64,14 @@ public sealed class NumericEditedDifferentialTests
 
     [Fact]
     public void FloatingCurrency()
-        => AssertSameAsLegacy(Program("01 E1 PIC $$,$$9.99.\n01 N1 PIC 9(4)V99 VALUE 3.07.", """
+        => AssertMatchesGolden(Program("01 E1 PIC $$,$$9.99.\n01 N1 PIC 9(4)V99 VALUE 3.07.", """
                 MOVE N1 TO E1.
                 DISPLAY ">" E1 "<".
             """));
 
     [Fact]
     public void TrailingMinus_AndSimpleInsertion()
-        => AssertSameAsLegacy(Program("01 E1 PIC ZZZ9-.\n01 E2 PIC 99B99/99.\n01 N1 PIC S9(4) VALUE -123.", """
+        => AssertMatchesGolden(Program("01 E1 PIC ZZZ9-.\n01 E2 PIC 99B99/99.\n01 N1 PIC S9(4) VALUE -123.", """
                 MOVE N1 TO E1.
                 DISPLAY ">" E1 "<".
                 MOVE 123456 TO E2.
@@ -80,14 +80,14 @@ public sealed class NumericEditedDifferentialTests
 
     [Fact]
     public void ArithmeticGiving_RoundedBeforeEditing()
-        => AssertSameAsLegacy(Program("01 E1 PIC $ZZ9.99.\n01 A PIC 9(3)V999 VALUE 24.035.\n01 B PIC 9 VALUE 3.", """
+        => AssertMatchesGolden(Program("01 E1 PIC $ZZ9.99.\n01 A PIC 9(3)V999 VALUE 24.035.\n01 B PIC 9 VALUE 3.", """
                 MULTIPLY A BY B GIVING E1 ROUNDED.
                 DISPLAY ">" E1 "<".
             """));
 
     [Fact]
     public void DivideRemainder_Basic()
-        => AssertSameAsLegacy(Program("01 Q PIC 9(3).\n01 R PIC 9(3).\n01 D PIC 9(4) VALUE 1234.", """
+        => AssertMatchesGolden(Program("01 Q PIC 9(3).\n01 R PIC 9(3).\n01 D PIC 9(4) VALUE 1234.", """
                 DIVIDE D BY 97 GIVING Q REMAINDER R.
                 DISPLAY Q " " R.
                 DIVIDE 97 INTO D GIVING Q REMAINDER R.
@@ -96,14 +96,14 @@ public sealed class NumericEditedDifferentialTests
 
     [Fact]
     public void DivideRemainder_RoundedQuotient_TruncatedIntermediate()
-        => AssertSameAsLegacy(Program("01 Q PIC 9(3).\n01 R PIC 9(3).", """
+        => AssertMatchesGolden(Program("01 Q PIC 9(3).\n01 R PIC 9(3).", """
                 DIVIDE 1000 BY 300 GIVING Q ROUNDED REMAINDER R.
                 DISPLAY Q " " R.
             """));
 
     [Fact]
     public void AlphanumericEdited_SimpleInsertion()
-        => AssertSameAsLegacy(Program("01 E1 PIC XBXBXBX.\n01 E2 PIC XX/XX/XX.\n01 E3 PIC 990099.", """
+        => AssertMatchesGolden(Program("01 E1 PIC XBXBXBX.\n01 E2 PIC XX/XX/XX.\n01 E3 PIC 990099.", """
                 MOVE "NPLD" TO E1.
                 DISPLAY ">" E1 "<".
                 MOVE "311224" TO E2.
@@ -114,7 +114,7 @@ public sealed class NumericEditedDifferentialTests
 
     [Fact]
     public void AllSymbolMask_AsteriskFillOnZero()
-        => AssertSameAsLegacy(Program("01 E1 PIC ****.\n01 N1 PIC 9(4) VALUE 0.", """
+        => AssertMatchesGolden(Program("01 E1 PIC ****.\n01 N1 PIC 9(4) VALUE 0.", """
                 MOVE N1 TO E1.
                 DISPLAY ">" E1 "<".
                 MOVE 42 TO N1.
@@ -124,7 +124,7 @@ public sealed class NumericEditedDifferentialTests
 
     [Fact]
     public void AlphanumericToNumeric_UnsignedInteger()
-        => AssertSameAsLegacy(Program("01 X1 PIC X(5) VALUE \"00347\".\n01 N1 PIC 9(5).", """
+        => AssertMatchesGolden(Program("01 X1 PIC X(5) VALUE \"00347\".\n01 N1 PIC 9(5).", """
                 MOVE X1 TO N1.
                 DISPLAY N1.
                 ADD 3 TO N1.

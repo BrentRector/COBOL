@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class SearchDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string procedure) => $$"""
         IDENTIFICATION DIVISION.
@@ -32,7 +32,7 @@ public sealed class SearchDifferentialTests
 
     [Fact]
     public void Search_FindsFromCurrentIndexSetting()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
                 SET IX-1 TO 1.
                 SEARCH ITM
                     AT END DISPLAY "NOT-FOUND"
@@ -45,7 +45,7 @@ public sealed class SearchDifferentialTests
 
     [Fact]
     public void Search_AtEnd_WhenStartedPastMatch()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
                 SET IX-1 TO 4.
                 SEARCH ITM
                     AT END DISPLAY "NOT-FOUND"
@@ -56,7 +56,7 @@ public sealed class SearchDifferentialTests
 
     [Fact]
     public void Search_MultipleWhens_FirstTrueWins()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
                 SET IX-1 TO 1.
                 SEARCH ITM
                     AT END DISPLAY "NOT-FOUND"
@@ -68,7 +68,7 @@ public sealed class SearchDifferentialTests
 
     [Fact]
     public void Search_VaryingOtherItem_InStep()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
                 MOVE 10 TO WS-N.
                 SET IX-1 TO 1.
                 SEARCH ITM VARYING WS-N
@@ -80,7 +80,7 @@ public sealed class SearchDifferentialTests
 
     [Fact]
     public void Search_GoToOutOfWhenBody()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
                 SET IX-1 TO 1.
                 SEARCH ITM
                     AT END GO TO MISS-PARA

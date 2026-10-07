@@ -13,13 +13,13 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class FileIoDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
     /// <summary>For the cases whose OBSERVATION needs a COBOL-2023 construct — today the line-sequential
     /// read-back of a print stream (kb/Work PB688). The BEHAVIOR under test is edition-invariant.</summary>
-    private static readonly ICompilerUnderTest CobolNet2023 = new CobolNetCompiler(2023);
+    private static readonly CobolNetCompiler CobolNet2023 = new(2023);
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>A program with a single SELECTed file; <paramref name="select"/> is the SELECT clause body (after the
     /// file-name), <paramref name="fd"/> the FD record description(s), and <paramref name="proc"/> the procedure body.
@@ -49,7 +49,7 @@ public sealed class FileIoDifferentialTests
     // CutRunner.Normalize / CompilerUnderTest); the per-line trailing trim then washes the field width out.
     [Fact]
     public void WriteThenReadBack_RecordSequential()
-        => AssertSameAsLegacy(Program("ASSIGN TO \"FIO-RT1\"", "01 F-REC PIC X(10).", "",
+        => AssertMatchesGolden(Program("ASSIGN TO \"FIO-RT1\"", "01 F-REC PIC X(10).", "",
             """
                 OPEN OUTPUT F.
                 MOVE "HELLO" TO F-REC. WRITE F-REC.
@@ -66,7 +66,7 @@ public sealed class FileIoDifferentialTests
 
     [Fact]
     public void WriteFrom_AndReadInto()
-        => AssertSameAsLegacy(Program("ASSIGN TO \"FIO-RT2\"", "01 F-REC PIC X(8).",
+        => AssertMatchesGolden(Program("ASSIGN TO \"FIO-RT2\"", "01 F-REC PIC X(8).",
             "01 WS-SEND PIC X(8) VALUE \"ABCDEFGH\".\n01 WS-RECV PIC X(8).",
             """
                 OPEN OUTPUT F.
@@ -81,7 +81,7 @@ public sealed class FileIoDifferentialTests
 
     [Fact]
     public void Extend_AppendsAfterExistingRecords()
-        => AssertSameAsLegacy(Program("ASSIGN TO \"FIO-RT3\"", "01 F-REC PIC X(4).", "",
+        => AssertMatchesGolden(Program("ASSIGN TO \"FIO-RT3\"", "01 F-REC PIC X(4).", "",
             """
                 OPEN OUTPUT F. MOVE "AAAA" TO F-REC. WRITE F-REC. CLOSE F.
                 OPEN EXTEND F. MOVE "BBBB" TO F-REC. WRITE F-REC. CLOSE F.
@@ -96,7 +96,7 @@ public sealed class FileIoDifferentialTests
 
     [Fact]
     public void FileStatus_SuccessAndEof()
-        => AssertSameAsLegacy(Program("ASSIGN TO \"FIO-RT4\" FILE STATUS IS WS-ST", "01 F-REC PIC X(3).",
+        => AssertMatchesGolden(Program("ASSIGN TO \"FIO-RT4\" FILE STATUS IS WS-ST", "01 F-REC PIC X(3).",
             "01 WS-ST PIC XX.",
             """
                 OPEN OUTPUT F. DISPLAY "OPEN=" WS-ST.
@@ -112,7 +112,7 @@ public sealed class FileIoDifferentialTests
     public void OptionalAbsent_OpenInput_IsAtEnd()
         // SELECT OPTIONAL precedes the file-name (ISO §12.4.5.2); an OPTIONAL file absent at OPEN INPUT opens with
         // status 05 and the first READ raises AT END (ISO §9.1.13.2).
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. FIOOPT.
             ENVIRONMENT DIVISION.
@@ -137,7 +137,7 @@ public sealed class FileIoDifferentialTests
     public void MultipleRecordsUnderOneFd_ShareTheArea()
         // ISO §9.1.2: two 01s under one FD occupy the same record area — MOVE into one, WRITE the other writes the
         // same bytes (the NC101A PRINT-REC / DUMMY-RECORD pattern).
-        => AssertSameAsLegacy(Program("ASSIGN TO \"FIO-RT5\"", "01 REC-A PIC X(6).\n01 REC-B PIC X(6).", "",
+        => AssertMatchesGolden(Program("ASSIGN TO \"FIO-RT5\"", "01 REC-A PIC X(6).\n01 REC-B PIC X(6).", "",
             """
                 OPEN OUTPUT F.
                 MOVE "SHARED" TO REC-A.
@@ -154,7 +154,7 @@ public sealed class FileIoDifferentialTests
         // Tier-B redefines (ISO §9.1.2; COBOLNET_DESIGN §4.2): the first record (a group) is a view over the ONE
         // backing, so WRITE writes the backing window and a READ distributes the image INTO the backing (not a struct
         // FromImage) — the EmitImageInto view path. The leaves then read it back.
-        => AssertSameAsLegacy(Program("ASSIGN TO \"FIO-RT7\"",
+        => AssertMatchesGolden(Program("ASSIGN TO \"FIO-RT7\"",
             "01 REC-A.\n   03 RA-1 PIC X(3).\n   03 RA-2 PIC X(3).\n01 REC-B PIC X(6).", "",
             """
                 OPEN OUTPUT F.

@@ -9,22 +9,18 @@ namespace CobolNet.Tests.Conformance;
 /// — a VALUE clause, a fixed-length receiver, a level-88 VALUE, or a compared-with operand — the literal is repeated
 /// character by character until its length is ≥ the associated width, then truncated from the right to that width
 /// (GR2). In a length-unspecified context (DISPLAY), the literal is used once (GR3c). Each result is derived from the
-/// spec and cross-checked against the legacy oracle.
+/// spec.
 /// </summary>
 public sealed class AllLiteralDifferentialTests
 {
-    private static readonly ICompilerUnderTest Legacy = new LegacyCompiler();
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSpecAndLegacy(string source, string expected)
+    private static void AssertSpec(string source, string expected)
     {
         string want = CutRunner.Normalize(expected);
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
         Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
-        Assert.Equal(want, cout);                       // primary: conformance to ISO §8.3.3.6.4
-        var (lok, lout, ldetail) = Legacy.CompileAndRun(source);
-        Assert.True(lok, $"legacy oracle failed: {ldetail}");
-        Assert.Equal(want, lout);                       // cross-check: the oracle agrees with the spec value
+        Assert.Equal(want, cout);                       // conformance to ISO §8.3.3.6.4
     }
 
     private static string Program(string ws, string proc) => $"""
@@ -47,12 +43,12 @@ public sealed class AllLiteralDifferentialTests
     // MOVE ALL "literal" fills the receiver to its width (GR2).
     [InlineData("01 R PIC X(6).", "    MOVE ALL \"AB\" TO R.\n    DISPLAY \"R=\" R.", "R=ABABAB")]
     public void AllLiteral_WidthContexts(string ws, string proc, string expected)
-        => AssertSpecAndLegacy(Program(ws, proc), expected);
+        => AssertSpec(Program(ws, proc), expected);
 
     [Fact]
     // A comparison repeats ALL "literal" to the OTHER operand's width (GR2): C6 "ABCABC" equals ALL "ABC" but not ALL "AB".
     public void AllLiteral_ComparisonUsesOtherOperandWidth()
-        => AssertSpecAndLegacy(Program("01 C6 PIC X(6) VALUE \"ABCABC\".",
+        => AssertSpec(Program("01 C6 PIC X(6) VALUE \"ABCABC\".",
             """
                 IF C6 = ALL "ABC" DISPLAY "EQ1" ELSE DISPLAY "NE1" END-IF.
                 IF C6 = ALL "AB"  DISPLAY "EQ2" ELSE DISPLAY "NE2" END-IF.
@@ -61,12 +57,12 @@ public sealed class AllLiteralDifferentialTests
     [Fact]
     // A level-88 VALUE ALL "literal" is repeated to the conditional variable's width (GR2).
     public void AllLiteral_Level88Value()
-        => AssertSpecAndLegacy(Program("01 FL PIC X(6) VALUE \"BACBAC\".\n   88 IS-ALL-BAC VALUE ALL \"BAC\".",
+        => AssertSpec(Program("01 FL PIC X(6) VALUE \"BACBAC\".\n   88 IS-ALL-BAC VALUE ALL \"BAC\".",
             "    IF IS-ALL-BAC DISPLAY \"YES\" ELSE DISPLAY \"NO\" END-IF."), "YES");
 
     [Fact]
     // DISPLAY is a length-UNSPECIFIED context (GR3c): ALL "literal" is used once.
     public void AllLiteral_DisplayUsesLiteralOnce()
-        => AssertSpecAndLegacy(Program("01 FILLER PIC X.",
+        => AssertSpec(Program("01 FILLER PIC X.",
             "    DISPLAY \"R=\" ALL \"XY\"."), "R=XY");
 }

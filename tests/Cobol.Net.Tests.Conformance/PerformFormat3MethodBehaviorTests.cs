@@ -15,7 +15,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class PerformFormat3MethodBehaviorTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(2023);
+    private static readonly CobolNetCompiler CobolNet = new(2023);
 
     /// <summary>A driver program that creates an <c>F3MCLS</c> object and INVOKEs its <c>DOIT</c> method; the method
     /// carries a per-activation LOCAL-STORAGE <c>N</c> (PIC 9 VALUE 9) and runs <paramref name="proc"/> in its body.

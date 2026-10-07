@@ -15,7 +15,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class RefModRangeTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(2023);
+    private static readonly CobolNetCompiler CobolNet = new(2023);
 
     private static string Prog(string directives, string ws, string proc) => $"""
         {directives}

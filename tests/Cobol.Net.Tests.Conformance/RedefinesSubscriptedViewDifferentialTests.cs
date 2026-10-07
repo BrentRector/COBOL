@@ -14,11 +14,11 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class RedefinesSubscriptedViewDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     [Fact]
     public void TableRedefinesPicture_SubscriptedElementReads()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. RSV1.
             DATA DIVISION.
@@ -36,7 +36,7 @@ public sealed class RedefinesSubscriptedViewDifferentialTests
 
     [Fact]
     public void SubscriptedViewWrite_VisibleThroughBacking()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. RSV2.
             DATA DIVISION.
@@ -53,7 +53,7 @@ public sealed class RedefinesSubscriptedViewDifferentialTests
 
     [Fact]
     public void NestedOccursInRedefines_TwoSubscripts()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. RSV3.
             DATA DIVISION.
@@ -70,7 +70,7 @@ public sealed class RedefinesSubscriptedViewDifferentialTests
 
     [Fact]
     public void SiblingAfterTable_OffsetCountsAllOccurrences()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. RSV4.
             DATA DIVISION.
@@ -96,7 +96,7 @@ public sealed class RedefinesSubscriptedViewDifferentialTests
     /// tests/conformance/85/pb414_next_sentence_last_sentence_inline.cob (kb/Work PB414).</summary>
     [Fact]
     public void NextSentence_SkipsTrailOfOwnSentence()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. RSV5.
             DATA DIVISION.

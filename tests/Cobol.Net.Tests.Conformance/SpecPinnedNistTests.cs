@@ -9,8 +9,8 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// NIST programs whose original GOLDEN was legacy-tainted — the baselined expected file encoded a LEGACY
 /// non-conformance. Each pin asserts the SPEC-derived outcome with its ISO citation. The goldens below were
-/// RE-BASELINED to the conforming output (owner-approved, DEVLOG 569 — the legacy guard carries them in its
-/// LEGACY_DIVERGENT list), so the programs are ALSO byte-locked in <see cref="NistDifferentialTests"/>;
+/// RE-BASELINED to the conforming output (owner-approved, DEVLOG 569; <c>tests/nist/corpus.tsv</c> marks each row
+/// <c>divergent</c> with its ISO citation), so the programs are ALSO byte-locked in <see cref="NistDifferentialTests"/>;
 /// these pins remain as the citation-bearing documentation of WHY each golden diverges from the legacy.
 /// <para>ONE pin is of a different KIND and is marked as such: <see cref="NC201A_VaryingAfterFromOuterInductionVariable_RunsEightBodies"/>
 /// is not a legacy artefact but a CCVS DEFECT — the CCVS program's own expected value is what the ISO text

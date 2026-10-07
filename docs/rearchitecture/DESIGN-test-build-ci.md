@@ -23,11 +23,12 @@ at G8* — so the net itself must be rearchitected first, or it evaporates mid-m
 | `tests/CobolSharp.Tests.Unit` | legacy | FROZEN legacy unit tests. |
 
 ### 1.2 The differential oracle (the load-bearing risk)
-`CompilerUnderTest.cs` defines `ICompilerUnderTest` with two impls: `LegacyCompiler` (drives the frozen
-`CobolSharp.Compiler.Compilation`) and `CobolNetCompiler` (drives `CompilerDriver`). ~60 `*DifferentialTests.cs`
-compile the SAME source with both and assert byte-identical normalized stdout (`CutRunner.Normalize` = the guard's
-`normalize()`: drop CR, per-line trailing-trim). **The legacy engine is deleted at G8** (design SSOT + the csproj
-comment on the legacy `ProjectReference`). At that moment every dynamic differential test loses its oracle.
+`CompilerUnderTest.cs` defines `CobolNetCompiler` (drives `CompilerDriver`) and `CutRunner`. The ~60
+`*DifferentialTests.cs` compile each source with WiseOwl COBOL and compare its normalized stdout
+(`CutRunner.Normalize` = the guard's `normalize()`: drop CR, per-line trailing-trim) with a committed golden under
+`tests/differential/` (`DifferentialGolden.Assert`, one mode). Those goldens were recorded once from the legacy
+engine; the live legacy comparison, its bake and verify modes and the conformance project's `ProjectReference`s
+to `CobolSharp.*` were removed by kb/Work PB2108 (R69), so a new golden is spec-derived and never baked.
 
 `NistDifferentialTests` is DIFFERENT and safe: it compares WiseOwl COBOL output to committed goldens
 (`tests/nist/valid/*.txt`), not to a live legacy run. But the green NIST set is a hand-maintained ~318-row
@@ -43,24 +44,19 @@ and each battery's headline `guard NIST: 353 MATCH` was a true statement about t
 demonstration: `NC215A` printed a wrong answer (PB741) that `NistDifferentialTests_P0` caught and the guard's
 353-MATCH/audit-CLEAN NIST line could not see.
 - `scripts/guard-compiler.sh` — ⭐ **the ONE place that answers "which compiler is this gate measuring?"**,
-  sourced by both guards and by `run-suite.sh`. `cobol` by default; the legacy oracle under `GUARD_COMPILER=legacy`
-  (NIST leg only) or the project's existing opt-in switch `COBOLSHARP_LEGACY_DIFFERENTIAL=1`, which **also**
-  switches `CobolSharp.Tests.Integration`'s `ConformanceTests` into their opt-in legacy-differential corpus (that
-  assembly reads the same variable) — a separate and much larger gate, so the banner says so and
-  `GUARD_COMPILER=legacy` exists to change ONLY the compiler. `guard_assert_compiler_identity` reads the resolved
-  CLI's own `.deps.json` — the build's record of its project graph — and REFUSES to run when the closure does
-  not match the compiler the guard claims (present `Cobol.Net.Compiler` for `cobol`, absent for `legacy`), so a
-  path typo, a stale bin dir or a project rename can no longer silently re-point the gate. `--self-test` proves
-  both directions of that refusal fire; `guard-verify.sh` runs it, so `battery.sh` phase 2a does too.
+  sourced by both guards: `cobol` (src/Cobol.Net.Cli), the only compiler any gate drives since the legacy engine's
+  retirement (kb/Work R69, PB2109). `guard_assert_compiler_identity` reads the resolved CLI's own `.deps.json` — the
+  build's record of its project graph — and REFUSES to run when the closure does not contain `Cobol.Net.Compiler`,
+  so a path typo, a stale bin dir or a project rename can never silently point the gate at another binary.
+  `--self-test` proves the refusal fires (on synthetic manifests, so it needs no second compiler); `guard-verify.sh`
+  runs it, so `battery.sh` phase 2a does too.
 - `scripts/guard-compile.sh` — the compile invocation, written once: `cobol` takes the test name as
-  `--nist NAME` (its parser binds the next token, so `--nist prog.cob` would consume the SOURCE), the legacy
-  takes a bare `--nist`. Called by the serial guard, the parallel compile and its serial re-observation retry.
-- `scripts/guard.sh` — serial: builds the CLI under test, runs the legacy unit+integration suites (a separate
-  leg — they gate `CobolSharp.Compiler` and, through it, the SHARED `Cobol.Net.Frontend`), then compiles+runs
-  376 NIST programs THROUGH THE COMPILER UNDER TEST and diffs against `tests/nist/valid/`. Carries
-  `LEGACY_DIVERGENT` (11 ISO-rebaselined goldens the LEGACY legitimately differs on — **emptied unless the run
-  is the legacy differential**, since under `cobol` those goldens are exactly what the compiler must reproduce)
-  and the golden-cleanliness sweep. Every summary line names the compiler: `=== NIST (cobol): … ===`.
+  `--nist NAME` (its parser binds the next token, so `--nist prog.cob` would consume the SOURCE). Called by the
+  serial guard, the parallel compile and its serial re-observation retry.
+- `scripts/guard.sh` — serial: builds the CLI under test, then compiles+runs 376 NIST programs THROUGH IT and diffs
+  against `tests/nist/valid/` — every program, the ISO-rebaselined `divergent` goldens included, since those are
+  exactly what the compiler must reproduce; a `TERMINATES` row must instead end naming its declared exception — and
+  runs the golden-cleanliness sweep. Every summary line names the compiler: `=== NIST (cobol): … ===`.
 - `scripts/guard-fast.sh` — parallel version. Isolation is now the CONNECTED COMPONENTS of `corpus.tsv`'s
   declared `chain-preds` (332 groups over 376 programs, longest 9), replacing the former per-suite heuristic —
   see §3.10's grouping row. Verdicts are checked ABSOLUTELY by `guard-nist-audit.sh` against the manifest, which is a
@@ -68,14 +64,11 @@ demonstration: `NC215A` printed a wrong answer (PB741) that `NistDifferentialTes
   two guards deviating together).
 - `scripts/guard-run-group.sh` — one group, serial, in its own scratch dir; owns the per-test EVIDENCE RULES.
 - `scripts/guard-nist-audit.sh` — the population/manifest/expectation audit, consumed by BOTH guards.
-- `scripts/guard-verify.sh` — the serial↔parallel equivalence proof. ⚠ Its verdict filter had silently omitted
-  `LEGACY DIVERGENT`, dropping 11 programs from both sides; the vocabulary is complete now and an unrecognized
+- `scripts/guard-verify.sh` — the serial↔parallel equivalence proof. ⚠ Its verdict filter had once silently omitted
+  a verdict word, dropping 11 programs from both sides; the vocabulary is complete now and an unrecognized
   verdict-shaped line is reported rather than discarded.
 - `scripts/version-continuity-sweep.sh` — INV-1: one warm `cobol check-batch` over ~350 programs × 4 editions
   (no Roslyn), fails on any `BREAKS`. THIS one drives the greenfield CLI.
-- `scripts/compliance.sh`, `nist-batch.sh`, `run-suite.sh` — ad-hoc dashboards. `run-suite.sh` selects its
-  compiler through `guard-compiler.sh` like the guards; `nist-batch.sh` drives `cobol` directly and is NOT a
-  gate (it duplicates guard-fast without isolation, chains, evidence rules or the audit).
 
 **NIST is measured twice, by two different paths, and they are ONE POPULATION.** `NistDifferentialTests`
 (6 partitions) drives `CompilerDriver` IN-PROCESS over the 349 green∪divergent rows on both OSes;
@@ -84,15 +77,17 @@ bash on Linux. Neither subsumes the other — one covers the library API and Win
 shipped exe, the CCVS chain-isolation model and the compile+run health of the golden-less programs — and both
 derive their population AND their expected verdict from `tests/nist/corpus.tsv`. `CorpusManifestTests` asserts
 that structurally (guard population ⊇ every asserted program, ⊆ the manifest, surplus only `pending` rows, and
-neither guard hard-coding a CLI path); `guard-nist-audit.sh` asserts it dynamically, per program, per compiler.
+neither guard hard-coding a CLI path or naming the retired engine); `guard-nist-audit.sh` asserts it dynamically,
+per program.
 
 ### 1.4 CI (`.github/workflows/build-and-test.yml`) — a gated matrix behind ONE required check
-Ten jobs. `changes` decides whether the matrix runs at all; then, concurrently, `guard` (WiseOwl COBOL parallel NIST +
-legacy unit/integration, ubuntu) · `greenfield-conformance` (ubuntu, 6 shards) · `greenfield-unit` (ubuntu) ·
+Ten jobs. `changes` decides whether the matrix runs at all; `audits` runs on every push; then, concurrently, `guard` (WiseOwl COBOL parallel NIST,
+ubuntu) · `greenfield-conformance` (ubuntu, 6 shards) · `greenfield-unit` (ubuntu) ·
 `windows-conformance` (windows, the same 6 shards, Release) · `conformance-population` (the shards' union against
 each platform's discovered population, `scripts/test_population.py`, §3.14.4) ·
-`inv1-strong-2023` · `windows-build-test` (Release warnings-as-errors) · `legacy-oracle` (schedule/dispatch only);
-and finally `ci-gate`. NuGet cached; `Generated/` regenerated per checkout (java+pwsh prerequisites).
+`inv1-strong-2023` · `windows-build-test` (Release warnings-as-errors); and finally `ci-gate`. (The nightly
+`legacy-oracle` job and the guard's legacy Unit and Integration legs were retired with the engine, kb/Work PB2108,
+PB2109.) NuGet cached; `Generated/` regenerated per checkout (java+pwsh prerequisites).
 
 **⛔ `ci-gate` is a REQUIRED status check on `main`** (owner decision 2026-09-06, question 23; `kb/Work/PB796`),
 with `enforce_admins: true` — an administrator exemption would be worthless when every push to this repository is
@@ -162,9 +157,9 @@ failing closed.
 4. ~~**The authoritative NIST gate tests frozen code.**~~ **CLOSED 2026-09-06 (kb/Work/PB750).** CI's heaviest job
    (`guard`) drove the legacy engine for the whole of the rearchitecture, so the compiler under development was
    gated on NIST only by the in-process differential suite — and battery #58's `NC215A` wrong answer proved the
-   cost. Both guards now resolve their compiler through `scripts/guard-compiler.sh` (default `cobol`, the legacy
-   only under `COBOLSHARP_LEGACY_DIFFERENTIAL=1`), refuse to start unless the resolved binary's `.deps.json`
-   closure matches, and name the compiler in every verdict line.
+   cost. Both guards now resolve their compiler through `scripts/guard-compiler.sh` (`cobol`, the only compiler
+   since kb/Work PB2109), refuse to start unless the resolved binary's `.deps.json` closure contains the code
+   generator, and name the compiler in every verdict line.
 5. **NIST loop is Linux-only bash**, so the Windows job cannot run it; the authoritative regression has an OS gap.
 6. **Diagnostics are unaddressable.** No registry ⇒ the version matrix, `--suppress`, and per-rule tests cannot key
    on a stable id; a renumber/reuse is invisible.
@@ -217,26 +212,23 @@ ST103A  ST     green          ST101A ST102A                            valid    
 IX999Z  IX     pending        -                                        none                 not yet compiling
 ```
 
-- `status ∈ {green, pending, divergent}`. `green` ⇒ a `[Theory]` row asserting golden match. `divergent` ⇒ the
-  `LEGACY_DIVERGENT` set (compiled+run, output NOT compared to a legacy run — the golden is already ISO-conforming;
-  the note carries the ISO citation). `pending` ⇒ catalogued, not asserted (the mass-red guard).
+- `status ∈ {green, pending, divergent}`. `green` ⇒ a `[Theory]` row asserting golden match. `divergent` ⇒ also
+  asserted, but the golden departs from the output first recorded for it (an ISO re-baseline, a CCVS defect or a
+  declared termination) and the note carries the ISO citation. `pending` ⇒ catalogued, not asserted (the mass-red
+  guard).
 - `chain-preds` REPLACES `chains.tsv` (folded in — one file).
 - `NistDifferentialTests` reads `corpus.tsv` via `[MemberData]`, NOT a hand-maintained `[InlineData]` list.
-- The bash guard reads the same file for its `NIST_TESTS` and `LEGACY_DIVERGENT`, and since kb/Work/PB750 its
-  EXPECTED verdict is derived per compiler: a `divergent` row expects `LEGACY DIVERGENT` under the legacy
-  oracle and `MATCH` under `cobol` (the golden IS the ISO-conforming output WiseOwl COBOL must reproduce).
-  ⛔ **`LEGACY_DIVERGENT` is DERIVED, through one reader** — `scripts/guard-population.sh`'s
-  `guard_legacy_divergent()`, sourced by `guard.sh` AND `guard-fast.sh` — and an unreadable or divergent-free
-  manifest is a LOUD non-zero return, never an empty exemption set. Until kb/Work PB898 this sentence described
-  an intent the code did not keep: `guard.sh` held the names as a hand-written string, `guard-fast.sh` `sed`-ed
-  that string out of it, and `guard-nist-audit.sh` derived the same fact from the manifest — three writings, no
-  comparison. The string had drifted a program behind (THIRTEEN rows, TWELVE names; `SQ212A`), so the runner
-  scored a difference the auditor beside it expected.
+- The bash guard reads the same file for its `NIST_TESTS` population and its EXPECTED verdicts: a plain
+  `divergent` row expects `MATCH` (the golden IS the ISO-conforming output WiseOwl COBOL must reproduce).
+  ⛔ **A fact about the rows is DERIVED, through one reader** — `scripts/guard-population.sh`, sourced by
+  `guard.sh`, `guard-fast.sh` and the audit. Until kb/Work PB898 the guard held the divergent names as a
+  hand-written string that `guard-fast.sh` `sed`-ed out of it while `guard-nist-audit.sh` derived the same fact
+  from the manifest — three writings, no comparison — and the string had drifted a program behind (`SQ212A`).
+  That exemption list was retired with the legacy engine (kb/Work PB2109); the one-reader rule stays.
 - ⛔ **A `divergent` row whose note begins `TERMINATES EC-<NAME>` is the other kind** (kb/Work PB1955): its golden
   records a run that continued past a fatal I-O status nothing covers, and WiseOwl COBOL's ISO §9.1.13.1 choice
-  (Annex A.1 item 103) ends the run unit there. Under `cobol` the run must exit non-zero naming that whole
-  exception-name (`TERMINATES <EC>`, scored by `guard-verdict.sh#guard_termination_verdict`, called by both runners);
-  under the legacy, which continues, the row is compared with its golden and is NOT in `LEGACY_DIVERGENT`. The shell
+  (Annex A.1 item 103) ends the run unit there. The run must exit non-zero naming that whole exception-name
+  (`TERMINATES <EC>`, scored by `guard-verdict.sh#guard_termination_verdict`, called by both runners). The shell
   reader is `guard-population.sh` (`GUARD_TERMINATES_MARKER`, `guard_terminating`), which the audit also asks; the
   C# reader is `CorpusRow.ExpectedTermination` (used by `NistDifferentialTests`); `CorpusManifestTests` holds the two
   grammars equal and refuses a malformed or non-fatal marker.
@@ -311,8 +303,8 @@ After the bake, the entire greenfield net is self-standing: it depends on commit
 ⛔ **The `guard.sh` NIST loop cannot** — not any more (kb/Work/PB750). It no longer drives the legacy engine: it
 is the CLI-level, separate-process, whole-in-scope-corpus NIST leg over `cobol`, and deleting it would drop the
 27 golden-less/pending programs' compile+run health, the CCVS chain-isolation model and the shipped exe's own
-path. What retires at G8 is `COBOLSHARP_LEGACY_DIFFERENTIAL=1` (the legacy arm of `guard-compiler.sh`) and the
-`LEGACY_DIVERGENT` list, not the leg.
+path. What retired with the engine (kb/Work PB2109) was the legacy arm of `guard-compiler.sh` and the legacy
+exemption list, not the leg.
 **This bake is a PREREQUISITE gate for G8 and for retiring the legacy CI job.**
 
 ### 3.5 Diagnostic-code registry (`Cobol.Net.Diagnostics`)
@@ -381,11 +373,9 @@ other. Scripts collapse to:
 - ⛔ **REVISED by kb/Work/PB750:** `guard-fast.sh`, `guard-run-group.sh`, `guard-verify.sh`, `guard-compiler.sh`,
   `guard-compile.sh`, `guard-verdict.sh` and `guard-nist-audit.sh` no longer "exist to parallelize the legacy
   NIST loop" — they ARE the CLI-level WiseOwl COBOL NIST leg, and they carry the verdict-evidence rules, the chain
-  isolation model and the population/expectation audit. They SURVIVE G8; what is deleted there is
-  `guard-compiler.sh`'s legacy arm (`COBOLSHARP_LEGACY_DIFFERENTIAL=1`) and `LEGACY_DIVERGENT`. DELETE at G8:
-  `compliance.sh`, `nist-batch.sh` (ad-hoc dashboards duplicating the guard). `run-suite.sh` survives as a
-  triage helper (it selects its compiler through `guard-compiler.sh`).
-- Until G8, KEEP the legacy differential arm as the oracle-agreement check that the bake was faithful.
+  isolation model and the population/expectation audit. They SURVIVE G8. kb/Work PB2109 deleted
+  `guard-compiler.sh`'s legacy arm, the legacy exemption list, the guard's legacy Unit and Integration legs, and
+  the ad-hoc dashboards `compliance.sh`, `nist-batch.sh` and `run-suite.sh`.
 
 ### 3.8 CI (target `build-and-test.yml`)
 An OS matrix, greenfield-authoritative, with the characterization gate:
@@ -396,11 +386,9 @@ jobs:
   build-test:      # per-OS: build -warnaserror; dotnet test Unit + Conformance + Characterization --no-build
   version-sweep:   # ubuntu: cobol check-batch INV-1 (permissive continuity), fail on BREAKS
   nist-cli:        # ubuntu: guard-fast.sh — the CLI-level WiseOwl COBOL NIST leg (PB750). Survives G8.
-  legacy-oracle:   # TEMPORARY (pre-G8 only): COBOLSHARP_LEGACY_DIFFERENTIAL=1 guard-fast.sh — proves the bake
-                   # still matches the legacy oracle; the SWITCH (not the leg) is deleted at G8
 ```
 
-Post-G8 the `legacy-oracle` job and the two legacy test projects are removed; `build-test` becomes the whole gate,
+The `legacy-oracle` job is gone (kb/Work PB2108); post-G8 the two legacy test projects go too, and `build-test` becomes the whole gate,
 identical on both OSes (NIST now runs in-process, closing smell #5). `Generated/` continues to regenerate per
 checkout (a failed regen fails the build — keep).
 
@@ -491,9 +479,9 @@ and it fails the gate as UNRESOLVED so it gets read rather than absorbed.
 |---|---|
 | `tests/_shared/ProcessObservation.cs` | **THE one child-process observer.** Replaced six copies of "start `dotnet`, wait N s, return whatever came back" (`CutRunner.RunExit`, `AcceptDifferentialTests.AcceptRun`, `CobolNetTestBase.CompileAndRun`, three in `EndToEndTestBase`) plus a seventh found by its own drift guard (`BinderDecompositionTests`, which read both streams synchronously and then read `ExitCode` without checking `WaitForExit`'s result). A run that does not complete raises `HarnessNonObservationException` — it never returns partial output for a caller to compare. Retries **once, serialized**, first: that is re-attempting a measurement that did not complete, not re-rolling a failed assertion. Budget `COBOLNET_RUN_TIMEOUT_MS` (default 120 s); every retry and non-observation is appended to `COBOLNET_HARNESS_LOG` so the rate is measurable. |
 | `ProcessObservationDriftTests` | Keeps the extraction collapsed (the `TestRepoDriftTests` pattern): no test source may start a process under its own bounded wait. Plus five behavioural facts, including "a process that never finishes RAISES instead of returning empty output" and "`Observe` reports a timeout with an **empty** stdout" — if that ever returns content, the defect is back. |
-| `scripts/guard-nist-audit.sh` | The population + manifest + expectation audit, consumed by **both** guards so the rule is written once. The EXPECTED verdict now depends on WHICH compiler ran — the plain `divergent` rows expect `LEGACY DIVERGENT` from the oracle and `MATCH` from `cobol` (PB750), and a `TERMINATES` row expects `TERMINATES <EC>` from `cobol` and `MATCH` from the oracle (PB1955), both sets asked of `guard-population.sh` — and an unknown compiler name is refused rather than silently audited against a default's expectations. `--self-test` proves all twenty-one checks can fail, including the four compiler-identity arms and the five TERMINATES arms. `guard-fast.sh` runs it, with `guard-population.sh --self-test` and `guard-verify.sh --witnesses`, before every guard run. |
-| `scripts/guard-compiler.sh` | ⭐ **THE one answer to "which compiler is this gate measuring?"** (kb/Work/PB750). `cobol` by default, the legacy oracle only under `COBOLSHARP_LEGACY_DIFFERENTIAL=1`; `guard_assert_compiler_identity` reads the resolved CLI's own `.deps.json` and REFUSES to run when the closure does not match — `Cobol.Net.Compiler` present for `cobol`, absent for `legacy`. Earned by both guards hard-coding `cobolsharp.dll`, so `guard NIST: 353 MATCH` measured the ORACLE for the whole rearchitecture and battery #58's NC215A wrong answer was invisible to it. `--self-test` (run by `guard-verify.sh`, hence by battery phase 2a) proves both directions of the refusal fire. |
-| `scripts/guard-compile.sh` | The compile invocation for one NIST program, written once for both compilers (`cobol` needs `--nist NAME` because its parser binds the next token; the legacy takes a bare `--nist`). Called by the serial guard, the parallel compile, the serial re-observation retry and `run-suite.sh` — four call sites that would otherwise each have had to be kept in step by hand. |
+| `scripts/guard-nist-audit.sh` | The population + manifest + expectation audit, consumed by **both** guards so the rule is written once. A plain `divergent` row expects `MATCH` (PB750) and a `TERMINATES` row expects `TERMINATES <EC>` (PB1955), the second set asked of `guard-population.sh`; a verdict word it does not know (the retired `LEGACY DIVERGENT` included) is an UNRECOGNIZED finding. `--self-test` proves all sixteen checks can fail, including the two `divergent` arms and the five TERMINATES arms. `guard-fast.sh` runs it, with `guard-population.sh --self-test` and `guard-verify.sh --witnesses`, before every guard run. |
+| `scripts/guard-compiler.sh` | ⭐ **THE one answer to "which compiler is this gate measuring?"** (kb/Work/PB750): `cobol`. `guard_assert_compiler_identity` reads the resolved CLI's own `.deps.json` and REFUSES to run when the closure does not contain `Cobol.Net.Compiler`. Earned by both guards hard-coding the legacy CLI, so `guard NIST: 353 MATCH` measured the ORACLE for the whole rearchitecture and battery #58's NC215A wrong answer was invisible to it. `--self-test` (run by `guard-verify.sh`, hence by battery phase 2a) proves the refusal fires on synthetic manifests. |
+| `scripts/guard-compile.sh` | The compile invocation for one NIST program, written once (`cobol` needs `--nist NAME` because its parser binds the next token). Called by the serial guard, the parallel compile and the serial re-observation retry — three call sites that would otherwise each have had to be kept in step by hand. |
 | `scripts/guard-verdict.sh` | ⭐ **THE evidence rules for the NIST guards, written ONCE and sourced by both** (`feedback_one_rule_one_place`). `guard_compile_verdict` (compile arm), `guard_output_verdict` (run + compare arms: normalization, candidate resolution, the FAIL*/footer rules, the verdict), `guard_preserve` (keep a non-MATCH's evidence). It reports through `GUARD_VERDICT` / `GUARD_CLASS` (`match` · `regression` · `no-verdict`) so each caller keeps its own recording and counting, and every function is option-local (`local -`) and returns 0: a scoring routine that can abort `guard.sh`'s `set -e` is not a scoring routine. **The comparison materializes both normalized sides into real files** — corollary 5 — and reads `diff`'s exit status explicitly. |
 | `scripts/guard-baselines.sh` | ⭐ **THE baseline-cleanliness audit, written ONCE and called by both guards** (`feedback_one_rule_one_place`). Empty / `FAIL*` / non-zero-footer baselines are refused, unless the program is declared `CCVS-DEFECT` in `tests/nist/corpus.tsv` — the same declaration, read from the same file, that `CorpusManifestTests.GoldensCarryingACcvsFailure_AreExactlyTheDeclaredCcvsDefects` states as a set equality. The complement is audited here too (a declaration with nothing to describe is a defect). Exits with the FAILURE COUNT, so each caller keeps its own aggregation. |
 | `scripts/guard-run-group.sh`, `scripts/guard.sh` | The two callers: same rules, different plumbing (a per-group `mktemp` dir vs. the run-scoped `$GUARD_WORK`, `echo` vs. the recording `v()`). They used to carry a COPY of the rules each, "kept character-for-character in step" by prose — which had already drifted (one `normalize()` had a `[ -f ]` guard, the other did not) and which kept both copies of the compare-arm hole. Compile diagnostics are captured (`<TEST>.compile.log` + `.compile.rc`) instead of `/dev/null`; the run is bounded by `timeout` and its exit status kept instead of `\|\| true`; **any non-MATCH's report, streams and both normalized sides are copied into a run-scoped forensic directory** before the group's dir dies with it (attributing battery #43 cost hours because that directory was already gone). |
@@ -1302,8 +1290,8 @@ on Windows and red in CI's Linux unit job. That was a ~30-minute round trip and 
 
 **`scripts/linux-gate.sh`** runs, from any tree (`wsl -d Ubuntu --cd <tree> -- bash -lc 'bash scripts/linux-gate.sh'`),
 the test projects CI's Linux jobs run, and the scripts they run: leg `guard` runs `bash scripts/guard-fast.sh`, CI's
-`guard` job (the NIST suite through the `cobol` CLI, the manifest audit, the guard's own self-tests, the legacy Unit and
-Integration suites), with a `TMPDIR` private to the clone because the guard writes fixed file names there.
+`guard` job (the NIST suite through the `cobol` CLI, the manifest audit, the baseline check and the guard's own
+self-tests), with a `TMPDIR` private to the clone because the guard writes fixed file names there.
 `LinuxGateDriftTests` holds both sets equal to the workflow's: every `dotnet test` project and every `run: bash
 scripts/….sh` step of a Linux job is a default leg. The guard leg was added 2026-10-04 (kb/Work PB1955, PB1957 row 40):
 the guard job was the one CI Linux job no local gate ran, so train 1013's guard red on PB322's `TERMINATES` rows

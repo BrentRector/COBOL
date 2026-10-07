@@ -21,13 +21,10 @@
 # ⛔ READ THE AUDIT LINE, NOT THE MATCH COUNT. "353 MATCH" is a number a human compares against memory, which is
 # exactly how a run at 352 once passed as green.
 #
-# ⛔ AND READ WHICH COMPILER IT DROVE. Until 2026-09-06 this leg hard-coded the LEGACY `cobolsharp.dll`, so its
-# headline MATCH count was a statement about the oracle (kb/Work/PB750). It now drives `cobol`
-# (src/Cobol.Net.Cli) by default, refuses to start unless the resolved binary really references
-# `Cobol.Net.Compiler`, and NAMES the compiler in every summary line: `=== NIST (cobol): ... ===`. The legacy
-# run survives behind `GUARD_COMPILER=legacy` (this leg only) or the project's existing opt-in switch
-# `COBOLSHARP_LEGACY_DIFFERENTIAL=1` (which ALSO flips the Integration suite's opt-in differential corpus —
-# see scripts/guard-compiler.sh).
+# ⛔ AND READ WHICH COMPILER IT DROVE. Until 2026-09-06 this leg hard-coded the legacy byte engine's CLI, so its
+# headline MATCH count was a statement about the oracle (kb/Work/PB750). It drives `cobol` (src/Cobol.Net.Cli),
+# refuses to start unless the resolved binary really references `Cobol.Net.Compiler`, and NAMES the compiler in
+# every summary line: `=== NIST (cobol): ... ===`.
 set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,7 +33,6 @@ export ROOT
 
 # WHICH COMPILER, asserted against the binary's own dependency graph (scripts/guard-compiler.sh).
 . "$(dirname "$0")/guard-compiler.sh"
-. "$(dirname "$0")/python-resolve.sh"   # "$PY" for the leg reporters (kb/Work PB1637)
 guard_select_compiler
 guard_announce_compiler
 CLI="$GUARD_CLI_DLL"
@@ -68,28 +64,12 @@ for selftest in "scripts/guard-population.sh --self-test" "scripts/guard-nist-au
 done
 [ "$SELF_RC" -eq 0 ] && echo "  all three GREEN"
 
-el "=== Building ($GUARD_COMPILER CLI + test projects) ==="
+el "=== Building ($GUARD_COMPILER CLI) ==="
 dotnet build "$GUARD_CLI_PROJECT" -v quiet
-# The legacy unit + integration suites are a SEPARATE leg from the NIST one: they gate CobolSharp.Compiler and,
-# through it, the SHARED Cobol.Net.Frontend, so they run whichever compiler the NIST leg is driving.
-dotnet build tests/CobolSharp.Tests.Unit/CobolSharp.Tests.Unit.csproj -v quiet
-dotnet build tests/CobolSharp.Tests.Integration/CobolSharp.Tests.Integration.csproj -v quiet
 
 # ⛔ THE IDENTITY WATCHDOG, AFTER THE BUILD AND BEFORE ANY MEASUREMENT (kb/Work/PB750). A gate that cannot say
 # which compiler it drove is not a gate; a gate that drives the wrong one is worse, because it is green.
-guard_assert_compiler_identity "$CLI" "$GUARD_COMPILER" || exit 1
-
-el "=== Unit + Integration tests (parallel, --no-build) ==="
-# --logger console;verbosity=minimal so a red run NAMES its failing tests in the log — battery #29's one
-# integration red was unnameable from a quiet-verbosity log, breaking the no-flake-without-a-name discipline
-# (kb/Work PB127): quiet prints only the Passed!/Failed! summary line. SCRUBBED (kb/Work PB1718): no gate leg
-# handshake or VSTest*/RunSettingsFilePath property reaches a test host.
-"$PY" scripts/test_population.py scrubbed dotnet test tests/CobolSharp.Tests.Unit/CobolSharp.Tests.Unit.csproj --no-build --verbosity quiet \
-    --logger "console;verbosity=minimal" > "$TMP/gf_unit.log" 2>&1 &
-UNIT=$!
-"$PY" scripts/test_population.py scrubbed dotnet test tests/CobolSharp.Tests.Integration/CobolSharp.Tests.Integration.csproj --no-build --verbosity quiet \
-    --logger "console;verbosity=minimal" > "$TMP/gf_int.log" 2>&1 &
-INT=$!
+guard_assert_compiler_identity "$CLI" || exit 1
 
 el "=== NIST: parallel compile + grouped parallel run (JOBS=$JOBS compile=$CJOBS run=$RJOBS) ==="
 # Authoritative test list — extracted from guard.sh's NIST_TESTS so the two never drift.
@@ -104,29 +84,15 @@ fi
 # The POPULATION, written down so the audit can assert against it rather than against a remembered count.
 POP="$TMP/gf_population.txt"
 echo "$TESTS" | tr ' ' '\n' | grep . | sort > "$POP"
-# The ISO-re-baselined goldens the LEGACY legitimately diverges from, DERIVED from tests/nist/corpus.tsv
-# through scripts/guard-population.sh — the same ONE reader guard.sh uses, and the same fact
-# guard-nist-audit.sh already derives to decide each row's expected verdict. ⛔ This used to `sed` the name
-# list out of guard.sh, which was itself a hand copy of the manifest and had drifted a program behind it
-# (kb/Work PB898); the per-program rationale is the manifest's note column.
-# ⭐ LEGACY ONLY (kb/Work/PB750). Those goldens were re-baselined to the ISO-CONFORMING output precisely
-# because the legacy is non-conforming there, so under `cobol` they are not exempt — they are the programs a
-# codegen regression is most likely to break, and NistDifferentialTests already locks them byte-exact. An
-# empty list makes the group runner compare them like every other program.
-# ⛔ AND A `TERMINATES` DIVERGENT ROW IS THE OTHER WAY ROUND (kb/Work PB1955): its golden records a run that
-# continued past a fatal I-O status nothing covers, which WiseOwl COBOL's Annex A.1 item 103 choice ends. So under
-# `cobol` the group runner checks that the run ENDS naming the declared exception (GUARD_TERMINATES, `NAME=EC-…`),
-# and under the legacy, which continues, the row is compared with its golden — guard_legacy_divergent leaves it out
-# of the exemption. Reading every divergent row the legacy way turned CI's guard red on PB322's two rows.
+# ⛔ THE TERMINATES ROWS (kb/Work PB1955), DERIVED from tests/nist/corpus.tsv through scripts/guard-population.sh —
+# the same ONE reader guard.sh and guard-nist-audit.sh use. Every other program, a `divergent` one included, is
+# compared with its golden (those goldens are the ISO-conforming output, which NistDifferentialTests also locks
+# byte-exact). A TERMINATES row's golden records a run that continued past a fatal I-O status nothing covers,
+# which WiseOwl COBOL's Annex A.1 item 103 choice ends, so the group runner checks that the run ENDS naming the
+# declared exception (GUARD_TERMINATES, `NAME=EC-…`).
 . "$(dirname "$0")/guard-population.sh"
-if [ "$GUARD_DIVERGENT" = "1" ]; then
-    LEGACY_DIVERGENT="$(guard_legacy_divergent)" || exit 1
-    GUARD_TERMINATES=""
-else
-    LEGACY_DIVERGENT=""
-    GUARD_TERMINATES="$(guard_terminating)" || exit 1
-fi
-export LEGACY_DIVERGENT GUARD_TERMINATES
+GUARD_TERMINATES="$(guard_terminating)" || exit 1
+export GUARD_TERMINATES
 export GUARD_RUNTIME_DLL
 
 OUT="tests/nist/output"
@@ -147,7 +113,7 @@ cp "$GUARD_RUNTIME_DLL" "$OUT/"
 # whether a .dll existed, so a transient and a genuine syntax error reported IDENTICALLY and the one thing that
 # would have settled it was thrown away. Each compile now records its own log and its own exit status; the
 # group runner reads both, and refuses to call a compile FAILED without evidence.
-export GUARD_CLI_DLL="$CLI" GUARD_COMPILER
+export GUARD_CLI_DLL="$CLI"
 echo "$TESTS" | tr ' ' '\n' | grep . \
   | xargs -P"$CJOBS" -I {} bash "$ROOT/scripts/guard-compile.sh" {} "tests/nist/programs/{}.cob" "$OUT"
 
@@ -291,20 +257,10 @@ echo "=== NIST (${GUARD_COMPILER}): ${NIST_MATCH} MATCH, ${NIST_TERM} TERMINATES
 # computed from the lines that ARRIVED, so losing a program lowers MATCH and still reads as green. The audit
 # asserts that every declared program produced exactly one verdict and that it is the verdict the committed
 # manifest predicts. It is the half that makes a false GREEN impossible.
-bash scripts/guard-nist-audit.sh "$RESULTS" "$POP" "$GUARD_COMPILER"
+bash scripts/guard-nist-audit.sh "$RESULTS" "$POP"
 NIST_AUDIT=$?
 
-# (4) Wait for the .NET test runs.
-wait "$UNIT"; UNIT_RC=$?
-wait "$INT"; INT_RC=$?
-# ⛔ THROUGH THE ONE LEG REPORTER (kb/Work PB1573): a red leg prints its COMPLETE log. This used to print the last
-# six lines matching `error|[FAIL]|Failed …` — a failing test's name without its message or stack — and in CI the
-# full log in $TMPDIR dies with the runner, so a legacy unit or integration red was unattributable there. A reporter
-# that cannot run (no python3) exits non-zero and turns the leg RED rather than silent.
-echo "=== Unit ==="; "$PY" scripts/test_leg_report.py --name unit --log "$TMP/gf_unit.log" --rc "$UNIT_RC" || UNIT_RC=1
-echo "=== Integration ==="; "$PY" scripts/test_leg_report.py --name integration --log "$TMP/gf_int.log" --rc "$INT_RC" || INT_RC=1
-
-# (5) Baseline-cleanliness check — ONE implementation, shared with guard.sh (scripts/guard-baselines.sh).
+# (4) Baseline-cleanliness check — ONE implementation, shared with guard.sh (scripts/guard-baselines.sh).
 # It used to be a hand-kept copy of guard.sh's loop ("parity with guard.sh"), and the copies drifted the moment
 # kb/Work PB436 gave one golden a DECLARED, spec-derived CCVS failure: guard-verdict.sh learned the allowance
 # and neither copy did (landing train 36).
@@ -314,12 +270,11 @@ BASE_FAILS=$?
 # The verdict says what it measured — `=== ALL GREEN ===` itself is left byte-identical because callers
 # (scripts/battery.sh, CI) gate on that exact token.
 echo "=== COMPILER UNDER TEST WAS: $GUARD_COMPILER ($CLI) ==="
-if [ "$NIST_FAILS" -eq 0 ] && [ "$NIST_AUDIT" -eq 0 ] && [ "$UNIT_RC" -eq 0 ] && [ "$INT_RC" -eq 0 ] \
-   && [ "$BASE_FAILS" -eq 0 ] && [ "$SELF_RC" -eq 0 ]; then
+if [ "$NIST_FAILS" -eq 0 ] && [ "$NIST_AUDIT" -eq 0 ] && [ "$BASE_FAILS" -eq 0 ] && [ "$SELF_RC" -eq 0 ]; then
     echo "=== ALL GREEN ==="
     exit 0
 fi
-echo "=== FAILURES ($GUARD_COMPILER): nist=$NIST_FAILS audit=$NIST_AUDIT unit_rc=$UNIT_RC int_rc=$INT_RC baselines=$BASE_FAILS selftests=$SELF_RC ==="
+echo "=== FAILURES ($GUARD_COMPILER): nist=$NIST_FAILS audit=$NIST_AUDIT baselines=$BASE_FAILS selftests=$SELF_RC ==="
 if [ -d "$GUARD_FORENSICS" ]; then
     echo "=== EVIDENCE for every non-MATCH (report, stdout, stderr, both normalized sides): $GUARD_FORENSICS ==="
     ls "$GUARD_FORENSICS"

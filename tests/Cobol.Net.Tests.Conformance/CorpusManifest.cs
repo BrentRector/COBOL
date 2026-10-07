@@ -33,8 +33,8 @@ public sealed record CorpusRow(string Name, string Suite, string Status, string[
 
 /// <summary>
 /// Loads <c>tests/nist/corpus.tsv</c> — the ONE source of truth for the green NIST set + producer/consumer chains
-/// (folds the former <c>NistDifferentialTests</c> <c>[InlineData]</c> list, <c>tests/nist/chains.tsv</c>, and
-/// <c>scripts/guard.sh</c> <c>LEGACY_DIVERGENT</c>). A green program is now a manifest ROW, not a code edit.
+/// (folds the former <c>NistDifferentialTests</c> <c>[InlineData]</c> list and <c>tests/nist/chains.tsv</c>). A green
+/// program is a manifest ROW, not a code edit.
 /// </summary>
 public static class CorpusManifest
 {
@@ -57,8 +57,9 @@ public static class CorpusManifest
     }
 
     /// <summary>The green ∪ divergent set — the programs <c>NistDifferentialTests</c> asserts. A <c>divergent</c>
-    /// program still matches its ISO golden in the greenfield harness; the flag only records that a LIVE legacy run
-    /// would differ (the note cites the ISO § the legacy is non-conforming to).</summary>
+    /// program matches its golden like a green one; the flag records that the golden departs from the output first
+    /// recorded for it (a re-baseline to the conforming run, a CCVS defect, or a declared termination), and the
+    /// note cites the ISO § that makes the golden right.</summary>
     public static IEnumerable<CorpusRow> Green() => Rows.Where(r => r.Status is "green" or "divergent");
 
     /// <summary>name → chain predecessors (in run order) — replaces the private <c>Chains</c> lazy formerly in

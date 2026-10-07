@@ -161,7 +161,7 @@ class Host:
             hashes = {"<test>": _sha256(test_dll)}
             for dll in sorted(test_dll.parent.glob("*.dll")):
                 n = dll.name
-                if dll != test_dll and (n.startswith(("Cobol.Net.", "CobolSharp.")) or n == "cobol.dll"):
+                if dll != test_dll and (n.startswith("Cobol.Net.") or n == "cobol.dll"):
                     hashes[n] = _sha256(dll)
             out[asm] = hashes
         return out

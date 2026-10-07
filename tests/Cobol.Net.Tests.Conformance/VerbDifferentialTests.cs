@@ -18,7 +18,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class VerbDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string workingStorage, string procedure) => $"""
         IDENTIFICATION DIVISION.
@@ -44,7 +44,7 @@ public sealed class VerbDifferentialTests
     [InlineData("01 R PIC 9(4) VALUE 6.", "    MULTIPLY 3 BY R.\n    DISPLAY R.")]
     [InlineData("01 R PIC 9(4).", "    DIVIDE 12 BY 4 GIVING R.\n    DISPLAY R.")]
     [InlineData("01 R PIC 9(4).", "    DIVIDE 4 INTO 13 GIVING R.\n    DISPLAY R.")]   // 13/4 = 3 (truncated)
-    public void Arithmetic(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void Arithmetic(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Theory]
     // COMPUTE with operator precedence and parentheses; scaled receiver truncates.
@@ -52,7 +52,7 @@ public sealed class VerbDifferentialTests
     [InlineData("01 R PIC 9(4).", "    COMPUTE R = 2 + 3 * 4.\n    DISPLAY R.")]          // precedence → 14
     [InlineData("01 R PIC 9(2)V99.", "    COMPUTE R = 10 / 3.\n    DISPLAY R.")]          // 3.33 truncated
     [InlineData("01 A PIC 9(3) VALUE 12.\n01 R PIC 9(4).", "    COMPUTE R = A * A.\n    DISPLAY R.")]
-    public void Compute(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void Compute(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Theory]
     // IF / ELSE with numeric and alphanumeric comparisons, AND/OR.
@@ -61,12 +61,12 @@ public sealed class VerbDifferentialTests
     [InlineData("01 A PIC 9 VALUE 5.", "    IF A > 1 AND A < 9\n        DISPLAY \"MID\"\n    END-IF.")]
     [InlineData("01 A PIC 9 VALUE 5.", "    IF A < 1 OR A = 5\n        DISPLAY \"HIT\"\n    END-IF.")]
     [InlineData("01 NM PIC X(3) VALUE \"BOB\".", "    IF NM = \"BOB\"\n        DISPLAY \"Y\"\n    ELSE\n        DISPLAY \"N\"\n    END-IF.")]
-    public void IfElse(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void IfElse(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Theory]
     // Inline PERFORM (a real C# loop — no control-flow dispatcher needed): n TIMES and UNTIL.
     [InlineData("01 I PIC 9.", "    PERFORM 3 TIMES\n        DISPLAY \"X\"\n    END-PERFORM.")]
     [InlineData("01 I PIC 9(2) VALUE 0.",
                 "    PERFORM UNTIL I = 3\n        DISPLAY I\n        ADD 1 TO I\n    END-PERFORM.")]
-    public void InlinePerform(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void InlinePerform(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 }

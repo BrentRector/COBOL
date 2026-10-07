@@ -1,7 +1,8 @@
 # WiseOwl COBOL NIST corpus manifest (rearchitecture P0 step 7). Tab-separated; a leading # is a comment.
 # The ONE source of truth for the green NIST set + producer/consumer chains — folds NistDifferentialTests
-# [InlineData] + tests/nist/chains.tsv + scripts/guard.sh LEGACY_DIVERGENT. Generated mechanically; a green
-# program is a manifest row, not a code edit. Columns:
+# [InlineData] + tests/nist/chains.tsv. Generated mechanically; a green program is a manifest row, not a code
+# edit. A divergent row's golden departs from the output first recorded for it; its note cites the ISO § that
+# makes the golden right. Columns:
 #   name  suite  status(green|divergent|pending)  chain-preds(space-joined or -)  golden(valid|none)  note
 # A divergent row whose note BEGINS `TERMINATES EC-<NAME>` is declared to end its run unit on that fatal exception
 # (the golden records the continuing run); both NIST runners read it: CorpusRow.ExpectedTermination and

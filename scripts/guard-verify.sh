@@ -94,7 +94,6 @@ SHIM
         PATH="$BIN:$PATH" \
         WITNESS_CASE="$case_name" WITNESS_RC="$wrc" WITNESS_STDERR="$werr" WITNESS_DIFF_RC="$wdiff" \
         WITNESS_GOLDEN="$FR/tests/nist/valid/WT001A.txt" \
-        LEGACY_DIVERGENT="" \
             bash "$GROUP_RUNNER" "$FR" gW "WT001A" 2>>"$d/stderr.txt"
     }
     # compile_case CRC CLOG_TEXT -> the compile arm, with no .dll at all
@@ -102,7 +101,7 @@ SHIM
         rm -rf "$FR/tests/nist/output"; mkdir -p "$FR/tests/nist/output"
         if [ -n "$1" ]; then printf '%s\n' "$1" > "$FR/tests/nist/output/WT001A.compile.rc"; fi
         printf '%s' "$2" > "$FR/tests/nist/output/WT001A.compile.log"
-        GUARD_FORENSICS="$d/forensics" PATH="$BIN:$PATH" LEGACY_DIVERGENT="" \
+        GUARD_FORENSICS="$d/forensics" PATH="$BIN:$PATH" \
             bash "$GROUP_RUNNER" "$FR" gW "WT001A" 2>>"$d/stderr.txt"
     }
     # want NAME EXPECTED-SUBSTRING ACTUAL-LINE
@@ -304,11 +303,11 @@ echo "=== parallel scripts/guard-fast.sh ==="
 bash scripts/guard-fast.sh > "$TMP/gv_fast.log" 2>&1; FAST=$?
 
 # Normalize verdict lines (strip indent, keep the FAIL* count) and sort so order (which differs by design) is moot.
-# ⛔ THE VOCABULARY MUST BE COMPLETE. The previous pattern omitted `LEGACY DIVERGENT`, so 11 programs were
-# silently dropped from BOTH sides and the equivalence proof never compared them — the same defect class this
-# whole wave closes (a filter that quietly excludes reads as agreement). Any line that looks like a verdict but
-# matches no known word is surfaced by the UNKNOWN check below rather than discarded.
-VERDICT_WORDS="MATCH|DIFF|FOOTER|COMPILE FAILED|COMPILE NO-VERDICT|RUN NO-VERDICT|COMPARE NO-VERDICT|NO BASELINE|LEGACY DIVERGENT|TERMINATES"
+# ⛔ THE VOCABULARY MUST BE COMPLETE. An earlier pattern omitted one verdict word, so 11 programs were silently
+# dropped from BOTH sides and the equivalence proof never compared them — the same defect class this whole wave
+# closes (a filter that quietly excludes reads as agreement). Any line that looks like a verdict but matches no
+# known word is surfaced by the UNKNOWN check below rather than discarded.
+VERDICT_WORDS="MATCH|DIFF|FOOTER|COMPILE FAILED|COMPILE NO-VERDICT|RUN NO-VERDICT|COMPARE NO-VERDICT|NO BASELINE|TERMINATES"
 verdicts() {
     grep -E "^ *[A-Z][A-Z0-9]+: ($VERDICT_WORDS)" "$1" | sed 's/^ *//' | sort
 }

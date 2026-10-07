@@ -11,9 +11,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class RefModDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string ws, string proc) => $"""
         IDENTIFICATION DIVISION.
@@ -36,13 +36,13 @@ public sealed class RefModDifferentialTests
     [InlineData(Six, "    DISPLAY X(3:).")]                                         // CDEF (to end)
     [InlineData(Six + "\n01 P PIC 9 VALUE 2.", "    DISPLAY X(P:2).")]              // BC (variable start)
     [InlineData(Six + "\n01 P PIC 9 VALUE 2.\n01 L PIC 9 VALUE 3.", "    DISPLAY X(P:L).")]   // BCD (variable both)
-    public void Read(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void Read(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Theory]
     // Write: replace a slice (exact / longer-source truncate).
     [InlineData(Six, "    MOVE \"XY\" TO X(2:2).\n    DISPLAY X.")]                  // AXYDEF
     [InlineData(Six, "    MOVE \"PQRST\" TO X(2:3).\n    DISPLAY X.")]               // APQREF (source truncated to 3)
-    public void Write(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void Write(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Fact]
     public void Write_ShorterSource_SpaceFills()
@@ -56,7 +56,7 @@ public sealed class RefModDifferentialTests
 
     [Fact]
     public void MoveRefModSource()
-        => AssertSameAsLegacy(Program("01 X PIC X(5) VALUE \"HELLO\".\n01 Y PIC X(3).", """
+        => AssertMatchesGolden(Program("01 X PIC X(5) VALUE \"HELLO\".\n01 Y PIC X(3).", """
                 MOVE X(1:3) TO Y.
                 DISPLAY Y.
                 MOVE X(4:2) TO Y.
@@ -66,5 +66,5 @@ public sealed class RefModDifferentialTests
     [Theory]
     [InlineData("01 X PIC X(5) VALUE \"HELLO\".", "    IF X(1:2) = \"HE\" DISPLAY \"Y\" ELSE DISPLAY \"N\" END-IF.")]
     [InlineData("01 X PIC X(5) VALUE \"HELLO\".", "    IF X(3:3) = \"LLO\" DISPLAY \"Y\" ELSE DISPLAY \"N\" END-IF.")]
-    public void Comparison(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void Comparison(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 }

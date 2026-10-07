@@ -13,9 +13,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class CallDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>Spec-pinned (no oracle): asserted against the ISO-derived expected output directly.</summary>
     private static void AssertSpecPinned(string source, string expected)
@@ -43,7 +43,7 @@ public sealed class CallDifferentialTests
     /// occupies the same storage area as the argument"; the callee's mutation is visible to the caller.</summary>
     [Fact]
     public void CallByReference_CalleeMutationVisibleToCaller()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDREF1.
             DATA DIVISION.
@@ -70,7 +70,7 @@ public sealed class CallDifferentialTests
     /// its mutation is NOT visible to the caller.</summary>
     [Fact]
     public void CallByContent_CalleeMutationNotVisibleToCaller()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDCON1.
             DATA DIVISION.
@@ -97,7 +97,7 @@ public sealed class CallDifferentialTests
     /// explicit BY CONTENT phrase is TRANSITIVE across the parameters that follow it.</summary>
     [Fact]
     public void CallPassingMode_DefaultByReference_PhraseTransitive()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDTRN1.
             DATA DIVISION.
@@ -130,7 +130,7 @@ public sealed class CallDifferentialTests
     /// its last-used state across activations within one run unit.</summary>
     [Fact]
     public void CalledProgram_WorkingStorage_LastUsedAcrossCalls()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDSTA1.
             PROCEDURE DIVISION.
@@ -155,7 +155,7 @@ public sealed class CallDifferentialTests
     /// re-applied); before that, last-used persists.</summary>
     [Fact]
     public void Cancel_NextCallFindsInitialState()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDCAN1.
             PROCEDURE DIVISION.
@@ -182,7 +182,7 @@ public sealed class CallDifferentialTests
     /// callee's first formal receives the first argument regardless of the data-names involved.</summary>
     [Fact]
     public void CallUsing_CorrespondenceIsPositionalNotByName()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDPOS1.
             DATA DIVISION.
@@ -210,7 +210,7 @@ public sealed class CallDifferentialTests
     /// at CALL time (dynamic call).</summary>
     [Fact]
     public void DynamicCall_IdentifierTarget_ResolvesAtRunTime()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDDYN1.
             DATA DIVISION.
@@ -238,7 +238,7 @@ public sealed class CallDifferentialTests
     /// storage area; subordinate-item mutations propagate back to the caller's record.</summary>
     [Fact]
     public void CallByReference_GroupArgument_SubordinateMutationsVisible()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDGRP1.
             DATA DIVISION.
@@ -270,7 +270,7 @@ public sealed class CallDifferentialTests
     /// nested unit carries END PROGRAM markers (the IC222A+ source shape).</summary>
     [Fact]
     public void NestedProgram_ContainedProgramCallableByContainer()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDNST1.
             DATA DIVISION.
@@ -316,7 +316,7 @@ public sealed class CallDifferentialTests
     /// available, the ON phrase's imperative runs and control then falls to the end of the CALL statement.</summary>
     [Fact]
     public void CallOnOverflow_UnresolvableProgram_RunsPhraseThenContinues()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. CDOVF1.
             PROCEDURE DIVISION.

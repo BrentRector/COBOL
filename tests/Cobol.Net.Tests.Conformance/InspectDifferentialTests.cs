@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class InspectDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>A SPEC-derived expectation (cited at the call site) — used where the legacy oracle is non-conforming
     /// or cannot host the dialect; <paramref name="dialectLevel"/> selects the targeted edition.</summary>
@@ -41,7 +41,7 @@ public sealed class InspectDifferentialTests
     // ALL "A" consumes the leading 'A', so LEADING "AH" never matches at its first eligible point and tallies 0.
     [Fact]
     public void Tally_SharedCycle_EarlierAllStarvesLeading()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-X PIC X(6) VALUE "AHAHXX".
             01 C1 PIC 99 VALUE 0.
             01 C2 PIC 99 VALUE 0.
@@ -54,7 +54,7 @@ public sealed class InspectDifferentialTests
     // operational sign is removed, so "-" tallies 0 and the magnitude digit "5" tallies 1 in -12345.
     [Fact]
     public void Tally_SignedNumericTarget_InspectsDeSignedDigits()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-S PIC S9(5) VALUE -12345.
             01 C1 PIC 9 VALUE 0.
             01 C2 PIC 9 VALUE 0.
@@ -67,7 +67,7 @@ public sealed class InspectDifferentialTests
     // is retained on completion — -12345 with ALL "1" BY "9" becomes -92345 (displayed with its overpunch sign).
     [Fact]
     public void Replace_SignedNumericTarget_SignRetained()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-S PIC S9(5) VALUE -12345.
             """, """
                 INSPECT WS-S REPLACING ALL "1" BY "9".
@@ -78,7 +78,7 @@ public sealed class InspectDifferentialTests
     // successive FIRST phrase independently — two FIRST "X" phrases replace the first two X's, differently.
     [Fact]
     public void Replace_First_EachSuccessivePhraseReplacesOneOccurrence()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-X PIC X(8) VALUE "XAXBXCXD".
             """, """
                 INSPECT WS-X REPLACING FIRST "X" BY "1" FIRST "X" BY "2".
@@ -90,7 +90,7 @@ public sealed class InspectDifferentialTests
     // while a BEFORE delimiter not found behaves as if BEFORE were absent (whole item) — the GR9 asymmetry.
     [Fact]
     public void Tally_Regions_BeforeAfterBounds_AndNotFoundAsymmetry()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-X PIC X(8) VALUE "AAQBBZCC".
             01 C1 PIC 99 VALUE 0.
             01 C2 PIC 99 VALUE 0.
@@ -106,7 +106,7 @@ public sealed class InspectDifferentialTests
     // duplicated in literal-4 ("ABA") maps by its FIRST occurrence — 'A' goes to 'X', never to 'Z'.
     [Fact]
     public void Convert_DuplicateFromCharacter_FirstOccurrenceWins()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-X PIC X(6) VALUE "ABCABC".
             """, """
                 INSPECT WS-X CONVERTING "ABA" TO "XYZ".
@@ -129,7 +129,7 @@ public sealed class InspectDifferentialTests
     // content (counts the B's), then the replacing pass (rewrites them) — never one merged pass.
     [Fact]
     public void Format3_TallyingRunsBeforeReplacing()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-X PIC X(6) VALUE "AAABBB".
             01 C1 PIC 9 VALUE 0.
             """, """

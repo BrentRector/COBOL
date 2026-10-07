@@ -4,48 +4,20 @@ using System.Diagnostics;
 using CobolNet.Frontend.Preprocessor;
 using CobolNet;                                          // CompilerDriver (the greenfield compiler)
 using CobolNet.Tests.Shared;                             // ProcessObserver — the ONE child-process observer
-using LegacyCompilation = CobolSharp.Compiler.Compilation;
-using LegacyState = CobolSharp.Runtime.ProgramState;
 
 namespace CobolNet.Tests.Conformance;
 
-/// <summary>
-/// A compiler the differential harness can drive uniformly: compile a COBOL source string to a runnable assembly
-/// and run it, returning its stdout. Two implementations — <see cref="LegacyCompiler"/> (the byte-engine oracle,
-/// 364-NIST-green) and <see cref="CobolNetCompiler"/> (the greenfield typed-native compiler) — let a test assert
-/// that WiseOwl COBOL produces <b>byte-identical stdout to the legacy</b> for a program (COBOLNET_DESIGN §2 / §18 #7).
-/// This is the verification backbone the G2 checkpoint demands ("binds and DISPLAYs its data byte-identically to
-/// the legacy"); hand-typed expected strings would re-derive the very semantics under test (padding, scale,
-/// edited/overpunch images).
-/// </summary>
-public interface ICompilerUnderTest
-{
-    /// <summary>A short label for assertion messages (e.g. <c>"legacy"</c> / <c>"cobolnet"</c>).</summary>
-    string Name { get; }
-
-    /// <summary>
-    /// Compile <paramref name="source"/> to a console assembly and run it in an isolated temp directory.
-    /// Returns whether it compiled-and-ran cleanly, its stdout (newline-canonicalized to <c>\r\n</c> then
-    /// trailing-trimmed — matching both engines' test bases so the two are compared apples-to-apples), and a
-    /// human-readable detail string for a failure.
-    /// </summary>
-    (bool ok, string stdout, string detail) CompileAndRun(string source);
-}
-
-/// <summary>Shared process-run plumbing for the two compiler-under-test implementations.</summary>
+/// <summary>Process-run plumbing for <see cref="CobolNetCompiler"/> and the tests that run a compiled program
+/// themselves.</summary>
 internal static class CutRunner
 {
     /// <summary>
     /// Canonicalize a compiled program's stdout to the <b>NIST acceptance basis</b> — exactly the guard's
-    /// <c>normalize()</c> (<c>scripts/guard.sh</c>): drop CR, then strip trailing spaces <i>per line</i>. This is
-    /// the criterion the legacy oracle's 364-NIST-green status was validated against, so comparing on this basis
-    /// makes the legacy a sound differential oracle. It also neutralizes the legacy's one known DISPLAY
-    /// non-conformance — it trims trailing spaces off alphanumeric operands (so <c>DISPLAY WS-X</c> of a
-    /// <c>PIC X(10)</c> holding <c>"HI"</c> emits <c>"HI"</c>, not <c>"HI        "</c>), contradicting ISO
-    /// §14.9.11.4 GR1/GR6 ("the content of each operand … the size … is the sum of the sizes of the operands").
-    /// WiseOwl COBOL emits the spec-correct full field; a single-/trailing-operand DISPLAY then matches the legacy once
-    /// per-line trailing spaces are stripped. (A case that exposes <i>internal</i> trailing spaces — e.g.
-    /// <c>DISPLAY WS-X "]"</c> — is pinned to the spec value instead, since the legacy is non-conforming there.)
+    /// <c>normalize()</c> (<c>scripts/guard.sh</c>): drop CR, then strip trailing spaces <i>per line</i>. The
+    /// committed differential goldens (<c>tests/differential/**/*.out</c>) were recorded on this basis, so every
+    /// comparison against them goes through it. WiseOwl COBOL itself DISPLAYs the full field (ISO §14.9.11.4 GR1);
+    /// a case whose meaning depends on <i>internal</i> trailing spaces (e.g. <c>DISPLAY WS-X "]"</c>) is pinned to
+    /// its spec-derived value, which keeps the spaces before the bracket.
     /// </summary>
     public static string Normalize(string s)
     {
@@ -111,12 +83,10 @@ internal static class CutRunner
 /// The greenfield WiseOwl COBOL compiler under test: drives <see cref="CompilerDriver"/> (COBOL → typed-native C# →
 /// Roslyn) into an isolated temp dir, then runs the produced assembly.
 /// </summary>
-/// <param name="dialectLevel">The targeted ISO edition (default 85 — the differential harness compiles at the
-/// legacy oracle's edition; spec-pinned tests of post-85 features pass their own, e.g. 2023 for the wide tier).</param>
-public sealed class CobolNetCompiler(int dialectLevel = 85) : ICompilerUnderTest
+/// <param name="dialectLevel">The targeted ISO edition (default 85 — the edition the committed differential goldens
+/// were recorded at; spec-pinned tests of post-85 features pass their own, e.g. 2023 for the wide tier).</param>
+public sealed class CobolNetCompiler(int dialectLevel = 85)
 {
-    public string Name => "cobolnet";
-
     public (bool ok, string stdout, string detail) CompileAndRun(string source)
     {
         string dir = CutRunner.NewTempDir("cn");
@@ -227,40 +197,6 @@ public sealed class CobolNetCompiler(int dialectLevel = 85) : ICompilerUnderTest
                 return (-1, "", $"[cobolnet compile] {result.Status}: {string.Join("\n", result.Errors)}");
 
             return CutRunner.RunExit(dll, dir);
-        }
-        finally { CutRunner.TryDelete(dir); }
-    }
-}
-
-/// <summary>
-/// The legacy byte-engine compiler as the differential oracle: drives the in-process <c>CobolSharp.Compiler</c>
-/// <see cref="LegacyCompilation"/> API (the same path <c>EndToEndTestBase</c> uses, 364-NIST-green) into an
-/// isolated temp dir, then runs the produced assembly. Default (permissive) dialect, matching the legacy base.
-/// </summary>
-public sealed class LegacyCompiler : ICompilerUnderTest
-{
-    public string Name => "legacy";
-
-    public (bool ok, string stdout, string detail) CompileAndRun(string source)
-    {
-        string dir = CutRunner.NewTempDir("lg");
-        try
-        {
-            string src = Path.Combine(dir, "prog.cob");
-            string dll = Path.Combine(dir, "prog.dll");
-            src = CompiledProgramCache.StageSource(src, source);
-
-            var compilation = new LegacyCompilation();
-            var result = compilation.Compile(src, dll);
-            if (!result.Success)
-                return (false, "", $"[legacy compile] {string.Join("\n", result.Diagnostics.Select(d => d.ToString()))}");
-
-            // Deploy the legacy runtime next to the output (defensive — mirrors EndToEndTestBase's multi-program path).
-            string runtime = typeof(LegacyState).Assembly.Location;
-            string dest = Path.Combine(dir, Path.GetFileName(runtime));
-            if (!File.Exists(dest)) File.Copy(runtime, dest);
-
-            return CutRunner.Run(dll, dir);
         }
         finally { CutRunner.TryDelete(dir); }
     }

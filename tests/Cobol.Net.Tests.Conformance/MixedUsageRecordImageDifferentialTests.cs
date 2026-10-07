@@ -21,7 +21,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class MixedUsageRecordImageDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
     /// <summary>Spec-pinned assertion (memory feedback_use_the_spec): the expected output is derived by hand from
     /// the cited general rules + the documented digit-image representation, not from an oracle run.</summary>

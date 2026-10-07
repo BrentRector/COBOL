@@ -139,7 +139,7 @@ PROGRAM NESTING: each BoundProgram→`internal [static] class <Prog>`; nested/co
 
 EDITION: EditionInfo held by the driver; the VersionConformancePass is its sole gating consumer — the frontend parses the superset, the binder and emitters are edition-agnostic, and emit is unreachable when any diagnostics exist.
 
-HARNESS: ICompilerUnderTest { (ok,stdout,stderr) Compile+Run(src, dialect, nist?) } with LegacyCompiler and CobolNetCompiler impls; DifferentialNistTests asserts CobolNet stdout == Legacy stdout == nist/valid/*.txt.
+HARNESS: CobolNetCompiler { (ok,stdout,detail) CompileAndRun(src) } at a chosen edition; NistDifferentialTests asserts CobolNet stdout == nist/valid/*.txt, and the *DifferentialTests compare with the committed goldens under tests/differential/.
 
 ## Hard problems
 

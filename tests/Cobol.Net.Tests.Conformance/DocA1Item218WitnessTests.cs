@@ -35,7 +35,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class DocA1Item218WitnessTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(2023);
+    private static readonly CobolNetCompiler CobolNet = new(2023);
 
     /// <summary>Compile-and-run; assert ABNORMAL termination (nonzero exit) whose stderr names the condition, and
     /// the exact stdout produced before it.</summary>

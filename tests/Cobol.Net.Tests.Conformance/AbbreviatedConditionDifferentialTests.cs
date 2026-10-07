@@ -11,16 +11,14 @@ namespace CobolNet.Tests.Conformance;
 /// subject and the last STATED relational operator are inserted; a NOT may be part of a carried relational operator
 /// (<c>A NOT &lt; C</c>); a parenthesized sub-condition is a complete simple condition that starts a fresh scope.
 /// <para>
-/// SPEC-ANCHORED: each case asserts the result DERIVED FROM §8.8.4.12.4 (the ISO spec is the authority for behavior),
-/// then cross-checks that the legacy oracle agrees (a regression net only — a divergence would mean one is
-/// non-conformant, which this test would surface). The expected value is computed by hand-expanding per GR1 with
+/// SPEC-ANCHORED: each case asserts the result DERIVED FROM §8.8.4.12.4 (the ISO spec is the authority for behavior).
+/// The expected value is computed by hand-expanding per GR1 with
 /// A=5, B=3, C=7, D=5 (shown in each case).
 /// </para>
 /// </summary>
 public sealed class AbbreviatedConditionDifferentialTests
 {
-    private static readonly ICompilerUnderTest Legacy = new LegacyCompiler();
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
     // A=5, B=3, C=7, D=5.
     private static string Program(string proc) => $$"""
@@ -38,17 +36,13 @@ public sealed class AbbreviatedConditionDifferentialTests
             STOP RUN.
         """;
 
-    /// <summary>Assert the program's result equals the SPEC-DERIVED <paramref name="expected"/> (ISO §8.8.4.12.4),
-    /// then assert the legacy oracle agrees (cross-check; the spec value is the authority).</summary>
+    /// <summary>Assert the program's result equals the SPEC-DERIVED <paramref name="expected"/> (ISO §8.8.4.12.4).</summary>
     private static void AssertSpec(string proc, string expected)
     {
         string source = Program(proc);
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
         Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
-        Assert.Equal(expected, cout);                 // primary: conformance to the ISO spec
-        var (lok, lout, ldetail) = Legacy.CompileAndRun(source);
-        Assert.True(lok, $"legacy oracle failed: {ldetail}");
-        Assert.Equal(expected, lout);                 // cross-check: the oracle agrees with the spec value
+        Assert.Equal(expected, cout);
     }
 
     [Theory]

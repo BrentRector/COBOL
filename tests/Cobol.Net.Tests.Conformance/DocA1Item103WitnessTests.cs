@@ -24,7 +24,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class DocA1Item103WitnessTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(2023);
+    private static readonly CobolNetCompiler CobolNet = new(2023);
 
     private static void AssertTerminates(string source, string ecName, string statement, string expectedStdout)
     {

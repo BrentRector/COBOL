@@ -14,10 +14,10 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class OnSizeErrorDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
     // ROUNDED MODE IS is an ISO-2014+ phrase (§14.7.4) — the PROHIBITED facts compile at 2014.
-    private static readonly ICompilerUnderTest CobolNet2014 = new CobolNetCompiler(dialectLevel: 2014);
+    private static readonly CobolNetCompiler CobolNet2014 = new(dialectLevel: 2014);
 
     private static void AssertOutput(string source, string expected, bool needs2014 = false)
     {
@@ -26,7 +26,7 @@ public sealed class OnSizeErrorDifferentialTests
         Assert.Equal(expected, outp);
     }
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string ws, string proc) => $"""
         IDENTIFICATION DIVISION.
@@ -48,7 +48,7 @@ public sealed class OnSizeErrorDifferentialTests
         // VALUE makes the unchanged-receiver image deterministic — an unvalued numeric differs across engines).
         var src = Program("01 R PIC 9(2) VALUE 7.", "    ADD 99 50 GIVING R ON SIZE ERROR DISPLAY \"OVF\".\n    DISPLAY R.");
         AssertOutput(src, "OVF\n07");
-        AssertSameAsLegacy(src);
+        AssertMatchesGolden(src);
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public sealed class OnSizeErrorDifferentialTests
     {
         var src = Program("01 R PIC 9(2).", "    ADD 1 2 GIVING R NOT ON SIZE ERROR DISPLAY \"OK\".\n    DISPLAY R.");
         AssertOutput(src, "OK\n03");
-        AssertSameAsLegacy(src);
+        AssertMatchesGolden(src);
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public sealed class OnSizeErrorDifferentialTests
         var src = Program("01 R1 PIC 9(3) VALUE 1.\n01 R2 PIC 9(1) VALUE 8.",
             "    ADD 50 GIVING R1 R2 ON SIZE ERROR DISPLAY \"E\".\n    DISPLAY R1.\n    DISPLAY R2.");
         AssertOutput(src, "E\n050\n8");
-        AssertSameAsLegacy(src);
+        AssertMatchesGolden(src);
     }
 
     // ── Intermediate overflow of the long engine → ON SIZE ERROR fires (§14.7.5 case 5; the phrase ENABLES the
@@ -116,13 +116,13 @@ public sealed class OnSizeErrorDifferentialTests
         var src = Program("01 R PIC 9(4) VALUE 1234.",
             "    COMPUTE R = 9999999999 * 9999999999 ON SIZE ERROR DISPLAY \"OVF\".\n    DISPLAY R.");
         AssertOutput(src, "OVF\n1234");
-        AssertSameAsLegacy(src);
+        AssertMatchesGolden(src);
     }
 
     // ── No ON SIZE ERROR phrase: a normal in-range computation is unaffected (the unchecked path). ──────────────
     [Fact]
     public void NoPhrase_NormalArithmetic_Unaffected()
-        => AssertSameAsLegacy(Program("01 R PIC 9(2).", "    ADD 1 2 GIVING R.\n    DISPLAY R."));
+        => AssertMatchesGolden(Program("01 R PIC 9(2).", "    ADD 1 2 GIVING R.\n    DISPLAY R."));
 
     // ── ROUNDED MODE IS PROHIBITED into a numeric-EDITED receiver: an inexact transfer is a size error
     //    (§14.7.4.3 r7 → EC-SIZE-TRUNCATION), receiver UNCHANGED. The DEVLOG-610-audited leak: the edited-store

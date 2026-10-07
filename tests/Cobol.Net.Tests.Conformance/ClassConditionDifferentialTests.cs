@@ -7,14 +7,13 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// Class conditions (ISO §8.8.4.4): <c>IS [NOT] {NUMERIC | ALPHABETIC | ALPHABETIC-UPPER | ALPHABETIC-LOWER}</c>.
 /// ALPHABETIC is the closed Latin set {A–Z, a–z, space} (not <c>char.IsLetter</c>); a typed-numeric field IS NUMERIC
-/// folds to true. Pinned to the legacy oracle.
+/// folds to true. Pinned to the committed differential goldens.
 /// </summary>
 public sealed class ClassConditionDifferentialTests
 {
-    private static readonly ICompilerUnderTest Legacy = new LegacyCompiler();
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string ws, string proc) => $"""
         IDENTIFICATION DIVISION.
@@ -51,13 +50,12 @@ public sealed class ClassConditionDifferentialTests
     [InlineData("01 X PIC X(3) VALUE \"abc\".", "    IF X IS ALPHABETIC-LOWER DISPLAY \"LO\" ELSE DISPLAY \"NO\" END-IF.")]
     [InlineData("01 X PIC X(3) VALUE \"A1C\".", "    IF X IS NOT NUMERIC DISPLAY \"NN\" ELSE DISPLAY \"NO\" END-IF.")]
     [InlineData("01 X PIC X(3) VALUE \"ABC\".", "    IF X IS NOT ALPHABETIC DISPLAY \"NA\" ELSE DISPLAY \"AL\" END-IF.")]
-    public void ClassConditions(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void ClassConditions(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Theory]
     // SPEC-ANCHORED — ISO §8.8.4.4.4 GR3 n)2: IS NUMERIC over an alphanumeric (non-numeric category) operand is true
     // ONLY if the content consists ENTIRELY of the digits 0–9; an operational sign is NOT a valid character. So
-    // "+1234" / "12-" are NOT NUMERIC (the NC211A GF-48 CLASS-1 case). Result derived from the spec, cross-checked
-    // against the legacy oracle.
+    // "+1234" / "12-" are NOT NUMERIC (the NC211A GF-48 CLASS-1 case). Result derived from the spec.
     [InlineData("01 X PIC X(5) VALUE \"+1234\".", "    IF X IS NUMERIC DISPLAY \"NU\" ELSE DISPLAY \"NO\" END-IF.", "NO")]
     [InlineData("01 X PIC X(5) VALUE \"+1234\".", "    IF X IS NOT NUMERIC DISPLAY \"NN\" ELSE DISPLAY \"NO\" END-IF.", "NN")]
     [InlineData("01 X PIC X(3) VALUE \"12-\".",   "    IF X IS NUMERIC DISPLAY \"NU\" ELSE DISPLAY \"NO\" END-IF.", "NO")]
@@ -67,9 +65,6 @@ public sealed class ClassConditionDifferentialTests
         string want = CutRunner.Normalize(expected);
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
         Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
-        Assert.Equal(want, cout);                       // primary: ISO §8.8.4.4.4 GR3 n)2
-        var (lok, lout, ldetail) = Legacy.CompileAndRun(source);
-        Assert.True(lok, $"legacy oracle failed: {ldetail}");
-        Assert.Equal(want, lout);                       // cross-check: the oracle agrees with the spec value
+        Assert.Equal(want, cout);                       // ISO §8.8.4.4.4 GR3 n)2
     }
 }

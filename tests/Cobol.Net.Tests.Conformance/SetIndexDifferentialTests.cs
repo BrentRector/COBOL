@@ -13,7 +13,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class SetIndexDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string workingStorage, string procedure) => $"""
         IDENTIFICATION DIVISION.
@@ -35,7 +35,7 @@ public sealed class SetIndexDifferentialTests
 
     [Fact]
     public void SetIndexToLiteral_ThenSubscript()
-        => AssertSameAsLegacy(Program(Table, """
+        => AssertMatchesGolden(Program(Table, """
                 MOVE 11 TO ITM(1).
                 MOVE 22 TO ITM(2).
                 MOVE 33 TO ITM(3).
@@ -45,7 +45,7 @@ public sealed class SetIndexDifferentialTests
 
     [Fact]
     public void SetIndexUpDownBy()
-        => AssertSameAsLegacy(Program(Table, """
+        => AssertMatchesGolden(Program(Table, """
                 MOVE 11 TO ITM(1).
                 MOVE 55 TO ITM(5).
                 SET IX-1 TO 1.
@@ -57,7 +57,7 @@ public sealed class SetIndexDifferentialTests
 
     [Fact]
     public void SetNumericToIndex_OccurrenceNumber()
-        => AssertSameAsLegacy(Program(Table, """
+        => AssertMatchesGolden(Program(Table, """
                 SET IX-1 TO 4.
                 SET WS-N TO IX-1.
                 DISPLAY WS-N.
@@ -65,7 +65,7 @@ public sealed class SetIndexDifferentialTests
 
     [Fact]
     public void SetIndexToIndex()
-        => AssertSameAsLegacy(Program(Table, """
+        => AssertMatchesGolden(Program(Table, """
                 MOVE 44 TO ITM(4).
                 SET IX-1 TO 4.
                 SET IX-2 TO IX-1.
@@ -74,7 +74,7 @@ public sealed class SetIndexDifferentialTests
 
     [Fact]
     public void UsageIndexDataItem_RoundTrip()
-        => AssertSameAsLegacy(Program(Table + "\n77 WS-IDX USAGE INDEX.", """
+        => AssertMatchesGolden(Program(Table + "\n77 WS-IDX USAGE INDEX.", """
                 MOVE 22 TO ITM(2).
                 SET IX-1 TO 2.
                 SET WS-IDX TO IX-1.
@@ -84,7 +84,7 @@ public sealed class SetIndexDifferentialTests
 
     [Fact]
     public void SetMultipleReceivers_SenderEvaluatedOnce()
-        => AssertSameAsLegacy(Program(Table, """
+        => AssertMatchesGolden(Program(Table, """
                 MOVE 33 TO ITM(3).
                 SET IX-1 IX-2 TO 3.
                 DISPLAY ITM(IX-1) ITM(IX-2).
@@ -92,7 +92,7 @@ public sealed class SetIndexDifferentialTests
 
     [Fact]
     public void IndexInRelationCondition()
-        => AssertSameAsLegacy(Program(Table, """
+        => AssertMatchesGolden(Program(Table, """
                 SET IX-1 TO 3.
                 IF IX-1 = 3 DISPLAY "EQ3" ELSE DISPLAY "NE3".
                 IF IX-1 > 1 DISPLAY "GT1".
@@ -100,7 +100,7 @@ public sealed class SetIndexDifferentialTests
 
     [Fact]
     public void SetIndexToDataNameValue()
-        => AssertSameAsLegacy(Program(Table, """
+        => AssertMatchesGolden(Program(Table, """
                 MOVE 55 TO ITM(5).
                 MOVE 5 TO WS-N.
                 SET IX-1 TO WS-N.

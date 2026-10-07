@@ -13,7 +13,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class RedefinesTierADifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string ws, string proc) => $"""
         IDENTIFICATION DIVISION.
@@ -29,13 +29,13 @@ public sealed class RedefinesTierADifferentialTests
 
     [Fact]
     public void IdenticalPic_WriteOriginal_ReadView()
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 WS-A PIC 9(4) VALUE 1234.\n01 WS-B REDEFINES WS-A PIC 9(4).",
             "    MOVE 5678 TO WS-A.\n    DISPLAY WS-B."));   // 5678 — the view sees the original's write
 
     [Fact]
     public void IdenticalPic_WriteView_ReadOriginal()
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 WS-A PIC 9(4) VALUE 1111.\n01 WS-B REDEFINES WS-A PIC 9(4).",
             "    MOVE 9999 TO WS-B.\n    DISPLAY WS-A."));   // 9999 — one shared backing, coherent both ways
 
@@ -43,7 +43,7 @@ public sealed class RedefinesTierADifferentialTests
     public void NumericOverNumeric_SameDigitsDifferentScale()
         // PIC 9(6)V9(6) holds 22.222222 as the 12 unscaled digits 000022222222; the S9(12) view reads the same
         // unscaled value at scale 0 → 000022222222.
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 WS-A PIC 9(6)V9(6).\n01 WS-B REDEFINES WS-A PIC 9(12).",
             "    MOVE 22.222222 TO WS-A.\n    DISPLAY WS-B."));   // 000022222222
 
@@ -52,7 +52,7 @@ public sealed class RedefinesTierADifferentialTests
         // The NC101A MPY-TEST-F1-6 shape (a scaled MULTIPLY into a S9(6)V9(6), then read its S9(12) same-storage
         // redefiner as a 12-digit integer) — exact (×4 of 2.5 = 10.0) so it isolates REDEFINES from ROUNDED (the
         // ROUNDED phrase is a separate G3 numeric gap, not wired yet).
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 WS-DS-06V06 PIC S9(6)V9(6).
             01 WS-DS-12V00-S REDEFINES WS-DS-06V06 PIC S9(12).
             """,
@@ -60,7 +60,7 @@ public sealed class RedefinesTierADifferentialTests
 
     [Fact]
     public void SignedNumericAlias_OverpunchImage()
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "01 WS-A PIC S9(4) VALUE -42.\n01 WS-B REDEFINES WS-A PIC S9(4).",
             "    DISPLAY WS-B."));   // 004K — the view formats the shared signed value
 }

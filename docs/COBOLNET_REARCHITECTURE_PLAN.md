@@ -3983,7 +3983,7 @@ absent.
 #### CUT 1 — Drop legacy from the build & test graph
 The engine files still exist on disk after Cut 1; only their edges into the greenfield build/test/CI graph are cut.
 
-- [ ] **Step 1 — Sever the conformance project's legacy `ProjectReference`s and delete `LegacyCompiler`.**
+- [x] **Step 1 — Sever the conformance project's legacy `ProjectReference`s and delete `LegacyCompiler`.** DONE by kb/Work PB2108 (wave 1025), which also found and removed six classes' LIVE legacy cross-checks.
   - Files: `tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj` (remove lines 34-35, the
     `CobolSharp.Compiler`/`CobolSharp.Runtime` `ProjectReference`s); `tests/Cobol.Net.Tests.Conformance/CompilerUnderTest.cs`
     (delete `using LegacyCompilation = …`, `using LegacyState = …`, the `LegacyCompiler` class, and the `Legacy*`
@@ -4002,7 +4002,7 @@ The engine files still exist on disk after Cut 1; only their edges into the gree
   - **COMMIT BOUNDARY.** Suggested message:
     `refactor(cobolnet): P15 Cut 1a — sever conformance project's legacy oracle ProjectReference (goldens are self-standing)`
 
-- [ ] **Step 2 — Point CI's authoritative gate at the greenfield guard; delete the legacy `guard` job.**
+- [x] **Step 2 — Point CI's authoritative gate at the greenfield guard; delete the legacy `guard` job.** DONE as amended: PB750 had already pointed the `guard` job at `cobol`, so it STAYS (the CLI-level NIST leg); PB2108 deleted the nightly `legacy-oracle` job and PB2109 the guard's and `windows-build-test`'s legacy Unit and Integration legs.
   - File: `.github/workflows/build-and-test.yml`. Delete the `guard` job (runs `scripts/guard-fast.sh` over the legacy
     engine). Confirm `greenfield-tests` (conformance+unit) and `inv1-sweep` remain and are green. Collapse
     `windows-build-test` into an OS-matrix `build-test` per DESIGN-test-build-ci §3.8 (matrix `[ubuntu-latest,
@@ -4017,7 +4017,7 @@ The engine files still exist on disk after Cut 1; only their edges into the gree
   - **COMMIT BOUNDARY.** Suggested message:
     `ci(cobolnet): P15 Cut 1b — retire the legacy guard-fast.sh job; greenfield in-process NIST is the authoritative gate`
 
-- [ ] **Step 3 — Sever `tools/DifferentialBakeTool`'s legacy dependency.**
+- [x] **Step 3 — Sever `tools/DifferentialBakeTool`'s legacy dependency.** Nothing to do: the tool was never created (the bake ran as `COBOLNET_DIFF_MODE=bake`, deleted by PB2108).
   - File: `tools/DifferentialBakeTool` (created in P0). The bake is a one-time operation that has already run; the tool
     must no longer reference `CobolSharp.*`. Either (a) delete the tool outright (the goldens are committed and the
     bake never needs re-running against legacy — recommended), or (b) if kept as a re-bake maintenance utility, strip
@@ -4028,7 +4028,7 @@ The engine files still exist on disk after Cut 1; only their edges into the gree
     (legacy projects still present but now referenced only by themselves).
   - **COMMIT BOUNDARY.** Suggested message: `chore(cobolnet): P15 Cut 1c — remove DifferentialBakeTool legacy oracle dependency`
 
-- [ ] **Step 4 — Delete the legacy guard scripts.**
+- [x] **Step 4 — Delete the legacy guard scripts.** DONE as amended by PB750: the guard scripts are the WiseOwl COBOL NIST leg and stay; PB2109 deleted their legacy arms and `compliance.sh`, `nist-batch.sh` and `run-suite.sh`.
   - Files: `scripts/guard.sh`, `scripts/guard-fast.sh`, `scripts/guard-run-group.sh`, `scripts/guard-verify.sh`,
     `scripts/compliance.sh`, `scripts/nist-batch.sh`, `scripts/run-suite.sh`. KEEP `scripts/guard.ps1` (greenfield
     authoritative), `scripts/version-continuity-sweep.sh` (INV-1, greenfield CLI), `scripts/gen-reserved-words.ps1`

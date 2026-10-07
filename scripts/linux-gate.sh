@@ -108,8 +108,8 @@ for leg in "${wanted[@]}"; do
     conformance)      proj="tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj" ;;
     guard)
       # CI's `guard` job (kb/Work PB1955, PB1957 row 40): the NIST suite through the `cobol` CLI from bash, the
-      # manifest audit, the guard's own self-tests and the legacy Unit + Integration suites — the one CI Linux job
-      # that runs a SCRIPT rather than `dotnet test`, so it was the one no local gate ran. Train 1013's CI red on
+      # manifest audit, the baseline check and the guard's own self-tests — the one CI Linux job that runs a SCRIPT
+      # rather than `dotnet test`, so it was the one no local gate ran. Train 1013's CI red on
       # PB322's TERMINATES rows was invisible to every local leg. Its scratch is private to this clone (the guard
       # writes fixed file names under TMPDIR, and implementers run this gate concurrently).
       mkdir -p "$snap/.guard-tmp"
@@ -121,7 +121,7 @@ for leg in "${wanted[@]}"; do
         echo "leg guard: GREEN in ${secs}s — $summary"; ran="$ran guard"
       else
         # A red guard prints its WHOLE log less the per-program verdicts that came out as predicted: trim what passed,
-        # never what failed (kb/Work PB1573). The audit's findings and a red legacy leg's complete output stay.
+        # never what failed (kb/Work PB1573). The audit's findings and every non-matching verdict's evidence stay.
         echo "leg guard: RED (rc=$rc) in ${secs}s — ${summary:-no guard verdict; see TestResults/linux-gate/guard.log}"
         grep -vE '^ *[A-Z][A-Z0-9]+: (MATCH|TERMINATES EC-|NO BASELINE)' "$out/guard.log" | sed 's/^/    /'
         bad="$bad guard"

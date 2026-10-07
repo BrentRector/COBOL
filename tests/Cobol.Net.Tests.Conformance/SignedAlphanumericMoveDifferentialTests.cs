@@ -10,7 +10,7 @@ namespace CobolNet.Tests.Conformance;
 /// digits are transferred (an overpunched digit becomes a plain digit; a separate sign character is omitted), NOT the
 /// zoned/overpunch image. A numeric-vs-alphanumeric comparison follows the same rule (§8.8.4.2.5 treats the numeric as
 /// moved to an alphanumeric item). DISPLAY is unaffected — it shows the sign-aware image. Each result is derived from
-/// the spec, then cross-checked against the legacy oracle.
+/// the spec.
 ///
 /// <para>EXCEPTION — a GROUP receiver: GR6a's sign-drop applies only to a valid ELEMENTARY move (GR6), and a group
 /// receiver makes the move NON-elementary (§14.9.25.4 GR4 ¶1). GR4 then bars any internal-representation conversion,
@@ -19,24 +19,10 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class SignedAlphanumericMoveDifferentialTests
 {
-    private static readonly ICompilerUnderTest Legacy = new LegacyCompiler();
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSpecAndLegacy(string source, string expected)
-    {
-        string want = CutRunner.Normalize(expected);
-        var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
-        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
-        Assert.Equal(want, cout);                       // primary: conformance to ISO §14.9.25.4 GR6a
-        var (lok, lout, ldetail) = Legacy.CompileAndRun(source);
-        Assert.True(lok, $"legacy oracle failed: {ldetail}");
-        Assert.Equal(want, lout);                       // cross-check: the oracle agrees with the spec value
-    }
-
-    /// <summary>Assert WiseOwl COBOL matches the SPEC-derived value, with NO legacy cross-check — used where the legacy
-    /// differential oracle is non-conformant to ISO 2023 for the case (the spec is the authority; cf. the DISPLAY
-    /// trailing-trim precedent).</summary>
-    private static void AssertSpecOnly(string source, string expected)
+    /// <summary>Assert WiseOwl COBOL produces the SPEC-DERIVED <paramref name="expected"/> (ISO §14.9.25.4).</summary>
+    private static void AssertSpec(string source, string expected)
     {
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(source);
         Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
@@ -58,19 +44,19 @@ public sealed class SignedAlphanumericMoveDifferentialTests
     [Fact]
     // A positive overpunch digit is de-signed on the move to alphanumeric (+1 → "1", not the zoned "A").
     public void SignedToAlphanumeric_PositiveOverpunchDeSigned()
-        => AssertSpecAndLegacy(Program("01 SN PIC S9 VALUE 1.\n01 XR PIC X.",
+        => AssertSpec(Program("01 SN PIC S9 VALUE 1.\n01 XR PIC X.",
             "    MOVE SN TO XR.\n    DISPLAY \"R=\" XR."), "R=1");
 
     [Fact]
     // A negative value moves its magnitude digits, sign dropped (-123 → "123").
     public void SignedToAlphanumeric_NegativeMagnitude()
-        => AssertSpecAndLegacy(Program("01 SN PIC S9(3) VALUE -123.\n01 XR PIC X(3).",
+        => AssertSpec(Program("01 SN PIC S9(3) VALUE -123.\n01 XR PIC X(3).",
             "    MOVE SN TO XR.\n    DISPLAY \"R=\" XR."), "R=123");
 
     [Fact]
     // The magnitude is zero-padded to the digit count (+7 in S9(3) → "007").
     public void SignedToAlphanumeric_ZeroPaddedMagnitude()
-        => AssertSpecAndLegacy(Program("01 SN PIC S9(3) VALUE 7.\n01 XR PIC X(3).",
+        => AssertSpec(Program("01 SN PIC S9(3) VALUE 7.\n01 XR PIC X(3).",
             "    MOVE SN TO XR.\n    DISPLAY \"R=\" XR."), "R=007");
 
     [Fact]
@@ -84,7 +70,7 @@ public sealed class SignedAlphanumericMoveDifferentialTests
     // implying a DIRECT numeric-vs-alphanumeric compare de-signs. No '85 golden requires the legacy image-compare, so
     // pin-to-spec for ALL dialects (see feedback_version_targeted_semantics / docs/VERSION_CHANGE_REFERENCE.md).
     public void SignedVsAlphanumericComparison_UsesDeSignedMagnitude()
-        => AssertSpecOnly(Program("01 SN PIC S9(2) VALUE -5.",
+        => AssertSpec(Program("01 SN PIC S9(2) VALUE -5.",
             "    IF SN = \"05\" DISPLAY \"EQ\" ELSE DISPLAY \"NE\" END-IF."), "EQ");
 
     [Fact]
@@ -99,7 +85,7 @@ public sealed class SignedAlphanumericMoveDifferentialTests
     // SPEC-CORRECT value. The elementary-receiver de-sign (SignedToAlphanumeric_NegativeMagnitude → "123") stays
     // correct — GR6a DOES apply there. Version-invariant (GR4 unchanged across editions).
     public void SignedToAlphanumericGroup_SignPreserved()
-        => AssertSpecOnly(Program("01 SN PIC S9(3) VALUE -45.\n01 GRP.\n   05 G1 PIC X(3).",
+        => AssertSpec(Program("01 SN PIC S9(3) VALUE -45.\n01 GRP.\n   05 G1 PIC X(3).",
             "    MOVE SN TO GRP.\n    DISPLAY \"R=\" GRP."), "R=04N");
 
     [Fact]
@@ -108,7 +94,7 @@ public sealed class SignedAlphanumericMoveDifferentialTests
     // gap (DEVLOG 516). SIGN LEADING SEPARATE +91275 has image "+91275"; the magnitude "91275" is moved (exact-fit
     // X(5) receiver, so no trailing space exposes the legacy DISPLAY-trim quirk).
     public void SignedRedefinesCanonicalToAlphanumeric_DeSigned()
-        => AssertSpecAndLegacy(Program(
+        => AssertSpec(Program(
             "01 SN PIC S9(5) SIGN LEADING SEPARATE VALUE 91275.\n01 GRP REDEFINES SN PIC X(6).\n01 XR PIC X(5).",
             "    MOVE SN TO XR.\n    DISPLAY \"R=\" XR."), "R=91275");
 
@@ -119,5 +105,5 @@ public sealed class SignedAlphanumericMoveDifferentialTests
     [InlineData("    IF SN = 5 DISPLAY \"EQ\" ELSE DISPLAY \"NE\" END-IF.", "NE")]
     [InlineData("    IF SN = -5 DISPLAY \"EQ\" ELSE DISPLAY \"NE\" END-IF.", "EQ")]
     public void SignedVsNumericComparison_StaysAlgebraic(string proc, string expected)
-        => AssertSpecAndLegacy(Program("01 SN PIC S9(2) VALUE -5.", proc), expected);
+        => AssertSpec(Program("01 SN PIC S9(2) VALUE -5.", proc), expected);
 }

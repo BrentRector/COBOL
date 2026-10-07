@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class OptionsDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(dialectLevel: 2014);   // OPTIONS / ROUNDED MODE IS are ISO-2014+ features
+    private static readonly CobolNetCompiler CobolNet = new(dialectLevel: 2014);   // OPTIONS / ROUNDED MODE IS are ISO-2014+ features
 
     private static void AssertOutput(string source, string expected)
     {
@@ -21,7 +21,7 @@ public sealed class OptionsDifferentialTests
         Assert.Equal(expected, outp);
     }
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source, 2014);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source, 2014);
 
     /// <summary>A program whose IDENTIFICATION DIVISION carries an <paramref name="options"/> paragraph body.</summary>
     private static string Program(string options, string ws, string proc) => $"""
@@ -46,7 +46,7 @@ public sealed class OptionsDifferentialTests
         var src = Program("           DEFAULT ROUNDED MODE IS NEAREST-EVEN.",
             "01 R PIC 9(3).", "    COMPUTE R ROUNDED = 25 / 10.\n    DISPLAY R.");
         AssertOutput(src, "002");
-        AssertSameAsLegacy(src);   // the legacy oracle also applies DEFAULT ROUNDED
+        AssertMatchesGolden(src);   // the legacy oracle also applies DEFAULT ROUNDED
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public sealed class OptionsDifferentialTests
         var src = Program("           DEFAULT ROUNDED MODE IS TRUNCATION.",
             "01 R PIC 9(3).", "    COMPUTE R ROUNDED = 25 / 10.\n    DISPLAY R.");
         AssertOutput(src, "002");
-        AssertSameAsLegacy(src);
+        AssertMatchesGolden(src);
     }
 
     [Fact]
@@ -70,14 +70,14 @@ public sealed class OptionsDifferentialTests
     //    (ARITHMETIC IS STANDARD-DECIMAL — plain STANDARD, the 2014 mode, is rejected: dropped by ISO 2023.) ─────
     [Fact]
     public void MultiClauseOptions_ParsesAndRuns()
-        => AssertSameAsLegacy(Program(
+        => AssertMatchesGolden(Program(
             "           ARITHMETIC IS STANDARD-DECIMAL\n           DEFAULT ROUNDED MODE IS NEAREST-EVEN.",
             "01 R PIC 9(3).", "    COMPUTE R ROUNDED = 35 / 10.\n    DISPLAY R."));   // 3.5 → 4 (even)
 
     // ── A bare OPTIONS header with no clauses (§11.9.3 — period optional) still compiles. ───────────────────────
     [Fact]
     public void BareOptionsHeader_Compiles()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. OPTBARE.
             OPTIONS.

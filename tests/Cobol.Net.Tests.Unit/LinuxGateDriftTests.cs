@@ -54,7 +54,7 @@ public sealed class LinuxGateDriftTests
     /// <remarks>
     /// The fact above reads only <c>dotnet test</c> lines, and CI's <c>guard</c> job runs none: its whole test is
     /// <c>run: bash scripts/guard-fast.sh</c> (the NIST suite through the <c>cobol</c> CLI, the manifest audit, the
-    /// legacy Unit and Integration suites). So that job was the one CI Linux job no local gate ran, and train 1013's
+    /// guard's own self-tests). So that job was the one CI Linux job no local gate ran, and train 1013's
     /// guard red on PB322's TERMINATES rows reached CI behind a green Windows gate and a green Linux gate. A step that
     /// runs a script under <c>scripts/</c> with <c>bash</c> is held here to a <c>linux-gate.sh</c> leg that runs the
     /// SAME script, so the local gate and the CI job cannot measure different populations.

@@ -198,9 +198,9 @@ error. This is the structural enforcement of the project's "fail LOUD" culture.
   no dedup; hash-suffixing — destroys readability.)*
 - **Binder scope tree** for multiple/nested/contained programs (GLOBAL/COMMON/EXTERNAL are lexical-nesting
   questions). The emitter walks ALL program units, not `FirstOrDefault()`.
-- **Differential conformance harness:** `ICompilerUnderTest { Compile+Run(src, dialect, nist?) }` with `LegacyCompiler`
-  and `CobolNetCompiler` impls; `DifferentialNistTests` asserts `CobolNet stdout == Legacy stdout == nist/valid/*.txt`.
-  The legacy's 364 passing programs become an instant regression net; the `.txt` oracle backstops a shared bug. Reuse
+- **Differential conformance harness:** `CobolNetCompiler` compiles and runs each case; `NistDifferentialTests`
+  asserts `CobolNet stdout == nist/valid/*.txt` and the `*DifferentialTests` compare with the committed goldens under
+  `tests/differential/` (recorded once from the legacy engine, which no test drives since kb/Work PB2108). Reuse
   the proven `guard-fast` parallelism; run each program in an ISOLATED working dir (file producer/consumer chains).
 - **One `EditionInfo`** (`Cobol85/2002/2014/2023`) threaded CLI → driver. The grammar parses the SUPERSET of all
   editions and stamps each version-gated construct's construct-id; the binder is edition-AGNOSTIC (save the documented exception ledger, DESIGN-version-conformance-pipeline §1.1); the

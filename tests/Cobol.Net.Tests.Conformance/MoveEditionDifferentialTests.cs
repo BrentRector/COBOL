@@ -15,14 +15,13 @@ namespace CobolNet.Tests.Conformance;
 /// is prohibited — NEWLY removed by 2023 (Annex E.2 item 1 bullet 1: permitted through ISO 2014 → COBOLNET0902,
 /// error strict / warning permissive, silent below 2023). Value semantics: §8.3.3.6.4 GR2 (character-by-character
 /// repetition to the associated size) + §14.9.25.4 GR6d3b (a figurative sending operand takes the RECEIVER's
-/// digit count, fraction digits included). Pre-removal semantics of the prohibited shapes are legacy-oracle
-/// adjudicated (provisional — ratified owner decision 1): the fill characters become the receiver's character
+/// digit count, fraction digits included). Pre-removal semantics of the prohibited shapes are a provisional
+/// adjudication (ratified owner decision 1): the fill characters become the receiver's character
 /// image, so IS NUMERIC is false and numeric reads decode deterministically (§14.6.13.2).
 /// </summary>
 public sealed class MoveEditionDifferentialTests
 {
-    private static readonly ICompilerUnderTest Legacy = new LegacyCompiler();
-    private static readonly ICompilerUnderTest CobolNet85 = new CobolNetCompiler();   // dialect 85 (default)
+    private static readonly CobolNetCompiler CobolNet85 = new();   // dialect 85 (default)
 
     private static string Program(string id, string ws, string proc) => $"""
         IDENTIFICATION DIVISION.
@@ -36,26 +35,10 @@ public sealed class MoveEditionDifferentialTests
             STOP RUN.
         """;
 
-    /// <summary>Assert WiseOwl COBOL (at --std 85) matches the spec-derived value AND the legacy oracle agrees.</summary>
-    private static void AssertSpecAndLegacy(string source, string expected)
-    {
-        string want = CutRunner.Normalize(expected);
-        var (cok, cout, cdetail) = CobolNet85.CompileAndRun(source);
-        Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
-        Assert.Equal(want, cout);
-        var (lok, lout, ldetail) = Legacy.CompileAndRun(source);
-        Assert.True(lok, $"legacy oracle failed: {ldetail}");
-        Assert.Equal(want, lout);
-    }
-
-    /// <summary>Assert WiseOwl COBOL (at --std 85) matches the pinned value with NO legacy cross-check — used where
-    /// the legacy oracle is unusable for the case: it REJECTS QUOTE/HIGH-VALUE/LOW-VALUE→numeric at compile time
-    /// (its CBL0906, stricter than ISO 2014 — Annex E.2 item 1 says these were permitted through 2014), and its
-    /// space-filled numeric DISPLAY renders EMPTY (zero characters — an internal byte-cell artifact inconsistent
-    /// with its own numeric-edited receiver, which renders the three spaces, and with §14.6.8 fixed-width
-    /// alignment). The pinned values keep the legacy's coherent core (fill characters stored, NOT NUMERIC,
-    /// deterministic zero decode) at the receiver's fixed width.</summary>
-    private static void AssertPinned(string source, string expected)
+    /// <summary>Assert WiseOwl COBOL (at --std 85) produces <paramref name="expected"/>: the spec-derived value, or for a
+    /// prohibited pre-removal shape the provisional pinned value (fill characters stored at the receiver's fixed width,
+    /// NOT NUMERIC, deterministic zero decode), as each case's comment says.</summary>
+    private static void AssertSpec(string source, string expected)
     {
         var (cok, cout, cdetail) = CobolNet85.CompileAndRun(source);
         Assert.True(cok, $"WiseOwl COBOL failed: {cdetail}");
@@ -86,14 +69,14 @@ public sealed class MoveEditionDifferentialTests
     // §14.9.25.4 GR6d3b: the figurative takes the receiver's digit count and is "replicated in this item, from
     // left to right" — ALL "5" → PIC 9(3) stores 555 (was the BoundAllLiteral runtime-loud latent bug).
     public void AllDigitToInteger_FillsEveryDigitPosition_Sr5_Gr6d3b()
-        => AssertSpecAndLegacy(Program("MVEDA1", "01 W-INT PIC 9(3).",
+        => AssertSpec(Program("MVEDA1", "01 W-INT PIC 9(3).",
             "    MOVE ALL \"5\" TO W-INT.\n    DISPLAY \"R[\" W-INT \"]\"."), "R[555]");
 
     [Fact]
     // GR6d3b: "if the receiving item is not an integer, the number of digits includes both those to the right
     // and the left of the decimal point" — ALL "5" → PIC 9V9 is 5.5 (digit image "55"; legacy-confirmed).
     public void AllDigitToNonInteger_FillsFractionDigits_Gr6d3b()
-        => AssertSpecAndLegacy(Program("MVEDA2", "01 W-FRAC PIC 9V9.",
+        => AssertSpec(Program("MVEDA2", "01 W-FRAC PIC 9V9.",
             "    MOVE ALL \"5\" TO W-FRAC.\n    DISPLAY \"R[\" W-FRAC \"]\"."), "R[55]");
 
     [Fact]
@@ -102,7 +85,7 @@ public sealed class MoveEditionDifferentialTests
     // '85 OBSOLETE element and admitted with exactly this repeat-truncate value (kb/Work PB422's determination,
     // VCR Table 7 row 7.13 — a derived edge; the golden twin is 85/pb422_all_multichar_numeric_85).
     public void AllDigitMultiCharacter_RepeatTruncate_At85_Sr3ObsoleteElement()
-        => AssertSpecAndLegacy(Program("MVEDA3", "01 W-INT PIC 9(3).",
+        => AssertSpec(Program("MVEDA3", "01 W-INT PIC 9(3).",
             "    MOVE ALL \"57\" TO W-INT.\n    DISPLAY \"R[\" W-INT \"]\"."), "R[575]");
 
     [Fact]
@@ -125,7 +108,7 @@ public sealed class MoveEditionDifferentialTests
     // is not digits). Pinned (no legacy cross-check): the legacy renders the space-filled numeric as EMPTY, an
     // artifact inconsistent with its own numeric-edited receiver ("   ") and QUOTE fill (three quotes).
     public void SpaceToNumeric_ImageFill_NotNumeric_At85_E2Item1()
-        => AssertPinned(Program("MVEDB1", "01 W-INT PIC 9(3).", """
+        => AssertSpec(Program("MVEDB1", "01 W-INT PIC 9(3).", """
                 MOVE SPACE TO W-INT.
                 DISPLAY "R[" W-INT "]".
                 IF W-INT IS NUMERIC
@@ -138,27 +121,27 @@ public sealed class MoveEditionDifferentialTests
     // QUOTE fill (§8.3.3.6.4 GR8: one or more quotation marks) — the legacy oracle's RUNTIME confirms three
     // quotes but its front end rejects the compile (CBL0906, stricter than ISO 2014), so the value is pinned.
     public void QuoteToNumeric_ImageFill_At85_E2Item1()
-        => AssertPinned(Program("MVEDB2", "01 W-INT PIC 9(3).",
+        => AssertSpec(Program("MVEDB2", "01 W-INT PIC 9(3).",
             "    MOVE QUOTE TO W-INT.\n    DISPLAY \"R[\" W-INT \"]\"."), "R[\"\"\"]");
 
     [Fact]
     // A space-filled numeric read in a numeric context decodes deterministically to 0 (§14.6.13.2 — incompatible
     // data; a non-digit contributes no digit), so ADD 1 yields 001. The legacy oracle agrees end-to-end here.
     public void SpaceFilledNumeric_DecodesZeroInArithmetic_1461312()
-        => AssertSpecAndLegacy(Program("MVEDB3", "01 W-INT PIC 9(3).",
+        => AssertSpec(Program("MVEDB3", "01 W-INT PIC 9(3).",
             "    MOVE SPACE TO W-INT.\n    ADD 1 TO W-INT.\n    DISPLAY \"R[\" W-INT \"]\"."), "R[001]");
 
     [Fact]
     // A NUMERIC-EDITED receiver is string-backed: the figurative fills its width (legacy-confirmed "   ").
     public void SpaceToNumericEdited_FillsWidth_At85_E2Item1()
-        => AssertSpecAndLegacy(Program("MVEDB4", "01 W-ED PIC ZZ9.",
+        => AssertSpec(Program("MVEDB4", "01 W-ED PIC ZZ9.",
             "    MOVE SPACE TO W-ED.\n    DISPLAY \"R[\" W-ED \"]\"."), "R[   ]");
 
     [Fact]
     // ALL "literal" containing a non-digit → numeric: character repetition to the receiver width (GR2) — the
     // legacy oracle stores "XXX" (provisional pre-removal semantics; 0902-removed at 2023).
     public void NonDigitAllToNumeric_CharacterFill_At85()
-        => AssertSpecAndLegacy(Program("MVEDB5", "01 W-INT PIC 9(3).",
+        => AssertSpec(Program("MVEDB5", "01 W-INT PIC 9(3).",
             "    MOVE ALL \"X\" TO W-INT.\n    DISPLAY \"R[\" W-INT \"]\"."), "R[XXX]");
 
     [Fact]
@@ -474,7 +457,7 @@ public sealed class MoveEditionDifferentialTests
     /// spec derivation; §14.6.13.2 gives the deterministic NOT-NUMERIC verdict).</summary>
     [Fact]
     public void RefModSlice_FigurativeAndLiteralSenders_PreserveCharacters()
-        => AssertPinned(Program("MVRFM1", "01 N PIC 9(3) VALUE 123.\n01 M PIC 9(3) VALUE 456.", """
+        => AssertSpec(Program("MVRFM1", "01 N PIC 9(3) VALUE 123.\n01 M PIC 9(3) VALUE 456.", """
                 MOVE SPACE TO N (1:2).
                 DISPLAY "[" N "]".
                 IF N IS NUMERIC DISPLAY "NUM" ELSE DISPLAY "NOTNUM".
@@ -498,7 +481,7 @@ public sealed class MoveEditionDifferentialTests
     /// legacy CBL0906 compile-rejects these at every standard (documented non-conformance vs E.2 item 1).</summary>
     [Fact]
     public void HighLowValue_PreRemoval_ImageFill_At85()
-        => AssertPinned(Program("MVHLV1", "01 N PIC 9(3) VALUE 123.", """
+        => AssertSpec(Program("MVHLV1", "01 N PIC 9(3) VALUE 123.", """
                 MOVE HIGH-VALUE TO N.
                 IF N = HIGH-VALUES DISPLAY "EQHV" ELSE DISPLAY "NEHV".
                 IF N IS NUMERIC DISPLAY "NUM" ELSE DISPLAY "NOTNUM".

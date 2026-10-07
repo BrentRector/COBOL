@@ -442,16 +442,14 @@ internal static class GateIdentityRecord
     }
 
     /// <summary>The compiler under test: the repository's own assemblies in the test assembly's directory
-    /// (<c>Cobol.Net.*</c>, <c>CobolSharp.*</c> and the CLI's <c>cobol.dll</c>), the test assembly excluded.</summary>
+    /// (<c>Cobol.Net.*</c> and the CLI's <c>cobol.dll</c>), the test assembly excluded.</summary>
     internal static IEnumerable<string> ProductAssemblies(string bin, string testAssemblyLocation) =>
         Directory.EnumerateFiles(bin, "*.dll")
             .Where(f =>
             {
                 string name = Path.GetFileName(f);
                 return !string.Equals(f, testAssemblyLocation, StringComparison.OrdinalIgnoreCase)
-                       && (name.StartsWith("Cobol.Net.", StringComparison.Ordinal)
-                           || name.StartsWith("CobolSharp.", StringComparison.Ordinal)
-                           || name == "cobol.dll");
+                       && (name.StartsWith("Cobol.Net.", StringComparison.Ordinal) || name == "cobol.dll");
             })
             .Order(StringComparer.Ordinal);
 

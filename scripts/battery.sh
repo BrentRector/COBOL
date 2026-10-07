@@ -19,13 +19,13 @@
 #                                               REGRESSION) before phase 2's output is believed. §3.10
 #                                               corollary 3; earned by kb/Work/PB473, where a green harness
 #                                               reported a regression it had not observed.
-#   PHASE 2  guard-fast                       — REBUILDS the `cobol` CLI + the legacy test projects, whose
-#                                               closures include Cobol.Net.Frontend and the whole greenfield
-#                                               compiler. Must not overlap phase 1.
+#   PHASE 2  guard-fast                       — REBUILDS the `cobol` CLI, whose closure includes
+#                                               Cobol.Net.Frontend and the whole greenfield compiler. Must not
+#                                               overlap phase 1.
 #                                               ⛔ SINCE kb/Work/PB750 THIS LEG MEASURES WiseOwl COBOL. It used to
-#                                               drive the LEGACY `cobolsharp.dll`, so `guard NIST: 353 MATCH`
+#                                               drive the legacy byte engine's CLI, so `guard NIST: 353 MATCH`
 #                                               was a statement about the oracle and battery #58's NC215A wrong
-#                                               answer was invisible to it. The summary line now NAMES the
+#                                               answer was invisible to it. The summary line NAMES the
 #                                               compiler: read `guard NIST (cobol): …`.
 #   PHASE 3  GnuCOBOL differential            — drives cobol.exe; CPU-saturating, so it is not overlapped with
 #                                               the guard (both would just split cores, and contention is the
@@ -155,8 +155,8 @@ if [ "${SKIP_GUARD:-0}" != "1" ]; then
 
     el "=== PHASE 2: guard-fast (rebuilds — never overlapped with phase 1) ==="
     bash scripts/guard-fast.sh > "$OUT/guard.log" 2>&1
-    # ⛔ THE COMPILER IS PART OF THE VERDICT (PB750): the pattern requires the `(cobol)` / `(legacy)` tag, so a
-    # guard that somehow printed the old unlabelled line reports NO VERDICT LINE here rather than a green.
+    # ⛔ THE COMPILER IS PART OF THE VERDICT (PB750): the pattern requires the `(cobol)` tag, so a guard that
+    # somehow printed an unlabelled line reports NO VERDICT LINE here rather than a green.
     note "$(printf '%-16s %s' 'guard NIST:' "$(grep -E '^=== NIST \(' "$OUT/guard.log" | tail -1)")"
     grep -qE '^=== NIST \(cobol\): ' "$OUT/guard.log" || { note "guard NIST:      ⛔ the guard did not drive WiseOwl COBOL — see $OUT/guard.log"; RC=1; }
     note "$(printf '%-16s %s' 'guard audit:' "$(grep -E '^=== NIST AUDIT: (CLEAN|[0-9])' "$OUT/guard.log" | tail -1)")"

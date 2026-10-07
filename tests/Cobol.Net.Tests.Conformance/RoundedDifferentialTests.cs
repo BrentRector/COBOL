@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class RoundedDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler(dialectLevel: 2014);   // OPTIONS / ROUNDED MODE IS are ISO-2014+ features
+    private static readonly CobolNetCompiler CobolNet = new(dialectLevel: 2014);   // OPTIONS / ROUNDED MODE IS are ISO-2014+ features
 
     /// <summary>Compile+run with WiseOwl COBOL and assert its stdout equals the hand-computed spec value.</summary>
     private static void AssertOutput(string source, string expected)
@@ -25,7 +25,7 @@ public sealed class RoundedDifferentialTests
     }
 
     /// <summary>Assert WiseOwl COBOL produces byte-identical stdout to the legacy oracle.</summary>
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source, 2014);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source, 2014);
 
     private static string Program(string ws, string proc) => $"""
         IDENTIFICATION DIVISION.
@@ -101,13 +101,13 @@ public sealed class RoundedDifferentialTests
     // ── Bare ROUNDED (no MODE) = NEAREST-AWAY-FROM-ZERO, the COBOL-85 default — cross-checked against the legacy. ─
     [Fact]
     public void BareRounded_DivideGiving_MatchesLegacy()
-        => AssertSameAsLegacy(Program("01 R PIC 9(3).", "    DIVIDE 10 INTO 25 GIVING R ROUNDED.\n    DISPLAY R."));   // 2.5 → 3
+        => AssertMatchesGolden(Program("01 R PIC 9(3).", "    DIVIDE 10 INTO 25 GIVING R ROUNDED.\n    DISPLAY R."));   // 2.5 → 3
 
     [Fact]
     public void BareRounded_Compute_MatchesLegacy()
-        => AssertSameAsLegacy(Program("01 R PIC 9V9.", "    COMPUTE R ROUNDED = 20 / 3.\n    DISPLAY R."));   // 6.666… → 6.7
+        => AssertMatchesGolden(Program("01 R PIC 9V9.", "    COMPUTE R ROUNDED = 20 / 3.\n    DISPLAY R."));   // 6.666… → 6.7
 
     [Fact]
     public void NoRounded_Compute_MatchesLegacy()
-        => AssertSameAsLegacy(Program("01 R PIC 9(3).", "    COMPUTE R = 29 / 10.\n    DISPLAY R."));   // 2.9 → 2 (truncates)
+        => AssertMatchesGolden(Program("01 R PIC 9(3).", "    COMPUTE R = 29 / 10.\n    DISPLAY R."));   // 2.9 → 2 (truncates)
 }

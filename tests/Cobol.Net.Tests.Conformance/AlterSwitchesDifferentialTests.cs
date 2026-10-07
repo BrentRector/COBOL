@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class AlterSwitchesDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>A program with the two-switch SPECIAL-NAMES surface NC174A/NC254A exercise: Option 1 with the
     /// STATUS keyword and Option 1 with the keyword-less <c>ON IS</c>/<c>OFF IS</c> shape (§12.3.7 — one format).</summary>
@@ -40,7 +40,7 @@ public sealed class AlterSwitchesDifferentialTests
 
     [Fact]   // §12.3.7 GR2 (status interrogated per §8.8.4.6 GR1; no external setting ⇒ OFF) + §14.9.39 F3 GR5.
     public void Switch_DefaultOff_ThenSetToOn_FlipsBothStatusConditions()
-        => AssertSameAsLegacy(SwitchProgram("SWTST1", """
+        => AssertMatchesGolden(SwitchProgram("SWTST1", """
                 IF A-IS-OFF DISPLAY "A-OFF-DEFAULT".
                 IF A-IS-ON DISPLAY "A-ON-DEFAULT".
                 SET SWM-A TO ON.
@@ -51,7 +51,7 @@ public sealed class AlterSwitchesDifferentialTests
 
     [Fact]   // §14.9.39 F3: the mnemonic LIST repeats (SET A B TO ON) and the OUTER group repeats (SET A TO OFF B TO ON).
     public void Switch_MultiReceiverAndCompoundSet_EachGroupTakesItsOwnPosition()
-        => AssertSameAsLegacy(SwitchProgram("SWTST2", """
+        => AssertMatchesGolden(SwitchProgram("SWTST2", """
                 SET SWM-A SWM-B TO ON.
                 IF A-IS-ON DISPLAY "MULTI-A-ON".
                 IF B-IS-ON DISPLAY "MULTI-B-ON".
@@ -63,7 +63,7 @@ public sealed class AlterSwitchesDifferentialTests
 
     [Fact]   // §12.3.7 Option 2 (no mnemonic — only status condition-names; the switch cannot be SET, GR3/SR5).
     public void Switch_Option2NoMnemonic_StatusConditionsResolve()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. SWTST3.
             ENVIRONMENT DIVISION.
@@ -81,7 +81,7 @@ public sealed class AlterSwitchesDifferentialTests
              // and as a complete simple condition it TERMINATES an abbreviated sequence (§8.8.4.12.4 GR1) — the
              // trailing A-IS-ON in `WS-N = 9 OR A-IS-ON` is the switch test, NOT an inserted-subject relation.
     public void Switch_InCompoundAndAbbreviatedConditions()
-        => AssertSameAsLegacy(SwitchProgram("SWTST4", """
+        => AssertMatchesGolden(SwitchProgram("SWTST4", """
                 SET SWM-A TO ON.
                 IF A-IS-ON AND B-IS-OFF DISPLAY "AND-OK".
                 IF B-IS-ON OR A-IS-ON DISPLAY "OR-OK".
@@ -94,7 +94,7 @@ public sealed class AlterSwitchesDifferentialTests
              // condition-name and as a level-88 resolves as the LEVEL-88 (§8.8.4.5 over §8.8.4.6 in this
              // implementation's name resolution — the legacy NIST-proven order).
     public void Switch_Level88WinsOverSwitchStatusName()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. SWTST5.
             ENVIRONMENT DIVISION.
@@ -122,7 +122,7 @@ public sealed class AlterSwitchesDifferentialTests
         Environment.SetEnvironmentVariable("COBOL_SWITCH_34", "ON");
         try
         {
-            AssertSameAsLegacy("""
+            AssertMatchesGolden("""
                 IDENTIFICATION DIVISION.
                 PROGRAM-ID. SWTST6.
                 ENVIRONMENT DIVISION.
@@ -146,7 +146,7 @@ public sealed class AlterSwitchesDifferentialTests
     [Fact]   // ANSI X3.23-1985 ALTER GR: until an ALTER executes, the WRITTEN GO TO target governs (the D4 field's
              // initial value); after, the GO TO transfers to the ALTER's destination.
     public void Alter_WrittenTargetGovernsUntilAltered()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ALTT1.
             PROCEDURE DIVISION.
@@ -166,7 +166,7 @@ public sealed class AlterSwitchesDifferentialTests
     [Fact]   // Multi-entry ALTER with PROCEED omitted on one entry (the NC302M shape) and a comma separator
              // between entries (the NC303M shape) — one statement, both targets re-pointed.
     public void Alter_MultiEntry_CommaSeparated_ProceedOptional()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ALTT2.
             PROCEDURE DIVISION.
@@ -191,7 +191,7 @@ public sealed class AlterSwitchesDifferentialTests
     [Fact]   // The 85-only target-less GO TO. — legal ONLY in a single-GO-TO paragraph named by an ALTER, and it
              // must be ALTERed before execution (ANSI X3.23-1985; deleted by 2002).
     public void Alter_BareGoTo_AlteredBeforeExecution()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ALTT3.
             PROCEDURE DIVISION.
@@ -211,7 +211,7 @@ public sealed class AlterSwitchesDifferentialTests
     [Fact]   // ALTER inside PERFORM … THRU dispatch (the NC302M execution shape) + the MOST RECENT ALTER governs
              // subsequent transfers (ANSI-85 ALTER GR) — written default, altered, then re-altered.
     public void Alter_InsidePerformThru_LastAlterWins()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. ALTT4.
             PROCEDURE DIVISION.

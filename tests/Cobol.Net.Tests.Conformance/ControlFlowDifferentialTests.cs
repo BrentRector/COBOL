@@ -12,9 +12,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class ControlFlowDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>Wrap a WORKING-STORAGE body + a full (multi-paragraph) PROCEDURE body into a program.</summary>
     private static string Program(string ws, string procedure) => $"""
@@ -29,7 +29,7 @@ public sealed class ControlFlowDifferentialTests
 
     [Fact]
     public void FallThroughBetweenParagraphs()
-        => AssertSameAsLegacy(Program("01 FILLER PIC X.", """
+        => AssertMatchesGolden(Program("01 FILLER PIC X.", """
             MAIN-PARA.
                 DISPLAY "A".
             P2.
@@ -41,7 +41,7 @@ public sealed class ControlFlowDifferentialTests
 
     [Fact]
     public void GoToForward()
-        => AssertSameAsLegacy(Program("01 FILLER PIC X.", """
+        => AssertMatchesGolden(Program("01 FILLER PIC X.", """
             MAIN-PARA.
                 DISPLAY "A".
                 GO TO P3.
@@ -54,7 +54,7 @@ public sealed class ControlFlowDifferentialTests
 
     [Fact]
     public void GoToBackward_Loop()
-        => AssertSameAsLegacy(Program("01 I PIC 9 VALUE 0.", """
+        => AssertMatchesGolden(Program("01 I PIC 9 VALUE 0.", """
             MAIN-PARA.
                 ADD 1 TO I.
                 DISPLAY I.
@@ -66,7 +66,7 @@ public sealed class ControlFlowDifferentialTests
 
     [Fact]
     public void Perform_SingleParagraph()
-        => AssertSameAsLegacy(Program("01 FILLER PIC X.", """
+        => AssertMatchesGolden(Program("01 FILLER PIC X.", """
             MAIN-PARA.
                 DISPLAY "BEFORE".
                 PERFORM SUB-PARA.
@@ -78,7 +78,7 @@ public sealed class ControlFlowDifferentialTests
 
     [Fact]
     public void Perform_Thru()
-        => AssertSameAsLegacy(Program("01 FILLER PIC X.", """
+        => AssertMatchesGolden(Program("01 FILLER PIC X.", """
             MAIN-PARA.
                 PERFORM P1 THRU P3.
                 DISPLAY "DONE".
@@ -93,7 +93,7 @@ public sealed class ControlFlowDifferentialTests
 
     [Fact]
     public void Perform_Times_OutOfLine()
-        => AssertSameAsLegacy(Program("01 X PIC 9(2) VALUE 0.", """
+        => AssertMatchesGolden(Program("01 X PIC 9(2) VALUE 0.", """
             MAIN-PARA.
                 PERFORM SUB-PARA 4 TIMES.
                 DISPLAY X.
@@ -104,7 +104,7 @@ public sealed class ControlFlowDifferentialTests
 
     [Fact]
     public void Perform_Until_OutOfLine()
-        => AssertSameAsLegacy(Program("01 X PIC 9 VALUE 0.", """
+        => AssertMatchesGolden(Program("01 X PIC 9 VALUE 0.", """
             MAIN-PARA.
                 PERFORM SUB-PARA UNTIL X = 3.
                 DISPLAY X.
@@ -118,7 +118,7 @@ public sealed class ControlFlowDifferentialTests
     [InlineData(2, "TWO")]
     [InlineData(3, "THREE")]
     public void GoTo_Depending(int sel, string _)
-        => AssertSameAsLegacy(Program($"01 SEL PIC 9 VALUE {sel}.", """
+        => AssertMatchesGolden(Program($"01 SEL PIC 9 VALUE {sel}.", """
             MAIN-PARA.
                 GO TO L1 L2 L3 DEPENDING ON SEL.
                 DISPLAY "NONE".
@@ -136,7 +136,7 @@ public sealed class ControlFlowDifferentialTests
 
     [Fact]
     public void GoTo_Depending_OutOfRange_FallsThrough()
-        => AssertSameAsLegacy(Program("01 SEL PIC 9 VALUE 5.", """
+        => AssertMatchesGolden(Program("01 SEL PIC 9 VALUE 5.", """
             MAIN-PARA.
                 GO TO L1 L2 DEPENDING ON SEL.
                 DISPLAY "FELLTHROUGH".
@@ -187,7 +187,7 @@ public sealed class ControlFlowDifferentialTests
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(src);
         Assert.True(cok, cdetail);
         Assert.Equal("033", cout);   // 3 × (1 + 10) — the whole THRU range iterated 3 times
-        AssertSameAsLegacy(src);
+        AssertMatchesGolden(src);
     }
 
     [Fact]
@@ -208,6 +208,6 @@ public sealed class ControlFlowDifferentialTests
         var (cok, cout, cdetail) = CobolNet.CompileAndRun(src);
         Assert.True(cok, cdetail);
         Assert.Equal("009", cout);
-        AssertSameAsLegacy(src);
+        AssertMatchesGolden(src);
     }
 }

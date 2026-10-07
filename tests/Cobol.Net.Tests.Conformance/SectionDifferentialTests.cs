@@ -15,7 +15,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class SectionDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string workingStorage, string procedure) => $"""
         IDENTIFICATION DIVISION.
@@ -29,7 +29,7 @@ public sealed class SectionDifferentialTests
 
     [Fact]
     public void GoToSectionName_TransfersToFirstParagraph()
-        => AssertSameAsLegacy(Program("01 WS-N PIC 9 VALUE 0.", """
+        => AssertMatchesGolden(Program("01 WS-N PIC 9 VALUE 0.", """
             MAIN-SECT SECTION.
             MAIN-PARA.
                 GO TO TARGET-SECT.
@@ -46,7 +46,7 @@ public sealed class SectionDifferentialTests
 
     [Fact]
     public void PerformSection_RunsWholeRangeAndReturns()
-        => AssertSameAsLegacy(Program("01 WS-N PIC 9 VALUE 0.", """
+        => AssertMatchesGolden(Program("01 WS-N PIC 9 VALUE 0.", """
             MAIN-SECT SECTION.
             MAIN-PARA.
                 PERFORM WORK-SECT.
@@ -61,7 +61,7 @@ public sealed class SectionDifferentialTests
 
     [Fact]
     public void PerformSectionThruParagraph_InvertedRange()
-        => AssertSameAsLegacy(Program("01 WS-N PIC 9 VALUE 0.", """
+        => AssertMatchesGolden(Program("01 WS-N PIC 9 VALUE 0.", """
             MAIN-SECT SECTION.
             MAIN-PARA.
                 PERFORM GO-SECT THRU EXIT-PARA.
@@ -80,7 +80,7 @@ public sealed class SectionDifferentialTests
 
     [Fact]
     public void QualifiedParagraph_DuplicateNamesAcrossSections()
-        => AssertSameAsLegacy(Program("01 WS-N PIC 9 VALUE 0.", """
+        => AssertMatchesGolden(Program("01 WS-N PIC 9 VALUE 0.", """
             MAIN-SECT SECTION.
             MAIN-PARA.
                 PERFORM DOIT OF SECT-ONE.
@@ -123,7 +123,7 @@ public sealed class SectionDifferentialTests
 
     [Fact]
     public void PerformTimes_CountDeterminedOnce()
-        => AssertSameAsLegacy(Program("01 WS-CNT PIC 999 VALUE 3.\n01 WS-RUNS PIC 999 VALUE 0.", """
+        => AssertMatchesGolden(Program("01 WS-CNT PIC 999 VALUE 3.\n01 WS-RUNS PIC 999 VALUE 0.", """
             MAIN-PARA.
                 PERFORM BUMP WS-CNT TIMES.
                 DISPLAY WS-RUNS.
@@ -135,7 +135,7 @@ public sealed class SectionDifferentialTests
 
     [Fact]
     public void PerformTimes_ZeroAndNegativeRunZeroTimes()
-        => AssertSameAsLegacy(Program("01 WS-Z PIC S999 VALUE 0.\n01 WS-M PIC S999 VALUE -3.\n01 WS-RUNS PIC 999 VALUE 0.", """
+        => AssertMatchesGolden(Program("01 WS-Z PIC S999 VALUE 0.\n01 WS-M PIC S999 VALUE -3.\n01 WS-RUNS PIC 999 VALUE 0.", """
             MAIN-PARA.
                 PERFORM BUMP WS-Z TIMES.
                 PERFORM BUMP WS-M TIMES.

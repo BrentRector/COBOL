@@ -17,9 +17,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class GroupSenderMoveDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static void AssertSpecPinned(string source, string expected)
     {
@@ -50,7 +50,7 @@ public sealed class GroupSenderMoveDifferentialTests
     /// asserted, not a re-formatting of it.</summary>
     [Fact]
     public void GroupToElementaryNumeric_RawCharacters_NoConversion()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 RCV-N PIC 99.
             01 RCV-NX REDEFINES RCV-N PIC XX.
             """, """
@@ -65,7 +65,7 @@ public sealed class GroupSenderMoveDifferentialTests
     /// REDEFINES, never numerically.</summary>
     [Fact]
     public void GroupToScaledNumeric_RawCharacters_ThroughRedefines()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 RCV-V PIC 9999V999.
             01 RCV-VX REDEFINES RCV-V PIC X(7).
             """, """
@@ -77,7 +77,7 @@ public sealed class GroupSenderMoveDifferentialTests
     /// applies only to valid ELEMENTARY moves): the receiver holds the raw "123ABC " image, not "0123AB0".</summary>
     [Fact]
     public void GroupToAlphanumericEdited_NoEditing()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 RCV-AE PIC 0XXXXX0.
             """, """
                 MOVE GRP-SEND TO RCV-AE.
@@ -88,7 +88,7 @@ public sealed class GroupSenderMoveDifferentialTests
     /// numeric decode: the receiver holds the raw "123ABC", not an edited "123.00"-like image.</summary>
     [Fact]
     public void GroupToNumericEdited_NoEditing()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 RCV-NE PIC ZZ9.99.
             """, """
                 MOVE GRP-SEND TO RCV-NE.
@@ -99,7 +99,7 @@ public sealed class GroupSenderMoveDifferentialTests
     /// space-fill (the baseline group-move alignment).</summary>
     [Fact]
     public void GroupToWiderAlphanumeric_LeftJustifiedSpaceFilled()
-        => AssertSameAsLegacy(Program("""
+        => AssertMatchesGolden(Program("""
             01 RCV-X PIC X(9).
             """, """
                 MOVE GRP-SEND TO RCV-X.
@@ -124,7 +124,7 @@ public sealed class GroupSenderMoveDifferentialTests
     /// characters, no numeric conversion.</summary>
     [Fact]
     public void ReadInto_ElementaryNumeric_IsGroupMove()
-        => AssertSameAsLegacy("""
+        => AssertMatchesGolden("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. GSMOV2.
             ENVIRONMENT DIVISION.

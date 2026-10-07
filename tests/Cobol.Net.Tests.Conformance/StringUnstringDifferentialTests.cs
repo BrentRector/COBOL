@@ -15,9 +15,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class StringUnstringDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>For the case the LEGACY engine gets wrong (no pointer &lt; 1 check): assert the SPEC-derived
     /// output directly, with the governing § on the fact.</summary>
@@ -46,7 +46,7 @@ public sealed class StringUnstringDifferentialTests
     // governed sender and is itself never transferred. Expected: "AB" + "EF" + "IJK".
     [Fact]
     public void String_DelimitedPhraseGovernsItsRun_TrailingRunIsSize()
-        => AssertSameAsLegacy(Program("STRRUN", """
+        => AssertMatchesGolden(Program("STRRUN", """
             01 WS-A PIC X(5) VALUE "AB*CD".
             01 WS-B PIC X(5) VALUE "EF*GH".
             01 WS-C PIC X(3) VALUE "IJK".
@@ -61,7 +61,7 @@ public sealed class StringUnstringDifferentialTests
     // sender (the NC217A "ABCDEFG" case).
     [Fact]
     public void String_DelimiterLongerThanSender_MovesWholeSender()
-        => AssertSameAsLegacy(Program("STRLNG", """
+        => AssertMatchesGolden(Program("STRLNG", """
             01 WS-R PIC X(10) VALUE SPACES.
             """, """
                 STRING "ABCDEF" DELIMITED BY "ABCDEFG" INTO WS-R.
@@ -74,7 +74,7 @@ public sealed class StringUnstringDifferentialTests
     // written window keeps its PRIOR content — no space filling. Expected: "12AB5678", pointer 05.
     [Fact]
     public void String_WithPointer_WritesWindow_PreservesRest_AdvancesPointer()
-        => AssertSameAsLegacy(Program("STRPTR", """
+        => AssertMatchesGolden(Program("STRPTR", """
             01 WS-R PIC X(8) VALUE "12345678".
             01 WS-P PIC 99 VALUE 3.
             """, """
@@ -89,7 +89,7 @@ public sealed class StringUnstringDifferentialTests
     // runs NOT ON OVERFLOW, and the receiver again keeps its untouched tail (GR7): "ABCD" then "XYCD".
     [Fact]
     public void String_Overflow_RunsOnOverflow_FitRunsNotOnOverflow()
-        => AssertSameAsLegacy(Program("STROVF", """
+        => AssertMatchesGolden(Program("STROVF", """
             01 WS-R PIC X(4) VALUE SPACES.
             """, """
                 STRING "ABCDEF" DELIMITED BY SIZE INTO WS-R
@@ -131,7 +131,7 @@ public sealed class StringUnstringDifferentialTests
     // when alphanumeric, ZERO-filled when numeric. Expected: spaces, "000", "23".
     [Fact]
     public void Unstring_ContiguousDelimiters_SpaceFillAlphanumeric_ZeroFillNumeric()
-        => AssertSameAsLegacy(Program("UNSFIL", """
+        => AssertMatchesGolden(Program("UNSFIL", """
             01 WS-S PIC X(5) VALUE "1,,23".
             01 WS-A PIC XX VALUE "XX".
             01 WS-N PIC 999 VALUE 999.
@@ -149,7 +149,7 @@ public sealed class StringUnstringDifferentialTests
     // counts 1 1 2.
     [Fact]
     public void Unstring_AllPhrase_CollapsesContiguousRuns_CountExcludesDelimiters()
-        => AssertSameAsLegacy(Program("UNSALL", """
+        => AssertMatchesGolden(Program("UNSALL", """
             01 WS-S PIC X(9) VALUE "X00Y000Z9".
             01 WS-A PIC XX.
             01 WS-B PIC XX.
@@ -175,7 +175,7 @@ public sealed class StringUnstringDifferentialTests
     // matched occurrence per the MOVE rules.
     [Fact]
     public void Unstring_OrDelimiters_EarliestWins_TieGoesToFirstListed()
-        => AssertSameAsLegacy(Program("UNSOR", """
+        => AssertMatchesGolden(Program("UNSOR", """
             01 WS-S PIC X(5) VALUE "ZABQW".
             01 WS-S2 PIC X(5) VALUE "Z*Q,W".
             01 WS-R1 PIC XX.
@@ -204,7 +204,7 @@ public sealed class StringUnstringDifferentialTests
     // count, and TALLYING ADDS the number of receivers acted upon to the item's STARTING value (5 + 3 = 08).
     [Fact]
     public void Unstring_DelimiterIn_CountIn_TallyingAddsToCurrentValue()
-        => AssertSameAsLegacy(Program("UNSDCT", """
+        => AssertMatchesGolden(Program("UNSDCT", """
             01 WS-S PIC X(9) VALUE "AB,CDE*FG".
             01 WS-R1 PIC XXX.
             01 WS-R2 PIC XXX.
@@ -234,7 +234,7 @@ public sealed class StringUnstringDifferentialTests
     // sender characters still unexamined IS the overflow condition — ON OVERFLOW runs.
     [Fact]
     public void Unstring_NoDelimited_SizeBounded_UnexaminedRemainder_Overflows()
-        => AssertSameAsLegacy(Program("UNSSZ", """
+        => AssertMatchesGolden(Program("UNSSZ", """
             01 WS-S PIC X(8) VALUE "ABCDEFGH".
             01 WS-P PIC 99 VALUE 3.
             01 WS-R1 PIC XX.
@@ -255,7 +255,7 @@ public sealed class StringUnstringDifferentialTests
     // WS-R3 keeps "Z", tally 2.
     [Fact]
     public void Unstring_SourceExhausted_IsNotOverflow_RemainingReceiversUntouched()
-        => AssertSameAsLegacy(Program("UNSEXH", """
+        => AssertMatchesGolden(Program("UNSEXH", """
             01 WS-S PIC X(3) VALUE "A,B".
             01 WS-R1 PIC X.
             01 WS-R2 PIC X.

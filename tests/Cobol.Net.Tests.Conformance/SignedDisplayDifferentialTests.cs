@@ -13,7 +13,7 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class SignedDisplayDifferentialTests
 {
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     private static string Program(string ws, string proc) => $"""
         IDENTIFICATION DIVISION.
@@ -47,7 +47,7 @@ public sealed class SignedDisplayDifferentialTests
     [InlineData("01 N PIC S9(3) COMP-3 VALUE -42.", "[-042]")]
     [InlineData("01 N PIC S9(4) COMP-5 VALUE -300.", "[-0300]")]
     public void SignedDisplay(string ws, string _)
-        => AssertSameAsLegacy(Program(ws, "    DISPLAY \"[\" N \"]\"."));
+        => AssertMatchesGolden(Program(ws, "    DISPLAY \"[\" N \"]\"."));
 
     [Theory]
     // The store path: a negative value MOVEd / computed into a signed item, then displayed.
@@ -55,5 +55,5 @@ public sealed class SignedDisplayDifferentialTests
     [InlineData("01 N PIC S9(3).", "    COMPUTE N = 10 - 52.\n    DISPLAY \"[\" N \"]\".")]
     [InlineData("01 A PIC S9(3) VALUE 30.\n01 N PIC S9(3).",
                 "    SUBTRACT 70 FROM A GIVING N.\n    DISPLAY \"[\" N \"]\".")]
-    public void SignedStoreThenDisplay(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void SignedStoreThenDisplay(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 }

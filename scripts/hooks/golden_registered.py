@@ -68,8 +68,7 @@ json.dump(
                 f"Golden '{name}' is NOT listed in {where}. Register it in the SAME commit (add to \"enabled\", or "
                 f"\"pending\" if its feature has not landed) — an unregistered golden never runs AND fails the "
                 f"manifest-integrity test at the comprehensive gate, long after the wave-local gate said green. "
-                f"Note: negative goldens use their own manifest, separate from the per-edition ones. Do NOT add a "
-                f"GreenfieldOnly entry — the legacy differential is opt-in."
+                f"Note: negative goldens use their own manifest, separate from the per-edition ones."
             ),
         }
     },

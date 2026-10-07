@@ -12,9 +12,9 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class ExpressionDifferentialTests
 {
-    private static readonly ICompilerUnderTest CobolNet = new CobolNetCompiler();
+    private static readonly CobolNetCompiler CobolNet = new();
 
-    private static void AssertSameAsLegacy(string source) => DifferentialGolden.Assert(source);
+    private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
     /// <summary>Pin WiseOwl COBOL output to the spec-correct value where the legacy is non-conforming (its DISPLAY
     /// trims an alphanumeric operand's trailing spaces, contra ISO §14.9.11.4 GR6).</summary>
@@ -55,45 +55,45 @@ public sealed class ExpressionDifferentialTests
     [InlineData("    COMPUTE R = A ** 2.\n    DISPLAY R.")]                          // 100
     [InlineData("    COMPUTE R = B ** 3.\n    DISPLAY R.")]                          // 27
     [InlineData("    COMPUTE R = A + 100.\n    DISPLAY R.")]                         // 110
-    public void NumericExpressions(string proc) => AssertSameAsLegacy(Program(Vars, proc));
+    public void NumericExpressions(string proc) => AssertMatchesGolden(Program(Vars, proc));
 
     [Theory]
     // Scaled COMPUTE with parentheses and division (truncation into a scaled receiver).
     [InlineData("01 X PIC 9(2)V99.", "    COMPUTE X = 100 / 7.\n    DISPLAY X.")]         // 14.28 → 1428
     [InlineData("01 X PIC 9(3)V9.",  "    COMPUTE X = (5 + 5) / 4.\n    DISPLAY X.")]      // 2.5 → 0025
-    public void ScaledExpressions(string ws, string proc) => AssertSameAsLegacy(Program(ws, proc));
+    public void ScaledExpressions(string ws, string proc) => AssertMatchesGolden(Program(ws, proc));
 
     [Fact]
     public void MultiTarget_Move()
-        => AssertSameAsLegacy(Program("01 A PIC 9(3).\n01 B PIC 9(3).\n01 C PIC 9(3).", """
+        => AssertMatchesGolden(Program("01 A PIC 9(3).\n01 B PIC 9(3).\n01 C PIC 9(3).", """
                 MOVE 7 TO A B C.
                 DISPLAY A B C.
             """));
 
     [Fact]
     public void MultiTarget_AddTo()
-        => AssertSameAsLegacy(Program("01 A PIC 9(3) VALUE 1.\n01 B PIC 9(3) VALUE 2.", """
+        => AssertMatchesGolden(Program("01 A PIC 9(3) VALUE 1.\n01 B PIC 9(3) VALUE 2.", """
                 ADD 10 TO A B.
                 DISPLAY A B.
             """));
 
     [Fact]
     public void MultiTarget_AddGiving()
-        => AssertSameAsLegacy(Program("01 A PIC 9(3) VALUE 4.\n01 B PIC 9(3) VALUE 5.\n01 C PIC 9(4).\n01 D PIC 9(4).", """
+        => AssertMatchesGolden(Program("01 A PIC 9(3) VALUE 4.\n01 B PIC 9(3) VALUE 5.\n01 C PIC 9(4).\n01 D PIC 9(4).", """
                 ADD A B GIVING C D.
                 DISPLAY C D.
             """));
 
     [Fact]
     public void MultiOperand_Subtract()
-        => AssertSameAsLegacy(Program("01 A PIC 9(3) VALUE 2.\n01 B PIC 9(3) VALUE 3.\n01 C PIC 9(3) VALUE 20.", """
+        => AssertMatchesGolden(Program("01 A PIC 9(3) VALUE 2.\n01 B PIC 9(3) VALUE 3.\n01 C PIC 9(3) VALUE 20.", """
                 SUBTRACT A B FROM C.
                 DISPLAY C.
             """));
 
     [Fact]
     public void MultiTarget_Compute()
-        => AssertSameAsLegacy(Program("01 X PIC 9(3) VALUE 6.\n01 A PIC 9(4).\n01 B PIC 9(4).", """
+        => AssertMatchesGolden(Program("01 X PIC 9(3) VALUE 6.\n01 A PIC 9(4).\n01 B PIC 9(4).", """
                 COMPUTE A B = X * 2.
                 DISPLAY A B.
             """));
