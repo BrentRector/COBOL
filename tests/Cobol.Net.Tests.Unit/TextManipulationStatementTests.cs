@@ -87,6 +87,27 @@ public sealed class TextManipulationStatementTests : IDisposable
         Assert.Equal(rejected ? 2 : 0, bag.Diagnostics.Count(d => d.Code == "COBOLNET0900"));
     }
 
+    [Theory] // constructs row replacing-partial-word-2002 (kb/Work PB1670): ONE gate for COPY and REPLACE, once per statement.
+    [InlineData(85, 2)]
+    [InlineData(2002, 0)]
+    [InlineData(2014, 0)]
+    [InlineData(2023, 0)]
+    public void PartialWordPhrases_AreGatedBelow2002_OncePerStatement(int edition, int expected)
+    {
+        Copybook("bkpw.cpy", " 01 PFX-A PIC X.\n");
+        var (_, bag) = Run(" COPY bkpw REPLACING LEADING ==PFX-== BY ==C1-== TRAILING ==-A== BY ==-B==.\n"
+            + " REPLACE LEADING ==X1== BY ==Y1== TRAILING ==X2== BY ==Y2==.\n", edition);
+        Assert.Equal(expected, bag.Diagnostics.Count(d => d.Code == "COBOLNET0900"));
+    }
+
+    [Fact] // the whole-pseudo-text operands of both statements are 1985 forms: no gate at any edition
+    public void WholePseudoTextOperands_AreNotGated()
+    {
+        Copybook("bkpw.cpy", " 01 PFX-A PIC X.\n");
+        var (_, bag) = Run(" COPY bkpw REPLACING ==PFX-A== BY ==C1-A==.\n REPLACE ==X1== BY ==Y1==.\n", 85);
+        Assert.DoesNotContain(bag.Diagnostics, d => d.Code == "COBOLNET0900");
+    }
+
     [Fact] // §7.2.4.2 format 2: LAST is followed by OFF.
     public void LastWithoutOff_IsASyntaxError()
     {

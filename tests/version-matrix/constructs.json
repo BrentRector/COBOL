@@ -2409,6 +2409,19 @@
   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMRAL.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 AA PIC X(2) VALUE \"AA\".\n01 BB PIC X(2) VALUE \"BB\".\nPROCEDURE DIVISION.\nMAIN.\nREPLACE ==XX1== BY ==AA==.\nREPLACE ALSO ==XX2== BY ==BB==.\n    DISPLAY XX1 XX2.\nREPLACE LAST OFF.\n    DISPLAY XX1.\nREPLACE OFF.\n    STOP RUN.\n"
  },
   {
+   "id": "replacing-partial-word-2002",
+   "status": "active",
+   "description": "Partial-word replacement: the LEADING and TRAILING phrases of the REPLACING phrase of COPY (ISO §7.2.3.2) and of the REPLACE statement format 1 (ISO §7.2.4.2) - `LEADING | TRAILING ==partial-word-1== BY ==partial-word-2==`, matched against the leftmost / rightmost characters of ONE text-word (§7.2.3.4 GR9 b, §7.2.4.4 GR8 b). THE EDGE IS DERIVED, NOT QUOTED (VCR row 7.33; the repo holds no 1985, 2002 or 2014 text, ratified decision #1): Annex E (2014->2023) does not list the phrases, so they predate 2023; ANSI X3.23-1985's COPY REPLACING admits only pseudo-text, identifier, literal and word operands and its REPLACE only pseudo-text, so partial-word replacement is a later edition's; GnuCOBOL 3.2 has no dialect option for it (cobc -std=cobol85 and -std=cobol2002 accept it alike - silence, not evidence). The row takes the provisional 2002 edge, the one that never refuses a legal 2002 program (row 7.31's reasoning; the sibling ALSO / LAST row replace-also-last-2002 shares it). ONE gate, asked by the one parser of both statements' operands (CopyProcessor.ParseReplacingOperands through OperandScreen.PartialWord, once per statement; kb/Work PB1670).",
+   "display": "the LEADING / TRAILING partial-word phrases of COPY REPLACING and REPLACE",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §7.2.3.2 / §7.2.4.2 (LEADING, TRAILING); §7.2.3.4 GR9 b; §7.2.4.4 GR8 b - emit site: CopyProcessor.OperandScreen.PartialWord (frontend); a COBOL-2002 introduction (derived: VCR row 7.33)",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "ISO §7.2.3.2 / §7.2.4.2 partial-word phrases; provisional edge per decision 1; VCR row 7.33",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMRPW.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 NEW-A PIC X(2) VALUE \"OK\".\nPROCEDURE DIVISION.\nMAIN.\nREPLACE LEADING ==OLD-== BY ==NEW-==.\n    DISPLAY OLD-A.\nREPLACE OFF.\n    STOP RUN.\n"
+  },
+  {
    "id": "col7-continuation-obsolete-2023",
    "description": "The fixed continuation indicator (hyphen in column 7), incl. literal continuation - OBSOLETE as of ISO 2023 (Annex F.2 item 4; use the floating indicator), warning-only (the element remains conforming). Emit site: the frontend ReferenceFormatProcessor, once per compilation.",
    "display": "the fixed continuation indicator (hyphen in column 7)",

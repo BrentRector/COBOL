@@ -72,6 +72,13 @@ statement's text is carried from its keyword across further directive lines, so 
 each (COBOLNET2697, `DirectiveDiag.WithinStatement`). The directive then takes effect like any other (superset-continue),
 and a truncated COPY still draws its own COBOLNET2449 after it.
 
+A `>>SOURCE FORMAT` line never reaches `Render` (kb/Work PB1353): logical conversion DISCARDS it (§6.5 1)) and leaves a blank
+line, with its physical line recorded in the text's `ReferenceFormatMap.DirectiveLines`. `Render` therefore asks, of each
+BLANK line, `CopyProcessor.IsDiscardedFormatDirective(origin)` — the map registered under the line's file, which is the
+main source's or the library text's own — and puts the same `OpenStatementAt` question over the pending block WITHOUT
+flushing it (the discarded line takes nothing from the text). One question, one answer, whichever stage consumed the
+directive. Inside pseudo-text the diagnostic also quotes §7.2.3.3 SR10 / §7.2.4.3 SR10 (`OpenStatementAt`'s `InPseudoText`).
+
 ### §3.2a Text-words — the one scanner under COPY and REPLACE (kb/Work PB1350 / PB1351 / PB1354)
 
 Everything the text-manipulation stage does is decided over §7.2.2.5 TEXT-WORDS, and ONE type forms them:
@@ -92,8 +99,11 @@ word of its own; `==` is the pseudo-text delimiter. Its three consumers:
   COBOLNET2449, SR4/SR5 literal forms COBOLNET2450, a COPY within a COPY statement COBOLNET2451 (SR1). Each operand
   pair is screened by ONE `ScreenOperandPair` against its statement's `OperandRules` row — the §7.2.3.3 / §7.2.4.3
   content rules are word-for-word twins (COBOLNET2572) — and `ReadOperand` checks the §8.3.5 6) separation of each
-  `==` (COBOLNET2573) (kb/Work PB1353). A directive line CONSUMED before the operand is read (`>>SOURCE` by logical
-  conversion, `>>DEFINE`/`>>IF`/… by this driver) leaves only a blank line and is not yet seen (PB1353, open).
+  `==` (COBOLNET2573) (kb/Work PB1353). A directive line CONSUMED before the operand is read leaves only a blank
+  line, so the operand screen cannot see it; §3.2b's driver check does (§7.3.3 SR8 b), and names §7.2.3.3 SR10 /
+  §7.2.4.3 SR10 when the open statement stands inside pseudo-text. The LEADING / TRAILING phrases are gated at their
+  introducing edition by constructs row `replacing-partial-word-2002` — ONE check, `OperandScreen.PartialWord`, asked
+  by `ParseReplacingOperands` for both statements, once per statement (kb/Work PB1670).
 - **The REPLACE states** — `ApplyReplaceStatements` parses format 1 `REPLACE [ALSO] …` and format 2
   `REPLACE [LAST] OFF` and drives `ReplaceStates` (§7.2.4.4 GR4–GR7): the active operands plus a LIFO stack of
   inactive ones; ALSO pushes and activates current-then-pushed operands, LAST OFF pops, a plain format 1 or OFF

@@ -227,6 +227,11 @@ public static partial class ConditionalCompilationProcessor
             var blockOrigins = new List<SourceOrigin>();
             string openStatementText = "";   // the text of a COPY / REPLACE statement still open at a directive line (§7.3.3 SR8 b)
 
+            // The text of the COPY / REPLACE statement a directive line would interrupt: what was carried from the last
+            // directive line plus the block accumulated since.
+            string PendingStatementText()
+                => string.Concat(openStatementText, openStatementText.Length > 0 ? "\n" : "", string.Join('\n', block));
+
             void Flush()
             {
                 if (block.Count == 0) return;
@@ -247,6 +252,14 @@ public static partial class ConditionalCompilationProcessor
                 SourceOrigin origin = input.Lines[i];
                 string trimmed = line.TrimSpacesStart();
                 _diag.At = origin;
+
+                // §7.3.3 SR8 b) for the one directive this stage never sees: logical conversion DISCARDED a
+                // >>SOURCE FORMAT line (§6.5 1)) and left this blank one, so the line is asked of the map of the text it
+                // was read from (kb/Work PB1353). The block is not flushed — the discarded line takes nothing from the text —
+                // so the question is asked of the statement text WITHOUT consuming it; the next directive line asks it again.
+                if (trimmed.Length == 0 && _copy is not null && _copy.IsDiscardedFormatDirective(origin)
+                    && CopyProcessor.OpenStatementAt(PendingStatementText()) is { } within)
+                    _diag.WithinStatement(within.Keyword, within.InPseudoText);
 
                 if (!trimmed.StartsWith(">>", StringComparison.Ordinal))
                 {
@@ -270,10 +283,10 @@ public static partial class ConditionalCompilationProcessor
                 // end of it (no separator period yet) has this directive inside it. The question is asked of the text
                 // since the statement began — carried across directive lines, so a statement split by several is
                 // reported at each — and the directive then takes effect like any other (superset-continue).
-                openStatementText = string.Concat(openStatementText, openStatementText.Length > 0 ? "\n" : "", string.Join('\n', block));
+                openStatementText = PendingStatementText();
                 if (CopyProcessor.OpenStatementAt(openStatementText) is { } open)
                 {
-                    _diag.WithinStatement(open.Keyword);
+                    _diag.WithinStatement(open.Keyword, open.InPseudoText);
                     openStatementText = openStatementText[open.Start..];
                 }
                 else openStatementText = "";
@@ -924,10 +937,15 @@ public static partial class ConditionalCompilationProcessor
 
         /// <summary>COBOLNET2697 — the directive at <see cref="At"/> stands within an unfinished COPY or REPLACE
         /// statement (kb/Work PB1384).</summary>
-        public void WithinStatement(string statementKeyword) =>
+        public void WithinStatement(string statementKeyword, bool inPseudoText) =>
             Emit(Editions.Diagnostics.DiagnosticCatalog.DirectiveWithinTextManipulationStatement.Code,
                 $"a compiler directive is specified within a {statementKeyword} statement — the statement has no separator "
-                + "period before this line (ISO §7.3.3 SR8 b)");
+                + "period before this line (ISO §7.3.3 SR8 b)"
+                + (inPseudoText
+                    ? $"; the line stands inside pseudo-text, which §{(statementKeyword == "COPY" ? "7.2.3.3" : "7.2.4.3")} SR10 "
+                    + "also forbids: \"Compiler directive lines shall not be specified within pseudo-text-1, pseudo-text-2, "
+                    + "partial-word-1, or partial-word-2\""
+                    : ""));
 
         public void Report1618(string name) => Emit("COBOLNET1618",
             $">>DEFINE: compilation variable '{name}' is redefined to a different value without the OVERRIDE "

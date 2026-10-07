@@ -1,0 +1,1 @@
+       01 PFX-ONE PIC X(3) VALUE "ONE".

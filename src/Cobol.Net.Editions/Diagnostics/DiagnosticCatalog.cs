@@ -2993,8 +2993,12 @@ public static class DiagnosticCatalog
         "COBOLNET2697", "directive-within-text-manipulation-statement", EditionSeverity.Error,
         "A compiler directive is specified within a COPY or REPLACE statement. ISO §7.3.3 SR8: \"A compiler directive "
         + "may be specified anywhere in a compilation group, in source text or in library text, except ... b) within "
-        + "a source text manipulation statement\". Finish the statement with its separator period first, or move "
-        + "the directive before it.", "ISO §7.3.3 SR8 b)");
+        + "a source text manipulation statement\". Inside the ==pseudo-text== of a REPLACING operand the directive line "
+        + "is barred twice: §7.2.3.3 SR10 (COPY) and §7.2.4.3 SR10 (REPLACE), \"Compiler directive lines shall not be "
+        + "specified within pseudo-text-1, pseudo-text-2, partial-word-1, or partial-word-2\" — and that holds for "
+        + ">>SOURCE FORMAT, which logical conversion consumes before text manipulation, as for every other directive. "
+        + "Finish the statement with its separator period first, or move the directive before it.",
+        "ISO §7.3.3 SR8 b); §7.2.3.3 SR10; §7.2.4.3 SR10");
 
     /// <summary>COBOLNET2698 — a DISPLAY directive's UPON phrase (kb/Work PB807): a word that is no OUTPUT-capable
     /// device-name of the implementor-name table and is not LISTING (§7.3.12.4 GR5 b), DOC-A.1-54), or an UPON phrase

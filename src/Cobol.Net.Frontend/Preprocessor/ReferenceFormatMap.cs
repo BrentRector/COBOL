@@ -18,11 +18,13 @@ public sealed class ReferenceFormatMap
     // element 0 starts at line 1.
     private readonly (int FromLine, bool Fixed, bool Detected)[] _changes;
 
+    private readonly int[] _directiveLines;
+
     private ReferenceFormatMap((int FromLine, bool Fixed, bool Detected)[] changes, int[] directiveLines,
         string[] physicalText)
     {
         _changes = changes;
-        DirectiveLines = directiveLines;
+        _directiveLines = directiveLines;
         PhysicalText = physicalText;
     }
 
@@ -38,7 +40,14 @@ public sealed class ReferenceFormatMap
     /// changed the format. What decides whether a §14.9.28.4 GR14 implicit PUSH ALL / POP ALL bracket can matter to the
     /// normalizer at all: a bracket that encloses no such line restores exactly the format it saved
     /// (<see cref="ImplicitFormatOps.Place"/>; kb/Work PB1066).</summary>
-    public IReadOnlyList<int> DirectiveLines { get; }
+    public IReadOnlyList<int> DirectiveLines => _directiveLines;
+
+    /// <summary>Whether 1-based physical <paramref name="line"/> of this text is a written <c>&gt;&gt;SOURCE FORMAT</c>,
+    /// <c>&gt;&gt;PUSH</c> or <c>&gt;&gt;POP</c> line (<see cref="DirectiveLines"/>). The conversion DISCARDS a
+    /// <c>&gt;&gt;SOURCE FORMAT</c> line (§6.5 1)) and leaves a blank one in its place, so a later stage that must ask
+    /// whether a blank line is one — the COPY or REPLACE statement a directive interrupts (§7.3.3 SR8 b), kb/Work
+    /// PB1353 — asks the line's origin here.</summary>
+    public bool HoldsDirectiveAt(int line) => Array.BinarySearch(_directiveLines, line) >= 0;
 
     /// <summary>A text read in <paramref name="initialFixed"/> from line 1 — <paramref name="detected"/> when no
     /// directive or COPY statement stated it — and then in each format of <paramref name="changes"/> (a directive

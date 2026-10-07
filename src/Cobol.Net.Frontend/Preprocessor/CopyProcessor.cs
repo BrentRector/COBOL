@@ -212,7 +212,8 @@ public sealed class CopyProcessor(
                     statement.Advance(first);
                 }
                 var operands = new List<Replacement>();
-                ParseReplacingOperands(statement, operands, new OperandScreen(ReplaceOperandRules, diagnostics, mapped), nestedCopy: null,
+                ParseReplacingOperands(statement, operands, new OperandScreen(ReplaceOperandRules, diagnostics, mapped, edition),
+                    nestedCopy: null,
                     nonPseudoText: p =>
                 {
                     if (statement.HasError || diagnostics is null) return;   // one report per REPLACE statement
@@ -608,7 +609,8 @@ public sealed class CopyProcessor(
             replacing = true;
             c.Advance(w);
             // The VCR-row-4 gate rides the operand reads (COPY only — REPLACE is not in the E.2 removal).
-            ParseReplacingOperands(c, replacements, new OperandScreen(CopyOperandRules, _diagnostics, mapped),
+            ParseReplacingOperands(c, replacements,
+                new OperandScreen(CopyOperandRules, _diagnostics, mapped, EditionInfo.Of(dialectLevel, permissive)),
                 nonPseudoText: p => OnNonPseudoTextOperand(mapped, p),
                 nestedCopy: p => ReportPlacement(mapped.OriginAt(p), "a COPY statement is written inside the "
                     + "REPLACING phrase of another COPY statement — §7.2.3.3 SR1: \"a COPY statement shall not "
@@ -845,8 +847,10 @@ public sealed class CopyProcessor(
     /// the walk is the statements' own: the same <see cref="TextWordScanner"/> words, a statement opened by the keyword
     /// <see cref="FindStatementKeyword"/> finds, the pseudo-text delimiters toggling. The merged driver asks it of the
     /// text before each compiler directive line (§7.3.3 SR8 b): "within a source text manipulation statement",
-    /// kb/Work PB1384), so the question has ONE answer for COPY and REPLACE alike.</summary>
-    internal static (string Keyword, int Start)? OpenStatementAt(string text)
+    /// kb/Work PB1384), so the question has ONE answer for COPY and REPLACE alike. <c>InPseudoText</c> says the text ends
+    /// between a pair of pseudo-text delimiters — the place §7.2.3.3 SR10 / §7.2.4.3 SR10 bar a directive line from
+    /// (kb/Work PB1353).</summary>
+    internal static (string Keyword, int Start, bool InPseudoText)? OpenStatementAt(string text)
     {
         int pos = 0;
         string? keyword = null;
@@ -862,8 +866,16 @@ public sealed class CopyProcessor(
             else if (word.Kind == TextWordKind.PseudoTextDelimiter) inPseudoText = !inPseudoText;
             else if (!inPseudoText && word.IsSeparatorPeriod) keyword = null;
         }
-        return keyword is null ? null : (keyword, start);
+        return keyword is null ? null : (keyword, start, inPseudoText);
     }
+
+    /// <summary>Whether the blank line at <paramref name="at"/> is where logical conversion DISCARDED a
+    /// <c>&gt;&gt;SOURCE FORMAT</c> line (§6.5 1): "the SOURCE FORMAT directive line is logically discarded"). That
+    /// stage runs before this one and leaves only the blank, so the merged driver cannot see the directive in the text
+    /// it walks; it asks the registered map of the text the line was read from (kb/Work PB1353 — the directive inside a
+    /// COPY or REPLACE statement, §7.3.3 SR8 b) and inside pseudo-text, §7.2.3.3 SR10 / §7.2.4.3 SR10).</summary>
+    internal bool IsDiscardedFormatDirective(SourceOrigin at)
+        => _referenceFormats.TryGetValue(at.File, out var map) && map.HoldsDirectiveAt(at.Line);
 
     /// <summary>A cursor over the text-words of ONE COPY or REPLACE statement — the parser of their general formats
     /// (§7.2.3.2 / §7.2.4.2) reads through it. Separator commas and semicolons "may be used anywhere the separator
@@ -942,10 +954,27 @@ public sealed class CopyProcessor(
     private const int MaxTextWordLength = 65_535;
 
     /// <summary>Where a REPLACING phrase reports: its statement's operand rules and the statement's diagnostics, at
-    /// SOURCE origins (kb/Work PB82).</summary>
-    private sealed class OperandScreen(OperandRules rules, DiagnosticBag? diagnostics, MappedText mapped)
+    /// SOURCE origins (kb/Work PB82). One instance per statement, so the edition gate of the LEADING / TRAILING phrases
+    /// reports once per statement. <paramref name="edition"/> is null where no edition gate applies (the line-map replay
+    /// of REPLACE, and the library-text length check that only reports content).</summary>
+    private sealed class OperandScreen(OperandRules rules, DiagnosticBag? diagnostics, MappedText mapped,
+        EditionInfo? edition = null)
     {
+        private bool _partialWordGated;
+
         public OperandRules Rules { get; } = rules;
+
+        /// <summary>The introduction gate of the partial-word phrases — <c>LEADING</c> / <c>TRAILING</c> partial-word-1
+        /// BY partial-word-2 of §7.2.3.2 and §7.2.4.2 — at the edition constructs row
+        /// <see cref="Constructs.ReplacingPartialWord2002"/> names (COBOLNET0900 below it; kb/Work PB1670). COPY and
+        /// REPLACE share the one parser of their operands, so this is the ONE place the gate is asked.</summary>
+        public void PartialWord(in TextWord phrase)
+        {
+            if (edition is not { } e || diagnostics is null || _partialWordGated) return;
+            _partialWordGated = true;
+            ConstructRegistry.Check(e, new BagSink(diagnostics, mapped.OriginAt(phrase.Start).ToLocation()),
+                Constructs.ReplacingPartialWord2002, $"{Rules.Statement} REPLACING {phrase.Value.ToUpperInvariant()}");
+        }
 
         /// <summary>COBOLNET2572 — an operand whose content breaks one of <see cref="Rules"/>.</summary>
         public void Content(int at, int rule, string quoted, string what)
@@ -1014,8 +1043,8 @@ public sealed class CopyProcessor(
         while (c.TryPeek(out var w) && !w.IsSeparatorPeriod)
         {
             ReplaceKind kind = ReplaceKind.Whole;
-            if (w.IsWord("LEADING")) { kind = ReplaceKind.Leading; c.Advance(w); }
-            else if (w.IsWord("TRAILING")) { kind = ReplaceKind.Trailing; c.Advance(w); }
+            if (w.IsWord("LEADING")) { kind = ReplaceKind.Leading; screen.PartialWord(w); c.Advance(w); }
+            else if (w.IsWord("TRAILING")) { kind = ReplaceKind.Trailing; screen.PartialWord(w); c.Advance(w); }
 
             if (ReadOperand(c, screen, nonPseudoText, nestedCopy) is not { } from) return;
             bool more = c.TryPeek(out var by);

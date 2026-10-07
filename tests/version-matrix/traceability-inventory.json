@@ -651,13 +651,13 @@
   "ordinal": 10,
   "subject": "COPY statement",
   "rule-digest": "4db5bbe8ad8e",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ScreenOperandPair; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ProcessWithCopyMapped",
-  "test-ref": "unit:TextManipulationStatementTests.ReplaceOperandContent_IsScreened",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ScreenOperandPair; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#IsDiscardedFormatDirective; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatMap.cs#HoldsDirectiveAt",
+  "test-ref": "unit:TextManipulationStatementTests.ReplaceOperandContent_IsScreened; unit:DirectiveWithinStatementTests.SourceFormatDirectiveInsideAStatement_IsDiagnosed; conformance:negative/pb1353-source-format-in-copy-pseudo-text; conformance:negative/pb1384-directive-within-copy",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1353 (w68x): 'Compiler directive lines shall not be specified within pseudo-text-1, pseudo-text-2, partial-word-1, or partial-word-2' (cite.py OK 7.2.3.3 10)). A directive line that REACHES the operand (one a later stage owns, e.g. >>TURN) is COBOLNET2572. NOT YET: a directive consumed BEFORE the COPY statement is parsed - >>SOURCE by logical conversion (probe r_dir.cob, still HELLO) and >>DEFINE/>>IF/>>EVALUATE/... by the conditional-compilation driver - leaves only a blank line, so the screen cannot see it; those stages do not know they are inside pseudo-text. Stays with kb/Work PB1353.",
-  "state": "GAP"
+  "editions": "",
+  "notes": "kb/Work PB1353 (w1032c): 'Compiler directive lines shall not be specified within pseudo-text-1, pseudo-text-2, partial-word-1, or partial-word-2' (cite.py OK 7.2.3.3 10)). Three arms, one answer: a directive line that REACHES the operand (>>TURN, >>PAGE, ...) is COBOLNET2572 (ScreenOperandPair); a directive the conditional-compilation driver consumes (>>DEFINE, >>IF, >>EVALUATE, ...) is COBOLNET2697 at the driver's directive line (OpenStatementAt, PB1384); and the one directive logical conversion consumes, >>SOURCE FORMAT (the line is discarded, 6.5 1), leaving a blank), is recognized by the blank line's origin in the text's ReferenceFormatMap (CopyProcessor.IsDiscardedFormatDirective) and asked the same OpenStatementAt question over the pending block: probe r_dir.cob (COPY bk1 REPLACING ==AA-X / >>SOURCE FORMAT FIXED / == BY ==BB-Y==.) was HELLO, is now COBOLNET2697 naming 7.2.3.3 SR10 at --std 2002/2023 (COBOLNET0900 too at 85, where the directive itself is a 2002 introduction).",
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.2.3.3-11",
@@ -1131,13 +1131,13 @@
   "ordinal": 10,
   "subject": "REPLACE statement",
   "rule-digest": "4db5bbe8ad8e",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ScreenOperandPair; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Manipulate",
-  "test-ref": "unit:TextManipulationStatementTests.ReplaceOperandContent_IsScreened",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ScreenOperandPair; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#IsDiscardedFormatDirective; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatMap.cs#HoldsDirectiveAt",
+  "test-ref": "unit:TextManipulationStatementTests.ReplaceOperandContent_IsScreened; unit:DirectiveWithinStatementTests.SourceFormatDirectiveInsideAStatement_IsDiagnosed; conformance:negative/pb1353-source-format-in-replace-pseudo-text; conformance:negative/pb1384-directive-within-replace",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1353 (w68x): 'Compiler directive lines shall not be specified within pseudo-text-1, pseudo-text-2, partial-word-1, or partial-word-2' (cite.py OK 7.2.4.3 10)). A directive line that reaches the REPLACE operand (>>TURN, >>PAGE, ... - the ones a later stage owns) is COBOLNET2572. NOT YET: the note's probe sr10 (>>DEFINE inside ==XX1==) - the conditional-compilation driver consumes >>DEFINE/>>IF/>>EVALUATE (and logical conversion >>SOURCE) before Step 3 and leaves a blank line, so the operand never sees it. Stays with kb/Work PB1353.",
-  "state": "GAP"
+  "editions": "",
+  "notes": "kb/Work PB1353 (w1032c): 'Compiler directive lines shall not be specified within pseudo-text-1, pseudo-text-2, partial-word-1, or partial-word-2' (cite.py OK 7.2.4.3 10)). Same three arms as COPY (SR-7.2.3.3-10): a directive reaching the operand is COBOLNET2572; a >>DEFINE/>>IF/>>EVALUATE/... line the driver consumes (the note's probe sr10, >>DEFINE ZZ AS 1 inside ==XX1==, and r_def.cob) is COBOLNET2697 naming 7.2.4.3 SR10 when the statement is open inside pseudo-text; a >>SOURCE FORMAT line logical conversion discarded is recognized through the text's ReferenceFormatMap and asked the same question. REPLACE twins: r_def.cob and the pb1353-source-format-in-replace-pseudo-text negative.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.4.4-1",
@@ -1492,11 +1492,11 @@
   "subject": "Compiler directives",
   "rule-digest": "838503efc54d",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#OpenStatementAt; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#WithinStatement",
-  "test-ref": "conformance:negative/pb1384-directive-within-copy; conformance:negative/pb1384-directive-within-replace; unit:DirectiveWithinStatementTests.DirectiveInsideAStatement_IsDiagnosedByName; unit:DirectiveWithinStatementTests.DirectiveOutsideAStatement_IsNotDiagnosed; unit:DirectiveWithinStatementTests.TheStatementTheTextEndsInside_IsNamedByTheDirectiveThatInterruptsIt",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#OpenStatementAt; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#WithinStatement; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#IsDiscardedFormatDirective; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatMap.cs#HoldsDirectiveAt",
+  "test-ref": "conformance:negative/pb1384-directive-within-copy; conformance:negative/pb1384-directive-within-replace; unit:DirectiveWithinStatementTests.DirectiveInsideAStatement_IsDiagnosedByName; unit:DirectiveWithinStatementTests.DirectiveOutsideAStatement_IsNotDiagnosed; unit:DirectiveWithinStatementTests.TheStatementTheTextEndsInside_IsNamedByTheDirectiveThatInterruptsIt; conformance:negative/pb1353-source-format-in-copy-pseudo-text; conformance:negative/pb1353-source-format-in-replace-pseudo-text; unit:DirectiveWithinStatementTests.SourceFormatDirectiveInsideAStatement_IsDiagnosed; unit:DirectiveWithinStatementTests.StatementSplitByTwoSourceFormatDirectives_IsReportedAtEach; unit:DirectiveWithinStatementTests.SourceFormatDirectiveInsideAStatementOfLibraryText_IsDiagnosed; unit:DirectiveWithinStatementTests.SourceFormatDirectiveOutsideAStatement_IsNotDiagnosed",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1384 landed (w1004b). b) within a source text manipulation statement: the merged driver asks, at each directive line and before it flushes its block, whether the text since a COPY or REPLACE keyword has reached its separator period (CopyProcessor.OpenStatementAt, pseudo-text aware) and reports COBOLNET2697 at the directive; a COPY or REPLACE split by one or several directives is reported at each. The truncated COPY still draws its own COBOLNET2449 after the new diagnostic (superset-continue). a) is each directive's own row; c) a directive between the lines of a continued literal was already rejected.",
+  "editions": "",
+  "notes": "kb/Work PB1384 landed (w1004b). b) within a source text manipulation statement: the merged driver asks, at each directive line and before it flushes its block, whether the text since a COPY or REPLACE keyword has reached its separator period (CopyProcessor.OpenStatementAt, pseudo-text aware) and reports COBOLNET2697 at the directive; a COPY or REPLACE split by one or several directives is reported at each. The truncated COPY still draws its own COBOLNET2449 after the new diagnostic (superset-continue). a) is each directive's own row; c) a directive between the lines of a continued literal was already rejected. kb/Work PB1353 (w1032c) extended the same question to the one directive logical conversion consumes before the driver runs: a >>SOURCE FORMAT line leaves a blank (6.5 1)), recognized by its origin in the text's ReferenceFormatMap (IsDiscardedFormatDirective) and reported at the directive's line without flushing the block.",
   "state": "OK"
  },
  {
@@ -57068,10 +57068,10 @@
   "rule-digest": "81b200d18277",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseCopyStatement; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadCopyName; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
-  "test-ref": "unit:TextManipulationTextWordTests.SuppressThenReplacing_AppliesTheReplacing; unit:TextManipulationTextWordTests.MalformedHeader_DrawsSyntaxError; conformance:2002/pb1354_copy_header_2002; conformance:negative/pb1354_copy_header_syntax",
+  "test-ref": "unit:TextManipulationTextWordTests.SuppressThenReplacing_AppliesTheReplacing; unit:TextManipulationTextWordTests.MalformedHeader_DrawsSyntaxError; conformance:2002/pb1354_copy_header_2002; conformance:negative/pb1354_copy_header_syntax; conformance:2002/pb1670_replacing_partial_word_copy_replace; conformance:negative/pb1670-replacing-partial-word-below-2002; unit:TextManipulationStatementTests.PartialWordPhrases_AreGatedBelow2002_OncePerStatement",
   "derivation": "",
-  "editions": "2023",
-  "notes": "kb/Work PB1354 landed (w61a): The COPY statement is parsed in general-format order over text-words; SUPPRESS [PRINTING] before REPLACING is applied (probes p01 / p2 / p2b HELLO / AAA); words outside the format are COBOLNET2449 (s01 s02 s03 s06). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadTextNameOrLiteral (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "editions": "",
+  "notes": "kb/Work PB1354 landed (w61a): The COPY statement is parsed in general-format order over text-words; SUPPRESS [PRINTING] before REPLACING is applied (probes p01 / p2 / p2b HELLO / AAA); words outside the format are COBOLNET2449 (s01 s02 s03 s06). Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. kb/Work PB1670 (w1032c): the LEADING / TRAILING partial-word phrases are gated at their introducing edition by constructs row replacing-partial-word-2002 (COBOLNET0900 at 85; a derived 2002 edge, VCR row 7.33), by the one gate OperandScreen.PartialWord that both statements' parser asks. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacements (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location) retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ReadTextNameOrLiteral (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
   "state": "OK"
  },
  {
@@ -57083,10 +57083,10 @@
   "rule-digest": "e746a0cbcc55",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ApplyReplaceStatements; src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ParseReplacingOperands",
-  "test-ref": "conformance:2002/pb1357_replace_also_last; conformance:negative/pb1357-replace-also-below-2002; unit:TextManipulationStatementTests.LastWithoutOff_IsASyntaxError",
+  "test-ref": "conformance:2002/pb1357_replace_also_last; conformance:negative/pb1357-replace-also-below-2002; unit:TextManipulationStatementTests.LastWithoutOff_IsASyntaxError; conformance:2002/pb1670_replacing_partial_word_copy_replace; conformance:negative/pb1670-replacing-partial-word-below-2002; unit:TextManipulationStatementTests.PartialWordPhrases_AreGatedBelow2002_OncePerStatement",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1357 (w68x): both general formats parse (cite.py OK 7.2.4.2 'REPLACE [ ALSO ]'): format 1 REPLACE [ALSO] operands... . and format 2 REPLACE [LAST] OFF . (probe also.cob was COBOLNET1641 x2, now prints AAA / AAA CCC / AAA). ALSO and LAST are gated at their introducing edition by the new constructs row replace-also-last-2002 (COBOLNET0900 at 85; a provisional pre-2023 edge per decision 1). BY stays required (COBOLNET2449).",
+  "editions": "",
+  "notes": "kb/Work PB1357 (w68x): both general formats parse (cite.py OK 7.2.4.2 'REPLACE [ ALSO ]'): format 1 REPLACE [ALSO] operands... . and format 2 REPLACE [LAST] OFF . (probe also.cob was COBOLNET1641 x2, now prints AAA / AAA CCC / AAA). ALSO and LAST are gated at their introducing edition by the new constructs row replace-also-last-2002 (COBOLNET0900 at 85; a provisional pre-2023 edge per decision 1). BY stays required (COBOLNET2449). kb/Work PB1670 (w1032c): the LEADING / TRAILING partial-word phrases of format 1 are gated by the sibling row replacing-partial-word-2002 (COBOLNET0900 at 85, once per statement; VCR row 7.33), through the same parser (ParseReplacingOperands) COPY REPLACING uses.",
   "state": "OK"
  },
  {
