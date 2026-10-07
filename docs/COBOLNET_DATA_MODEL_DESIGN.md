@@ -564,9 +564,10 @@ content-validation half is separately answered by the declined A.4.14 facility (
   `DynTableSegment`, its accessor the reference's direction). The whole-table path is `BuildTablePath` (its string
   twin was deleted), and the INITIALIZE / MOVE element / CORRESPONDING cursors re-anchor on the window's scope
   (`RedefViewPlace.Cell` / `DynOrdinal`, `PlaceCursor.DynamicElement`). The composer's own exclusion is the declared
-  group's (`DataItem.CurrentExtentImageCapable`): a group whose table element holds a component of its own is the
-  named loud for whole-group image operations, while each element and the element's members are referenced
-  normally.
+  group's (`DataItem.CurrentExtentImageCapable`, `CurrentImageCapable` for the one-way image): a cell-backed group
+  whose table element holds a component of its own is the named loud for whole-group image operations, while each
+  element and the element's members are referenced normally. The OCCURS DEPENDING table of a cell-backed group is
+  the window's trailing storage (`VarGroupWindow.Odo`, `CellOdoTail`; see the variable-length group section).
 - **D-SLOT the MANAGED SLOTS of a shared storage area** (kb/Work PB231, 2026-09-05 — the pointer third). A
   data item of class pointer or class object holds a MANAGED REFERENCE, which is not a byte sequence, so it is
   the one leaf kind a byte window genuinely cannot express. It does not ride the area's bytes: **`StorageCell`
@@ -1187,9 +1188,28 @@ the clamped CURRENT count for a statement's operand (§13.18.38.4 GR8), the MAXI
 (`VarGroupBoundaryImage`; §14.8.2.2). The boundary carrier holds the table in its fixed run (a shorter fixed run
 when the count is smaller); the record layout makes it the LAST variable-length component (`OdoTail`:
 `CobolContiguousLayout` converts at its two doors with `CobolVarGroup.SplitTail`/`JoinTail`), because the record's own
-length — not a constant — says how many occurrences it holds. Still outside: a runtime-length item inside an OCCURS
-DEPENDING or dynamic-capacity table's element (a run-time multiplicity of components) and a cell-backed group
-holding both a dynamic-length item and the table.
+length — not a constant — says how many occurrences it holds.
+
+**A cell-backed group holds the table too (kb/Work PB244).** An EXTERNAL / ADDRESS-OF-taken group that holds a
+dynamic-length item AND the OCCURS DEPENDING table composes through the cell helpers (`StorageCell.VarGroupAt` /
+`ContiguousAt` / `ContiguousExtentsAt` / `StoreContiguousAt`) the way a declared group does: the window reserves the
+table at its maximum as the last of the fixed run, `VarGroupWindow.Odo` is its element width and maximum, the
+runtime's `CellOdoTail` carries it beside the component layout (the layout's last component, `OdoTail: true`,
+so the take step never hands the table's positions to a dynamic item before it), and the operand's count
+(`PlaceRenderer.PeelOdo`, as for a declared group) cuts the fixed run to the current extent.
+
+**Run-time multiplicity: the one-way image (kb/Work PB244).** An OCCURS DEPENDING or dynamic-capacity table whose
+ELEMENTS are variable-length groups has a RUN-TIME multiplicity of components — the carrier's ordinal component list
+cannot hold it, and a record read back cannot say how many elements it holds (the DEPENDING item is data, not
+layout). The group has an IMAGE all the same: each occurrence's own current image, in occurrence order, up to the
+current count (§13.18.38.4 GR8) or capacity (§8.5.1.9.1). `DataItem.CurrentImageCapable` is that capability — the
+variable-length twin of `TransferImageCapable`: `CurrentExtentImageCapable` widened by exactly those tables, asked
+by the DISPLAY emitter and by FUNCTION LENGTH / BYTE-LENGTH (`BoundIntrinsicCall.OverCurrentImage`), while the
+carrier consumers (activation boundary, MOVE, comparison, record read-back) keep the narrower gate. The record
+struct then emits `CurrentImage` alone (`VarPartKind.OdoTable` renders through `CobolTable.ConcatImages`; a dynamic
+table's element lane calls the element's own `CurrentImage`). Still outside: a CELL-BACKED group holding such a
+table (the cell's element cells do not yet compose their own dynamic slots into the image), and every carrier
+consumer of a group that holds one.
 
 **CORE ships whole:** declaration (all phrases, each once and in the printed order — §13.18.38.2 with §5.2.1, refused otherwise by `DataBinder.NarrowToDataDivisionFormats`, **COBOLNET2789**, kb/Work PB1265) · out-of-line growable storage · CAPACITY
 read + SET Format 14 write · implicit + explicit growth · INITIALIZED seeding · bounds/capacity ECs

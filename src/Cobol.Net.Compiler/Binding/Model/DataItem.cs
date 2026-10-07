@@ -942,24 +942,44 @@ public sealed class DataItem
     /// §14.8.3.2 activation-boundary crossing's gate (kb/Work PB204): ONE capability, because both need exactly
     /// the same thing — every component's extent known to the group's own struct (the OCCURS DEPENDING count
     /// arrives as the <c>__odo</c> parameter of its methods).
-    /// <para>⚠ The one shape that stays OUT is a runtime-length item inside an OCCURS DEPENDING or dynamic-capacity
-    /// table's element (a run-time MULTIPLICITY of components) — deliberately the SAME boundary as the §15.50.4 r7
-    /// LENGTH sum's named stage (<c>IntrinsicBinder.VariableLengthGroupSum</c>), so DISPLAY, FUNCTION LENGTH and
-    /// the boundary crossing agree about which groups have a defined current extent. (Since the R40 INDEX pin no
-    /// LEAF KIND excludes a group — only the shapes here do.)</para>
+    /// <para>⚠ The one shape that stays OUT of the CARRIER is a runtime-length item inside an OCCURS DEPENDING or
+    /// dynamic-capacity table's element (a run-time MULTIPLICITY of components): such a group has a one-way
+    /// current-extent IMAGE (<see cref="CurrentImageCapable"/> — DISPLAY and FUNCTION LENGTH) but no ordinal
+    /// component list to cross a boundary, MOVE or read back with. (Since the R40 INDEX pin no LEAF KIND excludes
+    /// a group — only the shapes here do.)</para>
     /// <para>⛔ MOVED HERE FROM <c>GroupImageCodec</c> at the PB204 landing. It was a CODEGEN predicate that a
     /// BIND-time screen now has to ask (§14.8.2.2's compatibility sentence admits the crossing, so the binder
     /// must know whether this compiler can carry it); a bind phase consulting a codegen class is the layering
     /// inversion, and copying the predicate would have been the second copy this repo's two-arm-dispatch rule
     /// forbids. It is a pure declared-shape fact, so the data model is where it belongs.</para></summary>
-    public bool CurrentExtentImageCapable =>
+    public bool CurrentExtentImageCapable => ComposesCurrentExtent(carrier: true);
+
+    /// <summary>⛔ THE ONE-WAY CURRENT-EXTENT IMAGE capability (kb/Work PB244), the variable-length twin of
+    /// <see cref="TransferImageCapable"/>: true when the group's CURRENT extent can be RENDERED as characters for a
+    /// consumer that only sends them out — DISPLAY (ISO §14.9.11.4 GR7, A.1 item 57) and FUNCTION LENGTH
+    /// (§15.50.4 rule 7). It is <see cref="CurrentExtentImageCapable"/> widened by exactly the members whose
+    /// components have a RUN-TIME multiplicity: a table of OCCURS DEPENDING or dynamic-capacity ELEMENTS that are
+    /// themselves variable-length groups (<c>05 TE OCCURS 1 TO 3 DEPENDING ON K. 10 DD PIC X DYNAMIC LENGTH.</c>).
+    /// <para>⛔ WHY A SEPARATE CAPABILITY, NOT A WIDER <see cref="CurrentExtentImageCapable"/>: every other consumer
+    /// of the current extent ROUND-TRIPS it through the §8.5.1.12 component carrier (<c>CobolVarGroup</c>: an
+    /// ordinal list of components, matched position by position against a compatible group, §8.5.1.12.2) — an
+    /// activation boundary, a MOVE or comparison, a record read back. A table whose element count varies at run
+    /// time has no fixed component list, and a record read back cannot even say how many elements it holds (the
+    /// DEPENDING item is data, not layout). The image alone is well defined: the elements' own current images, in
+    /// occurrence order, up to the current count (§13.18.38.4 GR8) or capacity (§8.5.1.9.1). Folding the widening
+    /// into the carrier's gate would stage a component list that does not exist.</para></summary>
+    public bool CurrentImageCapable => ComposesCurrentExtent(carrier: false);
+
+    private bool ComposesCurrentExtent(bool carrier) =>
         IsGroup && CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(this)
         && Children.Where(c => c.RedefinesTargetName is null && (c.IsGroup || c.IsElementary))
-            .All(CurrentExtentComposes);
+            .All(c => CurrentExtentComposes(c, carrier));
 
-    /// <summary>⛔ THE ONE MEMBER LAW of <see cref="CurrentExtentImageCapable"/> (kb/Work PB244): can the group's
-    /// own struct compose <paramref name="c"/>'s CURRENT extent? The five arms are the five member kinds
-    /// <c>GroupImageCodec.VarParts</c> classifies, so the gate and the composer cannot disagree about a member.
+    /// <summary>⛔ THE ONE MEMBER LAW of <see cref="CurrentExtentImageCapable"/> and <see cref="CurrentImageCapable"/>
+    /// (kb/Work PB244): can the group's own struct compose <paramref name="c"/>'s CURRENT extent
+    /// (<paramref name="carrier"/> true: AND carry it as ordinal components; false: as an image only)? The arms are
+    /// the member kinds <c>GroupImageCodec.VarParts</c> classifies, so the gate and the composer cannot disagree
+    /// about a member.
     /// <list type="number">
     /// <item>A member with a fixed image (<see cref="IsImageCapable"/>), including one that holds the group's
     /// OCCURS DEPENDING table as its trailing storage (<see cref="OdoTableOnOrBeneath"/>): the composer takes the
@@ -975,19 +995,23 @@ public sealed class DataItem
     /// <item>A FIXED-OCCURS table of variable-length group elements (§8.5.1.12.1 "has at least one dynamic-length
     /// elementary item … as a subordinate item" does not exempt a table element): every occurrence is its own
     /// variable-length group and carries its own components, so the table contributes <c>Occurs</c> times the
-    /// element's components — a count known at compile time. An OCCURS DEPENDING table of such elements has a
-    /// RUN-TIME multiplicity of components and stays outside (the SR22 trailing table would have to carry a
-    /// per-occurrence layout the carrier's ordinal component list cannot express).</item>
+    /// element's components — a count known at compile time.</item>
     /// </list>
+    /// An OCCURS DEPENDING or dynamic-capacity table of such elements has a RUN-TIME multiplicity of components: the
+    /// carrier's ordinal component list cannot express it (the SR22 trailing table would have to carry a
+    /// per-occurrence layout), so it joins only the one-way IMAGE (<paramref name="carrier"/> false) — each
+    /// occurrence's own current image up to the current count (§13.18.38.4 GR8) or capacity (§8.5.1.9.1).
     /// A group holding USAGE BIT items is outside the ODO arm: its extent is a §8.5.1.6.3 bit layout, not a
     /// character prefix.</summary>
-    private static bool CurrentExtentComposes(DataItem c) =>
+    private static bool CurrentExtentComposes(DataItem c, bool carrier) =>
         c.IsImageCapable ? !HasOdoOnOrBeneath(c) || (!c.HasBitDescendant && OdoTableOnOrBeneath(c) is not null)
         : (c.IsDynamicLength && c.IsElementary)
-          || (c.IsDynamicTable && c.ElementImageCapable && !HasOdoOnOrBeneath(c))
-          || (c.IsGroup && !c.IsDynamicTable && c.Occurs is null && c.CurrentExtentImageCapable)
+          || (c.IsDynamicTable && !HasOdoOnOrBeneath(c) && (c.ElementImageCapable || (!carrier && c.ComposesCurrentExtent(false))))
+          || (c.IsGroup && !c.IsDynamicTable && c.Occurs is null && c.ComposesCurrentExtent(carrier))
           || (c.IsGroup && !c.IsDynamicTable && c.Occurs is not null && c.OccursSpec?.DependingName is null
-              && !HasOdoOnOrBeneath(c) && c.CurrentExtentImageCapable);
+              && !HasOdoOnOrBeneath(c) && c.ComposesCurrentExtent(carrier))
+          || (!carrier && c.IsGroup && !c.IsDynamicTable && c.OccursSpec?.DependingName is not null
+              && !c.Children.Any(m => m.RedefinesTargetName is null && HasOdoOnOrBeneath(m)) && c.ComposesCurrentExtent(false));
 
     /// <summary>The OCCURS DEPENDING table that is <paramref name="c"/> itself or lies beneath it, or null.
     /// §13.18.38.3 SR22 lets an occurs-depending subject be followed within its record only by entries
@@ -1007,12 +1031,19 @@ public sealed class DataItem
     public bool BoundaryImageCapable => IsImageCapable || CurrentExtentImageCapable;
 
     /// <summary>An OCCURS DEPENDING clause on <paramref name="c"/> itself or any subordinate — the shape the
-    /// current-extent composer must refuse (see <see cref="CurrentExtentImageCapable"/>). The sibling of
-    /// <c>IntrinsicBinder.HasOdoBeneath</c>, which tests subordinates only (its callers already hold the
-    /// operand); the composer screens MEMBERS, where the clause may sit on the member itself.</summary>
+    /// current-extent composer must classify (see <see cref="CurrentExtentImageCapable"/>). The composer screens
+    /// MEMBERS, where the clause may sit on the member itself; <see cref="HasOdoBeneath"/> is the question about a
+    /// group's own subordinates.</summary>
     internal static bool HasOdoOnOrBeneath(DataItem c) =>
-        c.OccursSpec?.DependingName is not null
-        || (c.IsGroup && c.Children.Any(m => m.RedefinesTargetName is null && HasOdoOnOrBeneath(m)));
+        c.OccursSpec?.DependingName is not null || HasOdoBeneath(c);
+
+    /// <summary>An OCCURS DEPENDING clause on a SUBORDINATE of <paramref name="g"/> at any depth, REDEFINES subtrees
+    /// aside - NOT on <paramref name="g"/> itself. Its extent varies at run time (§8.5.1.8), so a group struct whose
+    /// subordinates hold one takes the table's current count (<c>__odo</c>) in its current-extent methods; a group
+    /// that is itself the table (a struct of one OCCURRENCE) does not. THE one definition (the intrinsic binder's
+    /// LENGTH builder asks it too).</summary>
+    internal static bool HasOdoBeneath(DataItem g) =>
+        g.IsGroup && g.Children.Any(m => m.RedefinesTargetName is null && HasOdoOnOrBeneath(m));
 
     /// <summary>The character width of this item's image — meaningful for an <see cref="IsCharacterImage"/> item. For a
     /// group it is the sum of each child's TOTAL image contribution, i.e. the child's per-occurrence image width × its

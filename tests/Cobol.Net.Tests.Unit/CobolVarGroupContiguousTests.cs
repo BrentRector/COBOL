@@ -143,6 +143,61 @@ public sealed class CobolVarGroupContiguousTests
         Assert.Equal("H", taken.Fixed);
     }
 
+    // ── kb/Work PB244 shape (b), the CELL-BACKED half: the same record in a storage cell ───────────────────────────
+    // Window H X(1) · D dynamic (max 5, ordinal 0 at window offset 1) · T X(1) OCCURS 1 TO 3 DEPENDING, held at its
+    // maximum (3 positions) as the window's trailing storage: Ref "Hxyz", D "abc".
+
+    private static readonly CellOdoTail Tail = new(1, 3);
+
+    private static StorageCell Cell()
+    {
+        var cell = new StorageCell { Ref = "Hxyz" };
+        cell.SetDynAt(0, "abc");
+        return cell;
+    }
+
+    [Theory]
+    [InlineData(3, "Habcxyz")]
+    [InlineData(2, "Habcxy")]
+    [InlineData(1, "Habcx")]
+    [InlineData(0, "Habc")]      // below integer-1: the extent is what the count names (the caller clamps to the minimum)
+    [InlineData(9, "Habcxyz")]   // above integer-2: clamped to the maximum
+    public void ACellWindow_ComposesItsContiguousImage_AtTheOdoCount(int count, string expected) =>
+        Assert.Equal(expected, Cell().ContiguousAt(0, 4, 0, [1], [0], Tail, count));
+
+    [Fact]
+    public void ACellWindowsCarrier_CutsItsFixedRun_AtTheOdoCount()
+    {
+        var carrier = Cell().VarGroupAt(0, 4, 0, [1], [0], Tail, 2);
+        Assert.Equal("Hxy", carrier.Fixed);
+        Assert.Equal(["abc"], carrier.Dynamic);
+    }
+
+    [Fact]
+    public void ACellWindowsExtents_CarryTheTableAsTheLastComponent()
+    {
+        var extents = Cell().ContiguousExtentsAt(4, 0, [1], [5], [0], [0], Tail, 2);
+        Assert.Equal([3, 2], extents.Lengths);   // D "abc", T "xy"
+        Assert.Equal([1, 1], extents.FixedAt);
+    }
+
+    [Fact]
+    public void ARecordStoredIntoACellWindow_IsDecomposedWithTheTableAsItsLastComponent()
+    {
+        // The record travels with its extent table (D-FRA (v)): D "abc" then the table's two occurrences.
+        var cell = Cell();
+        var extents = cell.ContiguousExtentsAt(4, 0, [1], [5], [0], [0], Tail, 2);
+        var receiver = new StorageCell { Ref = "H   " };
+        receiver.StoreContiguousAt(0, 4, 0, [1], [5], [0], [0], Tail, "Habcxy", extents);
+        Assert.Equal("abc", receiver.DynAt(0));
+        Assert.Equal("Hxy ", receiver.Ref);   // the table's third occurrence is the excess: space-filled
+        // With no table to say where D ends, the take step (D-FRA) gives the EARLIER component, D, the whole excess
+        // up to its maximum - the same answer a declared group's layout gives (OdoTailLayout test above).
+        var taken = new StorageCell { Ref = "H   " };
+        taken.StoreContiguousAt(0, 4, 0, [1], [5], [0], [0], Tail, "Habcxy");
+        Assert.Equal("abcxy", taken.DynAt(0));
+    }
+
     [Fact]
     public void Concat_JoinsEveryOccurrencesFixedRunAndComponents_InOrder()
     {

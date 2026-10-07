@@ -1525,13 +1525,6 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         _ => null,   // computed results / error operands — genuinely runtime
     };
 
-    /// <summary>Does this group have an OCCURS DEPENDING ON table beneath it? Its CURRENT extent varies at run
-    /// time (§8.5.1.8), so the group's width is not statically known. The recursive REDEFINES-excluding walk
-    /// mirrors <see cref="HasDynamicLengthLeaf"/>.</summary>
-    private static bool HasOdoBeneath(DataItem g) =>
-        g.Children.Any(c => c.RedefinesTargetName is null
-                            && (c.OccursSpec?.DependingName is not null || (c.IsGroup && HasOdoBeneath(c))));
-
     /// <summary>DISPLAY-OF / NATIONAL-OF argument rules — DISPLAY-OF (§15.26.3): argument-1 shall be of class
     /// national (r1); argument-2 shall be of class alphabetic or alphanumeric and one character position in
     /// length (r2 — the alphanumeric SUBSTITUTION character). NATIONAL-OF (§15.66.3): argument-1 shall be of
@@ -2302,7 +2295,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(g);
 
     private static bool HasRuntimeLength(DataItem g) =>
-        HasOdoBeneath(g) || HasDynamicLengthLeaf(g) || HasDynamicCapacityTable(g);
+        DataItem.HasOdoBeneath(g) || HasDynamicLengthLeaf(g) || HasDynamicCapacityTable(g);
 
     /// <summary>
     /// The length of a group whose length is a RUNTIME value, as ONE expression — §15.50.4 r4b + r7 (LENGTH) /
@@ -2323,12 +2316,15 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// so a group that is itself a table element or a nested member sums correctly — nothing is re-resolved by
     /// name from the root. The ODO term reads data-name-1 through the <see cref="OdoGroupPlace"/> the resolver
     /// already wrapped the operand in.</para>
-    /// <para>⚠ THE ONE SHAPE NOT SUMMED, NAMED: a runtime-length item INSIDE a table element (a dynamic-length
-    /// leaf or a dynamic-capacity table under a fixed, ODO or dynamic OCCURS) — its total is a per-occurrence
-    /// loop over the table, and the standard's own phrase for r7c ("based on their current capacity") defines only
-    /// the fixed-element case. Reported as a named loud stage (§1.4), never as an under-count. A bit-bearing group
-    /// (its ByteWidth is the §8.5.1.6.3 layout extent, not a sum) is likewise staged rather than corrected by
-    /// subtraction.</para>
+    /// <para>⚠ THE SHAPE NOT SUMMED, AND WHAT IT BECOMES: a runtime-length item INSIDE the element of an OCCURS
+    /// DEPENDING or dynamic-capacity table — its total is a per-occurrence loop over run-time storage that no
+    /// term-by-term expression writes down (the standard's own phrase for r7c, "based on their current capacity",
+    /// defines only the fixed-element case; a FIXED table of such elements is summed per occurrence below). Its
+    /// length is the length of the group's own CURRENT IMAGE (kb/Work PB244 - <see cref="BoundIntrinsicCall.OverCurrentImage"/>,
+    /// the same composer DISPLAY uses, so LENGTH(G) equals the displayed width) wherever that image exists; a
+    /// group it cannot take (a cell-backed one) is reported as a named loud stage (§1.4), never as an
+    /// under-count. A bit-bearing group (its ByteWidth is the §8.5.1.6.3 layout extent, not a sum) is likewise
+    /// staged rather than corrected by subtraction.</para>
     /// </remarks>
     private BoundExpr VariableLengthGroupSum(IntrinsicSig sig, BoundFieldOperand op, bool bytes)
     {
@@ -2341,6 +2337,15 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         DataItem group = inner.Item;
         AccessPath? basePath = inner switch { MemberPlace m => m.Path, DynTablePlace d => d.Path, _ => null };
         BoundExprError Stage(string what) => BoundExprError.Unbuilt(ctx.Edition, $"FUNCTION {sig.Name} of '{group.CobolName ?? group.CsName}': {what} (ISO {rules})");
+        // ⛔ A TABLE OF VARIABLE-LENGTH ELEMENTS (kb/Work PB244) — an OCCURS DEPENDING or dynamic-capacity table
+        // whose occurrences each hold a runtime-length member — is a per-occurrence loop over run-time storage the
+        // term-by-term sum below cannot write down. The group's own CurrentImage composes exactly that extent (A.1
+        // item 57: LENGTH(G) equals the displayed width), so the length is the image's, through the ONE composer
+        // DISPLAY uses; a group the composer cannot take (a cell-backed or bit-bearing one) stays the named stage.
+        BoundExpr ImageOrStage(string what) =>
+            group.CurrentImageCapable && !group.HasBitDescendant && inner is MemberPlace or DynTablePlace
+                ? new BoundIntrinsicCall(sig, [op], PicCategory.Numeric) { OverCurrentImage = true }
+                : Stage(what);
 
         if (group.HasBitDescendant)
             return Stage("a group holding USAGE BIT items and a runtime-length subordinate — its fixed extent is a "
@@ -2348,7 +2353,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         long fixedPart = group.ByteWidth;
         BoundExpr? runtime = null;
         void Add(BoundExpr e) => runtime = runtime is null ? e : new BoundBinary(runtime, '+', e);
-        BoundExprError? failure = null;
+        BoundExpr? failure = null;
 
         // A component of a CELL-BACKED group (kb/Work PB1042): its ordinal is the group window's first ordinal plus
         // its place among the group's components — the difference of the two static ordinals (a group that is
@@ -2367,7 +2372,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                 {
                     // r7c / r6c — the current capacity × the element width. ByteWidth counted ONE occurrence.
                     if (HasRuntimeLength(c) || (c.IsElementary && c.IsDynamicLength))
-                    { failure = Stage($"the dynamic-capacity table '{c.CobolName ?? c.CsName}' has a runtime-length element — a per-occurrence sum"); return; }
+                    { failure = ImageOrStage($"the dynamic-capacity table '{c.CobolName ?? c.CsName}' has a runtime-length element — a per-occurrence sum"); return; }
                     // A CELL-BACKED group's table is a component of the cell (kb/Work PB1042): its path is the
                     // group's cell and its ordinal relative to the group's first component.
                     var tablePath = cPath ?? (inner is RedefViewPlace { Coding: VarGroupWindow tg }
@@ -2385,7 +2390,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     // MAXIMUM. data-name-1's place is the one the resolver wrapped the operand with (SR22 makes
                     // the table the record's trailing part, so the operand IS the OdoGroupPlace).
                     if (HasRuntimeLength(c))
-                    { failure = Stage($"the OCCURS DEPENDING table '{c.CobolName ?? c.CsName}' has a runtime-length element — a per-occurrence sum"); return; }
+                    { failure = ImageOrStage($"the OCCURS DEPENDING table '{c.CobolName ?? c.CsName}' has a runtime-length element — a per-occurrence sum"); return; }
                     if (odo is null)   // the resolver wraps every ODO group operand — struct member or class-tier window (kb/Work PB80); reaching here is a shape it could not resolve
                     { failure = Stage($"the OCCURS DEPENDING table '{c.CobolName ?? c.CsName}' has no resolvable data-name-1 place"); return; }
                     int elem = c.ByteWidth, max = c.Occurs ?? 1;
@@ -2404,7 +2409,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     // access path, and ByteWidth already counted each occurrence's dynamic items as zero. The
                     // SAME member kind the current-extent composer calls a NestedTable (GroupImageCodec), so
                     // DISPLAY, LENGTH and the boundary agree about which groups have a current extent.
-                    bool perOccurrence = c.IsGroup && !HasOdoBeneath(c)
+                    bool perOccurrence = c.IsGroup && !DataItem.HasOdoBeneath(c)
                                          && HasRuntimeLength(c) && (cPath is not null || inner is RedefViewPlace { Coding: VarGroupWindow });
                     if (perOccurrence)
                     {
@@ -2412,7 +2417,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                             Walk(c, cPath?.Add(new FixedTableSegment(i.ToString())), shift + (i - 1) * CellComponents.PerOccurrence(c));
                     }
                     else if (HasRuntimeLength(c) || c.IsDynamicLength)
-                    { failure = Stage($"the table '{c.CobolName ?? c.CsName}' has a runtime-length element — a per-occurrence sum"); return; }
+                    { failure = ImageOrStage($"the table '{c.CobolName ?? c.CsName}' has a runtime-length element — a per-occurrence sum"); return; }
                 }
                 else if (c.IsDynamicLength)
                 {

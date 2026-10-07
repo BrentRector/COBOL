@@ -23,13 +23,14 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
         // A VARIABLE-LENGTH group operand displays in the implementor-defined format §14.9.11.4 GR7 leaves to
         // us, documented as CONFORMANCE.md A.1 item 57 (kb/Work PB164): the generated CurrentImage() — fixed
         // members by the record-image member law, dynamic members at their CURRENT extent, following the
-        // §15.50.4 r7 LENGTH-sum geometry in character positions (a NATIONAL member displays one character
-        // per position where LENGTH counts two bytes — the sanctioned D-N1/D-N3 divergence; row 57 names the
-        // shapes that stay loud instead: a runtime-length item inside an OCCURS DEPENDING or dynamic-capacity
-        // table's element, and a cell-backed group holding both a dynamic-length item and an ODO table — kb/Work
-        // PB244. An ODO table beside a dynamic member displays at its CURRENT count).
+        // §15.50.4 r7 LENGTH-sum geometry, so LENGTH(G) equals the displayed width (a NATIONAL member contributes
+        // the two bytes it occupies — D-N1; kb/Work PB327 dissolved the old one-character divergence; row 57 names the
+        // one shape that stays loud instead: a CELL-BACKED group holding a table whose ELEMENTS are
+        // variable-length groups — kb/Work PB244. An ODO table beside a dynamic member displays at its CURRENT
+        // count, and a table of variable-length elements shows each occurrence's own current image: the gate is
+        // CurrentImageCapable, the ONE-WAY image, because DISPLAY never reads the characters back).
         // DISPLAY-ONLY by design: GR7 is a DISPLAY-statement determination, so the shared group-sender arm
-        // (WRITE/RELEASE/compare) keeps its loud posture.
+        // (WRITE/RELEASE/compare) keeps its narrower, carrier-capable gate.
         // ⛔ `vp is not RedefViewPlace`: a Tier-B class-tier VIEW's Read() is its string WINDOW — spelling
         // .CurrentImage() on it is CS1061 on `string` (the PB176 skeptic round; whether a dynamic-length
         // member under REDEFINES is even legal is kb/Work PB177's screen question — the emitter defends
@@ -40,8 +41,8 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
         var parts = d.Operands.Select(o =>
             o is BoundFieldOperand { Place: { Item.IsGroup: true, ImageCapable: false } vp }
                 && (vp is not RedefViewPlace || vp is RedefViewPlace { Coding: VarGroupWindow })
-                && vp.Item.CurrentExtentImageCapable
-            ? PlaceRenderer.VarGroupCurrentImage(vp, "DISPLAY of")
+                && vp.Item.CurrentImageCapable
+            ? PlaceRenderer.VarGroupCurrentImage(vp, "DISPLAY of", transfer: true)
             // A strongly-typed group with a class pointer/object leaf (kb/Work PB244): a legal identifier-1
             // (§14.9.11.3 SR1 bars only an item OF class pointer/object; a strongly-typed group's class is its
             // type-name, §8.5.2.1) whose GR1 device conversion is ours to define — CONFORMANCE.md A.1 item 56:

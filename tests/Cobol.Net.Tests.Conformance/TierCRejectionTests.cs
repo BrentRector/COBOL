@@ -170,19 +170,16 @@ public sealed class TierCRejectionTests
         Assert.Equal('\a', stdout[4]);
     }
 
-    /// <summary>kb/Work PB176 — a group whose OCCURS DEPENDING table holds a dynamic-length ELEMENT member must
-    /// COMPILE and stage the runtime Tier-C loud. Before the <c>PlaceRenderer.GroupImage</c> capability guard (the
-    /// SEVENTH two-arm-dispatch instance — the write twin <c>WriteGroupImage</c> was guarded, the read side
-    /// was not), the ODO sender path emitted <c>.AsImage()</c> on a struct that never receives one, and this
-    /// legal source failed BACKEND compilation with CS1061 — the loud-failure rule violated in the worst
-    /// direction. The lock pins the restored posture: compiles, throws Tier-C, names the dynamic mechanism.
-    /// ⛔ The fixture is the ONE shape <c>DataItem.CurrentExtentImageCapable</c> still excludes (kb/Work PB244): an
-    /// ODO table whose element carries a dynamic-length item has a RUN-TIME multiplicity of components. A group
-    /// that merely holds an ODO table BESIDE a dynamic member composes — <c>DisplayOdoGroupWithDynamicMember_RendersCurrentExtent</c>.</summary>
+    /// <summary>kb/Work PB176 — a group whose OCCURS DEPENDING table holds a dynamic-length ELEMENT member once
+    /// FAILED backend compilation with CS1061 (the ODO sender path emitted <c>.AsImage()</c> on a struct that never
+    /// received one; the SEVENTH two-arm-dispatch instance). kb/Work PB244 then gave such a group its one-way
+    /// current-extent IMAGE (<c>DataItem.CurrentImageCapable</c>, ISO §14.9.11.4 GR7 / A.1 item 57): each of the first
+    /// <c>WS-GO-N</c> occurrences, at its own current extent (§13.18.38.4 GR8). Here <c>WS-GO-D</c> is
+    /// ("ab", "c") and <c>WS-GO-F</c> ("123", "456") for the two occurrences in use: <c>2ab123c456</c>.</summary>
     [Fact]
-    public void DisplayOdoTableOfDynamicElements_FailsLoudNotCs1061()
+    public void DisplayOdoTableOfDynamicElements_RendersEachOccurrenceAtItsCurrentExtent()
     {
-        var (ok, _, detail) = new CobolNetCompiler(2023).CompileAndRun("""
+        var (ok, stdout, detail) = new CobolNetCompiler(2023).CompileAndRun("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. TIERCRE3.
             DATA DIVISION.
@@ -194,10 +191,42 @@ public sealed class TierCRejectionTests
                   10 WS-GO-F PIC X(3).
             PROCEDURE DIVISION.
             MAIN.
+                MOVE "ab" TO WS-GO-D(1).
+                MOVE "123" TO WS-GO-F(1).
+                MOVE "c" TO WS-GO-D(2).
+                MOVE "456" TO WS-GO-F(2).
                 DISPLAY WS-GO.
                 STOP RUN.
             """);
-        Assert.False(ok, "an ODO table of dynamic elements has no whole-group image — loud, never CS1061 (kb/Work PB176)");
+        Assert.True(ok, detail);
+        Assert.Equal("2ab123c456", stdout.TrimEnd('\r', '\n'));
+    }
+
+    /// <summary>kb/Work PB244 — the shape the CELL still cannot compose: an EXTERNAL (cell-backed) group whose
+    /// OCCURS DEPENDING table has variable-length ELEMENTS. The cell's table reservation holds one element's FIXED
+    /// run, and the element's own dynamic slots are not yet composed into the group image, so the statement
+    /// stays the named Tier-C loud — never a shortened image. (A struct-resident group composes:
+    /// <c>DisplayOdoTableOfDynamicElements_RendersEachOccurrenceAtItsCurrentExtent</c>.)</summary>
+    [Fact]
+    public void DisplayCellBackedTableOfDynamicElements_StaysLoud()
+    {
+        var (ok, _, detail) = new CobolNetCompiler(2023).CompileAndRun("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. TIERCRE5.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 WS-GN PIC 9(1) EXTERNAL.
+            01 WS-GX EXTERNAL.
+               05 WS-GX-T OCCURS 1 TO 5 DEPENDING ON WS-GN.
+                  10 WS-GX-D PIC X DYNAMIC LENGTH.
+                  10 WS-GX-F PIC X(3).
+            PROCEDURE DIVISION.
+            MAIN.
+                MOVE 1 TO WS-GN.
+                DISPLAY WS-GX.
+                STOP RUN.
+            """);
+        Assert.False(ok, "a cell-backed table of dynamic elements is not composed yet — loud, never a shortened image");
         Assert.Contains("Tier-C", detail);
         Assert.Contains("dynamic", detail);
     }

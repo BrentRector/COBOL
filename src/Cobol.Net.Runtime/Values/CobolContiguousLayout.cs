@@ -110,8 +110,13 @@ public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] U
         if (OdoTail) current = current.SplitTail(FixedAt[^1]);
         var lengths = new int[FixedAt.Length];
         for (int k = 0; k < lengths.Length; k++) lengths[k] = current.Dyn(k).Length;
-        return new RecordExtents(FixedAt, lengths, this);
+        return ExtentsFrom(lengths);
     }
+
+    /// <summary>The extent table of a record whose component lengths are already known — one per component of this
+    /// layout, the OCCURS DEPENDING table (<c>OdoTail</c>) last. The door for a record held in a storage cell, which
+    /// reads each component's length off its own slot rather than off a composed carrier (kb/Work PB244).</summary>
+    public RecordExtents ExtentsFrom(int[] lengths) => new(FixedAt, lengths, this);
 
     /// <summary>⛔ THE FIXED FORM OF A VARIABLE-LENGTH RECORD — the record as a file of FIXED-LENGTH records holds it
     /// (determination D-FRA (vi); kb/Work PB1562). ISO §13.18.43.4 GR6 makes every record of a Format 1 file the same

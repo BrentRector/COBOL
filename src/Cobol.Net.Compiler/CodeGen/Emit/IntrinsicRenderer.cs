@@ -334,6 +334,11 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
                     + $"{(ic.Args.Count > 2 ? IntArgWide(ic, 2) : "0")}, {(ic.Anycase ? "true" : "false")}"), 0);
             case "Ord":                                                         // §15.70 — PCS-relative ordinal (H5: weights only when flagged)
                 return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, $"{Str(ic.Args[0])}{Collate(ic)}"), 0);
+            case "Length" or "ByteLength" when ic.OverCurrentImage && ic.Args[0] is BoundFieldOperand { Place: { } vg }:
+                // §15.50.4 rule 7 / §15.14.4 rule 6 over a variable-length group's CURRENT-EXTENT IMAGE (kb/Work PB244):
+                // the same string DISPLAY shows (A.1 item 57), whose storage characters are bytes.
+                return new NumX(RuntimeApi.Intrinsic("ByteLength",
+                    PlaceRenderer.VarGroupCurrentImage(vg, $"FUNCTION {sig.Name} of", transfer: true)), 0);
             case "Length":                                                      // §15.50 runtime shapes (kb/Work PB61)
                 // (A group with a runtime length — an OCCURS DEPENDING table, dynamic-length items or
                 // dynamic-capacity tables beneath it — never arrives here: the binder's VariableLengthGroupSum

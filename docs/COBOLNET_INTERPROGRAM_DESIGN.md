@@ -580,8 +580,9 @@ the argument, RETURNING and override/implements checks all read.
 
 **Tier-C at the boundary, in BOTH halves.** A group with no boundary image at all (a pointer/object-class leaf,
 or a variable-length shape outside the current-extent gate — a runtime-length item inside an OCCURS DEPENDING or
-dynamic-capacity table's element; `DataItem.BoundaryImageCapable`) stages the documented Tier-C loud rather than
-crossing. (An OCCURS DEPENDING table BESIDE a dynamic member, and a runtime-length item inside a FIXED-OCCURS
+dynamic-capacity table's element, whose run-time multiplicity of components the ordinal carrier cannot hold; it has
+only the one-way `DataItem.CurrentImageCapable` image DISPLAY and FUNCTION LENGTH use; `DataItem.BoundaryImageCapable`)
+stages the documented Tier-C loud rather than crossing. (An OCCURS DEPENDING table BESIDE a dynamic member, and a runtime-length item inside a FIXED-OCCURS
 element, cross since kb/Work PB244: the former rides the carrier's fixed run at its **maximum** — §14.8.2.2, "the
 maximum length is used" — through `PlaceRenderer.VarGroupBoundaryImage`, the latter flattens `Occurs` times in place,
 `VarPartKind.NestedTable`.) ⛔ The WRITE half does not test that predicate itself: `CallStringWrite` hands **every** non-`RedefViewPlace`

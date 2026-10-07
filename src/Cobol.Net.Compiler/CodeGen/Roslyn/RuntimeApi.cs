@@ -1750,6 +1750,12 @@ internal static class RuntimeApi
     public static string VarGroupConcat(string carriersExpr) =>
         $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Concat)}({carriersExpr})";
 
+    /// <summary>The current-extent image of an OCCURS DEPENDING table whose elements are variable-length groups
+    /// (<c>CobolTable.ConcatImages</c>, kb/Work PB244): the first <paramref name="countExpr"/> occurrences of
+    /// <paramref name="tableExpr"/>, each rendered by the element lambda <paramref name="imageLambda"/>.</summary>
+    public static string TableConcatImages(string tableExpr, string countExpr, string imageLambda) =>
+        $"{nameof(CobolTable)}.{nameof(CobolTable.ConcatImages)}({tableExpr}, {countExpr}, {imageLambda})";
+
     /// <summary>A dynamic-length ELEMENTARY RECORD's image framed by its DYNAMIC LENGTH STRUCTURE — ISO §12.3.7.4 GR18
     /// length field, data, GR19 delimiter (<c>CobolDynStructure.FrameWith</c>; kb/Work PB1094). A group record frames
     /// each member through its layout (<c>RecordExtents.MediumImage</c>) instead.</summary>
@@ -2003,29 +2009,39 @@ internal static class RuntimeApi
     /// <summary>A cell-backed variable-length group's CONTIGUOUS image (§8.5.1.11.2) — <c>StorageCell.ContiguousAt</c>.
     /// <paramref name="dynTable"/> is each component's table element width, 0 for a dynamic-length item.</summary>
     public static string CellVarContiguous(string cellExpr, string fixedAtExpr, int width, string dynBase,
-                                           IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable) =>
-        $"{cellExpr}.{nameof(StorageCell.ContiguousAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)})";
+                                           IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable,
+                                           (int Elem, int Max) odo, string count) =>
+        $"{cellExpr}.{nameof(StorageCell.ContiguousAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count})";
+
+    /// <summary>The OCCURS DEPENDING table a cell-backed variable-length group holds as its trailing storage
+    /// (<c>CellOdoTail</c>, kb/Work PB244), as the argument of the cell's group helpers; <c>default</c> for a group
+    /// that holds none. <paramref name="odo"/> is the table's element width and maximum count (zero when absent).</summary>
+    private static string CellOdoTailOf((int Elem, int Max) odo) =>
+        odo.Max > 0 ? $"new {nameof(CellOdoTail)}({odo.Elem}, {odo.Max})" : "default";
 
     /// <summary>Make a contiguous image a cell-backed variable-length group's content — <c>StorageCell.StoreContiguousAt</c>.</summary>
     public static string CellVarStoreContiguous(string cellExpr, string fixedAtExpr, int width, string dynBase,
                                                 IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax,
-                                                IEnumerable<int> dynStructure, IEnumerable<int> dynTable, string imageExpr,
+                                                IEnumerable<int> dynStructure, IEnumerable<int> dynTable,
+                                                (int Elem, int Max) odo, string imageExpr,
                                                 string? extentsExpr = null, bool fixedForm = false) =>
         $"{cellExpr}.{nameof(StorageCell.StoreContiguousAt)}({fixedAtExpr}, {width}, (int)({dynBase}), "
-        + $"{IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {IntSpan(dynTable)}, {imageExpr}, {extentsExpr ?? "null"}{(fixedForm ? ", true" : "")})";
+        + $"{IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {imageExpr}, {extentsExpr ?? "null"}{(fixedForm ? ", true" : "")})";
 
     /// <summary>A cell-backed variable-length group's EXTENT TABLE — <c>StorageCell.ContiguousExtentsAt</c>
     /// (determination D-FRA (v); kb/Work PB1053). <paramref name="dynStructure"/> is each dynamic-length member's
     /// DYNAMIC LENGTH STRUCTURE code (<c>CobolDynStructure.Code</c>; kb/Work PB1094), 0 for none.</summary>
     public static string CellVarContiguousExtents(string cellExpr, int width, string dynBase,
                                                   IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax,
-                                                  IEnumerable<int> dynStructure, IEnumerable<int> dynTable) =>
-        $"{cellExpr}.{nameof(StorageCell.ContiguousExtentsAt)}({width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {IntSpan(dynTable)})";
+                                                  IEnumerable<int> dynStructure, IEnumerable<int> dynTable,
+                                                  (int Elem, int Max) odo, string count) =>
+        $"{cellExpr}.{nameof(StorageCell.ContiguousExtentsAt)}({width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count})";
 
     /// <summary>A cell-backed variable-length group's §8.5.1.12 component carrier — <c>StorageCell.VarGroupAt</c>.</summary>
     public static string CellVarCarrier(string cellExpr, string fixedAtExpr, int width, string dynBase,
-                                        IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable) =>
-        $"{cellExpr}.{nameof(StorageCell.VarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)})";
+                                        IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable,
+                                        (int Elem, int Max) odo, string count) =>
+        $"{cellExpr}.{nameof(StorageCell.VarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count})";
 
     /// <summary>Distribute a component carrier into a cell-backed variable-length group — <c>StorageCell.StoreVarGroupAt</c>.</summary>
     public static string CellVarStoreCarrier(string cellExpr, string fixedAtExpr, int width, string dynBase,

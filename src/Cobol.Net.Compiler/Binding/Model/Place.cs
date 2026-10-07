@@ -505,10 +505,14 @@ public static class CellComponents
 /// GR18/GR19; kb/Work PB1094). ISO §8.5.1.11.2 — "a variable-length data item behaves in all respects as though it
 /// were in fact contiguous with its neighbors whenever a procedural operation is applied to a group containing it"
 /// — is why its read is the CONTIGUOUS image (<c>StorageCell.ContiguousAt</c>), exactly what a declared group's
-/// generated <c>CurrentImage()</c> composes.</summary>
+/// generated <c>CurrentImage()</c> composes.
+/// <para><paramref name="Odo"/> is the OCCURS DEPENDING table the group holds as its TRAILING storage (kb/Work PB244;
+/// §13.18.38.3 SR22) - its element width and maximum count, <c>(0, 0)</c> for a group without one. The window
+/// reserves the table at its maximum in the fixed run; the cell helpers (<c>CellOdoTail</c>) make it the layout's last
+/// component and cut the run to the operand's current count (§13.18.38.4 GR8).</para></summary>
 public sealed record VarGroupWindow(AccessPath Cell, string DynBase, IReadOnlyList<int> DynFixedAt,
                                     IReadOnlyList<int> DynMax, IReadOnlyList<int> DynStructure,
-                                    IReadOnlyList<int> DynTable) : CellWindowCoding(Cell)
+                                    IReadOnlyList<int> DynTable, (int Elem, int Max) Odo) : CellWindowCoding(Cell)
 {
     /// <summary>The coding for <paramref name="group"/> when it has components under it, else null. The layout is
     /// read off the class walk (<see cref="CellComponents.Of"/> over <see cref="DataItem.ClassOffset"/>), never
@@ -522,7 +526,8 @@ public sealed record VarGroupWindow(AccessPath Cell, string DynBase, IReadOnlyLi
                 parts.Select(p => p.At).ToList(),
                 parts.Select(p => p.Item.IsDynamicTable ? p.Item.OccursSpec?.Max ?? 0 : p.Item.DynMaxSize).ToList(),
                 parts.Select(p => p.Item.IsDynamicTable ? 0 : FileModel.StructureOf(p.Item)?.Code ?? 0).ToList(),
-                parts.Select(p => p.Item.IsDynamicTable ? p.Item.ByteWidth : 0).ToList());
+                parts.Select(p => p.Item.IsDynamicTable ? p.Item.ByteWidth : 0).ToList(),
+                OdoModel.TableUnder(group) is { } table ? (table.ByteWidth, table.Occurs ?? 1) : (0, 0));
     }
 
     /// <summary>True when <paramref name="group"/> would take this coding.</summary>

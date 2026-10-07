@@ -9,6 +9,19 @@ namespace CobolNet.Runtime;
 /// </summary>
 public static class CobolTable
 {
+    /// <summary>The concatenated images of the first <paramref name="count"/> occurrences of an OCCURS DEPENDING
+    /// <paramref name="table"/> whose elements are VARIABLE-LENGTH groups (kb/Work PB244; ISO §14.9.11.4 GR7's
+    /// documented format): each occurrence contributes its own current extent
+    /// (<paramref name="image"/> = its <c>CurrentImage()</c>), in occurrence order, and the count is the table's
+    /// current one (§13.18.38.4 GR8 — only the part the DEPENDING item names is used). A count outside the table is
+    /// clamped; the caller has already applied the EC-BOUND-ODO clamp (<c>TableOdoExtent</c>).</summary>
+    public static string ConcatImages<T>(T[] table, int count, Func<T, string> image)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < Math.Clamp(count, 0, table.Length); i++) sb.Append(image(table[i]));
+        return sb.ToString();
+    }
+
     /// <summary>
     /// The table element at a 1-based <paramref name="occurrence"/> number, as a writable reference.
     /// <para><b>Out-of-range</b> (ISO §8.4.2.3.4 GR2): with EC-BOUND-SUBSCRIPT checking ON the condition is raised

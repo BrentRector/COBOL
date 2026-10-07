@@ -164,6 +164,8 @@
   "pb244_vlg_display_odo_and_element_tables",
   "pb244_vlg_record_odo_tail_and_element_tables",
   "pb244_vlg_boundary_odo_and_element_tables",
+  "pb244_vlg_cell_odo_and_dynamic",
+  "pb244_vlg_display_element_tables",
   "pb1937_vlg_formal_limit_keeps_argument_storage",
   "pb1094_dynamic_length_structure_record_image",
   "pb1094_dynamic_length_structure_elementary_record",

@@ -429,6 +429,15 @@ public sealed record BoundIntrinsicCall(
     /// image. The renderer's Length arm reads the storage channel when this is set.</summary>
     public bool LengthInBytes { get; init; }
 
+    /// <summary>FUNCTION LENGTH / BYTE-LENGTH of a VARIABLE-LENGTH GROUP, measured over its CURRENT-EXTENT IMAGE
+    /// (kb/Work PB244): §15.50.4 rule 7 / §15.14.4 rule 6 sum the group's fixed parts and every variable-length
+    /// member's current length, which for a table of variable-length ELEMENTS under OCCURS DEPENDING or dynamic
+    /// capacity is a per-occurrence loop over run-time storage that the binder's term-by-term sum
+    /// (<c>IntrinsicBinder.VariableLengthGroupSum</c>) cannot write down. The group's own <c>CurrentImage</c> IS that
+    /// sum by construction (A.1 item 57: <c>LENGTH(G)</c> equals the displayed width), so the renderer takes its
+    /// length — the image is in storage characters, which are bytes.</summary>
+    public bool OverCurrentImage { get; init; }
+
     /// <summary>CONCAT (§15.18.4 r3): the returned value is ALPHABETIC — argument-1 is usage display and every
     /// argument is class alphabetic (a PIC A item, or a nested CONCAT carrying this same rider). The RESULT
     /// CATEGORY stays <see cref="PicCategory.Alphanumeric"/> — the deliberate PIC A fold (PicInfo) is not
