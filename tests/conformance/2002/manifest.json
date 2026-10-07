@@ -746,7 +746,8 @@
   "pb2087_by_reference_area_formals",
   "pb2087_invoke_by_reference_aliasing",
   "pb2087_invoke_area_strong_recursion",
-  "pb2113_subscript_expressions_and_arguments"
+  "pb2113_subscript_expressions_and_arguments",
+  "pb311_date_day_windowing_r6_bounds"
   ],
   "pending": []
 }

@@ -52,6 +52,36 @@ public sealed class CobolDateWindowingTests
     }
 
     [Fact]
+    public void DateToYyyymmdd_R6_SumIsArgument2PlusWrittenArgument3_NotClockYear()
+    {
+        // §15.23.3 r6 words the sum on "the year at the time of execution"; §15.23.1 defines that year as
+        // argument-3 ("Argument-3 specifies the year at the time of execution"), so a WRITTEN argument-3 keys
+        // the window (kb/Work PB311). Clock pinned to 2026 so the two readings disagree on every probe:
+        // (8299, 1700) sums to 9999 — legal — where clock-year 2026 + 8299 = 10325 would be out of window;
+        // (-400, 2100) sums to 1700 — legal — where 2026 - 400 = 1626 would be; (7000, 3000) sums to 10000 —
+        // out of window — where 2026 + 7000 = 9026 would be legal. §15.100.4: 99851003 is r2a (MOD 99 >= 85,
+        // 85 + 100*99 = 9985); 16851003 is r2b (MOD 0 < 85, 85 + 100*16 = 1685). Out of window is
+        // EC-ARGUMENT-FUNCTION, whose checking-off value is 0.
+        var at = new DateTime(2026, 6, 10);
+        Assert.Equal(99851003, UnderClock(at, () => CobolDate.DateToYyyymmdd(851003, 8299, 1700)));
+        Assert.Equal(16851003, UnderClock(at, () => CobolDate.DateToYyyymmdd(851003, -400, 2100)));
+        Assert.Equal(0, UnderClock(at, () => CobolDate.DateToYyyymmdd(851003, 8300, 1700)));
+        Assert.Equal(0, UnderClock(at, () => CobolDate.DateToYyyymmdd(851003, -401, 2100)));
+        Assert.Equal(0, UnderClock(at, () => CobolDate.DateToYyyymmdd(851003, 7000, 3000)));
+    }
+
+    [Fact]
+    public void DayToYyyyddd_R6_SumIsArgument2PlusArgument3()
+    {
+        // §15.25.3 r6 — the same bounds on the sibling arm (the DAY form is the same delegation).
+        var at = new DateTime(2026, 6, 10);
+        Assert.Equal(9985365, UnderClock(at, () => CobolDate.DayToYyyyddd(85365, 8299, 1700)));
+        Assert.Equal(1685365, UnderClock(at, () => CobolDate.DayToYyyyddd(85365, -400, 2100)));
+        Assert.Equal(0, UnderClock(at, () => CobolDate.DayToYyyyddd(85365, 8300, 1700)));
+        Assert.Equal(0, UnderClock(at, () => CobolDate.DayToYyyyddd(85365, -401, 2100)));
+    }
+
+    [Fact]
     public void SecondsPastMidnight_PinnedClock_ExactTicks()
     {
         // §15.80.3 r1-r3 + Annex D.31.5.4: local time 05:14:27.8124791 → 18867.8124791 seconds. The runtime

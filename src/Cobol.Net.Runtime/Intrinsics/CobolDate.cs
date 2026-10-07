@@ -134,9 +134,13 @@ public static class CobolDate
     /// mmdd</c> where <c>YY = argument-1 / 10000</c> and <c>mmdd = MOD(argument-1, 10000)</c> — pure delegation
     /// to the ONE windowing core. §15.23.3 r1: argument-1 a POSITIVE integer &lt; 1,000,000 (0 illegal here,
     /// unlike YEAR-TO-YYYY's r1); the function does NOT validate the calendar date (the §15.23.3 NOTE points at
-    /// TEST-DATE-YYYYMMDD). The r6 sum window is checked uniformly as argument-2+argument-3 (§15.25.3 r6 /
-    /// §15.100.3 r6 wording; §15.23.3 r6's "year at the time of execution" phrasing coincides when argument-3
-    /// is defaulted — the scout-noted drafting divergence, resolved to the delegated form).</summary>
+    /// TEST-DATE-YYYYMMDD). The r6 sum window is argument-2+argument-3 (kb/Work PB311): §15.23.3 r6 words it
+    /// on "the year at the time of execution", but §15.23.1 DEFINES that year as argument-3 ("Argument-3
+    /// specifies the year at the time of execution"; an omitted argument-3 is the real execution year by r5),
+    /// so it is §15.25.3 r6's / §15.100.3 r6's sum, and the delegated core is the one place it is checked. The
+    /// machine clock is NOT consulted for r6 when argument-3 is written — a written argument-3 far from the
+    /// clock year (8299, 1700) is legal and (7000, 3000) is not; pb311_date_day_windowing_r6_bounds pins both
+    /// bounds end to end and CobolDateWindowingTests pins them under a fixed clock.</summary>
     public static long DateToYyyymmdd(long date, long off = 50) =>
         DateToYyyymmddAt(date, off, RunUnit.Current.Clock.Now().Year);
 
