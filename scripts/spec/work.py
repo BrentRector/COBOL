@@ -496,6 +496,13 @@ def open_blockers(it: dict, by_id: dict[str, dict]) -> list[str]:
             if by_id.get(b, {}).get("status") not in TERMINAL_STATUSES]
 
 
+def cluster_members(items: list[dict], lead: str) -> list[dict]:
+    """Every note whose `cluster` list names `lead`, terminal or not — THE membership rule, so `cluster_order` and the
+    ledger's program section (`gen_ledger.py`) count one population. A list only: a scalar `cluster: PB2108` would
+    match by SUBSTRING (`check` reports that shape)."""
+    return [i for i in items if isinstance(i.get("cluster"), list) and lead in i["cluster"]]
+
+
 def cluster_order(items: list[dict], lead: str) -> dict:
     """The cluster `lead` names: `{"cluster", "named", "notes": [...]}`, `notes` being every NON-TERMINAL note whose
     `cluster` list holds `lead`, whatever its kind, harm flags or `process_only`, in `blocked_by` topological order.
@@ -507,8 +514,7 @@ def cluster_order(items: list[dict], lead: str) -> dict:
     `waiting_on == []`. Ties sort by note number. `named` counts every note that names the cluster, landed or not,
     so a caller can tell a LANDED cluster (named > 0, notes empty) from a misspelled one (named == 0)."""
     by_id = {i.get("id"): i for i in items}
-    # a list only: a scalar `cluster: PB2108` would match by SUBSTRING (`check` reports that shape)
-    named = [i for i in items if isinstance(i.get("cluster"), list) and lead in i["cluster"]]
+    named = cluster_members(items, lead)
     members = {i["id"]: i for i in named if i.get("status") not in TERMINAL_STATUSES}
     depth: dict[str, int | None] = {}
 

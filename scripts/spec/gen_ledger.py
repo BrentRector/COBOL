@@ -18,7 +18,10 @@ So a refresh is now: run this script, then publish `--out` to the artifact's exi
     python scripts/spec/gen_ledger.py                       # write the default --out
     python scripts/spec/gen_ledger.py --out ledger.html     # write somewhere else
     python scripts/spec/gen_ledger.py --check               # non-zero if --out is stale (mirrors
-                                                            # gen_conformance_notes.py --check)
+                                                            # gen_conformance_notes.py --check) or the
+                                                            # program section's drift check fails
+    python scripts/spec/gen_ledger.py --self-test           # that drift check's arms on planted registers,
+                                                            # then on the real one (the gate's audits, CI)
 
 ⭐ INPUTS, each one an artifact something else already gates:
 
@@ -34,6 +37,14 @@ So a refresh is now: run this script, then publish `--out` to the artifact's exi
     docs/VERSION_CHANGE_REFERENCE.md                   the anchor dispositions (todo · gated · ref-only · pinned)
     tests/version-matrix/constructs.json               the matrix registry size
     tests/conformance/**                               the golden corpus, by edition
+    kb/Work clusters PB2108 · PB2119 + the phase notes  "The re-architecture program" (kb/Work R69's completion
+                                                       plan, PB2462): the phases R0-R5 of
+                                                       DESIGN-architecture-review.md §3 (the PHASES structure), the
+                                                       retirement cluster, and the review program by wave kind (the
+                                                       title prefixes of scripts/arch/file_census_notes.py, imported)
+                                                       x status, all through work.py's `cluster_members`
+    docs/rearchitecture/evidence/arch-census ·         R0's records: the newest file in each, by commit date
+      arch-oracle · perf-baseline
     git                                                HEAD sha + date, and how far HEAD has drifted from the
                                                        battery's tree (which is what makes "a battery is owed"
                                                        a measurement rather than an opinion)
@@ -41,7 +52,9 @@ So a refresh is now: run this script, then publish `--out` to the artifact's exi
 ⭐ THE TREND IS DATA, NOT MEMORY — `docs/rearchitecture/evidence/ledger-trend.json`. A burn-down chart is the one
 thing on the page that cannot be recomputed from the current tree: yesterday's GAP is gone. So the series lives in
 a small committed file, one point per battery or GAP-moving landing (`sha`, `date`, `gap`, `closed`, `dns`,
-`label`, `battery`), and a WRITE run appends the current point when the measurement has moved. `--check` never
+`label`, `battery`), and a WRITE run appends the current point when the measurement has moved. The same file
+carries a second series, `program` (`sha`, `date`, `open`, `landed`, `total` program notes), appended when those
+counts move: the program is behavior-neutral, so its progress never moves GAP and cannot ride on a GAP point. `--check` never
 writes — it renders against the series plus the current point exactly as a write would, so a moved measurement
 whose point has not been recorded shows up as staleness, which is the correct verdict.
 
@@ -129,6 +142,9 @@ STAMP_PATHS = (
     "docs/CONFORMANCE.md",
     "docs/COBOLNET_REARCHITECTURE_PLAN.md",
     "docs/VERSION_CHANGE_REFERENCE.md",
+    "docs/rearchitecture/evidence/arch-census",
+    "docs/rearchitecture/evidence/arch-oracle",
+    "docs/rearchitecture/evidence/perf-baseline",
 )
 
 
@@ -207,6 +223,232 @@ def measure_work() -> dict:
         "actionable": work.actionable(items),
         "owner_parked": [i for i in items if i.get("status") == "owner"],
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# the re-architecture program (kb/Work R69's completion plan, kb/Work PB2462) — read off the register
+# ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+#
+# ⭐ WHAT THE SECTION IS. R69 split the completion plan into named CLUSTERS of the register (work.py's
+# `cluster_members`, the one membership rule `cluster_order` also uses): the legacy retirement
+# (`cluster: ["PB2108"]`) and the review program's R3 waves (`cluster: ["PB2119"]`), plus the architecture review's
+# phases R0-R5 (DESIGN-architecture-review.md §3). Every status here is READ from a note; nothing in this block
+# writes or remembers one.
+#
+# ⛔ THE ONE HAND-KEPT STRUCTURE IS THE SIX PHASES, and it holds as few ids as it can: a note whose title names its
+# phase (`PB2115 — R0 census …`) is found by its title, so a phase note filed tomorrow appears with no edit here;
+# a phase's tuple lists only the notes whose titles do not say so. `program_problems` refuses an id the register
+# lacks, so a renumbered or retired note cannot silently drop out of its phase.
+
+RETIREMENT = "PB2108"
+REVIEW_PROGRAM = "PB2119"
+
+#: The phases of DESIGN-architecture-review.md §3, in order: (key, name, the phase notes whose titles do not name it).
+PHASES = (
+    ("R0", "Baseline and oracle", ()),
+    ("R1", "Target architecture", ()),
+    ("R2", "Review fleet", ()),
+    ("R3", "Restructuring waves", (REVIEW_PROGRAM,)),
+    ("R4", "Modernization", ()),
+    ("R5", "Close", ()),
+)
+#: A title that names its phase: `<id> — R0 census`, `<id> — R1, the target architecture`. The lookahead keeps
+#: `R69` (an owner-decision id) and `R0-0053` (a census finding id) out.
+PHASE_IN_TITLE = re.compile(r"\A\S+ — (?P<phase>R\d)(?=[ ,:])")
+
+#: R0's instruments write their records here, one file per measured commit, named by that commit's sha:
+#: (label, folder, glob, a suffix the glob also matches that is NOT a record).
+ARCH_EVIDENCE = REPO / "docs" / "rearchitecture" / "evidence"
+R0_EVIDENCE = (("census", "arch-census", "*.json", ".findings.json"),
+               ("oracle", "arch-oracle", "*.manifest.json", None),
+               ("perf baseline", "perf-baseline", "*.md", None))
+
+#: The status columns the review program's table always shows; any other status appears when a note carries it.
+BASE_STATUSES = ("open", "blocked", "landed")
+OTHER_WAVE = "other"
+
+
+def wave_prefixes() -> dict[str, str]:
+    """The R3 wave kinds, as the filing generator spells them at the head of a note's title (`Delete:`, `Unify:` …).
+
+    ⛔ IMPORTED, NEVER COPIED: `scripts/arch/file_census_notes.py` PREFIX is the contract the notes are written to,
+    so a wave kind it gains (Extract, Data-ize) is counted here the day it files its first note."""
+    sys.path.insert(0, str(REPO / "scripts" / "arch"))
+    import file_census_notes  # noqa: PLC0415
+    return dict(file_census_notes.PREFIX)
+
+
+def wave_kind(item: dict, prefixes: dict[str, str]) -> str | None:
+    """The note's wave kind (its prefix without the colon), `other` when the title carries none, or None when the
+    title is not `<id> — …` at all, so no kind can be read from it."""
+    head = f"{item.get('id')} — "
+    title = str(item.get("title", ""))
+    if not title.startswith(head):
+        return None
+    rest = title[len(head):]
+    return next((p.rstrip(":") for p in prefixes.values() if rest.startswith(p)), OTHER_WAVE)
+
+
+def newest_record(folder: str, pattern: str, exclude: str | None) -> dict | None:
+    """The newest record in an R0 evidence folder, by the date of the commit that added it (a checkout's mtimes are
+    the checkout's, not the record's)."""
+    files = [p for p in (ARCH_EVIDENCE / folder).glob(pattern) if not (exclude and p.name.endswith(exclude))]
+    if not files:
+        return None
+    dated = [(git("log", "-1", "--format=%cI", "--", p.relative_to(REPO).as_posix()), p.name, p) for p in files]
+    when, _, p = max(dated)
+    return {"sha": p.name.split(".")[0][:12], "date": when[:10], "path": p.relative_to(REPO).as_posix()}
+
+
+def measure_program(items: list[dict], prefixes: dict[str, str], evidence: bool = True) -> dict:
+    """The program's standing, read off `items` (the register): phases, the two clusters, the wave table."""
+    import work  # noqa: PLC0415
+    by_id = {i.get("id"): i for i in items}
+
+    def status(nid: str) -> str:
+        return str(by_id.get(nid, {}).get("status", "missing"))
+
+    phases = []
+    for key, name, listed in PHASES:
+        titled = {str(i.get("id")) for i in items
+                  if (m := PHASE_IN_TITLE.match(str(i.get("title", "")))) and m["phase"] == key}
+        ids = sorted(titled | set(listed), key=work.id_order)
+        phases.append({"key": key, "name": name, "notes": [(nid, status(nid)) for nid in ids]})
+
+    def cluster(lead: str) -> dict:
+        members = sorted(work.cluster_members(items, lead), key=lambda i: work.id_order(str(i.get("id"))))
+        live = [i for i in members if i.get("status") not in work.TERMINAL_STATUSES]
+        return {"lead": lead, "members": members,
+                "notes": [(str(i.get("id")), str(i.get("status"))) for i in members],
+                "total": len(members), "unfinished": len(live),
+                "waiting": sum(1 for i in live if work.open_blockers(i, by_id))}
+
+    retire, review = cluster(RETIREMENT), cluster(REVIEW_PROGRAM)
+    grid: dict[str, collections.Counter] = {k: collections.Counter()
+                                            for k in [*(p.rstrip(":") for p in prefixes.values()), OTHER_WAVE]}
+    unreadable = []
+    for it in review["members"]:
+        k = wave_kind(it, prefixes)
+        if k is None:
+            unreadable.append(str(it.get("id")))
+        else:
+            grid.setdefault(k, collections.Counter())[str(it.get("status"))] += 1
+    present = {s for c in grid.values() for s in c}
+    statuses = [*BASE_STATUSES, *sorted(present - set(BASE_STATUSES), key=lambda s: (s in work.TERMINAL_STATUSES, s))]
+    review.update(grid=grid, statuses=statuses, unreadable=unreadable,
+                  table_total=sum(sum(c.values()) for c in grid.values()))
+
+    every = {nid for p in phases for nid, _ in p["notes"]} | {nid for nid, _ in retire["notes"] + review["notes"]}
+    landed = sum(1 for nid in every if status(nid) in work.TERMINAL_STATUSES)
+    return {"phases": phases, "retire": retire, "review": review,
+            "evidence": ([(label, newest_record(folder, pat, exc)) for label, folder, pat, exc in R0_EVIDENCE]
+                         if evidence else []),
+            "counts": {"total": len(every), "landed": landed, "open": len(every) - landed}}
+
+
+def program_problems(items: list[dict], prefixes: dict[str, str], prog: dict) -> list[str]:
+    """Why the program section cannot be trusted, or [] — the drift test CLAUDE.md rule 5 asks of its structure.
+
+    Each arm is one way the section could render a tidy, wrong answer: a phase pointing at a note the register
+    lacks, a note whose wave kind cannot be read (or a kind rule that reads EVERY note as other, the same failure
+    hidden), and a table whose totals are not work.py's count of the cluster it claims to show."""
+    import work  # noqa: PLC0415
+    bad = []
+    if [k for k, _, _ in PHASES] != [f"R{i}" for i in range(6)]:
+        bad.append(f"phases: PHASES must be R0-R5 in order, got {[k for k, _, _ in PHASES]}")
+    ids = {i.get("id") for i in items}
+    for key, _, listed in PHASES:
+        bad += [f"phase-note-missing: {key} names {nid}, which is not a kb/Work note" for nid in listed if nid not in ids]
+    bad += [f"status-vocabulary: {s!r} is not a work.py status" for s in BASE_STATUSES if s not in work.STATUSES]
+    if not prefixes or any(not p.endswith(":") for p in prefixes.values()):
+        bad.append(f"wave-prefixes: file_census_notes.PREFIX must be non-empty `Kind:` spellings, got {prefixes}")
+    rv = prog["review"]
+    bad += [f"wave-kind-unreadable: {nid}'s title is not '<id> — …', so no wave kind can be read"
+            for nid in rv["unreadable"]]
+    readable = rv["table_total"]
+    if readable and sum(rv["grid"].get(OTHER_WAVE, collections.Counter()).values()) == readable:
+        bad.append(f"wave-kind-all-other: all {readable} notes of cluster {REVIEW_PROGRAM} read as '{OTHER_WAVE}' — "
+                   f"their titles no longer carry file_census_notes.PREFIX")
+    for c in (prog["retire"], rv):
+        order = work.cluster_order(items, c["lead"])
+        if c["total"] != order["named"] or c["unfinished"] != len(order["notes"]):
+            bad.append(f"cluster-total: {c['lead']} shows {c['total']} notes, {c['unfinished']} unfinished; work.py "
+                       f"counts {order['named']}, {len(order['notes'])} unfinished")
+    if readable + len(rv["unreadable"]) != rv["total"]:
+        bad.append(f"cluster-total: the wave table holds {readable} of the {rv['total']} notes of {REVIEW_PROGRAM}")
+    return bad
+
+
+def live_program_problems() -> list[str]:
+    import work  # noqa: PLC0415
+    items, prefixes = work.load(), wave_prefixes()
+    return program_problems(items, prefixes, measure_program(items, prefixes, evidence=False))
+
+
+def self_test() -> int:
+    """Fire every arm of `program_problems` on planted registers, then run it on the real one."""
+
+    def note(nid, title, cluster, status="open", blocked_by=()):
+        return {"id": nid, "title": f"{nid} — {title}", "cluster": list(cluster), "status": status,
+                "blocked_by": list(blocked_by), "_file": f"{nid}.md"}
+
+    prefixes = {"delete": "Delete:", "unify": "Unify:"}
+    good = [note(RETIREMENT, "lead", [RETIREMENT], "landed"), note(REVIEW_PROGRAM, "the Delete program", []),
+            note("PB9001", "Delete: x", [REVIEW_PROGRAM]), note("PB9002", "Unify: y", [REVIEW_PROGRAM], "landed"),
+            note("PB9003", "R0 census", []), note("PB9004", "something", [REVIEW_PROGRAM], blocked_by=["PB9001"])]
+    results = []
+
+    def case(name, items, expect, mutate=None):
+        prog = measure_program(items, prefixes, evidence=False)
+        if mutate:
+            mutate(prog)
+        got = program_problems(items, prefixes, prog)
+        ok = (not got) if expect is None else any(g.startswith(expect) for g in got)
+        results.append(ok)
+        print(f"{'✓' if ok else '✗'} {name}: {got or 'clean'}")
+
+    case("clean planted register", good, None)
+    p = measure_program(good, prefixes, evidence=False)
+    g = p["review"]["grid"]
+    shape = (g["Delete"]["open"], g["Unify"]["landed"], g[OTHER_WAVE]["open"], p["review"]["waiting"],
+             p["phases"][0]["notes"], p["phases"][3]["notes"], p["counts"])
+    want = (1, 1, 1, 1, [("PB9003", "open")], [(REVIEW_PROGRAM, "open")], {"total": 6, "landed": 2, "open": 4})
+    results.append(shape == want)
+    print(f"{'✓' if shape == want else '✗'} measured: wave grid, waiting, phase by title and by structure, "
+          f"program counts: {shape}")
+    case("phase-note-missing", [i for i in good if i["id"] != REVIEW_PROGRAM], "phase-note-missing")
+    case("wave-kind-unreadable", [*good, {**note("PB9005", "x", [REVIEW_PROGRAM]), "title": "no dash"}],
+         "wave-kind-unreadable")
+    case("wave-kind-all-other", [i for i in good if i["id"] not in ("PB9001", "PB9002")], "wave-kind-all-other")
+    case("cluster-total", good, "cluster-total", lambda q: q["review"].update(total=q["review"]["total"] + 1))
+
+    live = live_program_problems()
+    results.append(not live)
+    print(f"{'✓' if not live else '✗'} the real register: {live or 'clean'}")
+    if all(results):
+        print(f"✓ gen_ledger self-test: {len(results)} cases")
+        return 0
+    print(f"⛔ gen_ledger self-test: {results.count(False)} of {len(results)} cases failed")
+    return 1
+
+
+def program_series(prog: dict, head: dict) -> tuple[list[dict], bool]:
+    """The program's counts over time — the trend file's `program` series, beside the GAP `points`.
+
+    ⛔ A SEPARATE SERIES, NOT THREE MORE KEYS ON A GAP POINT. A GAP point is appended only when the inventory moves,
+    and the program is behavior-neutral by contract (DESIGN-architecture-review.md §4): its waves close no row, so
+    its counts riding on GAP points would almost never be recorded, and adding them to the GAP point's trigger would
+    fill the burn-down with flat steps the chart's note says are inventory landings. A point is appended when the
+    counts move, exactly as `trend_series` does for GAP, and `--check` renders without writing."""
+    doc = json.loads(TREND.read_text(encoding="utf-8")) if TREND.exists() else {}
+    pts = doc.get("program", [])
+    cur = {"sha": head["sha"], "date": head["date"], **prog["counts"]}
+    last = pts[-1] if pts else None
+    if last is not None and all(cur[k] == last.get(k) for k in ("total", "landed", "open")):
+        return pts, False
+    if last is not None and last.get("sha") == cur["sha"]:
+        return [*pts[:-1], cur], True
+    return [*pts, cur], True
 
 
 def measure_annex_a1() -> dict:
@@ -412,9 +654,10 @@ def trend_series(inv: dict, head: dict, battery: dict) -> tuple[list[dict], bool
     return [*pts, cur], True
 
 
-def write_trend(series: list[dict]) -> None:
+def write_trend(series: list[dict], program: list[dict]) -> None:
     doc = json.loads(TREND.read_text(encoding="utf-8")) if TREND.exists() else {}
     doc["points"] = series
+    doc["program"] = program
     TREND.parent.mkdir(parents=True, exist_ok=True)
     TREND.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -535,6 +778,89 @@ def clause_rows(buckets: dict) -> str:
     return "\n        ".join(out)
 
 
+#: A status's pill: finished is good, held on something is critical, everything else is still owed.
+PILL = {"landed": "good", "retired": "good", "blocked": "crit", "owner": "crit"}
+
+
+def status_pill(s: str) -> str:
+    return f'<span class="pill {PILL.get(s, "warn")}">{e(s)}</span>'
+
+
+def note_list(notes: list[tuple[str, str]]) -> str:
+    """`PB2115 landed · PB2118 open`, grouped by status so a long cluster reads as three runs, not a roll call."""
+    if not notes:
+        return '<span class="dim">no note filed yet</span>'
+    by: dict[str, list[str]] = collections.defaultdict(list)
+    for nid, s in notes:
+        by[s].append(nid)
+    return " ".join(f'{status_pill(s)} <span class="mono">{e(" ".join(ids))}</span>'
+                    for s, ids in sorted(by.items(), key=lambda kv: (kv[0] in ("landed", "retired"), kv[0])))
+
+
+def render_program(prog: dict, series: list[dict]) -> str:
+    ev = "<br>".join(f'{e(label)} <span class="mono">{e(r["sha"])}</span> <span class="dim">{e(r["date"])}</span>'
+                     if r else f'{e(label)} <span class="dim">no record</span>' for label, r in prog["evidence"])
+    phase_rows = "\n        ".join(
+        f'<tr><td class="mono">{e(p["key"])} <span class="dim">{e(p["name"])}</span></td>'
+        f'<td>{note_list(p["notes"])}</td><td>{ev if p["key"] == "R0" else ""}</td></tr>' for p in prog["phases"])
+    rt, rv = prog["retire"], prog["review"]
+
+    def counted(c: dict) -> str:
+        return (f'<strong class="num">{n(c["total"] - c["unfinished"])}</strong> of {n(c["total"])} landed · '
+                f'{n(c["unfinished"])} unfinished, {n(c["waiting"])} of them waiting on an unlanded note')
+
+    cols = rv["statuses"]
+    grid_rows = "\n        ".join(
+        f'<tr><td>{e(k)}</td>' + "".join(f'<td class="r num">{n(c[s])}</td>' for s in cols)
+        + f'<td class="r num">{n(sum(c.values()))}</td></tr>' for k, c in rv["grid"].items())
+    col_tot = "".join(f'<td class="r num">{n(sum(c[s] for c in rv["grid"].values()))}</td>' for s in cols)
+    recent = series[-8:]
+    trend_rows = "\n        ".join(
+        f'<tr><td class="mono">{e(p["date"])} {e(p["sha"])}</td><td class="r num">{n(p["open"])}</td>'
+        f'<td class="r num">{n(p["landed"])}</td><td class="r num">{n(p["total"])}</td></tr>' for p in recent)
+    return f"""<section aria-label="Re-architecture program">
+  <h2>The re-architecture program</h2>
+  <p>kb/Work R69's completion plan, read off the register: the architecture review's phases (<span class="mono">DESIGN-architecture-review.md</span> §3), the legacy retirement (cluster <span class="mono">{e(RETIREMENT)}</span>) and the review program's restructuring waves (cluster <span class="mono">{e(REVIEW_PROGRAM)}</span>). Every status is the note's own; the program is behavior-neutral by contract, so none of it moves the GAP above.</p>
+  <div class="tablecard">
+    <table>
+      <thead><tr><th>Phase</th><th>Notes in the register</th><th>Evidence</th></tr></thead>
+      <tbody>
+        {phase_rows}
+      </tbody>
+    </table>
+  </div>
+  <div class="cardgrid" style="margin-top:14px">
+    <div class="card">
+      <h3>Legacy retirement · cluster {e(RETIREMENT)}</h3>
+      <p>{counted(rt)}.</p>
+      <p>{note_list(rt["notes"])}</p>
+    </div>
+    <div class="card">
+      <h3>Review program · cluster {e(REVIEW_PROGRAM)}</h3>
+      <p>{counted(rv)}. One note is one wave; the wave kind is the title prefix <span class="mono">file_census_notes.py</span> files it under.</p>
+    </div>
+  </div>
+  <div class="tablecard" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Wave kind</th>{"".join(f'<th class="r">{e(s)}</th>' for s in cols)}<th class="r">Total</th></tr></thead>
+      <tbody>
+        {grid_rows}
+      </tbody>
+      <tfoot><tr><td>Total</td>{col_tot}<td class="r num">{n(rv["table_total"])}</td></tr></tfoot>
+    </table>
+  </div>
+  <div class="tablecard" style="margin-top:14px">
+    <table>
+      <thead><tr><th>Program notes, last {len(recent)} recorded points</th><th class="r">Unfinished</th><th class="r">Landed</th><th class="r">Total</th></tr></thead>
+      <tbody>
+        {trend_rows}
+      </tbody>
+    </table>
+  </div>
+  <p>Program notes are the phase notes plus both clusters' notes, counted once. The series is the trend file's <span class="mono">program</span> list, appended by <span class="mono">gen_ledger.py</span> when those counts move.</p>
+</section>"""
+
+
 def render(ctx: dict) -> str:
     inv, wk, a1, cf, bat, cp = (ctx["inv"], ctx["work"], ctx["a1"], ctx["conf"], ctx["battery"], ctx["corpus"])
     head, pts = ctx["head"], ctx["trend"]
@@ -611,6 +937,7 @@ def render(ctx: dict) -> str:
         trend_from=n(pts[0]["gap"]) if pts else "—", trend_to=n(pts[-1]["gap"]) if pts else "—",
         trend_points=n(len(pts)),
         gap_delta_word=("not recorded" if gap_delta is None else "unchanged" if gap_delta == 0 else f"{gap_delta:+d}"),
+        program=ctx["program"],
         in_flight=ctx["in_flight"],
     )
 
@@ -781,6 +1108,8 @@ TEMPLATE = """<title>{title}</title>
   </div>
 </section>
 
+{program}
+
 <section aria-label="In flight">
   <h2>In flight right now</h2>
 {in_flight}
@@ -802,7 +1131,7 @@ TEMPLATE = """<title>{title}</title>
 </section>
 
 <footer>
-  <p><strong>Every number on this page is computed from the tree it names — none is remembered.</strong> Inventory from <span class="mono">tests/version-matrix/traceability-inventory.json</span>, work standing from <span class="mono">kb/Work</span> through <span class="mono">work.py</span>'s own predicate, gates from plan §0's battery reference, documentation posture from <span class="mono">docs/CONFORMANCE.md</span> §2/§4/§5 and <span class="mono">audit_annex_a1.py --json</span>, the corpus and anchor counts from the trees themselves, the trend series from <span class="mono">docs/rearchitecture/evidence/ledger-trend.json</span>. Rendered by <span class="mono">scripts/spec/gen_ledger.py</span>; the only hand-written section is “In flight right now”. The work register remains <span class="mono">kb/Work/</span> — this ledger is a derived view, never a tracker.</p>
+  <p><strong>Every number on this page is computed from the tree it names — none is remembered.</strong> Inventory from <span class="mono">tests/version-matrix/traceability-inventory.json</span>, work standing from <span class="mono">kb/Work</span> through <span class="mono">work.py</span>'s own predicate, the re-architecture program from the register's clusters and the R0 evidence folders, gates from plan §0's battery reference, documentation posture from <span class="mono">docs/CONFORMANCE.md</span> §2/§4/§5 and <span class="mono">audit_annex_a1.py --json</span>, the corpus and anchor counts from the trees themselves, the trend series from <span class="mono">docs/rearchitecture/evidence/ledger-trend.json</span>. Rendered by <span class="mono">scripts/spec/gen_ledger.py</span>; the only hand-written section is “In flight right now”. The work register remains <span class="mono">kb/Work/</span> — this ledger is a derived view, never a tracker.</p>
   <p class="mono">Snapshot: {head_date} · measured tree {head_sha} — the last commit that touched an input this page reports, so an unrelated commit cannot make a correct page look stale · {rows} rows · {closed} closed · {gap} GAP · {adjudicated} adjudicated · battery #{bat_n} on {bat_sha} · A.1 {a1_discharged}/{a1_scope} · register {work_items} notes, {work_open} open, {work_actionable} actionable.</p>
 </footer>
 
@@ -812,11 +1141,16 @@ TEMPLATE = """<title>{title}</title>
 
 # ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-def build(in_flight_path: pathlib.Path | None) -> tuple[str, list[dict], bool]:
+def build(in_flight_path: pathlib.Path | None) -> tuple[str, dict]:
+    """The page, and the trend file's two series with whether each gained its current point."""
+    import work  # noqa: PLC0415
     inv = measure_inventory()
     head = measure_head()
     bat = measure_battery(head["sha"])
     pts, is_new = trend_series(inv, head, bat)
+    prefixes = wave_prefixes()
+    prog = measure_program(work.load(), prefixes)
+    prog_pts, prog_new = program_series(prog, head)
     frag = ""
     if in_flight_path is not None and in_flight_path.exists():
         # VERBATIM. The fragment lands inside <section aria-label="In flight"> after its <h2>; it is narrative,
@@ -826,8 +1160,9 @@ def build(in_flight_path: pathlib.Path | None) -> tuple[str, list[dict], bool]:
         frag = re.sub(r"\A(?:\s*<!--.*?-->)+\s*", "", in_flight_path.read_text(encoding="utf-8"), flags=re.S)
         frag = frag.rstrip("\n")
     ctx = {"inv": inv, "work": measure_work(), "a1": measure_annex_a1(), "conf": measure_conformance(),
-           "battery": bat, "corpus": measure_corpus(), "head": head, "trend": pts, "in_flight": frag}
-    return render(ctx), pts, is_new
+           "battery": bat, "corpus": measure_corpus(), "head": head, "trend": pts,
+           "program": render_program(prog, prog_pts), "in_flight": frag}
+    return render(ctx), {"points": pts, "is_new": is_new, "program": prog_pts, "prog_new": prog_new}
 
 
 def main() -> int:
@@ -838,14 +1173,28 @@ def main() -> int:
                     help="the ONE hand-written section, inserted verbatim (default "
                          f"{IN_FLIGHT.relative_to(REPO)}); pass a missing path to omit it")
     ap.add_argument("--check", action="store_true",
-                    help="do not write; exit non-zero if --out differs from what the repo would render now")
+                    help="do not write; exit non-zero if --out differs from what the repo would render now, or if "
+                         "the program section's self-check fails on the register")
+    ap.add_argument("--self-test", action="store_true",
+                    help="fire every arm of the program section's drift check on planted registers, then run it on "
+                         "the real one (the gate's audits and CI's audits job run this)")
     a = ap.parse_args()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:  # noqa: BLE001
         pass
 
-    text, pts, is_new = build(a.in_flight)
+    if a.self_test:
+        return self_test()
+    bad = live_program_problems()
+    if bad:
+        print("⛔ THE RE-ARCHITECTURE PROGRAM SECTION CANNOT BE TRUSTED:")
+        for b in bad:
+            print(f"   {b}")
+        return 1
+
+    text, tr = build(a.in_flight)
+    pts, is_new = tr["points"], tr["is_new"]
 
     if a.check:
         if not a.out.exists():
@@ -862,15 +1211,22 @@ def main() -> int:
         if is_new:
             print(f"      the trend series is missing the current point "
                   f"(GAP {pts[-1]['gap']} at {pts[-1]['sha']})")
+        if tr["prog_new"]:
+            print(f"      the program series is missing the current point "
+                  f"({tr['program'][-1]['open']} unfinished of {tr['program'][-1]['total']})")
         print("   Run: python scripts/spec/gen_ledger.py    then publish --out to the artifact's URL")
         return 1
 
+    if is_new or tr["prog_new"]:
+        write_trend(pts, tr["program"])
     if is_new:
-        write_trend(pts)
         print(f"trend  : appended {pts[-1]['sha']} — GAP {pts[-1]['gap']} · closed {pts[-1]['closed']} · "
               f"DNS {pts[-1]['dns']}   ({TREND.relative_to(REPO)}, {len(pts)} points)")
     else:
         print(f"trend  : unchanged — {len(pts)} points, last {pts[-1]['sha'] if pts else '—'}")
+    pp = tr["program"][-1]
+    print(f"program: {'appended' if tr['prog_new'] else 'unchanged'} — {pp['open']} unfinished · {pp['landed']} "
+          f"landed of {pp['total']} at {pp['sha']} ({len(tr['program'])} points)")
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(text, encoding="utf-8")
     print(f"wrote  : {a.out} ({len(text):,} bytes)")
