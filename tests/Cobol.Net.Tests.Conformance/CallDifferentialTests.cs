@@ -7,7 +7,7 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// CALL / inter-program communication (ISO/IEC 1989:2023 §14.9.4 CALL, §14.9.5 CANCEL, §14.9.14 EXIT PROGRAM,
 /// §14.2 parameter passing, §14.6.2.3 program state, §8.4.6.3 program-name scope): spec-derived facts pinned to
-/// the legacy oracle (NIST-IC-green) at COBOL-85, multi-unit sources in the IC-suite shape (concatenated
+/// the former legacy engine (NIST-IC-green) at COBOL-85, multi-unit sources in the IC-suite shape (concatenated
 /// top-level program units; nested units carry END PROGRAM). The EXIT-PROGRAM-in-main fact is SPEC-PINNED
 /// instead — the legacy deviates from §14.9.14 GR2 there (deep-dive brief, legacy deviation #5; the spec wins).
 /// </summary>
@@ -296,7 +296,7 @@ public sealed class CallDifferentialTests
 
     /// <summary>§14.9.14 GR2 — SPEC-PINNED: "If the EXIT PROGRAM statement is executed in a program that is not
     /// under the control of a calling runtime element, the EXIT PROGRAM statement is treated as if it were a
-    /// CONTINUE statement." The legacy oracle deviates (it terminates the main program — brief, legacy
+    /// CONTINUE statement." The former legacy engine deviates (it terminates the main program — brief, legacy
     /// deviation #5), so this fact asserts the ISO-derived output directly.</summary>
     [Fact]
     public void ExitProgram_InMainProgram_IsContinue()

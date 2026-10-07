@@ -210,9 +210,9 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     /// construct ISO/IEC 1989:2023 REMOVED (§14.9.25.3 SR5; Annex E.2 item 1 bullet 1 — permitted through 2014).
     /// The binder's "move-alphanumeric-figurative-removed-2023" gate carries the 0902 diagnostics; this emit path
     /// exists regardless, reachable at --std 85/2002/2014 and at 2023 --permissive. Provisional (ratified decision
-    /// 1 — the legacy oracle is the interim authority for pre-2023 semantics of removed constructs): the fill
+    /// 1 — the pre-2023 behavior recorded from the former legacy engine is the interim authority for removed constructs): the fill
     /// CHARACTERS are deposited as the receiver's character image, repeated to its width (§8.3.3.6.4 GR2), exactly
-    /// the legacy byte engine's fill — MOVE QUOTE TO PIC 9(3) leaves three quotation marks, IS NUMERIC is then
+    /// the pre-2023 fill — MOVE QUOTE TO PIC 9(3) leaves three quotation marks, IS NUMERIC is then
     /// false, and a later numeric read decodes deterministically (§14.6.13.2: a non-digit contributes no digit).
     /// The binder flagged an eligible numeric-DISPLAY receiver <see cref="DataItem.StoreAsImage"/> (REUSING the
     /// §14.9.25.4 MOVE GR4 whole-group image substrate — never a parallel mechanism), so the store is a plain image

@@ -38,7 +38,7 @@ STATE** is the single-write live-state SSOT; every session reads §0 first and u
 ## The spec-first CONFORMANCE-FIX-QUEUE campaign
 [[docs/rearchitecture/CONFORMANCE-FIX-QUEUE]] is the current work — audit-surfaced defects, independently re-verified
 against the spec, each carrying a decision-complete fix and a **spec-derived golden** (expected value computed from the
-ISO §, never copied from the legacy oracle). Tally as of **2026-07-23: 46 total (44 confirmed + 2 owner-decided),
+ISO §, never copied from a regression net). Tally as of **2026-07-23: 46 total (44 confirmed + 2 owner-decided),
 30 LANDED / 16 REMAIN.** The 16 remaining are the coordinated EC-infra + OO super-batch (shares
 `EcBinder`/`EcEmitter`/`ExceptionState`, kept serial under one design pass) plus owner-decided CA14/V59. See
 [[kb/Modernization/Audit Artifacts]].

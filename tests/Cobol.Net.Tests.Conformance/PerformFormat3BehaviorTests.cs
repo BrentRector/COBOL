@@ -7,7 +7,7 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// The exception-checking (Format-3) PERFORM RUNTIME interceptor (ISO/IEC 1989:2023 §14.9.28.4 GR14–GR22) — the
 /// per-GR behavior net for the pc-RANGE interceptor (design SSOT <c>PHASE-13-c5-perform-format3-DESIGN.md</c> §9).
-/// Every expected value is SPEC-PINNED (the legacy oracle has no EC model). Covers: GR17 tier-ordered WHEN match +
+/// Every expected value is SPEC-PINNED (the former legacy engine has no EC model). Covers: GR17 tier-ordered WHEN match +
 /// USE preemption; GR18 WHEN OTHER; GR19 WHEN COMMON; GR20 nonfatal resume-in-place vs fatal abnormal-termination +
 /// RESUME NEXT; GR16 FINALLY; §14.9.14.4 GR4 EXIT PERFORM; the version gate (COBOLNET0900) + the staged sub-GAPs
 /// (COBOLNET0899). The frame-stack unit mechanics are <c>PerformFrameStackTests</c>.

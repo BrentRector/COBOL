@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// G2-1b capability checkpoint: <b>OCCURS tables</b> (→ <c>T[]</c> arrays, element-initialized) and <b>subscripted
 /// references</b> (literal, data-name, and relative <c>name ± k</c> subscripts) resolved through
 /// <c>ReferenceResolver</c>→<c>Place</c> — each subscript attached to its OCCURS level as <c>[expr - 1]</c>
-/// (COBOLNET_DESIGN §3.2/§3.4). Pinned to the legacy oracle on the NIST acceptance basis (all results numeric or
+/// (COBOLNET_DESIGN §3.2/§3.4). Pinned to the committed golden on the NIST acceptance basis (all results numeric or
 /// trailing-clean, so the legacy is a sound oracle). Reference modification (<c>(s:l)</c>) is still G2-1c — those
 /// references fail loud until then.
 /// </summary>

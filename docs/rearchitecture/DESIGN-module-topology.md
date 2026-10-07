@@ -37,14 +37,13 @@ drifted** in five concrete, survey-confirmed ways:
 
 3. **The edition/version subsystem is fragmented across 3 namespaces / 2 assemblies with no home** — `EditionContext`,
    `ConstructRegistry`, `ReservedWords` live in `Cobol.Net.Compiler`; `ReservedWordEditionHints` lives in the *legacy*
-   `CobolSharp.Compiler.Parsing` namespace inside `Cobol.Net.Frontend`; the preprocessor re-implements the strict/
+   `legacy-root.Parsing` namespace inside `Cobol.Net.Frontend`; the preprocessor re-implements the strict/
    permissive severity policy twice. Because the canonical registry sits in Compiler (which Frontend cannot reference),
    the metadata is duplicated in the frontend — a topology defect, not a logic one.
 
-4. **Stale namespace/assembly split.** The whole tree still emits into `namespace CobolSharp.Compiler.*` and the ANTLR
-   package is `CobolSharp.Compiler.Generated` while the assemblies are already renamed `Cobol.Net.*` — the "cosmetic
-   namespace rename" was deferred to a G8 big-bang. `Frontend.cs` still carries a stale "reuses the legacy
-   CobolSharp.Compiler assembly" banner. Every consumer aliases `using Core = CobolParserCore`.
+4. **Namespace/assembly split — resolved (PHASE 01).** The tree once emitted into the legacy root namespace while the assemblies
+   were already renamed `Cobol.Net.*`; it now declares `CobolNet.*`, the ANTLR package is `CobolNet.Frontend.Generated` (an MSBuild
+   property) and `Frontend.cs` is self-contained. Every consumer still aliases `using Core = CobolParserCore`.
 
 5. **Dead / mislabeled files in the tree.** Five top-level grammars (`CobolParserJsonXml.g4`, `CobolParserGenerics.g4`,
    `CobolParserOO.g4`, `CobolDialect.g4`, `CobolPreprocessor.g4`) are neither generated nor referenced. JSON/XML lives in
@@ -341,7 +340,7 @@ set — the efficiency HIGH fix) + `Backend/AssemblyPackager` (deploy/runtimecon
 Delete the five dead top-level grammars. Quarantine JSON/XML: strip `jsonStatement`/`xmlStatement` from
 `Core/CobolExtensionsJsonXml.g4` and their `{is2014()}?` wiring; move `inlineMethodInvocationStatement` into
 `Core/CobolOO.g4`; delete the now-empty fragment. Remove committed `.antlr` / `obj/antlr-lib` caches from source control
-(gitignore). Fix the stale `Frontend.cs` "reuses the legacy CobolSharp.Compiler assembly" banner. Rename the generated
+(gitignore). Fix the stale `Frontend.cs` "reuses the legacy compiler assembly" banner. Rename the generated
 package to `CobolNet.Frontend.Generated` via the MSBuild property.
 
 ### 2.15 Naming & partial-file convention (the rule going forward)
@@ -366,8 +365,8 @@ Legend: **S**=split, **M**=move, **R**=rename, **X**=delete, **C**=create, **F**
 | # | Action | From | To | Why |
 |---|---|---|---|---|
 | 1 | C | — | `src/Cobol.Net.Editions/` | Leaf assembly Frontend+Compiler both reference; kills edition metadata dup |
-| 2 | R (ns) | `namespace CobolSharp.Compiler.*` | `namespace CobolNet.Compiler.*` (per §2.3 sub-ns) | Complete the deferred rename up front |
-| 3 | R (ns) | `CobolSharp.Compiler.Generated` | `CobolNet.Frontend.Generated` | Remove `using Core=` alias; MSBuild property |
+| 2 | R (ns) | `namespace legacy-root.*` | `namespace CobolNet.Compiler.*` (per §2.3 sub-ns) | Complete the deferred rename up front |
+| 3 | R (ns) | `legacy-root.Generated` | `CobolNet.Frontend.Generated` | Remove `using Core=` alias; MSBuild property |
 
 ### Frontend
 | # | Action | From | To | Why |
@@ -375,7 +374,7 @@ Legend: **S**=split, **M**=move, **R**=rename, **X**=delete, **C**=create, **F**
 | 4 | X | `Grammar/CobolParserJsonXml.g4`, `CobolParserGenerics.g4`, `CobolParserOO.g4`, `CobolDialect.g4`, `CobolPreprocessor.g4` | — | Dead: not generated, not referenced |
 | 5 | S/X | `Grammar/Core/CobolExtensionsJsonXml.g4` | JSON/XML stripped; `inlineMethodInvocationStatement`→`Core/CobolOO.g4`; file deleted | JSON/XML non-ISO (0 spec occ) |
 | 6 | X | `Grammar/.antlr`, `obj/antlr-lib/*.g4` caches | — (gitignore) | Build output in source tree |
-| 7 | X | `ReservedWordEditionHints.cs` (ns `CobolSharp.Compiler.Parsing`) | — (vendor JSON/XML COBOL0313 hint → `CobolErrorStrategy`, token-keyed) | No reverse-signature recogniser; the `VersionConformancePass` is the sole edition gate |
+| 7 | X | `ReservedWordEditionHints.cs` (ns `legacy-root.Parsing`) | — (vendor JSON/XML COBOL0313 hint → `CobolErrorStrategy`, token-keyed) | No reverse-signature recogniser; the `VersionConformancePass` is the sole edition gate |
 | 8 | edit | `Pipeline/Frontend.cs` stale banner | corrected banner | Understandability |
 
 ### DataBinder god-class → binders + model + passes
@@ -467,7 +466,7 @@ The battery (greenfield conformance + unit + characterization + the FULL NIST le
 STATUS banners) must stay green at **every commit**. Sequence
 the topology work as **behavior-preserving mechanical steps**, each independently green:
 
-1. **Wave 0 — namespace rename (mechanical, zero behavior).** `sed` the greenfield tree `CobolSharp.Compiler.* →
+1. **Wave 0 — namespace rename (mechanical, zero behavior).** `sed` the greenfield tree `legacy-root.* →
    CobolNet.Compiler.*`; set `<AntlrNamespace>` MSBuild property; drop the `using Core=` aliases. Update
    `InternalsVisibleTo` and test project references. One commit, guard green. **Do this first** — every later move is a
    file relocation within a stable namespace scheme.
@@ -527,7 +526,7 @@ guard; each extracted class ships with the header block; DEVLOG entry per commit
 
 ## 6. Open questions for the owner
 
-1. **Namespace rename timing (§2.2).** This doc recommends doing the `CobolSharp.Compiler.* → CobolNet.*` rename **now**
+1. **Namespace rename timing (§2.2).** This doc recommends doing the `legacy-root.* → CobolNet.*` rename **now**
    (Wave 0), decoupled from G8, because the rearchitecture is a clean-slate greenfield reimplementation and the rename is
    mechanical. The current SSOT (§1.4 / csproj banner) defers it to a G8 big-bang. **Confirm we may pull the rename
    forward.**

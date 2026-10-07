@@ -23,8 +23,7 @@ using Core = CobolParserCore;
 /// transcription and restored from the printed page — permit BOTH phrases in EITHER order on all of these
 /// statements, so every such rule now carries the NOT-led arm. Because each call site already passed
 /// <see cref="StartsWithNot"/> uniformly instead of relying on that no-op, the greenfield binder absorbed the
-/// shape change with ZERO edits — which is exactly why the uniformity was worth paying for. The frozen legacy
-/// binders hand-rolled the same split four times and every one had to be repaired.
+/// shape change with ZERO edits — which is exactly why the uniformity was worth paying for.
 /// </para>
 /// </summary>
 internal static class PhraseBlocks

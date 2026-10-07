@@ -90,8 +90,7 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
     /// undefined, GR18 — the in-place model of docs/CONFORMANCE.md D-UNS1/D-UNS2, <see cref="LiveReads"/>), the
     /// pointer initializes from the POINTER item or 1 (GR11a) and the TALLYING item receives its content AT THE
     /// END plus the count of receiving areas acted upon (GR14 — the statement ADDS to it; D-UNS3). An initiation pointer
-    /// outside [1, size(sender)] is the GR15a overflow and TERMINATES the operation before any transfer (GR16a — a
-    /// check the legacy engine performed but did not honor with termination); otherwise each receiving area gets
+    /// outside [1, size(sender)] is the GR15a overflow and TERMINATES the operation before any transfer (GR16a); otherwise each receiving area gets
     /// one <c>UnstringExtract</c> (GR11b–f), its result stored per the MOVE rules (GR11c — so two
     /// contiguous delimiters space-fill an alphanumeric receiver and ZERO-fill a numeric one, GR8), DELIMITER IN /
     /// COUNT IN stored per GR11d/e, and the tally bumped — all skipped when the sender was already exhausted

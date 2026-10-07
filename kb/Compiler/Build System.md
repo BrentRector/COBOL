@@ -44,8 +44,8 @@ from the csproj `<AntlrNamespace>` property.
 
 ## Solution project list (`Cobol.Net.sln`)
 Greenfield `Cobol.Net.*`: **Frontend**, **Editions** (shared lowest leaf), **Compiler**, **Compiler.SourceGen**
-(source generator), **Cli** (exe `cobol`), **Runtime**, and tests **Unit / Conformance / Characterization**. Legacy
-(differential oracle until G8): `CobolSharp.Compiler / Runtime / CLI` + `CobolSharp.Tests.Unit / Integration`. See
+(source generator), **Cli** (exe `cobol`), **Runtime**, and tests **Unit / Conformance / Characterization**. The legacy
+engine is deleted from `main` (`docs/rearchitecture/LEGACY-ARCHIVE.md`). See
 [[kb/Architecture/Module Overview]].
 
 ## Guard & generator scripts (`scripts/`)

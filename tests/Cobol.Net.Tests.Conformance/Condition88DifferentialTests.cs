@@ -7,7 +7,7 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// G2c capability checkpoint: <b>level-88 condition-names</b> and <b>sign conditions</b> (COBOLNET_DESIGN §3.5 /
 /// §8.8.4.1). An 88 reference is a membership test over its conditional variable (singletons + THRU ranges, multiple
-/// VALUEs); <c>SET cond TO TRUE</c> moves the first VALUE into the parent. Pinned to the legacy oracle.
+/// VALUEs); <c>SET cond TO TRUE</c> moves the first VALUE into the parent. Pinned to the committed golden.
 /// </summary>
 public sealed class Condition88DifferentialTests
 {

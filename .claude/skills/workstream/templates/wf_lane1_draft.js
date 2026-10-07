@@ -76,7 +76,7 @@ THE TREE IS FROZEN: a comprehensive battery is running. You may READ anything in
 file you produce goes under ${SCRATCH}/out/<slug>/ using the repo-relative destination path as a subpath
 (e.g. ${SCRATCH}/out/<slug>/tests/conformance/2023/<name>.cob). A director copies validated drafts into the tree.
 THE SPEC IS THE ONLY ORACLE: specs/ISO_COBOL.md (ISO/IEC 1989:2023). Derive every expected output value from the
-rule text BEFORE thinking about what the compiler does; NIST goldens, GnuCOBOL and the legacy engine are regression
+rule text BEFORE thinking about what the compiler does; NIST goldens and GnuCOBOL are regression
 nets, never authority; a *_MatchesLegacy test or a nist: ref cannot close a row. VALIDATE EVERY CITATION:
 python scripts/spec/cite.py --check <clause> "<quoted text>"  — a citation you did not run --check on is not a
 citation, and a REAL clause that answers a DIFFERENT question is the failure mode to fear most.

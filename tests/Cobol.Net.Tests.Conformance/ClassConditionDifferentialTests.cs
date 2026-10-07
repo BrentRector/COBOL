@@ -36,11 +36,11 @@ public sealed class ClassConditionDifferentialTests
     [InlineData("01 X PIC X(3) VALUE \"1 3\".", "    IF X IS NUMERIC DISPLAY \"NU\" ELSE DISPLAY \"NO\" END-IF.")]   // embedded space → not numeric
     [InlineData("01 N PIC 9(3) VALUE 42.", "    IF N IS NUMERIC DISPLAY \"NU\" ELSE DISPLAY \"NO\" END-IF.")]
     // ⛔ REMOVED — `IF N IS ALPHABETIC` over `01 N PIC 9(3)` is NOT CONFORMING SOURCE, and this row pinned the
-    // compiler to the legacy oracle's acceptance of it (its comment read "digits not alphabetic", i.e. it was
+    // compiler to the committed golden's acceptance of it (its comment read "digits not alphabetic", i.e. it was
     // asserting a RUN-TIME answer to a question §8.8.4.4.3 SR4 forbids asking). SR4: "ALPHABETIC,
     // ALPHABETIC-LOWER, ALPHABETIC-UPPER, or class-name-1 shall not be specified if the category of the data
     // item referenced by identifier-1 is boolean, numeric, or numeric-edited" — three categories, of which only
-    // BOOLEAN was screened until kb/Work PB571. The legacy engine is a regression NET, never authority
+    // BOOLEAN was screened until kb/Work PB571. The former legacy engine is a regression NET, never authority
     // (CLAUDE.md rule 1), and the case now lives where a rejection belongs:
     // tests/conformance/negative/pb571-class-alphabetic-on-numeric (COBOLNET0844, every edition).
     // The admission side — the same operand with an ALPHABET-NAME, which SR4 does NOT name — is

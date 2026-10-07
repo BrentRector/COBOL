@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// STRING (ISO §14.9.43) + UNSTRING (ISO §14.9.48): the semantically subtle general rules — delimiter runs and
 /// SIZE defaulting, the never-space-filled receiver and pointer mechanics, ON/NOT ON OVERFLOW, the OR'd / ALL
 /// delimiter scans, DELIMITER IN / COUNT IN / TALLYING, and the two GR15 overflow situations vs plain source
-/// exhaustion. Differential against the legacy oracle (NIST NC217A/NC218A-green) everywhere the legacy is sound;
+/// exhaustion. Differential against the committed golden (NIST NC217A/NC218A-green) everywhere the legacy is sound;
 /// the one legacy gap this family closes (the STRING pointer &lt; 1 check, §14.9.43.4 GR8) is spec-pinned.
 /// Space-padded fields are displayed ONE PER LINE so the legacy's known DISPLAY trailing-space trim cannot
 /// surface as an internal-spaces diff (see <see cref="CutRunner.Normalize"/>).
@@ -19,7 +19,7 @@ public sealed class StringUnstringDifferentialTests
 
     private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
-    /// <summary>For the case the LEGACY engine gets wrong (no pointer &lt; 1 check): assert the SPEC-derived
+    /// <summary>For the case the former legacy engine gets wrong (no pointer &lt; 1 check): assert the SPEC-derived
     /// output directly, with the governing § on the fact.</summary>
     private static void AssertSpecPinned(string source, string expected)
     {
@@ -105,7 +105,7 @@ public sealed class StringUnstringDifferentialTests
                 STOP RUN.
             """));
 
-    // §14.9.43.4 GR8 — SPEC-PINNED (the legacy engine never checked the < 1 arm): with POINTER 0, the check
+    // §14.9.43.4 GR8 — SPEC-PINNED (the former legacy engine never checked the < 1 arm): with POINTER 0, the check
     // BEFORE the first character move finds the pointer less than one, so NOTHING transfers (GR8a), ON OVERFLOW
     // runs (GR8c), the receiver is fully preserved (GR7), and the pointer — changed only by character moves
     // (GR6), of which there were none — writes back unchanged.

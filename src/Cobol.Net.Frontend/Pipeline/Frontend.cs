@@ -20,13 +20,11 @@ namespace CobolNet.Frontend;
 /// This is the WiseOwl COBOL front-end (assembly <c>Cobol.Net.Frontend</c>): the source preprocessor
 /// (reference-format normalization, conditional compilation, COPY expansion, NIST placeholder substitution) and
 /// the ANTLR lexer/parser. The parse tree it returns (<see cref="CobolParserCore.CompilationUnitContext"/>) is a
-/// pure syntactic artifact — no semantic analysis, storage layout, or emission is involved. It is shared,
-/// unchanged, by both the greenfield WiseOwl COBOL pipeline and (until the G8 cut-over) the legacy differential
-/// oracle, which references this same assembly.
+/// pure syntactic artifact — no semantic analysis, storage layout, or emission is involved. It is consumed,
+/// unchanged, by the WiseOwl COBOL pipeline.
 /// <para>
-/// The pipeline mirrors the legacy <c>Compilation.Preprocess</c> + <c>Compilation.LexAndParse</c> exactly so
-/// the proven preprocessing (incl. the SLL→LL two-stage parse and the <c>ZERO</c>→<c>ZERO_ARITH</c> rewrite)
-/// is preserved bit-for-bit.
+/// The pipeline carries the proven preprocessing (incl. the SLL→LL two-stage parse and the <c>ZERO</c>→<c>ZERO_ARITH</c>
+/// rewrite) bit-for-bit.
 /// </para>
 /// </remarks>
 public sealed class Frontend

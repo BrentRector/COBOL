@@ -1263,7 +1263,7 @@ feature that breaks them.
 ## 14. What explicitly does NOT change
 
 - The typed-native invariant; no byte substrate anywhere in the facility.
-- The legacy `CobolSharp.Runtime` locale bodies (`LocaleCompare` returning `1m/-1m/0m` from
+- The legacy runtime locale bodies (`LocaleCompare` returning `1m/-1m/0m` from
   `String.Compare(CurrentCulture)`, `LocaleDate` treating argument-1 as an integer date, `LocaleTime`
   substituting `ToString("T")` for `t_fmt`) are **not** ported and are **not** an oracle: each is
   independently non-conforming, so no row here may ever be closed on the legacy differential. They die at P15.

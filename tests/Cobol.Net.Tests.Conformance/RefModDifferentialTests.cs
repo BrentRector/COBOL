@@ -7,7 +7,7 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// G2-1c: reference modification <c>item(start:length)</c> (ISO §8.4.3.3.4) — read (DISPLAY / MOVE source /
 /// comparison) and write (MOVE into a slice), with literal and data-name start/length and the "to the end" form.
-/// Pinned to the legacy oracle.
+/// Pinned to the committed golden.
 /// </summary>
 public sealed class RefModDifferentialTests
 {

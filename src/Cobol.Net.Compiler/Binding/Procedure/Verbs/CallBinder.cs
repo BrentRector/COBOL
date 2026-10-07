@@ -989,7 +989,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
             // this one recovered one, which is the same rule written twice and only one of them complete.
             bareLit = bare.nonNumericLiteral();
         }
-        // The grammar keeps a `dataReference` arm on callByContent (the legacy binder shares this rule), so a
+        // The grammar keeps a `dataReference` arm on callByContent, so a
         // bare identifier can land there directly; the sole-reference reduction covers the one that arrived
         // inside an expression node. The two paths must agree, which is why both are consulted.
         return (lit, bareLit, dref ?? ConditionBinder.SoleDataReference(arith), boolExpr, arith);

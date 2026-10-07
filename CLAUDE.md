@@ -5,7 +5,7 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
 (mission, architectural commitments, the four required reviews) and does not restate them.
 
 1. **The ISO/IEC 1989:2023 spec (`specs/ISO_COBOL.md`) defines correct behavior for EVERY case.** Read it and cite
-   the exact §/GR for any semantics, syntax, or output question. The legacy oracle, the NIST goldens and the
+   the exact §/GR for any semantics, syntax, or output question. The NIST goldens and the
    GnuCOBOL differential are regression NETS with known holes — never authority. **Where there are several
    implementation options, the precedence is: the ISO spec if it controls → otherwise GnuCOBOL → if GnuCOBOL has
    nothing, IBM Enterprise COBOL or Micro Focus** (owner, 2026-08-08 via `kb/Work/R13`, restated 2026-09-22). This
@@ -81,7 +81,7 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
 ## The project
 WiseOwl COBOL (repo `BrentRector/COBOL`; code `src/Cobol.Net.*`, exe `cobol`, NuGet `WiseOwl.COBOL`) compiles COBOL into **idiomatic typed-native C# built by Roslyn**: a
 COBOL record IS a .NET `record struct`, an elementary item IS a native field. **There is NO byte `ProgramState`
-substrate — never fall back to the legacy byte engine.** That engine is deleted from `main` (PHASE 15 Cut 2,
+substrate — never reintroduce one.** The legacy CobolSharp engine that had one is deleted from `main` (PHASE 15 Cut 2,
 kb/Work PB2110); `docs/rearchitecture/LEGACY-ARCHIVE.md` names the tag that preserves it.
 
 **Mission (owner decision D13):** a commercial-quality, decades-sustainable compiler that is **100% conforming to

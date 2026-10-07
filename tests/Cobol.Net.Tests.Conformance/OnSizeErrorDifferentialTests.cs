@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// The ON SIZE ERROR phrase and the size error condition (ISO/IEC 1989:2023 §14.7.5), two-phase: a per-receiver
 /// capacity overflow leaves only that receiver unchanged and the others stored (rule 2), a zero divisor (case 2) or
 /// a ROUNDED MODE IS PROHIBITED inexact result (§14.7.4.3 r7) raises the condition with no receiver changed, and the
-/// ON / NOT ON SIZE ERROR imperative runs once afterward. Pinned to hand-computed spec values; the legacy oracle
+/// ON / NOT ON SIZE ERROR imperative runs once afterward. Pinned to hand-computed spec values; the former legacy engine
 /// (NIST-exercised for ON SIZE ERROR) is cross-checked. The "receiver unchanged" cases are the silent-corruption
 /// class — each asserts the receiver's post-value, not just the imperative output.
 /// </summary>

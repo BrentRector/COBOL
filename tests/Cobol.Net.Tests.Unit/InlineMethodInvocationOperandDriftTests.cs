@@ -19,12 +19,12 @@ namespace CobolNet.Tests.Unit;
 /// admits the other, and the receiving rules admit neither.</para>
 ///
 /// <para><b>Why a test and not a shared rule.</b> The obvious shape is ONE <c>sendingIdentifier</c> rule used
-/// everywhere, and it is blocked for exactly the reason <c>ArithmeticSendingOperandDriftTests</c> records:
-/// the FROZEN legacy compiler shares this grammar and reads <c>.dataReference()</c> / <c>.literal()</c> /
-/// <c>.functionCall()</c> off these contexts BY NAME, so a collapse or an alias breaks its build until
-/// PHASE 15 CUT 2 deletes it. The alternatives therefore stay per-site and this test is what makes the
+/// everywhere, and it has not landed for the reason <c>ArithmeticSendingOperandDriftTests</c> records:
+/// the generated <c>.dataReference()</c> / <c>.literal()</c> / <c>.functionCall()</c> accessors are read off
+/// these contexts BY NAME, so a collapse or an alias is a grammar unification (kb/Work PB2114), not an edit.
+/// The alternatives therefore stay per-site and this test is what makes the
 /// pairing mechanical instead of a hand-maintained list (CLAUDE.md rule 5): the next rule to gain
-/// <c>functionCall</c> fails here until it gains Format 4 too. Collapse both at CUT 2 and delete this with
+/// <c>functionCall</c> fails here until it gains Format 4 too. Collapse both in the PB2114 unification and delete this with
 /// <c>ArithmeticSendingOperandDriftTests</c>.</para>
 ///
 /// <para>⚠ It reads the GRAMMAR SOURCE, not the generated parser: the property is about what the <c>.g4</c>

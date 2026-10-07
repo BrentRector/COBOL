@@ -52,7 +52,7 @@ You MUST NOT run dotnet build/test, git, or write inside any repository tree; wr
 then APPEND one JSON line the moment each rule is decided (python open(path,'a'); never rewrite the file). Your final
 structured return is the union of the file's lines and your new ones. A session-limit kill can come at any moment; the
 file is what survives.
-THE SPEC IS THE ONLY ORACLE; NIST/GnuCOBOL/legacy are regression nets. VALIDATE EVERY CITATION with
+THE SPEC IS THE ONLY ORACLE; NIST/GnuCOBOL are regression nets. VALIDATE EVERY CITATION with
 python ${PIN}/scripts/spec/cite.py --check <clause> "<text>". EDITIONS from the spec, never from the code under review.
 ⛔ HARD CAP: 160 TURNS (read-only work; owner decision 2026-09-04). Agent cost is QUADRATIC in turns
 (tokens ~ 0.115*T + 0.00031*T^2, n=239), so a long transcript is the most expensive thing this project runs and the

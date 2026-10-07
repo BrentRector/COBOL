@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// G2 verification checkpoint: a program that declares elementary data and <c>DISPLAY</c>s it (COBOLNET_DESIGN
 /// §16 G2). Two kinds of assertion, both grounded in the ISO/IEC 1989:2023 specification:
 /// <list type="bullet">
-///   <item><see cref="AssertMatchesGolden"/> — the legacy byte-engine oracle (364-NIST-green) is a sound reference
+///   <item><see cref="AssertMatchesGolden"/> — the former legacy engine's recorded output (364-NIST-green) is a sound reference
 ///         here, so WiseOwl COBOL stdout must equal legacy stdout <b>on the NIST acceptance basis</b> (per-line
 ///         trailing-space stripped — the guard's <c>normalize()</c>). Used wherever that normalization makes the
 ///         two agree (single/trailing operand, numeric).</item>
@@ -32,7 +32,7 @@ public sealed class DataDisplayDifferentialTests
 
     /// <summary>
     /// Compile + run <paramref name="source"/> on WiseOwl COBOL and assert its stdout equals the <b>spec-correct</b>
-    /// <paramref name="expected"/> (NIST-basis normalized). Used where the legacy oracle is non-conforming.
+    /// <paramref name="expected"/> (NIST-basis normalized). Used where the former legacy engine is non-conforming.
     /// </summary>
     private static void AssertSpec(string source, string expected)
     {

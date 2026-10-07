@@ -10,7 +10,7 @@ namespace CobolNet.Tests.Conformance;
 /// The EC exception-condition model (ISO/IEC 1989:2023 §14.6.13 + §7.3.25 TURN + §14.9.29 RAISE + §14.9.33
 /// RESUME + §14.9.49 Format-3 USE + §14.9.18/§14.9.14 RAISING + §15.28–15.33 EXCEPTION-* functions;
 /// COBOLNET_CONDITIONS_EXCEPTIONS_DESIGN D9–D12): the per-GR conformance net. Every behavioral test is
-/// SPEC-PINNED (the legacy oracle has NO EC model — COBOL-2002+; expected values derive from the cited rules).
+/// SPEC-PINNED (the former legacy engine has NO EC model — COBOL-2002+; expected values derive from the cited rules).
 /// All EC programs compile at <c>--std 2023</c>; the per-edition gating facts compile at 85 and assert the
 /// targeted not-in-this-edition diagnostic (the four-compilers rule).
 /// </summary>

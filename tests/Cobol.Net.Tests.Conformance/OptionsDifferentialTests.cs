@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// The OPTIONS paragraph (ISO/IEC 1989:2023 §11.9), now fully parsed into a structured clause tree. The first
 /// applied consumer is DEFAULT ROUNDED (§11.9.6): a <b>bare</b> <c>ROUNDED</c> phrase (no MODE) uses the program's
 /// DEFAULT ROUNDED mode rather than the NEAREST-AWAY-FROM-ZERO fallback (§14.7.4.3 r1). Mode-specific results are
-/// pinned to hand-computed spec values; the legacy oracle (which also honors DEFAULT ROUNDED) is cross-checked.
+/// pinned to hand-computed spec values; the former legacy engine (which also honors DEFAULT ROUNDED) is cross-checked.
 /// </summary>
 public sealed class OptionsDifferentialTests
 {
@@ -46,7 +46,7 @@ public sealed class OptionsDifferentialTests
         var src = Program("           DEFAULT ROUNDED MODE IS NEAREST-EVEN.",
             "01 R PIC 9(3).", "    COMPUTE R ROUNDED = 25 / 10.\n    DISPLAY R.");
         AssertOutput(src, "002");
-        AssertMatchesGolden(src);   // the legacy oracle also applies DEFAULT ROUNDED
+        AssertMatchesGolden(src);   // the former legacy engine also applies DEFAULT ROUNDED
     }
 
     [Fact]

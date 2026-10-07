@@ -7,7 +7,7 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// ALTER + the 85-only target-less GO TO (ANSI X3.23-1985; deleted by ISO/IEC 1989:2002 — the 2023 §14.9.17 GO TO
 /// has only Formats 1–2) and the SPECIAL-NAMES external-switch family (ISO §12.3.7; SET F3 §14.9.39; switch-status
-/// condition §8.8.4.6). Differential against the legacy oracle (NIST-85 green: NC174A/254A/302M/303M); the
+/// condition §8.8.4.6). Differential against the committed golden (NIST-85 green: NC174A/254A/302M/303M); the
 /// edition-gating fact uses the per-edition harness. Switch facts avoid the guard's COBOL_SWITCH_1 env contract by
 /// using SWITCH-31…SWITCH-34 (available switch-names, docs/CONFORMANCE.md §7 item 191, that no environment sets ⇒
 /// deterministic default OFF in both engines; they were SWTEST-* until kb/Work PB862 closed the name set).

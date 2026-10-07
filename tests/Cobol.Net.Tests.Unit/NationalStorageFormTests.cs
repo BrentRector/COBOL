@@ -54,7 +54,7 @@ public sealed class NationalStorageFormTests
     }
 
     /// <summary>PIC N(5): ImageWidth == Length == 5 (one UTF-16 char per national position, D-N1) — expect 5,
-    /// NOT the legacy byte-doubled 10 — and the computed form is CharImage(5, National).</summary>
+    /// NOT a byte-doubled 10 — and the computed form is CharImage(5, National).</summary>
     [Fact]
     public void National_PicN5_ImageWidthEqualsLength_OneCharPerPosition()
     {

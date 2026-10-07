@@ -72,7 +72,7 @@ checkpoint file is what survives. Your checkpoint file is named below. FIRST rea
 already present in it; then, the moment you decide a rule, APPEND one JSON line for it (one line = one rule, flush
 immediately — write with python's open(path,'a') or a single-line append; never rewrite the whole file). Your final
 structured return is the union of the file's lines and your new ones.
-THE SPEC IS THE ONLY ORACLE. The legacy engine, NIST goldens and GnuCOBOL are regression nets with known holes.
+THE SPEC IS THE ONLY ORACLE. NIST goldens and GnuCOBOL are regression nets with known holes.
 VALIDATE EVERY CITATION: python ${PIN}/scripts/spec/cite.py --check <clause> "<quoted text>" — a citation you did not
 --check is not a citation, and a REAL clause that answers a DIFFERENT question is the failure mode to fear most.
 EDITIONS come from the spec (Annex E, the clause's own text), never from the code under review.

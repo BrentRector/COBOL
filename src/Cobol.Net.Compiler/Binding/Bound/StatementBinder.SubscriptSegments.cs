@@ -41,7 +41,7 @@ namespace CobolNet.Binding.Bound;
 /// <c>RefModPlace.Start</c>/<c>Length</c> to <c>BoundExpr</c>. They are the documented <b>D10 TRANSITIONAL
 /// carrier</b>, deliberately the same shape as <c>RefModSpec</c> "so PHASE 15 migrates both in one move rather
 /// than leaving a second, differently-shaped ref-mod behind", and D10 is an owner ruling relocated to PHASE 15
-/// §"CUT 2.5", blocked while the frozen legacy compiler still shares <c>SUB_*</c>/<c>SubscriptEntryContext</c>.
+/// §"CUT 2.5" (kb/Work PB2113; unblocked now that the legacy compiler that shared <c>SUB_*</c>/<c>SubscriptEntryContext</c> is deleted).
 /// The string carrier is deliberate sequencing, not decay — and when CUT 2.5 lands, THIS temp path is deleted
 /// with it. It is a mechanism designed to be deleted, which is precisely why it must not grow a second carrier
 /// in the meantime.</para>

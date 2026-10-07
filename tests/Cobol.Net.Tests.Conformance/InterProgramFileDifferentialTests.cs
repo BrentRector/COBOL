@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Conformance;
 /// and record area (§13.18.22.4 GR4a/GR4b — IC227A), GLOBAL FD visibility in contained programs (§13.18.30 —
 /// IC233A/IC234A), the cross-program GLOBAL USE dispatch (§14.9.49.4 GR4 — IC233A), and the cross-assembly
 /// run-unit composition probe (§14.6.1 / §14.9.4.4 GR3b — the implementor-defined locate step). Differential
-/// against the NIST-IC-green legacy oracle where it covers the construct; the cross-assembly probe is
+/// against the NIST-IC-green committed golden where it covers the construct; the cross-assembly probe is
 /// greenfield-only (the legacy's DiscoverProgram is its own mechanism) and asserted directly.
 /// </summary>
 public sealed class InterProgramFileDifferentialTests
@@ -76,7 +76,7 @@ public sealed class InterProgramFileDifferentialTests
     /// shared by every describer): the IC227A shape — the main OPENs OUTPUT and fills the record area; the
     /// separately-described subprogram WRITEs without opening (the open mode lives on the SHARED connector) and
     /// its differently-named record holds the MAIN's data (the SHARED record area, externalized by the FD name
-    /// per GR5). The read-back proves both halves at once. SPEC-PINNED: the legacy oracle DROPS the shared
+    /// per GR5). The read-back proves both halves at once. SPEC-PINNED: the former legacy engine DROPS the shared
     /// record area in this minimal two-unit shape (it reads back spaces — a hole; its IC227A pass goes through
     /// CCVS's fuller protocol), and GR4b's one-record-area rule decides ("the record data is external").</summary>
     [Fact]

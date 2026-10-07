@@ -21,7 +21,7 @@ using CobolNet.Runtime;
 /// <list type="number">
 ///   <item><b>Syntactic flatten</b> — walk <c>cobolWord dataReferenceSuffix*</c> into the base name, its OF/IN
 ///         qualifiers, and the subscript / reference-modification token group (a flat SUBSCRIPT-mode stream the
-///         binding layer interprets — the same grammar shape the legacy compiler proved over 364 NIST tests).</item>
+///         binding layer interprets).</item>
 ///   <item><b>Semantic resolve</b> — resolve the (optionally qualified) name to a <see cref="DataItem"/>, interpret
 ///         the subscripts to C# index expressions, and build the member-access path with each subscript attached to
 ///         its OCCURS level (outer→inner).</item>

@@ -14,7 +14,7 @@
 > `feedback_four_editions_one_compiler`, `feedback_four_editions_one_compiler`, `project_dialect_two_axes`.
 >
 > **Scope:** the **greenfield** compiler (`src/Cobol.Net.*`, the active engine) is the target. The legacy
-> `CobolSharp.Compiler` is the **blueprint** (it already has the per-edition machinery) and is retired at G8.
+> compiler was the **blueprint** (it had the per-edition machinery) and is deleted (P15 Cut 2).
 >
 > **Scope honesty (don't over-read this):** this matrix validates the edition **deltas / boundaries** — where gating
 > bugs live (the right ~80%): "feature introduced in E is rejected below E", "feature removed by E is rejected at E",
@@ -145,8 +145,8 @@ they cover ~70% of real dialect collisions and exercise all five gating patterns
 **6.2 Port the legacy per-edition model to the greenfield (the core rework).** The legacy already solved this; reuse
 the design (do not re-invent — `feedback_one_mechanism_per_job`):
 - **`DialectConfig` (two-axis, one cached object queried everywhere)** — strictness (`IsStrict`) × version thresholds
-  (`IsCobol2002OrLater`…), `FlagsFeaturesRemovedAfter85`, `DisplayName` for diagnostics. Port from
-  `CobolSharp.Compiler/Semantics/DialectConfig.cs`.
+  (`IsCobol2002OrLater`…), `FlagsFeaturesRemovedAfter85`, `DisplayName` for diagnostics. Ported from
+  the legacy compiler's `Semantics/DialectConfig.cs` (archived).
 - **A post-parse edition validator** — in the greenfield this is the parse-tree arm of the `VersionConformancePass`
   (`Validation/VersionConformancePass.cs`) — implementing the **validator pattern** from `DialectStrictnessChecks`: the
   grammar parses the permissive superset; the validator decides accept / warn / reject per `(construct, DialectConfig)`

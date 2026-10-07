@@ -34,7 +34,7 @@ probes under `/tmp/adj/{BATCH}/probe/`). Inputs: `python scripts/spec/phase_b_ba
 
 ## Rules (the production lane-3 bar)
 
-- THE SPEC IS THE ONLY ORACLE. The legacy engine, NIST and GnuCOBOL are regression nets, never authority.
+- THE SPEC IS THE ONLY ORACLE. NIST and GnuCOBOL are regression nets, never authority.
 - VALIDATE EVERY CITATION: `python scripts/spec/cite.py --check <clause> "<quoted text>"`. A real clause that
   answers a DIFFERENT question is the failure mode to fear most.
 - CONFORMS COSTS SOMETHING: code not located ⇒ NOT-IMPLEMENTED; an edge unverified ⇒ PARTIAL; a two-part rule with

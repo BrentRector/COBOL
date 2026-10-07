@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// USING/GIVING and INPUT/OUTPUT PROCEDURE, key direction + significance (GR1/GR2), DUPLICATES IN ORDER stability
 /// (GR3), algebraic numeric keys (GR8), the GR5 collating precedence, MERGE's equal-key file order (GR4), RELEASE
 /// FROM (GR4 of §14.9.32), RETURN INTO (GR5 of §14.9.34) and the SR4 reversed AT END order, plus the COBOL-2002+
-/// table sort (Format 2) edition gate. Pinned to the legacy oracle (NIST ST-suite green) except where the legacy
+/// table sort (Format 2) edition gate. Pinned to the committed golden (NIST ST-suite green) except where the legacy
 /// is not authoritative (the SR4 reversed order, the per-edition gates) — those pin to the spec.
 /// </summary>
 public sealed class SortMergeDifferentialTests
@@ -17,7 +17,7 @@ public sealed class SortMergeDifferentialTests
     private static readonly CobolNetCompiler CobolNet = new();
     private static readonly CobolNetCompiler CobolNet2002 = new(2002);
 
-    /// <summary>Spec-pinned facts (memory feedback_use_the_spec): the LEGACY oracle truncates a GO-TO loop
+    /// <summary>Spec-pinned facts (memory feedback_use_the_spec): the former legacy engine truncates a GO-TO loop
     /// inside a SORT INPUT/OUTPUT PROCEDURE to a single iteration (the same loop in a plain section works — see
     /// the passing USING/GIVING facts), so these six assert the ISO-derived output directly; the oracle is a
     /// regression net, not authority.</summary>
@@ -403,7 +403,7 @@ public sealed class SortMergeDifferentialTests
             "AREA=1ONE\nINTO=1ONE\nAREA=2TWO\nINTO=2TWO");
 
     /// <summary>§14.9.34.3 SR4: the AT END and NOT AT END phrases may be written in REVERSED order. SPEC-PINNED —
-    /// the legacy oracle's grammar predates this allowance, so the expected output derives from the spec: keys
+    /// the former legacy engine's grammar predates this allowance, so the expected output derives from the spec: keys
     /// 2,1,3 ascending return ONE, TWO, THREE. (Depends on the returnAtEndPhrase reversed-order grammar
     /// alternative shipped with this slice.)</summary>
     [Fact]

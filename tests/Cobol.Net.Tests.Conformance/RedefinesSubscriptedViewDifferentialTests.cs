@@ -10,7 +10,7 @@ namespace CobolNet.Tests.Conformance;
 /// adds no width; a sibling table contributes width × OCCURS), plus NEXT SENTENCE in an IF's THEN phrase
 /// (§14.9.19.4 GR4 — the ELSE-phrase rule GR6 is exercised by the spec-derived golden
 /// tests/conformance/85/pb414_next_sentence_last_sentence_inline.cob, not here). Pinned to the
-/// legacy oracle (NIST-85 green over the REDEFINES table series) — a regression net, never a rule's witness.
+/// former legacy engine (NIST-85 green over the REDEFINES table series) — a regression net, never a rule's witness.
 /// </summary>
 public sealed class RedefinesSubscriptedViewDifferentialTests
 {

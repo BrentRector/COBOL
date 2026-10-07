@@ -11,7 +11,7 @@ namespace CobolNet.Tests.Conformance;
 /// bodies reference the method's per-activation LOCAL-STORAGE — so every green case ALSO proves the method-local
 /// machinery (method-local <c>__RunUse</c>/<c>__RunF3</c>, the two-range <c>__MDispatch</c>, and the frame Matcher
 /// capturing the method's locals). Plus the §9.10.1-C2 cross-INVOKE frame-floor isolation. Every expected value is
-/// SPEC-PINNED (the legacy oracle has no EC model, let alone in a method).
+/// SPEC-PINNED (the former legacy engine has no EC model, let alone in a method).
 /// </summary>
 public sealed class PerformFormat3MethodBehaviorTests
 {

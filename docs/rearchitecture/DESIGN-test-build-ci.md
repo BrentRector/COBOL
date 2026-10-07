@@ -7,8 +7,8 @@ discipline that make each phase resumable and behavior-neutral.
 
 This dimension underpins every other rearchitecture dimension: none of the god-class splits, pass-pipeline
 extractions, or storage-form unifications can proceed safely unless the test net can PROVE, per phase, that
-observable behavior did not change. Today the net can prove agreement with a *frozen legacy engine that is deleted
-at G8* — so the net itself must be rearchitected first, or it evaporates mid-migration.
+observable behavior did not change. The net once proved agreement with a legacy engine that was to be deleted — so it
+was rearchitected first, to compare against committed goldens, and the engine is now deleted (P15 Cut 2).
 
 ---
 
@@ -19,8 +19,6 @@ at G8* — so the net itself must be rearchitected first, or it evaporates mid-m
 |---|---|---|
 | `tests/Cobol.Net.Tests.Conformance` | ~80 `.cs` | ACTIVE greenfield net: differential feature tests (`*DifferentialTests.cs`), `NistDifferentialTests` (the corpus goldens, `[MemberData]` over `corpus.tsv` — see §3.2), `VersionMatrixTests`, `CorpusRunnerTests`, `EditionHarness`, `CompilerUnderTest`/`CutRunner`. Those three theory-heavy families are **PARTITIONED across xUnit collections** — §3.11. |
 | `tests/Cobol.Net.Tests.Unit` | ~17 `.cs` | Greenfield unit: runtime kernels, `ConstructRegistryDriftTests`, `ReservedWordsDriftTests`, `CheckOnlyCompileTests`, CLI parser, `EditionContextTests`. |
-| `tests/CobolSharp.Tests.Integration` | legacy | FROZEN legacy oracle + the post-85 `ConformanceTests` corpus runner with the `GreenfieldOnly` / `LegacyDivergent` skip sets. |
-| `tests/CobolSharp.Tests.Unit` | legacy | FROZEN legacy unit tests. |
 
 ### 1.2 The differential oracle (the load-bearing risk)
 `CompilerUnderTest.cs` defines `CobolNetCompiler` (drives `CompilerDriver`) and `CutRunner`. The ~60
@@ -37,8 +35,8 @@ implicitly `tests/nist/chains.tsv`).
 
 ### 1.3 Guard scripts (bash, Linux-only NIST loop, over the WiseOwl COBOL CLI)
 ⛔ **The NIST leg drives `cobol` (`src/Cobol.Net.Cli`), not the legacy CLI** — since kb/Work/PB750, which found
-that both guards had hard-coded `src/CobolSharp.CLI/bin/Debug/net10.0/cobolsharp.dll`. That binary's project
-graph is `CobolSharp.CLI → CobolSharp.Compiler → Cobol.Net.Frontend`; `Cobol.Net.Compiler` — the Roslyn code
+that both guards had hard-coded the legacy engine's `cobolsharp.dll`. That binary's project
+graph was the legacy engine plus `Cobol.Net.Frontend`; `Cobol.Net.Compiler` — the Roslyn code
 generator that IS WiseOwl COBOL — is not in it, so the leg was structurally blind to every greenfield codegen defect
 and each battery's headline `guard NIST: 353 MATCH` was a true statement about the ORACLE. Battery #58 is the
 demonstration: `NC215A` printed a wrong answer (PB741) that `NistDifferentialTests_P0` caught and the guard's
@@ -194,12 +192,10 @@ Collapse to a coherent, layered set under one namespace root `CobolNet.Tests.*`:
 | Project | Replaces | Contents |
 |---|---|---|
 | `tests/Cobol.Net.Tests.Unit` | (kept) | Pure unit: runtime kernels, binder/emitter component units, CLI/driver, drift tests. Fast, no Roslyn where avoidable. |
-| `tests/Cobol.Net.Tests.Conformance` | (kept, refocused) | End-to-end program behavior: NIST goldens, per-edition corpus, version matrix, negative corpus. Compares to COMMITTED goldens only — no live legacy oracle. |
+| `tests/Cobol.Net.Tests.Conformance` | (kept, refocused) | End-to-end program behavior: NIST goldens, per-edition corpus, version matrix, negative corpus. Compares to COMMITTED goldens only — no live second compiler. |
 | `tests/Cobol.Net.Tests.Characterization` | NEW | The behavior-neutrality harness: diagnostic snapshots + emitted-C# snapshots (gates 2 & 3) over a fixed "characterization corpus". Runs on every phase. |
-| `tests/CobolSharp.Tests.*` | DELETE at G8 | Frozen legacy. Retired once the oracle is baked (see 3.4). |
 
-Rationale: the legacy `ConformanceTests` corpus runner and its `GreenfieldOnly`/`LegacyDivergent` sets are made
-redundant by `CorpusRunnerTests` once the legacy oracle is baked out — one corpus runner, not two.
+Rationale: `CorpusRunnerTests` is the one corpus runner; the legacy `ConformanceTests` runner and its `GreenfieldOnly`/`LegacyDivergent` skip sets were deleted with the legacy test projects (PB2110).
 
 ### 3.2 The green-corpus single source of truth: `tests/nist/corpus.tsv`
 Replace the three copies with ONE declarative manifest, consumed everywhere.
@@ -723,7 +719,7 @@ The recorder instead rides the test run itself, in its own RECORDING build, and 
 
 | piece | what it does |
 |---|---|
-| `tools/impact/ImpactRecording.targets` | imported ONLY through `-p:CustomAfterMicrosoftCommonTargets=…` (nothing in the tree imports it, so no gated, battery or shipped build carries a probe); compiles `ImpactProbe.cs` into the greenfield compiler, front end, editions, runtime and CLI, the legacy oracle the differential harness loads, and the three test assemblies; compiles `ImpactTestFramework.cs` into the test assemblies and names it in `[assembly: Xunit.TestFramework]` |
+| `tools/impact/ImpactRecording.targets` | imported ONLY through `-p:CustomAfterMicrosoftCommonTargets=…` (nothing in the tree imports it, so no gated, battery or shipped build carries a probe); compiles `ImpactProbe.cs` into the greenfield compiler, front end, editions, runtime and CLI, and the three test assemblies; compiles `ImpactTestFramework.cs` into the test assemblies and names it in `[assembly: Xunit.TestFramework]` |
 | `tools/impact/ImpactInstrumenter` (Mono.Cecil) | rewrites each covered assembly once: every method with sequence points calls `ImpactProbe.Hit(id)` on entry, `id` being its entry in the probe table — its file and the LINE RANGES it owns (its sequence points, merged across the lines between two of them unless another method's point lies between, so braces, `else` lines and comments belong to it and a lambda's body to the lambda); members with no sequence points are charged to a TYPE-LEVEL entry; `implies` names each entry's type-chain static constructors; every `Process.Start` is redirected to the probe's twin |
 | `ImpactProbe` | one byte store per hit into the array of the running CONTEXT, an `AsyncLocal` every assembly's copy shares through `AppContext` data; a hit with no context lands in an AMBIENT array. In a child process (a compiled COBOL program loading the instrumented runtime) it records for the process and writes a hits file at exit, which the redirected `Process.Start` queued on the starting test |
 | `ImpactTestFramework` | xunit's own framework with the message bus wrapped: `ITestCollectionStarting` / `ITestClassStarting` / `ITestStarting` install a fresh context synchronously on the flow about to run it (the same `TestRunner.RunAsync` then awaits the test, so the context flows into constructor, body and every task it starts, while parallel tests keep their own); `…Finished` saves it with the children folded in. A `BeforeAfterTestAttribute` cannot do this — it is handed only the `MethodInfo`, which cannot tell a theory's rows apart, and the corpus theories are ~3,400 of the ~9,300 Conformance tests. It DERIVES from the gate's `GateTestFramework` (§3.14.3), so a recording build still names one framework |
@@ -1368,9 +1364,9 @@ misses (the rule of section 3.14.1, ORDER, DON'T SKIP).
 | move | `CompilerUnderTest.LegacyCompiler` / `ICompilerUnderTest` | DELETE after the bake | Legacy oracle gone once goldens are baked. |
 | refactor | `RoslynBackend.ReferenceAssemblies()` (uncached) | `static Lazy<ImmutableArray<MetadataReference>>` | Battery throughput (thousands of rebuilds → one). |
 | refactor | binder passes behind the `CSharpEmitter.Bind` host facade | `Binding.BindPipeline → BoundCompilation` (standalone) | Bind phase boundary: fast `CheckOnly`, probe-able bound tree, clean Emit snapshot. |
-| rewrite | `.github/workflows/build-and-test.yml` (4 jobs, legacy-authoritative) | OS-matrix `build-test` + `version-sweep` + temporary `legacy-oracle` | Greenfield-authoritative, cross-platform NIST, characterization gated. |
-| delete (G8) | `tests/CobolSharp.Tests.Unit`, `tests/CobolSharp.Tests.Integration` | — | Frozen legacy retired after the bake. |
-| delete (G8) | `scripts/guard.sh`, `guard-fast.sh`, `guard-run-group.sh`, `guard-verify.sh`, `compliance.sh`, `nist-batch.sh`, `run-suite.sh` | — | All exist to run/parallelize the legacy NIST loop or legacy dashboards — dead once NIST runs in-process. |
+| rewrite | `.github/workflows/build-and-test.yml` (4 jobs, legacy-authoritative) | OS-matrix `build-test` + `version-sweep` (the temporary `legacy-oracle` job was deleted, PB2108) | Greenfield-authoritative, cross-platform NIST, characterization gated. |
+| deleted (PB2110) | the legacy unit and integration test projects | — | Retired with the engine. |
+| deleted (PB2109) | `scripts/compliance.sh`, `nist-batch.sh`, `run-suite.sh` and the guard scripts' legacy arms | — | The guard scripts themselves stay: they are the CLI-level NIST leg over `cobol` (PB750). |
 | delete | `CobolParserJsonXml.g4`, `CobolExtensionsJsonXml.g4` (dead JSON/XML) | — | Non-ISO (0 spec occurrences) — hard invariant #5; remove from any test/build surface. |
 | move | legacy `ConformanceTests` corpus + `GreenfieldOnly`/`LegacyDivergent` sets | folded into `CorpusRunnerTests` | One corpus runner over committed goldens. |
 
@@ -1378,7 +1374,7 @@ misses (the rule of section 3.14.1, ORDER, DON'T SKIP).
 
 ## 5. Migration notes — keeping the battery green through the phases
 
-The rearchitecture proceeds so the net is STRENGTHENED before it is relied on, then legacy is severed:
+The rearchitecture proceeded so the net was STRENGTHENED before it was relied on, then legacy was severed:
 
 - **Phase R0 — Net-first (do BEFORE any refactor).**
   1. Land `corpus.tsv` + `CorpusManifestTests`; repoint `NistDifferentialTests` at it (behavior identical, coverage
@@ -1386,17 +1382,14 @@ The rearchitecture proceeds so the net is STRENGTHENED before it is relied on, t
      CURRENT emitter (captures "today's behavior"). 3. Cache the Roslyn reference set (safe, pure speed). 4. Land the
      diagnostic registry + `DiagnosticSnapshotTests` seeded from today's output. After R0 the battery can prove
      behavior-neutrality; no compiler behavior changed.
-- **Phase R1 — Bake the oracle.** Run `DifferentialBakeTool`, commit `tests/differential/**/*.out`, rewrite the
-  differential base to golden comparison, DELETE the `cobolnet==legacy` asserts. Keep the legacy test projects and
-  `guard-fast.sh` in CI as a `legacy-oracle` job proving the goldens still equal a live legacy run. The net is now
-  self-standing but still cross-checked.
+- **Phase R1 — Bake the oracle (DONE).** The legacy output was committed as `tests/differential/**/*.out` and the differential
+  base rewritten to golden comparison, so the `cobolnet==legacy` asserts are gone and the net is self-standing.
 - **Phases R2…Rn — the actual rearchitecture** (god-class splits, pass pipeline, storage-form unification, per the
   sibling DESIGN-* docs). EACH phase: run the full battery; gates (1)+(2) MUST stay green; gate (3) stays green or
   is reviewed-re-baselined IN THE SAME change set (with a DEVLOG note citing the intended emit change and the
   gate-(1) proof). No phase merges red. Small phases (feedback_tiered_gates) so a snapshot diff is legible.
-- **Phase G8 — Sever legacy.** Once R1's `legacy-oracle` job has stayed green across the rearch, delete the legacy
-  test projects, the legacy `ProjectReference`s, the legacy guard scripts, and the `legacy-oracle` CI job. The
-  `build-test` matrix is now the whole gate, cross-platform.
+- **Phase G8 — Sever legacy (DONE, PB2108–PB2110).** The legacy test projects, the legacy `ProjectReference`s, the legacy guard
+  arms, the `legacy-oracle` CI job and the engine itself are deleted. The `build-test` matrix is the whole gate, cross-platform.
 
 Throughout: `Generated/` remains a build output (regen per checkout, failed regen fails the build); warnings-as-
 errors stays on the Release/CI build; the drift tests (`ConstructRegistry`, `ReservedWords`, `CorpusManifest`,
@@ -1434,9 +1427,9 @@ errors stays on the Release/CI build; the drift tests (`ConstructRegistry`, `Res
 2. **Characterization corpus size:** one program per feature family (~120 programs, fast) vs. snapshot the full NIST
    corpus's emitted C# (maximal coverage, slower, noisier diffs). Recommend the curated family set for gate (3), NIST
    goldens already cover gate (1) breadth.
-3. **When to sever legacy (G8 timing):** delete the legacy oracle the moment R1's bake lands and `legacy-oracle`
-   goes green once, or keep it running through the WHOLE rearch as a live cross-check (costs one CI job)? Recommend
-   keeping it through the rearch (cheap insurance), delete at true G8.
+3. **When to sever legacy (G8 timing) — RESOLVED (R69, 2026-10-06).** The legacy engine was deleted without a live cross-check
+   job and without an equivalence proof, because the one guard has driven `cobol` since PB750; the archive is the tag in
+   `docs/rearchitecture/LEGACY-ARCHIVE.md`.
 4. **`--suppress` granularity:** per-code, per-family, or per-descriptor `SuppressKey`? Affects the registry shape;
    default proposed is per-code with an optional family key.
 5. **Migration-SSOT vs resume-prompt.md ownership — RESOLVED (2026-07-07):** the migration roadmap is the standalone

@@ -6,7 +6,7 @@ namespace CobolNet.Tests.Conformance;
 
 /// <summary>
 /// Differential regression net for the core verbs already implemented (DEVLOG 460–463) — arithmetic, IF/ELSE,
-/// inline PERFORM — pinned to the legacy oracle on the NIST acceptance basis. This locks current behavior in BEFORE
+/// inline PERFORM — pinned to the committed golden on the NIST acceptance basis. This locks current behavior in BEFORE
 /// the G2 bound-tree/data-model rebuild re-routes every operand through <c>ReferenceResolver</c>→<c>Place</c>, so a
 /// regression in the rewrite is caught immediately (the advisor's "verify against the oracle" generalized).
 /// <para>

@@ -932,7 +932,7 @@ public abstract class CobolParserCoreBase : Parser
     /// character, a different token type. A function result IS an operand, so `FUNCTION f(x) B-AND y` ends its
     /// left operand on that token; without it here the predicate would answer false and the whole condition
     /// would take the comparison path instead. Found by sweeping every consumer of the plain paren types after
-    /// the legacy binder's copy of this same omission cost 31 NIST regressions.</remarks>
+    /// a second copy of this same omission cost 31 NIST regressions.</remarks>
     private static bool IsBoolOperandTerm(int t) => t is
         CobolLexer.IDENTIFIER or CobolLexer.RPAREN or CobolLexer.SUB_RPAREN or CobolLexer.FNARG_RPAREN
         or CobolLexer.INTEGERLIT or CobolLexer.DECIMALLIT or CobolLexer.FLOATLIT or CobolLexer.COMMA_FLOATLIT

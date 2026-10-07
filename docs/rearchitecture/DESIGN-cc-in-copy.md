@@ -25,9 +25,9 @@ deliberately, so a main-source `>>IF` can gate a `COPY` statement. Consequence: 
 2. A **missing copybook in a false branch** must NOT error (today it works because CC blanks the false-branch
    COPY line before `CopyProcessor` runs). **This is why a simple order-swap (COPY-first) is unacceptable** —
    it would expand the false-branch COPY and raise a spurious CBL3620.
-3. Legacy byte-identity: `ConditionalCompilationProcessor.Process` and `CopyProcessor.Process` keep their exact
-   behavior (the frozen `CobolSharp.Compiler` oracle at `Compilation.cs:345/355` + the standalone `preprocess`
-   CLI + the direct unit tests depend on them).
+3. Byte-identity of the standalone entry points: `ConditionalCompilationProcessor.Process` and `CopyProcessor.Process` keep their exact
+   behavior (the standalone `preprocess` CLI + the direct unit tests depend on them; the legacy compiler that also
+   called them is deleted, P15 Cut 2).
 4. The H3 line-count-preserving discipline: the five downstream directive-collection stages
    (TURN/PROPAGATE/REF-MOD/FLAG/COBOL-WORDS) run AFTER, on the final expanded text; the `linesBefore` baseline is
    captured after the merged driver. The merged driver itself changes line counts (COPY inserts lines) — it runs
@@ -191,7 +191,7 @@ legacy `Compilation.cs` and the `preprocess` CLI keep the two separate calls —
 ## §6 Gate (per the shared-core / high-blast-radius doctrine)
 
 Wave-local per commit (build + characterization + the new unit/goldens + CLI probes). **Before merge / for the
-driver-swap commit:** the FULL legacy guard (`guard.sh`/`guard-fast.sh` ALL GREEN — the legacy oracle must be
+driver-swap commit:** the FULL NIST guard (`guard.sh`/`guard-fast.sh` ALL GREEN — the NIST verdicts must be
 byte-identical) + the FULL greenfield Conformance + **the GnuCOBOL external differential before/after** (the
 owner directive: diff per-case verdicts; a divergence→agree flip is a FIX, an agree→divergence flip is a
 REGRESSION, 0 tolerated). The GnuCOBOL corpus exercises COPY heavily — it is the real net for this change.
@@ -202,4 +202,4 @@ REGRESSION, 0 tolerated). The GnuCOBOL corpus exercises COPY heavily — it is t
   later main `>>IF`, main `>>IF` gating COPY (taken/omitted), false-branch missing copybook (no error), nested
   COPY with directives, the `leave*` survival (a copybook `>>TURN` reaches the TURN stage).
 - **Conformance** `tests/conformance/2023/cc_in_copy_*.cob` (+ `.out`) — an observable end-to-end (a copybook
-  `>>IF` selecting a VALUE, printed) + GreenfieldOnly exclusion (the frozen legacy can't process copybook CC).
+  `>>IF` selecting a VALUE, printed).

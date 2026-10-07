@@ -62,7 +62,7 @@ public sealed class SignedAlphanumericMoveDifferentialTests
     [Fact]
     // A signed numeric compared against an alphanumeric literal uses its de-signed magnitude (ISO §8.8.4.2.5 → the
     // numeric is "treated as though it were moved, according to the rules of the MOVE statement" → §14.9.25.4 GR6a, the
-    // sign is not moved): -5 in two digits is "05", which equals the literal "05". SPEC-ONLY: the legacy oracle is
+    // sign is not moved): -5 in two digits is "05", which equals the literal "05". SPEC-ONLY: the former legacy engine is
     // non-conformant here — it compares the overpunch image ("0N") and reports NE (cf. the DISPLAY trailing-trim
     // precedent in feedback_use_the_spec). INVESTIGATED as a VERSION-INVARIANT legacy bug, not a cross-edition change
     // (DEVLOG 517): COBOL-85 already de-signs the MOVE building-block (NC114M MOVE-TEST-16 "STRIP MINUS SIGN" golden),
@@ -81,7 +81,7 @@ public sealed class SignedAlphanumericMoveDifferentialTests
     // an overpunch (byte 'N' → '5') is exactly the representation conversion GR4 bars. So S9(3) -45 copies its DISPLAY
     // overpunch image verbatim → "04N". CORRECTED 2026-07-22 (CA28, DEVLOG 998): this test previously pinned "045" on a
     // MISREAD — it applied §8.8.4.1 (a RELATION-CONDITION rule, "a group compares as elementary alphanumeric") to MOVE,
-    // where §14.9.25.4 GR4 governs. The legacy oracle's "04N" (once mislabelled non-conformant) is in fact the
+    // where §14.9.25.4 GR4 governs. The former legacy engine's "04N" (once mislabelled non-conformant) is in fact the
     // SPEC-CORRECT value. The elementary-receiver de-sign (SignedToAlphanumeric_NegativeMagnitude → "123") stays
     // correct — GR6a DOES apply there. Version-invariant (GR4 unchanged across editions).
     public void SignedToAlphanumericGroup_SignPreserved()
@@ -101,7 +101,7 @@ public sealed class SignedAlphanumericMoveDifferentialTests
     [Theory]
     // Boundary guard: the de-signing is scoped to the ALPHANUMERIC (string) comparison branch ONLY. A signed numeric
     // compared against a NUMERIC literal is an algebraic comparison (ISO §8.8.4.2.1) — the sign is significant and is
-    // NOT dropped — so -5 ≠ 5 but -5 = -5. (Spec and the legacy oracle agree here.)
+    // NOT dropped — so -5 ≠ 5 but -5 = -5. (Spec and the former legacy engine agree here.)
     [InlineData("    IF SN = 5 DISPLAY \"EQ\" ELSE DISPLAY \"NE\" END-IF.", "NE")]
     [InlineData("    IF SN = -5 DISPLAY \"EQ\" ELSE DISPLAY \"NE\" END-IF.", "EQ")]
     public void SignedVsNumericComparison_StaysAlgebraic(string proc, string expected)

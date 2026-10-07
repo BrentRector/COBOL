@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// DISPLAY-numeric / numeric-edited views over one storage area). The canonical is ONE <see cref="string"/> backing of
 /// class-max width; each view is a typed <c>(offset,width)</c> window over it — a numeric view decodes/encodes via
 /// <c>CobolNum.ParseDisplay</c>/<c>FormatDisplay</c>. A write through any view is visible through every other (one
-/// backing, NO byte[]). Pinned to the legacy oracle (spec-pinned where the legacy DISPLAY trailing-trim quirk shows).
+/// backing, NO byte[]). Pinned to the committed golden (spec-pinned where the legacy DISPLAY trailing-trim quirk shows).
 /// </summary>
 public sealed class RedefinesTierBDifferentialTests
 {

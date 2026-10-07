@@ -74,7 +74,7 @@ the group's image is built on demand (`AsImage()`/`FromImage()`) at the byte bou
 persisted.
 
 ## Key concepts
-- Typed-native only: PIC→CLR field, group→`record struct`, OCCURS→array; no byte engine.
+- Typed-native only: PIC→CLR field, group→`record struct`, OCCURS→array; no byte-array substrate.
 - `long` holds the unscaled value; scale is `PicInfo` metadata; `Int128` above 18 digits.
 - Every operand → one `Place` via the two-phase `ReferenceResolver`; consumed identically by all verbs.
 - One canonical backing per redefines class; views are computed accessors (4-tier A>B>C>D).

@@ -30,7 +30,7 @@ WiseOwl COBOL stores a datum as its VALUE (PIC 9(4)→a long holding unscaled 12
 
 **Rationale.** The only way two typed reps over one storage stay coherent WITHOUT a shared byte[] is for one to be stored and the others derived on access. This is the direct fix for the bug that triggered the greenfield pivot: typed writes were invisible through another view.
 
-**Rejected alternatives.** Materialize-on-demand for BOTH views (no single owner of truth → ambiguous which write wins). Keep a byte[] per RECORD (the legacy byte engine — the rejected substrate).
+**Rejected alternatives.** Materialize-on-demand for BOTH views (no single owner of truth → ambiguous which write wins). Keep a byte[] per RECORD (the legacy engine — the rejected substrate).
 
 ### D2. Never emit two stored fields for one redefines class.
 

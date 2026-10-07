@@ -282,7 +282,7 @@ Each quotation was run through `cite.py --check`. **(group)** marks a row the in
   .NET 11 GA date beyond trade press.
 
 ### 3.2 The precedent: the legacy compiler's direct emission
-`src/CobolSharp.Compiler/CodeGen/CilEmitter.cs` emits IL through Mono.Cecil; its ABI was `public static int
+`legacy-compiler/CodeGen/CilEmitter.cs` emits IL through Mono.Cecil; its ABI was `public static int
 Entry(ManagedPointer[] args)` per program, static LINKAGE fields, alternate `Entry` methods for ENTRY, a name→delegate
 registry. Reusable as technique: the by-name registry with factories, deterministic emission, one emitter per concern.
 Must not come across: the byte `ProgramState`, static LINKAGE fields, the static entry, and Mono.Cecil (a direct

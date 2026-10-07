@@ -31,8 +31,8 @@ milestones (D14): **v1.0 = P15 exit**; **v2 = P16 CIL backend**. See [[kb/Spec/O
 Owner-emphasized, repeatedly corrected:
 
 1. **The ISO spec is authority for EVERY case** — read [[specs/ISO_COBOL]] and cite the § (in code + DEVLOG) for any
-   semantics/syntax/output question. Never guess; never infer behavior from the legacy oracle (a regression net with
-   known non-conformances, NOT authority).
+   semantics/syntax/output question. Never guess; never infer behavior from the NIST goldens or the GnuCOBOL differential (regression nets with
+   known holes, NOT authority).
 2. **Implement each feature FROM its subsystem deep-dive design doc** ([[docs/COBOLNET_DESIGN]] §0.5 indexes them) +
    the spec — follow the doc, do not improvise.
 3. **Implement the COMPLETE feature to the spec + design — NEVER scope to what a test references.** Tests VERIFY; they
@@ -41,7 +41,7 @@ Owner-emphasized, repeatedly corrected:
    every doc except DEVLOG reads as current state (strip how-we-got-here history).
 
 > PROMPT.md rule 1: *"The ISO/IEC 1989:2023 spec defines the correct behavior for EVERY case … READ the spec and CITE
-> the § … Never guess; never infer behavior from the legacy oracle."*
+> the § … Never guess; never infer behavior from a regression net."*
 
 ## Supporting standing rules
 - **Typed-native, no byte substrate** — the greenfield `src/Cobol.Net.*` never routes through a byte `ProgramState`;

@@ -255,7 +255,7 @@ generated-code failure. Roadmap §2.12 / PHASE-07 Steps 5, 11-12.
 
 ### F7 — Edition metadata is duplicated across Frontend and Compiler (no shared home) — MED
 **Location:** `src/Cobol.Net.Frontend/Parsing/EditionGateHints.cs:35-63` (a `Gate` table with `IntroducedIn` +
-ISO citation + `constructs.json` row id, in the **legacy** `CobolSharp.Compiler.Parsing` namespace);
+ISO citation + `constructs.json` row id, in the **legacy** `legacy-root.Parsing` namespace);
 `src/Cobol.Net.Frontend/Parsing/CobolParserCoreBase.cs:17-22` (`DialectLevel` + `is2002/2014/2023`);
 `src/Cobol.Net.Compiler/Binding/EditionContext.cs:26-49` (`DialectLevel`, `MaxDigits`).
 
@@ -285,19 +285,19 @@ frontend copy. Roadmap §2.1 / §2.11 (new assembly, changes 1, 7, 46-48).
 
 ### F8 — Stale legacy namespace inside the greenfield Frontend (assembly/namespace mismatch) — LOW
 **Location:** `src/Cobol.Net.Frontend/Parsing/CobolParserCoreBase.cs:5` (`namespace
-CobolSharp.Compiler.Generated`); `EditionGateHints.cs:6` (`namespace CobolSharp.Compiler.Parsing`); every
+legacy-root.Generated`); `EditionGateHints.cs:6` (`namespace legacy-root.Parsing`); every
 Compiler consumer aliases `using Core = CobolParserCore` (e.g. `DataBinder.cs:7`, `StatementBinder.cs:11`,
 `CSharpEmitter.cs:11`).
 
 **Description.** The assemblies are renamed `Cobol.Net.*` but the code still emits into `namespace
-CobolSharp.Compiler.*` (the pre-PIVOT legacy root) and the ANTLR package is `CobolSharp.Compiler.Generated`. This
+legacy-root.*` (the pre-PIVOT legacy root) and the ANTLR package is `legacy-root.Generated`. This
 is only a cosmetic/understandability coupling, but it forces the `using Core =` alias noise into every file and
 keeps a false "reuses the legacy assembly" mental model.
 
-**Evidence.** `namespace CobolSharp.Compiler.Generated;` (`CobolParserCoreBase.cs:5`) inside the
+**Evidence.** `namespace legacy-root.Generated;` (`CobolParserCoreBase.cs:5`) inside the
 `Cobol.Net.Frontend` project; `using Core = CobolParserCore;` at the top of essentially every binder/emitter file.
 
-**Recommendation.** Complete the `CobolSharp.Compiler.* → CobolNet.*` rename now (single scripted commit, MSBuild
+**Recommendation.** Complete the `legacy-root.* → CobolNet.*` rename now (single scripted commit, MSBuild
 `<AntlrNamespace>` property), decoupled from G8. Roadmap §2.2 (changes 2-3, Wave 0).
 
 ---

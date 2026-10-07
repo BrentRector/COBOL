@@ -1098,7 +1098,7 @@ public sealed class CobolReport(
             // clause is "first" — and which contribute — depends on the PRESENT WHEN values (§13.18.35.4
             // GR4/§13.18.41.4 GR3a/GR3d: absent lines are disregarded by the page fit test).
             // ⚠ The 2023 GR4c wording — "incremented by integer-2 for each *subsequent* LINE clause" — is
-            // ambiguous about the FIRST relative line's integer-2; the NIST goldens and the legacy oracle
+            // ambiguous about the FIRST relative line's integer-2; the NIST goldens
             // resolve it as the sum over ALL relative lines (RW103A overflows exactly at LINE-COUNTER 25 with
             // LAST DETAIL 25 and one PLUS 1 line: 25+1 > 25), and GR5b3 then IGNORES the first line's relative
             // value anyway (first body group on the new page lands at FIRST DETAIL). Encoded as Σ over all.

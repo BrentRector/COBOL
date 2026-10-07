@@ -349,7 +349,7 @@ arm.
 through **`EditionContext.Removed`**, THE policy seam — which already carries documented-dialect-leniency gating
 as well as removed-construct gating — so it is an ERROR under strict and a WARNING with an **unchanged bind**
 under `--permissive`. Never a local `Permissive` test, never a parallel `Lenient()` method. ⛔ The legacy
-`DialectStrictnessChecks` lives only in `src/CobolSharp.Compiler` and must not be revived.
+engine's `DialectStrictnessChecks` (archived, not on `main`) must not be revived.
 
 **Why the tolerated path is safe — and what "tolerated" obliges.** The bind is unchanged under `--permissive`
 because the emitter's status-first branches make a phrase that cannot fire simply dead — a `'2x'` invalid-key
@@ -2396,7 +2396,7 @@ rows; derive 85↔2002 gating from the 2002 standard / the ISO2023_CONFORMANCE_P
   edition parameter for it. Both legs are now asserted at all three editions —
   `conformance:{2002,2014,2023}/pb334_read_previous_sequential` (sequential) and
   `conformance:{2002,2014,2023}/pb343_read_previous_relative` (relative, kb/Work PB343, which also removed the
-  carve-out from the legacy oracle's `RelativeFileHandler`). The relative golden's SPARSE-file phase is what
+  carve-out from the legacy engine's `RelativeFileHandler`). The relative golden's SPARSE-file phase is what
   makes rule b) falsifiable: with the lowest record at RRN 5, OPEN's indicator of 1 names an empty slot, so
   PREVIOUS and NEXT can only name the same record if the rule ignores the direction.
   ⚠ **The INDEXED leg IS gated, and the `<=2014` answer is the first existing record** (kb/Work PB344).

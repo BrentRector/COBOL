@@ -29,7 +29,7 @@ COBOL-85 suite. That era's scaffolding survives in the `create-*.ps1` scripts (p
 The owner reframed the effort as a blank-slate, spec-first rewrite → **COBOL.NET** (compiler `cobol.exe`,
 `src/Cobol.Net.*`): COBOL translated to **idiomatic, typed-native C#** compiled by Roslyn — a COBOL record IS a .NET
 `record struct`, an elementary item IS a native field, numerics are native scaled integers. **There is NO byte
-substrate; the legacy `CobolSharp.Compiler` is kept only as a differential oracle until the G8 cut-over.** The
+substrate; the legacy engine is deleted from `main` (P15 Cut 2).** The
 PROMPT.md non-negotiable rules were "repeatedly corrected 2026-06-08." See [[kb/Architecture/High-Level Design]].
 
 ## The G0–G8 greenfield build order
@@ -48,7 +48,7 @@ records blast radius + gate results.
 > note."*
 
 ## Key concepts
-- CobolSharp (byte engine, NIST-oracle era) → **2026-06-08 pivot** → COBOL.NET (typed-native, spec-first).
+- CobolSharp (the legacy byte-array engine, NIST-oracle era) → **2026-06-08 pivot** → COBOL.NET (typed-native, spec-first).
 - DEVLOG.md is the ONLY historical doc; descending order; real date+time header stamps per commit.
 - Legacy compiler survives only as a differential oracle until G8/P15 cut-over.
 - Doctrine sources: [[PROMPT]], [[CLAUDE]], [[CONSTRAINTS]].

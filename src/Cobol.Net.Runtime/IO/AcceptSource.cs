@@ -14,7 +14,7 @@ namespace CobolNet.Runtime;
 public static class AcceptSource
 {
     /// <summary>The Format 1 transfer size (ISO §14.9.1.4 GR2 — implementor-defined per device): one
-    /// 80-character card-image record, the NIST-proven convention of the legacy engine.</summary>
+    /// 80-character card-image record, the NIST-proven convention.</summary>
     public const int RecordSize = 80;
 
     /// <summary>The ONE clock read every temporal source makes (once per ACCEPT statement): the run unit's

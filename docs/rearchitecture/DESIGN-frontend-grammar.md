@@ -161,16 +161,11 @@ string comparisons (dossier; e.g. `DataBinder.cs:155`), rather than the generate
 parse-tree shape is thus a wide, un-narrowed, stringly-typed cross-assembly contract with no façade: any
 grammar rule rename ripples into dozens of `GetText()` sites invisibly.
 
-### 1.7 Stale namespace/assembly split and stale doc
-Generated code emits into namespace `CobolSharp.Compiler.Generated` while living in assembly
-`Cobol.Net.Frontend` (RootNamespace `CobolNet.Frontend`) — the package name is hard-coded at
-`Invoke-Antlr4CSharp.ps1:29`. Every consumer aliases `using Core = CobolParserCore`. The preprocessor files
-physically live in `src/Cobol.Net.Frontend/Preprocessor/` but still declare
-`namespace CobolSharp.Compiler.Preprocessor` (verified on all five files). `Frontend.cs:16` claims it "is the
-ONE place WiseOwl COBOL reuses the legacy `CobolSharp.Compiler` assembly" — **this is stale**: the preprocessor
-and parse machinery were already physically extracted into `Cobol.Net.Frontend`; only `DiagnosticBag` /
-`TurnEvent` type *namespaces* remain legacy-named, and they too live in this assembly now
-(`Diagnostics/DiagnosticBag.cs`, `Preprocessor/TurnDirectiveProcessor.cs`).
+### 1.7 Namespace/assembly coherence (resolved)
+Generated code emits into namespace `CobolNet.Frontend.Generated`, the same root as the assembly `Cobol.Net.Frontend`
+(RootNamespace `CobolNet.Frontend`); the package name is the csproj's `AntlrNamespace` property. The preprocessor, parsing
+and diagnostics files declare `CobolNet.Frontend.*` (PHASE 01 renamed the stale legacy-assembly namespaces), and `Frontend.cs`
+is self-contained: the preprocessor and parse machinery, `DiagnosticBag` and `TurnEvent` all live in this assembly.
 
 ### 1.8 Committed build-output caches and brittle two-stage error handling
 `Grammar/.antlr/` and `Grammar/Core/.antlr/` hold ANTLR java-target IDE caches checked into the tree
@@ -711,7 +706,7 @@ claimed; it was parse-to-diagnose COBOLNET1518 until then — the LOCALE clause'
 (CLASSIFICATION, and LOCALE / SYSTEM-DEFAULT / USER-DEFAULT in `localePhrase`) are `formatWord`s the §8.9 funnel
 never meets, while a locale-name-1 reference stays a `cobolWord` (kb/Work PB764). The name-less clause form is the 2002 relaxation of the '85 required-name
 format (`computer-name-optional-2002`, `VisitObjectComputerParagraph`); `sourceComputerParagraph` is
-`((computerName debuggingModeClause? unrecognizedClause?)? DOT)?`. The legacy oracle reads the clause list too.
+`((computerName debuggingModeClause? unrecognizedClause?)? DOT)?`.
 
 ### 3.4 Delete dead grammars; quarantine JSON/XML (D5)
 
@@ -729,21 +724,15 @@ format (`computer-name-optional-2002`, `VisitObjectComputerParagraph`); `sourceC
   IDENTIFIERs — verify no lexer rule else-branch depends on them). The vendor JSON/XML→COBOL0313 disposition
   lives in `CobolErrorStrategy` as a token-keyed vendor hint — it is a parse-error re-diagnosis of
   hard-reserved tokens, not an ISO edition gate — so no recogniser is involved.
-- **Frozen-oracle caveat:** the legacy `CobolSharp.Compiler` differential oracle also parses via this
-  frontend. Confirm no legacy test asserts a JSON/XML *parse success*; the dossier states the JSON/XML binder
-  path is loud-fail-by-name already, and the version-matrix `json-generate-2014` row exists only to prove the
-  seam — that row is retired with the grammar.
 
 ### 3.5 Generated-parser build (D7 + D8)
 
 Behavior is already correct (portable flat-output regen, fail-hard, `.gitignored` `Generated/`,
 java+pwsh prerequisites — `Invoke-Antlr4CSharp.ps1`, `GenerateIfNewer.ps1`). Target changes are hygiene:
 
-1. **Package name → MSBuild property.** Replace the hard-coded `$PackageName = 'CobolSharp.Compiler.Generated'`
-   default (`Invoke-Antlr4CSharp.ps1:29`) with a value passed from the csproj:
-   `<AntlrPackage>CobolNet.Frontend.Generated</AntlrPackage>`, threaded via `-PackageName $(AntlrPackage)` on
-   the `Exec` call. This performs the D8 namespace rename with one property and removes every
-   `using Core = CobolParserCore` alias in consumers.
+1. **Package name → MSBuild property (DONE).** The generated namespace `CobolNet.Frontend.Generated` is a csproj property
+   (`AntlrNamespace`) passed to `GenerateIfNewer.ps1` as `-PackageName`; this performed the D8 namespace rename with one
+   property (the `using Core = CobolParserCore` aliases in consumers are a separate cleanup).
 2. **Delete the committed `.antlr/` caches** (`Grammar/.antlr/`, `Grammar/Core/.antlr/`) and add
    `**/.antlr/` to `.gitignore`. They are IDE build output; one caches a dead grammar.
 3. **Narrow the SLL-bail catch** (`Frontend.cs:135`): `catch (Antlr4.Runtime.Misc.ParseCanceledException)`
@@ -1477,9 +1466,6 @@ portion is refused — one diagnostic per violation kind, at its first occurrenc
 | refactor | `Parsing/CobolErrorStrategy.cs:113` | drop the recogniser call; emit structured `Diagnostic`; host the token-keyed vendor JSON/XML→COBOL0313 hint | edition diagnosis moves to the `VersionConformancePass`; keep structure (§3.2, §3.4, §3.8) |
 | create | — | `Cobol.Net.Editions` assembly | shared lowest layer both Frontend + Compiler reference (§2 D4) — owned by DESIGN-edition-framework.md |
 | move | `EditionGateHints` metadata / preprocessor severity copies | `Cobol.Net.Editions` (`ConstructRegistry`, `EditionSeverityPolicy`) | one edition-metadata + one severity source (§1.5, §3.6) |
-| rename | generated ns `CobolSharp.Compiler.Generated` | `CobolNet.Frontend.Generated` (MSBuild property) | remove stale split + `using Core =` aliases (§3.5, D8) |
-| rename | `Preprocessor/*.cs` ns `CobolSharp.Compiler.Preprocessor` | `CobolNet.Frontend.Preprocessor` | stale namespace on physically-moved files (§1.7, §3.6) |
-| rename | `Parsing/*.cs` ns `CobolSharp.Compiler.Parsing`, `CobolSharp.Compiler.Generated` (base) | `CobolNet.Frontend.Parsing` | same stale-namespace cleanup (§1.7) |
 | move | `Diagnostics/DiagnosticBag.cs` ns → `CobolNet.Frontend.Diagnostics` | become the ONE pipeline diagnostic bag | one diagnostic model (§3.8) |
 | create | — | `Cst/` façade namespace (`DataDescriptionCst`, `StatementCst`, …) | typed narrow contract; retire ~336 `GetText()` walks (§3.7) |
 | edit | `Frontend.cs:135` `catch (Exception)` | `catch (ParseCanceledException)` + `RecognitionException` | stop masking predicate/lexer-action bugs (§3.5) |
@@ -1511,9 +1497,7 @@ the `Frontend.cs` catch; fix the stale banner + the line-count `throw`→diagnos
 touches every `using Core =` consumer — a mechanical, compiler-verified sweep. Verify: clean build on
 Windows AND WSL/Linux (portability is the known risk area); battery green.
 
-**M4 — namespace cleanup (preprocessor + parsing).** Rename the `CobolSharp.Compiler.*` namespaces on the
-already-moved frontend files to `CobolNet.Frontend.*`. Pure rename; compiler-verified. Do M3+M4 together if
-convenient (both are namespace sweeps). Verify: battery green.
+**M4 — namespace cleanup (preprocessor + parsing) — DONE (PHASE 01).** The front-end files declare `CobolNet.Frontend.*`.
 
 **M5 — single-source word set.** Create `cobol-words.json` from the current `_dataNameTokens` + `cobolWord`
 contents (mechanical extraction), write `gen-cobol-words.ps1` + the `CobolWordsDriftTests`, wire the
@@ -1570,9 +1554,7 @@ regression bisects to one step.
   FULL legacy guard; the version-matrix negative fixtures (every gated construct probed below its edition)
   are the regression net; annotation actions run only on committed matches, so speculative parses cannot
   mis-name a construct.
-- **R3 (M2, oracle):** the frozen legacy oracle parses via this frontend; deleting JSON/XML could break a
-  legacy test that parsed (even if it loud-failed to bind). Mitigation: grep the legacy + conformance corpus
-  for JSON/XML source before M2; the dossier indicates the seam was never a passing feature.
+- **R3 (M2): retired.** The legacy compiler that also parsed via this front-end is deleted (P15 Cut 2), so no legacy test can depend on JSON/XML parsing.
 - **R4 (M3, portability):** the package-name property + regen must work identically on Windows and Linux
   (the flat-output hazard). Mitigation: the existing portable-regen logic is untouched; only the
   `-package` argument value changes; verify on WSL per `reference_wsl_linux_repro.md`.
@@ -1635,26 +1617,22 @@ regression bisects to one step.
    land before it. Should the frontend ship M1–M7 first and defer M8 to the binder track, or co-develop the
    façade as the binder's first refactor? Recommendation: defer M8 to the binder track; it is enabling
    infrastructure for that work, not standalone frontend cleanup.
-4. **Generated-namespace rename timing (M3 vs G8).** This design brings the `Generated` namespace rename
-   forward (it is free and deletes the `using Core =` aliases). Confirm this does not conflict with the
-   planned G8 big-bang cut-over of the *legacy* `CobolSharp.Compiler` assembly (they are independent — this
-   renames only the frontend's generated code — but the owner tracks G8 holistically).
+4. **Generated-namespace rename timing (M3 vs G8) — RESOLVED.** The `Generated` namespace rename was brought forward
+   (PHASE 01); it renames only the front-end's generated code and was independent of the legacy assembly, which is now deleted.
 5. **SUBSCRIPT-mode elimination — D10 = FULLY REMOVE (§9 below is the design).** The owner ruled the SUBSCRIPT
    mode + the binder subscript re-parse are removed rather than deferred; the token-body dedup (§3.3b) is in the
-   tree, and the removal itself (**§9**) is scheduled for PHASE 15 §"CUT 2.5" (it cannot land while the frozen
-   legacy compiler shares the `SUB_*` grammar — §9.3). It still needs ONE owner decision — the space-separator
+   tree, and the removal itself (**§9**) is scheduled for PHASE 15 §"CUT 2.5" (it needed the legacy compiler, which
+   shared the `SUB_*` grammar, deleted first — §9.3; done at Cut 2). It still needs ONE owner decision — the space-separator
    question (§9.4) — resolved before the §9.5 stages run.
 
 ---
 
 ## 9. D10 — SUBSCRIPT-mode removal (owner override): design + the one open decision
 
-> **Status: DESIGN — scheduled for PHASE 15 §"CUT 2.5", sequenced immediately AFTER PHASE 15 Cut 2 deletes the
-> legacy `src/CobolSharp.*` tree — the event that clears the §9.3 entanglement (the frozen legacy compiler is the
-> sole remaining consumer of `SUB_*`/`SubscriptEntryContext`). The executing session resolves the §9.4 decision
-> FIRST, then runs the §9.5 D10.1–D10.5 stages. This is a MAJOR multi-stage rearchitecture sub-track (a
-> shared-grammar + ~250-line binder-parser rewrite); it is not doable while the legacy compiler shares the
-> grammar, which is why it lands at PHASE 15 rather than earlier.**
+> **Status: DESIGN — scheduled for PHASE 15 §"CUT 2.5" (kb/Work PB2113), unblocked by PHASE 15 Cut 2, which deleted the
+> legacy compiler that was the sole other consumer of `SUB_*`/`SubscriptEntryContext` (§9.3). The executing session resolves
+> the §9.4 decision FIRST, then runs the §9.5 D10.1–D10.5 stages. This is a MAJOR multi-stage rearchitecture sub-track (a
+> shared-grammar + ~250-line binder-parser rewrite).**
 
 ### 9.1 Goal
 Replace the lexer **SUBSCRIPT mode** (`CobolLexer.g4` — entered via `LPAREN` after a data-name token, emits the
@@ -1686,17 +1664,13 @@ The mode is not gratuitous; it solves two problems a naïve DEFAULT-mode rule re
   identically, so the relative-offset-vs-signed-literal distinction and the `-15.6` fraction-drop hazard
   (`CobolLexer.g4` SIGNED_DECIMALLIT must precede SIGNED_INTEGERLIT) can no longer be re-derived from tokens alone.
 
-### 9.3 ⚠ Entanglement with the frozen legacy compiler
+### 9.3 Entanglement with the legacy compiler — CLEARED
 The old **structured** subscript rules `subscriptList / subscriptEntry / subscriptQualification / relativeOffset`
-(`CobolParserCore.g4`) are dead in the GRAMMAR (rooted at the unreferenced `subscriptList`) — BUT the generated
-`CobolParserCore.SubscriptEntryContext` type is still consumed by the **frozen legacy** compiler
-(`CobolSharp.Compiler/…/ExpressionBinder.cs:1306 BindSubscriptEntry`). So the planned "D10.0 delete the 4 dead
-rules, byte-neutral, land immediately" is **NOT byte-neutral** — it breaks the legacy build (verified: `CS0426`).
-The `SUB_*` tokens are likewise shared with the legacy path. **Consequence:** the SUBSCRIPT machinery cannot be
-fully removed from the SHARED grammar until the frozen legacy compiler is retired (**PHASE 15 / G8**), unless D10
-is willing to (a) modify the frozen oracle (against its "differential net until cut-over" purpose) or (b) fork the
-grammar so greenfield and legacy diverge (against singular-pattern). This re-sequences D10 to sit AFTER — or to
-land ON — the G8 cut, not inside PHASE 04's byte-neutral window.
+(`CobolParserCore.g4`) were dead in the grammar (rooted at the unreferenced `subscriptList`), but the generated
+`CobolParserCore.SubscriptEntryContext` type was still consumed by the legacy compiler's `ExpressionBinder.BindSubscriptEntry`,
+so deleting the dead rules broke the legacy build (`CS0426`) and the `SUB_*` tokens were shared with the legacy path. P15 Cut 2
+deleted that compiler (kb/Work PB2110), so the SUBSCRIPT machinery no longer has a second consumer and D10 is no longer
+sequenced behind a deletion. The removal itself is kb/Work PB2113.
 
 ### 9.4 ⛔ THE OPEN DECISION (owner) — does WiseOwl COBOL preserve ISO §8.3.5 space-separated lists?
 This is the gating question; §9.5's staging depends on the answer.

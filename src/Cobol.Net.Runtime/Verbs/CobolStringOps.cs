@@ -21,7 +21,7 @@ public static class CobolStringOps
     /// the sender — moves the whole sender). Characters move one at a time at position <paramref name="pointer"/>,
     /// which increments after each character and is changed by nothing else (GR6); before EACH move, a pointer
     /// &lt; 1 or &gt; the receiver size sets <paramref name="overflow"/> and stops all transfer (GR8a/b — note the
-    /// &lt; 1 arm: a zero/negative POINTER overflows without writing, a check the legacy engine lacked). An
+    /// &lt; 1 arm: a zero/negative POINTER overflows without writing). An
     /// already-set <paramref name="overflow"/> short-circuits: GR8a terminates transfer for the REST of the
     /// statement, not just the current operand. A sending operand with nothing to move performs no pointer check
     /// (GR8 guards each character move — zero moves, zero checks, no overflow).

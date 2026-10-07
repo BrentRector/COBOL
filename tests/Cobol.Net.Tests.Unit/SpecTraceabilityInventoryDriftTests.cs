@@ -588,7 +588,7 @@ public sealed class SpecTraceabilityInventoryDriftTests
     /// <remarks>
     /// Two ways to fail. The FORM can be inherently differential (a NIST CCVS golden, a characterization
     /// snapshot). Or the form can be spec-derived-capable while the specific test is not: an xUnit test named
-    /// <c>*_MatchesLegacy</c> says in its own name that its expected value came from the legacy engine, which
+    /// <c>*_MatchesLegacy</c> says in its own name that its expected value came from the former legacy engine, which
     /// CLAUDE.md rule 1 forbids as authority. Keying on the repo's own naming convention is narrow, but it is
     /// exact where it applies, and it fails LOUDLY rather than quietly accepting a differential as coverage.
     /// </remarks>

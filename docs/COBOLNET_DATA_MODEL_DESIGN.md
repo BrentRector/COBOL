@@ -1566,7 +1566,7 @@ cannot render.
 · *Migrate `RefModPlace.Start`/`Length` to `BoundExpr`* — **forbidden here**: they are the documented **D10
   TRANSITIONAL carrier**, deliberately the same shape as `RefModSpec` "so PHASE 15 migrates both in one move
   rather than leaving a second, differently-shaped ref-mod behind", and **D10 is an owner ruling relocated to
-  PHASE 15 §"CUT 2.5"**, blocked while the frozen legacy compiler still shares `SUB_*`/`SubscriptEntryContext`.
+  PHASE 15 §"CUT 2.5"** (kb/Work PB2113; unblocked by Cut 2, which deleted the legacy compiler that shared `SUB_*`/`SubscriptEntryContext`).
   The string carrier is deliberate sequencing, not decay.
 
 **The decision.** Materialize what §15.4 already describes. Bind the function through the ONE function pipeline

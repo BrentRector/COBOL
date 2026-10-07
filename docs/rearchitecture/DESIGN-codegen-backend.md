@@ -115,7 +115,7 @@ H1 staleness class is closed by construction rather than by discipline.
   `FieldEmitter.GroupValueText` hard-code the `"` delimiter while `DecodeCobolString` handles both — a singular-pattern
   violation that corrupts data with no diagnostic. The `CsLiteralCodec` consolidation below fixes it structurally.
 - **Naming collision:** a second unrelated `EmissionContext` exists in the legacy tree
-  (`src/CobolSharp.Compiler/CodeGen/Emission/EmissionContext.cs`).
+  (`legacy-compiler/CodeGen/Emission/EmissionContext.cs`).
 
 ### 1.7 `RoslynBackend` throughput + packaging
 The framework `MetadataReference` set is built once and cached (`static readonly Lazy<ImmutableArray<MetadataReference>>`
@@ -469,7 +469,7 @@ smallest-blast-radius first; each step is behavior-neutral and independently com
   Mono.Cecil with private branch lowering; add `--backend cil`; the differential harness cross-checks Roslyn vs CIL
   stdout. Only possible because M7 made the tree neutral.
 
-**Green-keeping tools:** the differential harness (Roslyn output vs legacy oracle vs `nist/valid/*.txt`) at every step;
+**Green-keeping tools:** the differential harness (Roslyn output vs the committed goldens vs `nist/valid/*.txt`) at every step;
 `guard-fast.sh` before every commit; the new "no bare `Cobol*.` in `CodeGen/`" analyzer test after M3; the
 compile-error-on-missing-visitor-arm after M4.
 

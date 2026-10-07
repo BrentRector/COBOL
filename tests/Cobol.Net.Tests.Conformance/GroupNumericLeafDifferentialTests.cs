@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Conformance;
 /// subordinate can legitimately hold non-numeric characters (spaces). WiseOwl COBOL stores such a leaf as its character
 /// image (a <c>string</c>) — NOT a lossy native <c>long</c> — so the group image is byte-faithful (no byte[] — the
 /// owner-locked no-byte-substrate model; COBOLNET_DESIGN §14.4 / §4 Tier-B). Numeric use of the leaf decodes via
-/// <c>CobolNum.ParseDisplay</c> / formats via <c>FormatDisplay</c>. Pinned to the legacy oracle, spec-pinned where
+/// <c>CobolNum.ParseDisplay</c> / formats via <c>FormatDisplay</c>. Pinned to the committed golden, spec-pinned where
 /// the legacy DISPLAY trailing-trim quirk shows internal spaces.
 /// </summary>
 public sealed class GroupNumericLeafDifferentialTests

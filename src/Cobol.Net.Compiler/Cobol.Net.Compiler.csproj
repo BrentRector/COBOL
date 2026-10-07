@@ -9,7 +9,7 @@
     is what the CLI and the tests reference. RootNamespace is the single token CobolNet; the shared front-end's
     namespaces were renamed to CobolNet.Frontend.* at rearchitecture PHASE 01 (no longer a G8 big-bang).
 
-    Transitional reuse (front-end only — NOT the byte engine): the proven preprocessor + ANTLR lexer/parser live
+    Front-end reuse (no byte-array substrate): the proven preprocessor + ANTLR lexer/parser live
     in Cobol.Net.Frontend; we consume ONLY its public front-end (preprocessing + parse tree).
   -->
   <PropertyGroup>

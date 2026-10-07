@@ -23,7 +23,7 @@ tags:
 The generated C# program is a thin orchestrator that calls into **`Cobol.Net.Runtime`** (`CobolNet.Runtime.*`). The
 runtime is **typed-native**: a COBOL record is a .NET `record struct`, an elementary item is a native field
 (`long`/`Int128`/`double`/`string`/`bool`), and every verb is a value-in/value-out static helper. There is **no
-persistent byte-array `ProgramState` substrate** and no fallback to the legacy byte engine — byte images exist only
+persistent byte-array `ProgramState` substrate** and no fallback to a byte-array engine — byte images exist only
 transiently at the file/CODE-SET/category-mismatch boundary, produced by a compiler-generated per-layout codec.
 Semantics live in the binder/bound tree; backends (`--backend roslyn|cil`) only render calls to the same runtime API.
 Code is organized under `Values/`, `IO/`, `Intrinsics/`, `Control/` (+ `Signals/`), `Exceptions/`, `Verbs/`. See

@@ -8,8 +8,8 @@
 
 > **Status: LIVE — brief overview (companion to the SSOT `docs/COBOLNET_DESIGN.md`).** The overview of the blank-slate rewrite
 > directed by the owner on 2026-06-08: *"Move entirely to .NET representations for COBOL objects … totally
-> rewrite it … the best possible COBOL to .NET implementation."* It supersedes the byte-substrate compiler in
-> `src/CobolSharp.Compiler` (the *legacy* engine, kept only as a differential oracle until cut-over, task G8) and the
+> rewrite it … the best possible COBOL to .NET implementation."* It supersedes the byte-substrate legacy engine (deleted from `main`,
+> P15 Cut 2; archived, see `docs/rearchitecture/LEGACY-ARCHIVE.md`) and the
 > pre-PIVOT byte-engine "data-model migration" plan (the greenfield is
 > born typed-native, no migration). See memory `feedback_typed_native_only`.
 
@@ -51,7 +51,7 @@ source.cob
   → Emit C# (CobolNet.CodeGen.CSharpEmitter → CodeWriter)                                    [all tasks]
   → Compile C# (CobolNet.CodeGen.RoslynBackend → Roslyn CSharpCompilation) → assembly + .g.cs
 Runtime: CobolNet.Runtime — CobolNum (numeric), CobolString (character), ManagedPointer, format/file helpers
-         (reused from the clean, oracle-verified typed substrates; NO byte engine)
+         (reused from the clean, oracle-verified typed substrates; NO byte substrate)
 ```
 
 **Reuse line (deliberate, audited):** only the ANTLR grammar + lexer/parser/preprocessor (a declarative,
@@ -103,8 +103,8 @@ subsets. (Task G4.)
   `ICodeGenBackend`.
 - `src/Cobol.Net.Runtime/` — the runtime the generated C# calls (`CobolNum`, string ops, file connectors).
 - `src/Cobol.Net.Cli/` — the CLI shell (exe `cobol`; `--std`, default COBOL-2023).
-- `src/CobolSharp.*` — the legacy byte engine: differential oracle + reference ONLY (never authority — the ISO spec
-  is; never a substrate to fall back to). Deleted at G8 cut-over.
+- The legacy engine is deleted from `main` (P15 Cut 2; the tag is named in `docs/rearchitecture/LEGACY-ARCHIVE.md`). It was
+  reference ONLY, never authority (the ISO spec is), and never a substrate to fall back to.
 
 ## 6. Roadmap (tasks)
 

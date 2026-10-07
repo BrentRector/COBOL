@@ -195,8 +195,7 @@ internal sealed class SetAlterBinder(BinderContext ctx)
     /// <para>⛔ THE GROUPS ARE READ, NOT RE-DERIVED (kb/Work PB450). The grammar used to write the printed outer
     /// repetition as an inline <c>SET (dataReference+ TO (ON|OFF))+</c> group, which flattens every phrase into
     /// one <c>dataReference()</c> list and one <c>TO()</c> list — so this method reassembled the grouping by
-    /// comparing token indices, and the LEGACY binder carried a second hand-written copy of the same
-    /// re-assembly. <c>setSwitchPhrase</c> is now the printed unit, so a phrase IS a node and the loop is the
+    /// comparing token indices, a hand-written re-assembly. <c>setSwitchPhrase</c> is now the printed unit, so a phrase IS a node and the loop is the
     /// rule: one group, its receivers, its ON/OFF.</para>
     /// <para>Every receiver must name a settable external switch's mnemonic (SR5) — an unresolvable name fails
     /// loud, never a silent skip.</para>

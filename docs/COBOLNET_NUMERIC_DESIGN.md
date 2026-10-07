@@ -183,7 +183,7 @@ NUMERIC-EDITED formatting: PORT the proven two-pass legacy `PicRuntime.FormatByE
 
 ### D4. Port the legacy two-pass NUMERIC-EDITED formatter (PicRuntime.FormatByEditPattern + FormatNumericEdited) verbatim into a value-level `CobolEdit.Format(CobolInt value, EditPattern pat, PicEnvironment env) → string`; the edited field's CLR storage is `string`.
 
-**Rationale.** NUMERIC-EDITED is a famously fiddly subsystem (fixed vs floating $ + -, asterisk check-protect, BLANK WHEN ZERO, full-field-blank-on-zero, comma/B suppression inside floating zones, CR/DB, DECIMAL-POINT IS COMMA, CURRENCY SIGN). The legacy engine passes 364 NIST tests, so it is the proven PORTING SOURCE — re-deriving from scratch risks regressions the conformance corpus already covers. AUTHORITY NOTE (process rule #1): the ISO spec (§13.18.40 PICTURE editing rules), not the legacy oracle, defines correctness — validate the ported formatter clause-by-clause against the spec, resolve any legacy↔spec discrepancy to the SPEC (dialect-gated when the behavior is edition-varying), and treat NIST as a regression net that VERIFIES, never scopes. It needs no byte buffer: it produces a C# string directly, which is exactly the edited item's native representation (PicCategory.NumericEdited → `string`).
+**Rationale.** NUMERIC-EDITED is a famously fiddly subsystem (fixed vs floating $ + -, asterisk check-protect, BLANK WHEN ZERO, full-field-blank-on-zero, comma/B suppression inside floating zones, CR/DB, DECIMAL-POINT IS COMMA, CURRENCY SIGN). The legacy engine passes 364 NIST tests, so it is the proven PORTING SOURCE — re-deriving from scratch risks regressions the conformance corpus already covers. AUTHORITY NOTE (process rule #1): the ISO spec (§13.18.40 PICTURE editing rules), not the legacy engine, defines correctness — validate the ported formatter clause-by-clause against the spec, resolve any legacy↔spec discrepancy to the SPEC (dialect-gated when the behavior is edition-varying), and treat NIST as a regression net that VERIFIES, never scopes. It needs no byte buffer: it produces a C# string directly, which is exactly the edited item's native representation (PicCategory.NumericEdited → `string`).
 
 **Rejected alternatives.** (a) Rewrite the editor from the ISO §14.9.x grammar — REJECTED: high regression risk against a battle-tested oracle; the task explicitly says mine the legacy for behavior. (b) Use .NET ToString format strings — REJECTED: cannot express floating insertion, check-protect, overpunch, or COBOL's zero-suppression rules. (c) Keep editing in a byte buffer — REJECTED: no byte substrate; the value→string transform is pure.
 
@@ -370,7 +370,7 @@ unchanged (§14.7.4.3 rule 7); a transcendental intrinsic into a float receiver 
 
 **Edition gate.** The trio introduced 2002 → the `ConstructRegistry` introduction gate stands (COBOLNET0900 below
 2002, silent ≥2002; default `--std` 2023). COMP-1/2 accepted at ALL editions (universal vendor synonyms of the
-conformant usages — a documented asymmetry, matches the legacy oracle).
+conformant usages — a documented asymmetry, matches the legacy engine).
 
 ### D18. Every WORKING SCALE is capped at the receiver's Int128 headroom, and a RECEIVER-LESS float render is not quantized at all (`ReceiverContext.WorkingScale(floor)` / `.Receiverless`).
 

@@ -168,7 +168,7 @@ public sealed class ControlFlowDifferentialTests
     // PERFORM proc-1 [THRU proc-2] [times|until|varying]). The combination THRU + TIMES / THRU + UNTIL was
     // untested before DEVLOG 514, and the binder silently dropped the control phrase when THRU was present —
     // running the proc-1..proc-2 range ONCE instead of N times / until the condition. Spec-derived value asserted
-    // on WiseOwl COBOL, then cross-checked against the legacy oracle.
+    // on WiseOwl COBOL, then cross-checked against the committed golden.
 
     [Fact]
     public void Perform_Thru_Times_RunsRangeNTimes()

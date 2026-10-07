@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// §14.9.28 PERFORM section / THRU incl. the legal INVERTED range; §8.4.2.2 <c>para OF section</c> qualification
 /// and same-section implicit resolution of duplicated paragraph names), and the PERFORM … TIMES once-evaluated
 /// count (§14.9.28 GR7 — body modifications of the count item must not change the iteration count; zero/negative
-/// counts run zero times). Pinned to the legacy oracle (NIST-85 green across the whole PERFORM/GO TO series).
+/// counts run zero times). Pinned to the committed golden (NIST-85 green across the whole PERFORM/GO TO series).
 /// Every program that has a section opens with one too (MAIN-SECT): ISO §14.4.1 — "If one paragraph is in a
 /// section, all paragraphs shall be in sections" (kb/Work PB1146, COBOLNET2797).
 /// </summary>
@@ -98,7 +98,7 @@ public sealed class SectionDifferentialTests
     /// within a section that contains the named paragraph resolves to the paragraph IN THAT SECTION — ISO
     /// §8.4.2.2.1 rule 6 ("the name is a paragraph-name and the section containing the reference also contains the
     /// named paragraph") + §8.4.2.2.3 SR7 ("need not be qualified when referred to from within the same section").
-    /// The legacy oracle resolves this global-first (a version-invariant non-conformance — the rule is unchanged
+    /// The former legacy engine resolves this global-first (a version-invariant non-conformance — the rule is unchanged
     /// since COBOL-85), so this case pins to the spec.</summary>
     [Fact]
     public void UnqualifiedDuplicate_ResolvesWithinOwnSection()

@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// The Report Writer subsystem (ISO/IEC 1989:2023 §13.14–§13.18 report description clauses; §14.9.21 INITIATE /
 /// §14.9.16 GENERATE / §14.9.46 TERMINATE; §8.4.3.15 report counters; §14.9.49 Format 2 USE BEFORE REPORTING) —
 /// the spec-pinned conformance net (COBOLNET_REPORT_WRITER_DESIGN §8). Every expected value derives from the
-/// cited GR, NOT from the legacy oracle: the NIST RW goldens compare only the CCVS print file, never the RWCS
+/// cited GR, NOT from the former legacy engine: the NIST RW goldens compare only the CCVS print file, never the RWCS
 /// report file, and the LEGACY'S REPORT-FILE CONTENT IS DEMONSTRABLY WRONG in two places this net pins as fixed
 /// (a §13.18.53.4 GR1 numeric SOURCE byte-copied left-justified instead of MOVEd through the printable PICTURE;
 /// a blank <c>SOURCE LINE-COUNTER</c>). Counter behavior surfaces through MOVE-to-stdout; report CONTENT

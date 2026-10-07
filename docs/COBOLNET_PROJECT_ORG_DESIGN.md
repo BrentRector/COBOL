@@ -3,22 +3,14 @@
 > **Status: LIVE / authoritative.** The rename to Cobol.NET / cobol.exe, target solution/folder/namespace
 > layout, front-end extraction, no-god-class discipline, and C# 14 usage. Condensed view: `COBOLNET_DESIGN.md` §17.
 
-> **Execution state.** The §1.1 project set, the front-end extraction (§1.4), and the split + rename of the compiler/CLI/runtime (§1.5 steps 1–5) are complete — `src/Cobol.Net.{Frontend,Compiler,Runtime,Cli}` and `tests/Cobol.Net.Tests.{Unit,Conformance}` exist and are green. The no-god-class decomposition of §2 is complete: both the emitter and the binder god classes are fully dissolved (§1.2 / §2 / §2.2 describe the resulting structure). Pending: the G8 cut-over — legacy-engine deletion (§1.5 step 6).
+> **Execution state.** The §1.1 project set, the front-end extraction (§1.4), and the split + rename of the compiler/CLI/runtime (§1.5 steps 1–5) are complete — `src/Cobol.Net.{Frontend,Compiler,Runtime,Cli}` and `tests/Cobol.Net.Tests.{Unit,Conformance}` exist and are green. The no-god-class decomposition of §2 is complete: both the emitter and the binder god classes are fully dissolved (§1.2 / §2 / §2.2 describe the resulting structure). The legacy engine is deleted (P15 Cut 2, `docs/rearchitecture/LEGACY-ARCHIVE.md`); the remaining G8 work is the runtime namespace flip (P15 Cut 3).
 
 ---
 
 # Project Organization & Code-Structure (deep-dive; condensed copy lives in `COBOLNET_DESIGN.md` §17)
 
-> Scope of this section: the target solution/project layout, the front-end extraction, the rename, the no-god-class structural rules, and the C# 14/.NET 10 usage guidelines. It expands `COBOLNET_ARCHITECTURE.md` §5 (which currently sketches the layout in three bullets) into the decision-complete plan. Implementation: **G0 is DONE** (the layout below reflects the current tree, and the emitter and binder god classes are fully decomposed); the namespace-rename + legacy-deletion half lands at **G8** cut-over.
+> Scope of this section: the solution/project layout, the front-end extraction, the rename, the no-god-class structural rules, and the C# 14/.NET 10 usage guidelines. It expands `COBOLNET_ARCHITECTURE.md` §5. Implementation: **G0 is DONE** (the layout below reflects the current tree, and the emitter and binder god classes are fully decomposed); the legacy engine is deleted (P15 Cut 2) and the runtime namespace flip lands with P15 Cut 3.
 
-## A. Findings that drive every decision below
-
-These were verified against the live tree (2026-06-08), not assumed:
-
-1. **The front-end is assembly-cleanly separable.** `CobolNet` consumes exactly four legacy namespaces — `CobolSharp.Compiler.Diagnostics`, `.Generated`, `.Parsing`, `.Preprocessor` (plus `.Common` transitively). The dirs `Parsing/`, `Preprocessor/`, `Diagnostics/`, `Common/`, `Generated/` have **zero** `using` references to the legacy `Semantics`/`IR`/`CodeGen`/`FlowAnalysis` layers, and the front-end does not reference `CobolSharp.Runtime`. So the front-end can be lifted into its own assembly with no code edits to the moved files. *(Current state: the front-end references `Cobol.Net.Editions` and, since kb/Work PB1592, the typed-native `Cobol.Net.Runtime` — see §1.4. It still never references the legacy `CobolSharp.Runtime`.)*
-2. **The dependency the task wants killed is an *assembly* dependency, not a namespace dependency.** Moving `*.cs` files into a new `.csproj` ends the new compiler's reference to `CobolSharp.Compiler.dll` **without renaming a single namespace** — namespaces are independent of the project that compiles them. This lets us split "physical move" (G0) from "cosmetic namespace rename" (G8) and stay green throughout.
-3. **The legacy byte engine must keep parsing.** `COBOLNET_ARCHITECTURE.md` keeps `CobolSharp.Compiler` alive as a differential oracle until G8. After extraction, the *legacy* engine, the legacy CLI, and **both test projects** (all four currently reference `CobolSharp.Compiler.csproj`) must repoint to the new Frontend assembly for parsing/diagnostics. The front-end namespaces are consumed compiler-wide by the legacy `Semantics`/`IR`/`CodeGen` (every parse-tree `CobolParserCore.*` context; `DiagnosticBag` everywhere) — which is *why* a namespace rename has a wide blast radius and is deferred.
-4. **The front-end is more than `.cs`.** It includes the grammar-generation machinery: `Grammar/` + `Grammar/Core/*.g4`, `GenerateIfNewer.ps1`, `Invoke-Antlr4CSharp.ps1`, the `ANTLR4/antlr-4.13.2-complete.jar`, the `EnsureGeneratedFiles`/`CleanGenerated` MSBuild targets, and the `Generated/` output. These move as one unit; the generated namespace is set by the generation script and is held constant through the move.
 
 ---
 
@@ -28,7 +20,7 @@ These were verified against the live tree (2026-06-08), not assumed:
 
 | # | Project (assembly) | Kind | `RootNamespace` | `AssemblyName` | Purpose |
 |---|---|---|---|---|---|
-| P1 | **`Cobol.Net.Frontend`** | library | `CobolNet.Frontend` | `Cobol.Net.Frontend` | Preprocessor + ANTLR lexer/parser + parse-tree + diagnostics. Extracted from `CobolSharp.Compiler`. The single front-end for both the new compiler and (until G8) the legacy oracle. |
+| P1 | **`Cobol.Net.Frontend`** | library | `CobolNet.Frontend` | `Cobol.Net.Frontend` | Preprocessor + ANTLR lexer/parser + parse-tree + diagnostics. The single front-end. |
 | P2 | **`Cobol.Net.Compiler`** | library | `CobolNet` | `Cobol.Net.Compiler` | Bind → backend-neutral bound tree → `ICodeGenBackend` (`--backend roslyn\|cil`: RoslynBackend = primary/v1 C# source; CilBackend = future-additive, with its OWN private structure→branch lowering — NO shared lowered IR). The compiler proper, minus the CLI shell. |
 | P3 | **`Cobol.Net.Cli`** | exe | `CobolNet.Cli` | **`cobol`** | Thin command-line driver (`Main`, arg parsing, file orchestration). Produces **`cobol.exe`**. |
 | P4 | **`Cobol.Net.Runtime`** | library | `CobolNet.Runtime` | `Cobol.Net.Runtime` | The typed-native runtime the *generated* programs call (`CobolNum`, `CobolString`, `NumProfile`, `ManagedPointer`, file/format helpers). |
@@ -37,7 +29,7 @@ These were verified against the live tree (2026-06-08), not assumed:
 
 **Decision — name form.** Assembly/package/folder names use the dotted product brand **`Cobol.Net.*`** (reads as the product "WiseOwl COBOL"); **root namespaces stay the single token `CobolNet`** (e.g. `CobolNet.Frontend`, `CobolNet.CodeGen`). Rationale: dotted `Cobol.Net.*` is the marketing/NuGet identity; `CobolNet` as the namespace root avoids a clash with the `.Net`/`System.Net` reading and keeps `using CobolNet.CodeGen;` clean. One rule, applied consistently. (Owner may prefer `Cobol.Net` namespaces too — trivially flippable since it is just the `<RootNamespace>` value; not load-bearing.)
 
-**Decision — CLI split (P2/P3).** Today `Program.cs` lives *inside* the exe project, so tests cannot reference the compiler without referencing an exe. Split it: `Cobol.Net.Compiler` (library, everything except the CLI shell) + `Cobol.Net.Cli` (exe, `<AssemblyName>cobol</AssemblyName>`, ~120-line driver). This mirrors the proven legacy `CobolSharp.Compiler`/`CobolSharp.CLI` split and lets the test projects reference a library.
+**Decision — CLI split (P2/P3).** Today `Program.cs` lives *inside* the exe project, so tests cannot reference the compiler without referencing an exe. Split it: `Cobol.Net.Compiler` (library, everything except the CLI shell) + `Cobol.Net.Cli` (exe, `<AssemblyName>cobol</AssemblyName>`, ~120-line driver). This lets the test projects reference a library.
 
 **Decision — Diagnostics/Common placement.** Fold `Diagnostics/` and `Common/` into `Cobol.Net.Frontend` (a `Diagnostics/` folder + a `Common/` folder) for v1. They are small (4 + 3 files), have no independent consumer, and a separate `Cobol.Net.Diagnostics` would be premature. Revisit only if a non-frontend consumer of diagnostics appears.
 
@@ -104,61 +96,27 @@ src/Cobol.Net.Runtime/
 
 > The runtime subsystem folders (`Numeric/`, `Text/`, …) mirror `COBOLNET_ARCHITECTURE.md` §3's data-model rows, so a reader maps "COBOL national string" → `Text/` and "USAGE POINTER" → `Pointers/` directly.
 
-### 1.3 Complete item-by-item mapping
-
-| Current item | Verb | Destination |
-|---|---|---|
-| `src/CobolNet/Program.cs` | **split + move** | `Cobol.Net.Cli/Program.cs` (Main + Run); the `CliOptions` record → `Cobol.Net.Cli/CliOptions.cs`; the compile orchestration body → `Cobol.Net.Compiler/CompilerDriver.cs` |
-| `src/CobolNet/Frontend/Frontend.cs` | **move** | `Cobol.Net.Frontend/Pipeline/Frontend.cs` (it *is* the front-end orchestrator; belongs with what it drives) |
-| `src/CobolNet/Binding/*.cs` | move | `Cobol.Net.Compiler/Binding/` |
-| `src/CobolNet/CodeGen/CSharpEmitter.cs` | **decompose + move** | `Cobol.Net.Compiler/Emit/**` (see §2 for the split) |
-| `src/CobolNet/CodeGen/CodeWriter.cs`, `RoslynBackend.cs` | move | `Cobol.Net.Compiler/CodeGen/` (and factor `ReferenceAssemblies`/`RuntimeConfigWriter` out of `RoslynBackend`) |
-| `src/CobolNet.Runtime/**` | move (rename project) | `src/Cobol.Net.Runtime/**`, re-foldered (`CobolString.cs`→`Text/`, `StopRun.cs`→`Control/`) |
-| `src/CobolSharp.Compiler/Parsing/`, `Preprocessor/`, `Diagnostics/`, `Common/`, `Generated/`, `Grammar/`, `ANTLR4/`, `GenerateIfNewer.ps1`, `Invoke-Antlr4CSharp.ps1`, the ANTLR MSBuild targets | **extract** | `src/Cobol.Net.Frontend/` (same subfolder names) |
-| `src/CobolSharp.Compiler/` remainder — `Semantics/`, `IR/`, `CodeGen/` (the 11 `Cil*`/`*Lowerer`), `FlowAnalysis/`, `Compilation.cs`, `CompilationResult.cs` | **retire at G8** | deleted at cut-over; until then stays as `CobolSharp.Compiler` (the differential oracle), now referencing `Cobol.Net.Frontend` |
-| `src/CobolSharp.Runtime/**` | **retire at G8** | the byte engine's runtime; deleted at cut-over (its clean substrates already ported into `Cobol.Net.Runtime`) |
-| `src/CobolSharp.CLI/**` | **retire at G8** | replaced by `Cobol.Net.Cli`; until then repointed to `Cobol.Net.Frontend` |
-| `tests/CobolSharp.Tests.Unit/`, `tests/CobolSharp.Tests.Integration/` | keep (legacy), **add new** | stay until G8 (test the oracle). New `tests/Cobol.Net.Tests.Unit/` + `tests/Cobol.Net.Tests.Conformance/` added in G0; legacy test projects deleted at G8 |
-| `tests/nist/`, `tests/conformance/` | **keep in place** | the corpus is compiler-agnostic; the new conformance test project points at it |
-| `docs/COBOLNET_ARCHITECTURE.md`, `COBOLNET_DESIGN.md` (this doc), `COBOLNET_CONDITIONS_EXCEPTIONS_DESIGN.md` | keep | update §5 of ARCHITECTURE to point here; add a `DOC_INDEX.md` row for `COBOLNET_DESIGN.md` |
+### 1.3 Mapping from the pre-extraction tree — retired
+The G0 extraction is complete and the tree in §1.2 is the record. Nothing maps from the legacy engine, which is deleted from
+`main` (`docs/rearchitecture/LEGACY-ARCHIVE.md`); `tests/nist/` and `tests/conformance/` are compiler-agnostic corpora and stay in place.
 
 ### 1.4 Front-end extraction — how, precisely
 
 The new `Cobol.Net.Frontend.csproj`:
 - Inherits TFM/lang from `Directory.Build.props` (net10.0 / C# 14) — **do not** re-declare.
-- `<PackageReference Include="Antlr4.Runtime.Standard" />` — **no `Version`** (central package management via `Directory.Packages.props`). It needs `Antlr4.Runtime`; it does **not** need `Mono.Cecil` (that was the byte emitter's IL writer).
-- `ProjectReference`s: `Cobol.Net.Editions` (edition metadata) and `Cobol.Net.Runtime` (since kb/Work PB1592). It never references the legacy `CobolSharp.Runtime`. **Why the Runtime edge:** the compile-time expression evaluator (`>>DEFINE`/`>>IF`/`>>EVALUATE` and the CONSTANT binder) carries its values in the runtime's ONE SDIDI decimal engine (`CobolDec`) and selects its arithmetic mode through the ONE per-edition behaviour register (`DialectBehaviors`); ISO Annex E.2 6) and 21) prescribe standard arithmetic for compile-time arithmetic at 2002/2014. The alternative was a second copy of that engine in the front-end, which CLAUDE.md rule 5 rejects (one arithmetic engine). **Layering: `Cobol.Net.Editions` and `Cobol.Net.Runtime` are leaves (they reference nothing in the solution) → Frontend → Compiler → Cli. `Cobol.Net.Runtime` must NEVER reference `Cobol.Net.Frontend` (or the Compiler)**: the runtime is the assembly every generated program loads, and an edge back up would pull the parser into each compiled program's closure and close a cycle.
-- Carries the ANTLR generation: copy `EnsureGeneratedFiles` + `CleanGenerated` targets and the `<None Include="Grammar\…">`/jar items verbatim from the legacy csproj; the `Inputs`/`Outputs` paths stay relative so they work post-move.
-- `<InternalsVisibleTo Include="Cobol.Net.Tests.Unit" />` (replaces the legacy one) if any internals need testing.
+- `<PackageReference Include="Antlr4.Runtime.Standard" />` — **no `Version`** (central package management via `Directory.Packages.props`). It needs `Antlr4.Runtime`; it does **not** need `Mono.Cecil`.
+- `ProjectReference`s: `Cobol.Net.Editions` (edition metadata) and `Cobol.Net.Runtime` (since kb/Work PB1592). **Why the Runtime edge:** the compile-time expression evaluator (`>>DEFINE`/`>>IF`/`>>EVALUATE` and the CONSTANT binder) carries its values in the runtime's ONE SDIDI decimal engine (`CobolDec`) and selects its arithmetic mode through the ONE per-edition behaviour register (`DialectBehaviors`); ISO Annex E.2 6) and 21) prescribe standard arithmetic for compile-time arithmetic at 2002/2014. The alternative was a second copy of that engine in the front-end, which CLAUDE.md rule 5 rejects (one arithmetic engine). **Layering: `Cobol.Net.Editions` and `Cobol.Net.Runtime` are leaves (they reference nothing in the solution) → Frontend → Compiler → Cli. `Cobol.Net.Runtime` must NEVER reference `Cobol.Net.Frontend` (or the Compiler)**: the runtime is the assembly every generated program loads, and an edge back up would pull the parser into each compiled program's closure and close a cycle.
+- Carries the ANTLR generation: the `EnsureGeneratedFiles` + `CleanGenerated` targets and the `<None Include="Grammar\…">`/jar items live in its csproj; the `Inputs`/`Outputs` paths are relative.
+- `<InternalsVisibleTo Include="Cobol.Net.Tests.Unit" />` if any internals need testing.
 
-**Namespaces stay `CobolSharp.Compiler.*` through G0–G7.** The moved files are not edited. Consumers reference the new *assembly*; the `using CobolSharp.Compiler.Parsing;` lines in `Frontend.cs` still resolve. The cosmetic rename `CobolSharp.Compiler.* → CobolNet.Frontend.*` is a single mechanical big-bang at **G8**, when the legacy engine is being deleted anyway — so only the new compiler's `using`s need updating, the smallest possible diff. (Doing it at G0 would force-touch all of legacy `Semantics`/`IR`/`CodeGen`, which we are about to delete — wasted churn.)
+**Namespaces.** The five front-end sub-namespaces are `CobolNet.Frontend.{Common,Diagnostics,Generated,Parsing,Preprocessor}` (rearchitecture PHASE 01, `docs/rearchitecture/PHASE-01-mechanical-rename-deadcode.md`); the legacy tree that once shared them is deleted.
 
-### 1.5 Ordered git-mv sequence (build + guard green per step)
+### 1.5 Ordered git-mv sequence — executed
+The extraction, the runtime and compiler renames, the new test projects and the solution/script/CI update were executed in
+G0 (Steps 1–5); the tree above is the record. The legacy engine and its test projects were deleted at P15 Cut 2 (kb/Work
+PB2110) and are preserved at a git tag (`docs/rearchitecture/LEGACY-ARCHIVE.md`); the runtime namespace flip is P15 Cut 3.
 
-Each step is a self-contained commit; `dotnet build Cobol.Net.sln` (and the guard, once scripts are repointed) is green at the end of each. `git mv` preserves history.
-
-**Step 1 — Extract the front-end (kills the legacy-assembly dependency).**
-1. `git mv` `Parsing/ Preprocessor/ Diagnostics/ Common/ Generated/ Grammar/ ANTLR4/ GenerateIfNewer.ps1 Invoke-Antlr4CSharp.ps1` from `src/CobolSharp.Compiler/` → `src/Cobol.Net.Frontend/`.
-2. Create `Cobol.Net.Frontend.csproj` (with the ANTLR targets); add it to `Cobol.Net.sln`.
-3. Repoint the **four** consumers' `ProjectReference` from `CobolSharp.Compiler.csproj` → `Cobol.Net.Frontend.csproj` **and add** a `CobolSharp.Compiler → Cobol.Net.Frontend` reference (the byte engine now consumes the extracted front-end). Consumers: `src/CobolNet`, `src/CobolSharp.CLI`, both `tests/CobolSharp.Tests.*`. (`CobolSharp.Compiler` keeps its `Cobol.Net.Frontend` ref + its own `Mono.Cecil`/`CobolSharp.Runtime` refs for the byte engine.)
-4. Build. The new compiler no longer references `CobolSharp.Compiler.dll`. ✅ *Goal "stop depending on the legacy assembly" met here, with zero namespace churn.*
-
-**Step 2 — Rename the runtime.** `git mv src/CobolNet.Runtime src/Cobol.Net.Runtime`; rename the `.csproj`; set `<AssemblyName>Cobol.Net.Runtime</AssemblyName>`/`<RootNamespace>CobolNet.Runtime</RootNamespace>`; re-fold (`Text/`, `Numeric/`, `Control/`); update the `RoslynBackend` runtime-DLL path constant (`CobolNet.Runtime.dll` → `Cobol.Net.Runtime.dll`); update `.sln`. Build + run a HELLO compile. ✅
-
-**Step 3 — Split + rename the compiler & CLI.** `git mv src/CobolNet src/Cobol.Net.Compiler`; create `Cobol.Net.Cli` and move `Program.cs`/`CliOptions` into it; extract `CompilerDriver` into the library; set assembly/root-namespace/`OutputType` per §1.1 (Cli `<AssemblyName>cobol</AssemblyName>`); update `.sln`. Build; `cobol hello.cob --run`. ✅
-
-**Step 4 — Add the new test projects.** Create `tests/Cobol.Net.Tests.Unit` + `tests/Cobol.Net.Tests.Conformance`, referencing the new compiler library + the in-place `tests/nist`/`tests/conformance` corpus; add `InternalsVisibleTo`. Legacy test projects untouched (still guarding the oracle). ✅
-
-**Step 5 — Solution / scripts / CI / props (one commit).**
-- `Cobol.Net.sln`: as executed the filename was KEPT (entries updated in place); the `Cobol.Net.sln` brand rename remains an owner-taste option, best bundled with the G8 big-bang.
-- Update the **five** scripts that hardcode paths: `scripts/guard.sh`, `guard-fast.sh`, `guard-run-group.sh`, `nist-batch.sh`, `run-suite.sh` (the `.sln` name and any `src/CobolNet*`/`CobolSharp.*` project paths and the runtime-DLL copy target).
-- Update CI `.github/workflows/build-and-test.yml` (it hardcodes `Cobol.Net.sln` and the two `tests/CobolSharp.Tests.*` paths) in this same commit so CI tracks the rename.
-- `Directory.Build.props` / `Directory.Packages.props` need **no functional change** (TFM/lang/central-versions are name-agnostic); confirm the package-id list still covers `Antlr4.Runtime.Standard`, `Microsoft.CodeAnalysis.CSharp`, the test packages. (`Mono.Cecil` becomes legacy-only; keep its `PackageVersion` until G8.)
-- Full guard green. ✅
-
-**Step 6 — (at G8, not G0) Namespace big-bang + legacy deletion.** Delete `CobolSharp.Compiler` (`Semantics`/`IR`/`CodeGen`/`FlowAnalysis`/`Compilation*`), `CobolSharp.Runtime`, `CobolSharp.CLI`, and the legacy test projects. Rename `CobolSharp.Compiler.* → CobolNet.Frontend.*` across the surviving Frontend files + the new compiler's `using`s (one search-replace, now small because only the new compiler consumes it). Drop the `Mono.Cecil` `PackageVersion` (it returns only as the future-additive `CilBackend`'s IL writer, if/when that backend lands — COBOLNET_DESIGN §18.23). Update the generation script's emitted namespace. Final guard green. ✅
-
-> **`.sln` / config implications, summarized:** central package management means every new `.csproj` `PackageReference` is **version-less**; `Directory.Build.props` is the single TFM/lang/nullable/warnings-as-errors source — projects never re-declare those; the `.sln`, the 5 scripts, and the CI YAML are the only places project/solution *paths* are hardcoded and must move in lockstep (Step 5).
+> **`.sln` / config implications, summarized:** central package management means every `.csproj` `PackageReference` is **version-less**; `Directory.Build.props` is the single TFM/lang/nullable/warnings-as-errors source — projects never re-declare those; the `.sln`, the scripts and the CI YAML are the only places project/solution *paths* are hardcoded.
 
 ---
 
@@ -255,11 +213,3 @@ internal sealed class ArithmeticEmitter(EmitContext ctx)   // GOOD: collaborator
 
 **Standing conventions** (already in force, restated): full XML doc comments on public surface + inline rationale on non-obvious COBOL semantics (with ISO §citations — `feedback_spec_is_the_oracle`); generated C# written to `<name>.g.cs`, always inspectable; `SymbolDisplay.FormatLiteral` for every emitted string literal (never hand-rolled escaping).
 
----
-
-## Historical assembly notes (reconciled 2026-06-10 — kept for provenance)
-
-- This section is the **Project Organization & Code-Structure** chapter; it expands `COBOLNET_ARCHITECTURE.md` **§5** (currently 3 bullets) — add a cross-link there pointing to this doc, and keep ARCHITECTURE's roadmap (G1–G8) authoritative for *feature* sequencing while this doc owns the *structure* sequencing (the new G0).
-- ~~`docs/DOC_INDEX.md` needs a new row for `docs/COBOLNET_DESIGN.md`~~ DONE — the index carries rows for the SSOT and for this doc.
-- Two owner-level decisions are taste calls flagged inline, defaulted but trivially flippable: (a) root namespace `CobolNet` vs `Cobol.Net` (I default to single-token `CobolNet`); (b) rename `.sln` file vs keep filename (I default to rename for brand consistency).
-- Relevant absolute paths: compiler `E:\COBOL\src\CobolNet\CodeGen\CSharpEmitter.cs` (the decomposition target), `E:\COBOL\src\CobolNet\Program.cs` (the P2/P3 split source); front-end extraction set under `E:\COBOL\src\CobolSharp.Compiler\{Parsing,Preprocessor,Diagnostics,Common,Generated,Grammar,ANTLR4}\`; the architecture doc `E:\COBOL\docs\COBOLNET_ARCHITECTURE.md`; consumers to repoint = the 4 `.csproj` referencing `CobolSharp.Compiler.csproj` + 5 scripts under `E:\COBOL\scripts\` + `E:\COBOL\.github\workflows\build-and-test.yml`.

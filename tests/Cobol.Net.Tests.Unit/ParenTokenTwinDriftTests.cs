@@ -16,7 +16,7 @@ namespace CobolNet.Tests.Unit;
 /// token types — the argument-list <c>(</c> of ISO §8.4.3.2.3 SR6 versus an arithmetic grouping <c>(</c> — is
 /// invisible to the compiler's type system: every existing `t.Type is LPAREN` keeps compiling and silently
 /// stops matching half the parens it used to. The GRAMMAR consumers were swept (`functionCall`, `refModPart`);
-/// the CODE consumers were not, and the legacy oracle's <c>MapFunctionArgTokens</c> — which maps a nested call's
+/// the CODE consumers were not, and the former legacy engine's <c>MapFunctionArgTokens</c> — which maps a nested call's
 /// argument tokens down to their SUBSCRIPT-mode twins, and already had an arm for the FNARG_SEPARATOR twin —
 /// silently dropped the paren twins. Cost: <b>31 NIST IF-suite regressions</b>, every one a clean compile that
 /// threw <c>IndexOutOfRangeException</c> at RUN TIME, found only by the 11-minute comprehensive battery. The

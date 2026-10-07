@@ -1134,8 +1134,8 @@ addOperand
 
 // §14.9.2.2 (kb/Work PB134): Format 1 prints `TO {identifier-2 [rounded]}…` (receivers); Format 2 prints
 // `TO {identifier-2 | literal-2}` — ONE operand in a SENDING role, which §8.4.3.1.2 lets a
-// function-identifier fill. Parsed WIDE (the union of the three ADDITIVE alternatives — the frozen legacy
-// compiler reads .receivingArithmeticOperand() off this context by name, so no wrapper rule);
+// function-identifier fill. Parsed WIDE (the union of the three ADDITIVE alternatives, kept apart until the grammar
+// unification, kb/Work PB2114);
 // ArithmeticBinder narrows by the GIVING phrase. functionCall sits OUTSIDE the receiving rules so the
 // §8.4.3.2.3 SR1 drift guard keeps holding the receiving side clean.
 addToPhrase
@@ -1416,7 +1416,7 @@ callByReference
 // arms need no alternative at all — the spine subsumes both, and CallBinder RECOVERS them before it binds
 // (the GR8 reduction, `Gr8Classify`), which is `callByContent`'s discipline rather than its alternation.
 // ⚠ ADDITIVE: `arithmeticExpression()` still exists as a generated accessor and merely returns null on the
-// new arm, which the LEGACY binder (which shares this grammar until the P15 cut-over) now tests for.
+// new arm; the grammar unification is kb/Work PB2114.
 callByValue
     : BY? VALUE (addressIdentifier | arithmeticExpression | literal)   // introduction-gated at BIND time (StatementBinder.Call → ConstructRegistry.Check(CallByValue2002))
     ;
@@ -1433,9 +1433,9 @@ callByValue
 // `arithmeticExpression` subsumes it and the identifier case is recovered in the binder from a sole-dataReference
 // expression (Gr8Classify); and the boolean arm behind `{boolExprAhead()}?` because booleanExpression's leaf is
 // valueOperand and an unguarded alternative is ambiguous with the arithmetic one. ⛔ The `dataReference` arm this
-// rule used to keep for the legacy binder's accessor is what made `BY CONTENT N + 1` read as the two arguments
-// N and +1 (ANTLR resolves the ambiguity to the lower alternative); it is gone and the legacy oracle recovers the
-// sole identifier from the expression exactly as the current binder does (kb/Work PB1135, decision R59).
+// rule used to keep for a second binder's accessor is what made `BY CONTENT N + 1` read as the two arguments
+// N and +1 (ANTLR resolves the ambiguity to the lower alternative); it is gone and the binder recovers the
+// sole identifier from the expression (kb/Work PB1135, decision R59).
 callByContent
     : BY? CONTENT (addressIdentifier | {boolExprAhead()}? booleanExpression | {!numericLiteralIsLeftOperand()}? literal | arithmeticExpression)
     ;

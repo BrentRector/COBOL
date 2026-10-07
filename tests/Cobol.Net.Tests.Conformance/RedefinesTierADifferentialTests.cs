@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// numeric-over-numeric of the same digit count (a 12-digit DISPLAY long reinterpreted at a different implied scale).
 /// One stored field; every other name is a pass-through carrying its own scale/profile, so the shared unscaled value
 /// reinterprets for free (NO byte[]). A write through any view is visible through every other (one backing). Pinned
-/// to the legacy oracle.
+/// to the committed golden.
 /// </summary>
 public sealed class RedefinesTierADifferentialTests
 {

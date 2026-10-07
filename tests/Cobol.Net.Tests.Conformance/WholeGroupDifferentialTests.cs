@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// G6 (core): whole-group MOVE / DISPLAY / compare for a DISPLAY-homogeneous (all-character) group via the generated
 /// <c>AsImage()</c>/<c>FromImage()</c> facility (COBOLNET_DESIGN §14.4). A group is treated as alphanumeric (ISO
 /// §14.9.24): its character image is the concatenation of its leaves. Mixed-usage groups (numeric/COMP leaves) are
-/// the Tier-C byte island, still loud. Pinned to the legacy oracle (spec-pinned where the legacy DISPLAY
+/// the Tier-C byte island, still loud. Pinned to the committed golden (spec-pinned where the legacy DISPLAY
 /// trailing-trim quirk shows).
 /// </summary>
 public sealed class WholeGroupDifferentialTests

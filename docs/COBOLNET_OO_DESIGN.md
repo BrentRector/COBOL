@@ -735,13 +735,13 @@ The pass-1 symbol table records each method's ordered formal parameters with mod
 
 ## Legacy port map
 
-> The legacy OO design docs were deleted; the legacy code (`src/CobolSharp.Compiler`) is the only remaining
+> The legacy OO design docs were deleted; the legacy code (deleted from `main`, archived at the tag in `docs/rearchitecture/LEGACY-ARCHIVE.md`) is the only remaining
 > record. This section records the slice order legacy landed, each slice's portable algorithm/decision, and —
 > explicitly — what is NOT portable (the byte substrate). Port ALGORITHMS and slice sequencing; never the
 > ManagedPointer/ProgramState mechanics.
 
 ### Slice 1 — CLASS-ID + one METHOD-ID + NEW + no-arg INVOKE + USAGE OBJECT REFERENCE — ✅ done (multi-method scoping landed with it via per-method scopes)
-- **Portable — class-unit routing + group checks.** Compilation collects classDefinition contexts alongside program units; a case-insensitive `classNames` set is built up front and fed into semantic-model construction so class names are whitelisted in reference resolution (no undefined-name diagnostic on an INVOKE class target); after bind the module is tagged IsClass / ClassMethodName / BaseClassName (`CobolSharp.Compiler/Compilation.cs:60,125,140-194,531-548,749-767`). Substrate-free; ports directly (greenfield home: the pass-1 class symbol table after CallCollectUnits — see Greenfield seams).
+- **Portable — class-unit routing + group checks.** Compilation collects classDefinition contexts alongside program units; a case-insensitive `classNames` set is built up front and fed into semantic-model construction so class names are whitelisted in reference resolution (no undefined-name diagnostic on an INVOKE class target); after bind the module is tagged IsClass / ClassMethodName / BaseClassName (`legacy-compiler/Compilation.cs:60,125,140-194,531-548,749-767`). Substrate-free; ports directly (greenfield home: the pass-1 class symbol table after CallCollectUnits — see Greenfield seams).
 - **Portable — the object-reference data model.** Usage alt → an Object usage kind + declared class on the symbol (`Semantics/SemanticBuilder.cs:1278,1596`); PIC-less legal → ObjectReference category (`PicUsageResolver.cs:58-60`); occupies NO storage (`StorageLayoutComputer.cs:230-233`); .NET default null IS COBOL initial NULL (no init emitted); usage-mapper default hardened to Unknown so a stray usage keyword can't masquerade as a zero-storage object ref.
 - **NOT portable.** The `static <class> _OBJ_<name>` field registry (`CodeGen/Binder.cs:555-572`) — static fields are correct only for driver-program refs and can't live inside a class instance. Greenfield: an object-ref item is just a C# field of the class type (instance field when it lives in OBJECT data) — the limitation dissolves.
 
@@ -782,7 +782,7 @@ FACTORY (§11.4, D7), PROPERTY (§13.18.42), and EC-OO (Table 13) are net-new he
 9. Subclass-own-data detection must not false-fire on synthesized index-names placed in WS (ISO §8.5.1.2).
 10. Three-level SUPER chains; state allocated exactly once across ctor chaining; PERFORM/GO TO method-local resolution incl. backward GO TO; cross-method PERFORM rejected.
 
-**Reusable test assets:** `tests/conformance/2002/oo_hello|oo_instance_data|oo_method_perform|oo_method_args|oo_inherit|oo_super|oo_self|oo_self_polymorphic|oo_object_group` (.cob + .out goldens — 9 pairs), all compiled strict + run + byte-compared by CorpusRunnerTests (oo_instance_data = trap #1 two-object independence; oo_method_args = USING/RETURNING). The adversarial suite is `tests/Cobol.Net.Tests.Conformance/OoSpineTests.cs` (traps #4/#10, the D8 GOBACK/STOP RUN/EXIT METHOD split, the 0813/0820–0827 diagnostic band). The legacy `OoTests` suite (`tests/CobolSharp.Tests.Integration/OoTests.cs`) remains the port checklist reference.
+**Reusable test assets:** `tests/conformance/2002/oo_hello|oo_instance_data|oo_method_perform|oo_method_args|oo_inherit|oo_super|oo_self|oo_self_polymorphic|oo_object_group` (.cob + .out goldens — 9 pairs), all compiled strict + run + byte-compared by CorpusRunnerTests (oo_instance_data = trap #1 two-object independence; oo_method_args = USING/RETURNING). The adversarial suite is `tests/Cobol.Net.Tests.Conformance/OoSpineTests.cs` (traps #4/#10, the D8 GOBACK/STOP RUN/EXIT METHOD split, the 0813/0820–0827 diagnostic band). The legacy `OoTests` suite (archived at the tag, `docs/rearchitecture/LEGACY-ARCHIVE.md`) was the port checklist reference.
 
 ## Greenfield seams (the compiler seams the OO subsystem plugs into)
 

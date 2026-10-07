@@ -120,7 +120,7 @@ public sealed class CorpusManifestTests
             $"guard-only programs that are not `pending` in corpus.tsv: {string.Join(", ", wrong)}");
     }
 
-    /// <summary>⛔ THE PB750 REGRESSION TEST. Both guards once resolved the legacy byte engine's CLI, whose project
+    /// <summary>⛔ THE PB750 REGRESSION TEST. Both guards once resolved the former legacy engine's CLI, whose project
     /// graph contains no <c>Cobol.Net.Compiler</c>, and drove the whole NIST leg through it, so every battery's
     /// <c>guard NIST: 353 MATCH</c> was a true statement about the ORACLE and no statement at all about the
     /// shipping compiler. This fact fails the moment either guard grows its own CLI path again instead of
@@ -147,7 +147,7 @@ public sealed class CorpusManifestTests
     }
 
     /// <summary>
-    /// ⛔ THE GUARD DRIVES ONE COMPILER (kb/Work R69, PB2109). The legacy byte engine was reachable from the guard
+    /// ⛔ THE GUARD DRIVES ONE COMPILER (kb/Work R69, PB2109). A second (legacy) compiler was reachable from the guard
     /// scripts through a selector arm (<c>GUARD_COMPILER=legacy</c>, <c>COBOLSHARP_LEGACY_DIFFERENTIAL=1</c>), an
     /// exemption list for the programs it diverged on (<c>LEGACY_DIVERGENT</c>, <c>GUARD_DIVERGENT</c>) and its own
     /// Unit and Integration legs. All of it is retired with the engine, and this fact keeps every guard script from
@@ -185,7 +185,7 @@ public sealed class CorpusManifestTests
     /// <c>guard-fast.sh</c> then <c>sed</c>-extracted — so the fact was written down three times and nothing
     /// compared them. It had drifted: THIRTEEN divergent rows, TWELVE names, <c>SQ212A</c> missing, and its
     /// expected difference therefore scored as a REGRESSION while the audit beside it expected an exemption.
-    /// (That exemption list is itself retired with the legacy engine, kb/Work PB2109; the shape this fact
+    /// (That exemption list is itself retired with the former legacy engine, kb/Work PB2109; the shape this fact
     /// forbids is not.)
     /// </para>
     /// <para>

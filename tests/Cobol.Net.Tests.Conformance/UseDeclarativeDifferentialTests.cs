@@ -6,7 +6,7 @@ namespace CobolNet.Tests.Conformance;
 
 /// <summary>
 /// USE AFTER STANDARD ERROR/EXCEPTION DECLARATIVES (ISO/IEC 1989:2023 §14.3 DECLARATIVES, §14.9.49 USE,
-/// §9.1.13.1 exception processing): spec-derived facts at COBOL-85, differential against the legacy oracle
+/// §9.1.13.1 exception processing): spec-derived facts at COBOL-85, differential against the committed golden
 /// (NIST RL/IX/SQ-green). The contract under test: a declarative runs after the FILE STATUS store for an
 /// unsuccessful status NOT covered by the statement's own AT END ('1x') / INVALID KEY ('2x') phrase; file-scoped
 /// USE beats mode-scoped (incl. the failed-OPEN being-opened mode, GR6b); at most ONE declarative per exception

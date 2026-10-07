@@ -38,7 +38,7 @@ public sealed class ArithmeticSendingOperandDriftTests
         {
             var m = Regex.Match(g4, $@"^{rule}\s*\r?\n\s*:(?<body>.*?);", RegexOptions.Multiline | RegexOptions.Singleline);
             Assert.True(m.Success, $"grammar rule '{rule}' not found — if it was renamed or collapsed, this guard "
-                                   + "must move with it (see the class summary: collapse is a CUT 2 action)");
+                                   + "must move with it (see the class summary: the collapse is kb/Work PB2114)");
             bodies[rule] = m.Groups["body"].Value
                 .Split('|', StringSplitOptions.RemoveEmptyEntries)
                 .Select(a => a.Trim())
@@ -57,8 +57,8 @@ public sealed class ArithmeticSendingOperandDriftTests
         foreach (var rule in SendingRules.Skip(1))
             Assert.True(reference.SequenceEqual(bodies[rule]),
                 $"'{rule}' has drifted from '{SendingRules[0]}': [{string.Join(" | ", bodies[rule])}] vs "
-                + $"[{string.Join(" | ", reference)}]. They are ONE rule the legacy freeze forces us to write four "
-                + "times; keep them identical until CUT 2 collapses them.");
+                + $"[{string.Join(" | ", reference)}]. They are ONE rule written four "
+                + "times until kb/Work PB2114 collapses them; keep them identical.");
     }
 
     /// <summary>The receiving side must NOT admit one — <b>§8.4.3.2.3 SR1</b>: "A function-identifier shall not be

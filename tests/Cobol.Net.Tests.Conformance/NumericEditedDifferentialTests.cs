@@ -10,7 +10,7 @@ namespace CobolNet.Tests.Conformance;
 /// (B 0 / , .), MOVE editing (§14.9.25.4 GR5), arithmetic GIVING into edited receivers with ROUNDED applied
 /// BEFORE editing at the mask's scale (§14.7.4/§14.7.7), DIVIDE … REMAINDER (§14.9.12 GR7 — the remainder uses
 /// the TRUNCATED intermediate quotient), and the alphanumeric→numeric MOVE (§14.9.25.4 GR6 unsigned-integer
-/// treatment via <c>CobolNum.FromAlphanumeric</c>). Pinned to the legacy oracle (NIST-85 green).
+/// treatment via <c>CobolNum.FromAlphanumeric</c>). Pinned to the committed golden (NIST-85 green).
 /// </summary>
 public sealed class NumericEditedDifferentialTests
 {

@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// The LINAGE logical-page subsystem (ISO/IEC 1989:2023 §13.18.34 LINAGE clause, §8.4.3.14 LINAGE-COUNTER,
 /// §14.9.51 WRITE GR25–GR28): the per-GR conformance net for the counter state machine, the GR26a/GR26b
 /// end-of-page discrimination, and the GR6b data-name re-evaluation timing. Every behavioral test here is
-/// SPEC-PINNED (expected values derived from the cited rules, not the legacy oracle): the legacy evaluates
+/// SPEC-PINNED (expected values derived from the cited rules, not the former legacy engine): the legacy evaluates
 /// LINAGE data-names ONLY at OPEN OUTPUT — a verified hole vs §13.18.34 GR6b2/GR6b3 (the SQ208M/SQ210M golden
 /// re-baselines) — so it cannot be the authority for this subsystem.
 ///

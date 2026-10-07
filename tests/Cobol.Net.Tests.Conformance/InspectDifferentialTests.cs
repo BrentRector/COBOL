@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// INSPECT (ISO §14.9.22): the GR8 shared comparison cycle (one ordered operand list per statement, across ALL
 /// counters), the per-operand GR9 BEFORE/AFTER regions (with the not-found asymmetry), GR4d signed-numeric
 /// de-sign/re-sign, GR12/GR17 tally/replace adjectives, GR19 format-3 ordering, GR20/GR23 CONVERTING, and the
-/// 2023-only BACKWARD gate. Differential facts pin to the legacy oracle (NIST NC115A/NC122A/NC216A/NC221A-green);
+/// 2023-only BACKWARD gate. Differential facts pin to the committed golden (NIST NC115A/NC122A/NC216A/NC221A-green);
 /// spec-pinned facts cover the places the legacy deviates from the spec (SR6 figurative replacement expansion)
 /// and the post-85 surface the 85-dialect oracle cannot host (BACKWARD).
 /// </summary>
@@ -16,7 +16,7 @@ public sealed class InspectDifferentialTests
 {
     private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source);
 
-    /// <summary>A SPEC-derived expectation (cited at the call site) — used where the legacy oracle is non-conforming
+    /// <summary>A SPEC-derived expectation (cited at the call site) — used where the former legacy engine is non-conforming
     /// or cannot host the dialect; <paramref name="dialectLevel"/> selects the targeted edition.</summary>
     private static void AssertSpecPinned(string source, string expected, int dialectLevel = 85)
     {

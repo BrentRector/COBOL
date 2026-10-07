@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// loops, TEST BEFORE and TEST AFTER shapes, omitted BY (=1), FROM/BY re-evaluated per use, index-name and
 /// numeric induction variables, both inline and out-of-line. Plus the two fixes the NC243A torture exposed:
 /// ALL "literal" repeats to a GROUP receiver's width (§8.3.3.6.4 GR2), and an out-of-range subscript continues
-/// benignly with checking off (§8.4.2.3.4 GR2 — CobolTable.At). Pinned to the legacy oracle (NIST-85 green
+/// benignly with checking off (§8.4.2.3.4 GR2 — CobolTable.At). Pinned to the committed golden (NIST-85 green
 /// across the VARYING series).
 /// <para>⛔ THESE TESTS DO NOT MEASURE THE RESET/AUGMENT ORDERING, and this comment used to claim they did.
 /// Every FROM operand below is a LITERAL, and GR13 e) 2's order — reset the inner induction variable, THEN
@@ -70,7 +70,7 @@ public sealed class PerformVaryingDifferentialTests
 
     /// <summary>SPEC-PINNED (not differential): an omitted BY phrase means augment 1 (ISO §14.9.28 GR12 — "for any
     /// BY phrase that is omitted, the augment value is 1"); three 1..2 levels run the body 2×2×2 = 8 times. The
-    /// LEGACY binder crashes (IndexOutOfRange) on omitted BY with multiple AFTER levels, so it cannot oracle this.</summary>
+    /// former legacy binder crashes (IndexOutOfRange) on omitted BY with multiple AFTER levels, so it cannot oracle this.</summary>
     [Fact]
     public void Varying_ThreeLevels_OmittedBy()
     {

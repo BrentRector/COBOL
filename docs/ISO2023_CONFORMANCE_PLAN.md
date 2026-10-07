@@ -13,7 +13,7 @@
 
 > ⚠️ **PARTIALLY SUPERSEDED (2026-06-09, DEVLOG 521).** This doc predates the greenfield PIVOT (DEVLOG 457): its
 > framing — the byte-engine "data-model migration" being the #1 priority before conformance (§0 / §0.5), stages,
-> EnableTypedFields, "island the byte engine" — is **OBSOLETE** (the greenfield is born typed-native; there is no
+> EnableTypedFields, "island the legacy engine" — is **OBSOLETE** (the greenfield is born typed-native; there is no
 > migration). **Use this doc ONLY for the M2/M3/M4 FEATURE CATALOG (the still-valid list of post-85 features to
 > implement).** ⚠ **Every ☑/◐/🐛 status and every recipe/file path in §1/§3 records the LEGACY byte-engine
 > compiler (`src/CobolSharp.*` — differential oracle only, deleted at G8). In the greenfield `src/Cobol.Net.*` a
@@ -90,7 +90,7 @@ was the **#1 work item of the pre-PIVOT byte-engine era. Do NOT do it now:** the
   oracle → Stage 2 classifier (fallback on) → Stage 3 flip typed one rule at a time (**character data first — the
   cheapest, highest-payoff flip**) → Stage 4 pointers + OO → Stage 5 Roslyn C# backend w/ Cecil oracle → Stage 6
   finalize runtime + post-conformance rename (`CobolSharp` → `WiseOwl COBOL`, exe `cobol.exe`).
-  - **PROGRESS — Stage 0/1 slice 1 LANDED (DEVLOG 394):** ☑ the numeric substrate is in (`src/CobolSharp.Runtime/
+  - **PROGRESS — Stage 0/1 slice 1 LANDED (DEVLOG 394):** ☑ the numeric substrate is in (`legacy-runtime/
     Numeric/`): `CobolRounding` (8 ISO modes), **`CobolDecimal`** (the exact `BigInteger` base-10 carrier — the
     owner-gated substrate), `NumProfile` (runtime numeric descriptor + `FromDescriptor` bridge), **`CobolNum`**
     (`ScaleAndRound`/`TryStore`: scale→round→capacity→SIZE-ERROR, never throws). ☑ the **Stage-1 differential
@@ -132,7 +132,7 @@ was the **#1 work item of the pre-PIVOT byte-engine era. Do NOT do it now:** the
     the doc-only #16 note) / ~14 refuted**. +16 unit tests. Additive — not yet consumed by codegen. Guard
     1175/481/364.
   - **PROGRESS — Stage 0 character substrate `CobolString` LANDED (DEVLOG 399), guard 1184/481/364:** ☑
-    `src/CobolSharp.Runtime/Text/CobolString.cs` — the typed-string analogue of `CobolNum`: COBOL alphanumeric
+    `legacy-runtime/Text/CobolString.cs` — the typed-string analogue of `CobolNum`: COBOL alphanumeric
     MOVE value semantics (`Store` — width/justify/space-fill, ISO §14.9.25/§13.18.36) + ordinal space-extended
     comparison (`Compare`, ISO §8.8.4.2.7 r2) + the Latin-1 `IDataSlot` boundary codec (`FromWindow`/`ToWindow`, ADR
     R10/§2.5). ☑ a **differential oracle** (`CobolStringDifferentialTests`, +9) proves it byte-identical to the
@@ -215,7 +215,7 @@ was the **#1 work item of the pre-PIVOT byte-engine era. Do NOT do it now:** the
     ☑ `SET p TO ADDRESS OF x` (`ManagedPointer.CreateByReference` over x's byte storage; x demoted to byte via
     classifier **trigger 6**), `SET ADDRESS OF b TO p` (copy p's ref into the BASED item's `_PTR_` field), and
     BASED-deref via a new `IrBasedDerefLocation` (`CilLocationEmitter.EmitBasedDerefArgs` pushes (Buffer,Offset,Length)
-    from `_PTR_b` → byte engine reads+writes the pointed-to storage). `DataStatementBinder.BindSetAddress` (both
+    from `_PTR_b` → legacy engine reads+writes the pointed-to storage). `DataStatementBinder.BindSetAddress` (both
     grammar alts, token-order discriminated); `LocationResolver` intercepts a whole BASED reference. Conformance
     `tests/conformance/2002/based_pointer.cob`. **Pointer slice 1b COMPLETE — one `ManagedPointer` representation,
     always-typed, no 8-byte handle.**
@@ -361,7 +361,7 @@ first; large subsystems (pointers, exceptions, OO) last.
 > ⛔ **The ☑/◐ marks below are LEGACY-era. For GREENFIELD truth read `docs/PHASE4_RECONCILIATION.md`**
 > (DEVLOG 610 — the ratified Phase-4 entry audit). Many "done" items (all of §3.2 M2-DATA:
 > BINARY-CHAR / FLOAT / NATIONAL / BIT / POINTER; both §3.1 UDF invocation rows) were done in the RETIRED
-> byte engine and stage LOUD (COBOLNET0899) in the greenfield — Phase 4 reclaims them. The OO umbrella
+> legacy engine and stage LOUD (COBOLNET0899) in the greenfield — Phase 4 reclaims them. The OO umbrella
 > (§3.7, catalogued ◐) is effectively DONE (24 goldens; DEVLOG 600-609). Use the reconciliation table's
 > per-track wave sizing, not these marks, to scope work.
 
@@ -387,7 +387,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   the **category-carrying RETURNING channel** extends it to alphanumeric / numeric-edited / national /
   image-form-group results (every leaf `DataItem.ElementImageCapable` — character-stored or a pinned numeric
   byte form: zoned DISPLAY, binary, packed, COMP-5, IEEE float, INDEX) (§8.4.3.2.4 GR1; golden
-  `udf_returning_categories`, greenfield-only — the frozen legacy carries only numeric results);
+  `udf_returning_categories`, greenfield-only — the legacy carries only numeric results);
   every other RETURNING category — float, boolean, index, data-pointer, object-reference and strong-typed /
   REDEFINES / variable-length groups — is carried too (kb/Work PB1419 deleted the per-shape COBOLNET1510 residues).
 - ☐ **M2-UDF-3 — Separate-compilation user functions (prototypes).** Caller + function in different translation
@@ -469,7 +469,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   (a word standing for no literal `COBOLNET2473`; §12.3.7.3 SR11's symbolic-character operand `COBOLNET2474`), the
   `concat-operator-2002` VersionConformancePass parse-arm gate (0900 at `--std 85`), the enabled
   `tests/conformance/2002/literal_concat` golden (+ `concat_below_2002` / `concat_class_mismatch` negatives)
-  and the active version-matrix row. Never existed in the legacy oracle (GreenfieldOnly).
+  and the active version-matrix row. Never existed in the legacy engine (GreenfieldOnly).
 - ◑ **M2-DATA-5 — Pointers & based addressing. PHASE-1 DONE (DEVLOG 389); Phase-2 = managed .NET refs, done in the data-model Stage 4 (NOT gated).** **[A] HIGH.**
   **Phase-1 COMPLETE:** `USAGE POINTER` (8-byte opaque handle, no PIC), `NULL`, `SET p TO NULL` / `SET p TO q`,
   `= NULL` / `NOT = NULL` / `= q` equality; pointer↔non-pointer MOVE rejected (CBL0901); `VALUE` on a pointer

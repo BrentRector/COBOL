@@ -565,7 +565,7 @@ readAtEnd
 // carries none in ALL FIVE statements that have the phrase — DELETE (p635), READ (p722), REWRITE (p740),
 // START (p784) and WRITE (p816) — so `INVALID <imperative>` is conforming ISO. The same mistake was made for
 // the RECORD KEY clause above (p359: RECORD and SOURCE underlined, KEY and IS not) and for COLLATING in
-// SORT/MERGE (p687, p776). The legacy compiler's strict mode used to DIAGNOSE all of these (CBL3611–3618), i.e. it
+// SORT/MERGE (p687, p776). A strict-mode check once DIAGNOSED all of these (CBL3611–3618), i.e. it
 // reported conforming source; those checks and codes are retired (kb/Work PB756). The grammar accepting them is
 // correct. 'INVALID' is a reserved word, so `KEY?` is unambiguous. Applies to all five INVALID KEY phrases below.
 // ISO 5.2.6.4: the positive and negative phrases are enclosed in CHOICE INDICATORS (| bars inside the
@@ -886,7 +886,7 @@ sortCollatingPhrase
     // COLLATING is an OPTIONAL word (kb/Work PB1139): the printed formats (§14.9.40.2, §14.9.24.2) underline only
     // SEQUENCE in `COLLATING SEQUENCE`, and §5.2.2 / §5.2.3 make the underlining — not the absence of brackets — what
     // requires a word. `SEQUENCE alphabet-name` (the CCVS85 suite's ST139A spelling) is therefore the standard's own
-    // form, not a leniency to flag; the legacy oracle's CBL3617/CBL3618 premise ("unbracketed so required") was the
+    // form, not a leniency to flag; the retired CBL3617/CBL3618 premise ("unbracketed so required") was the
     // misreading, and both codes are retired (kb/Work PB756).
     // COLLATING SEQUENCE {IS alphabet-name-1 [alphabet-name-2] | {FOR ALPHANUMERIC IS alphabet-name-1 |
     // FOR NATIONAL IS alphabet-name-2}…} (ISO §14.9.40.2 / §14.9.24.2). alphabet-name-2 + the FOR forms

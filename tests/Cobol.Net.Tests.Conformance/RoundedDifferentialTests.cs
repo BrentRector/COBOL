@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// The ROUNDED phrase on arithmetic statements (ISO/IEC 1989:2023 §14.7.4): a bare <c>ROUNDED</c> rounds
 /// NEAREST-AWAY-FROM-ZERO (§14.7.4.3 r1 / §11.9.6 r2), <c>ROUNDED MODE IS x</c> selects one of the eight modes, and
 /// no phrase truncates toward zero (r2). The MODE-variant cases are pinned to <b>hand-computed spec values</b> (the
-/// rounding-mode definitions in §14.7.4.3 r3–r10), not to the legacy oracle — the legacy's NIST-85 corpus only ever
+/// rounding-mode definitions in §14.7.4.3 r3–r10), not to the committed golden — the legacy's NIST-85 corpus only ever
 /// exercises bare ROUNDED, so it is a weak witness for the seven other modes (process rule: the spec is authority,
 /// the oracle is a net). Bare ROUNDED (the COBOL-85 default) is cross-checked against the legacy.
 /// </summary>
@@ -24,7 +24,7 @@ public sealed class RoundedDifferentialTests
         Assert.Equal(expected, outp);
     }
 
-    /// <summary>Assert WiseOwl COBOL produces byte-identical stdout to the legacy oracle.</summary>
+    /// <summary>Assert WiseOwl COBOL produces byte-identical stdout to the committed golden.</summary>
     private static void AssertMatchesGolden(string source) => DifferentialGolden.Assert(source, 2014);
 
     private static string Program(string ws, string proc) => $"""

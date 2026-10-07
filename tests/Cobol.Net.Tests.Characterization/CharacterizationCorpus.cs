@@ -66,7 +66,7 @@ public static class CharacterizationCorpus
 /// <summary>Probes a program through the PUBLIC <see cref="CompilerDriver"/> API only (no production seam): a
 /// CheckOnly compile captures the WiseOwl COBOL diagnostic surface without Roslyn; a full compile writes the <c>.g.cs</c>
 /// sidecar the emit snapshot reads. The Characterization project references the greenfield compiler ONLY, so this
-/// never touches the legacy engine.</summary>
+/// never touches a second compiler.</summary>
 public static class CompilerProbe
 {
     public static ProbeResult Probe(string sourcePath, int edition, bool emit)

@@ -16,6 +16,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Cobol.Net.Tests.Unit" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The edition/diagnostics leaf (rearch PHASE 02): the frontend reads the ONE ConstructRegistry +
          EditionInfo + EditionSeverityPolicy instead of re-encoding edition metadata (the parse-layer residue
          is ReservedWordEditionHints). Editions is BELOW Frontend — it references nothing here. -->

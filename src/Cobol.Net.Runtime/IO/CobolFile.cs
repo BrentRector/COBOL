@@ -364,7 +364,7 @@ public static class CobolFile
 
     /// <summary>Resolve an ASSIGN target to a host file path: a target that already looks like a path (has a
     /// directory separator or an extension) is used verbatim; otherwise it becomes <c>&lt;lowercased&gt;.txt</c> in the
-    /// current directory — the convention the legacy oracle uses, so the differential corpus finds the same file.</summary>
+    /// current directory — the convention the NIST and differential corpora rely on to find the same file.</summary>
     public static string ResolveHostPath(string assignTarget)
     {
         // An EMPTY target identifies NO physical file, and the empty host path is exactly how a connector says

@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// defaults (numeric/numeric-edited → ZEROES through MOVE editing, the others → SPACES), REPLACING category
 /// selection with full MOVE semantics (GR5c2/GR6b), the FILLER and REDEFINES exclusions (GR5a2/GR5a3), OCCURS
 /// expansion of every occurrence (GR5b2), and multi-identifier order (GR3). The COBOL-85 facts are differential
-/// against the legacy oracle (NIST NC223A/NC201A-proven for this verb); the 2002+ surface (WITH FILLER) is
+/// against the committed golden (NIST NC223A/NC201A-proven for this verb); the 2002+ surface (WITH FILLER) is
 /// spec-pinned at --std 2023 and edition-REJECTED at 85 (the VERSION TEST MATRIX invariant — a construct is
 /// rejected below its introducing edition).
 /// </summary>
@@ -173,7 +173,7 @@ public sealed class InitializeDifferentialTests
             """));
 
     // §14.9.20 GR5a2 (the 2002+ FILLER phrase, Annex E): WITH FILLER re-includes FILLER elementary items.
-    // Spec-pinned at --std 2023 (the legacy oracle has no 2002 surface): the bare form leaves the FILLER bytes
+    // Spec-pinned at --std 2023 (the former legacy engine has no 2002 surface): the bare form leaves the FILLER bytes
     // ('  FF00' — P1 spaces, FILLER kept, P2 zeros), WITH FILLER clears them too ('    00').
     [Fact]
     public void Initialize_WithFiller_2023_IncludesFillerItems()

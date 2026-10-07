@@ -21,12 +21,12 @@ and R3 over binding and code generation wait for GAP near zero. PB1754 is the de
 same change when implementation proves it wrong (rule 5). Phases: R0 baseline and oracle · R1 target architecture ·
 R2 review fleet · R3 restructuring waves · R4 modernization · R5 close. The work items are the `PB1754` cluster in
 `kb/Work` (R0: PB2115 census · PB2116 oracle · PB2117 performance baseline; R1: PB2118; Delete: PB2119). The legacy
-engine's deletion is the `PB2108` cluster, implemented from the plan's PHASE-15 section, not from this skill.
+engine's deletion was the `PB2108` cluster (landed), implemented from the plan's PHASE-15 section, not from this skill.
 
 ## Preconditions specific to this project
 
-- **Never refactor the legacy `CobolSharp.*` engine** (~46,000 lines). kb/Work PB2110 deletes it; until then the
-  census and every wave exclude `src/CobolSharp.*` (`.agent-fleet.json` already indexes `src/Cobol.Net.*` only).
+- **There is no legacy engine to refactor.** kb/Work PB2110 deleted it (`docs/rearchitecture/LEGACY-ARCHIVE.md` names the
+  tag); the census and every wave cover `src/Cobol.Net.*` (`.agent-fleet.json` indexes that tree only).
 - **The approved `DESIGN-external-repository.md` is given, not reopened.** Its slices PB2097–PB2104 are in flight;
   R1 designs around them and a wave never touches a file an in-flight slice names.
 - **The fix lane is partitioned**, never paused: a wave's brief declares its file set, and it is checked against the

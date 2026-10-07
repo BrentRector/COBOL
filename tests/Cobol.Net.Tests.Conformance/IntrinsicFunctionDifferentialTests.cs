@@ -7,7 +7,7 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// The intrinsic-function catalog (ISO §15; COBOLNET_INTRINSICS_DESIGN spine 1; the Phase-1B brief). Two nets:
 /// <list type="bullet">
-///   <item><b>Differential</b> — pinned to the legacy oracle where it is sound (float math on values away from
+///   <item><b>Differential</b> — pinned to the committed golden where it is sound (float math on values away from
 ///         quantization boundaries, string functions, statistics): the 42-program NIST IF suite is the bulk net;
 ///         these cover the channel matrix (COMPUTE / IF / EVALUATE / MOVE) compactly.</item>
 ///   <item><b>Spec-pinned</b> — where the legacy diverges from the standard or the value IS the spec: the §15.64.4

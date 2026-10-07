@@ -8,9 +8,8 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// Drives real NIST CCVS programs through WiseOwl COBOL end-to-end and compares the produced output to the NIST golden
 /// (<c>tests/nist/valid/&lt;TEST&gt;.txt</c>) on the guard's acceptance basis (drop CR, strip per-line trailing spaces,
-/// and mask the volatile COMPUTED= operand). The golden is the authoritative oracle — it was validated against the
-/// legacy byte engine over the whole 364-program corpus — so a match here proves WiseOwl COBOL runs the program correctly,
-/// not merely that it agrees with the legacy. This is the harness the G5 corpus drive runs through: each NC/SM/IC/…
+/// and mask the volatile COMPUTED= operand). The golden is the authoritative oracle — it was validated over the
+/// whole 364-program corpus — so a match here proves WiseOwl COBOL runs the program correctly. This is the harness the G5 corpus drive runs through: each NC/SM/IC/…
 /// program that goes green becomes a permanent regression test by adding its name here.
 /// </summary>
 /// <remarks>

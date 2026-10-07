@@ -65,7 +65,7 @@ never waits. Then `bash scripts/linux-gate.sh` (MANDATORY-PRACTICES L10) and `pu
 
 - Full greenfield Conformance + full characterization
 - The GnuCOBOL external differential, before AND after, diffing PER-CASE verdicts
-- `scripts/guard-fast.sh` (parallel) when a legacy-shared seam was touched — never the serial `guard.sh`
+- `scripts/guard-fast.sh` (parallel, the CLI-level NIST leg through `cobol`) — never the serial `guard.sh`
 
 - **CI's own Linux leg — comprehensive is not comprehensive without it.** Everything above runs on ONE host
   (this Windows machine, Debug). The workflow's `ubuntu-26.04` jobs — `guard-fast.sh`'s NIST loop, the Linux

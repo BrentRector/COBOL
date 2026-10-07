@@ -534,9 +534,8 @@ public static partial class CobolIntrinsics
     /// (§15.75.4 rule 1). The sequence is RUN-UNIT state (§15.75.3 rule 4 scopes the implementor seed to "the first
     /// reference to this function in the run unit") and lives on <see cref="RunUnit.Random"/> — a process-global
     /// static here let a second run unit in one process continue the first's seeded sequence (kb/Work PB307).
-    /// NOTE: the legacy oracle instead news a throwaway generator per seeded call — both satisfy the 0 ≤ r &lt; 1
-    /// NIST range checks, but the spec form (one current sequence that seeded calls restart and argument-less calls
-    /// continue) is implemented here per the scout brief §4.1.</summary>
+    /// The spec form (one current sequence that seeded calls restart and argument-less calls
+    /// continue) is implemented here per the scout brief §4.1; it also satisfies the 0 ≤ r &lt; 1 NIST range checks.</summary>
     public static double Random() => RunUnit.Current.Random.Next();
 
     /// <summary>RANDOM (seed) (§15.75.3 rules 2/3): starts a NEW sequence from the seed and returns its first

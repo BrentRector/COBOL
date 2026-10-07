@@ -990,7 +990,7 @@ Four dirs: `tests/conformance/2002/` (247 files), `2014/` (68), `2023/` (32), `n
 - Positive golden runner: `EnabledProgram_CompilesStrict_AndMatchesOutIfPresent(string edition, string name)` (CorpusRunnerTests.cs:61-88). Compiles `<dir>/<name>.cob` via `CobolNet.CompilerDriver.Compile(new CompilerDriver.Options(src, dll, DialectLevel: int.Parse(edition)))` STRICT; if a sibling `<name>.out` exists it runs via `CutRunner.Run(dll, tmp)` and asserts `Assert.Equal(CutRunner.Normalize(File.ReadAllText(outFile)), CutRunner.Normalize(stdout))` (:85) — LF normalization + per-line trailing-space trim, no trailing newline. No `.out` = compile-only entry (:80).
 - Integrity fact: `Manifest_CoversEveryProgram_NoOverlap` (CorpusRunnerTests.cs:34-50) — every on-disk `*.cob` must be listed (enabled ⊕ pending), no phantoms, no overlap. So a new `.cob` dropped WITHOUT a manifest entry FAILS THE BUILD; a new pair is asserted only once added to `"enabled"`. `"pending"` = catalogued but not asserted (the mass-red guard).
 
-**B. Legacy runner (auto-discovery): `E:\COBOL\tests\CobolSharp.Tests.Integration\ConformanceTests.cs`**
+**B. Legacy runner (auto-discovery): `E:\COBOL\legacy-integration-tests/ConformanceTests.cs`**
 - `Cases()` (:30-42) filesystem-globs `tests/conformance/<ver>/*.cob` with a sibling `.out` — a new pair IS auto-picked-up here with no code change, which is why legacy exclusions matter (see §4).
 
 ### 2. Negative tests (how P10's exception_file_n_below_2002 ran)
@@ -1007,7 +1007,7 @@ THE per-edition compile path. `Editions = [85, 2002, 2014, 2023]` (:17). `Compil
 
 ### 4. Legacy-suite exclusion (GreenfieldOnly) — YES, required for greenfield-only goldens
 
-Because the legacy `ConformanceTests` auto-discovers every `.cob`+`.out`, a golden the frozen legacy engine cannot compile/run needs a `GreenfieldOnly` entry in `tests\CobolSharp.Tests.Integration\ConformanceTests.cs` in the SAME commit (memory `feedback_legacy_suite_on_shared_corpus`). `GreenfieldOnly` is a `HashSet<(string,string)>` of (versionDir, name) (:66-298); the theory returns early at :304 (`if (GreenfieldOnly.Contains((version, name))) return;`). There is also a smaller `LegacyDivergent` set (:51-59) where legacy compiles+runs but its output is skipped (ISO-adjudicated divergence). P10 added its entries with an explanatory comment, e.g. :108-111: the EC-N wave comment + `("2002", "exception_file_n")` and `("2002", "char_national")`.
+Because the legacy `ConformanceTests` auto-discovers every `.cob`+`.out`, a golden the legacy engine cannot compile/run needs a `GreenfieldOnly` entry in `legacy-integration-tests/ConformanceTests.cs` in the SAME commit (memory `feedback_legacy_suite_on_shared_corpus`). `GreenfieldOnly` is a `HashSet<(string,string)>` of (versionDir, name) (:66-298); the theory returns early at :304 (`if (GreenfieldOnly.Contains((version, name))) return;`). There is also a smaller `LegacyDivergent` set (:51-59) where legacy compiles+runs but its output is skipped (ISO-adjudicated divergence). P10 added its entries with an explanatory comment, e.g. :108-111: the EC-N wave comment + `("2002", "exception_file_n")` and `("2002", "char_national")`.
 
 ### 5. VERSION TEST MATRIX registry
 
@@ -1017,21 +1017,21 @@ Because the legacy `ConformanceTests` auto-discovers every `.cob`+`.out`, a gold
 
 ### 6. Other test classes asked about
 
-- **`IntrinsicFunctionDifferentialTests.cs`** (tests\Cobol.Net.Tests.Conformance): two idioms — `AssertSameAsLegacy(source)` → `DifferentialGolden.Assert(source)` (:24) and `AssertSpec(source, expected, dialect = 85)` (:26-31) which does `new CobolNetCompiler(dialect).CompileAndRun(source)` + `Assert.Equal(CutRunner.Normalize(expected), cout)`. `DifferentialGolden.Assert` (DifferentialGolden.cs:42) compares against a COMMITTED golden `tests/differential/<TestClass>/<hash(edition,source)>.out` by default (`COBOLNET_DIFF_MODE=golden`); `bake`/`verify` modes cross-check the live legacy oracle. New P11 spec-pinned intrinsic facts belong here via `AssertSpec` (spec value + § citation) — NOT differential — when legacy diverges or predates the function.
+- **`IntrinsicFunctionDifferentialTests.cs`** (tests\Cobol.Net.Tests.Conformance): two idioms — `AssertSameAsLegacy(source)` → `DifferentialGolden.Assert(source)` (:24) and `AssertSpec(source, expected, dialect = 85)` (:26-31) which does `new CobolNetCompiler(dialect).CompileAndRun(source)` + `Assert.Equal(CutRunner.Normalize(expected), cout)`. `DifferentialGolden.Assert` (DifferentialGolden.cs:42) compares against a COMMITTED golden `tests/differential/<TestClass>/<hash(edition,source)>.out` by default (`COBOLNET_DIFF_MODE=golden`); `bake`/`verify` modes cross-check the live legacy engine. New P11 spec-pinned intrinsic facts belong here via `AssertSpec` (spec value + § citation) — NOT differential — when legacy diverges or predates the function.
 - **`EditionGateDiagnosticTests.cs`**: message-QUALITY facts for the COBOLNET0900 band — `AssertNames(errors, requiredEdition, targeting)` (:20-25) asserts "COBOLNET0900" + `requires COBOL-{X}` + `targeting COBOL-{Y}`. One representative per gate CLASS (statement keyword, clause, SPECIAL-NAMES, unit, CALL-arg). Note: intrinsic-function windows do NOT use 0900 — they use COBOLNET1502/1503 from `src\Cobol.Net.Compiler\Binding\Procedure\Verbs\IntrinsicBinder.cs:139-144` (the D8 window: `sig.IntroducedIn > ctx.Edition.DialectLevel` → 1502 "FUNCTION {name} was introduced by ISO/IEC 1989:{year} (§15) — it requires --std {year} or later (targeting COBOL-{level})"; `RemovedIn` → 1503). Unknown name → 1501 (:126).
 
 ### 7. Complete worked example — the P10 exception_file_n set, end to end
 
 **(a) Positive golden**: `tests\conformance\2002\exception_file_n.cob` (header comment cites ISO 15.29/15.31; `>>TURN EC-I-O CHECKING ON`; a DECLARATIVES `USE AFTER EXCEPTION CONDITION EC-I-O-AT-END` displaying `FUNCTION EXCEPTION-FILE-N`, LENGTH probes, a `MOVE ... TO PIC N` + `N"10TF"` compare proving category-national) + `exception_file_n.out` (8 lines: `PRE=00`, `LEN-PRE=02`, `S: EC-I-O-AT-END`, `FN: 10TF`, `LEN-FN=04`, `NAT=YES`, `LEN-LN=01`, `AFTER`).
 **(b) Enabled**: `tests\conformance\2002\manifest.json:20` — `"exception_file_n"` in `"enabled"`. Runs via CorpusRunnerTests.cs:61-88 at strict `--std 2002`, byte-compares stdout to the .out under CutRunner.Normalize.
-**(c) Legacy exclusion**: `tests\CobolSharp.Tests.Integration\ConformanceTests.cs:111` — `("2002", "exception_file_n")` in `GreenfieldOnly` (comment :108-110: frozen legacy has no EC model and no national result category); the legacy theory returns early at :304.
+**(c) Legacy exclusion**: `legacy-integration-tests/ConformanceTests.cs:111` — `("2002", "exception_file_n")` in `GreenfieldOnly` (comment :108-110: legacy has no EC model and no national result category); the legacy theory returns early at :304.
 **(d) Negative**: `tests\conformance\negative\exception_file_n_below_2002.cob` — line 1 `*> reject-at: 85`, lines 2-5 a spec-citation comment, body displays both -N twins. `exception_file_n_below_2002.err` = the single line `COBOLNET1502`. Enabled at `tests\conformance\negative\manifest.json:42`. Runs via CorpusRunnerTests.cs:97-115: CompileFull at 85 must fail; AssertHasDiagnostic(errors, "COBOLNET1502"). The diagnostic is produced by IntrinsicBinder.cs:139-141.
 **(e) Matrix row**: `tests\version-matrix\constructs.json:1731-1743` — id `"exception-file-n-2002"`, status "active", introducedIn 2002, removedIn null, expectDiagnostic "COBOLNET1502", diagnosticCode "COBOLNET1502", citation (§15.29/§15.31 + the 2023 optional-arg form staged loud → PHASE-13 Step 9), vcr, source = inline VMEFN1 program displaying both twins. Executed by VersionMatrixTests.cs:76-101 as 4 cells: compile at 2002/2014/2023, reject at 85 asserting COBOLNET1502. Rendered to `src\Cobol.Net.Editions\Constructs.g.cs:151` (`public const string ExceptionFileN2002 = "exception-file-n-2002";`) and `ConstructRegistry.g.cs:153` by `scripts/gen-constructs.ps1`.
 
 ### Checklist for a new P11 golden+negative set (the P10-proven pattern)
 1. `tests/conformance/<ed>/<name>.cob` + `.out` (LF; header comment citing the ISO §).
 2. Add `<name>` to that dir's `manifest.json` `"enabled"` array (else the integrity fact fails).
-3. If the frozen legacy cannot reproduce it: add `("<ed>", "<name>")` + comment to `GreenfieldOnly` in `tests\CobolSharp.Tests.Integration\ConformanceTests.cs` — SAME commit.
+3. If the legacy cannot reproduce it: add `("<ed>", "<name>")` + comment to `GreenfieldOnly` in `legacy-integration-tests/ConformanceTests.cs` — SAME commit.
 4. Negative window row: `tests/conformance/negative/<name>.cob` with `*> reject-at: <editions>` line 1 + `<name>.err` containing the code substring (COBOLNET1502 for introduced-later intrinsics, 1503 for removed) + manifest `"enabled"` entry.
 5. Matrix row in `tests/version-matrix/constructs.json` (if a new construct id is warranted) + re-run `scripts/gen-constructs.ps1` and commit both .g.cs files.
 6. Optional spec-pinned xUnit facts in `IntrinsicFunctionDifferentialTests.cs` via `AssertSpec`.
@@ -1048,7 +1048,7 @@ Because the legacy `ConformanceTests` auto-discovers every `.cob`+`.out`, a gold
 - `tests/conformance/2002/manifest.json:20 — "exception_file_n" in "enabled"`
 - `tests/conformance/negative/manifest.json:42 — "exception_file_n_below_2002" in "enabled"`
 - `tests/conformance/negative/exception_file_n_below_2002.cob:1 — *> reject-at: 85   (.err = the single line COBOLNET1502)`
-- `tests/CobolSharp.Tests.Integration/ConformanceTests.cs:66 — private static readonly HashSet<(string, string)> GreenfieldOnly  [exception_file_n entry :111; skip :304]`
+- `legacy-integration-tests/ConformanceTests.cs:66 — private static readonly HashSet<(string, string)> GreenfieldOnly  [exception_file_n entry :111; skip :304]`
 - `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs:139-144 — the D8 window gate: COBOLNET1502 (IntroducedIn > DialectLevel) / COBOLNET1503 (RemovedIn)`
 - `src/Cobol.Net.Editions/Constructs.g.cs:151 + src/Cobol.Net.Editions/ConstructRegistry.g.cs:153 — generated by scripts/gen-constructs.ps1 from constructs.json (drift-tested)`
 - `tests/Cobol.Net.Tests.Conformance/IntrinsicFunctionDifferentialTests.cs:26 — private static void AssertSpec(string source, string expected, int dialect = 85)  [spec-pinned; :24 AssertSameAsLegacy → DifferentialGolden.Assert]`
@@ -1306,7 +1306,7 @@ unit-style golden if in doubt; the corpus golden stays within 8 bits.)
 - `tests/conformance/2002/intrinsics_boolean_conv.cob` + `.out` (copy from here) + `"intrinsics_boolean_conv"`
   into `tests/conformance/2002/manifest.json` "enabled".
 - Legacy exclusion SAME COMMIT: `("2002", "intrinsics_boolean_conv")` + comment into `GreenfieldOnly`,
-  `tests/CobolSharp.Tests.Integration/ConformanceTests.cs` (frozen legacy has no boolean functions).
+  `legacy-integration-tests/ConformanceTests.cs` (legacy has no boolean functions).
 - `tests/conformance/negative/boolean_conv_below_2002.cob` + `.err` (copy from here) + manifest "enabled" entry.
 - Matrix row in `tests/version-matrix/constructs.json` (id `boolean-of-integer-2002`, introducedIn 2002,
   expectDiagnostic COBOLNET1502, citation §15.13/§15.45, source = the nested COMPUTE program from the negative

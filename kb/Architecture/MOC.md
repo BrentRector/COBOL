@@ -16,7 +16,7 @@ What the compiler *is*: its locked invariants and its assembly/module topology.
 ## Notes in this domain
 
 - [[kb/Architecture/High-Level Design]] — the North Star, the four owner-locked invariants, bound-tree-only pipeline, the `ICodeGenBackend` dual backend, `Place` + PC dispatcher, strict layering, the G0–G8 build order.
-- [[kb/Architecture/Module Overview]] — the 5 greenfield assemblies + source-gen + legacy oracle trio; the dependency graph; the bind→emit boundary rule.
+- [[kb/Architecture/Module Overview]] — the 5 greenfield assemblies + source-gen; the dependency graph; the bind→emit boundary rule.
 
 ## See also
 

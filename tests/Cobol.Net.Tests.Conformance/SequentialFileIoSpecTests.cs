@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// Spec-pinned sequential file-I/O goldens (CONFORMANCE-FIX-QUEUE CA15/CA16). Each stages a filesystem precondition
 /// (an over-length input line; an absent OPTIONAL file) in a temp run directory, compiles + runs the program there at
 /// --std 2023, and asserts the spec-derived stdout — behaviours the self-contained write-then-read differential
-/// goldens cannot express. Expected values are DERIVED from the spec, not the legacy oracle.
+/// goldens cannot express. Expected values are DERIVED from the spec, not the former legacy engine.
 /// </summary>
 public sealed class SequentialFileIoSpecTests
 {

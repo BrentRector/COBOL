@@ -58,7 +58,7 @@ public static class ZonedSign
     /// time on the one program that selects it.</summary>
     private static readonly SignPunchTable[] Tables =
     [
-        // SignEncoding.Ibm — A.1 item 177/178 default. NIST-verified against the legacy engine and matched
+        // SignEncoding.Ibm — A.1 item 177/178 default. NIST-verified and matched
         // against GnuCOBOL's `DISPLAY: Sign EBCDIC` expectation `{ABCDEFGHI}JKLMNOPQR`.
         new("{ABCDEFGHI", "}JKLMNOPQR"),
         // SignEncoding.Ascii — GnuCOBOL's `DISPLAY: Sign ASCII (2)` expectation `0123456789pqrstuvwxy`:

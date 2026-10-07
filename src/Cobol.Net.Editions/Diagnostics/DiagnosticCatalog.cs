@@ -6178,8 +6178,7 @@ public static class DiagnosticCatalog
     /// <summary>The SUBJECT rules of the BLANK WHEN ZERO and JUSTIFIED clauses — what the elementary item they are
     /// written on may be. §13.18.8.3 SR1 (category numeric-edited, or numeric without 'S') and SR2 (usage display
     /// or national, written or inherited); §13.18.32.3 SR3 (category alphabetic, alphanumeric, boolean or
-    /// national — SR4's dynamic-length exclusion is §13.16.3 SR18's COBOLNET1563). The BLANK WHEN ZERO rules were written down once, in the
-    /// legacy engine, and never ported: the typed-native binder only USED the flag, so the clause was silently
+    /// national — SR4's dynamic-length exclusion is §13.16.3 SR18's COBOLNET1563). The typed-native binder only USED the BLANK WHEN ZERO flag, so the clause was silently
     /// ignored on every usage but display/national and on every non-numeric picture (kb/Work PB507).</summary>
     public static readonly DiagnosticDescriptor ClauseSubjectCategory = new(
         "COBOLNET2405", "clause-subject-category", EditionSeverity.Error,

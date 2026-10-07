@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// pair-selection rules, D1-declaration-order expansion, the one statement rounded-phrase applied per pair, the
 /// STATEMENT-level aggregated SIZE ERROR (one dispatch after all pairs, erring receiver unchanged, NOT suppressed),
 /// and item identification — group subscripts included — at statement START. Differential facts pin the
-/// NIST-85-proven shapes to the legacy oracle; the facts where the legacy deviates from the spec (the missing
+/// NIST-85-proven shapes to the committed golden; the facts where the legacy deviates from the spec (the missing
 /// rule-2 / rule-3 filters, per-pair group re-identification) are SPEC-PINNED with the governing § cited.
 /// </summary>
 public sealed class CorrespondingDifferentialTests

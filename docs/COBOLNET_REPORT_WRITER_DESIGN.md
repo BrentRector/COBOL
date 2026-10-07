@@ -13,7 +13,7 @@ clauses) and the INITIATE / GENERATE / TERMINATE / SUPPRESS verbs (§14.9.21/§1
 the per-report LINE-COUNTER / PAGE-COUNTER registers (§8.4.3.15) and USE BEFORE REPORTING declaratives
 (§14.9.49 Format 2).
 Validated by NIST RW101A–RW104A (byte-match) **plus a spec-pinned conformance net for the report-file CONTENT
-the NIST goldens never compare** (`ReportWriterConformanceTests`) — load-bearing because the legacy oracle's
+the NIST goldens never compare** (`ReportWriterConformanceTests`) — load-bearing because the legacy engine's
 report-file content is demonstrably WRONG in two places (see §7); the spec, not the oracle, governs.
 
 **Edition status:** RW is an optional module in COBOL-85 (the NIST RW suite runs `--std 85`) and an optional

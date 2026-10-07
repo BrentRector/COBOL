@@ -381,7 +381,7 @@ redefinition check (landed) use this model.
 oracle `Compilation.cs:345` (frozen until G8). Both route through the SAME shared evaluator — the hand-rolled
 `Tokenize`/`CondParser`/`Value`/`Relate` engine is **deleted** (the singular-pattern rule: one mechanism, the best
 one). The design's earlier "greenfield-only path" posture is superseded by reality: the legacy caller IS exercised
-with directives (`tests/CobolSharp.Tests.Integration/SpecFixTests.cs` CC1–CE3 run `>>DEFINE`/`>>IF`/`>>EVALUATE`
+with directives (`legacy-integration-tests/SpecFixTests.cs` CC1–CE3 run `>>DEFINE`/`>>IF`/`>>EVALUATE`
 end-to-end through `Compilation.cs`). The shared evaluator REPRODUCES the old single-token-operand behavior
 (single literal, defined-condition, relation, THROUGH range, compound cce) exactly, so those tests stay green;
 the rewrite only ADDS correct multi-token evaluation (the closed defect) and loud COBOLNET1619 rejects. The

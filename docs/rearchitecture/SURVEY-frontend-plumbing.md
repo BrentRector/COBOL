@@ -40,7 +40,7 @@ The `Common/` and `Diagnostics/` folders provide the shared value types (`Source
 | `Preprocessor/TurnDirectiveProcessor.cs` | `>>TURN` directive parsing → `TurnEvent` list; blanks lines (line-count preserving) | 151 | **Good, spec-cited.** Emits COBOLNET0875/0718/0719 as **raw string codes** (no descriptor). Uses a 0-based `SourceLocation` while `TurnEvent.Line` is 1-based (deliberate, but see the SourceLocation inconsistency in §6). |
 | `Parsing/EditionGateHints.cs` | Reverse-engineers which edition-gated construct a generic `NoViableAlternative` was | 207 | **Worst smell in the frontend (see §3).** A 29-signature `(token, rule-stack, lookahead)` table, empirically derived, that re-derives an identity the gate discarded and re-copies edition metadata the frontend can't see. |
 | `Parsing/CobolErrorStrategy.cs` | COBOL-aware error messages; 19 intent heuristics; edition-gate mapping | 238 | **Mostly good.** The 19 `GuessCobolIntent` heuristics (`:100-211`) are useful and non-duplicative. Only coupling smell: heuristic 0 calls `EditionGateHints.Recognize` (`:113`) and message is a pre-formatted `[code] text` string (`:95`) that `CobolErrorListener` must re-parse. |
-| `Parsing/CobolParserCoreBase.cs` | ANTLR parser base: `DialectLevel`, `is85/2002/2014/2023` predicates, `IsAtLineStart`, `IsBareInspectOperand`, `boolExprAhead` | 114 | **Good.** Clean disambiguation predicates. Holds a **second** `DialectLevel` store (`:17`) beside `Frontend.DialectLevel`. Namespace `CobolSharp.Compiler.Generated`. |
+| `Parsing/CobolParserCoreBase.cs` | ANTLR parser base: `DialectLevel`, `is85/2002/2014/2023` predicates, `IsAtLineStart`, `IsBareInspectOperand`, `boolExprAhead` | 114 | **Good.** Clean disambiguation predicates. Holds a **second** `DialectLevel` store (`:17`) beside `Frontend.DialectLevel`. Namespace `legacy-root.Generated`. |
 | `Parsing/ZeroTokenRewriter.cs` | Rewrites `ZERO` → `ZERO_ARITH` in arithmetic context to avoid exponential ANTLR prediction | 146 | **Clean, self-contained, no smell.** Preserve verbatim. |
 | `Parsing/CobolErrorListener.cs` | ANTLR `BaseErrorListener` → `DiagnosticBag`; extracts `[code]` prefix; caps at 20 | 56 | **Adequate.** Reconstructs a `DiagnosticDescriptor` code from a **string prefix** the error strategy embedded (`:41-49`) — a stringly-typed round-trip. Off-by-one `SourceLocation.Line` (§6). |
 | `Common/SourceLocation.cs` | `(FileName, Position, Line, Column)` value | 47 | Fine. Documented **zero-based** Line, but producers disagree (§6). |
@@ -113,9 +113,9 @@ file — each a candidate for extraction, and each duplicating tokenization logi
 ad-hoc line mechanisms plus a dead one.
 
 ### S8 — Stale namespaces on 16 of 17 frontend files · **LOW** · every file except `Frontend.cs`
-All Preprocessor/Parsing/Common/Diagnostics files still declare `namespace CobolSharp.Compiler.*`
+All Preprocessor/Parsing/Common/Diagnostics files still declare `namespace legacy-root.*`
 (grep confirmed 16 files) though physically in `Cobol.Net.Frontend`. `Frontend.cs:16` further claims
-it "is the ONE place WiseOwl COBOL reuses the legacy `CobolSharp.Compiler` assembly" — **stale**: the
+it "is the ONE place WiseOwl COBOL reuses the legacy compiler assembly" — **stale**: the
 code was already physically extracted; only the namespace strings remain legacy.
 
 ---

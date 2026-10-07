@@ -118,7 +118,7 @@ public sealed class MoveEditionDifferentialTests
             """), "R[   ]\nC[NOT-NUMERIC]");
 
     [Fact]
-    // QUOTE fill (§8.3.3.6.4 GR8: one or more quotation marks) — the legacy oracle's RUNTIME confirms three
+    // QUOTE fill (§8.3.3.6.4 GR8: one or more quotation marks) — the former legacy engine's RUNTIME confirms three
     // quotes but its front end rejects the compile (CBL0906, stricter than ISO 2014), so the value is pinned.
     public void QuoteToNumeric_ImageFill_At85_E2Item1()
         => AssertSpec(Program("MVEDB2", "01 W-INT PIC 9(3).",
@@ -126,7 +126,7 @@ public sealed class MoveEditionDifferentialTests
 
     [Fact]
     // A space-filled numeric read in a numeric context decodes deterministically to 0 (§14.6.13.2 — incompatible
-    // data; a non-digit contributes no digit), so ADD 1 yields 001. The legacy oracle agrees end-to-end here.
+    // data; a non-digit contributes no digit), so ADD 1 yields 001. The former legacy engine agrees end-to-end here.
     public void SpaceFilledNumeric_DecodesZeroInArithmetic_1461312()
         => AssertSpec(Program("MVEDB3", "01 W-INT PIC 9(3).",
             "    MOVE SPACE TO W-INT.\n    ADD 1 TO W-INT.\n    DISPLAY \"R[\" W-INT \"]\"."), "R[001]");
@@ -139,7 +139,7 @@ public sealed class MoveEditionDifferentialTests
 
     [Fact]
     // ALL "literal" containing a non-digit → numeric: character repetition to the receiver width (GR2) — the
-    // legacy oracle stores "XXX" (provisional pre-removal semantics; 0902-removed at 2023).
+    // former legacy engine stores "XXX" (provisional pre-removal semantics; 0902-removed at 2023).
     public void NonDigitAllToNumeric_CharacterFill_At85()
         => AssertSpec(Program("MVEDB5", "01 W-INT PIC 9(3).",
             "    MOVE ALL \"X\" TO W-INT.\n    DISPLAY \"R[\" W-INT \"]\"."), "R[XXX]");

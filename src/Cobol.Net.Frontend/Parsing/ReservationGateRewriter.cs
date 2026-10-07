@@ -40,12 +40,11 @@ namespace CobolNet.Frontend.Parsing;
 /// </summary>
 public static class ReservationGateRewriter
 {
-    /// <summary>⛔ THE GATE LOOP — the ONE entry every WHOLE-GROUP parse goes through (kb/Work PB655). Two front ends
-    /// parse the same grammar: the greenfield <c>Frontend.LexAndParse</c> and the legacy differential oracle's
-    /// <c>Compilation.LexAndParse</c>. A gated word is no longer a <c>cobolWord</c> alternative, so a parse that
-    /// skips this loop can never read it as a name — the legacy parse did, and every program naming a table
-    /// <c>COL</c> (free at COBOL-85, reserved by §8.9 from 2002) failed with "no viable alternative" (8 Integration
-    /// reds, train 49). The loop therefore lives HERE, beside the retype it drives, and both front ends call it.
+    /// <summary>⛔ THE GATE LOOP — the ONE entry every WHOLE-GROUP parse goes through (kb/Work PB655). <c>Frontend.LexAndParse</c>
+    /// calls it. A gated word is no longer a <c>cobolWord</c> alternative, so a parse that
+    /// skips this loop can never read it as a name, and every program naming a table
+    /// <c>COL</c> (free at COBOL-85, reserved by §8.9 from 2002) fails with "no viable alternative". The loop
+    /// therefore lives HERE, beside the retype it drives.
     /// <para>A pass that DECLARES a reservation-gated word §8.9 leaves free at this edition retypes every
     /// occurrence of it to IDENTIFIER, and the source is parsed again so every prediction sees a user-defined word.
     /// Each round frees at least one more word and a retyped token can never be declared again, so the loop ends; a

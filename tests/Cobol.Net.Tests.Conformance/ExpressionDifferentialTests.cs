@@ -5,7 +5,7 @@ using Xunit;
 namespace CobolNet.Tests.Conformance;
 
 /// <summary>
-/// Breadth net over expression and multi-target verb forms, pinned to the legacy oracle. Stood up to widen coverage
+/// Breadth net over expression and multi-target verb forms, pinned to the committed golden. Stood up to widen coverage
 /// of the paths the G2-2 bound-tree rebuild touches (nested/parenthesized arithmetic, precedence, exponentiation,
 /// negative literals, multi-target MOVE/ADD/SUBTRACT/COMPUTE GIVING, and a DISPLAY mixing operand kinds) BEFORE the
 /// rebuild re-routes them — so a behavior drift in the rewrite is caught. Straight-line, truncation-only.

@@ -423,7 +423,7 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     /// Pre-removal FILL STORAGE (reachable at 85/2002/2014 + 2023 --permissive regardless of the SR5 gate, and at
     /// EVERY edition through §14.9.25.4 GR2): a NON-digit fill — SPACE/QUOTE/HIGH-VALUE/LOW-VALUE, an ALL literal
     /// with a non-digit, or the figurative SPACE GR2 substitutes for a zero-length literal — deposits the fill
-    /// CHARACTERS as the receiver's character image (provisional; the legacy oracle's byte fill — MOVE QUOTE TO
+    /// CHARACTERS as the receiver's character image (provisional; the pre-2023 fill — MOVE QUOTE TO
     /// PIC 9(3) leaves three quotation marks, IS NUMERIC is then false, and a later read decodes deterministically
     /// per §14.6.13.2). Flag an eligible elementary numeric-DISPLAY receiver <c>StoreAsImage</c> — the SAME §14.9
     /// MOVE GR4 whole-group image substrate, never a parallel mechanism.

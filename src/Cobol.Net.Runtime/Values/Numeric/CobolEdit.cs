@@ -9,8 +9,8 @@ namespace CobolNet.Runtime;
 /// insertion (<c>.</c>), fixed insertion (<c>cs</c>, leading <c>+ -</c>, trailing <c>+ - CR DB</c>), floating
 /// insertion (<c>$$… ++… --…</c>), and zero suppression/replacement (<c>Z *</c>). The ONE numeric→edited
 /// conversion — used by MOVE to a numeric-edited receiver and by arithmetic GIVING/COMPUTE stores (§14.7.7: the
-/// result is stored per the MOVE editing rules). The algorithm is the legacy engine's, proven over the NIST-85
-/// corpus, re-hosted on the typed-native substrate (unscaled <see cref="long"/> + scale; no byte areas, no
+/// result is stored per the MOVE editing rules). The algorithm is proven over the NIST-85
+/// corpus and hosted on the typed-native substrate (unscaled <see cref="long"/> + scale; no byte areas, no
 /// <c>decimal</c>).
 ///
 /// SPECIAL-NAMES threading (ISO §12.3.7): <c>currency</c> is the mask's currency PICTURE SYMBOL (GR13; the
@@ -29,7 +29,7 @@ namespace CobolNet.Runtime;
 /// swapped so the core logic always sees dot-as-decimal, and the rendered output swaps back — which realizes
 /// GR14b exactly (the inserted decimal separator IS the comma, the inserted grouping separator IS the period),
 /// including zero suppression absorbing GROUPING periods and stopping at the COMMA decimal position (§13.18.40.5
-/// — the legacy engine's dead-flag bug, fixed here per spec).
+/// — a dead-flag bug, fixed here per spec).
 /// </summary>
 public static partial class CobolEdit
 {

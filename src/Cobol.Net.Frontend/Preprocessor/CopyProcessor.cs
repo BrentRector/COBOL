@@ -25,7 +25,7 @@ public sealed class CopyProcessor(
 {
     /// <summary>The compilation's ambient-input gateway (kb/Work PB985): every copybook probe and read below goes
     /// through it, so the record names each library text the group incorporated AND each candidate that was not
-    /// there. A caller that passes none (the legacy oracle, the standalone preprocess CLI) gets a private one.</summary>
+    /// there. A caller that passes none (the standalone preprocess CLI) gets a private one.</summary>
     private readonly CompilationInputs _inputs = inputs ?? new CompilationInputs();
 
     // One COBOLNET0902 per compilation for the VCR-row-4 gate (COPY REPLACING non-pseudo-text, W3 — DEVLOG 598).
@@ -112,9 +112,9 @@ public sealed class CopyProcessor(
         => _diagnostics?.Report(descriptor, at.ToLocation(), TextSpan.Empty, args);
 
     /// <summary>
-    /// Process all COPY and REPLACE statements in the source text — the LEGACY oracle's path (the product runs the
-    /// merged driver, <see cref="ConditionalCompilationProcessor.Manipulate"/>). The legacy compiler keeps its
-    /// historical search, which adds <paramref name="sourceDir"/> as the first configured search path; WiseOwl
+    /// Process all COPY and REPLACE statements in the source text — the standalone path (the product runs the
+    /// merged driver, <see cref="ConditionalCompilationProcessor.Manipulate"/>). This path keeps the historical
+    /// search, which adds <paramref name="sourceDir"/> as the first configured search path; WiseOwl
     /// COBOL's own default library (DOC-A.1-40) does not search the source directory.
     /// </summary>
     public string Process(string sourceText, string sourceDir)
@@ -126,7 +126,7 @@ public sealed class CopyProcessor(
         return ApplyReplaceStatements(expanded, _diagnostics, _sourceName, EditionInfo.Of(dialectLevel, permissive));
     }
 
-    /// <summary>The REPLACE pass over a plain text (the legacy oracle's <see cref="Process"/>).</summary>
+    /// <summary>The REPLACE pass over a plain text (the standalone <see cref="Process"/>).</summary>
     internal static string ApplyReplaceStatements(string text, DiagnosticBag? diagnostics = null,
         string sourceName = "<source>", EditionInfo? edition = null)
         => ApplyReplaceStatements(MappedText.Identity(text, sourceName), diagnostics, edition).Text;
@@ -462,7 +462,7 @@ public sealed class CopyProcessor(
         return sb.Finish();
     }
 
-    /// <summary>The recursive COPY-only expansion behind <see cref="Process"/> (the legacy compiler's path): the ONE
+    /// <summary>The recursive COPY-only expansion behind <see cref="Process"/> (the standalone path): the ONE
     /// one-level expander, <see cref="ExpandCopiesOneLevel"/>, fed with itself as the copybook expander.</summary>
     private string ExpandCopyStatements(string text, HashSet<string> alreadyIncluded, int depth)
         => ExpandCopiesOneLevel(text, alreadyIncluded, depth, (copybook, d) => ExpandCopyStatements(copybook, alreadyIncluded, d));

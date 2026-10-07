@@ -297,7 +297,5 @@ rows (98, 100–113) are directive-driven, not edition gates, so they carry `<!-
 Per `feedback_goldens_ship_with_the_feature`: every option ships a positive golden (ON ⇒ the warning) in the
 SAME commit; the wave-local gate is fresh build + characterization + the FLAG unit/corpus filter + a CLI probe.
 Because flagging is a Warning (never fatal), a golden asserts on stderr/warning text, not exit code. The
-comprehensive gate (full Conformance + legacy guard) runs once pre-merge; the GnuCOBOL differential is a triage
-net (flagging adds warnings, never rejects — expect zero accept/reject flips). A new 2023/2014 golden that the
-frozen legacy pipeline cannot reproduce needs a `GreenfieldOnly` exclusion in the same commit
-(`feedback_legacy_differential_optin`).
+comprehensive gate (full Conformance + the NIST guard) runs once pre-merge; the GnuCOBOL differential is a triage
+net (flagging adds warnings, never rejects — expect zero accept/reject flips).

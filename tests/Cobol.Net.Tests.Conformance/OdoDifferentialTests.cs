@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// (§8.5.1.8 — "the physical capacity is fixed at compile time; the logical capacity may vary"), the GR7
 /// current-count rule, and the GR8 group-operand extents — every quadrant plus the SEARCH / SEARCH ALL bound
 /// (§14.9.37.4 GR4/GR9), STRING/UNSTRING senders (§14.9.43 GR3a / §14.9.48 GR11), and VALUE-at-maximum
-/// initialization (§13.18.63 GR6). Differentially pinned to the legacy oracle, which is NIST-85 green on the
+/// initialization (§13.18.63 GR6). Differentially pinned to the committed golden, which is NIST-85 green on the
 /// ODO acceptance programs NC235A/NC247A — these facts are reductions of those programs' test paragraphs.
 /// </summary>
 public sealed class OdoDifferentialTests

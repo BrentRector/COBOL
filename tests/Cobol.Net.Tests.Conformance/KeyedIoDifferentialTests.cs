@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// RELATIVE + INDEXED file organizations (ISO §9.1.7.3/.4): the keyed verbs' status machine and transfer of
 /// control — WRITE/READ/REWRITE/DELETE/START with the §9.1.14 INVALID KEY contract, the RRN MOVE-backs
 /// (§14.9.51 GR29a / §14.9.30 GR25), and the keyed status family ('21' '22' '23', §9.1.13.5). Pinned to the
-/// legacy oracle (NIST RL/IX-green) — each compiler runs in its own temp directory, so the connectors'
+/// former legacy engine (NIST RL/IX-green) — each compiler runs in its own temp directory, so the connectors'
 /// on-disk stores never cross engines. Every test carries its governing ISO paragraph.
 /// </summary>
 public sealed class KeyedIoDifferentialTests

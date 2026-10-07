@@ -189,7 +189,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
     }
 
     /// <summary>Expand one identifier-1 (ISO §14.9.20 GR5): resolve its FULL data reference (qualification +
-    /// subscripts — the legacy binder's name-only resolution was a gap, not behavior), then walk its subtree in
+    /// subscripts), then walk its subtree in
     /// definition order (GR8) collecting the per-elementary stores. identifier-1 itself MAY have / sit under a
     /// REDEFINES (GR5a3's exclusion applies only BELOW it).</summary>
     private void BindInitializeTarget(Core.DataReferenceContext dref, in InitializeSpec spec, List<InitializeAction> actions)

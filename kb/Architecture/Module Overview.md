@@ -16,8 +16,8 @@ tags:
 
 # Module Overview (Assembly Topology)
 
-The solution is a **five-assembly greenfield tree** (`src/Cobol.Net.*`) plus a **source-generator project** and a
-**legacy oracle trio** (`src/CobolSharp.*`, deletion-scheduled at G8). The one structural addition over the original
+The solution is a **five-assembly greenfield tree** (`src/Cobol.Net.*`) plus a **source-generator project** (the legacy
+engine is deleted from `main`: `docs/rearchitecture/LEGACY-ARCHIVE.md`). The one structural addition over the original
 four-project split is the leaf **`Cobol.Net.Editions`**, so both Frontend and Compiler can share one
 construct/reserved-word catalogue without a cycle.
 
@@ -36,8 +36,6 @@ construct/reserved-word catalogue without a cycle.
    (source generator)                              (+ Microsoft.CodeAnalysis.CSharp)
 
    Cobol.Net.Cli (exe → cobol.exe) ──► Cobol.Net.Compiler ──► (System.CommandLine)
-
-   Legacy oracle (retire at G8):  CobolSharp.Compiler, CobolSharp.Runtime, CobolSharp.CLI
 ```
 
 ## Per-project responsibility

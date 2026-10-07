@@ -7,7 +7,7 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// Sequential file I/O (ISO/IEC 1989:2023 §14.9; COBOLNET_DESIGN §8): OPEN/CLOSE/WRITE/READ/REWRITE over a typed-native
 /// connector. Each test round-trips through the file (WRITE then READ back, or query FILE STATUS) and DISPLAYs the
-/// result, so the existing stdout differential harness pins WiseOwl COBOL to the legacy oracle (364-NIST-green) — the
+/// result, so the existing stdout differential harness pins WiseOwl COBOL to the committed golden (364-NIST-green) — the
 /// file content itself is verified indirectly, through the program's own read-back. The printer WRITE … ADVANCING path
 /// is exercised end-to-end by the NC101A NIST program; here the focus is the data-file verbs and the status machine.
 /// </summary>

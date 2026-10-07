@@ -581,8 +581,7 @@ public sealed record RenamesPlace(IReadOnlyList<Place> Leaves, DataItem AliasIte
 ///   <item><b>Receiving, data-name-1 inside the group</b> (GR8b): "the maximum length of the group will be used"
 ///     — <see cref="DependingInside"/> lets each receiver keep the plain full-width <c>FromImage</c> store.</item>
 /// </list>
-/// The legacy engine proved exactly this direction split over the NIST-85 corpus (NC247A; its
-/// <c>LocationResolver.ResolveWholeItem(receiving)</c>); the greenfield twin computes the extent at the operand
+/// This direction split is proven over the NIST-85 corpus (NC247A); the extent is computed at the operand
 /// site — no runtime table state (COBOLNET_DESIGN §3.6 / §14.4 — ONE image facility, the GR8 slice is a view over
 /// it). The legacy's LINKAGE max-length shortcut is deliberately NOT ported: GR8 applies in any section.
 /// <para>⛔ <b>THE EXTENT IS IN POSITIONS, AND A POSITION IS NOT ALWAYS A CHARACTER</b> (kb/Work PB173).
