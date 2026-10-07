@@ -310,6 +310,15 @@ public static class HostFile
         catch (UnauthorizedAccessException) { return false; }
     }
 
+    /// <summary>Are this host's share modes MANDATORY and PER-ACCESS — a handle opened with <see cref="FileShare.Read"/>
+    /// refuses an outside writer, and one opened <see cref="FileShare.None"/> refuses every other handle? That is
+    /// Windows; every other host reaches <see cref="FileShare"/> through .NET's advisory <c>flock</c>, which has two
+    /// states (kb/Work PB795). ⛔ The platform question is asked HERE, once, like the errno beside it, and it is
+    /// PINNED BY MEASUREMENT: <c>FileLockPostureDriftTests.TheHostsShareModeSemanticsAreTheDocumentedOnes</c> asserts
+    /// <c>OperatingSystem.IsWindows() == HostCapability.Sharing.SeparatesReadersFromWriters</c> against real handles,
+    /// so if a host moves the gate goes red rather than this line being trusted.</summary>
+    public static bool ShareModesAreMandatory => OperatingSystem.IsWindows();
+
     /// <summary><c>EWOULDBLOCK</c> (= <c>EAGAIN</c>) on this Unix host — 11 on Linux, 35 on the BSD family.</summary>
     private static readonly int UnixWouldBlock = OperatingSystem.IsLinux() || OperatingSystem.IsAndroid() ? 11 : 35;
 

@@ -330,7 +330,7 @@ cannot admit this run unit's second connector while refusing a foreign process. 
   (`FileRegistry.ImplementorDefaultSharing`, kb/Work PB322, Annex A.1 items 77 and 131): `OPEN INPUT` is `READ
   ONLY` (⇒ `FileShare.Read`) and every other mode is `NO OTHER` (⇒ `FileShare.None`), so a clause-less updater
   protects its physical file from other PROCESSES exactly as `SHARING WITH NO OTHER` does;
-- the registry hands the posture down ONCE per OPEN, ahead of the handle (`c.HostShare = OfSharingMode(sharing)`
+- the registry hands the posture down ONCE per OPEN, ahead of the handle (`c.HostSharing = sharing`; `HostShare` is derived from it
   in `SharedOpenAttempt`), and nothing re-derives it while the connector is open. **EVERY organization holds a
   long-lived host handle carrying its posture** — §9.1.15 3) names none, so all three owe the lock (kb/Work
   PB771). `KeyedConnector` is where RELATIVE and INDEXED hold theirs: `TakeFileLock` on each `OpenCore` arm that
@@ -354,37 +354,73 @@ share one file were refused by the host, the second OPEN answering '30' — a st
 §9.1.13.9 item produces — and its mirror, measured across processes, had a `SHARING WITH NO OTHER` connector
 admit a foreign append to a file the program had declared exclusive.)
 
-**⛔ DETERMINATION — THE FILE LOCK IS ONLY EVER AS STRONG AS THE HOST'S SHARE MODES, AND ON A HOST WITH ADVISORY
-LOCKS §9.1.15 2) HAS NO EXPRESSION AT ALL (kb/Work PB795).** Windows share modes are mandatory and per-access, so
-the three rules above are enforced there exactly as written. .NET reaches the same API on Unix through an
-advisory `flock` with **two** states — `FileShare.None` takes `LOCK_EX`, every other value takes `LOCK_SH` — and
-that has three consequences a user of this compiler on Linux or macOS is entitled to know:
+**The §9.1.15 FILE LOCK AGAINST OTHER RUN UNITS is Table 19 itself: `RunUnitFileLock` (`IO/Sharing/`), taken by
+`FileConnector.Open` (kb/Work PB833).** The share mode above is what a process that takes part in no protocol
+meets, and it cannot be the whole of §9.1.15's *"preventing other run units from opening that file with
+incompatible sharing rules"*, for two measured reasons: .NET reaches `FileShare` on Unix through ONE advisory
+`flock` whose only states are `LOCK_EX` (`FileShare.None`) and `LOCK_SH` (every other value), so rule 2's
+*"restricts concurrent access … to input mode"* — admit a reader, refuse a writer — has no expression in it; and
+on EVERY host a share mode refuses an open by its ACCESS, so it cannot refuse the truncation of an `OPEN OUTPUT`
+when a sibling's posture admits a writer (measured on Windows before PB833: a second run unit's `OPEN OUTPUT`
+answered `00` against a file the first held open `SHARING WITH ALL OTHER`, and emptied it, where Table 19 prints
+*Unsuccessful open* in every OUTPUT cell). The remedy is not to widen the posture to `FileShare.None`, which
+refuses the reader rule 2 admits; it is a second expression of the same table:
 
-- **Rule 2 has no expression through `FileShare` there — and that is a DEFECT, not a property of the host**
-  (kb/Work PB833). *"restricts concurrent access to a physical file through file connectors other than this
-  one, to input mode"* needs a lock that admits a reader and refuses a writer, and `LOCK_SH` admits both. So
-  `SHARING WITH READ ONLY` — and the implementor default of `OPEN INPUT`, which shares its posture — currently
-  gets the protection of rule 3's *"allows concurrent access"* instead, and another RUN UNIT may open the file
-  in the extend or I-O mode where Windows refuses it. ⛔ **The BINARY half is a fact about `flock`; the
-  "and therefore unavoidable" half is not.** Advisory is sufficient here — §9.1.15 3) binds *other run units*,
-  and every WiseOwl COBOL run unit reaches the file through this runtime, so every one of them takes whatever lock
-  the runtime takes — and `fcntl` region locks are advisory in the same way while being PER-ACCESS, which is
-  exactly the property `flock` lacks: a read lock for rule 2 admits another reader and refuses a writer. kb/Work
-  PB833 owns closing it, `GR-9.1.15-2` stays PARTIAL until it does, and this paragraph records the CURRENT
-  behaviour rather than a settled determination. **The posture is deliberately NOT widened to `FileShare.None`
-  to compensate, and that part stays:** it would refuse the reader rule 2 explicitly admits, trading an
-  under-refusal for an over-refusal of access the standard grants.
-- **Rule 1 survives, but only against cooperating processes.** `LOCK_EX` is the one thing a binary advisory lock
-  can say, so `SHARING WITH NO OTHER` still excludes an outside reader and an outside writer — from any process
-  that also takes the lock. A process that simply `open(2)`s the path is not bound by an advisory lock, so the
-  exclusion is not the operating environment's own.
-- **It is measured, not predicted.** `HostCapability.Sharing` (tests/_shared) establishes real handles on a real
-  file and reports what this host did; `FileLockPostureDriftTests.TheHostsShareModeSemanticsAreTheDocumentedOnes`
-  asserts that measurement against this determination, and `ExpectedOutsideWriter` is the single place the
-  standard's answer is translated through it. Measured 2026-09-06 — Linux: *FileShare.Read admits an outside
-  reader=True, refuses an outside writer=**False***; Windows: the same field **True**. If either moves, the gate
-  goes red naming this section, because the runtime's guarantee moved and this text has to be re-derived rather
-  than the assertion adjusted.
+- **Publish, then test (`RunUnitFileLock.Take`).** The OPEN publishes its Table 19 COLUMN
+  (`Table19.Column(sharing, mode)`) as a SHARED region lock on one byte of the physical file at offset
+  2^62 + the column's wire number (the five `ExistingSharingColumn`s; the numbers are a contract between run units
+  and are spelled out in the class, not derived from an ordinal), and then asks whether any OTHER description holds
+  a column its request ROW refuses (`Table19.Cell(row, column) == UnsuccessfulOpen` over the five columns). A
+  refusal is §9.1.13.9 1)'s `61`, the lock is given back, and §14.9.27.4 GR25's *"the file is not affected"*
+  holds because the test precedes `OpenCore`'s body on a file that exists. Publishing FIRST is what makes two
+  simultaneous OPENs unable to pass each other; it needs a lock the asker's OWN description does not conflict
+  with, because the classes that refuse their own kind (NO OTHER, an OUTPUT) would otherwise refuse themselves.
+  The table is read, never restated: the cross-run-unit verdict and the in-run-unit verdict are ONE lookup.
+- **The host primitive is `OfdRegionLocks` (`IO/Sharing/`): Linux open-file-description locks** (`fcntl`
+  `F_OFD_SETLK`/`F_OFD_GETLK`, kernel 3.15; x86-64 and arm64). Classic `fcntl` locks and `FileStream.Lock` are
+  keyed on the PROCESS and are dropped when ANY descriptor the process holds on the file closes, which this runtime
+  does constantly for its own bookkeeping handles; an OFD lock belongs to the one descriptor that took it, conflicts
+  with every other descriptor (this process's or another's) and never reports the asker's own. The descriptor is
+  made with `open(2)` directly (`O_CLOEXEC`), not through `FileStream`, because .NET would take a `LOCK_SH` `flock`
+  on it that a sibling's own `FileShare.None` handle would then be refused by. The lock is unlocked explicitly
+  before the descriptor closes, so a `fork` holding a copy of it until its `exec` cannot make a CLOSEd lock outlive
+  the CLOSE.
+- **OUTPUT asks the host first where the share modes are the lock (`FileConnector.TakeRunUnitFileLock`,
+  `HostFile.ShareModesAreMandatory` — Windows, pinned by the measured `HostCapability.Sharing`).** An OUTPUT open on
+  a file that exists first requests `FileShare.None` (`HostFile.IsHeldByAnother`) — refused by every outstanding
+  handle there is, which is what Table 19's OUTPUT rows mean — before the body truncates anything. This is what
+  closes the Windows gap, where there is no region-lock expression and `FileShare` carries every other cell. A host
+  with the region lock does not ask: the lock refuses an OUTPUT like any other cell, and a read open of a FIFO waits
+  for a writer that is the program's own next statement.
+- **Capability is measured.** `OfdRegionLocks.Open` answers null — and `Take` answers `Unavailable` — for a host
+  that cannot hold the lock: an ABI it was not written for (the commands and `struct flock` are the Linux 64-bit
+  x86-64/arm64 values), no `libc` (Windows, where `FileShare` is mandatory and per-access already), `EINVAL` from
+  the kernel (no OFD locks), `ENOLCK`/`EOPNOTSUPP` from a filesystem without byte-range locks — and a path that is
+  not a REGULAR file (read from the descriptor with `statx`, opened `O_NONBLOCK` so a FIFO answers at once): the lock
+  lives on the inode, so a device node such as `/dev/null` would arbitrate every run unit on the machine that assigns
+  it. An unavailable lock
+  leaves the connector the file lock its `FileShare` gives, nothing more.
+- **Guards.** `RunUnitFileLockDriftTests` opens a file in one `FileRegistry` and then in a second — a second
+  registry shares nothing with the first, neither the `PhysicalFileTable` nor a handle — for every sharing spelling
+  × open mode × sharing spelling × open mode × organization (768 pairs) and asserts the second OPEN is `61` exactly
+  where `Table19.Conflicts` refuses and a success-family status where it permits; it runs on Windows and Linux.
+
+**⛔ DETERMINATION (Annex A.1 item 75, `docs/CONFORMANCE.md` DOC-A.1-75) — WHO IS BOUND.** §9.1.15 binds other RUN
+UNITS, and every WiseOwl COBOL run unit is arbitrated by Table 19 on a host that carries the region lock (Linux
+x86-64/arm64) or whose `FileShare` carries the table (Windows, with the OUTPUT probe above). A process that takes
+part in no protocol meets only the share mode of the connector's own handle, whose strength is the host's:
+
+- **On Windows** the share modes are mandatory and per-access: rules 1–3 are enforced as written against every
+  process on the machine.
+- **On Linux** the share mode is one advisory `flock`: rule 1 (`FileShare.None` ⇒ `LOCK_EX`) excludes an outside
+  reader and writer that also take `flock`, and rule 2's refusal of an outside writer exists only against a run unit
+  of this runtime (the region lock). A program that opens the file without locking is neither stopped nor
+  detected. `HostCapability.Sharing` (tests/_shared) MEASURES the share-mode semantics and
+  `FileLockPostureDriftTests.TheHostsShareModeSemanticsAreTheDocumentedOnes` asserts the measurement against this
+  paragraph, so if the host moves, the gate goes red naming this section rather than an assertion being adjusted.
+- **On macOS** (and any Unix whose kernel exposes no open-file-description locks) the region lock is
+  `Unavailable`, so only the share-mode strength is present: rule 2 is not refused across run units there. The
+  classic `fcntl` locks macOS offers are process-owned and cannot be used for the reason above.
 
 
 **The rule generalizes, and that is why it is written here rather than in the sequential connector.** Each

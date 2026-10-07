@@ -819,6 +819,19 @@ exists (kb/Work PB740; see `DESIGN-runtime-library.md`). Since every connector h
 pair Table 19 admits is already mutually admissible at the host and no handle is rebuilt to admit a sibling
 (kb/Work PB322 deleted the widening that served the undetermined default).
 
+**⛔ AND A SHARE MODE IS NOT THE WHOLE OF THE LOCK AGAINST OTHER RUN UNITS** (kb/Work PB833). A host share mode
+refuses an open by its ACCESS, so on Unix (one advisory `flock`, two states) rule 2's *"restricts concurrent access
+… to input mode"* — admit a reader, refuse a writer — cannot be said at all, and on EVERY host it cannot refuse the
+truncation of an `OPEN OUTPUT` a sibling's posture admitted (measured: a second run unit's `OPEN OUTPUT` answered
+`00` against a file the first held `SHARING WITH ALL OTHER`, and emptied it). A connector therefore also takes
+`RunUnitFileLock` at the OPEN — its Table 19 column published as a shared byte-range lock on the physical file, then
+the columns its request row refuses tested for another holder — and, on a host whose share modes are mandatory
+(Windows), an OUTPUT open on an existing file first asks the host for exclusive access, before anything is truncated. Both are taken ONCE, in `FileConnector.Open`, above the
+organizations, and released by the CLOSE or an unsuccessful OPEN; the verdict is `Table19.Cell`, so the cross-run-unit
+and in-run-unit answers cannot drift (`RunUnitFileLockDriftTests`, 768 pairs through two registries). The mechanism,
+the host primitive (Linux open-file-description locks) and the hosts that cannot carry it are in
+`DESIGN-runtime-library.md`.
+
 **⛔ AND THE LOCK IS OWED BY EVERY ORGANIZATION, WHICH IS A SEPARATE FACT FROM THE DERIVATION BEING RIGHT**
 (kb/Work PB771). §9.1.15 3) names none — *"The successful opening of a file establishes a file lock for the
 applicable sharing rules, thereby preventing other run units from opening that file with incompatible sharing

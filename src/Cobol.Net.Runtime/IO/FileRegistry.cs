@@ -1085,8 +1085,11 @@ public sealed class FileRegistry
         // open against every connector already open on the physical file, and for every pair of the three modes it
         // admits, each side's base posture already admits the other's access (FileLockPostureDriftTests proves
         // that over the printed table), so no sibling's handle is ever rebuilt (kb/Work PB322 removed the
-        // widening that existed only for an undetermined default).
-        c.HostShare = FileLockPosture.OfSharingMode(sharing);
+        // widening that existed only for an undetermined default). The SHARING MODE itself is what is handed down:
+        // the connector derives its handle's share mode from it (FileConnector.HostShare) and, in c.Open, the
+        // cross-run-unit region lock (RunUnitFileLock, kb/Work PB833), so the two halves of the file lock cannot
+        // disagree about which mode this OPEN is under.
+        c.HostSharing = sharing;
         string status = c.Open(mode);
         if (status[0] == '0')   // the success family '00'/'05'/'07' — §9.1.13.2
         {

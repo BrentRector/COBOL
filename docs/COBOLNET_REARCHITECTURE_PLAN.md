@@ -41,7 +41,7 @@ a DEVLOG entry per commit; commit AND push every checkpoint.
   - **Open from wave 73's splits:**
     - PB480 and PB1113/PB1116 plus the PB1112 remnant (OO conformance);
     - PB1042 (StorageCell dyn slots for dynamic-capacity tables);
-    - PB322 (three mechanisms) and PB833 (fcntl locks; design first);
+    - PB322 (three mechanisms);
     - PB1422;
     - the leads PB1744–PB1747 and PB1755–PB1756.
   - **Unexplained, not dismissed:** one gate run went red on `NistDifferentialTests_P3.NistProgram_MatchesGolden(NC134A)` and `GateLegDriftTests.Arm3` (each passed alone and on the next run; DEVLOG 1804). A repeat on either is a real defect.

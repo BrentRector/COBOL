@@ -298,10 +298,13 @@ public sealed class FileLockPostureDriftTests
     /// value takes <c>LOCK_SH</c> — so §9.1.15 2)'s <i>"restricts concurrent access … to input mode"</i> has no
     /// expression there at all. The posture is NOT changed to compensate: mapping it onto
     /// <see cref="FileShare.None"/> would refuse the reader rule 2 explicitly ADMITS, trading an under-refusal
-    /// for an over-refusal of access the standard grants. So on such a host rule 2's file lock degrades toward
-    /// rule 3's <i>"allows concurrent access"</i> and never toward rule 1's exclusivity — a user on Linux gets
-    /// weaker protection from other run units than on Windows, and this is where that is written down instead
-    /// of being a red test nobody could explain.</para>
+    /// for an over-refusal of access the standard grants. So against a handle that is NOT a run unit — this
+    /// probe is a bare <see cref="FileStream"/> — rule 2's share mode degrades toward rule 3's <i>"allows
+    /// concurrent access"</i> and never toward rule 1's exclusivity. ⛔ That is the host share mode only: §9.1.15
+    /// binds other RUN UNITS, and a run unit of this runtime is bound by <c>RunUnitFileLock</c>'s region lock
+    /// as well, which expresses every rule on exactly the hosts whose <see cref="FileShare"/> cannot —
+    /// <see cref="RunUnitFileLockDriftTests"/> measures that over every pair (kb/Work PB833). What this class
+    /// pins is therefore the interplay with a process that takes part in no protocol (Annex A.1 item 75).</para>
     /// <para>Rule 1 survives everywhere, because <c>LOCK_EX</c> is exactly the one thing a binary advisory lock
     /// CAN say — subject to it being advisory, which binds only processes that also take the lock.</para></summary>
     private static (bool Expected, string Why) ExpectedOutsideWriter(Mode mode, bool isoAnswer)
@@ -319,10 +322,11 @@ public sealed class FileLockPostureDriftTests
             "⚠ MEASURED: this host's FileShare cannot express a share mode that "
             + "admits a reader and refuses a writer, so §9.1.15 2)'s file lock degrades toward rule 3's "
             + "concurrent access rather than toward rule 1's exclusivity (widening it to FileShare.None would "
-            + "refuse the reader rule 2 admits). ⛔ THIS ARM PINS A DEFECT, NOT A DETERMINATION — fcntl region "
-            + "locks are advisory in the same way and are PER-ACCESS, so rule 2 IS expressible on this host and "
-            + "kb/Work PB833 owns closing it; GR-9.1.15-2 stays PARTIAL until then. DESIGN-runtime-library.md "
-            + "carries it; kb/Work PB795 is why it is written down rather than a red nobody could explain. " + host.Because);
+            + "refuse the reader rule 2 admits). This probe is a bare handle, NOT a run unit: another run unit of "
+            + "this runtime is refused by RunUnitFileLock's region lock (RunUnitFileLockDriftTests, kb/Work "
+            + "PB833), and a process that takes part in no protocol meets only the share mode, which Annex A.1 "
+            + "item 75 lets the implementor define (DESIGN-runtime-library.md, docs/CONFORMANCE.md DOC-A.1-75). "
+            + "kb/Work PB795 is why it is written down rather than a red nobody could explain. " + host.Because);
     }
 
     /// <summary>⛔ THE HOST CAPABILITY EVERY ARM ABOVE LEANS ON, ASSERTED RATHER THAN ASSUMED (kb/Work PB795).
@@ -341,7 +345,7 @@ public sealed class FileLockPostureDriftTests
             "§9.1.15 2) restricts other access *to input mode*; it does not exclude it. " + host.Because);
         Assert.True(host.ReadWriteShareAdmitsAnOutsideWriter,
             "§9.1.15 3) — *allows concurrent access*. " + host.Because);
-        Assert.True(OperatingSystem.IsWindows() == host.SeparatesReadersFromWriters,
+        Assert.True(HostFile.ShareModesAreMandatory == host.SeparatesReadersFromWriters,
             "THE DOCUMENTED DETERMINATION (DESIGN-runtime-library.md, kb/Work PB795): Windows share modes are "
             + "mandatory and per-access, so §9.1.15 2) is enforced as written there; every other host reaches "
             + "FileShare through .NET's advisory flock, which has one shared state for every mode but None and "
@@ -606,7 +610,7 @@ public sealed class FileLockPostureDriftTests
 
         string registry = TestRepo.Src("Cobol.Net.Runtime", "IO", "FileRegistry.cs");
         var writers = File.ReadAllLines(registry)
-            .Where(l => l.Contains("HostShare =", StringComparison.Ordinal)
+            .Where(l => l.Contains("HostSharing =", StringComparison.Ordinal)
                         && !l.TrimStart().StartsWith("//", StringComparison.Ordinal)
                         && !l.TrimStart().StartsWith("///", StringComparison.Ordinal))
             .ToList();

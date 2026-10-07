@@ -286,7 +286,53 @@ public abstract class FileConnector
     /// appended to a file the program had declared exclusive, measured across processes), while two clause-less
     /// connectors Table 19 PERMITS to share one file took the restrictive one and the second OPEN answered '30'
     /// — a status no Table 19 row and no §9.1.13.9 item produces.</para></summary>
-    internal FileShare HostShare { get; set; } = FileLockPosture.OfSharingMode(FileSharing.ReadOnly);   // outside a registry nothing has arbitrated: the READ ONLY posture the .NET path constructors gave
+    internal FileShare HostShare => FileLockPosture.OfSharingMode(HostSharing);
+
+    /// <summary>The sharing mode this connector's current OPEN is arbitrated under (§9.1.15: the OPEN's SHARING
+    /// phrase, else the file control entry's clause, else the implementor default of the open mode) — the ONE
+    /// fact both halves of the file lock derive from: the host share mode of the connector's own handle
+    /// (<see cref="HostShare"/>) and the cross-run-unit region lock (<see cref="RunUnitFileLock"/>). The registry
+    /// assigns it immediately before the OPEN body runs; outside a registry nothing has arbitrated, so it is the
+    /// READ ONLY posture the .NET path constructors gave.</summary>
+    internal FileSharing HostSharing { get; set; } = FileSharing.ReadOnly;
+
+    /// <summary>The §9.1.15 file lock this connector holds against other RUN UNITS while it is open — the part
+    /// of the lock a host's <see cref="FileShare"/> cannot say (<see cref="RunUnitFileLock"/>, kb/Work PB833);
+    /// null where the host cannot hold it and the share mode of the connector's own handle is all there is.</summary>
+    private RunUnitFileLock? _runUnitLock;
+
+    /// <summary>Establish the cross-run-unit file lock of the OPEN in <paramref name="mode"/>. Returns the
+    /// failing I-O status — §9.1.13.9 1)'s '61', <i>"that physical file is already open by another file
+    /// connector in a manner that conflicts with this request"</i> — or null when the lock is held or the host
+    /// cannot hold one.
+    /// <para>⛔ OUTPUT ASKS A HOST WHOSE SHARE MODES ARE THE LOCK FIRST (<see cref="HostFile.ShareModesAreMandatory"/>).
+    /// Table 19's OUTPUT rows are unsuccessful against every column (§9.1.13.9 1) e)), but an OUTPUT open
+    /// <i>creates</i> the file — it truncates what is there — and a host share mode only refuses an open whose ACCESS
+    /// it excludes, so a handle that admits a writer admits the truncation: measured on Windows, an <c>OPEN
+    /// OUTPUT</c> in a second run unit answered '00' against a file the first held open <c>SHARING WITH ALL
+    /// OTHER</c>, and emptied it. A <see cref="FileShare.None"/> request (<see cref="HostFile.IsHeldByAnother"/>)
+    /// is refused by every outstanding handle there is, which is exactly the OUTPUT rows' meaning, and it is made
+    /// BEFORE anything is created (§14.9.27.4 GR25, <i>"If the execution of the OPEN statement is unsuccessful, the
+    /// file is not affected"</i>). A host without mandatory share modes has the region lock instead, which
+    /// refuses an OUTPUT like every other cell of the table and asks a REGULAR file only — the probe is a read
+    /// open, which on a FIFO waits for a writer that is this program's own next statement.</para></summary>
+    /// <param name="mode">The open mode being established.</param>
+    /// <param name="existedBeforeBody">True before <see cref="OpenCore"/> on a file that is present; false after
+    /// the body created it, when the connector's own handle would make the OUTPUT question answer yes.</param>
+    private string? TakeRunUnitFileLock(FileOpenMode mode, bool existedBeforeBody)
+    {
+        if (existedBeforeBody && mode == FileOpenMode.Output && HostFile.ShareModesAreMandatory && HostFile.IsHeldByAnother(HostPath))
+            return FileStatusCode.FileSharingConflict;
+        return RunUnitFileLock.Take(HostPath, HostSharing, mode, out _runUnitLock) == RunUnitFileLock.Outcome.Refused
+            ? FileStatusCode.FileSharingConflict
+            : null;
+    }
+
+    private void ReleaseRunUnitFileLock()
+    {
+        _runUnitLock?.Dispose();
+        _runUnitLock = null;
+    }
 
     /// <summary>The ACCESS this connector's own long-lived host handle takes of the physical file in
     /// <paramref name="mode"/> — what a SIBLING connector's §9.1.15 file lock has to admit for this connector to
@@ -683,7 +729,16 @@ public abstract class FileConnector
             // the creating stream's own refusal is the authority answer.
             if (presence is FilePresence.Present && mode is not FileOpenMode.Input && !HostFile.PermitsWrite(HostPath))
                 return Status = FileStatusCode.PermissionDenied;   // '37' §14.9.27.4 GR16 / §9.1.13.6 item 6 a)
+            // §9.1.15 — "The successful opening of a file establishes a file lock for the applicable sharing
+            // rules, thereby preventing other run units from opening that file with incompatible sharing rules":
+            // THE LOCK IS TAKEN HERE, ONCE, ABOVE THE ORGANIZATIONS, and BEFORE OpenCore on a file that exists,
+            // because an OPEN that is going to be unsuccessful leaves the file unaffected (GR25) and OUTPUT's
+            // body truncates it (kb/Work PB833). A file that does not exist yet is locked after the body has
+            // created it, below: nothing can hold what is not there.
+            if (presence is FilePresence.Present && TakeRunUnitFileLock(mode, existedBeforeBody: true) is { } refusal)
+                return Status = refusal;   // '61' §9.1.13.9 1)
             s = OpenCore(mode, presence);
+            if (s[0] == '0' && _runUnitLock is null && TakeRunUnitFileLock(mode, existedBeforeBody: false) is { } lateRefusal) s = lateRefusal;
         }
         catch (UnauthorizedAccessException) { s = FileStatusCode.PermissionDenied; }
         // §9.1.13.9 1) — "A file sharing conflict condition exists because an OPEN statement is attempted on a
@@ -723,6 +778,7 @@ public abstract class FileConnector
         {
             try { AbandonOpen(); }
             catch (IOException) { }   // the status above stands (§14.9.27.4 GR25 — the unsuccessful OPEN's own)
+            ReleaseRunUnitFileLock();   // §9.1.15 — only a SUCCESSFUL opening establishes the lock
         }
         // ⛔ NOTHING IS RECORDED HERE, AND THE ABSENCE IS THE DESIGN (kb/Work PB802). §9.1.6's fixed file
         // attributes "apply to the file at the time it is created", and the two moments the OPEN statement
@@ -824,6 +880,7 @@ public abstract class FileConnector
         try { s = CloseCore(); }
         catch (UnauthorizedAccessException) { s = FileStatusCode.PermanentError; }
         catch (IOException) { s = FileStatusCode.PermanentError; }
+        ReleaseRunUnitFileLock();   // §9.1.15 — "The file lock is removed by an explicit or implicit CLOSE statement"
         _openMode = false;
         // §9.1.13.1 / Annex A.1 item 105 — THE CORRECTION TECHNIQUE: a completed CLOSE ends a permanent error in
         // effect, successful or not (an unsuccessful CLOSE also leaves the connector closed), so the next OPEN

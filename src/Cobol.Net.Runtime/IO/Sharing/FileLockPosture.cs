@@ -41,6 +41,16 @@ namespace CobolNet.Runtime.IO;
 /// connector reaches this class as READ ONLY (INPUT) or NO OTHER (every other mode) and the file lock it
 /// establishes against other run units is the one that mode's rule gives — no separate posture for "undetermined"
 /// exists.</para>
+/// <para>⛔ THE SHARE MODE IS HALF OF THE FILE LOCK, AND NOT ALWAYS THE WHOLE OF IT (kb/Work PB833). A host
+/// share mode is the only thing a process that takes part in no protocol ever meets, but .NET reaches it on Unix
+/// through ONE advisory <c>flock</c> whose only states are <c>LOCK_EX</c> (<see cref="FileShare.None"/>) and
+/// <c>LOCK_SH</c> (everything else), so rule 2's <i>"restricts … to input mode"</i> — admit a reader, refuse a
+/// writer — cannot be said in it; and on every host a share mode refuses an open by its ACCESS, so it cannot
+/// refuse the truncation of an OPEN OUTPUT that a sharing sibling's access admits. Against other RUN UNITS —
+/// §9.1.15's own audience, <i>"preventing other run units from opening that file with incompatible sharing
+/// rules"</i> — the rest is <see cref="RunUnitFileLock"/>, which publishes the connector's Table 19 column and
+/// tests the columns its request row refuses; the posture here is deliberately NOT widened to
+/// <see cref="FileShare.None"/> to compensate, which would refuse the reader rule 2 admits.</para>
 /// </remarks>
 public static class FileLockPosture
 {
