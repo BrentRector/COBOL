@@ -53,6 +53,10 @@ p, fam = budget.points([ev(at(2026, 10, 5, 10), "claude-sonnet-5-5", inp=100_000
                        at(2026, 10, 5, 0), at(2026, 10, 5, 23), cal)
 check("points", round(p, 6), 2.0)
 check("per family", fam, {"sonnet": 1_000_000, "opus": 400_000})
+# 2b. the frontier tier is priced at its own rate, never at the opus fallback (kb/Work R69): 160,000 Mythos tokens = 1 point
+p, fam = budget.points([ev(at(2026, 10, 5, 11), "claude-mythos-5-1", out=160_000)], at(2026, 10, 5, 10), at(2026, 10, 5, 23), cal)
+check("mythos rate", p, 1.0)
+check("mythos family", fam, {"mythos": 160_000})
 p, _ = budget.points([ev(at(2026, 10, 5, 10), "claude-sonnet-5-5", out=1_000_000)], at(2026, 10, 5, 10), at(2026, 10, 5, 23), cal)
 check("event at the anchor instant is excluded", p, 0.0)
 

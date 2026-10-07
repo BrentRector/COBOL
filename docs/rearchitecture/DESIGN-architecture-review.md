@@ -1,6 +1,6 @@
 # DESIGN — The comprehensive architecture review and restructuring (kb/Work PB1754)
 
-> **Status: DESIGN, not started.** The owner asked (2026-09-29) for "a full, 100%, end-to-end, architectural review
+> **Status: DESIGN; R0 and R1 STARTED by owner decision R69 (2026-10-06), the rest sequenced in §2.** The owner asked (2026-09-29) for "a full, 100%, end-to-end, architectural review
 > of the entire COBOL compiler codebase, grammar and C# lexer/parser/code generator. Everything", using the latest
 > review techniques, to eliminate duplicate code, refactor god classes, and refactor the file-system layout, file
 > names and classes as necessary, following proven architectural designs. All C# is to use the latest .NET and C#
@@ -23,8 +23,9 @@
 | Tests, scripts, hooks, CI | `tests/`, `scripts/`, `.github/` | layout and duplication only (§5.6) |
 
 **Out of scope:**
-- **The legacy `CobolSharp.*` projects** (~46,000 lines). They are deleted at the P15 cut-over and are never
-  refactored. **The review starts after P15**, or it excludes them explicitly.
+- **The legacy `CobolSharp.*` projects** (~46,000 lines). They are deleted by kb/Work PB2110 (P15's Cuts 1–2,
+  decoupled from v1.0 by R69) and are never refactored; until then the census (PB2115) and every wave exclude
+  `src/CobolSharp.*`.
 - **Behavior.** No change to any compiled program's output, any diagnostic, or any conformance verdict. A defect the
   review finds becomes a `kb/Work` note and is fixed in the normal fix lane, never inside a refactor (§4).
 
@@ -37,6 +38,16 @@ The review runs when all of these hold. The owner confirms the start (PB1754).
 4. **A quiet fix lane.** The review's refactors touch every file, so fix waves pause or run only in subsystems the
    current review wave does not touch. Merge conflicts across a whole-codebase rename are the main schedule risk.
 
+**The split start (owner decision R69, 2026-10-06).** Preconditions 1 and 2 are not yet true (the external-repository
+slices PB2097–PB2104 are in flight; the legacy delete is PB2110), and the owner chose not to wait for them for the
+parts that cannot conflict with the fix lane: **R0** (PB2115 census · PB2116 oracle capture · PB2117 performance
+baseline) and **R1** (PB2118) run now, R1 taking the approved `DESIGN-external-repository.md` as given; **R3 leaf
+waves and Delete waves** (PB2119) run between fix-lane trains in subsystems the current train does not touch; **R2
+and R3 over binding and code generation** keep R64's condition (GAP near zero). Why now: the remaining GAP rows
+land in the god classes (48 in §14.9, 22 in §13.18, 14 in §12.3 at 173 GAP), so every fix landed before the split
+enlarges the extraction, and R1 lets those fixes be written into the target layout. The partition is enforced by
+the file set a wave's brief declares, checked against the in-flight trains before dispatch, not by hope.
+
 ## 3. Phases
 
 Every phase lands through the normal lander and `push-main.sh`. Every phase is behavior-neutral by the §4 contract.
@@ -48,7 +59,11 @@ Every finding is a `kb/Work` note (CLAUDE.md rule 8), never a list in this docum
     agreement;
   - per project, the dependency graph;
   - clone families (`roslyn-analysis`'s type-2 detector);
-  - unreachable members, measured, never deduced (`engineering-standards`).
+  - unreachable members, measured, never deduced (`engineering-standards`);
+  - dead artifacts beyond code: scripts, configuration, docs, test scaffolds and drift-test literals with no caller
+    or reader, measured by a caller query (the Delete program PB2119's input).
+  R0's instruments are kb/Work PB2115 (census), PB2116 (oracle capture) and PB2117 (performance baseline, which is
+  also kb/Work A6's instrument: one mechanism, one place).
 - **God-class candidates.** Any type over ~800 lines across its partials, or with more than one reason to change.
   Known today: `DataBinder` (7,448 lines in `DataBinder.cs` alone, plus the `.Reports`, `.Switches`, `.Odo`,
   `.Linkage` partials); `DiagnosticCatalog` (5,612, a data table written as code); `IntrinsicBinder` (2,826);
@@ -60,7 +75,8 @@ Every finding is a `kb/Work` note (CLAUDE.md rule 8), never a list in this docum
 
 ### R1 — The target architecture (designed, adversarially reviewed, owner-approved)
 A design section, not code. It is produced by an architect agent, broken by an adversarial reviewer, and revised
-until approved (the PB1708 workflow). It states:
+until approved (the PB1708 workflow). kb/Work PB2118: the author is Mythos 5.1 under the owner's explicit approval
+for that dispatch (R69 §4), the refuter is Opus, and the section lands as §8 of this document. It states:
 - **The layers and their allowed dependencies.** Editions → Frontend (preprocessor, lexer, parser) → syntax tree →
   Binding (data, procedure) → bound tree → Validation → Lowering → CodeGen (the Roslyn backend behind
   `ICodeGenBackend`, keeping the CIL backend's seam) → Runtime.
@@ -100,7 +116,11 @@ Rolling waves, one mechanism per implementer. Each wave is one of:
 - **Unify** (a duplicate family into one rule in one place);
 - **Move and rename** (layout, namespaces, file and type names, with EVERY caller changed in the same change, and no
   alias, forwarder or shim: CLAUDE.md rule 4);
-- **Data-ize** (code that is a table becomes data plus a generator or loader).
+- **Data-ize** (code that is a table becomes data plus a generator or loader);
+- **Delete** (a census-measured dead member, type, file, script, doc or scaffold, removed with every caller and
+  the drift test that pinned it; the wave records HOW the item was measured dead; a deletion that changes behavior
+  is a `kind: defect` note for the fix lane, never a deletion). Owner mandate R69 §3; the program is PB2119 and the
+  legacy engine (PB2110) is its first item.
 
 **Order.** Leaves first: runtime values, then editions, then the front end, then binding, then code generation.
 Each move then has a stable base, and renames land before extractions in the same area, so extraction diffs stay
@@ -110,6 +130,18 @@ readable.
 - proves the §4 contract;
 - adds or extends the drift test that keeps its new boundary true;
 - updates the design docs it changes (CLAUDE.md rule 6).
+
+### Who does what (R69 §4)
+- **Mythos 5.1** (`claude-mythos-5-1`, Fable-tier price): R1's author (PB2118) and a second adversarial round only if
+  the Opus refuter cannot break the design; explicit owner approval per dispatch, never a default
+  (MANDATORY-PRACTICES P1).
+- **Opus**: R0 tooling, the R1 refuter, R2 reviewers, extract and unify waves, landers and refuters;
+  `model_rules.json` routes `^architecture` and `^build/(ci|legacy)` to it.
+- **Sonnet**: census re-runs, the prose and register sweeps, move-and-rename and analyzer waves driven by a Roslyn
+  rewriter or a code fix, Delete waves whose items the census measured dead. The §4 oracle proves a mechanical
+  wave; the model does not. A Sonnet agent that meets a judgment returns `NEEDS-OPUS`.
+- Until kb/Work PB2120 lets a named cluster be planned by the orchestrator, review waves are dispatched with a
+  hand-written `groups.json` through the `workstream` skill.
 
 ### R4 — Modernization (mechanical, analyzer-driven)
 Per §5.5: language-version and SDK upgrade first, then one analyzer rule per wave applied with its code fix or a
@@ -203,9 +235,14 @@ production type. Scripts follow the same no-wrapper rule.
 - **A neutral-looking refactor that changes behavior** through static-state or registration order (the PB1708
   lesson). Mitigation: the §4 emitted-C# and diagnostic differentials, not only test results.
 - **Scope creep into fixes.** Mitigation: a defect found is a note, fixed in the fix lane (§1).
+- **The split start** (R69): an R3 or Delete wave in a subsystem a fix-lane train is also editing. Mitigation: the
+  wave's brief declares its file set, checked against the in-flight trains' file sets before dispatch; a collision
+  defers the wave, never the train.
 - **Cost.** About 16 subsystems × 5 dimensions of review agents, then tens of R3 waves. R2's findings set R3's real
   size, and the owner sees the estimate before R3 starts.
 
 ## 7. Owner decisions (tracked in PB1754, never here)
 When to start; whether a preview .NET SDK is acceptable; whether project and assembly names may change (the NuGet id
-`WiseOwl.COBOL` is public); and whether the tests/ layout is in R3's scope.
+`WiseOwl.COBOL` is public); and whether the tests/ layout is in R3's scope. **Decided:** R64 (2026-09-30: after zero
+GAP; the SDK question trails; names may change; tests/ in scope) and R69 (2026-10-06: the start is SPLIT as §2
+states; the legacy delete runs now; Delete is a wave kind; Mythos authors R1 under explicit approval).

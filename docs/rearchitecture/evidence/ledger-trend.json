@@ -1288,6 +1288,78 @@
       "dns": 457,
       "label": "PB1281+PB1252: REDEFINES ope",
       "battery": null
+    },
+    {
+      "sha": "6834e113",
+      "date": "2026-10-05",
+      "gap": 194,
+      "closed": 4153,
+      "dns": 457,
+      "label": "PB516+PB486+PB1650+PB1744+PB",
+      "battery": null
+    },
+    {
+      "sha": "241bd0d0",
+      "date": "2026-10-05",
+      "gap": 191,
+      "closed": 4156,
+      "dns": 457,
+      "label": "PB1221: report LINE, COLUMN,",
+      "battery": null
+    },
+    {
+      "sha": "59b45b13",
+      "date": "2026-10-05",
+      "gap": 188,
+      "closed": 4159,
+      "dns": 457,
+      "label": "PB1408+PB609+PB1282: ADDRESS",
+      "battery": null
+    },
+    {
+      "sha": "f79b7ccd",
+      "date": "2026-10-05",
+      "gap": 187,
+      "closed": 4160,
+      "dns": 457,
+      "label": "PB1421+PB1060+PB434: functio",
+      "battery": null
+    },
+    {
+      "sha": "cea9cce2",
+      "date": "2026-10-05",
+      "gap": 185,
+      "closed": 4162,
+      "dns": 457,
+      "label": "PB480+PB1112: structured uni",
+      "battery": null
+    },
+    {
+      "sha": "f4716089",
+      "date": "2026-10-05",
+      "gap": 178,
+      "closed": 4169,
+      "dns": 457,
+      "label": "PB1425+PB1783: object-proper",
+      "battery": null
+    },
+    {
+      "sha": "bc4f0ade",
+      "date": "2026-10-05",
+      "gap": 175,
+      "closed": 4172,
+      "dns": 457,
+      "label": "PB781+PB858+PB1415+PB1039+PB",
+      "battery": null
+    },
+    {
+      "sha": "e9e1d589",
+      "date": "2026-10-05",
+      "gap": 173,
+      "closed": 4174,
+      "dns": 457,
+      "label": "PB1042: dynamic tables and d",
+      "battery": null
     }
   ]
 }

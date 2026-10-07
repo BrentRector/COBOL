@@ -4,7 +4,8 @@
     "measured": "2026-10-04",
     "source": "waves 1011-1015: weekly-meter movement against the subagent tokens the Workflow tool reported per wave (orchestrator session, 2026-10-04). The Workflow's token count and the telemetry sum below may not be the same measure: refit from units.jsonl and usage_report.py (kb/Work PB1981 item 9; design open decision D6).",
     "counted_token_kinds": ["input_tokens", "output_tokens", "cache_creation_tokens"],
-    "tokens_per_point": {"sonnet": 1000000, "opus": 400000},
+    "tokens_per_point": {"sonnet": 1000000, "opus": 400000, "fable": 160000, "mythos": 160000},
+    "tokens_per_point_frontier_source": "fable and mythos: 2.5x the Opus rate, the published price ratio ($10/$50 against $4/$20 per MTok; kb/Work R69, 2026-10-06), until a meter reading refits it",
     "unknown_model_rate": "opus",
     "session_pct_per_weekly_pct": 5.0,
     "session_pct_per_weekly_pct_source": "a guess (design open decision D7) until two readings inside one session window measure it"
@@ -25,11 +26,11 @@
     "allowed": ["sonnet", "opus"],
     "opus_when": {
       "file_patterns": ["/Oo/", ".g4", "Frontend/Grammar/"],
-      "area_patterns": ["^oo", "grammar", "frontend/grammar"],
+      "area_patterns": ["^oo", "grammar", "frontend/grammar", "^build/(ci|legacy)", "^architecture"],
       "body_patterns": ["(?i)design question (is )?open", "(?i)NEEDS-OPUS", "(?i)needs a (re)?design", "(?i)redesign beyond"],
       "failed_attempts_at_least": 2
     },
-    "_why": "Opus where the work is design-heavy (OO, grammar), where a note says a design question is open, or where a note has already failed twice (a note that fails twice is a task-spec problem, kb/Work PB1981). Fable is never a value: it needs explicit owner approval per dispatch (owner 2026-10-02)."
+    "_why": "Opus where the work is design-heavy (OO, grammar), where a note says a design question is open, or where a note has already failed twice (a note that fails twice is a task-spec problem, kb/Work PB1981). Opus also for the legacy-retirement cuts (CI and gate wiring carry the CI invariant) and the architecture review's R0/R1 items (kb/Work R69). Fable and Mythos are never values here: each needs explicit owner approval per dispatch (owner 2026-10-02; R69 2026-10-06)."
   },
   "cost": {
     "per_group_tokens": {"sonnet": 100000, "opus": 40000},

@@ -73,15 +73,24 @@ if re.search(r"--autostash\b", commands):
 # "This repo" is recognized by its FOLDER NAME, derived from where this hook lives — never a hard-coded literal: the
 # literal "cobolsharp" silently failed OPEN when the repo became E:\COBOL (2026-09-26). The old name is kept so a
 # path written before the rename is still recognized; a RELATIVE `cd` never leaves the repo.
-_ROOT = __import__("pathlib").Path(__file__).resolve().parents[2].name.lower()
+_ROOT_DIR = __import__("pathlib").Path(__file__).resolve().parents[2]
+_ROOT = _ROOT_DIR.name.lower()
 _THIS_REPO = {_ROOT, "cobol", "cobolsharp"}
+# A path registered in .gitmodules is ANOTHER repository nested under this one (tools/claude-skills is the public
+# skills repo, whose main has no ci-gate), so a push of ITS main is not a push to this repo's main. The folder-name
+# rule below would otherwise catch it, because the submodule's path contains the repo's name (2026-10-06).
+_GITMODULES = _ROOT_DIR / ".gitmodules"
+_SUBMODULES = [tuple(p.lower().split("/")) for p in re.findall(r"^\s*path\s*=\s*(\S+)",
+               _GITMODULES.read_text(encoding="utf-8"), re.M)] if _GITMODULES.exists() else []
 
 
 def _is_this_repo(target: str) -> bool:
     t = target.lower().replace("\\", "/")
+    segs = [s for s in t.split("/") if s]
+    if any(len(segs) >= len(sub) and tuple(segs[-len(sub):]) == sub for sub in _SUBMODULES):
+        return False  # a registered submodule, absolute or relative: another repository
     if not (t.startswith(("/", "~")) or re.match(r"[a-z]:", t)):
         return True
-    segs = [s for s in t.split("/") if s]
     return any(s in _THIS_REPO or any(s.startswith(n + "-") for n in _THIS_REPO) for s in segs)
 
 

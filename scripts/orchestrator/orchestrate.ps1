@@ -57,7 +57,7 @@ Set-StrictMode -Version Latest
 $Here = $PSScriptRoot
 $Schema = Join-Path $Here 'handoff.schema.json'
 $UnitModel = @{ wave = 'opus'; land = 'opus'; resume = 'opus'; meter = 'sonnet' }
-$Allowed = @('opus', 'sonnet')   # never Fable: it needs the owner's approval per dispatch (owner 2026-10-02)
+$Allowed = @('opus', 'sonnet')   # never Fable or Mythos: each needs the owner's approval per dispatch (owner 2026-10-02; kb/Work R69 2026-10-06)
 New-Item -ItemType Directory -Force -Path $CoordDir, (Join-Path $CoordDir 'logs'), (Join-Path $CoordDir 'scratch') | Out-Null
 $env:COBOL_COORD_DIR = $CoordDir
 $Lock = Join-Path $CoordDir 'orchestrate.lock'

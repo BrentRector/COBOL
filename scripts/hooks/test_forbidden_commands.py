@@ -33,6 +33,9 @@ CASES = [
     ("cd scripts && git push origin main", True),               # a relative cd never leaves the repo
     ("cd /e/COBOL-private && git push origin main", True),      # a sibling of this repo's name (fail closed)
     ("cd /e/Sites/wiseowlsoftware.com && git push origin main", False),
+    ("git -C /e/COBOL/tools/claude-skills push -q origin main --follow-tags", False),  # a registered submodule is another repo
+    ("cd tools/claude-skills && git push origin main", False),                         # relative, same submodule
+    ("cd /e/COBOL/tools && git push origin main", True),                               # its parent folder is still this repo
     ("python - <<'EOF'\nprint('a" + BS + "nb')\nEOF", True),
     ("python - <<'EOF'\nprint('plain')\nEOF", False),
     ('dotnet test x.csproj --filter "~Drift|~EditionGate" > log.txt', True),

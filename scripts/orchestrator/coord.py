@@ -26,9 +26,10 @@ def rules(path: pathlib.Path | None = None) -> dict[str, Any]:
 
 
 def family(model: str) -> str:
-    """A model id or alias ('claude-sonnet-5-5', 'sonnet', 'claude-opus-5-5[1m]') -> 'sonnet' | 'opus' | 'haiku' | ''."""
+    """A model id or alias ('claude-sonnet-5-5', 'sonnet', 'claude-opus-5-5[1m]', 'claude-mythos-5-1') -> 'sonnet' | 'opus' |
+    'haiku' | 'fable' | 'mythos' | ''. Fable and Mythos are priced at their own rate (model_rules.json; kb/Work R69)."""
     m = (model or "").lower()
-    return next((f for f in ("opus", "sonnet", "haiku", "fable") if f in m), "")
+    return next((f for f in ("opus", "sonnet", "haiku", "fable", "mythos") if f in m), "")
 
 
 def coord_dir(override: str | None = None) -> pathlib.Path:
