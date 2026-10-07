@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Cobol.Net.Benchmarks — the BenchmarkDotNet harness for the WiseOwl COBOL runtime's performance-sensitive
-    subsystems (kb/Work PB101: the collation engine, src/Cobol.Net.Runtime/Collation/). NOT a test project:
-    nothing in CI runs it, and it asserts nothing.
+    Cobol.Net.Benchmarks — the BenchmarkDotNet harness for WiseOwl COBOL's performance: the runtime's
+    performance-sensitive subsystems (kb/Work PB101: the collation engine, src/Cobol.Net.Runtime/Collation/), compile
+    throughput and the generated programs' hot paths (kb/Work PB2117, the performance baseline that
+    scripts/arch/perf_baseline.py records and compares). NOT a test project: nothing in CI runs it, and it asserts
+    nothing.
 
     HOW TO RUN IT: see README.md beside this file. The command lines cannot be written here, because every one
     of them contains a double hyphen and XML forbids a double hyphen inside a comment.
@@ -39,6 +41,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cobol.Net.Runtime\Cobol.Net.Runtime.csproj" />
+    <!-- kb/Work PB2117: the compile-throughput benchmarks (Compile/) drive CompilerDriver, and the generated-program
+         benchmarks (GeneratedCode/) compile their COBOL sources with it before running them. -->
+    <ProjectReference Include="..\..\src\Cobol.Net.Compiler\Cobol.Net.Compiler.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -49,6 +54,11 @@
       unused linked file is one more thing that can fail to compile for reasons unrelated to benchmarking.
     -->
     <Compile Remove="$(MSBuildThisFileDirectory)../_shared/*.cs" />
+    <!--
+      The ONE exception: the repo-root locator. The PB2117 benchmarks read their inputs from the tree (the NIST
+      programs, Programs/*.cob), and TestRepoDriftTests forbids a second root-finder anywhere under tests/.
+    -->
+    <Compile Include="$(MSBuildThisFileDirectory)../_shared/TestRepo.cs" Link="_shared/TestRepo.cs" />
   </ItemGroup>
 
 </Project>

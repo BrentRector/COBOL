@@ -77,7 +77,13 @@ Every finding is a `kb/Work` note (CLAUDE.md rule 8), never a list in this docum
   script's policy arms firing. Its findings are filed as kb/Work notes by a clerk, never kept as a list.
 - **The oracle** (§4.1) is recorded at the baseline commit: `python scripts/arch/capture_oracle.py --record`.
 - **Performance baseline** (`brent-tools:performance-diagnosis`): the compile-throughput benchmark and the
-  whole-population gate time, so no refactor regresses speed unseen.
+  whole-population gate time, so no refactor regresses speed unseen. The instrument is
+  `scripts/arch/perf_baseline.py` (kb/Work PB2117, which is also kb/Work A6's): warm compile throughput and the
+  generated programs' hot paths through `tests/Cobol.Net.Benchmarks` (BenchmarkDotNet, each with a witness), cold
+  whole-process compiles, the same hot paths against GnuCOBOL 3.2 under WSL with a 1x/2x/4x scaling curve, and the
+  gate time read from `build-local.ps1`'s `verdict.json`. It writes the record, conditions and noise band included, to
+  `docs/rearchitecture/evidence/perf-baseline/<product commit>.md`. The legacy byte engine is not a baseline
+  (kb/Work R69 §1).
 
 ### R1 — The target architecture (designed, adversarially reviewed, owner-approved)
 A design section, not code. It is produced by an architect agent, broken by an adversarial reviewer, and revised
@@ -170,7 +176,10 @@ A refactor is proven neutral by ALL of these, compared case by case, never by to
 3. **Tokens and parse trees**, for any grammar or lexer change: the token-stream differential that M6 used (type,
    channel, offsets, line, column, text and final mode) plus a parse-tree shape differential.
 4. **Program output.** The whole-population gate (Conformance, Unit, Characterization), the Linux gate, and CI.
-5. **Performance** not worse than the R0 baseline beyond noise, with conditions recorded.
+5. **Performance** not worse than the R0 baseline beyond noise, with conditions recorded:
+   `python scripts/arch/perf_baseline.py --against docs/rearchitecture/evidence/perf-baseline/<R0 record>.md`. A row
+   slower than its band (the script's docstring states the band) is a REGRESSION and a finding; a row the run no longer
+   produces is a red too. No test asserts a time (kb/Work PB1590): the record is compared, never a stopwatch.
 
 ### 4.1 The oracle of items 1 and 2 (kb/Work PB2116)
 

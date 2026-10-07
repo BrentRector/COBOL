@@ -1,0 +1,9 @@
+# kb/Work PB2117 -- the hot-path programs' expected standard output, one line each, COMPUTED from the formula in
+# each program's header comment (never copied from a run). Tab-separated: program, the output line. Read by
+# GeneratedCode/GeneratedProgramBenchmarks.cs (the BenchmarkDotNet witness) and scripts/arch/perf_baseline.py
+# (the witness of every timed run, ours and GnuCOBOL's).
+EMPTYRUN	EMPTYRUN
+MOVEHOT	MOVEHOT 000000009999000000 [OVER   2,000,0]
+PERFHOT	PERFHOT 005000000 005000000 010000000 015000000 005000000
+SEQHOT	SEQHOT 000500000 000000125000250000 000000000
+IDXHOT	IDXHOT 000000000002001000 000000000002001000 000002000 000000000

@@ -4,7 +4,9 @@ The measured performance profile of WiseOwl COBOL's performance-sensitive runtim
 engine** (`src/Cobol.Net.Runtime/Collation/`, kb/Work **PB101** — `Collation/CollationBenchmarks.cs`), the **key
 cache** (**PB106** — `Collation/CacheBenchmarks.cs`), the **CLDR loader and builder** (**PB105** —
 `Collation/CldrBenchmarks.cs`), and the **Unicode normalization and grapheme segmentation** subsystems
-(**PB104** — `Unicode/UnicodeBenchmarks.cs`).
+(**PB104** — `Unicode/UnicodeBenchmarks.cs`); and the **performance baseline**'s in-process half — compile throughput
+and the generated programs' hot paths (**PB2117** — `Compile/`, `GeneratedCode/`, `Programs/`; see
+[the baseline section](#the-performance-baseline--compile-throughput-and-generated-programs-kbwork-pb2117)).
 
 This is **not a test project**. Nothing in CI runs it, it asserts nothing, and a red number here is a finding, not
 a failure. It exists because the collation engine is on the hot path of ordinary COBOL — every relation condition
@@ -36,7 +38,7 @@ Other useful invocations:
 ```
 dotnet run -c Release --project tests/Cobol.Net.Benchmarks                     # every benchmark class
 dotnet run -c Release --project tests/Cobol.Net.Benchmarks -- --list flat      # what exists
-dotnet run -c Release --project tests/Cobol.Net.Benchmarks -- --job short      # a quicker, noisier run
+dotnet run -c Release --project tests/Cobol.Net.Benchmarks -- --job short      # ADDS a short job beside the configured one
 dotnet run -c Release --project tests/Cobol.Net.Benchmarks -- --filter *BuildKey*
 ```
 
@@ -337,12 +339,38 @@ the numbers above are copied from them.
 
 ---
 
+## The performance baseline — compile throughput and generated programs (kb/Work PB2117)
+
+Two classes are the in-process half of the baseline that `scripts/arch/perf_baseline.py` records and compares
+(kb/Work A6's instrument; `docs/rearchitecture/DESIGN-architecture-review.md` §3 R0 and §4 item 5). Run them through
+the script, which also takes the cold, whole-process and GnuCOBOL measurements and writes the record to
+`docs/rearchitecture/evidence/perf-baseline/<product commit>.md`; the numbers live there, not here.
+
+- **`Compile/CompileBenchmarks`** — `CompilerDriver.Compile` over the three largest NIST programs (IX113A, NC105A,
+  NC218A) and the one making the most COPY statements (SM201A), compiled as the NIST harness compiles them.
+  `FrontEndAndBind` (the `CheckOnly` compile: preprocess, parse, bind, the conformance pass) is the baseline and
+  `FullCompile` adds emit, Roslyn and the written assembly, so the `Ratio` column is the backend's share. Witness: both
+  compiles succeed, the assembly is non-empty, and SM201A really read its library texts.
+- **`GeneratedCode/GeneratedProgramBenchmarks`** — the programs under `Programs/` (`MOVEHOT` moves through every storage
+  form, `PERFHOT` is PERFORM dispatch, `SEQHOT` sequential and `IDXHOT` indexed file I/O), compiled once at the shipping
+  edition and run in this process through their entry point: the generated code and the runtime, without process
+  start-up. Witness: the program's whole output must equal its line in `Programs/witnesses.tsv`, which is computed from
+  the formula in the program's header comment, never copied from a run. `Programs/EMPTYRUN.cob` is the start-up floor
+  the script's whole-process rows are read against.
+
+The `Programs/` sources are plain COBOL 85 on purpose: the script runs the same files through GnuCOBOL 3.2 under WSL,
+so the comparison always measures the same COBOL. Each has exactly one `01 LOOP-COUNT PIC 9(9) COMP VALUE n.` line,
+which the script scales (1x, 2x, 4x) for the scaling curve.
+
+---
+
 ## Not measured here
 
 **The COBOL layer beyond the carrier.** `Compare_ShortStrings_LocaleCollation` (run 2) measures the
-`CobolCollation` carrier's LOCALE arm; the table arms (`AlphanumericCollation` / `NationalCollation`), SORT/MERGE end
-to end, and indexed-file key ordering are not benchmarked yet.
+`CobolCollation` carrier's LOCALE arm; the table arms (`AlphanumericCollation` / `NationalCollation`) and SORT/MERGE end
+to end are not benchmarked yet (indexed-file key handling is, end to end, by `IDXHOT`).
 
-**Everything else in the runtime.** Numeric conversion, `MOVE`, file I/O and the generated-code paths have no
-benchmarks yet. Add them as sibling folders (`tests/Cobol.Net.Benchmarks/<Subsystem>/`) reusing
-`Collation/BenchmarkConfig.cs`, which is deliberately subsystem-neutral (`Unicode/UnicodeBenchmarks.cs` already does).
+**Numeric conversion in isolation.** `MOVEHOT` measures `MOVE` across the storage forms as a program does it; there is
+no micro-benchmark of one conversion. Add one as a sibling folder (`tests/Cobol.Net.Benchmarks/<Subsystem>/`) reusing
+`Collation/BenchmarkConfig.cs`, which is deliberately subsystem-neutral (`Unicode/`, `Compile/` and `GeneratedCode/`
+already do).

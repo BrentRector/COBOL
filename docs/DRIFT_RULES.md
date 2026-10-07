@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-277 drift tests.
+278 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -198,6 +198,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [OperandStringChannelDriftTests](../tests/Cobol.Net.Tests.Unit/OperandStringChannelDriftTests.cs) | Holds the TWO string-image channels for a BoundOperand in their intended relationship, leaf by leaf (fix-queue PB49). | `src/Cobol.Net.Compiler/CodeGen/Emit/IntrinsicRenderer.cs`, `src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs`, `src/Cobol.Net.Compiler` |
 | [ParenTokenTwinDriftTests](../tests/Cobol.Net.Tests.Unit/ParenTokenTwinDriftTests.cs) | Every source site that tests for the PLAIN paren token types shall either name the FUNCTION-ARGUMENT twins (FNARG_LPAREN / FNARG_RPAREN) or say in a comment that it means the grouping paren ONLY. | `src` |
 | [PartialExpressionSpineDriftTests](../tests/Cobol.Net.Tests.Unit/PartialExpressionSpineDriftTests.cs) | ⛔ A PARTIAL EXPRESSION IS A CONDITION WITH ITS LEFTMOST OPERAND MISSING — NOT A SECOND CONDITION LANGUAGE (kb/Work PB398). | — |
+| [PerfBaselineSelfTestDriftTests](../tests/Cobol.Net.Tests.Unit/PerfBaselineSelfTestDriftTests.cs) | ⛔ THE PERFORMANCE BASELINE'S COMPARISON MUST BE ABLE TO FAIL (kb/Work PB2117): scripts/arch/perf_baseline.py --self-test plants a regression, a vanished row, an allocation change and a machine change into a synthetic record and must flag each, stay silent on a delta inside the noise band, round-trip its own record format, and find the hot-path programs, their witnesses and the benchmark's [Params]… | `scripts/arch/perf_baseline.py` |
 | [PerformVaryingOperandWindowDriftTests](../tests/Cobol.Net.Tests.Unit/PerformVaryingOperandWindowDriftTests.cs) | kb/Work PB437 — the EVALUATION WINDOW of every PERFORM VARYING operand slot, pinned per slot. | — |
 | [PhysicalLinesDriftTests](../tests/Cobol.Net.Tests.Unit/PhysicalLinesDriftTests.cs) | ⛔ THE LINE-ENTRY STAGE IS THE ONLY PLACE A TEXT BECOMES LINES (kb/Work PB1800). | `src/Cobol.Net.Frontend/Preprocessor`, `src/Cobol.Net.Frontend/Parsing/SeparatorRule.cs`, `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4`, `src` |
 | [PictureCategoryDriftTests](../tests/Cobol.Net.Tests.Unit/PictureCategoryDriftTests.cs) | ⛔ THE TWO CLOSURE PROPERTIES OF PictureAnalyzer, MEASURED OVER THE WHOLE FORMAT-1 SYMBOL ALPHABET RATHER THAN OVER A LIST OF CASES (kb/Work PB535). | — |
