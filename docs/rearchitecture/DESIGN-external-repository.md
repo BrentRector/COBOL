@@ -250,9 +250,10 @@ Each quotation was run through `cite.py --check`. **(group)** marks a row the in
   05 F, 05 F-2, 05 G (10 X))` compiles, and a host built `-warnaserror` against the §4.3 naming rule (class `CUST`,
   record `CUST_Record` with `CUST`, `F`, `F_2`, `F_2_2`, `G`, `G_Record`) round-trips it (`MOVE 7 TO F-2` arrives in
   `F_2_2`); a record whose words are `AsImage`, `Equals`, `ToString`, its own name and `CALL` compiles as `AsImage_2`,
-  `Equals_2`, `ToString_2`, `R`, `CALL`. The same words break today's INTERNAL record struct: a subordinate named
-  `AsImage` or `Equals` draws CS0102 in `_T_0` (the internal allocator is not seeded with the struct's own members),
-  which the one seeded allocator of §4.5 removes for both.
+  `Equals_2`, `ToString_2`, `R`, `CALL`. The same words broke the INTERNAL record struct (a subordinate named
+  `AsImage` or `Equals` drew CS0102 in `_T_0`, the internal allocator not being seeded with the struct's own
+  members); the one seeded allocator of §4.5 removed that for the internal struct (kb/Work PB2093) and serves the
+  published one.
 - **Measured — namespaces (scratchpad `r7/ns/`):** `PAY.dll` (type `Cobol.PAY.V2`) beside `PAY.V2.dll` (namespace
   `Cobol.PAY.V2`) fails a host compile with CS0434 (and a COBOL group's source type with CS0437); with the
   one-segment namespace `Cobol.PAY_u002E_V2` both compile clean under `-warnaserror`.
@@ -589,12 +590,19 @@ assemblies whose namespaces coincide are REPO-6. `[assembly: CobolRepository(…
 tells the run-time probe which type to invoke.
 **The one name allocator.** Every C# name generated from a COBOL word — the internal record structs' members, the
 host-entry classes, the published record structs and their members, the `Call` parameters, OO classes and interfaces
-— comes from ONE function, `CsNames.Allocate(word, scope)`: `DataItem.Sanitize(word)`, then the smallest free `_2`,
-`_3`, … against the scope's used set, in source order. Each scope is SEEDED with its reserved names — the enclosing
-type's name and the members the emitter itself writes there (`AsImage`, `FromImage`, the record struct's synthesized
-members; `Call`, `Cancel`; `__ResetStatics`, `Call` and the other fixed members of a program class) — so a legal word
-never collides with a generated member. `DataBinder`'s private `Unique` (which today leaves the internal struct
-unseeded: a subordinate named `AsImage` or `Equals` draws CS0102, r7-names) is replaced by it, with every caller.
+— comes from ONE function, `CsNames.Allocate(baseName, scope)` (`Binding/Model/CsNames.cs`): the base name (the
+`DataItem.Sanitize`d word, or a synthesized base such as `_impliedRecordF`) when it is free, else the smallest free
+`_2`, `_3`, … against the scope's claimed set, in source order. Each `CsNameScope` is SEEDED with its reserved names —
+the members the emitter itself writes there and the ones C# synthesizes (a record struct: `AsImage`, `FromImage` and
+the other image and leaf-vector members, `Equals`, `GetHashCode`, `ToString`, `PrintMembers`, …, in
+`CsNames.RecordStructMembers`; a program class: the `ICobolProgram` surface `Call`, `CloseFiles`, `EndStorage`, …, in
+`CsNames.ProgramClassMembers`; the published host-entry scopes add `Call`, `Cancel` and the enclosing type's name) —
+so a legal word never collides with a generated member. **Landed for the internal scopes (kb/Work PB2093):**
+`DataBinder`'s private `Unique`, which left both unseeded (a subordinate named `AsImage` or `Equals` drew CS0102 in
+`_T_0`, a record named `CloseFiles` in the program class), is deleted; a group's members are appended only through
+`DataItem.AddMember`, which allocates in the group's own record-struct scope, and the class-level roots through the
+program-class scope. `CsNameReservationDriftTests` reads every member declaration the code generator writes, the
+members C# synthesizes for a record struct and the `ICobolProgram` members, and is red when one is in neither seed.
 Within a run unit one externalized name identifies one kind of entity (§8.3.2.2), so a program and a class never
 legally share one. Generated code spells every name outside the unit's own namespace `global::`-qualified
 (`global::CobolNet.Runtime.ProgramRegistry`): an assembly named `Cobol` or `CobolNet` would otherwise capture the
@@ -1308,7 +1316,7 @@ compile. A host entry always enables the check on its side (§4.3).
 | `ProgramTable` (`_probedModules` keyed by name; `ProbeSiblingModule` loads `<name>.dll` and calls a global `__CobolModule.Register`; a linear `_order` scan for rule 4; `CallProgram`/`Cancel` take a non-null `callerPath`) | `RegisterModule(registrar, runtimeVersion, callAbi, register)` (one registration set per run unit, the version refusal, staged commit refusing a duplicate outermost name, §11.2); `ProbeSiblingModule` per §11.2 over `RepositoryLocator`; per-kind `CallName` dictionary; `callerPath` is `string?` in `CallProgram` and `Cancel` (null: an activator outside every program), and the null arm is the outermost boundary that turns a STOP RUN or a run-unit-terminating fatal condition into R48's run-unit-ended result after the §14.6.11 actions | `ProgramRegistry` (`CallProgram(string?, …)`, `Cancel(string, string?)`, `RegisterModule`), `RuntimeFeatures` (new), `RunUnit` (the run-unit-ended exception type, `RunUnitEndedException(ExitStatus, Abnormal)`, R48) |
 | `ProgramRegistry` (public; XML remarks calling it the "emitted-surface shim", a facade whose members "forward") | `[EditorBrowsable(Never)]` on the type; remarks state that it is the generated code's ABI over the ambient run unit, callable from generated code in other assemblies, with no contract for a hand-written caller (§4.4) | — |
 | `ProgramEmitter.Emit` (the outermost-unit loop emits a program class per definition and skips prototypes) | every outermost program, function and prototype → its host-entry class (§4.3) with its record attributes when `RepositoryUpdate`; skeleton → `[CobolSkeleton]` class; expansion → §10.5's steps; the assembly attribute and `[CobolUnit]`s always | `HostEntryEmitter` (new: the entry body over `CallEmitter`'s argument renderer), `RecordStructEmitter` (the published mode), `RepositoryAttributeRenderer` (new), `CompilerDriver` (an expansion assembly is a second emission) |
-| `DataBinder.Unique` (private; the internal record struct's member names, unseeded: a subordinate `AsImage` or `Equals` draws CS0102) and `DataItem.Sanitize` | `CsNames.Allocate(word, scope)`: Sanitize, then the smallest free `_n`, over a scope seeded with the emitter's own members in that scope (§4.5) — the ONE allocator for internal and published names. `NameAllocator` (the `__`-prefixed temporaries, which no COBOL word can spell) is unchanged | `DataBinder` (every `Unique` caller), `RecordStructEmitter`, `HostEntryEmitter`, `OoEmitter` |
+| `DataBinder.Unique` (private; the internal record struct's member names, unseeded: a subordinate `AsImage` or `Equals` drew CS0102) and `DataItem.Sanitize` | **landed for the internal scopes (kb/Work PB2098):** `CsNames.Allocate(baseName, scope)`: the Sanitized base, then the smallest free `_n`, over a scope seeded with the emitter's own members in that scope (§4.5) — the ONE allocator for internal and published names. `NameAllocator` (the `__`-prefixed temporaries, which no COBOL word can spell) is unchanged | `DataBinder` (every `Unique` caller), `RecordStructEmitter`, `HostEntryEmitter`, `OoEmitter` |
 | `CallEmitter.ArgText` (renders a COBOL argument's `CobolArg`) | the one argument renderer is callable for "an argument of description D passed by CONTENT over a detached value" so the host entry renders through it | `HostEntryEmitter` |
 | `RecordStructEmitter` (a `private record struct` of the STORAGE form per group) | `+` a published mode: a `public record struct` of the DESCRIPTION's host types (§4.3's table), FILLER private, `AsImage`/`FromImage` from `GroupImageCodec` with `HostLanding`'s landing and validity rules | `HostEntryEmitter` |
 | — | `HostLanding` (new, runtime, `[EditorBrowsable(Never)]`): the exact landing that refuses every loss (`ArgumentOutOfRangeException`), the alias grouping (`ArgumentException`), the validity decode (`CobolNum.IsNumericImage`; `FormatException`) — one implementation of §4.3's door rules | `HostEntryEmitter`, `RecordStructEmitter` (published mode) |
@@ -1719,10 +1727,12 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
    re-baselines; the three registrar-naming tests (through the attribute and `EnsureRegistered`). Docs: INTERPROGRAM's
    probe paragraph; the OO design's namespace sentence; DOC-A.1-65/-167's `__CobolModule.Register()` →
    `EnsureRegistered()`. No prerequisite.
-2. **The one name allocator.** `CsNames.Allocate` with seeded scopes replaces `DataBinder.Unique` at every caller; the
-   collision fixture for internal record structs (a subordinate named `AsImage`, `Equals`, `ToString`, `F` beside
-   `F-2`) compiles; no existing snapshot changes, because only programs that fail to compile today get new names. No
-   prerequisite.
+2. **The one name allocator — LANDED (kb/Work PB2098, PB2093).** `CsNames.Allocate` with seeded scopes replaced
+   `DataBinder.Unique` at every caller (the class-level roots through `CsNameScope.ProgramClass()`, a group's members
+   through `DataItem.AddMember`); the collision fixture `tests/conformance/2002/pb2093_member_names_like_generated_members`
+   (subordinates named `AsImage`, `Equals`, `ToString`, `F` beside `F` and `F-2`, a record named `CloseFiles`, and a
+   TYPE clone of a type with such members) compiles and runs; `CsNameReservationDriftTests` keeps the seeds total.
+   The published scopes of slice 3 reuse the allocator with their own seeds.
 3. **The host entry and the one host surface.** `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,
    validity decode); `RecordStructEmitter`'s published mode; `HostEntryEmitter` over the CALL lane's renderer with
    `Call` and `Cancel`; `CallProgram`'s and `Cancel`'s nullable `callerPath` and its outermost-boundary arm with R48's

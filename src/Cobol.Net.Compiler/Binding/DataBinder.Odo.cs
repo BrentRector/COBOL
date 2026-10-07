@@ -423,8 +423,7 @@ public sealed partial class DataBinder
             // A later sibling that itself REDEFINES an earlier one adds no storage and does not violate SR22.
             for (DataItem? n = item; n is { Parent: { } parent }; n = parent)
             {
-                int idx = parent.Children.IndexOf(n);
-                if (idx >= 0 && parent.Children.Skip(idx + 1).Any(s => s.RedefinesTargetName is null))
+                if (parent.Children.SkipWhile(s => !ReferenceEquals(s, n)).Skip(1).Any(s => s.RedefinesTargetName is null))
                 {
                     Edition.Error("COBOLNET0856", $"occurs-depending table '{subject}' is followed by a "
                         + "non-subordinate entry in its record: the subject of an OCCURS DEPENDING ON entry may "

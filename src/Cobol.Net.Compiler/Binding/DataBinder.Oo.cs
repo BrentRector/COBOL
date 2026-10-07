@@ -701,7 +701,7 @@ public sealed partial class DataBinder
         t.Uid = _uidCounter++;
         if (model.IsGroup)
             foreach (var child in model.Children)
-                t.Children.Add(CloneTempNode(child, t));
+                t.AddMember(CloneTempNode(child, t));
         _roots.Add(t);
         CompilerTempClones.Add((t, model));
         return t;
@@ -723,7 +723,7 @@ public sealed partial class DataBinder
             Level = src.Level,
             DeclaredAt = src.DeclaredAt,
             CobolName = src.CobolName,
-            CsName = Unique(src.CsName, newParent.Children.Select(c => c.CsName)),
+            CsName = src.CsName,   // the base name: newParent.AddMember allocates it among the NEW siblings (PB2093)
             Occurs = src.Occurs,
             OccursSpec = src.OccursSpec is { } os ? CloneOccursSpec(os) : null,
         };
@@ -731,7 +731,7 @@ public sealed partial class DataBinder
         clone.Uid = _uidCounter++;
         clone.Parent = newParent;
         foreach (var child in src.Children)
-            clone.Children.Add(CloneTempNode(child, clone));
+            clone.AddMember(CloneTempNode(child, clone));
         return clone;
     }
 

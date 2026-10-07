@@ -43,7 +43,7 @@ public sealed class ConditionNameAssociationDriftTests
         foreach (var c in children)
         {
             c.Parent = g;
-            g.Children.Add(c);
+            g.AddMember(c);
         }
         return g;
     }

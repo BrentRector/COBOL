@@ -19,11 +19,14 @@
       *>   C  `"A" THRU "M"` with NO phrase -> rule 2's implementor arm = the PCS = AL, where "A"(25) collates
       *>      AFTER "M"(13): the range is inverted and 14.7.8 makes it EMPTY -> false  -> OUT
       *>   D  the VALUE-clause twin, `88 ... VALUE "M" THRU "A" IN AL`      -> true   -> IN
-      *>   E  the same set with no phrase, `VALUE "A" THRU "M"`             -> false  -> OUT
+      *>   E  the same set with no phrase, `VALUE "A" THRU "M"`, is inverted under the PCS AL - a sequence the
+      *>      compiler KNOWS, so 13.18.63.3 SR26 b) refuses it at compile time (COBOLNET2961, kb/Work PB552);
+      *>      that leg lives in conformance:negative/pb552-value-through-not-ascending.
       *>   F  a SINGLETON value in a clause that also names an alphabet is NOT governed by it - 14.7.8 is the
       *>      THROUGH phrase's specification and rule 2 names the sequence "used for RANGE evaluation", while a
       *>      singleton is compared by 8.8.4.5.3 GR2's ordinary relation rules (under the PCS). WS-C = "C" is
-      *>      listed as a singleton beside an inverted-under-AL range                -> true   -> YES
+      *>      listed as a singleton beside the range "Z" THRU "M" IN AL (0..13), which excludes it (23)
+      *>                                                                             -> true   -> YES
       *>   G  the NATIONAL half of SR3 ("if literal-3 or identifier-3 is of class national, alphabet-name-1
       *>      shall reference an alphabet that defines a national collating sequence"): under
       *>      ALPHABET NREV FOR NATIONAL IS N"CBA", position(C)=0 < position(B)=1 < position(A)=2, so the range
@@ -44,8 +47,7 @@
        WORKING-STORAGE SECTION.
        01 WS-C PIC X VALUE "C".
            88 D-IN-AL     VALUE "M" THRU "A" IN AL.
-           88 E-IN-NAT    VALUE "A" THRU "M".
-           88 F-SINGLETON VALUE "C", "A" THRU "M" IN AL.
+           88 F-SINGLETON VALUE "C", "Z" THRU "M" IN AL.
        01 WS-NB PIC N VALUE N"B".
        PROCEDURE DIVISION.
        MAIN-P.
@@ -62,7 +64,6 @@
                WHEN OTHER                  DISPLAY "C=OUT"
            END-EVALUATE
            IF D-IN-AL     DISPLAY "D=IN"  ELSE DISPLAY "D=OUT"  END-IF
-           IF E-IN-NAT    DISPLAY "E=IN"  ELSE DISPLAY "E=OUT"  END-IF
            IF F-SINGLETON DISPLAY "F=YES" ELSE DISPLAY "F=NO"   END-IF
            EVALUATE WS-NB
                WHEN N"C" THRU N"A" IN NREV DISPLAY "G=IN"

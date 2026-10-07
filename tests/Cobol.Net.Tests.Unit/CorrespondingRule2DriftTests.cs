@@ -107,7 +107,7 @@ public sealed class CorrespondingRule2DriftTests
     {
         var g = new DataItem { Level = 5, CobolName = name, CsName = name };
         var c = new DataItem { Level = 10, CobolName = "C", CsName = "C", Pic = P(PicCategory.Alphanumeric) };
-        g.Children.Add(c);
+        g.AddMember(c);
         return g;
     }
 
@@ -119,7 +119,7 @@ public sealed class CorrespondingRule2DriftTests
             Level = 10, CobolName = "C", CsName = "C", IsDynamicLength = true,
             Pic = P(PicCategory.Alphanumeric, len: 1),
         };
-        g.Children.Add(c);
+        g.AddMember(c);
         return g;
     }
 

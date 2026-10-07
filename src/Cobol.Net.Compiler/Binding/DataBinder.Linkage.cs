@@ -326,7 +326,7 @@ public sealed partial class DataBinder
     /// distinct name — instead of colliding with a bridge (kb/Work PB1047 — every global root is bridged now,
     /// including one a local declaration hides by §8.4.6.2.1 3) a), because its subordinate names remain
     /// visible).</summary>
-    internal void ReserveInheritedMemberNames(IEnumerable<string> names) => _rootNames.UnionWith(names);
+    internal void ReserveInheritedMemberNames(IEnumerable<string> names) => _rootNames.Reserve(names);
 
     /// <summary>The EXTERNAL records' synthesized run-unit backings (ISO §13.18.22; emitted as
     /// <c>ref</c>-properties over <c>ExternalStore</c>). (READ-ONLY view — P6 Step 5.)</summary>
@@ -371,7 +371,7 @@ public sealed partial class DataBinder
     /// <c>Bind</c> right after WORKING-STORAGE (so linkage items join the same forest, name index, and
     /// post-build passes — REDEFINES classification, SIGN inheritance, index resolution all apply, ISO §13.7.3).
     /// </summary>
-    internal void CallBindLinkage(Core.ProgramUnitContext program, HashSet<string> rootNames)
+    internal void CallBindLinkage(Core.ProgramUnitContext program, CsNameScope rootNames)
     {
         if (program.dataDivision()?.linkageSection() is { } ls)
             LinkageRoots.AddRange(BindEntries(ls.dataDescriptionEntry(), rootNames, EntrySection.Linkage));

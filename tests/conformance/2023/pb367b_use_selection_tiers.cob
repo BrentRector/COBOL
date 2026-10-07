@@ -44,6 +44,11 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB367BTIER.
        ENVIRONMENT DIVISION.
+      *> INV-RANGE is ordered IN a LOCALE alphabet: §13.18.63.3 SR26 refuses an inverted range whose runtime
+      *> collating sequence is known (COBOLNET2961, kb/Work PB552), and a locale's is not.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           ALPHABET LOC IS LOCALE.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
            SELECT F1 ASSIGN TO "pb367b-tier1.dat"
@@ -64,7 +69,7 @@
        01 WS-TABLE.
           05 WS-E PIC 9(3) OCCURS DYNAMIC CAPACITY IN WS-CAP FROM 2 TO 4.
        01 WS-C  PIC X VALUE "M".
-          88 INV-RANGE VALUE "Z" THRU "A".
+          88 INV-RANGE VALUE "Z" THRU "A" IN LOC.
        PROCEDURE DIVISION.
        DECLARATIVES.
        D-G1 SECTION.

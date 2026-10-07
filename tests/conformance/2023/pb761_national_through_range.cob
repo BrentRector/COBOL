@@ -46,9 +46,14 @@
       *>      could be vacuously true.
       *>  V05 THE OVER-FIX GUARD.  An ALPHANUMERIC elementary item must
       *>      stay on the ALPHANUMERIC sequence (8.8.4.2.7).  AE holds
-      *>      "CCC" and its range is "AAA" THRU "CCC": under REV-AN that
-      *>      range is inverted and therefore empty -> N.  A change that
-      *>      moved the alphanumeric side to REV-NAT would answer Y.
+      *>      "CCC" and its range is "BBB" THRU "AAA", which ASCENDS
+      *>      under REV-AN (C < B < A) and excludes C -> N.  Under
+      *>      REV-NAT ("ABC") the same pair is inverted, which
+      *>      13.18.63.3 SR26 b) refuses at compile time for a known
+      *>      sequence (COBOLNET2961, kb/Work PB552), so a change that
+      *>      moved the alphanumeric side to REV-NAT would not compile.
+      *>      (The range was "AAA" THRU "CCC", inverted under REV-AN,
+      *>      before SR26 was enforced.)
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB761NTR.
        ENVIRONMENT DIVISION.
@@ -70,7 +75,7 @@
        01 E2 PIC N(3).
           88 E2-IN-RANGE VALUE N"AAA" THRU N"BBB".
        01 AE PIC X(3).
-          88 AE-IN-RANGE VALUE "AAA" THRU "CCC".
+          88 AE-IN-RANGE VALUE "BBB" THRU "AAA".
        PROCEDURE DIVISION.
        MAIN.
            MOVE N"CCC" TO EN

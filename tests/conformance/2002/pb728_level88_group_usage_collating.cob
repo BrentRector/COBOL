@@ -38,10 +38,14 @@
       *>      stay on the ALPHANUMERIC sequence (8.8.4.2.1 - "an
       *>      alphanumeric group item shall be treated as an elementary
       *>      alphanumeric data item").  AG holds "CCC" and its range is
-      *>      "AAA" THRU "CCC": under REV-AN that range is inverted and
-      *>      therefore empty -> N.  A fix that moved this group to the
-      *>      national sequence would answer Y.
-      *>  V04 the alphanumeric ELEMENTARY twin of V03 -> N.
+      *>      "CCC" THRU "AAA", which ASCENDS under REV-AN (C < B < A)
+      *>      -> Y.  Under the national REV-NAT ("ABC") it would be
+      *>      inverted, which 13.18.63.3 SR26 b) refuses at compile
+      *>      time for a known sequence (COBOLNET2961, kb/Work PB552) -
+      *>      so a fix that moved this group to the national sequence
+      *>      would not compile.  (The range was "AAA" THRU "CCC",
+      *>      inverted under REV-AN, before SR26 was enforced.)
+      *>  V04 the alphanumeric ELEMENTARY twin of V03 -> Y.
       *>  V05 the BOOLEAN group: 8.8.4.2.8 compares boolean values
       *>      "regardless of their usage" and rule 2 extends the shorter
       *>      operand "on the right by sufficient boolean zeros", so no
@@ -65,10 +69,10 @@
           05 GN-A PIC N(3).
        01 EN PIC N(3).
        01 AG.
-          88 AG-IN-RANGE VALUE "AAA" THRU "CCC".
+          88 AG-IN-RANGE VALUE "CCC" THRU "AAA".
           05 AG-A PIC X(3).
        01 AE PIC X(3).
-          88 AE-IN-RANGE VALUE "AAA" THRU "CCC".
+          88 AE-IN-RANGE VALUE "CCC" THRU "AAA".
        01 BG GROUP-USAGE BIT.
           88 BG-IS-101 VALUE B"101".
           05 BG-A PIC 1(3) USAGE BIT.

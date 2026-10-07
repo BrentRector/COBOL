@@ -42,19 +42,16 @@
       *>      `[ WHEN SET TO FALSE IS literal-4 ]` on the LINE AFTER it, so IN comes FIRST, and 5.2.6.2
       *>      makes that order part of the format. Same range as A, and literal-4 does not disturb it
       *>                                                                                -> TRUE   -> E=T
-      *>   B  `VALUE "D" THRU "P" IN ALPHA-REV`        -> 23 > 11: literal-1 collates AFTER literal-2 under
-      *>      ALPHA-REV, so the range is INVERTED - EC-RANGE-INVALID is set and the range is treated as
-      *>      EMPTY                                                                     -> FALSE  -> B=F
-      *>      (NATIVE would give x44 <= x4D <= x50, a perfectly ordered range containing M -> B=T, and would
-      *>      raise NOTHING. B is A's mirror: the two legs are wrong in OPPOSITE directions when the phrase
-      *>      is dropped, which is why both are here.)
+      *>   B  `VALUE "D" THRU "P" IN ALPHA-REV` - 23 > 11: literal-1 collates AFTER literal-2 under
+      *>      ALPHA-REV. That leg moved to conformance:negative/pb552-value-through-not-ascending: ALPHA-REV
+      *>      is a sequence the compiler KNOWS, so 13.18.63.3 SR26 b) refuses the inverted range at compile
+      *>      time (COBOLNET2961, kb/Work PB552) - in the NAMED sequence, which is what B pinned here (NATIVE
+      *>      would give x44 <= x4D <= x50, a perfectly ordered range). A and E are its mirror: inverted
+      *>      NATIVELY, they compile only because the phrase is read.
       *>
-      *> THE EXCEPTION IS MEASURED ON THE NAMED SEQUENCE, NOT THE NATIVE ONE, and the two EXCEPTION-STATUS
-      *> lines are what pin that. EXC-BEFORE is taken after A, C, D and E - every one of which is ascending
-      *> in the sequence rule 2 puts it under - so no exception exists yet and FUNCTION EXCEPTION-STATUS
-      *> returns spaces. Evaluating B then sets EC-RANGE-INVALID. Read the pair together: legs A and E are
-      *> inverted NATIVELY and raise nothing, leg B is ordered NATIVELY and raises - so a compiler that
-      *> weighed the inversion test natively would print both lines the other way round.
+      *> EXC-STATUS is taken after A, C, D and E - every one of which is ascending in the sequence rule 2
+      *> puts it under - so no EC-RANGE-INVALID exists and FUNCTION EXCEPTION-STATUS returns spaces; a
+      *> compiler that weighed the ranges natively would raise it for A, D and E.
        >>TURN EC-RANGE-INVALID CHECKING ON
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB502VALRNGALPH.
@@ -69,14 +66,11 @@
            88 A-NONE  VALUE "D" THRU "P".
            88 A-MULTI VALUE "Q" THRU "O", "P" THRU "D" IN ALPHA-REV.
            88 A-ORDER VALUE "P" THRU "D" IN ALPHA-REV WHEN SET TO FALSE IS "Q".
-           88 A-INV   VALUE "D" THRU "P" IN ALPHA-REV.
        PROCEDURE DIVISION.
        MAIN-P.
            IF A-ASC   DISPLAY "A=T" ELSE DISPLAY "A=F" END-IF
            IF A-NONE  DISPLAY "C=T" ELSE DISPLAY "C=F" END-IF
            IF A-MULTI DISPLAY "D=T" ELSE DISPLAY "D=F" END-IF
            IF A-ORDER DISPLAY "E=T" ELSE DISPLAY "E=F" END-IF
-           DISPLAY "EXC-BEFORE=" FUNCTION EXCEPTION-STATUS
-           IF A-INV   DISPLAY "B=T" ELSE DISPLAY "B=F" END-IF
-           DISPLAY "EXC-AFTER=" FUNCTION EXCEPTION-STATUS
+           DISPLAY "EXC-STATUS=" FUNCTION EXCEPTION-STATUS
            STOP RUN.

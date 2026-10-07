@@ -31,7 +31,7 @@ public sealed class ZeroLengthItemDriftTests
     private static DataItem Group(string name, params DataItem[] children)
     {
         var g = new DataItem { Level = 1, CobolName = name, CsName = name };
-        foreach (var c in children) g.Children.Add(c);
+        foreach (var c in children) g.AddMember(c);
         return g;
     }
 

@@ -36,7 +36,7 @@ public sealed class GroupKindDriftTests
         var g = new DataItem { Level = 1, CobolName = name, CsName = name, GroupUsage = usage };
         DataItem c = child ?? Elem(name + "C", Alnum());
         c.Parent = g;
-        g.Children.Add(c);
+        g.AddMember(c);
         return g;
     }
 

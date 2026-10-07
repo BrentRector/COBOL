@@ -1641,8 +1641,8 @@ public static class DiagnosticCatalog
         "COBOLNET1725", "usage-object-reference-file-section", EditionSeverity.Error,
         "ISO §13.18.60.3 syntax rule 15: \"The USAGE OBJECT REFERENCE clause shall not be specified in the "
         + "file section.\" (The SAME AS twin — §13.18.49.3 SR6, a file-section SAME AS whose data-name-1 "
-        + "description contains an object reference — is COBOLNET1556; this is the DIRECT declaration arm, "
-        + "which had no screen at all.)",
+        + "description contains an object reference — is COBOLNET1556, and the TYPE twin — §13.18.57.3 SR8 — is "
+        + "COBOLNET2960; this is the DIRECT declaration arm.)",
         "ISO §13.18.60.3 SR15");
     public static readonly DiagnosticDescriptor UsageConstantRecord = new(
         "COBOLNET1726", "usage-constant-record", EditionSeverity.Error,
@@ -5361,13 +5361,10 @@ public static class DiagnosticCatalog
     // (kb/Work PB890, PB559). Both are the same failure shape: an operand or a word the general format
     // constrains, accepted because nothing asked the format about it. Neither is a wrong answer on its own
     // — one leaves a phrase that governs nothing, the other a spelling no figure prints — which is exactly
-    // why they were invisible. ⛔ §13.18.63.3 SR26 (an ASCENDING THROUGH pair, kb/Work PB552) is the third
-    // member of the family and is DELIBERATELY NOT HERE: SR26 b) is conditioned on the runtime collating
-    // sequence being KNOWN, which SR26's own NOTE 5 makes implementor-defined ("this is not a requirement
-    // of an implementor"), and this processor currently answers that question TWO ways at once — the SR27
-    // screen treats every non-LOCALE sequence as known at compile time, while §14.7.8's EC-RANGE-INVALID
-    // arm treats the native sequence as a runtime fact (tests/conformance/2023/ec_range_invalid). Settling
-    // that is an owner determination, not a screen.
+    // why they were invisible. §13.18.63.3 SR26 (an ASCENDING THROUGH pair, kb/Work PB552) is the third
+    // member of the family, COBOLNET2961 (declared with the later codes); its b) arm turns on the runtime
+    // collating sequence being KNOWN, the one determination it shares with SR27 b) (docs/CONFORMANCE.md §3,
+    // D-RANGE-KNOWN: every non-LOCALE sequence is known at compile time).
 
     /// <summary>COBOLNET2176 — §13.18.63.3 SR31's "only when": the VALUE clause writes
     /// <c>IN alphabet-name-1</c> but no THROUGH phrase, so there are no THROUGH literals for the permission to
@@ -6925,6 +6922,33 @@ public static class DiagnosticCatalog
         + "§14.9.17.3 SR2 states for GO TO and that IBM and Micro Focus document for STOP "
         + "(docs/CONFORMANCE.md §3, D-SEQ).",
         "ISO §14.9.42.3 SR1");
+
+    /// <summary>COBOLNET2960 — a TYPE clause in the file section whose type-name-1 describes a USAGE OBJECT REFERENCE
+    /// item, at any depth (kb/Work PB545). The third route of one prohibition: the direct USAGE clause is
+    /// COBOLNET1725 (§13.18.60.3 SR15) and the SAME AS twin COBOLNET1556 (§13.18.49.3 SR6); the TYPE copy of a
+    /// working-storage declaration was the route no screen asked.</summary>
+    public static readonly DiagnosticDescriptor TypeObjectReferenceFileSection = new(
+        "COBOLNET2960", "type-object-reference-file-section", EditionSeverity.Error,
+        "ISO §13.18.57.3 SR8: \"When the TYPE clause is specified in the file section, the description of "
+        + "type-name-1, including its subordinate data items, shall not contain a data item described with a USAGE "
+        + "OBJECT REFERENCE clause.\" A file record is external storage, which an object reference cannot occupy; "
+        + "describe the record without the object reference, or keep the typed item in working-storage.",
+        "ISO §13.18.57.3 SR8");
+
+    /// <summary>COBOLNET2961 — §13.18.63.3 SR26: a condition-name's VALUE range does not ascend (kb/Work PB552). The
+    /// THROUGH member of the format-3 family beside COBOLNET2176 (SR31) and COBOLNET2048 (SR27), and ordered by the
+    /// same sequence SR27 b) reads.</summary>
+    public static readonly DiagnosticDescriptor ValueThroughNotAscending = new(
+        "COBOLNET2961", "value-through-not-ascending", EditionSeverity.Error,
+        "ISO §13.18.63.3 SR26: \"When the THROUGH phrase is specified: a) when literal-2 is of a class other than "
+        + "alphanumeric or national, the value of literal-2 shall be less than the value of literal-3. b) when "
+        + "literal-2 is of class alphanumeric or national, and the runtime collating sequence is known, the value of "
+        + "literal-2 shall be less than the value of literal-3.\" A reversed or equal pair names a range the "
+        + "condition can never (or only once) be TRUE for — write the lower value first. The order of a character "
+        + "range is the IN alphabet-name-1 phrase's alphabet, else the PROGRAM COLLATING SEQUENCE, else the native "
+        + "order; every such sequence is known at compile time, and only a LOCALE sequence is not, so a range "
+        + "ordered by a locale is not screened here (an inverted one raises EC-RANGE-INVALID at run time, §14.7.8).",
+        "ISO §13.18.63.3 SR26");
 
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the

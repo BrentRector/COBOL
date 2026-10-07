@@ -646,8 +646,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <summary>The C#-field-name scope at the class level, shared by FILE SECTION records, WORKING-STORAGE
     /// roots, LINKAGE roots — and, in a CLASS unit, every METHOD's data roots (an emitted field/local name is
     /// unique across the whole class, so sibling methods' same-named items can never cross-wire — the legacy
-    /// trap-#6 guard at the NAME level).</summary>
-    private readonly HashSet<string> _rootNames = new(StringComparer.Ordinal);
+    /// trap-#6 guard at the NAME level). Seeded with the program class's own members (<c>Call</c>, <c>CloseFiles</c>,
+    /// …), so a record spelled like one is allocated a free name (kb/Work PB2093).</summary>
+    private readonly CsNameScope _rootNames = CsNameScope.ProgramClass();
 
     /// <summary>The resolution half of <see cref="Bind"/> — the post-build passes over the COMPLETE forest, driven by
     /// the DECLARED <see cref="BindPipeline"/> (rearchitecture PHASE 05 Step 3 / PHASE 06 Step 3; DESIGN-data-model
@@ -848,7 +849,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <paramref name="outOfOrder"/> marks ONE record bound ahead of its section's walk because a constant's value
     /// needed its length (<see cref="BindLaterRecords"/>, kb/Work PB1231): its roots are returned but not yet added
     /// to the forest — the section walk places them at their source position (<see cref="TakePreboundRecord"/>).</summary>
-    private List<DataItem> BindEntries(IEnumerable<Core.DataDescriptionEntryContext> entries, HashSet<string> rootNames,
+    private List<DataItem> BindEntries(IEnumerable<Core.DataDescriptionEntryContext> entries, CsNameScope rootNames,
         EntrySection section = EntrySection.WorkingStorage, bool outOfOrder = false)
     {
         var newRoots = new List<DataItem>();
@@ -1013,8 +1014,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     templateRoot = null;
                     // A 01/77 emits as a Program-level static field — its C# name must be unique across every root
                     // (FILE SECTION records and WORKING-STORAGE alike), so record it in the shared scope.
-                    item.CsName = Unique(item.CsName, rootNames);
-                    rootNames.Add(item.CsName);
+                    item.CsName = CsNames.Allocate(item.CsName, rootNames);
                     if (!outOfOrder) _roots.Add(item);   // an out-of-order record joins the forest at its source position
                     newRoots.Add(item);
                     _lastRoot = item;
@@ -1046,10 +1046,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     Edition.Error("COBOLNET1537", $"'{item.CobolName ?? "FILLER"}': a data description entry that "
                         + "specifies a TYPE clause shall not be followed immediately by a subordinate entry "
                         + "(ISO §13.18.57.3 SR2)");
-                // A member name need only be unique within its containing struct (the parent's children).
-                item.CsName = Unique(item.CsName, parent.Children.Select(c => c.CsName));
+                // A member name need only be unique within its containing struct — AddMember allocates it there,
+                // clear of the struct's own members too (kb/Work PB2093).
                 item.Parent = parent;
-                parent.Children.Add(item);
+                parent.AddMember(item);
             }
             // CONSTANT RECORD placement (P10 Step 15). §13.18.15.3 SR1: the clause may be specified only in the
             // local-storage or working-storage sections. (The same-entry SR13/SR3/SR6 conflicts are checked in
@@ -1844,7 +1844,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// WORKING-STORAGE), attach them to their <see cref="FileModel"/>, and model the shared record area: multiple
     /// <c>01</c>s under one FD occupy ONE area (ISO §9.1.2), so each secondary record is synthesized as a REDEFINES of
     /// the first — the existing tier machinery then makes them alias one backing (the singular-pattern rule).</summary>
-    private void BindFileSection(Core.ProgramUnitContext program, HashSet<string> rootNames)
+    private void BindFileSection(Core.ProgramUnitContext program, CsNameScope rootNames)
     {
         var fs = program.dataDivision()?.fileSection();
         if (fs is null) return;
@@ -2056,7 +2056,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <para>The record is kept OFF <see cref="ByName"/>: the entry is IMPLIED, so it has no record-name and the
     /// program cannot reference it (which is also why §13.4.5.3 SR3 b/c require the FILE … FROM and INTO phrases on
     /// the verbs). It IS on <see cref="Roots"/>, because it is real storage that has to emit.</para></summary>
-    private void MaterializeImpliedRecord(FileModel file, string fdName, HashSet<string> rootNames)
+    private void MaterializeImpliedRecord(FileModel file, string fdName, CsNameScope rootNames)
     {
         // §13.4.5.3 SR8: "No record description entries or constant entries shall be associated with the file
         // description entry for a report file." — a report file's area is the report engine's line, and
@@ -2094,11 +2094,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             Level = 1,
             DeclaredAt = Edition.Cursor,
             CobolName = null,   // implied, so unnamed and unreferenceable — never RegisterName'd
-            CsName = Unique($"_impliedRecord{DataItem.Sanitize(fdName)}", rootNames),
+            CsName = CsNames.Allocate($"_impliedRecord{DataItem.Sanitize(fdName)}", rootNames),
         };
         record.Uid = _uidCounter++;
         record.RootSection = EntrySection.File;   // §14.9.30.4 GR6's implied record is a FILE SECTION record
-        rootNames.Add(record.CsName);
         var area = new DataItem
         {
             Level = 2,
@@ -2110,7 +2109,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             Parent = record,
         };
         area.Uid = _uidCounter++;
-        record.Children.Add(area);
+        record.AddMember(area);
         _roots.Add(record);
         file.Records.Add(record);
         file.ImpliedRecord = record;   // real storage, but no record description entry: WrittenRecords leaves it out (kb/Work PB1219)
@@ -3657,6 +3656,18 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 + "item shall be specified only at level 1 or subordinate to a strongly-typed group "
                 + "(ISO §13.18.57.3 SR6)");
 
+        // §13.18.57.3 SR8: "When the TYPE clause is specified in the file section, the description of type-name-1,
+        // including its subordinate data items, shall not contain a data item described with a USAGE OBJECT
+        // REFERENCE clause." The TYPE arm of the one prohibition (kb/Work PB545): the copy this clause makes lands
+        // in the file section but is pruned from ConformanceForest, and the declaration it copies is a legal
+        // working-storage entry, so §13.18.60.3 SR15's direct-USAGE screen (COBOLNET1725) never meets it — the
+        // route is screened HERE, where it is expanded, exactly as ExpandSameAs screens its SR6 twin. The template
+        // is complete (ExpandTemplate above), so an object reference one TYPE level deeper is seen too.
+        if (IsFileSectionItem(item) && HasObjectReferenceLeaf(template))
+            Edition.Error(DiagnosticCatalog.TypeObjectReferenceFileSection, $"'{subject}': a TYPE clause in the file "
+                + $"section shall not reference '{typeName}', whose description contains a USAGE OBJECT REFERENCE "
+                + "data item (ISO §13.18.57.3 SR8)");
+
         // Clone the template's structure in (children / the entry description / the type's root-level 88s)
         // AFTER the flags above. The entry-description copy (§13.18.58.4 GR3 — "all other data description
         // clauses ... are assumed by data defined using the type-name") shares CopyEntryDescription with the
@@ -3664,7 +3675,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // which copies it). The subject's own VALUE wins (§13.18.57.4 GR3 — RawValue ??=).
         if (template.IsGroup)
             foreach (var child in template.Children)
-                item.Children.Add(CloneItem(child, item));
+                item.AddMember(CloneItem(child, item));
         bool wroteBased = item.IsBased;
         CopyEntryDescription(template, item, DescriptionCopyScope.TypeSubject);
         if (!wroteBased && item.IsBased) ScreenComposedBased(item, $"TYPE '{typeName}'");
@@ -3931,7 +3942,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             Level = src.Level + levelDelta,
             DeclaredAt = src.DeclaredAt,
             CobolName = src.CobolName,
-            CsName = Unique(src.CsName, newParent.Children.Select(c => c.CsName)),
+            CsName = src.CsName,   // the base name: newParent.AddMember allocates it among the NEW siblings (PB2093)
             Occurs = src.Occurs,
             // Clone the OccursSpec — never SHARE it: its Depending / CapacityRegister are RESOLVED per-clone by the
             // post-build OdoResolve / DynamicResolve, so a shared object would let two clones of the same group type
@@ -3957,7 +3968,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // reproduces rather than re-expanding the member's TYPE clause. After the children, whose C# names the
         // alias's own name is made unique against.
         foreach (var child in src.Children)
-            clone.Children.Add(CloneItem(child, clone, levelDelta));
+            clone.AddMember(CloneItem(child, clone, levelDelta));
         foreach (var ren in src.Renames66) CloneRenamesOnto(clone, ren);
         return clone;
     }
@@ -4209,7 +4220,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         {
             int levelDelta = item.Level - target.Level;
             foreach (var child in target.Children)
-                item.Children.Add(CloneItem(child, item, levelDelta));
+                item.AddMember(CloneItem(child, item, levelDelta));
         }
         foreach (var c88 in target.Own88s) CloneConditionOnto(item, c88);   // GR2a — data-name-1's own condition-names ride the copy
 
@@ -4242,7 +4253,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     }
 
     /// <summary>Whether an item belongs to a FILE SECTION record (its root is some FD/SD's record) — the
-    /// §13.18.49.3 SR6 placement test.</summary>
+    /// placement test of §13.18.49.3 SR6, §13.18.57.3 SR8 and §13.18.60.3 SR15.</summary>
     private bool IsFileSectionItem(DataItem item)
     {
         var root = item;
@@ -4393,7 +4404,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             Level = 66,
             DeclaredAt = src.DeclaredAt,
             CobolName = src.CobolName,
-            CsName = Unique(src.CsName, target.Renames66.Select(r => r.CsName).Concat(target.Children.Select(c => c.CsName))),
+            // A level-66 alias is no C# member (the place renderer composes it as a view over its span), so — as at
+            // its declaration — its CsName is the word's and names nothing that could collide (kb/Work PB2093).
+            CsName = src.CsName,
             Renames = new RenamesInfo
             {
                 FromName = info.FromName,
@@ -4554,6 +4567,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                                 $"condition-name '{name}'"))
                             cond.Alphabet = alphaName;
                     }
+                    // §13.18.63.3 SR26 — every THROUGH pair ascends, in the sequence cond.Alphabet (just resolved)
+                    // names. Before literal-4, whose SR27 screen reads the same ordering.
+                    CheckRangesAscending(cond, parent);
                     // literal-4 LAST, because the phrase is written last (§13.18.63.2 format 3 prints
                     // `[ WHEN SET TO FALSE IS literal-4 ]` on the line after the operand list), so the
                     // diagnostics a malformed entry produces come out in source order. It is bound AFTER the
@@ -4646,6 +4662,47 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         CheckFalseValueDistinct(cond, parent, where);
     }
 
+    /// <summary>§13.18.63.3 SR26 — every THROUGH pair of a condition-name's VALUE clause ascends: "<i>When the
+    /// THROUGH phrase is specified: a) when literal-2 is of a class other than alphanumeric or national, the value
+    /// of literal-2 shall be less than the value of literal-3. b) when literal-2 is of class alphanumeric or
+    /// national, and the runtime collating sequence is known, the value of literal-2 shall be less than the value
+    /// of literal-3.</i>" (kb/Work PB552). LESS THAN, so an equal pair is refused as well as a reversed one, and
+    /// every pair of a list is asked (<c>VALUE 1 THRU 3, 9 THRU 7</c>).
+    /// <para>a) is §14.7.8 rule 1's algebraic order and always applies: a numeric conditional variable's pair, or
+    /// a pair of numeric literals on a numeric-edited one (their class is numeric whatever the subject's). b) is
+    /// rule 2's collating sequence — the <c>IN alphabet-name-1</c> alphabet, else the PROGRAM COLLATING SEQUENCE,
+    /// else the native order — read through the SAME <see cref="ConditionValueOrder"/> SR27 b) reads, and
+    /// "known" is the one determination both rules share (docs/CONFORMANCE.md §3, D-RANGE-KNOWN): every sequence
+    /// this processor fixes at compile time is known, and only a LOCALE sequence (SR26 NOTE, "<i>The runtime
+    /// collating sequence is unknown when the collating sequence is defined by a locale</i>") is not, so a range
+    /// ordered by a locale is left to §14.7.8's run-time EC-RANGE-INVALID arm. An operand with no compile-time
+    /// value (a figurative other than ZERO, an <c>ALL</c> literal, a symbolic-character) is skipped, as in SR27.</para></summary>
+    private void CheckRangesAscending(Condition88 cond, DataItem parent)
+    {
+        ConditionValueOrder? ord = null;
+        foreach (var (lo, hi) in cond.Values)
+        {
+            if (hi is null) continue;
+            int? order;
+            if (parent.OperandPic is { Category: PicCategory.Numeric }
+                || (StringValue(lo) is null && StringValue(hi) is null
+                    && CobolNet.CodeGen.FigurativeConstants.Classify(lo.Trim()).Kind is null
+                    && CobolNet.CodeGen.FigurativeConstants.Classify(hi.Trim()).Kind is null))
+                order = NumericLiteralValue(lo) is { } a && NumericLiteralValue(hi) is { } b ? a.CompareTo(b) : null;   // a)
+            else
+            {
+                ord ??= new ConditionValueOrder(this, cond, parent);
+                if (!ord.Known) continue;                                                                             // b)
+                order = CompareConditionValues(ord, ConditionValueOf(parent, lo), ConditionValueOf(parent, hi));
+            }
+            if (order >= 0)
+                Edition.Error(DiagnosticCatalog.ValueThroughNotAscending, $"condition-name '{cond.Name}': the VALUE "
+                    + $"range {lo} THRU {hi} does not ascend — {lo} is {(order == 0 ? "equal to" : "greater than")} "
+                    + $"{hi}{(cond.Alphabet is { } al ? $" in alphabet '{al}'" : "")}, and the value of literal-2 shall be "
+                    + "less than the value of literal-3 (ISO §13.18.63.3 SR26)");
+        }
+    }
+
     /// <summary>§13.18.63.3 SR27 — literal-4 shall name a value the condition-name is FALSE for: "<i>The value of
     /// literal-4 shall not be equal to the value of any occurrence of literal-2. When the THROUGH phrase is
     /// specified: a) when literal-2 is of a class other than alphanumeric or national, the value of literal-4
@@ -4695,9 +4752,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // NOTE: a LOCALE sequence is not); a) is §14.7.8 rule 1's algebraic order and is always known. An
             // INVERTED range is EMPTY (§14.7.8 rule 2's last paragraph — it raises EC-RANGE-INVALID and
             // "execution proceeds as if the range of values were empty"), so nothing can be inside it and the
-            // test is skipped rather than inverted. ⛔ SR26 is the rule that refuses the inversion ITSELF, and
-            // it is NOT implemented (kb/Work PB552) — an owner determination is owed first, because SR26 b)'s
-            // "runtime collating sequence is known" is implementor-defined by its own NOTE 5.
+            // test is skipped rather than inverted. SR26 refuses the inversion ITSELF (CheckRangesAscending,
+            // COBOLNET2961, under the same Known), so an inverted pair reaches here only behind its error.
             if (vlo.Str is not null && !ord.Known) continue;
             var vhi = ConditionValueOf(parent, hi);
             if (CompareConditionValues(ord, vlo, vhi) <= 0
@@ -4714,8 +4770,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <summary>⛔ THE ONE "<i>value of</i>" A FORMAT-3 VALUE-CLAUSE OPERAND, over its conditional variable
     /// (kb/Work PB920) — an algebraic value (<c>Num</c>) or a character value (<c>Str</c>), never both, and
     /// neither when the operand names no value this compiler can weigh. §13.18.63.3 SR27 is written in terms
-    /// of it, and so is SR26 (kb/Work PB552, not yet implemented — see the COBOLNET2176/2177 family comment
-    /// in DiagnosticCatalog), which is why it is ONE reader and not a decoder per screen.
+    /// of it, and so is SR26's b) arm (<see cref="CheckRangesAscending"/>; kb/Work PB552), which is why it is ONE
+    /// reader and not a decoder per screen.
     /// <para>⛔ ON A NUMERIC-EDITED SUBJECT BOTH SPELLINGS DENOTE THE SAME KIND OF VALUE, and missing that was a
     /// measured WRONG ANSWER: <c>01 X PIC ZZ9.99. 88 X-TEN VALUE " 10.00" WHEN SET TO FALSE IS 10.</c> compiled
     /// clean and <c>SET X-TEN TO FALSE</c> left the condition TRUE, because a screen that compared only same-kind
@@ -4882,18 +4938,6 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         return Collating is { } pa
             ? pa.Locale is not null ? (null, false) : (pa.Table?.Collation(false), true)
             : (null, true);
-    }
-
-    /// <summary>Make <paramref name="name"/> unique within a C# name scope, appending <c>_2</c>, <c>_3</c>, … on collision.</summary>
-    private static string Unique(string name, IEnumerable<string> used)
-    {
-        var set = used as ICollection<string> ?? used.ToList();
-        if (!set.Contains(name)) return name;
-        for (int n = 2; ; n++)
-        {
-            string candidate = $"{name}_{n}";
-            if (!set.Contains(candidate)) return candidate;
-        }
     }
 
     /// <summary>Bind one data-description entry (skips level-66 RENAMES and level-88 condition names for now).</summary>

@@ -189,9 +189,9 @@ public sealed class ImageWidthIsStorageWidthTests
     public void MixedUsageGroup_ImageWidthEqualsByteWidth()
     {
         var group = new DataItem { Level = 1, CobolName = "G", CsName = "G" };
-        group.Children.Add(Leaf(Numeric(Usage.Binary, 4)));    // 2 bytes
-        group.Children.Add(Leaf(Numeric(Usage.Packed, 4)));    // 3 bytes
-        group.Children.Add(Leaf(Numeric(Usage.Display, 4)));   // 4 bytes
+        group.AddMember(Leaf(Numeric(Usage.Binary, 4)));    // 2 bytes
+        group.AddMember(Leaf(Numeric(Usage.Packed, 4)));    // 3 bytes
+        group.AddMember(Leaf(Numeric(Usage.Display, 4)));   // 4 bytes
         Assert.Equal(9, group.ByteWidth);
         Assert.Equal(group.ByteWidth, group.ImageWidth);
     }
@@ -205,7 +205,7 @@ public sealed class ImageWidthIsStorageWidthTests
     private static DataItem Add(DataItem group, DataItem child)
     {
         child.Parent = group;
-        group.Children.Add(child);
+        group.AddMember(child);
         return child;
     }
 
