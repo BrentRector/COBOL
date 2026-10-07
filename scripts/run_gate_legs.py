@@ -87,6 +87,7 @@ AUDITS = (
     ("DRIFT RULES INDEX", ["scripts/spec/drift_rules.py", "--check"]),
     ("GUARD HOOK SELF-TEST", ["scripts/hooks/test_forbidden_commands.py"]),
     ("READ-ONLY HOOK SELF-TEST", ["scripts/hooks/test_readonly_repo.py"]),
+    ("WORKTREE RM-ALLOW HOOK SELF-TEST", ["scripts/hooks/test_worktree_rm_allow.py"]),
     ("WITNESS LOSS", ["scripts/spec/audit_witness_loss.py", "--check"]),
     ("RULE CATALOG", ["scripts/spec/extract_rule_catalog.py", "--check"]),
     ("SPEC CORRECTIONS", ["scripts/spec/verify_publishable.py"]),

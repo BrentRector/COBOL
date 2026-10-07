@@ -99,6 +99,20 @@ echo "linux-gate: Linux clone of HEAD ${head:0:9} at $snap"
 [ "$dirty" -gt 0 ] && echo "linux-gate: NOTE — $dirty uncommitted tracked change(s) are NOT tested (the clone is HEAD)"
 
 bad=""; ran=""
+# CI's audits job runs the guard-hook self-tests on Linux (forbidden_commands, readonly_repo, worktree_rm_allow). They are
+# path-sensitive, so this gate runs the same set on the clone: a drive-letter path that Linux reads as relative turned CI
+# red on 2026-10-07 after a green Windows run (kb/Work PB2142). Seconds; never skipped.
+hooks_rc=0
+for t in scripts/hooks/test_forbidden_commands.py scripts/hooks/test_readonly_repo.py scripts/hooks/test_worktree_rm_allow.py; do
+  ( cd "$snap" && python3 "$t" ) > "$out/hooks-$(basename "$t" .py).log" 2>&1 || hooks_rc=1
+done
+if [ $hooks_rc -eq 0 ]; then
+  echo "leg hooks: GREEN (3 guard-hook self-tests on Linux)"; ran="$ran hooks"
+else
+  echo "leg hooks: RED — a guard-hook self-test failed on Linux (TestResults/linux-gate/hooks-*.log)"
+  grep -h "FAIL" "$out"/hooks-*.log | sed 's/^/    /'
+  bad="$bad hooks"
+fi
 IFS=',' read -r -a wanted <<< "$legs"
 for leg in "${wanted[@]}"; do
   start=$(date +%s)

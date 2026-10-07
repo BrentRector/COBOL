@@ -243,9 +243,9 @@ jobs:
       - name: Drift-rule index — docs/DRIFT_RULES.md regenerated from every *DriftTests summary (drift_rules.py --check)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/drift_rules.py --check
-      - name: Guard hook self-tests — forbidden_commands.py and readonly_repo.py block each forbidden shape and pass its neighbour
+      - name: Guard hook self-tests — forbidden_commands.py and readonly_repo.py block each forbidden shape and pass its neighbour; worktree_rm_allow.py grants only its exact shape
         if: ${{ !cancelled() }}
-        run: python3 scripts/hooks/test_forbidden_commands.py && python3 scripts/hooks/test_readonly_repo.py
+        run: python3 scripts/hooks/test_forbidden_commands.py && python3 scripts/hooks/test_readonly_repo.py && python3 scripts/hooks/test_worktree_rm_allow.py
       - name: Witness loss — inventory evidence dropped since the base of this push (audit_witness_loss.py --check)
         if: ${{ !cancelled() }}
         shell: bash
