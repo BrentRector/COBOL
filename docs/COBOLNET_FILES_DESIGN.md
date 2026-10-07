@@ -1944,6 +1944,11 @@ file name as the clause's data-name and died at OPEN naming a word the programme
   keep the base item and drop a reference-modifier, so a table SORT on `K(4:3)` sorted on all of K (kb/Work
   PB481). READ's KEY operand (§14.9.30.3 SR11) and START's (§14.9.41.3 SR5/SR6) are identity rules and ask
   `Place.DenotedItem`, which a reference-modified slice never is (kb/Work PB602, PB481).
+- **`ScreenReferenceModifier(dref, face, edition)`** — the NOTE's reference-modifier arm alone, for the one
+  `data-name-n` operand that must carry a subscript: SEARCH ALL Format 2's `data-name-1` and every `data-name-2`
+  (§14.9.37.2; §14.9.37.3 SR8 requires the first index-name subscript). `SearchAllFormat2Rules.CheckKeySide` asks it,
+  so `WHEN TK (IX) (1:2) = "AB"` is COBOLNET2024 rather than a prefix-key search (kb/Work PB1457). The sentence is
+  worded once, in `ReportReferenceModified`, shared with `ScreenDataNameShape`.
 - **`ResolveClauseOperand(name, quals, face, at)`** — the resolution, reporting a zero- or many-survivor outcome
   under **COBOLNET1639**, the same descriptor the procedure division's own unidentified reference uses: the rule
   broken is §8.4.2.1/§8.4.2.2, not a rule of the clause.

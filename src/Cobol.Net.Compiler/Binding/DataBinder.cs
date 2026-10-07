@@ -1780,11 +1780,33 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 + "— subscripting is §8.4.2.3's qualified-data-name-with-subscripts, an identifier form, and "
                 + subscriptRule);
         else if (refModified)
-            edition.Error(DiagnosticCatalog.ClauseOperandNotADataName,
-                $"{clauseFace} '{WrittenText(dref)}' is reference-modified; \"where data-name-n is used in a general "
-                + "format or syntax rule, then reference-modification is not permitted\" (ISO §8.4.3.3.3 NOTE)");
+            ReportReferenceModified(dref, clauseFace, edition);
         return !subscripted && !refModified;
     }
+
+    /// <summary>ISO §8.4.3.3.3's NOTE as a screen of its own, for the one data-name-n operand that LEGITIMATELY
+    /// carries a subscript and so cannot take <see cref="ScreenDataNameShape"/> whole: SEARCH ALL Format 2's
+    /// <c>data-name-1</c> / <c>data-name-2</c> (§14.9.37.2), which §14.9.37.3 SR8 requires to be "subscripted by the
+    /// first index-name associated with identifier-1". The reference modifier is the same violation there as in a
+    /// file clause or a SORT key ("where data-name-n is used in a general format or syntax rule, then
+    /// reference-modification is not permitted"), so it is refused by the SAME sentence and the SAME code, and
+    /// the NOTE is worded in one place (kb/Work PB1457). Reads the suffixes through the one lexical reader,
+    /// <see cref="ReferenceResolver.ReadOperandSuffixes"/>; true when the reference carries no reference modifier.</summary>
+    internal static bool ScreenReferenceModifier(Core.DataReferenceContext dref, string clauseFace, EditionContext edition)
+    {
+        if (ReferenceResolver.ReadOperandSuffixes(dref).RefMods == 0) return true;
+        using var _ = edition.At(dref);
+        ReportReferenceModified(dref, clauseFace, edition);
+        return false;
+    }
+
+    /// <summary>The NOTE's sentence: the ONE place §8.4.3.3.3's "reference-modification is not permitted" is worded
+    /// for a data-name-n operand (<see cref="ScreenDataNameShape"/> and <see cref="ScreenReferenceModifier"/>).
+    /// The caller has already established that the reference is reference-modified and set the edition's position.</summary>
+    private static void ReportReferenceModified(Core.DataReferenceContext dref, string clauseFace, EditionContext edition) =>
+        edition.Error(DiagnosticCatalog.ClauseOperandNotADataName,
+            $"{clauseFace} '{WrittenText(dref)}' is reference-modified; \"where data-name-n is used in a general "
+            + "format or syntax rule, then reference-modification is not permitted\" (ISO §8.4.3.3.3 NOTE)");
 
     /// <summary>⛔ ISO §8.4.3.14.3 SR1 — "LINAGE-COUNTER may be referenced only in procedure division statements", for
     /// every DATA DIVISION operand that is not a data-name-n clause position (those are

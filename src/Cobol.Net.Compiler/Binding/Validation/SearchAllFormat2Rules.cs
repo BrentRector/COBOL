@@ -239,7 +239,14 @@ internal readonly struct SearchAllFormat2Rules(DataBinder data, ReferenceResolve
                 + $"be referenced in the KEY phrase\" (ISO §14.9.37.3 SR8). The KEY phrase declares {KeyList(keys)}.");
         referenced[pos] = true;
 
-        bool ok = CheckKeySubscript(dref, item!, table, firstIndex, "SR8");
+        // §14.9.37.2 Format 2 prints data-name-1 / data-name-2, and §8.4.3.3.3's NOTE says "where data-name-n is used
+        // in a general format or syntax rule, then reference-modification is not permitted". The subscript is the
+        // one suffix this operand MUST carry (SR8), so the shared data-name-n screen's reference-modifier arm is
+        // asked on its own: `WHEN TK(IX)(1:2) = "AB"` otherwise resolved to the base item TK and ran a search on
+        // the whole key (kb/Work PB1457). It does not disturb the SR11 accounting above (referenced[pos]).
+        bool ok = DataBinder.ScreenReferenceModifier(dref, $"SEARCH ALL '{table.CobolName}' WHEN key operand",
+                                                     data.Edition);
+        ok &= CheckKeySubscript(dref, item!, table, firstIndex, "SR8");
         // SR12 — "Data-name-1, data-name-2, identifier-3, or identifier-4 shall not specify a variable-length
         // group." The predicate is the ONE VariableLengthCompatibility module (§8.5.1.12), never a second walk.
         if (VariableLengthCompatibility.IsVariableLength(item!))

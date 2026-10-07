@@ -1988,6 +1988,8 @@
   "pb481-sort-key-refmod",
   "pb481-table-sort-key-refmod",
   "pb481-read-key-refmod",
+  "pb1457-search-all-key-refmod",
+  "pb1457-search-all-and-key-refmod",
   "pb510-blank-when-zeros",
   "pb510-sign-condition-zeroes",
   "pb510-options-initialize-binary-zero",
