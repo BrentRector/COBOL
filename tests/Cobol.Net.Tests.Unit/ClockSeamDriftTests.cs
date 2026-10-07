@@ -41,9 +41,7 @@ public sealed class ClockSeamDriftTests
         var offenders = new List<string>();
         foreach (string file in Directory.EnumerateFiles(TestRepo.Src(), "*.cs", SearchOption.AllDirectories))
         {
-            // The seam governs the greenfield tree; the legacy CobolSharp.* assemblies predate it and die at P15.
             string rel = Path.GetRelativePath(TestRepo.Src(), file);
-            if (!rel.StartsWith("Cobol.Net.", StringComparison.Ordinal)) continue;
             if (rel.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
                 || rel.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
                 || rel.Contains($"{Path.DirectorySeparatorChar}Generated{Path.DirectorySeparatorChar}")) continue;

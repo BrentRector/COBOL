@@ -611,11 +611,8 @@ writeStatement
 // so a function-identifier belongs here: §8.4.3.1.2 Format 1 makes one an IDENTIFIER and §8.4.3.2.3 SR1
 // bars it only from RECEIVING operands, so `FROM FUNCTION UPPER-CASE(X)` was legal source we rejected
 // with COBOL0001 (fix-queue PB10). Replacing the alternatives with a single shared rule is the tidier
-// shape and was tried FIRST; it deletes the generated `.dataReference()`/`.literal()` accessors and so
-// breaks ~8 call sites across BOTH compilers — this grammar is shared with the legacy
-// `CobolSharp.Compiler`, which survives until the P15 cut-over. Adding an alternative keeps every
-// existing accessor, so the legacy binders compile untouched. The unification belongs to P15, when the
-// legacy side is deleted rather than migrated.
+// shape; it deletes the generated `.dataReference()`/`.literal()` accessors and so moves every binder that
+// reads them. That unification is kb/Work PB2114.
 writeFrom
     : FROM (functionCall | inlineMethodInvocation | dataReference | literal)
     ;
@@ -713,11 +710,8 @@ rewriteStatement
 // so a function-identifier belongs here: §8.4.3.1.2 Format 1 makes one an IDENTIFIER and §8.4.3.2.3 SR1
 // bars it only from RECEIVING operands, so `FROM FUNCTION UPPER-CASE(X)` was legal source we rejected
 // with COBOL0001 (fix-queue PB10). Replacing the alternatives with a single shared rule is the tidier
-// shape and was tried FIRST; it deletes the generated `.dataReference()`/`.literal()` accessors and so
-// breaks ~8 call sites across BOTH compilers — this grammar is shared with the legacy
-// `CobolSharp.Compiler`, which survives until the P15 cut-over. Adding an alternative keeps every
-// existing accessor, so the legacy binders compile untouched. The unification belongs to P15, when the
-// legacy side is deleted rather than migrated.
+// shape; it deletes the generated `.dataReference()`/`.literal()` accessors and so moves every binder that
+// reads them. That unification is kb/Work PB2114.
 rewriteFrom
     : FROM (functionCall | inlineMethodInvocation | dataReference | literal)
     ;
@@ -1013,11 +1007,8 @@ releaseStatement
 // so a function-identifier belongs here: §8.4.3.1.2 Format 1 makes one an IDENTIFIER and §8.4.3.2.3 SR1
 // bars it only from RECEIVING operands, so `FROM FUNCTION UPPER-CASE(X)` was legal source we rejected
 // with COBOL0001 (fix-queue PB10). Replacing the alternatives with a single shared rule is the tidier
-// shape and was tried FIRST; it deletes the generated `.dataReference()`/`.literal()` accessors and so
-// breaks ~8 call sites across BOTH compilers — this grammar is shared with the legacy
-// `CobolSharp.Compiler`, which survives until the P15 cut-over. Adding an alternative keeps every
-// existing accessor, so the legacy binders compile untouched. The unification belongs to P15, when the
-// legacy side is deleted rather than migrated.
+// shape; it deletes the generated `.dataReference()`/`.literal()` accessors and so moves every binder that
+// reads them. That unification is kb/Work PB2114.
 releaseFrom
     : FROM (functionCall | inlineMethodInvocation | dataReference | literal)
     ;
@@ -1142,9 +1133,8 @@ unstringOnOverflow
 // or replaced by literal-3 (format 2)", while GR20 makes format 4 execute AS a format 2 over the same
 // identifier-1. So Formats 2/3/4 MODIFY it and bar a function-identifier. ⛔ THE BINDER SCREENS PER FORMAT
 // (InspectBinder, COBOLNET1632); widening the grammar alone would ACCEPT ILLEGAL SOURCE.
-// ⛔ ADDITIVE — an ALTERNATIVE, never a rewrite to a shared rule: this grammar is shared with the legacy
-// CobolSharp.Compiler until the P15 cut-over, and collapsing the rule would DELETE the generated
-// .dataReference() accessor its binder reads. The legacy binder guards on the new null instead.
+// The function-identifier is an added ALTERNATIVE beside dataReference rather than a shared operand rule, so
+// the generated .dataReference() accessor stays; unifying it is kb/Work PB2114.
 inspectStatement
     : INSPECT BACKWARD? (functionCall | inlineMethodInvocation | dataReference)
       ( inspectTallyingPhrase inspectReplacingPhrase?

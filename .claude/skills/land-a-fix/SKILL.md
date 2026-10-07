@@ -49,11 +49,10 @@ The exact section AND rule number (`§14.9.24 GR4d`), not "per the spec".
 
 ## 5. Write the golden AND register it in the same commit
 
-- Expected value **computed from the spec**, never copied from the legacy oracle or from observed output.
+- Expected value **computed from the spec**, never copied from another compiler or from observed output.
 - Positive golden in `tests/conformance/<edition>/` → add its name to that directory's `manifest.json` `enabled`.
 - Negative golden in `tests/conformance/negative/` (`.cob` + `.err`) → add it to
   `tests/conformance/negative/manifest.json`, which is a SEPARATE manifest.
-- Do **not** add a `GreenfieldOnly` entry — the legacy differential is opt-in now.
 
 An unregistered golden never runs AND fails the manifest-integrity test — but only at the comprehensive gate, never
 at the wave-local run. Register it before running even the wave-local gate.

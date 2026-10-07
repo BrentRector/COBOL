@@ -66,7 +66,6 @@ SCHEMA = 2
 # The assemblies whose execution the map records — keep in step with tools/impact/ImpactRecording.targets.
 PROBED = [
     "cobol", "Cobol.Net.Compiler", "Cobol.Net.Editions", "Cobol.Net.Frontend", "Cobol.Net.Runtime",
-    "CobolSharp.Compiler", "CobolSharp.Runtime",
     "Cobol.Net.Tests.Characterization", "Cobol.Net.Tests.Conformance", "Cobol.Net.Tests.Unit",
 ]
 

@@ -23,7 +23,7 @@
 
   <ItemGroup>
     <!-- Front-end only: preprocessor + ANTLR lexer/parser + parse-tree (CobolParserCore) context types
-         (extracted out of the legacy CobolSharp.Compiler at G0; namespaces renamed to CobolNet.Frontend.* at P1). -->
+         (namespaces CobolNet.Frontend.*). -->
     <ProjectReference Include="..\Cobol.Net.Frontend\Cobol.Net.Frontend.csproj" />
     <!-- The edition/diagnostics leaf (rearch PHASE 02): the ONE home for ConstructRegistry / ReservedWords /
          EditionInfo / EditionSeverityPolicy / the diagnostic descriptors, referenced by both Frontend and

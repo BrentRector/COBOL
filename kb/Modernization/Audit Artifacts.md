@@ -10,7 +10,6 @@ related_files:
   - docs/rearchitecture/CONFORMANCE-FIX-QUEUE.md
   - create-agents.ps1
   - create-auditartifacts.ps1
-  - Run-Cobol85Audit.ps1
 tags:
   - cobolsharp
   - modernization
@@ -42,17 +41,15 @@ A 16-finder multi-agent review (184 agents launched, 85 completed, ~7.7M tokens;
 partial coverage). **28 findings confirmed** (1 critical, 14 major, 13 minor). The one critical: diagnostic code
 **COBOLNET1573 shipped with two meanings**. §24 is the 10-tier prioritized fix queue.
 
-## The three PowerShell audit scripts (early scaffolding, legacy-era)
+## The two PowerShell audit scripts (early scaffolding, legacy-era)
 - **`create-agents.ps1`** — writes 10 role-scoped agent YAML files into `agents/` (pipeline-architecture,
   preprocessor, grammar-parsing, semantics, flow-bound, ir-lowering, cil-emission-runtime, nist-harness, docs-dx,
   legacy-compat), each owning a phase band and a modernization-ledger slice.
 - **`create-auditartifacts.ps1`** — scaffolds `audit/plans/` with four planning templates:
   `ModernizationLedgerTemplate.md`, `NistEnablementRoadmap.md`, `GrammarGapClosurePlan.md`,
   `SemanticValidatorHardeningPlan.md`.
-- **`Run-Cobol85Audit.ps1`** — the COBOL-85 audit runner: restores + builds `-c Release`, runs unit/integration/NIST
-  test projects (TRX logs → `audit/cobol85/`), and snapshots key source directories to `source-snapshot.txt`.
 
-> The three `.ps1` scripts predate the pivot (byte-engine vocabulary: phases 0–21, IR lowering, CIL emission). They
+> The two `.ps1` scripts predate the pivot (byte-engine vocabulary: phases 0–21, IR lowering, CIL emission). They
 > are historical scaffolding, not the current spec-first audit machinery.
 
 ## Key concepts

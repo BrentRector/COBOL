@@ -6,9 +6,8 @@
 #   semgrep scan --config scripts/semgrep/invariants.yml \
 #       src/Cobol.Net.Cli src/Cobol.Net.Compiler src/Cobol.Net.Editions src/Cobol.Net.Frontend src/Cobol.Net.Runtime
 #
-# The frozen legacy tree (src/CobolSharp.*) is deliberately NOT scanned — it predates every invariant here and is
-# deleted at P15. Scope the scan to the greenfield projects rather than excluding paths, so a new legacy-shaped
-# directory cannot silently opt itself out.
+# The scan names the product projects (here and in scripts/semgrep/verify.py) rather than excluding paths, so a
+# new directory is scanned only once it is named on purpose.
 #
 # SUPPRESSION: use semgrep's built-in `// nosemgrep: <rule-id>` on the line (or the line above), WITH a reason:
 #     byte[] _scratch = ...;  // nosemgrep: cobolnet-no-persistent-byte-storage - CODE-SET file boundary, §9.1

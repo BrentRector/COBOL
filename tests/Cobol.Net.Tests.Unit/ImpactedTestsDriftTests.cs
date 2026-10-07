@@ -202,13 +202,6 @@ public sealed class ImpactedTestsDriftTests
 
             var asm = Regex.Match(text, "<AssemblyName>([^<]+)</AssemblyName>", RegexOptions.None, TimeSpan.FromSeconds(5));
             string assembly = asm.Success ? asm.Groups[1].Value : project;
-            // A project whose own output is not loaded by any gated test (the legacy CLI) is exempt only by name
-            // here, where the exemption is visible.
-            if (project == "CobolSharp.CLI")
-            {
-                continue;
-            }
-
             if (!targets.Contains($"'{project}'", StringComparison.Ordinal))
             {
                 missing.Add($"{project}: not compiled with the probe (tools/impact/ImpactRecording.targets)");

@@ -1120,13 +1120,11 @@ addOperandList
 // format writes as `identifier-n | literal-n` in a SENDING role admits one — yet `ADD FUNCTION SQRT(X) TO Y`
 // was a PARSE error across the WHOLE arithmetic family (ADD/SUBTRACT/MULTIPLY/DIVIDE, every format), while
 // COMPUTE accepted it because its RHS is an arithmeticExpression.
-// ⚠ THEY ARE NOT COLLAPSED INTO ONE RULE, AND THAT IS A RECORDED CONSTRAINT RATHER THAN A PREFERENCE: the
-// FROZEN legacy compiler (src/CobolSharp.Compiler) shares this grammar and reads `.dataReference()`/`.literal()`
-// off AddOperandContext / SubtractOperandContext / MultiplyOperandContext / DivideOperandContext by name, so
-// both a collapse and an alias break it — the same freeze that blocks D10 until PHASE 15 CUT 2 deletes legacy.
-// The change is therefore ADDITIVE (the standing grammar discipline), and
-// ArithmeticSendingOperandDriftTests pins the four alternative sets IDENTICAL so they cannot drift apart while
-// they must stay separate. Collapse them to ONE rule at CUT 2.
+// ⚠ THEY ARE NOT YET COLLAPSED INTO ONE RULE. The fix was made ADDITIVE while a second consumer of the
+// generated `.dataReference()`/`.literal()` accessors on AddOperandContext / SubtractOperandContext /
+// MultiplyOperandContext / DivideOperandContext existed; that consumer is gone, and collapsing the four to ONE
+// rule is kb/Work PB2114. Until then ArithmeticSendingOperandDriftTests pins the four alternative sets IDENTICAL
+// so they cannot drift apart.
 addOperand
     : literal
     | functionCall

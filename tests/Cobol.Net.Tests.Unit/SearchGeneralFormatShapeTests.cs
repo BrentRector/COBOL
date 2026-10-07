@@ -16,8 +16,6 @@ namespace CobolNet.Tests.Unit;
 /// WHEN, an AT END NEXT SENTENCE, a NEXT SENTENCE beside another statement, and the SR4 pair, which was given a
 /// meaning — and every row is written behind a GO TO so the statement is never reached: the verdict is a
 /// COMPILE-TIME one (§4.2.2), never a run-time one.
-/// <para>This class replaces <c>CobolSharp.Tests.Unit/Overlenient/M421_OverlenientSearchTests</c>, whose three
-/// facts had EMPTY bodies and passed without looking at anything while the row sat at DIVERGES.</para>
 /// </summary>
 public sealed class SearchGeneralFormatShapeTests
 {

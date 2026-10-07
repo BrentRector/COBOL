@@ -1882,9 +1882,8 @@ result. Run the long legs ONE AT A TIME.
   ⚠ `paths-ignore` is GONE from the workflow — it made the workflow decline to START, which a required per-commit
   check reads as "blocked forever" — and the same path list now lives in the first job, `changes`, where it decides
   whether the MATRIX runs. A docs-only push therefore still produces a run; it is `changes` + `ci-gate`, seconds.
-- **The legacy differential is OPT-IN** (`COBOLSHARP_LEGACY_DIFFERENTIAL=1`) and NO new `GreenfieldOnly` exclusions
-  are added — greenfield registration alone suffices. The legacy engine + `guard.sh` survive ONLY for the P14
-  Step-0 equivalence proof; deletion is P15.
+- **There is no legacy differential:** the CobolSharp byte engine is deleted from `main` (P15 Cut 2, kb/Work PB2110);
+  `docs/rearchitecture/LEGACY-ARCHIVE.md` names the tag that preserves it. `guard.sh` is the WiseOwl COBOL NIST leg.
 - **GnuCOBOL external differential — USE IT (owner directive):** `python3 scripts/gnucobol_differential.py --exe
   src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe --report <path>` over the fetched GPL corpus (1323 groups,
   git-ignored `tests/external/gnucobol/`; run `fetch-gnucobol-tests.ps1` if absent). It catches reference-format
@@ -3854,7 +3853,7 @@ is preserved at an annotated git tag with a WSL reproduction recipe before it is
    `CONFORMANCE.md` and this phase doc, and the count/preamble is updated.
 
 ### STATUS
-`IN PROGRESS — Cuts 1, 2 and 2.5 decoupled from v1.0 (R69, 2026-10-06): kb/Work PB2108–PB2114, dispatched through the workstream skill; Cut 3 and the §4.2.16 docs stay with v1.0`
+`IN PROGRESS — Cuts 1 and 2 DONE (R69, 2026-10-06, decoupled from v1.0): Cut 1 = kb/Work PB2108 + PB2109 (train 1025, 86f33fd7d); Cut 2 = kb/Work PB2110 (the five legacy trees deleted, archive pointer docs/rearchitecture/LEGACY-ARCHIVE.md). Cut 2.5 (D10) = kb/Work PB2113; Cut 3 and the §4.2.16 docs stay with v1.0`
 <!-- The executing session updates this line to `IN PROGRESS @ step N` and finally `DONE`.
      Keep the per-step checkboxes in §4 current so an interrupted session can resume exactly. -->
 
@@ -4046,17 +4045,18 @@ The engine files still exist on disk after Cut 1; only their edges into the gree
 At the start of Cut 2, NOTHING in the greenfield build/test/CI graph references `CobolSharp.*` (Cut 1 proved it). The
 only remaining references are the legacy projects referencing each other, and the two legacy test projects.
 
-- [ ] **Step 5 — Tag & archive the legacy engine BEFORE deleting it.**
-  - Create an annotated tag at HEAD (which still contains the engine) with a WSL reproduction recipe in the message, so
-    the frozen oracle is recoverable forever:
+- [x] **Step 5 — Tag & archive the legacy engine.** DONE as amended by R69: PB2110 wrote
+  `docs/rearchitecture/LEGACY-ARCHIVE.md` and its `DOC_INDEX.md` row; the ORCHESTRATOR creates the tag on `main`'s last
+  commit that contains the engine (the first parent of PB2110's landing) after the train lands, since an implementer
+  neither tags nor pushes. The guard scripts at that commit no longer have a legacy arm (PB2109), so the recipe runs
+  the legacy CLI directly:
     ```bash
-    git tag -a legacy-byte-engine-final -m "Final commit containing the frozen CobolSharp.* byte-engine oracle (pre-G8 Cut 2).
-    To run the legacy engine for a differential spot-check: check out this tag, then on WSL/Linux:
-      dotnet build src/CobolSharp.CLI/CobolSharp.CLI.csproj
-      GUARD_COMPILER=legacy bash scripts/guard.sh   # (this tag still has the guard scripts; since PB750
-                                                   #  the guard drives `cobol` unless the legacy arm is
-                                                   #  explicitly asked for)
-    The greenfield goldens under tests/differential/**/*.out and tests/nist/valid/*.txt were baked from this engine."
+    git tag -a legacy-byte-engine-final <last pre-delete commit of main> -m "Final commit containing the CobolSharp byte engine (P15 Cut 2, kb/Work PB2110).
+    To run it on WSL/Linux: clone, check out this tag, then
+      dotnet build CobolSharp.sln
+      dotnet src/CobolSharp.CLI/bin/Debug/net10.0/cobolsharp.dll -o out/PROG.dll prog.cbl
+      dotnet out/PROG.dll
+    See docs/rearchitecture/LEGACY-ARCHIVE.md."
     git push origin legacy-byte-engine-final
     ```
   - Also write `docs/rearchitecture/LEGACY-ARCHIVE.md` (short): the tag name, the recipe, and the note that the engine
@@ -4067,7 +4067,9 @@ only remaining references are the legacy projects referencing each other, and th
     engine present at the tag.
   - **COMMIT BOUNDARY.** Suggested message: `docs(cobolnet): P15 Cut 2a — archive the legacy byte engine at tag legacy-byte-engine-final + WSL recipe`
 
-- [ ] **Step 6 — Remove legacy projects from the solution and delete the legacy trees.**
+- [x] **Step 6 — Remove legacy projects from the solution and delete the legacy trees.** DONE by kb/Work PB2110
+  (wave 1027): the five trees and their five `CobolSharp.sln` entries, with every `InternalsVisibleTo`, impact-map,
+  drift-test and CI reference; the solution file keeps its name until PB2112.
   - Files: remove from `CobolSharp.sln` the entries for `src\CobolSharp.Compiler`, `src\CobolSharp.Runtime`,
     `src\CobolSharp.CLI`, `tests\CobolSharp.Tests.Unit`, `tests\CobolSharp.Tests.Integration` (use
     `dotnet sln CobolSharp.sln remove <path>` for each). Then delete the directories:
@@ -4093,7 +4095,10 @@ only remaining references are the legacy projects referencing each other, and th
   - **COMMIT BOUNDARY.** Suggested message:
     `feat(cobolnet)!: P15 Cut 2b — DELETE the src/CobolSharp.* byte engine + legacy test suites (G8; archived at tag)`
 
-- [ ] **Step 7 — Grep-clean sweep for legacy residue.**
+- [x] **Step 7 — Grep-clean sweep for legacy residue.** The code half is DONE by kb/Work PB2110: `grep -rn
+  "CobolSharp\.\(Compiler\|Runtime\|CLI\)\|CobolSharp.Tests" src tests scripts .github CobolSharp.sln` is empty except
+  the traceability inventory's adjudication notes, which are verdict records naming legacy tests as historical
+  evidence; no repo-root script names the engine (the legacy-only `Run-Cobol85Audit.ps1` is deleted). The prose half (the docs, plan §0's additive-grammar caution, open notes' code sites) is kb/Work PB2111.
   - Search the whole repo (excluding `bin/`, `obj/`, `.git/`) for stale references and fix each: doc comments naming
     "the legacy CobolSharp.Compiler assembly" (notably `src/Cobol.Net.Frontend/Pipeline/Frontend.cs:16` banner —
     correct it to state the frontend is self-contained; P4/P1 own the code rename but the banner text may still be

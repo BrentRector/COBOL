@@ -1237,12 +1237,12 @@ public sealed class SpecTraceabilityInventoryDriftTests
             {
                 CodeLocation = Anchor, TestRef = "conformance:2023/pb154_cancel_active", State = "OK",
             }], s));
-        // The LEGACY engine is not an implementing site: CobolSharp.* is the oracle being retired, not the
-        // compiler, so a row resting on it is as unobservable as one resting on nothing.
+        // A code location outside src/Cobol.Net.* is not an implementing site: tooling, scripts and test harness
+        // code are not the compiler, so a row resting on one is as unobservable as one resting on nothing.
         Assert.Single(BadStates(
             [Doc("DOC-A.1-19") with
             {
-                CodeLocation = $"{Anchor}; src/CobolSharp.Runtime/Intrinsics/IntrinsicFunctions.cs#Cancel",
+                CodeLocation = $"{Anchor}; tools/impact/ImpactProbe.cs#Hit",
                 TestRef = "conformance:2023/pb154_cancel_active", State = "OK",
             }], s));
         // ✔ And the shape that DOES close: own anchor + a greenfield site + a spec-derived test.

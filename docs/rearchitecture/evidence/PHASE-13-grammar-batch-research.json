@@ -2239,6 +2239,11 @@
      }
     ],
     "currentState": {
+     "superseded_by": {
+      "note": "PB2110",
+      "date": "2026-10-07",
+      "why": "The delete refutes ONLY the path citation into the removed legacy tree in this object: src/CobolSharp.Compiler/Semantics/ReportSymbol.cs:127, cited as the legacy tree's only SUPPRESS hit. Owner decision R69 deleted src/CobolSharp.Compiler, src/CobolSharp.Runtime, src/CobolSharp.CLI and both tests/CobolSharp.* projects (P15 Cut 2); they are preserved at the tag legacy-byte-engine-final (docs/rearchitecture/LEGACY-ARCHIVE.md). Every other claim in this object is untouched by this marker."
+     },
      "summary": "ABSENT end-to-end on the greenfield side. The SUPPRESS lexer token exists but is referenced by ZERO parser rules, so `SUPPRESS PRINTING` is a hard parse failure (generic COBOL0001/COBOL0312) at every --std. There is no bound node, no binder, no emitter, and no runtime flag — the runtime carries only a DOC COMMENT claiming the flag is 'staged', which is factually wrong (grep for 'suppress' in Cobol.Net.Runtime finds no report-suppression field). Two ledger claims are STALE and must NOT be repeated: (1) the ledger says the SUPPRESS token is 'used only by COPY … SUPPRESS PRINTING' — false, the preprocessor has ZERO suppress handling (grep -i suppress over src/Cobol.Net.Frontend/**/*.cs finds only unrelated hits), so both SUPPRESS and PRINTING are entirely unreferenced tokens today; (2) the implied 'legacy has a proven algorithm to port' — false, src/CobolSharp.Compiler has NO SUPPRESS implementation either (the only 'suppress' hit is an unrelated GROUP INDICATE comment). So there is nothing to port; this is a from-spec implementation. Everything it depends on IS live: USE BEFORE REPORTING Format 2 binds to a ReportGroupModel (ProcedureTableBuilder), the emitter wires per-group BeforeReporting delegates, and the runtime invokes them at four presentation sites. The declarative-context probe SR1 needs already exists verbatim in EcBinder.BindResume. The grammar is SHARED by both compilers (only one .g4 tree exists in the repo) ⇒ a full legacy guard is mandatory.",
      "evidence": [
       "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4:301 — `SUPPRESS : 'SUPPRESS' ;` (the token)",
@@ -2499,6 +2504,11 @@
      ]
     },
     {
+     "superseded_by": {
+      "note": "PB2110",
+      "date": "2026-10-07",
+      "why": "The delete refutes ONLY the path citation into the removed legacy tree in this object: tests/CobolSharp.Tests.Integration/ConformanceTests.cs:375. Owner decision R69 deleted src/CobolSharp.Compiler, src/CobolSharp.Runtime, src/CobolSharp.CLI and both tests/CobolSharp.* projects (P15 Cut 2); they are preserved at the tag legacy-byte-engine-final (docs/rearchitecture/LEGACY-ARCHIVE.md). Every other claim in this object is untouched by this marker."
+     },
      "verdict": "NEEDS-CORRECTION",
      "citationErrors": [
       "§13.18.54.4 GR2 is MISQUOTED, and the omission is load-bearing. The spec-under-review's 'quote' reads \"the SUM counters whose reset point is the END of the report group's processing\". The verbatim text (specs/ISO_COBOL.md:22132) is: \"the sum counter is reset to zero and the size error indicator is unset at the end of the processing of the report group **in which it is printed** or, if the RESET phrase is specified, at the end of the processing of the control footing for the specified level of control.\" The dropped words 'in which it is printed' cut directly AGAINST the researcher's openQuestion-1 conclusion (that the reset survives suppression), since §14.9.45.4 GR3a inhibits exactly the printing. A paraphrase presented as a quotation on the one genuinely ambiguous branch is the worst place for it (feedback_bare_end / feedback_spec_fidelity_discipline).",
@@ -3513,6 +3523,11 @@
      ]
     },
     {
+     "superseded_by": {
+      "note": "PB2110",
+      "date": "2026-10-07",
+      "why": "The delete refutes ONLY the path citation into the removed legacy tree in this object: src/CobolSharp.Compiler/CobolSharp.Compiler.csproj:25. Owner decision R69 deleted src/CobolSharp.Compiler, src/CobolSharp.Runtime, src/CobolSharp.CLI and both tests/CobolSharp.* projects (P15 Cut 2); they are preserved at the tag legacy-byte-engine-final (docs/rearchitecture/LEGACY-ARCHIVE.md). Every other claim in this object is untouched by this marker."
+     },
      "verdict": "NEEDS-CORRECTION",
      "citationErrors": [
       "§12.4.5.2 SR1(g) is WRONG on both the section number AND the rule type. The EXTERNAL file-connector consistency rule is specs/ISO_COBOL.md:15170 — §12.4.5.3 GENERAL RULE 1(g) ('If the file connector referenced by file-name-1 is an external file connector ... g) The same specification of COLLATING SEQUENCE clauses.'). §12.4.5.2 is the *Syntax rules* subclause (specs/ISO_COBOL.md:15126-15166) and its SR1 is 'The SELECT clause shall be specified first...'. The wrong citation is propagated into the COBOLNET1580 user-visible message text, the BinderDriver code comment, the FileModel.HasFileLevelCollating doc comment, and the CONFORMANCE §3 note. It is also inconsistent with the very file the spec edits: BinderDriver.cs:167 and :180 already cite the sibling rules correctly as 'ISO §12.4.5.3 GR1(i)' and 'GR1(h)'.",

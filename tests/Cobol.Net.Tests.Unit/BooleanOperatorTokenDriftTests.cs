@@ -108,7 +108,6 @@ public sealed class BooleanOperatorTokenDriftTests
             if (rel.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)
                 || rel.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar)
                 || rel.Contains(Path.DirectorySeparatorChar + "Generated" + Path.DirectorySeparatorChar)
-                || rel.StartsWith("CobolSharp.", StringComparison.Ordinal)   // the legacy oracle, deleted at P15
                 || exempt.Contains(Path.GetFileName(file)))
                 continue;
             scanned++;

@@ -286,15 +286,13 @@ jobs:
           python3 scripts/hooks/test_dispatch_guard.py
 
   # ── The authoritative NIST gate: the PARALLEL guard. guard-fast.sh runs exactly the checks scripts/guard.sh
-  # does (build + unit + integration + the ~376 NIST CCVS-85 programs) but fans the NIST suite across the
+  # does (build src/Cobol.Net.Cli + the ~376 NIST CCVS-85 programs) but fans the NIST suite across the
   # runner's cores (JOBS defaults to nproc) with a per-suite isolation model PROVEN equivalent to the serial
   # guard by scripts/guard-verify.sh (which diffs the per-test verdicts). Linux only — the NIST loop is bash. A
   # non-zero exit (any REGRESSION, DIFF, FAIL*, or build warning) fails the job.
-  # ⛔ IT MEASURES WiseOwl COBOL SINCE kb/Work/PB750. The NIST leg used to drive the legacy byte engine's CLI, whose
-  # project graph has no code generator, so this job's green said nothing about the shipping compiler; it now
-  # drives `cobol` (src/Cobol.Net.Cli), refuses to start if the resolved binary does not reference
-  # Cobol.Net.Compiler, and names the compiler in its `=== NIST (cobol): … ===` line. The legacy engine's own
-  # Unit and Integration legs and its exemption list were retired from this job with the engine (kb/Work PB2109). ──
+  # ⛔ IT MEASURES WiseOwl COBOL (kb/Work/PB750): the NIST leg drives `cobol` (src/Cobol.Net.Cli), refuses to start
+  # if the resolved binary does not reference Cobol.Net.Compiler, and names the compiler in its
+  # `=== NIST (cobol): … ===` line. ──
   guard:
     name: Guard (WiseOwl COBOL NIST, parallel)
     needs: changes

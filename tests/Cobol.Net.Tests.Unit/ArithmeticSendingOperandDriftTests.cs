@@ -13,12 +13,10 @@ namespace CobolNet.Tests.Unit;
 /// arithmetic family while COMPUTE accepted it — <b>ISO §8.4.3.1.2 Format 1</b> makes a function-identifier an
 /// identifier, and every one of those formats writes its sending operand as <c>identifier-n | literal-n</c>.
 ///
-/// <para><b>Why four rules and not one.</b> The obvious fix is to collapse them, and it is BLOCKED: the FROZEN
-/// legacy compiler (<c>src/CobolSharp.Compiler</c>) shares this grammar and reads <c>.dataReference()</c> /
-/// <c>.literal()</c> off <c>AddOperandContext</c> and friends BY NAME, so both a collapse and an alias break its
-/// build — the same freeze that holds D10 until PHASE 15 CUT 2 deletes legacy. The change was therefore ADDITIVE,
-/// and <b>this test is what keeps four copies from drifting apart while they must stay separate.</b> Collapse them
-/// to one rule at CUT 2 and delete this test with them.</para>
+/// <para><b>Why four rules and not one.</b> The fix was made ADDITIVE while a second consumer read
+/// <c>.dataReference()</c> / <c>.literal()</c> off <c>AddOperandContext</c> and friends BY NAME. That consumer is
+/// gone; collapsing the four to one rule is kb/Work PB2114, which deletes this test with them. Until then
+/// <b>this test is what keeps four copies from drifting apart.</b></para>
 ///
 /// <para>⚠ It reads the GRAMMAR SOURCE rather than the generated parser on purpose: the property being guarded is
 /// that the four rules are written identically, which is a fact about the <c>.g4</c>. A generated-parser check

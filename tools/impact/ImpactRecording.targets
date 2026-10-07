@@ -7,16 +7,15 @@
         dotnet build CobolSharp.sln -c Debug -p:CustomAfterMicrosoftCommonTargets=<repo>/tools/impact/ImpactRecording.targets
 
     Nothing in the tree imports it, so no gated, battery or shipped build ever contains the probe. It adds:
-      * ImpactProbe.cs to every assembly the impact map covers (the greenfield compiler, runtime and front end, the
-        legacy oracle the differential harness still loads, and
-        the three test assemblies, whose harness code is as much a dependency of a test as the compiler is);
+      * ImpactProbe.cs to every assembly the impact map covers (the compiler, runtime, front end, editions and CLI,
+        and the three test assemblies, whose harness code is as much a dependency of a test as the compiler is);
       * ImpactTestFramework.cs plus [assembly: Xunit.TestFramework] naming it, to the three test assemblies, and
         the IMPACT_RECORDING constant, which drops the gate's own framework attribute (tests/Directory.Build.props):
         ImpactTestFramework derives from GateTestFramework, and an assembly names exactly one framework.
     tools/impact/ImpactInstrumenter then rewrites the built assemblies to call the probe.
   -->
   <PropertyGroup>
-    <_CobolImpactProbed Condition="'$(MSBuildProjectName)' == 'Cobol.Net.Compiler' or '$(MSBuildProjectName)' == 'Cobol.Net.Runtime' or '$(MSBuildProjectName)' == 'Cobol.Net.Frontend' or '$(MSBuildProjectName)' == 'Cobol.Net.Editions' or '$(MSBuildProjectName)' == 'Cobol.Net.Cli' or '$(MSBuildProjectName)' == 'CobolSharp.Compiler' or '$(MSBuildProjectName)' == 'CobolSharp.Runtime'">true</_CobolImpactProbed>
+    <_CobolImpactProbed Condition="'$(MSBuildProjectName)' == 'Cobol.Net.Compiler' or '$(MSBuildProjectName)' == 'Cobol.Net.Runtime' or '$(MSBuildProjectName)' == 'Cobol.Net.Frontend' or '$(MSBuildProjectName)' == 'Cobol.Net.Editions' or '$(MSBuildProjectName)' == 'Cobol.Net.Cli'">true</_CobolImpactProbed>
     <_CobolImpactTests Condition="'$(MSBuildProjectName)' == 'Cobol.Net.Tests.Conformance' or '$(MSBuildProjectName)' == 'Cobol.Net.Tests.Unit' or '$(MSBuildProjectName)' == 'Cobol.Net.Tests.Characterization'">true</_CobolImpactTests>
   </PropertyGroup>
 

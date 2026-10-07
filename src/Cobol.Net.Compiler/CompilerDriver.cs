@@ -121,8 +121,7 @@ public static class CompilerDriver
             frontend.AddCopySearchPath(dir);
         // The implementor-defined DEFAULT COBOL LIBRARY (ISO §7.2.3.4 GR3 — "the implementor defines the
         // mechanism for identifying the default COBOL library"): in NIST mode it is the `copylib/` directory
-        // sibling to the source's directory — the convention the legacy CLI auto-discovers
-        // (CobolSharp.CLI/Program.cs::RunCompile), so the SM COPY suite resolves its K*/KP*/ALTLB texts.
+        // sibling to the source's directory, so the SM COPY suite resolves its K*/KP*/ALTLB texts.
         // Appended AFTER caller-supplied paths so an explicit --copy outranks the convention.
         if (options.NistTestName is not null
             && Path.GetDirectoryName(Path.GetFullPath(options.SourcePath)) is { } srcDir

@@ -81,9 +81,8 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
 ## The project
 WiseOwl COBOL (repo `BrentRector/COBOL`; code `src/Cobol.Net.*`, exe `cobol`, NuGet `WiseOwl.COBOL`) compiles COBOL into **idiomatic typed-native C# built by Roslyn**: a
 COBOL record IS a .NET `record struct`, an elementary item IS a native field. **There is NO byte `ProgramState`
-substrate — never fall back to the legacy byte engine.** The legacy `CobolSharp.Compiler` survives only as a
-differential oracle until the P15 cut-over, and that differential is opt-in
-(`COBOLSHARP_LEGACY_DIFFERENTIAL=1`).
+substrate — never fall back to the legacy byte engine.** That engine is deleted from `main` (PHASE 15 Cut 2,
+kb/Work PB2110); `docs/rearchitecture/LEGACY-ARCHIVE.md` names the tag that preserves it.
 
 **Mission (owner decision D13):** a commercial-quality, decades-sustainable compiler that is **100% conforming to
 ISO/IEC 1989:2023 per §4.2.1, with correct support for 1985/2002/2014** — validated as four per-edition compilers

@@ -54,10 +54,12 @@ public sealed class ParenTokenTwinDriftTests
     /// between worktrees, so the gate's plan could never key on it (kb/Work PB1719; GateLegDriftTests).</summary>
     public static IEnumerable<object[]> SourceFiles()
     {
-        foreach (string proj in new[] { "Cobol.Net.Frontend", "Cobol.Net.Compiler", "CobolSharp.Compiler" })
+        foreach (string proj in new[] { "Cobol.Net.Frontend", "Cobol.Net.Compiler" })
         {
             string root = TestRepo.Src(proj);
-            if (!Directory.Exists(root)) continue;
+            // A renamed or moved project must fail loudly here, never shrink the scan to nothing.
+            if (!Directory.Exists(root))
+                throw new DirectoryNotFoundException($"ParenTokenTwinDriftTests scans {root}, which does not exist");
             foreach (string f in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories))
             {
                 // Generated/ is a BUILD OUTPUT (feedback_generated_parser_is_a_build_output); obj/ likewise.
@@ -114,11 +116,10 @@ public sealed class ParenTokenTwinDriftTests
         // The sites the PB48 sweep enumerated. Each must still be REACHED by the theory above; if one is
         // renamed the list is wrong and this says so, rather than the theory silently covering less.
         foreach (string expected in new[]
-                 { "Parsing/ZeroTokenRewriter.cs", "Parsing/CobolParserCoreBase.cs",
-                   "Binding/ReferenceResolver.cs", "Semantics/Bound/Binding/ExpressionBinder.cs" })
+                 { "Parsing/ZeroTokenRewriter.cs", "Parsing/CobolParserCoreBase.cs", "Binding/ReferenceResolver.cs" })
         {
             Assert.True(seen.Any(s => s.EndsWith(expected, StringComparison.Ordinal)),
-                $"the paren-twin guard no longer inspects {expected} — it was one of the four sites the PB48 "
+                $"the paren-twin guard no longer inspects {expected} — it was one of the sites the PB48 "
                 + $"sweep found, so either it moved (update this list) or the matcher stopped working. "
                 + $"Inspected: {string.Join(", ", seen)}");
         }

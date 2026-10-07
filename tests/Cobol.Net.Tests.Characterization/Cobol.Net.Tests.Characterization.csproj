@@ -3,8 +3,8 @@
   <!--
     Cobol.Net.Tests.Characterization — the behavior-neutrality harness (rearchitecture Phase 0). Snapshots the CURRENT
     emitter's generated C# (gate 3) and diagnostic surface (gate 2) for a curated one-per-family corpus, so every later
-    refactor phase can PROVE it changed no observable behavior. References the greenfield compiler + runtime ONLY (never
-    the legacy CobolSharp.* projects) — the probe drives the public CompilerDriver API.
+    refactor phase can PROVE it changed no observable behavior. References the compiler + runtime; the probe drives the
+    public CompilerDriver API.
   -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
