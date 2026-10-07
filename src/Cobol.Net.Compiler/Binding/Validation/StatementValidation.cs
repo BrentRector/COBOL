@@ -152,8 +152,57 @@ internal sealed class StatementValidation(DataBinder data)
     /// citation, when it has one (SORT §14.9.40.3 SR8, MERGE §14.9.24.3 SR9).</param>
     /// <returns>true when the name identifies a file connector the statement may reference; false after
     /// reporting.</returns>
-    public bool ResolveFile(string name, string verb, [NotNullWhen(true)] out FileModel? file,
+    /// <remarks>⛔ IT TAKES THE PARSE NODE, NEVER A STRING (kb/Work PB2040). Two operand shapes reach it: the
+    /// <c>fileName</c> production (a bare <c>cobolWord</c> — CLOSE, READ, START, DELETE, DELETE FILE, UNLOCK,
+    /// RETURN) and a <c>dataReference</c> (OPEN, SORT, MERGE and the SORT/MERGE USING/GIVING lists, whose
+    /// positions share a production with a data-name or carry a trailing phrase the grammar keeps apart this way).
+    /// The second overload screens the written shape through <see cref="ScreenFileNameOperand"/> FIRST, so no
+    /// caller can hand the resolver a reference's glued <c>GetText()</c> — which is how <c>OPEN OUTPUT A OF B</c>
+    /// opened the file <c>AOFB</c>, and how <c>SORT S OF X … USING F OF Y</c> dropped both qualifiers in
+    /// silence.</remarks>
+    public bool ResolveFile(Core.FileNameContext name, string verb, [NotNullWhen(true)] out FileModel? file,
+                            bool admitsReportFile = false, string? statementRule = null) =>
+        ResolveFileWord(name.GetText(), verb, out file, admitsReportFile, statementRule);
+
+    /// <summary>The <c>dataReference</c>-shaped file-name operand: <see cref="ScreenFileNameOperand"/>, then the
+    /// base word resolves exactly as a <c>fileName</c> does (kb/Work PB2040).</summary>
+    public bool ResolveFile(Core.DataReferenceContext operand, string verb, [NotNullWhen(true)] out FileModel? file,
                             bool admitsReportFile = false, string? statementRule = null)
+    {
+        file = null;
+        return ScreenFileNameOperand(operand, verb) is { } word
+            && ResolveFileWord(word, verb, out file, admitsReportFile, statementRule);
+    }
+
+    /// <summary>⛔ THE ONE FILE-NAME OPERAND SHAPE RULE (kb/Work PB2040). A file-name is a user-defined word that
+    /// names a file connector, and nothing more may be written in its place: ISO §8.4.2.2.2 prints the qualified
+    /// formats of a data-name, a condition-name, an index-name, a paragraph-name, a screen-name, a record-key-name,
+    /// LINAGE-COUNTER and the report counters, and a file-name appears in them only AS a qualifier (the
+    /// <c>file-report-qualifier</c>) — it has no qualified format of its own, so <c>A OF B</c> in a file-name
+    /// position names no file. Subscripting (§8.4.2.3.1: "Subscripts are used when reference is made to an
+    /// individual element within a table of like elements") and reference modification (§8.4.3.3.1, "by specifying
+    /// an identifier") are identifier decorations, and a special register is no user-defined word at all.
+    /// <para>The production these positions share with a data-name is a superset parse, so this screen is where
+    /// the narrower operand is refused BY NAME (COBOLNET2972), quoting the reference as written; the statement is
+    /// not bound. A position that may hold EITHER a file-name or a data-name (the SORT subject, APPLY COMMIT's
+    /// operand list) decides by the base word first and asks this only of the file reading.</para></summary>
+    /// <returns>The base word when the operand is a bare file-name; null after reporting.</returns>
+    public string? ScreenFileNameOperand(Core.DataReferenceContext operand, string verb)
+    {
+        if (operand.cobolWord() is { } word && operand.dataReferenceSuffix().Length == 0)
+            return word.GetText();
+        using var _ = data.Edition.At(operand);
+        data.Edition.Error(DiagnosticCatalog.FileNameOperandShape,
+            $"{verb} '{DataBinder.WrittenText(operand)}' — a file-name is a user-defined word naming a file "
+            + "connector, and is written alone: ISO §8.4.2.2.2 gives a file-name no qualified format (it "
+            + "appears there only as the file-report-qualifier of another name), and subscripting (§8.4.2.3.1) and "
+            + "reference modification (§8.4.3.3.1) decorate identifiers, not file-names. Write the file-name as its "
+            + "SELECT clause spells it.");
+        return null;
+    }
+
+    private bool ResolveFileWord(string name, string verb, [NotNullWhen(true)] out FileModel? file,
+                                 bool admitsReportFile, string? statementRule)
     {
         if (data.FilesByName.TryGetValue(name, out file))
             return admitsReportFile || ScreenReportFileReference(file, verb, statementRule);
@@ -1163,7 +1212,6 @@ internal sealed class StatementValidation(DataBinder data)
 
     // ── Sequential file I/O (ISO §14.9.27 / §14.9.51) — lifted at 10h ───────────────────────────────────────
 
-    /// <summary>§14.9.27.3 SR8 — OPEN … SHARING WITH ALL OTHER (clause or phrase) requires a LOCK MODE clause.</summary>
     /// <summary>§13.4.6.3 SR3/SR4 — a sort-merge (SD) file-name may be referenced ONLY by SORT / MERGE /
     /// RELEASE / RETURN (and a SORT/MERGE USING/GIVING). Every other input-output statement rejects at BIND
     /// time; the old posture was a patchwork — a bind error at UNLOCK, a runtime loud stage at
@@ -1178,6 +1226,62 @@ internal sealed class StatementValidation(DataBinder data)
             + "appear only in SORT/MERGE/RELEASE/RETURN (ISO §13.4.6.3 SR3/SR4)";
         data.Edition.Error(DiagnosticCatalog.SortMergeFileInIoStatement, msg);
         return msg;
+    }
+
+    /// <summary>⛔ THE ONE §13.4.6.3 SR4 SCREEN, ASKED OF EVERY INPUT-OUTPUT STATEMENT'S OWN OPERANDS (kb/Work
+    /// PB1291) — <i>"A record description entry associated with file-name-1 shall not be specified in an
+    /// input-output statement other than following the word FROM or the word INTO."</i> The input-output statements
+    /// are the eight statements §9.1.13.1 names as those whose execution sets the I-O status — CLOSE, DELETE, OPEN, READ,
+    /// REWRITE, START, UNLOCK and WRITE — and the statement binder calls this for each of them from its ONE
+    /// funnel, so a new operand position in any of them is screened by construction.
+    /// <para>It used to be asked only at the WRITE / REWRITE record-name slot (<see cref="ScreenSortMergeFile"/> on
+    /// the record's file), so an SD record anywhere else — <c>WRITE IN-REC AFTER ADVANCING SRT-N LINES</c>, a
+    /// <c>START … KEY</c>, a RETRY count, a subscript — compiled clean and read a sort record area outside any
+    /// sort. The walk covers the statement's whole parse subtree, nested subscripts included, and skips exactly:
+    /// the FROM and INTO phrases (SR4's exception), the nested imperative statements (each is a statement of its
+    /// own and is screened as one, if it is an input-output statement), and the record-name / file-name operand
+    /// itself (whose SD case is SR3's, <see cref="ScreenSortMergeFile"/> — one rule reported once). A record
+    /// description entry is the 01 and every entry subordinate to it, so the test is on the reference's record.
+    /// </para></summary>
+    public void ScreenSortMergeRecordReferences(Antlr4.Runtime.ParserRuleContext statement, string verb,
+                                                ReferenceResolver refs)
+    {
+        Walk(statement);
+
+        void Walk(IParseTree node)
+        {
+            for (int i = 0; i < node.ChildCount; i++)
+                switch (node.GetChild(i))
+                {
+                    case Core.StatementBlockContext or Core.WriteFromContext or Core.RewriteFromContext
+                        or Core.ReadIntoContext:
+                        continue;   // SR4's FROM / INTO exception, and the nested statements screened on their own
+                    case Core.DataReferenceContext dref:
+                        if (dref.Parent is not (Core.RecordNameContext or Core.OpenFileSpecContext))
+                            Screen(dref);
+                        Walk(dref);   // a subscript of the operand is specified in the statement too
+                        continue;
+                    case var child:
+                        Walk(child);
+                        continue;
+                }
+        }
+
+        void Screen(Core.DataReferenceContext dref)
+        {
+            if (refs.Probe(dref) is not { } probe) return;   // an unresolved name is the resolver's to report
+            DataItem root = probe.Item;
+            while (root.Parent is { } up) root = up;
+            if (FileWhoseRecordIs(root) is not { IsSortMerge: true } sd) return;
+            using var _ = data.Edition.At(dref);
+            data.Edition.Error(DiagnosticCatalog.SortMergeRecordInIoStatement,
+                $"{verb} '{DataBinder.WrittenText(dref)}' — "
+                + (ReferenceEquals(root, probe.Item) ? "" : $"'{probe.Item.CobolName}' belongs to ")
+                + $"'{root.CobolName}', a record description entry of the sort-merge file '{sd.CobolName}', and ISO §13.4.6.3 SR4: \"A record description entry associated "
+                + "with file-name-1 shall not be specified in an input-output statement other than following the word "
+                + "FROM or the word INTO.\" Move the value to a working-storage item first, or name it in the FROM / "
+                + "INTO phrase.");
+        }
     }
 
     /// <summary>⛔ THE ONE SCREEN for the L1–L3 "phrase written where this statement's syntax rules forbid it"

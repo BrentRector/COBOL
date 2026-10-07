@@ -39,9 +39,13 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     {
         var operand = s.sortFileName().dataReference();
         string name = SubjectName(s);
-        return ctx.Data.FilesByName.TryGetValue(name, out var file)
-            ? SortBindFile(s, file)
-            : SortBindTable(s, operand, name);
+        if (!ctx.Data.FilesByName.TryGetValue(name, out var file)) return SortBindTable(s, operand, name);
+        // The FILE reading of the operand is file-name-1, which is written alone — `SORT S OF X …` named the SD `S`
+        // with its qualifier dropped in silence until kb/Work PB2040. The table reading's data-name-2 MAY be
+        // qualified and subscripted, which is why the split is decided by the base word and the shape asked after.
+        return ctx.Validation.ScreenFileNameOperand(operand, "SORT") is null
+            ? BoundRejected.Reported(ctx.Edition)
+            : SortBindFile(s, file);
     }
 
     /// <summary>The base word of the SORT's first operand — the name the file / table split is decided by.</summary>
@@ -357,14 +361,13 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     public BoundStatement BindMerge(Core.MergeStatementContext m)
     {
         var operand = m.mergeFileName().dataReference();
-        string name = operand.cobolWord()?.GetText() ?? operand.GetText();
         ScreenDeclarativePlacement(merge: true);   // §14.9.24.3 SR1, the declarative leg (kb/Work PB1139)
         // TWO verdicts, not one (kb/Work PB236): "no such file-name" is §8.4.2.1, "declared but under an FD"
         // is §14.9.24.3 — and both used to be answered by the same run-time loud.
-        if (!ctx.Validation.ResolveFile(name, "MERGE", out var file)) return BoundRejected.Reported(ctx.Edition);
+        if (!ctx.Validation.ResolveFile(operand, "MERGE", out var file)) return BoundRejected.Reported(ctx.Edition);
         if (!file.IsSortMerge)
         {
-            ctx.Validation.RejectStatementOperand($"MERGE file '{name}' is not described in a sort-merge "
+            ctx.Validation.RejectStatementOperand($"MERGE file '{file.CobolName}' is not described in a sort-merge "
                 + "description entry (ISO §14.9.24.3 — file-name-1 shall be described in an SD)");
             return BoundRejected.Reported(ctx.Edition);
         }
@@ -499,7 +502,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         // FD", which is §14.9.34.3 SR1, and answered both with a run-time loud. They are different diagnoses and
         // the user needs the right one: telling someone whose file has an FD that the name is undefined sends
         // them hunting for a declaration that is right there.
-        if (!ctx.Validation.ResolveFile(name, "RETURN", out var file)) return BoundRejected.Reported(ctx.Edition);
+        if (!ctx.Validation.ResolveFile(r.fileName(), "RETURN", out var file)) return BoundRejected.Reported(ctx.Edition);
         if (!ctx.Validation.CheckReturnFile(file)) return BoundRejected.Reported(ctx.Edition);
         // GR3 makes the record available in the WHOLE record area — resolve it through the LARGEST record's view
         // (ReferenceResolver.RecordArea, ISO §13.18.33.4 GR3); a shorter Records[0] window would truncate the
@@ -727,12 +730,11 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
               + "that is not for a report file and is not a sort-merge file description entry\"";
         foreach (var dref in list?.dataReference() ?? [])
         {
-            string name = dref.cobolWord()?.GetText() ?? dref.GetText();
-            if (!ctx.Validation.ResolveFile(name, verb, out var f, statementRule: reportRule))
+            if (!ctx.Validation.ResolveFile(dref, verb, out var f, statementRule: reportRule))
                 return false;
             if (f.IsSortMerge)
                 return ctx.Validation.RejectStatementOperand(
-                    $"{verb} file '{name}' shall not be a sort-merge file ({(merge ? "ISO §14.9.24.3 SR9" : "ISO §14.9.40.3 SR8")})");
+                    $"{verb} file '{f.CobolName}' shall not be a sort-merge file ({(merge ? "ISO §14.9.24.3 SR9" : "ISO §14.9.40.3 SR8")})");
             // ⛔ THE ACCESS-MODE RULE, BY NAME (kb/Work PB994). §12.4.5.5.2 SR1 — "The RANDOM clause shall not be
             // specified for file-names specified in the USING or GIVING phrase of a SORT or MERGE statement" — holds for
             // both phrases; §14.9.40.3 SR12 / §14.9.24.3 SR13 restate it for USING ("If file-name-2 references a
@@ -740,7 +742,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             // the keyed organizations were "the G5 slice" — a statement about the compiler — for every such file.
             if (f.AccessMode == FileAccessMode.Random)
                 return ctx.Validation.RejectStatementOperand(
-                    $"{verb} file '{name}' is described with ACCESS MODE IS RANDOM: \"The RANDOM clause shall not be specified "
+                    $"{verb} file '{f.CobolName}' is described with ACCESS MODE IS RANDOM: \"The RANDOM clause shall not be specified "
                     + "for file-names specified in the USING or GIVING phrase of a SORT or MERGE statement\" (ISO §12.4.5.5.2 SR1"
                     + (giving ? ")" : merge ? "; §14.9.24.3 SR13)" : "; §14.9.40.3 SR12)"));
             files.Add(f);

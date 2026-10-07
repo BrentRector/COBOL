@@ -44,15 +44,17 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
             RetrySpec? retry = clause.retryPhrase() is { } rp ? host.BindRetry(rp) : null;
             foreach (var spec in clause.openFileSpec())
             {
-                string name = spec.dataReference().GetText();
                 // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639).
-                if (!ctx.Validation.ResolveFile(name, "OPEN", out var file, admitsReportFile: true)) return BoundRejected.Reported(ctx.Edition);
+                if (!ctx.Validation.ResolveFile(spec.dataReference(), "OPEN", out var file, admitsReportFile: true)) return BoundRejected.Reported(ctx.Edition);
                 // §14.9.27.3 SR8: OPEN … SHARING WITH ALL OTHER (clause or phrase) requires a LOCK MODE clause,
                 // unless file-name-1 is subject to an APPLY COMMIT clause. The effective mode is THIS group's
                 // phrase over the file-control clause — §14.9.27.4 GR23: "If there is no SHARING phrase on the
                 // OPEN statement, then file sharing is completely specified in the file control entry."
                 // ⛔ THIS IS SR8's ONLY SITE (kb/Work PB319): the rule speaks about the OPEN statement's
                 // operand, so a file control entry cannot host it. The full antecedent lives in the callee.
+                ctx.Data.ScreenApplyCommitSubject(file, clause.sharingPhrase() is not null, "OPEN with a SHARING phrase",
+                    "ISO §14.9.27.3 SR7: \"The sharing phrase shall not be specified for a file subject to an APPLY "
+                    + "COMMIT clause\"");   // SR7 — the phrase, never the file control entry's clause (kb/Work PB666)
                 ctx.Validation.CheckOpenSharingAllOther(file, sharing ?? file.Sharing);   // SR8 — pure check
                 ctx.Validation.CheckOpenModeForFile(file, mode);                          // SR1 + SR2 — pure check (kb/Work PB318)
                 // ⛔ THE ONE READ of the per-file-name TAPE PHRASE — `openFileSpec`'s
@@ -99,7 +101,7 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
         {
             string name = phrase.fileName().GetText();
             // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639).
-            if (!ctx.Validation.ResolveFile(name, "CLOSE", out var file, admitsReportFile: true)) return BoundRejected.Reported(ctx.Edition);
+            if (!ctx.Validation.ResolveFile(phrase.fileName(), "CLOSE", out var file, admitsReportFile: true)) return BoundRejected.Reported(ctx.Edition);
             // §13.4.6.3 SR3: an SD file-name in a CLOSE — the statement previously compiled and ran against an
             // unregistered connector whose fail-open status read '00' (kb/Work PB140).
             if (ctx.Validation.ScreenSortMergeFile(file, "CLOSE") is not null)
@@ -249,7 +251,7 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
     {
         string name = r.fileName().GetText();
         // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639).
-        if (!ctx.Validation.ResolveFile(name, "READ", out var file)) return BoundRejected.Reported(ctx.Edition);
+        if (!ctx.Validation.ResolveFile(r.fileName(), "READ", out var file)) return BoundRejected.Reported(ctx.Edition);
         if (!file.IsSequential) return keyedIo.BindRead(r, file);   // relative/indexed READ F1/F2 (ISO 14.9.30; KeyedIo partial)
         // READ … INTO is an IMPLICIT MOVE and is bound as one (ISO §14.9.30.4 GR4 b); kb/Work PB348): the
         // sender is the record area sliced to its §13.18.43.4 GR16 byte count, resolved through the LARGEST
@@ -400,7 +402,20 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
         bool before = wba.BEFORE() is not null;   // §14.9.51.4 GR25 e)/f): BEFORE, alone or with AFTER, presents first
         if (wba.PAGE() is not null) return new BoundAdvancing(before, true, null);
         if (wba.dataReference() is { } m && ctx.Mnemonics.Of(wba).TryGetValue(m.GetText(), out var system))
+        {
+            // ⛔ LINE / LINES BELONG TO THE COUNT ALTERNATIVE ONLY (kb/Work PB1189). §14.9.51.2 Format 1 prints
+            // `{ identifier-2 | integer-1 } [ LINE | LINES ]` and `{ mnemonic-name-1 | PAGE }` as the two operand
+            // alternatives, so `mnemonic-name-1 LINES` is no WRITE statement. The grammar cannot tell a mnemonic
+            // from identifier-2 (both are a dataReference), so the refusal lives here, on the arm that knows; the
+            // PAGE twin is a parse error because PAGE is a keyword. The word used to be dropped in silence.
+            if ((wba.LINE() ?? wba.LINES()) is { } word)
+                ctx.Edition.Error(DiagnosticCatalog.StatementFormatShape,
+                    $"WRITE … ADVANCING {DataBinder.WrittenText(m)} {word.GetText()}: '{DataBinder.WrittenText(m)}' "
+                    + "is a mnemonic-name, and ISO §14.9.51.2 Format 1 writes LINE or LINES only after the count "
+                    + "alternative { identifier-2 | integer-1 } — the other alternative is { mnemonic-name-1 | PAGE } "
+                    + $"with no such word. Remove '{word.GetText()}'.");
             return FeatureAdvancing(before, m.GetText(), system);
+        }
         BoundOperand lines =
             wba.integerLiteral() is { } il ? new BoundNumericLiteral(il.GetText())
             // identifier-2 as a function-identifier (§8.4.3.1.2 Format 1),

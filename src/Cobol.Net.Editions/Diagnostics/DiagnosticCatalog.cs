@@ -714,6 +714,31 @@ public static class DiagnosticCatalog
         + "let CLOSE and the DELETE forms compile and run against an unregistered connector, whose fail-open "
         + "status read '00'.",
         "ISO §13.4.6.3");
+    // kb/Work PB1291: SR4 was asked only at the WRITE / REWRITE record-name slot (through COBOLNET1692), so an SD
+    // record in any other operand position of an input-output statement — the ADVANCING count, a START KEY, a RETRY
+    // count, a subscript — compiled clean. StatementValidation.ScreenSortMergeRecordReferences is the ONE screen,
+    // asked of every input-output statement from StatementBinder.BindStatement.
+    public static readonly DiagnosticDescriptor SortMergeRecordInIoStatement = new(
+        "COBOLNET2973", "sd-record-io-statement", EditionSeverity.Error,
+        "An input-output statement (CLOSE, DELETE, OPEN, READ, REWRITE, START, UNLOCK or WRITE — the statements whose "
+        + "execution sets the I-O status, ISO §9.1.13.1) references a record description entry of a sort-merge (SD) "
+        + "file outside its FROM or INTO phrase. ISO §13.4.6.3 SR4: \"A record description entry associated with "
+        + "file-name-1 shall not be specified in an input-output statement other than following the word FROM or the "
+        + "word INTO.\"",
+        "ISO §13.4.6.3 SR4");
+    // kb/Work PB666: the APPLY COMMIT antecedent family had no code anywhere — its rows were CONFORMS "witnessed by the
+    // refusal of the antecedent" (COBOLNET1709 refusing APPLY COMMIT, kb/Work PB371), but COBOLNET1709 is
+    // PermissiveInert, so under --permissive every forbidden shape compiled with zero errors.
+    // DataBinder.ScreenApplyCommitSubject is the ONE report.
+    public static readonly DiagnosticDescriptor ApplyCommitSubjectRule = new(
+        "COBOLNET2974", "apply-commit-subject-rule", EditionSeverity.Error,
+        "A clause or statement that a syntax rule forbids for a file subject to an I-O-CONTROL APPLY COMMIT clause is "
+        + "written for such a file: the LOCK MODE clause (ISO §12.4.5.9.3 SR1), a SAME clause naming it with a file "
+        + "not subject to one (§12.4.6.4.3 SR11), OPEN's sharing phrase (§14.9.27.3 SR7), READ's IGNORING LOCK / WITH "
+        + "LOCK / WITH NO LOCK (§14.9.30.3 SR5), REWRITE's WITH LOCK / WITH NO LOCK (§14.9.35.3 SR5), or UNLOCK "
+        + "(§14.9.47.3 SR2). The APPLY COMMIT clause is itself declined (COBOLNET1709), so a program reaches these "
+        + "rules only under --permissive, where that refusal is a warning.",
+        "ISO §14.9.27.3 SR7 / §12.4.5.9.3 SR1 / §12.4.6.4.3 SR11 / §14.9.30.3 SR5 / §14.9.35.3 SR5 / §14.9.47.3 SR2");
     public static readonly DiagnosticDescriptor ClosePhraseOrganization = new(
         "COBOLNET1693", "close-phrase-organization", EditionSeverity.Error,
         "A CLOSE statement's NO REWIND, REEL, or UNIT phrase on a file whose organization is not sequential: "
@@ -2485,6 +2510,17 @@ public static class DiagnosticCatalog
         + "shall not be qualified.\" — the required placement (SR4: data-name-2 precedes the subject at the same "
         + "level) already makes the reference unambiguous (NOTE 1). Write the bare data-name.",
         "ISO §13.18.44.3 SR6");
+    // kb/Work PB2040: the procedure-division file-name positions that share the dataReference production (OPEN, SORT,
+    // MERGE, SORT/MERGE USING and GIVING, FUNCTION EXCEPTION-FILE / EXCEPTION-FILE-N) handed the resolver the
+    // reference's GLUED text, so `OPEN OUTPUT A OF B` opened a file named AOFB and `SORT S OF X` sorted S with the
+    // qualifier dropped — both silently. StatementValidation.ScreenFileNameOperand is the ONE screen.
+    public static readonly DiagnosticDescriptor FileNameOperandShape = new(
+        "COBOLNET2972", "file-name-operand-shape", EditionSeverity.Error,
+        "A file-name operand is written qualified (OF / IN), subscripted, reference-modified, or as a special "
+        + "register. A file-name is a user-defined word naming a file connector: ISO §8.4.2.2.2 gives it no qualified "
+        + "format (it appears there only as the file-report-qualifier of another name), and subscripting (§8.4.2.3) "
+        + "and reference modification (§8.4.3.3) decorate identifiers. Write the file-name alone.",
+        "ISO §8.4.2.2.2");
     public static readonly DiagnosticDescriptor RenamesOperandUnresolved = new(
         "COBOLNET1655", "renames-operand-unresolved", EditionSeverity.Error,
         "A RENAMES clause's data-name-2 or data-name-3 does not name an elementary item or group of elementary items in "

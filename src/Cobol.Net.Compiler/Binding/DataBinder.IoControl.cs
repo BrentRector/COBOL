@@ -58,11 +58,22 @@ public sealed partial class DataBinder
             // accepted with a warning and the program compiles (kb/Work PB319). §12.4.6.3.2's operand list is a
             // repetition of an all-optional [file-name-1][identifier-1] pair, so a name that resolves to a file
             // IS file-name-1 and anything else is identifier-1 — the symbol table is the only discriminator.
+            // Only a BARE word can be file-name-1 (§8.4.2.2.2 gives a file-name no qualified format, kb/Work
+            // PB2040): a qualified or subscripted operand is identifier-1, and its glued text (`F OF G` → `FOFG`)
+            // must never be looked up as a file-name.
             if (clause.applyCommitClause() is { } apply)
             {
                 foreach (var operand in apply.dataReference())
-                    if (FilesByName.TryGetValue(operand.GetText(), out var subject))
+                    if (operand.cobolWord() is { } word && operand.dataReferenceSuffix().Length == 0
+                        && FilesByName.TryGetValue(word.GetText(), out var subject))
+                    {
                         subject.SubjectToApplyCommit = true;
+                        // §12.4.5.9.3 SR1 — the LOCK MODE clause of the file control entry, bound before this paragraph.
+                        ScreenApplyCommitSubject(subject, subject.LockMode is not null, "LOCK MODE clause",
+                            "ISO §12.4.5.9.3 SR1: \"This clause shall not be specified for a file that is the subject of "
+                            + "an APPLY COMMIT clause for which there is an implicit LOCK MODE IS AUTOMATIC WITH LOCK ON "
+                            + "MULTIPLE RECORDS applied automatically\"");
+                    }
                 continue;
             }
             if (clause.sameClause() is not { } same) continue;
@@ -82,8 +93,46 @@ public sealed partial class DataBinder
             sites.Add(new SameSite(same, recorded, complete));
         }
         ScreenSameClauses(sites);
+        // §12.4.6.4.3 SR11 — asked after the WHOLE paragraph, because an APPLY COMMIT clause may follow the SAME
+        // clause it constrains. One clause mixing the two kinds is one violation, reported at the clause.
+        foreach (var site in sites)
+            if (site.Clause.Members.FirstOrDefault(f => f.SubjectToApplyCommit) is { } subject
+                && site.Clause.Members.FirstOrDefault(f => !f.SubjectToApplyCommit) is { } other)
+            {
+                using var _ = Edition.At(site.Ctx);
+                ScreenApplyCommitSubject(subject, true,
+                    $"{site.Clause.Written} naming '{subject.CobolName}' and '{other.CobolName}'",
+                    "ISO §12.4.6.4.3 SR11: \"A file or record area that is subject to an APPLY COMMIT clause shall not be "
+                    + "specified with another file or record area that is not subject to an APPLY COMMIT clause\"");
+            }
         foreach (var site in sites)
             if (site.Clause.Kind == SameClauseKind.RecordArea) LinkSameRecordArea(site.Clause);
+    }
+
+    /// <summary>⛔ THE ONE REPORT FOR THE APPLY COMMIT ANTECEDENT FAMILY (kb/Work PB666) — the syntax rules of CLAIMED
+    /// clauses and statements whose antecedent is "a file subject to an APPLY COMMIT clause": §12.4.5.9.3 SR1 (the
+    /// LOCK MODE clause), §12.4.6.4.3 SR11 (a SAME clause mixing subject and non-subject files), §14.9.27.3 SR7 (OPEN's
+    /// sharing phrase), §14.9.30.3 SR5 / §14.9.35.3 SR5 (READ's and REWRITE's lock phrases) and §14.9.47.3 SR2
+    /// (UNLOCK). Each caller passes its own rule quoted with its citation; the fact is
+    /// <see cref="FileModel.SubjectToApplyCommit"/>, recorded off this paragraph.
+    /// <para>⛔ THESE RULES ARE LIVE, NOT VACUOUS. kb/Work PB371 (owner, 2026-09-02) recorded the family CONFORMS
+    /// "witnessed by the refusal of the antecedent": COBOLNET1709 refuses the APPLY COMMIT clause (Annex A.4.3 is
+    /// not claimed). But COBOLNET1709 is <c>PermissiveInert</c>: under <c>--permissive</c> the clause is a warning,
+    /// the fact is recorded and the program compiles — and every one of these forbidden shapes then compiled with
+    /// zero errors. A refusal witnesses a rule only in the lanes where it refuses, so each rule is enforced here in
+    /// its own right (COBOLNET2974), in both lanes. (§12.4.6.4.4 GR3, the family's seventh member, is a general rule
+    /// about an ACTIVE clause's sharing at run time; no APPLY COMMIT clause is ever active here, in either lane.)</para></summary>
+    /// <param name="file">The file the clause or statement names.</param>
+    /// <param name="written">Whether the source wrote the construct the rule forbids for such a file.</param>
+    /// <param name="what">The construct as written, for the message.</param>
+    /// <param name="rule">The caller's own rule, quoted with its citation.</param>
+    /// <returns>true when the rule holds; false after reporting.</returns>
+    internal bool ScreenApplyCommitSubject(FileModel file, bool written, string what, string rule)
+    {
+        if (!(written && file.SubjectToApplyCommit)) return true;
+        Edition.Error(DiagnosticCatalog.ApplyCommitSubjectRule, $"{what} — the file '{file.CobolName}' is named in an "
+            + $"I-O-CONTROL APPLY COMMIT clause, and {rule}.");
+        return false;
     }
 
     /// <summary>Only SAME RECORD AREA shares storage (Format 2) — SORT/SORT-MERGE AREA is Format 3, and SAME AREA

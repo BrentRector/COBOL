@@ -644,6 +644,9 @@ writeFrom
 // method invocation), functionCall first because it is keyword-led (kb/Work PB1421's sibling sweep: the arms were
 // missing, so `AFTER ADVANCING FUNCTION INTEGER(X) LINES` was a parse error). §14.9.51.3 SR14's "an integer data
 // item" is then asked of the function's temporary item (§8.4.3.2.4 GR1) by the ONE operand-class screen.
+// ⚠ `(LINE | LINES)?` FOLLOWS THE dataReference ARM TOO, A SUPERSET: mnemonic-name-1 also parses as a dataReference,
+// and the printed `{ mnemonic-name-1 | PAGE }` alternative carries no LINE/LINES. Only the symbol table tells the two
+// apart, so SequentialIoBinder.BindAdvancing refuses the word on its mnemonic arm (COBOLNET2269, kb/Work PB1189).
 writeBeforeAfter
     : (BEFORE AFTER? | AFTER BEFORE?) ADVANCING?
       ( PAGE

@@ -439,6 +439,11 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         int errorMark = data.Edition.ErrorsRecorded, refusalMark = data.Edition.RefusalsBound;
         int unbuiltMark = data.Edition.UnbuiltMark;
         int controlStoreMark = _controlStoreReports;
+        // ISO §13.4.6.3 SR4 (kb/Work PB1291) — asked HERE, of every input-output statement, because this is the one
+        // funnel every statement passes through: a new operand position in any of the eight is screened without a
+        // verb binder remembering to ask.
+        if (InputOutputStatement(s) is { } io)
+            Ctx.Validation.ScreenSortMergeRecordReferences(io, io.Start.Text.ToUpperInvariant(), Ctx.Refs);
         var core = BindStatementCore(s);
         // ISO §14.9.14.3 SR1, §14.9.17.3 SR2, §14.9.42.3 SR1 (kb/Work PB397) — the three rules stated over a
         // statement SEQUENCE (a bare EXIT alone in its paragraph; a Format 1 GO TO and a STOP last in their
@@ -516,6 +521,16 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
     /// <summary>How many §14.9.49.3 SR11 violations <see cref="BindStatement"/> has reported — compared across a
     /// statement's bind so an enclosing statement does not report again the store its nested statement reported.</summary>
     private int _controlStoreReports;
+
+    /// <summary>The statement's INPUT-OUTPUT STATEMENT node, or null — the eight statements ISO §9.1.13.1 names as
+    /// those whose execution sets the I-O status (CLOSE, DELETE in both formats, OPEN, READ, REWRITE, START, UNLOCK
+    /// and WRITE), which is the set §13.4.6.3 SR4 speaks about (kb/Work PB1291).</summary>
+    private static Antlr4.Runtime.ParserRuleContext? InputOutputStatement(Core.StatementContext s) =>
+        s.GetChild(0) is Core.OpenStatementContext or Core.CloseStatementContext or Core.ReadStatementContext
+            or Core.WriteStatementContext or Core.RewriteStatementContext or Core.StartStatementContext
+            or Core.DeleteStatementContext or Core.DeleteFileStatementContext or Core.UnlockStatementContext
+            ? (Antlr4.Runtime.ParserRuleContext)s.GetChild(0)
+            : null;
 
     private BoundStatement BindStatementCore(Core.StatementContext s) => s switch
     {

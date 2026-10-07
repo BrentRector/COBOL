@@ -32,10 +32,12 @@ internal sealed class FileLockBinder(BinderContext ctx, StatementBinder host)
         string name = ul.fileName().GetText();
         // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639); the old
         // BoundUnsupported staged an UNDECLARED file-name to a run-time loud with no compile-time word.
-        if (!ctx.Validation.ResolveFile(name, "UNLOCK", out var file)) return BoundRejected.Reported(ctx.Edition);
+        if (!ctx.Validation.ResolveFile(ul.fileName(), "UNLOCK", out var file)) return BoundRejected.Reported(ctx.Edition);
         if (file.IsSortMerge)
             ctx.Edition.Error("COBOLNET1512", $"UNLOCK may not name the sort/merge file '{name}' "
                 + "(ISO §14.9.47.3 SR1)");
+        ctx.Data.ScreenApplyCommitSubject(file, true, "UNLOCK", "ISO §14.9.47.3 SR2: \"File-name-1 shall not be a "
+            + "file specified in an APPLY COMMIT clause\"");   // kb/Work PB666
         return new BoundUnlock(file, ul.RECORDS() is not null || ul.RECORD() is not null);
     }
 
@@ -86,13 +88,27 @@ internal sealed class FileLockBinder(BinderContext ctx, StatementBinder host)
 
     /// <summary>§14.9.30.3 SR4 / §14.9.51.3 SR22 / §14.9.35.3 SR4 — <i>"If automatic locking has been specified
     /// for file-name-1, none of the phrases IGNORING LOCK, WITH LOCK, or WITH NO LOCK shall be specified."</i>
-    /// ONE screen for all three phrases, so the two brackets cannot drift apart on the rule that names both.</summary>
+    /// ONE screen for all three phrases, so the two brackets cannot drift apart on the rule that names both.
+    /// <para>The APPLY COMMIT twin rides the same screen for the same reason (kb/Work PB666): §14.9.30.3 SR5 forbids
+    /// all three phrases on a READ of a file subject to an APPLY COMMIT clause and §14.9.35.3 SR5 the two retention
+    /// phrases on a REWRITE. WRITE's format has the retention bracket and §14.9.51.3 states no such rule, so a
+    /// WRITE is not asked.</para></summary>
     private void ScreenLockPhraseAgainstAutomatic(FileModel file, string verb, string phrase)
     {
         if (file.LockMode is { Kind: LockKind.Automatic })
             ctx.Edition.Error("COBOLNET1512", $"{verb} on file '{file.CobolName}': the {phrase} phrase may not "
                 + "be specified when the file's LOCK MODE is AUTOMATIC — the lock is implicit "
                 + "(ISO §14.9.30.3 SR4 / §14.9.51.3 SR22 / §14.9.35.3 SR4)");
+        string? applyCommitRule = verb switch
+        {
+            "READ" => "ISO §14.9.30.3 SR5: \"If file-name-1 is subject to an APPLY COMMIT clause, none of the phrases "
+                + "IGNORING LOCK, WITH LOCK, or WITH NO LOCK shall be specified\"",
+            "REWRITE" => "ISO §14.9.35.3 SR5: \"If the rewrite file is subject to an APPLY COMMIT clause, neither the "
+                + "WITH LOCK phrase nor the WITH NO LOCK phrase shall be specified\"",
+            _ => null,
+        };
+        if (applyCommitRule is not null)
+            ctx.Data.ScreenApplyCommitSubject(file, true, $"{verb} with the {phrase} phrase", applyCommitRule);
     }
 
     /// <summary>Bind a RETRY phrase on a verb (READ/WRITE/REWRITE/DELETE) — the same shape as OPEN's, and the

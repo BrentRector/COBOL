@@ -1,6 +1,7 @@
 {
  "enabled": [
   "pb643_reserve_areas_all_organizations",
+  "pb1291_sd_record_from_into_85",
   "pb756_alternate_record_key_spellings",
   "pb351_delimited_conditional_operand",
   "pb1446_comma_point_literal_value_and_size",

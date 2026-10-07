@@ -854,7 +854,17 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         ConstructRegistry.Check(ctx.Edition.Edition, ctx.Edition.Sink,
             sig.Name == "EXCEPTION-FILE" ? Constructs.ExceptionFileArgument2023 : Constructs.ExceptionFileNArgument2023,
             $"FUNCTION {sig.Name}(file-connector-name)");
-        string name = argCtx.GetText().Trim();
+        // The argument is a FILE-NAME, so it is written alone (kb/Work PB2040): a qualified, subscripted or
+        // reference-modified reference is refused by the ONE file-name shape rule, never looked up by its glued
+        // text (`F OF G` → `FOFG`). Any other shape is no name at all and falls to the not-a-file refusal below.
+        string name;
+        if (SoleDataReference(argCtx) is { } dref)
+        {
+            if (ctx.Validation.ScreenFileNameOperand(dref, $"FUNCTION {sig.Name}") is not { } word)
+                return BoundExprError.Refused(ctx.Edition, $"FUNCTION {sig.Name} argument");
+            name = word;
+        }
+        else name = DataBinder.WrittenText(argCtx);
         // §15.28.3 r1 / §15.29.3 r1 (word for word): "Argument-1 is optional and when specified shall be the name of
         // a file connector that is specified in an FD statement." BOTH halves (kb/Work PB63): the name must be a
         // file-name, and that file must be FD-described — an SD (a sort-merge file description) or a SELECT with no

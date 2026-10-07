@@ -195,7 +195,7 @@ internal sealed class KeyedIoBinder(BinderContext ctx, StatementBinder host, Fil
     {
         string name = del.fileName().GetText();
         // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639).
-        if (!ctx.Validation.ResolveFile(name, "DELETE", out var file)) return BoundRejected.Reported(ctx.Edition);
+        if (!ctx.Validation.ResolveFile(del.fileName(), "DELETE", out var file)) return BoundRejected.Reported(ctx.Edition);
         // §13.4.6.3 SR3: an SD file (its SELECT may even carry ORGANIZATION RELATIVE/INDEXED) previously bound
         // and ran against an unregistered connector — the fail-open status read '00' (kb/Work PB140).
         if (ctx.Validation.ScreenSortMergeFile(file, "DELETE") is not null)
@@ -240,7 +240,7 @@ internal sealed class KeyedIoBinder(BinderContext ctx, StatementBinder host, Fil
             // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639). GR12's as-if
             // duplication means each name is its own statement, so a bad one drops its own element and the
             // others still bind.
-            if (!ctx.Validation.ResolveFile(name, "DELETE FILE", out var file)) continue;
+            if (!ctx.Validation.ResolveFile(fn, "DELETE FILE", out var file)) continue;
             // §14.9.10.3 SR3 / §13.4.6.3 SR3: DELETE FILE of the sort-merge file rejects at bind time —
             // it previously compiled and the statement's TWO status channels answered oppositely (kb/Work PB140).
             if (ctx.Validation.ScreenSortMergeFile(file, "DELETE FILE") is not null)
@@ -270,7 +270,7 @@ internal sealed class KeyedIoBinder(BinderContext ctx, StatementBinder host, Fil
     {
         string name = st.fileName().GetText();
         // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639).
-        if (!ctx.Validation.ResolveFile(name, "START", out var file)) return BoundRejected.Reported(ctx.Edition);
+        if (!ctx.Validation.ResolveFile(st.fileName(), "START", out var file)) return BoundRejected.Reported(ctx.Edition);
         // §9.1.19 / §13.4.6.3 SR3: "The only statements that may reference a sort file are the RELEASE, RETURN,
         // and SORT statements." START was the ONE keyed verb that skipped this screen (BindDelete,
         // BindDeleteFile, BindClose and SequentialIoBinder.UnsupportedOrg all call it — the PB140 consolidation),

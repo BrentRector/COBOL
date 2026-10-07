@@ -732,6 +732,20 @@ copy of it can only be a paraphrase, because a declaration cannot see the statem
 `conformance:OpenSharingLockModeTests` carries the two assertions no `.cob` corpus can make — that ONE violation
 draws exactly ONE diagnostic (a substring-matching `.err` is blind to a duplicate, which is how the second copy
 survived), and the APPLY COMMIT exemption, which needs the permissive axis.
+
+**SR8's antecedent family is enforced in its own right (kb/Work PB666).** The same fact, `SubjectToApplyCommit`,
+is the antecedent of six syntax rules of CLAIMED clauses and statements: §12.4.5.9.3 SR1 (LOCK MODE), §12.4.6.4.3
+SR11 (a SAME clause mixing subject and non-subject files), §14.9.27.3 SR7 (OPEN's sharing phrase), §14.9.30.3 SR5 and
+§14.9.35.3 SR5 (READ's and REWRITE's lock phrases) and §14.9.47.3 SR2 (UNLOCK). kb/Work PB371 recorded them CONFORMS
+"witnessed by the refusal of the antecedent", but that refusal (COBOLNET1709) is `PermissiveInert`, so under
+`--permissive` every forbidden shape compiled clean. They now report through ONE helper,
+`DataBinder.ScreenApplyCommitSubject` (COBOLNET2974), each caller quoting its own rule: the LOCK MODE arm as the
+APPLY COMMIT clause records the fact (the file control entries are bound first), SR11 after the whole I-O-CONTROL
+paragraph (an APPLY COMMIT clause may follow the SAME clause), SR7 in `BindOpen` beside SR8, the lock phrases in
+`FileLockBinder.ScreenLockPhraseAgainstAutomatic` (the one screen every lock phrase passes) and UNLOCK in
+`BindUnlock`. §12.4.6.4.4 GR3, the family's seventh member, is a general rule about an ACTIVE clause's sharing at run
+time, and no APPLY COMMIT clause is ever active here in either lane. Witness: `ApplyCommitSubjectRuleTests`, which
+compiles each `negative/apply-commit-*` fixture under `--permissive`.
 ### D14. ISO §14.9.27.4 Table 19 is a STRUCTURE, and it arbitrates EVERY OPEN — not only the connectors that declared a SHARING clause.
 
 **The rule.** §9.1.15 puts the gate on the physical file, not on the connectors that opted in: *"Before access
@@ -2604,6 +2618,49 @@ the subordinate / reference-modified / not-a-file-record faults, each `*> reject
 the acceptance twins `tests/conformance/2023/pb347_record_name_identity` and
 `tests/conformance/85/pb347_record_name_identity_85`, which pin that the qualified `OF` form still binds at all
 three verbs and that a SORT returns exactly the records RELEASE named. (kb/Work PB347)
+
+## The `file-name` operand — ONE resolution that takes the PARSE NODE, and ONE shape rule
+
+Every procedure-division statement that names a file resolves it through `StatementValidation.ResolveFile`
+(§8.4.2.1, COBOLNET1639 for a word that names no file; the §13.4.5.3 SR9 report-file screen beside it). It
+takes the operand's PARSE NODE, never a string, in two overloads for the two productions that reach it:
+
+- `fileName` (a bare `cobolWord`) — CLOSE, READ, START, DELETE, DELETE FILE, UNLOCK, RETURN. The grammar already
+  admits only the word.
+- `dataReference` — OPEN (`openFileSpec`), the SORT and MERGE subjects, and the SORT/MERGE USING and GIVING
+  lists. These positions share the production with a data-name (the SORT subject is a table in Format 2) or keep
+  a trailing phrase apart with it, so the parse is a superset and the overload asks
+  `StatementValidation.ScreenFileNameOperand` FIRST. FUNCTION EXCEPTION-FILE / EXCEPTION-FILE-N ask the same screen
+  of a sole-reference argument.
+
+**The shape rule (COBOLNET2972).** A file-name is a user-defined word naming a file connector and is written alone:
+§8.4.2.2.2 prints no qualified format for it (it appears only as the `file-report-qualifier` of another name), and
+subscripting (§8.4.2.3.1) and reference modification (§8.4.3.3.1) decorate identifiers. Until kb/Work PB2040 these
+callers handed the resolver `dataReference().GetText()` — ANTLR's GLUED text — so `OPEN OUTPUT A OF B` silently
+opened a file named `AOFB`, while SORT and MERGE took the base word and dropped the qualifier in silence. A position
+that may hold either a file-name or a data-name decides by the BASE WORD first and asks the shape only of the file
+reading: the SORT subject (a table's data-name-2 may be qualified), and the I-O-CONTROL APPLY COMMIT operand list
+(§12.4.6.3.2's `[file-name-1][identifier-1]`, where a qualified operand is simply identifier-1). Witnesses:
+`tests/conformance/negative/pb2040-*` (`*> reject-at: 85 2002 2014 2023`).
+
+## An SD's records in an input-output statement — §13.4.6.3 SR3 and SR4, two rules, two screens
+
+§13.4.6.3 SR3 keeps an SD **file-name** out of every input-output statement, and SR4 keeps its **record
+description entries** out of them "other than following the word FROM or the word INTO". The input-output
+statements are the eight §9.1.13.1 names as those whose execution sets the I-O status: CLOSE, DELETE (both
+formats), OPEN, READ, REWRITE, START, UNLOCK and WRITE.
+
+- SR3, and the WRITE / REWRITE record-name slot (where the record names its file): `StatementValidation.ScreenSortMergeFile`
+  (COBOLNET1692), asked by each verb binder of the file it resolved.
+- SR4 everywhere else: `StatementValidation.ScreenSortMergeRecordReferences` (COBOLNET2973), asked ONCE per
+  input-output statement by `StatementBinder.BindStatement`, the funnel every statement passes through. It walks the
+  statement's parse subtree, subscripts included, skipping the FROM / INTO phrases, the nested imperative statements
+  (each screened as its own statement) and the record-name / file-name operand itself, and refuses any reference
+  whose record is an SD record (the record description entry is the 01 and everything under it). A new operand
+  position in any of the eight is therefore screened without a verb binder remembering to ask: until kb/Work PB1291
+  only the record-name slot was, and `WRITE … AFTER ADVANCING SRT-N LINES`, a START KEY or a RETRY count naming an
+  SD item compiled clean. Witnesses: `tests/conformance/negative/pb1291-sd-record-advancing` and the permitted arm
+  `tests/conformance/85/pb1291_sd_record_from_into_85`.
 
 ## The COLLATING SEQUENCE clause — SR8 counts CLAUSES, not occurrences
 
