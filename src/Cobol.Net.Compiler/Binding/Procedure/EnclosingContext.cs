@@ -190,7 +190,7 @@ internal readonly struct EnclosingContext
 /// <c>if (PlacementRules.X(...)) return BoundRejected.Reported(ctx.Edition);</c> — the refusal the statement funnel
 /// verifies drew its error (kb/Work PB1029).</para>
 /// </summary>
-internal static class PlacementRules
+internal static partial class PlacementRules
 {
     /// <summary>ISO §14.9.18.3 SR1 (GOBACK) / §14.9.14.3 SR2 (EXIT Format 2) — "shall not be specified in a
     /// declarative procedure for which the GLOBAL phrase is specified in the associated USE statement".

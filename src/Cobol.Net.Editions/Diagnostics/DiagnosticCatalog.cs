@@ -6883,6 +6883,49 @@ public static class DiagnosticCatalog
         + "the reference one.",
         "ISO §8.4.3.9.3 SR2");
 
+    // ── The statement-SEQUENCE placement family (kb/Work PB397) ───────────────────────────────────────────
+    // Three syntax rules stated over a SEQUENCE of statements — which sentence a statement is in, whether that
+    // sentence is alone in its paragraph, where the statement stands in its consecutive run of imperative
+    // statements — and none was enforced anywhere: the binder knew SCOPE (section, method, enclosing PERFORM) and
+    // had no POSITION axis to ask them of. Each is accepted silently with no wrong value, which is exactly why
+    // the errors they exist to catch (a stray EXIT, a missing period, a GO TO written before the statements it
+    // was meant to follow) never show up as a symptom. All three are asked by ONE funnel check,
+    // PlacementRules.RefusedOutOfSequence, over one parse-tree position, StatementPosition.
+
+    /// <summary>COBOLNET2966 — §14.9.14.3 SR1: a Format 1 (simple) EXIT that is not a sentence by itself, or whose
+    /// sentence is not the only one in its paragraph.</summary>
+    public static readonly DiagnosticDescriptor ExitNotAlone = new(
+        "COBOLNET2966", "exit-not-alone", EditionSeverity.Error,
+        "A bare EXIT statement shares its sentence with another statement, is written inside another statement, or "
+        + "is in a paragraph (or a section without paragraphs) that has other sentences. ISO §14.9.14.3 SR1: \"The "
+        + "EXIT statement shall appear in a sentence by itself that shall be the only sentence in the paragraph or "
+        + "in a section without paragraphs.\" The statement only gives a procedure-name a point to name "
+        + "(§14.9.14.4 GR1): put it alone in its own paragraph, or write CONTINUE where a no-op statement is meant.",
+        "ISO §14.9.14.3 SR1");
+
+    /// <summary>COBOLNET2967 — §14.9.17.3 SR2: a Format 1 GO TO followed by another statement in its consecutive
+    /// sequence of imperative statements.</summary>
+    public static readonly DiagnosticDescriptor GoToNotLast = new(
+        "COBOLNET2967", "go-to-not-last", EditionSeverity.Error,
+        "A Format 1 GO TO statement is followed by another statement in the same consecutive sequence of imperative "
+        + "statements, so control never reaches that statement. ISO §14.9.17.3 SR2: \"If a GO TO statement "
+        + "represented by format 1 appears in a consecutive sequence of imperative statements within a sentence, it "
+        + "shall appear as the last statement in that sequence.\" Move the GO TO to the end of its sequence, or "
+        + "end the sentence with a period; a Format 2 (DEPENDING) GO TO may be followed by a statement.",
+        "ISO §14.9.17.3 SR2");
+
+    /// <summary>COBOLNET2968 — §14.9.42.3 SR1: a STOP statement followed by another statement in its block.</summary>
+    public static readonly DiagnosticDescriptor StopNotLast = new(
+        "COBOLNET2968", "stop-not-last", EditionSeverity.Error,
+        "A STOP statement is followed by another statement in the same block of code, so that statement can never "
+        + "execute. ISO §14.9.42.3 SR1: \"The STOP statement shall be specified only as the last statement in any "
+        + "discreet block of code.\" The standard does not define \"discreet block of code\"; this implementation "
+        + "reads it as the consecutive sequence of imperative statements (a "
+        + "sentence's statements, or the statements of one phrase of a conditional statement) that "
+        + "§14.9.17.3 SR2 states for GO TO and that IBM and Micro Focus document for STOP "
+        + "(docs/CONFORMANCE.md §3, D-SEQ).",
+        "ISO §14.9.42.3 SR1");
+
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

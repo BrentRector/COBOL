@@ -2443,7 +2443,10 @@
   "pb1421-perform-times-folded-numeric-function",
   "pb2087-strong-pointer-group-by-content",
   "pb2113-keyword-omitted-arguments-85",
-  "pb1968-subscript-unary-unary"
+  "pb1968-subscript-unary-unary",
+  "pb397-exit-not-alone",
+  "pb397-go-to-not-last",
+  "pb397-stop-not-last"
  ],
  "pending": []
 }

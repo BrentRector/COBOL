@@ -37206,13 +37206,13 @@
   "ordinal": 1,
   "subject": "EXIT statement",
   "rule-digest": "b4b28175008f",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ControlFlowBinder.cs#BindExit",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/StatementPosition.cs#RefusedOutOfSequence; src/Cobol.Net.Compiler/Binding/Procedure/StatementPosition.cs#StatementPosition; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs#BindStatement",
+  "test-ref": "conformance:negative/pb397-exit-not-alone; conformance:85/pb397_sequence_placement_legal; conformance-test:StatementSequencePlacementTests.BareExit_NotAloneInItsParagraph_IsRefused; conformance-test:StatementSequencePlacementTests.BareExit_InASentenceByItselfAloneInItsParagraph_IsAccepted; unit:StatementSequenceDriftTests.SentencesInParagraph_CountsTheParagraphsSentences",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work/PB397.md — CODE SITE DETAIL: ControlFlowBinder.cs#BindExit line 270 - the bare-EXIT arm returns `new BoundNop()` with no placement check; no other site in src/ tests the sentence/paragraph context of a Format-1 EXIT. EDITIONS NOTE: Format 1 is present in every edition. SR1 requires the Format-1 EXIT to be a sentence by itself AND the only sentence in its paragraph (or in a section without paragraphs). Nothing checks either half. PROBE out-b2/probe/sr1-exit-not-alone/p.cob — MAIN-PARA holds DISPLAY \"A\". / EXIT. / DISPLAY \"B\". / STOP RUN., four sentences — compiles clean at --std 2023 (exit 0, no diagnostic). Harm is under-rejection only: GR1 makes the accepted statement a no-op, so no wrong answer follows. The binder has the paragraph cursor it would need (ctx.BindCursor / ctx.Table.Paragraphs) but never consults it.  || CODE SITES (verbatim from the adjudication, kept because the schema's code-location is symbol-keyed, not line-keyed): src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ControlFlowBinder.cs#BindExit",
-  "state": "GAP"
+  "notes": "kb/Work PB397. A bare (Format 1) EXIT is refused (COBOLNET2966) unless it is the only statement of its sentence AND that sentence is the only one of its paragraph (section header runs and the procedure-division header run are paragraphs by 14.4.3, so a section without paragraphs is one such paragraph). Asked once by the statement funnel through StatementPosition, a parse-tree view; an EXIT written inside an IF or other statement is not in a sentence by itself. EXIT PERFORM/PARAGRAPH/SECTION/PROGRAM are Formats 2-4 and not governed.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.14.3-2",
@@ -37701,13 +37701,13 @@
   "ordinal": 2,
   "subject": "GO TO statement",
   "rule-digest": "05fa3075759b",
-  "verdict": "NOT-IMPLEMENTED",
-  "code-location": "",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/StatementPosition.cs#RefusedOutOfSequence; src/Cobol.Net.Compiler/Binding/Procedure/StatementPosition.cs#StatementPosition; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs#BindStatement",
+  "test-ref": "conformance:negative/pb397-go-to-not-last; conformance:85/pb397_sequence_placement_legal; conformance:85/pb413_go_to_out_of_inline_perform; conformance-test:StatementSequencePlacementTests.Format1GoTo_FollowedByAStatement_IsRefused; conformance-test:StatementSequencePlacementTests.Format1GoTo_LastInItsSequence_IsAccepted",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work/PB397.md — Nothing implements this rule anywhere. Searched src/ for the rule text ('consecutive sequence', 'last statement in that sequence') -- no hit -- and for the clause number: the ONLY '14.9.17.3' citation in src/ is EcBinder.ExceptionPerform.cs's SR3 ban. The only shape check on goToStatement, VersionConformancePass.VisitGoToStatement, tests just the bare-form edition gate. Consequence: 'DISPLAY \"START\" GO TO PARA-A DISPLAY \"AFTER-GO-TO\".' -- one sentence, three imperative statements, the format-1 GO TO not last -- compiles clean and runs, printing START then A-TAKEN (probe p6, at --std 85 and 2023). Under-rejection only: the statements after the GO TO are unreachable, so no wrong answer is produced; the cost is that a real coding error passes silently. Finding F5. Probe: scratchpad/lane3/out-b2/probe/go-to/p6-not-last.cob.",
-  "state": "GAP"
+  "notes": "kb/Work PB397. A Format 1 GO TO followed by another statement in the same consecutive sequence of imperative statements (a sentence's statements, or the statements of one phrase of a conditional or delimited-scope statement) is refused (COBOLNET2967). The Format 2 DEPENDING GO TO is not constrained; the 1985 target-less GO TO is that edition's Format 1 and is covered. One existing golden (85/pb413_go_to_out_of_inline_perform) wrote the GO TO beside a following DISPLAY on purpose and was corrected to put the GO TO in an IF phrase.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.17.3-3",
@@ -47061,13 +47061,13 @@
   "ordinal": 1,
   "subject": "STOP statement",
   "rule-digest": "aa171e415d99",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ControlFlowBinder.cs#BindStop",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/StatementPosition.cs#RefusedOutOfSequence; src/Cobol.Net.Compiler/Binding/Procedure/StatementPosition.cs#StatementPosition; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs#BindStatement",
+  "test-ref": "conformance:negative/pb397-stop-not-last; conformance:85/pb397_sequence_placement_legal; conformance-test:StatementSequencePlacementTests.Stop_FollowedByAStatement_IsRefused; conformance-test:StatementSequencePlacementTests.Stop_LastInItsBlock_IsAccepted; conformance-test:StatementSequencePlacementTests.StopLiteral_FollowedByAStatement_IsAccepted",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB397 (registrar 14c). cite.py --check 14.9.42.3 \"The STOP statement shall be specified only as the last statement in any discreet block of code.\" -> OK §14.9.42.3 1); cite.py --check 4.2.2 'An implementation shall provide a warning mechanism ... to indicate violations of the general formats and the explicit syntax rules' -> OK. Searched src/Cobol.Net.* for any placement check (last statement / sequence of imperative / 14.9.42.3 SR1): none. Probes: p10 'STOP RUN' followed by 'DISPLAY \"NEXT\".' in the same sentence and p11 'IF WS-A = 1 STOP RUN DISPLAY \"IN-IF\" END-IF.' both compile rc=0 with NO diagnostic (2023 and --std 85). Expected: a diagnostic naming §14.9.42.3 SR1 (at minimum the §4.2.2 warning). Same mechanism as OPEN kb/Work PB397 (the binder has no sentence / statement-sequence position model; bare EXIT SR1 and GO TO §14.9.17.3 SR2 unenforced - probe q3 'GO TO P2 DISPLAY \"UNREACH\".' also compiles clean); this row is NOT in PB397's inventory_rows - extend that note. [editions as adjudicated: 1985, 2002, 2014, 2023 (STOP RUN is in every edition; §14.9.42 of the 2023 text)]",
-  "state": "GAP"
+  "notes": "Train-1031 lander review (kb/Work PB397): the rule governs STOP RUN, the only STOP of 14.9.42. The X3.23-1985 STOP literal (deleted 2002) communicates to the operator and continues with the next statement, so a statement after it executes and it is not refused (it was, at 85, before this correction); StopLiteral_FollowedByAStatement_IsAccepted and the 85 golden's AFTER-STOP-LITERAL line pin it. retired-witness: conformance-test:StatementSequencePlacementTests.StopLiteral_FollowedByAStatement_IsRefused (renamed StopLiteral_FollowedByAStatement_IsAccepted by the train-1031 review: the 1985 STOP literal continues with the next statement, so SR1 does not govern it)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.42.3-2",

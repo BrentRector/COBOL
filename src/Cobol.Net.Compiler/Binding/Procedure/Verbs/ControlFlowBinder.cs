@@ -310,6 +310,11 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
     ///         header", so EVERY sentence of a procedure division is in a paragraph and SR10 admits no violating
     ///         program. A screen here would be dead code that could only ever reject legal source.</item>
     /// </list>
+    /// <para>⛔ <b>SR1</b> ("The EXIT statement shall appear in a sentence by itself that shall be the only sentence in
+    /// the paragraph or in a section without paragraphs", Format 1) is NOT asked here, and neither are GO TO's
+    /// §14.9.17.3 SR2 and STOP's §14.9.42.3 SR1: all three are stated over a statement SEQUENCE, which is a fact
+    /// of the parse tree and not of the bind cursor, so they are asked once for every statement by the funnel
+    /// (<c>PlacementRules.RefusedOutOfSequence</c> over <c>StatementPosition</c>; kb/Work PB397).</para>
     /// SR2 ("shall not be specified in a declarative procedure for which the GLOBAL phrase is specified") and
     /// SR6 (the RAISING LAST placement) are the remaining §14.9.14.3 placement rules; both are stated again for
     /// GOBACK by §14.9.18.3 SR1/SR5 over the SHARED raising binder, so they are one cluster with the GOBACK verb
@@ -380,7 +385,7 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
         }
         if (e.METHOD() is not null) return host.Oo.OoBindExitMethod(e);   // method-return synonym ≤2014; 0902 at 2023 (validator)
         if (e.FUNCTION() is not null) return host.Udf.UdfBindExitFunction(e);   // function-return synonym ≤2014; 0900/0902 window (validator)
-        return new BoundNop();   // bare EXIT
+        return new BoundNop();   // bare EXIT (§14.9.14.4 GR1); its SR1 placement is asked by the funnel, see above
     }
 
 

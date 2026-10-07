@@ -116,6 +116,32 @@ of an unsupported facility.
 
 ## 3. Behavior determinations (§4.2.6 / Annex E — pinned implementor choices)
 
+- **D-SEQ — the statement-sequence placement rules, and what "a discreet block of code" is** (kb/Work PB397).
+  Three syntax rules are stated over a SEQUENCE of statements and are refused at compile time at every edition
+  (none carries an edition qualifier): §14.9.14.3 SR1 — a Format 1 (bare) EXIT "shall appear in a sentence by itself
+  that shall be the only sentence in the paragraph or in a section without paragraphs" (COBOLNET2966); §14.9.17.3 SR2
+  — a Format 1 GO TO appearing "in a consecutive sequence of imperative statements within a sentence … shall appear as
+  the last statement in that sequence" (COBOLNET2967); §14.9.42.3 SR1 — "The STOP statement shall be specified only as
+  the last statement in any discreet block of code" (COBOLNET2968). **(a) The sequence** is the parse tree's: the
+  statements of one sentence, or the statements of one phrase of a conditional or delimited-scope statement (an IF
+  THEN or ELSE phrase, an inline PERFORM body, an ON SIZE ERROR phrase); so `IF A GO TO P END-IF DISPLAY "X"` is legal
+  (the GO TO ends its own phrase) and `IF A GO TO P DISPLAY "X" END-IF` is not. **(b) "A discreet block of code"**
+  is undefined by the standard (the spelling is the printed one); the implementor latitude is settled by CLAUDE.md
+  rule 1's order: the standard does not decide, GnuCOBOL 3.2 compiles all four violating shapes without a diagnostic (measured), and IBM Enterprise COBOL and Micro Focus
+  document the STOP rule as a statement last in "a sequence of imperative statements within a sentence" — so the block
+  is read as the SAME sequence §14.9.17.3 SR2 names, for STOP RUN. "The STOP statement" of §14.9.42 is STOP RUN alone;
+  the X3.23-1985 STOP literal (deleted 2002) communicates to the operator and then CONTINUES with the next statement,
+  so a statement after it executes and it is not governed (`STOP "HALT" DISPLAY "A".` compiles at 85). A narrower reading (only sentence-level
+  sequences) would admit `IF A STOP RUN DISPLAY "X" END-IF`, whose DISPLAY can never execute. **(c) Format 1 GO TO**
+  includes the 1985 target-less `GO TO.` (that edition's Format 1; its procedure-name is optional there); the
+  Format 2 DEPENDING GO TO is not constrained, since control falls through when no name is selected (§14.9.17.4 GR2).
+  **(d) An EXIT inside another statement** (`IF A EXIT END-IF`) is not "in a sentence by itself": the sentence is the
+  IF. A paragraph is §14.4.3's, so the sentences after a section header or the procedure division header form one
+  (unnamed) paragraph and a section without paragraphs is one such paragraph. Witnesses:
+  `conformance:negative/pb397-exit-not-alone`, `conformance:negative/pb397-go-to-not-last`,
+  `conformance:negative/pb397-stop-not-last`, `conformance:85/pb397_sequence_placement_legal`,
+  `conformance-test:StatementSequencePlacementTests`.
+
 - **D-PROP — what `>>PROPAGATE ON` propagates, and from where** (kb/Work PB1119). §7.3.21.4 GR2 says "any exception
   condition raised and not handled … shall be propagated as though a GOBACK RAISING LAST statement were executed",
   while the two processing orders it feeds name the directive in exactly two places: §14.6.13.1.3 6) for a FATAL

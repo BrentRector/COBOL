@@ -24,6 +24,8 @@
       *>   MAIN-P      GO TO with no enclosing lowered container (the control that always worked).
       *>   T1-TIMES    PERFORM n TIMES        -> C# for      : leaves on N = 2, T1-TAIL is never reached.
       *>   T2-BARE     bare inline PERFORM    -> C# do/while : leaves before T2-MID, T2-TAIL never reached.
+      *>               (The GO TO is the whole THEN phrase of an IF: written beside T2-MID in one sequence it would
+      *>               violate 14.9.17.3 SR2, "it shall appear as the last statement in that sequence" - kb/Work PB397.)
       *>   T3-VARYING  PERFORM VARYING/AFTER  -> nested while: leaves EVERY level from the inner one.
       *>   T4-UNTIL    PERFORM UNTIL + an EVALUATE inside it -> the WHEN arm's GO TO leaves both.
       *>   T5-AFTER    PERFORM WITH TEST AFTER-> C# do/while : leaves on the first body execution.
@@ -60,7 +62,9 @@
            DISPLAY "T2 " N.
            PERFORM
                ADD 1 TO N
-               GO TO T3-VARYING
+               IF N > 0
+                   GO TO T3-VARYING
+               END-IF
                DISPLAY "T2-MID-MUST-NOT"
            END-PERFORM.
            DISPLAY "T2-TAIL-MUST-NOT".
