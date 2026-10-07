@@ -517,8 +517,8 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         bool senderIsFunction = source is BoundComputedOperand { Expr: BoundIntrinsicCall };
         bool senderIsView = source is BoundFieldOperand { Place: RefModPlace };
         if (ctx.Edition.Permissive
-            && MoveTable16.Refusal(Table16Operand.Lenient(senderPos, senderIsFunction, senderIsView),
-                                   Table16Operand.Lenient(Table16Operand.Of(t), false, t is RefModPlace)) is null)
+            && MoveValidity.Table16Refusal(Table16Operand.Lenient(senderPos, senderIsFunction, senderIsView).Heading,
+                Table16Operand.Lenient(Table16Operand.Of(t), false, t is RefModPlace).Heading) is null)
             ctx.Edition.Warning("COBOLNET0819", $"{where}: {refusal}; accepted under --permissive "
                 + (senderIsFunction ? "as the function's literal text (a NUMERIC-typed function is the Noninteger sender, ISO §15.2 item 4)"
                                     : "reading the reference-modified view as plain alphanumeric (ISO §8.4.3.3.4 GR6 keeps it alphabetic)"));

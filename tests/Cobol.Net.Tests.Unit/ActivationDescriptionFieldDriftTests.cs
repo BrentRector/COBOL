@@ -39,6 +39,7 @@ public sealed class ActivationDescriptionFieldDriftTests
         {
             Shape = ActivationShape.ObjectReference, Category = "c", Clauses = "k", LocaleExternal = "en-US",
             LocaleFromLiteral = true, AnyLength = true, Positions = 7, Usage = "u", StrongType = "s",
+            Table16 = Table16Category.NumericNoninteger, BinaryWidth = true,
             Atoms = [new GroupAtom(GroupAtomKind.Fixed, 7, 7)], ObjectKind = ObjectReferenceKind.ObjectClass, ObjectName = "C", Factory = true,
             Only = true, Optional = true, ByValue = true,
         };

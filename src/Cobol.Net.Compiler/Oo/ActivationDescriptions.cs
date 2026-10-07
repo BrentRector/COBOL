@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 
+using CobolNet.Binding;
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
 using CobolNet.Runtime;
@@ -49,6 +50,7 @@ public static class ActivationDescriptions
                 Category = item.GroupUsage is GroupUsage.Bit ? ActivationCategory.Boolean : ActivationCategory.National,
                 Usage = item.GroupUsage is GroupUsage.Bit ? nameof(Usage.Bit) : nameof(Usage.National),
                 Positions = item.AsIfPic!.Length,
+                Table16 = Table16Operand.Of(item).Heading,
             };
         if (item.IsGroup)
         {
@@ -103,6 +105,9 @@ public static class ActivationDescriptions
             Positions = p.Length,
             LocaleExternal = p.LocaleEdit?.Locale.Named?.External,
             LocaleFromLiteral = p.LocaleEdit?.Locale.Named?.FromLiteral ?? false,
+            // An index item is class index (§8.5.2.1 Table 2), which SR1 keeps out of every MOVE, so it has no heading.
+            Table16 = p.Usage is Usage.Index ? Table16Category.None : Table16Operand.Of(item).Heading,
+            BinaryWidth = MoveTable16.IsBinaryWidth(item),
         };
     }
 
@@ -128,6 +133,8 @@ public static class ActivationDescriptions
             Category = category,
             Usage = r.Inner.Item.OperandPic?.Usage.ToString() ?? "",
             Positions = r.StaticLength(r.Inner.Item.OperandPic?.Length) ?? 0,
+            // GR6's category, with the alphabetic rider the ONE ref-mod Table-16 reader keeps (kb/Work PB73).
+            Table16 = Table16Operand.Of(r).Heading,
         };
     }
 

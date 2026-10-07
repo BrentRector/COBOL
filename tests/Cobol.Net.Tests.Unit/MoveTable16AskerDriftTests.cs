@@ -43,8 +43,9 @@ public sealed class MoveTable16AskerDriftTests
     }
 
     /// <summary>
-    /// The askers of TABLE 16 ALONE (<c>MoveTable16.Refusal</c>) outside the class, each with the reason the whole
-    /// chain is not the question it asks. The list can only shrink: a new caller fails here and must either ask
+    /// The compiler's askers of TABLE 16 ALONE (<c>MoveValidity.Table16Refusal</c>, the table's one home, in the
+    /// runtime since kb/Work PB2076) outside MoveTable16, each with the reason the whole chain is not the question it
+    /// asks. The list can only shrink: a new caller fails here and must either ask
     /// <c>Validity</c> or say why its sender has no data item and no shape for SR2/SR6–SR9 to read.
     /// </summary>
     private static readonly Dictionary<string, string> TableOnlyAskers = new(StringComparer.Ordinal)
@@ -69,7 +70,7 @@ public sealed class MoveTable16AskerDriftTests
             Path.Combine(TestRepo.Src("Cobol.Net.Compiler"), "Binding", "Procedure", "Verbs", "AcceptDisplayBinder.cs")));
         Assert.Matches(@"\bMoveTable16\s*\.\s*Validity\s*\(", src);
         Assert.Matches(@"\bBindMoveOf\s*\([^;]*ImplicitMovePhrase\s*\.\s*AcceptTemporal", src);
-        Assert.DoesNotMatch(@"\bMoveTable16\s*\.\s*Refusal\s*\(", src);
+        Assert.DoesNotMatch(@"\bMoveValidity\s*\.\s*Table16Refusal\s*\(", src);
     }
 
     [Fact]
@@ -81,17 +82,17 @@ public sealed class MoveTable16AskerDriftTests
         {
             if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                 || Path.GetFileName(file) == "MoveTable16.cs") continue;
-            int n = Regex.Matches(StripComments(File.ReadAllText(file)), @"\bMoveTable16\s*\.\s*Refusal\s*\(").Count;
+            int n = Regex.Matches(StripComments(File.ReadAllText(file)), @"\bMoveValidity\s*\.\s*Table16Refusal\s*\(").Count;
             if (n > 0) found[Path.GetFileName(file)] = n;
         }
         var unexpected = found.Keys.Where(f => !TableOnlyAskers.ContainsKey(f)).ToList();
         Assert.True(unexpected.Count == 0,
-            $"MoveTable16.Refusal (Table 16 ALONE) is called from {string.Join(", ", unexpected)}. §14.9.25.3 SR10 "
+            $"MoveValidity.Table16Refusal (Table 16 ALONE) is called from {string.Join(", ", unexpected)}. §14.9.25.3 SR10 "
             + "applies only \"for all other cases not described in Syntax rules 8 and 9\", so an asker holding a "
             + "data-item or bound-operand sender asks MoveTable16.Validity — the whole chain (kb/Work PB878).");
         var stale = TableOnlyAskers.Keys.Where(f => !found.ContainsKey(f)).ToList();
         Assert.True(stale.Count == 0,
-            $"TableOnlyAskers names {string.Join(", ", stale)}, which no longer call MoveTable16.Refusal — remove "
+            $"TableOnlyAskers names {string.Join(", ", stale)}, which no longer call MoveValidity.Table16Refusal — remove "
             + "the entry so the list stays a statement of fact.");
     }
 

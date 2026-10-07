@@ -125,22 +125,81 @@ public static class ActivationRelations
         };
     }
 
-    /// <summary>ISO §9.3.6 match rules 6 and 7: the method's returning item <paramref name="sending"/> "may be a sending
-    /// item in a SET statement" (an OBJECT REFERENCE, POINTER or INDEX returning item of the invocation,
-    /// <paramref name="receiving"/>) or "in a MOVE statement" (every other one). A SET admits only the same reference
-    /// class; a MOVE admits none of them. Which object classes a SET admits is a run-time question through a universal
-    /// receiver, decided at the delivery (<see cref="CobolObject.NarrowUniversal{T}"/>).</summary>
+    /// <summary>ISO §9.3.6 match rules 6 and 7, split on the INVOCATION's returning item <paramref name="receiving"/>:
+    /// when it is "usage OBJECT REFERENCE, POINTER or INDEX" the method's returning item <paramref name="sending"/> "may
+    /// be a sending item in a SET statement with the returning item as the receiving item" (rule 6,
+    /// <see cref="MaySet"/>), otherwise it "may be a sending item in a MOVE statement" (rule 7, <see cref="MayMove"/>).
+    /// "May be" is the statement's VALIDITY — its syntax rules over the two descriptions — not only which statement
+    /// applies: a method returning <c>PIC 9V99</c> does not match an invocation returning <c>PIC X(4)</c> (Table 16:
+    /// Numeric Noninteger → Alphanumeric is "No"), so the search goes on up the INHERITS chain and ends in EC-OO-METHOD
+    /// (§9.3.6 6)) rather than binding the method and failing its §14.8.3 conformance (kb/Work PB2076).</summary>
     public static bool ReturningMatches(ActivationDescription receiving, ActivationDescription sending) =>
-        string.Equals(SetClass(receiving), SetClass(sending), StringComparison.Ordinal);
+        SetClass(receiving) is { } setClass ? MaySet(setClass, receiving, sending) : MayMove(sending, receiving);
 
-    /// <summary>The SET class of a returning description (§9.3.6 rules 6 / 7): "object", a pointer category, "index",
-    /// or the empty string for a description received by a MOVE.</summary>
-    private static string SetClass(ActivationDescription d) =>
+    /// <summary>The class a SET statement receives a description into (§9.3.6 rule 6's "usage OBJECT REFERENCE,
+    /// POINTER or INDEX"; POINTER read as the class, §8.5.2.1 Table 2's three pointer categories, since a
+    /// program-pointer or function-pointer receiver is no MOVE operand either, §14.9.25.3 SR1): "object", the pointer
+    /// category, "index" — or null for a description a MOVE receives.</summary>
+    private static string? SetClass(ActivationDescription d) =>
         d.Shape is ActivationShape.ObjectReference ? ActivationCategory.Object
         : d.Shape is ActivationShape.Elementary && d.Category is ActivationCategory.DataPointer
             or ActivationCategory.ProgramPointer or ActivationCategory.FunctionPointer or ActivationCategory.Index
             ? d.Category
-            : "";
+            : null;
+
+    /// <summary>§9.3.6 rule 6: is a SET of <paramref name="sending"/> into <paramref name="receiving"/> (of SET class
+    /// <paramref name="setClass"/>) valid by ISO §14.9.39.3?
+    /// <list type="bullet">
+    /// <item>object — Format 5 SR9: "Identifier-4 shall be an object reference". ⚠ SR10–SR14's CLASS conditions (the
+    /// sender's class the receiver's class or a subclass, an interface it implements, the ONLY and FACTORY phrases) are
+    /// NOT asked here: a description carries a class NAME and the run time has no class hierarchy to read it against,
+    /// so an unrelated class matches and the delivery refuses the object (<see cref="CobolObject.NarrowUniversal{T}"/>,
+    /// EC-OO-UNIVERSAL where rule 6 makes it a non-match, EC-OO-METHOD) — kb/Work PB2463.</item>
+    /// <item>index — Format 1 SR2: "Identifier-2 shall reference a data item of class index".</item>
+    /// <item>data-pointer — Format 7 SR17 / SR19: a data-pointer, and a restricted one on either side needs the other
+    /// "restricted to the same type".</item>
+    /// <item>program-pointer — Format 9 SR21 / SR22: a program-pointer, and a RESTRICTED receiver needs a sender whose
+    /// program-prototype has the same signature; an unrestricted receiver takes any.</item>
+    /// <item>function-pointer — Format 8 SR20: "The function-prototypes associated with identifier-12 and
+    /// identifier-13 shall have the same signature".</item>
+    /// </list>
+    /// A pointer's restriction is its USAGE clause's TO phrase as <see cref="ActivationDescription.Clauses"/> carries
+    /// it ("*" for none): the prototype's NAME, so two differently named prototypes of one signature do not match (kb/Work PB2464).</summary>
+    private static bool MaySet(string setClass, ActivationDescription receiving, ActivationDescription sending)
+    {
+        if (!string.Equals(SetClass(sending), setClass, StringComparison.Ordinal)) return false;
+        return setClass switch
+        {
+            ActivationCategory.ProgramPointer => receiving.Clauses == Unrestricted
+                                                 || string.Equals(receiving.Clauses, sending.Clauses, StringComparison.Ordinal),
+            ActivationCategory.DataPointer or ActivationCategory.FunctionPointer =>
+                string.Equals(receiving.Clauses, sending.Clauses, StringComparison.Ordinal),
+            _ => true,
+        };
+    }
+
+    /// <summary>The <see cref="ActivationDescription.Clauses"/> of a class pointer described without a TO phrase.</summary>
+    private const string Unrestricted = "*";
+
+    /// <summary>§9.3.6 rule 7: is a MOVE of <paramref name="sending"/> to <paramref name="receiving"/> valid by ISO
+    /// §14.9.25.3? Its syntax rules over two data items, in SR order: SR1 (neither of class index, object or pointer —
+    /// the receiving side is not, or rule 6 would apply), SR2 (a strongly-typed group receiver takes only a group of the
+    /// same type), SR8 (a binary-char/-short/-long/-double sender needs a numeric or numeric-edited receiver), SR9
+    /// (a variable-length group only to or from a compatible group, §8.5.1.12) and SR10 (Table 16). SR8 and SR10 are
+    /// the ONE copy the compiler's MOVE screens read (<see cref="MoveValidity"/>).</summary>
+    private static bool MayMove(ActivationDescription sending, ActivationDescription receiving)
+    {
+        if (SetClass(sending) is not null) return false;                                                    // SR1
+        if (receiving.Shape is ActivationShape.StrongGroup
+            && (sending.Shape is not ActivationShape.StrongGroup
+                || !string.Equals(receiving.StrongType, sending.StrongType, StringComparison.Ordinal)))
+            return false;                                                                                     // SR2
+        if (MoveValidity.BinaryWidthRefusal(sending.BinaryWidth, receiving.Table16) is not null) return false; // SR8
+        if ((sending.Shape is ActivationShape.VariableLengthGroup || receiving.Shape is ActivationShape.VariableLengthGroup)
+            && VariableLengthViolation(sending, receiving, "sending item", "receiving item") is not null)
+            return false;                                                                                     // SR9
+        return MoveValidity.Table16Refusal(sending.Table16, receiving.Table16) is null;                       // SR10
+    }
 
     /// <summary>ISO §14.8.3 for the returning item of a method §9.3.6 has BOUND (§14.9.23.4 GR7 c)):
     /// <paramref name="sending"/> is the method's returning item, <paramref name="receiving"/> the invocation's. Null when

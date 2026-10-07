@@ -319,7 +319,7 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
     /// <para>⚠ A REFUSAL IS A SILENT NON-SELECTION, NEVER A DIAGNOSTIC. §14.7.6 defines which pairs CORRESPOND;
     /// a pair whose implied move would be invalid simply is not one, so the receiving item keeps its prior
     /// content and the direct-MOVE COBOLNET0819 must not fire from here. That is why this reads
-    /// <see cref="MoveTable16.Refusal"/>'s null-ness and discards its message.</para>
+    /// <see cref="MoveValidity.Table16Refusal"/>'s null-ness and discards its message.</para>
     /// <para>⚠ THE ≥2002 DE-EDITING GATE THE PRIVATE COPY CARRIED IS GONE, DELIBERATELY. It admitted a
     /// numeric-edited sender into a numeric receiver only at <c>--std</c> 2002 and above, with no citation and
     /// no row in <c>docs/VERSION_CHANGE_REFERENCE.md</c>, while the direct MOVE through this same table admits
@@ -327,7 +327,7 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
     /// <see cref="MoveTable16"/>, where BOTH askers would get it, behind a sourced VCR row.</para>
     /// <para>⛔ AND IT ASKS THE WHOLE QUESTION, NOT ONLY TABLE 16 (kb/Work PB391, second half). Rule 2 says
     /// "the rules for the MOVE statement", and §14.9.25.3 SR10 — the rule that routes to Table 16 — governs only
-    /// <i>"all other cases not described in Syntax rules 8 and 9"</i>. Asking <see cref="MoveTable16.Refusal"/>
+    /// <i>"all other cases not described in Syntax rules 8 and 9"</i>. Asking <see cref="MoveValidity.Table16Refusal"/>
     /// alone therefore skipped SR8 (a <c>BINARY-CHAR</c>/<c>-SHORT</c>/<c>-LONG</c>/<c>-DOUBLE</c> sender needs a
     /// numeric or numeric-edited receiver) and SR9 (a variable-length group operand needs a compatible group on
     /// the other side), both MEASURED wrong: <c>MOVE CORRESPONDING</c> over a <c>BINARY-LONG</c> K and a

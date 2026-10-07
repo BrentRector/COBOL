@@ -76,10 +76,11 @@ public abstract class CobolObject
 
     /// <summary>Deliver an object reference that crossed a UNIVERSAL invocation (D10) into a receiving item of type
     /// <typeparamref name="T"/>. The delivery follows the SET rules (§14.8.3.3 rule 1), and through a universal
-    /// receiver the class of the object is a RUNTIME fact: a method written in COBOL is admitted only when its
-    /// descriptor equals the caller's (so this always succeeds for it), but the standard class BASE's New and
-    /// FactoryObject return ACTIVE-CLASS results (§16.2) whose class is the receiver's own, which only the object
-    /// can answer. A non-conforming object is §14.9.23.4 GR7c's EC-OO-UNIVERSAL when the activator checks for it,
+    /// receiver the class of the object is a RUNTIME fact: the §9.3.6 rule 6 match
+    /// (<see cref="ActivationRelations.ReturningMatches"/>) asks only that both returning items are object references,
+    /// so a method written in COBOL whose returning item names an unrelated class reaches this delivery too, and the
+    /// standard class BASE's New and FactoryObject return ACTIVE-CLASS results (§16.2) whose class is the receiver's
+    /// own, which only the object can answer. A non-conforming object is §14.9.23.4 GR7c's EC-OO-UNIVERSAL when the activator checks for it,
     /// and otherwise still cannot proceed into typed code (<see cref="CobolImplementorFatalException"/>) — never an
     /// unchecked cast's InvalidCastException.</summary>
     public static T? NarrowUniversal<T>(object? value, string what) where T : class

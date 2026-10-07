@@ -425,8 +425,16 @@ prescribes (kb/Work PB1500):
   asked through `CobolObject.__InstanceClassType` / `__FactoryClassType`, which every emitted class half overrides; any
   other argument the same class and category, 3 c), and the same 3 e) clauses — a group carries none, so two groups
   match whatever their sizes and a group never matches an `X(n)`; a strongly-typed group's category is its type-name,
-  §8.5.2.1) and rules 6/7 for the RETURNING items (the same SET class — object, a pointer category, index — or both
-  MOVE-received). A method that does not match is NOT bound: its case `break`s out of the switch into
+  §8.5.2.1) and rules 6/7 for the RETURNING items, split on the invocation's item: an OBJECT REFERENCE, POINTER or
+  INDEX one needs a method item that "may be a sending item in a SET statement" — the same SET class, and for a pointer
+  §14.9.39.3's restriction rules (SR19 both directions for a data-pointer, SR22 for a restricted program-pointer
+  receiver, SR20 for a function-pointer) over the USAGE TO phrase the description carries — and every other one a
+  method item that "may be a sending item in a MOVE statement": §14.9.25.3 SR1, SR2 (strong type), SR8 (the
+  fixed-width binary sender), SR9 (§8.5.1.12) and SR10's Table 16, the last two read from the ONE copy both phases
+  share, `Runtime/Values/MoveValidity` (the compiler's `MoveTable16` chain asks it through `Table16Operand.Heading`;
+  each description carries its `Table16` heading and `BinaryWidth`; kb/Work PB2076). A MOVE-valid pair that §14.8.3.3
+  then refuses (a `9(4)` method item into a `9(8)`) is bound and raises EC-OO-UNIVERSAL under GR7 c); a MOVE-invalid
+  one (a `9V99` into an `X(4)`) is not bound. A method that does not match is NOT bound: its case `break`s out of the switch into
   `base.__CobolInvoke`, the search continues up the INHERITS chain (§9.3.6 2)/4)), and the CobolObject root sets
   EC-OO-METHOD (§9.3.6 6)) — a declarative on EC-OO-METHOD selects it. The standard class BASE's New and FactoryObject
   match the same way (`StandardMethodCrossing.Matches`).
@@ -494,9 +502,14 @@ only a group formal of its class. Drift protection: `PictureClauseIdentityDriftT
 numeric-edited included) and `ActivationDescriptionFieldDriftTests` (every description field is read by a relation or
 the carrier and spelled by the renderer); the goldens `conformance:2002/pb480_universal_match_relations`,
 `conformance:2002/pb1112_active_class_universal`, `conformance:2014/pb480_universal_variable_length` and
-`conformance:2014/pb480_universal_variable_length_shapes` pin each arm.
-**Residue:** rule 7's MOVE-class RETURNING match admits every non-reference pair, so a MOVE-illegal pair surfaces as
-EC-OO-UNIVERSAL rather than EC-OO-METHOD (kb/Work PB2076).
+`conformance:2014/pb480_universal_variable_length_shapes` pin each arm, and
+`conformance:2002/pb2076_universal_returning_move_match` rules 6 and 7; `Table16PrintedTableDriftTests` holds the one
+Table 16 to the printed table cell for cell.
+**Residue:** rule 6 for an OBJECT REFERENCE returning item asks only that both items are object references: §14.9.39.3
+SR10–SR14's class conditions need the class hierarchy, which a description (a class NAME) does not carry, so a method
+returning an unrelated class matches and the delivery (`CobolObject.NarrowUniversal`) raises EC-OO-UNIVERSAL where the
+rule makes it EC-OO-METHOD (kb/Work PB2463). A pointer's restriction is compared by prototype NAME, so two differently
+named prototypes of one signature do not match (kb/Work PB2464).
 
 ### D12. Parameterized classes and interfaces (§9.3.12 / §9.3.13) are EXPANDED, one ordinary class per expansion — never C# generics; the parameterized definition itself is a skeleton that binds and emits nothing.
 

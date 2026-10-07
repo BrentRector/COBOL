@@ -127,6 +127,18 @@ public sealed record ActivationDescription
     /// national group, the usage its GROUP-USAGE gives its positions.</summary>
     public string Usage { get; init; } = "";
 
+    /// <summary>The item's heading in ISO §14.9.25.3 Table 16 — an elementary item's, a bit / national group's as-if
+    /// PICTURE's (§13.18.29.4 GR1 b) / GR2 b)) — or <see cref="Table16Category.None"/> for a group and for every class
+    /// SR1 governs. §9.3.6 match rule 7's "may be a sending item in a MOVE statement" reads it
+    /// (<see cref="MoveValidity.Table16Refusal"/>; kb/Work PB2076). The compiler derives it through the ONE mapping its
+    /// own MOVE screens use (<c>Table16Operand.Heading</c>).</summary>
+    public Table16Category Table16 { get; init; }
+
+    /// <summary>True when the item is described with usage binary-char, binary-short, binary-long or binary-double —
+    /// §14.9.25.3 SR8's antecedent, which a MOVE from it needs a numeric or numeric-edited receiver for
+    /// (<see cref="MoveValidity.BinaryWidthRefusal"/>).</summary>
+    public bool BinaryWidth { get; init; }
+
     /// <summary>A strongly-typed group's §8.5.3.1 type identity — its type-name, STRONG and EXTERNAL presence and the
     /// position, length and clauses of every elementary item — so two descriptions name "the same type" exactly when
     /// these are equal (§14.8.2.2 / §14.8.3.2: "both shall be of the same type").</summary>

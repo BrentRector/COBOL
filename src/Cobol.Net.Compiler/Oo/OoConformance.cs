@@ -1160,7 +1160,7 @@ public static class OoConformance
         var receiver = Table16Operand.Of(formal);
         string? why = sender.Operand is { } op
             ? MoveTable16.Validity(op, receiver, formal)?.Reason
-            : MoveTable16.Refusal(sender.Position, receiver);
+            : MoveValidity.Table16Refusal(sender.Position.Heading, receiver.Heading);
         return why is null ? null : $"§14.8.2.3.3 rule 2d transfers {sender.Spelled} by the MOVE rules: {why}";
     }
 
@@ -1191,7 +1191,7 @@ public static class OoConformance
     public static string? ContentAlphanumericLiteralMismatch(DataItem formal)
     {
         var receiver = Table16Operand.Of(formal);
-        return NonNumericLiteralSenders.Any(s => MoveTable16.Refusal(s, receiver) is null)
+        return NonNumericLiteralSenders.Any(s => MoveValidity.Table16Refusal(s.Heading, receiver.Heading) is null)
             ? null
             : "a nonnumeric literal argument has no conforming MOVE into this formal parameter under any "
               + "literal category (ISO §14.8.2.3.3 rule 2d / §14.9.25.3 Table 16)";
@@ -1206,7 +1206,7 @@ public static class OoConformance
     /// (<see cref="ContentAlphanumericLiteralMismatch"/>'s remark; kb/Work PB1617). Null when conformant.</summary>
     public static string? ContentNonNumericLiteralMismatch(DataItem formal, PicCategory literalCategory)
     {
-        return MoveTable16.Refusal(new Table16Operand(literalCategory), Table16Operand.Of(formal)) is { } why
+        return MoveValidity.Table16Refusal(new Table16Operand(literalCategory).Heading, Table16Operand.Of(formal).Heading) is { } why
             ? $"a {literalCategory.ToString().ToLowerInvariant()} literal argument has no conforming MOVE into this "
               + $"formal parameter: {why} (ISO §14.8.2.3.3 rule 2d)"
             : null;

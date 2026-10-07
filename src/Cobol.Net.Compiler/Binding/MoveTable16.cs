@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding;
 
@@ -18,6 +19,21 @@ namespace CobolNet.Binding;
 public readonly record struct Table16Operand(
     PicCategory Category, bool IsAlphabetic = false, bool IsEdited = false, bool IsNonInteger = false)
 {
+    /// <summary>⛔ THE ONE MAPPING of these axes to the table's printed headings (<see cref="Table16Category"/>), which
+    /// the ONE table reads (<see cref="MoveValidity.Table16Refusal"/>, in the runtime because §9.3.6 match rule 7 asks
+    /// it at run time too — kb/Work PB2076). The alphabetic rider wins over an edit mask (a PIC A item is Table 16's
+    /// Alphabetic row and column whatever else it carries); a group and every class SR1 governs are no heading.</summary>
+    public Table16Category Heading => Category switch
+    {
+        PicCategory.Alphanumeric => IsAlphabetic ? Table16Category.Alphabetic
+            : IsEdited ? Table16Category.AlphanumericEdited : Table16Category.Alphanumeric,
+        PicCategory.National => IsEdited ? Table16Category.NationalEdited : Table16Category.National,
+        PicCategory.Numeric => IsNonInteger ? Table16Category.NumericNoninteger : Table16Category.NumericInteger,
+        PicCategory.NumericEdited => Table16Category.NumericEdited,
+        PicCategory.Boolean => Table16Category.Boolean,
+        _ => Table16Category.None,
+    };
+
     /// <summary>The Table-16 position of a described item — its OWN picture, or a bit / national group's as-if
     /// picture (§13.18.29.4 GR1b/GR2b; D20/PB79: a national group is Table 16's NATIONAL row, never the GR4 group
     /// exemption); an alphanumeric group is the GR4 conversion-free copy.</summary>
@@ -80,7 +96,9 @@ public enum MoveRule
 public readonly record struct MoveRefusal(MoveRule Rule, string Reason);
 
 /// <summary>
-/// ⭐ ISO §14.9.25.3 <b>Table 16 — Validity of types of MOVE statements</b>, in ONE place.
+/// ⭐ ISO §14.9.25.3's MOVE-validity question (SR2, SR6–SR9 and SR10's <b>Table 16 — Validity of types of MOVE
+/// statements</b>), in ONE place: the chain here, the table and SR8's test in the runtime's <see cref="MoveValidity"/>,
+/// which the universal dispatch asks at run time too (kb/Work PB2076).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -115,7 +133,7 @@ public readonly record struct MoveRefusal(MoveRule Rule, string Reason);
 /// SUBTRACT CORRESPONDING's pairing decision the MOVE statement's own validity question, over two DATA ITEMS and
 /// no bound operands. <see cref="DataItemRefusal"/> is that question in SR order; <see cref="VariableLengthRefusal"/>
 /// is SR9's relation, which <c>MoveBinder.MoveCategoryLegality</c> frames as COBOLNET1931 for the MOVE the
-/// program wrote. Rule 2 asked only <see cref="Refusal"/>, so SR8 and SR9 — the two rules SR10 explicitly defers to —
+/// program wrote. Rule 2 asked only Table 16, so SR8 and SR9 — the two rules SR10 explicitly defers to —
 /// were unasked under CORRESPONDING: a BINARY-LONG namesake paired with a PIC X(5) one, and a variable-length-group
 /// namesake paired with an elementary one and reached the run time.
 /// </para>
@@ -134,96 +152,9 @@ public static class MoveTable16
     // which is how INITIALIZE came to ask SR8 and SR10 but never SR9, and the INVOKE BY CONTENT screen Table 16
     // alone. An asker now reaches them only through Validity / DataItemRefusal, so the next MOVE rule added to
     // the chain reaches every asker without an edit, and a hand composition is a COMPILE error rather than a
-    // review finding. `Refusal` (Table 16 itself) stays public for the askers whose sender has no data item and
-    // no shape — MoveTable16AskerDriftTests names them.
-
-    /// <summary>Why Table 16 refuses this sending→receiving pair, or <see langword="null"/> when it admits it.
-    /// A GROUP on either side is exempt — §14.9.25.4 GR4 makes such a move an alphanumeric character copy with
-    /// no conversion, which the table does not describe.</summary>
-    public static string? Refusal(Table16Operand sender, Table16Operand receiver)
-    {
-        if (sender.Category is PicCategory.Group || receiver.Category is PicCategory.Group) return null;
-
-        // ── Table 16, BOOLEAN column: alphabetic, alphanumeric-edited, numeric and numeric-edited are "No" ──
-        if (receiver.Category is PicCategory.Boolean)
-            return sender.IsAlphabetic || sender.IsEdited
-                   || sender.Category is PicCategory.Numeric or PicCategory.NumericEdited
-                ? "an alphabetic, alphanumeric-edited, numeric or numeric-edited sending operand does not move "
-                  + "to a boolean receiver (ISO §14.9.25.3 SR10, Table 16)"
-                : null;
-
-        // ── NATIONAL column: only a NONINTEGER numeric sender is "No" ──
-        if (receiver.Category is PicCategory.National)
-            return sender.IsNonInteger
-                ? "a noninteger numeric sending operand does not move to a national receiver "
-                  + "(ISO §14.9.25.3 SR10, Table 16)"
-                : null;
-
-        // ── NATIONAL-EDITED row: the ONLY "Yes" is the "National, National-edited" column — alphabetic,
-        //    alphanumeric, alphanumeric-edited, boolean, numeric and numeric-edited receivers are all "No".
-        //    It is a SEPARATE ROW from National (which is "Yes" into boolean and into the numeric column), and
-        //    for the same reason the alphanumeric-edited row differs from alphanumeric: an edit mask has no
-        //    de-editable value and no boolean characters. The receiving COLUMN, by contrast, PAIRS the two
-        //    ("National, National-edited"), which is why only the ROW reads IsEdited — the column arm above is
-        //    correct for a national-edited receiver as written. (kb/Work PB492.) ──
-        if (sender is { Category: PicCategory.National, IsEdited: true })
-            return "a national-edited sending operand moves only to a national or national-edited receiver "
-                 + "(ISO §14.9.25.3 SR10, Table 16)";
-
-        // ── NATIONAL row: alphabetic / alphanumeric / alphanumeric-edited receivers are "No" ──
-        if (sender.Category is PicCategory.National)
-            return receiver.Category is PicCategory.Alphanumeric
-                ? "a national sending operand does not move to an alphabetic, alphanumeric or "
-                  + "alphanumeric-edited receiver (ISO §14.9.25.3 SR10, Table 16; FUNCTION DISPLAY-OF is the "
-                  + "sanctioned conversion)"
-                : null;
-
-        // ── BOOLEAN row: alphabetic / numeric / numeric-edited receivers are "No" (plain alphanumeric is Yes) ──
-        if (sender.Category is PicCategory.Boolean)
-            return receiver.IsAlphabetic
-                   || receiver.Category is PicCategory.Numeric or PicCategory.NumericEdited
-                ? "a boolean sending operand does not move to an alphabetic, numeric or numeric-edited receiver "
-                  + "(ISO §14.9.25.3 SR10, Table 16)"
-                : null;
-
-        // ⭐ THE ALPHABETIC / EDITED / NONINTEGER AXES, COMPLETED (fix-queue PB72 — the arms below were absent
-        // and every one of their "No" cells was a MEASURED silent acceptance; the table is read AS PRINTED at
-        // specs/ISO_COBOL.md:25263, and with these four arms every cell over the modeled categories is decided
-        // here). The classic '85 rows carry the same "No" cells, so all four arms are version-invariant.
-
-        // ── ALPHABETIC column: a numeric or numeric-edited sender is "No" (`MOVE 5 TO a-pic-a` stored "5   ").
-        //    Boolean and national senders are refused by their ROW arms above; the alphanumeric family is Yes. ──
-        if (receiver.IsAlphabetic && sender.Category is PicCategory.Numeric or PicCategory.NumericEdited)
-            return "a numeric or numeric-edited sending operand does not move to an alphabetic receiver "
-                 + "(ISO §14.9.25.3 SR10, Table 16)";
-
-        // ── ALPHABETIC row: numeric and numeric-edited receivers are "No" (a PIC A sender into PIC 9 stored
-        //    zeros); boolean and national columns are covered above, the alphanumeric family is Yes. ──
-        if (sender.IsAlphabetic && receiver.Category is PicCategory.Numeric or PicCategory.NumericEdited)
-            return "an alphabetic sending operand does not move to a numeric or numeric-edited receiver "
-                 + "(ISO §14.9.25.3 SR10, Table 16)";
-
-        // ── ALPHANUMERIC-EDITED row: numeric and numeric-edited receivers are "No". The DE-EDITING move is
-        //    the NUMERIC-edited row's (numeric-edited → numeric is Yes) — an ALPHANUMERIC edit mask has no
-        //    de-editable value, which is exactly why the two rows differ. ⛔ The category guard is load-bearing:
-        //    IsEdited is set for a NUMERIC-edited item too (Of reads the one EditMask field), and an unguarded
-        //    arm refused the de-editing move — caught by the corpus (move_numeric_edited_source), not by reading. ──
-        if (sender is { Category: PicCategory.Alphanumeric, IsEdited: true }
-            && receiver.Category is PicCategory.Numeric or PicCategory.NumericEdited)
-            return "an alphanumeric-edited sending operand does not move to a numeric or numeric-edited "
-                 + "receiver (ISO §14.9.25.3 SR10, Table 16)";
-
-        // ── NUMERIC row, Noninteger: alphabetic / alphanumeric / alphanumeric-edited receivers are "No"
-        //    (`MOVE 5.5 TO a-pic-x` printed "5.5"); the INTEGER row's Yes is the classic digit-image move.
-        //    The alphabetic receiver is already refused by the column arm above; this closes the plain and
-        //    edited alphanumeric cells. ──
-        if (sender is { Category: PicCategory.Numeric, IsNonInteger: true }
-            && receiver.Category is PicCategory.Alphanumeric)
-            return "a noninteger numeric sending operand does not move to an alphabetic, alphanumeric or "
-                 + "alphanumeric-edited receiver (ISO §14.9.25.3 SR10, Table 16)";
-
-        return null;
-    }
+    // review finding. Table 16 itself is the runtime's MoveValidity.Table16Refusal (kb/Work PB2076: §9.3.6 match
+    // rule 7 asks it at run time too, so the ONE table lives where both phases reach it); it is public for the
+    // askers whose sender has no data item and no shape — MoveTable16AskerDriftTests names them.
 
     /// <summary>The SENDER's position in the §14.9.25.3 Table 16 category matrix (fix-queue PB72: built in ONE
     /// place, and a FIELD builds through <c>Table16Operand.Of(Place)</c> so a ref-mod view takes §8.4.3.3.4
@@ -262,7 +193,7 @@ public static class MoveTable16
     /// SHAPE against the receiving operand's Table-16 POSITION rather than by the table's own cells: SR8 (the
     /// fixed-width binary family), SR7 (a figurative constant whose characters are not boolean characters, and
     /// the <c>ALL</c>-literal form of the same) and SR6 (the figurative constant ZERO into an alphabetic item).
-    /// Null when none of them refuses; the caller then asks <see cref="Refusal"/> for the table itself.
+    /// Null when none of them refuses; the caller then asks <see cref="MoveValidity.Table16Refusal"/> for the table itself.
     /// <para>⛔ THE ORDER IS THE CALLER'S FORMER CONTROL FLOW, PRESERVED: SR8 short-circuits (a binary-family
     /// sender into a non-numeric receiver is answered by SR8, and §14.9.25.3 SR10 applies only "for all other
     /// cases not described in Syntax rules 8 and 9"), and an SR7/SR6 refusal likewise pre-empts the table,
@@ -321,7 +252,7 @@ public static class MoveTable16
     /// of their input. Today that is SR8 alone: <i>"If identifier-1 references a data item described with usage
     /// binary-char, binary-short, binary-long, or binary-double, identifier-2 shall reference a numeric or
     /// numeric-edited item."</i> §14.9.25.3 SR10 defers to it explicitly — <i>"for all other cases not described
-    /// in Syntax rules 8 and 9"</i> — so it is asked BEFORE <see cref="Refusal"/>, never instead of it.
+    /// in Syntax rules 8 and 9"</i> — so it is asked BEFORE <see cref="MoveValidity.Table16Refusal"/>, never instead of it.
     /// <para>⛔ THIS IS THE HOME, AND THE <see cref="ShapeRefusal(BoundOperand, Table16Operand)"/> ENTRY CALLS IT
     /// (kb/Work PB391). Two askers reach it: <c>MoveBinder</c> / <c>InitializeBinder</c> through the bound-operand
     /// entry, and <c>CorrespondingBinder</c>'s §14.7.6 rule-2 filter through <see cref="DataItemRefusal"/>, which
@@ -334,11 +265,13 @@ public static class MoveTable16
     /// exemption is Table 16's, not SR8's — SR10 is the rule that routes to the table, and SR10 does not reach
     /// a case SR8 describes.</para></summary>
     private static string? ShapeRefusal(DataItem sender, Table16Operand receiver) =>
-        sender.Pic is { Usage: Usage.BinaryChar or Usage.BinaryShort or Usage.BinaryLong or Usage.BinaryDouble }
-        && receiver.Category is not (PicCategory.Numeric or PicCategory.NumericEdited)
-            ? "a BINARY-CHAR/-SHORT/-LONG/-DOUBLE sending operand shall reference only a numeric or "
-              + "numeric-edited receiver (ISO §14.9.25.3 SR8)"
-            : null;
+        MoveValidity.BinaryWidthRefusal(IsBinaryWidth(sender), receiver.Heading);
+
+    /// <summary>SR8's antecedent — "a data item described with usage binary-char, binary-short, binary-long, or
+    /// binary-double" — the ONE reading of it, which the universal crossing's description carries too
+    /// (<c>ActivationDescriptions</c>, <see cref="ActivationDescription.BinaryWidth"/>; kb/Work PB2076).</summary>
+    public static bool IsBinaryWidth(DataItem item) =>
+        item.Pic is { Usage: Usage.BinaryChar or Usage.BinaryShort or Usage.BinaryLong or Usage.BinaryDouble };
 
     /// <summary>ISO §14.9.25.3 SR9 — <i>"If identifier-1 or identifier-2 references a variable-length group then
     /// these groups shall be compatible groups as specified in 8.5.1.12, Variable-length groups"</i> — as the
@@ -428,7 +361,8 @@ public static class MoveTable16
         StrongGroupRefusal(senderItem, receiverItem) is { } sr2 ? new MoveRefusal(MoveRule.StrongGroup, sr2)
         : shape is { } sr8 ? new MoveRefusal(MoveRule.SourceShape, sr8)
         : VariableLengthRefusal(senderItem, receiverItem) is { } sr9 ? new MoveRefusal(MoveRule.VariableLength, sr9)
-        : Refusal(senderPos, receiverPos) is { } sr10 ? new MoveRefusal(MoveRule.Table16, sr10)
+        : MoveValidity.Table16Refusal(senderPos.Heading, receiverPos.Heading) is { } sr10
+            ? new MoveRefusal(MoveRule.Table16, sr10)
         : null;
 
     /// <summary>ISO §14.9.25.3 SR2 — <i>"If identifier-2 references a strongly-typed group item, identifier-1 shall

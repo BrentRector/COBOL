@@ -5,6 +5,7 @@ using CobolNet.Binding;
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
 using CobolNet.Binding.Procedure;
+using CobolNet.Runtime;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
@@ -30,7 +31,7 @@ namespace CobolNet.Tests.Unit;
 /// <para><b>And it pins the SECOND half, which is not Table 16 at all</b> (kb/Work PB391). §14.9.25.3 SR10 — the
 /// rule that routes to the table — governs only <i>"all other cases not described in Syntax rules 8 and 9"</i>,
 /// so rule 2 also owes SR8 (a fixed-width binary sender needs a numeric or numeric-edited receiver) and SR9 (a
-/// variable-length group operand needs a compatible group opposite). Asking <see cref="MoveTable16.Refusal"/>
+/// variable-length group operand needs a compatible group opposite). Asking <see cref="MoveValidity.Table16Refusal"/>
 /// alone skipped both, MEASURED: a <c>BINARY-LONG</c> namesake paired with a <c>PIC X(5)</c> one and overwrote
 /// it while the written MOVE of the same two items was refused COBOLNET0819, and a variable-length-group
 /// namesake paired with an elementary one and reached the run time as a <c>NotImplementedCobolFeatureException</c>.
@@ -38,7 +39,7 @@ namespace CobolNet.Tests.Unit;
 /// and <see cref="TheBoundAndItemKeyedShapeEntriesAnswerTogether"/> pins the two-arm split the fix could have
 /// re-created.</para>
 ///
-/// <para><b>And it pins the trap the deletion sprang.</b> <see cref="MoveTable16.Refusal"/> ADMITS a
+/// <para><b>And it pins the trap the deletion sprang.</b> <see cref="MoveValidity.Table16Refusal"/> ADMITS a
 /// pointer × pointer pair — it screens group / boolean / national / alphabetic / numeric and returns null for
 /// everything else — so routing rule 2 to it without rule 4's class exclusion would have converted a silent
 /// EXCLUSION into a silent pointer copy. <see cref="CorrespondingRule4ClassExclusionIsTheOnlyThingRefusingAPointerPair"/>
@@ -204,7 +205,7 @@ public sealed class CorrespondingRule2DriftTests
 
     /// <summary>⛔ THE TRAP. §14.7.6 rule 4 — <i>"Neither data item ... is of class index, message-tag, object, or
     /// pointer"</i> — is the ONLY thing that keeps a pointer namesake pair out of the correspondence set: Table 16
-    /// has no pointer row or column and <see cref="MoveTable16.Refusal"/> therefore ADMITS the pair. Before
+    /// has no pointer row or column and <see cref="MoveValidity.Table16Refusal"/> therefore ADMITS the pair. Before
     /// kb/Work PB391 the exclusion was an ACCIDENT of the private copy's <c>_ =&gt; false</c> default, and
     /// deleting that copy without adding rule 4 would have made <c>MOVE CORRESPONDING</c> copy pointers
     /// silently. Both halves are asserted so neither can be dropped as redundant.</summary>

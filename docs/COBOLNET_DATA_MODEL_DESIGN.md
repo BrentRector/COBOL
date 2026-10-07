@@ -379,7 +379,7 @@ content-validation half is separately answered by the declined A.4.14 facility (
   that DON'T** — §13.18.40.5 Table 7 gives both categories "Simple insertion" and nothing else, so one renderer
   (`CobolEdit.FormatSimpleInsertion`, reached only through `RuntimeApi.EditFormatSimpleInsertion(value, pic)`)
   and one MOVE/ACCEPT/STRING receiver arm serve both. The rules that DO tell them apart read `Category` beside
-  `EditMask`: Table 16's separate national-edited ROW (`MoveTable16`), `InitializeCategory.NationalEdited`
+  `EditMask`: Table 16's separate national-edited ROW (`MoveValidity.Table16Refusal`, through `Table16Operand.Heading`), `InitializeCategory.NationalEdited`
   (§14.9.20.4 GR5c's category-name match, even though GR6c fills both with national SPACES), and the edition
   gate (`VersionConformancePass.PictureConstructId` → `national-edited-2002`, the FINER identity, so the usage
   arm does not also fire `national-data-2002` on the same entry).

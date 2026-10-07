@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-282 drift tests.
+283 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -271,6 +271,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [SubscriptAdmissionDriftTests](../tests/Cobol.Net.Tests.Unit/SubscriptAdmissionDriftTests.cs) | ⛔ ISO §8.4.2.3.3 SR2 HAS TWO HALVES AND THE COMPILER ONLY EVER WROTE DOWN THE FIRST (kb/Work PB877). | — |
 | [SynthesizedNameFamilyDriftTests](../tests/Cobol.Net.Tests.Unit/SynthesizedNameFamilyDriftTests.cs) | ⛔ A SYNTHESIZED C# NAME THAT EMBEDS A USER-DEFINED WORD COMES FROM A TAGGED FAMILY IN NamingConvention, AND NO EMITTER-FIXED __X NAME ENTERS A FAMILY (kb/Work PB973). | `src/Cobol.Net.Compiler` |
 | [Table12StatementNameDriftTests](../tests/Cobol.Net.Tests.Unit/Table12StatementNameDriftTests.cs) | ⛔ Table12StatementNames IS ISO Table 12's 'Statement name' COLUMN, AND THIS RE-DERIVES IT FROM THE SPEC — BOTH DIRECTIONS. | — |
+| [Table16PrintedTableDriftTests](../tests/Cobol.Net.Tests.Unit/Table16PrintedTableDriftTests.cs) | ⛔ THE ONE TABLE 16 AGREES WITH THE PRINTED ONE, CELL FOR CELL (kb/Work PB2076). | `specs/ISO_COBOL.md` |
 | [TestLegReportDriftTests](../tests/Cobol.Net.Tests.Unit/TestLegReportDriftTests.cs) | ⛔ A GATE MAY TRIM A PASSING TEST LEG, NEVER A FAILING ONE (kb/Work/PB1573). | `scripts`, `scripts/run_gate_legs.py` |
 | [TestPartitionCoverageDriftTests](../tests/Cobol.Net.Tests.Unit/TestPartitionCoverageDriftTests.cs) | THE drift gate for this assembly's partitioned test families (TestPartitioning, plan §11 A13). | — |
 | [TestRepoDriftTests](../tests/Cobol.Net.Tests.Unit/TestRepoDriftTests.cs) | Keeps the repo-root locator collapsed to ONE implementation. | `tests`, `Cobol.Net.sln`, `src/Cobol.Net.Compiler`, `tests/version-matrix/constructs.json`, `tests/nist/corpus.tsv`, `docs/COBOLNET_REARCHITECTURE_PLAN.md` … |
