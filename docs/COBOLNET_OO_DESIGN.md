@@ -434,8 +434,9 @@ prescribes (kb/Work PB1500):
   LENGTH formal or returning item ("neither a formal parameter nor the returning item in the invoked method shall be
   described with the ANY LENGTH clause"), §14.8.2.2 rule 1 (a formal group no larger than the argument), the
   strong-type sentence (§8.5.3.1 equivalence of the two declarations, `StrongTypeModel.TypeIdentityKey`), §8.5.1.12
-  compatibility of a variable-length pair (equal signatures, or a fixed group whose tables correspond to every dynamic
-  item, `CobolVarGroup.CorrespondingSpans`), §14.8.2.3.2 "Additionally" b)/c) for bit / national groups, and §14.8.3
+  compatibility of a variable-length pair (`GroupCompatibility.Walk` over the `GroupAtom` layouts both descriptions
+  carry — the ONE walk the compiler's bind-time screens ask too, kb/Work PB480 — and, for a fixed partner, the carrier's
+  `CobolVarGroup.CorrespondingSpans`), §14.8.2.3.2 "Additionally" b)/c) for bit / national groups, and §14.8.3
   for the RETURNING pair (§14.8.3.2's same length, §14.8.3.3's clause identity; an object reference is delivered by the
   SET-rule narrowing `CobolObject.NarrowUniversal`). The EC-OO-UNIVERSAL
   exception condition is set to exist WHEN checking for it is enabled in BOTH the activated method and the
@@ -483,17 +484,19 @@ BOTH sides (kb/Work PB1781): `OoEmitter.OoUnivCallerRead` reads it through `Call
 INVOKE lanes use — and `UniversalCrossingShapeDriftTests` holds the universal lane to the typed lane shape by shape. A
 group FORMAL the relations admitted in another shape is converted by the callee (`UniversalGroupCarrier`): §14.8.2.2
 rule 1's PREFIX (the formal sees the argument's leading positions; its write-back is spliced over them and the tail
-survives) and §8.5.1.12's fixed / variable-length pair (through the pair's `CorrespondingSpans`, both directions, and the
-RETURNING delivery). A REFERENCE-MODIFIED argument is the §8.4.3.3.4 GR6 unique data item — no PICTURE, so it matches
+survives), §8.5.1.12's fixed / variable-length pair (through the pair's `CorrespondingSpans`, both directions, and the
+RETURNING delivery) and two variable-length groups of different shapes (`CobolVarGroup.Reshape` rebuilds the argument's
+carrier in the formal's shape segment by segment of the walk's correspondence, `CobolVarGroup.Overlay` stores the
+formal's back over the argument's storage, keeping what the formal does not reach — the typed INVOKE lane uses the same
+pair, `OoEmitter.VarGroupShapes`). A REFERENCE-MODIFIED argument is the §8.4.3.3.4 GR6 unique data item — no PICTURE, so it matches
 only a group formal of its class. Drift protection: `PictureClauseIdentityDriftTests.ActivationMatch_AgreesWithTheComparator_OverEveryElementaryPair`
 (the relation's match ⇔ the typed comparator's identity over analyzed elementary pictures, national / boolean /
 numeric-edited included) and `ActivationDescriptionFieldDriftTests` (every description field is read by a relation or
 the carrier and spelled by the renderer); the goldens `conformance:2002/pb480_universal_match_relations`,
-`conformance:2002/pb1112_active_class_universal` and `conformance:2014/pb480_universal_variable_length` pin each arm.
-**Residue:** two variable-length groups whose §8.5.1.12 signatures differ are compatible only when equal (the
-element-wise walk with recursion into element groups is the compiler's `VariableLengthCompatibility.Walk`, not yet
-carried to the runtime), and rule 7's MOVE-class RETURNING match admits every non-reference pair, so a MOVE-illegal pair
-surfaces as EC-OO-UNIVERSAL rather than EC-OO-METHOD.
+`conformance:2002/pb1112_active_class_universal`, `conformance:2014/pb480_universal_variable_length` and
+`conformance:2014/pb480_universal_variable_length_shapes` pin each arm.
+**Residue:** rule 7's MOVE-class RETURNING match admits every non-reference pair, so a MOVE-illegal pair surfaces as
+EC-OO-UNIVERSAL rather than EC-OO-METHOD (kb/Work PB2076).
 
 ### D12. Parameterized classes and interfaces (§9.3.12 / §9.3.13) are EXPANDED, one ordinary class per expansion — never C# generics; the parameterized definition itself is a skeleton that binds and emits nothing.
 

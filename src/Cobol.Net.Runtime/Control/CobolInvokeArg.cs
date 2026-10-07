@@ -79,7 +79,10 @@ public sealed class CobolInvokeArg(ActivationDescription description, object? va
 /// positions and keeps the tail;</item>
 /// <item>§8.5.1.12's fixed / variable-length pair: one side crosses as the variable-length carrier
 /// (<see cref="CobolVarGroup"/>), the other as a fixed record image, converted through the pair's positional
-/// correspondence (<see cref="CobolVarGroup.CorrespondingSpans"/>) exactly as the CALL boundary converts them.</item>
+/// correspondence (<see cref="CobolVarGroup.CorrespondingSpans"/>) exactly as the CALL boundary converts them;</item>
+/// <item>two variable-length groups of different shapes (§8.5.1.12.1 constrains only where their variable-length items
+/// lie): the argument's carrier is rebuilt in the formal's shape (<see cref="CobolVarGroup.Reshape"/>) and the formal's
+/// stores are overlaid back onto it (<see cref="CobolVarGroup.Overlay"/>).</item>
 /// </list>
 /// The caller's box is always in the ARGUMENT's own form, so a caller needs nothing of the method it reaches.
 /// </summary>
@@ -105,14 +108,17 @@ public static class UniversalGroupCarrier
     /// <summary>The variable-length carrier a VARIABLE-length group formal sees of the argument box.</summary>
     public static CobolVarGroup VariableCarrier(object? box, ActivationDescription argument,
         ActivationDescription formal) =>
-        box as CobolVarGroup ?? CobolVarGroup.FromFixedImage((string)box!, Spans(argument, formal));
+        box is CobolVarGroup v
+            ? CobolVarGroup.Reshape(v, ActivationRelations.AtomsOf(argument), ActivationRelations.AtomsOf(formal))
+            : CobolVarGroup.FromFixedImage((string)box!, Spans(argument, formal));
 
     /// <summary>The argument box after the VARIABLE-length group formal's carrier <paramref name="carrier"/> is stored
     /// back: a variable-length argument takes the carrier, a fixed one the record image it rebuilds.</summary>
     public static object WriteBackVariable(object? box, ActivationDescription argument, ActivationDescription formal,
         CobolVarGroup carrier) =>
-        box is CobolVarGroup ? carrier
-        : CobolVarGroup.ToFixedImage(carrier, ((string)box!).Length, Spans(argument, formal));
+        box is CobolVarGroup v
+            ? CobolVarGroup.Overlay(v, carrier, ActivationRelations.AtomsOf(argument), ActivationRelations.AtomsOf(formal))
+            : CobolVarGroup.ToFixedImage(carrier, ((string)box!).Length, Spans(argument, formal));
 
     /// <summary>A group RETURNING value <paramref name="value"/> (the method's item, described by
     /// <paramref name="sending"/>) in the form of the invocation's receiving item (<paramref name="receiving"/>) — the
@@ -125,12 +131,15 @@ public static class UniversalGroupCarrier
                 CobolVarGroup.ToFixedImage(v, receiving.Positions, Spans(receiving, sending)),
             string s when receiving.Shape is ActivationShape.VariableLengthGroup =>
                 CobolVarGroup.FromFixedImage(s, Spans(sending, receiving)),
+            CobolVarGroup v when receiving.Shape is ActivationShape.VariableLengthGroup =>
+                CobolVarGroup.Reshape(v, ActivationRelations.AtomsOf(sending), ActivationRelations.AtomsOf(receiving)),
             _ => value,
         };
 
     /// <summary>The spans of the FIXED side's tables that correspond to the VARIABLE side's dynamic items — never
     /// null here: the conformance relation proved the correspondence before any carrier is built.</summary>
     private static int[] Spans(ActivationDescription fixedSide, ActivationDescription varSide) =>
-        CobolVarGroup.CorrespondingSpans(fixedSide.Layout ?? CobolVarGroup.FixedRun(fixedSide.Positions), varSide.Layout!)
+        CobolVarGroup.CorrespondingSpans(GroupCompatibility.Layout(ActivationRelations.AtomsOf(fixedSide)),
+            GroupCompatibility.Layout(ActivationRelations.AtomsOf(varSide)))
         ?? [];
 }

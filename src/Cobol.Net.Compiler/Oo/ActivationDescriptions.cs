@@ -60,8 +60,7 @@ public static class ActivationDescriptions
                 {
                     Shape = ActivationShape.VariableLengthGroup,
                     Category = ActivationCategory.Alphanumeric,
-                    VariableSignature = VariableLengthCompatibility.Signature(item),
-                    Layout = VariableLengthCompatibility.Layout(item),
+                    Atoms = VariableLengthCompatibility.GroupAtoms(item),
                 };
             return item.IsImageCapable
                 ? new ActivationDescription
@@ -69,7 +68,7 @@ public static class ActivationDescriptions
                     Shape = ActivationShape.AlphanumericGroup,
                     Category = ActivationCategory.Alphanumeric,
                     Positions = item.ImageWidth,
-                    Layout = VariableLengthCompatibility.Layout(item),
+                    Atoms = VariableLengthCompatibility.GroupAtoms(item),
                 }
                 : null;
         }
@@ -165,14 +164,8 @@ public static class ActivationDescriptions
     private static string Restriction(StrongTypeModel.TypeRestriction type) =>
         type.IsRestricted ? "TO " + type.Key : "*";
 
-    private static ActivationDescription With(ActivationDescription d, bool optional, bool byValue) => new()
-    {
-        Shape = d.Shape, Category = d.Category, Clauses = d.Clauses, Usage = d.Usage, AnyLength = d.AnyLength,
-        Positions = d.Positions, LocaleExternal = d.LocaleExternal, LocaleFromLiteral = d.LocaleFromLiteral,
-        StrongType = d.StrongType, Layout = d.Layout, VariableSignature = d.VariableSignature,
-        ObjectKind = d.ObjectKind, ObjectName = d.ObjectName, Factory = d.Factory, Only = d.Only,
-        Optional = optional, ByValue = byValue,
-    };
+    private static ActivationDescription With(ActivationDescription d, bool optional, bool byValue) =>
+        d with { Optional = optional, ByValue = byValue };
 
     /// <summary>The ISO §8.5.2 class-and-category name of an elementary item (§8.5.2.1 Table 2). The PICTURE identity in
     /// <see cref="ElementaryClauses"/> separates every finer distinction; this is match rule 3 c)'s coarse half.</summary>

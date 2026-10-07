@@ -276,6 +276,154 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
         return new CobolVarGroup(fixedRun, dyn);
     }
 
+    /// <summary>⛔ ONE VARIABLE-LENGTH GROUP'S CARRIER IN THE SHAPE OF ANOTHER, COMPATIBLE ONE (kb/Work PB480). Two
+    /// variable-length groups are compatible when their variable-length items correspond and match (ISO §8.5.1.12.1),
+    /// which leaves them free to differ in everything else: the shape and, after the last variable-length item, the
+    /// length of their fixed material, and — §8.5.1.12.3 sentence 3 — a dynamic-capacity table in one where the other
+    /// has a table of a FIXED number of occurrences ("treated as though it were a dynamic-capacity table whose capacity is
+    /// either its fixed number of occurrences or the value of the DEPENDING operand"). So the carrier of
+    /// <paramref name="from"/>'s layout is not, in general, the carrier of <paramref name="to"/>'s: this rebuilds it,
+    /// segment by segment of the pair's correspondence (<see cref="GroupCompatibility.Walk"/>):
+    /// <list type="bullet">
+    ///   <item>the fixed material between two corresponding items lands at the same relative position, fitted to the
+    ///     receiving shape's material there (the last run is §14.8.2.2 rule 1's prefix: truncated or space-filled);</item>
+    ///   <item>a corresponding pair of components (dynamic-length items, dynamic-capacity tables) carries the content
+    ///     whole;</item>
+    ///   <item>a dynamic-capacity table opposite a fixed table: the fixed table's occurrences become the component, and a
+    ///     component becomes the fixed table fitted to its width — §14.6.9.2's rule for a non-dynamic receiving table
+    ///     (superfluous elements not moved, missing ones space filled), as <see cref="ToFixedImage"/> applies it;</item>
+    ///   <item>a dynamic-capacity table beyond the shorter group's last character corresponds to "a space-filled
+    ///     fixed-length table" (§8.5.1.12.2): it gets no component (<see cref="HasDyn"/> false).</item>
+    /// </list>
+    /// A pair the walk does not find compatible never reaches here — the bind-time screen or the run-time relation
+    /// (<see cref="ActivationRelations.ParameterViolation"/>) refused it first — so one is an internal fault, raised
+    /// loudly.</summary>
+    public static CobolVarGroup Reshape(CobolVarGroup v, GroupAtom[] from, GroupAtom[] to)
+    {
+        if (GroupCompatibility.SameShape(from, to)) return v;
+        var pairs = Correspondence(from, to);
+        var src = new Geometry(from);
+        var dst = new Geometry(to);
+        var fixedRun = new System.Text.StringBuilder(v.Fixed.Length);
+        var dyn = new List<string>();
+        int prevA = 0, prevB = 0;
+        for (int k = 0; k <= pairs.Count; k++)
+        {
+            (int pa, int pb) = k < pairs.Count ? pairs[k] : (from.Length, to.Length);
+            fixedRun.Append(CobolString.Store(src.FixedSlice(v, prevA, pa), dst.FixedChars(prevB, pb)));
+            if (k == pairs.Count) break;
+            var b = to[pb];
+            if (b.IsComponent)
+            {
+                // An absent component (the sender carried fewer) stays absent — absent ones are a suffix.
+                if (src.Content(v, pa) is { } content) dyn.Add(content);
+            }
+            else fixedRun.Append(CobolString.Store(src.Content(v, pa) ?? "", b.Chars));
+            (prevA, prevB) = (pa + 1, pb + 1);
+        }
+        return new CobolVarGroup(fixedRun.ToString(), [.. dyn]);
+    }
+
+    /// <summary>⛔ A VIEW'S STORE BACK INTO THE STORAGE IT VIEWS — the BY REFERENCE write-back of
+    /// <see cref="Reshape"/> (ISO §14.2.3 GR8: "the activated runtime element operates as if the formal parameter occupies
+    /// the same storage area as the argument"). <paramref name="current"/> is the argument's carrier, of
+    /// <paramref name="currentShape"/>; <paramref name="view"/> the formal's, of <paramref name="viewShape"/>. A store
+    /// through the formal reaches only the argument storage it overlays:
+    /// <list type="bullet">
+    ///   <item>each run of fixed material the formal covers replaces the argument's leading characters there, and the
+    ///     argument's material past it survives (the §14.8.2.2 rule 1 prefix);</item>
+    ///   <item>a corresponding pair of components replaces the argument's component whole — both are variable, so the
+    ///     formal's length or capacity IS the argument's;</item>
+    ///   <item>a FIXED table of the formal opposite the argument's dynamic-capacity table is written OVER the argument's
+    ///     current occurrences, never re-sizing them, and a component of the formal opposite the argument's fixed table is
+    ///     fitted to it — the same ⚠ DETERMINATION <see cref="OverlayFixedImage"/> records;</item>
+    ///   <item>every component of the argument the formal does not reach (beyond its last character) survives.</item>
+    /// </list></summary>
+    public static CobolVarGroup Overlay(CobolVarGroup current, CobolVarGroup view, GroupAtom[] currentShape,
+        GroupAtom[] viewShape)
+    {
+        if (GroupCompatibility.SameShape(currentShape, viewShape)) return view;
+        var pairs = Correspondence(currentShape, viewShape);
+        var arg = new Geometry(currentShape);
+        var formal = new Geometry(viewShape);
+        var fixedRun = new System.Text.StringBuilder(current.Fixed.Length);
+        var dyn = (string[])current.Dynamic.Clone();
+        int prevA = 0, prevB = 0;
+        for (int k = 0; k <= pairs.Count; k++)
+        {
+            (int pa, int pb) = k < pairs.Count ? pairs[k] : (currentShape.Length, viewShape.Length);
+            fixedRun.Append(Overlaid(arg.FixedSlice(current, prevA, pa), formal.FixedSlice(view, prevB, pb)));
+            if (k == pairs.Count) break;
+            var a = currentShape[pa];
+            string? now = formal.Content(view, pb);
+            if (!a.IsComponent)
+                fixedRun.Append(CobolString.Store(now ?? arg.Content(current, pa) ?? "", a.Chars));
+            else if (arg.Ordinal[pa] < dyn.Length && now is not null)
+                dyn[arg.Ordinal[pa]] = viewShape[pb].IsComponent ? now : Overlaid(dyn[arg.Ordinal[pa]], now);
+            (prevA, prevB) = (pa + 1, pb + 1);
+        }
+        return new CobolVarGroup(fixedRun.ToString(), dyn);
+    }
+
+    /// <summary><paramref name="was"/> with its leading characters replaced by <paramref name="now"/>'s, its length
+    /// kept — a store through a view of the leading positions.</summary>
+    private static string Overlaid(string was, string now) =>
+        now.Length >= was.Length ? now[..was.Length] : now + was[now.Length..];
+
+    /// <summary>The corresponding pairs of two compatible layouts, left to right — the segment boundaries of
+    /// <see cref="Reshape"/> and <see cref="Overlay"/>.</summary>
+    private static List<(int First, int Second)> Correspondence(GroupAtom[] a, GroupAtom[] b)
+    {
+        var pairs = new List<(int, int)>();
+        if (GroupCompatibility.Walk(a, b, pairs) is { } why)
+            throw new InvalidOperationException(
+                $"internal error: a variable-length group carrier was reshaped across an incompatible pair ({why.Kind}) — "
+                + "the §8.5.1.12 relation should have refused it");
+        return pairs;
+    }
+
+    /// <summary>Where each atom of a layout lies in its carrier: a component's ordinal in <see cref="Dynamic"/>, every
+    /// other atom's character offset in <see cref="Fixed"/> (components contribute nothing to the fixed run).</summary>
+    private sealed class Geometry
+    {
+        private readonly GroupAtom[] _atoms;
+        private readonly int[] _fixedAt;
+        public readonly int[] Ordinal;
+
+        public Geometry(GroupAtom[] atoms)
+        {
+            _atoms = atoms;
+            _fixedAt = new int[atoms.Length + 1];
+            Ordinal = new int[atoms.Length];
+            int at = 0, ord = 0;
+            for (int i = 0; i < atoms.Length; i++)
+            {
+                _fixedAt[i] = at;
+                Ordinal[i] = atoms[i].IsComponent ? ord++ : -1;
+                if (!atoms[i].IsComponent) at += atoms[i].Chars;
+            }
+            _fixedAt[atoms.Length] = at;
+        }
+
+        /// <summary>The fixed-run characters of atoms [<paramref name="from"/>, <paramref name="to"/>) — contiguous,
+        /// because the components among them contribute nothing to the fixed run.</summary>
+        public string FixedSlice(CobolVarGroup v, int from, int to)
+        {
+            int start = Math.Min(_fixedAt[from], v.Fixed.Length);
+            return v.Fixed[start..Math.Min(_fixedAt[to], v.Fixed.Length)];
+        }
+
+        /// <summary>The character count of atoms [<paramref name="from"/>, <paramref name="to"/>) in the fixed run.</summary>
+        public int FixedChars(int from, int to) => _fixedAt[to] - _fixedAt[from];
+
+        /// <summary>Atom <paramref name="i"/>'s content: a component's carried string (null when the carrier did not
+        /// carry it), a fixed table's characters of the fixed run.</summary>
+        public string? Content(CobolVarGroup v, int i) =>
+            _atoms[i].IsComponent
+                ? v.HasDyn(Ordinal[i]) ? v.Dynamic[Ordinal[i]] : null
+                : FixedSlice(v, i, i + 1);
+    }
+
     /// <summary>⛔ A FILE RECORD'S CONTIGUOUS IMAGE, DECOMPOSED — the READ / RETURN half of a variable-length
     /// record (docs/CONFORMANCE.md §3 determination D-FRA; kb/Work PB981, PB1053). A WRITE sends the record "as
     /// though it were in fact contiguous with its neighbors" (ISO §8.5.1.11.2) — the group's <c>CurrentImage()</c>

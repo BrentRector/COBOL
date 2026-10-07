@@ -14,27 +14,29 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class ActivationRelationsRoleLabelTests
 {
-    private static ActivationDescription Var(string signature) => new()
+    /// <summary>A variable-length group of <paramref name="lead"/> characters followed by a dynamic-length item: two of
+    /// different leads are incompatible (§8.5.1.12.2 — the dynamic-length items start at different positions).</summary>
+    private static ActivationDescription Var(int lead) => new()
     {
         Shape = ActivationShape.VariableLengthGroup, Category = ActivationCategory.Alphanumeric,
-        VariableSignature = signature,
+        Atoms = [new GroupAtom(GroupAtomKind.Fixed, lead, lead), new GroupAtom(GroupAtomKind.DynamicLength, 0, 0)],
     };
 
     [Fact]
     public void ParameterViolation_NamesTheArgumentAndTheFormalByTheirOwnDescriptions()
     {
-        string? reason = ActivationRelations.ParameterViolation(Var("ARG-SIG"), Var("FORMAL-SIG"));
+        string? reason = ActivationRelations.ParameterViolation(Var(2), Var(3));
         Assert.NotNull(reason);
-        Assert.Contains("the argument (a variable-length group (ARG-SIG))", reason);
-        Assert.Contains("the formal parameter (a variable-length group (FORMAL-SIG))", reason);
+        Assert.Contains("the argument (a variable-length group (2,D))", reason);
+        Assert.Contains("the formal parameter (a variable-length group (3,D))", reason);
     }
 
     [Fact]
     public void ReturningViolation_NamesTheReturningAndTheReceivingItemByTheirOwnDescriptions()
     {
-        string? reason = ActivationRelations.ReturningViolation(receiving: Var("RECV-SIG"), sending: Var("SEND-SIG"));
+        string? reason = ActivationRelations.ReturningViolation(receiving: Var(4), sending: Var(5));
         Assert.NotNull(reason);
-        Assert.Contains("the returning item (a variable-length group (SEND-SIG))", reason);
-        Assert.Contains("the receiving item (a variable-length group (RECV-SIG))", reason);
+        Assert.Contains("the returning item (a variable-length group (5,D))", reason);
+        Assert.Contains("the receiving item (a variable-length group (4,D))", reason);
     }
 }

@@ -132,15 +132,13 @@ public sealed record ActivationDescription
     /// these are equal (§14.8.2.2 / §14.8.3.2: "both shall be of the same type").</summary>
     public string? StrongType { get; init; }
 
-    /// <summary>A group's §8.5.1.12 layout as the runtime reads it (<see cref="CobolVarGroup"/>'s <c>Layout*</c>
-    /// triples in character positions) — the compatibility walk and the carrier conversion between a fixed and a
-    /// variable-length group (<see cref="CobolVarGroup.CorrespondingSpans"/>). Null when the layout is not stated (a
-    /// non-group, or a group with a bit leaf).</summary>
-    public int[]? Layout { get; init; }
-
-    /// <summary>A variable-length group's canonical §8.5.1.12 atom signature (dynamic items, dynamic-capacity tables
-    /// and their element widths, and the fixed runs between them). Equal signatures are compatible.</summary>
-    public string? VariableSignature { get; init; }
+    /// <summary>A group's ISO §8.5.1.12 layout as positional atoms (<see cref="GroupAtom"/>: REDEFINES subtrees dropped,
+    /// subordinate groups flattened, tables whole with their element's atoms) — what the §8.5.1.12 compatibility walk
+    /// (<see cref="GroupCompatibility.Walk"/>) compares and what the carrier conversions between two shapes of group read
+    /// (<see cref="UniversalGroupCarrier"/>). Null for a non-group, and for a group with a USAGE BIT leaf (§8.5.1.6.3's
+    /// shared-byte runs make a character position non-positional), which then stands as one run of
+    /// <see cref="Positions"/>.</summary>
+    public GroupAtom[]? Atoms { get; init; }
 
     /// <summary>An object reference's §13.18.60.2 kind.</summary>
     public ObjectReferenceKind ObjectKind { get; init; }
@@ -175,7 +173,7 @@ public sealed record ActivationDescription
         },
         ActivationShape.AlphanumericGroup => $"an alphanumeric group of {Positions} character positions",
         ActivationShape.AsIfElementaryGroup => $"a {Category} group of {Positions} positions",
-        ActivationShape.VariableLengthGroup => $"a variable-length group ({VariableSignature})",
+        ActivationShape.VariableLengthGroup => $"a variable-length group ({GroupCompatibility.Describe(Atoms ?? [])})",
         ActivationShape.StrongGroup => $"a strongly-typed group of type {Category}",
         _ => $"{Category} {Clauses}",
     };

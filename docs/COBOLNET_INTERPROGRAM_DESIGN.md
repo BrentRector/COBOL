@@ -559,9 +559,15 @@ CALL snapshot and at the INVOKE BY CONTENT arm alike. Golden `2002/pb965_odo_gro
 
 `CobolVarGroup` is `(string Fixed, string[] Dynamic)` and is the §8.5.1.12 model itself, not an encoding:
 `Fixed` is the group's image with every variable-length component collapsed to nothing — the exact accounting
-§8.5.1.12.3 states the relation in, which is why two COMPATIBLE groups lay it out identically — and `Dynamic`
-carries each component's current content in declaration order, which §8.5.1.12.2's positional correspondence puts
-one-for-one on both sides. A receiving dynamic-capacity table recovers its capacity by dividing its component by
+§8.5.1.12.3 states the relation in — and `Dynamic` carries each component's current content in declaration order.
+Two compatible groups of the SAME shape lay the carrier out identically; §8.5.1.12 constrains only where the
+variable-length items lie, so two of DIFFERENT shapes (fixed material differing in shape or in trailing length, a
+dynamic-capacity table opposite a fixed one — §8.5.1.12.3 sentence 3 — or one beyond the shorter group's end) are
+converted at the INVOKE boundary (universal and typed) by `CobolVarGroup.Reshape` (the argument's carrier in the
+formal's shape) and `CobolVarGroup.Overlay` (the formal's stores back over the argument's storage, keeping what the
+formal does not reach), segment by segment of the
+correspondence the ONE §8.5.1.12 walk reports (`GroupCompatibility.Walk`, the runtime walk the bind-time screens also
+ask; kb/Work PB480). A receiving dynamic-capacity table recovers its capacity by dividing its component by
 its OWN element width, legitimate because §8.5.1.12.3 admits corresponding tables only "when the byte length of
 their elements is equal". Nested variable-length groups FLATTEN into the same carrier (`CobolVarGroup.Slice`
 hands one its window back), because the relation is stated over relative byte positions and is blind to the

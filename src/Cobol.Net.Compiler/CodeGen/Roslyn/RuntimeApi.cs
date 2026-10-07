@@ -1802,6 +1802,17 @@ internal static class RuntimeApi
     public static string VarGroupOverlayFixedImage(string current, string image, string spans) =>
         $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.OverlayFixedImage)}({current}, {image}, {spans})";
 
+    /// <summary>A variable-length group's carrier rebuilt in the shape of another, compatible one (ISO §8.5.1.12;
+    /// kb/Work PB480) — <c>CobolVarGroup.Reshape</c>.</summary>
+    public static string VarGroupReshape(string carrier, GroupAtom[] from, GroupAtom[] to) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Reshape)}({carrier}, {GroupAtomsNew(from)}, {GroupAtomsNew(to)})";
+
+    /// <summary>A variable-length view's store back over the variable-length storage it views (ISO §14.2.3 GR8;
+    /// kb/Work PB480) — <c>CobolVarGroup.Overlay</c>.</summary>
+    public static string VarGroupOverlay(string current, string view, GroupAtom[] currentShape, GroupAtom[] viewShape) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Overlay)}({current}, {view}, {GroupAtomsNew(currentShape)}, "
+        + $"{GroupAtomsNew(viewShape)})";
+
     /// <summary>A DETACHED variable-length carrier cell (BY CONTENT / BY VALUE, §14.2.3 GR9/GR10).</summary>
     public static string VarGroupCell(string value) => $"ManagedPointer<{VarGroupType}>.Cell({value})";
 
@@ -2084,7 +2095,8 @@ internal static class RuntimeApi
                 bool b => b ? "true" : null,
                 int n => n == 0 ? null : n.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 int[] a => $"new int[] {{ {string.Join(", ", a.Select(x => x.ToString(System.Globalization.CultureInfo.InvariantCulture)))} }}",
-                Enum e => Convert.ToInt32(e, System.Globalization.CultureInfo.InvariantCulture) == 0 ? null : $"{e.GetType().Name}.{e}",
+                GroupAtom[] atoms => GroupAtomsNew(atoms),
+                Enum e =>Convert.ToInt32(e, System.Globalization.CultureInfo.InvariantCulture) == 0 ? null : $"{e.GetType().Name}.{e}",
                 _ => throw new InvalidOperationException(
                     $"ActivationDescription.{prop.Name} is of a type ({v.GetType().Name}) the renderer does not spell"),
             };
@@ -2092,6 +2104,14 @@ internal static class RuntimeApi
         }
         return $"new {nameof(ActivationDescription)} {{ {string.Join(", ", members)} }}";
     }
+
+    /// <summary>The C# expression constructing a group's ISO §8.5.1.12 atoms (<see cref="GroupAtom"/>, element atoms
+    /// included) — the ONE rendering of the layout the run-time compatibility walk and carrier reshaping read (kb/Work
+    /// PB480).</summary>
+    public static string GroupAtomsNew(GroupAtom[] atoms) =>
+        $"new {nameof(GroupAtom)}[] {{ {string.Join(", ", atoms.Select(a =>
+            $"new {nameof(GroupAtom)}({nameof(GroupAtomKind)}.{a.Kind}, {a.Bytes}, {a.Chars}, {a.ElementBytes}, "
+            + $"{a.ElementChars}, {(a.Element is { } e ? GroupAtomsNew(e) : "null")})"))} }}";
 
     /// <summary>Normalize a runtime method-name value for universal dispatch (D-U6) —
     /// <c>CobolObject.NormalizeMethodName</c>.</summary>

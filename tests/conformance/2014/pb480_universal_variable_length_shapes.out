@@ -1,0 +1,20 @@
+TA:HH/dyn/TT
+G1=HH/Q/axTTT
+TA:HH/dyn/TT
+G1=HH/Q/axTTT
+TB:hh/AABBCC/xyz
+G2=hh/AABBZZ/xyz
+TB:hh/AABBCC/xyz
+G2=hh/AABBZZ/xyz
+TB:hh/AABB  /xyz
+G2=hh/AABB/xyz C2=2
+TB:hh/AABB  /xyz
+G2=hh/AABB/xyz C2=2
+TA:55/d5/xx
+G5=55/Q/ax/pq
+TA:55/d5/xx
+G5=55/Q/ax/pq
+HANDLED=EC-OO-UNIVERSAL                
+G4=RR/ret/Z   |
+G4=RR/ret/Z   |
+END

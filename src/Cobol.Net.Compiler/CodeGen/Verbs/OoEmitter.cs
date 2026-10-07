@@ -895,6 +895,20 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             ? VariableLengthCompatibility.CorrespondingSpans(fixedSide, varSide.Item)
             : null;
 
+    /// <summary>The §8.5.1.12 atoms of the variable-length group place <paramref name="place"/> and of the
+    /// variable-length group <paramref name="other"/> it crosses to or from, when the two are of DIFFERENT shapes —
+    /// compatible (bind proved it) but not carried alike, so the carrier is rebuilt (<c>CobolVarGroup.Reshape</c>) and a
+    /// store overlaid back (<c>CobolVarGroup.Overlay</c>; kb/Work PB480). Null when the shapes are the same (the carrier
+    /// crosses as it is) or either side is not a variable-length group.</summary>
+    private static (GroupAtom[] PlaceShape, GroupAtom[] OtherShape)? VarGroupShapes(Place place, DataItem other) =>
+        CallEmitter.CallPlaceIsVarGroup(place) && place.DenotedItem is { } item
+        && VariableLengthCompatibility.IsVariableLength(other)
+        && VariableLengthCompatibility.GroupAtoms(item) is { } placeShape
+        && VariableLengthCompatibility.GroupAtoms(other) is { } otherShape
+        && !GroupCompatibility.SameShape(placeShape, otherShape)
+            ? (placeShape, otherShape)
+            : null;
+
     /// <summary>⛔ THE CALLER'S BOX OF ONE UNIVERSAL ARGUMENT — D10's canonical box, in the ARGUMENT's own form (the
     /// callee converts a group box it admits in another shape, <see cref="UniversalGroupCarrier"/>): a string-carried
     /// item → string, a variable-length group → its carrier, a strong group with no image → its leaf vector (kb/Work
@@ -1612,10 +1626,15 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // a variable-length group"; kb/Work PB965): it decomposes at the spans of ITS tables that
                 // correspond to the formal's dynamic-capacity tables — the ONE correspondence walk, run here at
                 // compile time because both descriptions are in hand.
+                // Two variable-length groups of DIFFERENT shapes (kb/Work PB480): the argument's carrier is rebuilt in
+                // the formal's (§8.5.1.12 constrains only where their variable-length items lie).
                 Decl(RuntimeApi.VarGroupType, a.Source is { } vgp
                     ? FixedArgumentSpans(vgp, a.Formal) is { } fs
                         ? RuntimeApi.VarGroupFromFixedImage(CallEmitter.CallStringRead(vgp), CallEmitter.LayoutArray(fs))
-                        : PlaceRenderer.VarGroupBoundaryImage(vgp, "INVOKE argument")
+                        : VarGroupShapes(vgp, a.Formal) is (var argShape, var formalShape)
+                            ? RuntimeApi.VarGroupReshape(PlaceRenderer.VarGroupBoundaryImage(vgp, "INVOKE argument"),
+                                argShape, formalShape)
+                            : PlaceRenderer.VarGroupBoundaryImage(vgp, "INVOKE argument")
                     : RuntimeApi.VarGroupEmpty);
             }
             else if (a.Source is { } vsp && VarPlaceSpans(vsp, a.Formal) is { } vs)
@@ -1803,7 +1822,12 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 w.Line(CallEmitter.CallStringWrite(inv.Returning,
                     RuntimeApi.VarGroupToFixedImage(tmp, ri.ImageWidth, CallEmitter.LayoutArray(rvs))));
             else if (OoVarGroupCarried(rs))
-                w.Line(PlaceRenderer.WriteVarGroupImage(inv.Returning, tmp, "INVOKE RETURNING delivery into"));
+                // A variable-length receiver of another shape takes the result rebuilt in its own (kb/Work PB480).
+                w.Line(PlaceRenderer.WriteVarGroupImage(inv.Returning,
+                    VarGroupShapes(recv, rs) is (var recvShape, var sendShape)
+                        ? RuntimeApi.VarGroupReshape(tmp, sendShape, recvShape)
+                        : tmp,
+                    "INVOKE RETURNING delivery into"));
             else if (ItemCategory.IsGroupItem(rs) && VarPlaceSpans(recv, rs) is { } fvs)
                 w.Line(PlaceRenderer.WriteVarGroupImage(inv.Returning,
                     RuntimeApi.VarGroupFromFixedImage(tmp, CallEmitter.LayoutArray(fvs)), "INVOKE RETURNING delivery into"));
@@ -1856,6 +1880,14 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             return FixedArgumentSpans(src, a.Formal) is { } ws
                 ? CallEmitter.CallStringWrite(src,
                     RuntimeApi.VarGroupToFixedImage(value, src.Item.ImageWidth, CallEmitter.LayoutArray(ws)))
+                // …and of a variable-length argument of another shape, the formal's store overlaid on the argument's
+                // storage: its material past the formal and its components the formal does not reach survive (kb/Work
+                // PB480; §14.2.3 GR8).
+                : VarGroupShapes(src, a.Formal) is (var argShape, var formalShape)
+                    ? PlaceRenderer.WriteVarGroupImage(src,
+                        RuntimeApi.VarGroupOverlay(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into"), value,
+                            argShape, formalShape),
+                        "INVOKE copy-out into")
                 : PlaceRenderer.WriteVarGroupImage(src, value, "INVOKE copy-out into");
         else if (VarPlaceSpans(src, a.Formal) is { } wv)
             // …and its write-back OVERLAYS the argument's storage (§14.2.3 GR8): the argument's tables keep

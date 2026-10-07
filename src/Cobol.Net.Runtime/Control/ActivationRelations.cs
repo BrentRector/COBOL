@@ -204,23 +204,49 @@ public static class ActivationRelations
     }
 
     /// <summary>§14.8.2.2 / §14.8.3.2: "If either … is a variable length group, … shall be compatible, as described
-    /// in 8.5.1.12". Two variable-length groups with the same §8.5.1.12 signature are compatible; a variable-length
-    /// group opposite a FIXED-length group is compatible when every dynamic item of the variable one has its
-    /// positional counterpart (§8.5.1.12.2, <see cref="CobolVarGroup.CorrespondingSpans"/> — the same correspondence
-    /// walk the CALL boundary runs on the layouts that travel with its arguments). Null when compatible.</summary>
+    /// in 8.5.1.12" — the ONE §8.5.1.12 walk (<see cref="GroupCompatibility.Walk"/>, the walk the compiler's bind-time
+    /// screen asks) over the atoms both descriptions carry. A variable-length group is compatible only with a GROUP
+    /// (§8.5.1.12.1: "unless the other operand is a compatible group"). A fixed-length partner is converted through the
+    /// carrier's character correspondence (<see cref="CobolVarGroup.CorrespondingSpans"/>), so a pair whose
+    /// correspondence that carrier cannot state is not admitted either. Null when compatible.</summary>
     private static string? VariableLengthViolation(ActivationDescription a, ActivationDescription b, string aRole,
         string bRole)
     {
+        string Refusal(string why) => $"the {aRole} ({a}) and the {bRole} ({b}) are not compatible: {why}";
         bool aVar = a.Shape is ActivationShape.VariableLengthGroup, bVar = b.Shape is ActivationShape.VariableLengthGroup;
-        if (aVar && bVar)
-            return string.Equals(a.VariableSignature, b.VariableSignature, StringComparison.Ordinal) ? null
-                : $"the {aRole} ({a}) and the {bRole} ({b}) are not compatible variable-length groups (ISO §8.5.1.12)";
+        if (!IsGroupPartner(a) || !IsGroupPartner(b))
+            return Refusal("a variable-length group is compatible only with a group (ISO §8.5.1.12.1)");
+        if (GroupCompatibility.Walk(AtomsOf(a), AtomsOf(b)) is { } why)
+            return Refusal($"{GroupMismatchText(why)} (ISO §8.5.1.12)");
+        if (aVar && bVar) return null;
         var (fixedSide, varSide) = aVar ? (b, a) : (a, b);
-        return fixedSide.Shape is ActivationShape.AlphanumericGroup && varSide.Layout is { } v
-               && CobolVarGroup.CorrespondingSpans(fixedSide.Layout ?? CobolVarGroup.FixedRun(fixedSide.Positions), v)
-                   is not null
+        return CobolVarGroup.CorrespondingSpans(GroupCompatibility.Layout(AtomsOf(fixedSide)),
+                   GroupCompatibility.Layout(AtomsOf(varSide))) is not null
             ? null
-            : $"the {aRole} ({a}) and the {bRole} ({b}) are not compatible: a variable-length group is compatible only "
-              + "with a group whose items correspond to its variable-length items (ISO §8.5.1.12.1 / §8.5.1.12.2)";
+            : Refusal("a variable-length group is compatible only with a group whose items correspond to its "
+                      + "variable-length items (ISO §8.5.1.12.1 / §8.5.1.12.2)");
     }
+
+    /// <summary>A side §8.5.1.12 can pair: a variable-length group or a fixed-length alphanumeric group.</summary>
+    private static bool IsGroupPartner(ActivationDescription d) =>
+        d.Shape is ActivationShape.VariableLengthGroup or ActivationShape.AlphanumericGroup;
+
+    /// <summary>A group description's atoms — one run of its positions when it carries none (a group with a USAGE BIT
+    /// leaf).</summary>
+    internal static GroupAtom[] AtomsOf(ActivationDescription d) => d.Atoms ?? GroupCompatibility.FixedRun(d.Positions);
+
+    /// <summary>A §8.5.1.12 reason in run-time words: the descriptions carry no item names, so it names the rule and the
+    /// relative byte position.</summary>
+    private static string GroupMismatchText(GroupMismatch m) => m.Kind switch
+    {
+        GroupMismatchKind.DynamicLengthUnpaired =>
+            $"a dynamic-length item at relative byte position {m.Position} has no dynamic-length item opposite it",
+        GroupMismatchKind.DynamicLengthBeyondEnd =>
+            "a dynamic-length item lies beyond the last byte of the other group",
+        GroupMismatchKind.DynamicTableOppositeNonTable or GroupMismatchKind.DynamicTableUnpaired =>
+            $"a dynamic-capacity table at relative byte position {m.Position} has no table opposite it",
+        GroupMismatchKind.ElementBytesDiffer =>
+            $"the corresponding tables at relative byte position {m.Position} have elements of different byte lengths",
+        _ => $"the corresponding tables at relative byte position {m.Position} have incompatible elements",
+    };
 }

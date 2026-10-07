@@ -38,8 +38,8 @@ public sealed class ActivationDescriptionFieldDriftTests
         var d = new ActivationDescription
         {
             Shape = ActivationShape.ObjectReference, Category = "c", Clauses = "k", LocaleExternal = "en-US",
-            LocaleFromLiteral = true, AnyLength = true, Positions = 7, Usage = "u", StrongType = "s", Layout = [0, 7, 0],
-            VariableSignature = "v", ObjectKind = ObjectReferenceKind.ObjectClass, ObjectName = "C", Factory = true,
+            LocaleFromLiteral = true, AnyLength = true, Positions = 7, Usage = "u", StrongType = "s",
+            Atoms = [new GroupAtom(GroupAtomKind.Fixed, 7, 7)], ObjectKind = ObjectReferenceKind.ObjectClass, ObjectName = "C", Factory = true,
             Only = true, Optional = true, ByValue = true,
         };
         string text = CobolNet.CodeGen.RuntimeApi.ActivationDescriptionNew(d);
