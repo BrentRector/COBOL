@@ -53,6 +53,7 @@ the tools it runs). Contents:
 | `handoff.last.json` | the supervisor | the newest VALID handoff, which the next unit reads and `next_unit.py` decides from |
 | `scratch\` | the units and their fleets | the fleet scratch directory (`{SCRATCH}`): specs, `groups.json`, the Workflow args, and `reports\`, which `plan_wave.py` reads for finishers; it persists across units |
 | `clusters-open.json`, `clusters-half.json` | `plan_wave.py` | the latest `fix_clusters.py --json` views it planned from |
+| `clusters-campaign-<lead>.json` | `plan_wave.py --cluster` | the latest campaign view it planned from: the open and half clusters, `deps` and `waiting` (section 9.1) |
 | `units.jsonl` | the supervisor | one line per unit (section 4.5) |
 | `OWNER-QUESTIONS.md` | the supervisor | questions only the owner can answer; the loop stops after writing one |
 | `logs\` | the supervisor | the raw stream-json of every unit, its archived handoff, and the breaker's notes |
@@ -65,6 +66,7 @@ one session.
 | Unit | Model | Starts when | Ends when |
 |---|---|---|---|
 | `wave` | Opus (the orchestrator's judgment; the implementers are routed per group by `model_rules.json`) | nothing pending to land or resume and the budget says `go` | its Workflow returned, the last lander train landed through `push-main.sh`, the ledger refreshed (`python scripts/spec/gen_ledger.py`, `references/landing.md`) and the handoff written |
+| `campaign` | Opus | only with `-Cluster <lead>`: the cluster has a ready note and the last wave-type unit was not a `campaign` (section 9.1) | as `wave`; its prompt is `units/wave.md` with `--cluster <lead>` on the `plan_wave.py` call |
 | `land` | Opus | finished implementer branches exist with no lander (a previous wave unit ended early), or a handoff says `next_unit: land` | the train landed (or was dropped with reasons) and the ledger rendered to `{COORD}\ledger.html` (section 14) |
 | `resume` | Opus | the previous unit died, timed out, was stopped with a Workflow in flight, or handed off `split` | it has classified every pending branch and report (finish, land, re-plan) and handed off the next unit |
 | `meter` | Sonnet, with `--chrome` | the newest reading in `readings.json` is older than 3 hours | the reading is appended (`budget.py --record`) and the handoff written |
@@ -113,6 +115,12 @@ that fires wins (the supervisor's `-Unit` overrides the first iteration only):
 6. The handoff lists `branches_pending` with status `DONE` → `land`.
 7. Otherwise → `wave`. (A stale ledger page is not a reason for a unit: a headless unit cannot publish it, section 14.
    The earlier rule 7 compared a repo file that never existed, so it sent every idle loop to `land`.)
+   With `--cluster <lead>` (the supervisor's `-Cluster`, section 9.1) this rule decides the lane: `campaign` when the
+   cluster has a ready note (`work.py`'s `cluster_order`) and the newest `wave` or `campaign` line of `units.jsonl` is
+   not a `campaign`, so campaign waves alternate with fix-lane waves; otherwise `wave`. The JSON then also carries
+   `campaign`: `run`, `between`, `waiting` (no ready note), `landed` (every note that names the cluster is landed or
+   retired: the supervisor ends the lane and runs the fix lane alone) or `unknown`. Without `--cluster` the output is
+   byte-identical to the fix lane's (`test_orchestrate.ps1` 8b).
 
 ## 4. The supervisor loop (`orchestrate.ps1`)
 
@@ -120,12 +128,12 @@ Parameters: `-DryRun` (prints the budget decision, the unit it would run and the
 exits; it starts nothing and, past a hold, says what it would run after it), `-ClaudeExe` (the executable; a test
 seam pointing at a fake that emits canned stream-json, not a wrapper; a `.ps1` or `.cmd` is launched through its
 shell), `-CoordDir`, `-RepoDir` (default the repository containing the script), `-MaxContextTokens` (default
-150000), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave`
+150000), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave` or `campaign`
 unit gets three times this, because a lander train must be allowed to finish), `-BorrowDays` (passed to
-`budget.py`), `-Unit` (the first unit, overriding `next_unit.py` once), `-Watch` (section 13), `-Python`, and the
-test seams `-TelemetryDir` (passed to `budget.py`), `-IdleCloseSeconds` (default 20, section 4.6), `-CheckpointSeconds` (default 300, section 5.1) and `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
+`budget.py`), `-Unit` (the first unit, overriding `next_unit.py` once), `-Cluster <lead>` (the campaign lane, section 9.1; validated at start), `-Watch` (section 13), `-Python`, and the
+test seams `-TelemetryDir` (passed to `budget.py`), `-WorkDir` (the register `next_unit.py` and `work.py` read for `-Cluster`), `-IdleCloseSeconds` (default 20, section 4.6), `-CheckpointSeconds` (default 300, section 5.1) and `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
 (default 60). Exit codes: 0 stopped (`STOP`, `-MaxUnits`, `stop-week`, `-DryRun`), 3 another instance runs,
-4 circuit breaker, 5 an owner question is waiting.
+4 circuit breaker, 5 an owner question is waiting, 2 `-Cluster` names no cluster any kb/Work note names (or `-Unit campaign` without `-Cluster`).
 
 Each iteration, in this order:
 
@@ -148,8 +156,8 @@ Each iteration, in this order:
 5. **Next unit** (section 3.2).
 6. **Run it**: `claude -p <prompt> --model <unit model> --permission-mode <mode> --permission-prompts none
    --output-format stream-json --verbose --session-id <fresh GUID>` from the repository root (plus `--chrome` for
-   `meter`). The prompt is `units/common.md` followed by `units/<unit>.md`, with the substitutions `{COORD}`,
-   `{HANDOFF}`, `{STOP_UNIT}`, `{PREV_HANDOFF}`, `{SCRATCH}`, `{TASKS_DIR}` and `{BORROW_DAYS}` (the supervisor's `-BorrowDays`, so the
+   `meter`). The prompt is `units/common.md` followed by `units/<unit>.md` (`units/wave.md` for a `campaign` unit), with the substitutions `{COORD}`,
+   `{HANDOFF}`, `{STOP_UNIT}`, `{PREV_HANDOFF}`, `{SCRATCH}`, `{TASKS_DIR}`, `{CLUSTER_ARG}` (` --cluster <lead>` for a `campaign` unit, empty otherwise) and `{BORROW_DAYS}` (the supervisor's `-BorrowDays`, so the
    `wave` unit's `plan_wave.py --from-budget` sees the same allowance the supervisor's gate used). The stream goes to `logs\<time>-<unit>.jsonl`,
    stderr to `logs\<time>-<unit>.stderr.txt`.
    While it runs, the supervisor reads every `assistant` event's `usage` (counting each message id once: the
@@ -391,6 +399,10 @@ applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status
    `make_dispatch_specs.py`; exit 1 when red), and `<scratch>\wf-args-w<wave>.json` with the rolling wave's args
    (`scratch, wave, concurrency, train_size, min_final_train, devlog_n, previous_train, lead_id_blocks,
    implementer_model, authorization, groups`).
+9. **Frontier models wait for the owner.** A note whose body says its work needs Fable or Mythos under the owner's
+   approval (`routing.owner_approval_patterns`) is never planned, in either lane: that approval is per dispatch
+   (MANDATORY-PRACTICES P1) and an unattended wave cannot ask, and routing it to Opus would pre-empt the owner's
+   choice. It is printed as waiting; the attended session asks. First case: PB2118, R1's authorship (R69 section 4).
 
 Measured on 2026-10-04 against the repository after train 1015 (budget 3 points): eight groups in two trains,
 finishers first (PB244 from wave 1013's split, PB480 and PB1112 from wave 1013's not-started pair, PB1940 from
@@ -402,6 +414,54 @@ groups because the open half notes now form their own clusters.
 The constants in `model_rules.json` carry their date and source: one weekly point is about 1 M agent tokens on
 Sonnet and 0.4 M on Opus (measured 2026-10-04 over waves 1011-1015). The per-group and per-note figures are seeded
 from that measurement and are refit from `units.jsonl` and `usage_report.py` (PB1981 item 9).
+
+### 9.1 The campaign lane (`--cluster`, kb/Work PB2120)
+
+The fix lane plans from harm: `fix_clusters.py` reads `.agent-fleet.json`, which keeps `kind: defect`, skips
+`blocked` and `process_only` notes, and resolves sites under `src/Cobol.Net.*` only. A CAMPAIGN (the legacy
+retirement `PB2108`, the architecture review `PB1754`) is `process_only` work in `tests/`, `scripts/`, `.github/`,
+`docs/` and the legacy tree, so before this lane it could be dispatched only by a hand-written `groups.json`. A
+campaign is a named cluster in the register: every note whose `cluster:` list names the lead (a lead note may list
+itself), ordered by `blocked_by:`.
+
+- **Selection** is `work.py`'s `cluster_order(items, lead)`, the one reader of `cluster` and `blocked_by` (also behind
+  `python scripts/spec/work.py next --cluster <lead> [--json]`): every non-terminal note naming the cluster, of any kind,
+  whatever its harm flags, with its depth in the `blocked_by` topology and what it waits on (open blockers, in the
+  cluster or not; `status: owner` or `blocked`; or `blocked: true` with no `blocked_by`). A note is READY when it waits
+  on nothing. `work.py check` holds the two spellings together: `blocked_by` names notes, `blocked` is true exactly
+  while a named blocker is open (a stale `true` hid PB1940 and PB1956 from every work list), and open notes form no
+  cycle.
+- **Planning** (`plan_wave.py --cluster <lead>`): a note is PLANNABLE when it is ready or when everything it waits on
+  is plannable; the rest are printed as waiting with the reason. Plannable notes are clustered by the code sites their
+  text names, with `fix_clusters.py`'s own `source_index`, `sites` and `cluster` (imported, never forked) over
+  `model_rules.json` `campaign.src`, `ext` and `exclude_dir` (the whole tree less corpora and generated output; project
+  files are not sites, because their dotted names read as `Type.Member` references), one topological depth at a time
+  so a cluster never mixes a blocker with what it blocks. A note naming no site is a group of its own, ordered by its
+  chain. The clusters holding one dependent's blockers MERGE when they share a depth and fit the cap, so the dependent
+  can follow one chain (wave 1025 was planned so by hand: PB2108 + PB2109, then PB2110). Ranking puts depth first. Everything else is the fix lane's mechanism: awaiting landing, finishers, model
+  routing, budget, trains, allocation and outputs.
+- **Dependencies become successors.** A group whose notes wait on notes planned in this wave joins the TAIL of the
+  blocker group's successor chain (`after:`), so it starts once that chain has returned, merges its branch and lands
+  through it (the rolling wave's same-file mechanism, unchanged). A chain stays linear because the rolling wave holds a
+  predecessor for one successor. In the fix lane the only link is a shared primary file, whose chain tail is that
+  file's last group, so the rule there is the same-file rule exactly. A group whose blockers are planned in no group,
+  or still sit in two chains (they did not merge, or the group's own file belongs to another chain), waits for a later
+  wave. Its spec says it is a DEPENDENCY
+  SUCCESSOR and to return BLOCKED if its blocker did not finish.
+- **The supervisor** (`orchestrate.ps1 -Cluster <lead>`) checks the cluster exists at start, passes it to
+  `next_unit.py`, which alternates `campaign` and fix-lane `wave` units (section 3.2 rule 7), and ends the lane when
+  every note naming the cluster is landed or retired; the loop then runs the fix lane alone. A `campaign` unit is a
+  `wave` unit whose `plan_wave.py` call carries `--cluster` (the `{CLUSTER_ARG}` placeholder).
+- **The fix lane is unchanged** without `--cluster`: `test_plan_wave.py` check 8 compares the whole fixture plan with a
+  golden that the planner wrote before this lane existed, and `test_orchestrate.ps1` 8b compares `next_unit.py`'s
+  choice and the wave prompt.
+
+Measured on 2026-10-07 (dry runs, budget 3 points, before wave 1025 landed): `--cluster PB2108` plans six groups in
+two trains for 1.62 points: `A` = PB2108 + PB2109 (Opus, `build/ci`, merged because PB2110 waits on both), PB2120 on
+its own, then the chain `A2` PB2110, `A3` PB2112, `A4` PB2113 (Opus, the lexer `.g4`), `A5` PB2114, and PB2111 waiting
+(its primary file is PB2120's, another chain); `--cluster PB1754` plans PB2115, PB2116, PB2117 and PB2119 after PB2115
+(`A2`) for 0.94 points, and holds PB2118 for the owner's Mythos approval. A live run also excludes the notes whose
+branches await landing (wave 1025's), exactly as the fix lane does.
 
 ## 10. What is built and what is not
 
@@ -464,7 +524,7 @@ concurrently with no duplicate), `test_inventory_ratchet.py` (a fabricated reope
 `test_budget.py`, `test_ledger_state.py` (owed until the current stamp is marked, owed again after an input-touching commit,
 not after an unrelated one), `test_checkpoint.py` (real linked worktrees: committed, dirty, clean; a synthesized handoff checked
 against the schema's required and permitted keys), `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
-real dispatch-spec template and `check_practices.py`'s same-file rule), `test_watch_agent.py` (a transcript with a
+real dispatch-spec template and `check_practices.py`'s same-file rule; the fix lane's whole plan against a golden the pre-campaign planner wrote; the campaign lane's selection, `blocked_by` order, `after:` derivation and waits, and `work.py check`'s topology rules, section 9.1), `test_watch_agent.py` (a transcript with a
 partial last line). CI runs the hook self-tests in the `audits` job (`python3 scripts/hooks/test_forbidden_commands.py
 && ...`); the orchestrator tests would be one more step there
 (`for t in scripts/orchestrator/test_*.py; do python3 "$t"; done`). They need no build; `test_plan_wave.py` imports

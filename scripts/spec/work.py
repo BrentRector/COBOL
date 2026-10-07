@@ -22,6 +22,7 @@ a previous summary was wrong — lives in the note BODY, which is where it alrea
     python scripts/spec/work.py migrate    # ONE TIME: fold the five registers into kb/Work/
     python scripts/spec/work.py check      # validate frontmatter; non-zero on a bad/missing field
     python scripts/spec/work.py next       # the ranked work list (session-probe prints this)
+    python scripts/spec/work.py next --cluster PB2108 [--json]   # one campaign's open notes in blocked_by order
     python scripts/spec/work.py stats      # counts by kind/status/harm
     python scripts/spec/work.py parity     # the frontmatter reader vs. its C# twin's fixture (--json for the gate)
 
@@ -290,9 +291,10 @@ def parse_frontmatter(text: str) -> dict | None:
     return out
 
 
-def load() -> list[dict]:
+def load(work_dir: pathlib.Path = WORK) -> list[dict]:
+    """Every note under `work_dir` (the register; a test passes a fixture directory)."""
     items = []
-    for p in sorted(WORK.glob("*.md")):
+    for p in sorted(work_dir.glob("*.md")):
         d = parse_frontmatter(p.read_text(encoding="utf-8"))
         if d is None:
             continue
@@ -428,6 +430,7 @@ def check() -> int:
                        f'`work.py next`. Set one of {list(HARM_FLAGS)}, or process_only: true if it '
                        f'genuinely does nothing to a user\'s program.')
         bad += closes_rows_shape(it)
+    bad += topology_problems(items)
     ids = [it.get("id") for it in items]
     for i in set(ids):
         if ids.count(i) > 1:
@@ -464,6 +467,142 @@ def actionable(items: list[dict]) -> list[dict]:
             and any(i.get(f) for f in HARM_FLAGS)
             and not i.get("process_only") and not i.get("blocked")]
     return sorted(live, key=lambda i: (sev.get(i.get("severity"), 9), i.get("id", "")))
+
+
+# ── clusters and the blocked_by topology (kb/Work PB2120) ─────────────────────────────────────────────────────
+#
+# ⭐ A NAMED CLUSTER IS A PLANNABLE UNIT. `actionable` answers "what harms a user's program"; a campaign (the legacy
+# retirement, the architecture review) is `process_only` work that ranks nowhere there, so it was dispatched by
+# hand. `cluster:` names the campaign a note belongs to (usually its lead note's id, which may list itself) and
+# `blocked_by:` orders the campaign. `cluster_order` is the ONE reader of both: `work.py next --cluster`,
+# `plan_wave.py --cluster` and `next_unit.py` all call it, so "ready" means one thing everywhere.
+#
+# ⛔ `blocked:` IS A SECOND SPELLING OF `blocked_by:`, AND THEY DRIFTED. The fix lane skips a note whose flag is
+# true (`.agent-fleet.json` skip_flag), so a flag left true after its blocker landed HIDES a live defect from every
+# work list; two were found that way when this was written (PB1940 after PB2087 landed, PB1956 after PB322). So
+# `check` holds the flag to the list: when `blocked_by` names notes, `blocked` is true exactly while one of them is
+# still open. A flag with an empty list stays legal: it is a note blocked on something that is not a note.
+
+
+def id_order(nid: str) -> tuple[int, str]:
+    """Sort key: a note id by its number (PB98 before PB120), a name without one last."""
+    m = re.search(r"\d+", nid or "")
+    return (int(m.group()) if m else 1 << 30, nid or "")
+
+
+def open_blockers(it: dict, by_id: dict[str, dict]) -> list[str]:
+    """The note's `blocked_by` entries that are not terminal (an id the register lacks counts as open)."""
+    return [b for b in (it.get("blocked_by") or [])
+            if by_id.get(b, {}).get("status") not in TERMINAL_STATUSES]
+
+
+def cluster_order(items: list[dict], lead: str) -> dict:
+    """The cluster `lead` names: `{"cluster", "named", "notes": [...]}`, `notes` being every NON-TERMINAL note whose
+    `cluster` list holds `lead`, whatever its kind, harm flags or `process_only`, in `blocked_by` topological order.
+
+    Each entry is `{"id", "kind", "status", "area", "title", "depth", "ready", "waiting_on", "blockers_in_cluster"}`:
+    `depth` is 0 for a note no open cluster member blocks and one past its deepest open in-cluster blocker otherwise
+    (`None` inside a cycle); `waiting_on` lists every open blocker, in the cluster or not, plus the reason a note is
+    held without one (`status: owner`, `status: blocked`, or `blocked: true` with no `blocked_by`); `ready` is
+    `waiting_on == []`. Ties sort by note number. `named` counts every note that names the cluster, landed or not,
+    so a caller can tell a LANDED cluster (named > 0, notes empty) from a misspelled one (named == 0)."""
+    by_id = {i.get("id"): i for i in items}
+    # a list only: a scalar `cluster: PB2108` would match by SUBSTRING (`check` reports that shape)
+    named = [i for i in items if isinstance(i.get("cluster"), list) and lead in i["cluster"]]
+    members = {i["id"]: i for i in named if i.get("status") not in TERMINAL_STATUSES}
+    depth: dict[str, int | None] = {}
+
+    def depth_of(nid: str, on_path: set[str]) -> int | None:
+        """None exactly when the note reaches a cycle, which does not depend on the path taken, so it memoizes."""
+        if nid in depth:
+            return depth[nid]
+        if nid in on_path:
+            return None
+        on_path.add(nid)
+        ds = [depth_of(b, on_path) for b in open_blockers(members[nid], by_id) if b in members]
+        on_path.discard(nid)
+        depth[nid] = None if None in ds else (1 + max(ds) if ds else 0)
+        return depth[nid]
+
+    rows = []
+    for nid, it in members.items():
+        waiting = open_blockers(it, by_id)
+        if it.get("status") in ("owner", "blocked"):
+            waiting.append(f"status: {it['status']}")
+        elif it.get("blocked") and not it.get("blocked_by"):
+            waiting.append("blocked: true (no blocked_by note)")
+        rows.append({"id": nid, "kind": it.get("kind", ""), "status": it.get("status", ""), "area": it.get("area", ""),
+                     "title": str(it.get("title", "")), "depth": depth_of(nid, set()), "ready": not waiting,
+                     "waiting_on": waiting, "blockers_in_cluster": [b for b in waiting if b in members]})
+    rows.sort(key=lambda r: (r["depth"] is None, r["depth"] or 0, id_order(r["id"])))
+    return {"cluster": lead, "named": len(named), "notes": rows}
+
+
+def topology_problems(items: list[dict]) -> list[str]:
+    """`blocked_by` names notes that exist, `blocked` agrees with it, open notes form no blocking cycle, and
+    `cluster` is a list of names (a lead note's id, or a campaign name such as `user-documentation`)."""
+    by_id = {i.get("id"): i for i in items}
+    bad = []
+    for it in items:
+        f = it["_file"]
+        bb, cl = it.get("blocked_by", []), it.get("cluster", [])
+        if not isinstance(cl, list) or not all(isinstance(c, str) and c for c in cl):
+            bad.append(f"{f}: cluster must be a list of cluster names, got {cl!r}")
+        if not isinstance(bb, list):
+            bad.append(f"{f}: blocked_by must be a list of note ids, got {bb!r}")
+            continue
+        unknown = [b for b in bb if b not in by_id]
+        for b in unknown:
+            bad.append(f"{f}: blocked_by names {b!r}, which is not a kb/Work note id — name the blocking note "
+                       f"(an owner question is a decision note), or keep `blocked: true` with an empty list and "
+                       f"say what blocks it in the body")
+        if unknown or not bb or it.get("status") in TERMINAL_STATUSES:
+            continue
+        still = open_blockers(it, by_id)
+        if bool(it.get("blocked")) != bool(still):
+            bad.append(f"{f}: blocked is {bool(it.get('blocked'))} but its blocked_by {bb} "
+                       + (f"still has {still} open" if still else "have all landed or retired")
+                       + " — set `blocked: " + ("true" if still else "false")
+                       + "` (a stale true hides the note from every work list)")
+    live = {i["id"]: i for i in items if i.get("status") not in TERMINAL_STATUSES and isinstance(i.get("blocked_by"), list)}
+    state: dict[str, int] = {}
+
+    def visit(nid: str, path: list[str]) -> None:
+        state[nid] = 1
+        for b in live[nid]["blocked_by"]:
+            if b not in live:
+                continue
+            if state.get(b) == 1:
+                bad.append("blocked_by cycle among open notes: " + " -> ".join(path[path.index(b):] + [b]))
+            elif b not in state:
+                visit(b, path + [b])
+        state[nid] = 2
+
+    for nid in sorted(live, key=id_order):
+        if nid not in state:
+            visit(nid, [nid])
+    return bad
+
+
+def print_cluster(view: dict, as_json: bool) -> int:
+    if as_json:
+        print(json.dumps(view, ensure_ascii=False))
+        return 0 if view["named"] else 1
+    lead, notes = view["cluster"], view["notes"]
+    if not view["named"]:
+        print(f"cluster {lead}: no kb/Work note names it in `cluster:`")
+        return 1
+    if not notes:
+        print(f"cluster {lead}: LANDED ({view['named']} note(s), every one landed or retired)")
+        return 0
+    ready = sum(n["ready"] for n in notes)
+    print(f"cluster {lead}: {len(notes)} open note(s), {ready} ready, {len(notes) - ready} waiting (blocked_by order)")
+    for n in notes:
+        title = re.sub(rf"^{re.escape(n['id'])}\s*[—-]\s*", "", n["title"])[:90]
+        state = "ready  " if n["ready"] else "waiting on " + ", ".join(n["waiting_on"])
+        depth = "cyc" if n["depth"] is None else f"{n['depth']:3}"
+        print(f"  {depth} {n['id']:7} {n['kind']:9} {n['area'][:18]:18} {state}" + (f"  {title}" if n["ready"] else ""))
+    return 0
 
 
 # ── the cross-language parity fixture ────────────────────────────────────────────────────────────────────────
@@ -561,7 +700,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["migrate", "check", "next", "stats", "parity"])
     ap.add_argument("--top", type=int, default=3)
-    ap.add_argument("--json", action="store_true", help="emit one machine-readable JSON line (parity)")
+    ap.add_argument("--json", action="store_true", help="emit one machine-readable JSON line (parity, next --cluster)")
+    ap.add_argument("--work", default=str(WORK), help="the register directory (default kb/Work; a test seam)")
+    ap.add_argument("--cluster", metavar="LEAD", help="next: the open notes whose `cluster` names LEAD, in blocked_by "
+                    "order, whatever their harm flags (a campaign; exit 1 when no note names it)")
     a = ap.parse_args()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -573,7 +715,11 @@ def main() -> int:
         return check()
     if a.cmd == "parity":
         return parity(a.json)
-    items = load()
+    if a.cluster and a.cmd != "next":
+        ap.error("--cluster goes with next")
+    items = load(pathlib.Path(a.work))
+    if a.cmd == "next" and a.cluster:
+        return print_cluster(cluster_order(items, a.cluster), a.json)
     if a.cmd == "next":
         nxt = actionable(items)
         if not nxt:

@@ -140,8 +140,8 @@ readable.
 - **Sonnet**: census re-runs, the prose and register sweeps, move-and-rename and analyzer waves driven by a Roslyn
   rewriter or a code fix, Delete waves whose items the census measured dead. The §4 oracle proves a mechanical
   wave; the model does not. A Sonnet agent that meets a judgment returns `NEEDS-OPUS`.
-- Until kb/Work PB2120 lets a named cluster be planned by the orchestrator, review waves are dispatched with a
-  hand-written `groups.json` through the `workstream` skill.
+- Review waves are planned from the `PB1754` cluster like any campaign (kb/Work PB2120,
+  `DESIGN-orchestrator-loop.md` section 9.1): `plan_wave.py --cluster PB1754`, or `orchestrate.ps1 -Cluster PB1754`.
 
 ### R4 — Modernization (mechanical, analyzer-driven)
 Per §5.5: language-version and SDK upgrade first, then one analyzer rule per wave applied with its code fix or a

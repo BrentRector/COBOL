@@ -30,6 +30,8 @@
       "body_patterns": ["(?i)design question (is )?open", "(?i)NEEDS-OPUS", "(?i)needs a (re)?design", "(?i)redesign beyond"],
       "failed_attempts_at_least": 2
     },
+    "owner_approval_patterns": ["(?i)\\b(mythos|fable)\\b[\\s\\S]{0,160}?\\bapprov"],
+    "_owner_approval_why": "A note whose body says its work needs a frontier model (Fable, Mythos) under the owner's approval is never planned: that approval is per dispatch (MANDATORY-PRACTICES P1), which an unattended wave cannot obtain, so the planner lists the note as waiting and the attended session asks. First case: PB2118, R1's authorship (kb/Work R69 section 4, PB2120, 2026-10-07).",
     "_why": "Opus where the work is design-heavy (OO, grammar), where a note says a design question is open, or where a note has already failed twice (a note that fails twice is a task-spec problem, kb/Work PB1981). Opus also for the legacy-retirement cuts (CI and gate wiring carry the CI invariant) and the architecture review's R0/R1 items (kb/Work R69). Fable and Mythos are never values here: each needs explicit owner approval per dispatch (owner 2026-10-02; R69 2026-10-06)."
   },
   "cost": {
@@ -38,6 +40,12 @@
     "lander_tokens": 120000,
     "lander_model": "opus",
     "source": "seeded 2026-10-04 so that a five-note group costs about 0.4 weekly points on either model, a lander about 0.3, and a six-group wave of five-note groups about 3 points with its landers, matching waves 1011-1015 (kb/Work PB1981: a six-group wave already costs about 3 weekly points); refit from units.jsonl"
+  },
+  "campaign": {
+    "src": ["src", "tests", "scripts", ".github", "docs"],
+    "ext": ".cs,.g4,.py,.ps1,.sh,.js,.yml,.md",
+    "exclude_dir": ["Generated", "external", "TestResults", "conformance", "evidence"],
+    "_why": "plan_wave.py --cluster (kb/Work PB2120): a campaign note's code sites are whatever it names, so its notes are clustered over the whole tree, not .agent-fleet.json's src/Cobol.Net.* (which the fix lane keeps). Project files (.csproj, .props, .targets) are not sites: their dotted names (Cobol.Net.Cli.csproj) make fix_clusters read every `Cobol.Net` in a note as a Type.Member reference to the first one indexed (measured on PB2108, 2026-10-07). exclude_dir names directories that hold corpora or generated output, never a fix site: the GnuCOBOL corpus (tests/external), the conformance programs and goldens, gate run output, and the frozen evidence records under docs/."
   },
   "wave": {
     "max_notes_per_group": 5,

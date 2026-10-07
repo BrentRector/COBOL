@@ -1,0 +1,566 @@
+{
+ "full": {
+  "groups": [
+   {
+    "letter": "A",
+    "after": "",
+    "kind": "finisher",
+    "model": "sonnet",
+    "why": "default",
+    "notes": [
+     "PB3",
+     "PB6",
+     "PB7",
+     "PB12"
+    ],
+    "file": "src/X/Emitter.cs",
+    "files": [
+     "src/X/Emitter.cs"
+    ],
+    "pred": "FINISH-FIRST: predecessor w1014b (PB3) returned SPLIT for PB3. Read <TMP>/reports/w1014b-PB3-report.md first, its NEXT and its \"For the next implementer\" section, and run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` when the worktree still exists. Its branch worktree-wf_bbb-2 (worktree E:/COBOL/.claude/worktrees/wf_bbb-2, head 2222222bb) is LANDED: its landed part is already on main, so orient from the report only.",
+    "cost": 0.34,
+    "json": {
+     "letter": "A",
+     "model": "sonnet",
+     "slug": "w77a",
+     "group": "FINISH: EMITTER",
+     "notes": "PB3, PB6, PB7, PB12",
+     "lead": "PB6",
+     "codes": "COBOLNET0001-COBOLNET0003",
+     "root": "src/X/Emitter.cs",
+     "files": "`kb/Work/PB3.md`, `kb/Work/PB6.md`, `kb/Work/PB7.md`, `kb/Work/PB12.md`",
+     "body": "NOTES: PB3 (2 inventory rows claimed): a defect in runtime · PB6 (10 inventory rows claimed): a defect in runtime · PB7 (3 inventory rows claimed): a defect in runtime · PB12 (4 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Emitter.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes.",
+     "pred": "FINISH-FIRST: predecessor w1014b (PB3) returned SPLIT for PB3. Read <TMP>/reports/w1014b-PB3-report.md first, its NEXT and its \"For the next implementer\" section, and run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` when the worktree still exists. Its branch worktree-wf_bbb-2 (worktree E:/COBOL/.claude/worktrees/wf_bbb-2, head 2222222bb) is LANDED: its landed part is already on main, so orient from the report only."
+    }
+   },
+   {
+    "letter": "B",
+    "after": "",
+    "kind": "finisher",
+    "model": "sonnet",
+    "why": "default",
+    "notes": [
+     "PB4"
+    ],
+    "file": "src/X/Half.cs",
+    "files": [
+     "src/X/Half.cs"
+    ],
+    "pred": "FINISH-FIRST: PB4 is `status: half`: read each note's record of the landed half and its kb/Work history before touching code; finish the open half at its root. Branch worktree-wf_fff-3 carries unlanded work for PB4 with no report. Run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` if the worktree still exists, read its STATUS.md, cherry-pick its commits onto current main (never merge the branch), resolve conflicts against the spec, re-gate, then finish the notes at their roots.",
+    "cost": 0.16,
+    "json": {
+     "letter": "B",
+     "model": "sonnet",
+     "slug": "w77b",
+     "group": "FINISH: HALF",
+     "notes": "PB4",
+     "lead": "PB4",
+     "codes": "COBOLNET0001-COBOLNET0003",
+     "root": "src/X/Half.cs",
+     "files": "`kb/Work/PB4.md`",
+     "body": "NOTES: PB4 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Half.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes.",
+     "pred": "FINISH-FIRST: PB4 is `status: half`: read each note's record of the landed half and its kb/Work history before touching code; finish the open half at its root. Branch worktree-wf_fff-3 carries unlanded work for PB4 with no report. Run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` if the worktree still exists, read its STATUS.md, cherry-pick its commits onto current main (never merge the branch), resolve conflicts against the spec, re-gate, then finish the notes at their roots."
+    }
+   },
+   {
+    "letter": "C",
+    "after": "",
+    "kind": "finisher",
+    "model": "sonnet",
+    "why": "default",
+    "notes": [
+     "PB13"
+    ],
+    "file": "src/X/Zero.cs",
+    "files": [
+     "src/X/Zero.cs"
+    ],
+    "pred": "FINISH-FIRST: Branch worktree-wf_ddd-9 carries unlanded work for PB13 with no report. Run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` if the worktree still exists, read its STATUS.md, cherry-pick its commits onto current main (never merge the branch), resolve conflicts against the spec, re-gate, then finish the notes at their roots.",
+    "cost": 0.16,
+    "json": {
+     "letter": "C",
+     "model": "sonnet",
+     "slug": "w77c",
+     "group": "FINISH: ZERO",
+     "notes": "PB13",
+     "lead": "PB13",
+     "codes": "COBOLNET0001-COBOLNET0003",
+     "root": "src/X/Zero.cs",
+     "files": "`kb/Work/PB13.md`",
+     "body": "NOTES: PB13 (0 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Zero.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes.",
+     "pred": "FINISH-FIRST: Branch worktree-wf_ddd-9 carries unlanded work for PB13 with no report. Run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` if the worktree still exists, read its STATUS.md, cherry-pick its commits onto current main (never merge the branch), resolve conflicts against the spec, re-gate, then finish the notes at their roots."
+    }
+   },
+   {
+    "letter": "D",
+    "after": "",
+    "kind": "cluster",
+    "model": "sonnet",
+    "why": "default",
+    "notes": [
+     "PB2",
+     "PB5"
+    ],
+    "file": "src/X/Binder.cs",
+    "files": [
+     "src/X/Binder.cs"
+    ],
+    "pred": "",
+    "cost": 0.22,
+    "json": {
+     "letter": "D",
+     "model": "sonnet",
+     "slug": "w77d",
+     "group": "BINDER",
+     "notes": "PB2, PB5",
+     "lead": "PB2",
+     "codes": "COBOLNET0001-COBOLNET0003",
+     "root": "src/X/Binder.cs",
+     "files": "`kb/Work/PB2.md`, `kb/Work/PB5.md`",
+     "body": "NOTES: PB2 (2 inventory rows claimed): a defect in runtime · PB5 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Binder.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes."
+    }
+   },
+   {
+    "letter": "E",
+    "after": "",
+    "kind": "cluster",
+    "model": "opus",
+    "why": "design-heavy file src/X/Oo/Table.cs (/Oo/)",
+    "notes": [
+     "PB8"
+    ],
+    "file": "src/X/Oo/Table.cs",
+    "files": [
+     "src/X/Oo/Table.cs"
+    ],
+    "pred": "",
+    "cost": 0.16,
+    "json": {
+     "letter": "E",
+     "model": "opus",
+     "slug": "w77e",
+     "group": "TABLE",
+     "notes": "PB8",
+     "lead": "PB8",
+     "codes": "COBOLNET0001-COBOLNET0003",
+     "root": "src/X/Oo/Table.cs",
+     "files": "`kb/Work/PB8.md`",
+     "body": "NOTES: PB8 (1 inventory rows claimed): a defect in oo/classes CODE SITES the notes name: src/X/Oo/Table.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: design-heavy file src/X/Oo/Table.cs (/Oo/); settle any open design question against its design doc first."
+    }
+   },
+   {
+    "letter": "F",
+    "after": "",
+    "kind": "cluster",
+    "model": "opus",
+    "why": "design-heavy file src/F/Grammar/Core.g4 (.g4)",
+    "notes": [
+     "PB11"
+    ],
+    "file": "src/F/Grammar/Core.g4",
+    "files": [
+     "src/F/Grammar/Core.g4"
+    ],
+    "pred": "",
+    "cost": 0.16,
+    "json": {
+     "letter": "F",
+     "model": "opus",
+     "slug": "w77f",
+     "group": "CORE",
+     "notes": "PB11",
+     "lead": "PB11",
+     "codes": "COBOLNET0001-COBOLNET0003",
+     "root": "src/F/Grammar/Core.g4",
+     "files": "`kb/Work/PB11.md`",
+     "body": "NOTES: PB11 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/F/Grammar/Core.g4. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: design-heavy file src/F/Grammar/Core.g4 (.g4); settle any open design question against its design doc first."
+    }
+   },
+   {
+    "letter": "G",
+    "after": "",
+    "kind": "cluster",
+    "model": "opus",
+    "why": "PB9: an open design question ((?i)design question (is )?open)",
+    "notes": [
+     "PB9"
+    ],
+    "file": "src/X/Misc.cs",
+    "files": [
+     "src/X/Misc.cs"
+    ],
+    "pred": "",
+    "cost": 0.16,
+    "json": {
+     "letter": "G",
+     "model": "opus",
+     "slug": "w77g",
+     "group": "MISC",
+     "notes": "PB9",
+     "lead": "PB9",
+     "codes": "COBOLNET0001-COBOLNET0003",
+     "root": "src/X/Misc.cs",
+     "files": "`kb/Work/PB9.md`",
+     "body": "NOTES: PB9 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Misc.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: PB9: an open design question ((?i)design question (is )?open); settle any open design question against its design doc first."
+    }
+   },
+   {
+    "letter": "H",
+    "after": "",
+    "kind": "cluster",
+    "model": "opus",
+    "why": "PB10 already attempted 2 times without landing",
+    "notes": [
+     "PB10"
+    ],
+    "file": "src/X/Other.cs",
+    "files": [
+     "src/X/Other.cs"
+    ],
+    "pred": "",
+    "cost": 0.16,
+    "json": {
+     "letter": "H",
+     "model": "opus",
+     "slug": "w77h",
+     "group": "OTHER",
+     "notes": "PB10",
+     "lead": "PB10",
+     "codes": "COBOLNET0001-COBOLNET0003",
+     "root": "src/X/Other.cs",
+     "files": "`kb/Work/PB10.md`",
+     "body": "NOTES: PB10 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Other.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: PB10 already attempted 2 times without landing; settle any open design question against its design doc first."
+    }
+   },
+   {
+    "letter": "D2",
+    "after": "D",
+    "kind": "cluster",
+    "model": "sonnet",
+    "why": "default",
+    "notes": [
+     "PB14"
+    ],
+    "file": "src/X/Binder.cs",
+    "files": [
+     "src/X/Binder.cs"
+    ],
+    "pred": "",
+    "cost": 0.16,
+    "json": {
+     "letter": "D2",
+     "model": "sonnet",
+     "slug": "w77d2",
+     "group": "BINDER",
+     "notes": "PB14",
+     "lead": "PB14",
+     "codes": "COBOLNET0001-COBOLNET0003",
+     "root": "src/X/Binder.cs",
+     "files": "`kb/Work/PB14.md`",
+     "body": "NOTES: PB14 (0 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Binder.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes.",
+     "after": "D"
+    }
+   }
+  ],
+  "skipped": [],
+  "awaiting_landing": {
+   "worktree-wf_aaa-1": [
+    "PB1"
+   ]
+  },
+  "points": 2.28,
+  "trains": 2,
+  "unlanded_without_note": [
+   "worktree-wf_eee-1"
+  ]
+ },
+ "tight": {
+  "groups": [
+   {
+    "letter": "A",
+    "after": "",
+    "kind": "finisher",
+    "model": "sonnet",
+    "why": "default",
+    "notes": [
+     "PB3",
+     "PB6",
+     "PB7",
+     "PB12"
+    ],
+    "file": "src/X/Emitter.cs",
+    "files": [
+     "src/X/Emitter.cs"
+    ],
+    "pred": "FINISH-FIRST: predecessor w1014b (PB3) returned SPLIT for PB3. Read <TMP>/reports/w1014b-PB3-report.md first, its NEXT and its \"For the next implementer\" section, and run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` when the worktree still exists. Its branch worktree-wf_bbb-2 (worktree E:/COBOL/.claude/worktrees/wf_bbb-2, head 2222222bb) is LANDED: its landed part is already on main, so orient from the report only.",
+    "cost": 0.34,
+    "json": null
+   }
+  ],
+  "skipped": [
+   [
+    "B",
+    "",
+    [
+     "PB4"
+    ]
+   ],
+   [
+    "C",
+    "",
+    [
+     "PB13"
+    ]
+   ],
+   [
+    "D",
+    "",
+    [
+     "PB2",
+     "PB5"
+    ]
+   ],
+   [
+    "E",
+    "",
+    [
+     "PB8"
+    ]
+   ],
+   [
+    "F",
+    "",
+    [
+     "PB11"
+    ]
+   ],
+   [
+    "G",
+    "",
+    [
+     "PB9"
+    ]
+   ],
+   [
+    "H",
+    "",
+    [
+     "PB10"
+    ]
+   ],
+   [
+    "D2",
+    "D",
+    [
+     "PB14"
+    ]
+   ]
+  ],
+  "awaiting_landing": {
+   "worktree-wf_aaa-1": [
+    "PB1"
+   ]
+  },
+  "points": 0.64,
+  "trains": 1,
+  "unlanded_without_note": [
+   "worktree-wf_eee-1"
+  ]
+ },
+ "small": {
+  "groups": [
+   {
+    "letter": "B",
+    "after": "",
+    "kind": "finisher",
+    "model": "sonnet",
+    "why": "default",
+    "notes": [
+     "PB4"
+    ],
+    "file": "src/X/Half.cs",
+    "files": [
+     "src/X/Half.cs"
+    ],
+    "pred": "FINISH-FIRST: PB4 is `status: half`: read each note's record of the landed half and its kb/Work history before touching code; finish the open half at its root. Branch worktree-wf_fff-3 carries unlanded work for PB4 with no report. Run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` if the worktree still exists, read its STATUS.md, cherry-pick its commits onto current main (never merge the branch), resolve conflicts against the spec, re-gate, then finish the notes at their roots.",
+    "cost": 0.16,
+    "json": null
+   }
+  ],
+  "skipped": [
+   [
+    "A",
+    "",
+    [
+     "PB3",
+     "PB6",
+     "PB7",
+     "PB12"
+    ]
+   ],
+   [
+    "C",
+    "",
+    [
+     "PB13"
+    ]
+   ],
+   [
+    "D",
+    "",
+    [
+     "PB2",
+     "PB5"
+    ]
+   ],
+   [
+    "E",
+    "",
+    [
+     "PB8"
+    ]
+   ],
+   [
+    "F",
+    "",
+    [
+     "PB11"
+    ]
+   ],
+   [
+    "G",
+    "",
+    [
+     "PB9"
+    ]
+   ],
+   [
+    "H",
+    "",
+    [
+     "PB10"
+    ]
+   ],
+   [
+    "D2",
+    "D",
+    [
+     "PB14"
+    ]
+   ]
+  ],
+  "awaiting_landing": {
+   "worktree-wf_aaa-1": [
+    "PB1"
+   ]
+  },
+  "points": 0.46,
+  "trains": 1,
+  "unlanded_without_note": [
+   "worktree-wf_eee-1"
+  ]
+ },
+ "max2": {
+  "groups": [
+   {
+    "letter": "A",
+    "after": "",
+    "kind": "finisher",
+    "model": "sonnet",
+    "why": "default",
+    "notes": [
+     "PB3",
+     "PB6",
+     "PB7",
+     "PB12"
+    ],
+    "file": "src/X/Emitter.cs",
+    "files": [
+     "src/X/Emitter.cs"
+    ],
+    "pred": "FINISH-FIRST: predecessor w1014b (PB3) returned SPLIT for PB3. Read <TMP>/reports/w1014b-PB3-report.md first, its NEXT and its \"For the next implementer\" section, and run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` when the worktree still exists. Its branch worktree-wf_bbb-2 (worktree E:/COBOL/.claude/worktrees/wf_bbb-2, head 2222222bb) is LANDED: its landed part is already on main, so orient from the report only.",
+    "cost": 0.34,
+    "json": null
+   },
+   {
+    "letter": "B",
+    "after": "",
+    "kind": "finisher",
+    "model": "sonnet",
+    "why": "default",
+    "notes": [
+     "PB4"
+    ],
+    "file": "src/X/Half.cs",
+    "files": [
+     "src/X/Half.cs"
+    ],
+    "pred": "FINISH-FIRST: PB4 is `status: half`: read each note's record of the landed half and its kb/Work history before touching code; finish the open half at its root. Branch worktree-wf_fff-3 carries unlanded work for PB4 with no report. Run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` if the worktree still exists, read its STATUS.md, cherry-pick its commits onto current main (never merge the branch), resolve conflicts against the spec, re-gate, then finish the notes at their roots.",
+    "cost": 0.16,
+    "json": null
+   }
+  ],
+  "skipped": [
+   [
+    "C",
+    "",
+    [
+     "PB13"
+    ]
+   ],
+   [
+    "D",
+    "",
+    [
+     "PB2",
+     "PB5"
+    ]
+   ],
+   [
+    "E",
+    "",
+    [
+     "PB8"
+    ]
+   ],
+   [
+    "F",
+    "",
+    [
+     "PB11"
+    ]
+   ],
+   [
+    "G",
+    "",
+    [
+     "PB9"
+    ]
+   ],
+   [
+    "H",
+    "",
+    [
+     "PB10"
+    ]
+   ],
+   [
+    "D2",
+    "D",
+    [
+     "PB14"
+    ]
+   ]
+  ],
+  "awaiting_landing": {
+   "worktree-wf_aaa-1": [
+    "PB1"
+   ]
+  },
+  "points": 0.8,
+  "trains": 1,
+  "unlanded_without_note": [
+   "worktree-wf_eee-1"
+  ]
+ }
+}

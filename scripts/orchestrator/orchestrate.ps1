@@ -11,7 +11,9 @@ Design: docs/rearchitecture/DESIGN-orchestrator-loop.md (kb/Work PB1981). Each i
   3. circuit breaker: three consecutive units that fail (nonzero exit, invalid or missing handoff, or under
      -FastFailSeconds without a `done` handoff) stop the loop with an owner note; exponential backoff between failures
   4. budget.py decides go / hold-session / hold-day / stop-week
-  5. the next unit: -Unit for the first iteration, else next_unit.py (the handoff's next_unit, then the deterministic checks)
+  5. the next unit: -Unit for the first iteration, else next_unit.py (the handoff's next_unit, then the deterministic checks);
+     with -Cluster LEAD the CAMPAIGN lane (kb/Work PB2120): next_unit.py alternates `campaign` waves (plan_wave.py
+     --cluster LEAD) with fix-lane waves while the cluster has a ready note, and the lane ends when the cluster is landed
   6. run `claude -p` with the unit prompt (first stream-json message on stdin, which stays open so the session outlives
      a model turn that ends with a Workflow in flight; the supervisor closes it when the stream is idle with no
      background task), a fresh session id, stream-json to logs\; watch the context size and wind the unit down past
@@ -19,11 +21,12 @@ Design: docs/rearchitecture/DESIGN-orchestrator-loop.md (kb/Work PB1981). Each i
   7. validate handoff.json against handoff.schema.json
   8. append one line to units.jsonl
 Exit codes: 0 stopped (STOP, -MaxUnits, stop-week, -DryRun), 3 another instance runs, 4 circuit breaker,
-5 an owner question is waiting in OWNER-QUESTIONS.md.
+5 an owner question is waiting in OWNER-QUESTIONS.md, 2 -Cluster names no kb/Work cluster (or -Unit campaign without it).
 
 .EXAMPLE
 pwsh -NoProfile -File scripts/orchestrator/orchestrate.ps1 -DryRun
 pwsh -NoProfile -File scripts/orchestrator/orchestrate.ps1 -MaxUnits 1 -Unit meter
+pwsh -NoProfile -File scripts/orchestrator/orchestrate.ps1 -Cluster PB2108 -DryRun
 #>
 [CmdletBinding()]
 param(
@@ -40,8 +43,12 @@ param(
     [string]$PermissionMode = 'bypassPermissions',   # owner 2026-10-04 (D1): allowed for the COBOL work; the repo's hooks are the guard
     [double]$GraceMinutes = 30,
     [int]$BorrowDays = 0,
-    [ValidateSet('', 'wave', 'land', 'resume', 'meter')]
+    [ValidateSet('', 'wave', 'campaign', 'land', 'resume', 'meter')]
     [string]$Unit = '',
+    # The campaign lane: the kb/Work cluster (its lead note's id, or a campaign name) whose waves run between fix-lane waves.
+    [string]$Cluster = '',
+    # Test seam: the register directory next_unit.py and work.py read (default kb/Work).
+    [string]$WorkDir = '',
     [switch]$Watch,
     [string]$Python = 'python',
     [string]$TelemetryDir = '',
@@ -56,7 +63,9 @@ Set-StrictMode -Version Latest
 
 $Here = $PSScriptRoot
 $Schema = Join-Path $Here 'handoff.schema.json'
-$UnitModel = @{ wave = 'opus'; land = 'opus'; resume = 'opus'; meter = 'sonnet' }
+$UnitModel = @{ wave = 'opus'; campaign = 'opus'; land = 'opus'; resume = 'opus'; meter = 'sonnet' }
+# A `campaign` unit is a `wave` unit whose plan_wave.py call carries --cluster: one prompt file, one placeholder.
+$PromptFile = @{ campaign = 'wave' }
 $Allowed = @('opus', 'sonnet')   # never Fable or Mythos: each needs the owner's approval per dispatch (owner 2026-10-02; kb/Work R69 2026-10-06)
 New-Item -ItemType Directory -Force -Path $CoordDir, (Join-Path $CoordDir 'logs'), (Join-Path $CoordDir 'scratch') | Out-Null
 $env:COBOL_COORD_DIR = $CoordDir
@@ -138,12 +147,14 @@ function Build-Prompt([string]$unit, [string]$scratch, [string]$sessionId) {
         param($t)
         $t.Replace('{TASKS_DIR}', $tasksDir).Replace('{COORD}', $CoordDir).Replace('{HANDOFF}', $Handoff).Replace('{STOP_UNIT}', $StopUnit).
            Replace('{PREV_HANDOFF}', $LastHandoff).Replace('{SCRATCH}', $scratch).
-           Replace('{BORROW_DAYS}', "$BorrowDays")
+           Replace('{BORROW_DAYS}', "$BorrowDays").Replace('{CLUSTER_ARG}', $(if ($unit -eq 'campaign') { " --cluster $Cluster" } else { '' }))
     }
     $common = & $sub (Get-Content (Join-Path $Here 'units/common.md') -Raw)
-    $own = & $sub (Get-Content (Join-Path $Here "units/$unit.md") -Raw)
+    $own = & $sub (Get-Content (Join-Path $Here "units/$(Get-PromptFile $unit).md") -Raw)
     return "$common`n$own"
 }
+
+function Get-PromptFile([string]$unit) { if ($PromptFile.ContainsKey($unit)) { $PromptFile[$unit] } else { $unit } }
 
 function Get-ProjectTranscriptDir([string]$sessionId) {
     # Claude Code keeps a project's transcripts under ~/.claude/projects/<path with ':' '\' '/' as '-'>.
@@ -178,7 +189,7 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
     $stats = [ordered]@{ calls = 0; input = 0; output = 0; cache_read = 0; cache_creation = 0; peak_context = 0; peak_subagent_context = 0;
         context = 0; cost_usd = $null; stop_unit_sent = $false; killed = $false }
     $seen = @{}
-    $graceMin = if ($unit -eq 'wave') { 3 * $GraceMinutes } else { $GraceMinutes }
+    $graceMin = if ($unit -in @('wave', 'campaign')) { 3 * $GraceMinutes } else { $GraceMinutes }
     $stopAt = $null
     $watcher = $null
     $log = [System.IO.StreamWriter]::new("$logBase.jsonl", $false, [System.Text.UTF8Encoding]::new($false))
@@ -314,6 +325,17 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
     return @{ exit = $proc.ExitCode; stats = $stats }
 }
 
+# The campaign lane needs a cluster the register knows: a misspelled one would quietly run the fix lane alone.
+if ($Unit -eq 'campaign' -and -not $Cluster) { Say '-Unit campaign needs -Cluster <lead>'; exit 2 }
+if ($Cluster) {
+    $wa = @((Join-Path (Split-Path $Here -Parent) 'spec/work.py'), 'next', '--cluster', $Cluster, '--json')
+    if ($WorkDir) { $wa += @('--work', $WorkDir) }
+    $view = & $Python @wa 2>&1
+    if ($LASTEXITCODE -ne 0) { Say "no kb/Work note names the cluster '$Cluster' in its cluster: list; refusing to start"; exit 2 }
+    $v = ($view -join "`n") | ConvertFrom-Json
+    Say "campaign lane: cluster $Cluster, $(@($v.notes).Count) open note(s), $(@($v.notes | Where-Object { $_.ready }).Count) ready"
+}
+
 if (-not (Take-Lock)) { exit 3 }
 $exitCode = 0
 try {
@@ -365,7 +387,15 @@ try {
             if (Test-Path $LastHandoff) { $na += @('--handoff', $LastHandoff) }
             if ($lastFailed) { $na += '--last-failed' }
             if ($lastStarted) { $na += @('--last-started', $lastStarted.ToString('o')) }
+            if ($Cluster) { $na += @('--cluster', $Cluster) + $(if ($WorkDir) { @('--work', $WorkDir) } else { @() }) }
             $choice = Invoke-Py $na | ConvertFrom-Json
+        }
+        if ($Cluster -and $choice.PSObject.Properties['campaign'] -and $choice.campaign -eq 'landed') {
+            Say "campaign ${Cluster}: every note is landed or retired; the campaign lane ends and the fix lane continues"
+            $Cluster = ''
+        }
+        if ($choice.unit -eq 'campaign' -and -not $Cluster) {
+            $choice = [pscustomobject]@{ unit = 'wave'; reason = "a campaign was named but no campaign lane runs (no -Cluster, or its cluster landed): $($choice.reason)" }
         }
         if ($choice.unit -eq 'owner-question') {
             $q = Get-Content $LastHandoff -Raw | ConvertFrom-Json
@@ -380,7 +410,7 @@ try {
         $logBase = Join-Path $CoordDir "logs/$stamp-$($choice.unit)"
         if ($DryRun) {
             Say "DRY RUN: would run unit '$($choice.unit)' ($($choice.reason)) on $model, session $sessionId"
-            Say "DRY RUN: $ClaudeExe -p <units/common.md + units/$($choice.unit).md> --model $model --permission-mode $PermissionMode --permission-prompts none --output-format stream-json --verbose --session-id $sessionId$(if ($choice.unit -eq 'meter') { ' --chrome' }) > $logBase.jsonl"
+            Say "DRY RUN: $ClaudeExe -p <units/common.md + units/$(Get-PromptFile $choice.unit).md$(if ($choice.unit -eq 'campaign') { " with --cluster $Cluster" })> --model $model --permission-mode $PermissionMode --permission-prompts none --output-format stream-json --verbose --session-id $sessionId$(if ($choice.unit -eq 'meter') { ' --chrome' }) > $logBase.jsonl"
             break
         }
 

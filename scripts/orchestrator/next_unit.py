@@ -2,6 +2,7 @@
 """Choose the orchestrator's next unit deterministically when the last handoff does not name one.
 
     python scripts/orchestrator/next_unit.py [--handoff FILE] [--last-failed] [--last-started ISO] [--repo DIR]
+                                             [--cluster LEAD [--work DIR]]
 
 Prints JSON {unit, reason}. The order (docs/rearchitecture/DESIGN-orchestrator-loop.md section 3.2), first match wins:
   1. the handoff carries owner_question            -> owner-question
@@ -11,7 +12,10 @@ Prints JSON {unit, reason}. The order (docs/rearchitecture/DESIGN-orchestrator-l
   5. the last unit failed or ended split, or a branch classified UNLANDED got a commit after the last unit
      started (an agent of a unit that died)          -> resume
   6. branches_pending with status DONE               -> land
-  7. otherwise                                       -> wave
+  7. otherwise                                       -> wave; with --cluster (the CAMPAIGN lane, kb/Work PB2120)
+     -> campaign when the cluster has a ready note and the last wave-type unit was not a campaign, so campaign
+     waves alternate with fix-lane waves; the JSON then also carries `campaign`: run | between | waiting | landed |
+     unknown, and `landed` tells the supervisor the lane is over
 (A stale ledger page is NOT a reason for a unit: a headless unit cannot publish, so the supervisor announces an owed
 publish through ledger_state.py and the attended session publishes.)
 """
@@ -27,7 +31,9 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
+sys.path.insert(0, str(HERE.parent / "spec"))
 import coord  # noqa: E402
+import work  # noqa: E402  (cluster_order: the one reader of cluster: and blocked_by:)
 
 
 
@@ -69,8 +75,43 @@ def fresh_unlanded(repo: pathlib.Path, since: dt.datetime) -> list[str]:
     return out
 
 
+def last_wave_unit(cdir: pathlib.Path) -> str | None:
+    """The newest `wave` or `campaign` line of units.jsonl (the supervisor's own record), or None."""
+    path = cdir / "units.jsonl"
+    if not path.is_file():
+        return None
+    last = None
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            unit = json.loads(line).get("unit")
+        except ValueError:
+            continue
+        if unit in ("wave", "campaign"):
+            last = unit
+    return last
+
+
+def campaign_choice(cluster: str, cdir: pathlib.Path, work_dir: pathlib.Path) -> dict[str, str]:
+    """Rule 7 of the campaign lane: a campaign wave between fix-lane waves while the cluster has a ready note."""
+    view = work.cluster_order(work.load(work_dir), cluster)
+    if not view["named"]:
+        return {"unit": "wave", "reason": f"no kb/Work note names the cluster {cluster}", "campaign": "unknown"}
+    if not view["notes"]:
+        return {"unit": "wave", "reason": f"the cluster {cluster} is landed: the campaign lane ends",
+                "campaign": "landed"}
+    ready = [n["id"] for n in view["notes"] if n["ready"]]
+    if not ready:
+        return {"unit": "wave", "reason": f"campaign {cluster}: no ready note (" + "; ".join(
+            f"{n['id']} waits on {', '.join(n['waiting_on'])}" for n in view["notes"][:4]) + ")", "campaign": "waiting"}
+    if last_wave_unit(cdir) == "campaign":
+        return {"unit": "wave", "reason": f"a fix-lane wave between campaign {cluster} waves", "campaign": "between"}
+    return {"unit": "campaign", "reason": f"campaign {cluster}: {len(ready)} ready note(s): {', '.join(ready[:6])}",
+            "campaign": "run"}
+
+
 def choose(handoff: dict | None, cdir: pathlib.Path, repo: pathlib.Path, now: dt.datetime, last_failed: bool,
-           last_started: dt.datetime | None, max_meter_age_h: float) -> dict[str, str]:
+           last_started: dt.datetime | None, max_meter_age_h: float, cluster: str | None = None,
+           work_dir: pathlib.Path = work.WORK) -> dict[str, str]:
     h = handoff or {}
     if h.get("owner_question"):
         return {"unit": "owner-question", "reason": "the last handoff asks the owner"}
@@ -91,6 +132,8 @@ def choose(handoff: dict | None, cdir: pathlib.Path, repo: pathlib.Path, now: dt
     done = [b["branch"] for b in h.get("branches_pending", []) if b.get("status") == "DONE"]
     if done:
         return {"unit": "land", "reason": "finished branches waiting: " + ", ".join(done)}
+    if cluster:
+        return campaign_choice(cluster, cdir, work_dir)
     return {"unit": "wave", "reason": "nothing pending"}
 
 
@@ -102,6 +145,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--repo", default=str(coord.REPO))
     ap.add_argument("--coord")
     ap.add_argument("--now")
+    ap.add_argument("--cluster", help="the campaign lane's cluster (orchestrate.ps1 -Cluster)")
+    ap.add_argument("--work", default=str(work.WORK), help="the register directory (a test seam)")
     a = ap.parse_args(argv)
     handoff = None
     if a.handoff:
@@ -113,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     started = dt.datetime.fromisoformat(a.last_started) if a.last_started else None
     rules = coord.rules()
     print(json.dumps(choose(handoff, coord.coord_dir(a.coord), pathlib.Path(a.repo), now, a.last_failed, started,
-                            rules["quota"]["meter_max_age_hours"])))
+                            rules["quota"]["meter_max_age_hours"], a.cluster, pathlib.Path(a.work))))
     return 0
 
 

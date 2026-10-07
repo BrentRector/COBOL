@@ -3,7 +3,9 @@
 # Proves: one unit runs and is recorded; the handoff is validated (a missing one is a failure); the STOP file ends the
 # loop; the circuit breaker trips after three fast failures; a second instance is refused; -DryRun starts nothing;
 # the context cap sends STOP-UNIT and the unit hands off; an owner question stops the loop; open-watchers.ps1 opens
-# one titled, model-coloured Windows Terminal tab per agent (against a fake wt.exe).
+# one titled, model-coloured Windows Terminal tab per agent (against a fake wt.exe); the campaign lane (-Cluster, kb/Work
+# PB2120) alternates with fix-lane waves, ends when its cluster lands, refuses an unknown cluster, and leaves the fix
+# lane's choice and prompt byte-identical.
 # Run: pwsh -NoProfile -File scripts/orchestrator/test_orchestrate.ps1
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -213,6 +215,68 @@ $r = Run-Orch 'owner' 'owner' @('-Unit', 'resume', '-FastFailSeconds', '0')
 Check 'owner exit' $r.code 5
 Check 'owner ran once' $r.runs 1
 Check 'owner question written' ((Get-Content (Join-Path $r.coord 'OWNER-QUESTIONS.md') -Raw) -match 'reading A or reading B') $true
+
+# 8b. THE CAMPAIGN LANE (-Cluster, kb/Work PB2120). A fixture register: cluster CAMP has a ready note and one it blocks;
+# cluster DONE is landed. A temp -RepoDir (not a git tree: clean, nothing unpushed) and a fresh meter reading let
+# next_unit.py reach its last rule, where the lane decides.
+$fx = Join-Path $Root 'campaign'
+$fxWork = Join-Path $fx 'Work'
+$fxRepo = Join-Path $fx 'repo'
+New-Item -ItemType Directory -Force -Path $fxWork, $fxRepo | Out-Null
+function New-FxNote([string]$id, [string]$status, [string]$cluster, [string]$blockedBy) {
+    $blocked = if ($blockedBy -and $status -ne 'landed') { 'true' } else { 'false' }
+    Set-Content -Path (Join-Path $fxWork "$id.md") -Encoding utf8 -Value @(
+        '---', "title: `"$id - a campaign step`"", "id: $id", 'kind: defect', "status: $status", 'area: build/ci',
+        'process_only: true', "blocked: $blocked", "blocked_by: [$blockedBy]", "cluster: [$cluster]", '---', '', "# $id")
+}
+New-FxNote 'PB901' 'open' 'CAMP' ''
+New-FxNote 'PB902' 'open' 'CAMP' 'PB901'
+New-FxNote 'PB903' 'landed' 'DONE' ''
+$fresh = { param($c) Set-Content -Path (Join-Path $c 'readings.json') -Encoding utf8 -Value (ConvertTo-Json -Compress @(@{
+    noted_at = (Get-Date).ToUniversalTime().ToString('o'); weekly_pct = 1; session_pct = 1; session_reset = (Get-Date).AddHours(4).ToUniversalTime().ToString('o') })) }
+$NextUnit = Join-Path $Here 'next_unit.py'
+function Next-Unit([string]$coord, [string[]]$extra) {
+    return (& python $NextUnit --repo $fxRepo --coord $coord @extra) -join ''
+}
+$nc = Join-Path $Root 'nextunit'
+New-Item -ItemType Directory -Force -Path $nc | Out-Null
+& $fresh $nc
+Check 'the fix lane''s choice is unchanged without -Cluster (byte for byte)' (Next-Unit $nc @()) '{"unit": "wave", "reason": "nothing pending"}'
+$c1 = Next-Unit $nc @('--cluster', 'CAMP', '--work', $fxWork) | ConvertFrom-Json
+Check 'a cluster with a ready note gets a campaign wave' "$($c1.unit) $($c1.campaign)" 'campaign run'
+Check 'the campaign reason names the ready note' ($c1.reason -match 'PB901') $true
+Set-Content -Path (Join-Path $nc 'units.jsonl') -Encoding utf8 -Value '{"unit":"campaign"}', '{"unit":"meter"}'
+$c2 = Next-Unit $nc @('--cluster', 'CAMP', '--work', $fxWork) | ConvertFrom-Json
+Check 'after a campaign wave, a fix-lane wave' "$($c2.unit) $($c2.campaign)" 'wave between'
+Add-Content -Path (Join-Path $nc 'units.jsonl') -Encoding utf8 -Value '{"unit":"wave"}'
+$c3 = Next-Unit $nc @('--cluster', 'CAMP', '--work', $fxWork) | ConvertFrom-Json
+Check 'after a fix-lane wave, the campaign again' $c3.unit 'campaign'
+$c4 = Next-Unit $nc @('--cluster', 'DONE', '--work', $fxWork) | ConvertFrom-Json
+Check 'a landed cluster ends the lane' "$($c4.unit) $($c4.campaign)" 'wave landed'
+New-FxNote 'PB904' 'open' 'HELD' 'PB901'
+$c5 = Next-Unit $nc @('--cluster', 'HELD', '--work', $fxWork) | ConvertFrom-Json
+Check 'a cluster with no ready note waits and runs the fix lane' "$($c5.unit) $($c5.campaign)" 'wave waiting'
+
+$camp = @('-RepoDir', $fxRepo, '-WorkDir', $fxWork)
+$r = Run-Orch 'campdry' 'good' (@('-DryRun', '-Cluster', 'CAMP') + $camp) $fresh
+Check 'campaign dry run: the supervisor names the lane' ($r.out -match 'campaign lane: cluster CAMP, 2 open note\(s\), 1 ready') $true
+Check 'campaign dry run: would run the campaign unit' ($r.out -match "would run unit 'campaign'") $true
+Check 'campaign dry run: from the wave prompt, with --cluster' ($r.out -match 'units/wave\.md with --cluster CAMP') $true
+$r = Run-Orch 'campdone' 'good' (@('-DryRun', '-Cluster', 'DONE') + $camp) $fresh
+Check 'a landed cluster: the supervisor says the lane ends' ($r.out -match 'campaign DONE: every note is landed or retired; the campaign lane ends') $true
+Check 'a landed cluster: the fix lane runs' ($r.out -match "would run unit 'wave'") $true
+$r = Run-Orch 'campbad' 'good' (@('-DryRun', '-Cluster', 'NOSUCH') + $camp)
+Check 'an unknown cluster refuses to start' "$($r.code) $($r.runs)" '2 0'
+$r = Run-Orch 'campnolead' 'good' @('-DryRun', '-Unit', 'campaign')
+Check '-Unit campaign without -Cluster refuses to start' $r.code 2
+$r = Run-Orch 'camprun' 'good' (@('-Unit', 'campaign', '-Cluster', 'CAMP', '-MaxUnits', '1', '-FastFailSeconds', '0') + $camp)
+$inv = Get-Content (Join-Path $r.coord 'fake-invocations.txt') -Raw
+Check 'the campaign unit''s plan_wave call carries --cluster' ($inv -match 'scratch --cluster CAMP` plans the wave') $true
+Check 'the campaign unit is recorded as such' $r.units[0].unit 'campaign'
+Check 'the campaign unit runs on opus' ($inv -match '--model \| opus') $true
+$r = Run-Orch 'wavedefault' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0')
+$inv = Get-Content (Join-Path $r.coord 'fake-invocations.txt') -Raw
+Check 'the fix lane''s wave prompt is unchanged (no --cluster, no placeholder)' (($inv -match 'scratch` plans the wave') -and ($inv -notmatch '--cluster') -and ($inv -notmatch 'CLUSTER_ARG')) $true
 
 # 9. open-watchers.ps1: one tab per agent whose meta.json exists, titled and coloured by model
 $wf = Join-Path $Root 'session/subagents/workflows/wf_test-1'

@@ -8,10 +8,10 @@
   "required": ["schema_version", "unit", "outcome", "summary"],
   "properties": {
     "schema_version": {"const": 1},
-    "unit": {"enum": ["wave", "land", "resume", "meter"]},
+    "unit": {"enum": ["wave", "campaign", "land", "resume", "meter"]},
     "outcome": {"enum": ["done", "split", "failed", "owner-question"]},
     "summary": {"type": "string", "minLength": 1, "maxLength": 900},
-    "next_unit": {"enum": ["wave", "land", "resume", "meter", "owner-question", null]},
+    "next_unit": {"enum": ["wave", "campaign", "land", "resume", "meter", "owner-question", null]},
     "next_unit_reason": {"type": "string", "maxLength": 400},
     "branches_pending": {
       "type": "array",

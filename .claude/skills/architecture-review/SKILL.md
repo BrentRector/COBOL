@@ -34,9 +34,11 @@ engine's deletion is the `PB2108` cluster, implemented from the plan's PHASE-15 
 
 ## Dispatch (R69 §4 and PB2120)
 
-`work.py next` and the orchestrator plan harm-flagged DEFECTS only; every review item is `process_only: true`. Until
-PB2120 lands, plan a review wave by hand: `groups.json` → `make_dispatch_specs.py` → `check_practices.py` GREEN →
-the quota meter → the Workflow rolling wave (the `workstream` skill, rule 9). Model tiers:
+Every review item is `process_only: true`, which `work.py next` and the fix lane never rank, so a review wave is a
+CAMPAIGN wave (PB2120): `python scripts/spec/work.py next --cluster PB1754` lists the cluster in `blocked_by` order,
+`python scripts/orchestrator/plan_wave.py --cluster PB1754 ...` plans it (rendered specs, `check_practices.py`), and
+`orchestrate.ps1 -Cluster PB1754` runs it between fix-lane waves; the quota meter and the Workflow rolling wave as
+usual (the `workstream` skill, rule 9). PB2118 is held for the owner's per-dispatch Mythos approval. Model tiers:
 - **Mythos 5.1** authors R1 (PB2118) and runs a second adversarial round only if the Opus refuter cannot break the
   design; EACH dispatch needs the owner's explicit approval, asked as a bare question (MANDATORY-PRACTICES P1).
 - **Opus** (`cobol-implementer`, `cobol-refuter`, `cobol-lander`): R0 tooling, the R1 refuter, R2 reviewers, extract
@@ -108,8 +110,8 @@ four (R69 §2), which is why R1 runs before zero GAP.
   its code site, the rule it breaks, a scenario, the target and the wave kind (extract · unify · move and rename ·
   data-ize · delete).
 - **R3 waves** run as rolling waves (`.claude/skills/workstream`), with groups computed by
-  `tools/claude-skills/skills/agent-fleet/references/fix_clusters.py` over those notes once PB2120 lets a named
-  cluster be planned; by hand-written `groups.json` before that.
+  `fix_clusters.py`'s site index over those notes through `plan_wave.py --cluster <lead>` (PB2120; a note's
+  `cluster:` names its campaign, `blocked_by:` orders it).
 - **A defect found is a separate `kind: defect` note** for the fix lane, never fixed inside a refactor.
 
 ## .NET and C#

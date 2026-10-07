@@ -21,7 +21,7 @@ description: Use BEFORE dispatching any fleet, lander, implementer or adjudicati
 
 > ⭐ **THE DEFAULT WAY TO RUN THE FIX LANE IS THE ORCHESTRATOR LOOP** (owner 2026-10-04: it "appears to better handle
 > autonomous progress towards the compiler"; wave 1018 ran 2.5 hours unattended and landed 8 of 8 groups, GAP 281 to
-> 255). `pwsh scripts/orchestrator/orchestrate.ps1 [-BorrowDays N] [-MaxUnits N] [-Unit meter|resume|land|wave] [-DryRun]
+> 255). `pwsh scripts/orchestrator/orchestrate.ps1 [-BorrowDays N] [-MaxUnits N] [-Unit meter|resume|land|wave|campaign] [-Cluster <lead>] [-DryRun]
 > [-Watch]` runs one bounded unit per fresh `claude -p` session, chosen by `next_unit.py` from the last handoff and the
 > disk (meter, resume, land, wave); each unit loads THIS skill and follows `scripts/orchestrator/units/*.md`. Design:
 > `docs/rearchitecture/DESIGN-orchestrator-loop.md` (kb/Work PB1981); the generalized form is the base skill's
@@ -91,6 +91,15 @@ gathering"; "use this new rolling functionality as it reduces context and token 
   instead of re-surveying the file. The predecessor's branch is HELD from the trains and lands THROUGH the successor,
   which contains it; if the successor produces nothing landable, the predecessor lands alone. A successor may also
   follow a group in the same technological area (a runtime file, then its emitter).
+- **A campaign is a named cluster, and it is planned, not hand-picked** (kb/Work PB2120, design section 9.1). Process
+  work the fix lane cannot see (`process_only`, sites outside `src/Cobol.Net.*`: the legacy retirement `PB2108`, the
+  architecture review `PB1754`) runs from its notes' `cluster:` and `blocked_by:`:
+  `python scripts/spec/work.py next --cluster <lead>` lists it in dependency order,
+  `python scripts/orchestrator/plan_wave.py --cluster <lead> --budget-points P --dry-run` plans a wave of it (its
+  dependent notes become successors, `after:`, of the groups holding their blockers), and
+  `pwsh scripts/orchestrator/orchestrate.ps1 -Cluster <lead>` alternates its waves with fix-lane waves until every
+  note naming it has landed. Never hand-write a `groups.json` for a campaign; a note that needs Fable or Mythos is
+  held for the owner's per-dispatch approval and dispatched by the attended session.
 - **Why.** Orientation was ~46 % of every implementer's tokens (waves 45–57): a successor pays the file's context
   once, not once per cluster. It is a FRESH agent, not a longer transcript, because of the quadratic cost law above:
   the cap exists because the sixth defect in one transcript costs more than a new agent, and the successor keeps the
