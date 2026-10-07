@@ -876,7 +876,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// formal's dynamic-capacity tables (kb/Work PB965) — null when the argument is itself variable-length (it
     /// composes its own carrier) or is not a group place the correspondence can be stated for. A redefinition or cell
     /// VIEW of a group is that group's storage and has its layout like any other (a group passed BY REFERENCE is claimed
-    /// onto a cell, kb/Work PB2087/PB2089 — the INVOKE twin of <c>CallEmitter.BoundaryLayout</c>); a reference-modified
+    /// onto a cell, kb/Work PB2087/PB2089 — the INVOKE twin of <c>CallEmitter.BoundaryAtoms</c>); a reference-modified
     /// operand denotes no item, so it has none.</summary>
     private static int[]? FixedArgumentSpans(Place arg, DataItem formal) =>
         !CallEmitter.CallPlaceIsVarGroup(arg)

@@ -71,13 +71,22 @@ internal sealed class BoundUnit
     /// FILE STATUS places (<c>ProgramEmitter</c>).</summary>
     public string AnchorOf(string csMember, int depth) =>
         Data.IsStaticMember(csMember) ? ClassName + "." : CodeGen.RuntimeApi.OuterChain(depth);
+
+    /// <summary>The FORMAL PARAMETERS of containing programs that this unit sees as GLOBAL names (ISO §13.18.27.4 GR2),
+    /// read off the bridges that reach them (kb/Work PB2096). Their member names are Uid-keyed and bridged under the same
+    /// names, so a contained program renders them as the container does: a forward of one BY REFERENCE passes on the
+    /// incoming carrier, its presence (§8.8.4.8.4 GR1c) and the argument area it occupies (§14.2.3 GR8).</summary>
+    public IEnumerable<LinkageFormal> InheritedFormals => Bridges.Select(b => b.Formal).OfType<LinkageFormal>().Distinct();
 }
 
 /// <summary>One inherited-GLOBAL bridge a nested class emits: a property aliasing the containing instance's
 /// member (ISO §13.18.27 GR2 — the name is visible in every contained program; the STORAGE stays the
 /// container's). Built ONLY by <c>DataBinder.GlobalBridgesOf</c>, the one list of the members a reference to a
-/// global root can render (kb/Work PB1009). <paramref name="Formal"/> is set for a
-/// <see cref="CallBridgeKind.Carrier"/> bridge — the emitter derives the carrier's cell type from it.</summary>
+/// global root can render (kb/Work PB1009). <paramref name="Formal"/> is set when the bridged member belongs to a
+/// FORMAL PARAMETER of the container — its carrier (<see cref="CallBridgeKind.Carrier"/>, whose cell type the emitter
+/// derives from it), its argument area (<see cref="CallBridgeKind.ArgumentArea"/>) or an area formal's data-address
+/// pointer (<see cref="CallBridgeKind.Address"/>) — so the contained program knows the GLOBAL formals in its scope
+/// (<see cref="BoundUnit.InheritedFormals"/>; kb/Work PB2096).</summary>
 internal sealed record CallBridge(string Field, string Path, CallBridgeKind Kind, DataItem? Item,
     LinkageFormal? Formal = null);
 
@@ -96,6 +105,10 @@ internal enum CallBridgeKind
     /// <summary>A carrier-resident LINKAGE formal's <c>ManagedPointer&lt;T&gt;</c> carrier (its field IS
     /// <c>carrier.Value</c>).</summary>
     Carrier,
+    /// <summary>A carrier-resident BY REFERENCE formal's ARGUMENT AREA (<c>ref CellPointer?</c>,
+    /// <c>LinkageFormal.ArgumentAreaField</c>): what a contained program's forward of the GLOBAL formal passes on, so an
+    /// area formal of the next activation occupies the argument's own storage (ISO §14.2.3 GR8; kb/Work PB2096).</summary>
+    ArgumentArea,
     /// <summary>An INDEXED BY <c>long</c> field of a global table.</summary>
     Index,
     /// <summary>A GLOBAL formal's omitted-argument presence member (a plain <c>bool</c>, not a ref — kb/Work PB971).</summary>

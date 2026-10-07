@@ -212,7 +212,8 @@ public sealed partial class DataBinder
     /// <c>ADDRESS OF</c> both name the cell), plus a BASED class's implicit data-address pointer (every
     /// reference displaces by it, and SET ADDRESS OF / ALLOCATE / FREE write it);</item>
     /// <item>a CARRIER-RESIDENT formal → its <c>ManagedPointer</c> carrier (its "field" IS
-    /// <c>carrier.Value</c>, so the bridge is the carrier, never the accessor text);</item>
+    /// <c>carrier.Value</c>, so the bridge is the carrier, never the accessor text), and, BY REFERENCE, the argument
+    /// area it occupies (kb/Work PB2096);</item>
     /// <item>any other root → its field;</item>
     /// <item>a guarded formal → its omitted-presence member (kb/Work PB971); a table → its index fields.</item>
     /// </list>
@@ -224,8 +225,10 @@ public sealed partial class DataBinder
             yield return new CallBridge(cls.BackingCsName, anchorOf(cls.BackingCsName) + cls.BackingCsName, CallBridgeKind.Backing, null);
             if (cls.IsCellBacked)
                 yield return new CallBridge(cls.BackingCellCsName, anchorOf(cls.BackingCellCsName) + cls.BackingCellCsName, CallBridgeKind.Cell, null);
+            // An AREA formal's carrier IS this pointer (LinkageFormal.IsArea), so the bridge names the formal too.
             if (cls.BasedPointerField is { } addr)
-                yield return new CallBridge(addr, anchorOf(addr) + addr, CallBridgeKind.Address, null);
+                yield return new CallBridge(addr, anchorOf(addr) + addr, CallBridgeKind.Address, null,
+                    _linkageFormals.FirstOrDefault(f => f.IsArea && f.CarrierField == addr));
         }
         else
         {
@@ -236,7 +239,14 @@ public sealed partial class DataBinder
             // itself; the storage it names is the one both entries share (§13.18.44.4 GR1).
             var anchor = AnchorOf(g);
             if (_linkageFormals.FirstOrDefault(f => f.CarrierResident && ReferenceEquals(f.Item, anchor)) is { } rf)
+            {
                 yield return new CallBridge(rf.CarrierField, anchorOf(rf.CarrierField) + rf.CarrierField, CallBridgeKind.Carrier, anchor, rf);
+                // Its argument area (kb/Work PB2096): a contained program's BY REFERENCE forward of this formal passes
+                // the area on, as the container's own forward does (ISO §14.2.3 GR8).
+                if (rf.KeepsArgumentArea)
+                    yield return new CallBridge(rf.ArgumentAreaField, anchorOf(rf.ArgumentAreaField) + rf.ArgumentAreaField,
+                        CallBridgeKind.ArgumentArea, anchor, rf);
+            }
             else
                 yield return new CallBridge(anchor.CsName, anchorOf(anchor.CsName) + anchor.CsName, CallBridgeKind.Field, anchor);
             if (!ReferenceEquals(anchor, g))

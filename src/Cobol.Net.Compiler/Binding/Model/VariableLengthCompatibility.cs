@@ -190,19 +190,19 @@ internal static class VariableLengthCompatibility
     /// reads; kb/Work PB965). It is the compile-time half of <c>CobolVarGroup.CorrespondingSpans</c>, which pairs a
     /// FIXED group's layout with a VARIABLE-length group's and answers which of the fixed group's tables correspond
     /// (§8.5.1.12.2) — the spans <c>CobolVarGroup.FromFixedImage</c> lifts out so a fixed group can stand on the other
-    /// side of an ISO §14.9.25.4 GR9 move, a §14.8.2.2 CALL argument/formal pair or a §14.8.3.2 returning pair. Across a
-    /// CALL each side is compiled apart, so the layout TRAVELS (<c>CobolArg.Layout</c>) and the pair is decided where
-    /// both are in hand. <see langword="null"/> for a non-group or a subtree with a USAGE BIT leaf.</summary>
-    public static int[]? Layout(DataItem g) => GroupAtoms(g) is { } atoms ? GroupCompatibility.Layout(atoms) : null;
+    /// side of an ISO §14.9.25.4 GR9 move. Across a CALL each side is compiled apart, so the ATOMS travel
+    /// (<c>CobolArg.Atoms</c>, <see cref="GroupAtoms"/>; kb/Work PB2280) and the runtime derives this layout from them.
+    /// <see langword="null"/> for a non-group or a subtree with a USAGE BIT leaf.</summary>
+    private static int[]? Layout(DataItem g) => GroupAtoms(g) is { } atoms ? GroupCompatibility.Layout(atoms) : null;
 
-    /// <summary>True when a layout has anything but fixed material — a table or a variable-length member, the
-    /// only atoms §8.5.1.12.2's correspondence can pair. A layout of fixed material alone states nothing beyond the
-    /// group's length, which the runtime recovers from the carrier (<c>CobolVarGroup.FixedRun</c>), so the
-    /// boundary does not emit it.</summary>
-    public static bool HasTableOrVariable(int[] layout)
+    /// <summary>True when a group's atoms have anything but fixed material — a table or a variable-length member, the
+    /// only atoms §8.5.1.12.2's correspondence can pair. Fixed material alone states nothing beyond the group's length,
+    /// which the runtime recovers from the carrier (<c>GroupCompatibility.FixedRun</c>), so the boundary does not emit
+    /// it.</summary>
+    public static bool HasTableOrVariable(GroupAtom[] atoms)
     {
-        for (int k = 0; k < layout.Length; k += 3)
-            if (layout[k] != CobolNet.Runtime.CobolVarGroup.LayoutFixed) return true;
+        foreach (var a in atoms)
+            if (a.Kind != GroupAtomKind.Fixed) return true;
         return false;
     }
 

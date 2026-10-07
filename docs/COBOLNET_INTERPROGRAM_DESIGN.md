@@ -512,16 +512,24 @@ fixed group decomposes into the same `CobolVarGroup` (`FromFixedImage`) and is r
 at the spans of ITS tables that CORRESPOND to the variable-length group's dynamic-capacity tables — and
 correspondence is a fact about the PAIR (§8.5.1.12.2: "they occupy the same relative byte positions within their
 groups"), so it is computed by ONE walk, `CobolVarGroup.CorrespondingSpans(fixedLayout, varLayout)`, over each
-group's §8.5.1.12 LAYOUT (`VariableLengthCompatibility.Layout` — `(kind, chars, elementChars)` triples: fixed run,
-fixed table, occurs-depending table, dynamic-capacity table, dynamic-length item). The corresponding fixed table
+group's §8.5.1.12 LAYOUT (`GroupCompatibility.Layout` of the group's atoms — `(kind, chars, elementChars)` triples:
+fixed run, fixed table, occurs-depending table, dynamic-capacity table, dynamic-length item). The corresponding fixed table
 crosses at its fixed occurrence count (§8.5.1.12.3 sentence 3); a fixed table opposite plain bytes is plain
 material (the former `FlatTableSpans` lifted EVERY table and moved the wrong one); a dynamic-capacity table past the
 fixed group's last character gets no component (§8.5.1.12.2's last sentence — the receiver's §14.6.9.4 space fill).
-The two sides of a CALL are compiled apart, so each side's LAYOUT TRAVELS: `CobolArg.Layout` carries an argument's
-(or the RETURNING receiver's) layout, emitted for a group with a table or a variable-length member; the formal's
-adapter (`CobolArgAdapt.VarGroup/VarGroupValue(args, i, formalLayout)`) and the RETURNING legs
-(`StoreReturnGroup`, `StoreReturn(ret, CobolVarGroup, layout)`) pair them; a table-less fixed group states only
-its length (`CobolVarGroup.FixedRun`). The §14.9.25.4 GR9 MOVE and the typed INVOKE know both descriptions at
+The two sides of a CALL are compiled apart, so each side's §8.5.1.12 ATOMS TRAVEL (kb/Work PB2280):
+`CobolArg.Atoms` carries an argument's (or the RETURNING receiver's) `GroupAtom[]` (`CallEmitter.BoundaryAtoms`,
+`VariableLengthCompatibility.GroupAtoms`), emitted for a group with a table or a variable-length member; the formal's
+adapter (`CobolArgAdapt.VarGroup/VarGroupValue(args, i, formalAtoms)`) and the RETURNING legs
+(`StoreReturnGroup`, `StoreReturn(ret, CobolVarGroup, atoms)`) pair them; a table-less fixed group states only
+its length (`CobolVarGroup.FixedRun`). The atoms, not the `int[]` layout derived from them, are what travel because
+TWO VARIABLE-LENGTH GROUPS OF DIFFERENT SHAPES are compatible too (§8.5.1.12.1 constrains only where the variable-length
+items lie): the formal sees the argument's carrier rebuilt in its own shape (`CobolVarGroup.Reshape`) and a BY REFERENCE
+store overlays the argument's storage (`CobolVarGroup.Overlay`, §14.2.3 GR8), so the argument material the formal does not
+describe survives; a RETURNING value is rebuilt in the receiver's shape. This is the conversion the INVOKE lanes
+(`UniversalGroupCarrier`, `OoEmitter.VarGroupShapes`) already made; an incompatible pair met at run time fails the
+activation with EC-PROGRAM-ARG-MISMATCH. Golden `2014/pb2280_call_variable_length_shapes`. ⚠ The fixed-⇄-variable pair
+still converts through the span walk over layouts; kb/Work PB2281 folds it into `Reshape` / `Overlay`. The §14.9.25.4 GR9 MOVE and the typed INVOKE know both descriptions at
 compile time and call the SAME walk there (`VariableLengthCompatibility.CorrespondingSpans`). ⚠ DETERMINATION: a
 callee cannot grow a fixed-length argument's table past its fixed extent — that storage has no more occurrences —
 so the write-back fits each component to its table as §14.6.9.2 fits a dynamic sending table into a non-dynamic
@@ -540,8 +548,8 @@ variable-length groups take compatibility alone and a fixed group opposite one c
 sentence 3 gives the PAIR ("the dynamic-capacity table is considered to be the same length as the corresponding
 table") — `VariableLengthCompatibility.PairCharWidths`, the SAME walk that decides the correspondence. Override and
 prototype signature equality (§9.3.8.2.3) keeps strict equality. The admitted VARIABLE-into-FIXED pairs run through
-the same correspondence: every group formal states its layout to `CobolArgAdapt.Text` / `TextValue`
-(`ProgramEmitter.GroupFormalLayout`; `System.Array.Empty<int>()` for a table-less group, read as `FixedRun(width)`),
+the same correspondence: every group formal states its atoms to `CobolArgAdapt.Text` / `TextValue`
+(`ProgramEmitter.GroupFormalAtoms`; `System.Array.Empty<GroupAtom>()` for a table-less group, read as `FixedRun(width)`),
 whose variable-carrier arm reads the argument through `ToFixedImage`; the typed INVOKE does the same at compile time
 (`OoEmitter.VarPlaceSpans`), including both mixed RETURNING directions. ⚠ DETERMINATION: a formal with a FIXED
 occurrence count cannot change the argument table's current capacity, so a BY REFERENCE store OVERLAYS the argument's

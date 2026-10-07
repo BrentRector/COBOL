@@ -407,14 +407,14 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// <c>CobolArg</c> constructor arguments (kb/Work PB873 + PB965): an elementary NUMERIC item's whole
     /// <c>NumProfile</c> (Place.DenotedItem — a reference-modified view denotes no item and is character storage;
     /// a USAGE INDEX item's storage description has no digit positions for a profile to state), and a GROUP's
-    /// §8.5.1.12 layout when it has a table or a variable-length member (<c>VariableLengthCompatibility.Layout</c>
-    /// — the fact §8.5.1.12.2's correspondence needs from each side, since the two sides are compiled apart). ONE
+    /// §8.5.1.12 atoms when it has a table or a variable-length member (<see cref="BoundaryAtoms"/> — the fact
+    /// §8.5.1.12.2's correspondence needs from each side, since the two sides are compiled apart). ONE
     /// renderer for the argument and the RETURNING item, because both are storage the activating element owns
     /// and the activated element reaches through a carrier.</summary>
     private string PlaceDescription(Place p)
     {
         string meta = BoundaryProfile(p, ctx.SignEncoding) ?? "null";
-        return BoundaryLayout(p) is { } layout ? $"{meta}, {layout}" : meta;
+        return BoundaryAtoms(p) is { } atoms ? $"{meta}, {atoms}" : meta;
     }
 
     /// <summary>The emitted <c>NumProfile</c> of an elementary NUMERIC place's storage, or null when it has none
@@ -492,17 +492,17 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             ? width
             : RuntimeApi.UnstatedBoundaryLength;
 
-    /// <summary>The emitted §8.5.1.12 layout of a group place that has a table or a variable-length member, or
-    /// null when it has neither (a null layout answers "no correspondence" on the runtime side, which is right
-    /// for such a group). A reference-modified or redefinition view is character storage, never a group.</summary>
-    internal static string? BoundaryLayout(Place p) =>
-        // A redefinition or cell VIEW of a group is that group's storage and states its layout like any other (the
+    /// <summary>The emitted §8.5.1.12 ATOMS of a group place that has a table or a variable-length member
+    /// (<c>CobolArg.Atoms</c>; kb/Work PB2280), or null when it has neither (its one §8.5.1.12 fact is then its length,
+    /// which the runtime reads off the carrier). A reference-modified view is character storage, never a group.</summary>
+    internal static string? BoundaryAtoms(Place p) =>
+        // A redefinition or cell VIEW of a group is that group's storage and states its atoms like any other (the
         // group a CALL claims onto a cell is one — kb/Work PB2087); a reference-modified one denotes no item.
         // A bit / national group crosses as its ELEMENTARY value, which has no image layout (kb/Work PB1166).
         p.DenotedItem is { IsAsIfElementary: false } item
-        && VariableLengthCompatibility.Layout(item) is { } layout
-        && VariableLengthCompatibility.HasTableOrVariable(layout)
-            ? LayoutArray(layout)
+        && VariableLengthCompatibility.GroupAtoms(item) is { } atoms
+        && VariableLengthCompatibility.HasTableOrVariable(atoms)
+            ? RuntimeApi.GroupAtomsNew(atoms)
             : null;
 
     /// <summary>⛔ THE STORAGE AREA OF A BY REFERENCE ARGUMENT (kb/Work PB2087) — the C# expression of the cell area it
@@ -526,9 +526,15 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         }
         // A bit item's positions are bits and a national one's two bytes each, so only an identity-coded view's start is
         // a character offset a reference-modified slice can be displaced by.
-        if (FullAllocation(p) is not RedefViewPlace { Cell: { } cell } view || BitLayout.IsBitItem(view.ViewItem)
+        if (FullAllocation(p) is not RedefViewPlace { Cell: { } cell } view
             || start is not null && view.Coding is not null) return null;
-        string offset = start is null ? view.OffsetExpr : $"({view.OffsetExpr}) + ({start}) - 1";
+        // ⛔ A BIT ITEM HAS AN AREA TOO (kb/Work PB2095): its window is stated in BIT positions of the cell
+        // (BitWindow.OffsetExpr, absolute in the cell), and §14.9.4.3 SR6 — "identifier-2 shall be described such that
+        // it is aligned on a byte boundary" — makes a BY REFERENCE bit item's first bit a whole number of characters
+        // into the cell, so its area begins at that bit offset over the bits a character holds. The activated element's
+        // bit-group area formal windows its bits at BitsPerCharacter × the area's offset (PlaceRenderer), the same unit.
+        string at = view.Bit is { } bit ? $"({bit.OffsetExpr}) / {BitLayout.BitsPerCharacter}" : view.OffsetExpr;
+        string offset = start is null ? at : $"({at}) + ({start}) - 1";
         return RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset);
     }
 

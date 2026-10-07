@@ -150,25 +150,25 @@ internal sealed class ProgramEmitter
             // profile field RecordStructEmitter declares for every elementary numeric item.
             ? f.Item.IsElementary && f.Item.Pic is { Category: PicCategory.Numeric } fp && fp.Usage is not Usage.Index
                 ? RuntimeApi.ArgAdaptTextValue("__args", f.Position, $"{fixedWidth}", f.Item.ProfileName, $"{fp.Scale}")
-                : RuntimeApi.ArgAdaptTextValue("__args", f.Position, $"{fixedWidth}", "null", "0", GroupFormalLayout(f.Item))
+                : RuntimeApi.ArgAdaptTextValue("__args", f.Position, $"{fixedWidth}", "null", "0", GroupFormalAtoms(f.Item))
             : RuntimeApi.ArgAdaptText("__args", f.Position, f.Item.IsAnyLength ? "-1" : $"{fixedWidth}",
-                GroupFormalLayout(f.Item),
+                GroupFormalAtoms(f.Item),
                 // An image-stored NUMERIC formal (kb/Work PB992) states its description, so an OMITTED
                 // argument's benign read is the numeric zero the documented GR12 leniency promises.
                 f.Item.IsElementary && f.Item.StoreAsImage ? f.Item.ProfileName : null);
 
-    /// <summary>A fixed-length GROUP formal's §8.5.1.12 layout, the one fact a VARIABLE-LENGTH group argument
-    /// needs to meet it (ISO §14.8.2.2 / §8.5.1.12.2; kb/Work PB965) — its layout literal when it has a table,
-    /// <see cref="RuntimeApi.NoTableGroupLayout"/> when it has none (its length is then the whole description),
+    /// <summary>A fixed-length GROUP formal's §8.5.1.12 atoms, the one fact a VARIABLE-LENGTH group argument
+    /// needs to meet it (ISO §14.8.2.2 / §8.5.1.12.2; kb/Work PB965, PB2280) — its atoms literal when it has a table,
+    /// <see cref="RuntimeApi.NoTableGroupAtoms"/> when it has none (its length is then the whole description),
     /// and null for a formal that is not a group, which no variable-length group is compatible with
     /// (§8.5.1.12.1).</summary>
-    private static string? GroupFormalLayout(DataItem formal) =>
+    private static string? GroupFormalAtoms(DataItem formal) =>
         // A bit / national group crosses as its ELEMENTARY value (kb/Work PB1166 — CallEmitter.CallStringRead),
         // which has no §8.5.1.12 image layout to meet.
         !ItemCategory.IsGroupItem(formal) || formal.IsAsIfElementary
-            || VariableLengthCompatibility.Layout(formal) is not { } layout ? null
-        : VariableLengthCompatibility.HasTableOrVariable(layout) ? CallEmitter.LayoutArray(layout)
-        : RuntimeApi.NoTableGroupLayout;
+            || VariableLengthCompatibility.GroupAtoms(formal) is not { } atoms ? null
+        : VariableLengthCompatibility.HasTableOrVariable(atoms) ? RuntimeApi.GroupAtomsNew(atoms)
+        : RuntimeApi.NoTableGroupAtoms;
 
     /// <summary>⛔ THE ONE ADOPTION EXPRESSION for a formal's carrier at the activation boundary — one arm per
     /// <see cref="CallCrossing"/>, each with its BY REFERENCE (§14.2.3 GR8 aliasing) and BY VALUE (GR10
@@ -192,11 +192,12 @@ internal sealed class ProgramEmitter
                 : RuntimeApi.ArgAdaptSlot("__args", f.Position, carrier),
             // §8.5.1.12's component carrier, adopted whole — there is no width window to apply, because the
             // receiving group's own FromVarImage is what re-fits both halves (kb/Work PB204). The formal's own
-            // §8.5.1.12 layout rides along so a FIXED-length group argument can be met at the spans the pair
-            // corresponds at (§14.8.2.2; kb/Work PB965).
+            // §8.5.1.12 atoms ride along so a FIXED-length group argument can be met at the spans the pair
+            // corresponds at (§14.8.2.2; kb/Work PB965) and a variable-length one of another shape is rebuilt in the
+            // formal's (kb/Work PB2280).
             CallCrossing.VarGroup => f.ByValue
-                ? RuntimeApi.ArgAdaptVarGroupValue("__args", f.Position, FormalLayout(f.Item))
-                : RuntimeApi.ArgAdaptVarGroup("__args", f.Position, FormalLayout(f.Item)),
+                ? RuntimeApi.ArgAdaptVarGroupValue("__args", f.Position, FormalAtoms(f.Item))
+                : RuntimeApi.ArgAdaptVarGroup("__args", f.Position, FormalAtoms(f.Item)),
             _ => FormalTextCarrier(f, textWidth),
         };
 
@@ -247,7 +248,9 @@ internal sealed class ProgramEmitter
         var refs = Current.Refs;
         _callState.SelfPath = unit.Path;
         _callState.ReturningPlace = data.LinkageReturning is { } ret ? refs.ResolveItem(ret) : null;
-        _callState.Formals = data.LinkageFormals;   // §8.8.4.8.4 GR1c forwarding (kb/Work PB165)
+        // §8.8.4.8.4 GR1c forwarding (kb/Work PB165) — of this unit's own formals AND of every container formal it sees
+        // as a GLOBAL name, whose forward passes on the same carrier, presence and argument area (kb/Work PB2096).
+        _callState.Formals = [.. data.LinkageFormals, .. unit.InheritedFormals];
         _ecState.UnitHasF3 = unit.Bound.Declaratives?.Any(d => d.EcEntries is not null) ?? false;   // → __EcDispatch exists
         _ecState.UnitHasF3Perform = unit.Bound.Ec?.HasF3Perform ?? false;   // → __EcPerform + the F3-frame interceptor (§14.9.28)
         _ecState.UnitHasF4 = unit.Bound.Declaratives?.Any(d => d.Eo is not null) ?? false;   // → __EcObjDispatch exists (EC-OO F4)
@@ -330,6 +333,7 @@ internal sealed class ProgramEmitter
                     CallBridgeKind.Index => "long",
                     CallBridgeKind.Backing => "string",
                     CallBridgeKind.Address => "ManagedPointer",
+                    CallBridgeKind.ArgumentArea => $"{nameof(CellPointer)}?",
                     // The carrier's cell type is the formal's own crossing form — the ONE dispatch the container
                     // declares it with (a resident formal has no Place, so it classifies from its DataItem).
                     CallBridgeKind.Carrier => $"ManagedPointer<{FormalCarrierType(b.Formal!, FormalCrossing(b.Formal!, null))}>",
@@ -687,22 +691,22 @@ internal sealed class ProgramEmitter
     /// </list></summary>
     private static string ReturningDelivery(Place ret)
     {
-        string? layout = CallEmitter.BoundaryLayout(ret);
+        string? atoms = CallEmitter.BoundaryAtoms(ret);
         if (CallEmitter.CallPlaceIsVarGroup(ret))
-            return RuntimeApi.ArgAdaptStoreReturn("__ret", PlaceRenderer.VarGroupBoundaryImage(ret, "RETURNING item"), layout!);
+            return RuntimeApi.ArgAdaptStoreReturn("__ret", PlaceRenderer.VarGroupBoundaryImage(ret, "RETURNING item"), atoms!);
         string? profile = ret.DenotedItem is { Pic: { Category: PicCategory.Numeric, IsFloat: false, Usage: not Usage.Index } } item
             ? item.ProfileName : null;
         if (CallEmitter.CallPlaceIsString(ret))
-            return layout is not null
-                ? RuntimeApi.ArgAdaptStoreReturnGroup("__ret", CallEmitter.CallStringRead(ret), layout)
+            return atoms is not null
+                ? RuntimeApi.ArgAdaptStoreReturnGroup("__ret", CallEmitter.CallStringRead(ret), atoms)
                 : RuntimeApi.ArgAdaptStoreReturn("__ret", CallEmitter.CallStringRead(ret), profile);
         return RuntimeApi.ArgAdaptStoreReturn("__ret", PlaceRenderer.Read(ret), profile);
     }
 
-    /// <summary>A variable-length group formal's §8.5.1.12 layout, emitted for its adapter (kb/Work PB965).</summary>
-    private static string FormalLayout(DataItem formal) =>
-        CallEmitter.LayoutArray(VariableLengthCompatibility.Layout(formal)
-            ?? throw new InvalidOperationException($"variable-length formal '{formal.CobolName}' has no §8.5.1.12 layout"));
+    /// <summary>A variable-length group formal's §8.5.1.12 atoms, emitted for its adapter (kb/Work PB965, PB2280).</summary>
+    private static string FormalAtoms(DataItem formal) =>
+        RuntimeApi.GroupAtomsNew(VariableLengthCompatibility.GroupAtoms(formal)
+            ?? throw new InvalidOperationException($"variable-length formal '{formal.CobolName}' has no §8.5.1.12 atoms"));
 
     /// <summary>Emit the module registrar + the run-unit entry wrapper. <c>__CobolModule</c> is the ONE public,
     /// well-known discovery surface of a compiled module (deep-dive D2; the generated program classes are
