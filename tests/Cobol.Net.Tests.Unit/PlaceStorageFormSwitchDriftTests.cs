@@ -99,7 +99,7 @@ public sealed class PlaceStorageFormSwitchDriftTests
                     continue;                                            // exhaustive by kind — fine
                 if (AsksUndecorated(subject, text)) continue;
                 if (Regex.IsMatch(body, @"\b(PlaceDecorator|RefModPlace|OdoGroupPlace|GroupImagePlace"
-                                      + @"|NumericImagePlace|BitImagePlace|NatImagePlace|TableAllPlace)\b"))
+                                      + @"|NumericImagePlace|NationalBytesPlace|BitImagePlace|NatImagePlace|TableAllPlace)\b"))
                     continue;                                            // decorator-aware in its own arms
                 string key = $"{Path.GetFileName(path)}:{subject}";
                 if (Exempt.ContainsKey(key)) continue;

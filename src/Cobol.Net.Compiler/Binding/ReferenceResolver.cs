@@ -1015,12 +1015,14 @@ public sealed partial class ReferenceResolver(DataBinder data)
             if (part.Occurrence is { } occIdx)
             {
                 // ONE occurrence (or the one-and-only cell) of the leaf, possibly a partial slice of it (kb/Work
-                // PB96): the cell's place, then its ref-mod view when the part does not cover the whole cell.
+                // PB96): the cell's storage image, then a BYTE slice of it when the part does not cover the whole cell
+                // — bytes, because the cell's image is its storage bytes (SpanLeafPlace), so a slice that splits a
+                // national character is as addressable as any other (kb/Work PB2466).
                 if (SpanLeafPlace(leaf, part.SubscriptsFor(leaf.Occurs is null ? null : occIdx), out gap) is not { } cell)
                     return null;
-                if (part.IsPartial) cell = new RefModPlace(cell, part.Start.ToString(), part.Length.ToString());
+                if (part.IsPartial) cell = new RefModPlace(cell, part.StartByte.ToString(), part.LengthBytes.ToString());
                 leafPlaces.Add(cell);
-                widths.Add(part.Bytes);   // STORAGE bytes — the unit the alias's image is in (kb/Work PB1665)
+                widths.Add(part.LengthBytes);   // STORAGE bytes — the unit the alias's image is in (kb/Work PB1665)
                 continue;
             }
             // An OCCURS leaf inside the span contributes EVERY occurrence in order (§13.18.45 — the alias covers
@@ -1050,13 +1052,19 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// abort for <c>66 RN RENAMES RA THRU RC</c> over a <c>PIC 9(4) COMP</c> member), although the image place it
     /// declined renders every numeric usage through the ONE storage codec (<c>NumFormatImage</c> /
     /// <c>NumStoreImage</c>, and the float lane). Pointer, object and message-tag members never reach here: §13.18.45.3
-    /// SR8 refuses them in the range at the declaration (<c>DataBinder.RenamesRangeFault</c>).</para></summary>
+    /// SR8 refuses them in the range at the declaration (<c>DataBinder.RenamesRangeFault</c>).</para>
+    /// <para>⛔ A USAGE NATIONAL CELL IS ITS BYTES TOO (kb/Work PB1665, PB2466): its value carrier holds one character
+    /// per national position, and the position occupies two storage bytes (D-N1), so the cell is composed through
+    /// <see cref="NationalBytesPlace"/> — after the numeric image, for a usage-national numeric leaf whose image is
+    /// national characters. The image is then in the unit every <see cref="RenamesSpanPart"/> is kept in, and a part
+    /// that splits a national character is a byte slice of it like any other.</para></summary>
     private Place? SpanLeafPlace(DataItem leaf, IReadOnlyList<string> indexExprs, out PlaceGap gap)
     {
         if (PlaceForItem(leaf, indexExprs, out gap) is not { } place) return null;
         bool stringValued = data.IsImageBackedEarly(leaf) || place is RedefViewPlace
             || leaf.Pic?.Category is not PicCategory.Numeric;
-        return stringValued ? place : new NumericImagePlace(place);
+        var image = stringValued ? place : new NumericImagePlace(place);
+        return leaf.Pic is { Usage: Usage.National } ? new NationalBytesPlace(image) : image;
     }
 
     /// <summary>A group whose subtree contains an occurs-depending table is an ODO operand (ISO §13.18.38 GR8): wrap

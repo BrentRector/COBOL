@@ -55,15 +55,22 @@ Fixed-point = native `long` holding the UNSCALED value; scale is compile-time me
 
 == 7. LEVELS 66 (RENAMES) and 88 (condition-names) ==
   • 88 condition-name: NOT a storage item — a named boolean predicate over its parent (the conditional variable). DECISION: emit each 88 as a C# `static bool` PROPERTY (or a method) over the parent Place: `private static bool LvlOk => CobolCond.In(Parent.Read(), <value-or-range-set>);` where the value set comes from the (possibly multi-valued, THRU-ranged) VALUE clause. SET cond TO TRUE → assign the parent its first/low value (ISO §14.9.39.4 GR6). The binder captures 88 entries as `Condition88` records on their conditional variable (IMPLEMENTED — `DataBinder.Conditions` multimap); ensure the captured VALUE list covers THRU ranges + multiple literals.
-  • 66 RENAMES: a re-grouping alias over a contiguous run FROM..THRU of sibling elementary items. DECISION: model as a Place that is an ALIAS — for the common case (RENAMES of a single elementary, or a whole-group read/write) emit a computed property that concatenates/splits the underlying members' char images. The general overlapping-bytes RENAMES is a storage-overlay case → defer to G6 (the byte-image fallback) and flag loud. Capture RenamesInfo (FROM/THRU + qualifiers) now; resolution is deferred-pass like legacy.
+  • 66 RENAMES: a re-grouping alias. Without THROUGH it forwards to data-name-2's place (§13.18.45.4 GR1); with THROUGH it is a `RenamesPlace` that concatenates on read, and splits on write, the STORAGE IMAGES of the parts that tile its window (GR2: "an alphanumeric group item"). Resolution is a post-build pass (`DataBinder`'s RENAMES resolution, `RenamesOwners()`).
     A THROUGH alias answers two DIFFERENT questions from two fields, and each rule asks the one it means: its STORAGE
-    (`RenamesInfo.Span` — the record's characters tiled by non-redefining leaves, a leaf under an OCCURS group once per
-    occurrence of that group, `RenamesSpanPart.Outer`, kb/Work PB986; atoms, images, reads and writes) and
+    (`RenamesInfo.Span` — the record's storage BYTES tiled once each by whichever leaves cover them, a REDEFINES view's
+    leaves included, a leaf under an OCCURS group once per occurrence of that group, `RenamesSpanPart.Outer`, kb/Work
+    PB986; atoms, images, reads and writes) and
     its MEMBERSHIP (`RenamesInfo.IncludedElementaryItems` — §13.18.45.4 GR2's "all elementary items starting with
     data-name-2 … and concluding with data-name-3", in declaration order; §14.7.6's "a data item in D1" for MOVE
     CORRESPONDING, kb/Work PB966, determination D-CORR66 in docs/CONFORMANCE.md). A rule about WHICH ENTRY a
     reference names — "described with level-number 66", "shall not contain a RENAMES clause" — asks
     `Place.DenotedItem`, never `Place.Item`: the no-THROUGH alias resolves to data-name-2's own place.
+    ⛔ A span part is a range of its cell's STORAGE BYTES, never of its character positions (kb/Work PB2466, PB1902).
+    `ReferenceResolver.SpanLeafPlace` makes every cell its storage image — a numeric leaf through `NumericImagePlace`,
+    a usage-national leaf through `NationalBytesPlace` (its UTF-16BE pairs, D-N1) — and a partial part is a
+    `RefModPlace` over that image in bytes. So a REDEFINES view of another layout that puts a window boundary, or
+    leaves an interior byte, on the odd byte of a national character is tiled and addressed like any other byte;
+    COBOLNET1655 "do not tile" is left to a window no leaf reaches.
 
 == 8. REDEFINES — the storage-overlay boundary ==
 > **Canonical REDEFINES design.** The 4-tier one-canonical-backing model below is the design; the SSOT is

@@ -675,6 +675,20 @@ public abstract record AllCount
 public sealed record NumericImagePlace(Place Inner) : PlaceDecorator(Inner);
 
 /// <summary>
+/// A NATIONAL elementary cell viewed as the STORAGE BYTES its character positions occupy — UTF-16BE pairs, two per
+/// position (D-N1) — for a level-66 RENAMES THROUGH alias, which ISO §13.18.45.4 GR2 makes "an alphanumeric group
+/// item" over the record's storage (kb/Work PB1665, PB2466). Reading serializes the cell's characters
+/// (<c>CobolBits.NatBytes</c>); writing decodes the byte image back into the cell's positions
+/// (<c>CobolBits.NatReadWindow</c>, the one inverse). The alias composes its spanned leaves through this view, and a
+/// part that covers only some of a national cell's bytes is a <see cref="RefModPlace"/> over it in BYTES — which is
+/// how a window boundary, or an interior byte, on the odd byte of a national character is addressed: the bytes the
+/// alias renames, never a fraction of a character position. The national twin of <see cref="NumericImagePlace"/>'s
+/// role in the alias (both turn a leaf's value carrier into the bytes it occupies). Rendered by
+/// <c>CodeGen.PlaceRenderer</c>.
+/// </summary>
+public sealed record NationalBytesPlace(Place Inner) : PlaceDecorator(Inner);
+
+/// <summary>
 /// A GROUP item viewed as its CHARACTER IMAGE for reference modification (ISO §8.4.3.3.3 SR1 — "an alphanumeric
 /// group item" / "a group item that is neither a strongly-typed group nor a variable-length group"; §8.4.3.3.4 GR6 —
 /// the unique data item is an elementary alphanumeric item over the group's positions): reading is the generated

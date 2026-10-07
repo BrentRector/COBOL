@@ -163,9 +163,9 @@ internal static class VariableLengthCompatibility
                 into.Add(TableAtom(leaf, GroupAtomKind.Table, n));
                 continue;
             }
-            // part.Length is in the leaf's own CHARACTER positions; the relation is stated in bytes (a national
-            // leaf's character is two of them) — RenamesSpanPart.Bytes is the one conversion.
-            into.Add(new GroupAtom(GroupAtomKind.Fixed, part.Bytes, part.Length));
+            // The part is kept in storage BYTES, the unit the relation is stated in; its CHARACTER positions (a
+            // national leaf's character is two bytes) are RenamesSpanPart.Positions, the one conversion.
+            into.Add(new GroupAtom(GroupAtomKind.Fixed, part.LengthBytes, part.Positions));
         }
     }
 

@@ -58,6 +58,8 @@ public sealed class PlaceDenotedItemDriftTests
         ["GroupImagePlace"] = "The whole-group image view — a coding of the same group item.",
         ["BitImagePlace"] = "The as-if-elementary boolean view of a bit group (§13.18.29.4 GR1 b) — same item.",
         ["NatImagePlace"] = "The as-if-elementary national view of a national group (§13.18.29.4 GR2 b) — same item.",
+        ["NationalBytesPlace"] = "A national cell's storage bytes as a RENAMES THROUGH alias composes them "
+            + "(§13.18.45.4 GR2; kb/Work PB2466) — a coding of the same item, never a reference of its own.",
     };
 
     /// <summary>Kinds that OVERRIDE the answer, with the rule that makes the reference denote something the

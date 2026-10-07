@@ -7295,42 +7295,39 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 bool stuck = false;
                 while (pos <= endOff)
                 {
-                    (DataItem Leaf, int? Occ, int Start, int Len, int Cover, int[] Outer)? best = null;
+                    // ⛔ EVERY CANDIDATE IS ADDRESSABLE, because a part is a range of STORAGE BYTES (RenamesSpanPart;
+                    // kb/Work PB2466, PB1902): a slice whose boundary falls on the odd byte of a national character, and
+                    // an interior byte only half a national character covers (an alphanumeric REDEFINES view shorter than
+                    // the national item it redefines), are bytes of the record's storage like any other, and the alias
+                    // is "an alphanumeric group item" over that storage (§13.18.45.4 GR2). Parts used to be kept in their
+                    // leaf's positions, so such a slice was chosen and then refused — COBOLNET1655 on legal source.
+                    RenamesSpanPart? best = null;
                     foreach (var (leaf, off, w, occ, outer) in leaves)
                     {
                         int total = w * occ;
                         if (pos < off || pos > off + total - 1) continue;          // the leaf does not contain pos
                         // the whole leaf (every occurrence) starting exactly here and fitting the window
                         if (off == pos && off + total - 1 <= endOff)
-                            Consider((leaf, null, 1, total, total, outer));
+                            Consider(new RenamesSpanPart(leaf, null, 1, total, outer));
                         int k = (pos - off) / w + 1;                                // the occurrence containing pos
                         int cellLo = off + (k - 1) * w, cellHi = cellLo + w - 1;
-                        if (cellLo == pos && cellHi <= endOff)
-                            Consider((leaf, occ == 1 ? null : k, 1, w, w, outer));   // a whole cell (or the whole 1-occurrence leaf)
-                        else
-                        {
-                            int to = Math.Min(endOff, cellHi);                     // a partial slice of the containing cell
-                            Consider((leaf, k, pos - cellLo + 1, to - pos + 1, to - pos + 1, outer));
-                        }
+                        if (cellLo == pos && cellHi <= endOff)                      // a whole cell (or the whole 1-occurrence leaf)
+                            Consider(new RenamesSpanPart(leaf, occ == 1 ? null : k, 1, w, outer));
+                        else                                                        // a partial slice of the containing cell
+                            Consider(new RenamesSpanPart(leaf, k, pos - cellLo + 1, Math.Min(endOff, cellHi) - pos + 1, outer));
                     }
-                    void Consider((DataItem Leaf, int? Occ, int Start, int Len, int Cover, int[] Outer) c)
+                    void Consider(RenamesSpanPart c)
                     {
                         // prefer: whole (non-partial) over partial; then the longest cover; then the narrowest leaf
-                        bool cPartial = c.Occ is not null && (c.Start != 1 || c.Len != c.Leaf.ByteWidth);
-                        bool bPartial = best is { } b0 && b0.Occ is not null && (b0.Start != 1 || b0.Len != b0.Leaf.ByteWidth);
-                        if (best is null
-                            || (bPartial && !cPartial)
-                            || (bPartial == cPartial && c.Cover > best.Value.Cover)
-                            || (bPartial == cPartial && c.Cover == best.Value.Cover && c.Leaf.ByteWidth < best.Value.Leaf.ByteWidth))
+                        if (best is not { } b
+                            || (b.IsPartial && !c.IsPartial)
+                            || (b.IsPartial == c.IsPartial && c.LengthBytes > b.LengthBytes)
+                            || (b.IsPartial == c.IsPartial && c.LengthBytes == b.LengthBytes && c.Leaf.ByteWidth < b.Leaf.ByteWidth))
                             best = c;
                     }
-                    if (best is not { } chosen || chosen.Cover <= 0) { stuck = true; break; }
-                    // The tiling ran in STORAGE bytes; a part is kept in its leaf's own positions. A national leaf's boundary
-                    // inside a position (an odd byte) is no whole character of that item - nothing can address it.
-                    if (RenamesSpanPart.FromBytes(chosen.Leaf, chosen.Occ, chosen.Start, chosen.Len, chosen.Outer) is not { } spanPart)
-                    { stuck = true; break; }
-                    info.Span.Add(spanPart);
-                    pos += chosen.Cover;
+                    if (best is not { LengthBytes: > 0 } chosen) { stuck = true; break; }
+                    info.Span.Add(chosen);
+                    pos += chosen.LengthBytes;
                 }
                 if (stuck || info.Span.Count == 0)
                 {

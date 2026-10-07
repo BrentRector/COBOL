@@ -52,6 +52,10 @@ internal static class PlaceRenderer
         NumericImagePlace n => n.Inner.Item is { Pic.IsFloat: true, StoreAsImage: false }
             ? NumericRenderer.ImageOfCarrier(Read(n.Inner), n.Inner.Item)
             : RuntimeApi.NumFormatImage(Read(n.Inner), n.Inner.Item.ProfileName),
+        // A NATIONAL cell viewed as its STORAGE BYTES (a RENAMES THROUGH alias's leaf, §13.18.45.4 GR2; kb/Work PB1665,
+        // PB2466): its characters serialized as UTF-16BE pairs (D-N1), the same CobolBits.NatBytes every other storage
+        // image uses.
+        NationalBytesPlace b => RuntimeApi.NatBytes(Read(b.Inner)),
         // A GROUP viewed as its character image for reference modification (ISO §8.4.3.3.3 SR1 / §8.4.3.3.4 GR6 —
         // kb/Work PB70), READ: §8.4.3.3.4 GR5 makes the unique data item "a subset of the data item referenced by
         // identifier-1", so a ref-mod READ references the group as a SENDING operand and an occurs-depending group
@@ -74,10 +78,12 @@ internal static class PlaceRenderer
         // positions" — the item's OWN characters; §13.18.29.4 GR2b's as-if PICTURE N(m)) — kb/Work PB327. The
         // national twin of the bit arm above, through THE ONE national reader.
         NatImagePlace n => SendingNat(n.Inner),
-        // A level-66 RENAMES alias (ISO §13.18.45): concatenate the spanned leaves' character images.
+        // A level-66 RENAMES alias (ISO §13.18.45): concatenate the spanned leaves' STORAGE images — each leaf is its
+        // cell's bytes or a byte slice of them (ReferenceResolver.SpanLeafPlace), the alias being "an alphanumeric
+        // group item" over the record's storage (§13.18.45.4 GR2).
         RenamesPlace n => n.Leaves.Count == 1
-            ? ReadRenamesLeaf(n.Leaves[0])
-            : "(" + string.Join(" + ", n.Leaves.Select(ReadRenamesLeaf)) + ")",
+            ? Read(n.Leaves[0])
+            : "(" + string.Join(" + ", n.Leaves.Select(Read)) + ")",
         // An ODO group operand read plainly (not as a GR8 slice) is the struct lvalue — the inner member place.
         OdoGroupPlace o => Read(o.Inner),
         // ⛔ A DYNAMIC-LENGTH LINKAGE item is read through a description that does not own its storage (kb/Work
@@ -190,6 +196,10 @@ internal static class PlaceRenderer
         NumericImagePlace n => n.Inner.Item is { Pic.IsFloat: true, StoreAsImage: false }
             ? Write(n.Inner, NumericRenderer.CarrierOfImage(rhs, n.Inner.Item))
             : Write(n.Inner, RuntimeApi.NumStoreImage(rhs, n.Inner.Item.ProfileName, Read(n.Inner))),
+        // The receiving twin of the national-bytes read above: the cell's positions decoded out of its byte image
+        // (CobolBits.NatReadWindow, the one inverse of NatBytes). A byte slice that split a character was spliced
+        // into the cell's WHOLE image first (the RefModPlace arm), so the decode always sees whole pairs.
+        NationalBytesPlace b => Write(b.Inner, RuntimeApi.NatReadWindow(rhs, "0", b.Inner.Item.ImageWidth.ToString())),
         // The spliced group image goes back through the ONE group-image store (kb/Work PB70).
         GroupImagePlace g => WriteGroupImage(g.Inner, rhs, "reference modification into group"),
         // The spliced BOOLEAN string goes back through the generated FromBits, which distributes the boolean
@@ -367,7 +377,9 @@ internal static class PlaceRenderer
     /// renamed item and vice versa — no second storage).</summary>
     private static string WriteRenames(RenamesPlace n, string rhs)
     {
-        if (n.Leaves.Count == 1) return Write(n.Leaves[0], StorageToLeafCharacters(n.Leaves[0], rhs, n.Widths[0]));
+        // Every leaf is already its cell's STORAGE image, or a byte slice of it (ReferenceResolver.SpanLeafPlace:
+        // NumericImagePlace / NationalBytesPlace), so each slice of the alias's image is stored as it stands.
+        if (n.Leaves.Count == 1) return Write(n.Leaves[0], rhs);
         int width = n.Widths.Sum();   // each part's width — a partial part's is its slice, not the item's (kb/Work PB96)
         var sb = new System.Text.StringBuilder();
         sb.Append($"{{ string __ren = {RuntimeApi.StrStore(rhs, width.ToString())};");
@@ -375,31 +387,11 @@ internal static class PlaceRenderer
         for (int i = 0; i < n.Leaves.Count; i++)
         {
             int w = n.Widths[i];
-            sb.Append(' ').Append(Write(n.Leaves[i], StorageToLeafCharacters(n.Leaves[i], $"__ren.Substring({off}, {w})", w)));
+            sb.Append(' ').Append(Write(n.Leaves[i], $"__ren.Substring({off}, {w})"));
             off += w;
         }
         return sb.Append(" }").ToString();
     }
-
-    /// <summary>A spanned RENAMES leaf cell is of class national when the cell, or the slice of it, is — then its
-    /// storage is UTF-16BE byte pairs (D-N1), two bytes per character position.</summary>
-    private static bool IsNationalRenamesLeaf(Place leaf) =>
-        leaf is RefModPlace r ? r.Category is PicCategory.National : leaf.Item.Pic is { Usage: Usage.National };
-
-    /// <summary>One spanned leaf cell's contribution to the alias's image, which is a string of STORAGE bytes
-    /// (§13.18.45.4 GR2 — the alias is an alphanumeric group over the record's storage): the cell's characters, a
-    /// national cell serialized as its byte pairs — the same <c>CobolBits.NatBytes</c> every other storage image
-    /// uses (kb/Work PB1665).</summary>
-    private static string ReadRenamesLeaf(Place leaf) =>
-        IsNationalRenamesLeaf(leaf) ? RuntimeApi.NatBytes(Read(leaf)) : Read(leaf);
-
-    /// <summary>The inverse of <see cref="ReadRenamesLeaf"/> for the write through the alias: the leaf cell's
-    /// characters out of its <paramref name="bytes"/>-wide slice of the alias's image
-    /// (<c>CobolBits.NatReadWindow</c>, the one inverse of <c>NatBytes</c>).</summary>
-    private static string StorageToLeafCharacters(Place leaf, string imageSlice, int bytes) =>
-        IsNationalRenamesLeaf(leaf)
-            ? RuntimeApi.NatReadWindow(imageSlice, "0", $"{bytes / RuntimeApi.BytesPerNational}")
-            : imageSlice;
 
     /// <summary>A figurative-constant store into a reference-modified slice: <paramref name="seed"/> — a C# string
     /// expression holding one fill character, or the literal of <c>ALL literal-1</c> — is repeated character by

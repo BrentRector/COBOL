@@ -5,14 +5,22 @@ namespace CobolNet.Binding.Model;
 /// <summary>One storage part of a RENAMES THRU span (kb/Work PB96): a leaf of the record (a REDEFINES view is as
 /// good a reader of the storage it overlays as the entry it redefines — NC252A's RDF8-5 THRU RDF8-6 lives inside a
 /// double redefinition of an OCCURS 36 table), <paramref name="Occurrence"/> = null for the WHOLE leaf (every
-/// occurrence of a table leaf, in order) or the 1-based occurrence the part lies in, and <paramref name="Start"/>
-/// (1-based) / <paramref name="Length"/> the character range of that occurrence the alias covers — the whole cell
-/// (the ordinary case) or a partial slice when a span boundary lands inside it.
+/// occurrence of a table leaf, in order) or the 1-based occurrence the part lies in, and <paramref name="StartByte"/>
+/// (1-based) / <paramref name="LengthBytes"/> the range of that occurrence's STORAGE BYTES the alias covers — the
+/// whole cell (the ordinary case) or a partial slice when a span boundary lands inside it.
+/// <para>⛔ A PART IS KEPT IN STORAGE BYTES, NEVER IN ITS LEAF'S CHARACTER POSITIONS (kb/Work PB2466, PB1902).
+/// §13.18.45.4 GR2 makes data-name-1 "an alphanumeric group item" over the record's storage, so the window is tiled
+/// in bytes, and a REDEFINES view of a different layout can put a part boundary — or leave an interior byte no other
+/// leaf covers — on the odd byte of a national character (D-N1: two bytes per national position). That byte is no
+/// range of the national item's positions, but it IS a range of its storage, which is what the alias renames: the
+/// resolver addresses every part as a byte slice of its cell's storage image (<c>ReferenceResolver.PlaceForRenames</c>,
+/// <see cref="NationalBytesPlace"/>), so every part the tiling can choose is addressable. Keeping the part in
+/// positions made a half-character part unrepresentable, and legal source drew COBOLNET1655 "do not tile".</para>
 /// <para><paramref name="Outer"/> is the 1-based occurrence of each OCCURS GROUP the leaf sits under, outermost first
 /// (kb/Work PB986): §13.18.45.3 SR3 bars an OCCURS only on the three NAMED operands, so a table may lie INSIDE the
 /// range, and a leaf of such a table lives once per occurrence of its group — S4 of <c>ST OCCURS 2</c> is
 /// <c>S4 OF ST(1)</c> and <c>S4 OF ST(2)</c>, two parts, not one. Empty for a leaf under no table.</para></summary>
-public sealed record RenamesSpanPart(DataItem Leaf, int? Occurrence, int Start, int Length, IReadOnlyList<int> Outer)
+public sealed record RenamesSpanPart(DataItem Leaf, int? Occurrence, int StartByte, int LengthBytes, IReadOnlyList<int> Outer)
 {
     /// <summary>The subscript of each OCCURS level on the leaf's path, outermost first — the table groups' occurrences
     /// (<see cref="Outer"/>) and then <paramref name="own"/> for the leaf's own OCCURS when it has one: the index list
@@ -20,33 +28,26 @@ public sealed record RenamesSpanPart(DataItem Leaf, int? Occurrence, int Start, 
     public IReadOnlyList<string> SubscriptsFor(int? own) =>
         [.. Outer.Select(o => o.ToString()), .. own is { } k ? new[] { k.ToString() } : Array.Empty<string>()];
 
-    /// <summary>The whole leaf — every occurrence, every character (the composed accessor's fast path).</summary>
+    /// <summary>The whole leaf — every occurrence, every byte (the composed accessor's fast path).</summary>
     public bool IsWhole => Occurrence is null;
 
-    /// <summary>A part that covers only some characters of its occurrence (renders as the cell's ref-mod view).</summary>
-    public bool IsPartial => Occurrence is not null && (Start != 1 || Length != Leaf.ImageWidth);
+    /// <summary>A part that covers only some bytes of its occurrence (renders as a byte slice of the cell's storage
+    /// image).</summary>
+    public bool IsPartial => Occurrence is not null && (StartByte != 1 || LengthBytes != Leaf.ByteWidth);
 
-    /// <summary>Storage bytes per character position of <paramref name="leaf"/> — 1, or
-    /// <c>CobolBits.BytesPerNational</c> for a national leaf (D-N1). The one conversion between the unit a RENAMES
-    /// window is tiled in (storage bytes: it is a re-grouping of the record's STORAGE, §13.18.45.4 GR2) and the unit
-    /// a part is kept in (its leaf's own positions, which is what a ref-mod view of the leaf indexes).</summary>
-    private static int BytesPerPosition(DataItem leaf) =>
-        leaf.ImageWidth > 0 ? leaf.ByteWidth / leaf.ImageWidth : 1;
-
-    /// <summary>This part's extent in STORAGE bytes — what it contributes to the alias's image
-    /// (<see cref="Length"/> × bytes per position).</summary>
-    public int Bytes => Length * BytesPerPosition(Leaf);
-
-    /// <summary>A part from a tiling stated in storage BYTES (<paramref name="startByte"/> 1-based within the
-    /// occurrence), expressed in the leaf's own positions; null when a boundary falls inside a character position
-    /// (the odd byte of a national character), which is no range of that item.</summary>
-    public static RenamesSpanPart? FromBytes(DataItem leaf, int? occurrence, int startByte, int lengthBytes,
-        IReadOnlyList<int> outer)
+    /// <summary>The part's extent in its leaf's CHARACTER positions when it covers whole positions — the carrier
+    /// geometry a <c>GroupAtom</c> records beside the bytes (a national position is two bytes, D-N1) — and its bytes
+    /// otherwise: a slice that splits a national character covers no whole position of the leaf, and the alias's
+    /// image holds it as the storage bytes it is.</summary>
+    public int Positions
     {
-        int u = BytesPerPosition(leaf);
-        return (startByte - 1) % u != 0 || lengthBytes % u != 0
-            ? null
-            : new RenamesSpanPart(leaf, occurrence, (startByte - 1) / u + 1, lengthBytes / u, outer);
+        get
+        {
+            int perPosition = Leaf.ImageWidth > 0 ? Leaf.ByteWidth / Leaf.ImageWidth : 1;
+            return (StartByte - 1) % perPosition == 0 && LengthBytes % perPosition == 0
+                ? LengthBytes / perPosition
+                : LengthBytes;
+        }
     }
 }
 
@@ -79,9 +80,10 @@ public sealed class RenamesInfo
     public DataItem? Thru { get; set; }
 
     /// <summary>The STORAGE parts the THRU span covers, in record storage order (kb/Work PB96): each part is one
-    /// NON-redefining leaf of the record and the 1-based character range of it inside the window (a whole leaf is
-    /// (1, its width); a boundary that falls inside a leaf — a FROM / THRU that is a partial redefinition of it —
-    /// makes a partial part). A REDEFINES view is never a part: it overlays storage the parts already cover.</summary>
+    /// leaf of the record — a REDEFINES view's leaf as readily as the redefined entry's, since either reads the
+    /// storage — and the 1-based range of its STORAGE BYTES inside the window (a whole leaf is (1, its byte width); a
+    /// boundary that falls inside a leaf — a FROM / THRU that is a partial redefinition of it — makes a partial
+    /// part). The tiling advances by what each part covers, so no byte is covered twice.</summary>
     public List<RenamesSpanPart> Span { get; } = [];
 
     /// <summary>The leaves the rename spans (the parts' leaves) — the strong-type check's view.</summary>
@@ -96,8 +98,7 @@ public sealed class RenamesInfo
     /// item in data-name-2 (if data-name-2 is a group item), and concluding with data-name-3 (if data-name-3 is an
     /// elementary item) or the last elementary item in data-name-3 (if data-name-3 is a group item)."</i>
     /// <para>This is the alias's MEMBERSHIP, which is a different question from its STORAGE (<see cref="Span"/>):
-    /// the span is the record's characters tiled by non-redefining leaves (a REDEFINES view is never counted
-    /// twice), while GR2 names the ELEMENTARY ITEMS — every one of them between the two endpoints in the order
+    /// the span is the record's storage bytes tiled once each by whichever leaves cover them, while GR2 names the ELEMENTARY ITEMS — every one of them between the two endpoints in the order
     /// the entries are written, a redefining entry's items included. The one reader today is §14.7.6's "a data
     /// item in D1" when D1 is an alias (kb/Work PB966); a rule asking which items an alias INCLUDES reads this,
     /// and a rule asking which characters it OCCUPIES reads <see cref="Span"/>.</para>
