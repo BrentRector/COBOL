@@ -13,6 +13,16 @@
          inline-value and space-separated handling, arity, and auto-generated help (Cobol.Net.Cli). -->
     <PackageVersion Include="System.CommandLine" Version="2.0.9" />
 
+    <!-- The architecture census's Roslyn host (tools/ArchCensus; kb/Work PB2115): it loads CobolSharp.sln through
+         MSBuildWorkspace. The host's Roslyn packages share ONE version among themselves, and it need not be the
+         product compiler's (a measuring tool ships nothing): 5.0.0 because 4.14's MSBuild workspace pulls
+         Microsoft.Build.Tasks.Core 17.7.2, a known high-severity advisory (NU1903, an error here), and 5.0.0
+         depends on Microsoft.Build.Framework alone. MSBuildLocator registers the SDK's MSBuild before any workspace
+         call. Never part of CobolSharp.sln. -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.Build.Locator" Version="1.9.1" />
+
     <!-- Benchmarks -->
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
 

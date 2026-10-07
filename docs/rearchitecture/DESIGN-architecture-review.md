@@ -65,10 +65,16 @@ Every finding is a `kb/Work` note (CLAUDE.md rule 8), never a list in this docum
   R0's instruments are kb/Work PB2115 (census), PB2116 (oracle capture) and PB2117 (performance baseline, which is
   also kb/Work A6's instrument: one mechanism, one place).
 - **God-class candidates.** Any type over ~800 lines across its partials, or with more than one reason to change.
-  Known today: `DataBinder` (7,448 lines in `DataBinder.cs` alone, plus the `.Reports`, `.Switches`, `.Odo`,
-  `.Linkage` partials); `DiagnosticCatalog` (5,612, a data table written as code); `IntrinsicBinder` (2,826);
-  `ReferenceResolver` (2,660); `VersionConformancePass` (2,535); `ExceptionState` (2,201); `BoundTree` (1,985);
-  `RuntimeApi` (1,949).
+  The MEASURED list, with each candidate's responsibilities named, is the newest census record's `godClasses`
+  table and its findings file (`docs/rearchitecture/evidence/arch-census/<sha>.json` and `<sha>.findings.json`);
+  this document keeps no copy, because a hand-kept list is stale the day after it is written.
+- **The census instrument** is `scripts/arch/census.py` driving the Roslyn host `tools/ArchCensus` (MSBuildWorkspace,
+  never grep). It measures a DETACHED worktree at one commit; its scope rule makes every `src/Cobol.Net.*` project a
+  census project and every `tests/Cobol.Net.*` project a reader, and refuses a solution project it does not classify.
+  Its POPULATION CHECK compares the types it saw with the type definitions of each built assembly's metadata and
+  refuses to write a record on any difference. Reachability is a semantic walk confirmed by `SymbolFinder`, with
+  every exclusion a stated rule the record carries. `ArchCensusDriftTests` keeps the newest record whole and the
+  script's policy arms firing. Its findings are filed as kb/Work notes by a clerk, never kept as a list.
 - **The oracle** (§4.1) is recorded at the baseline commit: `python scripts/arch/capture_oracle.py --record`.
 - **Performance baseline** (`brent-tools:performance-diagnosis`): the compile-throughput benchmark and the
   whole-population gate time, so no refactor regresses speed unseen.

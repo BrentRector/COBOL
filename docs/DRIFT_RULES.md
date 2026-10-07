@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-276 drift tests.
+277 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -38,6 +38,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [AnnexA2UndefinedListDriftTests](../tests/Cobol.Net.Tests.Unit/AnnexA2UndefinedListDriftTests.cs) | ⛔ THE GATE THAT HOLDS THE GENERATED ANNEX A.2 LIST EQUAL TO THE STANDARD — scripts/spec/extract_annex_a2.py. | `scripts/spec/extract_annex_a2.py`, `tests/version-matrix/annex-a2-undefined.json`, `scripts/spec/audit_derivations.py` |
 | [AnnexA3RegisterDriftTests](../tests/Cobol.Net.Tests.Unit/AnnexA3RegisterDriftTests.cs) | The drift guard for docs/CONFORMANCE.md §2 — the Annex A.3 processor-dependent element register, which ISO §4.2.6 makes NORMATIVE user documentation and not a summary table: "To meet the requirements of standard COBOL, the implementor shall document the processor-dependent language elements for which the implementation claims support", and "The absence of processor-dependent elements from an imple… | `docs/CONFORMANCE.md`, `src` |
 | [AnnexBCDriftTests](../tests/Cobol.Net.Tests.Unit/AnnexBCDriftTests.cs) | ⛔ THE ANNEX B AND ANNEX C TABLES ARE THE STANDARD'S, LIST FOR LIST (kb/Work PB1402). | `specs/ISO_COBOL.md` |
+| [ArchCensusDriftTests](../tests/Cobol.Net.Tests.Unit/ArchCensusDriftTests.cs) | ⛔ THE ARCHITECTURE CENSUS CANNOT SILENTLY SKIP A PROJECT (kb/Work PB2115; docs/rearchitecture/DESIGN-architecture-review.md §3 R0): the newest committed census record under docs/rearchitecture/evidence/arch-census/ covers every product project of CobolSharp.sln (each src/Cobol.Net.* project), its census population equals the built assembly's compiled type population for each, and its type table ho… | `scripts/arch/census.py`, `CobolSharp.sln`, `docs/rearchitecture/evidence/arch-census` |
 | [ArgumentOrderDriftTests](../tests/Cobol.Net.Tests.Unit/ArgumentOrderDriftTests.cs) | ⛔ EVERY FUNCTION-IDENTIFIER'S ARGUMENT LIST IS EVALUATED LEFT TO RIGHT THROUGH ONE WINDOW (kb/Work PB1423, CLAUDE.md rule 5). | `src/Cobol.Net.Compiler` |
 | [ArgumentSubstituteDriftTests](../tests/Cobol.Net.Tests.Unit/ArgumentSubstituteDriftTests.cs) | ⛔ NO INTRINSIC GUARD SPELLS ITS OWN SUBSTITUTED TEXT RESULT (kb/Work PB383, PB470). | `src/Cobol.Net.Runtime/Intrinsics` |
 | [ArithmeticModeScreenDriftTests](../tests/Cobol.Net.Tests.Unit/ArithmeticModeScreenDriftTests.cs) | The §4.2.6 non-support screen for ARITHMETIC IS STANDARD-BINARY fires for EVERY kind of source unit that can carry an OPTIONS paragraph — and the set of such units is read out of the GRAMMAR, not out of a list somebody remembered to update. | `src/Cobol.Net.Frontend/Grammar` |
