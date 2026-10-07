@@ -10,6 +10,20 @@
       *> across the nested call (R-lines). CANCEL then re-calls: WS back to initial (D1 WS=01).
       *> The UDF twin: FCTR-P10RW's WS call-counter accumulates across three invocations (1, 2, 13).
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. FCTR-P10RW.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-CNT PIC 9(4) VALUE 0.
+       LINKAGE SECTION.
+       01 L-A PIC 9(2).
+       01 L-R PIC 9(4).
+       PROCEDURE DIVISION USING L-A RETURNING L-R.
+       P.
+           ADD 1 TO WS-CNT.
+           COMPUTE L-R = WS-CNT + L-A.
+           GOBACK.
+       END FUNCTION FCTR-P10RW.
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. RWMAIN-P10RW.
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
@@ -58,17 +72,3 @@
            GOBACK.
        END PROGRAM RWREC-P10RW.
 
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. FCTR-P10RW.
-       DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01 WS-CNT PIC 9(4) VALUE 0.
-       LINKAGE SECTION.
-       01 L-A PIC 9(2).
-       01 L-R PIC 9(4).
-       PROCEDURE DIVISION USING L-A RETURNING L-R.
-       P.
-           ADD 1 TO WS-CNT.
-           COMPUTE L-R = WS-CNT + L-A.
-           GOBACK.
-       END FUNCTION FCTR-P10RW.

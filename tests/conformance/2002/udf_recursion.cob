@@ -2,21 +2,6 @@
       *> itself") + 8.4.6.6 (within a function definition its OWN user-function-name is referable with NO
       *> REPOSITORY declaration) - self-recursive factorial through five nested activations: 5! = 120.
        IDENTIFICATION DIVISION.
-       PROGRAM-ID. URECURSE.
-       ENVIRONMENT DIVISION.
-       CONFIGURATION SECTION.
-       REPOSITORY.
-           FUNCTION UFACT.
-       DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01 WS-R PIC 9(8).
-       PROCEDURE DIVISION.
-       MAIN.
-           COMPUTE WS-R = FUNCTION UFACT(5).
-           DISPLAY "F5=" WS-R.
-           STOP RUN.
-       END PROGRAM URECURSE.
-       IDENTIFICATION DIVISION.
        FUNCTION-ID. UFACT.
        DATA DIVISION.
        LINKAGE SECTION.
@@ -31,3 +16,18 @@
            END-IF.
            GOBACK.
        END FUNCTION UFACT.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. URECURSE.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           FUNCTION UFACT.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-R PIC 9(8).
+       PROCEDURE DIVISION.
+       MAIN.
+           COMPUTE WS-R = FUNCTION UFACT(5).
+           DISPLAY "F5=" WS-R.
+           STOP RUN.
+       END PROGRAM URECURSE.

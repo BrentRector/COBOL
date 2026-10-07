@@ -32,6 +32,12 @@ internal sealed class BoundUnit
     public required string ExternalizedName;
     public required string ClassName;
     public required Core.ProgramUnitContext Ctx;
+    /// <summary>Where this unit's source text STARTS in the compilation group — the character offset of its first
+    /// token, a total order over every source element of the group (§12.3.8.4 GR10 a) / GR11 a): "a program
+    /// definition specified PREVIOUSLY in the same compilation group" means a definition whose position is less
+    /// than the referencing element's; kb/Work PB989). A contained program's own context carries no start token,
+    /// so this reads the first token under it.</summary>
+    public required int SourcePosition;
     public BoundUnit? Parent;
     public List<BoundUnit> Children = [];
     public bool Initial, Common, Recursive;

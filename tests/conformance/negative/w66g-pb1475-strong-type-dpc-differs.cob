@@ -15,6 +15,23 @@
       *> not equivalent, A and L are not of the same type, and the CALL
       *> is rejected (COBOLNET1688, call-argument-conformance). An
       *> implementation comparing the picture TEXT alone accepts it.
+      *> kb/Work PB989 - ISO 12.3.8.4 GR10 a): the details come from a program definition specified PREVIOUSLY in the
+      *> compilation group; a definition that follows the REPOSITORY entry is not one. The callee below is therefore
+      *> given a program prototype definition (11.10.2 Format 2) ahead of every other unit (10.6.2 SR1), which
+      *> supplies the details under GR10 b) - the same signature as the definition (10.6.2 SR2).
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. W66GDS IS PROTOTYPE.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           DECIMAL-POINT IS COMMA.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01  T1 TYPEDEF STRONG.
+           05  F           PIC 9.99.
+       01  L TYPE T1.
+       PROCEDURE DIVISION USING L.
+       END PROGRAM W66GDS.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. W66GDC.
        ENVIRONMENT DIVISION.

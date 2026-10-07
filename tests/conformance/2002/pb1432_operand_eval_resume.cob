@@ -20,6 +20,19 @@
       *>  C-T AFTER-C the true first operand short-circuits the divide: no declarative
        >>TURN EC-ALL CHECKING ON
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. TRC-P1432.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 L-T PIC X.
+       01 L-N PIC 9.
+       01 L-R PIC 9.
+       PROCEDURE DIVISION USING L-T L-N RETURNING L-R.
+       F-P.
+           DISPLAY "ACT-" L-T.
+           MOVE L-N TO L-R.
+           GOBACK.
+       END FUNCTION TRC-P1432.
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1432OER.
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
@@ -62,16 +75,3 @@
            STOP RUN.
        END PROGRAM PB1432OER.
 
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. TRC-P1432.
-       DATA DIVISION.
-       LINKAGE SECTION.
-       01 L-T PIC X.
-       01 L-N PIC 9.
-       01 L-R PIC 9.
-       PROCEDURE DIVISION USING L-T L-N RETURNING L-R.
-       F-P.
-           DISPLAY "ACT-" L-T.
-           MOVE L-N TO L-R.
-           GOBACK.
-       END FUNCTION TRC-P1432.

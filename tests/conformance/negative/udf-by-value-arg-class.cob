@@ -3,6 +3,17 @@
       *> with a BY VALUE phrase, argument-1 shall be of class numeric, object, or pointer: an
       *> alphanumeric literal argument is rejected (COBOLNET1554).
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. BVF-P10UV.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 L-V PIC 9(4).
+       01 L-R PIC 9(4).
+       PROCEDURE DIVISION USING BY VALUE L-V RETURNING L-R.
+       P.
+           MOVE L-V TO L-R.
+           GOBACK.
+       END FUNCTION BVF-P10UV.
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. BVAC-P10UV.
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
@@ -16,14 +27,3 @@
            COMPUTE WS-R = FUNCTION BVF-P10UV("AB").
            STOP RUN.
        END PROGRAM BVAC-P10UV.
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. BVF-P10UV.
-       DATA DIVISION.
-       LINKAGE SECTION.
-       01 L-V PIC 9(4).
-       01 L-R PIC 9(4).
-       PROCEDURE DIVISION USING BY VALUE L-V RETURNING L-R.
-       P.
-           MOVE L-V TO L-R.
-           GOBACK.
-       END FUNCTION BVF-P10UV.

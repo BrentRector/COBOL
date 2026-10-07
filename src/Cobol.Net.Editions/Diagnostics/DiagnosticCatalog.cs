@@ -404,6 +404,21 @@ public static class DiagnosticCatalog
         + "literal-4, and literal-5 shall be alphanumeric literals or national literals and shall be neither "
         + "figurative constants nor zero-length literals.\"",
         "ISO §12.3.8.3 SR1/SR2");
+    /// <summary>COBOLNET2969 — a REPOSITORY <c>FUNCTION F</c> specifier whose §12.3.8.4 GR11 a) / b) search, keyed by
+    /// EXTERNALIZED name, selects one function while a DIFFERENT function carries the user-function-name F in the same
+    /// compilation group (determination D-R3, DESIGN-external-repository §8.3; kb/Work PB989).</summary>
+    public static readonly DiagnosticDescriptor FunctionWordNamesAnotherFunction = new(
+        "COBOLNET2969", "function-word-names-another-function", EditionSeverity.Warning,
+        "A REPOSITORY FUNCTION specifier names two different functions. ISO §12.3.8.4 GR11 takes the details for "
+        + "activating a function from \"a function definition specified previously in the same compilation group\" "
+        + "whose externalized name is the specifier's (a), else from a function prototype definition of that "
+        + "externalized name (b) — and GR11 NOTE 2 makes the externalized name literal-5, or the function-prototype-name "
+        + "itself when there is no AS phrase. §8.4.6.7 independently lets the user-function-name be written as a "
+        + "function-prototype-name, so a function whose user-function-name is the word but whose externalized name "
+        + "differs (FUNCTION-ID. F AS \"G\") is another candidate; the standard does not rank the two clauses. The "
+        + "externalized name wins, which is GnuCOBOL 3.2.0's answer (it resolves by externalized name only); the other "
+        + "function is reachable through a specifier FUNCTION F AS \"G\".",
+        "ISO §12.3.8.4 GR11 / §8.4.6.7");
     // kb/Work PB609: the CALL side of the restricted program-pointer (§13.18.60.4 GR25). The pointer's own
     // restriction is declared and screened at its TYPEDEF (COBOLNET0881); this is the rule that CONSUMES it.
     public static readonly DiagnosticDescriptor CallRestrictedProgramPointerSignature = new(

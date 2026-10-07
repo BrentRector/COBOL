@@ -738,6 +738,13 @@ public sealed class OptionalWordSubsetDriftTests
     // compile rather than print something else.
     private const string PointerUsageTo = """
            IDENTIFICATION DIVISION.
+           PROGRAM-ID. OPWVP IS PROTOTYPE.
+           DATA DIVISION.
+           LINKAGE SECTION.
+           01 L-X PIC 9(4).
+           PROCEDURE DIVISION USING L-X.
+           END PROGRAM OPWVP.
+           IDENTIFICATION DIVISION.
            FUNCTION-ID. OPWVF.
            DATA DIVISION.
            LINKAGE SECTION.

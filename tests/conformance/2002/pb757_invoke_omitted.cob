@@ -19,6 +19,20 @@
       *>     omission -> OP / PO / PO / PP.
       *>   A universal receiver (14.9.23.4 GR7c) carries the same omission -> TAKE OMITTED, B OMITTED.
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. PB757F.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 A PIC X(4).
+       01 B PIC X(4).
+       01 R PIC X(2).
+       PROCEDURE DIVISION USING OPTIONAL A OPTIONAL B RETURNING R.
+           MOVE "PP" TO R.
+           IF A IS OMITTED MOVE "O" TO R(1:1) END-IF.
+           IF B IS OMITTED MOVE "O" TO R(2:1) END-IF.
+           GOBACK.
+       END FUNCTION PB757F.
+
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. PB757M.
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
@@ -90,20 +104,6 @@
            INVOKE O2 "TAKE" USING P.
            GOBACK.
        END PROGRAM PB757S2.
-
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. PB757F.
-       DATA DIVISION.
-       LINKAGE SECTION.
-       01 A PIC X(4).
-       01 B PIC X(4).
-       01 R PIC X(2).
-       PROCEDURE DIVISION USING OPTIONAL A OPTIONAL B RETURNING R.
-           MOVE "PP" TO R.
-           IF A IS OMITTED MOVE "O" TO R(1:1) END-IF.
-           IF B IS OMITTED MOVE "O" TO R(2:1) END-IF.
-           GOBACK.
-       END FUNCTION PB757F.
 
        IDENTIFICATION DIVISION.
        CLASS-ID. PB757C INHERITS FROM BASE.

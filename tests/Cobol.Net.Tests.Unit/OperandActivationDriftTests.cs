@@ -87,6 +87,16 @@ public sealed class OperandActivationDriftTests
         string cs = Emit("""
                    >>TURN EC-USER-OAZ CHECKING ON
                    IDENTIFICATION DIVISION.
+                   FUNCTION-ID. OADRIFTF.
+                   DATA DIVISION.
+                   LINKAGE SECTION.
+                   01 R PIC 9.
+                   PROCEDURE DIVISION RETURNING R RAISING EC-USER-OAZ.
+                   F-P.
+                       MOVE 7 TO R.
+                       GOBACK RAISING EXCEPTION EC-USER-OAZ.
+                   END FUNCTION OADRIFTF.
+                   IDENTIFICATION DIVISION.
                    PROGRAM-ID. OADRIFT1.
                    ENVIRONMENT DIVISION.
                    CONFIGURATION SECTION.
@@ -109,16 +119,6 @@ public sealed class OperandActivationDriftTests
                        COMPUTE X = FUNCTION OADRIFTF + 1.
                        STOP RUN.
                    END PROGRAM OADRIFT1.
-                   IDENTIFICATION DIVISION.
-                   FUNCTION-ID. OADRIFTF.
-                   DATA DIVISION.
-                   LINKAGE SECTION.
-                   01 R PIC 9.
-                   PROCEDURE DIVISION RETURNING R RAISING EC-USER-OAZ.
-                   F-P.
-                       MOVE 7 TO R.
-                       GOBACK RAISING EXCEPTION EC-USER-OAZ.
-                   END FUNCTION OADRIFTF.
             """);
         var lambda = Regex.Match(cs, @"new Func<bool>\(\(\) => \{(?<b>.*?)return ", RegexOptions.Singleline);
         Assert.True(lambda.Success, cs);

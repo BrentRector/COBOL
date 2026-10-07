@@ -4,21 +4,6 @@
       *> value becomes the function result (14.9.18.4 GR5 semantics). The IF-guarded early exit keeps the
       *> trailing MOVE emit-live: X=0014 proves the transfer happened (9999 would mean it fell through).
        IDENTIFICATION DIVISION.
-       PROGRAM-ID. UEXITFN.
-       ENVIRONMENT DIVISION.
-       CONFIGURATION SECTION.
-       REPOSITORY.
-           FUNCTION UEARLY.
-       DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01 WS-R PIC 9(4).
-       PROCEDURE DIVISION.
-       MAIN.
-           COMPUTE WS-R = FUNCTION UEARLY(7).
-           DISPLAY "X=" WS-R.
-           STOP RUN.
-       END PROGRAM UEXITFN.
-       IDENTIFICATION DIVISION.
        FUNCTION-ID. UEARLY.
        DATA DIVISION.
        LINKAGE SECTION.
@@ -33,3 +18,18 @@
            MOVE 9999 TO L-R.
            GOBACK.
        END FUNCTION UEARLY.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. UEXITFN.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           FUNCTION UEARLY.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-R PIC 9(4).
+       PROCEDURE DIVISION.
+       MAIN.
+           COMPUTE WS-R = FUNCTION UEARLY(7).
+           DISPLAY "X=" WS-R.
+           STOP RUN.
+       END PROGRAM UEXITFN.

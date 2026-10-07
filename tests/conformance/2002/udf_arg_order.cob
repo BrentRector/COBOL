@@ -21,65 +21,6 @@
       *>   BOOL  - a boolean expression argument (8.8.2): WS-BA B-AND WS-BB is B"1" when it is evaluated, before
       *>           UAOCLR stores B"0" into WS-BA, so the activated function sees B"1" and answers 1 (not 0).
        IDENTIFICATION DIVISION.
-       PROGRAM-ID. UARGORD.
-       ENVIRONMENT DIVISION.
-       CONFIGURATION SECTION.
-       REPOSITORY.
-           FUNCTION UAOF2
-           FUNCTION UAOVAL
-           FUNCTION UAOBMP
-           FUNCTION UAOBMI
-           FUNCTION UAOCHG
-           FUNCTION UAOCLR
-           FUNCTION UAOBOOL.
-       DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01 WS-A PIC 9(4) EXTERNAL.
-       01 WS-I PIC 9(4) EXTERNAL.
-       01 WS-T.
-          05 WS-E PIC 9(4) OCCURS 3.
-       01 WS-S PIC X(4) EXTERNAL.
-       01 WS-R PIC 9(8).
-       01 WS-BA PIC 1 EXTERNAL.
-       01 WS-BB PIC 1.
-       PROCEDURE DIVISION.
-       MAIN.
-           MOVE 4 TO WS-A.
-           COMPUTE WS-R = FUNCTION UAOF2(WS-A + 0,
-               FUNCTION UAOBMP(WS-A)).
-           DISPLAY "EXPR=" WS-R " A=" WS-A.
-           MOVE 4 TO WS-A.
-           COMPUTE WS-R = FUNCTION SUM(WS-A, FUNCTION UAOBMP(WS-A)).
-           DISPLAY "INTR=" WS-R " A=" WS-A.
-           MOVE 4 TO WS-A.
-           COMPUTE WS-R = FUNCTION UAOF2(FUNCTION MAX(WS-A, 1),
-               FUNCTION UAOBMP(WS-A)).
-           DISPLAY "NEST=" WS-R " A=" WS-A.
-           MOVE 4 TO WS-A.
-           COMPUTE WS-R = FUNCTION UAOF2(WS-A, FUNCTION UAOBMP(WS-A)).
-           DISPLAY "REF=" WS-R " A=" WS-A.
-           MOVE 4 TO WS-A.
-           COMPUTE WS-R = FUNCTION UAOVAL(WS-A + 1,
-               FUNCTION UAOBMP(WS-A)).
-           DISPLAY "VAL=" WS-R " A=" WS-A.
-           MOVE 1 TO WS-I.
-           MOVE 7 TO WS-E (1).
-           MOVE 8 TO WS-E (2).
-           COMPUTE WS-R = FUNCTION UAOVAL(WS-E (WS-I),
-               FUNCTION UAOBMI(WS-I)).
-           DISPLAY "SUB=" WS-R " I=" WS-I.
-           MOVE "ABCD" TO WS-S.
-           COMPUTE WS-R = FUNCTION ORD-MIN(WS-S,
-               FUNCTION UAOCHG(WS-S), WS-S).
-           DISPLAY "ORD=" WS-R " S=" WS-S.
-           MOVE B"1" TO WS-BA.
-           MOVE B"1" TO WS-BB.
-           COMPUTE WS-R = FUNCTION UAOBOOL(WS-BA B-AND WS-BB,
-               FUNCTION UAOCLR(WS-BA)).
-           DISPLAY "BOOL=" WS-R " BA=" WS-BA.
-           STOP RUN.
-       END PROGRAM UARGORD.
-       IDENTIFICATION DIVISION.
        FUNCTION-ID. UAOF2.
        DATA DIVISION.
        LINKAGE SECTION.
@@ -173,3 +114,62 @@
            IF L-P MOVE 1 TO L-R ELSE MOVE 0 TO L-R.
            GOBACK.
        END FUNCTION UAOBOOL.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. UARGORD.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           FUNCTION UAOF2
+           FUNCTION UAOVAL
+           FUNCTION UAOBMP
+           FUNCTION UAOBMI
+           FUNCTION UAOCHG
+           FUNCTION UAOCLR
+           FUNCTION UAOBOOL.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-A PIC 9(4) EXTERNAL.
+       01 WS-I PIC 9(4) EXTERNAL.
+       01 WS-T.
+          05 WS-E PIC 9(4) OCCURS 3.
+       01 WS-S PIC X(4) EXTERNAL.
+       01 WS-R PIC 9(8).
+       01 WS-BA PIC 1 EXTERNAL.
+       01 WS-BB PIC 1.
+       PROCEDURE DIVISION.
+       MAIN.
+           MOVE 4 TO WS-A.
+           COMPUTE WS-R = FUNCTION UAOF2(WS-A + 0,
+               FUNCTION UAOBMP(WS-A)).
+           DISPLAY "EXPR=" WS-R " A=" WS-A.
+           MOVE 4 TO WS-A.
+           COMPUTE WS-R = FUNCTION SUM(WS-A, FUNCTION UAOBMP(WS-A)).
+           DISPLAY "INTR=" WS-R " A=" WS-A.
+           MOVE 4 TO WS-A.
+           COMPUTE WS-R = FUNCTION UAOF2(FUNCTION MAX(WS-A, 1),
+               FUNCTION UAOBMP(WS-A)).
+           DISPLAY "NEST=" WS-R " A=" WS-A.
+           MOVE 4 TO WS-A.
+           COMPUTE WS-R = FUNCTION UAOF2(WS-A, FUNCTION UAOBMP(WS-A)).
+           DISPLAY "REF=" WS-R " A=" WS-A.
+           MOVE 4 TO WS-A.
+           COMPUTE WS-R = FUNCTION UAOVAL(WS-A + 1,
+               FUNCTION UAOBMP(WS-A)).
+           DISPLAY "VAL=" WS-R " A=" WS-A.
+           MOVE 1 TO WS-I.
+           MOVE 7 TO WS-E (1).
+           MOVE 8 TO WS-E (2).
+           COMPUTE WS-R = FUNCTION UAOVAL(WS-E (WS-I),
+               FUNCTION UAOBMI(WS-I)).
+           DISPLAY "SUB=" WS-R " I=" WS-I.
+           MOVE "ABCD" TO WS-S.
+           COMPUTE WS-R = FUNCTION ORD-MIN(WS-S,
+               FUNCTION UAOCHG(WS-S), WS-S).
+           DISPLAY "ORD=" WS-R " S=" WS-S.
+           MOVE B"1" TO WS-BA.
+           MOVE B"1" TO WS-BB.
+           COMPUTE WS-R = FUNCTION UAOBOOL(WS-BA B-AND WS-BB,
+               FUNCTION UAOCLR(WS-BA)).
+           DISPLAY "BOOL=" WS-R " BA=" WS-BA.
+           STOP RUN.
+       END PROGRAM UARGORD.

@@ -13,6 +13,22 @@
       *>    cell is seeded with its VALUE image (it used to fail its type
       *>    initializer).
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. P2087FN.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LF-1.
+          05 Q1 PIC 9.
+          05 Q2 PIC X(3).
+       01 LF-2.
+          05 Q3 PIC 9.
+          05 Q4 PIC X(3).
+       01 LF-R PIC X(4).
+       PROCEDURE DIVISION USING LF-1 LF-2 RETURNING LF-R.
+           MOVE 5 TO Q1
+           MOVE LF-2 TO LF-R
+           GOBACK.
+       END FUNCTION P2087FN.
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. P2087M02.
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
@@ -128,19 +144,3 @@
            END-IF
            GOBACK.
        END PROGRAM P2087AD.
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. P2087FN.
-       DATA DIVISION.
-       LINKAGE SECTION.
-       01 LF-1.
-          05 Q1 PIC 9.
-          05 Q2 PIC X(3).
-       01 LF-2.
-          05 Q3 PIC 9.
-          05 Q4 PIC X(3).
-       01 LF-R PIC X(4).
-       PROCEDURE DIVISION USING LF-1 LF-2 RETURNING LF-R.
-           MOVE 5 TO Q1
-           MOVE LF-2 TO LF-R
-           GOBACK.
-       END FUNCTION P2087FN.

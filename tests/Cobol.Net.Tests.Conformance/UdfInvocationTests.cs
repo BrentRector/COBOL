@@ -16,6 +16,17 @@ public sealed class UdfInvocationTests
     /// per fact (the stale same-named-assembly hazard); {body} is the caller's MAIN body.</summary>
     private static string Group(string pid, string body, string repository = "    FUNCTION UDFDBL.") => $$"""
         IDENTIFICATION DIVISION.
+        FUNCTION-ID. UDFDBL.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 L-X PIC 9(4).
+        01 L-R PIC 9(4).
+        PROCEDURE DIVISION USING L-X RETURNING L-R.
+        P.
+            COMPUTE L-R = L-X * 2.
+            GOBACK.
+        END FUNCTION UDFDBL.
+        IDENTIFICATION DIVISION.
         PROGRAM-ID. {{pid}}.
         ENVIRONMENT DIVISION.
         CONFIGURATION SECTION.
@@ -30,17 +41,6 @@ public sealed class UdfInvocationTests
         {{body}}
             STOP RUN.
         END PROGRAM {{pid}}.
-        IDENTIFICATION DIVISION.
-        FUNCTION-ID. UDFDBL.
-        DATA DIVISION.
-        LINKAGE SECTION.
-        01 L-X PIC 9(4).
-        01 L-R PIC 9(4).
-        PROCEDURE DIVISION USING L-X RETURNING L-R.
-        P.
-            COMPUTE L-R = L-X * 2.
-            GOBACK.
-        END FUNCTION UDFDBL.
         """;
 
     /// <summary>The introduction gate: user-defined functions are COBOL-2002+ (§9.4 / §12.3.8) — 0900 at 85
@@ -115,12 +115,6 @@ public sealed class UdfInvocationTests
     {
         string src = """
             IDENTIFICATION DIVISION.
-            PROGRAM-ID. UDFT5.
-            PROCEDURE DIVISION.
-            MAIN.
-                STOP RUN.
-            END PROGRAM UDFT5.
-            IDENTIFICATION DIVISION.
             FUNCTION-ID. UDFNORET.
             DATA DIVISION.
             LINKAGE SECTION.
@@ -129,6 +123,12 @@ public sealed class UdfInvocationTests
             P.
                 GOBACK.
             END FUNCTION UDFNORET.
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. UDFT5.
+            PROCEDURE DIVISION.
+            MAIN.
+                STOP RUN.
+            END PROGRAM UDFT5.
             """;
         var (ok, errors, _) = EditionHarness.CompileFull(src, 2002);
         Assert.False(ok);
@@ -200,6 +200,17 @@ public sealed class UdfInvocationTests
     {
         string src = """
             IDENTIFICATION DIVISION.
+            FUNCTION-ID. UDFDBL.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 L-X PIC 9(4).
+            01 L-R PIC 9(4).
+            PROCEDURE DIVISION USING L-X RETURNING L-R.
+            P.
+                COMPUTE L-R = L-X * 2.
+                GOBACK.
+            END FUNCTION UDFDBL.
+            IDENTIFICATION DIVISION.
             PROGRAM-ID. UDFT6S.
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
@@ -217,17 +228,6 @@ public sealed class UdfInvocationTests
                 END-SEARCH.
                 STOP RUN.
             END PROGRAM UDFT6S.
-            IDENTIFICATION DIVISION.
-            FUNCTION-ID. UDFDBL.
-            DATA DIVISION.
-            LINKAGE SECTION.
-            01 L-X PIC 9(4).
-            01 L-R PIC 9(4).
-            PROCEDURE DIVISION USING L-X RETURNING L-R.
-            P.
-                COMPUTE L-R = L-X * 2.
-                GOBACK.
-            END FUNCTION UDFDBL.
             """;
         var (ok, errors, _) = EditionHarness.CompileFull(src, 2002);
         Assert.True(ok, "SEARCH WHEN must bind per-evaluation: " + string.Join("\n", errors));
@@ -322,20 +322,6 @@ public sealed class UdfInvocationTests
     {
         string src = """
             IDENTIFICATION DIVISION.
-            PROGRAM-ID. UDFT12.
-            ENVIRONMENT DIVISION.
-            CONFIGURATION SECTION.
-            REPOSITORY.
-                FUNCTION UFCT.
-            DATA DIVISION.
-            WORKING-STORAGE SECTION.
-            01 WS-R PIC 9(8).
-            PROCEDURE DIVISION.
-            MAIN.
-                COMPUTE WS-R = FUNCTION UFCT(5).
-                STOP RUN.
-            END PROGRAM UDFT12.
-            IDENTIFICATION DIVISION.
             FUNCTION-ID. UFCT.
             DATA DIVISION.
             LINKAGE SECTION.
@@ -350,6 +336,20 @@ public sealed class UdfInvocationTests
                 END-IF.
                 GOBACK.
             END FUNCTION UFCT.
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. UDFT12.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                FUNCTION UFCT.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 WS-R PIC 9(8).
+            PROCEDURE DIVISION.
+            MAIN.
+                COMPUTE WS-R = FUNCTION UFCT(5).
+                STOP RUN.
+            END PROGRAM UDFT12.
             """;
         var (ok, errors, _) = EditionHarness.CompileFull(src, 2002);
         Assert.True(ok, string.Join("\n", errors));
@@ -362,6 +362,17 @@ public sealed class UdfInvocationTests
     public void ContainedProgram_InheritsRepositoryFunctions()
     {
         string src = """
+            IDENTIFICATION DIVISION.
+            FUNCTION-ID. UDFDBL.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 L-X PIC 9(4).
+            01 L-R PIC 9(4).
+            PROCEDURE DIVISION USING L-X RETURNING L-R.
+            P.
+                COMPUTE L-R = L-X * 2.
+                GOBACK.
+            END FUNCTION UDFDBL.
             IDENTIFICATION DIVISION.
             PROGRAM-ID. UDFT13.
             ENVIRONMENT DIVISION.
@@ -386,17 +397,6 @@ public sealed class UdfInvocationTests
                 EXIT PROGRAM.
             END PROGRAM UDFT13IN.
             END PROGRAM UDFT13.
-            IDENTIFICATION DIVISION.
-            FUNCTION-ID. UDFDBL.
-            DATA DIVISION.
-            LINKAGE SECTION.
-            01 L-X PIC 9(4).
-            01 L-R PIC 9(4).
-            PROCEDURE DIVISION USING L-X RETURNING L-R.
-            P.
-                COMPUTE L-R = L-X * 2.
-                GOBACK.
-            END FUNCTION UDFDBL.
             """;
         var (ok, errors, _) = EditionHarness.CompileFull(src, 2002);
         Assert.True(ok, string.Join("\n", errors));
@@ -420,6 +420,17 @@ public sealed class UdfInvocationTests
     {
         string src = """
             IDENTIFICATION DIVISION.
+            FUNCTION-ID. UDFT16F.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 L-X PIC 9(4).
+            01 L-R PIC 9(4).
+            PROCEDURE DIVISION USING L-X RETURNING L-R.
+            P.
+                COMPUTE L-R = L-X * 2.
+                EXIT FUNCTION.
+            END FUNCTION UDFT16F.
+            IDENTIFICATION DIVISION.
             PROGRAM-ID. UDFT16.
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
@@ -433,17 +444,6 @@ public sealed class UdfInvocationTests
                 COMPUTE WS-R = FUNCTION UDFT16F(3).
                 STOP RUN.
             END PROGRAM UDFT16.
-            IDENTIFICATION DIVISION.
-            FUNCTION-ID. UDFT16F.
-            DATA DIVISION.
-            LINKAGE SECTION.
-            01 L-X PIC 9(4).
-            01 L-R PIC 9(4).
-            PROCEDURE DIVISION USING L-X RETURNING L-R.
-            P.
-                COMPUTE L-R = L-X * 2.
-                EXIT FUNCTION.
-            END FUNCTION UDFT16F.
             """;
         var (ok02, e02, _) = EditionHarness.CompileFull(src, 2002);
         Assert.True(ok02, string.Join("\n", e02));
@@ -481,6 +481,16 @@ public sealed class UdfInvocationTests
         string read = consumer.Replace("TAG", tag);
         string src = $$"""
             IDENTIFICATION DIVISION.
+            FUNCTION-ID. UDFX{{tag}}P10UR.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 L-X PIC 9(4).
+            {{returningDecl}}
+            PROCEDURE DIVISION USING L-X RETURNING L-R.
+            P.
+                GOBACK.
+            END FUNCTION UDFX{{tag}}P10UR.
+            IDENTIFICATION DIVISION.
             PROGRAM-ID. {{pid}}.
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
@@ -495,16 +505,6 @@ public sealed class UdfInvocationTests
                 {{read}}.
                 STOP RUN.
             END PROGRAM {{pid}}.
-            IDENTIFICATION DIVISION.
-            FUNCTION-ID. UDFX{{tag}}P10UR.
-            DATA DIVISION.
-            LINKAGE SECTION.
-            01 L-X PIC 9(4).
-            {{returningDecl}}
-            PROCEDURE DIVISION USING L-X RETURNING L-R.
-            P.
-                GOBACK.
-            END FUNCTION UDFX{{tag}}P10UR.
             """;
         var (ok, errors, _) = EditionHarness.CompileFull(src, 2002);
         Assert.True(ok, $"{tag}: " + string.Join("\n", errors));
@@ -522,6 +522,20 @@ public sealed class UdfInvocationTests
     {
         string src = """
             IDENTIFICATION DIVISION.
+            FUNCTION-ID. UDFXBINCARRYP199.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 L-X PIC 9(4).
+            01 L-R.
+               05 L-R-A PIC X(2).
+               05 L-R-B PIC 9(4) USAGE BINARY.
+            PROCEDURE DIVISION USING L-X RETURNING L-R.
+            P.
+                MOVE "AB" TO L-R-A.
+                COMPUTE L-R-B = L-X * 2.
+                GOBACK.
+            END FUNCTION UDFXBINCARRYP199.
+            IDENTIFICATION DIVISION.
             PROGRAM-ID. UDFT14BINCARRYP199.
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
@@ -538,20 +552,6 @@ public sealed class UdfInvocationTests
                 DISPLAY "A=[" WS-A "] B=[" WS-B "]".
                 STOP RUN.
             END PROGRAM UDFT14BINCARRYP199.
-            IDENTIFICATION DIVISION.
-            FUNCTION-ID. UDFXBINCARRYP199.
-            DATA DIVISION.
-            LINKAGE SECTION.
-            01 L-X PIC 9(4).
-            01 L-R.
-               05 L-R-A PIC X(2).
-               05 L-R-B PIC 9(4) USAGE BINARY.
-            PROCEDURE DIVISION USING L-X RETURNING L-R.
-            P.
-                MOVE "AB" TO L-R-A.
-                COMPUTE L-R-B = L-X * 2.
-                GOBACK.
-            END FUNCTION UDFXBINCARRYP199.
             """;
         var (ok, stdout, detail) = EditionHarness.CompileAndRun(src, 2002);
         Assert.True(ok, detail);
@@ -580,6 +580,16 @@ public sealed class UdfInvocationTests
     {
         string src = """
             IDENTIFICATION DIVISION.
+            FUNCTION-ID. UDFK.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 L-R PIC 9(4).
+            PROCEDURE DIVISION RETURNING L-R.
+            P.
+                MOVE 7 TO L-R.
+                GOBACK.
+            END FUNCTION UDFK.
+            IDENTIFICATION DIVISION.
             PROGRAM-ID. UDFT8.
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
@@ -593,16 +603,6 @@ public sealed class UdfInvocationTests
                 COMPUTE WS-R = FUNCTION UDFK.
                 STOP RUN.
             END PROGRAM UDFT8.
-            IDENTIFICATION DIVISION.
-            FUNCTION-ID. UDFK.
-            DATA DIVISION.
-            LINKAGE SECTION.
-            01 L-R PIC 9(4).
-            PROCEDURE DIVISION RETURNING L-R.
-            P.
-                MOVE 7 TO L-R.
-                GOBACK.
-            END FUNCTION UDFK.
             """;
         var (ok, errors, _) = EditionHarness.CompileFull(src, 2002);
         Assert.True(ok, string.Join("\n", errors));
@@ -617,6 +617,18 @@ public sealed class UdfInvocationTests
     {
         string src = """
             IDENTIFICATION DIVISION.
+            FUNCTION-ID. SQRT.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 L-A PIC 9(4).
+            01 L-B PIC 9(4).
+            01 L-R PIC 9(4).
+            PROCEDURE DIVISION USING L-A L-B RETURNING L-R.
+            P.
+                COMPUTE L-R = L-A + L-B.
+                GOBACK.
+            END FUNCTION SQRT.
+            IDENTIFICATION DIVISION.
             PROGRAM-ID. UDFT9.
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
@@ -630,18 +642,6 @@ public sealed class UdfInvocationTests
                 COMPUTE WS-R = FUNCTION SQRT(4, 5).
                 STOP RUN.
             END PROGRAM UDFT9.
-            IDENTIFICATION DIVISION.
-            FUNCTION-ID. SQRT.
-            DATA DIVISION.
-            LINKAGE SECTION.
-            01 L-A PIC 9(4).
-            01 L-B PIC 9(4).
-            01 L-R PIC 9(4).
-            PROCEDURE DIVISION USING L-A L-B RETURNING L-R.
-            P.
-                COMPUTE L-R = L-A + L-B.
-                GOBACK.
-            END FUNCTION SQRT.
             """;
         // Two arguments: the INTRINSIC SQRT takes exactly one — binding proves the user function won.
         var (ok, errors, _) = EditionHarness.CompileFull(src, 2002);

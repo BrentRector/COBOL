@@ -884,8 +884,8 @@ IS the externalized name under `ExternalizedNames`' fold (DOC-A.1-68).
 
 ### 8.2 Program specifier (SR14, GR10)
 1. GR10 a): an outermost program DEFINITION whose EXTERNALIZED name equals the specifier's and whose source element
-   PRECEDES the specifier's → its `CalleeSignature`. (`BuildProgramDetailsTable`'s order-blind determination is
-   replaced: a later definition is neither a) nor c), because the output being produced is never in the search space
+   PRECEDES the specifier's → its `CalleeSignature`. (LANDED with slice 6, kb/Work PB989 / PB2102: `GroupRepository.Find`
+   replaced the order-blind `BuildProgramDetailsTable`. A later definition is neither a) nor c), because the output being produced is never in the search space
    (§9.3); a specifier naming only a later definition with no prototype is REPO-1 — SR14.) Derivation: SR14 admits
    "the name of a program definition specified previously in this compilation group" and a program "for which
    information exists in the external repository"; a definition that FOLLOWS the specifier is the first only if it
@@ -893,13 +893,15 @@ IS the externalized name under `ExternalizedNames`' fold (DOC-A.1-68).
    the information this compilation UPDATES (§8.13 ¶3), not information it resolves against, so the legality of a
    source text never depends on whether an earlier build of it exists. The corpus programs that name a later
    definition with no prototype (2002 `pb237_program_prototype`, `pb239_call_address_identifier`,
-   `pb549_program_address_identifier`, `pb817_restricted_program_pointer`, `pb1063_restricted_pointer_by_content`,
+   `pb549_program_address_identifier`, `pb609_call_restricted_program_pointer`, `pb817_restricted_program_pointer`,
+   `pb1063_restricted_pointer_by_content`, `l1c24_repository_self_program_specifier`,
    `w66g_pb1475_strong_type_locale_identification`; 2014 `pb848_pointer_usage_to_optional`; negatives `pb237-call-
-   prototype-argument-count`, `pb817-set-program-pointer-signature`, `pb970-pointer-by-content-prototype-alnum-formal`,
-   `pb1063-program-pointer-by-content-sr22`, `w66g-pb1475-strong-type-dpc-differs`) are therefore non-conforming as
-   written; kb/Work PB989's slice gives each a program prototype definition of its callee ahead of every other unit
-   (§10.6.2 SR1), which keeps each test's subject — a prototype-checked CALL, pointer or argument — under GR10 b),
-   with its expectation files re-pinned for the shifted lines (§21 slice 5).
+   prototype-argument-count`, `pb609-call-restricted-program-pointer-signature`, `pb817-set-program-pointer-signature`,
+   `pb970-pointer-by-content-prototype-alnum-formal`, `pb1063-program-pointer-by-content-sr22`,
+   `w66g-pb1475-strong-type-dpc-differs`) were therefore non-conforming as written; slice 6 gave each a program
+   prototype definition of its callee ahead of every other unit (§10.6.2 SR1), which keeps each test's subject — a
+   prototype-checked CALL, pointer or argument — under GR10 b) (the expectation files hold codes and output, not line
+   positions, so none needed re-pinning; §21 slice 5 is not involved).
 2. GR10 b): a program PROTOTYPE definition in the group (prototypes precede all other units, §10.6.2 SR1).
 3. GR10 c): `MetadataRepositoryProvider.Program(externalizedName)` → the first entry of `P:name` in the search order,
    its signature decoded from that entry's host-entry `Call` method (§5.3).
@@ -931,10 +933,11 @@ conflict it answers, and on the word-only case it has nothing to follow and ISO 
 1. GR11 a)–c) are applied exactly as written, keyed by externalized name. Whichever of them hits names the function
    (GnuCOBOL's answer and the standard's text).
 2. When all three miss and the specifier is legal by SR10's word alternative or by §8.4.6.7, the details are taken
-   from the function the WORD names: the group definition whose user-function-name is F (its externalized name "G" is
-   what is activated), else the repository entry whose recorded word is F (`FunctionByWord`; every entry carries the
-   word beside the externalized name, §5.3) — so `FUNCTION F` in a later-compiled unit never draws REPO-1 on legal
-   source.
+   from the function the WORD names: the group definition (specified previously) whose user-function-name is F (its
+   externalized name "G" is what is activated), else the group prototype of that name (SR10's first alternative — the
+   same word's other legal reading; slice 6 added it: without it `FUNCTION F` naming only a prototype `F AS "G"` was
+   refused), else the repository entry whose recorded word is F (`FunctionByWord`; every entry carries the word beside
+   the externalized name, §5.3) — so `FUNCTION F` in a later-compiled unit never draws REPO-1 on legal source.
 3. **Whenever step 1 selects a function and a DIFFERENT function whose user-function-name is F exists** — in the
    compilation group (preceding the specifier) or in the repository — the compile warns **REPO-13** naming both
    functions and both clauses ("`FUNCTION F` activates the function externalized "F" (§12.3.8.4 GR11); the function
@@ -947,9 +950,9 @@ Legal source is never rejected, so the goldens that write `FUNCTION PB303FN` for
 pin REPO-13 in one group (`FX AS "F"` and `F AS "G"` both preceding `FUNCTION F`), REPO-13 across the repository (a
 repository "F" beside `F AS "G"`), the word reaching a later-compiled unit (`F AS "G"` in a library, `FUNCTION F` in a
 program compiled against it), and the group-only word case. REPO-1 for a function specifier cites SR10 only when NONE
-of its alternatives and not §8.4.6.7 holds. The group provider keys both tables by externalized name and keeps the
-word → definition map for steps 2 and 3 (`BuildUserFunctionTable` keys by word and `UserFunctionsOf` skips a no-AS
-specifier: both rewritten). `docs/CONFORMANCE.md` carries this determination under GR-12.3.8.4-11 (§9.4).
+of its alternatives and not §8.4.6.7 holds. The group provider keys both searches by externalized name and keeps the
+word → definition map for steps 2 and 3 (`GroupRepository.ResolveFunction`, slice 6; the word-keyed
+`BuildUserFunctionTable` and the no-AS skip of `UserFunctionsOf` are gone). `docs/CONFORMANCE.md` carries this determination under GR-12.3.8.4-11 (§9.4).
 
 ### 8.4 Class and interface specifiers (SR6/SR9, GR6/GR9)
 1. EXPANDS → §10.5. 2. The group: `Find(word)` / `FindByExternalizedName(lit)`; BASE when no definition claims it.
@@ -1320,9 +1323,8 @@ compile. A host entry always enables the check on its side (§4.3).
 | `CallEmitter.ArgText` (renders a COBOL argument's `CobolArg`) | the one argument renderer is callable for "an argument of description D passed by CONTENT over a detached value" so the host entry renders through it | `HostEntryEmitter` |
 | `RecordStructEmitter` (a `private record struct` of the STORAGE form per group) | `+` a published mode: a `public record struct` of the DESCRIPTION's host types (§4.3's table), FILLER private, `AsImage`/`FromImage` from `GroupImageCodec` with `HostLanding`'s landing and validity rules | `HostEntryEmitter` |
 | — | `HostLanding` (new, runtime, `[EditorBrowsable(Never)]`): the exact landing that refuses every loss (`ArgumentOutOfRangeException`), the alias grouping (`ArgumentException`), the validity decode (`CobolNum.IsNumericImage`; `FormatException`) — one implementation of §4.3's door rules | `HostEntryEmitter`, `RecordStructEmitter` (published mode) |
-| `BindSession.Repository : GroupRepository(…)` | `: RepositoryResolver`; `GroupRepository` DELETED | `BinderDriver.Bind`, `BindUnitProcedure`, `OoDriver` |
-| `BuildProgramDetailsTable` (order-blind), `BuildUserFunctionTable`/`UserFunctionsOf` (word-keyed, no-AS skipped) | both keyed by externalized name, source-order aware, with the word → definition map for D-R3's steps 2 and 3; the "previously is not enforced" comment DELETED (§8.2, §8.3) | `GroupRepositoryProvider`, `BindUnitProcedure`, `OoDriver` |
-| `ProgramPrototypesOf(…, programDefinitions)`; `ProgramPrototype(…, CalleeSignature? Signature)`; `PrototypeSignatures.Same` null arm and its "the external repository is the RUN UNIT's registry" remark | resolver-driven; `Signature` non-nullable; null arm and remark DELETED | `CallBinder`, `SetBinder`, `PtrBinder`, CANCEL arm, `CheckPrototypeSignaturePairs` |
+| `BindSession.Repository : GroupRepository` (slice 6: the class holding the group's units, `ProgramDetails` / `ResolveFunction` / `FunctionsAt`, one `Find`) | `: RepositoryResolver`; `GroupRepository` DELETED | `BinderDriver.Bind`, `BindUnitProcedure`, `OoDriver` |
+| `ProgramPrototypesOf(…, repository, position)`; `ProgramPrototype(…, CalleeSignature? Signature)`; `PrototypeSignatures.Same` null arm and its "the external repository is the RUN UNIT's registry" remark | resolver-driven; `Signature` non-nullable; null arm and remark DELETED | `CallBinder`, `SetBinder`, `PtrBinder`, CANCEL arm, `CheckPrototypeSignaturePairs` |
 | `ObjectRefDescriptor(Kind, Name, Factory, Only)` | `+ Target`; equality/`SignatureKey`/`ClrTypeName` over `Target` | `PictureAnalyzer`/`DataBinder` (sets `Target`), `OoEmitter.OoReturnClrType`, `OoConformance`, `SetBinder` Format 5 |
 | `PicInfo.RestrictedPrototypeName`; `ConformanceDescriptor` (`DynStructure?.Name`); `CategoryArmMismatch` pointer arm; `ClassRaisingCovered`; `DescriptionClauses` | `RestrictedPrototype` identity; structure DEFINITION key; type-declaration equivalence / prototype identity; `RaisingTarget.Target`; definition compare | `StrongTypeModel`, `OoConformance`, `RaisingTarget` |
 | `OoClassTable.Build`; `OoClassSymbol.Ctx`; `OoRepositoryScope` (classes/interfaces) | `+ Import(symbol)` by identity, `IsParameterized` for imported skeletons; `Ctx` → `Origin`; `OoRepositoryScope` → `IdentityScope` (+ prototypes, structures; reverse map) | `OoNameResolution`, `OoEmitter.EmitClassUnit` (skips imported), `ResolveOverrides`, `OoExpansion` |
@@ -1337,7 +1339,6 @@ compile. A host entry always enables the check on its side (§4.3).
 | Tests naming the global-namespace registrar: `NonCobolActivatorReturnTests` (`asm.GetType("__CobolModule")…Register`, then `ProgramRegistry.CallProgram(…, "", …)` as a host), `FunctionLocateResourceWitnessTests` (a hand-written fixture declaring a global `__CobolModule` whose `Register` throws, with no `[CobolRepository]`), `InterProgramFileDifferentialTests` (the `XASMS1.dll` sibling-module remarks) | slice 1: the activator test reaches the module through `EnsureRegistered` named by `[CobolRepository(Registrar)]`; the witness fixture carries the assembly attribute and a throwing `EnsureRegistered`, so the probe still selects it and the throwing registrar is still what is tested; the remarks name the locator. Slice 2: the activator test is a host of the generated entries (`Cobol.L1HSTGB.L1HSTGB.Call()` inside `RunUnit.Run`) | — |
 | `docs/CONFORMANCE.md` DOC-A.1-65, -116, -141, -167 (the host route through `__CobolModule.Register()`, `ProgramRegistry.CallProgram`, `ICobolProgram.Call`) | rewritten to the host entry (§9.4's DOC-A.1-141 text; the other three name the entry, `EnsureRegistered` and the exception contract) in slice 2 | — |
 | Goldens pinning function resolution (§8.3 D-R3) | unchanged source and expectations; new goldens for REPO-13 in one group and across the repository, the word reaching a later-compiled unit, and the group-only word case | — |
-| The 2002/2014 goldens and negatives that name a later program definition with no prototype (§8.2) | a program prototype definition of the callee ahead of every other unit; expectation files re-pinned for the shifted lines (kb/Work PB989) | — |
 | `OoStandardClasses` comment; XML remarks in `PrototypeSignatures`, `BinderDriver`, `ProgramPrototype`, `ProgramTable` ("probes `<name>.dll`", "invokes its public `__CobolModule.Register()`") describing the registry-as-repository | rewritten to this design | — |
 Nothing is wrapped or forwarded: `GroupRepository`, the null-signature state, the order-blind and word-keyed tables,
 `DataBinder.Unique`, the public `Register()`, the global-namespace registrar lookup and the documented untyped host
@@ -1371,7 +1372,7 @@ No new gate; §17.1's 85 arm proves introduction gating fires before any REPO-* 
 | REPO-10 | Error | `--repository DIR` does not exist / cannot be enumerated | — |
 | REPO-11 | Error | an imported symbol's base, implemented interface or referenced identity is in no entry | §12.3.8.4 GR6 |
 | REPO-12 | Info | the previous build of this output, or an own-assembly expansion target of the same name, carries another schema, runtime major or call ABI; not compared / overwritten (§10.5) | §8.13 ¶4 |
-| REPO-13 | Warning | a `FUNCTION F` specifier for which GR11 a), b) or c) selects the function externalized "F" while a different function whose user-function-name is F exists, in the compilation group or in the repository; the externalized name is used (D-R3) | §12.3.8.4 GR11; §8.4.6.7 |
+| REPO-13 (COBOLNET2969, slice 6) | Warning | a `FUNCTION F` specifier for which GR11 a), b) or c) selects the function externalized "F" while a different function whose user-function-name is F exists, in the compilation group or in the repository; the externalized name is used (D-R3) | §12.3.8.4 GR11; §8.4.6.7 |
 Existing codes keep their roles: 1761 (SR1/SR2), 1760, 1505, 0813/0821/0859 (unreachable for a declared name), 1513 (a
 definition vs a prototype in ONE compilation group, §10.6.2 SR2/SR3), 2240 (expansion identity reuse; the §9.3.12
 "shall not" where the two classes necessarily share a run unit, §10.5), 0900. No exception condition is new and
@@ -1507,7 +1508,8 @@ Folded-name comparison over the enumerated listing; CI's Linux legs run the mult
   load failure (and a file removed after the listing) → its message in the EC message; a module registered by a host
   and then reached by a probe is registered once.
 - Existing goldens keep their expectations (the three function-resolution goldens included) except the SR14 cases
-  kb/Work PB989 owns.
+  kb/Work PB989 rewrote with prototypes, and the corpus programs whose FUNCTION-ID definition followed the program that
+  names it, which now precede it (a definition that follows is COBOLNET1505 until slice 7's REPO-1).
 
 ### 17.2 Round-trip and two-sided schema drift tests
 - For every LINKAGE root of every conformance golden: `Decode(Encode(x))` satisfies `DescriptionMismatch == null` both
@@ -1757,7 +1759,7 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
    compile-time resolution. Docs: INTERPROGRAM's probe paragraph (index-based); the manual's trimmed/AOT paragraph.
    Depends on 4 (the `Units` index) and, through it, 3 (the composed application activates its main through a host
    entry).
-6. **The group provider's corrections — kb/Work PB989.** Inside the existing group tables: externalized-name keys and
+6. **The group provider's corrections — kb/Work PB989 (LANDED with PB2102; the order-blind tables are `GroupRepository`'s one `Find`, REPO-13 is COBOLNET2969).** Inside the existing group tables: externalized-name keys and
    source order for GR10/GR11 a)/b), the word → definition map, D-R3 step 2's group arm and step 3's in-group REPO-13,
    with their goldens; and in the same change the corpus programs that name a later program definition with no
    prototype (§8.2's list) gain a prototype of the callee, so no golden depends on the order-blind table this slice

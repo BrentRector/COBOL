@@ -2,6 +2,17 @@
       *> parameter): the user-defined function returns FUNCTION LENGTH of its ANY LENGTH argument, once
       *> for an X(3) and once for an X(8) argument (GR1 — n tracks each activation's argument).
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. ALFLENP9AL.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 L PIC X ANY LENGTH.
+       01 L-R PIC 99.
+       PROCEDURE DIVISION USING L RETURNING L-R.
+       COMPUTE-IT.
+           MOVE FUNCTION LENGTH(L) TO L-R.
+           GOBACK.
+       END FUNCTION ALFLENP9AL.
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. ALFNMAINP9AL.
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
@@ -20,14 +31,3 @@
            DISPLAY "F8=" R.
            STOP RUN.
        END PROGRAM ALFNMAINP9AL.
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. ALFLENP9AL.
-       DATA DIVISION.
-       LINKAGE SECTION.
-       01 L PIC X ANY LENGTH.
-       01 L-R PIC 99.
-       PROCEDURE DIVISION USING L RETURNING L-R.
-       COMPUTE-IT.
-           MOVE FUNCTION LENGTH(L) TO L-R.
-           GOBACK.
-       END FUNCTION ALFLENP9AL.

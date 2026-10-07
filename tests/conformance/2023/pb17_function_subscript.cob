@@ -20,6 +20,17 @@
       *> EC-BOUND-SUBSCRIPT for a non-integer RESULT, a run-time condition that
       *> would be pointless if the position required an integer syntactically.
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. PB17PICK.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 L-X PIC 9(4).
+       01 L-R PIC 9(4).
+       PROCEDURE DIVISION USING L-X RETURNING L-R.
+       P.
+           COMPUTE L-R = L-X + 2.
+           GOBACK.
+       END FUNCTION PB17PICK.
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. PB17FNSUB.
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
@@ -74,14 +85,3 @@
            DISPLAY "PEREVAL=" W-I.
            STOP RUN.
        END PROGRAM PB17FNSUB.
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. PB17PICK.
-       DATA DIVISION.
-       LINKAGE SECTION.
-       01 L-X PIC 9(4).
-       01 L-R PIC 9(4).
-       PROCEDURE DIVISION USING L-X RETURNING L-R.
-       P.
-           COMPUTE L-R = L-X + 2.
-           GOBACK.
-       END FUNCTION PB17PICK.

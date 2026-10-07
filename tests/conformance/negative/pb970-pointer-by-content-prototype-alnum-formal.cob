@@ -13,6 +13,17 @@
       *> class of identifier-1 or identifier-2 shall not be index,
       *> message-tag, object, or pointer." The pairing is refused at
       *> compile time; it must never reach the rule-1 image delivery.
+      *> kb/Work PB989 - ISO 12.3.8.4 GR10 a): the details come from a program definition specified PREVIOUSLY in the
+      *> compilation group; a definition that follows the REPOSITORY entry is not one. The callee below is therefore
+      *> given a program prototype definition (11.10.2 Format 2) ahead of every other unit (10.6.2 SR1), which
+      *> supplies the details under GR10 b) - the same signature as the definition (10.6.2 SR2).
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB970NEGPTRS IS PROTOTYPE.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 L PIC X(8).
+       PROCEDURE DIVISION USING L.
+       END PROGRAM PB970NEGPTRS.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB970NEGPTR.
        ENVIRONMENT DIVISION.

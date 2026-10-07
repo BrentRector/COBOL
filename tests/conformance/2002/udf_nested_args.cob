@@ -6,31 +6,6 @@
       *> SR5 forbids a function to store into its formal parameter, so UMUT changes the argument through
       *> the EXTERNAL item WS-A both programs describe, and reads the new value through the formal).
        IDENTIFICATION DIVISION.
-       PROGRAM-ID. UNESTARG.
-       ENVIRONMENT DIVISION.
-       CONFIGURATION SECTION.
-       REPOSITORY.
-           FUNCTION UDBL3
-           FUNCTION UMUT.
-       DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01 WS-A PIC 9(4) EXTERNAL.
-       01 WS-R PIC 9(4).
-       PROCEDURE DIVISION.
-       MAIN.
-           MOVE 4 TO WS-A.
-           COMPUTE WS-R = FUNCTION UDBL3(2) + FUNCTION UDBL3(3).
-           DISPLAY "T=" WS-R.
-           MOVE FUNCTION UDBL3(FUNCTION UDBL3(2)) TO WS-R.
-           DISPLAY "N=" WS-R.
-           COMPUTE WS-R = FUNCTION UDBL3(FUNCTION MOD(7, 4)).
-           DISPLAY "I=" WS-R.
-           COMPUTE WS-R = FUNCTION UMUT(WS-A).
-           DISPLAY "M=" WS-R.
-           DISPLAY "A=" WS-A.
-           STOP RUN.
-       END PROGRAM UNESTARG.
-       IDENTIFICATION DIVISION.
        FUNCTION-ID. UDBL3.
        DATA DIVISION.
        LINKAGE SECTION.
@@ -55,3 +30,28 @@
            COMPUTE L-R = L-X * 2.
            GOBACK.
        END FUNCTION UMUT.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. UNESTARG.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           FUNCTION UDBL3
+           FUNCTION UMUT.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-A PIC 9(4) EXTERNAL.
+       01 WS-R PIC 9(4).
+       PROCEDURE DIVISION.
+       MAIN.
+           MOVE 4 TO WS-A.
+           COMPUTE WS-R = FUNCTION UDBL3(2) + FUNCTION UDBL3(3).
+           DISPLAY "T=" WS-R.
+           MOVE FUNCTION UDBL3(FUNCTION UDBL3(2)) TO WS-R.
+           DISPLAY "N=" WS-R.
+           COMPUTE WS-R = FUNCTION UDBL3(FUNCTION MOD(7, 4)).
+           DISPLAY "I=" WS-R.
+           COMPUTE WS-R = FUNCTION UMUT(WS-A).
+           DISPLAY "M=" WS-R.
+           DISPLAY "A=" WS-A.
+           STOP RUN.
+       END PROGRAM UNESTARG.

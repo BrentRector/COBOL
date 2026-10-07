@@ -152,10 +152,12 @@ internal sealed class BinderDriver
         var ooAdapters = OoConformance.ValidateImplements(table, edition);   // §9.3.11 via §9.3.8.2.3 (D-I1 — the binder is the authority; returns the covariant adapters)
         // TWO-PHASE binding (M2-UDF-1 key enabler): EVERY unit's DATA division binds before ANY procedure body
         // binds — a class's method bodies (below) as well as a program unit's (the ProcedureBinding group pass) —
-        // so a function-identifier reference resolves the callee's RETURNING / USING signatures even when the
-        // FUNCTION-ID unit FOLLOWS the caller in the compilation group (§8.4.3.2.4 GR1 — the caller-side temporary
-        // takes the callee's RETURNING description; the same forward-reference discipline OoClassTable D1 gives
-        // typed object references).
+        // so a function-identifier reference resolves the callee's RETURNING / USING signatures from a unit whose
+        // DATA is bound, wherever in the group that unit sits (§8.4.3.2.4 GR1 — the caller-side temporary takes the
+        // callee's RETURNING description; the same forward-reference discipline OoClassTable D1 gives typed object
+        // references). WHICH unit a REPOSITORY entry may take its details from is §12.3.8.4 GR10 / GR11's order
+        // rule, not this phase's: a definition that FOLLOWS the element is not "specified previously" and a
+        // prototype ahead of it stands in (GroupRepository, kb/Work PB989).
         foreach (var unit in units) BindUnitData(unit, session);
         // The group's REPOSITORY resolution tables (§12.3.8.4 GR10 / GR11), built once every DATA division is
         // bound and BEFORE the first body: a CLASS definition's REPOSITORY reaches its methods (§12.3.4 GR1 — "apply
@@ -547,6 +549,7 @@ internal sealed class BinderDriver
         return new BoundUnit
         {
             Name = name, ExternalizedName = externalized, ClassName = className, Ctx = ctx,
+            SourcePosition = FirstToken(ctx)?.StartIndex ?? 0,
             Parent = parent, Initial = initial, Common = common, Recursive = recursive,
             IsFunction = isFunction, IsPrototype = isPrototype,
         };
@@ -578,21 +581,27 @@ internal sealed class BinderDriver
     /// <summary>The line of a unit's first token — where §7.3.4 GR5's "all of the source text … that follows" is folded.
     /// A unit whose context carries no start token of its own (a header-less nested program, §11.2.1) takes its first
     /// descendant's line.</summary>
-    private static int UnitFirstLine(Antlr4.Runtime.ParserRuleContext c)
+    private static int UnitFirstLine(Antlr4.Runtime.ParserRuleContext c) => FirstToken(c)?.Line ?? 0;
+
+    /// <summary>The first token of <paramref name="c"/>'s text — its own start token, or, for a re-shaped contained
+    /// program (<see cref="Reparent"/>) that has none, the first token of its first descendant. The ONE reader of a
+    /// unit's source position: the line (<see cref="UnitFirstLine"/>) and the character offset
+    /// (<see cref="BoundUnit.SourcePosition"/>) both come from this token.</summary>
+    private static Antlr4.Runtime.IToken? FirstToken(Antlr4.Runtime.ParserRuleContext c)
     {
-        if (c.Start is { } s) return s.Line;
+        if (c.Start is { } s) return s;
         for (int i = 0; i < c.ChildCount; i++)
         {
-            int line = c.GetChild(i) switch
+            var token = c.GetChild(i) switch
             {
-                Antlr4.Runtime.ParserRuleContext p => UnitFirstLine(p),
-                Antlr4.Runtime.Tree.ITerminalNode t => t.Symbol.Line,
-                _ => 0,
+                Antlr4.Runtime.ParserRuleContext p => FirstToken(p),
+                Antlr4.Runtime.Tree.ITerminalNode t => t.Symbol,
+                _ => null,
             };
-            if (line > 0) return line;
+            if (token is not null) return token;
         }
 
-        return 0;
+        return null;
     }
 
     private static void BindUnitData(BoundUnit unit, BindSession session)
@@ -769,33 +778,33 @@ internal sealed class BinderDriver
         foreach (var unit in ctx.Units) BindUnitProcedure(unit, ctx.Session);
     }
 
-    /// <summary>Build the group's REPOSITORY resolution tables (§12.3.8.4 GR10 / GR11) — once, between the DATA
-    /// phase and the first procedure body.</summary>
+    /// <summary>Build the group's REPOSITORY resolution source (§12.3.8.4 GR10 / GR11 — <see cref="GroupRepository"/>)
+    /// — once, between the DATA phase and the first procedure body.</summary>
     private static GroupRepository BuildGroupRepository(IReadOnlyList<BoundUnit> units,
                                                         IReadOnlyList<OoClassUnit> classes, BindSession session)
     {
-        // BEFORE either table is built (kb/Work PB660): a compilation group that DEFINES one name twice
-        // is nonconforming source, and both tables below silently keep the first definition and drop the
+        // BEFORE the repository is read (kb/Work PB660): a compilation group that DEFINES one name twice
+        // is nonconforming source, and the search silently keeps the first definition and drops the
         // second — the shape §8.3.2.2 exists to forbid.
         CheckDefinitionNameUniqueness(units, classes, session.OoClasses, session.Edition);
         CheckPrototypeSignaturePairs(units, session.Edition);
-        // kb/Work PB237 — the compilation group's program definitions by EXTERNALIZED name, the search space
-        // §12.3.8.4 GR10 a) names. Built once for the whole group, exactly like the user-function table beside it.
-        // PB894 adds GR10 b): an in-group program PROTOTYPE definition, behind the definitions.
-        return new GroupRepository(BuildUserFunctionTable(units, session.Edition), BuildProgramDetailsTable(units));
+        CheckFunctionUnits(units, session.Edition);
+        // kb/Work PB237 / PB894 / PB989 — the compilation group's program and function units, the search space
+        // §12.3.8.4 GR10 / GR11 a) and b) name. Built once; each source element searches it AS OF ITS OWN POSITION.
+        return new GroupRepository(units);
     }
 
     /// <summary>The PROCEDURE half of unit binding (phase 2): every unit's DATA is already bound
-    /// (<see cref="BindUnitData"/>) and the group's user-function signature table is built, so a
-    /// <c>FUNCTION user-name(args)</c> reference resolves its callee's RETURNING/USING descriptions
-    /// regardless of unit order in the source (§8.4.3.2.4 GR1).</summary>
+    /// (<see cref="BindUnitData"/>) and the group's <see cref="GroupRepository"/> is built, so a
+    /// <c>FUNCTION user-name(args)</c> reference resolves its callee's RETURNING/USING descriptions from the
+    /// definition or prototype §12.3.8.4 GR11 a) / b) selects as of this unit's position (§8.4.3.2.4 GR1).</summary>
     private static void BindUnitProcedure(BoundUnit unit, BindSession session)
     {
         var data = unit.Data;
         var binder = new StatementBinder(data, unit.Refs)
         {
             OoClasses = session.OoClasses,
-            UserFunctions = UserFunctionsOf(data, unit, session.Repository.UserFunctions),
+            UserFunctions = UserFunctionsOf(data, unit, session.Repository, unit.SourcePosition),
             // §8.4.6.6 — inside a function definition its OWN name is a referable function-prototype-name
             // (self-recursion without a repository entry; §12.3.8.3 SR11 makes a present self-entry a no-op —
             // SpecifiesItself, which UserFunctionsOf asks).
@@ -813,7 +822,7 @@ internal sealed class BinderDriver
             NestedCallables = NestedCallablesOf(unit),
             // kb/Work PB237 — the unit's visible program prototypes (§12.3.8.2 specifiers resolved through
             // §12.3.8.4 GR10, plus §8.4.6.8's containing-program spelling).
-            ProgramPrototypes = ProgramPrototypesOf(data, unit, session.Repository.ProgramDefinitions),
+            ProgramPrototypes = ProgramPrototypesOf(data, unit, session.Repository, unit.SourcePosition),
             UnitRecursive = unit.Recursive,   // §14.9.7.3 SR1 / §14.9.36.3 SR1 (kb/Work PB137)
         };
         binder.ConfigureEc(session.Turn, session.DirectiveSites, unit.Name);   // the EC bind context (TURN fold + directive sites + §15.30 location element)
@@ -865,9 +874,10 @@ internal sealed class BinderDriver
     }
 
     // ── The program-prototype registry (kb/Work PB237; ISO §12.3.8.2 program-specifier → §12.3.8.4 GR10) ──────
-    // The PROGRAM twin of BuildUserFunctionTable below: GR10 a)/b)/c) has the identical shape to GR11 a)/b)/c),
-    // and the two tables are built at the same point for the same reason — every unit's DATA has bound, so a
-    // callee's PD-header signature is a fact no matter where in the group its definition sits.
+    // The PROGRAM twin of the function resolution below: GR10 a)/b)/c) has the identical shape to GR11 a)/b)/c), so
+    // both are answered by the ONE search GroupRepository.Find, built at the same point for the same reason — every
+    // unit's DATA has bound, so a callee's PD-header signature is a fact — and run as of the referencing element's
+    // position, because a) and GR11 a) say "specified PREVIOUSLY" (kb/Work PB989).
 
     /// <summary>⛔ THE ONE UNIQUENESS CHECK OVER A COMPILATION GROUP'S DEFINITION NAMES (kb/Work PB660), in
     /// the two scopes the standard gives them.
@@ -879,7 +889,7 @@ internal sealed class BinderDriver
     /// item"</i>, and a SAME-KIND pair by <i>"when two or more source elements identify something with the same
     /// externalized name, they refer to the same instance"</i> — two distinct definitions cannot be ONE
     /// instance. Programs and functions are therefore ONE namespace here, not two, which is why this replaced
-    /// the function-only duplicate report that used to live in <see cref="BuildUserFunctionTable"/>.</item>
+    /// the function-only duplicate report that used to live in <see cref="CheckFunctionUnits"/>.</item>
     /// <item><b>The CONTAINED scope — one outermost program</b> (§8.4.6.3, COBOLNET2214): <i>"The names
     /// assigned to programs that are contained directly or indirectly within the same outermost program shall
     /// be unique within that outermost program."</i> A containee's name is not externalized at all, so its
@@ -1063,38 +1073,6 @@ internal sealed class BinderDriver
         static CalleeSignature Signature(BoundUnit u) => new(u.Data.LinkageFormals, u.Data.LinkageReturning);
     }
 
-    /// <summary>The IN-GROUP half of §12.3.8.4 GR10 — externalized name → the calling details a REPOSITORY
-    /// program-specifier takes from this compilation group. GR10 a) (a program DEFINITION) and GR10 b) (a program
-    /// PROTOTYPE definition, §11.10.2 Format 2 — kb/Work PB894) have the SAME consequence, "the details are taken
-    /// from" that unit, so they are ONE table: definitions are registered first and a prototype only fills a
-    /// name no definition holds, which is exactly a)'s "otherwise" precedence. A name in neither is GR10 c), the
-    /// external repository — this implementation's run-unit program registry.
-    /// <para>The compilation group's program definitions by EXTERNALIZED name — the search space of ISO
-    /// §12.3.8.4 general rule 10 a): "if the externalized name of the program prototype is the externalized name
-    /// of a program definition specified previously in the same compilation group, the details are taken from that
-    /// program definition, which is the program that will be called".</para>
-    /// <para>OUTERMOST program definitions only: a contained program is part of its container's program
-    /// definition, is not a compilation-group source unit (§10.6.1), and is reachable only through §14.9.4.3 SR15's
-    /// AS NESTED — which has its own table. FUNCTION-ID units are excluded because §9.4 puts them in the function
-    /// namespace, and prototype units because they have no body. The key is <c>BoundUnit.ExternalizedName</c>
-    /// — GR10 a) says "externalized name" twice and §11.10.4 GR1 makes that the AS literal when one is written
-    /// (kb/Work PB303; before the phrase parsed, MakeUnit collapsed it onto <c>Name</c>).</para>
-    /// <para>DETERMINATION on GR10 a)'s word "previously": the ORDER is not enforced. GR10 a) and c) are the two
-    /// arms this implementation can reach, and for a later in-group definition both name the SAME program — c)
-    /// takes "the details … from the external repository for the program with the same name", and this
-    /// implementation's external repository is the run unit's program registry, which the later definition is in.
-    /// Enforcing the order would therefore reject nothing illegal and would only DOWNGRADE a later definition's
-    /// signature from a compile-time §14.8.2 check to a run-time EC-PROGRAM-ARG-MISMATCH.</para></summary>
-    private static Dictionary<string, CalleeSignature> BuildProgramDetailsTable(IReadOnlyList<BoundUnit> units)
-    {
-        var map = new Dictionary<string, CalleeSignature>(CobolNet.Runtime.ExternalizedNames.Comparer);
-        foreach (bool prototypes in (bool[])[false, true])
-            foreach (var u in units)
-                if (u is { IsFunction: false, Parent: null } && u.IsPrototype == prototypes)
-                    map.TryAdd(u.ExternalizedName, new CalleeSignature(u.Data.LinkageFormals, u.Data.LinkageReturning));
-        return map;
-    }
-
     /// <summary>The program prototypes ONE source element may name (ISO §8.4.6.8, Scope of program-prototype-names:
     /// "Program-prototype-names referenced within a source element shall be either the program-name of a
     /// containing program definition or a program-prototype-name declared in the REPOSITORY paragraph").
@@ -1103,7 +1081,9 @@ internal sealed class BinderDriver
     /// <item>every §12.3.8.2 program-specifier visible to the element (<c>DataBinder.ProgramSpecifiers</c>, which
     /// already inherits its container's — §12.3.8.4 GR10's "scope of the containing environment division"; for a
     /// CLASS's OBJECT or FACTORY forest, the class-level REPOSITORY, which §12.3.4 GR1 applies to every method —
-    /// kb/Work PB1100), resolved through GR10 against <paramref name="programDefinitions"/>;</item>
+    /// kb/Work PB1100), resolved through GR10 against <paramref name="repository"/> AS OF
+    /// <paramref name="position"/> — a definition specified LATER in the group is not a) and takes the element
+    /// down to b) / c) (kb/Work PB989);</item>
     /// <item>for a program <paramref name="unit"/>, its own name and every containing program definition's name,
     /// which §8.4.6.8 admits with no specifier at all — and which is also exactly what §12.3.8.3 syntax rule 15 means
     /// by "references to program-prototype-name-1 are to the named program definition and this program-specifier is
@@ -1112,17 +1092,17 @@ internal sealed class BinderDriver
     /// (<paramref name="unit"/> null) has neither: a class is not a program definition and contains none.</item>
     /// </list></summary>
     internal static Dictionary<string, ProgramPrototype> ProgramPrototypesOf(
-        DataBinder data, BoundUnit? unit, IReadOnlyDictionary<string, CalleeSignature> programDefinitions)
+        DataBinder data, BoundUnit? unit, GroupRepository repository, int position)
     {
         var map = new Dictionary<string, ProgramPrototype>(CobolNames.Comparer);
         foreach (var (name, spec) in data.ProgramSpecifiers)
-            // GR10 a) / b): the in-group definition — else the in-group program PROTOTYPE definition (kb/Work
-            // PB894) — supplies the details; BuildProgramDetailsTable already layered the two in that order.
+            // GR10 a) / b): the in-group definition SPECIFIED PREVIOUSLY — else the in-group program PROTOTYPE
+            // definition (kb/Work PB894) — supplies the details (GroupRepository.ProgramDetails, the one search).
             // Otherwise GR10 c) — the external repository, i.e. this implementation's run-unit program registry,
             // resolved at execution (§14.9.4.4 GR3 b)) — so the prototype is legal and simply carries no
             // compile-time signature.
             map[name] = new ProgramPrototype(name, spec.ExternalizedName,
-                programDefinitions.GetValueOrDefault(spec.ExternalizedName));
+                repository.ProgramDetails(spec.ExternalizedName, position));
         // §8.4.6.8's second spelling: "the program-name of a containing program definition" is a referable
         // program-prototype-name with NO specifier at all. It also subsumes §12.3.8.3 SR15's containing-program
         // half — a specifier naming a container is "ignored" and references go to that definition, which is
@@ -1159,33 +1139,55 @@ internal sealed class BinderDriver
         => unit is not null && unit.IsFunction == function && specifiers.ContainsKey(unit.Name);
 
     /// <summary>The user-defined functions ONE source element may reference, by the function-prototype-name it
-    /// WRITES — the function twin of <see cref="ProgramPrototypesOf"/> (kb/Work PB974). A specifier with no AS phrase
-    /// names the group's function of that word (the <paramref name="group"/> table's key, unchanged). A specifier
-    /// <c>FUNCTION name AS literal-5</c> names the function whose EXTERNALIZED name is literal-5 — §12.3.8.4 GR11
-    /// NOTE 2: "Literal-5, if specified, is the externalized name of the function prototype" — searched per GR11 a)
-    /// / b) over the group's definitions and then its prototypes (the table already holds a definition in place of
-    /// its same-name prototype). No match leaves the name unmapped: GR11 c)'s external repository, which this
-    /// implementation holds no compile-time signature for, and the reference draws COBOLNET1505 at its use.
+    /// WRITES — the function twin of <see cref="ProgramPrototypesOf"/> (kb/Work PB974, PB989), resolved by
+    /// <see cref="GroupRepository.ResolveFunction"/> as of <paramref name="position"/> (determination D-R3,
+    /// DESIGN-external-repository §8.3): §12.3.8.4 GR11 a) / b) keyed by the EXTERNALIZED name — literal-5 when the
+    /// specifier writes <c>AS literal-5</c>, else the name itself (NOTE 2) — over the definitions specified BEFORE this
+    /// element and then the prototypes; when both miss, the function the WORD names (§8.4.6.7). No hit leaves the name
+    /// unmapped — GR11 c)'s external repository, which this implementation holds no compile-time signature for — and
+    /// the reference draws COBOLNET1505 at its use; a definition that FOLLOWS the element and has no prototype is
+    /// such a name. A hit that is NOT the function the word names, while a different function does carry the word,
+    /// warns (COBOLNET2969): the externalized name wins, as GnuCOBOL's does.
     /// A specifier naming the function definition it is written in is IGNORED (§12.3.8.3 SR11,
     /// <see cref="SpecifiesItself{T}"/>) and the name resolves to that definition's own signature — registered LAST,
     /// as <see cref="ProgramPrototypesOf"/> registers its self entry. <paramref name="data"/> is a program unit's
     /// forest or a CLASS's OBJECT / FACTORY forest (whose specifiers are the class REPOSITORY's — §12.3.4 GR1,
-    /// kb/Work PB1100; <paramref name="unit"/> is then null). A forest with no remapping specifier shares the group
-    /// table (no copy).</summary>
+    /// kb/Work PB1100; <paramref name="unit"/> is then null, and <paramref name="position"/> is the class's own start).
+    /// A function definition's own name is ALWAYS referable inside it (§8.4.6.6), so the self entry is registered
+    /// whether or not a specifier writes it: a definition does not start strictly before itself, and the group's
+    /// view as of <paramref name="position"/> would otherwise drop it. A forest with no function specifier and no
+    /// self entry shares the group view (no copy).</summary>
     internal static IReadOnlyDictionary<string, UserFunctionSignature> UserFunctionsOf(
-        DataBinder data, BoundUnit? unit, IReadOnlyDictionary<string, UserFunctionSignature> group)
+        DataBinder data, BoundUnit? unit, GroupRepository repository, int position)
     {
+        var group = repository.FunctionsAt(position);
+        bool self = unit is { IsFunction: true };
         bool selfSpecified = SpecifiesItself(unit, data.FunctionSpecifiers, function: true);
         Dictionary<string, UserFunctionSignature>? own = null;
-        foreach (var (name, externalized) in data.FunctionSpecifiers)
+        foreach (var (name, specifier) in data.FunctionSpecifiers)
         {
-            if (string.Equals(name, externalized, StringComparison.Ordinal)) continue;
+            if (selfSpecified && CobolNames.Same(name, unit!.Name)) continue;
             own ??= new Dictionary<string, UserFunctionSignature>(group, CobolNames.Comparer);
-            var target = group.Values.FirstOrDefault(f => CobolNet.Runtime.ExternalizedNames.Same(f.Externalized, externalized));
-            if (target is null) own.Remove(name);
-            else own[name] = target;
+            if (repository.ResolveFunction(name, specifier.ExternalizedName, position) is not { } resolved)
+            {
+                own.Remove(name);
+                continue;
+            }
+
+            own[name] = resolved.Signature;
+            if (resolved.Shadowed is { } shadowed)
+            {
+                using var _ = data.Edition.At(specifier.At);
+                data.Edition.Warning(DiagnosticCatalog.FunctionWordNamesAnotherFunction,
+                    $"FUNCTION {name} activates the function externalized \"{resolved.Signature.Externalized}\" "
+                    + "(§12.3.8.4 GR11 a) / b) take the details by externalized name), but this compilation group "
+                    + $"also specifies {(shadowed.IsPrototype ? "a function prototype" : "the function")} "
+                    + $"{shadowed.Name} AS \"{shadowed.ExternalizedName}\" whose user-function-name is "
+                    + $"{name}: it is reachable only through a REPOSITORY entry FUNCTION {name} AS "
+                    + $"\"{shadowed.ExternalizedName}\" (§8.4.6.7)");
+            }
         }
-        if (selfSpecified)
+        if (self)
         {
             own ??= new Dictionary<string, UserFunctionSignature>(group, CobolNames.Comparer);
             own[unit!.Name] = new UserFunctionSignature(unit.Name, unit.ExternalizedName,
@@ -1194,19 +1196,17 @@ internal sealed class BinderDriver
         return own ?? group;
     }
 
-    /// <summary>Build the compilation group's user-function signature table (name → bound RETURNING item +
-    /// USING formals), between the DATA and PROCEDURE bind phases: FUNCTION-ID units only (ISO §9.4 — the
-    /// binder's function namespace never sees PROGRAM-ID units; §8.4.6.6 scope of function-prototype-names).
-    /// The §14.2 procedure-division-header rule "The RETURNING phrase shall be specified in a function
-    /// definition" (:23666) is checked HERE, once per unit — even an uncalled function without RETURNING is
-    /// ill-formed.</summary>
-    private static Dictionary<string, UserFunctionSignature> BuildUserFunctionTable(
-        IReadOnlyList<BoundUnit> units, EditionContext edition)
+    /// <summary>The per-unit screens of the group's FUNCTION-ID units, run once before any source element searches the
+    /// group (<see cref="GroupRepository"/> is the search; the table this method used to build is its
+    /// <see cref="GroupRepository.FunctionsAt"/>). The §14.2 procedure-division-header rule "The RETURNING phrase
+    /// shall be specified in a function definition" (:23666) is checked HERE, once per unit — even an uncalled
+    /// function without RETURNING is ill-formed — and so is the same-word duplicate (COBOLNET1508).</summary>
+    private static void CheckFunctionUnits(IReadOnlyList<BoundUnit> units, EditionContext edition)
     {
         // Partition the group's FUNCTION-ID units by name into DEFINITIONS (a real body) and PROTOTYPES
         // (signature-only, §11.5 Format 2). A prototype precedes all other units (§10.6.2 SR1), so a naive
         // first-wins TryAdd would false-report the FOLLOWING same-name definition as a duplicate (1508) — the
-        // partition prevents that. Every function unit must carry a RETURNING (§14.2 :23666) — checked once here.
+        // partition prevents that.
         var defs = new Dictionary<string, BoundUnit>(CobolNames.Comparer);
         var protos = new Dictionary<string, BoundUnit>(CobolNames.Comparer);
         foreach (var u in units)
@@ -1238,19 +1238,6 @@ internal sealed class BinderDriver
             }
             else bucket[u.Name] = u;
         }
-
-        // §12.3.8 GR11(a) — an in-group DEFINITION is authoritative over a same-name PROTOTYPE (:14871); a lone
-        // prototype supplies the signature for a separately-compiled target (:14875 / §8.4.3.2.4 GR6b :6997).
-        var table = new Dictionary<string, UserFunctionSignature>(CobolNames.Comparer);
-        foreach (var (name, u) in defs)
-            table[name] = new UserFunctionSignature(name, u.ExternalizedName, u.Data.LinkageReturning, u.Data.LinkageFormals);
-        foreach (var (name, p) in protos)
-        {
-            // §10.6.2 SR3's same-signature obligation is CheckPrototypeSignaturePairs' (both kinds, one test).
-            if (defs.ContainsKey(name)) continue;   // the definition's signature is authoritative (GR11a)
-            table[name] = new UserFunctionSignature(name, p.ExternalizedName, p.Data.LinkageReturning, p.Data.LinkageFormals);
-        }
-        return table;
     }
 
     /// <summary>Qualify a class's OBJECT/FACTORY file connectors into the run-unit registry namespace (M2-OO-1i —

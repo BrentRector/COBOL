@@ -124,6 +124,13 @@ public sealed record CalleeSignature(IReadOnlyList<LinkageFormal> Formals, DataI
 /// <c>BinderDriver.ProgramPrototypesOf</c>.</summary>
 public sealed record ProgramSpecifier(string Name, string ExternalizedName);
 
+/// <summary>One §12.3.8.2 user-defined-function-specifier as WRITTEN — <c>FUNCTION function-prototype-name-1 [AS
+/// literal-5]</c>. <paramref name="ExternalizedName"/> is literal-5 when the AS phrase is present and the name itself
+/// otherwise (§12.3.8.4 GR11 NOTE 2). <paramref name="At"/> is the REPOSITORY entry, where a diagnostic about its
+/// resolution (<c>BinderDriver.UserFunctionsOf</c>, COBOLNET2969) is reported. Collected by
+/// <c>DataBinder</c>'s REPOSITORY loop; RESOLVED by <c>GroupRepository.ResolveFunction</c>.</summary>
+internal sealed record FunctionSpecifier(string Name, string ExternalizedName, Antlr4.Runtime.ParserRuleContext At);
+
 /// <summary>One RESOLVED program prototype, as §12.3.8.4 GR10 defines it: the declared program-prototype-name, the
 /// externalized name that identifies the program to be called, and — when GR10 a) found a program definition in
 /// this compilation group — that definition's <see cref="CalleeSignature"/> (kb/Work PB237).

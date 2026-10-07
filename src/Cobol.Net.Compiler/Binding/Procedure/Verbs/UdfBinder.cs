@@ -93,9 +93,11 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
         {
             ctx.Edition.Error("COBOLNET1505",
                 $"FUNCTION {name.ToUpperInvariant()} is declared in the REPOSITORY paragraph but the compilation "
-                + "group contains neither a FUNCTION-ID definition nor a FUNCTION-ID … IS PROTOTYPE for it — "
-                + "declare a function prototype (ISO §11.5 / §12.3.8.3 SR10) so its signature is available for a "
-                + "separately-compiled target, or provide the definition in this group");
+                + "group contains neither a FUNCTION-ID definition specified BEFORE this source element nor a "
+                + "FUNCTION-ID … IS PROTOTYPE for it (ISO §12.3.8.4 GR11 a) / b): a definition that follows this "
+                + "element is not \"specified previously\") — declare a function prototype (ISO §11.5 / §12.3.8.3 "
+                + "SR10) so its signature is available for a separately-compiled or later target, or place the "
+                + "definition ahead of this element");
             return BoundExprError.Refused(ctx.Edition, $"FUNCTION {name}");
         }
         return UdfActivate(name, fn, argCtxs, pointer: null);
@@ -126,8 +128,9 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
             ctx.Edition.Error("COBOLNET1505",
                 $"FUNCTION {name.ToUpperInvariant()}: function-pointer '{name}' is restricted to function-prototype "
                 + $"'{proto.ToUpperInvariant()}', but the compilation group contains neither a FUNCTION-ID "
-                + "definition nor a FUNCTION-ID … IS PROTOTYPE for it — the prototype supplies the characteristics "
-                + "of the activated function (ISO §8.4.3.2.4 GR4) and the result's description (GR1)");
+                + "definition specified before this source element nor a FUNCTION-ID … IS PROTOTYPE for it (ISO "
+                + "§12.3.8.4 GR11 a) / b)) — the prototype supplies the characteristics of the activated function "
+                + "(ISO §8.4.3.2.4 GR4) and the result's description (GR1)");
             return BoundExprError.Refused(ctx.Edition, $"FUNCTION {name}");
         }
         return UdfActivate(name, fn, argCtxs, new BoundFieldOperand(pointer));

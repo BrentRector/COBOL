@@ -7,6 +7,17 @@
       *> arguments in the activating element shall be equal to the number of formal
       *> parameters in the activated element" (trailing OPTIONAL formals excepted) -
       *> two arguments are supplied where the callee declares one.
+      *> kb/Work PB989 - ISO 12.3.8.4 GR10 a): the details come from a program definition specified PREVIOUSLY in the
+      *> compilation group; a definition that follows the REPOSITORY entry is not one. The callee below is therefore
+      *> given a program prototype definition (11.10.2 Format 2) ahead of every other unit (10.6.2 SR1), which
+      *> supplies the details under GR10 b) - the same signature as the definition (10.6.2 SR2).
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB237NCE IS PROTOTYPE.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LK-A PIC 9(4).
+       PROCEDURE DIVISION USING LK-A.
+       END PROGRAM PB237NCE.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB237NARG.
        ENVIRONMENT DIVISION.

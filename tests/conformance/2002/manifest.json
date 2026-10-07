@@ -297,6 +297,8 @@
     "pb254_total_integer_arguments",
     "pb598_condition_name_value_size_national_bit",
     "pb237_program_prototype",
+    "pb989_function_externalized_name_wins",
+    "pb989_function_prototype_externalized_name",
     "pb119_windowing_float_args",
     "pb120_when_compiled_contained",
     "pb121_test_numval_f_positions",

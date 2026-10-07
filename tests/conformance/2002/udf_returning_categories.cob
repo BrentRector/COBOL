@@ -5,53 +5,6 @@
       *> direct DISPLAY), a NUMERIC-EDITED result carries its edited mask image, and a NATIONAL result rides
       *> the national category channel (MOVE to PIC N + national relation).
        IDENTIFICATION DIVISION.
-       PROGRAM-ID. UFCATP10UR.
-       ENVIRONMENT DIVISION.
-       CONFIGURATION SECTION.
-       REPOSITORY.
-           FUNCTION UFALNP10UR.
-           FUNCTION UFGRPP10UR.
-           FUNCTION UFEDTP10UR.
-           FUNCTION UFNATP10UR.
-       DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01 WS-T PIC X(8).
-       01 WS-L PIC 9(2).
-       01 WS-G.
-          05 WS-G-A PIC X(3).
-          05 WS-G-N PIC 9(4).
-       01 WS-N PIC N(4).
-       PROCEDURE DIVISION.
-       MAIN.
-      *>   The alphanumeric leg: MOVE / direct DISPLAY / LENGTH fold / relation over the cloned X(8) temp.
-           MOVE FUNCTION UFALNP10UR("AB") TO WS-T
-           DISPLAY "A=" WS-T "<"
-           DISPLAY "D=" FUNCTION UFALNP10UR("XY") "<"
-           COMPUTE WS-L = FUNCTION LENGTH(FUNCTION UFALNP10UR("QQ"))
-           DISPLAY "L=" WS-L
-           IF FUNCTION UFALNP10UR("OK") = "OK*"
-               DISPLAY "R=Y"
-           END-IF
-      *>   The group leg: group MOVE (image transfer), receiver child access, direct DISPLAY (AsImage).
-           MOVE FUNCTION UFGRPP10UR(7) TO WS-G
-           DISPLAY "G=" WS-G
-           DISPLAY "G2=" FUNCTION UFGRPP10UR(2)
-           DISPLAY "GA=" WS-G-A " GN=" WS-G-N
-      *>   The numeric-edited leg: the edited mask image displayed and moved to an alphanumeric receiver.
-           DISPLAY "E=" FUNCTION UFEDTP10UR(12345)
-           MOVE FUNCTION UFEDTP10UR(60) TO WS-T
-           DISPLAY "E2=" WS-T "<"
-      *>   The national leg: MOVE to PIC N (national pad) + a national relation.
-           IF FUNCTION UFNATP10UR("CD") = N"CD  "
-               DISPLAY "NR=Y"
-           END-IF
-           MOVE FUNCTION UFNATP10UR("AB") TO WS-N
-           DISPLAY "N=" WS-N "<"
-           STOP RUN.
-       END PROGRAM UFCATP10UR.
-
-      *> Alphanumeric RETURNING: PIC X(8), left-justified store + a ref-mod splice in the callee.
-       IDENTIFICATION DIVISION.
        FUNCTION-ID. UFALNP10UR.
        DATA DIVISION.
        LINKAGE SECTION.
@@ -105,3 +58,50 @@
            MOVE FUNCTION NATIONAL-OF(L-A) TO L-NR
            GOBACK.
        END FUNCTION UFNATP10UR.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. UFCATP10UR.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           FUNCTION UFALNP10UR.
+           FUNCTION UFGRPP10UR.
+           FUNCTION UFEDTP10UR.
+           FUNCTION UFNATP10UR.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-T PIC X(8).
+       01 WS-L PIC 9(2).
+       01 WS-G.
+          05 WS-G-A PIC X(3).
+          05 WS-G-N PIC 9(4).
+       01 WS-N PIC N(4).
+       PROCEDURE DIVISION.
+       MAIN.
+      *>   The alphanumeric leg: MOVE / direct DISPLAY / LENGTH fold / relation over the cloned X(8) temp.
+           MOVE FUNCTION UFALNP10UR("AB") TO WS-T
+           DISPLAY "A=" WS-T "<"
+           DISPLAY "D=" FUNCTION UFALNP10UR("XY") "<"
+           COMPUTE WS-L = FUNCTION LENGTH(FUNCTION UFALNP10UR("QQ"))
+           DISPLAY "L=" WS-L
+           IF FUNCTION UFALNP10UR("OK") = "OK*"
+               DISPLAY "R=Y"
+           END-IF
+      *>   The group leg: group MOVE (image transfer), receiver child access, direct DISPLAY (AsImage).
+           MOVE FUNCTION UFGRPP10UR(7) TO WS-G
+           DISPLAY "G=" WS-G
+           DISPLAY "G2=" FUNCTION UFGRPP10UR(2)
+           DISPLAY "GA=" WS-G-A " GN=" WS-G-N
+      *>   The numeric-edited leg: the edited mask image displayed and moved to an alphanumeric receiver.
+           DISPLAY "E=" FUNCTION UFEDTP10UR(12345)
+           MOVE FUNCTION UFEDTP10UR(60) TO WS-T
+           DISPLAY "E2=" WS-T "<"
+      *>   The national leg: MOVE to PIC N (national pad) + a national relation.
+           IF FUNCTION UFNATP10UR("CD") = N"CD  "
+               DISPLAY "NR=Y"
+           END-IF
+           MOVE FUNCTION UFNATP10UR("AB") TO WS-N
+           DISPLAY "N=" WS-N "<"
+           STOP RUN.
+       END PROGRAM UFCATP10UR.
+
+      *> Alphanumeric RETURNING: PIC X(8), left-justified store + a ref-mod splice in the callee.

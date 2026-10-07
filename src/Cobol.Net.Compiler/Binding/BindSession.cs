@@ -80,11 +80,3 @@ internal sealed class BindSession
         return band;
     }
 }
-
-/// <summary>The two whole-group tables a REPOSITORY specifier resolves against (ISO §12.3.8.4): the user-defined
-/// functions by user-function-name (GR11 a) / b) — definitions over same-name prototypes) and the program
-/// definitions by EXTERNALIZED name (GR10 a) / b)). One pair per compilation group; each source element narrows
-/// it to what ITS specifiers name (<c>BinderDriver.UserFunctionsOf</c> / <c>ProgramPrototypesOf</c>).</summary>
-internal sealed record GroupRepository(
-    IReadOnlyDictionary<string, UserFunctionSignature> UserFunctions,
-    IReadOnlyDictionary<string, CalleeSignature> ProgramDefinitions);

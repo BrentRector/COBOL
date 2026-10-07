@@ -19,6 +19,20 @@
       *> return, which presumes the element is on the stack. Latitude over which
       *> name string, never over whether the frame exists.
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. PB36MNFN.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 L-X PIC 9(4).
+       01 L-R PIC 9(4).
+       PROCEDURE DIVISION USING L-X RETURNING L-R.
+       F.
+           DISPLAY "F-CUR=[" FUNCTION MODULE-NAME(CURRENT) "]".
+           DISPLAY "F-ACT=[" FUNCTION MODULE-NAME(ACTIVATING) "]".
+           MOVE 1 TO L-R.
+           GOBACK.
+       END FUNCTION PB36MNFN.
+
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. PB36MODNAME.
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
@@ -85,20 +99,6 @@
            END-IF.
            GOBACK.
        END PROGRAM PB36MNREC.
-
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. PB36MNFN.
-       DATA DIVISION.
-       LINKAGE SECTION.
-       01 L-X PIC 9(4).
-       01 L-R PIC 9(4).
-       PROCEDURE DIVISION USING L-X RETURNING L-R.
-       F.
-           DISPLAY "F-CUR=[" FUNCTION MODULE-NAME(CURRENT) "]".
-           DISPLAY "F-ACT=[" FUNCTION MODULE-NAME(ACTIVATING) "]".
-           MOVE 1 TO L-R.
-           GOBACK.
-       END FUNCTION PB36MNFN.
 
        IDENTIFICATION DIVISION.
        CLASS-ID. CPB36MN INHERITS FROM BASE.

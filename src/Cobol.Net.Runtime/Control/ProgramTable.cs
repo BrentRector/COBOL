@@ -411,12 +411,11 @@ public sealed class ProgramTable
     /// by §14.9.39.4 GR14: true when <paramref name="p"/> is NULL (GR26's first alternative) or addresses a
     /// registered function whose declared formal count is <paramref name="expectedFormals"/>.
     /// <para>⛔ GRANULARITY, STATED: the compare is ARITY-ONLY, because a registered unit carries
-    /// <c>FormalCount</c>/<c>RequiredCount</c> and nothing finer. That is the SAME granularity as the
-    /// compile-time COBOLNET1513 prototype-vs-definition check (<c>BinderDriver.BuildUserFunctionTable</c> —
-    /// "Light check (argument count; full §8.13 external-repository conformance is staged residue)"), and the
-    /// COMPILE-TIME §14.9.39.3 SR20 compare in <c>SetBinder</c> is richer: it has both bound
-    /// <c>CalleeSignature</c>s. This site exists for the one case SR20 cannot reach — a sender resolved from a
-    /// run-time NAME (§8.4.3.12.4 GR1 a), the identifier-1 form).</para>
+    /// <c>FormalCount</c>/<c>RequiredCount</c> and nothing finer. Both compile-time compares are richer, because each
+    /// has the two bound <c>CalleeSignature</c>s: the COBOLNET1513 prototype-vs-definition check
+    /// (<c>BinderDriver.CheckPrototypeSignaturePairs</c>, the full <c>PrototypeSignatures.Same</c> comparison since
+    /// kb/Work PB894) and the §14.9.39.3 SR20 compare in <c>SetBinder</c>. This site exists for the one case SR20
+    /// cannot reach — a sender resolved from a run-time NAME (§8.4.3.12.4 GR1 a), the identifier-1 form).</para>
     /// <para><c>Math.Max(FormalCount, 0)</c> is LOAD-BEARING, not defensive: <c>ProgramEmitter.EmitEntryWrapper</c>
     /// omits the <c>formalCount:</c> argument entirely when the unit has no formals, so a ZERO-formal function
     /// registers with the "not registered" sentinel −1.</para></summary>

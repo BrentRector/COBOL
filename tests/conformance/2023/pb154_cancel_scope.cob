@@ -1,4 +1,17 @@
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. FCTR154.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 C PIC 9(4) VALUE 0.
+       LINKAGE SECTION.
+       01 RES PIC 9(4).
+       PROCEDURE DIVISION RETURNING RES.
+       MAIN.
+           ADD 1 TO C
+           MOVE C TO RES
+           GOBACK.
+       END FUNCTION FCTR154.
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. PB154SC.
       *> kb/Work PB154 - 8.4.6.3 first paragraph: a program-name is
       *> referenced only by CALL/CANCEL/program-address/end-marker, and a
@@ -44,16 +57,3 @@
            DISPLAY "H=" N
            GOBACK.
        END PROGRAM HLP154.
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. FCTR154.
-       DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01 C PIC 9(4) VALUE 0.
-       LINKAGE SECTION.
-       01 RES PIC 9(4).
-       PROCEDURE DIVISION RETURNING RES.
-       MAIN.
-           ADD 1 TO C
-           MOVE C TO RES
-           GOBACK.
-       END FUNCTION FCTR154.

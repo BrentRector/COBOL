@@ -141,12 +141,15 @@ internal sealed class OoDriver(BindSession session)
     public void BindClassBody(OoClassUnit cls)
     {
         var repository = session.Repository;
+        // §12.3.8.4 GR10 a) / GR11 a): "specified PREVIOUSLY" is relative to the class definition whose REPOSITORY
+        // paragraph holds the specifier (kb/Work PB989) — an expansion's text starts where its skeleton does.
+        int position = cls.Symbol.Ctx.Start.StartIndex;
         var binder = new StatementBinder(cls.Data, cls.Refs)
         {
             OoClasses = session.OoClasses,
             OoCurrentClass = cls.Symbol,   // the SELF/SUPER resolution root (§8.4.3.8; slice 3b)
-            UserFunctions = Binding.BinderDriver.UserFunctionsOf(cls.Data, unit: null, repository.UserFunctions),
-            ProgramPrototypes = Binding.BinderDriver.ProgramPrototypesOf(cls.Data, unit: null, repository.ProgramDefinitions),
+            UserFunctions = Binding.BinderDriver.UserFunctionsOf(cls.Data, unit: null, repository, position),
+            ProgramPrototypes = Binding.BinderDriver.ProgramPrototypesOf(cls.Data, unit: null, repository, position),
         };
         binder.ConfigureEc(session.Turn, session.DirectiveSites, cls.Name);   // methods fold the same source-ordered >>TURN state (§7.3.25 GR6)
         // kb/Work PB971 — the method formals' EC-OO-ARG-OMITTED guards (§14.9.23.4 GR10), before any body binds.
@@ -161,8 +164,8 @@ internal sealed class OoDriver(BindSession session)
             OoClasses = session.OoClasses,
             OoCurrentClass = cls.Symbol,
             OoInFactory = true,
-            UserFunctions = Binding.BinderDriver.UserFunctionsOf(cls.FactoryData, unit: null, repository.UserFunctions),
-            ProgramPrototypes = Binding.BinderDriver.ProgramPrototypesOf(cls.FactoryData, unit: null, repository.ProgramDefinitions),
+            UserFunctions = Binding.BinderDriver.UserFunctionsOf(cls.FactoryData, unit: null, repository, position),
+            ProgramPrototypes = Binding.BinderDriver.ProgramPrototypesOf(cls.FactoryData, unit: null, repository, position),
         };
         fbinder.ConfigureEc(session.Turn, session.DirectiveSites, cls.Name);
         cls.FactoryBound = fbinder.BindMethodRoster(cls.Symbol, cls.Symbol.FactoryMethods);

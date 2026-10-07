@@ -6,6 +6,17 @@
 *> satisfied. (14.8.2.3.2 states the same requirement explicitly in the argument-passing direction: "if
 *> either is a restricted pointer, both shall be restricted and of the same type.") COBOLNET1959 - the one
 *> code SR20 and SR22 share, because they are one rule over two carriers. kb/Work PB817.
+*> kb/Work PB989 - ISO 12.3.8.4 GR10 a): the details come from a program definition specified PREVIOUSLY in the
+*> compilation group; a definition that follows the REPOSITORY entry is not one. The callee below is therefore
+*> given a program prototype definition (11.10.2 Format 2) ahead of every other unit (10.6.2 SR1), which
+*> supplies the details under GR10 b) - the same signature as the definition (10.6.2 SR2).
+IDENTIFICATION DIVISION.
+PROGRAM-ID. NEGPPTGT IS PROTOTYPE.
+DATA DIVISION.
+LINKAGE SECTION.
+01 L-X PIC 9(4).
+PROCEDURE DIVISION USING L-X.
+END PROGRAM NEGPPTGT.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. NEGPP06.
 ENVIRONMENT DIVISION.

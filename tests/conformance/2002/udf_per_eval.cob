@@ -8,6 +8,20 @@
       *> activation counter is EXTERNAL data - last-used per run unit (14.6.2.3.3) - because a
       *> function's internal data is per-activation (functions are always recursive, 8.6.6).
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. SEQ-P10UV.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 CTR-P10UV PIC 9(4) EXTERNAL.
+       LINKAGE SECTION.
+       01 L-X PIC 9(4).
+       01 L-R PIC 9(4).
+       PROCEDURE DIVISION USING L-X RETURNING L-R.
+       P.
+           ADD 1 TO CTR-P10UV.
+           COMPUTE L-R = CTR-P10UV + L-X.
+           GOBACK.
+       END FUNCTION SEQ-P10UV.
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. UPEREVAL-P10UV.
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
@@ -62,17 +76,3 @@
            STOP RUN.
        END PROGRAM UPEREVAL-P10UV.
 
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. SEQ-P10UV.
-       DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01 CTR-P10UV PIC 9(4) EXTERNAL.
-       LINKAGE SECTION.
-       01 L-X PIC 9(4).
-       01 L-R PIC 9(4).
-       PROCEDURE DIVISION USING L-X RETURNING L-R.
-       P.
-           ADD 1 TO CTR-P10UV.
-           COMPUTE L-R = CTR-P10UV + L-X.
-           GOBACK.
-       END FUNCTION SEQ-P10UV.

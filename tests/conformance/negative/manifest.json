@@ -2453,7 +2453,9 @@
   "pb1968-subscript-unary-unary",
   "pb397-exit-not-alone",
   "pb397-go-to-not-last",
-  "pb397-stop-not-last"
+  "pb397-stop-not-last",
+  "pb989-function-definition-follows-the-specifier",
+  "pb989-call-previous-definition-argument-count"
  ],
  "pending": []
 }

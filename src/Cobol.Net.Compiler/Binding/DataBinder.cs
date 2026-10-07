@@ -418,7 +418,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// Format-2 CALL and prototype CANCEL (kb/Work PB237). §8.3.2 case-insensitive. The SPECIFIER is collected
     /// here (syntax); §12.3.8.3 SR15's self/containing-program ignore and §12.3.8.4 GR10's resolution against the
     /// compilation group need the unit's identity and its siblings, so they run in
-    /// <c>BinderDriver.ProgramPrototypesOf</c>, exactly as the function twin resolves in BuildUserFunctionTable.</summary>
+    /// <c>BinderDriver.ProgramPrototypesOf</c>, exactly as the function twin resolves in <c>BinderDriver.UserFunctionsOf</c>.</summary>
     internal Dictionary<string, ProgramSpecifier> ProgramSpecifiers { get; } = new(CobolNames.Comparer);
 
     /// <summary>The unit's REPOSITORY user-function specifiers (§12.3.8 — <c>FUNCTION function-prototype-name</c>
@@ -427,12 +427,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// function of the same name" — so the binder's user-function dispatch precedes the intrinsic catalog.</summary>
     internal HashSet<string> UserFunctionNames { get; } = new(CobolNames.Comparer);
 
-    /// <summary>The unit's user-defined-function specifiers by function-prototype-name-1 → EXTERNALIZED name:
-    /// literal-5 when <c>AS literal-5</c> is written (§12.3.8.4 GR11 NOTE 2 — "Literal-5, if specified, is the
-    /// externalized name of the function prototype; otherwise, the externalized name is function-prototype-name-1"),
-    /// otherwise the name itself. GR11's search of the compilation group runs in
+    /// <summary>The unit's user-defined-function specifiers by function-prototype-name-1 (<see cref="FunctionSpecifier"/>):
+    /// its EXTERNALIZED name is literal-5 when <c>AS literal-5</c> is written (§12.3.8.4 GR11 NOTE 2 — "Literal-5, if
+    /// specified, is the externalized name of the function prototype; otherwise, the externalized name is
+    /// function-prototype-name-1"), otherwise the name itself. GR11's search of the compilation group runs in
     /// <c>BinderDriver.UserFunctionsOf</c>, the twin of <c>ProgramPrototypesOf</c> (kb/Work PB974).</summary>
-    internal Dictionary<string, string> FunctionSpecifiers { get; } = new(CobolNames.Comparer);
+    internal Dictionary<string, FunctionSpecifier> FunctionSpecifiers { get; } = new(CobolNames.Comparer);
 
     /// <summary>The unit's REPOSITORY intrinsic-function specifiers by name (§12.3.8 —
     /// <c>FUNCTION intrinsic-function-name INTRINSIC</c>): the §8.4.3.2 SR2 precondition that lets the word
@@ -572,8 +572,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             {
                 specifierWords.Add((re, fn.GetText(), UserWordKind.FunctionPrototypeName));
                 UserFunctionNames.Add(fn.GetText());
-                FunctionSpecifiers[fn.GetText()] =
-                    BindSpecifierExternalizedName(re, "FUNCTION", fn.GetText(), "literal-5") ?? fn.GetText();
+                FunctionSpecifiers[fn.GetText()] = new FunctionSpecifier(fn.GetText(),
+                    BindSpecifierExternalizedName(re, "FUNCTION", fn.GetText(), "literal-5") ?? fn.GetText(), re);
             }
             // FUNCTION … INTRINSIC (§12.3.8): `ALL` (GR14) or a LIST of intrinsic-function-names (§12.3.8.2's
             // `{ intrinsic-function-name-1 } …`, kb/Work PB974) — the §8.4.3.2 SR2 keyword-omission enabler

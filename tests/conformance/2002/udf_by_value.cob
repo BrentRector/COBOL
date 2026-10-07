@@ -9,6 +9,30 @@
       *> kept its 7 / 3 while WS-A became 9999 and the REFERENCE formal followed WS-B up by one.
       *> A literal argument to a BY VALUE formal is 8.4.3.2.3 SR10-legal (numeric).
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. SCALEV-P10UV.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-A PIC 9(4) EXTERNAL.
+       01 WS-B PIC 9(4) EXTERNAL.
+       01 W-BEFORE PIC 9(4).
+       01 W-DELTA PIC S9(4).
+       LINKAGE SECTION.
+       01 L-V PIC 9(4).
+       01 L-REF PIC 9(4).
+       01 L-R PIC 9(4).
+       PROCEDURE DIVISION USING BY VALUE L-V BY REFERENCE L-REF
+           RETURNING L-R.
+       P.
+           MOVE L-REF TO W-BEFORE.
+      *>   the argument of the VALUE formal changes - the detached copy must NOT follow (14.2.3 GR10)
+           MOVE 9999 TO WS-A.
+      *>   the argument of the REFERENCE formal changes - the formal occupies its storage and MUST follow (GR8)
+           ADD 1 TO WS-B.
+           COMPUTE W-DELTA = L-REF - W-BEFORE - 1.
+           COMPUTE L-R = L-V * 2 + W-DELTA.
+           GOBACK.
+       END FUNCTION SCALEV-P10UV.
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. UBYVAL-P10UV.
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
@@ -54,27 +78,3 @@
        END PROGRAM SUBV-P10UV.
        END PROGRAM UBYVAL-P10UV.
 
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. SCALEV-P10UV.
-       DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01 WS-A PIC 9(4) EXTERNAL.
-       01 WS-B PIC 9(4) EXTERNAL.
-       01 W-BEFORE PIC 9(4).
-       01 W-DELTA PIC S9(4).
-       LINKAGE SECTION.
-       01 L-V PIC 9(4).
-       01 L-REF PIC 9(4).
-       01 L-R PIC 9(4).
-       PROCEDURE DIVISION USING BY VALUE L-V BY REFERENCE L-REF
-           RETURNING L-R.
-       P.
-           MOVE L-REF TO W-BEFORE.
-      *>   the argument of the VALUE formal changes - the detached copy must NOT follow (14.2.3 GR10)
-           MOVE 9999 TO WS-A.
-      *>   the argument of the REFERENCE formal changes - the formal occupies its storage and MUST follow (GR8)
-           ADD 1 TO WS-B.
-           COMPUTE W-DELTA = L-REF - W-BEFORE - 1.
-           COMPUTE L-R = L-V * 2 + W-DELTA.
-           GOBACK.
-       END FUNCTION SCALEV-P10UV.

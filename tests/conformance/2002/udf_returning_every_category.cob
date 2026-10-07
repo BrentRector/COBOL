@@ -15,58 +15,6 @@
       *>          (13.18.38.4 GR8 a), padded with spaces by the alphanumeric receiver.
       *>   STR  - a strongly typed group displays its character image: 12AB.
        IDENTIFICATION DIVISION.
-       PROGRAM-ID. UEVERY.
-       ENVIRONMENT DIVISION.
-       CONFIGURATION SECTION.
-       REPOSITORY.
-           FUNCTION UEVFLT
-           FUNCTION UEVBOOL
-           FUNCTION UEVBIT
-           FUNCTION UEVIDX
-           FUNCTION UEVPNUL
-           FUNCTION UEVPSET
-           FUNCTION UEVRED
-           FUNCTION UEVODO
-           FUNCTION UEVSTR.
-       DATA DIVISION.
-       WORKING-STORAGE SECTION.
-       01 WS-FIX PIC 9(4)V99.
-       01 WS-B PIC 1(4).
-       01 WS-TBL.
-          05 WS-EL PIC 9(2) OCCURS 5 INDEXED BY WS-IX.
-       01 WS-DI USAGE INDEX.
-       01 WS-RED.
-          05 WS-RA PIC X(4).
-          05 WS-RB REDEFINES WS-RA PIC 9(4).
-       01 WS-ANY PIC X(8).
-       PROCEDURE DIVISION.
-       MAIN.
-           COMPUTE WS-FIX = FUNCTION UEVFLT(3).
-           DISPLAY "FLT=" WS-FIX.
-           MOVE FUNCTION UEVBOOL(3) TO WS-B.
-           DISPLAY "BOOL=" WS-B.
-           COMPUTE WS-B = B-NOT FUNCTION UEVBOOL(3).
-           DISPLAY "NOT=" WS-B.
-           COMPUTE WS-B = FUNCTION UEVBOOL(3) B-AND B"1100".
-           DISPLAY "AND=" WS-B.
-           IF FUNCTION UEVBIT(3) DISPLAY "BIT=TRUE"
-               ELSE DISPLAY "BIT=FALSE".
-           SET WS-IX TO 3.
-           SET WS-DI TO WS-IX.
-           IF FUNCTION UEVIDX(1) = WS-DI DISPLAY "IDX=EQ"
-               ELSE DISPLAY "IDX=NE".
-           IF FUNCTION UEVPNUL(1) = NULL DISPLAY "PNUL=NULL"
-               ELSE DISPLAY "PNUL=SET".
-           IF FUNCTION UEVPSET(1) = NULL DISPLAY "PSET=NULL"
-               ELSE DISPLAY "PSET=SET".
-           MOVE FUNCTION UEVRED(1) TO WS-RED.
-           DISPLAY "RED=" WS-RA " " WS-RB.
-           MOVE FUNCTION UEVODO(1) TO WS-ANY.
-           DISPLAY "ODO=[" WS-ANY "]".
-           DISPLAY "STR=" FUNCTION UEVSTR(1).
-           STOP RUN.
-       END PROGRAM UEVERY.
-       IDENTIFICATION DIVISION.
        FUNCTION-ID. UEVFLT.
        DATA DIVISION.
        LINKAGE SECTION.
@@ -181,3 +129,55 @@
            MOVE "AB" TO T-B OF L-R.
            GOBACK.
        END FUNCTION UEVSTR.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. UEVERY.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           FUNCTION UEVFLT
+           FUNCTION UEVBOOL
+           FUNCTION UEVBIT
+           FUNCTION UEVIDX
+           FUNCTION UEVPNUL
+           FUNCTION UEVPSET
+           FUNCTION UEVRED
+           FUNCTION UEVODO
+           FUNCTION UEVSTR.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-FIX PIC 9(4)V99.
+       01 WS-B PIC 1(4).
+       01 WS-TBL.
+          05 WS-EL PIC 9(2) OCCURS 5 INDEXED BY WS-IX.
+       01 WS-DI USAGE INDEX.
+       01 WS-RED.
+          05 WS-RA PIC X(4).
+          05 WS-RB REDEFINES WS-RA PIC 9(4).
+       01 WS-ANY PIC X(8).
+       PROCEDURE DIVISION.
+       MAIN.
+           COMPUTE WS-FIX = FUNCTION UEVFLT(3).
+           DISPLAY "FLT=" WS-FIX.
+           MOVE FUNCTION UEVBOOL(3) TO WS-B.
+           DISPLAY "BOOL=" WS-B.
+           COMPUTE WS-B = B-NOT FUNCTION UEVBOOL(3).
+           DISPLAY "NOT=" WS-B.
+           COMPUTE WS-B = FUNCTION UEVBOOL(3) B-AND B"1100".
+           DISPLAY "AND=" WS-B.
+           IF FUNCTION UEVBIT(3) DISPLAY "BIT=TRUE"
+               ELSE DISPLAY "BIT=FALSE".
+           SET WS-IX TO 3.
+           SET WS-DI TO WS-IX.
+           IF FUNCTION UEVIDX(1) = WS-DI DISPLAY "IDX=EQ"
+               ELSE DISPLAY "IDX=NE".
+           IF FUNCTION UEVPNUL(1) = NULL DISPLAY "PNUL=NULL"
+               ELSE DISPLAY "PNUL=SET".
+           IF FUNCTION UEVPSET(1) = NULL DISPLAY "PSET=NULL"
+               ELSE DISPLAY "PSET=SET".
+           MOVE FUNCTION UEVRED(1) TO WS-RED.
+           DISPLAY "RED=" WS-RA " " WS-RB.
+           MOVE FUNCTION UEVODO(1) TO WS-ANY.
+           DISPLAY "ODO=[" WS-ANY "]".
+           DISPLAY "STR=" FUNCTION UEVSTR(1).
+           STOP RUN.
+       END PROGRAM UEVERY.

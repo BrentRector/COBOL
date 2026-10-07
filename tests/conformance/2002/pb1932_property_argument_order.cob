@@ -22,6 +22,18 @@
       *>          function at the time control is transferred" (GR6 a)) --
       *>          after the GET has run: 1 + 1.
        IDENTIFICATION DIVISION.
+       FUNCTION-ID. P1932F.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 X PIC 9(4).
+       01 Y PIC 9(4).
+       01 R PIC 9(4).
+       PROCEDURE DIVISION USING X Y RETURNING R.
+       MAIN.
+           COMPUTE R = X + Y.
+       END FUNCTION P1932F.
+
+       IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1932AO.
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
@@ -54,18 +66,6 @@
            DISPLAY "5=" W.
            STOP RUN.
        END PROGRAM PB1932AO.
-
-       IDENTIFICATION DIVISION.
-       FUNCTION-ID. P1932F.
-       DATA DIVISION.
-       LINKAGE SECTION.
-       01 X PIC 9(4).
-       01 Y PIC 9(4).
-       01 R PIC 9(4).
-       PROCEDURE DIVISION USING X Y RETURNING R.
-       MAIN.
-           COMPUTE R = X + Y.
-       END FUNCTION P1932F.
 
        IDENTIFICATION DIVISION.
        CLASS-ID. P1932C INHERITS FROM BASE.

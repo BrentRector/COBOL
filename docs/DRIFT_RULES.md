@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-281 drift tests.
+282 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -141,6 +141,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [GrammarEncodingDriftTests](../tests/Cobol.Net.Tests.Unit/GrammarEncodingDriftTests.cs) | ⛔ ANTLR IS TOLD HOW TO READ A GRAMMAR FILE: UTF-8, ALWAYS (kb/Work PB1944). | `src/Cobol.Net.Frontend/Grammar`, `src/Cobol.Net.Frontend/Invoke-Antlr4CSharp.ps1` |
 | [GrammarRelativeSignDriftTests](../tests/Cobol.Net.Tests.Unit/GrammarRelativeSignDriftTests.cs) | ⛔ THE DRIFT GUARD FOR "PLUS AND + ARE SYNONYMS" (kb/Work PB951). | `src/Cobol.Net.Frontend/Grammar` |
 | [GroupKindDriftTests](../tests/Cobol.Net.Tests.Unit/GroupKindDriftTests.cs) | ⛔ THE SHAPE PIN FOR "WHICH KIND OF GROUP ITEM IS THIS?" (kb/Work PB392). | — |
+| [GroupRepositoryOrderDriftTests](../tests/Cobol.Net.Tests.Unit/GroupRepositoryOrderDriftTests.cs) | ⛔ A REPOSITORY PROTOTYPE IS RESOLVED BY ONE SEARCH OF THE COMPILATION GROUP, RUN AS OF THE REFERENCING ELEMENT'S POSITION (kb/Work PB989; ISO §12.3.8.4 GR10 / GR11). | `src`, `src/Cobol.Net.Compiler/Binding/BinderDriver.cs`, `src/Cobol.Net.Compiler/Binding/GroupRepository.cs` |
 | [GroupStoreTargetDriftTests](../tests/Cobol.Net.Tests.Unit/GroupStoreTargetDriftTests.cs) | kb/Work PB1411 — EVERY GROUP-LEVEL STORE IS CALLED ON PlaceRenderer.GroupTarget, the one receiver that reaches an element of a dynamic-capacity table through RefReceiving. | `src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs` |
 | [HostFileProbeDriftTests](../tests/Cobol.Net.Tests.Unit/HostFileProbeDriftTests.cs) | ⛔ THE RUNTIME ASKS THE OPERATING ENVIRONMENT ABOUT A PHYSICAL FILE IN EXACTLY ONE PLACE — HostFile, in Cobol.Net.Runtime/IO/FileSupport.cs — AND THE OPEN CONTRACT ASKS EACH QUESTION ONCE, ABOVE THE ORGANIZATIONS. | `src/Cobol.Net.Runtime/IO` |
 | [ImagePredicateDriftTests](../tests/Cobol.Net.Tests.Unit/ImagePredicateDriftTests.cs) | The image predicate's VALUE pin (kb/Work PB164): HasImageByteForm answers true for exactly the ByteForm-pinned set and false for ByteForm-less usages, and the binary forms' image width is StorageWidth (the V59 ONE-WIDTH invariant). | — |
