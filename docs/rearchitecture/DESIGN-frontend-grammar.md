@@ -174,18 +174,18 @@ is self-contained: the preprocessor and parse machinery, `DiagnosticBag` and `Tu
 SLL bail — this masks predicate/lexer-action bugs (a `NullReferenceException` in a semantic predicate) as a
 "retry with LL," hiding real defects behind a silent second parse.
 
-### 1.9 Parallel SUBSCRIPT lexer vocabulary
-SUBSCRIPT mode (`CobolLexer.g4:726-776`) re-declares its own `SUB_*` literal/operator/identifier tokens
-(`SUB_INTEGERLIT`, `SUB_STRINGLIT`, `SUB_PLUS`, `SUB_IDENTIFIER`, …) paralleling the DEFAULT-mode tokens,
-because the disambiguation of `x(i)`-as-subscript vs `(a+b)`-as-grouping is punted from the grammar into a
-lexer mode driven by `PreviousTokenCouldBeDataName()`. The binder then re-parses the captured subscript
-token run (`ReferenceResolver` `SplitSubscriptTokens`). Two vocabularies + a binder-side mini-parser for
-one concept.
+### 1.9 Parallel SUBSCRIPT lexer vocabulary — RESOLVED (kb/Work PB2113, §9)
+SUBSCRIPT mode re-declared its own `SUB_*` literal/operator/identifier tokens paralleling the DEFAULT-mode tokens,
+because the disambiguation of `x(i)`-as-subscript vs `(a+b)`-as-grouping was punted from the grammar into a lexer
+mode driven by `PreviousTokenCouldBeDataName()`, and the binder re-parsed the captured token run by hand
+(`ReferenceResolver.SplitSubscriptTokens`). §9 removed both: the '(' after a data-name-capable word is now the
+virtual token `REF_LPAREN` (its ')' `REF_RPAREN`), the tokens between them are the DEFAULT vocabulary, and the
+grammar parses the list (`subscriptPart : REF_LPAREN subscriptList? REF_RPAREN`). One vocabulary, no mini-parser.
 
 The trigger has ONE region exception, and it is a spec rule, not a heuristic (kb/Work PB924): ISO §13.18.54.3
 SR9 makes a SUM not preceded by FUNCTION inside a report description entry the report-writer SUM CLAUSE, whose
 addend may open with '(' — so the lexer tracks the REPORT SECTION (`TrackReportSection`: opened by its header,
-closed by the next section or division header) and a SUM there does not push SUBSCRIPT
+closed by the next section or division header) and a SUM there opens no reference paren
 (`IsReportSumClauseKeyword`). SUM is the only §8.9 ∩ §8.11 word that begins a report or data description clause
 whose operand can open with '('; `CobolLexerModeDriftTests` pins both regions for all four words.
 
@@ -1657,10 +1657,13 @@ regression bisects to one step.
 
 ## 9. D10 — SUBSCRIPT-mode removal (owner override): design + the one open decision
 
-> **Status: DESIGN — scheduled for PHASE 15 §"CUT 2.5" (kb/Work PB2113), unblocked by PHASE 15 Cut 2, which deleted the
-> legacy compiler that was the sole other consumer of `SUB_*`/`SubscriptEntryContext` (§9.3). The executing session resolves
-> the §9.4 decision FIRST, then runs the §9.5 D10.1–D10.5 stages. This is a MAJOR multi-stage rearchitecture sub-track (a
-> shared-grammar + ~250-line binder-parser rewrite).**
+> **Status: FIRST HALF LANDED (kb/Work PB2113, PHASE 15 §"CUT 2.5").** §9.4 is resolved (Option A, from the spec), the
+> SUBSCRIPT lexer mode and every `SUB_*` token are deleted, subscripts / reference modifiers / keyword-omitted argument
+> lists are parse nodes, and the binder's hand-rolled splitter and captured-group readers are gone (§9.5 records what each
+> stage became). The SECOND half remains (kb/Work PB2151): subscript and reference-modifier positions still reach the code generator as
+> the D10 TRANSITIONAL string carrier (`ReferenceResolver.RenderSegment`, and the D18 materializer's text re-parse
+> through `subscriptExpressionFragment`); moving them onto `BoundExpr` deletes both. §9.3's entanglement cleared when
+> PB2110 deleted the legacy tree.
 
 ### 9.1 Goal
 Replace the lexer **SUBSCRIPT mode** (`CobolLexer.g4` — entered via `LPAREN` after a data-name token, emits the
@@ -1700,8 +1703,24 @@ so deleting the dead rules broke the legacy build (`CS0426`) and the `SUB_*` tok
 deleted that compiler (kb/Work PB2110), so the SUBSCRIPT machinery no longer has a second consumer and D10 is no longer
 sequenced behind a deletion. The removal itself is kb/Work PB2113.
 
-### 9.4 ⛔ THE OPEN DECISION (owner) — does WiseOwl COBOL preserve ISO §8.3.5 space-separated lists?
-This is the gating question; §9.5's staging depends on the answer.
+### 9.4 THE DECISION — WiseOwl COBOL preserves ISO §8.3.5 space-separated lists (RESOLVED from the spec, kb/Work PB2113)
+**Resolution: Option A, and the spec leaves no latitude.** §8.3.5 1): "The COBOL character space is a separator", and
+2): "The COBOL characters comma and semicolon, immediately followed by a space, are separators that may be used anywhere
+the separator space is used" (`cite.py --check 8.3.5` OK, both) — so `X (I J)` is two subscripts exactly as `X (I, J)`
+is, and Option B would reject legal source. §8.3.3.3.2 2) ("If a sign is used, it shall appear as the leftmost
+character of the literal") and §8.7.1 (the operators "shall be preceded by a space and followed by a space") make
+`X (I -1)` two subscripts and `X (I - 1)` one.
+**The mechanism, as built.** No lexer MODE: the lexer's paren stack (`_parenRegions`, the mechanism the FUNCTION
+argument list already had) records which open parens are LIST REGIONS — an argument list (`FNARG_LPAREN`) or a
+reference's parenthesized tail (`REF_LPAREN`, typed by the same `PreviousTokenCouldBeDataName` trigger that used to push
+the mode). Inside a list region the §8.3.5 2) separator survives as `FNARG_SEPARATOR` and a sign that follows a separator
+and touches its digits is retyped `SIGNED_INTEGERLIT` / `SIGNED_DECIMALLIT` (actions, never predicates — PB1715);
+everything else is the DEFAULT vocabulary, so the grammar parses the list by juxtaposition, the shape `functionArgList`
+always had. That is the "minimal WS / sign-adjacency mechanism" Option A predicted, and nothing more.
+⚠ A sign-adjacent literal is retyped in ANY list region, including a group nested in one: `X ((I -1))` is now refused
+(two juxtaposed operands inside a parenthesized expression, as `MAX((A -1))` always was) where the captured stream read
+it as `I - 1`. The spec agrees with the refusal; no corpus program writes the shape.
+The options as they were weighed:
 - **Option A — spec-faithful (recommended): keep space-separated subscript/argument lists.** Then a **scoped
   WS-significance mechanism is unavoidable** (an island-grammar region, or a `WS`-non-skipping lexer predicate
   active only inside a data-name's `(...)` tail). "Full removal of the mode" then *reduces* to: **replace the flat
@@ -1713,9 +1732,9 @@ This is the gating question; §9.5's staging depends on the answer.
 - **Option C — interpret in-mode.** Keep the mode but give it real grammar rules (parse `SUB_*` structurally
   instead of the flat `subToken*`), deleting only the C# re-parsers. Smaller, but leaves the mode.
 
-**Recommendation: Option A** — it honors the spec (hard-invariant 3) and still deletes the hand-rolled parsers,
-which is the substance of the owner's directive. Frame "fully remove" as "remove the uninterpreted flat-stream +
-C# re-parse," retaining the smallest possible lexer assist the spec compels.
+**Taken: Option A** — it honors the spec (hard-invariant 3) and still deletes the hand-rolled parsers, which is the
+substance of the owner's directive: "fully remove" is "remove the uninterpreted flat stream + C# re-parse," retaining
+the smallest lexer assist the spec compels.
 
 ### 9.5 Staged plan — executed as PHASE 15 §"CUT 2.5", after Cut 2 (each stage: greenfield battery + `guard.ps1` + INV-1-strong)
 These D10.1–D10.5 stages ARE the PHASE-15 §"CUT 2.5" step list. Sequenced because the LPAREN mode-entry is an
@@ -1741,3 +1760,33 @@ the verification metric is the greenfield `guard.ps1` + the D10.1 corpus + INV-1
 
 **Metric:** token equivalence is NOT the goal (tokens change by design) — prove OUTPUT/behavior equivalence via the
 D10.1 corpus + greenfield battery + FULL legacy guard 353 MATCH + INV-1-strong 349/349 at every stage.
+
+**As executed (kb/Work PB2113, one change set — the stages could not land apart, because the mode flip is
+all-or-nothing):**
+- **D10.1** — §9.4 resolved above; the corpus is `85/pb2113_subscript_list_separators` (space / comma / semicolon lists,
+  literals, qualified and relative subscripts, index-name ± integer, a list across a line end, ref-mod `(a:b)`/`(a:)`,
+  a subscript then a ref-mod, space-separated and sign-adjacent arguments), `2002/pb2113_subscript_expressions_and_arguments`
+  (Annex D.3.5.3's two examples, sign adjacency in a subscript list, keyword-omitted arguments with all three separators,
+  nested FUNCTION and keyword-omitted calls inside a subscript, a keyword-omitted result's ref-mod, `table(ALL)`) and
+  `negative/pb2113-keyword-omitted-arguments-85`. Every line produced the same output on the pre-change compiler.
+- **D10.2** — `refModPart` takes `REF_LPAREN` (a ref-mod straight after a name) beside `LPAREN` / `FNARG_LPAREN`, and
+  `refModSpec`'s leftmost position is optional so `X (:2)` still reaches its named refusal (COBOLNET2876). Each position is the
+  superset `functionArgument`, the operand a subscript item takes, so a position that is not an arithmetic expression
+  (`X ("A" : 1)`) reaches its named refusal too (COBOLNET2363, kb/Work PB1030) instead of a raw parse error. One
+  carrier, one `ReferenceResolver.ReadRefMod`.
+- **D10.3** — `subscriptPart : REF_LPAREN subscriptList? REF_RPAREN`, `subscriptList : subscriptItem ((FNARG_SEPARATOR |
+  COMMA)? subscriptItem)*`, `subscriptItem : ALL | functionArgument` (the superset: the same paren carries a keyword-omitted
+  argument list; a bare COMMA parses so SeparatorRule names it, COBOLNET2631). `ReferenceResolver.SegmentsOf` takes one
+  token segment per item and applies PB136's declaration-informed cut on the TREE (a dataReference at the item's own
+  level whose name cannot be subscripted gives its paren to a new subscript). `RenderSegment` now renders those segments;
+  as a TOKEN renderer it is the transitional carrier the second half replaces.
+- **D10.4** — the keyword-omitted channel binds the parsed `functionArgument` items (`IntrinsicBinder.ArgumentsOf`);
+  `FunctionArgFragment`, `functionArgListFragment` and the lexer's `PrimeFunctionArgs` are deleted. The
+  `functionArgList` / `argumentList` reunification is kb/Work PB2114's.
+- **D10.5** — the `mode SUBSCRIPT` block, `SUB_DEBUG_LINE` (a debugging line inside a subscript is now lexed like any
+  other, behind the DEFAULT `DEBUG_LINE` marker) and the dead structured rules are deleted. ⚠ CORRECTED: under Option A
+  `PreviousTokenCouldBeDataName` and the `cobol-words.json` `subscriptTrigger` column do NOT go dead — they type the
+  reference paren.
+- **Side effect, spec-correct:** a subscript's arithmetic is now an ordinary `arithmeticExpression` node, so the
+  `ExpressionFormationPass` screens reach it — §8.8.1.2 Table 3's (unary, unary) cell in `X (- - 2)` is refused
+  (kb/Work PB1968).

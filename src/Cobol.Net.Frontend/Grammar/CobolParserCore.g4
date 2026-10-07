@@ -722,60 +722,49 @@ propertyObject
     : OF (objectView | SELF | SUPER | predefinedNull | functionCall)
     ;
 
-// subscriptPart uses SUBSCRIPT-mode tokens (entered via LPAREN after IDENTIFIER).
-// SUB_RPAREN pops back to default mode. Also handles ref-mod (colon form).
+// ⛔ A REFERENCE'S PARENTHESIZED TAIL IS PARSED, NOT CAPTURED (kb/Work PB2113, owner ruling D10; DESIGN-frontend-grammar
+// §9). The lexer types the '(' after a data-name-capable word REF_LPAREN and its ')' REF_RPAREN (CobolLexer.g4,
+// OnDefaultLParen), and between them sit the ordinary DEFAULT-mode tokens — so the subscripts ARE parse nodes. Before
+// PB2113 the paren pushed a SUBSCRIPT lexer mode whose SUB_* tokens the grammar kept as one flat uninterpreted run,
+// and the binder re-parsed that run by hand (split it on spaces and commas, found the depth-0 colon, rendered each
+// segment); none of that exists now.
+// ISO §8.4.2.3.2: `qualified-data-name-1 [ ( subscript … ) ]`, a subscript being ALL, arithmetic-expression-1 or
+// `index-name-1 [{+|-} integer-1]` (the last is an arithmetic expression too). §8.3.5 1)/2) make the space, and the
+// comma or semicolon followed by a space, the separators between them — the lexer keeps the second as FNARG_SEPARATOR
+// inside the list region and the first is juxtaposition, exactly the shape functionArgList has. A sign touching its
+// digits after a separator is a signed literal (the list region's SIGNED_* retype), so `T (I -1)` is two subscripts and
+// `T (I - 1)` one (§8.7.1).
+// The SAME paren also carries the keyword-omitted function-identifier's argument list (§8.4.3.2.3 SR2 — only the
+// resolved symbol says whether the word before it names a function or a table), so an item is ALL or any
+// functionArgument: the superset parse. The binder decides which the reference is and screens the items against that
+// reading — a subscript must be an arithmetic expression or ALL (ReferenceResolver), an argument whatever its function
+// admits (IntrinsicBinder) — and a bare COMMA (no space after it, so no separator: §8.3.5 2)) parses so SeparatorRule
+// can name it (COBOLNET2631) instead of a raw parse error.
+// ⛔ THE GROUP MAY BE EMPTY (kb/Work PB969). §8.4.3.2.2 prints the argument list `[ ( [ {argument-1 | OMITTED} ] … ) ]`
+// — the arguments bracketed INSIDE the parentheses, so `F()` is the zero-argument spelling, and for a function-pointer
+// §8.4.3.2.3 SR5 ("If function-pointer-name-1 is specified, the parentheses shall be specified") makes it the ONLY one.
+// A DATA reference with empty parentheses is still illegal (§8.4.2.3.2 writes `( subscript … )`, §8.4.3.3.2 a required
+// leftmost-position) and is refused BY NAME in the resolver (ReferenceResolver.ScreenEmptyParentheses), never here.
+// ⚠ A REFERENCE MODIFIER written straight after the name opens with the same REF_LPAREN (the lexer cannot see the
+// colon coming), so refModPart accepts that paren too; the two alternatives are disjoint on refModSpec's COLON.
 subscriptPart
-    : LPAREN subscriptOrRefMod SUB_RPAREN
+    : REF_LPAREN subscriptList? REF_RPAREN
     ;
 
-// Inside SUBSCRIPT mode: captures all content as a flat sequence of SUBSCRIPT-mode tokens.
-// The binding layer interprets the content: SUB_COLON → ref-mod, else → subscript list.
-// This avoids the need for the grammar to distinguish subscripts from ref-mod.
-// ⛔ THE GROUP MAY BE EMPTY (kb/Work PB969). This one capture also carries the keyword-omitted function-identifier's
-// argument list (§8.4.3.2.3 SR2 lets FUNCTION be omitted for a prototype, a function-pointer, a REPOSITORY-declared
-// intrinsic), and §8.4.3.2.2 prints that list `[ ( [ {argument-1 | OMITTED} ] … ) ]` — the arguments bracketed INSIDE
-// the parentheses, so `F()` is the zero-argument spelling, and for a function-pointer §8.4.3.2.3 SR5 ("If
-// function-pointer-name-1 is specified, the parentheses shall be specified") makes it the ONLY one. `subToken+` refused
-// it with COBOL0001 while `F( )` — one SUB_WS token — parsed; an empty group is now that same whitespace-only group. A
-// DATA reference with empty parentheses is still illegal (§8.4.2.3.2 writes `( subscript … )`, §8.4.3.3.2 a required
-// leftmost-position) and is refused BY NAME in the resolver (ReferenceResolver.ScreenEmptyParentheses), never here:
-// only the resolved symbol says whether the word before the parenthesis is a function or a data item.
-subscriptOrRefMod
-    : subToken*
+subscriptList
+    : subscriptItem ((FNARG_SEPARATOR | COMMA)? subscriptItem)*
     ;
 
-// Any token that can appear inside subscript/ref-mod parentheses
-subToken
-    : SUB_WS
-    | SUB_IDENTIFIER
-    | SUB_INTEGERLIT
-    | SUB_DECIMALLIT
-    | FLOATLIT         // 1.5E3 / -1.5E3 in a captured region (kb/Work R17 — the SUBSCRIPT-mode float forms
-                       // re-type to the ONE FLOATLIT vocabulary; without this the keyword-omitted
-                       // EXP(+1.5E1) failed the OUTER capture with 'no viable alternative')
-    | COMMA_FLOATLIT   // 1,5E3 / -1,5E3 — the DECIMAL-POINT IS COMMA float twin (kb/Work PB98)
-    | SUB_STRINGLIT
-    | SUB_NATLIT       // national literal argument N"…" (ISO §15.50.3 — FUNCTION LENGTH(N"…") etc.)
-    | SUB_BOOLLIT      // boolean literal argument B"…"
-    | SUB_HEXLIT       // hexadecimal-alphanumeric literal argument X"…" (kb/Work PB1393 — the literal screen's twin)
-    | SIGNED_DECIMALLIT
-    | SIGNED_INTEGERLIT
-    | SUB_PLUS
-    | SUB_MINUS
-    | SUB_POWER
-    | SUB_STAR
-    | SUB_SLASH
-    | SUB_COMMA
-    | SUB_SEMICOLON
-    | SUB_COLON
-    | SUB_OF
-    | SUB_IN
-    | SUB_ALL
-    | SUB_LPAREN subToken* SUB_RPAREN                                  // nested parens — `MAX(RANDOM() A)` (§8.4.3.2.3 SR6's NOTE)
+// ALL is §8.4.2.3.3 SR6's subscript (an intrinsic argument's `table (ALL)`, a SORT table's rightmost subscript); the
+// binder screens it where SR6 does not admit it.
+subscriptItem
+    : ALL
+    | functionArgument
     ;
 
-// refModPart for non-identifier context (default mode)
-// ⛔ BOTH PAREN FLAVOURS, AND THE FNARG ONE IS NOT AN OVERSIGHT (fix-queue PB48). The lexer types a '(' that
+// ⛔ THREE PAREN FLAVOURS. REF_LPAREN is a reference modifier written straight after a data name (`X (1:4)`, kb/Work
+// PB2113 — the lexer types that paren before it can see the colon); LPAREN one written after a ')' (`X (I) (1:4)`).
+// ⛔ AND THE FNARG ONE IS NOT AN OVERSIGHT (fix-queue PB48). The lexer types a '(' that
 // immediately follows `FUNCTION <name>` as FNARG_LPAREN, but §8.4.3.2.3 SR6 hands that paren to the argument list
 // only "if a function's definition PERMITS arguments" — a CATALOG question no lexer or grammar can answer. So for
 // a zero-argument function the very same token is the reference modifier: `FUNCTION CURRENT-DATE (1:8)` is the
@@ -784,37 +773,18 @@ subToken
 // catalog half to IntrinsicBinder, which reads `functionCall.FNARG_LPAREN()` (a DIRECT child, so an argument list
 // that actually parsed) to tell `FUNCTION RANDOM (1:4)` from `FUNCTION UPPER-CASE("x") (1:2)`.
 refModPart
-    : (LPAREN | FNARG_LPAREN) refModSpec (RPAREN | FNARG_RPAREN)
+    : (LPAREN | FNARG_LPAREN | REF_LPAREN) refModSpec (RPAREN | FNARG_RPAREN | REF_RPAREN)
     ;
 
+// ISO §8.4.3.3.2: `( leftmost-position : [ length ] )` — only the length is bracketed. The leftmost position is
+// OPTIONAL HERE so that `X (:2)` reaches ReferenceResolver.ReadRefMod, which refuses it by name (COBOLNET2876, kb/Work
+// PB1407 / PB1458), instead of dying as a raw parse error: the superset parse. The labels are what every reader uses.
+// Each position is the SAME superset operand a subscript is (`functionArgument`, as in subscriptItem), not
+// arithmeticExpression: §8.4.3.3.3 SR4 makes both positions arithmetic expressions, and a position that is not one
+// (`X ("A" : 1)`) must reach ReadRefMod's segment renderer and be refused by name (COBOLNET2363, kb/Work PB1030)
+// rather than die as a raw parse error. The binder adjudicates; the grammar only delimits.
 refModSpec
-    : arithmeticExpression COLON arithmeticExpression?
-    ;
-
-// COBOL-85 §5.3: subscript list using SUBSCRIPT-mode tokens.
-// Whitespace (SUB_WS) separates subscripts; commas are optional.
-subscriptList
-    : SUB_WS? subscriptEntry ( (SUB_WS+ | SUB_WS* SUB_COMMA SUB_WS*) subscriptEntry )* SUB_WS?
-    ;
-
-// Each subscript is one of the three COBOL-85 forms
-subscriptEntry
-    : SIGNED_INTEGERLIT                                                // +8, -3, +1
-    | SUB_INTEGERLIT                                                   // 1, 10, 300
-    | SUB_ALL                                                          // ALL
-    | SUB_IDENTIFIER subscriptQualification* relativeOffset?           // W-2, INDEX1 + 2
-    ;
-
-// Qualification inside subscript: data-name OF/IN qualifier
-subscriptQualification
-    : SUB_WS? (SUB_OF | SUB_IN) SUB_WS? SUB_IDENTIFIER
-    ;
-
-// Relative subscript offset: {+|-} unsigned-integer
-// The + or - is separated by whitespace from the data-name,
-// distinguishing it from SIGNED_INTEGERLIT where sign is adjacent.
-relativeOffset
-    : SUB_WS (SUB_PLUS | SUB_MINUS) SUB_WS SUB_INTEGERLIT
+    : leftmost=functionArgument? COLON length=functionArgument?
     ;
 
 fileName

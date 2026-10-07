@@ -100,54 +100,6 @@ internal sealed class ExpressionFormationPass(IDiagnosticSink sink) : CursorFoll
         return base.VisitChildren(ctx);
     }
 
-    /// <summary>The same order inside a SUBSCRIPT-mode capture, where a subscript's or reference modifier's own
-    /// identifier is a flat token run rather than a <c>dataReference</c> (`X (E (1) OF T)`): a nested parenthesized
-    /// group followed by OF / IN is a subscript written before a qualifier. No other SUBSCRIPT-mode shape puts a
-    /// qualifier connective after a closing parenthesis.</summary>
-    public override object? VisitSubscriptOrRefMod(CobolParserCore.SubscriptOrRefModContext ctx)
-    {
-        ScreenCapturedGroup(ctx.subToken());
-        return base.VisitChildren(ctx);
-    }
-
-    /// <summary>A nested group's own content (`X (Y (E (1) OF T))`).</summary>
-    public override object? VisitSubToken(CobolParserCore.SubTokenContext ctx)
-    {
-        if (ctx.SUB_LPAREN() is not null) ScreenCapturedGroup(ctx.subToken());
-        return base.VisitChildren(ctx);
-    }
-
-    private void ScreenCapturedGroup(CobolParserCore.SubTokenContext[] run)
-    {
-        for (int i = 0; i < run.Length; i++)
-        {
-            if (run[i].SUB_LPAREN() is null) continue;
-            int next = i + 1;
-            while (next < run.Length && run[next].SUB_WS() is not null) next++;
-            if (next < run.Length && (run[next].SUB_OF() ?? run[next].SUB_IN()) is { } connective)
-            {
-                int word = next + 1;
-                while (word < run.Length && run[word].SUB_WS() is not null) word++;
-                string qualifier = word < run.Length && run[word].SUB_IDENTIFIER() is { } w
-                    ? $"{connective.GetText()} {w.GetText()}" : connective.GetText();
-                using var _ = Sink.At(connective.Symbol.Line, connective.Symbol.Column + 1);
-                ReportSuffixBeforeQualifier(qualifier, HeadWordBefore(run, i));
-            }
-        }
-    }
-
-    /// <summary>The word that heads the reference whose subscript group starts at <paramref name="group"/>, for the
-    /// message only (null when the group follows no word — then the message names no item).</summary>
-    private static string? HeadWordBefore(CobolParserCore.SubTokenContext[] run, int group)
-    {
-        for (int i = group - 1; i >= 0; i--)
-        {
-            if (run[i].SUB_WS() is not null) continue;
-            return run[i].SUB_IDENTIFIER()?.GetText();
-        }
-        return null;
-    }
-
     private void ReportSuffixBeforeQualifier(string qualifier, string? head) => Sink.Report(new EditionDiagnostic(
         DiagnosticCatalog.SuffixBeforeQualifier.Code, EditionSeverity.Error,
         DiagnosticCatalog.SuffixBeforeQualifier.Id,

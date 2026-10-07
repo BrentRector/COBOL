@@ -58,7 +58,7 @@ public static class SeparatorRule
             if (t.Channel == CobolLexer.ABSENT_DEBUG_LINE) continue;   // a debugging line that is a comment (kb/Work PB1705)
             switch (t.Type)
             {
-                case CobolLexer.COMMA or CobolLexer.SUB_COMMA or CobolLexer.SEMICOLON or CobolLexer.SUB_SEMICOLON:
+                case CobolLexer.COMMA or CobolLexer.SEMICOLON:
                     if (!IsSeparatorSpace(CharAt(text, t.StopIndex + 1)) && !IsDecimalComma(text, t))
                         yield return new(t, DiagnosticCatalog.SeparatorCommaWithoutSpace,
                             $"the {Name(t)} is not immediately followed by a space, so it is not a separator — ISO §8.3.5 "
@@ -120,13 +120,13 @@ public static class SeparatorRule
     /// digit, a sign, a left parenthesis or a separator space precedes it (<c>1,5</c>, <c>,5</c>, <c>-,5</c>).</summary>
     private static bool IsDecimalComma(string text, IToken t)
     {
-        if (t.Type is not (CobolLexer.COMMA or CobolLexer.SUB_COMMA)) return false;
+        if (t.Type != CobolLexer.COMMA) return false;
         if (!char.IsAsciiDigit((char)Math.Max(0, CharAt(text, t.StopIndex + 1)))) return false;
         int before = CharAt(text, t.StartIndex - 1);
         return IsSeparatorSpace(before) || before is '+' or '-' or '(' || char.IsAsciiDigit((char)Math.Max(0, before));
     }
 
-    private static string Name(IToken t) => t.Type is CobolLexer.COMMA or CobolLexer.SUB_COMMA ? "comma" : "semicolon";
+    private static string Name(IToken t) => t.Type == CobolLexer.COMMA ? "comma" : "semicolon";
 
     private static string Abbreviated(string raw) => CobolLiteral.Abbreviated(raw);
 }

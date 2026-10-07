@@ -12,8 +12,8 @@
 > only as the renderer's never-hit backstop), `BoundIntrinsicCall`,
 > `Binding/Procedure/Verbs/IntrinsicBinder.cs` (P7 Step 12: FUNCTION arguments are REAL parse trees —
 > `functionCall : FUNCTION functionName (LPAREN functionArgList? RPAREN)?`, each argument a §8.4.3.2 SR8 shape
-> bound through the ONE `ExpressionBinder.BindExpr`; the keyword-omitted form re-parses its captured text through
-> the SAME `functionArgList` rule via `FunctionArgFragment`; table(ALL) expansion, MAX/MIN resolution, LENGTH
+> bound through the ONE `ExpressionBinder.BindExpr`; the keyword-omitted form binds the `functionArgument` items its
+> reference's parsed `subscriptPart` already holds (`IntrinsicBinder.ArgumentsOf`, kb/Work PB2113); table(ALL) expansion, MAX/MIN resolution, LENGTH
 > fold, the §15.68.3 r3 currency injection), `IntrinsicRenderer` (ONE instance channel — numeric + string; the
 > static twin is deleted; arguments render through the ONE `NumericRenderer`, `ReceiverContext.None` in the
 > string channel), runtime `CobolIntrinsics`/`CobolDate`. The 1989 Intrinsic Function Module (42
@@ -258,8 +258,9 @@ argument-1 and binds as an operand, so a data item named one of the §8.10 conte
 BYTE, reserved only where CONVERT's format permits them) stays a legal argument-1, and an operand after the format
 words is rejected (PB59 / FMT-15.19.2); the §8.9
 reserved-word funnel skips a BARE argument word (a §15 phrase-word position is not a provable user-word slot).
-The keyword-omitted reference form (D2 — no grammar alternative) re-parses its captured argument text through the
-SAME `functionArgList` rule (`Frontend.Parsing.FunctionArgFragment`, lexer primed via `PrimeFunctionArgs`), and
+The keyword-omitted reference form (D2 — no grammar alternative of its own) parses its arguments as its reference's
+`subscriptPart`, whose items are the SAME `functionArgument` rule (`IntrinsicBinder.ArgumentsOf`; kb/Work PB2113 retired
+the `FunctionArgFragment` text re-parse and the lexer's `PrimeFunctionArgs`), and
 `UdfBinder.UdfBindCall` binds its arguments through the same `BindArgOperand` — ONE argument pipeline; the former
 hand-rolled per-segment recursive-descent parser is deleted. That pipeline is also where §8.4.3.2.4 GR2's LEFT-TO-RIGHT
 argument order is settled for every function (kb/Work PB1423): `BindArgOperand` records each bound operand into the

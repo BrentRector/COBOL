@@ -15,7 +15,7 @@ namespace CobolNet.Tests.Conformance;
 /// <item>§8.8.4.2.8 — a boolean figurative relation right-extends with boolean zeros (not spaces).</item>
 /// <item>§13.18.63 SR4/SR5/SR24→SR10 — level-88 VALUE category conformance, both directions.</item>
 /// <item>§8.8.4.4.3 SR8/SR4 — class conditions on boolean operands.</item>
-/// <item>§15.50 — N"…"/B"…" as intrinsic-function arguments (the SUB_NATLIT/SUB_BOOLLIT parser leg).</item>
+/// <item>§15.50 — N"…"/B"…" as intrinsic-function arguments (the keyword-omitted parser leg).</item>
 /// <item>The ALL-prefixed figurative VALUE (ALL SPACES / ALL ZEROS) is NOT falsely rejected.</item>
 /// <item>SET condition-name TO TRUE fills a figurative-word 88 VALUE, not the word's characters.</item>
 /// </list>

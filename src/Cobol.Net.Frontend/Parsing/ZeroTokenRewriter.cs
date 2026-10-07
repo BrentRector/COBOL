@@ -34,6 +34,12 @@ namespace CobolNet.Frontend.Parsing;
 /// a plain LPAREN, so <c>FUNCTION ABS((ZERO))</c> and <c>FUNCTION MAX((ZERO + 1) 2)</c> continue to rewrite
 /// exactly as before. The two token types are what separates the two meanings; nothing here needs to.
 /// </para>
+/// <para>
+/// The REFERENCE parens <c>REF_LPAREN</c>/<c>REF_RPAREN</c> (kb/Work PB2113) are absent for the same reason: the '('
+/// after a name may open a keyword-omitted function's ARGUMENT list (§8.4.3.2.3 SR2), where <c>LOWER-CASE(ZERO)</c>
+/// must keep the figurative exactly as the FUNCTION form does — and in a subscript, a sole ZERO keeps it too, while
+/// <c>T(ZERO + 1)</c> is rewritten by its operator like any arithmetic operand.
+/// </para>
 /// </summary>
 public static class ZeroTokenRewriter
 {
@@ -60,7 +66,8 @@ public static class ZeroTokenRewriter
         CobolLexer.STAR,
         CobolLexer.SLASH,
         CobolLexer.POWER,
-        // GROUPING-PAREN-ONLY — see the class remarks: excluding FNARG_LPAREN is the whole of fix-queue PB48.
+        // GROUPING-PAREN-ONLY — see the class remarks: excluding FNARG_LPAREN is the whole of fix-queue PB48, and
+        // REF_LPAREN is excluded for the same reason (kb/Work PB2113).
         CobolLexer.LPAREN,
         // The reference-modification COLON (§8.4.3.3.3 SR4 — "leftmost-character-position and length shall be
         // arithmetic expressions"). Its ONE grammar use is refModSpec, so both neighbours are arithmetic by
@@ -80,7 +87,7 @@ public static class ZeroTokenRewriter
         CobolLexer.STAR,
         CobolLexer.SLASH,
         CobolLexer.POWER,
-        // GROUPING-PAREN-ONLY — FNARG_RPAREN excluded deliberately (PB48); see the class remarks.
+        // GROUPING-PAREN-ONLY — FNARG_RPAREN and REF_RPAREN excluded deliberately (PB48, PB2113); see the remarks.
         CobolLexer.RPAREN,
         CobolLexer.COLON,   // the ref-mod COLON — see PrecedingArithmeticContext (`… (ZERO:2)`)
     };

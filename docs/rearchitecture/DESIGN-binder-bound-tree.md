@@ -784,7 +784,7 @@ operand and its own rule (`COBOLNET2113`) and the next amount-taking format is a
 | rename | `StatementBinder.Accept.cs`, `CSharpEmitter.Accept.cs` (the ACCEPT *verb*) | `Binding/Procedure/Verbs/AcceptDisplayBinder.cs` + `CodeGen/Verbs/AcceptDisplayEmitter.cs` (the AcceptDisplay* names) | End the Visitor-term collision once a real visitor exists |
 | rename | `BoundStores` | `BoundStoreAnalysis` | It is an analysis, not storage |
 | create | — | `Common/CobolLiteral.cs` (Decode), `Binding/RecordLayout.cs`, `Binding/PhraseBlocks.cs`, `DataItem.Root` | One canonical helper per job (dedup) |
-| move | `ReferenceResolver` sub-parsers (`SplitSubscriptTokens`/`InterpretSubscripts`, `ReferenceResolver.cs:377-431`) | `SubscriptTokenParser` + `NameResolver` collaborators | Thin the resolver; it becomes an orchestrator over SymbolTable |
+| move | `ReferenceResolver` subscript readers (`SegmentsOf`/`InterpretSubscripts`/`RenderSegment` — the hand-rolled token splitter is gone, kb/Work PB2113) | `NameResolver` collaborator; subscripts as `BoundExpr` (D10's second half) | Thin the resolver; it becomes an orchestrator over SymbolTable |
 | retire (G8) | `using Core = CobolParserCore; using legacy-root.Generated;` (`StatementBinder.cs:6,11`) | `CobolNet.Frontend.Generated` | Decouple from the legacy generated namespace at cut-over (driver/frontend sibling) |
 
 ---

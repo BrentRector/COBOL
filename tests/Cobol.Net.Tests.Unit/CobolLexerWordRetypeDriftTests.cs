@@ -84,8 +84,8 @@ public sealed class CobolLexerWordRetypeDriftTests
         // The seam this replaces (a set of de-reserved types the lexer consulted at '('): the retype made it redundant.
         var tokens = Lex("COMPUTE MOVE(2) = 5.\n", new CobolWordsOp(CobolWordsAction.Undefine, "MOVE", null, 0));
         Assert.Contains(tokens, t => t.Type == CobolLexer.IDENTIFIER && t.Text == "MOVE");
-        // The '(' after a data-name opens SUBSCRIPT mode: its content is lexed as SUB_ tokens, exactly as after any
-        // ordinary data-name — and NOT as it is after a reserved MOVE, which opens none.
+        // The '(' after a data-name is a REFERENCE paren (REF_LPAREN … REF_RPAREN), exactly as after any ordinary
+        // data-name — and NOT as it is after a reserved MOVE, which opens none.
         string Shape(List<IToken> ts) => string.Join(" ", ts.Skip(2).Select(t => CobolLexer.DefaultVocabulary.GetSymbolicName(t.Type)));
         Assert.Equal(Shape(Lex("COMPUTE XDATA(2) = 5.\n")), Shape(tokens));
         Assert.NotEqual(Shape(Lex("COMPUTE MOVE(2) = 5.\n")), Shape(tokens));

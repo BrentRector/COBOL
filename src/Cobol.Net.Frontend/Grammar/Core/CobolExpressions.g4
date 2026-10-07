@@ -422,7 +422,7 @@ powerExpression
 // §8.3.3.3.2 rule 2 makes a sign part of the numeric literal when the literal is one contiguous character-string,
 // so `- -2` is the PERMISSIBLE (unary, literal) pair while `- - 2` is the invalid (unary, unary) one — and in the
 // DEFAULT lexer mode both emit MINUS MINUS INTEGERLIT (the SIGNED_INTEGERLIT/SIGNED_DECIMALLIT twins that encode
-// the adjacency exist only in the FUNCTION-argument and SUBSCRIPT regions). No CFG tier can separate them; only
+// the adjacency exist only in the lexer's list regions — argument and subscript lists). No CFG tier can separate them; only
 // the TOKEN POSITIONS can. The cell is therefore screened post-parse by ArithmeticFormationRules (COBOLNET1719),
 // which reads that adjacency off the token stream. Precedence is unaffected and correct as written: powerExpression
 // puts a full unaryExpression in its base position, so `- 2 ** 2` binds as (-2)**2 = 4 per Table 3 GR2's rank 1
@@ -479,11 +479,11 @@ primaryExpression
 // comma/semicolon followed by space — both skipped by the lexer), so the list is plain juxtaposition; the
 // space-vs-adjacent sign distinction (MAX(A -4) = two args, MAX(A - 4) = one subtraction; §8.7.1 operator
 // spacing + §8.3.3.3.2 literal-sign adjacency) is preserved by the lexer's argument-region SIGNED_* twins.
-// A nested data-reference subscript inside an argument still lexes in SUBSCRIPT mode (the D10/PHASE-15
-// deferral is untouched). The empty-parens form (FUNCTION RANDOM ()) is the §8.4.3.2 SR6 NOTE's shape.
-// The keyword-omitted form name(args) (§8.4.3.2 SR2) has NO grammar alternative (D2 — irreducible ambiguity
-// with a subscripted dataReference); the binder re-parses its captured argument text through
-// functionArgListFragment below.
+// A nested data-reference subscript inside an argument is a parsed subscriptPart like any other (kb/Work PB2113).
+// The empty-parens form (FUNCTION RANDOM ()) is the §8.4.3.2 SR6 NOTE's shape.
+// The keyword-omitted form name(args) (§8.4.3.2 SR2) has NO grammar alternative of its own (D2 — irreducible
+// ambiguity with a subscripted dataReference): it parses as the dataReference's subscriptPart, whose items are
+// functionArguments, and the binder binds them as the arguments once it proves the name is a function.
 //
 // ── REFERENCE-MODIFYING THE FUNCTION RESULT (fix-queue PB8, ISO §8.4.3.3.3 SR2) ────────────────────────────
 // §8.4.3.1.2 Format 3 makes `identifier-1 reference-modifier-1` an IDENTIFIER, and §8.4.3.3.3 SR2 admits a
@@ -494,10 +494,10 @@ primaryExpression
 //     FUNCTION CURRENT-DATE (1:4)              -- zero-argument function, ref-modified
 //     FUNCTION UPPER-CASE("abc") (1:2)         -- argument list, THEN ref-modified
 // ⛔ NO LEXER CHANGE IS INVOLVED, and the fix-queue entry that said otherwise was wrong. A token dump of both
-// shapes (pinned by CobolLexerModeDriftTests) shows the ref-mod paren lexed in DEFAULT mode in each case: after
-// a function NAME the lexer's FUNCTION suppression already keeps it out of SUBSCRIPT mode, and after the
-// argument list's ')' the previous token is not a data-name so the SUBSCRIPT trigger never fires. Both therefore
-// reach the DEFAULT-mode refModPart (COLON, not SUB_COLON) that already exists for dataReference.
+// shapes (pinned by CobolLexerModeDriftTests) shows the ref-mod paren is no reference paren in either case: after
+// a function NAME the lexer's FUNCTION suppression makes it FNARG_LPAREN, and after the argument list's ')' the
+// previous token is not a data-name so the reference-paren trigger never fires. Both therefore reach the
+// refModPart that already exists for dataReference.
 // ⚠ `refModPart*`, not `refModPart?`, and that is deliberate: §8.4.3.3.3 SR3 ("identifier-1 shall not be a
 // reference-modification format identifier") forbids ref-modifying a ref-mod, and making the ARITY carry that
 // rule here would enforce SR3 in a SECOND place — the data-reference side already counts ref-mods in
@@ -505,7 +505,7 @@ primaryExpression
 // place, so both sides parse the extra modifier and the binder rejects it with COBOLNET1630, giving the same
 // cited message for FUNCTION F(X) (1:4)(1:2) as for A (3:4)(2:2) instead of a raw parse error on one side only.
 // ⚠ The two alternatives are disjoint on the COLON and need no predicate: a functionArgList can never contain a
-// DEFAULT-mode COLON (a nested data-item ref-mod inside an argument lexes SUB_COLON in SUBSCRIPT mode). §8.4.3.2
+// COLON at its own level (a nested data item's ref-mod inside an argument is that item's own refModPart). §8.4.3.2
 // SR6 — "if a function's definition permits arguments … the left parenthesis is ALWAYS … that function's
 // arguments" — is a CATALOG question the grammar cannot answer, so the binder enforces it (IntrinsicBinder):
 // a bare ref-mod directly after an argument-PERMITTING function name is an SR6/SR8 argument-list error.
@@ -526,12 +526,12 @@ primaryExpression
 // LENGTH is safe there only because LENGTH does not BEGIN a data-description clause; SIGN and SUM both do
 // (§13.18.52 SIGN, §13.18.54 report-writer SUM). This alternative is confined to expression/operand positions and
 // cannot reach a data description at all, so that whole class is structurally out of reach.
-// ⚠ THE ARGUMENT LIST IS A `subscriptPart`, NOT `LPAREN functionArgList RPAREN`, and a token dump is what says
-// so: these words carry subscriptTrigger=true, so with no FUNCTION keyword before them the lexer pushes
-// SUBSCRIPT mode at the '(' and the arguments arrive as SUB_* tokens —
-//     COMPUTE N = SUM(1 2 3)  ==>  COMPUTE IDENTIFIER EQUALS SUM LPAREN SUB_INTEGERLIT×3 SUB_RPAREN
-// which is exactly the D2 carrier the keyword-omitted form already uses. The binder therefore re-parses it
-// through the SAME `ReparseArgs` → `functionArgListFragment` path as every other keyword-omitted reference,
+// ⚠ THE ARGUMENT LIST IS A `subscriptPart`, NOT `FNARG_LPAREN functionArgList FNARG_RPAREN`, and a token dump is what
+// says so: these words carry subscriptTrigger=true, so with no FUNCTION keyword before them the lexer types the '('
+// REF_LPAREN —
+//     COMPUTE N = SUM(1 2 3)  ==>  COMPUTE IDENTIFIER EQUALS SUM REF_LPAREN INTEGERLIT×3 REF_RPAREN
+// which is exactly the D2 carrier the keyword-omitted form already uses, and whose items are functionArguments. The
+// binder therefore binds it through the SAME IntrinsicBinder.ArgumentsOf as every other keyword-omitted reference,
 // rather than growing a second argument grammar. (Pinned by CobolLexerModeDriftTests.)
 // ⛔ THE ARGUMENT GROUP IS REQUIRED FOR SIGN AND SUM, AND THAT IS WHAT KEEPS THIS SAFE — it is derived from the
 // functions' own general formats, not an ad-hoc guard. §15.81.2 writes `FUNCTION SIGN ( argument-1 )` and
@@ -552,9 +552,13 @@ primaryExpression
 // adjacent to a paren is arithmetic" rule was reading THIS paren and converting `FUNCTION LOWER-CASE(ZERO)`'s
 // figurative into an arithmetic zero, so the §15.3 class screen saw class numeric and rejected legal source.
 // A grouping paren INSIDE the list (`FUNCTION MAX((A + B) 2)`) is an ordinary LPAREN and is unaffected.
+// The keyword-omitted reserved form takes EITHER suffix group: `SUM (A B)` is the argument list, and `SUM (1:4)` is a
+// group the lexer cannot type (REF_LPAREN opens both) and the COLON makes a refModPart. Parsing the second keeps
+// §8.4.3.2.3 SR6's verdict in IntrinsicBinder (`subscriptPart() is null` with a refModPart is the argument-list
+// error) instead of a raw parse error (kb/Work PB2113).
 functionCall
     : FUNCTION functionName (FNARG_LPAREN functionArgList? FNARG_RPAREN)? refModPart*
-    | reservedIntrinsicArgFn subscriptPart refModPart*
+    | reservedIntrinsicArgFn (subscriptPart | refModPart) refModPart*
     | RANDOM subscriptPart? refModPart*
     ;
 
@@ -611,31 +615,21 @@ fnArgPhraseWord
     | NATIONAL
     ;
 
-// The D2 keyword-omitted re-parse entry (binder-invoked only): the argument text captured by a dataReference's
-// subscriptPart, re-lexed with the lexer primed as a function-argument region (PrimeFunctionArgs), parses
-// through the SAME functionArgList rule — ONE argument grammar for both reference forms.
-functionArgListFragment
-    : functionArgList? EOF
-    ;
-
 // The D18 SUBSCRIPT-EXPRESSION re-parse entry (binder-invoked only; ISO §8.4.2.3.2 admits `arithmetic-expression-1`
 // as a subscript and §8.4.3.3.3 SR4 as a reference-modifier position). A subscript / ref-mod SEGMENT that the
-// SUBSCRIPT-mode token renderer (ReferenceResolver.RenderSegment) cannot render — today a function-identifier,
+// token renderer (ReferenceResolver.RenderSegment) cannot render — today a function-identifier,
 // fix-queue PB17 — is re-lexed from its VERBATIM source text and parsed through the ONE arithmeticExpression rule,
 // so it binds through ExpressionBinder.BindExpr exactly as every other arithmetic expression does. That is what
 // keeps the token renderer a token renderer instead of growing a THIRD hand-written expression compiler beside
 // ExpressionBinder and IntrinsicRenderer.
-// Referenced by nothing in compilationUnit — the functionArgListFragment precedent, so ZERO blast radius on the
-// main parse; the SUBSCRIPT lexer mode and the main subscript grammar are untouched (the D10/PHASE-15 deferral
-// stands).
-// ⛔ DEFAULT lexer mode, NOT PrimeFunctionArgs: a subscript is not a function-argument region, so the
-// §8.3.3.3.2 sign-adjacent literal twinning (which makes `MAX(A -4)` two arguments) must NOT fire here — inside a
-// subscript `A -4` is the subtraction §8.7.1 says it is.
+// Referenced by nothing in compilationUnit, so ZERO blast radius on the main parse. The main parse already delimited
+// the segment (kb/Work PB2113 — subscriptList's items), so the DEFAULT lexer mode is right here: no list region is
+// open in one subscript. (The whole route goes when subscripts bind as BoundExpr, D10's second half.)
 subscriptExpressionFragment : arithmeticExpression EOF ;
 
 // ── COMPILE-TIME DIRECTIVE-EXPRESSION fragments (ISO §7.3.6 arithmetic / §7.3.7 boolean / §7.3.8 constant-
 // conditional-expression). Isolated fragment entry rules — reachable ONLY from the frontend's directive-expression
-// re-parse (the functionArgListFragment precedent: referenced by nothing in compilationUnit, so ZERO blast radius
+// re-parse (the subscriptExpressionFragment precedent: referenced by nothing in compilationUnit, so ZERO blast radius
 // on the main parse). They reuse the existing operand sub-rules (arithmeticExpression / booleanExpression /
 // nonNumericLiteral / comparisonOperator / cobolWord) — no duplicated expression grammar. The lexer is primed with
 // PrimeDirectiveExpr() so DEFINED is a token and every '(' groups. Evaluated by the ONE shared

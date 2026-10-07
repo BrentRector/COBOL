@@ -678,9 +678,11 @@ public sealed partial class DataBinder
             // procedure-division twin is ReferenceResolver.ResolveSubscriptName's constant arm).
             var toks = new List<Antlr4.Runtime.IToken>();
             ReferenceResolver.CollectLeafTokens(sub, toks);
-            if (toks.Any(t => t.Type is not (Core.SUB_INTEGERLIT or Core.INTEGERLIT or Core.SUB_WS
-                    or Core.SUB_LPAREN or Core.SUB_RPAREN or Core.SUB_COMMA)
-                && !(t.Type == Core.SUB_IDENTIFIER && IsIntegerConstant(t.Text))))
+            // GROUPING-PAREN-ONLY beside the list's own REF_ parens: a nested paren inside the list is a group (no
+            // FNARG_ paren can occur without a FUNCTION, which is no literal).
+            if (toks.Any(t => t.Type is not (Core.INTEGERLIT or Core.REF_LPAREN or Core.REF_RPAREN
+                    or Core.LPAREN or Core.RPAREN or Core.FNARG_SEPARATOR or Core.COMMA)
+                && !(ReferenceResolver.IsNameToken(t) && IsIntegerConstant(t.Text))))
             {
                 Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: all subscripts of the {phrase} "
                     + "operand shall be literals (ISO §13.10.3 SR3)");

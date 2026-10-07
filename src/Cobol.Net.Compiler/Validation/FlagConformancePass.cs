@@ -284,7 +284,7 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     /// (<see cref="DataBinder.ActivationSites"/>): the two activations whose text looks like a data reference.</summary>
     public override object? VisitDataReference(CobolParserCore.DataReferenceContext ctx)
     {
-        if (_activationSites.Contains(ctx)) NoteActivation();
+        if (IsActivation(ctx)) NoteActivation();
         return base.VisitChildren(ctx);
     }
 
@@ -366,28 +366,13 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
 
     // ── FLAG-14 i REF-MOD-ZERO-LENGTH (§7.3.15.4 GR4 i; E.2 item 23) — a reference modification flagged ONLY when
     //    the >>REF-MOD-ZERO-LENGTH directive is UNSPECIFIED (neither explicit ON nor OFF) at the site AND
-    //    EC-BOUND-REF-MOD checking is on there (a zero-length result would then raise the exception). A ref-mod
-    //    reaches the parser two ways: the default-mode `refModSpec`, and — for a data reference — a
-    //    `subscriptOrRefMod` carrying a SUB_COLON (the grammar leaves subscript-vs-refmod to the binder). GR4 i
-    //    flags "a reference modification of a data-item" — the reference modification of a FUNCTION's result
+    //    EC-BOUND-REF-MOD checking is on there (a zero-length result would then raise the exception). Every ref-mod
+    //    is ONE parse node, `refModSpec` (kb/Work PB2113 retired the second, a SUBSCRIPT-mode group with a colon).
+    //    GR4 i flags "a reference modification of a data-item" — the reference modification of a FUNCTION's result
     //    (`FUNCTION UPPER-CASE (X) (1:2)`, or the keyword-omitted form) is not one. ──
     public override object? VisitRefModSpec(CobolParserCore.RefModSpecContext ctx)
     {
         if (!ModifiesAFunctionResult(ctx)) FlagRefMod(ctx.Start.Line);
-        return base.VisitChildren(ctx);
-    }
-
-    public override object? VisitSubscriptOrRefMod(CobolParserCore.SubscriptOrRefModContext ctx)
-    {
-        // A SUB_COLON among the sub-tokens ⇒ a reference modification, not a subscript list. On a function-identifier
-        // the colon that makes the group a reference modification OF THE RESULT is at depth 0; a colon only inside the
-        // argument parentheses is a data item's own reference modification (`UPPER-CASE (X (1:2))`).
-        if (ctx.subToken().Any(t => t.SUB_COLON() is not null)
-            && (!ModifiesAFunctionResult(ctx) || !ReferenceResolver.HasDepth0Colon(ctx)))
-            FlagRefMod(ctx.Start.Line);
-        // A function-identifier written INSIDE the captured group (`TBL (FUNCTION LENGTH (X))`, or keyword-omitted)
-        // has no FunctionCall node: the subscript renderer recorded its head token (ReferenceResolver.IsFunctionBearing).
-        if (ctx.subToken().Any(t => _activationSites.Contains(t.Start))) NoteActivation();
         return base.VisitChildren(ctx);
     }
 
@@ -401,10 +386,16 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
             switch (host)
             {
                 case CobolParserCore.FunctionCallContext: return true;
-                case CobolParserCore.DataReferenceContext dref: return _activationSites.Contains(dref);
+                case CobolParserCore.DataReferenceContext dref: return IsActivation(dref);
             }
         return false;
     }
+
+    /// <summary>Whether the binder resolved <paramref name="dref"/> to a keyword-omitted function activation: the
+    /// reference itself, or — for one written inside a subscript, which the subscript renderer binds from its tokens —
+    /// its head token (ReferenceResolver.IsFunctionBearing records that).</summary>
+    private bool IsActivation(CobolParserCore.DataReferenceContext dref)
+        => _activationSites.Contains(dref) || _activationSites.Contains(dref.Start);
 
     private void FlagRefMod(int line)
     {
@@ -650,17 +641,11 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
         => (!operandsRefModified && item.Pic is { Category: PicCategory.Alphanumeric, EditMask: not null })
         || (OdoModel.TableUnder(item) is { OccursSpec.Depending: { } dep } && OdoModel.IsWithin(dep, item));
 
-    /// <summary>Whether the reference carries a reference modification (§8.4.3.3): a <c>refModPart</c> suffix, or the
-    /// parenthesized group the lexer captured as a subscript list that holds a depth-0 colon (the grammar leaves
-    /// subscript-versus-reference-modification to the binder — <see cref="ReferenceResolver.HasDepth0Colon"/> is the
-    /// one test the resolver itself asks).</summary>
+    /// <summary>Whether the reference carries a reference modification (§8.4.3.3): a <c>refModPart</c> suffix, on the
+    /// base word or on a qualifier.</summary>
     private static bool IsRefModified(CobolParserCore.DataReferenceContext dref)
         => dref.dataReferenceSuffix().Any(s => s.refModPart() is not null
-            || IsRefModGroup(s.subscriptPart())
-            || (s.qualification() is { } q && (q.refModPart().Length > 0 || q.subscriptPart().Any(IsRefModGroup))));   // `X OF G (1:3)`
-
-    private static bool IsRefModGroup(CobolParserCore.SubscriptPartContext? group)
-        => group?.subscriptOrRefMod() is { } captured && ReferenceResolver.HasDepth0Colon(captured);
+            || (s.qualification() is { } q && q.refModPart().Length > 0));   // `X OF G (1:3)`
 
     // ── FLAG-02 e RANGE-EXCEPTION-FOR-INDEX (§7.3.14.4 GR4 e) — a Format-1 index-assignment (SET … TO) or Format-2
     //    index-arithmetic (SET … UP/DOWN BY) whose receiving field is an INDEX-NAME, flagged when EC-RANGE-INDEX

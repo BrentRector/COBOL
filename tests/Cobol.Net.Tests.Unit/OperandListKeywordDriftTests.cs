@@ -94,7 +94,7 @@ public sealed class OperandListKeywordDriftTests
         foreach (string token in gate.OrderBy(t => t, StringComparer.Ordinal))
         {
             int type = CobolLexer.DefaultVocabulary is var v
-                ? Enumerable.Range(1, CobolLexer.SUB_RPAREN + 400).FirstOrDefault(t => v.GetSymbolicName(t) == token) : 0;
+                ? Enumerable.Range(1, ((Antlr4.Runtime.Vocabulary)v).getMaxTokenType()).FirstOrDefault(t => v.GetSymbolicName(t) == token) : 0;
             if (type == 0 || !clauseFirst.Contains(type)) continue;
             string word = CobolWordsDriftTests.ToWord(token);
             if (!reserved.TryGetValue(word, out var flags)) continue;

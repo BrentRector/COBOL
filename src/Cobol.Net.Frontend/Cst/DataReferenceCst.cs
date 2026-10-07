@@ -17,14 +17,14 @@ public enum SpecialRegister { None, LinageCounter, LineCounter, PageCounter }
 /// 1:1 with the <c>dataReference</c> grammar rule: it holds the context and names the accessors, it computes NO
 /// semantic state (that belongs to the binder). A grammar-rule rename now breaks THIS file (a compile error)
 /// instead of drifting silently across the ~336 raw <c>GetText()</c> sites (P7 migrates the rest).
-/// <para>The subscript / reference-modification token group stays a RAW <see cref="Core.SubscriptOrRefModContext"/>
-/// (reached via <see cref="Context"/>): the binder's <c>InterpretSubscripts</c>/<c>SplitSubscriptTokens</c> still
-/// operate on the flat SUBSCRIPT-mode stream — the seam PHASE-04 D10 reshapes when it removes the lexer mode.</para>
+/// <para>The subscript list (<see cref="Core.SubscriptPartContext"/>) and the reference modifier
+/// (<see cref="Core.RefModPartContext"/>) are reached through <see cref="Context"/>: both are parse nodes since D10
+/// removed the SUBSCRIPT lexer mode (kb/Work PB2113), read by the binder's <c>ReferenceResolver.ReadWritten</c>.</para>
 /// </summary>
 public readonly struct DataReferenceCst(Core.DataReferenceContext ctx)
 {
     /// <summary>The wrapped raw context — the escape hatch for reads not yet lifted onto the façade (the suffix
-    /// classify walk + the raw subscript token stream; P4 D10 / P7).</summary>
+    /// classify walk; P7).</summary>
     public Core.DataReferenceContext Context => ctx;
 
     /// <summary>The special-register kind this reference names, else <see cref="SpecialRegister.None"/>.</summary>

@@ -162,30 +162,35 @@ public sealed class DebuggingLineRewriterTests
         Assert.True(before.SequenceEqual(stream.GetTokens()), "no token object may be replaced when no line is carried");
     }
 
-    /// <summary>kb/Work PB1913: a debugging line inside an open subscript or PICTURE region has its text SKIPPED by the
-    /// lexer (the region modes), leaving a <see cref="CobolLexer.DEBUG_LINE_IN_REGION"/> marker; the rewriter does not move
-    /// tokens for it but names it when it is source, for the frontend to blank its carrier and lex again.</summary>
+    /// <summary>kb/Work PB2113: a subscript is no lexer region of its own any more (the SUBSCRIPT mode is gone), so a
+    /// debugging line inside one is lexed like any other — the DEFAULT <see cref="CobolLexer.DEBUG_LINE"/> marker, its text
+    /// as tokens behind it — and the rewriter decides it in place: SOURCE under the clause, the absent channel without it
+    /// (ISO §12.3.5.4 GR1; kb/Work PB1705). Nothing is named for a second lex: that is the PICTURE region's need alone
+    /// (kb/Work PB1913, below).</summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void ADebuggingLineInsideASubscript_IsNamedWhenItIsSource_AndLeftAlone_WhenItIsAComment(bool clause)
+    public void ADebuggingLineInsideASubscript_IsLexedInPlace_AndTheClauseDecidesIt(bool clause)
     {
         string[] lines = ["PROGRAM-ID. P.", clause ? "SOURCE-COMPUTER. IBM-PC WITH DEBUGGING MODE." : "SOURCE-COMPUTER. IBM-PC.",
             "MOVE A(1", D("+ 2"), ") TO B."];
         var stream = new CommonTokenStream(new CobolLexer(new AntlrInputStream(string.Join("\n", lines) + "\n")));
         var named = DebuggingLineRewriter.Rewrite(stream);
         var tokens = stream.GetTokens();
-        Assert.DoesNotContain(tokens, t => t.Type == CobolLexer.DEBUG_LINE);            // the region skipped the text: no line marker
-        Assert.Single(tokens, t => t.Type == CobolLexer.DEBUG_LINE_IN_REGION);
-        Assert.Equal(clause, named is not null);
-        Assert.True(named is null || named.Type == CobolLexer.DEBUG_LINE_IN_REGION);
+        Assert.Single(tokens, t => t.Type == CobolLexer.DEBUG_LINE);
+        Assert.DoesNotContain(tokens, t => t.Type == CobolLexer.DEBUG_LINE_IN_REGION);
+        Assert.Null(named);
+        var plus = tokens.Single(t => t.Text == "+");
+        Assert.Equal(clause ? TokenConstants.DefaultChannel : CobolLexer.ABSENT_DEBUG_LINE, plus.Channel);
     }
 
+    /// <summary>kb/Work PB1913's second lex, over the one region that still needs it — an open PICTURE character-string:
+    /// blanking the carrier keeps every column and offset, and the second lex reads the line's text as the picture.</summary>
     [Fact]
     public void WithCarrierBlanked_MakesTheLineSourceAtTheSameColumns_AndTheSecondLexSeesNoMarker()
     {
         string text = string.Join("\n", ["PROGRAM-ID. P.", "SOURCE-COMPUTER. IBM-PC WITH DEBUGGING MODE.",
-            "MOVE A(1", D("+ 2"), ") TO B."]) + "\n";
+            "01 X PIC", D("X(5)."), "   VALUE 'A'."]) + "\n";
         var first = new CommonTokenStream(new CobolLexer(new AntlrInputStream(text)));
         string blanked = DebuggingLineRewriter.WithCarrierBlanked(text, DebuggingLineRewriter.Rewrite(first)!);
         Assert.Equal(text.Length, blanked.Length);
@@ -193,8 +198,8 @@ public sealed class DebuggingLineRewriterTests
 
         var second = new CommonTokenStream(new CobolLexer(new AntlrInputStream(blanked)));
         Assert.Null(DebuggingLineRewriter.Rewrite(second));
-        var plus = second.GetTokens().Single(t => t.Text == "+");                         // lexed as source this time
-        Assert.Equal(D("").Length, plus.Column);                                           // the text keeps its column
+        var picture = second.GetTokens().Single(t => t.Text == "X(5)");                   // lexed as the picture this time
+        Assert.Equal(D("").Length, picture.Column);                                        // the text keeps its column
         Assert.DoesNotContain(second.GetTokens(), t => t.Type is CobolLexer.DEBUG_LINE or CobolLexer.DEBUG_LINE_IN_REGION);
     }
 

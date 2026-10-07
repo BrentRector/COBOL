@@ -602,9 +602,9 @@ public abstract class CobolParserCoreBase : Parser
     /// (<c>C(1) FOR</c>, <c>M OF G FOR</c>) has <c>(</c> or <c>OF</c> at LA(2), so it was taken as one more
     /// operand of the previous counter and its FOR clause re-attached to THAT counter — a silent wrong count at every
     /// edition. The scan steps over the reference's own extent — each qualifier (<c>OF|IN word</c>) and each
-    /// parenthesised subscript / reference-modification group, whose tokens are SUBSCRIPT-mode and close at the
-    /// matching SUB_RPAREN — and asks whether FOR follows. A literal or figurative operand has no such extent, so it
-    /// is still bare.</para></summary>
+    /// parenthesised subscript / reference-modification group, which opens with the REF_LPAREN the lexer gives a '('
+    /// after a name (or, for a modifier after a subscript list, a plain LPAREN) and closes at its matching paren —
+    /// and asks whether FOR follows. A literal or figurative operand has no such extent, so it is still bare.</para></summary>
     protected bool IsBareInspectOperand()
     {
         // A phrase ADJECTIVE begins the NEXT phrase — `ALL "B"` after `ALL "A"` is a new ALL phrase, never the
@@ -614,17 +614,18 @@ public abstract class CobolParserCoreBase : Parser
         while (true)
         {
             int k = TokenStream.LA(t);
-            // GROUPING-PAREN-ONLY: the plain LPAREN here is a data reference's own SUBSCRIPT / reference-modification
-            // group. A function-argument list (FNARG_LPAREN) belongs to a function-identifier, which is never a
-            // tallying counter, so it has no extent this scan should step over.
-            if (k == CobolLexer.LPAREN)
+            // The reference's own subscript / reference-modification group: REF_LPAREN after the name, LPAREN for a
+            // modifier after a subscript list (kb/Work PB2113). A function-argument list (FNARG_LPAREN) belongs to a
+            // function-identifier, which is never a tallying counter, so it begins no extent this scan steps over —
+            // but inside the group every paren flavour nests, so all three count.
+            if (k is CobolLexer.REF_LPAREN or CobolLexer.LPAREN)
             {
                 int depth = 1;
                 for (t++; depth > 0 && TokenStream.LA(t) != Antlr4.Runtime.TokenConstants.EOF; t++)
                 {
                     int u = TokenStream.LA(t);
-                    if (u == CobolLexer.SUB_LPAREN) depth++;
-                    else if (u == CobolLexer.SUB_RPAREN) depth--;
+                    if (u is CobolLexer.LPAREN or CobolLexer.FNARG_LPAREN or CobolLexer.REF_LPAREN) depth++;
+                    else if (u is CobolLexer.RPAREN or CobolLexer.FNARG_RPAREN or CobolLexer.REF_RPAREN) depth--;
                 }
                 continue;
             }
@@ -757,7 +758,8 @@ public abstract class CobolParserCoreBase : Parser
                     break;
                 // An OPERATOR-FREE parenthesized boolean literal — `(B"101")` — is a boolean expression with no
                 // B-operator in it at all (kb/Work PB1370; see ParenRunOpensOnBoolLiteral). GROUPING-PAREN-ONLY: a
-                // function argument list (FNARG_LPAREN) is an operand's own parenthesis, never a boolean group.
+                // function argument list (FNARG_LPAREN) or a reference's subscript list (REF_LPAREN) is an operand's
+                // own parenthesis, never a boolean group.
                 case CobolLexer.LPAREN:
                     if (ParenRunOpensOnBoolLiteral(i)) return true;
                     break;
@@ -885,8 +887,8 @@ public abstract class CobolParserCoreBase : Parser
                 // The operator-free parenthesized boolean literal, the same recognition boolExprAhead makes.
                 case CobolLexer.LPAREN when ParenRunOpensOnBoolLiteral(i):
                     return true;
-                case CobolLexer.LPAREN: case CobolLexer.FNARG_LPAREN: depth++; break;
-                case CobolLexer.RPAREN: case CobolLexer.FNARG_RPAREN:
+                case CobolLexer.LPAREN: case CobolLexer.FNARG_LPAREN: case CobolLexer.REF_LPAREN: depth++; break;
+                case CobolLexer.RPAREN: case CobolLexer.FNARG_RPAREN: case CobolLexer.REF_RPAREN:
                     if (depth == 0) return false;   // the argument list's ')' — this argument is over
                     depth--; break;
                 case CobolLexer.COMMA:
@@ -913,8 +915,8 @@ public abstract class CobolParserCoreBase : Parser
     /// operand is boolean although it carries NO B-operator — the shape a B-operator scan alone misses, which made
     /// <c>&gt;&gt;DEFINE X AS (B"101")</c> and <c>IF (B"1") = F</c> malformed (kb/Work PB1370). The token run is
     /// decisive, not a guess: a boolean literal is never an arithmetic operand (§8.8.1.1), so a grouping '(' whose
-    /// first operand is one can only open a boolean expression. A subscript / reference-modifier '(' carries SUB_*
-    /// operands and a function-argument '(' is FNARG_LPAREN, so neither reaches this test with a BOOLLIT behind it.
+    /// first operand is one can only open a boolean expression. A subscript / reference-modifier '(' is REF_LPAREN
+    /// (kb/Work PB2113) and a function-argument '(' is FNARG_LPAREN, so neither reaches this test.
     /// An operator-free parenthesized boolean IDENTIFIER (<c>(F)</c>) is NOT decidable from tokens — its category is
     /// a binding fact — and stays with the binder.</summary>
     private bool ParenRunOpensOnBoolLiteral(int i)
@@ -934,15 +936,16 @@ public abstract class CobolParserCoreBase : Parser
     /// would take the comparison path instead. Found by sweeping every consumer of the plain paren types after
     /// a second copy of this same omission cost 31 NIST regressions.</remarks>
     private static bool IsBoolOperandTerm(int t) => t is
-        CobolLexer.IDENTIFIER or CobolLexer.RPAREN or CobolLexer.SUB_RPAREN or CobolLexer.FNARG_RPAREN
+        CobolLexer.IDENTIFIER or CobolLexer.RPAREN or CobolLexer.REF_RPAREN or CobolLexer.FNARG_RPAREN
         or CobolLexer.INTEGERLIT or CobolLexer.DECIMALLIT or CobolLexer.FLOATLIT or CobolLexer.COMMA_FLOATLIT
         or CobolLexer.STRINGLIT or CobolLexer.NATLIT or CobolLexer.HEXLIT or CobolLexer.BOOLLIT
         or CobolLexer.SIGNED_INTEGERLIT or CobolLexer.SIGNED_DECIMALLIT;
 
     /// <summary>A token that STARTS A NEW TERM when it directly follows a completed operand term (kb/Work
     /// PB124 — <see cref="boolArgAhead"/>'s space-separated argument boundary): an identifier, any literal,
-    /// figurative ZERO, a unary B-NOT, or the FUNCTION keyword opening a nested call. Deliberately NOT
-    /// LPAREN — a paren straight after a term is that term's subscript/ref-mod, the parser's own reading.</summary>
+    /// figurative ZERO, a unary B-NOT, or the FUNCTION keyword opening a nested call. Deliberately NOT a paren:
+    /// a REF_LPAREN straight after a term is that term's subscript/ref-mod, the parser's own reading, and a
+    /// FNARG_LPAREN follows a function name, never a completed term.</summary>
     private static bool IsTermStartToken(int t) => BooleanOperatorTokens.IsPrefix(t) || t is
         CobolLexer.IDENTIFIER or CobolLexer.ZERO or CobolLexer.ZEROS or CobolLexer.ZEROES
         or CobolLexer.FUNCTION
@@ -952,9 +955,10 @@ public abstract class CobolParserCoreBase : Parser
 
     /// <summary>An operand-STARTING token — a boolean operand can start with an identifier, '(', a nested B-NOT, a
     /// boolean literal, or figurative ZERO. Used to confirm a prefix B-NOT is a genuine unary operator.</summary>
-    /// <remarks>GROUPING-PAREN-ONLY (fix-queue PB48): FNARG_LPAREN is deliberately absent. An operand that
-    /// STARTS with a parenthesis is a parenthesized sub-expression, and that paren is always a plain LPAREN; a
-    /// function operand starts with the FUNCTION keyword or its name, never with the argument-list '('.</remarks>
+    /// <remarks>GROUPING-PAREN-ONLY (fix-queue PB48): FNARG_LPAREN and REF_LPAREN are deliberately absent. An operand
+    /// that STARTS with a parenthesis is a parenthesized sub-expression, and that paren is always a plain LPAREN; a
+    /// function operand starts with the FUNCTION keyword or its name, never with the argument-list '(', and a
+    /// reference's own '(' follows its name.</remarks>
     private static bool IsBoolOperandStart(int t) => BooleanOperatorTokens.IsPrefix(t) || t is
         CobolLexer.IDENTIFIER or CobolLexer.LPAREN
         or CobolLexer.BOOLLIT or CobolLexer.ZERO or CobolLexer.ZEROS or CobolLexer.ZEROES;

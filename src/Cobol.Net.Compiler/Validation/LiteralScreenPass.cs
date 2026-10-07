@@ -41,13 +41,12 @@ namespace CobolNet.Validation;
 /// literal is ONE TOKEN whichever rule consumes it, so the check sits on the token: every literal the lexer
 /// produced from the unit is screened here exactly once, and a new grammar position that admits a literal needs no
 /// arm.</para>
-/// <para>⚠ THE CAPTURED REGIONS ARE COVERED BY THEIR SUBSCRIPT-MODE TWINS. A parenthesized capture
-/// (<c>subscriptOrRefMod</c>) is lexed in the SUBSCRIPT mode and re-parsed from its TEXT when the binder proves it is a
-/// function argument list (<c>FunctionArgFragment</c>) or a subscript expression; those fragment trees are never
-/// walked here, and do not need to be, because each of their literals was already a <c>SUB_*</c> literal token of
-/// this tree. That argument holds only while every literal format has a SUBSCRIPT-mode twin — which is why
-/// <c>SUB_HEXLIT</c> exists — and <c>LiteralScreenDriftTests</c> derives <see cref="LiteralTokens.Types"/> from the
-/// lexer grammar (every token whose body is a literal fragment), so a new literal token cannot escape the screen.</para>
+/// <para>⚠ A SUBSCRIPT LIST AND A KEYWORD-OMITTED ARGUMENT LIST ARE PART OF THIS TREE. Since kb/Work PB2113 the tokens
+/// between a reference's parentheses are the ordinary literal tokens, parsed in place, so they are screened here like
+/// any other. A subscript the binder materializes is re-parsed from its TEXT (<c>SubscriptExpressionFragment</c>);
+/// that fragment tree is never walked here, and does not need to be, because each of its literals is already a token
+/// of this tree. <c>LiteralScreenDriftTests</c> derives <see cref="LiteralTokens.Types"/> from the lexer grammar
+/// (every token whose body is a literal fragment), so a new literal token cannot escape the screen.</para>
 /// <para>Edition-invariant: the rules carry no edition qualifier in the text the repository holds, and the checks
 /// they replace ran at every <c>--std</c>. It is a sibling of <see cref="ExpressionFormationPass"/> on the same
 /// "orthogonal axis ⇒ separate pass" footing (<c>BinderDriver</c>), and — unlike a <see cref="CursorFollowingVisitor"/>

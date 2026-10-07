@@ -19,13 +19,13 @@ using Core = CobolParserCore;
 /// <c>functionArgument</c> one of the §8.4.3.2 SR8 shapes (phrase word / OMITTED / non-numeric literal /
 /// arithmetic expression) — and every arithmetic argument binds through the ONE
 /// <see cref="ExpressionBinder.BindExpr"/> (nested <c>FUNCTION</c> calls recurse naturally through
-/// <c>BindPrimary</c>). The keyword-omitted form <c>name(args)</c> (§8.4.3.2 SR2) still arrives as a
-/// SUBSCRIPT-mode capture on a <c>dataReference</c> (D2 — a grammar alternative is an irreducible ambiguity);
-/// <see cref="KeywordOmittedFunction"/> re-parses that captured text through the SAME <c>functionArgList</c>
-/// rule (<c>FunctionArgFragment</c>), so both reference forms bind through one argument pipeline and the former
-/// per-segment recursive-descent parser is DELETED. <c>table(ALL)</c> arguments expand at bind time to one
-/// operand per occurrence (§15.3), detected from the argument's sole data reference whose subscript capture
-/// (still SUBSCRIPT-mode — the D10/PHASE-15 deferral) holds a depth-0 ALL. ALL semantics — D8 edition gating,
+/// <c>BindPrimary</c>). The keyword-omitted form <c>name(args)</c> (§8.4.3.2 SR2) arrives as a
+/// <c>dataReference</c> whose <c>subscriptPart</c> carries the arguments (D2 — a grammar alternative is an
+/// irreducible ambiguity); every item of that list is a <c>functionArgument</c>, the SAME rule the FUNCTION-keyword
+/// form's <c>functionArgList</c> uses (kb/Work PB2113 — it used to be a SUBSCRIPT-mode capture re-parsed from its
+/// text), so both reference forms bind one parse through one argument pipeline. <c>table(ALL)</c> arguments expand
+/// at bind time to one operand per occurrence (§15.3), detected from the argument's sole data reference whose
+/// subscript list holds an ALL item. ALL semantics — D8 edition gating,
 /// §15.3 arity, MAX/MIN category resolution, the §15.68.3 r3 default-currency injection, the D7 LENGTH fold —
 /// happen HERE; backends only render the resulting <see cref="BoundIntrinsicCall"/>.
 /// P7 Step 10k: a real collaborator over <see cref="BinderContext"/>, landed TOGETHER with
@@ -69,16 +69,13 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     + "INTRINSIC).");
                 return BoundExprError.Refused(ctx.Edition, $"FUNCTION {fn}");
             }
-            // The captured group is the ARGUMENT LIST unless it holds a depth-0 colon, in which case it is a
-            // reference modification of a zero-argument result — the same two shapes, decided the same way, as
-            // KeywordOmittedFunction. §8.4.3.2.3 SR6 is then applied by ResultRefMod exactly as for the
-            // FUNCTION-keyword form, so `RANDOM (1:4)` is rejected as an argument list on both routes.
+            // The parenthesis after the name is the ARGUMENT LIST (subscriptPart) unless it holds a colon, in which
+            // case the parser read it as a reference modifier (refModPart) of a zero-argument result — the same two
+            // shapes, decided the same way, as KeywordOmittedFunction. §8.4.3.2.3 SR6 is then applied exactly as for
+            // the FUNCTION-keyword form, so `RANDOM (1:4)` is rejected as an argument list on both routes.
             var sp = fc.subscriptPart();
-            if (sp?.subscriptOrRefMod() is { } grp && ReferenceResolver.HasDepth0Colon(grp))
-                return DefinitionPermitsArguments(fw)
-                    ? Sr6ArgumentListError(fn)
-                    : ResultRefMod(BindIntrinsicCore(fw, []), ctx.Refs.ReadRefMod(grp), fn);
-            var args = sp is null ? [] : ReparseArgs(sp);
+            if (sp is null && fc.refModPart().Length > 0 && DefinitionPermitsArguments(fw)) return Sr6ArgumentListError(fn);
+            var args = sp is null ? [] : ArgumentsOf(sp);
             return args is null
                 ? BoundExprError.Refused(ctx.Edition, $"FUNCTION {fn} arguments")
                 : FinishIntrinsic(fc, BindIntrinsicCore(fw, args), fn);
@@ -283,25 +280,24 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // Admitted ONLY when the catalog says the function can take zero arguments, so a bare word can never be
         // re-routed away from a data reference on the strength of merely sharing a name with some function.
         // ── The suffix shapes a keyword-omitted function reference can wear ──────────────────────────────────
-        // With FUNCTION omitted the reference lexes as a dataReference, so its parenthesised groups arrive as
+        // With FUNCTION omitted the reference parses as a dataReference, so its parenthesised groups arrive as
         // dataReferenceSuffixes and the ARGUMENT list is indistinguishable from a subscript until this point.
         // Reference modification of the RESULT (§8.4.3.3.3 SR2, fix-queue PB8) adds two more shapes, and the
         // standard writes one of them itself at §D.14.3.6: `FUNCTION LOCALE-DATE (CURRENT-DATE (1:8))`.
         //   ()                       zero suffixes  — a bare zero-argument reference           (PB7)
-        //   (args)                   subscriptPart, no depth-0 colon — the argument list
-        //   (start:len)              subscriptPart WITH a depth-0 colon — a ref-mod on a ZERO-ARGUMENT result
+        //   (args)                   subscriptPart — the argument list
+        //   (start:len)              refModPart — a ref-mod on a ZERO-ARGUMENT result
         //   (args) (start:len)       the argument list, then a ref-mod
-        // The ref-mod tail is a refModPart, not a subscriptPart: after the argument list's ')' the previous
-        // token is no longer a data-name, so the lexer's SUBSCRIPT trigger does not fire and the group stays in
-        // DEFAULT mode. Both carriers are read by the ONE ReferenceResolver.ReadRefMod.
+        // The parser tells the middle two apart by the colon (kb/Work PB2113: both open with the REF_LPAREN the lexer
+        // gives every '(' after a name). Both ref-mods are read by the ONE ReferenceResolver.ReadRefMod.
         Core.SubscriptPartContext? sp = null;
-        Core.SubscriptOrRefModContext? capturedRefMod = null;   // `name (start:len)` — a zero-argument result
-        Core.RefModPartContext? tailRefMod = null;              // `name (args) (start:len)`
+        Core.RefModPartContext? capturedRefMod = null;   // `name (start:len)` — a zero-argument result
+        Core.RefModPartContext? tailRefMod = null;       // `name (args) (start:len)`
         if (suffixes.Length == 1)
         {
-            if (suffixes[0].subscriptPart() is not { } only) return null;   // a qualification tail is not an argument list
-            if (only.subscriptOrRefMod() is { } g && ReferenceResolver.HasDepth0Colon(g)) capturedRefMod = g;
-            else sp = only;
+            if (suffixes[0].subscriptPart() is { } only) sp = only;
+            else if (suffixes[0].refModPart() is { } rm) capturedRefMod = rm;
+            else return null;   // a qualification tail is not an argument list
         }
         else if (suffixes.Length == 2)
         {
@@ -309,7 +305,6 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             // (§8.4.3.3.3 SR3) — is not a function reference and stays a data reference, which reports through
             // the ordinary unresolved-name path rather than being turned into a function-arity error here.
             if (suffixes[0].subscriptPart() is not { } argsPart
-                || argsPart.subscriptOrRefMod() is { } ag && ReferenceResolver.HasDepth0Colon(ag)
                 || suffixes[1].refModPart() is not { } tail) return null;
             sp = argsPart;
             tailRefMod = tail;
@@ -329,7 +324,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // RESULT is the same two-suffix shape the prototype form wears.
         if (sp is not null && FunctionPointerNamed(name) is { } fp)
         {
-            var viaPointer = ReparseArgs(sp) is { } fpArgs
+            var viaPointer = ArgumentsOf(sp) is { } fpArgs
                 ? host.Udf.UdfBindPointerCall(fp, fpArgs)
                 : BoundExprError.Refused(ctx.Edition, $"FUNCTION {name} arguments");
             return Activated(tailRefMod is null ? viaPointer : ResultRefMod(viaPointer, ctx.Refs.ReadRefMod(tailRefMod), name));
@@ -402,15 +397,15 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             // is the honest verdict, not an arity error about a function never intended.
             if (!catalogued || sig.MinArgs != 0) return null;
             var bare = BindIntrinsicCore(functionWord, []);
-            // `CURRENT-DATE (1:8)` — the captured group carries a depth-0 colon, so it is a reference
-            // modification of the RESULT, not an argument list: SR6 was answered above (a zero-argument
+            // `CURRENT-DATE (1:8)` — the parenthesis carries a colon, so it is a reference modification of the
+            // RESULT, not an argument list: SR6 was answered above (a zero-argument
             // definition permits none), so the group is applied to the result exactly as the FUNCTION-keyword
             // form applies it, and the two reference forms cannot drift apart.
             return Activated(capturedRefMod is null
                 ? bare
                 : ResultRefMod(bare, ctx.Refs.ReadRefMod(capturedRefMod), name));
         }
-        var call = ReparseArgs(sp) is { } args
+        var call = ArgumentsOf(sp) is { } args
             ? BindIntrinsicCore(functionWord, args)
             : BoundExprError.Refused(ctx.Edition, $"FUNCTION {name} arguments");
         return Activated(tailRefMod is null
@@ -488,20 +483,25 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         _ => "ISO §15.3",
     };
 
-    /// <summary>The D2 keyword-omitted argument re-parse: the SUBSCRIPT-mode captured argument text (verbatim
-    /// from the source char stream, spacing intact) re-parses through the ONE <c>functionArgList</c> grammar
-    /// rule via <see cref="FunctionArgFragment"/> — the same tokens, rule, and binding path as the
-    /// FUNCTION-keyword form. Null (after a COBOLNET1543 diagnostic) on a malformed argument list.</summary>
-    private IReadOnlyList<Core.FunctionArgumentContext>? ReparseArgs(Core.SubscriptPartContext sp)
+    /// <summary>The D2 keyword-omitted form's ARGUMENTS (§8.4.3.2.3 SR2): the reference's parenthesized list, which
+    /// the grammar parses item by item (kb/Work PB2113). Every item but ALL is a <c>functionArgument</c> — the rule the
+    /// FUNCTION-keyword form's <c>functionArgList</c> uses — so both reference forms bind the same parse through the
+    /// same pipeline; this was a SUBSCRIPT-mode token capture re-parsed from its text through a fragment parser until
+    /// the lexer mode went. ALL is a subscript (§8.4.2.3.3 SR6), never an argument (SR8): null after a COBOLNET1543
+    /// diagnostic.</summary>
+    private IReadOnlyList<Core.FunctionArgumentContext>? ArgumentsOf(Core.SubscriptPartContext sp)
     {
-        if (sp.subscriptOrRefMod() is not { } som) return [];
-        string text = som.Start.InputStream.GetText(
-            new Antlr4.Runtime.Misc.Interval(som.Start.StartIndex, som.Stop.StopIndex));
-        if (Frontend.Parsing.FunctionArgFragment.Parse(text, ctx.Edition.Edition, ctx.Retypes) is { } frag)
-            return ArgsOf(frag.functionArgList());
-        ctx.Edition.Error("COBOLNET1543", $"malformed function-argument list '({text})' — an argument is an "
-            + "identifier, a literal, a boolean expression, or an arithmetic expression (ISO §8.4.3.2.3 SR8)");
-        return null;
+        if (sp.subscriptList() is not { } list) return [];
+        var args = new List<Core.FunctionArgumentContext>();
+        foreach (var item in list.subscriptItem())
+        {
+            if (item.functionArgument() is { } a) { args.Add(a); continue; }
+            ctx.Edition.Error("COBOLNET1543", $"malformed function-argument list '{DataBinder.WrittenText(sp)}' — an "
+                + "argument is an identifier, a literal, a boolean expression, or an arithmetic expression, and ALL is "
+                + "none of them (ISO §8.4.3.2.3 SR8)");
+            return null;
+        }
+        return args;
     }
 
     /// <summary>Bind one FUNCTION reference from its name + argument parse trees (shared by the FUNCTION-keyword
@@ -2875,7 +2875,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
 
     /// <summary>
     /// A <c>table(… ALL …)</c> argument (ISO §15.3; kb/Work PB62): detected from an argument that is a sole data
-    /// reference whose one subscript capture (SUBSCRIPT-mode tokens — the D10/PHASE-15 deferral) holds a depth-0
+    /// reference whose one subscript list (a parsed subscriptPart, kb/Work PB2113) holds an
     /// ALL, and bound as ONE <see cref="TableAllPlace"/> operand the backend ENUMERATES — never a bind-time
     /// expansion into N operands. Returns true when the argument IS such a reference (consuming it — including a
     /// loud error operand for an unresolvable shape); false hands the argument to the ordinary operand bind.
@@ -2910,16 +2910,14 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             if (q.refModPart().Length > 0 || q.subscriptPart().Length > 1) return false;
             if (q.subscriptPart() is [{ } trailing]) sp = trailing;
         }
-        if (sp?.subscriptOrRefMod() is not { } som) return false;
+        if (sp is null) return false;
 
-        var inner = new List<IToken>();
-        ReferenceResolver.CollectLeafTokens(som, inner);
         // THE SAME declaration-informed '(' predicate the two reference-resolution callers use (kb/Work PB877):
-        // this was the one caller that passed none, so the splitter's "unknown → no split" fallback stood here
-        // and a §8.4.2.3.2 NOTE-2 parenthesized-expression subscript (`T (CTR (- OFF) ALL)`) joined itself to the
+        // this was the one caller that passed none, so the "unknown → no split" fallback stood here and a
+        // §8.4.2.3.2 NOTE-2 parenthesized-expression subscript (`T (CTR (- OFF) ALL)`) joined itself to the
         // preceding name. Three callers, one §8.4.2.3.3 SR2 answer.
-        var innerSegs = ReferenceResolver.SplitSubscriptTokens(inner, ctx.Refs.CannotBeSubscripted);
-        if (!innerSegs.Any(IsAllSegment)) return false;
+        var innerSegs = ReferenceResolver.SegmentsOf(sp, ctx.Refs.CannotBeSubscripted);
+        if (!innerSegs.Any(ReferenceResolver.IsAllSegment)) return false;
 
         if (!sig.RepeatsAnArgument)
         {
@@ -2962,7 +2960,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         for (int i = 0; i < innerSegs.Count; i++)
         {
             DataItem level = levels[i];
-            if (IsAllSegment(innerSegs[i]))
+            if (ReferenceResolver.IsAllSegment(innerSegs[i]))
             {
                 exprs[i] = $"{indexVar}[{counts.Count}]";
                 // The level's range is the ONE current-occurrence-count model (fixed / ODO / dynamic capacity) — or,
@@ -3007,8 +3005,5 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// function inside a fixed subscript of an ALL argument renders its own enumeration lambda INSIDE the outer
     /// one, and C# forbids a lambda parameter that shadows an enclosing one.</summary>
     private int _allSerial;
-
-    private static bool IsAllSegment(List<IToken> seg) =>
-        seg.Count(t => t.Type != Core.SUB_WS) == 1 && seg.Any(t => t.Type == Core.SUB_ALL);
 
 }

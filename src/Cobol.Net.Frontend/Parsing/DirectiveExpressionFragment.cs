@@ -13,10 +13,10 @@ namespace CobolNet.Frontend.Parsing;
 /// cce) and re-lexes it here with the lexer primed as a directive-expression region
 /// (<see cref="CobolLexer.PrimeDirectiveExpr"/>: DEFINED is a token and every '(' groups), then parses it through
 /// the isolated fragment entry rules — the SAME expression grammar the main parse uses, so there is no hand-rolled
-/// tokenizer / condition parser (the <see cref="FunctionArgFragment"/> precedent). The tree is evaluated by the ONE
+/// tokenizer / condition parser (the <see cref="SubscriptExpressionFragment"/> precedent). The tree is evaluated by the ONE
 /// shared <see cref="T:CobolNet.Frontend.Expressions.CompileTimeExpressionEvaluator"/>.
 ///
-/// The DEFAULT lexer mode is used (NOT PrimeFunctionArgs) — §7.3.6 has no argument juxtaposition, so <c>1 - 2</c>
+/// The DEFAULT lexer mode is used (no list region) — §7.3.6 has no argument juxtaposition, so <c>1 - 2</c>
 /// is subtraction — and the <see cref="ZeroTokenRewriter"/> is applied so a figurative <c>ZERO</c> in an arithmetic
 /// operand becomes <c>ZERO_ARITH</c> (which the evaluator then rejects under §7.3.3 SR10). The operand parses at the
 /// newest edition (<see cref="EditionInfo.Latest"/>) — the whole-<c>&gt;&gt;</c>-facility introduction gate below

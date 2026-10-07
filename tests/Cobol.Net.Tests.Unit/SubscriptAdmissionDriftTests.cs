@@ -11,15 +11,16 @@ namespace CobolNet.Tests.Unit;
 /// SR2: "If a subscript is specified, the data description entry describing qualified-data-name-1 or the
 /// conditional variable associated with qualified-condition-name-1 shall contain an OCCURS clause <b>or shall be
 /// subordinate to a data description entry that contains an OCCURS clause</b>." <c>DataItem.IsTable</c> answers
-/// the first half only. The splitter that decides whether a <c>'('</c> after a name belongs to that name or
-/// begins a new subscript asked <c>IsTable</c>, so <c>X</c> — <c>PIC 9</c> under <c>02 G2 OCCURS 3</c> — was
+/// the first half only. The segmenter that decides whether a <c>'('</c> after a name belongs to that name or
+/// begins a new subscript (<c>ReferenceResolver.SegmentsOf</c>, a token splitter before kb/Work PB2113) asked
+/// <c>IsTable</c>, so <c>X</c> — <c>PIC 9</c> under <c>02 G2 OCCURS 3</c> — was
 /// judged unsubscriptable, its own <c>'('</c> opened a second subscript, and <c>Y (X(1))</c> became a
 /// two-subscript reference to a one-dimensional table: rejected loud on the receiving side (COBOLNET0899) and
 /// compiled-then-aborted-at-run-time on the sending side.
 ///
 /// <para><b>What this pins, and why it is a source scan.</b> The property is not observable from behaviour once
 /// the predicate is right — every arm looks identical from outside — so the guard has to be about WHERE the rule
-/// is written. Three call sites split a subscript token stream and each one used to spell its own lambda; two of
+/// is written. Three call sites segment a subscript list and each one used to spell its own lambda; two of
 /// them spelled the same wrong one, and <c>SubscriptSegments</c>'s doc-comment CLAIMED they "use the same
 /// declaration-informed '(' rule" while nothing made that true. It is true structurally now — one named
 /// predicate, <c>ReferenceResolver.CannotBeSubscripted</c> — and these tests fail the moment a fourth caller
@@ -39,11 +40,11 @@ public sealed class SubscriptAdmissionDriftTests
     private static readonly string DataItem =
         Src("Cobol.Net.Compiler", "Binding", "Model", "DataItem.cs");
 
-    /// <summary>Every caller that splits a subscript token stream passes THE shared §8.4.2.3.3 SR2 predicate.
+    /// <summary>Every caller that segments a subscript list passes THE shared §8.4.2.3.3 SR2 predicate.
     /// A call with any other argument — or with none, which is how the intrinsic table(ALL) caller silently kept
     /// the pre-PB136 join — is the drift this test exists to catch.</summary>
     [Fact]
-    public void EverySplitSubscriptTokensCallSite_PassesTheOneSr2Predicate()
+    public void EverySegmentsOfCallSite_PassesTheOneSr2Predicate()
     {
         var sites = new List<(string File, string Args)>();
         foreach (string file in Directory.EnumerateFiles(Path.Combine(TestRepo.Root, "src", "Cobol.Net.Compiler"),
@@ -51,18 +52,18 @@ public sealed class SubscriptAdmissionDriftTests
         {
             string text = File.ReadAllText(file);
             foreach (Match m in Regex.Matches(text,
-                         @"(?<!internal static List<List<IToken>> )SplitSubscriptTokens\((?<args>[^;]*?)\)\s*[;),]",
+                         @"(?<!internal static List<List<IToken>> )(?<![A-Za-z])SegmentsOf\((?<args>[^;]*?)\)\s*[;),]",
                          RegexOptions.Singleline))
                 sites.Add((Path.GetFileName(file), m.Groups["args"].Value));
         }
 
         // The declaration itself is excluded by the lookbehind; what is left is call sites only.
         Assert.True(sites.Count >= 3,
-            $"expected at least the three known SplitSubscriptTokens call sites, found {sites.Count} — if the "
-            + "splitter moved, this guard moves with it (kb/Work PB877)");
+            $"expected at least the three known SegmentsOf call sites, found {sites.Count} — if the "
+            + "segmenter moved, this guard moves with it (kb/Work PB877)");
         foreach (var (file, args) in sites)
             Assert.True(args.Contains("CannotBeSubscripted", StringComparison.Ordinal),
-                $"{file}: SplitSubscriptTokens is called with '{args.Trim()}' instead of the shared "
+                $"{file}: SegmentsOf is called with '{args.Trim()}' instead of the shared "
                 + "ReferenceResolver.CannotBeSubscripted predicate. ISO §8.4.2.3.3 SR2 decides whether a '(' after "
                 + "a name belongs to that name; writing the test a second time is how PB877 happened.");
     }

@@ -20,8 +20,8 @@ using CobolNet.Runtime;
 /// turn a COBOL operand into a typed C# lvalue (COBOLNET_DESIGN §3.4). Two phases:
 /// <list type="number">
 ///   <item><b>Syntactic flatten</b> — walk <c>cobolWord dataReferenceSuffix*</c> into the base name, its OF/IN
-///         qualifiers, and the subscript / reference-modification token group (a flat SUBSCRIPT-mode stream the
-///         binding layer interprets).</item>
+///         qualifiers, its subscript list (<c>subscriptPart</c>, one parsed item per subscript — kb/Work PB2113) and
+///         its reference modifier (<c>refModPart</c>).</item>
 ///   <item><b>Semantic resolve</b> — resolve the (optionally qualified) name to a <see cref="DataItem"/>, interpret
 ///         the subscripts to C# index expressions, and build the member-access path with each subscript attached to
 ///         its OCCURS level (outer→inner).</item>
@@ -170,8 +170,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
 
     /// <summary>The source nodes this resolver has already DIAGNOSED — a data reference (an undefined name,
     /// <see cref="ReportUnidentified"/>, or a rejected reference shape: SR3 ref-mod-of-ref-mod, SR1 identifier-1
-    /// exclusion) or a captured reference-modifier group (an omitted leftmost-position,
-    /// <see cref="ReadRefMod(Core.SubscriptOrRefModContext)"/>): one report per source node even when a statement binder resolves the same node more than once, and the fact the receiving
+    /// exclusion) or a reference modifier (an omitted leftmost-position, <see cref="ReadRefMod"/>): one report per
+    /// source node even when a statement binder resolves the same node more than once, and the fact the receiving
     /// chokepoint asks (<see cref="WasDiagnosed"/>) so that a null it gets back is EITHER already reported OR
     /// reported there — never a silently dropped receiver (kb/Work PB70).</summary>
     private readonly HashSet<ParserRuleContext> _diagnosed = [];
@@ -448,16 +448,15 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // The reference AS WRITTEN, read by the ONE decomposition (kb/Work PB443 — see WrittenReference).
         var written = ReadWritten(dref);
         var qualifiers = written.Qualifiers;
-        var subCtx = written.SubscriptGroup;    // the subscript group (no depth-0 colon)
-        var refCtx = written.RefModGroup;       // a reference-modification group (start : length)
-        var cleanRef = written.RefModPart;      // the refModPart form (parsed arithmeticExpression : ...)
+        var subCtx = written.SubscriptGroup;    // the subscript list
+        var cleanRef = written.RefModPart;      // the reference modifier (refModSpec : leftmost : length)
 
         // ISO §8.4.3.3.3 SR3 — "Identifier-1 shall not be a reference-modification format identifier." The
         // grammar cannot express this (dataReferenceSuffix* and qualification's own (subscriptPart|refModPart)*
         // both admit unlimited ref-mods), so it is COUNTED (WrittenReference.RefModCount). Before that count,
-        // `??=` kept the FIRST of each carrier and the DEFAULT-mode form then outranked the SUBSCRIPT-mode one,
-        // so `MOVE A (3:4)(2:2)` COMPILED CLEAN and returned A(2:2) — a silent wrong value, not a composition
-        // and not a rejection.
+        // `??=` kept the FIRST of each of the two carriers a ref-mod then had and one outranked the other, so
+        // `MOVE A (3:4)(2:2)` COMPILED CLEAN and returned A(2:2) — a silent wrong value, not a composition and not
+        // a rejection.
         if (!ScreenRefModCount(dref, written, name)) return Refused();
 
         // A reference whose chain ends in a non-word object (SELF, SUPER, a view, a function, NULL) is never a data name.
@@ -503,7 +502,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // no-THROUGH form's forward to data-name-2's place.
         if (PlaceForItem(item, indexExprs, out var gap) is not { } inner) return ItemFailure(dref, gap);
 
-        if (refCtx is null && cleanRef is null) return Resolved(inner);
+        if (cleanRef is null) return Resolved(inner);
         // identifier-1's DESCRIPTION is the item its place stands for, not the name as written: for a no-THROUGH
         // RENAMES alias that is data-name-2, whose attributes §13.18.45.4 GR1 makes data-name-1's own; for a
         // THROUGH alias it is the alias itself (an alphanumeric group item, GR2); for every other item the two
@@ -556,7 +555,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
             refusal = RefResolution.Refused(DataBinder.WrittenText(dref));
             return null;
         }
-        if ((written.RefModPart is not null ? ReadRefMod(written.RefModPart) : ReadRefMod(written.RefModGroup!)) is not { } spec)
+        if (ReadRefMod(written.RefModPart!) is not { } spec)   // RefModCount > 0 ⇒ the first modifier is in hand
         {
             refusal = SegmentFailure(DataBinder.WrittenText(dref));   // a bound the materializer refused or deferred (§8.4.3.3.3 SR4)
             // A REFUSED segment was reported by whoever refused it (the materializer, or ReadRefMod's omitted
@@ -790,31 +789,38 @@ public sealed partial class ReferenceResolver(DataBinder data)
     }
 
     // ── The ONE reference-modification reader (ISO §8.4.3.3.2) ───────────────────────────────────────────────
-    // A ref-mod reaches the binder through TWO source carriers, decided by the lexer at the '(' and frozen there:
-    // the DEFAULT-mode PARSED form (`refModPart : (LPAREN | FNARG_LPAREN) refModSpec (RPAREN | FNARG_RPAREN)` —
-    // BOTH paren flavours, because a ref-mod written directly after a ZERO-ARGUMENT function name is delimited
-    // by the argument-list twins the lexer cannot rule out, §8.4.3.2.3 SR6's catalog precondition; PB48)
-    // and the SUBSCRIPT-mode CAPTURED token group (a depth-0 SUB_COLON). Both reduce to the same
-    // <see cref="RefModSpec"/> through the same segment renderer, so the rule "how a ref-mod's start and length
-    // are read off the source" is written down ONCE. Both overloads are internal because the intrinsic binder
-    // reads the SAME two carriers for a ref-modified FUNCTION RESULT (§8.4.3.3.3 SR2, fix-queue PB8) — a second
-    // copy of this reader there is exactly the one-rule-two-places defect PB4 was.
+    // A ref-mod reaches the binder as ONE parse node, `refModPart : (LPAREN | FNARG_LPAREN | REF_LPAREN) refModSpec
+    // (RPAREN | FNARG_RPAREN | REF_RPAREN)` — three paren flavours because the lexer types the paren before it can see
+    // the colon: REF_LPAREN straight after a data name (kb/Work PB2113 — this was a second carrier, a SUBSCRIPT-mode
+    // token group with a depth-0 colon, until the mode was removed), FNARG_LPAREN straight after a ZERO-ARGUMENT
+    // function name (§8.4.3.2.3 SR6's catalog precondition; PB48) and LPAREN after a ')'. Internal because the
+    // intrinsic binder reads the SAME node for a ref-modified FUNCTION RESULT (§8.4.3.3.3 SR2, fix-queue PB8) — a
+    // second copy of this reader there is exactly the one-rule-two-places defect PB4 was.
 
-    /// <summary>Read the PARSED DEFAULT-mode <c>refModPart</c> form. Null when a start/length expression uses a
-    /// form the segment renderer does not handle, so the caller fails loud rather than emitting a wrong slice.</summary>
+    /// <summary>Read a <c>refModPart</c>. Null when a start/length expression uses a form the segment renderer does not
+    /// handle, so the caller fails loud rather than emitting a wrong slice — or on an OMITTED leftmost-position, which
+    /// is reported HERE, in the one reader, so a sending operand, a receiving operand, an ADDRESS OF operand and a
+    /// function result all name §8.4.3.3.2 (kb/Work PB1407, PB1458). The grammar admits the omission
+    /// (<c>refModSpec : leftmost=functionArgument? COLON …</c>) precisely so that it reaches this report rather than
+    /// a raw parse error.</summary>
     internal RefModSpec? ReadRefMod(Core.RefModPartContext rmp)
     {
-        var rmExprs = rmp.refModSpec().arithmeticExpression();
-        if (rmExprs.Length == 0) return null;
-        var startToks = new List<IToken>();
-        CollectLeafTokens(rmExprs[0], startToks);
-        if (RenderSegment(startToks, SegmentPosition.RefMod) is not { } rmStart) return null;
-        string? rmLen = null;
-        if (rmExprs.Length > 1)
+        var spec = rmp.refModSpec();
+        if (spec.leftmost is null)
         {
-            var lenToks = new List<IToken>();
-            CollectLeafTokens(rmExprs[1], lenToks);
-            if (RenderSegment(lenToks, SegmentPosition.RefMod) is not { } l) return null;
+            // R30 purity: a probe never diagnoses (kb/Work PB157); one report per written modifier (_diagnosed).
+            if (!_probing && _diagnosed.Add(rmp))
+                data.Edition.Error(DiagnosticCatalog.RefModLeftmostPositionOmitted,
+                    $"'{DataBinder.WrittenText(rmp).Trim()}': a reference modifier is written ( leftmost-position : "
+                    + "[ length ] ) and only the length may be omitted, so the colon cannot lead (ISO §8.4.3.3.2). Write "
+                    + "the leftmost position explicitly, for example (1:2).");
+            return null;
+        }
+        if (RenderSegment(LeafTokens(spec.leftmost), SegmentPosition.RefMod) is not { } rmStart) return null;
+        string? rmLen = null;
+        if (spec.length is { } lengthExpr)
+        {
+            if (RenderSegment(LeafTokens(lengthExpr), SegmentPosition.RefMod) is not { } l) return null;
             rmLen = l;
         }
         // §7.3.23 / §8.4.3.3.4 item 5c: the ref-mod allows a zero-length result iff REF-MOD-ZERO-LENGTH is ON at
@@ -822,132 +828,53 @@ public sealed partial class ReferenceResolver(DataBinder data)
         return new RefModSpec(rmStart, rmLen, data.RefModZeroLength.IsOnAt(rmp.Start.Line));
     }
 
-    /// <summary>Read the SUBSCRIPT-mode CAPTURED group form. The caller has already established the group IS a
-    /// ref-mod (<see cref="HasDepth0Colon"/>); null on an unrenderable segment, or on an OMITTED leftmost-position,
-    /// which is reported HERE — in the one reader of the captured form, so a sending operand, a receiving operand,
-    /// an ADDRESS OF operand and a function result all name §8.4.3.3.2 (kb/Work PB1407, PB1458). The default-mode
-    /// <c>refModPart</c> carrier cannot arise: its grammar rule requires the leftmost arithmetic expression.</summary>
-    internal RefModSpec? ReadRefMod(Core.SubscriptOrRefModContext group)
-    {
-        if (LeftmostPositionOmitted(group))
-        {
-            // R30 purity: a probe never diagnoses (kb/Work PB157); one report per written group (_diagnosed).
-            if (!_probing && _diagnosed.Add(group))
-                data.Edition.Error(DiagnosticCatalog.RefModLeftmostPositionOmitted,
-                    $"'({DataBinder.WrittenText(group).Trim()})': a reference modifier is written ( leftmost-position : "
-                    + "[ length ] ) and only the length may be omitted, so the colon cannot lead (ISO §8.4.3.3.2). Write "
-                    + "the leftmost position explicitly, for example (1:2).");
-            return null;
-        }
-        var (rm, _) = InterpretSubscripts(group);
-        return rm is { Count: > 0 }
-            ? new RefModSpec(rm[0], rm.Count > 1 ? rm[1] : null, data.RefModZeroLength.IsOnAt(group.Start.Line))
-            : null;
-    }
-
-    /// <summary>The suffixes written on ONE data reference, read LEXICALLY — how many subscript and
-    /// reference-modification carriers it carries, and, for a single ref-mod whose two segments are INTEGER
-    /// LITERALS, their values.
-    /// <para>⛔ THE CARRIER KNOWLEDGE LIVES HERE, beside the two <see cref="ReadRefMod"/> overloads, because a
-    /// ref-mod reaches the binder through TWO source carriers frozen at lex time — the DEFAULT-mode parsed
-    /// <c>refModPart</c> and the SUBSCRIPT-mode captured token group — and a clause that walked only one of them
-    /// would drop the other SILENTLY (kb/Work PB4's one-rule-two-places defect, and PB205's dropped ref-mod).</para>
+    /// <summary>The suffixes written on ONE data reference, read LEXICALLY — how many subscript lists and
+    /// reference modifiers it carries, and, for a single ref-mod whose two positions are INTEGER LITERALS, their
+    /// values.
     /// <para>This is the DATA-DIVISION read: the clauses that admit a reference-modified operand all restrict it
     /// to integer literals (ISO §13.18.16.3 SR4, §13.18.54.3 SR8, §13.18.57.3 SR10), so no expression renderer and
-    /// no procedure-phase state are involved. A segment that is anything else — a data-name, an arithmetic
+    /// no procedure-phase state are involved. A position that is anything else — a data-name, an arithmetic
     /// expression, a figurative constant — comes back <see cref="RefModSuffixes.NonLiteral"/>, for the CLAUSE's own
     /// syntax rule to reject with its own diagnostic.</para></summary>
     internal static RefModSuffixes ReadOperandSuffixes(Core.DataReferenceContext dref)
     {
         int refMods = 0, subscripts = 0;
-        Core.SubscriptOrRefModContext? captured = null;
-        Core.RefModPartContext? parsed = null;
-
-        void TakeSubscriptPart(Core.SubscriptPartContext sp)
-        {
-            if (sp.subscriptOrRefMod() is not { } s) return;
-            if (HasDepth0Colon(s)) { refMods++; captured ??= s; } else subscripts++;
-        }
-
+        Core.RefModPartContext? first = null;
         foreach (var suffix in dref.dataReferenceSuffix())
         {
             // A qualification carries its OWN (subscriptPart | refModPart)* tail — `C IN G (1:3)` hangs the
             // ref-mod off the qualification, not off the base word.
             if (suffix.qualification() is { } q)
             {
-                foreach (var sp in q.subscriptPart()) TakeSubscriptPart(sp);
-                foreach (var rp in q.refModPart()) { refMods++; parsed ??= rp; }
+                subscripts += q.subscriptPart().Length;
+                foreach (var rp in q.refModPart()) { refMods++; first ??= rp; }
             }
-            else if (suffix.refModPart() is { } rmp) { refMods++; parsed ??= rmp; }
-            else if (suffix.subscriptPart() is { } sp2) TakeSubscriptPart(sp2);
+            else if (suffix.refModPart() is { } rmp) { refMods++; first ??= rmp; }
+            else if (suffix.subscriptPart() is not null) subscripts++;
         }
         if (refMods != 1) return new RefModSuffixes(refMods, subscripts, null, null, false);
 
-        var (start, length, ok, beyond) =
-            parsed is not null ? ReadParsedLiterals(parsed) : ReadCapturedLiterals(captured!);
+        var (start, length, ok, beyond) = ReadLiteralPositions(first!);
         return ok && beyond
             ? new RefModSuffixes(refMods, subscripts, null, null, false, BeyondHostLimit: true)
             : new RefModSuffixes(refMods, subscripts, ok ? start : null, ok ? length : null, !ok);
     }
 
-    /// <summary>The DEFAULT-mode <c>refModPart</c> as integer literals: each arithmetic-expression segment shall be
-    /// ONE integer literal (§13.18.16.3 SR4 and its twins), so its whole text is the value or the read fails.
+    /// <summary>A <c>refModPart</c> as integer literals: each position shall be ONE integer literal (§13.18.16.3 SR4
+    /// and its twins), so its whole text is the value or the read fails; an omitted length — §8.4.3.3.2's bracketed
+    /// form — is the only omission permitted.
     /// ⛔ Read through THE ONE integer-literal reader, <see cref="CobolNet.Validation.IntegerOperandRules.TryHostValue(string, out int, out bool)"/>
     /// (kb/Work PB1579): an int.TryParse sent an 11-digit literal to the "not an integer literal" branch, a false
     /// sentence; the reader answers "integer literal, beyond the host range" (<c>Beyond</c>) instead.</summary>
-    private static (int Start, int? Length, bool Ok, bool Beyond) ReadParsedLiterals(Core.RefModPartContext rmp)
+    private static (int Start, int? Length, bool Ok, bool Beyond) ReadLiteralPositions(Core.RefModPartContext rmp)
     {
-        var exprs = rmp.refModSpec().arithmeticExpression();
-        if (exprs.Length == 0
-            || !CobolNet.Validation.IntegerOperandRules.TryHostValue(exprs[0].GetText(), out int start, out bool b0))
+        var spec = rmp.refModSpec();
+        if (spec.leftmost is null
+            || !CobolNet.Validation.IntegerOperandRules.TryHostValue(spec.leftmost.GetText(), out int start, out bool b0))
             return (0, null, false, false);
-        if (exprs.Length == 1) return (start, null, true, b0);
-        return CobolNet.Validation.IntegerOperandRules.TryHostValue(exprs[1].GetText(), out int len, out bool b1)
+        if (spec.length is null) return (start, null, true, b0);
+        return CobolNet.Validation.IntegerOperandRules.TryHostValue(spec.length.GetText(), out int len, out bool b1)
             ? (start, len, true, b0 || b1) : (0, null, false, false);
-    }
-
-    /// <summary>The SUBSCRIPT-mode captured group as integer literals: split at the depth-0 colon and require each
-    /// side (whitespace apart) to be exactly ONE integer-literal token. An omitted length — §8.4.3.3.2's bracketed
-    /// form — is the empty right side, and is the only empty side permitted.</summary>
-    private static (int Start, int? Length, bool Ok, bool Beyond) ReadCapturedLiterals(
-        Core.SubscriptOrRefModContext group)
-    {
-        var tokens = new List<IToken>();
-        CollectLeafTokens(group, tokens);
-        int colon = -1;
-        for (int i = 0, d = 0; i < tokens.Count; i++)
-        {
-            int tt = tokens[i].Type;
-            if (tt == Core.SUB_LPAREN) d++;
-            else if (tt == Core.SUB_RPAREN) { if (d > 0) d--; }
-            else if (tt == Core.SUB_COLON && d == 0) { colon = i; break; }
-        }
-        if (colon < 0) return (0, null, false, false);
-        if (SoleIntegerLiteral(tokens, 0, colon) is not var (start, b0)) return (0, null, false, false);
-        int after = colon + 1;
-        bool empty = true;
-        for (int i = after; i < tokens.Count; i++) if (tokens[i].Type != Core.SUB_WS) { empty = false; break; }
-        if (empty) return (start, null, true, b0);
-        return SoleIntegerLiteral(tokens, after, tokens.Count) is var (len, b1)
-            ? (start, len, true, b0 || b1) : (0, null, false, false);
-    }
-
-    /// <summary>The one integer-literal token in <c>tokens[from, to)</c>, whitespace ignored, read through THE ONE
-    /// integer-literal reader (kb/Work PB1579) — its host value and whether that value is saturated; null when the
-    /// range holds anything else (a data-name, an operator, more than one token) — i.e. not an integer literal.</summary>
-    private static (int Value, bool Beyond)? SoleIntegerLiteral(List<IToken> tokens, int from, int to)
-    {
-        IToken? only = null;
-        for (int i = from; i < to; i++)
-        {
-            if (tokens[i].Type == Core.SUB_WS) continue;
-            if (only is not null) return null;
-            only = tokens[i];
-        }
-        return only is not null
-            && only.Type is Core.SUB_INTEGERLIT or Core.SIGNED_INTEGERLIT or Core.INTEGERLIT
-            && CobolNet.Validation.IntegerOperandRules.TryHostValue(only.Text, out int v, out bool beyond)
-            ? (v, beyond) : null;
     }
 
     /// <summary>
@@ -1201,7 +1128,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// tables only — <see cref="ScreenTableSubjectArity"/> — and §8.4.2.3.3 SR6's rightmost ALL, "equivalent to
     /// omitting the rightmost or only subscript in this context", is admitted and dropped.</param>
     private RefResolution? ReadSubscripts(Core.DataReferenceContext dref, DataItem item,
-        Core.SubscriptOrRefModContext? subCtx, out List<string> indexExprs, bool tableSubject = false)
+        Core.SubscriptPartContext? subCtx, out List<string> indexExprs, bool tableSubject = false)
     {
         indexExprs = [];
         if (subCtx is null)
@@ -1210,8 +1137,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         if (ScreenEmptyParentheses(dref, subCtx))   // §8.4.2.3.2 / §8.4.3.3.2 (kb/Work PB969)
             return RefResolution.Refused(DataBinder.WrittenText(dref));
         List<IndexUse> ixNames = [];
-        // A subscript group never carries a depth-0 colon (WrittenReference), so the ref-mod arm is not reachable.
-        var (e, _) = InterpretSubscripts(subCtx, ixNames, tableSubject);
+        var e = InterpretSubscripts(subCtx, ixNames, tableSubject);
         if (e is null) return SegmentFailure(DataBinder.WrittenText(dref));   // a segment the materializer refused or deferred
         ScreenIndexNameAssociation(item, ixNames);   // §8.4.2.3.3 SR4 (kb/Work PB459)
         if (tableSubject ? ScreenTableSubjectArity(dref, item, e.Count) : ScreenSubscriptArity(dref, item, e.Count))   // §8.4.2.3.3 SR2/SR3 (kb/Work PB877)
@@ -1259,19 +1185,15 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// <c>( subscript … )</c>, at least one subscript, and §8.4.3.3.2 a reference modifier as
     /// <c>( leftmost-position : [ length ] )</c>, a required leftmost position. Returns <see langword="true"/> when
     /// the reference is rejected, so the caller returns null.
-    /// <para>The GRAMMAR admits the empty group because the same capture carries a keyword-omitted
+    /// <para>The GRAMMAR admits the empty group because the same parenthesis carries a keyword-omitted
     /// function-identifier's argument list, where §8.4.3.2.2 brackets the arguments inside the parentheses and
     /// <c>F()</c> is the zero-argument spelling — only the resolved symbol tells a function from a data item, and
-    /// a name that reached THIS resolver resolved to a data item. The whitespace-only spelling was the same group
-    /// before the grammar admitted the empty one, and it compiled CLEAN on the sending side (<c>DISPLAY WS-X( )</c>
-    /// aborted at RUN time on NotImplementedCobolFeatureException) while the receiving side drew COBOLNET0899's
-    /// "not yet implemented" — so this closes a compile-clean-then-abort as well as keeping the new spelling out.
-    /// It is asked of the written GROUP, before the subscript interpreter, because the interpreter gives up on a
-    /// whitespace-only group silently.</para></summary>
-    /// <summary>THE test for an empty written parenthesis group — nothing but separators inside it (kb/Work PB969).
-    /// One definition for every reader that must refuse <c>X()</c> on a data reference.</summary>
-    internal static bool IsEmptyGroup(Core.SubscriptOrRefModContext group) =>
-        group.subToken().All(t => t.SUB_WS() is not null);
+    /// a name that reached THIS resolver resolved to a data item. Unscreened, <c>DISPLAY WS-X( )</c> compiled CLEAN
+    /// and aborted at RUN time on NotImplementedCobolFeatureException while the receiving side drew COBOLNET0899's
+    /// "not yet implemented". It is asked of the written GROUP, before the subscript interpreter.</para></summary>
+    /// <summary>THE test for an empty written parenthesis group — no subscript list inside it (kb/Work PB969). One
+    /// definition for every reader that must refuse <c>X()</c> on a data reference.</summary>
+    internal static bool IsEmptyGroup(Core.SubscriptPartContext group) => group.subscriptList() is null;
 
     /// <summary>The COBOLNET2309 message body (the quoted reference is the caller's).</summary>
     internal const string EmptyParenthesesMessage = "parentheses with nothing inside them follow a data reference. A "
@@ -1279,7 +1201,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         + "modifier a leftmost position (ISO §8.4.3.3.2); empty parentheses belong only to a function-identifier "
         + "with no arguments (ISO §8.4.3.2.2). Remove the parentheses, or write the subscript.";
 
-    private bool ScreenEmptyParentheses(Core.DataReferenceContext dref, Core.SubscriptOrRefModContext group)
+    private bool ScreenEmptyParentheses(Core.DataReferenceContext dref, Core.SubscriptPartContext group)
     {
         if (!IsEmptyGroup(group)) return false;
         // R30 purity: a probe never diagnoses (kb/Work PB157); one report per written reference (_diagnosed).
@@ -1351,12 +1273,11 @@ public sealed partial class ReferenceResolver(DataBinder data)
         return true;
     }
 
-    /// <summary>The FIRST subscript group of <paramref name="dref"/> — the <c>(…)</c> that carries the reference's
-    /// subscript list rather than a reference modification (no depth-0 colon), taken from the base word's own
-    /// suffix or from a qualification's suffix tail (<c>K OF E (IX)</c> hangs it off the qualification). Shared by
+    /// <summary>The FIRST subscript group of <paramref name="dref"/> — the <c>subscriptPart</c> that carries the
+    /// reference's subscript list, taken from the base word's own suffix or from a qualification's suffix tail (<c>K OF E (IX)</c> hangs it off the qualification). Shared by
     /// <see cref="ResolveForItem"/>, which renders it into index expressions, and by
     /// <see cref="SubscriptSegments"/>, which keeps it as written.</summary>
-    internal static Core.SubscriptOrRefModContext? SubscriptGroupOf(Core.DataReferenceContext dref) =>
+    internal static Core.SubscriptPartContext? SubscriptGroupOf(Core.DataReferenceContext dref) =>
         ReadWritten(dref).SubscriptGroup;
 
     /// <summary>A <c>dataReference</c> AS WRITTEN: the qualifier chain, the subscript group and the
@@ -1370,11 +1291,10 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// (kb/Work PB443).</para></summary>
     /// <param name="Written">The OF/IN qualifiers in written order, inner → outer, or null when the reference
     /// carries none — the common case, which therefore allocates nothing.</param>
-    /// <param name="SubscriptGroup">The first SUBSCRIPT-mode group with no depth-0 colon: the reference's
-    /// subscript list. Taken from the base word's own suffix or from a qualification's suffix tail
-    /// (<c>K OF E (IX)</c> hangs it off the qualification).</param>
-    /// <param name="RefModGroup">The first SUBSCRIPT-mode group that IS a reference modification (a depth-0 colon).</param>
-    /// <param name="RefModPart">The first parsed <c>refModPart</c> form (<c>start : length</c> as expressions).</param>
+    /// <param name="SubscriptGroup">The first <c>subscriptPart</c>: the reference's subscript list. Taken from the
+    /// base word's own suffix or from a qualification's suffix tail (<c>K OF E (IX)</c> hangs it off the
+    /// qualification).</param>
+    /// <param name="RefModPart">The first <c>refModPart</c> (<c>leftmost : length</c> as expressions).</param>
     /// <param name="RefModCount">How many reference modifications the whole reference carries — §8.4.3.3.3 SR3
     /// admits at most one, and the count is the only way to see a second one.</param>
     /// <param name="PropertyObject">The non-word object the qualifier chain ends in (<c>OF SELF</c>, <c>OF SUPER</c>,
@@ -1382,8 +1302,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// spell it (kb/Work PB1425).</param>
     internal readonly record struct WrittenReference(
         List<string>? Written,
-        Core.SubscriptOrRefModContext? SubscriptGroup,
-        Core.SubscriptOrRefModContext? RefModGroup,
+        Core.SubscriptPartContext? SubscriptGroup,
         Core.RefModPartContext? RefModPart,
         int RefModCount,
         Core.PropertyObjectContext? PropertyObject)
@@ -1411,27 +1330,22 @@ public sealed partial class ReferenceResolver(DataBinder data)
     internal static WrittenReference ReadWritten(Core.DataReferenceContext dref)
     {
         List<string>? qualifiers = null;
-        Core.SubscriptOrRefModContext? subCtx = null;
-        Core.SubscriptOrRefModContext? refCtx = null;
+        Core.SubscriptPartContext? subCtx = null;
         Core.RefModPartContext? cleanRef = null;
         Core.PropertyObjectContext? propertyObject = null;
         int refModCount = 0;
-        void Classify(Core.SubscriptOrRefModContext s)
-        {
-            if (HasDepth0Colon(s)) { refModCount++; refCtx ??= s; } else subCtx ??= s;
-        }
 
         foreach (var suffix in dref.dataReferenceSuffix())
         {
             if (suffix.qualification() is { } q)
             {
                 (qualifiers ??= []).Add(q.cobolWord().Name());
-                foreach (var sp in q.subscriptPart()) if (sp.subscriptOrRefMod() is { } qs) Classify(qs);
+                if (q.subscriptPart() is [var qs, ..]) subCtx ??= qs;
                 refModCount += q.refModPart().Length;
                 if (q.refModPart().Length > 0) cleanRef ??= q.refModPart()[0];
             }
             else if (suffix.refModPart() is { } rmp) { refModCount++; cleanRef ??= rmp; }
-            else if (suffix.subscriptPart()?.subscriptOrRefMod() is { } s) Classify(s);
+            else if (suffix.subscriptPart() is { } s) subCtx ??= s;
             else if (suffix.propertyObject() is { } po)
             {
                 propertyObject ??= po;
@@ -1440,13 +1354,13 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 foreach (var resultRef in ResultRefModsOf(po)) { refModCount++; cleanRef ??= resultRef; }
             }
         }
-        return new WrittenReference(qualifiers, subCtx, refCtx, cleanRef, refModCount, propertyObject);
+        return new WrittenReference(qualifiers, subCtx, cleanRef, refModCount, propertyObject);
     }
 
     /// <summary>The reference's subscript list AS WRITTEN — one token segment per subscript position, outermost
-    /// first, split by the ONE <see cref="SplitSubscriptTokens"/> splitter with the same declaration-informed
-    /// '(' rule <see cref="InterpretSubscripts"/> uses (kb/Work PB136), or <see langword="null"/> when the
-    /// reference carries no subscript group at all.
+    /// first, read by the ONE <see cref="SegmentsOf"/> with the same declaration-informed '(' rule
+    /// <see cref="InterpretSubscripts"/> uses (kb/Work PB136), or <see langword="null"/> when the reference carries
+    /// no subscript group at all.
     /// <para>⛔ The RENDERED form cannot answer the question this exists for. ISO §14.9.37.3 SR8 and SR9 are rules
     /// about the SOURCE TEXT of a SEARCH ALL subscript — "shall be subscripted by the first index-name associated
     /// with identifier-1 … The index-name subscript shall not be followed by a '+' or a '–'" — and the C# index
@@ -1472,19 +1386,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
             for (int i = 0; i < seg.Count; i++)
             {
                 var t = seg[i];
-                if (t.Type != Core.SUB_IDENTIFIER
-                    || !CobolNames.Same(t.Text, index.Name)) continue;
-                List<string> quals = [];
-                for (int j = i + 1; ; )
-                {
-                    while (j < seg.Count && seg[j].Type == Core.SUB_WS) j++;
-                    if (j >= seg.Count || seg[j].Type is not (Core.SUB_OF or Core.SUB_IN or Core.OF or Core.IN)) break;
-                    int k = j + 1;
-                    while (k < seg.Count && seg[k].Type == Core.SUB_WS) k++;
-                    if (k >= seg.Count || seg[k].Type is not (Core.SUB_IDENTIFIER or Core.IDENTIFIER)) break;
-                    quals.Add(seg[k].Text);
-                    j = k + 1;
-                }
+                if (!IsNameToken(t) || !CobolNames.Same(t.Text, index.Name)) continue;
+                var quals = QualifiersAfter(seg, i, out _);
                 if (ResolveIndexName(t.Text, quals, t) is { Outcome: IndexRefOutcome.Resolved } ix
                     && ReferenceEquals(ix.Decl, index)) return true;
             }
@@ -1493,16 +1396,11 @@ public sealed partial class ReferenceResolver(DataBinder data)
 
     /// <summary>The <see cref="SubscriptSegments"/> split over an ALREADY-READ subscript group (the caller has
     /// the <see cref="WrittenReference"/> in hand and need not walk the suffix tail a second time).</summary>
-    private List<List<IToken>>? SubscriptSegmentsOf(Core.SubscriptOrRefModContext? group)
-    {
-        if (group is null) return null;
-        var tokens = new List<IToken>();
-        CollectLeafTokens(group, tokens);
-        return SplitSubscriptTokens(tokens, CannotBeSubscripted);
-    }
+    private List<List<IToken>>? SubscriptSegmentsOf(Core.SubscriptPartContext? group) =>
+        group is null ? null : SegmentsOf(group, CannotBeSubscripted);
 
     /// <summary>⛔ THE ONE DECLARATION-INFORMED <c>'('</c> PREDICATE (kb/Work PB136, corrected by PB877) — the
-    /// splitter's question "does this name own the <c>'('</c> that follows it, or does that paren open a new
+    /// segmenter's question "does this name own the <c>'('</c> that follows it, or does that paren open a new
     /// subscript?", answered by §8.4.2.3.3 SR2: a name that may carry a subscript owns its paren; a name that may
     /// not cannot, so the paren can only begin a parenthesized-expression subscript.
     /// <para>⛔ IT IS A NAMED MEMBER, NOT A LAMBDA AT EACH CALL SITE, AND THAT IS THE POINT. Both callers —
@@ -1521,11 +1419,11 @@ public sealed partial class ReferenceResolver(DataBinder data)
     internal bool CannotBeSubscripted(string name, List<string> qualifiers) =>
         (qualifiers.Count > 0 ? ResolveQualified(name, qualifiers) : ResolveUnqualified(name)) is { IsTableElement: false };
 
-    // ── Intrinsic-argument entries (ISO §15.3; consumed by StatementBinder.Intrinsics.cs) ─────────────────
-    // The function-argument mini-parser resolves identifiers from flat SUBSCRIPT-mode tokens, where no
-    // dataReference parse context exists — these thin internal entries expose the SAME private resolution
-    // (ResolveUnqualified/ResolveQualified → PlaceForItem → RenderSegment) so argument references see identical
-    // view/qualification/subscript semantics as every verb operand (singular-pattern rule).
+    // ── Intrinsic-argument entries (ISO §15.3; consumed by IntrinsicBinder) ─────────────────────────────────
+    // The table(ALL) argument resolves its name and renders its non-ALL subscripts itself (it builds an enumeration,
+    // not one place) — these thin internal entries expose the SAME private resolution (ResolveUnqualified /
+    // ResolveQualified → PlaceForItem → RenderSegment) so argument references see identical view/qualification/
+    // subscript semantics as every verb operand (singular-pattern rule).
 
     /// <summary>Resolve a (possibly OF/IN-qualified) data-name to its <see cref="DataItem"/>, or null. Used by
     /// the table(ALL) expansion (§15.3) to read the OCCURS counts before building per-occurrence places.</summary>
@@ -2261,236 +2159,135 @@ public sealed partial class ReferenceResolver(DataBinder data)
         return path;
     }
 
-    // ── Subscript interpretation (the flat SUBSCRIPT-mode token stream) ──────────────────────────────────
+    // ── Subscript interpretation (the parsed subscript list, kb/Work PB2113) ───────────────────────────────
 
-    /// <summary>
-    /// Interpret the flat subscript/ref-mod token sequence. Returns (index expressions, isRefMod): a depth-0
-    /// <c>SUB_COLON</c> marks reference modification (handled in a later slice, so the C# list is null). Otherwise
-    /// each comma- or multi-space-separated segment is rendered to a C# <c>long</c> index expression; a segment that
-    /// cannot be rendered yields a null list (→ the caller fails loud).
-    /// </summary>
-    /// <summary>True when one subscript segment is the bare word <c>ALL</c> (§8.4.2.3.3 SR6).</summary>
-    private static bool IsAllSegment(List<IToken> segment)
-    {
-        IToken? only = null;
-        foreach (var t in segment)
-        {
-            if (t.Type == Core.SUB_WS) continue;
-            if (only is not null) return false;
-            only = t;
-        }
-        return only is { Type: Core.SUB_ALL };
-    }
-
-    /// <summary>True if the flat token stream has a depth-0 <c>SUB_COLON</c> — i.e. it is a reference modification
-    /// (<c>start:length</c>) rather than a subscript list. Internal because the keyword-omitted FUNCTION path
-    /// asks the SAME question of a captured group (fix-queue PB8): with the FUNCTION keyword omitted,
-    /// <c>CURRENT-DATE (1:8)</c> captures its ref-mod in SUBSCRIPT mode exactly as a data reference would, and
-    /// only this test separates it from an argument list.</summary>
-    internal static bool HasDepth0Colon(Core.SubscriptOrRefModContext ctx)
-    {
-        var tokens = new List<IToken>();
-        CollectLeafTokens(ctx, tokens);
-        for (int i = 0, d = 0; i < tokens.Count; i++)
-        {
-            int tt = tokens[i].Type;
-            if (tt == Core.SUB_LPAREN) d++;
-            else if (tt == Core.SUB_RPAREN) { if (d > 0) d--; }
-            else if (tt == Core.SUB_COLON && d == 0) return true;
-        }
-        return false;
-    }
-
-    /// <summary>True when the captured ref-mod group has NOTHING but separators before its depth-0 colon — an
-    /// omitted leftmost-position (§8.4.3.3.2 brackets only the length). The group is already known to carry the
-    /// colon (<see cref="HasDepth0Colon"/>).</summary>
-    private static bool LeftmostPositionOmitted(Core.SubscriptOrRefModContext group)
-    {
-        var tokens = new List<IToken>();
-        CollectLeafTokens(group, tokens);
-        // the first non-separator token is the colon (a leftmost-position written would come first)
-        return tokens.FirstOrDefault(t => t.Type != Core.SUB_WS)?.Type == Core.SUB_COLON;
-    }
+    /// <summary>True when one subscript segment is the bare word <c>ALL</c> (§8.4.2.3.3 SR6) — the ONE test, asked by
+    /// the reference reader and the table(ALL) intrinsic argument alike.</summary>
+    internal static bool IsAllSegment(List<IToken> segment) => segment is [{ Type: Core.ALL }];
 
     /// <param name="indexNames">§8.4.2.3.3 SR4's collector — the index-names used as subscripts, for
     /// <see cref="ScreenIndexNameAssociation"/> at the caller, which knows the table being referenced.</param>
     /// <param name="admitRightmostAll">True only for a Format-2 SORT table subject (§8.4.2.3.3 SR6): a rightmost
     /// <c>ALL</c> is "equivalent to omitting the rightmost or only subscript", so the segment is dropped from the
     /// result rather than rendered (<see cref="ReadSubscripts"/>).</param>
-    private (List<string>? Exprs, bool IsRefMod) InterpretSubscripts(
-        Core.SubscriptOrRefModContext ctx, List<IndexUse>? indexNames = null, bool admitRightmostAll = false)
+    /// <summary>Render each subscript of the written list to a C# <c>long</c> index expression, outermost first; a
+    /// segment that cannot be rendered yields null (→ the caller fails loud).</summary>
+    private List<string>? InterpretSubscripts(
+        Core.SubscriptPartContext ctx, List<IndexUse>? indexNames = null, bool admitRightmostAll = false)
     {
-        var tokens = new List<IToken>();
-        CollectLeafTokens(ctx, tokens);
-
-        int colonIdx = -1;
-        for (int i = 0, d = 0; i < tokens.Count; i++)
-        {
-            int tt = tokens[i].Type;
-            if (tt == Core.SUB_LPAREN) d++;
-            else if (tt == Core.SUB_RPAREN) { if (d > 0) d--; }
-            else if (tt == Core.SUB_COLON && d == 0) { colonIdx = i; break; }
-        }
-        if (colonIdx >= 0)   // reference modification: start [: length]
-        {
-            if (RenderSegment(tokens.GetRange(0, colonIdx), SegmentPosition.RefMod) is not { } start)
-                return (null, true);
-            var result = new List<string> { start };
-            var lengthTokens = tokens.GetRange(colonIdx + 1, tokens.Count - colonIdx - 1);
-            if (lengthTokens.Any(t => t.Type != Core.SUB_WS))
-            {
-                if (RenderSegment(lengthTokens, SegmentPosition.RefMod) is not { } len) return (null, true);
-                result.Add(len);
-            }
-            return (result, true);
-        }
-
         var exprs = new List<string>();
         // kb/Work PB136 — declaration-informed '(' splitting, through the ONE predicate (kb/Work PB877): an
         // inline `IsTable` lambda stood here and answered only §8.4.2.3.3 SR2's FIRST half, so a name SUBORDINATE
         // to an OCCURS — legally subscripted, and a legal arithmetic-expression-1 subscript under §8.4.2.3.2 +
         // §8.8.1.1 + §8.4.3.1.2 Format 2 — had its own '(' split off as an EXTRA subscript.
-        var segments = SplitSubscriptTokens(tokens, CannotBeSubscripted);
+        var segments = SegmentsOf(ctx, CannotBeSubscripted);
         if (admitRightmostAll && segments.Count > 0 && IsAllSegment(segments[^1])) segments.RemoveAt(segments.Count - 1);
         foreach (var seg in segments)
         {
-            if (RenderSegment(seg, SegmentPosition.Subscript, indexNames) is not { } e) return (null, false);
+            if (RenderSegment(seg, SegmentPosition.Subscript, indexNames) is not { } e) return null;
             exprs.Add(e);
         }
-        return (exprs, false);
+        return exprs;
     }
 
-    // Internal (not private): the intrinsic-argument binder (StatementBinder.Intrinsics.cs) flattens and splits
-    // the SAME SUBSCRIPT-mode token streams for FUNCTION argument lists (ISO §15.3) — one splitter, not two.
+    /// <summary>The parse tree's terminals under <paramref name="node"/>, in source order.</summary>
     internal static void CollectLeafTokens(IParseTree node, List<IToken> tokens)
     {
         if (node is ITerminalNode term) { tokens.Add(term.Symbol); return; }
         for (int i = 0; i < node.ChildCount; i++) CollectLeafTokens(node.GetChild(i), tokens);
     }
 
-    /// <summary>Split a flat token list into subscript segments on depth-0 comma / multi-space boundaries (a faithful
-    /// reduction of the legacy <c>ExpressionBinder.SplitSubscriptTokens</c>: a single space inside a relative
-    /// subscript such as <c>I + 1</c> does not split; a separator space before a new operand does).</summary>
-    internal static List<List<IToken>> SplitSubscriptTokens(List<IToken> tokens,
-        Func<string, List<string>, bool>? parenSplitsAfterName = null)
+    private static List<IToken> LeafTokens(IParseTree node)
+    {
+        var tokens = new List<IToken>();
+        CollectLeafTokens(node, tokens);
+        return tokens;
+    }
+
+    /// <summary>A name as the subscript renderer reads one: a word that can name a data item, an index-name or a
+    /// constant (the lexer's own data-name word set, <c>CobolLexer.SubscriptTriggerTokens</c> — IDENTIFIER plus every
+    /// context-sensitive word that can be user-defined). Whether it names one HERE is the resolver's question.</summary>
+    internal static bool IsNameToken(IToken t) => CobolLexer.SubscriptTriggerTokens.Contains(t.Type);
+
+    /// <summary>The OF/IN qualifiers written after the name at <paramref name="at"/> in <paramref name="tokens"/>
+    /// (ISO §8.4.2.2.2), in written order; <paramref name="last"/> is the index of the last token they cover.</summary>
+    private static List<string> QualifiersAfter(List<IToken> tokens, int at, out int last)
+    {
+        var qualifiers = new List<string>();
+        last = at;
+        while (last + 2 < tokens.Count && tokens[last + 1].Type is Core.OF or Core.IN && IsNameToken(tokens[last + 2]))
+        {
+            qualifiers.Add(tokens[last + 2].Text);
+            last += 2;
+        }
+        return qualifiers;
+    }
+
+    /// <summary>⛔ THE WRITTEN SUBSCRIPT LIST AS TOKEN SEGMENTS, ONE PER SUBSCRIPT, read off the PARSE (kb/Work PB2113).
+    /// The grammar already split the list — each <c>subscriptItem</c> is one operand, separated by §8.3.5's space or
+    /// comma/semicolon-plus-space — so a segment is an item's own tokens. Before PB2113 this was a hand-written
+    /// splitter over the SUBSCRIPT lexer mode's flat token run (spaces, commas and depth counting); the one decision
+    /// the grammar cannot make is kept, and it is asked of the tree:
+    /// <para>⛔ kb/Work PB136 — the '(' after a name, at an item's own level, is the name's subscript list when the
+    /// name can carry one and the start of a NEW subscript when it cannot (§8.4.2.3.3 SR2): Annex D.3.5.3's
+    /// <c>DOG (XCOUNTER (- YCOUNTER))</c> is two subscripts, <c>DOG (BAKER (I) 3)</c> two with BAKER(I) the first. The
+    /// parser always reads the first way (the lexer typed the paren REF_LPAREN after the name), so a name that
+    /// <paramref name="parenSplitsAfterName"/> says cannot be subscripted has its item cut at that paren — the cut
+    /// the declarations decide, which §8.4.2.3.2 leaves to them. With no predicate (none is known) nothing is cut.</para></summary>
+    internal static List<List<IToken>> SegmentsOf(Core.SubscriptPartContext group,
+        Func<string, List<string>, bool>? parenSplitsAfterName)
     {
         var segments = new List<List<IToken>>();
-        var current = new List<IToken>();
-        int depth = 0;
-
-        // kb/Work PB136: does a depth-0 '(' BEGIN A NEW SEGMENT? After ')' or a literal, always — neither can
-        // take a subscript, so the paren can only open a parenthesized-expression subscript (the spec's own
-        // NOTE 2 form, `DOG (XCOUNTER (- YCOUNTER))`, was rejected with a wrong-count error). After an
-        // IDENTIFIER it is AMBIGUOUS with the identifier's own subscript (`DOG (BAKER (I) 3)`), so the split
-        // is DECLARATION-INFORMED: a name that carries no OCCURS cannot be subscripted, so its '(' starts a
-        // new segment; with no lookup (the intrinsic-argument caller) the old join stands.
-        bool LParenStartsNew()
+        if (group.subscriptList() is not { } list) return segments;
+        foreach (var item in list.subscriptItem())
         {
-            var lastNonWs = current.FindLast(x => x.Type != Core.SUB_WS);
-            if (lastNonWs is null) return false;
-            return lastNonWs.Type switch
+            var tokens = LeafTokens(item);
+            if (parenSplitsAfterName is null) { segments.Add(tokens); continue; }
+            var cuts = new HashSet<IToken>();
+            CollectCuts(item, parenSplitsAfterName, cuts);
+            var current = new List<IToken>();
+            foreach (var t in tokens)
             {
-                Core.SUB_RPAREN or Core.SUB_INTEGERLIT or Core.SIGNED_INTEGERLIT or Core.SUB_DECIMALLIT
-                    or Core.SIGNED_DECIMALLIT or Core.SUB_STRINGLIT or Core.SUB_HEXLIT => true,
-                // The predicate is ReferenceResolver.CannotBeSubscripted — §8.4.2.3.3 SR2's admission test, and
-                // the ONE copy of it (kb/Work PB877). It answers true ONLY for a name that RESOLVES to a data
-                // item NO subscript may be written on (neither carrying an OCCURS clause nor subordinate to
-                // one): an unresolved name may be a function reference (`FUNCTION INTEGER (X)` — the first cut
-                // split a function from its own argument list and six goldens went red on "0 given"), and a
-                // TABLE ELEMENT owns its paren as its own subscript list. Unknown → no split → the D18 loud
-                // names the operand.
-                Core.SUB_IDENTIFIER when parenSplitsAfterName is not null
-                    && !CobolNames.Same(lastNonWs.Text, "FUNCTION")
-                    => QualifiedNameEnding(current) is var (head, qualifiers) && parenSplitsAfterName(head, qualifiers),
-                _ => false,
-            };
-        }
-
-        // The qualified name `head (OF|IN qualifier)*` that ENDS the run — the reference the '(' would subscript
-        // (§8.4.2.3.2: the subscripts follow qualified-data-name-1 as a whole). Read backwards over WS.
-        static (string Head, List<string> Qualifiers) QualifiedNameEnding(List<IToken> run)
-        {
-            var words = new List<string>();
-            int i = run.Count - 1;
-            while (true)
-            {
-                while (i >= 0 && run[i].Type == Core.SUB_WS) i--;
-                if (i < 0 || run[i].Type != Core.SUB_IDENTIFIER) break;
-                words.Add(run[i].Text);
-                int j = i - 1;
-                while (j >= 0 && run[j].Type == Core.SUB_WS) j--;
-                if (j < 0 || run[j].Type is not (Core.SUB_OF or Core.SUB_IN)) break;
-                i = j - 1;
-            }
-            // words holds the chain read backwards — the last-written qualifier first, the head last.
-            string head = words[^1];
-            words.RemoveAt(words.Count - 1);
-            words.Reverse();
-            return (head, words);
-        }
-
-        for (int i = 0; i < tokens.Count; i++)
-        {
-            var t = tokens[i];
-            if (t.Type == Core.SUB_LPAREN)
-            {
-                if (depth == 0 && current.Count > 0 && LParenStartsNew())
-                {
-                    segments.Add(current);
-                    current = [];
-                }
-                depth++; current.Add(t); continue;
-            }
-            if (t.Type == Core.SUB_RPAREN) { if (depth > 0) depth--; current.Add(t); continue; }
-
-            if (depth == 0 && (t.Type == Core.SUB_COMMA || t.Type == Core.SUB_SEMICOLON))
-            {
-                if (current.Count > 0) { segments.Add(current); current = []; }
-                continue;
-            }
-            if (depth == 0 && t.Type == Core.SUB_WS)
-            {
-                int next = i + 1;
-                while (next < tokens.Count && tokens[next].Type == Core.SUB_WS) next++;
-                if (next < tokens.Count && current.Count > 0)
-                {
-                    var lastNonWs = current.FindLast(x => x.Type != Core.SUB_WS);
-                    // A trailing operator OR a trailing OF/IN continues the SAME segment (`I + 1` relative
-                    // subscripts; `SUB1 OF GRP` qualified subscripts, ISO §8.4.2.3.2) — and a pending OF/IN also
-                    // continues into its qualifier identifier. The FUNCTION keyword (a plain SUB_IDENTIFIER in
-                    // SUBSCRIPT mode) also continues: the following name belongs to a nested intrinsic call in a
-                    // FUNCTION argument list — `SQRT(FUNCTION SQRT(F))` is ONE argument (ISO §15.3; the legacy
-                    // splitter's endsWithFunction rule, dropped in the original subscript-only reduction).
-                    bool continues = lastNonWs is not null &&
-                        (lastNonWs.Type is Core.SUB_PLUS or Core.SUB_MINUS or Core.SUB_STAR or Core.SUB_SLASH
-                            or Core.SUB_POWER or Core.SUB_OF or Core.SUB_IN
-                         || (lastNonWs.Type == Core.SUB_IDENTIFIER
-                             && CobolNames.Same(lastNonWs.Text, "FUNCTION")));
-                    int nextType = tokens[next].Type;
-                    // The new-segment starters: every token that can BEGIN an operand — identifiers, all four
-                    // numeric-literal shapes, string literals (intrinsic arguments may be space-separated,
-                    // ISO §15's general formats), and the ALL subscript word (§15.3 table(ALL) arguments).
-                    if (!continues && (nextType is Core.SIGNED_INTEGERLIT or Core.SIGNED_DECIMALLIT
-                            or Core.SUB_IDENTIFIER or Core.SUB_INTEGERLIT or Core.SUB_DECIMALLIT
-                            or Core.SUB_STRINGLIT or Core.SUB_HEXLIT or Core.SUB_ALL
-                        // kb/Work PB136 — the spaced NOTE 2 form: a '(' after this WS opens a NEW subscript
-                        // under the same declaration-informed rule as the unspaced arm above.
-                        || (nextType == Core.SUB_LPAREN && LParenStartsNew())))
-                    {
-                        segments.Add(current);
-                        current = [];
-                        i = next - 1;   // skip consumed WS
-                        continue;
-                    }
-                    // A following OF/IN never splits — `name OF qualifier` stays one segment.
-                }
+                if (cuts.Contains(t) && current.Count > 0) { segments.Add(current); current = []; }
                 current.Add(t);
-                continue;
             }
-            current.Add(t);
+            segments.Add(current);
         }
-        if (current.Count > 0) segments.Add(current);
         return segments;
+    }
+
+    /// <summary>The cut points of one subscript item (see <see cref="SegmentsOf"/>): the opening paren of every
+    /// subscript list hung on a name that cannot be subscripted, at the item's OWN level — inside a nested paren
+    /// (another reference's subscripts or reference modifier, a function's arguments, a parenthesized expression)
+    /// the split question belongs to that paren's owner, so the walk does not descend there.</summary>
+    private static void CollectCuts(IParseTree node, Func<string, List<string>, bool> cannotBeSubscripted,
+        HashSet<IToken> cuts)
+    {
+        switch (node)
+        {
+            case Core.DataReferenceContext dref:
+                if (dref.cobolWord() is not { } head) return;
+                var qualifiers = new List<string>();
+                foreach (var suffix in dref.dataReferenceSuffix())
+                {
+                    Core.SubscriptPartContext? sp = suffix.subscriptPart();
+                    if (suffix.qualification() is { } q)
+                    {
+                        qualifiers.Add(q.cobolWord().GetText());
+                        if (q.subscriptPart() is [var qsp, ..]) sp = qsp;
+                    }
+                    if (sp is null) continue;
+                    // §8.4.2.3.2 hangs the list off the whole qualified name (kb/Work PB1455's sweep)
+                    if (cannotBeSubscripted(head.GetText(), qualifiers)) cuts.Add(sp.Start);
+                    return;   // the first list decides; what follows it is that list's own reading
+                }
+                return;
+            case Core.SubscriptPartContext or Core.RefModPartContext or Core.FunctionCallContext:
+                return;
+            case Core.PrimaryExpressionContext p when p.LPAREN() is not null:
+                return;   // GROUPING-PAREN-ONLY: a parenthesized expression's inside is its own level (FNARG_ / REF_ parens belong to functionCall / subscriptPart, handled above)
+        }
+        for (int i = 0; i < node.ChildCount; i++) CollectCuts(node.GetChild(i), cannotBeSubscripted, cuts);
     }
 
     /// <summary>Render one subscript / ref-mod segment to a C# <c>long</c> position expression, or
@@ -2529,52 +2326,37 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // the expression at full precision into the §15.4 temp and applies the integrality rule exactly once — to
         // the result, where the standard applies it. A SINGLE scaled operand needs no such detour: it IS the
         // result, so the direct read below is equivalent and cheaper.
-        bool compound = tokens.Any(t => t.Type is Core.SUB_PLUS or Core.SUB_MINUS or Core.SUB_STAR
-            or Core.SUB_SLASH or Core.SUB_POWER or Core.PLUS or Core.MINUS or Core.STAR or Core.SLASH);
+        bool compound = tokens.Any(t => t.Type is Core.PLUS or Core.MINUS or Core.STAR or Core.SLASH or Core.POWER);
         // kb/Work PB136: a QUOTIENT-bearing segment routes to D18 UNCONDITIONALLY — the token splice would be
         // C# integer division over long reads, truncating where §8.4.2.3.4 GR1b evaluates the exact result of
         // the whole expression and requires EC-BOUND-SUBSCRIPT on a non-integer (`E((W-A + W-B) / 2)` with the
         // sum 7 silently selected occurrence 3). The scaled-operand routing above (PB41) caught only segments
         // whose OPERANDS are scaled; an all-integer quotient is exactly the case it could not see.
-        if (tokens.Any(t => t.Type is Core.SUB_SLASH or Core.SLASH))
+        if (tokens.Any(t => t.Type is Core.SLASH))
             return MaterializeViaFragment(tokens, position);
         for (int i = 0; i < tokens.Count; i++)
         {
             var t = tokens[i];
             switch (t.Type)
             {
-                case Core.SUB_WS: sb.Append(' '); break;
-                case Core.SUB_INTEGERLIT or Core.SIGNED_INTEGERLIT or Core.INTEGERLIT: sb.Append(t.Text); break;
-                case Core.SUB_PLUS or Core.PLUS: sb.Append(" + "); break;
-                case Core.SUB_MINUS or Core.MINUS: sb.Append(" - "); break;
-                case Core.SUB_STAR or Core.STAR: sb.Append(" * "); break;
-                case Core.SUB_SLASH or Core.SLASH: sb.Append(" / "); break;
-                // GROUPING-PAREN-ONLY (fix-queue PB48): the argument-list twins FNARG_LPAREN/FNARG_RPAREN are
-                // deliberately absent. A segment carrying them is function-bearing, and the `default:` arm below
-                // routes ANY unrenderable token to D18 — which is where such a segment belongs anyway — so
-                // adding them here would render a function call's parens into a token-by-token string that the
-                // rest of this switch cannot complete. PB42's rule ("can the renderer render it") is what makes
+                case Core.SIGNED_INTEGERLIT or Core.INTEGERLIT: sb.Append(t.Text); break;
+                case Core.PLUS: sb.Append(" + "); break;
+                case Core.MINUS: sb.Append(" - "); break;
+                case Core.STAR: sb.Append(" * "); break;
+                // GROUPING-PAREN-ONLY (fix-queue PB48): the argument-list twins FNARG_LPAREN/FNARG_RPAREN and the
+                // reference twins REF_LPAREN/REF_RPAREN (kb/Work PB2113) are deliberately absent. A segment carrying
+                // them holds a function call or a nested subscripted / reference-modified name, and the `default:`
+                // arm below routes ANY unrenderable token to D18 — which is where such a segment belongs anyway — so
+                // adding them here would render a call's or a nested reference's parens into a token-by-token string
+                // the rest of this switch cannot complete. PB42's rule ("can the renderer render it") is what makes
                 // the omission safe rather than lucky.
-                case Core.SUB_LPAREN or Core.LPAREN: sb.Append('('); break;
-                case Core.SUB_RPAREN or Core.RPAREN: sb.Append(')'); break;
-                case Core.SUB_IDENTIFIER or Core.IDENTIFIER:
+                case Core.LPAREN: sb.Append('('); break;
+                case Core.RPAREN: sb.Append(')'); break;
+                case var _ when IsNameToken(t):
                 {
                     // Gather `name (OF|IN qualifier)*` — a QUALIFIED data-name subscript (ISO §8.4.2.3.2).
                     string name = t.Text;
-                    var qualifiers = new List<string>();
-                    int j = i;
-                    while (true)
-                    {
-                        int k = j + 1;
-                        while (k < tokens.Count && tokens[k].Type == Core.SUB_WS) k++;
-                        if (k >= tokens.Count || tokens[k].Type is not (Core.SUB_OF or Core.SUB_IN or Core.OF or Core.IN)) break;
-                        int m = k + 1;
-                        while (m < tokens.Count && tokens[m].Type == Core.SUB_WS) m++;
-                        if (m >= tokens.Count || tokens[m].Type is not (Core.SUB_IDENTIFIER or Core.IDENTIFIER)) break;
-                        qualifiers.Add(tokens[m].Text);
-                        j = m;
-                    }
-                    i = j;
+                    var qualifiers = QualifiersAfter(tokens, i, out i);
                     // A FUNCTION-BEARING segment cannot be rendered token-by-token (the head word is a function
                     // name, not a data-name), so the WHOLE segment routes to D18 rather than this arm failing.
                     if (IsFunctionBearing(tokens)) return MaterializeViaFragment(tokens, position);
@@ -2582,8 +2364,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
                     // to `return null`, which is the caller's LOUD posture, and that made it the one place in
                     // this renderer that decided a segment was unrenderable without asking D18 — contradicting
                     // the rule stated ten lines below it ("EVERY token the renderer cannot render ROUTES TO
-                    // D18"). SUBSCRIPT mode has no ZERO token, so the figurative arrives as a plain
-                    // SUB_IDENTIFIER, resolves to no data item, and `E(ZERO + 1)` ABORTED AT RUN TIME —
+                    // D18"). The figurative used to arrive here as a plain word (the retired SUBSCRIPT lexer mode
+                    // had no ZERO token), resolve to no data item, and `E(ZERO + 1)` ABORTED AT RUN TIME —
                     // §8.8.1.1 admits "the figurative constant ZERO" as an arithmetic operand and §8.4.2.3.2
                     // makes a subscript an arithmetic expression, so that is legal source.
                     // ⚠ A GENUINELY undefined name keeps the SAME posture, verified rather than assumed:
@@ -2753,30 +2535,27 @@ public sealed partial class ReferenceResolver(DataBinder data)
 
     /// <summary>True when this segment contains a FUNCTION-IDENTIFIER (ISO §8.4.3.1.2 Format 1) and therefore
     /// belongs to the D18 materialization route rather than the token renderer: either the explicit
-    /// <c>FUNCTION</c> keyword (a plain <c>SUB_IDENTIFIER</c> in SUBSCRIPT mode), or the §8.4.3.2.3 SR2
-    /// keyword-omitted form — a REPOSITORY-declared intrinsic or a user-function name, immediately followed by a
-    /// left parenthesis, that is NOT shadowed by a declared data item (a declared item always wins, exactly as in
+    /// <c>FUNCTION</c> keyword, or the §8.4.3.2.3 SR2 keyword-omitted form — a REPOSITORY-declared intrinsic or a
+    /// user-function name, immediately followed by its parenthesis, that is NOT shadowed by a declared data item (a declared item always wins, exactly as in
     /// <c>IntrinsicBinder.KeywordOmittedFunction</c>; the two must not drift apart, which is why both ask the
     /// question the same way).</summary>
     private bool IsFunctionBearing(List<IToken> tokens)
     {
         for (int i = 0; i < tokens.Count; i++)
         {
-            if (tokens[i].Type is not (Core.SUB_IDENTIFIER or Core.IDENTIFIER)) continue;
+            if (tokens[i].Type == Core.FUNCTION) return Activation(tokens[i]);
+            if (!IsNameToken(tokens[i])) continue;
             string w = tokens[i].Text;
-            if (CobolNames.Same(w, "FUNCTION")) return Activation(tokens[i]);
-            int k = i + 1;
-            while (k < tokens.Count && tokens[k].Type == Core.SUB_WS) k++;
-            // GROUPING-PAREN-ONLY (fix-queue PB48): this arm detects the KEYWORD-OMITTED form `name(args)`,
-            // which by definition has no FUNCTION token before the name — so its '(' is never retyped
-            // FNARG_LPAREN (the lexer's mark keys on exactly that token). The explicit-keyword form is caught by
-            // the `w == "FUNCTION"` test above and never reaches here.
-            if (k >= tokens.Count || tokens[k].Type is not (Core.SUB_LPAREN or Core.LPAREN)) continue;
+            // This arm detects the KEYWORD-OMITTED form `name(args)`, which by definition has no FUNCTION token
+            // before the name — so its '(' is never retyped FNARG_LPAREN (the lexer's mark keys on exactly that
+            // token): it is the reference paren REF_LPAREN the lexer gives every '(' after a name (kb/Work PB2113).
+            // The explicit-keyword form is caught by the FUNCTION test above and never reaches here.
+            if (i + 1 >= tokens.Count || tokens[i + 1].Type != Core.REF_LPAREN) continue;
             if (data.Symbols.TryResolve(w, data.ActiveScope, out _)) continue;   // a declared item wins
             // The REPOSITORY half is the ONE membership the declaration screen and KeywordOmittedFunction ask
             // (DataBinder.IsRepositoryIntrinsic — >>COBOL-WORDS and the edition window included; kb/Work PB1083).
-            // An IDENTIFIER / SUB_IDENTIFIER keeps its WRITTEN word (the lexer retypes only keyword-token words), so the
-            // directive is applied to it once, here.
+            // An IDENTIFIER keeps its WRITTEN word (the lexer retypes only keyword-token words), so the directive is
+            // applied to it once, here.
             if (data.UserFunctionNames.Contains(w)
                 || data.IsRepositoryIntrinsic(FunctionWord.OfWrittenWord(w, data.CobolWords)))
                 return Activation(tokens[i]);
@@ -2991,8 +2770,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// carriers COBOLNET0844 admits — keeps the bare <c>CobolTable.Occ(path)</c> digit decode.</para>
     /// <para>⚠ The runtime call is spelled out rather than routed through <c>RuntimeApi</c>: this text is produced
     /// at BIND time (the D10 transitional string carrier) and the binder cannot reference the CodeGen assembly.
-    /// When PHASE 15 CUT 2.5 removes the SUBSCRIPT lexer mode and the carrier becomes <c>BoundExpr</c>, this
-    /// rendering moves to the renderer with the rest of it.</para></summary>
+    /// PHASE 15 CUT 2.5 removed the SUBSCRIPT lexer mode (kb/Work PB2113), so every subscript is now a parse node;
+    /// when the carrier becomes <c>BoundExpr</c>, this rendering moves to the renderer with the rest of it.</para></summary>
     private string? PositionRead(DataItem item, SegmentPosition position)
     {
         bool numeric = item.Pic is { Category: PicCategory.Numeric };

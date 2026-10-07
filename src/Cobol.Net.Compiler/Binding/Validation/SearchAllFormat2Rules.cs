@@ -403,9 +403,7 @@ internal readonly struct SearchAllFormat2Rules(DataBinder data, ReferenceResolve
     {
         int pos = OdoModel.SubscriptPositionOf(item, table);
         var segs = refs.SubscriptSegments(dref);
-        List<IToken> toks = pos >= 0 && segs is not null && pos < segs.Count
-            ? [.. segs[pos].Where(t => t.Type != Core.SUB_WS)]
-            : [];
+        List<IToken> toks = pos >= 0 && segs is not null && pos < segs.Count ? segs[pos] : [];
         if (toks.Count == 0)
             return Key(table, $"'{DataBinder.WrittenText(dref)}' is not subscripted by '{firstIndex}': it \"shall be "
                 + "subscripted by the first index-name associated with identifier-1 along with any subscripts "
@@ -415,13 +413,13 @@ internal readonly struct SearchAllFormat2Rules(DataBinder data, ReferenceResolve
         // by the DECLARATION it resolves to, never by its spelling alone (kb/Work PB919).
         int next = 1;
         List<string> quals = [];
-        while (next + 1 < toks.Count && toks[next].Type is Core.SUB_OF or Core.SUB_IN or Core.OF or Core.IN
-               && toks[next + 1].Type is Core.SUB_IDENTIFIER or Core.IDENTIFIER)
+        while (next + 1 < toks.Count && toks[next].Type is Core.OF or Core.IN
+               && ReferenceResolver.IsNameToken(toks[next + 1]))
         {
             quals.Add(toks[next + 1].Text);
             next += 2;
         }
-        if (toks[0].Type != Core.SUB_IDENTIFIER
+        if (!ReferenceResolver.IsNameToken(toks[0])
             || !CobolNames.Same(toks[0].Text, firstIndex)
             || (table.Indexes.Count > 0
                 && refs.ResolveIndexName(toks[0].Text, quals, toks[0]) is { Outcome: ReferenceResolver.IndexRefOutcome.Resolved } ix
@@ -431,7 +429,7 @@ internal readonly struct SearchAllFormat2Rules(DataBinder data, ReferenceResolve
                 + $"(ISO §14.9.37.3 {rule})");
         if (toks.Count == next) return true;
         toks = [toks[0], .. toks.Skip(next)];
-        return toks[1].Type is Core.SUB_PLUS or Core.SUB_MINUS
+        return toks[1].Type is Core.PLUS or Core.MINUS
                              or Core.SIGNED_INTEGERLIT or Core.SIGNED_DECIMALLIT
             ? Key(table, $"'{DataBinder.WrittenText(dref)}' writes '{Written(toks)}': \"the index-name subscript shall not be "
                 + $"followed by a '+' or a '–'\" (ISO §14.9.37.3 {rule})")

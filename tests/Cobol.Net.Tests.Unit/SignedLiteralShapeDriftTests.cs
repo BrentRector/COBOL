@@ -8,14 +8,13 @@ namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// ⛔ THE SIGNED-LITERAL SHAPE SYMMETRY (kb/Work R17 — ledger F12). The lexer has three numeric literal
-/// BODIES (integer, decimal, float), and a sign-adjacent form must exist for each in BOTH regions that admit
-/// one — the DEFAULT-mode FUNCTION-argument twins (<c>FN_SIGNED_*</c>, whose <c>OnSignedLiteral</c> action keeps
-/// the signed literal only where §8.3.3.3.2 makes the sign part of it, and otherwise splits the sign off as the
-/// operator) and the SUBSCRIPT mode.
+/// BODIES (integer, decimal, float), and a sign-adjacent form must exist for each — the <c>FN_SIGNED_*</c> twins, whose
+/// <c>OnSignedLiteral</c> action keeps the signed literal only inside a list region (an argument list or, since kb/Work
+/// PB2113 removed the SUBSCRIPT lexer mode, a reference's subscript list) where §8.3.3.3.2 makes the sign part of it,
+/// and otherwise splits the sign off as the operator.
 /// The float shape was the one signed-capable body with NO twins, so <c>FUNCTION EXP(-1.5E3)</c> lexed as
 /// TWO arguments (the signed-decimal rule won maximal munch at "-1.5" and orphaned "E3") and drew a false
-/// arity diagnostic — and the same hole in SUBSCRIPT mode broke the keyword-omitted spelling's OUTER capture.
-/// This scrape makes the next literal body unable to join only two of the three shape sets silently.
+/// arity diagnostic. This scrape makes the next literal body unable to join only one of the two shape sets silently.
 /// </summary>
 public sealed class SignedLiteralShapeDriftTests
 {
@@ -54,27 +53,5 @@ public sealed class SignedLiteralShapeDriftTests
             Assert.True(Regex.IsMatch(src, @"^" + tok + @"\s*:\s*\w+_BODY\s*;", RegexOptions.Multiline),
                 $"{tok} does not reference a *_BODY fragment — an inline body is invisible to the twin "
                 + "assertions in this suite (the pre-R17 float hole's exact shape)");
-    }
-
-    [Fact]
-    public void EveryNumericBody_HasItsSubscriptModeForms()
-    {
-        string src = LexerSource();
-        int subMode = src.IndexOf("mode SUBSCRIPT;", System.StringComparison.Ordinal);
-        Assert.True(subMode > 0, "the SUBSCRIPT mode header moved — this guard is blind");
-        string sub = src[subMode..];
-        foreach (string body in NumericBodies(src))
-        {
-            // The DEC/INT bodies keep their historical spellings (SIGNED_DECIMALLIT writes its body inline);
-            // what the guard demands is a signed-adjacent rule and an unsigned rule PER SHAPE, by body
-            // reference or by an inline pattern carrying the shape's discriminator.
-            bool signed = Regex.IsMatch(sub, @"\[\+-\]\s*" + body + @"\b")
-                || (body == "DEC_BODY" && sub.Contains("SIGNED_DECIMALLIT"))
-                || (body == "INT_BODY" && sub.Contains("SIGNED_INTEGERLIT"));
-            bool unsigned = Regex.IsMatch(sub, @"(?<!\[\+-\]\s)\b" + body + @"\b");
-            Assert.True(signed, $"{body} has no SIGN-ADJACENT form in SUBSCRIPT mode — the keyword-omitted "
-                + "argument capture splits it (the R17 outer-capture failure shape)");
-            Assert.True(unsigned, $"{body} has no unsigned form in SUBSCRIPT mode");
-        }
     }
 }

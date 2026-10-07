@@ -226,11 +226,10 @@ public sealed class CobolWordsDriftTests
     {
         var vocab = CobolLexer.DefaultVocabulary;
         var wordTokens = new Dictionary<string, string>(StringComparer.Ordinal);   // token -> word
-        for (int t = 1; t <= CobolLexer.SUB_RPAREN + 400; t++)
+        for (int t = 1; t <= ((Antlr4.Runtime.Vocabulary)vocab).getMaxTokenType(); t++)
         {
             string? sym = vocab.GetSymbolicName(t), lit = vocab.GetLiteralName(t);
-            if (sym is null || lit is null || sym.StartsWith("SUB_", StringComparison.Ordinal)
-                || sym.StartsWith("PIC_", StringComparison.Ordinal)) continue;
+            if (sym is null || lit is null || sym.StartsWith("PIC_", StringComparison.Ordinal)) continue;
             string word = lit.Trim('\'').ToUpperInvariant();
             if (Regex.IsMatch(word, "^[A-Z][A-Z0-9-]*$")) wordTokens[sym] = word;
         }

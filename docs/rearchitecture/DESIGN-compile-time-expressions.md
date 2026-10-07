@@ -163,10 +163,10 @@ cceRelationOrBoolean
   subtraction.
 * **`PrimeDirectiveExpr()`** — a lexer flag (the `PrimeFunctionArgs()` pattern) with two effects specific to the
   directive-expression context: it makes `DEFINED` a token (context-sensitive — reserved nowhere else), and it
-  makes every `(` a grouping `LPAREN` (subscript mode is never pushed). The second is required: the subscript-vs-
+  makes every `(` a grouping `LPAREN` (never a REF_LPAREN reference paren). The second is required: the subscript-vs-
   grouping lexer decision treats a `(` after any word that *could* be a data-name as a subscript, and the boolean
   operators (`B-AND` etc.) are legal data-names below 2023 — so without this flag `A B-AND (…)` mis-lexes the
-  parenthesized group in SUBSCRIPT mode (confirmed by token dump). Directive operands never subscript, so every
+  parenthesized group as a reference paren (confirmed by token dump). Directive operands never subscript, so every
   `(` is unambiguously a group. (The same latent subscript-vs-grouping ambiguity affects `(` after a boolean
   operator in the *main* parse — a pre-existing runtime `COMPUTE` Format-2 limitation, tracked separately.)
 * **`ZeroTokenRewriter`** applied to the fragment stream (as `Frontend.LexAndParse`), so figurative `ZERO` in an

@@ -9,9 +9,9 @@ namespace CobolNet.Frontend.Parsing;
 /// <summary>
 /// ⭐ THE ONE FRAGMENT RE-PARSE. Several places isolate a run of SOURCE TEXT and re-parse it through an isolated
 /// fragment entry rule rather than growing a second expression compiler: the D18 subscript / reference-modifier
-/// segment (<see cref="SubscriptExpressionFragment"/>), the D2 keyword-omitted argument list
-/// (<see cref="FunctionArgFragment"/>) and the compile-time directive expression
-/// (<see cref="DirectiveExpressionFragment"/>). Each needs the SAME five steps — lex the text, prime the lexer
+/// segment (<see cref="SubscriptExpressionFragment"/>) and the compile-time directive expression
+/// (<see cref="DirectiveExpressionFragment"/>). (The D2 keyword-omitted argument list was the third until kb/Work
+/// PB2113 made it a parse node of the main tree.) Each needs the SAME five steps — lex the text, prime the lexer
 /// for its region, normalize the token stream, parse at an edition, and return null on any syntax error — and
 /// each had its own copy.
 /// </summary>
@@ -45,10 +45,8 @@ public static class FragmentParse
 {
     /// <summary>Re-parse <paramref name="text"/> through <paramref name="rule"/>, or null on any syntax error
     /// from either recognizer — a partial parse is never returned, so every caller keeps its own loud posture.</summary>
-    /// <param name="prime">The lexer-region prime for this fragment (<c>PrimeFunctionArgs</c>,
-    /// <c>PrimeDirectiveExpr</c>, or null for the DEFAULT mode). The choice is semantic: the §8.3.3.3.2
-    /// sign-adjacent literal twins shall fire inside an argument list and shall NOT fire inside a subscript,
-    /// where <c>A -4</c> is the subtraction §8.7.1 makes it.</param>
+    /// <param name="prime">The lexer-region prime for this fragment (<c>PrimeDirectiveExpr</c>, or null for the
+    /// DEFAULT mode, where no list region is open and a sign before digits is the arithmetic operator).</param>
     /// <param name="rewriteZero">Apply <see cref="ZeroTokenRewriter"/> to the token stream — required wherever
     /// the fragment's grammar can contain an ARITHMETIC EXPRESSION, since §8.8.1.1 admits the figurative ZERO as
     /// an operand and only the rewrite makes it matchable.</param>

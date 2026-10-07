@@ -1921,9 +1921,9 @@ file name as the clause's data-name and died at OPEN naming a word the programme
   REFERENCE-MODIFIER (§8.4.3.3.3's NOTE). A refused operand is recorded AS WRITTEN and its later resolution stays
   silent — one fault, one verdict, including the RECORD KEY / ALTERNATE RECORD KEY selection and the
   `FileControlKeyRules` SR2 row, which take the refused names with the ambiguous ones (kb/Work PB481). The screen
-  reads the operand's suffixes through `ReferenceResolver.ReadOperandSuffixes`, the one reader that knows both
-  lex-time carriers of a reference-modifier (the parsed `refModPart` and the SUBSCRIPT-mode group with a depth-0
-  colon); counting every `subscriptPart` as a subscript called `IX-KEY(1:3)` "a subscript".
+  reads the operand's suffixes through `ReferenceResolver.ReadOperandSuffixes`, the one reader of a reference's
+  subscript lists and reference modifiers; while a ref-mod written after a name was a SUBSCRIPT-mode capture
+  (before kb/Work PB2113), counting every `subscriptPart` as a subscript called `IX-KEY(1:3)` "a subscript".
 - **`ScreenDataNameShape(dref, face, edition)`** — the same screen, static, for a PROCEDURE-DIVISION operand
   where a general format prints `data-name-n`: the SORT KEY phrase of both formats (§14.9.40.2; §14.9.40.3
   SR14 b) *"Key data names shall not be subscripted"*) and the MERGE KEY phrase (§14.9.24.2). Those keys used to

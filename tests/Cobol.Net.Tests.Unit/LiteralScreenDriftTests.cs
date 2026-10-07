@@ -14,16 +14,15 @@ namespace CobolNet.Tests.Unit;
 /// length rule (COBOLNET0814), hexadecimal grouping rule (COBOLNET1635) and content repertoire rule (COBOLNET2630,
 /// kb/Work PB1441) live in <c>LiteralScreenPass</c>, which walks every token of the unit's tree, and nowhere else; and
 /// the literal token set (<c>LiteralTokens.Types</c>, shared with the §8.3.5 <c>SeparatorRule</c>) is every token the
-/// lexer defines over a literal body fragment, so a new literal token — a new lexer mode's twin — joins both rules or
-/// fails here.
+/// lexer defines over a literal body fragment, so a new literal token joins both rules or fails here.
 /// </summary>
 /// <remarks>
 /// Each rule used to be written in the one funnel its author was fixing (the length cap in two procedure-operand
 /// arms; the grouping rule in two version-pass visitors), and every other position a literal can be written in —
 /// VALUE, level-88, CONSTANT, ALL literal-1, a concatenation operand, a keyword-omitted intrinsic argument —
-/// compiled the violation in silence. The keyword-omitted argument is the reason for the token-set half: it is
-/// screened as its SUBSCRIPT-mode token because its re-parsed fragment is not part of the walked tree, which was a
-/// hole exactly as long as <c>X"…"</c> had no SUBSCRIPT-mode twin.
+/// compiled the violation in silence. The keyword-omitted argument was the reason for the token-set half while it was
+/// a SUBSCRIPT-mode capture (a hole exactly as long as <c>X"…"</c> had no twin there); since kb/Work PB2113 it is
+/// parsed in place, so its literals are the ordinary tokens of the walked tree.
 /// </remarks>
 public sealed class LiteralScreenDriftTests
 {
@@ -40,8 +39,8 @@ public sealed class LiteralScreenDriftTests
             Assert.Matches(new Regex($@"(?m)^fragment\s+{body}\s*:"), LexerText);   // a rename must fail here, not empty the set
         var defined = Regex.Matches(LexerText, $@"(?m)^([A-Z_]+)\s*:\s*({string.Join("|", LiteralBodies)})\s*;")
             .Select(m => m.Groups[1].Value).ToHashSet();
-        Assert.True(defined.Count >= 8,
-            $"expected the four DEFAULT-mode literal tokens and their SUBSCRIPT twins, found {defined.Count}");
+        Assert.True(defined.Count >= 4,
+            $"expected the four literal tokens (STRINGLIT, HEXLIT, NATLIT, BOOLLIT), found {defined.Count}");
         var screened = LiteralTokens.Types
             .Select(t => CobolLexer.DefaultVocabulary.GetSymbolicName(t)).ToHashSet();
         Assert.Equal(defined.Order(), screened.Order());

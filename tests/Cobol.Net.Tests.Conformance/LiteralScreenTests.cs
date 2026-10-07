@@ -89,8 +89,8 @@ public sealed class LiteralScreenTests
         Assert.Single(errors, e => e.Contains("COBOLNET1635"));
     }
 
-    /// <summary>The well-formed twins still compile and yield the §8.3.3.2.4 / §8.3.3.5.4 values — the SUBSCRIPT-mode
-    /// <c>SUB_HEXLIT</c> token the screen needed must not change what a keyword-omitted argument binds to:
+    /// <summary>The well-formed twins still compile and yield the §8.3.3.2.4 / §8.3.3.5.4 values — screening a
+    /// keyword-omitted argument's literal where it is written must not change what the argument binds to:
     /// <c>X"4142"</c> is two alphanumeric characters and <c>NX"00410042"</c> two national ones, so LENGTH is 2 for
     /// both, and <c>"Z" &amp; X"41"</c> is <c>ZA</c> (§8.8.3.3 GR2).</summary>
     [Fact]

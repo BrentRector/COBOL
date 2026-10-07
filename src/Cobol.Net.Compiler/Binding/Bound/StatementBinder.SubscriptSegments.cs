@@ -40,10 +40,11 @@ namespace CobolNet.Binding.Bound;
 /// <para>⛔ <b>The alternative that is FORBIDDEN, not merely worse:</b> migrating
 /// <c>RefModPlace.Start</c>/<c>Length</c> to <c>BoundExpr</c>. They are the documented <b>D10 TRANSITIONAL
 /// carrier</b>, deliberately the same shape as <c>RefModSpec</c> "so PHASE 15 migrates both in one move rather
-/// than leaving a second, differently-shaped ref-mod behind", and D10 is an owner ruling relocated to PHASE 15
-/// §"CUT 2.5" (kb/Work PB2113; unblocked now that the legacy compiler that shared <c>SUB_*</c>/<c>SubscriptEntryContext</c> is deleted).
-/// The string carrier is deliberate sequencing, not decay — and when CUT 2.5 lands, THIS temp path is deleted
-/// with it. It is a mechanism designed to be deleted, which is precisely why it must not grow a second carrier
+/// than leaving a second, differently-shaped ref-mod behind", and D10 is an owner ruling executed as PHASE 15
+/// §"CUT 2.5". Its first half landed with kb/Work PB2113 — the SUBSCRIPT lexer mode, the <c>SUB_*</c> tokens and the
+/// hand-rolled splitter are gone and every subscript is a parse node — and its second half moves these positions
+/// onto <c>BoundExpr</c>. The string carrier is deliberate sequencing, not decay — and when that half lands, THIS
+/// temp path is deleted with it. It is a mechanism designed to be deleted, which is precisely why it must not grow a second carrier
 /// in the meantime.</para>
 /// </summary>
 public sealed partial class StatementBinder

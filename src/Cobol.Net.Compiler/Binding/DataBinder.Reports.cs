@@ -4880,6 +4880,9 @@ public sealed partial class DataBinder
     /// Returns the first offending identifier as written, or null when every identifier is admissible.</summary>
     private string? ReportSectionNameIn(Antlr4.Runtime.Tree.IParseTree node, ReportModel? countersOf = null)
     {
+        // A subscript list's names are read by SubscriptWordsOfReference below, which leaves §8.4.2.3.3 SR8's counters
+        // to ScreenReportSubscripts; walking into the list as well would judge a counter subscript a second time.
+        if (node is Core.SubscriptPartContext) return null;
         if (node is Core.DataReferenceContext dref)
         {
             if (dref.LINE_COUNTER() is not null || dref.PAGE_COUNTER() is not null)
@@ -4902,9 +4905,9 @@ public sealed partial class DataBinder
             }
             // identifier-1 is a qualified-data-name-with-subscripts (§8.4.3.1.2): a name inside a SUBSCRIPT or a
             // reference-modification is an identifier of the clause too (SR4's "any identifier appearing in…"). A
-            // subscript is CAPTURED as SUBSCRIPT-mode tokens, not as a nested dataReference (kb/Work PB1295), so its
-            // words are read here: a report section item other than a sum counter or a counter register — those are
-            // §8.4.2.3.3 SR8's, said once by ScreenReportSubscripts — is a report section name like any other.
+            // subscript's words are read here (kb/Work PB1295): a report section item other than a sum counter or a
+            // counter register — those are §8.4.2.3.3 SR8's, said once by ScreenReportSubscripts — is a report section
+            // name like any other.
             foreach (var subscripted in SubscriptWordsOfReference(dref))
                 if (!IsReportSubscriptCounter(subscripted) && IsReportSectionOnlyName(subscripted)) return subscripted;
             for (int i = 0; i < dref.ChildCount; i++)
@@ -4916,13 +4919,10 @@ public sealed partial class DataBinder
         return null;
     }
 
-    /// <summary>The words of the SUBSCRIPTS of one written reference (kb/Work PB1295, PB1474). A subscript is not a nested
-    /// <c>dataReference</c>: the lexer captures everything between the parentheses as SUBSCRIPT-mode tokens
-    /// (<c>subscriptPart</c>), so the tree walks that look for a <c>DataReferenceContext</c> or a LINE-COUNTER token
-    /// never reached a name written there. The reference counts only when its base word is a data item or a report
-    /// section entry — a keyword-omitted function call has the same parenthesised shape, and its arguments are
-    /// not subscripts (§8.4.3.2.3 SR2) — and a reference-modification (a colon at the top level of the parentheses)
-    /// has none.</summary>
+    /// <summary>The words of the SUBSCRIPTS of one written reference (kb/Work PB1295, PB1474): every name written in
+    /// its subscript lists (<c>subscriptPart</c>). The reference counts only when its base word is a data item or a
+    /// report section entry — a keyword-omitted function call has the same parenthesised shape, and its arguments
+    /// are not subscripts (§8.4.3.2.3 SR2) — and a reference modification (<c>refModPart</c>) has none.</summary>
     private IEnumerable<string> SubscriptWordsOfReference(Core.DataReferenceContext dref)
     {
         if (dref.cobolWord()?.GetText() is not { } baseWord || !(ByName.ContainsKey(baseWord) || IsReportSectionOnlyName(baseWord)))
@@ -4932,11 +4932,7 @@ public sealed partial class DataBinder
             var parts = suffix.subscriptPart() is { } direct ? [direct]
                 : suffix.qualification()?.subscriptPart() ?? [];
             foreach (var part in parts)
-            {
-                var content = part.subscriptOrRefMod();
-                if (content.subToken().Any(t => t.SUB_COLON() is not null)) continue;   // reference modification
-                foreach (var word in SubscriptIdentifiers(content)) yield return word;
-            }
+                foreach (var word in SubscriptIdentifiers(part)) yield return word;
         }
     }
 
@@ -4944,7 +4940,8 @@ public sealed partial class DataBinder
     {
         if (node is Antlr4.Runtime.Tree.ITerminalNode t)
         {
-            if (t.Symbol.Type == Core.SUB_IDENTIFIER) yield return t.GetText();
+            if (ReferenceResolver.IsNameToken(t.Symbol) || t.Symbol.Type is Core.LINE_COUNTER or Core.PAGE_COUNTER)
+                yield return t.GetText();
             yield break;
         }
         for (int i = 0; i < node.ChildCount; i++)

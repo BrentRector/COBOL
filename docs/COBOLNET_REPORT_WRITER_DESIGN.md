@@ -311,8 +311,8 @@ off-by-one through every later counter check.
   analyses it (`ScreenReportEntryPicture`): the digit-position limit of §13.18.40.3 SR14 through the data division's
   own `ScreenPictureDigitCapacity` (kb/Work PB1687) and §13.18.54.3 SR2 through `MoveTable16.NumericSenderRefusal`
   (COBOLNET2750; docs/CONFORMANCE.md, the integer-row determination). A subscript in any report entry clause is asked
-  once per written entry by `ScreenReportSubscripts` (§8.4.2.3.3 SR8, COBOLNET2751): the lexer captures a subscript as
-  SUBSCRIPT-mode tokens, so `SubscriptWordsOfReference` reads its words, and a report section item that is not a
+  once per written entry by `ScreenReportSubscripts` (§8.4.2.3.3 SR8, COBOLNET2751): `SubscriptWordsOfReference` reads
+  the words of a reference's subscript lists, and a report section item that is not a
   counter is the SUM expression's / SOURCE's own section rule (`ReportSectionNameIn`). (Before PB482 the addend went through `KeyReference` — the
   FILE STATUS key helper — so `SUM WS-CELL(2)` compiled and ABORTED at the first GENERATE, `SUM WS-TXT(1:2)`
   silently summed the whole item, `SUM WS-TXT` over a `PIC X(6)` summed its digits, `UPON <a control footing>`
@@ -610,8 +610,8 @@ correspondence rules — a name with no RD (§13.18.46.3 SR1), a name in two REP
 **FUNCTION inside a PRESENT WHEN condition
 (`report-condition-function` — the UDF activation-hoist is statement-context machinery)**; an
 arithmetic-expression-1 SUM addend written with a LEADING PARENTHESIS
-(`SUM (A * B)` — the lexer's §8.4.3.2.3 SR2 keyword-omitted-intrinsic trigger on the SUM token pushes
-SUBSCRIPT mode at that `(`, against §13.18.54.3 SR9's "Otherwise, SUM refers to the report writer SUM
+(`SUM (A * B)` — the lexer's §8.4.3.2.3 SR2 keyword-omitted-intrinsic trigger on the SUM token made that `(` a
+subscript capture, against §13.18.54.3 SR9's "Otherwise, SUM refers to the report writer SUM
 clause"; every OTHER spelling of the expression addend is LIVE, and §13.18.54.3 states no parenthesization
 rule that would force the refused one).
 

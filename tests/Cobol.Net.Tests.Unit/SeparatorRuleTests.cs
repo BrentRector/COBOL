@@ -33,7 +33,7 @@ public sealed class SeparatorRuleTests
     [InlineData("MOVE 1 TO N; M.\n")]
     [InlineData("MOVE 1,5 TO N.\n")]                  // DECIMAL-POINT IS COMMA's decimal point (§12.3.7.4 GR14 a))
     [InlineData("MOVE ,5 TO N.\n")]
-    [InlineData("MOVE A(1, 2) TO N.\n")]              // inside a subscript capture (SUB_COMMA + SUB_WS)
+    [InlineData("MOVE A(1, 2) TO N.\n")]              // inside a subscript list (FNARG_SEPARATOR)
     [InlineData("MOVE 1 TO N,\n")]                    // an end of line is a space to the lexer
     // Rule 3 — a period followed by a space or by the end of the text.
     [InlineData("DISPLAY N. DISPLAY M.")]
@@ -51,8 +51,8 @@ public sealed class SeparatorRuleTests
     [Theory]
     [InlineData("MOVE 1 TO N,M.\n", "COBOLNET2631")]
     [InlineData("MOVE 1 TO N;M.\n", "COBOLNET2631")]          // the hidden-channel SEMICOLON
-    [InlineData("MOVE A(I,J) TO N.\n", "COBOLNET2631")]      // SUB_COMMA
-    [InlineData("MOVE A(1;2) TO N.\n", "COBOLNET2631")]      // SUB_SEMICOLON: never a decimal point
+    [InlineData("MOVE A(I,J) TO N.\n", "COBOLNET2631")]      // a bare COMMA inside a subscript list
+    [InlineData("MOVE A(1;2) TO N.\n", "COBOLNET2631")]      // a bare SEMICOLON (HIDDEN): never a decimal point
     [InlineData("MOVE N,5 TO M.\n", "COBOLNET2631")]         // a letter before it: no numeric literal
     [InlineData("DISPLAY N.DISPLAY M.\n", "COBOLNET2632")]
     [InlineData("DISPLAY \"AB\"N.\n", "COBOLNET2633")]          // closing delimiter

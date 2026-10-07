@@ -9,17 +9,16 @@ namespace CobolNet.Frontend.Parsing;
 /// <summary>
 /// The D18 subscript / reference-modifier expression re-parse (fix-queue PB17; ISO §8.4.2.3.2 admits
 /// <c>arithmetic-expression-1</c> as a subscript, §8.4.3.3.3 SR4 as a leftmost-position/length). A subscript
-/// SEGMENT arrives at the binder as a flat SUBSCRIPT-mode token run that
+/// SEGMENT arrives at the binder as the tokens of one parsed subscript item (kb/Work PB2113), which
 /// <c>ReferenceResolver.RenderSegment</c> renders to C# text directly — a token renderer that handles literals,
 /// data-names, index-names, the operators and parentheses, and nothing else. A segment it cannot render (today a
 /// function-identifier) is re-lexed HERE from its verbatim source text and parsed through the ONE
 /// <c>arithmeticExpression</c> rule, so it binds through <c>ExpressionBinder.BindExpr</c> — the documented entry
 /// for subscripts — instead of growing a third hand-written expression compiler inside the renderer.
 ///
-/// The DEFAULT lexer mode is used (the <see cref="DirectiveExpressionFragment"/> posture, NOT
-/// <see cref="CobolLexer.PrimeFunctionArgs"/>): a subscript is not a function-argument region, so the
-/// §8.3.3.3.2 sign-adjacent literal twins must not fire — inside a subscript <c>A -4</c> is the subtraction
-/// §8.7.1 makes it, not two juxtaposed operands. The fragment parses at the CALLER's edition so a
+/// The DEFAULT lexer mode is used (the <see cref="DirectiveExpressionFragment"/> posture): the text is ONE subscript
+/// the main parse already delimited, so no list region is open in it and the §8.3.3.3.2 sign-adjacent literal twins
+/// do not fire. The fragment parses at the CALLER's edition so a
 /// function referenced in a subscript meets the same D8 introduction window it would meet anywhere else.
 /// Any syntax error is a loud <see langword="null"/> — the caller keeps its existing not-implemented posture
 /// rather than binding a partial parse.

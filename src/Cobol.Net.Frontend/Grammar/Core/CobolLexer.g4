@@ -8,36 +8,51 @@ options {
 }
 
 // Virtual token types for the FUNCTION argument-list parentheses (ISO §8.4.3.2.3 SR6). No lexer rule matches
-// them: the '(' / ')' rules below RETYPE themselves from the _fnParenStack the lexer already maintains, which is
-// the ONE place that knows which parens open an argument list. A distinct type is what lets every DOWNSTREAM
+// them: the '(' / ')' rules below RETYPE themselves from the _parenRegions stack the lexer already maintains, which
+// is the ONE place that knows which parens open an argument list. A distinct type is what lets every DOWNSTREAM
 // consumer stop guessing — see the SR6 note on OnDefaultLParen.
+// REF_LPAREN / REF_RPAREN are virtual for the same reason (kb/Work PB2113, owner ruling D10): the '(' right after a word
+// that can name a data item opens that reference's SUBSCRIPT list, REFERENCE MODIFIER or keyword-omitted ARGUMENT list
+// (ISO §8.3.5 4) names all three), never an arithmetic group. The lexer publishes that decision as the paren's TYPE, the
+// parser's subscriptPart / refModPart read it, and the tokens BETWEEN the two parens are the ordinary DEFAULT-mode
+// vocabulary — the SUBSCRIPT lexer mode, its parallel SUB_* token family and the binder's hand-rolled re-parse of that
+// flat stream are gone.
+// SIGNED_INTEGERLIT / SIGNED_DECIMALLIT are virtual: the FN_SIGNED_* rules retype a sign-adjacent literal to them inside
+// a list region (an argument list or a reference's parenthesized tail), where §8.3.5 1) makes the space a separator.
 // DEFINED is virtual for the same reason in another region: it is a keyword ONLY inside a primed compiler-directive
 // expression, so IDENTIFIER's action retypes the word there (see IDENTIFIER). A rule spelling 'DEFINED' would publish
 // that literal in the vocabulary, whose literal names are read as "the lexer makes this word a keyword token"
 // (CobolKeywordTokens, CobolWordsDriftTests) — which, everywhere else, it does not.
-// DEBUG_LINE_IN_REGION is virtual for the same reason: the two region modes (PICMODE, SUBSCRIPT) retype their debugging-line
-// carrier rule to it (kb/Work PB1913), so a debugging line inside an open PICTURE or subscript region reaches
-// DebuggingLineRewriter as a marker that says its text was SKIPPED, not lexed.
-tokens { FNARG_LPAREN, FNARG_RPAREN, DEFINED, DEBUG_LINE_IN_REGION }
+// DEBUG_LINE_IN_REGION is virtual for the same reason: the PICMODE region retypes its debugging-line carrier rule to it
+// (kb/Work PB1913), so a debugging line inside an open PICTURE character-string reaches DebuggingLineRewriter as a
+// marker that says its text was SKIPPED, not lexed.
+tokens { FNARG_LPAREN, FNARG_RPAREN, REF_LPAREN, REF_RPAREN, SIGNED_INTEGERLIT, SIGNED_DECIMALLIT, DEFINED,
+         DEBUG_LINE_IN_REGION }
 
 // The channel of a debugging line that is a COMMENT (kb/Work PB1705): DebuggingLineRewriter moves the tokens of a
 // fixed-form debugging line here when its source unit does not declare WITH DEBUGGING MODE. No lexer rule emits to it.
 channels { ABSENT_DEBUG_LINE }
 
 @members {
-    // Track the types of the last TWO non-WS tokens emitted: one for subscript-mode detection, two for the
+    // Track the types of the last TWO non-WS tokens emitted: one for the reference-paren decision, two for the
     // FUNCTION-argument suppression (P7 Step 12 — '(' after "FUNCTION name" opens an ARGUMENT list, ISO
     // §8.4.3.2 SR6, lexed in DEFAULT mode so arguments parse as real arithmeticExpressions).
     private int _lastNonWsTokenType = -1;
     private int _prevNonWsTokenType = -1;
 
-    // SUBSCRIPT MODE TRIGGER: whitelist approach.
+    // THE REFERENCE-PAREN TRIGGER: whitelist approach.
     //
     // In COBOL, '(' after a data-name means subscript/reference-modification; '(' after anything else means
     // arithmetic grouping (e.g., IF (A + B) > C). The whitelist is IDENTIFIER plus every context-sensitive
     // keyword that can appear as a user-defined data-name. Safe failure mode: a token missing from the set makes
-    // the parser see LPAREN/RPAREN (arithmetic) instead of SUBSCRIPT-mode tokens — a clear parse error on the
+    // the parser see LPAREN/RPAREN (arithmetic) instead of REF_LPAREN/REF_RPAREN — a clear parse error on the
     // first subscripted use.
+    // ⛔ WHY THE DECISION STAYS IN THE LEXER (kb/Work PB2113, DESIGN-frontend-grammar §9.4): ISO §8.3.5 1) makes the
+    // SPACE a separator, so `X (I J)` is two subscripts and `X (I -1)` a subscript and the literal -1, while
+    // `X (I - 1)` is one subtraction (§8.7.1 spaces an operator, §8.3.3.3.2 puts a literal's sign at its leftmost
+    // character). The parser sees the skipped-WS stream, so only the lexer can tell `-1` from `- 1`; it does that
+    // inside a LIST REGION (an argument list or a reference's parenthesized tail) and nowhere else, and it must know
+    // which parens open one. What it no longer does is lex the region's CONTENT in a mode of its own.
     //
     // The set (_dataNameTokens) is GENERATED into Parsing/CobolLexerWordSet.g.cs from
     // tests/version-matrix/cobol-words.json (the subscriptTrigger=true rows) by scripts/gen-cobol-words.ps1
@@ -50,9 +65,9 @@ channels { ABSENT_DEBUG_LINE }
 
     // ⛔ A WORD THIS COMPILE RESERVES IS NEVER A DATA-NAME, SO A '(' AFTER IT IS NEVER A SUBSCRIPT (kb/Work PB1465).
     // _dataNameTokens is edition-blind: it holds every word that is a user-defined word in SOME edition, because
-    // the SUBSCRIPT decision is frozen here, before any parser predicate can ask the edition. That made the '(' after
+    // the reference-paren decision is frozen here, before any parser predicate can ask the edition. That made the '(' after
     // a boolean OPERATOR — B-AND / B-OR / B-XOR / B-NOT, user words at COBOL-85 and reserved by ISO §8.9 from 2002 —
-    // open SUBSCRIPT mode, so `IF BZ B-OR (BW B-AND BW)` and `COMPUTE BR = B-NOT (BW B-XOR BZ)` were COBOL0001
+    // open a reference paren, so `IF BZ B-OR (BW B-AND BW)` and `COMPUTE BR = B-NOT (BW B-XOR BZ)` were COBOL0001
     // although §8.8.2's Table 4 admits '(' after every boolean operator. §8.3.2.1 rule 1 ("Reserved words shall not
     // be used as user-defined words") settles it for EVERY reservation-gated word at once: the compile's own answer
     // to "is this word a user-defined word here" (ReservedWordSet.AdmitsAsUserWord — the question the parser's
@@ -67,7 +82,7 @@ channels { ABSENT_DEBUG_LINE }
         foreach (int t in types) _reservedNonNames.Add(t);
     }
 
-    /// <summary>The edition-blind SUBSCRIPT-trigger set (every word that is a data-name in some edition), for
+    /// <summary>The edition-blind reference-paren trigger set (every word that is a data-name in some edition), for
     /// TokenRetypes.PrimeLexer to narrow per compile.</summary>
     public static System.Collections.Generic.IReadOnlySet<int> SubscriptTriggerTokens => _dataNameTokens;
 
@@ -76,9 +91,9 @@ channels { ABSENT_DEBUG_LINE }
     // so that trigger exists ONLY for the function. ISO §13.18.54.3 SR9: "Within a report description entry, if
     // the keyword SUM is preceded by the keyword FUNCTION, SUM is a reference to the SUM intrinsic function.
     // Otherwise, SUM refers to the report writer SUM clause" — so inside the REPORT SECTION a bare SUM's '(' can
-    // only open a parenthesised addend (arithmetic-expression-1), and capturing it in SUBSCRIPT mode made
+    // only open a parenthesised addend (arithmetic-expression-1), and capturing it as a reference paren made
     // `SUM (WS-K * WS-M)` unparseable while `SUM WS-K * WS-M` compiled. SR9's discriminator is the REGION, which
-    // is why the trigger is made contextual here rather than recovered after the fact: the SUBSCRIPT decision
+    // is why the trigger is made contextual here rather than recovered after the fact: the reference-paren decision
     // is frozen at lex time. The FUNCTION-keyword form is unaffected (PreviousIsFunctionName keys on FUNCTION
     // before the name, and SUM then stays the argument-list FNARG_LPAREN), and outside the REPORT SECTION the
     // keyword-omitted SUM(…) still captures exactly as before. SUM is the only §8.9 ∩ §8.11 word (LENGTH,
@@ -98,7 +113,7 @@ channels { ABSENT_DEBUG_LINE }
 
     // ⛔ >>COBOL-WORDS (ISO §7.3.10.4 GR2/GR3/GR4) IS APPLIED HERE, TO EACH TOKEN AS IT IS EMITTED (kb/Work PB1372).
     // Every decision this lexer takes from a keyword — PIC's mode switch, the FUNCTION argument region, the
-    // SUBSCRIPT trigger, the REPORT SECTION region — is frozen at lex time, so a retype that ran after lexing could
+    // reference-paren trigger, the REPORT SECTION region — is frozen at lex time, so a retype that ran after lexing could
     // reach none of them: a synonym of PIC/PICTURE never entered PICMODE, a synonym of FUNCTION never opened an
     // argument region, a de-reserved PICTURE still swallowed the next word as a picture string, and the one seam that
     // existed (a set of de-reserved types that made '(' subscript) covered only the last of them. NextToken retypes
@@ -120,7 +135,7 @@ channels { ABSENT_DEBUG_LINE }
 
     private void ApplyEditionSpelling(Antlr4.Runtime.IToken token)
     {
-        if (_caseMappingEdition >= 2023 || (token.Type != IDENTIFIER && token.Type != SUB_IDENTIFIER)
+        if (_caseMappingEdition >= 2023 || token.Type != IDENTIFIER
             || token is not Antlr4.Runtime.CommonToken word) return;
         // A word of basic characters has one spelling at every edition: look at the input, build no text.
         bool basic = true;
@@ -135,26 +150,27 @@ channels { ABSENT_DEBUG_LINE }
         if (!ReferenceEquals(spelled, text)) word.Text = spelled;
     }
 
-    // FUNCTION-ARGUMENT REGION (P7 Step 12). '(' after "FUNCTION functionName" is the function's argument-list
-    // paren (ISO §8.4.3.2 SR6) — it stays in DEFAULT mode so the arguments parse through the ONE
-    // arithmeticExpression grammar. The keyword-omitted form name(args) (§8.4.3.2 SR2, D2) has no FUNCTION
-    // token before the name, so it still pushes SUBSCRIPT and stays token-captured. Inside an argument region a
-    // '(' after a data-name still pushes SUBSCRIPT (nested subscripts/ref-mod are untouched — the D10/PHASE-15
-    // deferral). The paren stack tracks which OPEN DEFAULT-mode parens are function-argument regions so the
-    // sign-adjacent literal twins below fire only there.
+    // THE LIST REGIONS (P7 Step 12; kb/Work PB2113). '(' after "FUNCTION functionName" is the function's argument-list
+    // paren (ISO §8.4.3.2 SR6); '(' after a word that can name a data item is that reference's parenthesized tail —
+    // its subscripts (§8.4.2.3.2), its reference modifier (§8.4.3.3.2) or, for the keyword-omitted form name(args)
+    // (§8.4.3.2.3 SR2, D2), its arguments. Both are LIST regions: the §8.3.5 2) comma/semicolon separator survives
+    // as FNARG_SEPARATOR and a sign touching its digits after a separator is a signed literal (SignedLiteralCanStart),
+    // so juxtaposed operands stay apart. Every token inside either region is the DEFAULT-mode vocabulary. The paren
+    // stack tracks what each OPEN paren is, so the matching ')' takes the same type and the region tests are exact.
     private bool PreviousIsFunctionName() => _prevNonWsTokenType == FUNCTION && !_functionIsAddressOperand;
 
     // ⛔ THE FUNCTION OF `ADDRESS [OF] FUNCTION word` DOES NOT HEAD A FUNCTION-IDENTIFIER (kb/Work PB1416). §8.4.3.12.2
     // prints `ADDRESS OF FUNCTION { function-prototype-name-1 | identifier-1 }`: the word after FUNCTION is a prototype
     // name, which takes no argument list, or identifier-1, which §8.4.3.1.3 SR1 makes ANY identifier format — so a '('
     // after it is that identifier's SUBSCRIPT or reference modifier, never §8.4.3.2.3 SR6's argument paren. Retyping
-    // it FNARG_LPAREN kept it in DEFAULT mode, where subscriptPart (LPAREN only) cannot take it, and
+    // it FNARG_LPAREN kept it from the reference paren that subscriptPart reads (REF_LPAREN), and
     // `ADDRESS OF FUNCTION WS-NAME(2)` died COBOL0001. Set as each FUNCTION token is emitted (NextToken), from the
     // two tokens before it: ADDRESS, or ADDRESS OF (OF is optional — §8.4.3.12.2 does not underline it).
     private bool _functionIsAddressOperand;
 
-    private readonly System.Collections.Generic.List<bool> _fnParenStack = new();
-    private bool _primeFunctionArgs;
+    private enum ParenRegion : byte { Group, Arguments, Reference }
+    private readonly System.Collections.Generic.List<ParenRegion> _parenRegions = new();
+    private int _openListRegions;   // the open Arguments + Reference entries of _parenRegions
 
     // COMPILER-DIRECTIVE EXPRESSION region (compile-time expression evaluator, ISO §7.3.6/§7.3.7/§7.3.8). The
     // frontend fragment-parses a directive operand / constant-conditional-expression with the lexer primed here.
@@ -162,15 +178,11 @@ channels { ABSENT_DEBUG_LINE }
     // token (the §7.3.8.4.4 defined-condition keyword — reserved nowhere else); (2) every '(' is a grouping
     // LPAREN, never a subscript. Effect (2) is required because the subscript-vs-grouping decision treats a '('
     // after any word that COULD be a data-name as a subscript, and the boolean operators (B-AND …) are legal
-    // data-names below 2023, so `A B-AND (…)` would mis-lex the group in SUBSCRIPT mode; a directive operand
+    // data-names below 2023, so `A B-AND (…)` would mis-lex the group as a reference paren; a directive operand
     // never subscripts, so every '(' is unambiguously a group (confirmed by token dump, DESIGN §4.1).
     private bool _primeDirectiveExpr;
 
-    private bool InFunctionArgs() => _primeFunctionArgs || _fnParenStack.Contains(true);
-
-    // Fragment re-parse hook (the D2 keyword-omitted argument re-parse): treat the WHOLE input as one
-    // function-argument region (the fragment is the text inside the argument parens).
-    public void PrimeFunctionArgs() => _primeFunctionArgs = true;
+    private bool InListRegion() => _openListRegions > 0;
 
     // Fragment re-parse hook (the compile-time directive-expression parse): treat the WHOLE input as a directive
     // operand / cce region — DEFINED is a token and every '(' groups (DESIGN §4.1).
@@ -191,14 +203,18 @@ channels { ABSENT_DEBUG_LINE }
     // is never the '(' of a parenthesized arithmetic expression. ZeroTokenRewriter reads adjacency to '(' / ')'
     // as proof that a figurative ZERO sits inside parenthesized arithmetic, which is true for a grouping paren and
     // FALSE for this one; the result was that `FUNCTION LOWER-CASE(ZERO)` reached the binder as an arithmetic
-    // zero and was rejected as class numeric, while the keyword-omitted `LOWER-CASE(ZERO)` — whose arguments are
-    // re-lexed by FunctionArgFragment, where no parens are present — returned the correct "0". Two arms of one
+    // zero and was rejected as class numeric, while the keyword-omitted `LOWER-CASE(ZERO)` — whose arguments were
+    // then re-lexed from their text, where no parens are present — returned the correct "0". Two arms of one
     // dispatch, one right (feedback_two_arm_dispatch).
     // ⛔ THE FIX IS THE TOKEN TYPE, NOT A SECOND COPY OF THE PREDICATE. The rewriter could have re-derived "is
     // this '(' an argument list" by walking back two tokens, but that is this method's rule written down twice,
-    // and the SUBSCRIPT decision above proves how easily the two copies drift (feedback_one_rule_one_place). The
+    // and the reference-paren decision above proves how easily the two copies drift (feedback_one_rule_one_place). The
     // stack below is the single source of truth; retyping publishes it, so the rewriter's own rule — "ZERO
     // adjacent to an ARITHMETIC paren is arithmetic" — becomes true as written, with no change to it at all.
+    // The reference paren is published the same way, and for the same reason (kb/Work PB2113): REF_LPAREN is the
+    // paren after a data-name-capable word, so the parser's subscriptPart / refModPart take exactly the parens this
+    // method classified, and a grouping paren after a ')' (`MAX(T (1) (A + B))`, two arguments) never becomes a
+    // second subscript list.
     private void OnDefaultLParen()
     {
         // A directive-expression region never subscripts: every '(' groups (DESIGN §4.1). Checked first so a '('
@@ -206,10 +222,11 @@ channels { ABSENT_DEBUG_LINE }
         if (!_primeDirectiveExpr && PreviousTokenCouldBeDataName() && !PreviousIsFunctionName()
             && !IsReportSumClauseKeyword())
         {
-            PushMode(SUBSCRIPT);   // subscript / ref-mod capture — the matching ')' is SUB_RPAREN (popMode)
+            OpenRegion(ParenRegion.Reference);
+            Type = REF_LPAREN;   // subscripts / reference modifier / keyword-omitted arguments; its ')' is REF_RPAREN
             return;
         }
-        // Staying DEFAULT: record whether this paren opens a FUNCTION argument region, and publish it as the type.
+        // Not a reference: record whether this paren opens a FUNCTION argument region, and publish it as the type.
         // ⚠ THE `&& PreviousTokenCouldBeDataName()` CONJUNCT THAT STOOD HERE IS GONE, and dropping it is part of
         // the fix rather than a tidy-up. SR6 keys on the '(' following an intrinsic-function-name — it says
         // nothing about whether that name's TOKEN happens to be one of the context-sensitive words that can also
@@ -217,16 +234,28 @@ channels { ABSENT_DEBUG_LINE }
         // the conjunct silently made `FUNCTION BIT(…)` the one function call whose parens were not an argument
         // region — a difference with no rule behind it, and exactly the sort of accidental exception a later
         // reader would preserve as intentional.
-        _fnParenStack.Add(PreviousIsFunctionName());
-        if (PreviousIsFunctionName()) Type = FNARG_LPAREN;
+        if (PreviousIsFunctionName())
+        {
+            OpenRegion(ParenRegion.Arguments);
+            Type = FNARG_LPAREN;
+        }
+        else OpenRegion(ParenRegion.Group);
+    }
+
+    private void OpenRegion(ParenRegion region)
+    {
+        _parenRegions.Add(region);
+        if (region != ParenRegion.Group) _openListRegions++;
     }
 
     private void OnDefaultRParen()
     {
-        if (_fnParenStack.Count == 0) return;   // unbalanced source — the parser reports it
-        bool wasFnArgs = _fnParenStack[_fnParenStack.Count - 1];
-        _fnParenStack.RemoveAt(_fnParenStack.Count - 1);
-        if (wasFnArgs) Type = FNARG_RPAREN;
+        if (_parenRegions.Count == 0) return;   // unbalanced source — the parser reports it
+        var region = _parenRegions[_parenRegions.Count - 1];
+        _parenRegions.RemoveAt(_parenRegions.Count - 1);
+        if (region == ParenRegion.Group) return;
+        _openListRegions--;
+        Type = region == ParenRegion.Arguments ? FNARG_RPAREN : REF_RPAREN;
     }
 
     // ⛔ NO SEMANTIC PREDICATE ON A PATH THE DFA MUST CACHE — CONTEXT GOES IN AN ACTION (kb/Work PB1715). ANTLR
@@ -241,15 +270,15 @@ channels { ABSENT_DEBUG_LINE }
 
     // A signed numeric literal's sign is the leftmost CHARACTER of the literal (ISO §8.3.3.3.2 2): "If a sign is
     // used, it shall appear as the leftmost character of the literal") and an arithmetic operator "shall be
-    // preceded by a space and followed by a space" (§8.7.1) — so inside a function-argument region a [+-] that
-    // follows a separator and touches its digits starts a NEW argument (a signed literal), never a binary
-    // operator: MAX(A -4) is two arguments, MAX(A - 4) is one subtraction. Asked by the FN_SIGNED_* action after
-    // the match, so the separator test reads the character before the TOKEN'S START, not before the input index.
+    // preceded by a space and followed by a space" (§8.7.1) — so inside a list region a [+-] that follows a
+    // separator and touches its digits starts a NEW argument or subscript (a signed literal), never a binary
+    // operator: MAX(A -4) and T(I -4) are two each, MAX(A - 4) and T(I - 4) one subtraction each. Asked by the
+    // FN_SIGNED_* action after the match, so the separator test reads the character before the TOKEN'S START, not
+    // before the input index.
     private bool SignedLiteralCanStart()
     {
-        if (!InFunctionArgs()) return false;
+        if (!InListRegion()) return false;
         int start = TokenStartCharIndex;
-        if (start == 0) return true;   // fragment start (the D2 re-parse) — a separator by definition
         int before = InputStream.LA(start - 1 - InputStream.Index);   // LA(-k) is the character k before the index
         return before == ' ' || before == '\n' || before == ',' || before == ';'
             || before == '(';
@@ -292,7 +321,7 @@ channels { ABSENT_DEBUG_LINE }
         // makes a data-name of it; EQUATE "PIC" WITH "PX" makes PX the keyword).
         if (token.Type == PIC) PushMode(PICMODE);
         // DEBUG_LINE is a marker, not a word: like a comment it must not become the "previous token" of the next one.
-        if (token.Type != WS && token.Type != SUB_WS && token.Type != DEBUG_LINE && token.Type != DEBUG_LINE_IN_REGION
+        if (token.Type != WS && token.Type != DEBUG_LINE && token.Type != DEBUG_LINE_IN_REGION
             && token.Type != Antlr4.Runtime.TokenConstants.EOF)
         {
             TrackReportSection(token.Type);   // before the shift: it asks what PRECEDED this token
@@ -322,10 +351,12 @@ COMMENT_START: '*>' -> skip, pushMode(COMMENT_MODE) ;
 // HIDDEN token, and the line's text is lexed as ordinary tokens behind it: whether they are SOURCE or COMMENT is decided
 // per source unit, after lexing, by DebuggingLineRewriter (the unit's SOURCE-COMPUTER WITH DEBUGGING MODE clause is
 // further down the token stream than the line may be, so no earlier stage can know). Longer than COMMENT_START's `*>`, so
-// it wins. PICMODE and SUBSCRIPT cannot lex the line's text on the strength of a decision not yet made — which of the
-// two the text is changes the lexer's own mode — so they SKIP the line as a comment and leave a DEBUG_LINE_IN_REGION marker
-// (PIC_DEBUG_LINE / SUB_DEBUG_LINE below); when the rewriter finds such a line is SOURCE (its unit declares the mode), the
-// frontend blanks that line's carrier and lexes the text again, now with the line as plain source (kb/Work PB1913).
+// it wins. PICMODE cannot lex the line's text on the strength of a decision not yet made — which of the two the text is
+// changes the lexer's own mode — so it SKIPS the line as a comment and leaves a DEBUG_LINE_IN_REGION marker
+// (PIC_DEBUG_LINE below); when the rewriter finds such a line is SOURCE (its unit declares the mode), the frontend blanks
+// that line's carrier and lexes the text again, now with the line as plain source (kb/Work PB1913). A subscript or
+// reference-modification region is no mode of its own any more (kb/Work PB2113): its text is DEFAULT-mode text, so a
+// debugging line inside one is lexed behind this marker like any other.
 DEBUG_LINE   : '*>' '\u{FDD0}' 'DEBUG ' -> channel(HIDDEN) ;
 
 // ── END-xxx paired terminators (must precede END and IDENTIFIER) ──
@@ -990,8 +1021,8 @@ QUOTES      : 'QUOTES' ;
 // MUST precede DECIMALLIT so maximal munch keeps "1.5E3" ONE token, not DECIMALLIT "1.5" + IDENTIFIER "E3" (the
 // old parse error). Additive: the no-space <decimal>E<digits> form was previously always a parse error. (D16.)
 // The body is a FRAGMENT (the Group-B one-body discipline) because THREE tokens consume it: this one, the
-// FN_SIGNED twin, and the SUBSCRIPT-mode forms (kb/Work R17 — the float shape was the one signed-capable
-// literal with no twins, so `FUNCTION EXP(-1.5E3)` lexed as TWO arguments and drew a false COBOLNET1504).
+// FN_SIGNED twin (kb/Work R17 — the float shape was the one signed-capable literal with no twin, so
+// `FUNCTION EXP(-1.5E3)` lexed as TWO arguments and drew a false COBOLNET1504).
 fragment FLOAT_BODY : ( [0-9]+ '.' [0-9]* | '.' [0-9]+ ) 'E' [-+]? [0-9]+ ;
 FLOATLIT    : FLOAT_BODY ;
 
@@ -1003,17 +1034,16 @@ FLOATLIT    : FLOAT_BODY ;
 // DECIMAL-POINT IS COMMA is not in effect. No dot-mode program legally spells `<digits>,<digits>E<exponent>` (the
 // comma-decimal fixed form assembles in the parser as INTEGERLIT COMMA INTEGERLIT because ',' alone is a token; the
 // float shape needs the E-tail, so it is lexed whole — before this a comma-mode `VALUE 1,5E+3` silently seeded 1 and
-// `MOVE 1,5E+3 TO X` was a parse error). Same body discipline as FLOAT_BODY: fragment + FN_SIGNED twin + SUB forms
+// `MOVE 1,5E+3 TO X` was a parse error). Same body discipline as FLOAT_BODY: fragment + FN_SIGNED twin
 // (SignedLiteralShapeDriftTests scrapes every FLOAT*_BODY).
 fragment FLOAT_COMMA_BODY : ( [0-9]+ ',' [0-9]* | ',' [0-9]+ ) 'E' [-+]? [0-9]+ ;
 COMMA_FLOATLIT : FLOAT_COMMA_BODY ;
 
 // ── Shared literal fragment bodies (rearchitecture PHASE 04, Group B) ──
-// One definition per literal tokenization shape, referenced by BOTH the DEFAULT-mode literal tokens and their
-// SUBSCRIPT-mode SUB_* twins (fragments are mode-independent). The two modes previously re-declared each body
-// char-for-char; now a future string-escape / national-literal / data-name fix is applied ONCE and cannot diverge
-// between modes (DESIGN-frontend-grammar §3.3b). Bodies are byte-identical to the retired inline forms.
-fragment STR_BODY  : '"' (~["\n] | '""')* '"' | '\'' (~['\n] | '\'\'')* '\'' ;   // STRINGLIT / SUB_STRINGLIT
+// One definition per literal tokenization shape, referenced by the literal tokens and their sign-adjacent twins. A
+// second lexer mode used to re-declare each body char-for-char (the SUBSCRIPT mode, deleted by kb/Work PB2113); a
+// string-escape / national-literal / data-name fix is applied ONCE (DESIGN-frontend-grammar §3.3b).
+fragment STR_BODY  : '"' (~["\n] | '""')* '"' | '\'' (~['\n] | '\'\'')* '\'' ;   // STRINGLIT
 // ⛔ FORMAT 2 IS THE SAME LITERAL KIND, SO IT IS THE SAME TOKEN (fix-queue R03). §8.3.3.5.2 and §8.3.3.4.2 each
 // print TWO general formats — `N"…"` / `NX"…"` and `B"…"` / `BX"…"` — and their ALL-FORMATS general rules put
 // both formats in ONE class and category (§8.3.3.5.4 GR2 national, §8.3.3.4.4 GR2 boolean). Folding Format 2
@@ -1040,20 +1070,18 @@ fragment STR_BODY  : '"' (~["\n] | '""')* '"' | '\'' (~['\n] | '\'\'')* '\'' ;  
 // Hexadecimal-alphanumeric X"…" / X'…' (§8.3.3.2.2 Format 2 — the printed page shows BOTH delimiters with
 // the hex sequence OPTIONAL, verified at 300 dpi 2026-08-09): one body, both delimiters, zero length legal —
 // the Group-B discipline.
-// ⛔ SUB_HEXLIT IS ITS SUBSCRIPT-MODE TWIN (kb/Work PB1393). The keyword-omitted intrinsic capture re-lexes its
-// argument text in DEFAULT mode, so the VALUE never needed the twin (PB59 measured that); the literal SYNTAX
-// SCREEN does. LiteralScreenPass asks the §8.3.3 length and grouping rules of every literal TOKEN of the unit's
-// one tree, and the re-parsed fragment is not part of that tree — so a captured literal is screened as its
-// SUBSCRIPT-mode token or not at all. Without the twin, `LENGTH(X"414")` lexed here as SUB_IDENTIFIER `X` +
-// SUB_STRINGLIT `"414"` and the malformed hexadecimal literal decoded to "" in silence. LiteralScreenDriftTests
-// requires every token defined over one of these literal body fragments to be in the screen's token set.
+// LiteralScreenPass asks the §8.3.3 length and grouping rules of every literal TOKEN of the unit's one tree (kb/Work
+// PB1393), and a keyword-omitted intrinsic's argument list is part of that tree like any other operand: its literals
+// are the ordinary DEFAULT-mode tokens (kb/Work PB2113), so `LENGTH(X"414")` is screened as the HEXLIT it is.
+// LiteralScreenDriftTests requires every token defined over one of these literal body fragments to be in the screen's
+// token set.
 fragment HEX_BODY  : [x] STR_BODY ;                                                  // §8.3.3.2.2 Format 2
-fragment NAT_BODY  : 'N' STR_BODY                                                    // NATLIT / SUB_NATLIT F1
+fragment NAT_BODY  : 'N' STR_BODY                                                    // NATLIT F1
                    | 'NX' STR_BODY ;                                                 // §8.3.3.5.2 Format 2
-fragment BOOL_BODY : 'B' STR_BODY                                                    // BOOLLIT / SUB_BOOLLIT F1
+fragment BOOL_BODY : 'B' STR_BODY                                                    // BOOLLIT F1
                    | 'BX' STR_BODY ;                                                 // §8.3.3.4.2 Format 2
-fragment INT_BODY  : [0-9]+ ;                                                        // INTEGERLIT / SUB_INTEGERLIT
-fragment DEC_BODY  : [0-9]+ '.' [0-9]+ | '.' [0-9]+ ;                                // DECIMALLIT / SUB_DECIMALLIT
+fragment INT_BODY  : [0-9]+ ;                                                        // INTEGERLIT
+fragment DEC_BODY  : [0-9]+ '.' [0-9]+ | '.' [0-9]+ ;                                // DECIMALLIT
 // ⛔ THE UNDERSCORE IS A COBOL WORD CHARACTER AND HAS BEEN SINCE COBOL-2002 (fix-queue R02). §8.3.2.1: "Each
 // character of a COBOL word … shall be selected from the set of basic letters, basic digits, extended letters,
 // and the basic special characters HYPHEN AND UNDERSCORE. The hyphen or underscore shall not appear as the first
@@ -1083,21 +1111,21 @@ fragment DEC_BODY  : [0-9]+ '.' [0-9]+ | '.' [0-9]+ ;                           
 // legal last); only hyphen and underscore are barred from the ends here.
 fragment EXT_CHAR  : ~[\u0000-\u007F\uFDD0-\uFDEF\uFFFE\uFFFF] ;
 fragment NAME_TAIL : ([a-z0-9_-] | EXT_CHAR)* ([a-z0-9] | EXT_CHAR) ;   // cannot END on a separator (§8.3.2.1)
-fragment NAME_BODY                                                                   // IDENTIFIER / SUB_IDENTIFIER
+fragment NAME_BODY                                                                   // IDENTIFIER
     : [0-9]+ [-_] ([a-z0-9] | EXT_CHAR) NAME_TAIL?   // digit-start with separator: 42-DATANAMES, 42_DATANAMES
     | [0-9]+ ([a-z] | EXT_CHAR) NAME_TAIL?           // digit-start with letter: 11A, 25COUNT, 80PARTS, 1É
     | ([a-z] | EXT_CHAR) NAME_TAIL?                  // alpha-start: A, WRK-DS-01V00, MY_NAME, CAFÉ
     ;
 
-// ── Function-argument signed literals (P7 Step 12) ──
-// Inside a FUNCTION argument region (and only there — the predicate), a sign that follows a separator and
-// touches its digits is the leftmost CHARACTER of a numeric literal (ISO §8.3.3.3.2 r2); a binary operator is
-// space-surrounded (§8.7.1). These twins re-type to the SUBSCRIPT-mode SIGNED_* token types so the parser sees
-// one vocabulary: MAX(A -4) lexes A SIGNED_INTEGERLIT(-4) = two arguments; MAX(A - 4) lexes A MINUS 4 = one
+// ── List-region signed literals (P7 Step 12; kb/Work PB2113) ──
+// Inside a list region (an argument list or a reference's parenthesized tail, and only there — the action), a sign
+// that follows a separator and touches its digits is the leftmost CHARACTER of a numeric literal (ISO §8.3.3.3.2
+// r2); a binary operator is space-surrounded (§8.7.1). These twins re-type to the virtual SIGNED_* token types:
+// MAX(A -4) lexes A SIGNED_INTEGERLIT(-4) = two arguments, T(I -4) two subscripts; MAX(A - 4) lexes A MINUS 4 = one
 // subtraction. Outside argument regions OnSignedLiteral cuts the token back to its sign, so [+-] lexes PLUS/MINUS
 // and the digits their own literal, exactly as a lone sign always has. ⛔ The context test is the ACTION, never a
 // predicate on the rule (kb/Work PB1715 — see the members): a predicate here re-simulated every `+`/`-` token.
-// The decimal twin MUST precede the integer twin (the SUBSCRIPT-mode ordering note: else -15.6 orphans ".6"),
+// The decimal twin MUST precede the integer twin (else -15.6 orphans ".6"),
 // and the FLOAT twin precedes them both (kb/Work R17): "-1.5E3" must stay ONE token — without this twin the
 // signed-decimal rule won maximal munch at "-1.5" and orphaned "E3" as an IDENTIFIER, so the parser reported
 // two arguments (§8.3.3.3.3 r2 makes the sign part of the literal; §15.3 type 10 admits the literal). The
@@ -1119,8 +1147,8 @@ DECIMALLIT  : DEC_BODY ;
 // Pure digits remain INTEGERLIT (level numbers, paragraph numbers, etc.).
 // The action is the ONE place a word that is a keyword only in a primed region is retyped: DEFINED, the §7.3.8.4.4
 // defined-condition keyword (`compilation-variable-name IS [NOT] DEFINED`), is NOT a reserved word in the source
-// language — it is a token ONLY inside a primed compiler-directive-expression fragment (the PrimeFunctionArgs
-// precedent), and an ordinary IDENTIFIER (a legal user data-name) everywhere else. ⛔ An ACTION, never a predicate
+// language — it is a token ONLY inside a primed compiler-directive-expression fragment, and an ordinary IDENTIFIER
+// (a legal user data-name) everywhere else. ⛔ An ACTION, never a predicate
 // (kb/Work PB1715): the predicate the DEFINED rule carried kept every D-initial word of every compile (DATA,
 // DIVISION, DISPLAY …) off the cached DFA.
 IDENTIFIER  : NAME_BODY { if (_primeDirectiveExpr) RetypeDirectiveKeyword(); } ;
@@ -1158,16 +1186,17 @@ NOTEQUAL    : '<>' ;
 // A period is a separator only when a space follows it (§8.3.5 rule 3). The token is every period the literal and
 // PICTURE rules did not take; SeparatorRule reports one with no space after it (COBOLNET2632, kb/Work PB1394).
 DOT         : '.' ;
-// P7 Step 12: inside a FUNCTION-argument region the ','/';'-plus-space separator (§8.3.5 rules 1/2) is a REAL
-// token — the argument boundary must survive to the parser: a '(' right after it opens a PARENTHESIZED
-// ARGUMENT, and the LPAREN whitelist action sees the separator (not the previous argument's data-name) as the
-// previous token, so `MAX(A * B, (C + 1) / 2, …)` (IF119A/IF123A) does not mis-lex the group as a subscript
-// of B. Outside argument regions the ACTION skips it — ISO §8.3.5 2): "The COBOL characters comma and semicolon,
+// P7 Step 12: inside a list region (an argument list, or a reference's subscripts — kb/Work PB2113) the ','/';'-plus-
+// space separator (§8.3.5 rules 1/2) is a REAL token — the boundary must survive to the parser: a '(' right after it
+// opens a PARENTHESIZED ARGUMENT or SUBSCRIPT, and the LPAREN whitelist action sees the separator (not the previous
+// operand's data-name) as the previous token, so `MAX(A * B, (C + 1) / 2, …)` (IF119A/IF123A) and
+// `HARRY (I - 3, 4, (X * 2) - 3)` (ISO Annex D.3.5.3) do not mis-lex the group as a subscript of the operand before
+// it. Outside list regions the ACTION skips it — ISO §8.3.5 2): "The COBOL characters comma and semicolon,
 // immediately followed by a space, are separators that may be used anywhere the separator space is used" — so it
 // is skipped exactly as the space is. ONE rule matches the separator everywhere and its action says which it is;
 // ⛔ never a predicate choosing between two rules (kb/Work PB1715): the predicate this rule carried kept every
 // `, ` and `; ` of every compile off the cached DFA, and the unpredicated twin it needed is gone with it.
-FNARG_SEPARATOR : [,;] [ \n]+ { if (!InFunctionArgs()) Skip(); } ;
+FNARG_SEPARATOR : [,;] [ \n]+ { if (!InListRegion()) Skip(); } ;
 // A comma NOT followed by whitespace is preserved for DECIMAL-POINT IS COMMA, where it is a numeric literal's
 // decimal point; anywhere else it is no separator (§8.3.5 rule 2) and SeparatorRule reports it (COBOLNET2631).
 COMMA       : ',' ;
@@ -1246,7 +1275,7 @@ PIC_STRING  : ( ~[ \n.] | '.' ~[ \n] )+
         // last clause) is followed by the separator PERIOD, not a space (NC125A's `PIC 9,9,…,9,.` — the token
         // ends at the ',' because '.'+newline cannot extend the match, so LA(1) is '.' and the ',' is a
         // PICTURE SYMBOL to keep). The seek-back re-lexes a trimmed separator in DEFAULT mode, where
-        // FNARG_SEPARATOR's action skips it (a PICTURE clause is never inside a function-argument region).
+        // FNARG_SEPARATOR's action skips it (a PICTURE clause is never inside a list region).
         else if (t.Length > 1 && (t[t.Length - 1] == ',' || t[t.Length - 1] == ';'))
         {
             int la = InputStream.LA(1);
@@ -1261,83 +1290,6 @@ PIC_STRING  : ( ~[ \n.] | '.' ~[ \n] )+
     // Post-action: if PIC string ends with '.', the greedy match consumed a
     //   sentence-ending period — back up one char so it tokenizes as DOT;
     //   likewise a trailing ','/';' clause separator (§8.3.5 r2) backs up and re-lexes as a skip token.
-
-// ==========================================
-// COMMENT_MODE — *> to end of line
-// ==========================================
-
-// ==========================================
-// SUBSCRIPT MODE — COBOL-85 §5.3 subscript lexing
-// ==========================================
-// Entered when '(' follows an IDENTIFIER. Whitespace is preserved (not skipped)
-// and sign adjacency is distinguished: +1 (SIGNED_INTEGERLIT) vs + 1 (SUB_PLUS SUB_WS SUB_INTEGERLIT).
-
-mode SUBSCRIPT;
-
-SUB_WS              : [ \n]+ ;
-// The same comment carrier inside a subscript or reference-modifier (see PIC_COMMENT): *> is no operator there.
-// A fixed-form DEBUGGING line inside the region (kb/Work PB1913) — see PIC_DEBUG_LINE; it precedes SUB_COMMENT for the same reason.
-SUB_DEBUG_LINE      : '*>' '\u{FDD0}' 'DEBUG ' ~[\n]* -> type(DEBUG_LINE_IN_REGION), channel(HIDDEN) ;
-SUB_COMMENT         : '*>' ~[\n]* -> skip ;
-
-// Keywords must precede SUB_IDENTIFIER (same length → first rule wins)
-SUB_OF              : 'OF' ;
-SUB_IN              : 'IN' ;
-SUB_ALL             : 'ALL' ;
-
-// The FLOAT forms first (kb/Work R17 — this mode had NO float shape at all, so "1.5E3" in a captured region
-// lexed SUB_DECIMALLIT "1.5" + SUB_IDENTIFIER "E3" and the signed form orphaned identically). Re-typed to
-// the ONE FLOATLIT vocabulary, sign in the token text — same convention as the DEFAULT-mode twin.
-SUB_SIGNED_FLOATLIT : [+-] FLOAT_BODY -> type(FLOATLIT) ;
-SUB_FLOATLIT        : FLOAT_BODY -> type(FLOATLIT) ;
-SUB_SIGNED_COMMA_FLOATLIT : [+-] FLOAT_COMMA_BODY -> type(COMMA_FLOATLIT) ;   // the DECIMAL-POINT IS COMMA twin (kb/Work PB98)
-SUB_COMMA_FLOATLIT        : FLOAT_COMMA_BODY -> type(COMMA_FLOATLIT) ;
-
-// Sign immediately adjacent to a decimal literal: -15.6, +0.2, -.5 (signed decimal
-// argument to an intrinsic function, ISO §15). MUST precede SIGNED_INTEGERLIT so the
-// fractional part is not orphaned: ANTLR longest-match makes "-15.6" one SIGNED_DECIMALLIT
-// rather than SIGNED_INTEGERLIT "-15" + SUB_DECIMALLIT ".6" (which silently dropped the .6).
-SIGNED_DECIMALLIT   : [+-] [0-9]+ '.' [0-9]+ | [+-] '.' [0-9]+ ;
-
-// Sign immediately followed by digits: +1, -10 (signed literal subscript)
-SIGNED_INTEGERLIT   : [+-] [0-9]+ ;
-
-// Numeric literals
-SUB_INTEGERLIT      : INT_BODY ;
-SUB_DECIMALLIT      : DEC_BODY ;
-
-// Alphanumeric literal — needed for string-valued intrinsic-function arguments,
-// e.g. FUNCTION LOWER-CASE("ABC"), FUNCTION NUMVAL("12.3"). Mirrors STRINGLIT.
-SUB_STRINGLIT       : STR_BODY ;
-
-// National/boolean literal arguments (N"…"/B"…", ISO §8.3.3.5/§8.3.3.4) — mirror NATLIT/BOOLLIT. MUST
-// precede SUB_IDENTIFIER (and win by longest match anyway) so the prefix letter is never orphaned as a
-// one-character data-name with the quoted body becoming a separate SUB_STRINGLIT — that shape silently
-// misbound FUNCTION LENGTH(N"AB") before these tokens existed (Phase 4a, the proper-token rule).
-SUB_NATLIT          : NAT_BODY ;
-SUB_BOOLLIT         : BOOL_BODY ;
-// Hexadecimal-alphanumeric X"…" (§8.3.3.2 Format 2) — the twin of HEXLIT, for the literal syntax screen (see
-// HEX_BODY above). Longest match makes it beat SUB_IDENTIFIER's one-character `X`.
-SUB_HEXLIT          : HEX_BODY ;
-
-// Data-name / index-name (must follow keywords to avoid capturing OF/IN/ALL)
-SUB_IDENTIFIER      : NAME_BODY ;
-
-// Operators and punctuation. Arithmetic operators (*, /, **) are needed because
-// intrinsic-function arguments — captured in this mode to preserve comma/space
-// separators — may be full arithmetic expressions (ISO §15), e.g. MEAN(9 * A, B / 2).
-// SUB_POWER must precede SUB_STAR so '**' is one token, not two.
-SUB_PLUS            : '+' ;
-SUB_MINUS           : '-' ;
-SUB_POWER           : '**' ;
-SUB_STAR            : '*' ;
-SUB_SLASH           : '/' ;
-SUB_COMMA           : ',' ;
-SUB_SEMICOLON       : ';' ;  // §8.3.5: semicolon is interchangeable with comma
-SUB_COLON           : ':' ;
-SUB_LPAREN          : '(' -> pushMode(SUBSCRIPT) ;
-SUB_RPAREN          : ')' -> popMode ;
-SUB_ANY             : . ;
 
 // ==========================================
 // COMMENT_MODE — *> to end of line

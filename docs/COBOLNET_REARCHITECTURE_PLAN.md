@@ -3895,26 +3895,32 @@ This is a HIGH-risk rearchitecture task; keep it a self-contained sub-track that
 Execute it FROM `docs/rearchitecture/DESIGN-frontend-grammar.md §9` (the decision-complete design), staged §9.5
 D10.1–D10.5, battery-green at every commit boundary.
 
-- [ ] **Step D10.1 — resolve §9.4 + land the before-corpus.** Answer the §9.4 space-separator decision (recommended
+- [x] **Step D10.1 — resolve §9.4 + land the before-corpus.** (kb/Work PB2113: Option A from §8.3.5 1)/2); the corpus
+  is `85/pb2113_subscript_list_separators`, `2002/pb2113_subscript_expressions_and_arguments` and
+  `negative/pb2113-keyword-omitted-arguments-85`, each green on the pre-change compiler too.) Answer the §9.4 space-separator decision (recommended
   Option A — preserve ISO §8.3.5 space-separated subscript/argument lists via a scoped WS mechanism; Option B narrows the
   language and is a spec violation). Add the NEW conformance/characterization corpus (§9.5 D10.1: multi-subscript
   space/comma lists, relative offsets `I+1` vs `I + 1`, signed literals `+1`/`-15.6`/`-.5`, ref-mod `(a:b)`/`(a:)`,
   qualified subscripts, nested FUNCTION args, string/national/boolean args, `table(ALL)`) captured GREEN first. **COMMIT.**
-- [ ] **Step D10.2 — converge ref-mod** onto the DEFAULT-mode `refModPart`; delete the ref-mod branch of the binder's
+- [x] **Step D10.2 — converge ref-mod** onto the DEFAULT-mode `refModPart` (PB2113: `refModPart` takes REF_LPAREN); delete the ref-mod branch of the binder's
   `InterpretSubscripts`. **COMMIT.**
-- [ ] **Step D10.3 — interpreted subscript grammar rule** (per §9.4's answer) + rewrite `ReferenceResolver`'s subscript
+- [x] **Step D10.3 — interpreted subscript grammar rule** (PB2113: `subscriptPart : REF_LPAREN subscriptList? REF_RPAREN`;
+  `ReferenceResolver.SegmentsOf` reads one segment per parsed item. The SUBSCRIPT-mode splitter, `HasDepth0Colon` and the
+  captured ref-mod reader are deleted; `RenderSegment` and the D18 text re-parse remain the transitional string carrier,
+  which D10's second half moves onto `BoundExpr`) (per §9.4's answer) + rewrite `ReferenceResolver`'s subscript
   interpreters (`HasDepth0Colon`/`InterpretSubscripts`/`SplitSubscriptTokens`/`RenderSegment`/`ResolveSubscriptName`)
   over real `arithmeticExpression`/`subscript` nodes. **COMMIT.**
-- [ ] **Step D10.4 — REDUCED by P7 Step 12** (which already parses FUNCTION arguments as real trees through
+- [x] **Step D10.4 — REDUCED by P7 Step 12** (PB2113: the keyword-omitted channel binds the parsed items,
+  `FunctionArgFragment` is deleted; the `functionArgList`/`argumentList` reunification is kb/Work PB2114's) (which already parses FUNCTION arguments as real trees through
   `functionArgList`, deleted the recursive-descent `SUB_*` parser, and routes UdfBinder/keyword-omitted through the
   ONE `BindArgOperand`). Residual scope: reunify `functionArgList` with `inlineMethodInvocationStatement`'s
   `argumentList` (one argument rule), and convert the keyword-omitted D2 channel from the `FunctionArgFragment`
   text re-parse to the interpreted-subscript grammar (falls out of D10.3, which makes a dataReference's captured
   subscripts real nodes). **COMMIT.**
-- [ ] **Step D10.5 — delete the SUBSCRIPT-mode block** + the `LPAREN` mode-entry action + `PreviousTokenCouldBeDataName`
-  + the now-dead structured `subscriptList/subscriptEntry/subscriptQualification/relativeOffset` rules (legacy is gone,
-  so their `SubscriptEntryContext` consumer is gone); reconcile the PHASE-04 Group-A `cobol-words.json` drift test (the
-  `subscriptTrigger` column goes dead — regenerate + adjust the drift assertion). **COMMIT.**
+- [x] **Step D10.5 — delete the SUBSCRIPT-mode block** + the `LPAREN` mode-entry action + the now-dead structured
+  `subscriptList/subscriptEntry/subscriptQualification/relativeOffset` rules (PB2113). ⚠ CORRECTED: under §9.4's Option A
+  `PreviousTokenCouldBeDataName` and the `subscriptTrigger` column stay — the lexer still decides which '(' opens a list
+  region (REF_LPAREN), because only it can see the space that separates `-1` from `- 1`. **COMMIT.**
 - **Verify (each step):** greenfield battery + `guard.ps1` + INV-1-strong; the D10.1 corpus green; token equivalence is
   NOT the metric (tokens change by design — prove OUTPUT/behavior equivalence). Exit criterion 0 holds when D10.5 lands.
 

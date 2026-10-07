@@ -245,9 +245,9 @@ none.
 The lexer freezes three decisions at lex time; because the retype is applied by the lexer itself (§2), each reads
 the EFFECTIVE word:
 
-1. **SUBSCRIPT-mode entry** (`_dataNameTokens` at `(`). The previous token's type is its EFFECTIVE type: a
-   de-reserved keyword (UNDEFINE lit3 / SUBSTITUTE lit4) is an `IDENTIFIER` by the time `(` is lexed, so a later
-   `lit3(sub)` enters SUBSCRIPT; a synonym is the keyword's type, so `lit2 (` follows the keyword's own rule. (This
+1. **The reference paren** (`_dataNameTokens` at `(`, REF_LPAREN — kb/Work PB2113). The previous token's type is
+   its EFFECTIVE type: a de-reserved keyword (UNDEFINE lit3 / SUBSTITUTE lit4) is an `IDENTIFIER` by the time `(` is
+   lexed, so a later `lit3(sub)` opens a reference paren; a synonym is the keyword's type, so `lit2 (` follows the keyword's own rule. (This
    used to be a separate set of de-reserved types the lexer consulted; the retype made it redundant and it is gone.)
 2. **PIC / FUNCTION** (`PicMode` push, `PreviousIsFunctionName`). A synonym of PIC/PICTURE enters PICMODE and a
    synonym of FUNCTION opens the argument region, because the token IS the keyword when the lexer acts on it; a

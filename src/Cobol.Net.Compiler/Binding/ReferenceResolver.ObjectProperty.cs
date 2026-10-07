@@ -283,10 +283,19 @@ public sealed partial class ReferenceResolver
     /// (kb/Work PB2078), so <c>OoBinder.OoWrapPropertyOps</c> refuses it as a RECEIVING operand.</summary>
     private static bool SelectsByValue(IParseTree? tree) => tree switch
     {
-        null => false,
-        ITerminalNode t => t.Symbol.Type == Core.SUB_IDENTIFIER,
+        null or ITerminalNode => false,
         Core.FunctionCallContext => true,
+        Core.SubscriptPartContext list => NamesAValue(list),
         _ => Enumerable.Range(0, tree.ChildCount).Any(i => SelectsByValue(tree.GetChild(i))),
+    };
+
+    /// <summary>True when a subscript or argument list names anything read at run time — a data-name or index-name
+    /// (any word: a literal or a figurative constant is no word token) or a function-identifier, at any depth.</summary>
+    private static bool NamesAValue(IParseTree tree) => tree switch
+    {
+        ITerminalNode t => IsNameToken(t.Symbol),
+        Core.FunctionCallContext => true,
+        _ => Enumerable.Range(0, tree.ChildCount).Any(i => NamesAValue(tree.GetChild(i))),
     };
 
     /// <summary>The roster an object-reference item of <paramref name="item"/>'s description selects (§8.4.3.9.3 SR3/SR4):
@@ -334,13 +343,12 @@ public sealed partial class ReferenceResolver
         var obj = new Core.DataReferenceContext(dref.Parent as ParserRuleContext, dref.invokingState);
         obj.AddChild(q1.cobolWord());
         IToken stop = q1.cobolWord().Stop;
-        foreach (var sp in q1.subscriptPart())
-            if (!IsRefMod(sp)) stop = Adopt(obj, Suffix(obj, sp));
+        foreach (var sp in q1.subscriptPart()) stop = Adopt(obj, Suffix(obj, sp));
         for (int i = first + 1; i < suffixes.Length; i++)
         {
             var s = suffixes[i];
-            if (s.refModPart() is not null || (s.subscriptPart() is { } part && IsRefMod(part))) continue;
-            stop = Adopt(obj, s.qualification() is { } q && (q.refModPart().Length > 0 || q.subscriptPart().Any(IsRefMod))
+            if (s.refModPart() is not null) continue;
+            stop = Adopt(obj, s.qualification() is { } q && q.refModPart().Length > 0
                 ? Suffix(obj, WithoutRefMods(q))
                 : s.propertyObject() is { } po && ResultRefModsOf(po).Length > 0 ? Suffix(obj, WithoutResultRefMods(po)) : s);
         }
@@ -348,7 +356,6 @@ public sealed partial class ReferenceResolver
         obj.Stop = stop;
         return obj;
 
-        static bool IsRefMod(Core.SubscriptPartContext sp) => sp.subscriptOrRefMod() is { } g && HasDepth0Colon(g);
         static IToken Adopt(Core.DataReferenceContext into, ParserRuleContext child)
         {
             into.AddChild(child);
@@ -360,8 +367,7 @@ public sealed partial class ReferenceResolver
             copy.AddChild((ITerminalNode)q.GetChild(0));
             copy.AddChild(q.cobolWord());
             IToken last = q.cobolWord().Stop;
-            foreach (var sp in q.subscriptPart())
-                if (!IsRefMod(sp)) { copy.AddChild(sp); last = sp.Stop; }
+            foreach (var sp in q.subscriptPart()) { copy.AddChild(sp); last = sp.Stop; }
             copy.Start = q.Start;
             copy.Stop = last;
             return copy;

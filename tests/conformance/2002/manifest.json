@@ -742,7 +742,8 @@
   "pb1060_address_identifier_evaluate_argument",
   "pb2087_by_reference_area_formals",
   "pb2087_invoke_by_reference_aliasing",
-  "pb2087_invoke_area_strong_recursion"
+  "pb2087_invoke_area_strong_recursion",
+  "pb2113_subscript_expressions_and_arguments"
   ],
   "pending": []
 }

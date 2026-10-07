@@ -7,8 +7,13 @@ using Xunit;
 namespace CobolNet.Tests.Unit;
 
 /// <summary>
-/// Every source site that tests for the PLAIN paren token types shall either name the FUNCTION-ARGUMENT twins
-/// (<c>FNARG_LPAREN</c> / <c>FNARG_RPAREN</c>) or say in a comment that it means the grouping paren ONLY.
+/// Every source site that tests for the PLAIN paren token types shall either name BOTH twins — the FUNCTION-ARGUMENT
+/// parens (<c>FNARG_LPAREN</c> / <c>FNARG_RPAREN</c>) and the REFERENCE parens of a subscript list or reference
+/// modifier (<c>REF_LPAREN</c> / <c>REF_RPAREN</c>, kb/Work PB2113) — or say in a comment that it means the grouping
+/// paren ONLY.
+/// <para>The reference twin is the second split of the same lexeme, and the more dangerous one: until PB2113 the
+/// subscript paren WAS a plain LPAREN (its content was another lexer mode's tokens), so every site written before
+/// then that counted "an LPAREN" counted subscript parens too and stops seeing them silently.</para>
 /// </summary>
 /// <remarks>
 /// <para>
@@ -41,8 +46,8 @@ public sealed class ParenTokenTwinDriftTests
     private const string Marker = "GROUPING-PAREN-ONLY";
 
     /// <summary>A reference to the plain paren token type — <c>LPAREN</c>/<c>RPAREN</c> not prefixed by
-    /// <c>SUB_</c> or <c>FNARG_</c>, and not part of a longer identifier.</summary>
-    private static readonly Regex PlainParen = new(@"(?<![A-Z0-9_])(?<!SUB_)(?<!FNARG_)[LR]PAREN\b",
+    /// <c>REF_</c> or <c>FNARG_</c>, and not part of a longer identifier.</summary>
+    private static readonly Regex PlainParen = new(@"(?<![A-Z0-9_])(?<!REF_)(?<!FNARG_)[LR]PAREN\b",
         RegexOptions.Compiled);
 
     /// <summary>How far from the match a satisfying mention may sit — enough for a doc-comment above the
@@ -86,18 +91,23 @@ public sealed class ParenTokenTwinDriftTests
             if (!PlainParen.IsMatch(lines[i])) continue;
             int lo = Math.Max(0, i - Window), hi = Math.Min(lines.Length - 1, i + Window);
             bool considered = false;
+            bool fnarg = false, reference = false;
             for (int j = lo; j <= hi && !considered; j++)
-                considered = lines[j].Contains("FNARG_", StringComparison.Ordinal)
-                          || lines[j].Contains(Marker, StringComparison.Ordinal);
+            {
+                fnarg |= lines[j].Contains("FNARG_", StringComparison.Ordinal);
+                reference |= lines[j].Contains("REF_", StringComparison.Ordinal);
+                considered = (fnarg && reference) || lines[j].Contains(Marker, StringComparison.Ordinal);
+            }
             if (!considered) unconsidered.Add(i + 1);
         }
 
         Assert.True(unconsidered.Count == 0,
             $"{proj}/{rel} line(s) {string.Join(", ", unconsidered)} test the PLAIN paren token type without "
-            + $"considering the FUNCTION-ARGUMENT twin. The lexer types the '(' after `FUNCTION <name>` as "
-            + $"FNARG_LPAREN (ISO §8.4.3.2.3 SR6), so a site matching only LPAREN/RPAREN silently stops seeing "
-            + $"every function argument list — which is how PB48 shipped 31 NIST regressions past a green "
-            + $"wave-local gate. Either handle FNARG_LPAREN/FNARG_RPAREN, or write {Marker} in a comment on or "
+            + $"considering BOTH twins. The lexer types the '(' after `FUNCTION <name>` as FNARG_LPAREN (ISO "
+            + $"§8.4.3.2.3 SR6) and the '(' after a data name as REF_LPAREN (kb/Work PB2113), so a site matching only "
+            + $"LPAREN/RPAREN silently stops seeing every function argument list or subscript list — which is how "
+            + $"PB48 shipped 31 NIST regressions past a green wave-local gate. Either handle FNARG_ and REF_ parens, "
+            + $"or write {Marker} in a comment on or "
             + $"near the line saying why the grouping paren alone is meant.");
     }
 
