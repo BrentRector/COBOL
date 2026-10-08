@@ -49,7 +49,7 @@ public sealed class CurrentDateOffsetPinTests
             Assert.True(compiled.Success, string.Join("\n", compiled.Errors));
 
             var (ok, stdout, detail) = CutRunner.Run(dll, dir, null,
-                new Dictionary<string, string> { [CobolNet.Runtime.IO.SystemClock.PinVariable] = clock });
+                new Dictionary<string, string?> { [CobolNet.Runtime.IO.SystemClock.PinVariable] = clock });
             Assert.True(ok, detail);
             Assert.Equal(expected, stdout);
         }

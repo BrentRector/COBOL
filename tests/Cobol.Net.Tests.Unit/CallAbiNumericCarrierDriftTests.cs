@@ -248,13 +248,13 @@ public sealed class CallAbiNumericCarrierDriftTests
     {
         var cell = ManagedPointer<long>.Cell(-1234L);
         var byRef = new[] { new CobolArg(CobolPassMode.Reference, cell, SignedDisplay) };
-        var view = CobolArgAdapt.Text(byRef, 0, 6);
+        var view = CobolArgAdapt.Text(byRef, 0, 6, null, static () => "");
         Assert.Equal("00123M", view.Value);
         view.Value = "00133M";                       // the callee's SUBTRACT 1, stored through the GR8 view
         Assert.Equal(-1334L, cell.Value);
 
         var byValue = new[] { new CobolArg(CobolPassMode.Value, ManagedPointer<long>.Cell(-1234L), SignedDisplay) };
-        Assert.Equal("00123M", CobolArgAdapt.TextValue(byValue, 0, 6, SignedDisplay, 2).Value);
+        Assert.Equal("00123M", CobolArgAdapt.TextValue(byValue, 0, 6, SignedDisplay, 2, null, static () => "").Value);
     }
 
     /// <summary>The carried description decides the image's SHAPE, not only its sign: a <c>SIGN LEADING
@@ -269,7 +269,7 @@ public sealed class CallAbiNumericCarrierDriftTests
             Truncation = NumericTruncation.DigitCount, ByteForm = NumericByteForm.Zoned,
         };
         var ls = new[] { new CobolArg(CobolPassMode.Reference, ManagedPointer<long>.Cell(-123L), leadingSeparate) };
-        Assert.Equal("-123", CobolArgAdapt.Text(ls, 0, -1).Value);
+        Assert.Equal("-123", CobolArgAdapt.Text(ls, 0, -1, null, static () => "").Value);
 
         var comp5 = new NumProfile
         {
@@ -277,6 +277,6 @@ public sealed class CallAbiNumericCarrierDriftTests
             Truncation = NumericTruncation.BinaryCapacity, ByteForm = NumericByteForm.Binary, StorageLength = 2,
         };
         var c5 = new[] { new CobolArg(CobolPassMode.Reference, ManagedPointer<long>.Cell(258L), comp5) };
-        Assert.Equal("\u0001\u0002", CobolArgAdapt.Text(c5, 0, 2).Value);
+        Assert.Equal("\u0001\u0002", CobolArgAdapt.Text(c5, 0, 2, null, static () => "").Value);
     }
 }

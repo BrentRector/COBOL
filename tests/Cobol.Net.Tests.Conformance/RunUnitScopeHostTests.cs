@@ -1,10 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-using CobolNet;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
-using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -103,22 +99,6 @@ public sealed class RunUnitScopeHostTests
         }
         """;
 
-    private static void CompileHost(string dir, string program)
-    {
-        var tpa = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator);
-        var refs = tpa
-            .Where(p => Path.GetFileNameWithoutExtension(p) is "System.Private.CoreLib" or "System.Runtime"
-                or "System.Console" or "System.Reflection" or "netstandard")
-            .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
-            .ToList();
-        var compilation = CSharpCompilation.Create("RUSCOPEHOST",
-            [CSharpSyntaxTree.ParseText(Host(program))], refs,
-            new CSharpCompilationOptions(OutputKind.ConsoleApplication, nullableContextOptions: NullableContextOptions.Enable));
-        var emit = compilation.Emit(Path.Combine(dir, "RUSCOPEHOST.dll"));
-        Assert.True(emit.Success, string.Join("\n", emit.Diagnostics));
-        File.Copy(Path.Combine(dir, $"{program}.runtimeconfig.json"), Path.Combine(dir, "RUSCOPEHOST.runtimeconfig.json"));
-    }
-
     /// <summary>Compile <paramref name="source"/> as <paramref name="program"/> at <paramref name="dialect"/>, run it
     /// twice in one host process, and return the host's stdout (asserting a clean exit).</summary>
     private static string RunTwice(string program, string source, int dialect)
@@ -126,11 +106,8 @@ public sealed class RunUnitScopeHostTests
         string dir = CutRunner.NewTempDir("ruscope");
         try
         {
-            string src = CompiledProgramCache.StageSource(Path.Combine(dir, $"{program}.cob"), source);
-            var r = CompiledProgramCache.Compile(
-                new CompilerDriver.Options(src, Path.Combine(dir, $"{program}.dll"), DialectLevel: dialect, SourceFormat: InitialReferenceFormat.Auto));
-            Assert.True(r.Success, $"compile {program}: {string.Join("; ", r.Errors)}");
-            CompileHost(dir, program);
+            NonCobolElement.CompileCobol(dir, program, source, dialect);
+            NonCobolElement.CompileCSharp(dir, "RUSCOPEHOST", Host(program), runtimeConfigOf: program);
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "RUSCOPEHOST.dll"), dir);
             Assert.Equal(0, exit);
             Assert.Equal("", stderr);

@@ -1766,13 +1766,10 @@ internal static class RuntimeApi
 
     /// <summary>A LINKAGE formal's text carrier adoption — <c>CobolArgAdapt.Text</c>. <paramref name="groupAtoms"/>
     /// is a GROUP formal's §8.5.1.12 atoms expression (kb/Work PB965, PB2280), null for any other formal;
-    /// <paramref name="formalProfile"/> is an image-stored NUMERIC formal's profile field (kb/Work PB992), null
-    /// for any other formal.</summary>
-    public static string ArgAdaptText(string args, int position, string width, string? groupAtoms = null,
-                                      string? formalProfile = null) =>
-        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Text)}({args}, {position}, {width}"
-        + $"{(groupAtoms is null ? "" : $", {groupAtoms}")}"
-        + $"{(formalProfile is null ? "" : $", formalNum: {formalProfile}")})";
+    /// <paramref name="unbound"/> is the factory of the formal's unbound value, which an OMITTED argument's carrier
+    /// reads (kb/Work PB992, PB2671).</summary>
+    public static string ArgAdaptText(string args, int position, string width, string? groupAtoms, string unbound) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Text)}({args}, {position}, {width}, {groupAtoms ?? "null"}, {unbound})";
 
     /// <summary>A DYNAMIC LENGTH formal's text carrier adoption — <c>CobolArgAdapt.DynText</c> (ISO §13.18.19;
     /// §14.2.3 GR9's second-regime dynamic-length record — kb/Work PB165).</summary>
@@ -1918,11 +1915,11 @@ internal static class RuntimeApi
     /// <summary>A BY VALUE image-carried formal's DETACHED value-copy cell (§14.2.3 GR10, image form) —
     /// <c>CobolArgAdapt.TextValue</c>. <paramref name="profile"/> / <paramref name="scale"/> are the FORMAL's
     /// description (the record GR10's COMPUTE fills — kb/Work PB873), <c>"null"</c> / <c>"0"</c> for a formal
-    /// with no numeric description.</summary>
+    /// with no numeric description; <paramref name="unbound"/> is the factory of the formal's unbound value, which an
+    /// OMITTED argument's carrier reads (kb/Work PB2671).</summary>
     public static string ArgAdaptTextValue(string args, int position, string width, string profile, string scale,
-        string? groupAtoms = null) =>
-        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.TextValue)}({args}, {position}, {width}, {profile}, {scale}"
-        + $"{(groupAtoms is null ? "" : $", {groupAtoms}")})";
+        string? groupAtoms, string unbound) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.TextValue)}({args}, {position}, {width}, {profile}, {scale}, {groupAtoms ?? "null"}, {unbound})";
 
     /// <summary>The §8.5.1.12 atoms argument of a TABLE-LESS group formal — the empty array, which the adapter
     /// reads as <c>CobolVarGroup.FixedRun(width)</c> (kb/Work PB965, PB2280); allocation-free at every activation.</summary>
@@ -1950,10 +1947,17 @@ internal static class RuntimeApi
     /// <summary>The storage of a METHOD's area formal (§14.2.3 GR8; kb/Work PB2087) — <c>CobolArgAdapt.Area</c>'s one
     /// decision over the method ABI's area parameter and presence: the argument's own area when it can hold
     /// <paramref name="areaWidth"/> positions and the formal can be laid over it, else a fresh cell.
-    /// <paramref name="formalShape"/> and <paramref name="fresh"/> are a variable-length formal's atoms and seeded cell
-    /// (kb/Work PB2094; <see cref="AreaFormalShape"/>), "null" for every other formal.</summary>
+    /// <paramref name="formalShape"/> is a variable-length formal's atoms ("null" for every other formal) and
+    /// <paramref name="fresh"/> the factory of the category-default cell every area formal takes when it is not laid
+    /// over its argument (kb/Work PB2094, PB2671; <c>DataEmitter.AreaFormalShape</c>).</summary>
     public static string ArgAdaptAreaOf(string sharedArea, string present, int areaWidth, string formalShape, string fresh) =>
         $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Area)}({sharedArea}, {present}, {areaWidth}, {formalShape}, {fresh})";
+
+    /// <summary>The storage of an AREA formal at the main-program entry (ISO §13.7.4 GR3/GR5; kb/Work PB2671) —
+    /// <c>CobolArgAdapt.Unbound</c>: <paramref name="carrier"/> unchanged when an earlier Call set it, else a fresh area
+    /// from <paramref name="fresh"/>, the formal's category-default cell.</summary>
+    public static string ArgAdaptUnboundArea(string carrier, int areaWidth, string formalShape, string fresh) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Unbound)}({carrier}, {areaWidth}, {formalShape}, {fresh})";
 
     /// <summary>The storage area a carrier-resident BY REFERENCE formal occupies (§14.2.3 GR8; kb/Work PB2089) —
     /// <c>CobolArgAdapt.ArgumentArea</c>: its argument's <c>CobolArg.Area</c>, or null.</summary>
@@ -1982,13 +1986,6 @@ internal static class RuntimeApi
     /// <c>CobolArgAdapt.StoreReturnArea</c>: the returning item's area <paramref name="source"/> into the receiver's.</summary>
     public static string ArgAdaptStoreReturnArea(string ret, string source, int width) =>
         $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.StoreReturnArea)}({ret}, {source}, {width})";
-
-    /// <summary>The emitted (atoms, fresh cell) pair a VARIABLE-LENGTH group area formal states to
-    /// <c>CobolArgAdapt.Area</c> (kb/Work PB2094) — its §8.5.1.12 atoms and a factory of the seeded cell its own
-    /// description starts from (§8.5.1.9.1: a dynamic-capacity table exists at its FROM capacity) — or ("null", "null")
-    /// for every other area formal.</summary>
-    public static (string Shape, string Fresh) AreaFormalShape(string? atoms, string? seededCell) =>
-        atoms is null ? ("null", "null") : (atoms, $"static () => {seededCell}");
 
     /// <summary>RETURNING delivery into the caller's item (§14.6.5) — <c>CobolArgAdapt.StoreReturn</c>.
     /// <paramref name="description"/> is the SENDING item's description when it has one — its

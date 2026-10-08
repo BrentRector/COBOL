@@ -1,10 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-using CobolNet;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
-using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -29,14 +25,6 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class FunctionLocateResourceWitnessTests
 {
-    private static void CompileTo(string source, string dir, string name)
-    {
-        string src = Path.Combine(dir, name + ".cob");
-        src = CompiledProgramCache.StageSource(src, source);
-        var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, Path.Combine(dir, name + ".dll"), DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
-        Assert.True(r.Success, $"compile {name}: {string.Join("; ", r.Errors)}");
-    }
-
     /// <summary>A caller of <paramref name="fn"/> through its prototype; the prototype registers no function, so the
     /// function can only come from a sibling module.</summary>
     private static string Caller(string id, string fn) => $"""
@@ -82,7 +70,7 @@ public sealed class FunctionLocateResourceWitnessTests
         string dir = CutRunner.NewTempDir("l1frs1");
         try
         {
-            CompileTo(Caller("L1FRSMA", "L1FRSZ"), dir, "L1FRSMA");
+            NonCobolElement.CompileCobol(dir, "L1FRSMA", Caller("L1FRSMA", "L1FRSZ"));
             // A file with the function's module name that is not a loadable assembly (a foreign image).
             File.WriteAllText(Path.Combine(dir, "L1FRSZ.dll"), "THIS IS NOT A PE IMAGE");
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "L1FRSMA.dll"), dir);
@@ -113,8 +101,8 @@ public sealed class FunctionLocateResourceWitnessTests
         string dir = CutRunner.NewTempDir("l1frs2");
         try
         {
-            CompileTo(Caller("L1FRSMB", "L1FRSY"), dir, "L1FRSMB");
-            CompileTo(function, dir, "L1FRSY");
+            NonCobolElement.CompileCobol(dir, "L1FRSMB", Caller("L1FRSMB", "L1FRSY"));
+            NonCobolElement.CompileCobol(dir, "L1FRSY", function);
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "L1FRSMB.dll"), dir);
             // GR6 d): located and activated; 5 * 2 = 10 into PIC 9(4) -> "0010"; no handler line.
             Assert.Equal("R=0010", stdout);
@@ -141,17 +129,8 @@ public sealed class FunctionLocateResourceWitnessTests
         string dir = CutRunner.NewTempDir("l1frs3");
         try
         {
-            CompileTo(Caller("L1FRSMC", "L1FRSX"), dir, "L1FRSMC");
-            var tpa = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator);
-            var refs = tpa
-                .Where(p => Path.GetFileNameWithoutExtension(p) is "System.Private.CoreLib" or "System.Runtime")
-                .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
-                .ToList();
-            var compilation = CSharpCompilation.Create("L1FRSX",
-                [CSharpSyntaxTree.ParseText(library)], refs,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            var emit = compilation.Emit(Path.Combine(dir, "L1FRSX.dll"));
-            Assert.True(emit.Success, string.Join("\n", emit.Diagnostics));
+            NonCobolElement.CompileCobol(dir, "L1FRSMC", Caller("L1FRSMC", "L1FRSX"));
+            NonCobolElement.CompileCSharp(dir, "L1FRSX", library, runtimeConfigOf: null);
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "L1FRSMC.dll"), dir);
             // Not located -> EC-FUNCTION-NOT-FOUND (GR6 b)), the declarative runs, RESUME continues; W-R keeps VALUE 0.
             Assert.Equal("H: EC-FUNCTION-NOT-FOUND\nR=0000", stdout);

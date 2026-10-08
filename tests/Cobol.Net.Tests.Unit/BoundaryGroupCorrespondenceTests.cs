@@ -164,7 +164,7 @@ public sealed class BoundaryGroupCorrespondenceTests
         // VG = gh · VT capacity 2 "kl" · ij, opposite LF = X(2) · X OCCURS 3 · X(2).
         var vg = ManagedPointer<CobolVarGroup>.Cell(new CobolVarGroup("ghij", ["kl"]));
         var args = new[] { new CobolArg(CobolPassMode.Reference, vg, null, VarLGAtoms) };
-        var formal = CobolArgAdapt.Text(args, 0, 7, FixedSGAtoms);
+        var formal = CobolArgAdapt.Text(args, 0, 7, FixedSGAtoms, static () => "");
         // §8.5.1.12.3 sentence 3 + §14.6.9.2: the capacity-2 table fills a 3-occurrence view, the third spaces.
         Assert.Equal("ghkl ij", formal.Value);
         // §14.2.3 GR8 — the formal overlays the argument's storage: the fixed material and the occurrences the
@@ -178,7 +178,7 @@ public sealed class BoundaryGroupCorrespondenceTests
     public void AFixedFormalOverAWiderTable_LeavesTheOccurrencesPastItsCountUntouched()
     {
         var vg = ManagedPointer<CobolVarGroup>.Cell(new CobolVarGroup("ghij", ["klmn"]));
-        var formal = CobolArgAdapt.Text([new CobolArg(CobolPassMode.Reference, vg, null, VarLGAtoms)], 0, 7, FixedSGAtoms);
+        var formal = CobolArgAdapt.Text([new CobolArg(CobolPassMode.Reference, vg, null, VarLGAtoms)], 0, 7, FixedSGAtoms, static () => "");
         Assert.Equal("ghklmij", formal.Value);   // §14.6.9.2: superfluous elements are not moved
         formal.Value = "ghKLMrs";
         Assert.Equal(["KLMn"], vg.Value!.Dynamic);
@@ -191,7 +191,7 @@ public sealed class BoundaryGroupCorrespondenceTests
         // §14.8.2.2 rule 1's prefix: a 2-character group formal; VT lies past its last character (§8.5.1.12.2's
         // last sentence), so it is no component of the pair and must come back unchanged.
         var vg = ManagedPointer<CobolVarGroup>.Cell(new CobolVarGroup("ghij", ["kl"]));
-        var formal = CobolArgAdapt.Text([new CobolArg(CobolPassMode.Reference, vg, null, VarLGAtoms)], 0, 2, []);
+        var formal = CobolArgAdapt.Text([new CobolArg(CobolPassMode.Reference, vg, null, VarLGAtoms)], 0, 2, [], static () => "");
         Assert.Equal("gh", formal.Value);
         formal.Value = "PP";
         Assert.Equal("PPij", vg.Value!.Fixed);
@@ -202,7 +202,7 @@ public sealed class BoundaryGroupCorrespondenceTests
     public void ByContent_TheSameView_IsDetached()
     {
         var vg = ManagedPointer<CobolVarGroup>.Cell(new CobolVarGroup("ghij", ["kl"]));
-        var cell = CobolArgAdapt.TextValue([new CobolArg(CobolPassMode.Content, vg, null, VarLGAtoms)], 0, 7, null, 0, FixedSGAtoms);
+        var cell = CobolArgAdapt.TextValue([new CobolArg(CobolPassMode.Content, vg, null, VarLGAtoms)], 0, 7, null, 0, FixedSGAtoms, static () => "");
         Assert.Equal("ghkl ij", cell.Value);
         cell.Value = "zzzzzzz";
         Assert.Equal("ghij", vg.Value!.Fixed);   // §14.2.3 GR9 — the callee's stores never reach the argument
@@ -213,7 +213,7 @@ public sealed class BoundaryGroupCorrespondenceTests
         // §8.5.1.12.1: a variable-length group is compatible only with a GROUP — an elementary formal states no
         // layout, and the carrier it cannot read fails the activation rather than being reinterpreted.
         => Assert.Throws<CobolCallException>(() => CobolArgAdapt.Text(
-            [new CobolArg(CobolPassMode.Reference, ManagedPointer<CobolVarGroup>.Cell(CobolVarGroup.Empty), null, VarLGAtoms)], 0, 7));
+            [new CobolArg(CobolPassMode.Reference, ManagedPointer<CobolVarGroup>.Cell(CobolVarGroup.Empty), null, VarLGAtoms)], 0, 7, null, static () => ""));
 
     private static readonly NumProfile S3V1 = new()
     {

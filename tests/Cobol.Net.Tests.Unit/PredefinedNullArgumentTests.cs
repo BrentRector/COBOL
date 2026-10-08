@@ -65,7 +65,7 @@ public sealed class PredefinedNullArgumentTests
     {
         // §14.8.2.3.3: a formal not of class object or pointer takes its argument by a MOVE, and §14.9.25.3 SR1 bars
         // class pointer from a MOVE — reached only when the activating element could not screen it at bind.
-        var ex = Assert.Throws<CobolCallException>(() => CobolArgAdapt.Text(Null(CobolPassMode.Content), 0, 4));
+        var ex = Assert.Throws<CobolCallException>(() => CobolArgAdapt.Text(Null(CobolPassMode.Content), 0, 4, null, static () => ""));
         Assert.Equal("EC-PROGRAM-ARG-MISMATCH", ex.EcName);
     }
 }

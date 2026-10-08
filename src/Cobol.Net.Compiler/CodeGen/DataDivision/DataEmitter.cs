@@ -47,19 +47,44 @@ internal sealed class DataEmitter
     /// <summary>See <see cref="GroupImageCodec.CellDynSeeds"/>.</summary>
     public string CellDynSeeds(DataItem item, bool useValues = true) => _codec.CellDynSeeds(item, useValues);
 
-    /// <summary>⛔ THE ONE STATEMENT OF WHAT A VARIABLE-LENGTH GROUP AREA FORMAL BRINGS TO ITS AREA DECISION (kb/Work PB2094),
-    /// for the program ABI and the method ABI alike: its §8.5.1.12 atoms — <c>CobolArgAdapt.Area</c> lays it over its
-    /// argument's area only when the two have the same storage — and the seeded cell its own description starts from
-    /// when it is not laid over one (a fresh area holds every dynamic-capacity table at its FROM capacity, §8.5.1.9.1,
-    /// so a reference through it never meets a missing table). §13.18.63.4 GR3: "In the linkage section, VALUE clauses
-    /// take effect only during the execution of an explicit or implicit INITIALIZE statement", so the seed is the
-    /// space-filled image with no VALUE applied. ("null",
-    /// "null") for every other area formal.</summary>
+    /// <summary>⛔ THE ONE STATEMENT OF WHAT AN AREA FORMAL BRINGS TO ITS AREA DECISION (kb/Work PB2094, PB2671), for the
+    /// program ABI and the method ABI alike: its §8.5.1.12 atoms when it is a VARIABLE-LENGTH group
+    /// (<c>CobolArgAdapt.Area</c> lays it over its argument's area only when the two have the same storage; "null" for
+    /// every other area formal), and the factory of the fresh cell it takes whenever it is NOT laid over an argument's
+    /// area — an omitted argument, an argument whose storage is not a cell, BY CONTENT / BY VALUE, and (through
+    /// <c>CobolArgAdapt.Unbound</c>) the main-program entry that binds no argument. That cell is
+    /// <see cref="UnboundFormalRecord"/>: the description's category-default RECORD image (a fresh area holds every
+    /// dynamic-capacity table at its FROM capacity, §8.5.1.9.1, so a reference through it never meets a missing
+    /// table). Before kb/Work PB2671 a fixed-shape area formal took a SPACE-filled cell, which an omitted national or
+    /// numeric formal read as byte pairs and invalid data — the record image is the one composition its own codec
+    /// reads.</summary>
     public (string Shape, string Fresh) AreaFormalShape(DataItem formal) =>
-        VarGroupWindow.Applies(formal) && VariableLengthCompatibility.GroupAtoms(formal) is { } atoms
-            ? RuntimeApi.AreaFormalShape(RuntimeApi.GroupAtomsNew(atoms),
-                $"new StorageCell {{ Ref = new string(' ', {formal.Class!.Width}) }}{CellDynSeeds(formal, useValues: false)}")
-            : RuntimeApi.AreaFormalShape(null, null);
+        (VarGroupWindow.Applies(formal) && VariableLengthCompatibility.GroupAtoms(formal) is { } atoms
+                ? RuntimeApi.GroupAtomsNew(atoms) : "null",
+            $"static () => new StorageCell {{ Ref = {UnboundFormalRecord(formal, formal.Class!.Width)} }}"
+            + CellDynSeeds(formal, useValues: false));
+
+    /// <summary>⛔ THE UNBOUND VALUE OF A LINKAGE FORMAL (kb/Work PB2671; docs/CONFORMANCE.md DOC-A.1-116): what a formal
+    /// refers to when no activation bound an argument to it — the main-program entry <c>ICobolProgram.Activate</c>, or
+    /// an omitted argument's storage. ISO §13.7.4 GR3 and GR5 leave the access and the initial value to the implementor
+    /// when a non-COBOL element activates the program, and §13.18.63.4 GR3 lets a linkage VALUE take effect only during
+    /// INITIALIZE, so it is the CATEGORY-DEFAULT value with no VALUE applied: spaces for a character item, the zero
+    /// encoding for a numeric item of every usage, length zero for a dynamic-length item, a group's composed from its
+    /// elementary items'. ⛔ ITS SHAPE FOLLOWS THE STORAGE, NEVER THE ITEM'S KIND: a CARRIER-resident elementary formal
+    /// (<see cref="UnboundFormalCarrier"/>) holds its own field string — one UTF-16 character per national position —
+    /// while every RECORD-shaped storage (a group carrier, and any AREA formal's cell, an addressed, REDEFINED or
+    /// floating-point elementary one included) holds the record image (<see cref="ImageInitOf"/>, where a national
+    /// position is two byte characters). Choosing by <c>IsElementary</c> gave an addressed <c>PIC N(2)</c> area a
+    /// 2-character image in a 4-position cell, and its first reference died with EC-BOUND-PTR.</summary>
+    public string UnboundFormalRecord(DataItem formal, int width) =>
+        RuntimeApi.StrStore(ImageInitOf(formal, useValues: false), $"{width}");
+
+    /// <summary>The unbound value of a CARRIER-resident formal's <c>ManagedPointer&lt;string&gt;</c> (see
+    /// <see cref="UnboundFormalRecord"/>): an elementary carrier holds the item's own field string with no VALUE applied, which
+    /// is the linkage item's category baseline (<see cref="ValueInitializer.InitializerFrom"/>); a group carrier holds
+    /// its record image.</summary>
+    public string UnboundFormalCarrier(DataItem formal, int width) =>
+        formal.IsElementary ? _values.InitializerFrom(formal, effRaw: null) : UnboundFormalRecord(formal, width);
 
     /// <summary>See <see cref="ValueInitializer.InitializerFrom"/> — the §13.18.63 VALUE recipe over an operand
     /// the caller supplies (the report section's format-4 lane; kb/Work PB506).</summary>

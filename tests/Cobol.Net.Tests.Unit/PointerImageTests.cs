@@ -64,14 +64,14 @@ public sealed class PointerImageTests
         var cell = new StorageCell { Ref = "ABCDEFGH" };
         var slot = ManagedPointer<ManagedPointer>.Cell(ManagedPointer.At(cell, 2));
         var args = new[] { new CobolArg(CobolPassMode.Content, slot, null) };
-        var view = CobolArgAdapt.Text(args, 0, 8);
+        var view = CobolArgAdapt.Text(args, 0, 8, null, static () => "");
         Assert.Equal(PointerImage.Of(ManagedPointer.At(cell, 2)), view.Value);
         view.Value = "ZZZZZZZZ";                                                // GR9 — a record of its own
         Assert.True(ManagedPointer.SameTarget(ManagedPointer.At(cell, 2), slot.Value));
 
         var fslot = ManagedPointer<FunctionPointer>.Cell(new FunctionPointer("F1"));
         Assert.Equal(PointerImage.Of(new FunctionPointer("F1")),
-            CobolArgAdapt.Text([new CobolArg(CobolPassMode.Content, fslot, null)], 0, 8).Value);
+            CobolArgAdapt.Text([new CobolArg(CobolPassMode.Content, fslot, null)], 0, 8, null, static () => "").Value);
     }
 
     // ── A pointer MEMBER of a shared storage area (kb/Work PB1071): the slot holds the value, the 8 positions hold
@@ -134,6 +134,6 @@ public sealed class PointerImageTests
         // formal parameter or argument shall be of class pointer": no image is delivered BY REFERENCE.
         var slot = ManagedPointer<ManagedPointer>.Cell(ManagedPointer.Null);
         Assert.Throws<CobolCallException>(() =>
-            CobolArgAdapt.Text([new CobolArg(CobolPassMode.Reference, slot, null)], 0, 8));
+            CobolArgAdapt.Text([new CobolArg(CobolPassMode.Reference, slot, null)], 0, 8, null, static () => ""));
     }
 }

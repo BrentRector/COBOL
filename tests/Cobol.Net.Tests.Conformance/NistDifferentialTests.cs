@@ -83,7 +83,7 @@ public abstract class NistDifferentialTestsBase<TSlot>
 
             // Guard parity (scripts/guard.sh:120): the CCVS-85 switch programs (NC174A/NC254A) run with external
             // SWITCH-1 ON, SWITCH-2 unset — their goldens assume exactly that.
-            var env = new Dictionary<string, string> { ["COBOL_SWITCH_1"] = "ON" };
+            var env = new Dictionary<string, string?> { ["COBOL_SWITCH_1"] = "ON" };
 
             // Chain predecessors: each producer compiles from its OWN .cob and runs in THIS directory so the
             // consumer's shared TF### input files exist. Chains are self-sufficient in an isolated dir — every

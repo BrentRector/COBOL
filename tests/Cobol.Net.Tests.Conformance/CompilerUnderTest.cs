@@ -29,7 +29,7 @@ internal static class CutRunner
     /// <paramref name="stdinFile"/> (when given) is piped to the program's stdin — ACCEPT device input (ISO
     /// §14.9.1 F1); stdin is always redirected and closed so an over-reading ACCEPT sees EOF, never the console.</summary>
     public static (bool ok, string stdout, string detail) Run(string dllPath, string workDir, string? stdinFile = null,
-        IReadOnlyDictionary<string, string>? env = null)
+        IReadOnlyDictionary<string, string?>? env = null)
     {
         var (code, stdout, detail) = RunExit(dllPath, workDir, stdinFile, env);
         return (code == 0, stdout, detail);
@@ -46,7 +46,7 @@ internal static class CutRunner
     /// once serially first. No caller had to change: the fix is in the dispatch, and all ~730 call sites
     /// inherit it.</para></summary>
     public static (int exitCode, string stdout, string detail) RunExit(string dllPath, string workDir,
-        string? stdinFile = null, IReadOnlyDictionary<string, string>? env = null)
+        string? stdinFile = null, IReadOnlyDictionary<string, string?>? env = null)
     {
         var psi = new ProcessStartInfo("dotnet", $"\"{dllPath}\"") { WorkingDirectory = workDir };
         // ⚖ DETERMINISM (DESIGN-locale-facility §10 T-F): the run unit's USER and SYSTEM default locales are the
@@ -54,11 +54,15 @@ internal static class CutRunner
         // golden that collates under the default locale would pass on one author's machine and fail on a runner
         // with another regional setting. The harness pins BOTH to the root ("INVARIANT") for every program it
         // runs; a golden that needs a locale SETs it (SET LOCALE … TO locale-name) or names it (IS LOCALE name),
-        // and a test that wants another default passes it in `env` (which overrides the pin).
+        // and a test that wants another default passes it in `env` (which overrides the pin). A NULL value REMOVES
+        // the variable, so a test can reach the run unit's fallback when it is unset (docs/CONFORMANCE.md
+        // DOC-A.1-118; kb/Work PB2671).
         psi.Environment[CobolNet.Runtime.LocaleState.UserDefaultVariable] = "INVARIANT";
         psi.Environment[CobolNet.Runtime.LocaleState.SystemDefaultVariable] = "INVARIANT";
         if (env is not null)
-            foreach (var (k, v) in env) psi.Environment[k] = v;
+            foreach (var (k, v) in env)
+                if (v is null) psi.Environment.Remove(k);
+                else psi.Environment[k] = v;
         // ACCEPT device input (ISO §14.9.1 F1): pipe the NIST .dat to stdin (EOF when none) — guard.sh parity.
         var obs = ProcessObserver.ObserveOrThrow(psi, stdinFile is null ? null : File.ReadAllText(stdinFile));
         return (obs.ExitCode, Normalize(obs.Stdout), Normalize(obs.Stderr));

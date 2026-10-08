@@ -1,10 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-using CobolNet;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
-using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -25,14 +21,6 @@ namespace CobolNet.Tests.Conformance;
 /// </summary>
 public sealed class NonCobolActivatorReturnTests
 {
-    private static void CompileCobol(string source, string dir, string name)
-    {
-        string src = Path.Combine(dir, name + ".cob");
-        src = CompiledProgramCache.StageSource(src, source);
-        var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, Path.Combine(dir, name + ".dll"), DialectLevel: 2023, SourceFormat: InitialReferenceFormat.Auto));
-        Assert.True(r.Success, $"compile {name}: {string.Join("; ", r.Errors)}");
-    }
-
     private const string GobackSub = """
         IDENTIFICATION DIVISION.
         PROGRAM-ID. L1HSTGB.
@@ -84,33 +72,15 @@ public sealed class NonCobolActivatorReturnTests
         }
         """;
 
-    private static void CompileHost(string dir)
-    {
-        var tpa = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator);
-        var refs = tpa
-            .Where(p => Path.GetFileNameWithoutExtension(p) is "System.Private.CoreLib" or "System.Runtime"
-                or "System.Console" or "System.Reflection" or "netstandard")
-            .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
-            .Append(MetadataReference.CreateFromFile(typeof(CobolNet.Runtime.ProgramRegistry).Assembly.Location))
-            .ToList();
-        var compilation = CSharpCompilation.Create("L1HSTHOST",
-            [CSharpSyntaxTree.ParseText(Host)], refs,
-            new CSharpCompilationOptions(OutputKind.ConsoleApplication, nullableContextOptions: NullableContextOptions.Enable));
-        var emit = compilation.Emit(Path.Combine(dir, "L1HSTHOST.dll"));
-        Assert.True(emit.Success, string.Join("\n", emit.Diagnostics));
-        // The host is a framework-dependent app like the COBOL modules beside it: reuse their runtimeconfig.
-        File.Copy(Path.Combine(dir, "L1HSTGB.runtimeconfig.json"), Path.Combine(dir, "L1HSTHOST.runtimeconfig.json"));
-    }
-
     [Fact]
     public void GobackAndExitProgram_ReturnToANonCobolHost_WhichContinuesAtItsCallSite()
     {
         string dir = CutRunner.NewTempDir("l1host");
         try
         {
-            CompileCobol(GobackSub, dir, "L1HSTGB");
-            CompileCobol(ExitProgramSub, dir, "L1HSTEP");
-            CompileHost(dir);
+            NonCobolElement.CompileCobol(dir, "L1HSTGB", GobackSub);
+            NonCobolElement.CompileCobol(dir, "L1HSTEP", ExitProgramSub);
+            NonCobolElement.CompileCSharp(dir, "L1HSTHOST", Host, runtimeConfigOf: "L1HSTGB");
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "L1HSTHOST.dll"), dir);
             Assert.Equal(
                 "HOST BEFORE\n" +

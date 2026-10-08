@@ -142,20 +142,27 @@ internal sealed class ProgramEmitter
     /// The BY VALUE leg is the detached value copy (§14.2.3 GR10). A BY VALUE dynamic-length formal cannot
     /// arise — §14.2.2 SR2 admits only class numeric, message-tag, object or pointer BY VALUE — so the dynamic
     /// arm is stated first without a mode test rather than duplicated under both.</summary>
-    private static string FormalTextCarrier(LinkageFormal f, int fixedWidth) =>
+    private static string FormalTextCarrier(LinkageFormal f, int fixedWidth, DataEmitter seeds) =>
         f.Item.IsDynamicLength
             ? RuntimeApi.ArgAdaptDynText("__args", f.Position, $"{f.Item.DynMaxSize}")
         : f.ByValue
             // GR10's record is of the FORMAL's description (kb/Work PB873), so its profile rides along — the
             // profile field RecordStructEmitter declares for every elementary numeric item.
             ? f.Item.IsElementary && f.Item.Pic is { Category: PicCategory.Numeric } fp && fp.Usage is not Usage.Index
-                ? RuntimeApi.ArgAdaptTextValue("__args", f.Position, $"{fixedWidth}", f.Item.ProfileName, $"{fp.Scale}")
-                : RuntimeApi.ArgAdaptTextValue("__args", f.Position, $"{fixedWidth}", "null", "0", GroupFormalAtoms(f.Item))
+                ? RuntimeApi.ArgAdaptTextValue("__args", f.Position, $"{fixedWidth}", f.Item.ProfileName, $"{fp.Scale}",
+                    null, UnboundFactory(f, fixedWidth, seeds))
+                : RuntimeApi.ArgAdaptTextValue("__args", f.Position, $"{fixedWidth}", "null", "0", GroupFormalAtoms(f.Item),
+                    UnboundFactory(f, fixedWidth, seeds))
             : RuntimeApi.ArgAdaptText("__args", f.Position, f.Item.IsAnyLength ? "-1" : $"{fixedWidth}",
-                GroupFormalAtoms(f.Item),
-                // An image-stored NUMERIC formal (kb/Work PB992) states its description, so an OMITTED
-                // argument's benign read is the numeric zero the documented GR12 leniency promises.
-                f.Item.IsElementary && f.Item.StoreAsImage ? f.Item.ProfileName : null);
+                GroupFormalAtoms(f.Item), UnboundFactory(f, fixedWidth, seeds));
+
+    /// <summary>The factory of a character-carried formal's UNBOUND value (kb/Work PB992, PB2671), which an unchecked
+    /// reference to the formal reads when its argument is OMITTED (the documented §14.9.4.4 GR12 leniency,
+    /// docs/CONFORMANCE.md DOC-A.1-141): the same category-default value its declared carrier starts with at the
+    /// main-program entry (<see cref="DataEmitter.UnboundFormalCarrier"/>), so an omitted formal and an unbound one
+    /// read alike — spaces, boolean zeros, a numeric zero image — in every arm.</summary>
+    private static string UnboundFactory(LinkageFormal f, int width, DataEmitter seeds) =>
+        $"static () => {seeds.UnboundFormalCarrier(f.Item, Math.Max(1, width))}";
 
     /// <summary>A fixed-length GROUP formal's §8.5.1.12 atoms, the one fact a VARIABLE-LENGTH group argument
     /// needs to meet it (ISO §14.8.2.2 / §8.5.1.12.2; kb/Work PB965, PB2280) — its atoms literal when it has a table,
@@ -177,7 +184,7 @@ internal sealed class ProgramEmitter
     /// this repo's two-arm-dispatch shape with the arms one method apart.
     /// <paramref name="textWidth"/> is the character arm's window — the formal's PICTURE length for a resident
     /// formal, its whole record image for a round-tripped one.</summary>
-    private static string FormalAdopt(LinkageFormal f, CallCrossing crossing, string carrier, int textWidth) =>
+    private static string FormalAdopt(LinkageFormal f, CallCrossing crossing, string carrier, int textWidth, DataEmitter seeds) =>
         crossing switch
         {
             CallCrossing.Native => f.ByValue
@@ -198,7 +205,7 @@ internal sealed class ProgramEmitter
             CallCrossing.VarGroup => f.ByValue
                 ? RuntimeApi.ArgAdaptVarGroupValue("__args", f.Position, FormalAtoms(f.Item))
                 : RuntimeApi.ArgAdaptVarGroup("__args", f.Position, FormalAtoms(f.Item)),
-            _ => FormalTextCarrier(f, textWidth),
+            _ => FormalTextCarrier(f, textWidth, seeds),
         };
 
     /// <summary>⛔ THE ONE PLACE A LINKAGE FORMAL'S CROSSING FORM IS DECIDED (kb/Work PB663) — the ACTIVATED
@@ -343,7 +350,11 @@ internal sealed class ProgramEmitter
             }
             _oo.EmitExternalBackings(data, w);
 
-            new DataEmitter(Current.Ctx).Emit();
+            // ONE DataEmitter per program class: it emits the data fields, and the same instance (its PhysicalModel memo
+            // included) composes the formals' unbound seeds below and in the Call method. A second instance would build
+            // the physical model again for every program (DeepNestingTests pins one model per program; kb/Work PB2671).
+            var dataEmitter = new DataEmitter(Current.Ctx);
+            dataEmitter.Emit();
             // BASED bridges + ADDRESS-OF cells — the ONE renderer the OO type-half shares (kb/Work PB956). AFTER the
             // data fields: a RECURSIVE unit's cell is STATIC, and C# runs static field initializers in TEXTUAL order,
             // so a cell declared above the NumProfile fields its seed image reads encoded every numeric leaf through a
@@ -363,19 +374,24 @@ internal sealed class ProgramEmitter
                             + "// the omitted-argument condition of this formal (ISO §8.8.4.8.4 GR1; §14.9.4.4 GR11)");
                     continue;
                 }
-                // The UNBOUND seed (ISO §13.7.4 GR3 — a linkage item referenced outside an activation that
-                // supplied it). Native AND Managed default through the item's OWN PicInfo.DefaultInitializer
-                // (0L / 0UL / (Int128)0 / (UInt128)0 / ManagedPointer.Null / ProgramPointer.Null /
-                // FunctionPointer.Null / null), so the cell type and the seed cannot drift (kb/Work R12 +
-                // PB663 — the managed seed IS §13.18.63's initial state for its class). A variable-length
-                // carrier seeds EMPTY — a space image of its collapsed width would be a wrong-shaped value,
-                // not a benign one (kb/Work PB204).
+                // The UNBOUND seed (ISO §13.7.4 GR3 and GR5 — a linkage item referenced outside an activation that
+                // supplied it; docs/CONFORMANCE.md DOC-A.1-116). Native AND Managed default through the item's OWN
+                // PicInfo.DefaultInitializer (0L / 0UL / (Int128)0 / (UInt128)0 / ManagedPointer.Null /
+                // ProgramPointer.Null / FunctionPointer.Null / null), so the cell type and the seed cannot drift
+                // (kb/Work R12 + PB663 — the managed seed IS §13.18.63's initial state for its class). A character
+                // carrier seeds the CATEGORY-DEFAULT value of its description with no VALUE applied
+                // (DataEmitter.UnboundFormalCarrier — the carrier's shape of the one unbound value an AREA formal's
+                // record-shaped cell takes too, DataEmitter.UnboundFormalRecord; kb/Work PB2671): spaces for a character item, the zero ENCODING for an image-stored numeric of any usage — a
+                // space image read as binary or packed data is a nonzero, invalid value — and EMPTY for a
+                // dynamic-length item (§14.6.2.3.2 GR7: "The length of each dynamic-length elementary item that is
+                // specified without a VALUE clause is set to zero"). A variable-length carrier seeds EMPTY — a
+                // space image of its collapsed width would be a wrong-shaped value, not a benign one (kb/Work PB204).
                 string init = crossing switch
                 {
                     CallCrossing.Native or CallCrossing.Managed
                         => $"ManagedPointer<{carrier}>.Cell({f.Item.Pic!.DefaultInitializer})",
                     CallCrossing.VarGroup => $"ManagedPointer<{carrier}>.Cell({RuntimeApi.VarGroupEmpty})",
-                    _ => $"ManagedPointer<string>.Cell(new string(' ', {Math.Max(1, f.Item.ImageWidth)}))",
+                    _ => $"ManagedPointer<string>.Cell({dataEmitter.UnboundFormalCarrier(f.Item, Math.Max(1, f.Item.ImageWidth))})",
                 };
                 w.Line($"private ManagedPointer<{carrier}> {f.CarrierField} = {init};   "
                     + $"// LINKAGE formal #{f.Position + 1} — the caller-storage carrier (ISO §13.7.1; design D1)");
@@ -390,14 +406,32 @@ internal sealed class ProgramEmitter
             }
             w.Line();
 
-            EmitCallMethod(unit, formals, w);
-            if (OoEmitter.WantsExternalDescribes(data))
+            EmitCallMethod(unit, formals, dataEmitter, w);
+            // ⛔ THE MAIN-PROGRAM ENTRY BINDS NO FORMAL (ISO §13.7.4 GR3 and GR5; docs/CONFORMANCE.md DOC-A.1-116; kb/Work
+            // PB2671): an AREA formal no earlier Call laid over an argument still holds its class's never-set NULL
+            // data-address pointer, so it takes the same category-default cell an omitted argument gives it
+            // (DataEmitter.AreaFormalShape) — the value an elementary formal's carrier is declared with above — instead
+            // of failing its first reference with
+            // EC-DATA-PTR-NULL. A pointer an earlier Call set is kept: the formal still refers to what it bound.
+            var unboundAreas = formals.Where(x => x.Formal.IsArea).Select(x => x.Formal).ToList();
+            bool describes = OoEmitter.WantsExternalDescribes(data);
+            if (unboundAreas.Count > 0 || describes)
             {
-                // §14.8.4: the main-program activation registers its external descriptions too (the ACTIVATOR
-                // mask is zero there — store-only). A CALLed activation gets it from the activation BOUNDARY,
-                // which calls DescribeExternals() before Call() (§14.9.4.4 GR3e precedes GR3g — kb/Work PB233).
-                w.Line("void ICobolProgram.Activate() { DescribeExternals(); __Activate(); }");
-                _oo.EmitExternalDescribes(data, unit.Path, "public void DescribeExternals()", $"{data.ExternalCheckMask}", w);
+                using (w.Block("void ICobolProgram.Activate()"))
+                {
+                    foreach (var f in unboundAreas)
+                    {
+                        var (shape, fresh) = dataEmitter.AreaFormalShape(f.Item);
+                        w.Line($"{f.CarrierField} = {RuntimeApi.ArgAdaptUnboundArea(f.CarrierField, f.Item.Class!.Width, shape, fresh)};");
+                    }
+                    // §14.8.4: the main-program activation registers its external descriptions too (the ACTIVATOR
+                    // mask is zero there — store-only). A CALLed activation gets it from the activation BOUNDARY,
+                    // which calls DescribeExternals() before Call() (§14.9.4.4 GR3e precedes GR3g — kb/Work PB233).
+                    if (describes) w.Line("DescribeExternals();");
+                    w.Line("__Activate();");
+                }
+                if (describes)
+                    _oo.EmitExternalDescribes(data, unit.Path, "public void DescribeExternals()", $"{data.ExternalCheckMask}", w);
             }
             else
                 w.Line("void ICobolProgram.Activate() => __Activate();");
@@ -529,10 +563,11 @@ internal sealed class ProgramEmitter
     }
 
     /// <summary>Emit the opaque-ABI <c>Call</c> body: positional formal mapping (ISO §14.2.3 GR2), the
-    /// activation, boundary copy-out for image formals, and RETURNING delivery (GR7).</summary>
+    /// activation, boundary copy-out for image formals, and RETURNING delivery (GR7). <paramref name="seeds"/> is the
+    /// program class's one DataEmitter, which composes the formals' unbound values (kb/Work PB2671).</summary>
     private void EmitCallMethod(
         BoundUnit unit, List<(LinkageFormal Formal, Place? Place, CallCrossing Crossing, string Carrier)> formals,
-        CodeWriter w)
+        DataEmitter seeds, CodeWriter w)
     {
         using (w.Block("public void Call(CobolArg[] __args, CobolArg? __ret)"))
         {
@@ -592,7 +627,7 @@ internal sealed class ProgramEmitter
                     // activated element's stores reach only the copy, never the caller; §14.2.2 SR2 restricts
                     // the carried shape to class numeric, object or pointer, so the text leg has no BY VALUE
                     // arm while the managed one does).
-                    w.Line($"{f.CarrierField} = {FormalAdopt(f, crossing, carrier, CallEmitter.ElementaryFormalWindow(f.Item))};");
+                    w.Line($"{f.CarrierField} = {FormalAdopt(f, crossing, carrier, CallEmitter.ElementaryFormalWindow(f.Item), seeds)};");
                     if (f.KeepsArgumentArea)
                         w.Line($"{f.ArgumentAreaField} = {RuntimeApi.ArgAdaptArgumentArea("__args", f.Position)};");
                     continue;
@@ -609,11 +644,11 @@ internal sealed class ProgramEmitter
                 // shape whose carrier field takes the copy itself.
                 string copyCarrier = f.CarrierField;
                 string copyGuard = RuntimeApi.ArgAdaptPresent("__args", f.Position);
-                string adopt = FormalAdopt(f, crossing, carrier, Math.Max(1, CallEmitter.BoundaryImageWidth(f.Item)));
+                string adopt = FormalAdopt(f, crossing, carrier, Math.Max(1, CallEmitter.BoundaryImageWidth(f.Item)), seeds);
                 if (f.IsArea)
                 {
                     copyCarrier = AreaCopyCarrier(f);
-                    var (shape, fresh) = new DataEmitter(Current.Ctx).AreaFormalShape(f.Item);
+                    var (shape, fresh) = seeds.AreaFormalShape(f.Item);
                     w.Line($"{f.CarrierField} = {RuntimeApi.ArgAdaptArea("__args", f.Position, f.Item.Class!.Width, f.ByValue, shape, fresh)};");
                     w.Line($"ManagedPointer<{carrier}>? {copyCarrier} = null;");
                     copyGuard += $" && !{RuntimeApi.ArgAdaptAliased("__args", f.Position, f.CarrierField)}";

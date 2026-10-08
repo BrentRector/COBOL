@@ -88,7 +88,7 @@ public sealed class LeapSecondReportedSecondsPinTests
             Assert.True(compiled.Success, string.Join("\n", compiled.Errors));
 
             var (ok, stdout, detail) = CutRunner.Run(dll, dir, null,
-                new Dictionary<string, string> { [CobolNet.Runtime.IO.SystemClock.PinVariable] = LastTickBeforeLeapSecond });
+                new Dictionary<string, string?> { [CobolNet.Runtime.IO.SystemClock.PinVariable] = LastTickBeforeLeapSecond });
             Assert.True(ok, detail);
             Assert.Equal(formatted ? Expected2023 : Expected2002, stdout);
         }

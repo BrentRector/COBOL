@@ -434,6 +434,18 @@ public static class CobolArgAdapt
         return new CellPointer(FreshArea(areaWidth, fresh), 0) { Shape = formalShape };
     }
 
+    /// <summary>⛔ AN AREA FORMAL THE MAIN-PROGRAM ENTRY FINDS UNBOUND (kb/Work PB2671; docs/CONFORMANCE.md DOC-A.1-116).
+    /// ISO §13.7.4 GR3 and GR5 leave to the implementor whether a non-COBOL activator's access to the formals is
+    /// guaranteed and what a linkage item's initial value is. <see cref="ICobolProgram.Activate"/> supplies no argument,
+    /// so a formal whose data-address pointer is still the never-set <see cref="ManagedPointer.Null"/> takes a fresh
+    /// area from <paramref name="fresh"/> — its description's category-default image, the initial state an elementary
+    /// formal's cell is declared with — and keeps it for the instance. A pointer an earlier
+    /// <see cref="ICobolProgram.Call"/> set is returned unchanged, whether it lies over that call's argument or is an
+    /// omitted argument's fresh area: the formal still refers to what that activation bound.</summary>
+    public static ManagedPointer Unbound(ManagedPointer carrier, int areaWidth, GroupAtom[]? formalShape,
+                                        Func<StorageCell> fresh) =>
+        ReferenceEquals(carrier, ManagedPointer.Null) ? Area(null, present: true, areaWidth, formalShape, fresh) : carrier;
+
     /// <summary>A fresh area of <paramref name="areaWidth"/> positions: the formal's own seeded cell when it states one,
     /// else a space-filled cell.</summary>
     private static StorageCell FreshArea(int areaWidth, Func<StorageCell>? fresh) =>
@@ -875,16 +887,14 @@ public static class CobolArgAdapt
     /// sentence 3), and a store overlays the argument's storage (<see cref="CobolVarGroup.OverlayFixedImage"/>,
     /// §14.2.3 GR8). Before PB965's finisher the pair was refused at bind by a size compare on the collapsed
     /// width, and this arm did not exist.</para></summary>
-    /// <remarks><paramref name="formalNum"/> is an image-stored NUMERIC formal's own description (kb/Work PB992) —
-    /// read only by the omitted arm, whose benign value (the documented §14.9.4.4 GR12 leniency: "a numeric view
-    /// answers zero") is then the formal's ZERO image rather than the empty string.</remarks>
-    public static ManagedPointer<string> Text(CobolArg[] args, int i, int width, GroupAtom[]? groupAtoms = null,
-                                              NumProfile? formalNum = null)
+    /// <remarks><paramref name="unbound"/> is the factory of the formal's UNBOUND value (kb/Work PB992, PB2671;
+    /// docs/CONFORMANCE.md DOC-A.1-116 and DOC-A.1-141) — the category default its declared carrier starts with, which
+    /// an unchecked reference to an OMITTED formal reads (the documented §14.9.4.4 GR12 leniency): spaces for a
+    /// character item, zeros for a boolean, the zero image for a numeric item. Read only by the omitted arm.</remarks>
+    public static ManagedPointer<string> Text(CobolArg[] args, int i, int width, GroupAtom[]? groupAtoms,
+                                              Func<string> unbound)
     {
-        if (!Present(args, i))
-            return formalNum is { } fz
-                ? ManagedPointer<string>.OmittedArgument(() => CobolNum.FormatImage(0, fz), _ => { })
-                : Omitted<string>();
+        if (!Present(args, i)) return OmittedText(unbound);
         if (groupAtoms is null && IsPointerContent(args[i])) args = WithPointerContent(args, i, width);
         switch (args[i].Carrier)
         {
@@ -980,9 +990,9 @@ public static class CobolArgAdapt
     /// is what dropped the sign of <c>-12.34</c>. <paramref name="formal"/> is null only for a formal with no
     /// numeric description, which takes the argument's own image.</para></summary>
     public static ManagedPointer<string> TextValue(CobolArg[] args, int i, int width, NumProfile? formal, int formalScale,
-        GroupAtom[]? groupAtoms = null)
+        GroupAtom[]? groupAtoms, Func<string> unbound)
     {
-        if (!Present(args, i)) return Omitted<string>();
+        if (!Present(args, i)) return OmittedText(unbound);
         // A variable-length group argument into a fixed-length GROUP formal BY CONTENT (kb/Work PB965): §14.8.2.2
         // rule 2's MOVE, which §14.9.25.4 GR9 performs through the same correspondence (§8.5.1.12.3 sentence 3).
         if (args[i].Carrier is ManagedPointer<CobolVarGroup> vp && VarGroupSpans(args[i], groupAtoms, width) is { } vspans)
@@ -1511,6 +1521,16 @@ public static class CobolArgAdapt
             + $"through {formal} — the argument and the formal parameter do not conform (ISO §14.8.2 via "
             + "§14.9.4.4 GR3d — EC-PROGRAM-ARG-MISMATCH)",
             "EC-PROGRAM-ARG-MISMATCH") { RaisedAtAdoption = true };
+
+    /// <summary>The omitted carrier of a fixed-length CHARACTER-IMAGE formal (kb/Work PB2671): <see cref="Omitted{T}"/>'s
+    /// contract — IsNull true, stores ignored, nothing raised — with reads answering the formal's own unbound value
+    /// (<paramref name="unbound"/>, composed once) rather than the empty string, so an omitted formal reads what the
+    /// same formal reads unbound at the main-program entry and what an omitted AREA formal's fresh cell holds.</summary>
+    private static ManagedPointer<string> OmittedText(Func<string> unbound)
+    {
+        string value = unbound();
+        return ManagedPointer<string>.OmittedArgument(() => value, _ => { });
+    }
 
     /// <summary>The omitted/absent CALL argument's carrier (ISO §14.9.4.4 GR11; kb/Work PB133 wave C): IsNull
     /// answers true — what makes the §8.8.4.8 omitted-argument condition and GR1c's TRANSITIVE omission work
