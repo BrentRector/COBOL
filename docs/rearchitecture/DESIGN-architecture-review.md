@@ -1715,7 +1715,7 @@ deletions and rewriter-driven moves (the Move notes say so in their Model line) 
 
 | Not yet notes | What files them |
 |---|---|
-| the 67 test-only findings | R2's Opus reviewer, by the rule above |
+| the 67 test-only findings, less R0-0081, R0-0082 and R0-0198 (rule (c): deleted whole with PB2189/PB2190) | R2's Opus reviewer, by the rule above |
 | §8.2 rules 2–3 (178 multi-type files, 22 misnamed; `BoundTree.cs` already claimed by PB2393) | the census's columns (PB2351), then `file_census_notes.py` |
 | the tests' re-home | R2's tests, scripts and CI reviewer, then `file_census_notes.py`; a wave under the partition (PB1754 amended) |
 
