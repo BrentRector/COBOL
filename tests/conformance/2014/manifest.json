@@ -219,7 +219,9 @@
   "pb2094_vlg_formal_shares_argument_area",
   "pb1939_dyn_numeric_element_spaces",
   "pb2004_dyn_element_character_channels",
-  "pb1900_nested_product_rounded_modes"
+  "pb1900_nested_product_rounded_modes",
+  "pb2496_vlg_dynamic_element_tables",
+  "pb2496_vlg_dynamic_element_tables_call"
  ],
  "pending": []
 }

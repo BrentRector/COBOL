@@ -209,8 +209,10 @@ internal static class VariableLengthCompatibility
 
     /// <summary>The spans of <paramref name="fixedGroup"/>'s tables that correspond to
     /// <paramref name="varGroup"/>'s dynamic-capacity tables — the compile-time call of the ONE correspondence
-    /// walk (<c>CobolVarGroup.CorrespondingSpans</c>), for a pair both of whose descriptions are in hand (the
-    /// §14.9.25.4 GR9 MOVE). Null when either layout cannot be stated or the pair does not correspond.</summary>
+    /// walk (<c>CobolVarGroup.CorrespondingSpans</c>), for a pair both of whose descriptions are in hand at an INVOKE
+    /// boundary (<c>OoEmitter</c>'s fixed-group arms; a statement — the §14.9.25.4 GR9 MOVE, the §8.8.4.2.17 relation —
+    /// pairs the two shapes through <c>CobolVarGroup.Reshape</c> / <c>Compare</c> instead, kb/Work PB2496). Null when
+    /// either layout cannot be stated or the pair does not correspond.</summary>
     public static int[]? CorrespondingSpans(DataItem fixedGroup, DataItem varGroup) =>
         Layout(fixedGroup) is { } f && Layout(varGroup) is { } v
             ? CobolNet.Runtime.CobolVarGroup.CorrespondingSpans(f, v)

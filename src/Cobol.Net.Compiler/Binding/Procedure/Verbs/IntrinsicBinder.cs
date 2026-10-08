@@ -2393,7 +2393,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // item 57: LENGTH(G) equals the displayed width), so the length is the image's, through the ONE composer
         // DISPLAY uses; a group the composer cannot take (a cell-backed or bit-bearing one) stays the named stage.
         BoundExpr ImageOrStage(string what) =>
-            group.CurrentImageCapable && !group.HasBitDescendant
+            group.CurrentExtentImageCapable && !group.HasBitDescendant
                 && inner is MemberPlace or DynTablePlace or RedefViewPlace { Coding: VarGroupWindow }
                 ? new BoundIntrinsicCall(sig, [op], PicCategory.Numeric) { OverCurrentImage = true }
                 : Stage(what);

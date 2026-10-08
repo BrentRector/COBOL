@@ -659,9 +659,9 @@ internal static class PlaceRenderer
         {
             // The cell's window holds the OCCURS DEPENDING table at its MAXIMUM, as the trailing storage of the run
             // (SR22); the operand's count cuts the carrier's fixed run to the current extent (kb/Work PB244).
-            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo, CurrentExtentUse.Carrier) =>
+            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo, CurrentExtentUse.Operand) =>
                 RuntimeApi.CellVarCarrier(RenderPath(g.Cell, AccessDir.Sending),
-                    $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynTable, g.Odo, CellOdoCount(odo)),   // kb/Work PB1026, PB1042
+                    $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynTable, g.Odo, CellOdoCount(odo), g.DynElem),   // kb/Work PB1026, PB1042, PB2496
             _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.CurrentExtentImageCapable =>
                 EmitText.LoudValue(RuntimeApi.VarGroupType, TierCIsland.Reason(inner.Item, context)),
             // A STATEMENT's read asks a LINKAGE dynamic-length member to agree with its clause (§14.6.13.2 rule 5,
@@ -732,7 +732,7 @@ internal static class PlaceRenderer
         RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreCarrier(RenderPath(g.Cell, AccessDir.Receiving),
             $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt,
             formalStorage ? g.DynMax.Select(_ => int.MaxValue) : g.DynMax, g.DynTable, g.Odo,
-            odoCount ?? g.Odo.Max.ToString(), value)};",   // kb/Work PB1026, PB1042, PB244
+            odoCount ?? g.Odo.Max.ToString(), value, g.DynElem, formalStorage)};",   // kb/Work PB1026, PB1042, PB244, PB2496
         _ when !group.Item.CurrentExtentImageCapable => EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),
         _ => $"{GroupTarget(group)}.FromVarImage({value}{(odoCount is null ? (formalStorage ? ", true" : "") : $", {(formalStorage ? "true" : "false")}, {odoCount}")});",
     };
@@ -743,13 +743,13 @@ internal static class PlaceRenderer
     /// (the A.1 item 57 composer DISPLAY already uses), behind the same capability guard and unwrap as
     /// <see cref="VarGroupImage"/>. It is what a WRITE / REWRITE / RELEASE of a variable-length RECORD sends
     /// (determination D-FRA; kb/Work PB981).</summary>
-    /// <param name="transfer">True for a ONE-WAY consumer (DISPLAY - kb/Work PB244): the guard then asks
-    /// <see cref="DataItem.CurrentImageCapable"/>, which also admits a table of variable-length ELEMENTS under
-    /// OCCURS DEPENDING or dynamic capacity. A record's image (WRITE) leaves it false: that record must also be
-    /// READ back, through the carrier's layout.</param>
+    /// <param name="transfer">True for a statement's OPERAND (DISPLAY - kb/Work PB244): the guard then asks
+    /// <see cref="DataItem.CurrentExtentImageCapable"/>, which also admits an OCCURS DEPENDING table of variable-length
+    /// ELEMENTS. A record's image (WRITE) leaves it false: that record must also be READ back, through the carrier's
+    /// layout (<see cref="DataItem.RecordImageCapable"/>).</param>
     public static string VarGroupCurrentImage(Place group, string context, bool transfer = false)
     {
-        var use = transfer ? CurrentExtentUse.OneWayImage : CurrentExtentUse.Record;
+        var use = transfer ? CurrentExtentUse.Operand : CurrentExtentUse.Record;
         var (inner, odo) = PeelOdo(group, maximum: false);
         return inner.Undecorated switch
         {
@@ -761,28 +761,37 @@ internal static class PlaceRenderer
         };
     }
 
-    /// <summary>⛔ THE ONE §8.5.1.12 CARRIER OF A GROUP PAIRED WITH A VARIABLE-LENGTH GROUP — for every operation
-    /// that takes a compatible pair component by component: the §14.9.25.4 GR9 MOVE's sending operand and both
-    /// operands of the §8.8.4.2.17 comparison (kb/Work PB1467 moved it here from the MOVE emitter so the two
-    /// cannot decompose a group differently). A variable-length group is its own composer; a FIXED-length group is
-    /// its record image decomposed at the spans of ITS tables that correspond to <paramref name="other"/>'s
-    /// dynamic-capacity tables (<c>VariableLengthCompatibility.CorrespondingSpans</c> — the PAIR's
-    /// correspondence, §8.5.1.12.2; kb/Work PB965). Null when this implementation cannot compose the group's
-    /// current extent (the caller emits its named loud). <paramref name="variableContext"/> /
-    /// <paramref name="fixedContext"/> name the operand in a run-time reason, as <see cref="GroupImage"/>'s
-    /// <c>context</c> does.</summary>
-    public static string? VarGroupCarrier(Place g, DataItem other, string variableContext, string fixedContext) =>
-        VariableLengthCompatibility.IsVariableLength(g.Item)
-            ? g.Item.CurrentExtentImageCapable
-                ? VarGroupImage(g, variableContext)
-                : null
-            : VariableLengthCompatibility.CorrespondingSpans(g.Item, other) is { } spans && g.ImageCapable
-                ? RuntimeApi.VarGroupFromFixedImage(SendingGroupImage(g, fixedContext), SpanArray(spans))
-                : null;
+    /// <summary>⛔ THE ONE §8.5.1.12 CARRIER OF A GROUP OPERAND THAT MEETS A VARIABLE-LENGTH GROUP, IN ITS OWN SHAPE —
+    /// for every statement that takes a compatible pair component by component: the §14.9.25.4 GR9 MOVE's sending
+    /// operand and both operands of the §8.8.4.2.17 comparison (kb/Work PB1467 moved it here from the MOVE emitter so
+    /// the two cannot decompose a group differently). A variable-length group is its own composer; a FIXED-length group
+    /// is its record image with no components. <c>Shape</c> is the operand's own §8.5.1.12 atoms
+    /// (<c>VariableLengthCompatibility.GroupAtoms</c>; null for a group with a USAGE BIT leaf): the pair's
+    /// correspondence is decided over the TWO shapes (<c>CobolVarGroup.Reshape</c> for a MOVE, <c>CobolVarGroup.Compare</c>
+    /// for a relation), the same walk that decided the pair compatible, so a fixed table opposite a dynamic-capacity
+    /// table (§8.5.1.12.3 sentence 3) and a table of variable-length elements (§14.6.9.2, kb/Work PB2496) are paired
+    /// where the walk pairs them. Null when this implementation cannot compose the operand (the caller emits its named
+    /// loud): a variable-length group whose current extent does not compose, a fixed-length group with no character
+    /// image or no atoms. <paramref name="variableContext"/> / <paramref name="fixedContext"/> name the operand in a
+    /// run-time reason, as <see cref="GroupImage"/>'s <c>context</c> does.</summary>
+    public static (string Carrier, GroupAtom[]? Shape)? VarGroupOperand(Place g, string variableContext, string fixedContext)
+    {
+        var shape = VariableLengthCompatibility.GroupAtoms(g.Item);
+        if (VariableLengthCompatibility.IsVariableLength(g.Item))
+            return g.Item.CurrentExtentImageCapable ? (VarGroupImage(g, variableContext), shape) : null;
+        return shape is not null && g.ImageCapable
+            ? (RuntimeApi.VarGroupOfImage(SendingGroupImage(g, fixedContext)), shape)
+            : null;
+    }
 
-    /// <summary>The flat <c>(offset, width)</c> C# array literal <c>CobolVarGroup.FromFixedImage</c> /
-    /// <c>ToFixedImage</c> take.</summary>
-    public static string SpanArray(int[] spans) => $"new int[] {{ {string.Join(", ", spans)} }}";
+    /// <summary>A §8.5.1.12 carrier of shape <paramref name="from"/> seen in shape <paramref name="to"/>: the carrier
+    /// itself when the shapes are the same, else <c>CobolVarGroup.Reshape</c> (kb/Work PB480, PB2496). A shape that
+    /// cannot be stated (null: a USAGE BIT leaf) leaves the carrier as it is, which is exact only between two groups of
+    /// one layout.</summary>
+    public static string VarGroupInShape(string carrier, GroupAtom[]? from, GroupAtom[]? to) =>
+        from is not null && to is not null && !GroupCompatibility.SameShape(from, to)
+            ? RuntimeApi.VarGroupReshape(carrier, from, to)
+            : carrier;
 
     /// <summary>Each variable-length component's offset in a variable-length group's FIXED run — where
     /// <c>CobolVarGroup.Compare</c> interleaves the components with the fixed material (§8.8.4.2.17; kb/Work

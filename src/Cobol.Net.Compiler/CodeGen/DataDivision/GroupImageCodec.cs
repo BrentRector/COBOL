@@ -366,7 +366,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     {
         VarPartKind.Fixed => AsImageOf(p.Field),
         VarPartKind.OdoFixed => OdoPrefixImage(p),
-        VarPartKind.DynLeaf or VarPartKind.DynTable => CurrentMemberImage(p.Item!, agree: "true"),
+        VarPartKind.DynLeaf or VarPartKind.DynTable or VarPartKind.DynGroupTable => CurrentMemberImage(p.Item!, agree: "true"),
         VarPartKind.Nested => $"{p.Field.Name}.CurrentImage({OdoArgument(p.Item!)})",
         VarPartKind.NestedTable =>
             $"string.Concat(System.Array.ConvertAll({p.Field.Name}, __e => __e.CurrentImage()))",
@@ -438,6 +438,11 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         DynLeaf,
         /// <summary>A dynamic-capacity table — ONE carried component, its occurrences concatenated (§8.5.1.9).</summary>
         DynTable,
+        /// <summary>A dynamic-capacity table whose ELEMENTS are variable-length groups (kb/Work PB2496) — ONE carried
+        /// component, NESTED: its occurrences ride as their own carriers (<c>CobolVarGroup.Elements</c>), because their
+        /// count is a run-time quantity and each holds components of its own, so flattening them would move the ordinal
+        /// of every later component. §14.6.9.2 moves such a table element by element, a group MOVE per occurrence.</summary>
+        DynGroupTable,
         /// <summary>A nested SCALAR variable-length group — FLATTENED: its own fixed run joins ours and its own
         /// components join ours in place, because §8.5.1.12 is stated over relative byte positions and is blind
         /// to the declaration tree.</summary>
@@ -490,7 +495,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                 continue;
             }
             parts.Add(d.IsDynamicLength ? new VarPart(VarPartKind.DynLeaf, f, d, 0, 1)
-                : d.IsDynamicTable ? new VarPart(VarPartKind.DynTable, f, d, 0, 1)
+                : d.IsDynamicTable ? new VarPart(d.ElementImageCapable ? VarPartKind.DynTable : VarPartKind.DynGroupTable, f, d, 0, 1)
                 : d.IsImageCapable ? new VarPart(VarPartKind.OdoFixed, f, d, f.Width, 0)
                 : d.OccursSpec?.DependingName is not null
                     ? new VarPart(VarPartKind.OdoTable, f, d, (d.Occurs ?? 1) * VarFixedWidth(d), (d.Occurs ?? 1) * VarComponentCount(d), d.Occurs ?? 1)
@@ -517,6 +522,12 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// <summary>How many variable-length components a group carries, nested groups flattened in.</summary>
     public int VarComponentCount(DataItem group) => VarParts(group).Sum(p => p.DynCount);
 
+    /// <summary>Does the group's carrier hold a NESTED component (<see cref="VarPartKind.DynGroupTable"/>) at any depth
+    /// of its flattening — whether its <c>AsVarImage</c> states the carrier's <c>Elements</c> (kb/Work PB2496).</summary>
+    private bool CarriesNested(DataItem group) =>
+        VarParts(group).Any(p => p.Kind is VarPartKind.DynGroupTable
+            || p.Kind is VarPartKind.Nested or VarPartKind.NestedTable or VarPartKind.OdoTable && CarriesNested(p.Item!));
+
     /// <summary>Emit a variable-length group's <c>AsVarImage()</c> / <c>FromVarImage()</c> — the boundary codec
     /// §14.8.2.2 and §14.8.3.2 need, the exact analogue of <c>AsImage</c>/<c>FromImage</c> for a group that has
     /// no fixed record window. Gated on <see cref="DataItem.CurrentExtentImageCapable"/>, THE ONE capability
@@ -529,10 +540,14 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     {
         var parts = VarParts(group);
         int totalFixed = parts.Sum(p => p.FixedWidth);
+        bool nested = CarriesNested(group);
         using (w.Block($"public readonly CobolVarGroup AsVarImage({AsVarImageParameters(group)})"))
         {
             var fixedParts = new List<string>();
             var dynParts = new List<string>();
+            // Parallel to dynParts when the carrier holds a nested component (kb/Work PB2496): each component's
+            // occurrence carriers, null for a plain one; a spliced nested group's own list, every entry, in place.
+            var elemParts = new List<string>();
             int n = 0;
             foreach (var p in parts)
             {
@@ -549,6 +564,12 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                     case VarPartKind.DynLeaf:
                     case VarPartKind.DynTable:
                         dynParts.Add(CurrentMemberImage(p.Item!, agree: "__agree"));
+                        elemParts.Add("null");
+                        break;
+                    case VarPartKind.DynGroupTable:
+                        // ONE nested component: no characters of its own, its occurrences' carriers beside it.
+                        dynParts.Add("\"\"");
+                        elemParts.Add($"{p.Field.Name}.CurrentOccurrencesAs(__e => __e.AsVarImage(__agree))");
                         break;
                     case VarPartKind.Nested:
                     case VarPartKind.NestedTable:
@@ -567,6 +588,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                         });
                         fixedParts.Add($"__n{n}.Fixed");
                         dynParts.Add($".. __n{n}.Dynamic");
+                        elemParts.Add($".. {RuntimeApi.VarGroupElementList($"__n{n}")}");
                         n++;
                         break;
                     default:
@@ -574,7 +596,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                 }
             }
             w.Line($"return new CobolVarGroup({(fixedParts.Count > 0 ? string.Join(" + ", fixedParts) : "\"\"")}, "
-                + $"[{string.Join(", ", dynParts)}]);");
+                + $"[{string.Join(", ", dynParts)}]{(nested ? $", [{string.Join(", ", elemParts)}]" : "")});");
         }
         // THE FILE-RECORD HALF (determination D-FRA; kb/Work PB981): a record read back as ONE contiguous image
         // (§8.5.1.11.2 — what CurrentImage() wrote) is decomposed into this same carrier by the ONE split rule,
@@ -664,8 +686,21 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                             w.Line($"{p.Field.Name}.FromCurrentImage(__v.Dyn({dynAt}), {p.Field.Width}, "
                                 + $"{TableElementFromImage(p.Item!)});");
                         using (w.Block("else"))
-                            w.Line($"{p.Field.Name}.SpaceFillElements({p.Field.Width}, "
+                            w.Line($"{p.Field.Name}.SpaceFillElements(new string(' ', {p.Field.Width}), "
                                 + $"{TableElementFromImage(p.Item!)});");
+                        dynAt++;
+                        break;
+                    case VarPartKind.DynGroupTable:
+                        // §14.6.9.2: the table is RECREATED from the sender's occurrences, each stored into its element
+                        // by the element's own FromVarImage — "Correspondingly numbered elements are moved according to
+                        // the rules of the MOVE statement" (kb/Work PB2496); the FROM minimum is filled with space-filled
+                        // elements. Not carried at all, it is in the GR9b excess part: §14.6.9.4 space-fills each
+                        // element at an unaffected capacity — the empty carrier, which GR9b's own steps space-fill.
+                        string store = "(__e, __x) => { __e.FromVarImage(__x, __storage); return __e; }";
+                        using (w.Block($"if (__v.HasDyn({dynAt}))"))
+                            w.Line($"{p.Field.Name}.Recreate(__v.ElementCarriersAt({dynAt}), {RuntimeApi.VarGroupEmpty}, {store});");
+                        using (w.Block("else"))
+                            w.Line($"{p.Field.Name}.SpaceFillElements({RuntimeApi.VarGroupEmpty}, {store});");
                         dynAt++;
                         break;
                     case VarPartKind.Nested:
@@ -697,7 +732,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             {
                 case VarPartKind.Fixed: off += p.Field.Width; break;
                 case VarPartKind.DynLeaf: layout.Add((off, 1, p.Item!.DynMaxSize, FileModel.StructureOf(p.Item)?.Code ?? 0)); break;
-                case VarPartKind.DynTable: layout.Add((off, p.Field.Width, p.Item!.OccursSpec?.Max ?? 0, 0)); break;
+                case VarPartKind.DynTable:
+                case VarPartKind.DynGroupTable: layout.Add((off, p.Field.Width, p.Item!.OccursSpec?.Max ?? 0, 0)); break;
                 case VarPartKind.Nested: ContiguousLayout(p.Item!, off, layout); off += p.FixedWidth; break;
                 case VarPartKind.NestedTable:
                 case VarPartKind.OdoTable:   // the components at the table's MAXIMUM: where compare / the boundary look for them

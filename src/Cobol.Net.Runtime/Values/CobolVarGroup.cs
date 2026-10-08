@@ -26,12 +26,24 @@ namespace CobolNet.Runtime;
 /// <para>NESTING is flattened by the emitted composer, because §8.5.1.12 is stated over relative byte positions
 /// and is blind to the declaration tree: a nested variable-length group contributes its own fixed run and its
 /// own dynamic components inline, and <see cref="Slice"/> hands it back exactly that window on the way in.</para>
+/// <para>⛔ ONE SHAPE IS NOT FLATTENED — A DYNAMIC-CAPACITY TABLE WHOSE ELEMENTS ARE THEMSELVES VARIABLE-LENGTH GROUPS
+/// (kb/Work PB2496). Its occurrence count is a run-time quantity and each occurrence holds components of its own, so
+/// splicing the occurrences' components into this list would make the ordinal of every LATER component depend on the
+/// table's current capacity, and the positional correspondence the ordinal list rests on would be lost. The table is
+/// ONE component, and its occurrences' own carriers ride beside it in <see cref="Elements"/>: §14.6.9.2 moves it
+/// "Correspondingly numbered elements … according to the rules of the MOVE statement" (each occurrence a group MOVE
+/// of its own) and §14.6.9.3 compares it element by element, so the element carriers are exactly what both
+/// operations take.</para>
 /// <para>⛔ NOT a general-purpose serializer, and never persisted: it exists only between the argument
 /// evaluation and the formal's copy-in (and back at the copy-out), the same lifetime the string image has.</para>
 /// </summary>
 /// <param name="Fixed">The group's image with the variable-length components collapsed to zero width.</param>
-/// <param name="Dynamic">Each variable-length component's current content, in declaration order.</param>
-public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
+/// <param name="Dynamic">Each variable-length component's current content, in declaration order. A NESTED component
+/// (one with <see cref="Elements"/>) has no character content of its own and holds the empty string.</param>
+/// <param name="Elements">Null when no component is nested; otherwise one entry per component of
+/// <paramref name="Dynamic"/>: for a dynamic-capacity table of variable-length group elements, its occurrences' own
+/// carriers in occurrence order up to its current capacity, and null for every other component.</param>
+public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup[]?[]? Elements = null)
 {
     /// <summary>The empty carrier — an absent / OMITTED argument's value (ISO §14.9.4.4 GR11 hands out a
     /// carrier whose accessors raise; this is the shape those accessors return when checking is off).</summary>
@@ -52,6 +64,39 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
     /// zero-length component string; only this tells them apart.</summary>
     public bool HasDyn(int i) => (uint)i < (uint)Dynamic.Length;
 
+    /// <summary>Component <paramref name="i"/>'s occurrence carriers when it is a NESTED component — a carried
+    /// dynamic-capacity table of variable-length group elements (kb/Work PB2496) — else null.</summary>
+    public CobolVarGroup[]? ElementsAt(int i) => Elements is { } e && (uint)i < (uint)e.Length ? e[i] : null;
+
+    /// <summary><see cref="Elements"/> as one entry per component, null for every plain one — what an enclosing group
+    /// splices in place when it flattens this carrier into its own (the emitted <c>AsVarImage</c>).</summary>
+    public CobolVarGroup[]?[] ElementList => Elements ?? new CobolVarGroup[]?[Dynamic.Length];
+
+    /// <summary>⛔ THE OCCURRENCE CARRIERS A NESTED RECEIVER STORES (kb/Work PB2496): component <paramref name="i"/>'s
+    /// <see cref="ElementsAt"/>, or the empty list when the component was carried EMPTY (a sender whose table had no
+    /// occurrence, §14.6.9.2's recreation at capacity zero). A component carried as CHARACTERS instead is the image of a
+    /// fixed-length group's table, decomposed at the span of a FIXED-length counterpart
+    /// (<see cref="FromFixedImage"/>): those characters are the fixed group's elements, whose own layout did not travel
+    /// with them, so no occurrence of a variable-length element can be recovered from them — loud, never a guessed
+    /// split. The caller asks <see cref="HasDyn"/> first: an absent component is §14.6.9.4's space fill.</summary>
+    /// <exception cref="NotImplementedCobolFeatureException">The component was carried as characters.</exception>
+    public CobolVarGroup[] ElementCarriersAt(int i) =>
+        ElementsAt(i) ?? (Dyn(i).Length == 0 ? [] : NotImplemented.Value<CobolVarGroup[]>(FixedSpanOppositeNested));
+
+    /// <summary>Component <paramref name="k"/>'s characters for a span of a FIXED-length counterpart
+    /// (<see cref="ToFixedImage"/>, <see cref="OverlayFixedImage"/>): a nested component has none to give — its
+    /// occurrences hold components the fixed group's flat span cannot place — so it is the same named loud as
+    /// <see cref="ElementCarriersAt"/>, never the empty string a silent space fill would make of it.</summary>
+    private string FlatAt(int k) => ElementsAt(k) is null ? Dyn(k) : NotImplemented.Value<string>(FixedSpanOppositeNested);
+
+    /// <summary>The one reason both span adapters give for a nested component (kb/Work PB2496): a statement's fixed
+    /// operand converts through the PAIR's atoms (<see cref="Reshape"/>), but an activation boundary still pairs a
+    /// fixed-length group by the flat spans of <see cref="CorrespondingSpans"/>.</summary>
+    private const string FixedSpanOppositeNested =
+        "a fixed-length group's table crossing an activation boundary opposite a dynamic-capacity table whose elements "
+        + "are variable-length groups: the fixed group's element layout does not travel with its image "
+        + "(ISO §14.6.9.2 over §8.5.1.12.3; kb/Work PB2496)";
+
     /// <summary>The window a NESTED variable-length group occupies inside this carrier:
     /// <paramref name="fixedWidth"/> character positions of <see cref="Fixed"/> starting at
     /// <paramref name="fixedAt"/> (space-padded when the sender's fixed run was shorter — the same store rule
@@ -67,7 +112,13 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
         // §14.6.9.4 space fill degrades into §14.6.9.2's recreate-at-zero one level down (kb/Work PB393).
         var d = new string[Math.Clamp(Dynamic.Length - dynAt, 0, dynCount)];
         for (int k = 0; k < d.Length; k++) d[k] = Dyn(dynAt + k);
-        return new CobolVarGroup(f, d);
+        CobolVarGroup[]?[]? e = null;
+        if (Elements is not null)
+        {
+            e = new CobolVarGroup[]?[d.Length];
+            for (int k = 0; k < e.Length; k++) e[k] = ElementsAt(dynAt + k);
+        }
+        return new CobolVarGroup(f, d, e);
     }
 
     /// <summary>The carrier of a fixed-OCCURS table of variable-length group elements (kb/Work PB244): each
@@ -78,12 +129,16 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
     {
         var fixedRun = new System.Text.StringBuilder();
         var dyn = new List<string>();
+        var elements = new List<CobolVarGroup[]?>();
+        bool nested = false;
         foreach (var o in occurrences)
         {
             fixedRun.Append(o.Fixed);
             dyn.AddRange(o.Dynamic);
+            for (int k = 0; k < o.Dynamic.Length; k++) elements.Add(o.ElementsAt(k));
+            nested |= o.Elements is not null;
         }
-        return new CobolVarGroup(fixedRun.ToString(), [.. dyn]);
+        return new CobolVarGroup(fixedRun.ToString(), [.. dyn], nested ? [.. elements] : null);
     }
 
     /// <summary>This carrier with the group's TRAILING fixed material cut off the fixed run and appended as one
@@ -93,13 +148,14 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
     /// component instead, because the record's own length — not a constant — says how many occurrences it holds.
     /// <paramref name="tailAt"/> is where the table starts in the fixed run.</summary>
     public CobolVarGroup SplitTail(int tailAt) =>
-        new(CobolString.Store(Fixed, tailAt), [.. Dynamic, Fixed.Length > tailAt ? Fixed[tailAt..] : ""]);
+        new(CobolString.Store(Fixed, tailAt), [.. Dynamic, Fixed.Length > tailAt ? Fixed[tailAt..] : ""],
+            Elements is null ? null : [.. Elements, null]);
 
     /// <summary>The inverse of <see cref="SplitTail"/>: the LAST component rejoins the fixed run at
     /// <paramref name="tailAt"/>.</summary>
     public CobolVarGroup JoinTail(int tailAt) =>
         Dynamic.Length == 0 ? this
-        : new(CobolString.Store(Fixed, tailAt) + Dynamic[^1], Dynamic[..^1]);
+        : new(CobolString.Store(Fixed, tailAt) + Dynamic[^1], Dynamic[..^1], Elements?[..^1]);
 
     // ── The §8.5.1.12 LAYOUT of a group, and the correspondence between two of them (kb/Work PB965) ─────────────
     //
@@ -240,7 +296,7 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
             outp.Append(CobolString.Store(
                 fixedAt >= v.Fixed.Length ? "" : v.Fixed[fixedAt..Math.Min(v.Fixed.Length, fixedAt + take)], take));
             fixedAt += take;
-            outp.Append(CobolString.Store(v.Dyn(k), width));
+            outp.Append(CobolString.Store(v.FlatAt(k), width));
         }
         outp.Append(fixedAt >= v.Fixed.Length ? "" : v.Fixed[fixedAt..]);
         return CobolString.Store(outp.ToString(), totalWidth);
@@ -270,10 +326,10 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
         var dyn = (string[])current.Dynamic.Clone();
         for (int k = 0; k < view.Dynamic.Length && k < dyn.Length; k++)
         {
-            string was = dyn[k], now = view.Dynamic[k];
+            string was = current.FlatAt(k), now = view.Dynamic[k];
             dyn[k] = now.Length >= was.Length ? now[..was.Length] : now + was[now.Length..];
         }
-        return new CobolVarGroup(fixedRun, dyn);
+        return new CobolVarGroup(fixedRun, dyn, current.Elements);
     }
 
     /// <summary>⛔ ONE VARIABLE-LENGTH GROUP'S CARRIER IN THE SHAPE OF ANOTHER, COMPATIBLE ONE (kb/Work PB480). Two
@@ -294,6 +350,10 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
     ///     (superfluous elements not moved, missing ones space filled), as <see cref="ToFixedImage"/> applies it;</item>
     ///   <item>a dynamic-capacity table beyond the shorter group's last character corresponds to "a space-filled
     ///     fixed-length table" (§8.5.1.12.2): it gets no component (<see cref="HasDyn"/> false).</item>
+    /// <item>a corresponding pair of tables at least one of which holds VARIABLE-LENGTH ELEMENTS (kb/Work PB2496):
+    ///   each occurrence is reshaped from the one element's shape into the other's, §14.6.9.2's "Correspondingly
+    ///   numbered elements are moved according to the rules of the MOVE statement"; a fixed table's occurrences are
+    ///   its characters cut at its element width, each a fixed-length element's carrier.</item>
     /// </list>
     /// A pair the walk does not find compatible never reaches here — the bind-time screen or the run-time relation
     /// (<see cref="ActivationRelations.ParameterViolation"/>) refused it first — so one is an internal fault, raised
@@ -306,22 +366,47 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
         var dst = new Geometry(to);
         var fixedRun = new System.Text.StringBuilder(v.Fixed.Length);
         var dyn = new List<string>();
+        var elements = new List<CobolVarGroup[]?>();
         int prevA = 0, prevB = 0;
         for (int k = 0; k <= pairs.Count; k++)
         {
             (int pa, int pb) = k < pairs.Count ? pairs[k] : (from.Length, to.Length);
             fixedRun.Append(CobolString.Store(src.FixedSlice(v, prevA, pa), dst.FixedChars(prevB, pb)));
             if (k == pairs.Count) break;
-            var b = to[pb];
-            if (b.IsComponent)
+            GroupAtom a = from[pa], b = to[pb];
+            if (IsNested(a) || IsNested(b))
+            {
+                // The element-by-element move (§14.6.9.2): every occurrence the sender has, in the receiver's element shape.
+                var moved = src.Occurrences(v, pa) is { } occ ? Reshaped(occ, ElementShape(a), ElementShape(b)) : null;
+                if (!b.IsComponent) fixedRun.Append(CobolString.Store(moved is null ? "" : FixedImages(moved), b.Chars));
+                else if (moved is not null)
+                {
+                    dyn.Add(IsNested(b) ? "" : FixedImages(moved));
+                    elements.Add(IsNested(b) ? moved : null);
+                }
+            }
+            else if (b.IsComponent)
             {
                 // An absent component (the sender carried fewer) stays absent — absent ones are a suffix.
-                if (src.Content(v, pa) is { } content) dyn.Add(content);
+                if (src.Content(v, pa) is { } content)
+                {
+                    dyn.Add(content);
+                    elements.Add(null);
+                }
             }
             else fixedRun.Append(CobolString.Store(src.Content(v, pa) ?? "", b.Chars));
             (prevA, prevB) = (pa + 1, pb + 1);
         }
-        return new CobolVarGroup(fixedRun.ToString(), [.. dyn]);
+        return new CobolVarGroup(fixedRun.ToString(), [.. dyn], AnyNested(elements));
+    }
+
+    /// <summary>Each of <paramref name="occurrences"/> rebuilt from the element shape <paramref name="from"/> in
+    /// <paramref name="to"/> — §14.6.9.2's element-by-element move.</summary>
+    private static CobolVarGroup[] Reshaped(CobolVarGroup[] occurrences, GroupAtom[] from, GroupAtom[] to)
+    {
+        var outp = new CobolVarGroup[occurrences.Length];
+        for (int i = 0; i < outp.Length; i++) outp[i] = Reshape(occurrences[i], from, to);
+        return outp;
     }
 
     /// <summary>⛔ A VIEW'S STORE BACK INTO THE STORAGE IT VIEWS — the BY REFERENCE write-back of
@@ -337,6 +422,10 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
     ///   <item>a FIXED table of the formal opposite the argument's dynamic-capacity table is written OVER the argument's
     ///     current occurrences, never re-sizing them, and a component of the formal opposite the argument's fixed table is
     ///     fitted to it — the same ⚠ DETERMINATION <see cref="OverlayFixedImage"/> records;</item>
+    ///   <item>a pair of tables at least one of which holds VARIABLE-LENGTH ELEMENTS (kb/Work PB2496) takes the same rules
+    ///     one level down: each occurrence of the view overlays the argument's occurrence of the same number, because the
+    ///     formal's element occupies that element's storage; an occurrence the argument did not have is the view's element
+    ///     seen in the argument's element shape;</item>
     ///   <item>every component of the argument the formal does not reach (beyond its last character) survives.</item>
     /// </list></summary>
     public static CobolVarGroup Overlay(CobolVarGroup current, CobolVarGroup view, GroupAtom[] currentShape,
@@ -348,21 +437,58 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
         var formal = new Geometry(viewShape);
         var fixedRun = new System.Text.StringBuilder(current.Fixed.Length);
         var dyn = (string[])current.Dynamic.Clone();
+        var elements = new CobolVarGroup[]?[dyn.Length];
+        for (int k = 0; k < dyn.Length; k++) elements[k] = current.ElementsAt(k);
         int prevA = 0, prevB = 0;
         for (int k = 0; k <= pairs.Count; k++)
         {
             (int pa, int pb) = k < pairs.Count ? pairs[k] : (currentShape.Length, viewShape.Length);
             fixedRun.Append(Overlaid(arg.FixedSlice(current, prevA, pa), formal.FixedSlice(view, prevB, pb)));
             if (k == pairs.Count) break;
-            var a = currentShape[pa];
-            string? now = formal.Content(view, pb);
-            if (!a.IsComponent)
-                fixedRun.Append(CobolString.Store(now ?? arg.Content(current, pa) ?? "", a.Chars));
-            else if (arg.Ordinal[pa] < dyn.Length && now is not null)
-                dyn[arg.Ordinal[pa]] = viewShape[pb].IsComponent ? now : Overlaid(dyn[arg.Ordinal[pa]], now);
+            GroupAtom a = currentShape[pa], b = viewShape[pb];
+            int ord = arg.Ordinal[pa];
+            if (IsNested(a) || IsNested(b))
+            {
+                var seen = formal.Occurrences(view, pb);
+                if (!a.IsComponent)
+                    fixedRun.Append(CobolString.Store(
+                        seen is null ? arg.Content(current, pa) ?? "" : FixedImages(Reshaped(seen, ElementShape(b), ElementShape(a))),
+                        a.Chars));
+                else if (ord < dyn.Length && seen is not null)
+                {
+                    var now = OverlaidOccurrences(arg.Occurrences(current, pa) ?? [], seen, resize: b.IsComponent,
+                        ElementShape(a), ElementShape(b));
+                    dyn[ord] = IsNested(a) ? "" : FixedImages(now);
+                    elements[ord] = IsNested(a) ? now : null;
+                }
+            }
+            else
+            {
+                string? now = formal.Content(view, pb);
+                if (!a.IsComponent)
+                    fixedRun.Append(CobolString.Store(now ?? arg.Content(current, pa) ?? "", a.Chars));
+                else if (ord < dyn.Length && now is not null)
+                    dyn[ord] = b.IsComponent ? now : Overlaid(dyn[ord], now);
+            }
             (prevA, prevB) = (pa + 1, pb + 1);
         }
-        return new CobolVarGroup(fixedRun.ToString(), dyn);
+        return new CobolVarGroup(fixedRun.ToString(), dyn, AnyNested(elements));
+    }
+
+    /// <summary>The occurrences of a table the view <paramref name="seen"/> stores over (<paramref name="was"/>, in the
+    /// argument's element shape <paramref name="wasShape"/>): each of the view's occurrences overlays the argument's of
+    /// the same number. <paramref name="resize"/> — the view's table is variable too — makes its capacity the argument's
+    /// (an occurrence the argument lacked is the view's, reshaped); otherwise the view is a FIXED table written over the
+    /// argument's current occurrences, never re-sizing them (<see cref="Overlay"/>'s determination).</summary>
+    private static CobolVarGroup[] OverlaidOccurrences(CobolVarGroup[] was, CobolVarGroup[] seen, bool resize,
+        GroupAtom[] wasShape, GroupAtom[] seenShape)
+    {
+        var now = new CobolVarGroup[resize ? seen.Length : was.Length];
+        for (int i = 0; i < now.Length; i++)
+            now[i] = i >= seen.Length ? was[i]
+                : i < was.Length ? Overlay(was[i], seen[i], wasShape, seenShape)
+                : Reshape(seen[i], seenShape, wasShape);
+        return now;
     }
 
     /// <summary><paramref name="was"/> with its leading characters replaced by <paramref name="now"/>'s, its length
@@ -371,15 +497,37 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
         now.Length >= was.Length ? now[..was.Length] : now + was[now.Length..];
 
     /// <summary>The corresponding pairs of two compatible layouts, left to right — the segment boundaries of
-    /// <see cref="Reshape"/> and <see cref="Overlay"/>.</summary>
+    /// <see cref="Reshape"/>, <see cref="Overlay"/> and <see cref="Compare"/>.</summary>
     private static List<(int First, int Second)> Correspondence(GroupAtom[] a, GroupAtom[] b)
     {
         var pairs = new List<(int, int)>();
         if (GroupCompatibility.Walk(a, b, pairs) is { } why)
             throw new InvalidOperationException(
-                $"internal error: a variable-length group carrier was reshaped across an incompatible pair ({why.Kind}) — "
+                $"internal error: a variable-length group carrier was taken across an incompatible pair ({why.Kind}) — "
                 + "the §8.5.1.12 relation should have refused it");
         return pairs;
+    }
+
+    /// <summary>⛔ THE ONE TEST FOR A NESTED COMPONENT (kb/Work PB2496): a dynamic-capacity table whose element is
+    /// itself a variable-length group — its element atoms hold a component. The emitted composer carries exactly these
+    /// tables in <see cref="Elements"/> (<c>GroupImageCodec</c>'s nested arm, gated on the same declared shape).</summary>
+    private static bool IsNested(GroupAtom t) =>
+        t.Kind is GroupAtomKind.DynamicTable && t.Element is { } e && GroupCompatibility.HasComponent(e);
+
+    /// <summary>A table atom's element shape: its element's atoms, or one run of fixed material for an elementary element.</summary>
+    private static GroupAtom[] ElementShape(GroupAtom t) => t.Element ?? GroupCompatibility.FixedRun(t.ElementChars);
+
+    /// <summary>The fixed runs of occurrence carriers concatenated — a table of FIXED-length elements' characters
+    /// (a carrier in a fixed element shape has no components).</summary>
+    private static string FixedImages(CobolVarGroup[] occurrences) =>
+        string.Concat(Array.ConvertAll(occurrences, static e => e.Fixed));
+
+    /// <summary>The <see cref="Elements"/> of a rebuilt carrier: null when no component is nested.</summary>
+    private static CobolVarGroup[]?[]? AnyNested(IReadOnlyList<CobolVarGroup[]?> elements)
+    {
+        foreach (var e in elements)
+            if (e is not null) return [.. elements];
+        return null;
     }
 
     /// <summary>Where each atom of a layout lies in its carrier: a component's ordinal in <see cref="Dynamic"/>, every
@@ -417,11 +565,50 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
         public int FixedChars(int from, int to) => _fixedAt[to] - _fixedAt[from];
 
         /// <summary>Atom <paramref name="i"/>'s content: a component's carried string (null when the carrier did not
-        /// carry it), a fixed table's characters of the fixed run.</summary>
+        /// carry it), a fixed table's characters of the fixed run. A NESTED component has no characters; read through a
+        /// shape that does not say so (<see cref="Positional"/>), its empty string would compare or move as if the table
+        /// were empty — loud instead.</summary>
         public string? Content(CobolVarGroup v, int i) =>
             _atoms[i].IsComponent
-                ? v.HasDyn(Ordinal[i]) ? v.Dynamic[Ordinal[i]] : null
+                ? !v.HasDyn(Ordinal[i]) ? null
+                  : v.ElementsAt(Ordinal[i]) is not null && !IsNested(_atoms[i])
+                      ? NotImplemented.Value<string>("a table of variable-length elements inside a variable-length group "
+                          + "whose layout cannot be stated (a USAGE BIT leaf; ISO §14.6.9.3; kb/Work PB2496)")
+                  : v.Dynamic[Ordinal[i]]
                 : FixedSlice(v, i, i + 1);
+
+        /// <summary>Table atom <paramref name="i"/>'s occurrences, each a carrier in the shape of the table's element
+        /// (kb/Work PB2496): a nested component's carried occurrence carriers; otherwise the table's characters
+        /// (<see cref="Content"/>) cut at one element's width, each the carrier of a fixed-length element. Null when the
+        /// sender did not carry the component.</summary>
+        public CobolVarGroup[]? Occurrences(CobolVarGroup v, int i)
+        {
+            if (_atoms[i].IsComponent && IsNested(_atoms[i]))
+                return v.HasDyn(Ordinal[i]) ? v.ElementCarriersAt(Ordinal[i]) : null;
+            return Content(v, i) is { } chars
+                ? Array.ConvertAll(CobolVarGroup.Occurrences(chars, _atoms[i].ElementChars), static x => new CobolVarGroup(x, []))
+                : null;
+        }
+
+        /// <summary>Atoms [<paramref name="from"/>, end) of <paramref name="v"/> as the characters they occupy in the
+        /// group's contiguous image (§8.5.1.11.2): fixed material, each component's content, each nested table's
+        /// occurrences at their own extents — what the end of a §8.8.4.2.17 comparison compares with the other group's
+        /// end, and with spaces where that one has ended.</summary>
+        public string Contiguous(CobolVarGroup v, int from)
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int i = from; i < _atoms.Length; i++)
+            {
+                if (!_atoms[i].IsComponent) sb.Append(FixedSlice(v, i, i + 1));
+                else if (IsNested(_atoms[i]))
+                {
+                    var shape = new Geometry(ElementShape(_atoms[i]));
+                    foreach (var e in Occurrences(v, i) ?? []) sb.Append(shape.Contiguous(e, 0));
+                }
+                else sb.Append(Content(v, i));
+            }
+            return sb.ToString();
+        }
     }
 
     /// <summary>⛔ A FILE RECORD'S CONTIGUOUS IMAGE, DECOMPOSED — the READ / RETURN half of a variable-length
@@ -545,42 +732,88 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic)
         at >= s.Length || length <= 0 ? "" : s.Substring(at, Math.Min(length, s.Length - at));
 
     /// <summary>⛔ ISO §8.8.4.2.17 — THE COMPARISON OF TWO COMPATIBLE GROUPS, ONE OR BOTH OF WHICH IS A
-    /// VARIABLE-LENGTH GROUP (kb/Work PB1467): it "proceeds from left to right as described under 8.8.4.2.7,
+    /// VARIABLE-LENGTH GROUP (kb/Work PB1467, PB2496): it "proceeds from left to right as described under 8.8.4.2.7,
     /// Comparison of alphanumeric operands except that — when corresponding tables are encountered, they are
     /// compared as described in 14.6.9.3, Comparing two tables — when corresponding dynamic-length elementary items
     /// are encountered, the length is determined as described in 8.5.1.10.4 … After comparison of corresponding
     /// tables or dynamic-length elementary items, comparison continues with the next data item in each of the
     /// compatible groups."
-    /// <para>The two carriers already lay their operands out in that order: <see cref="Fixed"/> is each group's
-    /// material with every variable-length component collapsed (the §8.5.1.12.3 accounting under which compatible
-    /// groups have the same relative positions), and component k sits at <paramref name="fixedAt"/>[k] of it. So
-    /// the walk compares each stretch of fixed material, then each pair of components, in order, and stops at the
-    /// first inequality. Every step is one §8.8.4.2.7 comparison — the shorter side extended with spaces — which is
-    /// exactly both "except" clauses: a dynamic-length item compares at its current length (§8.5.1.10.4 — "treated
-    /// as a fixed-length data item whose length is the dynamic-length elementary item's current length"), and two
-    /// tables of equal element width (§8.5.1.12.3's matching) compared element by element "until … the last element
-    /// of the table with the smallest current capacity has been compared", after which "each successive remaining
-    /// element of the larger table [is compared] with spaces" (§14.6.9.3), is the same as their concatenated
-    /// occurrences compared with space padding. A component a side does not carry (a dynamic-capacity table beyond
-    /// a shorter fixed group's end, §8.5.1.12.2) is the empty string — compared with spaces, the space-filled table
-    /// that sentence substitutes.</para>
+    /// <para>Each operand is its carrier in its OWN shape (<paramref name="aShape"/>, <paramref name="bShape"/>; a
+    /// fixed-length group is its record image with no components), and the pair's correspondence
+    /// (<see cref="GroupCompatibility.Walk"/>, the same walk that decided the pair compatible) gives the corresponding
+    /// items. The material between two of them lies at the same relative positions in both groups, so it is compared
+    /// stretch by stretch; each corresponding pair is then compared as one §8.8.4.2.7 comparison, the shorter side
+    /// extended with spaces — exactly both "except" clauses for a dynamic-length item (§8.5.1.10.4, "treated as a
+    /// fixed-length data item whose length is the dynamic-length elementary item's current length") and for two tables
+    /// of elementary or fixed-length elements, whose element-by-element comparison "until … the last element of the
+    /// table with the smallest current capacity has been compared", then "each successive remaining element of the
+    /// larger table with spaces" (§14.6.9.3), is the comparison of their concatenated occurrences. A table of
+    /// VARIABLE-LENGTH elements is compared element by element in fact, each pair of elements by this same rule and
+    /// each remaining element against spaces. After the last pair the two groups' remaining material is compared as it
+    /// lies in their contiguous images — a dynamic-capacity table beyond the shorter group's end against spaces, the
+    /// "space-filled fixed-length table" §8.5.1.12.2 makes correspond to it.</para>
     /// <para><paramref name="collation"/> is the alphanumeric program collating sequence when it is not native
     /// (§8.8.4.2.7), null otherwise.</para></summary>
     /// <returns>&lt;0, 0 or &gt;0 as <paramref name="a"/> is less than, equal to or greater than <paramref name="b"/>.</returns>
-    public static int Compare(CobolVarGroup a, CobolVarGroup b, IReadOnlyList<int> fixedAt, CobolCollation? collation = null)
+    public static int Compare(CobolVarGroup a, GroupAtom[] aShape, CobolVarGroup b, GroupAtom[] bShape,
+        CobolCollation? collation = null)
     {
-        int pos = 0;
-        for (int k = 0; k < fixedAt.Count; k++)
+        var pairs = Correspondence(aShape, bShape);
+        var ga = new Geometry(aShape);
+        var gb = new Geometry(bShape);
+        int prevA = 0, prevB = 0;
+        foreach (var (pa, pb) in pairs)
         {
-            int at = fixedAt[k];
-            int c = CompareRun(Slice(a.Fixed, pos, at - pos), Slice(b.Fixed, pos, at - pos), collation);
+            int c = CompareRun(ga.FixedSlice(a, prevA, pa), gb.FixedSlice(b, prevB, pb), collation);
             if (c != 0) return c;
-            c = CompareRun(a.Dyn(k), b.Dyn(k), collation);
+            c = IsNested(aShape[pa]) || IsNested(bShape[pb])
+                ? CompareElements(ga.Occurrences(a, pa) ?? [], ElementShape(aShape[pa]),
+                                  gb.Occurrences(b, pb) ?? [], ElementShape(bShape[pb]), collation)
+                : CompareRun(ga.Content(a, pa) ?? "", gb.Content(b, pb) ?? "", collation);
             if (c != 0) return c;
-            pos = at;
+            (prevA, prevB) = (pa + 1, pb + 1);
         }
-        int rest = Math.Max(a.Fixed.Length, b.Fixed.Length) - pos;
-        return CompareRun(Slice(a.Fixed, pos, rest), Slice(b.Fixed, pos, rest), collation);
+        return CompareRun(ga.Contiguous(a, prevA), gb.Contiguous(b, prevB), collation);
+    }
+
+    /// <summary><see cref="Compare"/> between two variable-length groups whose §8.5.1.12 shapes cannot be stated (a
+    /// USAGE BIT leaf, whose shared-byte runs make a character position non-positional) and which therefore share ONE
+    /// layout: component k of each sits at <paramref name="fixedAt"/>[k] of its fixed run, so the positional shape those
+    /// offsets describe pairs the components one for one.</summary>
+    public static int CompareInLayout(CobolVarGroup a, CobolVarGroup b, IReadOnlyList<int> fixedAt,
+        CobolCollation? collation = null) =>
+        Compare(a, Positional(fixedAt, a.Fixed.Length), b, Positional(fixedAt, b.Fixed.Length), collation);
+
+    /// <summary>The shape of a carrier known only by its components' offsets in its fixed run of
+    /// <paramref name="fixedChars"/> characters: the material between them, each component as a dynamic-length item.</summary>
+    private static GroupAtom[] Positional(IReadOnlyList<int> fixedAt, int fixedChars)
+    {
+        var atoms = new List<GroupAtom>(2 * fixedAt.Count + 1);
+        int at = 0;
+        foreach (int off in fixedAt)
+        {
+            if (off > at) atoms.Add(new GroupAtom(GroupAtomKind.Fixed, off - at, off - at));
+            atoms.Add(new GroupAtom(GroupAtomKind.DynamicLength, 0, 0));
+            at = Math.Max(at, off);
+        }
+        if (fixedChars > at) atoms.Add(new GroupAtom(GroupAtomKind.Fixed, fixedChars - at, fixedChars - at));
+        return [.. atoms];
+    }
+
+    /// <summary>§14.6.9.3 over two tables of which at least one holds VARIABLE-LENGTH elements: correspondingly
+    /// numbered elements compared as two compatible groups (<see cref="Compare"/>), then each remaining element of the
+    /// larger table against spaces — an element compared with the empty carrier, every part of which is spaces.</summary>
+    private static int CompareElements(CobolVarGroup[] a, GroupAtom[] aShape, CobolVarGroup[] b, GroupAtom[] bShape,
+        CobolCollation? collation)
+    {
+        for (int i = 0; i < Math.Max(a.Length, b.Length); i++)
+        {
+            int c = i >= b.Length ? Compare(a[i], aShape, Empty, aShape, collation)
+                : i >= a.Length ? Compare(Empty, bShape, b[i], bShape, collation)
+                : Compare(a[i], aShape, b[i], bShape, collation);
+            if (c != 0) return c;
+        }
+        return 0;
     }
 
     private static int CompareRun(string a, string b, CobolCollation? collation) =>

@@ -14,6 +14,9 @@ namespace CobolNet.Runtime;
 /// table reserves (<paramref name="DynTable"/>).</param>
 /// <param name="DynFixedAt">Each component's position in the window, relative to the element.</param>
 /// <param name="DynTable">Each component's table element width, 0 for a dynamic-length item.</param>
+/// <param name="DynMax">Each component's maximum size: a dynamic-length item's in characters (§8.5.1.10.1), a table's
+/// maximum capacity — what a store into the element truncates at (kb/Work PB2496: an element receives its own
+/// §8.5.1.12 carrier, §14.6.9.2).</param>
 /// <param name="Elems">For each component that is a table, the shape of ITS element when that element is itself a
 /// variable-length group; null where every component's element is a fixed image.</param>
-public sealed record CellGroupShape(int Width, int[] DynFixedAt, int[] DynTable, CellGroupShape?[]? Elems = null);
+public sealed record CellGroupShape(int Width, int[] DynFixedAt, int[] DynTable, int[] DynMax, CellGroupShape?[]? Elems = null);

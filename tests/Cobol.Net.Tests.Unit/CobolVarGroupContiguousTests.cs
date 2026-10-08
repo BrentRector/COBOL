@@ -263,7 +263,7 @@ public sealed class CobolVarGroupContiguousTests
         var second = table.RefReceiving(2);
         second.Ref = "2";
         second.SetDynAt(0, "c");
-        var shape = new CellGroupShape(1, [0], [0]);
+        var shape = new CellGroupShape(1, [0], [0], [5]);
         Assert.Equal("Hab1c2", cell.ContiguousAt(0, 2, 0, [1], [1], default, 0, [shape]));
         // Without the shape the element is its fixed run only - the image the pre-PB244 composer gave, now the
         // fixed-element lane (an element with no components of its own).

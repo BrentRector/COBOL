@@ -271,6 +271,17 @@ public sealed class CobolDynTable<T>
         return sb.ToString();
     }
 
+    /// <summary>Each occurrence up to the current capacity, mapped by <paramref name="map"/>, in occurrence order — the
+    /// occurrence carriers of a table whose elements are variable-length groups (kb/Work PB2496; ISO §14.6.9.2 moves it
+    /// "Correspondingly numbered elements … according to the rules of the MOVE statement", so each occurrence travels as
+    /// its own §8.5.1.12 carrier).</summary>
+    public TOut[] CurrentOccurrencesAs<TOut>(Func<T, TOut> map)
+    {
+        var outp = new TOut[_count];
+        for (int i = 0; i < _count; i++) outp[i] = map(_store[i]);
+        return outp;
+    }
+
     /// <summary>The write half of <see cref="CurrentImage"/> — distribute a carried current-extent image back
     /// into the table (kb/Work PB204). The capacity BECOMES the number of whole
     /// <paramref name="elementWidth"/>-wide occurrences the content holds (raised to the FROM minimum by
@@ -292,19 +303,27 @@ public sealed class CobolDynTable<T>
     /// an implicit change to a table already past its expected capacity. The new table is built whole and swapped
     /// in, so a table that cannot be recreated (EC-BOUND-TABLE-LIMIT, <see cref="TableLimit"/>) is left exactly as
     /// it was.</remarks>
-    public void FromCurrentImage(string content, int elementWidth, Func<T, string, T> store)
+    public void FromCurrentImage(string content, int elementWidth, Func<T, string, T> store) =>
+        Recreate(CobolVarGroup.Occurrences(content, elementWidth), new string(' ', Math.Max(0, elementWidth)), store);
+
+    /// <summary>⛔ §14.6.9.2's RECREATION, over whatever one occurrence travels as (kb/Work PB2496): the table becomes
+    /// <paramref name="parts"/>.Count occurrences, each a freshly seeded element <paramref name="store"/> distributes one
+    /// part into, raised to the FROM minimum by elements filled from <paramref name="blank"/> ("further elements are
+    /// created and filled with spaces"). <see cref="FromCurrentImage"/> recreates from an occurrence IMAGE; a table whose
+    /// elements are variable-length groups recreates from each occurrence's own §8.5.1.12 carrier, because "Correspondingly
+    /// numbered elements are moved according to the rules of the MOVE statement" — a group MOVE per element. See
+    /// <see cref="FromCurrentImage"/>'s remarks for why this is a recreation and not a SET.</summary>
+    public void Recreate<TPart>(IReadOnlyList<TPart> parts, TPart blank, Func<T, TPart, T> store)
     {
-        var parts = CobolVarGroup.Occurrences(content, elementWidth);
-        int target = Math.Max(parts.Length, _min);   // §14.6.9.2: the minimum-capacity fill
+        int target = Math.Max(parts.Count, _min);   // §14.6.9.2: the minimum-capacity fill
         RaiseImplicitOverflow(target, "recreation by a variable-length group transfer");
         if (target > MaxOccurrences) { TableLimit(target, $"the implementor maximum ({MaxOccurrences})"); return; }
-        string? spaces = null;
         T[] fresh;
         try
         {
             fresh = new T[Math.Max(target, 4)];
             for (int i = 0; i < target; i++)
-                fresh[i] = store(_seedAt(i + 1), i < parts.Length ? parts[i] : spaces ??= new string(' ', Math.Max(0, elementWidth)));
+                fresh[i] = store(_seedAt(i + 1), i < parts.Count ? parts[i] : blank);
         }
         catch (OutOfMemoryException)
         {
@@ -324,11 +343,14 @@ public sealed class CobolDynTable<T>
     /// same zero-length string and are told apart by <c>CobolVarGroup.HasDyn</c>.
     /// <para>A NUMERIC element holds those spaces because the compiler stores it as its character image — a
     /// <c>CobolDynTable&lt;string&gt;</c> whose <paramref name="store"/> passes the image through (kb/Work PB1939);
-    /// a native carrier would decode them to zero.</para></summary>
-    public void SpaceFillElements(int elementWidth, Func<T, string, T> store)
+    /// a native carrier would decode them to zero.</para>
+    /// <para><paramref name="blank"/> is a space-filled occurrence in the form <paramref name="store"/> distributes: an
+    /// image of spaces, or — for a table whose elements are variable-length groups (kb/Work PB2496) — the empty carrier,
+    /// which §14.9.25.4 GR9b's own steps space-fill (a dynamic-length item at length zero, a nested table §14.6.9.4 again,
+    /// everything else spaces).</para></summary>
+    public void SpaceFillElements<TPart>(TPart blank, Func<T, TPart, T> store)
     {
-        string spaces = new(' ', Math.Max(0, elementWidth));
-        for (int i = 0; i < _count; i++) _store[i] = store(_seedAt(i + 1), spaces);
+        for (int i = 0; i < _count; i++) _store[i] = store(_seedAt(i + 1), blank);
     }
 
     /// <summary>Mark the start of a SEARCH of this table (a SET Format 14 on it while active raises EC-FLOW-SEARCH,

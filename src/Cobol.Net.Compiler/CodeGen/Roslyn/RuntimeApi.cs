@@ -1836,8 +1836,17 @@ internal static class RuntimeApi
     /// variable-length member precedes (kb/Work PB1025).</summary>
     public static string ContiguousLayoutOf(string record) => $"{record}.{ContiguousLayoutProperty}";
 
+    /// <summary>A carrier's <c>Elements</c> as a list of one entry per component (null for a plain one) — what a group
+    /// splices in for a nested variable-length group's carrier (kb/Work PB2496): <c>CobolVarGroup.ElementList</c>.</summary>
+    public static string VarGroupElementList(string carrier) => $"{carrier}.{nameof(CobolVarGroup.ElementList)}";
+
     /// <summary>The empty carrier value (an unbound formal's seed).</summary>
     public static string VarGroupEmpty => $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Empty)}";
+
+    /// <summary>A FIXED-length group's record image as a §8.5.1.12 carrier in its OWN shape — no components, the whole
+    /// image its fixed run (kb/Work PB2496); a statement pairs it with a variable-length group by the two shapes
+    /// (<see cref="VarGroupReshape"/>, <see cref="VarGroupCompare"/>).</summary>
+    public static string VarGroupOfImage(string image) => $"new {nameof(CobolVarGroup)}({image}, [])";
 
     /// <summary>A FIXED-length group's decomposition into the same carrier (ISO §8.5.1.12.3 sentence 3 /
     /// §14.6.9.1 — its table is treated as a dynamic-capacity table of its fixed or DEPENDING count), so a fixed
@@ -1846,10 +1855,18 @@ internal static class RuntimeApi
     public static string VarGroupFromFixedImage(string image, string spans) =>
         $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.FromFixedImage)}({image}, {spans})";
 
-    /// <summary>The ISO §8.8.4.2.17 comparison of two compatible groups' carriers — <c>CobolVarGroup.Compare</c>,
-    /// &lt;0 / 0 / &gt;0; <paramref name="collateArg"/> is the <c>, __COLLATE</c> suffix or empty (kb/Work PB1467).</summary>
-    public static string VarGroupCompare(string left, string right, string componentOffsets, string collateArg) =>
-        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Compare)}({left}, {right}, {componentOffsets}{collateArg})";
+    /// <summary>The ISO §8.8.4.2.17 comparison of two compatible groups' carriers, each in its own shape —
+    /// <c>CobolVarGroup.Compare</c>, &lt;0 / 0 / &gt;0; <paramref name="collateArg"/> is the <c>, __COLLATE</c> suffix or
+    /// empty (kb/Work PB1467, PB2496).</summary>
+    public static string VarGroupCompare(string left, GroupAtom[] leftShape, string right, GroupAtom[] rightShape,
+                                         string collateArg) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Compare)}({left}, {GroupAtomsNew(leftShape)}, {right}, "
+        + $"{GroupAtomsNew(rightShape)}{collateArg})";
+
+    /// <summary>The same comparison between two variable-length groups whose shapes cannot be stated (a USAGE BIT leaf)
+    /// and so share one layout — <c>CobolVarGroup.CompareInLayout</c> at the variable-length side's component offsets.</summary>
+    public static string VarGroupCompareInLayout(string left, string right, string componentOffsets, string collateArg) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.CompareInLayout)}({left}, {right}, {componentOffsets}{collateArg})";
 
     /// <summary>A variable-length record type's component offsets in its fixed run —
     /// <c>{group}.__Contiguous.ComponentOffsets</c>.</summary>
@@ -2123,14 +2140,15 @@ internal static class RuntimeApi
                                            CellOdoTail odo, string count, IReadOnlyList<CellGroupShape?> dynElem) =>
         $"{cellExpr}.{nameof(StorageCell.ContiguousAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count}{CellElemShapes(dynElem)})";
 
-    /// <summary>The trailing <c>elems</c> argument of <c>StorageCell.ContiguousAt</c>: for each component that is a
+    /// <summary>The trailing <c>elems</c> argument of <c>StorageCell.ContiguousAt</c>, <c>VarGroupAt</c> and
+    /// <c>StoreVarGroupAt</c>: for each component that is a
     /// dynamic-capacity table of VARIABLE-LENGTH elements, the element's window shape (<c>CellGroupShape</c>,
     /// kb/Work PB244); nothing when no component has one.</summary>
     private static string CellElemShapes(IReadOnlyList<CellGroupShape?> shapes) =>
         shapes.All(s => s is null) ? "" : $", [{string.Join(", ", shapes.Select(CellShapeText))}]";
 
     private static string CellShapeText(CellGroupShape? s) => s is null ? "null"
-        : $"new {nameof(CellGroupShape)}({s.Width}, {IntSpan(s.DynFixedAt)}, {IntSpan(s.DynTable)}"
+        : $"new {nameof(CellGroupShape)}({s.Width}, {IntSpan(s.DynFixedAt)}, {IntSpan(s.DynTable)}, {IntSpan(s.DynMax)}"
           + (s.Elems is null || s.Elems.All(e => e is null) ? ")" : $", [{string.Join(", ", s.Elems.Select(CellShapeText))}])");
 
     /// <summary>The OCCURS DEPENDING table a cell-backed variable-length group holds as its trailing storage
@@ -2160,14 +2178,17 @@ internal static class RuntimeApi
     /// <summary>A cell-backed variable-length group's §8.5.1.12 component carrier — <c>StorageCell.VarGroupAt</c>.</summary>
     public static string CellVarCarrier(string cellExpr, string fixedAtExpr, int width, string dynBase,
                                         IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable,
-                                        CellOdoTail odo, string count) =>
-        $"{cellExpr}.{nameof(StorageCell.VarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count})";
+                                        CellOdoTail odo, string count, IReadOnlyList<CellGroupShape?> dynElem) =>
+        $"{cellExpr}.{nameof(StorageCell.VarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count}{CellElemShapes(dynElem)})";
 
     /// <summary>Distribute a component carrier into a cell-backed variable-length group — <c>StorageCell.StoreVarGroupAt</c>.</summary>
     public static string CellVarStoreCarrier(string cellExpr, string fixedAtExpr, int width, string dynBase,
                                              IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax,
-                                             IEnumerable<int> dynTable, CellOdoTail odo, string count, string carrierExpr) =>
-        $"{cellExpr}.{nameof(StorageCell.StoreVarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count}, {carrierExpr})";
+                                             IEnumerable<int> dynTable, CellOdoTail odo, string count, string carrierExpr,
+                                             IReadOnlyList<CellGroupShape?> dynElem, bool storage) =>
+        $"{cellExpr}.{nameof(StorageCell.StoreVarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count}, {carrierExpr}"
+        // the storage flag reaches only the nested elements' stores (the top level's maximum sizes already say it)
+        + (dynElem.All(s => s is null) ? ")" : $"{CellElemShapes(dynElem)}{(storage ? ", true" : "")})");
 
     /// <summary>The INVOKE null-receiver guard (EC-OO-NULL, §14.9.23.4 GR5) — <c>CobolObject.RequireNonNull</c>.</summary>
     public static string ObjRequireNonNull(string receiver) =>

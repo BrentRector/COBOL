@@ -416,8 +416,9 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     ///
     /// <para>That is exactly the carrier <c>CobolVarGroup</c> already models (kb/Work PB204): the collapsed fixed
     /// run plus each variable-length component's current content, in order. So GR9 IS
-    /// <c>receiver.FromVarImage(sender.AsVarImage())</c>, and each of GR9's sub-rules is discharged by a part of
-    /// that codec that was already written to the same clause:</para>
+    /// <c>receiver.FromVarImage(sender.AsVarImage())</c> — the sender's carrier first seen in the RECEIVER's shape when
+    /// the two differ (<c>CobolVarGroup.Reshape</c>, kb/Work PB2496) — and each of GR9's sub-rules is discharged by a
+    /// part of that codec that was already written to the same clause:</para>
     /// <list type="bullet">
     ///   <item>GR9a's positional move of the non-table character positions — the fixed run, stored through the
     ///     ONE image-member law at §8.5.1.12.3 offsets.</item>
@@ -437,10 +438,10 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     /// </list>
     ///
     /// <para>A FIXED-length group on either side is admitted by §8.5.1.12.1 ("only one of the operands may be a
-    /// variable-length group") and decomposes into the SAME carrier through
-    /// <c>VariableLengthCompatibility.CorrespondingSpans</c> + <c>CobolVarGroup.FromFixedImage</c> — §8.5.1.12.3
-    /// sentence 3 and §14.6.9.1 both say to treat its table as a dynamic-capacity table of its fixed or DEPENDING
-    /// count, so this is the standard's own conversion rather than an adapter invented here.</para>
+    /// variable-length group"): it is its record image with no components, in its own shape, and
+    /// <c>CobolVarGroup.Reshape</c> pairs its tables with the other group's dynamic-capacity tables over the two shapes —
+    /// §8.5.1.12.3 sentence 3 and §14.6.9.1 both say to treat its table as a dynamic-capacity table of its fixed or
+    /// DEPENDING count, so this is the standard's own conversion rather than an adapter invented here.</para>
     ///
     /// <para>The pair reached emit only after §14.9.25.3 SR9 passed at bind
     /// (<c>MoveTable16.Validity</c>, framed by <c>MoveBinder.MoveCategoryLegality</c>), so the two component sequences correspond one for
@@ -454,31 +455,40 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         // asked as ItemCategory.IsGroupItem — the CATEGORY question — never the structural IsGroup, which it
         // fails for want of subordinate entries (kb/Work PB907; the bind-side twin is
         // MoveClassifier.VariableLengthGroupSender, which this method asks). It is never
-        // VARIABLE-LENGTH (§13.18.45.3 SR8), so it takes the FIXED-group arm of PlaceRenderer.VarGroupCarrier / VarCarrierWrite:
-        // its layout is its span (VariableLengthCompatibility.Layout), and its image is the composed RenamesPlace string (PlaceRenderer).
+        // VARIABLE-LENGTH (§13.18.45.3 SR8), so it takes the FIXED-group arm of PlaceRenderer.VarGroupOperand / VarCarrierWrite:
+        // its atoms are its span (VariableLengthCompatibility.GroupAtoms), and its image is the composed RenamesPlace string (PlaceRenderer).
         // The antecedent is MoveClassifier's ONE reading, which the binder's §14.6.9.2 element moves ask too (kb/Work PB1144).
         if (MoveClassifier.VariableLengthGroupSender(source, target) is not { } send) return false;
-        ctx.Writer.Line(PlaceRenderer.VarGroupCarrier(send, target.Item, "the sending variable-length group",
-                "the sending group of a variable-length group MOVE") is not { } carrier
+        ctx.Writer.Line(PlaceRenderer.VarGroupOperand(send, "the sending variable-length group",
+                "the sending group of a variable-length group MOVE") is not var (carrier, sendShape)
             ? LoudStmt(VarShapeReason(send.Item, "the sending operand of a variable-length group MOVE"))
-            : VarCarrierWrite(target, send.Item, carrier) ?? LoudStmt(
+            : VarCarrierWrite(target, carrier, sendShape) ?? LoudStmt(
                 VarShapeReason(target.Item, "the receiving operand of a variable-length group MOVE")));
         return true;
     }
 
-    /// <summary>The RECEIVING half of <see cref="PlaceRenderer.VarGroupCarrier"/> (the ONE sending-side reader, shared
-    /// with the §8.8.4.2.17 comparison — kb/Work PB1467) — the statement that distributes the carrier back into the
-    /// receiving group's members. Null when the shape cannot be distributed.</summary>
-    private static string? VarCarrierWrite(Place g, DataItem other, string carrier) =>
-        VariableLengthCompatibility.IsVariableLength(g.Item)
+    /// <summary>The RECEIVING half of <see cref="PlaceRenderer.VarGroupOperand"/> (the ONE sending-side reader, shared
+    /// with the §8.8.4.2.17 comparison — kb/Work PB1467) — the statement that distributes the sender's carrier, seen in
+    /// the RECEIVER's shape, into the receiving group's members. ⛔ THE CARRIER IS RESHAPED (kb/Work PB2496): two
+    /// compatible groups may differ in everything but the positions of their variable-length items (§8.5.1.12.1), so a
+    /// sender's carrier is not, in general, the receiver's — a dynamic-capacity table opposite a fixed table (§8.5.1.12.3
+    /// sentence 3), a table of variable-length elements opposite another (§14.6.9.2, element by element). The pair is
+    /// the one the INVOKE boundary already reshapes (<c>OoEmitter</c>); handing the sender's carrier over ordinally put
+    /// a dynamic table's occurrences into the receiver's dynamic-length item. A fixed-length receiver takes the reshaped
+    /// carrier's fixed run, which is its whole record image. Null when the shape cannot be distributed.</summary>
+    private static string? VarCarrierWrite(Place g, string carrier, GroupAtom[]? sendShape)
+    {
+        var recvShape = VariableLengthCompatibility.GroupAtoms(g.Item);
+        string moved = PlaceRenderer.VarGroupInShape(carrier, sendShape, recvShape);
+        return VariableLengthCompatibility.IsVariableLength(g.Item)
             ? g.Item.CurrentExtentImageCapable
-                ? PlaceRenderer.WriteVarGroupImage(g, carrier, "the receiving variable-length group", receivingOperand: true)
+                ? PlaceRenderer.WriteVarGroupImage(g, moved, "the receiving variable-length group", receivingOperand: true)
                 : null
-            : VariableLengthCompatibility.CorrespondingSpans(g.Item, other) is { } spans && g.ImageCapable
-                ? PlaceRenderer.WriteGroupImage(g,
-                    RuntimeApi.VarGroupToFixedImage(carrier, g.Item.ImageWidth, PlaceRenderer.SpanArray(spans)),
+            : sendShape is not null && recvShape is not null && g.ImageCapable
+                ? PlaceRenderer.WriteGroupImage(g, RuntimeApi.StrStore($"{moved}.Fixed", g.Item.ImageWidth.ToString()),
                     "the receiving group of a variable-length group MOVE")
                 : null;
+    }
 
     /// <summary>Why a GR9 operand's §8.5.1.12 components cannot be composed by THIS implementation — a named
     /// shape, never the generic Tier-C string, because the generic one blames "a dynamic-length /
@@ -488,7 +498,8 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     private static string VarShapeReason(DataItem g, string role) =>
         VariableLengthCompatibility.IsVariableLength(g)
             ? $"{role}, '{g.CobolName ?? g.CsName}', is a variable-length group whose current extent this "
-              + "implementation cannot compose (a runtime-length item inside a dynamic-capacity table's element) "
+              + "implementation cannot compose (an OCCURS DEPENDING table inside a dynamic-capacity table's element or "
+              + "beneath another table's element, or a member with no character image) "
               + "— ISO §14.9.25.4 GR9 over §8.5.1.12; CONFORMANCE.md A.1 item 57"
             : $"{role}, '{g.CobolName ?? g.CsName}', is a fixed-length group whose record image this "
               + "implementation cannot lay out in character positions (a USAGE BIT leaf, or a leaf with no "

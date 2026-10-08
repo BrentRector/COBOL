@@ -603,9 +603,10 @@ content-validation half is separately answered by the declined A.4.14 facility (
   `DynTableSegment`, its accessor the reference's direction). The whole-table path is `BuildTablePath` (its string
   twin was deleted), and the INITIALIZE / MOVE element / CORRESPONDING cursors re-anchor on the window's scope
   (`RedefViewPlace.Cell` / `DynOrdinal`, `PlaceCursor.DynamicElement`). The composer's own exclusion is the declared
-  group's (`DataItem.CurrentExtentImageCapable`, `CurrentImageCapable` for the one-way image): a cell-backed group
-  whose table element holds a component of its own is the named loud for whole-group image operations, while each
-  element and the element's members are referenced normally. The OCCURS DEPENDING table of a cell-backed group is
+  group's (`DataItem.CurrentExtentImageCapable`): a cell-backed group whose dynamic-capacity table's element holds a
+  component of its own carries that table NESTED, each element cell read and stored by the element's own shape
+  (`CellGroupShape`, with its components' maximum sizes `DynMax`; `StorageCell.VarGroupAt` / `StoreVarGroupAt`'s
+  `elems`; kb/Work PB2496), exactly as a declared group's carrier does. The OCCURS DEPENDING table of a cell-backed group is
   the window's trailing storage (`VarGroupWindow.Odo`, `CellOdoTail`; see the variable-length group section).
 - **D-SLOT the MANAGED SLOTS of a shared storage area** (kb/Work PB231, 2026-09-05 — the pointer third). A
   data item of class pointer or class object holds a MANAGED REFERENCE, which is not a byte sequence, so it is
@@ -1215,11 +1216,17 @@ a containing group drops out of the STATIC record codec exactly like the Tier-C 
 variable component collapsed to nothing, plus each component's current content in order. **That codec, not a byte
 image, is what every whole-group operation the standard admits over such a group now runs on** — the §14.8.2.2 /
 §14.8.3.2 activation-boundary crossing, since kb/Work PB393 §14.9.25.4 GR9's MOVE, and since kb/Work PB1467 the
-§8.8.4.2.17 RELATION: `PlaceRenderer.VarGroupCarrier` (the ONE reader of a group paired with a variable-length group,
-shared by the MOVE and the comparison) decomposes both operands and `CobolVarGroup.Compare` walks them at the
-variable side's component offsets — fixed material and component pairs in order, each a §8.8.4.2.7 comparison with
-space extension (a dynamic-length item at its current length, a table element-wise with the larger table's remainder
-against spaces, §14.6.9.3). The relation is screened at bind by §8.5.1.12.1 through the MOVE's own reader
+§8.8.4.2.17 RELATION: `PlaceRenderer.VarGroupOperand` (the ONE reader of a group operand that meets a
+variable-length group, shared by the MOVE and the comparison) gives each operand's carrier IN ITS OWN SHAPE — a fixed
+group is its record image with no components — with its §8.5.1.12 atoms, and the pair is joined over the TWO shapes
+by the walk that decided it compatible (`GroupCompatibility.Walk`): the MOVE reshapes the sender's carrier into the
+receiver's (`CobolVarGroup.Reshape`, `PlaceRenderer.VarGroupInShape` — kb/Work PB2496: handing it over ordinally put
+a dynamic table's occurrences into the receiver's dynamic-length item when the shapes differed), and
+`CobolVarGroup.Compare` walks the corresponding pairs — fixed material and component pairs in order, each a §8.8.4.2.7
+comparison with space extension (a dynamic-length item at its current length, a table element-wise with the larger
+table's remainder against spaces, §14.6.9.3), the material after the last pair as it lies in the contiguous images.
+Two variable-length groups whose shapes cannot be stated (a USAGE BIT leaf) share one layout and compare at its
+component offsets (`CobolVarGroup.CompareInLayout`). The relation is screened at bind by §8.5.1.12.1 through the MOVE's own reader
 (`VariableLengthCompatibility.PairRefusal`) → **COBOLNET2492**. Only the operations that genuinely need a FIXED record
 window (WRITE/RELEASE) and the shapes the composer cannot reach (CONFORMANCE.md A.1 item 57) stay staged LOUD.
 
@@ -1264,22 +1271,30 @@ table's elements are element cells that are a scope of their own, so an element 
 group is composed with ITS window shape (`CellGroupShape`, built by `VarGroupWindow` from the same
 `CellComponents` walk and passed beside the group's layout) - one level down as many times as the tables nest.
 
-**Three uses of a variable-length group's current extent (kb/Work PB244).** `DataItem.CanCompose(CurrentExtentUse)` is the
-one spelling of which capability a consumer asks, and the three are nested: the **one-way image**
-(`CurrentImageCapable` - DISPLAY and FUNCTION LENGTH / BYTE-LENGTH through `BoundIntrinsicCall.OverCurrentImage`),
-the **component carrier** (`CurrentExtentImageCapable` - the activation boundary, MOVE, comparison, INITIALIZE,
-CORRESPONDING) and the **record** (`RecordImageCapable` - WRITE / REWRITE / RELEASE, READ / RETURN, a sort or indexed
-key). The image alone is well defined for every table of variable-length ELEMENTS: each occurrence's own current
-image, in occurrence order, up to the current count (§13.18.38.4 GR8) or capacity (§8.5.1.9.1), for a declared group
-(`VarPartKind.OdoTable` through `CobolTable.ConcatImages`; a dynamic table's element lane calls the element's own
-`CurrentImage`) and for a cell-backed one alike. The carrier takes an OCCURS DEPENDING table of such elements
-(`VarPartKind.OdoTable`, above) - a RUN-TIME multiplicity that is only a parameter, because the table is the group's
-trailing storage - but not a DYNAMIC-CAPACITY table of them: that component is one string, which cannot be split back
-into elements that each hold components of their own, so the carrier would need nested element carriers (the standard
-does define the operation: §14.6.9.2 moves "correspondingly numbered elements" by the rules of MOVE, §14.6.9.3
-compares them element by element). A RECORD cannot take an OCCURS DEPENDING table of them either: a record read back is
-decomposed by a FIXED list of components, and the record's own length cannot say how many occurrences it holds
-(the DEPENDING item is data, not layout), so those two stay the named loud (`TierCIsland.Reason`).
+**Two uses of a variable-length group's current extent (kb/Work PB244, PB2496).** `DataItem.CanCompose(CurrentExtentUse)` is
+the one spelling of which capability a consumer asks, and the two are nested: a statement's **operand**
+(`CurrentExtentImageCapable` - DISPLAY and FUNCTION LENGTH / BYTE-LENGTH through `BoundIntrinsicCall.OverCurrentImage`,
+the activation boundary, MOVE, comparison, INITIALIZE, CORRESPONDING) and the **record** (`RecordImageCapable` - WRITE /
+REWRITE / RELEASE, READ / RETURN, a sort or indexed key). The image is each occurrence's own current image for every
+table of variable-length ELEMENTS, in occurrence order, up to the current count (§13.18.38.4 GR8) or capacity
+(§8.5.1.9.1), for a declared group (`VarPartKind.OdoTable` through `CobolTable.ConcatImages`; a dynamic table's element
+lane calls the element's own `CurrentImage`) and for a cell-backed one alike. The carrier takes an OCCURS DEPENDING
+table of such elements (`VarPartKind.OdoTable`, above) - a RUN-TIME multiplicity that is only a parameter, because the
+table is the group's trailing storage - and a DYNAMIC-CAPACITY table of them as ONE NESTED component
+(`VarPartKind.DynGroupTable`; `CobolVarGroup.Elements`, kb/Work PB2496): its occurrence count is a run-time quantity
+and each occurrence holds components of its own, so splicing them in would move the ordinal of every later component;
+instead the occurrences ride beside the component as their own carriers, which is exactly what §14.6.9.2 ("Correspondingly
+numbered elements are moved according to the rules of the MOVE statement") and §14.6.9.3 (element by element, the
+larger table's remainder against spaces) take. The receiver recreates the table from them (`CobolDynTable.Recreate`, the
+§14.6.9.2 recreation with its FROM-minimum fill) and an uncarried table space-fills each element at its unaffected
+capacity (§14.6.9.4: the empty carrier, which GR9b's own steps space-fill). `Reshape` / `Overlay` / `Compare` recurse per
+element over the element atoms (`GroupAtom.Element`), so a fixed table of fixed-length elements opposite such a table
+(§8.5.1.12.3 sentence 3) converts at a statement too; only the activation boundary's FIXED-group span adapters
+(`FromFixedImage` / `ToFixedImage`, which carry no element layout) refuse a nested component by name. Since the one-way
+image and the carrier now admit the same groups, the former `CurrentImageCapable` capability is gone. A RECORD cannot
+take an OCCURS DEPENDING table of variable-length elements: a record read back is decomposed by a FIXED list of
+components, and the record's own length cannot say how many occurrences it holds (the DEPENDING item is data, not
+layout), so that stays the named loud (`TierCIsland.Reason`; kb/Work PB2497).
 
 **CORE ships whole:** declaration (all phrases, each once and in the printed order — §13.18.38.2 with §5.2.1, refused otherwise by `DataBinder.NarrowToDataDivisionFormats`, **COBOLNET2789**, kb/Work PB1265) · out-of-line growable storage · CAPACITY
 read + SET Format 14 write · implicit + explicit growth · INITIALIZED seeding · bounds/capacity ECs

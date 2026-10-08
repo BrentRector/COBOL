@@ -290,27 +290,31 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
 
     /// <summary>ISO §8.8.4.2.17 — "A comparison of two compatible groups, one or both of which is a variable-length
     /// group, proceeds from left to right as described under 8.8.4.2.7, Comparison of alphanumeric operands",
-    /// with corresponding tables compared by §14.6.9.3 and dynamic-length items at their current length. Both
-    /// operands decompose into the ONE §8.5.1.12 carrier (<see cref="PlaceRenderer.VarGroupCarrier"/> — the MOVE's
-    /// GR9 reader), and <c>CobolVarGroup.Compare</c> walks them against the variable-length side's component
-    /// offsets, under the alphanumeric program collating sequence §8.8.4.2.7 names.</summary>
+    /// with corresponding tables compared by §14.6.9.3 and dynamic-length items at their current length. Each operand
+    /// is its ONE §8.5.1.12 carrier in its own shape (<see cref="PlaceRenderer.VarGroupOperand"/> — the MOVE's GR9
+    /// reader), and <c>CobolVarGroup.Compare</c> walks the PAIR's correspondence over the two shapes (kb/Work PB2496: a
+    /// fixed table opposite a dynamic-capacity one, a table of variable-length elements compared element by element),
+    /// under the alphanumeric program collating sequence §8.8.4.2.7 names. Two variable-length groups whose shapes
+    /// cannot be stated (a USAGE BIT leaf) compare in their one layout, at the component offsets.</summary>
     private string RenderVariableLengthGroupRelational(BoundRelational r)
     {
         if (r.Left is not BoundFieldOperand { Place: var lp } || r.Right is not BoundFieldOperand { Place: var rp })
             return EmitText.LoudValue("bool", "a variable-length group compared with an operand that is not a group");
-        Place variable = VariableLengthCompatibility.IsVariableLength(lp.Item) ? lp : rp;
-        string? left = PlaceRenderer.VarGroupCarrier(lp, rp.Item, "a compared variable-length group",
-                          "a fixed-length group compared with a variable-length group"),
-                right = PlaceRenderer.VarGroupCarrier(rp, lp.Item, "a compared variable-length group",
-                          "a fixed-length group compared with a variable-length group");
-        if (left is null || right is null)
+        var left = PlaceRenderer.VarGroupOperand(lp, "a compared variable-length group",
+                       "a fixed-length group compared with a variable-length group");
+        var right = PlaceRenderer.VarGroupOperand(rp, "a compared variable-length group",
+                        "a fixed-length group compared with a variable-length group");
+        bool bothVariable = VariableLengthCompatibility.IsVariableLength(lp.Item) && VariableLengthCompatibility.IsVariableLength(rp.Item);
+        if (left is not var (lc, ls) || right is not var (rc, rs) || (ls is null || rs is null) && !bothVariable)
             return EmitText.LoudValue("bool", TierCIsland.Reason((left is null ? lp : rp).Item,
                 "the §8.8.4.2.17 comparison of"));
         // The sequence is the PAIR's, from the ONE pair reader (kb/Work PB649/PB741) — for two groups, the
         // alphanumeric program collating sequence §8.8.4.2.7 names.
         var (leftCat, rightCat) = RelationCategories(r.Left, r.Right);
         string collate = ctx.CollateArgFor(leftCat, rightCat);
-        return $"{RuntimeApi.VarGroupCompare(left, right, PlaceRenderer.VarGroupComponentOffsets(variable), collate)} {r.Op} 0";
+        return (ls is not null && rs is not null
+            ? RuntimeApi.VarGroupCompare(lc, ls, rc, rs, collate)
+            : RuntimeApi.VarGroupCompareInLayout(lc, rc, PlaceRenderer.VarGroupComponentOffsets(lp), collate)) + $" {r.Op} 0";
     }
 
     /// <summary>GR3's content test for whichever operand is the subject of a BLANK WHEN ZERO entry and has a

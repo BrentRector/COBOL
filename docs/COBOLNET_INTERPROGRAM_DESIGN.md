@@ -590,7 +590,7 @@ sending data item." BY REFERENCE reads `CallEmitter.CallStringRead` (the whole a
 `CallEmitter.CallContentRead` — the §13.18.38.4 GR8 current extent through `PlaceRenderer.SendingGroupImage` — at the
 CALL snapshot and at the INVOKE BY CONTENT arm alike. Golden `2002/pb965_odo_group_argument_length`.
 
-`CobolVarGroup` is `(string Fixed, string[] Dynamic)` and is the §8.5.1.12 model itself, not an encoding:
+`CobolVarGroup` is `(string Fixed, string[] Dynamic, CobolVarGroup[]?[]? Elements)` and is the §8.5.1.12 model itself, not an encoding:
 `Fixed` is the group's image with every variable-length component collapsed to nothing — the exact accounting
 §8.5.1.12.3 states the relation in — and `Dynamic` carries each component's current content in declaration order.
 Two compatible groups of the SAME shape lay the carrier out identically; §8.5.1.12 constrains only where the
@@ -604,7 +604,10 @@ ask; kb/Work PB480). A receiving dynamic-capacity table recovers its capacity by
 its OWN element width, legitimate because §8.5.1.12.3 admits corresponding tables only "when the byte length of
 their elements is equal". Nested variable-length groups FLATTEN into the same carrier (`CobolVarGroup.Slice`
 hands one its window back), because the relation is stated over relative byte positions and is blind to the
-declaration tree. The emitted pair is `AsVarImage()`/`FromVarImage()`, gated on `DataItem.CurrentExtentImageCapable`
+declaration tree — except a dynamic-capacity table whose ELEMENTS are variable-length groups, which is ONE component
+whose occurrences ride beside it as their own carriers (`Elements`; kb/Work PB2496), because their count is a run-time
+quantity; `Reshape` / `Overlay` convert it element by element over the element atoms. The emitted pair is
+`AsVarImage()`/`FromVarImage()`, gated on `DataItem.CurrentExtentImageCapable`
 — **the same** capability the §14.9.11.4 GR7 DISPLAY format uses, so a group that displays is a group that
 crosses. The one crossing-form predicate is `CallEmitter.CallPlaceIsVarGroup` (CALL/RETURNING) and
 `OoEmitter.OoCrossingType` (the INVOKE signature, box lanes and marshaling); the ADMISSION is decided once, at
@@ -612,10 +615,11 @@ bind, by `VariableLengthCompatibility.Mismatch` through `OoConformance.Descripti
 the argument, RETURNING and override/implements checks all read.
 
 **Tier-C at the boundary, in BOTH halves.** A group with no boundary image at all (a pointer/object-class leaf,
-or a variable-length shape outside the current-extent gate — a runtime-length item inside a DYNAMIC-CAPACITY table's
-element, whose component is one string the carrier cannot split back into elements; it has only the one-way
-`DataItem.CurrentImageCapable` image DISPLAY and FUNCTION LENGTH use; `DataItem.BoundaryImageCapable`)
-stages the documented Tier-C loud rather than crossing. (An OCCURS DEPENDING table BESIDE a dynamic member, and a runtime-length item inside a FIXED-OCCURS
+or a variable-length shape outside the current-extent gate; `DataItem.BoundaryImageCapable`) stages the documented
+Tier-C loud rather than crossing. (A runtime-length item inside a DYNAMIC-CAPACITY table's element crosses since kb/Work
+PB2496 as a nested component; a FIXED-length group opposite it at the boundary, decomposed by the flat
+`CorrespondingSpans` adapters that carry no element layout, is the named run-time loud of
+`CobolVarGroup.ElementCarriersAt`.) (An OCCURS DEPENDING table BESIDE a dynamic member, and a runtime-length item inside a FIXED-OCCURS
 element, cross since kb/Work PB244: the former rides the carrier's fixed run at its **maximum** — §14.8.2.2, "the
 maximum length is used" — through `PlaceRenderer.VarGroupBoundaryImage`, the latter flattens `Occurs` times in place,
 `VarPartKind.NestedTable`; so does an OCCURS DEPENDING table whose ELEMENTS hold runtime-length items,

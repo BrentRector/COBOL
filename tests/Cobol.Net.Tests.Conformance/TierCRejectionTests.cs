@@ -184,7 +184,7 @@ public sealed class TierCRejectionTests
     /// <summary>kb/Work PB176 — a group whose OCCURS DEPENDING table holds a dynamic-length ELEMENT member once
     /// FAILED backend compilation with CS1061 (the ODO sender path emitted <c>.AsImage()</c> on a struct that never
     /// received one; the SEVENTH two-arm-dispatch instance). kb/Work PB244 then gave such a group its one-way
-    /// current-extent IMAGE (<c>DataItem.CurrentImageCapable</c>, ISO §14.9.11.4 GR7 / A.1 item 57): each of the first
+    /// current-extent IMAGE (<c>DataItem.CurrentExtentImageCapable</c>, ISO §14.9.11.4 GR7 / A.1 item 57): each of the first
     /// <c>WS-GO-N</c> occurrences, at its own current extent (§13.18.38.4 GR8). Here <c>WS-GO-D</c> is
     /// ("ab", "c") and <c>WS-GO-F</c> ("123", "456") for the two occurrences in use: <c>2ab123c456</c>.</summary>
     [Fact]

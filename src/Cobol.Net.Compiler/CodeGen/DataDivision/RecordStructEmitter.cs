@@ -169,13 +169,10 @@ internal sealed class RecordStructEmitter(EmitContext ctx, PhysicalModel phys, G
             // the same capability and the same member-image law, so a group that displays is a group that
             // crosses; it still stays out of the STATIC record codec (D9 — a record window has a fixed width
             // and this group does not).
-            // A group whose current extent has only an IMAGE (a table of variable-length ELEMENTS under OCCURS
-            // DEPENDING or DYNAMIC capacity - a run-time multiplicity of components, kb/Work PB244) gets
-            // CurrentImage() alone: DISPLAY and FUNCTION LENGTH render it; the carrier has no component list for it.
-            else if (item.CurrentImageCapable)
+            else if (item.CurrentExtentImageCapable)
             {
                 codec.EmitCurrentImageMethod(item, w);
-                if (item.CurrentExtentImageCapable) codec.EmitVarImageMethods(item, w);
+                codec.EmitVarImageMethods(item, w);
             }
             // A strong group with no character image crosses an activation boundary as its LEAF VECTOR (kb/Work
             // PB1116; OoClassTable.LeafCarried) — so it, and every group struct nested in it, gets the pair.

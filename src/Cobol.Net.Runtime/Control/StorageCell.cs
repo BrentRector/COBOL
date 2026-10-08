@@ -196,7 +196,7 @@ public sealed class StorageCell
     }
 
     /// <summary>An element cell's character image — the element's fixed run. An element that has a component of its
-    /// own (a table of variable-length ELEMENTS, <c>DataItem.CurrentImageCapable</c>) is composed with its
+    /// own (a table of variable-length ELEMENTS, kb/Work PB244) is composed with its
     /// <see cref="CellGroupShape"/> instead (<see cref="ComponentAt"/>).</summary>
     private static readonly Func<StorageCell, string> ElementImage = static e => e.Ref;
 
@@ -227,8 +227,13 @@ public sealed class StorageCell
     /// <summary>Make the <paramref name="k"/>-th carried component the content of component <paramref name="ordinal"/>
     /// — the declared group's <c>FromVarImage</c> arm for arm: a dynamic-length item takes it truncated on the right at
     /// its maximum size (§8.5.1.10.4); a table is RECREATED from it (§14.6.9.2) when it was carried and space-filled
-    /// at its unaffected capacity (§14.6.9.4) when the sender had no corresponding component.</summary>
-    private void StoreComponentAt(int ordinal, int tableWidth, int max, CobolVarGroup v, int k)
+    /// at its unaffected capacity (§14.6.9.4) when the sender had no corresponding component. A table whose ELEMENTS are
+    /// variable-length groups (<paramref name="element"/>, kb/Work PB2496) is recreated from its carried occurrence
+    /// carriers, each stored into its element cell by the element's own shape — §14.6.9.2's "Correspondingly numbered
+    /// elements are moved according to the rules of the MOVE statement". <paramref name="storage"/> is the formal
+    /// copy-in that keeps every dynamic-length item's whole content (kb/Work PB1937), one level down too.</summary>
+    private void StoreComponentAt(int ordinal, int tableWidth, int max, CobolVarGroup v, int k,
+                                  CellGroupShape? element = null, bool storage = false)
     {
         if (tableWidth == 0)
         {
@@ -236,9 +241,32 @@ public sealed class StorageCell
             return;
         }
         var table = DynTableAt(ordinal, 0, tableWidth);
+        if (element is { } shape)
+        {
+            StorageCell Store(StorageCell e, CobolVarGroup x)
+            {
+                e.StoreVarGroupAt(0, shape.Width, 0, shape.DynFixedAt, storage ? Unlimited(shape.DynMax) : shape.DynMax,
+                    shape.DynTable, default, int.MaxValue, x, shape.Elems, storage);
+                return e;
+            }
+            if (v.HasDyn(k)) table.Recreate(v.ElementCarriersAt(k), CobolVarGroup.Empty, Store);
+            else table.SpaceFillElements(CobolVarGroup.Empty, Store);
+            return;
+        }
         if (v.HasDyn(k)) table.FromCurrentImage(v.Dyn(k), tableWidth, ElementStore);
-        else table.SpaceFillElements(tableWidth, ElementStore);
+        else table.SpaceFillElements(new string(' ', tableWidth), ElementStore);
     }
+
+    /// <summary>The maximum sizes of a formal's copy-in (kb/Work PB1937): no member LIMIT applies to that store.</summary>
+    private static int[] Unlimited(int[] dynMax) => Array.ConvertAll(dynMax, static _ => int.MaxValue);
+
+    /// <summary>Component <paramref name="ordinal"/> — a dynamic-capacity table whose elements are variable-length groups
+    /// of <paramref name="shape"/> (kb/Work PB2496) — as its occurrences' own §8.5.1.12 carriers, up to its current
+    /// capacity: the nested component of <see cref="CobolVarGroup.Elements"/>, each element cell read by the element's
+    /// shape (an element cell is a scope of its own, its slots numbered from zero).</summary>
+    private CobolVarGroup[] ElementCarriersAt(int ordinal, int tableWidth, CellGroupShape shape) =>
+        DynTableAt(ordinal, 0, tableWidth).CurrentOccurrencesAs(
+            e => e.VarGroupAt(0, shape.Width, 0, shape.DynFixedAt, shape.DynTable, default, 0, shape.Elems));
 
     /// <summary>A variable-length group of this area as its §8.5.1.12 component carrier: the group's fixed run (its
     /// <paramref name="width"/> positions of <see cref="Ref"/> from <paramref name="fixedAt"/>, each table's
@@ -247,17 +275,29 @@ public sealed class StorageCell
     /// width, 0 for a dynamic-length item) — the same carrier a declared group's generated <c>AsVarImage()</c>
     /// builds. A group that holds an OCCURS DEPENDING table (<paramref name="tail"/>, kb/Work PB244) has it cut to
     /// <paramref name="count"/> occurrences: the table is the run's trailing storage (§13.18.38.3 SR22), and the
-    /// activation boundary passes the table's maximum count (§14.8.2.2); the other helpers below take the same pair.</summary>
+    /// activation boundary passes the table's maximum count (§14.8.2.2); the other helpers below take the same pair.
+    /// <paramref name="elems"/> is each table component's element shape when its elements are variable-length groups
+    /// (kb/Work PB2496): that component is carried nested, as its occurrences' own carriers.</summary>
     public CobolVarGroup VarGroupAt(int fixedAt, int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
-                                    ReadOnlySpan<int> dynTable, CellOdoTail tail, int count)
+                                    ReadOnlySpan<int> dynTable, CellOdoTail tail, int count, CellGroupShape?[]? elems = null)
     {
         // The occurrences beyond the OCCURS DEPENDING count carry no components (kb/Work PB244): the table is the
         // group's trailing storage, so they are its last ones - the carrier a declared group builds
         // (CobolTable.ConcatVarImages) holds the first `count` occurrences' only.
         var dyn = new string[dynFixedAt.Length - tail.CutComponents(count)];
-        for (int k = 0; k < dyn.Length; k++) dyn[k] = ComponentAt(dynBase + k, dynTable[k]);
+        CobolVarGroup[]?[]? nested = null;
+        for (int k = 0; k < dyn.Length; k++)
+        {
+            // A table of variable-length ELEMENTS is a nested component (kb/Work PB2496): its occurrences' carriers.
+            if (elems?[k] is { } shape)
+            {
+                (nested ??= new CobolVarGroup[]?[dyn.Length])[k] = ElementCarriersAt(dynBase + k, dynTable[k], shape);
+                dyn[k] = "";
+            }
+            else dyn[k] = ComponentAt(dynBase + k, dynTable[k]);
+        }
         string run = RunOf(fixedAt, width, dynFixedAt, dynTable);
-        return new CobolVarGroup(tail.Present ? run[..^tail.CutAt(count)] : run, dyn);
+        return new CobolVarGroup(tail.Present ? run[..^tail.CutAt(count)] : run, dyn, nested);
     }
 
     /// <summary>Distribute a component carrier into the group — the receiving twin of <see cref="VarGroupAt"/>,
@@ -268,10 +308,14 @@ public sealed class StorageCell
     /// <paramref name="count"/> of its occurrences (ISO §13.18.38.4 GR8 a: "only that part of the table area that is
     /// specified by the value of the data item referenced by data-name-1 at the start of the operation will be
     /// used"): the table's remaining occurrences keep their fixed run AND their components. The maximum count - GR8 b)
-    /// for a depending item inside the group, a record read back, the activation boundary - stores them all.</para></summary>
+    /// for a depending item inside the group, a record read back, the activation boundary - stores them all.</para>
+    /// <para><paramref name="elems"/> is each table component's element shape when its elements are variable-length
+    /// groups (kb/Work PB2496; the component is then nested, <see cref="CobolVarGroup.Elements"/>), and
+    /// <paramref name="storage"/> marks a formal's copy-in, whose dynamic-length items keep their whole content at every
+    /// level (kb/Work PB1937).</para></summary>
     public void StoreVarGroupAt(int fixedAt, int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
                                 ReadOnlySpan<int> dynMax, ReadOnlySpan<int> dynTable, CellOdoTail tail, int count,
-                                CobolVarGroup v)
+                                CobolVarGroup v, CellGroupShape?[]? elems = null, bool storage = false)
     {
         string run = v.Fixed;
         if (tail.CutAt(count) is > 0 and var cut)
@@ -281,7 +325,7 @@ public sealed class StorageCell
         }
         StoreRun(fixedAt, width, dynFixedAt, dynTable, run);
         for (int k = 0, used = dynFixedAt.Length - tail.CutComponents(count); k < used; k++)
-            StoreComponentAt(dynBase + k, dynTable[k], dynMax[k], v, k);
+            StoreComponentAt(dynBase + k, dynTable[k], dynMax[k], v, k, elems?[k], storage);
     }
 
     /// <summary>A variable-length group of this area as its CONTIGUOUS image at its current extent — ISO
