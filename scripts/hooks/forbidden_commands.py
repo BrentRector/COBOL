@@ -35,8 +35,12 @@ Exit 2 blocks the call and returns stderr to the agent. Anything unparseable pas
 """
 import json
 import os
+import pathlib
 import re
 import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import shell_location  # noqa: E402  (the one parser of a command's location changes, kb/Work PB2599)
 
 
 # the harness reads hook stderr as UTF-8; Windows would otherwise encode it in the console code page (an em dash arrived
@@ -73,7 +77,7 @@ if re.search(r"--autostash\b", commands):
 # "This repo" is recognized by its FOLDER NAME, derived from where this hook lives — never a hard-coded literal: the
 # literal "cobolsharp" silently failed OPEN when the repo became E:\COBOL (2026-09-26). The old name is kept so a
 # path written before the rename is still recognized; a RELATIVE `cd` never leaves the repo.
-_ROOT_DIR = __import__("pathlib").Path(__file__).resolve().parents[2]
+_ROOT_DIR = pathlib.Path(__file__).resolve().parents[2]
 _ROOT = _ROOT_DIR.name.lower()
 _THIS_REPO = {_ROOT, "cobol", "cobolsharp"}
 # A path registered in .gitmodules is ANOTHER repository nested under this one (tools/claude-skills is the public
@@ -94,7 +98,13 @@ def _is_this_repo(target: str) -> bool:
     return any(s in _THIS_REPO or any(s.startswith(n + "-") for n in _THIS_REPO) for s in segs)
 
 
-cds = re.findall(r"(?:\bcd|\bSet-Location|\bgit\s+-C)\s+[\"']?([^\s;&|\"']+)", commands)
+# Every location change either shell accepts (`cd`, `pushd`, `Set-Location`/`sl`/`chdir`/`Push-Location`, `-Path`,
+# quoted paths with spaces, `-WorkingDirectory`), read by the one shared parser (kb/Work PB2599), plus git's own `-C`.
+try:
+    cds = shell_location.location_targets(commands, shell_location.shell_of(data.get("tool_name")))
+except Exception:  # noqa: BLE001 — no target read means no other repo: the push rule still applies (fails closed)
+    cds = []
+cds += re.findall(r"\bgit\s+-C\s+[\"']?([^\s;&|\"']+)", commands)
 other_repo = any(not _is_this_repo(c) for c in cds)
 for m in ([] if other_repo else re.finditer(r"\bgit\s+(?:-C\s+\S+\s+)?push\b([^;&|\n]*)", commands)):
     args = m.group(1)

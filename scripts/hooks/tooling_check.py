@@ -12,7 +12,6 @@ So each adopted capability is CHECKED here, never assumed, and every line is one
 
     python scripts/hooks/tooling_check.py      # prints the block
 """
-import datetime
 import json
 import os
 import pathlib
@@ -30,8 +29,6 @@ CONFIG = account.config_dir()   # THIS session's account: its user settings, ski
 CLOUD = os.environ.get("CLAUDE_CODE_REMOTE") == "true"
 ROLES = ["cobol-implementer", "cobol-lander", "cobol-refuter", "cobol-adjudicator", "cobol-clerk", "cobol-locator",
          "cobol-reviewer"]
-SKILL_DOCTOR_STAMP = CONFIG / "cobolsharp-skill-doctor.stamp"
-SKILL_DOCTOR_DAYS = 7
 
 
 def load(p):
@@ -82,18 +79,21 @@ def check():
     # PB2480: a named account's config dir carries its seed (model_rules.json accounts.seed: settings, plugins, skills,
     # the shared memory junction, the Claude in Chrome flags). Seeding rewrites its .claude.json, which the running
     # session also writes, so the check asks rather than repairs.
+    rules = coord.rules()
+    try:
+        acct = account.current(rules)
+    except account.UnknownAccount as exc:
+        acct = None
+        if not CLOUD:
+            add("ASK-OWNER", "Claude account", f"{exc} — ask the owner which account this is")
     if CLOUD:
         add("N/A", "Claude account seed", "cloud session")
-    else:
-        try:
-            acct = account.current()
-            missing = account.seed_problems(acct, coord.rules(), REPO)
-            add("OK" if not missing else "ASK-OWNER", f"Claude account seed ({acct.name})",
-                ("the default account, the source of every seed" if not acct.explicit else f"{CONFIG} is seeded")
-                if not missing else f"{'; '.join(missing)} — ask the owner to run `pwsh scripts/account-profile.ps1 "
-                f"-ConfigDir {CONFIG}` with no session of that account running; effective from the next session")
-        except account.UnknownAccount as exc:
-            add("ASK-OWNER", "Claude account", f"{exc} — ask the owner which account this is")
+    elif acct is not None:
+        missing = account.seed_problems(acct, rules, REPO)
+        add("OK" if not missing else "ASK-OWNER", f"Claude account seed ({acct.name})",
+            ("the default account, the source of every seed" if not acct.explicit else f"{CONFIG} is seeded")
+            if not missing else f"{'; '.join(missing)} — ask the owner to run `pwsh scripts/account-profile.ps1 "
+            f"-ConfigDir {CONFIG}` with no session of that account running; effective from the next session")
 
     user = load(CONFIG / "settings.json")
     lsp_plugin = any(k.startswith("csharp-lsp@") and v for k, v in (user.get("enabledPlugins") or {}).items())
@@ -108,17 +108,19 @@ def check():
                ([] if ls else ["install the server: dotnet tool install --global csharp-ls"])
         add("ASK-OWNER", "C# LSP", "; ".join(need) + " — ask before installing; effective from the next session")
 
-    try:
-        age = (datetime.datetime.now() - datetime.datetime.fromtimestamp(SKILL_DOCTOR_STAMP.stat().st_mtime)).days
-    except OSError:
-        age = None
+    # The weekly review covers a SKILL SET, so a review under any account whose skill set contains this account's
+    # counts (account.skill_review, kb/Work PB2598): a freshly seeded account is not asked again for its source's review.
     if CLOUD:
         add("N/A", "/skill-doctor", "cloud session")
-    elif age is not None and age < SKILL_DOCTOR_DAYS:
-        add("OK", "/skill-doctor", f"reviewed {age} day(s) ago")
+    elif acct is None:
+        add("N/A", "/skill-doctor", "the account is unknown (the Claude account line above asks which it is)")
+    elif (review := account.skill_review(acct, rules)) is not None:
+        add("OK", "/skill-doctor", f"reviewed {review.age_days} day(s) ago"
+            + ("" if review.by == acct.name else f" under {review.by}, whose skill set contains this account's"))
     else:
-        add("ASK-OWNER", "/skill-doctor", "owner-only interactive command, due (weekly): ask the owner to run "
-            "`/skill-doctor`, prune what it flags, then touch " + SKILL_DOCTOR_STAMP.as_posix())
+        add("ASK-OWNER", "/skill-doctor", f"owner-only interactive command, due (weekly; no review in "
+            f"{account.SKILL_REVIEW_DAYS} days covers this account's skill set): ask the owner to run `/skill-doctor`, "
+            f"prune what it flags, then touch {(acct.config_dir / account.SKILL_REVIEW_STAMP).as_posix()}")
 
     asks = sum(1 for l in out if "ASK-OWNER" in l)
     head = ("TOOLING (kb/Work R49) — every line is checked, not assumed. "

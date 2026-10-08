@@ -4,6 +4,7 @@
     python scripts/orchestrator/account.py [--json] [--account NAME | --config-dir DIR] [--repo DIR]
     python scripts/orchestrator/account.py --field config_dir|child_config_dir|name|project_dir|account_uuid|email
     python scripts/orchestrator/account.py --config-dir DIR --seed-plan | --seed-check   # kb/Work PB2480
+    python scripts/orchestrator/account.py [--config-dir DIR] --skill-review              # kb/Work PB2598
     python scripts/orchestrator/account.py --self-test
 
 Design: docs/rearchitecture/DESIGN-orchestrator-loop.md section 2.1 (kb/Work PB2478, PB2479). Owner 2026-10-07: the fix
@@ -23,6 +24,11 @@ a PARAMETER of every coordination tool, never an assumption.
 - SEEDING a named account's config dir (`model_rules.json` `accounts.seed`, kb/Work PB2480): `--seed-plan` prints what
   `scripts/account-profile.ps1` copies, junctions and flags; `--seed-check` lists what is missing (tooling_check.py runs
   it at every session start). The default account is the source and needs no seed.
+- The weekly /skill-doctor REVIEW (kb/Work PB2598) covers a SKILL SET, not an account: the command reports what each
+  skill costs and how often it is used "so you can decide which ones to turn off" (code.claude.com/docs/en/skills), and
+  the pruning it drives edits the skills and plugins the seed copies. So `skill_review` answers "was THIS account's
+  skill set reviewed within the week?" from every account's stamp: a review under an account whose skill set contains
+  this one's covers it, which is how a freshly seeded account inherits its source's review instead of re-asking.
 - TELEMETRY is per MACHINE, not per account: every account's settings export to the one sink on 127.0.0.1:4318, which
   writes `~/.claude/telemetry/<UTC day>.jsonl` (`otlp_sink.OUT_DIR`). Each `api_request` event carries the account id
   (`usage_report.ACCOUNT_ATTR`, `user.account_uuid`), and a consumer that needs one account's spend filters on it.
@@ -31,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import datetime
 import json
 import os
 import pathlib
@@ -43,6 +50,10 @@ sys.path.insert(0, str(HERE))
 import coord  # noqa: E402
 
 ENV = "CLAUDE_CONFIG_DIR"
+# The owner's /skill-doctor review: a stamp file in the reviewing account's config dir, touched after the review; its
+# mtime is the review's time. It is due again SKILL_REVIEW_DAYS later (kb/Work R49 item 11, PB2598).
+SKILL_REVIEW_STAMP = "cobolsharp-skill-doctor.stamp"
+SKILL_REVIEW_DAYS = 7
 
 
 class UnknownAccount(LookupError):
@@ -206,6 +217,50 @@ def seed_problems(acct: Account, rules: dict[str, Any], repo: pathlib.Path) -> l
     return bad
 
 
+def skill_set(acct: Account) -> frozenset[str]:
+    """What /skill-doctor reviews for `acct`: the user skills in `<config dir>/skills` and the plugins its user
+    `settings.json` enables. The project's own `.claude/skills` are the same for every account and are not part of it."""
+    try:
+        skills = {f"skill:{p.name}" for p in (acct.config_dir / "skills").iterdir() if p.is_dir()}
+    except OSError:
+        skills = set()
+    try:
+        settings = json.loads((acct.config_dir / "settings.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        settings = {}
+    enabled = settings.get("enabledPlugins") if isinstance(settings, dict) else None
+    plugins = {f"plugin:{k}" for k, v in enabled.items() if v} if isinstance(enabled, dict) else set()
+    return frozenset(skills | plugins)
+
+
+@dataclasses.dataclass(frozen=True)
+class SkillReview:
+    by: str              # the account whose stamp records the review
+    stamp: pathlib.Path
+    age_days: int
+
+
+def skill_review(acct: Account, rules: dict[str, Any], now: datetime.datetime | None = None) -> SkillReview | None:
+    """The newest /skill-doctor review younger than SKILL_REVIEW_DAYS that covers `acct`'s whole skill set, or None
+    when the review is due. A review covers `acct` when the reviewing account's skill set CONTAINS `acct`'s: the owner
+    pruned that set, and `acct` runs no skill outside it. The reviewer's set is read as it is now, the same reading an
+    account's own stamp has always had. Every account in the table is a candidate (kb/Work PB2598): a freshly seeded
+    account whose copied skills were reviewed under its source is not asked again."""
+    now = now or datetime.datetime.now()
+    mine = skill_set(acct)
+    found: list[SkillReview] = []
+    for row in _table(rules):
+        other = _make(row, _row_dir(row), bool(row.get("config_dir")), rules)
+        stamp = other.config_dir / SKILL_REVIEW_STAMP
+        try:
+            age = (now - datetime.datetime.fromtimestamp(stamp.stat().st_mtime)).days
+        except OSError:
+            continue
+        if age < SKILL_REVIEW_DAYS and mine <= skill_set(other):
+            found.append(SkillReview(other.name, stamp, age))
+    return min(found, key=lambda r: r.age_days, default=None)
+
+
 def _self_test() -> int:
     import tempfile
     fails, checked = [], []
@@ -250,10 +305,59 @@ def _self_test() -> int:
               (50, rules["quota"]["daily_pct"]))
         (d / ".claude.json").write_text("{not json", encoding="utf-8")
         check("unreadable global config -> no uuid", p.uuid, None)
+    _skill_review_cases(check)
     for f in fails:
         print("FAIL:", f)
     print(f"account self-test: {len(checked) - len(fails)}/{len(checked)} checks OK")
     return 1 if fails else 0
+
+
+def _skill_review_cases(check) -> None:
+    """kb/Work PB2598, over temporary config dirs: a seeded account inherits its source's review, and only that."""
+    import tempfile
+    now = datetime.datetime(2026, 10, 7, 23, 47)
+    with tempfile.TemporaryDirectory() as t:
+        root = pathlib.Path(t)
+        src, seeded = root / "src", root / "seeded"
+
+        def give(d: pathlib.Path, skills: list[str], plugins: dict[str, bool]) -> None:
+            d.mkdir(parents=True, exist_ok=True)
+            for name in skills:
+                (d / "skills" / name).mkdir(parents=True, exist_ok=True)
+            (d / "settings.json").write_text(json.dumps({"enabledPlugins": plugins}), encoding="utf-8")
+
+        def stamp(d: pathlib.Path, days_ago: float) -> None:
+            (d / SKILL_REVIEW_STAMP).touch()
+            t0 = (now - datetime.timedelta(days=days_ago)).timestamp()
+            os.utime(d / SKILL_REVIEW_STAMP, (t0, t0))
+
+        reset = {"weekday": 0, "hour": 0, "minute": 0, "tz": "UTC"}
+        rules = {"quota": {}, "accounts": {"list": [{"name": "src", "config_dir": str(src), "weekly_reset": reset},
+                                                    {"name": "seeded", "config_dir": str(seeded), "weekly_reset": reset}]}}
+        give(src, ["humanizer", "synced"], {"csharp-lsp@x": True, "github@x": True, "off@x": False})
+        give(seeded, ["humanizer", "synced"], {"csharp-lsp@x": True, "github@x": True})
+        acct = current(rules, {ENV: str(seeded)})
+
+        def got(who: Account = acct):
+            r = skill_review(who, rules, now)
+            return r and (r.by, r.age_days)
+
+        check("PB2598: no stamp anywhere -> due", got(), None)
+        stamp(src, 5.2)
+        check("PB2598: a seeded copy of the set reviewed 5 days ago under its source -> covered", got(), ("src", 5))
+        check("PB2598: the source is covered by its own review", got(current(rules, {ENV: str(src)})), ("src", 5))
+        stamp(seeded, 1.5)
+        check("PB2598: the newest covering review wins", got(), ("seeded", 1))
+        (seeded / SKILL_REVIEW_STAMP).unlink()
+        give(seeded, ["humanizer", "synced", "extra"], {"csharp-lsp@x": True, "github@x": True})
+        check("PB2598: a skill outside the reviewed set -> due", got(), None)
+        (seeded / "skills" / "extra").rmdir()
+        give(seeded, ["humanizer", "synced"], {"csharp-lsp@x": True, "github@x": True, "off@x": True})
+        check("PB2598: a plugin the reviewed set has disabled -> due", got(), None)
+        give(seeded, ["humanizer"], {"github@x": True})
+        check("PB2598: a subset of the reviewed set is covered", got(), ("src", 5))
+        stamp(src, 7.0)
+        check("PB2598: a review 7 days old is due again", got(), None)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -266,6 +370,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--field", help="print one field of the JSON form, bare (for PowerShell callers)")
     ap.add_argument("--seed-plan", action="store_true", help="print what account-profile.ps1 makes the dir carry")
     ap.add_argument("--seed-check", action="store_true", help="list what the dir lacks of its seed; exit 1 if anything")
+    ap.add_argument("--skill-review", action="store_true",
+                    help="say which account's /skill-doctor review covers this account's skill set; exit 1 if it is due")
     ap.add_argument("--rules", help="a model_rules.json to read instead of the repository's (a test seam)")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args(argv)
@@ -289,6 +395,11 @@ def main(argv: list[str] | None = None) -> int:
         bad = seed_problems(acct, rules, repo)
         print("\n".join(bad) if bad else f"{acct.name}: seeded ({acct.config_dir})")
         return 1 if bad else 0
+    if a.skill_review:
+        r = skill_review(acct, rules)
+        print(f"{acct.name}: reviewed {r.age_days} day(s) ago under {r.by} ({r.stamp})" if r
+              else f"{acct.name}: the /skill-doctor review is due (no review in {SKILL_REVIEW_DAYS} days covers its skill set)")
+        return 0 if r else 1
     out = acct.as_json(a.repo)
     if a.field:
         if a.field not in out:

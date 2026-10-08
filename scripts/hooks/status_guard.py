@@ -24,11 +24,19 @@ silent. A STATUS.md without a stamp line counts as not describing HEAD. Any inte
 
 Register it for PreToolUse on the shell tools WITHOUT an `if` filter, and for Stop and SubagentStop without a
 matcher. Agents commit through chains (`git add -A && git commit …`), which an `if: Bash(git commit*)` filter does
-not match (measured: it silenced the hook in most sessions); the script finds `git commit` anywhere in the command.
+not match (measured: it silenced the hook in most sessions); the script finds `git commit` anywhere in the command,
+and checks the tree that commit runs in: the shared parser `shell_location.py` follows the command's location changes
+(`cd <worktree> && git commit`, `Set-Location <worktree>; git commit`) and `git -C <dir>`, so an agent that addresses
+its worktree by path from the main checkout is checked against ITS STATUS.md, not the main tree's absent one (which
+left the guard silent for exactly those agents, kb/Work PB2599). A directory the line does not determine falls back
+to the payload's cwd.
 A commit made inside a script the agent runs is invisible to PreToolUse, and the Stop check catches it.
 `--self-test` exercises every branch in a throwaway repository.
 """
 import json, os, pathlib, re, subprocess, sys, tempfile
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import shell_location  # noqa: E402  (the one parser of a command's location changes, kb/Work PB2599)
 
 STAMP = re.compile(r"^\s*STATUS-AT:\s*([0-9a-fA-F]{7,40})\b", re.M)
 COMMIT = re.compile(r"(^|[;&|(]\s*|\s)git(\s+-C\s+\S+)?\s+commit(?![-\w])")
@@ -63,6 +71,16 @@ def describe(head, stamp):
             f"STATUS.md now so DONE / NEXT / GATE cover it, with first line `STATUS-AT: {head}`.")
 
 
+def commit_dirs(payload, cwd):
+    """The directories the call's `git commit` commands run in (location changes and `-C` followed); `cwd` stands in
+    for one the command line does not determine."""
+    cmd = (payload.get("tool_input") or {}).get("command", "")
+    found = [shell_location.git_dir(s) or cwd
+             for s in shell_location.steps(cmd, cwd, shell_location.shell_of(payload.get("tool_name")))
+             if COMMIT.search(s.text)]
+    return list(dict.fromkeys(found)) or [cwd]
+
+
 def decide(payload):
     """Returns (stdout_json_or_None). Never raises past main()."""
     event = payload.get("hook_event_name", "")
@@ -71,14 +89,20 @@ def decide(payload):
         cmd = (payload.get("tool_input") or {}).get("command", "")
         if not COMMIT.search(cmd):
             return None
-    elif event not in ("Stop", "SubagentStop"):
+        dirs = commit_dirs(payload, cwd)
+    elif event in ("Stop", "SubagentStop"):
+        dirs = [cwd]
+    else:
         return None
-    st = state(cwd)
-    if st is None:
+    stale = None
+    for d in dirs:
+        st = state(d)
+        if st is not None and st[2] != st[1]:
+            stale = st
+            break
+    if stale is None:
         return None
-    top, head, stamp = st
-    if stamp == head:
-        return None
+    top, head, stamp = stale
     msg = describe(head, stamp)
     if event == "PreToolUse":
         return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
@@ -144,6 +168,16 @@ def self_test():
         check("commit-tree not a commit", decide({"hook_event_name": "PreToolUse", "cwd": d, "tool_input": {"command": "git commit-tree abc"}}), "none")
         (p / "STATUS.md").write_text("STATUS-AT: 0123456789abcdef0123456789abcdef01234567\n")
         check("unknown sha stamp: denied", commit("PreToolUse"), "deny")
+        # kb/Work PB2599: the commit's own tree, reached by a location change or -C from a directory with no STATUS.md
+        with tempfile.TemporaryDirectory() as away:
+            pd = p.as_posix()
+            pre = lambda command, tool="Bash": decide({"hook_event_name": "PreToolUse", "cwd": away, "tool_name": tool,
+                                                       "tool_input": {"command": command}})
+            check("stale, reached by `cd <tree> && git commit`: denied", pre(f"cd {pd} && git add -A && git commit -m y"), "deny")
+            check("stale, reached by `git -C <tree> commit`: denied", pre(f"git -C {pd} commit -m y"), "deny")
+            check("stale, reached by PowerShell `Set-Location <tree>; git commit`: denied",
+                  pre(f"Set-Location '{p}'; git commit -m y", "PowerShell"), "deny")
+            check("a commit elsewhere after visiting the tree in a subshell: silent", pre(f"(cd {pd} && ls) && git commit -m y"), "none")
     with tempfile.TemporaryDirectory() as d2:
         check("not a git repo: silent", decide({"hook_event_name": "Stop", "cwd": d2}), "none")
     print("=== SELF-TEST: " + ("GREEN" if ok else "RED") + " ===")

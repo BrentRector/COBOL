@@ -26,9 +26,13 @@ other's liveness. So the guard now denies iff some FOREIGN live agent is working
 
 Both trees in that comparison are DERIVED, never listed — a hand-maintained map of agent→tree is exactly the
 shape rule 5 forbids, and it would go stale the first time the host renamed a directory:
-  • the CALLER's tree = the repository root of the payload's `cwd` — the nearest ancestor holding a `.git`
-    entry, which is a DIRECTORY in the main checkout and a FILE in a worktree. Stopping at the FIRST one is
-    what makes a worktree resolve to itself rather than to the repository it was cut from (`repo_root_of`).
+  • the CALLER's tree = the repository root of WHERE THE BUILD RUNS — the project a `dotnet` command names, else
+    the directory the shell is in when it runs it, following every location change of either shell
+    (`build_sites`, through the shared parser `shell_location.py`, kb/Work PB2599), else the payload's `cwd` —
+    the nearest ancestor holding a `.git` entry, which is a DIRECTORY in the main checkout and a FILE in a
+    worktree. Stopping at the FIRST one is what makes a worktree resolve to itself rather than to the repository
+    it was cut from (`repo_root_of`). A directory outside every working tree (a scratch probe) stays UNKNOWN: a
+    scratch project can `ProjectReference` a worktree's project, so the trees it writes are not its directory's.
   • the MAIN checkout = that root itself when its `.git` is a directory, else the `gitdir: <main>/.git/
     worktrees/<name>` target named by the worktree's `.git` FILE, parsed here rather than by shelling out to
     git — a PreToolUse hook runs on every `dotnet` call and must not pay a subprocess (`main_repo_root`).
@@ -69,13 +73,14 @@ silence).
 import json
 import os
 import pathlib
-import re
 import sys
 import tempfile
 import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "orchestrator"))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import account  # noqa: E402  (the one resolver of Claude's config dir, kb/Work PB2479)
+import shell_location  # noqa: E402  (the one parser of a command's location changes, kb/Work PB2599)
 
 WINDOW_SECONDS = 120
 
@@ -97,9 +102,9 @@ BUILD_VERBS = ("build", "test", "clean", "publish", "run", "msbuild")
 # and relative when the worktree was created with `--relative-paths`.
 GITDIR_PREFIX = "gitdir:"
 
-# `cd <dir> && dotnet build …` builds in <dir>, not in the payload's cwd. This is the SAME tree question asked of
-# a more accurate answer — not a second mechanism (PB103 recognized the worktree this way too).
-CD_PREFIX_RE = re.compile(r"""^\s*cd\s+(?:"([^"]+)"|'([^']+)'|([^\s&;|]+))\s*(?:&&|;|&)""", re.IGNORECASE)
+# A build writes the bin/obj of the PROJECT it builds: `dotnet build <x>.sln`, `dotnet run --project <x>.csproj`,
+# `dotnet run walk.cs`. A positional argument with one of these suffixes, or a `--project` value, names it.
+PROJECT_SUFFIXES = (".sln", ".slnx", ".csproj", ".fsproj", ".vbproj", ".proj", ".cs")
 
 
 def bail() -> None:
@@ -287,32 +292,15 @@ def agents_sharing_tree(caller_cwd: str, foreign: list) -> tuple[list, "pathlib.
     return sharing, caller_tree
 
 
-# Git Bash / MSYS spell a Windows drive path as `/e/COBOL/…` (or `/cygdrive/e/…`). On Windows `pathlib`
-# calls that path ROOTED but not ABSOLUTE (it has no drive), so `Path(cwd) / p` yields `E:\e\CobolSharp\…` — a
-# directory that does not exist and whose ancestors carry no `.git`. The caller's tree then became UNKNOWN and
-# the guard reverted to the session-wide rule: every foreign live agent denied, in EVERY worktree, for the whole
-# fleet window (2026-09-04, `kb/Work/PB474` — the fourth time this guard failed closed). The single letter must
-# be followed by `/` or the end, so a POSIX path such as `/tmp/x` is left alone.
-MSYS_DRIVE_RE = re.compile(r"^/(?:cygdrive/)?([A-Za-z])(?=/|$)(.*)$")
+def build_sites(data: dict) -> list:
+    """Every place the tool call builds: for each `dotnet <verb>` command, the project it names, else the directory it
+    runs in. `None` is a place the command line does not determine (an UNKNOWN tree, so the session-wide rule).
 
-
-def native_path(target: str) -> str:
-    """A `cd` target as the OS spells it: MSYS `/e/x` → `E:/x` on Windows; anything else unchanged."""
-    if os.name != "nt":
-        return target
-    m = MSYS_DRIVE_RE.match(target)
-    if not m:
-        return target
-    return f"{m.group(1).upper()}:{m.group(2) or '/'}"
-
-
-def effective_cwd(data: dict) -> str:
-    """Where the build will actually run: a leading `cd <dir>` in the command, else the payload's `cwd`.
-
-    `cwd` is a documented PreToolUse payload field (Claude Code hooks: `session_id`, `transcript_path`, `cwd`,
-    `hook_event_name`, `tool_name`, `tool_input`) and this hook has keyed on it since PB103. `os.getcwd()` is
-    kept as a fallback for a host that omits it — the hook is launched from the caller's directory, so it is
-    the same answer by a different route, and it keeps a missing field from collapsing the tree to UNKNOWN.
+    The directory each command runs in comes from `shell_location.steps`, the one parser of the two shells' location
+    changes (kb/Work PB2599): a PowerShell `Set-Location <worktree>; dotnet build`, a Bash `git worktree add … && cd
+    <worktree> && dotnet build`, a `pushd`, a `( … )` subshell or `pwsh -WorkingDirectory` each build where the shell
+    does, not in the payload's cwd. `cwd` is a documented PreToolUse payload field (since PB103); `os.getcwd()` stands
+    in for a host that omits it, because the hook is launched from the caller's directory.
     """
     cwd = (data.get("cwd") or "").strip()
     if not cwd:
@@ -320,17 +308,29 @@ def effective_cwd(data: dict) -> str:
             cwd = os.getcwd()
         except OSError:
             cwd = ""
-
     command = (data.get("tool_input") or {}).get("command") or ""
-    m = CD_PREFIX_RE.match(command)
-    if m:
-        target = next((g for g in m.groups() if g), "")
-        try:
-            p = pathlib.Path(native_path(target))
-            cwd = str(p if p.is_absolute() else pathlib.Path(cwd) / p)
-        except (OSError, ValueError):
-            pass
-    return cwd
+    sites = []
+    for step in shell_location.steps(command, cwd or None, shell_location.shell_of(data.get("tool_name"))):
+        if not is_build_command(step.text):
+            continue
+        words = list(step.words)
+        named = [words[i + 1] for i, w in enumerate(words[:-1]) if w in ("--project", "--solution")]
+        named += [w.split("=", 1)[1] for w in words if w.startswith(("--project=", "--solution="))]
+        named += [w for w in words if w.lower().endswith(PROJECT_SUFFIXES) and not w.startswith("-")]
+        sites += [shell_location.resolve(n, step.cwd) for n in named] or [step.cwd]
+    return sites
+
+
+def agents_sharing_any(sites: list, foreign: list) -> tuple[list, "pathlib.Path | None"]:
+    """`agents_sharing_tree` over every build site of the call: the live agents sharing ANY of them (an UNKNOWN site
+    reverts to the session-wide rule), and the tree the first sharing site resolved to (None when unknown)."""
+    sharing, tree = [], None
+    for site in sites:
+        live, caller_tree = agents_sharing_tree(site or "", foreign)
+        if live and not sharing:
+            tree = caller_tree
+        sharing += [p for p in live if p not in sharing]
+    return sharing, tree
 
 
 def live_agent_transcripts(session_id: str) -> list:
@@ -529,38 +529,54 @@ def self_test() -> int:
             sharing, _ = agents_sharing_tree(str(cwd), foreign)
             check(f"scope: {name}", len(sharing), expected)
 
-        # `cd <dir> && dotnet build` builds in <dir>: the tree question asked of the right directory.
-        check(
-            "scope: `cd <main> && dotnet build` from a worktree -> DENY on the main fleet",
-            len(agents_sharing_tree(
-                effective_cwd({"cwd": str(fx["wtA"]),
-                               "tool_input": {"command": f'cd "{fx["main"]}" && dotnet build'}}),
-                [t("main1")],
-            )[0]),
-            1,
-        )
-        check(
-            "scope: no `cd` -> the payload cwd stands",
-            effective_cwd({"cwd": str(fx["wtA"]), "tool_input": {"command": "dotnet build Cobol.Net.sln"}}),
-            str(fx["wtA"]),
-        )
+        # A build is judged where it runs (kb/Work PB2599): every location change either shell accepts, and the project
+        # a build names. The shapes are the operator's six false denials of 2026-10-07/08, plus the harmful direction.
+        def sites(command: str, cwd, tool: str = "Bash") -> list:
+            return build_sites({"cwd": str(cwd), "tool_name": tool, "tool_input": {"command": command}})
+
+        def denies(command: str, cwd, tool: str = "Bash", fleet=("main1",)) -> int:
+            return len(agents_sharing_any(sites(command, cwd, tool), [t(a) for a in fleet])[0])
+
+        main, wt = fx["main"], fx["wtA"]
+        for name, command, tool, expected in [
+            ("`cd <main> && dotnet build` from a worktree -> DENY on the main fleet", f'cd "{main}" && dotnet build', "Bash", 1),
+            ("no location change -> the payload cwd (main) -> DENY", "dotnet build Cobol.Net.sln", "Bash", 1),
+            ("PowerShell `Set-Location <wt>; dotnet build` -> ALLOW", f"Set-Location {wt}; dotnet build -c Debug", "PowerShell", 0),
+            ("PowerShell `Set-Location <wt>; (Measure-Command {{ dotnet publish }})` -> ALLOW",
+             f"Set-Location {wt}; (Measure-Command {{ dotnet publish x.csproj -c Release }}).TotalSeconds", "PowerShell", 0),
+            ("PowerShell `Push-Location -Path <wt>` -> ALLOW", f"Push-Location -Path '{wt}'; dotnet build; Pop-Location", "PowerShell", 0),
+            ("PowerShell `pwsh -WorkingDirectory <wt> -Command` -> ALLOW",
+             f'pwsh -NoProfile -WorkingDirectory "{wt}" -Command "dotnet build"', "PowerShell", 0),
+            ("Bash `git worktree add … && cd <wt> && dotnet build` -> ALLOW",
+             f"git worktree add -q --detach x abc && cd {wt.as_posix()} && dotnet build Cobol.Net.sln", "Bash", 0),
+            ("Bash `mkdir -p … && cd <wt> && dotnet build` -> ALLOW", f"mkdir -p /tmp/q && cd {wt.as_posix()} && dotnet build", "Bash", 0),
+            ("Bash `ls …; cd <wt> && dotnet build` -> ALLOW", f"ls STOP; cd {wt.as_posix()} && dotnet build", "Bash", 0),
+            ("Bash `pushd <wt> && dotnet build` -> ALLOW", f"pushd {wt.as_posix()} && dotnet build", "Bash", 0),
+            ("Bash `(cd <wt> && dotnet build) && dotnet test` -> DENY: the test runs in main",
+             f"(cd {wt.as_posix()} && dotnet build) && dotnet test", "Bash", 1),
+            ("Bash `cd <wt> & dotnet build` -> DENY: a background cd does not move the shell", f"cd {wt.as_posix()} & dotnet build", "Bash", 1),
+            ("a target the line does not determine -> UNKNOWN -> DENY session-wide", "cd $NOWHERE && dotnet build", "Bash", 1),
+            ("from main, `dotnet build <wt>/x.sln` builds the worktree -> ALLOW",
+             f"dotnet build {wt.as_posix()}/Cobol.Net.sln", "Bash", 0),
+        ]:
+            check(f"scope: {name}", denies(command, main if "from a worktree" not in name else wt, tool), expected)
+        # The harmful direction: from a worktree, a build of the MAIN checkout's solution must see the main fleet.
+        check("scope: from a worktree, `dotnet build <main>/x.sln` -> DENY on the main fleet",
+              denies(f"dotnet build {main.as_posix()}/Cobol.Net.sln", wt), 1)
+        check("scope: from a worktree, `dotnet run --project <main>/x.csproj` -> DENY on the main fleet",
+              denies(f"dotnet run --project {main.as_posix()}/x.csproj", wt), 1)
+        check("scope: a scratch dir outside every tree stays UNKNOWN -> DENY session-wide (2026-10-07 21:41 refuter)",
+              denies(f"cd {fx['outside'].as_posix()}; timeout 600 dotnet run walk.cs", main), 1)
 
         # PB474: a Git-Bash `cd /e/…` target must land on the worktree, not on `E:\e\…` and thence UNKNOWN.
         if os.name == "nt":
-            wt = fx["wtA"]
             drive, rest = os.path.splitdrive(str(wt))
             msys = "/" + drive[0].lower() + rest.replace("\\", "/")
             for spelled in (msys, "/cygdrive" + msys):
-                got = effective_cwd({"cwd": str(fx["main"]), "tool_input": {"command": f"cd {spelled} && dotnet build"}})
-                check(f"scope: MSYS `cd {spelled[:14]}…` resolves to the worktree (PB474)", same_path(got, wt), True)
-                sharing, tree = agents_sharing_tree(got, [t("main1")])
+                got = sites(f"cd {spelled} && dotnet build", main)
+                check(f"scope: MSYS `cd {spelled[:14]}…` resolves to the worktree (PB474)", same_path(got[0], wt), True)
+                sharing, tree = agents_sharing_tree(got[0], [t("main1")])
                 check("scope: …and a main-tree fleet then does NOT deny that worktree build", (len(sharing), tree), (0, wt))
-        check("scope: a POSIX path that is not a drive is left alone", native_path("/tmp/x"), "/tmp/x")
-        # The drive mapping is Windows-only (`native_path`): on Linux `/e` is a real POSIX directory and stays as spelled.
-        if os.name == "nt":
-            check("scope: a bare drive `/e` maps to the drive root", native_path("/e"), "E:/")
-        else:
-            check("scope: `/e` is a POSIX path off Windows, left alone", native_path("/e"), "/e")
 
         # The DENY message must name the agents AND the shared tree (it named `subagents` for every one).
         sharing, tree = agents_sharing_tree(str(fx["main"]), [t("main1"), t("main2")])
@@ -612,38 +628,40 @@ def self_test() -> int:
     return 1 if failures else 0
 
 
-if __name__ == "__main__" and "--self-test" in sys.argv:
-    sys.exit(self_test())
+def main() -> None:
+    try:
+        data = json.load(sys.stdin)
+    except Exception:  # noqa: BLE001
+        bail()
 
-try:
-    data = json.load(sys.stdin)
-except Exception:  # noqa: BLE001
-    bail()
+    command = (data.get("tool_input") or {}).get("command") or ""
+    if not command or not is_build_command(command):
+        bail()
 
-command = (data.get("tool_input") or {}).get("command") or ""
-if not command or not is_build_command(command):
-    bail()
+    session_id = data.get("session_id") or ""
+    if not session_id:
+        bail()
 
-session_id = data.get("session_id") or ""
-if not session_id:
-    bail()
+    try:
+        foreign = foreign_transcripts(data, live_agent_transcripts(session_id))
+        live, caller_tree = agents_sharing_any(build_sites(data), foreign)
+    except Exception:  # noqa: BLE001
+        bail()
 
-try:
-    foreign = foreign_transcripts(data, live_agent_transcripts(session_id))
-    live, caller_tree = agents_sharing_tree(effective_cwd(data), foreign)
-except Exception:  # noqa: BLE001
-    bail()
+    if not live:
+        bail()
 
-if not live:
-    bail()
+    json.dump(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": deny_reason(live, caller_tree),
+            }
+        },
+        sys.stdout,
+    )
 
-json.dump(
-    {
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
-            "permissionDecisionReason": deny_reason(live, caller_tree),
-        }
-    },
-    sys.stdout,
-)
+
+if __name__ == "__main__":
+    sys.exit(self_test()) if "--self-test" in sys.argv else main()

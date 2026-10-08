@@ -43,13 +43,37 @@ CASES = [
     ("git rm -r /elsewhere/src/X", str(WT), False),                                  # a POSIX-absolute path outside
     ("cd /elsewhere && git rm -r src/X", str(WT), False),                            # cd to a POSIX-absolute path outside
     ("cd .. && git rm -r src/X", str(WT), False),                                    # cd out of the worktree
+    # every location change the shared parser reads (kb/Work PB2599), and only joined by `&&`
+    (f"pushd {WT.as_posix()} && git rm -r src/X", MAIN, True),
+    (f'cd "{WT.as_posix()}" && git rm -r src/X', MAIN, True),                         # quoted
+    (f"cd {WT.as_posix()}; git rm -r src/X", MAIN, False),                            # `;`: a failed cd removes in main
+    (f"ls && cd {WT.as_posix()} && git rm -r src/X", MAIN, False),                    # more than the one prefix
+    (f"(cd {WT.as_posix()} && git rm -r src/X)", MAIN, False),                        # a subshell is never covered
+    (f"bash -c 'git rm -r src/X'", str(WT), False),                                  # nor a -c payload
+    ("cd $WT && git rm -r src/X", MAIN, False),                                      # a target the line does not determine
     ("git rm -r", str(WT), False),                                                   # no path
     ("echo 'git rm -r src/X'", str(WT), False),                                      # not the command
+    # the shell runs a substitution and a redirect before git sees its argv (train 1039b review)
+    ('git rm -r -- "$(rm -rf ~/x)"', str(WT), False),                                # command substitution
+    ("git rm -r -- `rm -rf ~/x`", str(WT), False),                                   # backquote substitution
+    (f"git rm -r src/X >{REPO.as_posix()}/src/a.cs", str(WT), False),                # a redirect truncates outside
+    ("git rm -r src/X 2>/e/COBOL/kb/Work/PB1.md", str(WT), False),
+    ("git rm -r <(ls) src/X", str(WT), False),                                       # process substitution
 ]
 
 
-def allowed(cmd: str, cwd: str) -> bool:
-    r = subprocess.run([sys.executable, str(HOOK)], input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}, "cwd": cwd}),
+# The PowerShell tool: its location changes, joined by `&&` (PowerShell 7), and never by `;`.
+PS_CASES = [
+    (f"Set-Location {WT.as_posix()} && git rm -r src/X", MAIN, True),
+    (f"Set-Location -Path '{WT.as_posix()}' && git rm -r src/X", MAIN, True),
+    (f"sl {WT.as_posix()} && git rm -r src/X", MAIN, True),
+    (f"Set-Location {WT.as_posix()}; git rm -r src/X", MAIN, False),
+    (f"Set-Location {REPO.as_posix()} && git rm -r src/X", str(WT), False),
+]
+
+
+def allowed(cmd: str, cwd: str, tool: str = "Bash") -> bool:
+    r = subprocess.run([sys.executable, str(HOOK)], input=json.dumps({"tool_name": tool, "tool_input": {"command": cmd}, "cwd": cwd}),
                        capture_output=True, text=True, timeout=30)
     if r.returncode != 0:
         print(f"FAIL: hook exited {r.returncode} on {cmd!r}: {r.stderr.strip()}")
@@ -62,8 +86,8 @@ def allowed(cmd: str, cwd: str) -> bool:
 
 def main() -> int:
     bad = 0
-    for cmd, cwd, want in CASES:
-        got = allowed(cmd, cwd)
+    for cmd, cwd, want, tool in [(*c, "Bash") for c in CASES] + [(*c, "PowerShell") for c in PS_CASES]:
+        got = allowed(cmd, cwd, tool)
         if got != want:
             bad += 1
             print(f"FAIL: {'allow' if want else 'no decision'} expected, got {'allow' if got else 'no decision'}: {cmd!r} in {cwd!r}")
@@ -72,7 +96,8 @@ def main() -> int:
     if r.returncode != 0 or r.stdout.strip():
         bad += 1
         print("FAIL: unparseable input must exit 0 with no decision")
-    print(f"worktree_rm_allow self-test: {len(CASES) + 1 - bad}/{len(CASES) + 1} {'GREEN' if not bad else 'RED'}")
+    n = len(CASES) + len(PS_CASES) + 1
+    print(f"worktree_rm_allow self-test: {n - bad}/{n} {'GREEN' if not bad else 'RED'}")
     return 1 if bad else 0
 
 

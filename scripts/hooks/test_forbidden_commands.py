@@ -36,6 +36,11 @@ CASES = [
     ("git -C /e/COBOL/tools/claude-skills push -q origin main --follow-tags", False),  # a registered submodule is another repo
     ("cd tools/claude-skills && git push origin main", False),                         # relative, same submodule
     ("cd /e/COBOL/tools && git push origin main", True),                               # its parent folder is still this repo
+    # every location change the shared parser reads (kb/Work PB2599), not only a bare `cd`
+    ("pushd /e/claude-skills && git push -q origin main", False),
+    ('cd "/e/Sites/wise owl" && git push origin main', False),                          # a quoted path with a space
+    ("ls; cd /e/claude-skills && git push origin main", False),
+    ("pushd /e/COBOL && git push origin main", True),
     ("python - <<'EOF'\nprint('a" + BS + "nb')\nEOF", True),
     ("python - <<'EOF'\nprint('plain')\nEOF", False),
     ('dotnet test x.csproj --filter "~Drift|~EditionGate" > log.txt', True),
@@ -77,13 +82,24 @@ CASES = [
 ]
 
 
-def blocked(cmd: str, unit: bool = False) -> bool:
+# The PowerShell tool's commands: the same rules, read with PowerShell's location changes (kb/Work PB2599).
+PS_CASES = [
+    ("Set-Location E:/claude-skills; git push -q origin main", False),
+    ("sl E:/claude-skills; git push -q origin main", False),
+    ("Push-Location -Path 'E:/Sites/wise owl'; git push origin main", False),
+    ("Set-Location E:/COBOL; git push origin main", True),
+    ("git push origin HEAD:main", True),
+    ("git stash", True),
+]
+
+
+def blocked(cmd: str, unit: bool = False, tool: str = "Bash") -> bool:
     # The environment is part of the case: an orchestrator unit has COBOL_COORD_DIR, an attended session never does. Set or
     # removed EXPLICITLY, so the result never depends on who runs this test.
     env = {k: v for k, v in os.environ.items() if k != "COBOL_COORD_DIR"}
     if unit:
         env["COBOL_COORD_DIR"] = "E:/COBOL-coord"
-    r = subprocess.run([sys.executable, str(HOOK)], input=json.dumps({"tool_input": {"command": cmd}}),
+    r = subprocess.run([sys.executable, str(HOOK)], input=json.dumps({"tool_name": tool, "tool_input": {"command": cmd}}),
                        capture_output=True, text=True, timeout=30, env=env)
     return r.returncode == 2
 
@@ -117,12 +133,13 @@ UNIT_CASES = [
 
 fails =[(c, e) for c, e in CASES if blocked(c) != e]
 fails += [(f"[unit] {c}", e) for c, e in UNIT_CASES if blocked(c, unit=True) != e]
+fails += [(f"[PowerShell] {c}", e) for c, e in PS_CASES if blocked(c, tool="PowerShell") != e]
 # The same pushes in an ATTENDED session (no COBOL_COORD_DIR) keep their old behaviour: rule 2 alone decides.
 ATTENDED = [("git push -u origin claude/batch-7", False), ("git -C E:/claude-skills push origin v1.18.0", False),
             ("git push -q origin HEAD:main", True)]
 fails += [(f"[attended] {c}", e) for c, e in ATTENDED if blocked(c) != e]
 for c, e in fails:
     print(f"FAIL: expected {'BLOCK' if e else 'PASS'}: {c!r}")
-total = len(CASES) + len(UNIT_CASES) + len(ATTENDED)
+total = len(CASES) + len(UNIT_CASES) + len(PS_CASES) + len(ATTENDED)
 print(f"forbidden_commands self-test: {total - len(fails)}/{total} " + ("GREEN" if not fails else "RED"))
 sys.exit(1 if fails else 0)

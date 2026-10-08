@@ -131,14 +131,21 @@ replace — the guard that exists because ~6 rebuilds under a running 60-agent f
 (2026-08-04, PB15). Liveness is transcript MTIME within 120 s, scoped to this session's id.
 **The unit of the freeze is the WORKING TREE, not the session (2026-09-01).** It denies iff some *foreign* live
 agent works in the caller's own tree, and both trees are derived, never listed: the caller's tree is the nearest
-ancestor of the payload `cwd` holding a `.git` entry (a directory in the main checkout, a file in a worktree);
+ancestor holding a `.git` entry (a directory in the main checkout, a file in a worktree) of WHERE THE BUILD RUNS —
+the project a `dotnet` command names, else the directory the shell is in when it runs it. That directory comes from
+`scripts/hooks/shell_location.py`, the ONE parser of both shells' location changes (`cd`, `pushd`/`popd`, a
+subshell, `bash -c`; `Set-Location`/`sl`/`chdir`/`Push-Location` with `-Path`/`-LiteralPath`, `pwsh
+-WorkingDirectory`, `Start-Process -WorkingDirectory`), which `worktree_rm_allow.py`, `forbidden_commands.py` and
+`status_guard.py` share (kb/Work PB2599; each used to carry its own partial parser, and a PowerShell `Set-Location
+<worktree>; dotnet build` was judged to build in the main checkout);
 the main checkout is that root, or the `gitdir:` target parsed out of the worktree's `.git` file (parsed, not
 shelled out — this runs before every `dotnet` call); and a foreign agent's tree is
 `<main>/.claude/worktrees/agent-<agentId>` **when that directory exists**, else the main checkout, because
 `Agent(isolation="worktree")` creates exactly that path. So N implementer agents in N worktrees build in
 parallel, a main-tree build is still denied by a live main-tree agent, and a main-tree build is *allowed* while
-only worktree agents are live. Fail-open on any error; an **unknown** tree (unreadable/unparseable `.git`)
-reverts to the old session-wide deny rather than to an allow. `--self-test` fires every branch over real
+only worktree agents are live. Fail-open on any error; an **unknown** tree (unreadable/unparseable `.git`, a
+directory the command line does not determine, or one outside every working tree — a scratch project can
+`ProjectReference` a worktree's project) reverts to the old session-wide deny rather than to an allow. `--self-test` fires every branch over real
 temporary worktrees and is the only thing that proves the ALLOW arm — three of this hook's four defects were it
 failing closed.
 
