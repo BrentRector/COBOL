@@ -10,7 +10,10 @@ namespace CobolNet.Tests.Unit;
 /// <c>scripts/gate_slot.py --self-test</c> drives all five arms — FIFO order (a later waiter never overtakes a live
 /// earlier ticket, and a re-gate queues last), a killed holder releases its slot, a dead waiter leaves the queue, an
 /// orphaned tree is killed on Windows or keeps its slot until it exits on Linux, and the slots are shared across
-/// worktrees — and every arm passes on the host running this test.
+/// worktrees — and every arm passes on the host running this test. ⛔ AND THE CAP IS ONE SHARED SETTING (kb/Work
+/// PB2514): a raise written by <c>gate_slot.py set-cap</c> in one worktree reaches gates already queued in another at
+/// once (no head-of-line block), an expired setting is the default again, malformed settings stop a gate, and
+/// <c>status</c> shows every held slot, one above the cap in force included.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -36,7 +39,7 @@ public sealed class GateSlotDriftTests
         Assert.True(File.Exists(script), $"the gate cap is missing: {script}");
         var r = PythonInstrument.Run(script, "--self-test");
         Assert.True(r.ExitCode == 0, $"`gate_slot.py --self-test` is RED:\n{r.Stdout}{r.Stderr}");
-        Assert.Contains("ALL GREEN — 5 arms", r.Stdout, StringComparison.Ordinal);
+        Assert.Contains("ALL GREEN — 8 arms", r.Stdout, StringComparison.Ordinal);
         foreach (string arm in new[]
                  {
                      "PASS  FIFO order: a later waiter never overtakes a live earlier ticket, a re-gate queues last",
@@ -44,6 +47,9 @@ public sealed class GateSlotDriftTests
                      "PASS  a dead waiter leaves the queue",
                      "PASS  an orphaned tree is killed (Windows) or keeps its slot until it exits (Linux)",
                      "PASS  the slots are shared across worktrees",
+                     "PASS  one shared cap: a raise from another worktree reaches the queued gates at once, no head-of-line block",
+                     "PASS  an expired setting is the default again; a malformed file stops the gate; bad values are refused",
+                     "PASS  status shows every held slot, one above the cap in force included",
                  })
         {
             Assert.True(r.Stdout.Contains(arm, StringComparison.Ordinal),

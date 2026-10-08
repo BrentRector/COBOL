@@ -596,7 +596,8 @@ marked, owed again after an input-touching commit, not after an unrelated one; p
 `account.py --self-test`, `mailbox.py --self-test` (section 15), `test_checkpoint.py` (real linked worktrees: committed, dirty, clean; a synthesized handoff checked
 against the schema's required and permitted keys), `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
 real dispatch-spec template and `check_practices.py`'s same-file rule; the fix lane's whole plan against a golden the pre-campaign planner wrote; the campaign lane's selection, `blocked_by` order, `after:` derivation and waits, and `work.py check`'s topology rules, section 9.1), `test_watch_agent.py` (a transcript with a
-partial last line). CI runs the hook self-tests in the `audits` job (`python3 scripts/hooks/test_forbidden_commands.py
+partial last line), `train_measure.py --self-test` (the batched-gating trial's per-train record and summary, kb/Work
+PB2515; `TrainMeasureDriftTests` runs it in every Unit run). CI runs the hook self-tests in the `audits` job (`python3 scripts/hooks/test_forbidden_commands.py
 && ...`); the orchestrator tests would be one more step there
 (`for t in scripts/orchestrator/test_*.py; do python3 "$t"; done`). They need no build; `test_plan_wave.py` imports
 `check_practices.py`, which that job already has with its submodule. `test_inventory_ratchet.py` reads the

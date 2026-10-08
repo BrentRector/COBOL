@@ -9,7 +9,9 @@
   of lander per cluster against 9.8. The corpus proves it directly: the golden lander landed 151 rows for 52.9 M =
   0.35 M/row; the PB383 lander landed 2 rows for 7.2 M = 3.6 M/row — **10×**. Mechanics: bring in each implementer's
   diff in turn, **one build**, the **WHOLE population of Conformance, Unit and Characterization in one leg** (`build-local.ps1 -Mode lander`; a union of the implementers' filter terms was never a landing gate — CI's `rest` shard is exactly the tests no term names, and it was red on the first push of trains 39, 40 and 41 in one day), **one commit per cluster inside the landing** so
-  a red bisects by cluster, one DEVLOG entry naming every cluster, one push. Past six clusters the token curve is
+  a red is attributed per cluster by re-running only its failing cases on each cluster alone, then fixed in the train
+  or ejected to a finisher, an interaction bisected (MANDATORY-PRACTICES L12, kb/Work PB2515), one DEVLOG entry naming
+  every cluster, one push, and the train recorded with `scripts/orchestrator/train_measure.py`. Past six clusters the token curve is
   flat and the gate-attribution risk is not. Template: `templates/lander-train-brief.md`.
 - ⛔ **Never spend a lander on a 1–2 cluster landing** unless nothing else is ready — that is the k = 1 corner of the
   table above, at twice the cost per cluster. If only one cluster is finished, hold it and dispatch the lander when

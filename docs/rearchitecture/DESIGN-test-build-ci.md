@@ -785,6 +785,15 @@ acceptance (§3.14.9) records the time to the first red of every implementer gat
   (§3.14.4). A filtered run can therefore never pass as a whole one.
 - **Fail fast:** the gate stops at the first leg with a red and reports RED and INCOMPLETE. It never reports GREEN
   unless every leg ran. An implementer is done only on GREEN.
+- ⭐ **The batched-gating trial (owner 2026-10-07 16:25 PDT, kb/Work PB2515, until Sat 2026-10-10 10:00 PDT):** the
+  ONE exception to the first bullet. While the shared implementer SCOPE is `leg1` (`gate_slot.py
+  set-implementer-scope leg1 --until <ISO>`, §3.14.6; it must carry an expiry and reverts to `whole` by itself), an
+  implementer gate whose plan has a leg 2 runs leg 1 only, names every leg-2 case NOT RUN through the population
+  check, and prints `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched-gating trial, PB2515): GREEN|RED — … ===` — never
+  `GREEN`, so no reader takes it for a whole-population green. The lander's whole-population train gate is then the
+  population check for every cluster; a red there is attributed per cluster (MANDATORY-PRACTICES L12) and every train
+  is measured (`scripts/orchestrator/train_measure.py`). A gate with no plan runs its one leg, the whole population,
+  and says GREEN. The lander ignores the scope.
 - **The verdict line counts the whole population, by discovered case:** `=== BUILD-LOCAL GATE: GREEN — Conformance
   9,317/9,317 · Unit 29,703/29,703 · Characterization 33/33 cases ran (skipped 0) in 2 legs (plan 3f1c…: map dbea124,
   timings run 20260928T2210-7c1e) ===`. A case "ran" when it has a Passed or Failed result; a case whose only result
@@ -982,8 +991,11 @@ generators and `record_verdicts.py`, which still filter), and so are their two c
    otherwise overwrite the binaries between the first gate's legs.
 2. The gate slot (`-Mode implementer` only, §3.14.6) — taken BEFORE the build, so the cap bounds the builds too. The
    lock order is always worktree lock, then slot, so no two gates can wait on each other in a cycle.
-3. The audits, the per-worktree GnuCOBOL corpus fetch (absent in a fresh worktree; a failed fetch makes the gate RED,
-   attributed to it), the solution build, then the binaries' SHA-256 record — per assembly, the test assembly and
+3. The audits — FIRST, since none needs a build or a test result, and in implementer mode FAIL-FAST: a red audit ends
+   the gate `RED — <audit> RED — fail-fast: the audits run before the build and NO LEG RAN` in seconds (kb/Work
+   PB2523: four of wave 1034's eight first-run implementer reds were audit-only, each reported after a whole ~6-min
+   population); a lander's gate goes on, so its one run shows every red of the train — then the per-worktree GnuCOBOL
+   corpus fetch (absent in a fresh worktree; a failed fetch makes the gate RED, attributed to it), the solution build, then the binaries' SHA-256 record — per assembly, the test assembly and
    every product assembly beside it, the set each identity record names.
 4. A fresh RUN DIRECTORY `TestResults/build-local/<UTC stamp>-<nonce>/`: the plan, every trx, every identity record
    and the verdict file. Nothing is written to a fixed name, so no earlier gate's file can be read as this one's. The
@@ -1210,22 +1222,35 @@ never a wall-clock assertion — MANDATORY-PRACTICES forbids those), so the next
   the slot for its whole idle lifetime (a design correction made by M13, kb/Work PB1721). Acquisition is never nested beyond
   the one fixed order (worktree lock, then ticket, then slot), so no two gates can wait on each other in a cycle.
 - **Who takes one.** Every `-Mode implementer` gate, and the impact recorder. The LANDER (`-Mode lander`) and the
-  BATTERY never take a slot and never wait. N comes from `COBOLNET_GATE_SLOTS` (a positive integer; anything else
-  stops the gate with the reason). Its default is the largest N at which the lander's whole-Conformance leg stays
+  BATTERY never take a slot and never wait. N is ONE shared setting of the slot directory (kb/Work PB2514):
+  `cobol-gate-slots/settings.json`, written only by `gate_slot.py set-cap N [--until ISO] [--why TEXT]` (under
+  `settings.lock`, replaced atomically, recording who, when and why) and re-read by every waiter on every poll, so
+  every gate applies the same cap at the same moment and a raise reaches the queue at once. While each gate read N
+  from its own environment, gates started with different N shared one FIFO queue, and a cap-1 gate at its head
+  waited for slot 1 while slot 3 stood free, blocking every cap-3 gate behind it (2026-10-07 16:13 PDT). A setting
+  may carry an expiry (an ISO time with its UTC offset); once it passes, the default is in force again with no one
+  acting. Malformed settings stop the gate with the reason. The same file carries the implementer SCOPE (`whole`,
+  the default, or `leg1`, the batched-gating trial of §3.14.1, which must carry an expiry). Its default is the largest N at which the lander's whole-Conformance leg stays
   within 1.25× of its quiet time with N implementer gates running, builds included, since the slot now covers them
   (M2's acceptance). MEASURED by M13's landing (kb/Work PB1720, evidence `m13`: every gate cold, the lander at Normal,
   the implementers at BelowNormal, each rebuilding its compiler): quiet 143.1, 135.8 and 133.6 s; with ONE implementer
   gate 1.24x and 1.30x; with two 1.58x and 1.52x; with three 1.56x. Two is far over the line and one is at it, so
   `DEFAULT_SLOTS = 1`: one implementer gate builds or tests at a time, repository-wide. The measurement was made on
   a quiet host (kb/Work PB1720). The verdict line prints the wait and the slot (`Slot.describe()`).
-  `gate_slot.py status` prints each slot's holder and the live tickets in queue order.
-- `gate_slot.py --self-test` proves five arms against a throwaway repository with one linked worktree: the FIFO
+  `gate_slot.py status` prints the cap and the scope with who set them, EVERY held slot (one taken under an earlier,
+  higher cap included) and the live tickets in queue order.
+- `gate_slot.py --self-test` proves eight arms against throwaway repositories, each with one linked worktree: the FIFO
   order (three waiters queued behind a holder are served in ticket order, and the holder re-gating the moment it
   releases is served LAST), the release on a killed holder, a dead waiter leaving the queue, the orphaned tree (on
   Windows the job kills the orphaned child and grandchild and the slot frees; on Linux the tree keeps the slot until it
   exits) and the sharing across worktrees (both checkouts resolve one slot directory, and a holder in one makes a
-  waiter in the other wait). Each arm was seen RED on a planted defect: no ticket check, a ticket file counted live
-  unlocked, no Job object, the descriptor withheld from Linux children, and the per-worktree git dir. It passes on
+  waiter in the other wait); the SHARED CAP (a gate queued at the head under cap 1 and one behind it both take a slot
+  the moment `set-cap 3` is written from the linked worktree, while the first holder still holds slot 1: no
+  head-of-line block); the EXPIRY and the refusals (an expired cap 3 frees no slot; `leg1` without `--until`, an
+  expiry already past or without its offset, and a cap of 0 are refused; a malformed settings file stops a gate);
+  and STATUS (a slot held above a lowered cap is shown). Each arm was seen RED on a planted defect: no ticket check, a
+  ticket file counted live unlocked, no Job object, the descriptor withheld from Linux children, the per-worktree git
+  dir, the cap read once per process (kb/Work PB2514's defect), and `status` probing only the slots below the cap. It passes on
   Windows and under WSL, and `GateSlotDriftTests` (Unit) runs it in every Unit run, including CI's Linux unit jobs,
   so each operating system's arm is proven where it runs. Every helper process it starts exits once its sentinel
   file is deleted, so a red arm leaves nothing running on the host. ⛔ The cap does not span operating systems: a

@@ -60,8 +60,11 @@ Verify on wave 67 with the same measurement (turns to first edit, read calls, pr
 30.6 min in train 48, because up to seventeen implementers were running the SAME whole assembly on the same 32 cores.
 (1) Every implementer gate is `build-local.ps1 -Mode implementer`, the ORDERED whole population (owner, 2026-09-28,
 kb/Work PB1708: "order, don't skip"), and it holds a GATE SLOT (`scripts/gate_slot.py`, kb/Work PB1720): at most N
-implementer gates build or test at once, repository-wide, while the lander (`-Mode lander`) never takes one and never
-waits. (2) Every implementer gate runs at `-Priority BelowNormal`, which Windows passes down to the build, the test
+implementer gates build or test at once, repository-wide (N is one shared setting, `gate_slot.py set-cap`, kb/Work
+PB2514), while the lander (`-Mode lander`) never takes one and never waits. During the owner's batched-gating trial
+(kb/Work PB2515, until Sat 2026-10-10 10:00 PDT) the implementer gate runs leg 1 only and the lander's train gate is
+the one whole-population run per train (MANDATORY-PRACTICES L12): ≈ 2–3 whole-population runs per 5-change train
+against ≈ 7–8, measured per train by `scripts/orchestrator/train_measure.py`. (2) Every implementer gate runs at `-Priority BelowNormal`, which Windows passes down to the build, the test
 hosts and every compiled program, so the lander's Normal-priority gate wins the cores. (3) PIPELINED
 LANDING: the next train's lander is dispatched while the previous one is still in CI; it merges and gates on the
 current origin/main, and before `push-main.sh` it BLOCKS until the previous train's head is an ancestor of

@@ -1,6 +1,6 @@
 ---
 name: gate
-description: Use before every commit and before every merge to choose and run the correct test gate - the ordered whole-population gate per commit (build-local -Mode implementer - two legs, fail-fast, a gate slot), the lander's one-leg whole population per train, and the comprehensive battery per accumulated batch - and to read the verdict without producing a false green.
+description: Use before every commit and before every merge to choose and run the correct test gate - the ordered whole-population gate per commit (build-local -Mode implementer - two legs, fail-fast, a gate slot; leg 1 only while the owner's batched-gating trial is set), the lander's one-leg whole population per train with per-cluster attribution of a red, and the comprehensive battery per accumulated batch - and to read the verdict without producing a false green.
 ---
 
 > ⛔ **BASE SKILL FIRST.** Invoke `brent-tools:test-gate` (Skill tool) before reading on. If the plugin is not loaded
@@ -35,7 +35,9 @@ pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal *> <log>
 
 The driver, `scripts/run_gate_legs.py` (DESIGN-test-build-ci.md §3.14; kb/Work PB1721), holds the worktree's GATE
 LOCK (a second gate in the same worktree is refused), takes a GATE SLOT (`scripts/gate_slot.py`: at most N implementer
-gates build or test at once, repository-wide — `gate-slot: waiting, k ahead` is the cap working), runs the audits,
+gates build or test at once, repository-wide — `gate-slot: waiting, k ahead` is the cap working), runs the audits
+(FAIL-FAST, before the build: a red audit ends an implementer gate in seconds with `NO LEG RAN`, kb/Work PB2523 —
+run `python scripts/spec/drift_rules.py` and the citation audits yourself before gating to avoid the round trip),
 fetches the per-worktree GnuCOBOL corpus when absent, builds the solution and lists every discovered case of
 Conformance, Unit and Characterization. The ORDER PLAN (`scripts/gate_plan.py`) puts in leg 1 the tests the change
 ADDS, the previous gate's reds and the cheapest cases the change can reach — the tiers `impacted_tests.py` derives from
@@ -44,6 +46,21 @@ FAIL-FAST: a red in leg 1 stops the gate `RED/INCOMPLETE` and names the remainde
 (`TestResults/build-local/<run>/not-run-*.txt`). It is GREEN only when every leg ran, every assembly's population
 equals its `--list-tests` (`scripts/test_population.py`) and every leg host ran this plan on these binaries.
 
+- **The cap is ONE shared setting** (kb/Work PB2514): `python scripts/gate_slot.py set-cap N [--until ISO] [--why
+  TEXT]` writes it into the slot directory every worktree shares; every gate re-reads it while it waits, so a raise
+  reaches the queue at once, and an expired raise is the default (1) again with no one acting. `gate_slot.py status`
+  prints the cap, the implementer scope, every held slot and the queue. No environment variable sets it.
+- ⭐ **THE BATCHED-GATING TRIAL** (owner 2026-10-07 16:25 PDT, kb/Work PB2515, until Sat 2026-10-10 10:00 PDT): while
+  the shared implementer scope is `leg1` (`gate_slot.py set-implementer-scope leg1 --until <ISO> --why <text>`, which
+  must carry an expiry), `-Mode implementer` runs LEG 1 ONLY, names every leg-2 case NOT RUN and prints
+  `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched-gating trial, PB2515): GREEN — … ===` (or `…: RED`). That is the
+  implementer's done-state, and the Linux gate moves to the lander with the rest of the population. The lander's
+  whole-population train gate is the population check for every cluster; a red there is ATTRIBUTED per cluster by
+  re-running only the failing cases on each cluster alone, then fixed in the train or ejected to a finisher
+  (`lander-train-brief.md` step 3, MANDATORY-PRACTICES L12), and every train is recorded with
+  `scripts/orchestrator/train_measure.py record`. The CI invariant holds: the lander runs the whole population, the
+  Linux gate and the oracle before every push. With the scope `whole` — the default, and after the expiry — the
+  implementer gate is the whole population, as described above.
 - **The impact map only ORDERS.** It is recorded ON DEMAND (`python scripts/spec/record_impact_map.py`, a detached
   worktree, ~25 min at BelowNormal, inside a gate slot), never per commit (kb/Work PB1709). With no map, or a stale
   one, the gate still runs everything — the order is plainer, never the population smaller.
@@ -56,7 +73,7 @@ equals its `--list-tests` (`scripts/test_population.py`) and every leg host ran 
 pwsh scripts/build-local.ps1 -Mode lander *> <log>
 ```
 
-No plan, ONE leg — every red of every cluster in one run — no fail-fast and no slot, at Normal priority: the lander
+The implementer scope never applies to it. No plan, ONE leg — every red of every cluster in one run — no fail-fast and no slot, at Normal priority: the lander
 never waits. Then `bash scripts/linux-gate.sh` (MANDATORY-PRACTICES L10) and `push-main.sh`.
 
 **Do NOT run per commit:** the battery or the serial `scripts/guard.sh`.
@@ -104,8 +121,9 @@ re-run). Here, additionally:
   `||` or `;` — MANDATORY-PRACTICES P14, and the guard hook (`scripts/hooks/forbidden_commands.py` rule 5) BLOCKS
   it. To capture the status in the same call, append `; echo "EXIT=$?"`; read-only commands may follow that.
 - `scripts/build-local.{ps1,sh}` prints ONE `=== BUILD-LOCAL GATE: ` verdict line — `GREEN`, `RED`,
-  `RED/INCOMPLETE` (stopped after leg 1), `BUILD FAILED` or `NOT RUN` (the lock was held, the cap is malformed, the
-  population could not be listed) — block on that line, never on the exit code. The run directory it names holds
+  `RED/INCOMPLETE` (stopped after leg 1), `LEG 1 ONLY (batched-gating trial, PB2515): GREEN|RED` (the trial's leg 1
+  ran, leg 2 is the lander's — never a whole-population GREEN), `BUILD FAILED` or `NOT RUN` (the lock was held, the
+  shared gate settings are malformed, the population could not be listed) — block on that line, never on the exit code. The run directory it names holds
   every leg's full log, trx and identity record, the plan and `verdict.json` (timings, first red, slot).
 
 ## Read the failure before diagnosing it

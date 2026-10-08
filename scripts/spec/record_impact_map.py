@@ -252,13 +252,14 @@ def main() -> int:
         print(f"=== IMPACT MAP: FAILED — {msg} (logs {logs}) ===")
         return 1
 
+    slots = GateSlots.for_repo()
     try:
-        slots = GateSlots.for_repo()
-    except ValueError as e:  # a malformed COBOLNET_GATE_SLOTS: never a silent default
+        slot = slots.acquire(f"record_impact_map {sha[:12]} (pid {os.getpid()}, {time.strftime('%Y-%m-%d %H:%M:%S')})",
+                             say=lambda line: print(line, flush=True))
+    except ValueError as e:  # malformed shared gate settings (gate_slot.py, kb/Work PB2514): never a silent default
         print(f"=== IMPACT MAP: FAILED — {e} ===")
         return 2
-    with slots.acquire(f"record_impact_map {sha[:12]} (pid {os.getpid()}, {time.strftime('%Y-%m-%d %H:%M:%S')})",
-                       say=lambda line: print(line, flush=True)) as slot:
+    with slot:
         return record(args, sha, store, wt, raw, logs, asms, slot, fail)
 
 

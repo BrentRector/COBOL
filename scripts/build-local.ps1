@@ -4,7 +4,10 @@
 # the solution build, lists the population, plans the order and runs the WHOLE discovered population of Conformance,
 # Unit and Characterization — then checks that population and prints `=== BUILD-LOCAL GATE: … ===`.
 # ⛔ ORDER, DON'T SKIP (owner, 2026-09-28): no gate filters. -Mode is REQUIRED and has no default — the caller names it:
-#   implementer  two legs, the likely-red cases first, FAIL-FAST, a gate slot (at most N implementer gates at once);
+#   implementer  two legs, the likely-red cases first, FAIL-FAST, a gate slot (at most N implementer gates at once;
+#                N is the shared `gate_slot.py set-cap` setting, kb/Work PB2514) — LEG 1 ONLY while the shared
+#                implementer scope is `leg1`, the owner's batched-gating trial (kb/Work PB2515), whose verdict line
+#                says `LEG 1 ONLY (batched-gating trial, PB2515)`;
 #   lander       one leg, every red of every cluster in one run, no slot (the lander never waits).
 # Usage:  pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal     (every IMPLEMENTER gate)
 #         pwsh scripts/build-local.ps1 -Mode lander                                (the LANDER, at Normal priority)

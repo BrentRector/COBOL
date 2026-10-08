@@ -22,14 +22,19 @@ BRIEFS = {
     'fix-lane-implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'STATUS-AT:',
                                       r'status_delta\.py', r'BUILD-LOCAL GATE: GREEN',
                                       # PB1732 (I8): CI's Linux legs run under WSL before the report
-                                      r'linux-gate\.sh', r'FIX WHAT YOU FIND'],  # I9
+                                      r'linux-gate\.sh', r'FIX WHAT YOU FIND',  # I9
+                                      r'LEG 1 ONLY \(batched-gating trial, PB2515\)'],  # PB2515: the trial's done-state
     'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'BUILD-LOCAL GATE: GREEN',
-                             r'FIX WHAT YOU FIND'],  # I9
+                             r'FIX WHAT YOU FIND', r'LEG 1 ONLY \(batched-gating trial, PB2515\)'],  # I9; PB2515
     'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN',
                               r'compare_oracle',  # PB2152 (L11): the R0 oracle runs after every train's gate
                               r'-Mode lander',  # PB1721 (L2): the lander's gate is the whole population, one leg
-                              r'linux-gate\.sh'],  # PB1732 (L10): CI's Linux legs under WSL before push-main
-    'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'-Mode lander'],  # PB1732 (L10); PB1721 (L2)
+                              r'linux-gate\.sh',  # PB1732 (L10): CI's Linux legs under WSL before push-main
+                              # PB2515 (L12): a red train is attributed per cluster before it is fixed; every train
+                              # is measured
+                              r'ATTRIBUTE BEFORE YOU FIX', r'filter_population\.py', r'train_measure\.py record'],
+    'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'-Mode lander',  # PB1732 (L10); PB1721 (L2)
+                        r'train_measure\.py record'],  # PB2515 (L12)
     'golden-lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'-Mode lander'],  # PB1721 (L2)
     'registrar-brief.md': [r'claude-skills', POINTER, r'code site'],
     # PB2483: a stop is scoped; every workflow names the owner's global stop AND the fleet's own.
@@ -43,7 +48,8 @@ BRIEFS = {
                                      r'BUILD-LOCAL GATE: ',
                                      # PB1732 (I8): CI's Linux legs run under WSL before the report
                                      r'linux-gate\.sh', r'FIX WHAT YOU FIND',  # I9
-                                     r'LSP DIAGNOSTICS'],  # P13: act on the language server's diagnostics
+                                     r'LSP DIAGNOSTICS',  # P13: act on the language server's diagnostics
+                                     r'LEG 1 ONLY \(batched-gating trial, PB2515\)'],  # PB2515: the trial's done-state
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit
     # final StructuredOutput reminder (three agents in waves 65-67 ended without it and stranded finished branches).
     # PB1703 / PB1704: a dead agent (rejection) and a hung agent (ceiling) must not hold the wave.
@@ -52,7 +58,8 @@ BRIEFS = {
                            r"status: 'NO-RESULT', error"],
     # O8: every fleet workflow runs with the stall watchdog beside it (PB1704).
     'MANDATORY-PRACTICES.md': [r'stall_watch\.py', r'linux-gate\.sh', r'I9', r'dispatch_guard\.py', r'prune_worktrees\.py',  # O8; PB1732; I9, O9, O10
-                               r'STOP-<scope>'],  # P3, PB2483: the scoped stop
+                               r'STOP-<scope>',  # P3, PB2483: the scoped stop
+                               r'set-cap', r'set-implementer-scope', r'L12'],  # PB2514 (one shared cap); PB2515 (L12)
 }
 # The group slug is w<wave><letter>, optionally followed by a successor ordinal (w68v2 = the second same-file
 # cluster after group V), so the report path stays wave-and-group prefixed.

@@ -24,6 +24,12 @@ a DEVLOG entry per commit; commit AND push every checkpoint.
 
 ### Where we are
 
+- **▶ GATE POLICY (2026-10-07, kb/Work PB2514, PB2515): the batched-gating TRIAL until Sat 2026-10-10 10:00 PDT.** The
+  implementer gate cap is one shared setting (`gate_slot.py set-cap`, 3 until Saturday, then the default 1); while the
+  shared implementer scope is `leg1` an implementer gate runs leg 1 only (`LEG 1 ONLY (batched-gating trial, PB2515)`),
+  the lander's whole-population train gate is the population check and attributes a red per cluster
+  (MANDATORY-PRACTICES L12), and every train is recorded with `scripts/orchestrator/train_measure.py`. Both settings
+  expire by themselves; the owner decides on `train_measure.py summary` against the baseline trains 1033–1035.
 - **▶ LIVE STATE (2026-10-06 23:40 PDT) — THE COMPLETION PLAN IS DECIDED (kb/Work R69; DEVLOG 1901).** Main is train 1024 plus this plan commit; no compiler code changed. Three owner decisions of 2026-10-06, each recorded in R69 and never to be re-asked:
   - **The legacy `CobolSharp.*` engine is DELETED from main** (trains 1025 and 1027, 2026-10-07; the archive tag `legacy-byte-engine-final` marks `48a44548c`, the last commit holding it; `docs/rearchitecture/LEGACY-ARCHIVE.md` is the pointer). The decision supersedes DEVLOG 997's "keep engine" and amends D14. P15's Cut 2.5 (D10), the prose sweep, the solution rename and the grammar unification run as wave 1028 of the `PB2108` cluster (lead PB2108; the register's `cluster` and `blocked_by` fields carry the membership and order: Cut 1a and 1b in parallel → Cut 2 with the archive tag → the prose sweep, the solution rename, D10 and the grammar unification). v1.0 keeps Cut 3 (the runtime namespace flip) and the §4.2.16 conformance documentation. Evidence: R69 §1 (zero product defects caught since July; its one purpose dissolved when PB750 made the guard greenfield-driven; its costs measured).
   - **R64 is SPLIT:** the architecture review's R0 (PB2115 census · PB2116 oracle capture · PB2117 performance baseline, which is A6's instrument) and R1 (PB2118, the target architecture: Mythos-authored under explicit approval, Opus-refuted, owner-approved) start now; after R1's approval, R2 and every R3 wave (the Delete program PB2119 included) run between fix-lane trains under the file-set partition, the only gate (owner 2026-10-07, PB2118 question 5, which dropped the GAP-near-zero hold). Design: `docs/rearchitecture/DESIGN-architecture-review.md` §2–§3 (amended today); skill `.claude/skills/architecture-review` over `brent-tools:architecture-audit` 1.19.0.
@@ -3155,8 +3161,13 @@ already-derivable coverage; none change the pipeline.
   a stale plan, makes every case an execution error, so never export them by hand). Maps are recorded ON DEMAND:
   `python scripts/spec/record_impact_map.py [--commit <sha>]` (inside a gate slot; a detached worktree, a
   probe-instrumented build, every test assembly once with the compile cache off; the map lands in
-  `<git common dir>/cobol-impact/<sha>.json.gz`, shared by every worktree). The gate cap: `python scripts/gate_slot.py
-  status` shows the slots and the queue; `COBOLNET_GATE_SLOTS` overrides N.
+  `<git common dir>/cobol-impact/<sha>.json.gz`, shared by every worktree). The gate cap and the implementer scope are ONE
+  shared setting each, in the slot directory every worktree shares (kb/Work PB2514, PB2515): `python
+  scripts/gate_slot.py set-cap N [--until ISO] [--why TEXT]` and `set-implementer-scope whole|leg1 --until ISO`
+  (`leg1` = the batched-gating trial: the implementer gate runs leg 1 only and its verdict says `LEG 1 ONLY
+  (batched-gating trial, PB2515)`; an expired setting is its default again); `gate_slot.py status` shows both, every
+  held slot and the queue. A lander records each train with `python scripts/orchestrator/train_measure.py record`,
+  and `train_measure.py summary` compares the trial with the whole-population baseline.
 - Greenfield conformance: `dotnet test tests/Cobol.Net.Tests.Conformance` · unit: `tests/Cobol.Net.Tests.Unit` ·
   characterization: `tests/Cobol.Net.Tests.Characterization` ·
   FULL CLI-level NIST guard: `bash scripts/guard.sh` (fast: `guard-fast.sh`; gate on the VERDICT line). It drives

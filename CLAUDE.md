@@ -113,7 +113,11 @@ The owner decided on 2026-09-28 (kb/Work PB1708): ORDER, DON'T SKIP. Every gate 
 population of Conformance, Unit and Characterization, and no gate filters. Per commit, an implementer runs
 `pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal` (MANDATORY-PRACTICES I1/I2; kb/Work PB1721):
 two legs with the likely failures first, fail-fast, inside a gate slot that caps how many implementer gates run at
-once. A lander runs `-Mode lander`: the whole population in one leg, with no slot. A stale or missing impact map only
+once (one shared cap, `gate_slot.py set-cap`, kb/Work PB2514). **Batched-gating trial (owner 2026-10-07, kb/Work
+PB2515, until Sat 2026-10-10 10:00 PDT):** while `gate_slot.py`'s implementer scope is `leg1`, an implementer gate
+runs leg 1 only and its verdict reads `LEG 1 ONLY (batched-gating trial, PB2515): GREEN|RED`; the lander's
+whole-population gate is then each change's population check, and the implementer leaves the Linux gate to the
+lander. A lander runs `-Mode lander`: the whole population in one leg, with no slot. A stale or missing impact map only
 changes the order, never what runs, and impact maps are recorded on demand, never per commit. Run the comprehensive
 battery plus the GnuCOBOL differential once per accumulated batch, pre-merge, in its own worktree. **CI also runs on
 Linux, so every gate runs CI's Linux legs under WSL before a push** (`scripts/linux-gate.sh`, kb/Work PB1732). Every
