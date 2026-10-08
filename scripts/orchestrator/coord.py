@@ -7,11 +7,15 @@ directory).
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import pathlib
 import re
-from typing import Any
+import time
+from typing import Any, Callable, Iterator, TypeVar
+
+T = TypeVar("T")
 
 DEFAULT = r"E:\COBOL-coord"
 ENV = "COBOL_COORD_DIR"
@@ -39,8 +43,13 @@ def coord_path(override: str | None = None) -> pathlib.Path:
 
 
 def coord_dir(override: str | None = None) -> pathlib.Path:
-    """The coordination directory, created when missing (the tools that write into it)."""
+    """The coordination directory, created when missing (the tools that write into it). It must be ABSOLUTE: the
+    default is a Windows path, which on Linux is a relative name, so a writer there would create a private directory
+    inside its own checkout and every lock and lease in it would bind no one else."""
     d = coord_path(override)
+    if not d.is_absolute():
+        raise SystemExit(f"⛔ the coordination directory {d} is not an absolute path on this host (the default "
+                         f"{DEFAULT} is a Windows path): set {ENV} to the shared directory")
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -65,9 +74,80 @@ def fleet_stop(scratch: pathlib.Path | str, scope: str) -> pathlib.Path:
     return pathlib.Path(scratch) / f"STOP-{scope}"
 
 
+# THE COORDINATION DIRECTORY'S ONE SHORT MUTEX (the allocator's `alloc.lock`, the landing lease's `landing-lease.lock`):
+# held for the milliseconds of a read-modify-write of one JSON file, never across a wait. It is an atomic create
+# (os.open with O_CREAT|O_EXCL) holding the PID and time, because the coordination tools are short processes that share
+# no OS handle. A lock older than LOCK_STALE_S was left by a crashed holder and is broken by an atomic rename to a name
+# only the breaker uses, so two breakers cannot both win; a waiter gives up after LOCK_WAIT_S.
+LOCK_STALE_S = 60.0
+LOCK_WAIT_S = 30.0
+
+
+@contextlib.contextmanager
+def locked(cdir: pathlib.Path, name: str) -> Iterator[None]:
+    lock = cdir / name
+    deadline = time.monotonic() + LOCK_WAIT_S
+    while True:
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, f"{os.getpid()} {time.time():.3f}\n".encode())
+            os.close(fd)
+            break
+        except FileExistsError:
+            try:
+                age = time.time() - lock.stat().st_mtime
+            except FileNotFoundError:
+                continue  # released between our create and our stat: try again at once
+            if age > LOCK_STALE_S:
+                # Between our stat and our rename another breaker may already have removed the stale lock and a live
+                # holder created a fresh one; if the file we moved is fresh, put it back with a link (which, unlike a
+                # POSIX rename, never overwrites a lock created meanwhile).
+                grave = lock.with_name(f"{name}.stale.{os.getpid()}.{time.time_ns()}")
+                with contextlib.suppress(OSError):
+                    os.rename(lock, grave)
+                    if time.time() - grave.stat().st_mtime <= LOCK_STALE_S:
+                        with contextlib.suppress(OSError):
+                            os.link(grave, lock)
+                    os.remove(grave)
+                continue
+            if time.monotonic() > deadline:
+                raise SystemExit(f"⛔ {name} held for more than {LOCK_WAIT_S:.0f}s: {lock} (a live holder never keeps it "
+                                 f"for more than milliseconds; if no coordination tool is running, delete it)")
+            time.sleep(0.02)
+        except PermissionError:
+            # Windows: the file is being deleted by its holder at this instant. Bounded like the wait above: a lock path
+            # that can never be created (an ACL, a file stuck delete-pending) fails loudly instead of spinning.
+            if time.monotonic() > deadline:
+                raise SystemExit(f"⛔ {name} could not be created for {LOCK_WAIT_S:.0f}s: {lock} (access denied)")
+            time.sleep(0.02)
+    try:
+        yield
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            sharing_retry(lambda: os.remove(lock))
+
+
+# Windows refuses to replace, remove or open a file another process holds open at that instant (Python opens without
+# FILE_SHARE_DELETE): a reader of a coordination file can make a writer's os.replace fail (WinError 5) and an unlink
+# fail (WinError 32). The refusal lasts milliseconds, so every coordination read and write retries it briefly, and a
+# refusal that outlasts the retries is raised. (scripts/gate_slot.py retries its own settings file for the same reason.)
+_SHARE_RETRIES, _SHARE_PAUSE_S = 100, 0.02
+
+
+def sharing_retry(fn: Callable[[], T]) -> T:
+    for attempt in range(_SHARE_RETRIES):
+        try:
+            return fn()
+        except PermissionError:
+            if attempt == _SHARE_RETRIES - 1:
+                raise
+            time.sleep(_SHARE_PAUSE_S)
+    raise AssertionError("unreachable: the last attempt returns or raises")
+
+
 def read_json(path: pathlib.Path, default: Any) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(sharing_retry(lambda: path.read_text(encoding="utf-8")))
     except FileNotFoundError:
         return default
 
@@ -76,4 +156,4 @@ def write_json(path: pathlib.Path, value: Any) -> None:
     """Write to a sibling temp file and rename over the target, so a crash never leaves a half-written file."""
     tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(value, indent=1) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
+    sharing_retry(lambda: os.replace(tmp, path))

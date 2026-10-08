@@ -125,7 +125,7 @@ considered and rejected in that form: split chains become extra turns, and turns
 
 ## 3. Landing order and mechanics
 
-- Land finished work first; one lander on main at a time; five clusters per landing (4-6 is the band) and never a lander for a 1-2 cluster landing unless it is a blocking fix; one build, the WHOLE population in one leg, one commit per cluster, one DEVLOG entry, one push.
+- Land finished work first; one lander on main at a time, MECHANICALLY: every lander takes the landing lease (`scripts/orchestrator/landing_lease.py acquire`) before its final rebase and gates, a second lander waits for it instead of gating, and `push-main.sh` refuses a landing while another worktree holds it and releases it on exit (kb/Work PB2537); five clusters per landing (4-6 is the band) and never a lander for a 1-2 cluster landing unless it is a blocking fix; one build, the WHOLE population in one leg, one commit per cluster, one DEVLOG entry, one push.
 - The only way a commit reaches `main` is `bash scripts/push-main.sh` (the `ci-gate` check is required; the script is idempotent; a red is a blocking finding). A docs-only landing still runs and still has to be green.
 - Verdict batches are re-applied on the merged tree with `record_verdicts.py`, never merged as JSON hunks.
 - A checkpoint file never enters a landing: `git add -A -- . ":!.claude/settings.local.json"` then `git reset -q -- STATUS.md`.

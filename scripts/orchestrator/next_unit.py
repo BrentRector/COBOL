@@ -6,12 +6,13 @@
 
 Prints JSON {unit, reason}. The order (docs/rearchitecture/DESIGN-orchestrator-loop.md section 3.2), first match wins:
   1. the handoff carries owner_question            -> owner-question
-  2. the handoff names next_unit                    -> that unit
+  2. the handoff names next_unit                    -> that unit (but not `land` while the landing lease is held)
   3. no meter reading of THIS account in 3 hours   -> meter (two accounts share readings.json; kb/Work PB2478)
   4. the repository is dirty or has unpushed commits -> resume
   5. the last unit failed or ended split, or a branch classified UNLANDED got a commit after the last unit
      started (an agent of a unit that died)          -> resume
-  6. branches_pending with status DONE               -> land
+  6. branches_pending with status DONE               -> land, unless another lander holds the landing lease
+     (landing_lease.py, kb/Work PB2537): then rule 7 chooses, and its reason says the land waits and on whom
   7. otherwise                                       -> wave; with --cluster (the CAMPAIGN lane, kb/Work PB2120)
      -> campaign when the cluster has a ready note and the last wave-type unit was not a campaign, so campaign
      waves alternate with fix-lane waves; the JSON then also carries `campaign`: run | between | waiting | landed |
@@ -34,6 +35,7 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "spec"))
 import account  # noqa: E402
 import coord  # noqa: E402
+import landing_lease  # noqa: E402  (current: is another lander on main?)
 import work  # noqa: E402  (cluster_order: the one reader of cluster: and blocked_by:)
 
 
@@ -117,7 +119,11 @@ def choose(handoff: dict | None, cdir: pathlib.Path, repo: pathlib.Path, now: dt
     h = handoff or {}
     if h.get("owner_question"):
         return {"unit": "owner-question", "reason": "the last handoff asks the owner"}
-    if h.get("next_unit"):
+    # ONE LANDER ON MAIN AT A TIME (kb/Work PB2537): while another lander holds the landing lease a `land` unit would
+    # only wait for it, so neither a handoff naming `land` nor finished branches start one; the other rules choose.
+    lease = landing_lease.current(cdir, now)
+    land_deferred = lease is not None and h.get("next_unit") == "land"
+    if h.get("next_unit") and not land_deferred:
         return {"unit": h["next_unit"], "reason": "named by the last handoff: " + h.get("next_unit_reason", "")}
     age = meter_age_hours(cdir, now, acct_name)
     if age is None or age > max_meter_age_h:
@@ -133,11 +139,13 @@ def choose(handoff: dict | None, cdir: pathlib.Path, repo: pathlib.Path, now: dt
         if fresh:
             return {"unit": "resume", "reason": "unlanded branches from the last unit: " + ", ".join(fresh)}
     done = [b["branch"] for b in h.get("branches_pending", []) if b.get("status") == "DONE"]
-    if done:
+    if done and lease is None:
         return {"unit": "land", "reason": "finished branches waiting: " + ", ".join(done)}
-    if cluster:
-        return campaign_choice(cluster, cdir, work_dir)
-    return {"unit": "wave", "reason": "nothing pending"}
+    choice = campaign_choice(cluster, cdir, work_dir) if cluster else {"unit": "wave", "reason": "nothing pending"}
+    if done or land_deferred:
+        choice["reason"] += (f"; land deferred ({', '.join(done) or 'named by the last handoff'}): the landing lease is "
+                             + landing_lease.describe(lease, now))
+    return choice
 
 
 def main(argv: list[str] | None = None) -> int:

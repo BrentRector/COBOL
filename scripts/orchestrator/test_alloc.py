@@ -13,6 +13,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 ALLOC = HERE / "alloc.py"
 sys.path.insert(0, str(HERE))
 import alloc  # noqa: E402
+import coord  # noqa: E402
 
 TMP = pathlib.Path(tempfile.mkdtemp(prefix="alloc-test-"))
 REPO = TMP / "repo"
@@ -81,7 +82,7 @@ c2 = TMP / "c2"
 c2.mkdir()
 lock = c2 / "alloc.lock"
 lock.write_text("12345 0\n", encoding="utf-8")
-old = time.time() - alloc.STALE_S - 5
+old = time.time() - coord.LOCK_STALE_S - 5
 os.utime(lock, (old, old))
 t0 = time.monotonic()
 check("stale lock broken", run(c2, "code", "1"), (0, "COBOLNET0106"))

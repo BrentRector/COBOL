@@ -16,24 +16,20 @@ handed out so far, kept in `<coord>/alloc.json` OUTSIDE every worktree, so an id
 whose note has not landed yet is never handed out again (five collisions in one day cost a renumbering pass,
 workstream SKILL section 4). A reservation is never returned: an unused id is a harmless gap.
 
-The lock is an atomic create of `<coord>/alloc.lock` (os.open with O_CREAT|O_EXCL). A lock older than STALE_S is
-broken by an atomic rename to a unique name (so two breakers cannot both win); a waiter gives up after WAIT_S.
+The lock is `coord.locked(cdir, "alloc.lock")`, the coordination directory's one short mutex (an atomic create,
+broken when stale; coord.py says how).
 """
 from __future__ import annotations
 
 import argparse
-import contextlib
-import os
 import pathlib
 import re
 import sys
-import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import coord  # noqa: E402
 
-STALE_S = 60.0
-WAIT_S = 30.0
+LOCK = "alloc.lock"
 KINDS = ("devlog", "pb", "code")
 ENTRY = re.compile(r"^## Entry (\d+)\b")
 PB_FILE = re.compile(r"^PB(\d+)\.md$")
@@ -94,57 +90,13 @@ def render(kind: str, first: int, count: int) -> str:
     return f"COBOLNET{first:04d}" if count == 1 else f"COBOLNET{first:04d}-COBOLNET{last:04d}"
 
 
-# ── the lock ─────────────────────────────────────────────────────────────────────────────────────────────────────
-@contextlib.contextmanager
-def locked(cdir: pathlib.Path):
-    lock = cdir / "alloc.lock"
-    deadline = time.monotonic() + WAIT_S
-    while True:
-        try:
-            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.write(fd, f"{os.getpid()} {time.time():.3f}\n".encode())
-            os.close(fd)
-            break
-        except FileExistsError:
-            try:
-                age = time.time() - lock.stat().st_mtime
-            except FileNotFoundError:
-                continue  # released between our create and our stat: try again at once
-            if age > STALE_S:
-                # Break a stale lock by renaming it to a name only this process uses: exactly one breaker's rename
-                # succeeds, and a fresh lock created after it is never the one renamed away.
-                # Between our stat and our rename another breaker may already have removed the stale lock and a live
-                # allocator created a fresh one; if the file we moved is fresh, put it back with a link (which, unlike
-                # a POSIX rename, never overwrites a lock created meanwhile).
-                grave = lock.with_name(f"alloc.lock.stale.{os.getpid()}.{time.time_ns()}")
-                with contextlib.suppress(OSError):
-                    os.rename(lock, grave)
-                    if time.time() - grave.stat().st_mtime <= STALE_S:
-                        with contextlib.suppress(OSError):
-                            os.link(grave, lock)
-                    os.remove(grave)
-                continue
-            if time.monotonic() > deadline:
-                raise SystemExit(f"⛔ alloc.lock held for more than {WAIT_S:.0f}s: {lock} (a live allocator never holds it "
-                                 f"for more than milliseconds; if no allocator is running, delete it)")
-            time.sleep(0.02)
-        except PermissionError:
-            # Windows: the file is being deleted by its holder at this instant.
-            time.sleep(0.02)
-    try:
-        yield
-    finally:
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(lock)
-
-
 # ── allocation ───────────────────────────────────────────────────────────────────────────────────────────────────
 def allocate(kind: str, count: int, repo: pathlib.Path, cdir: pathlib.Path) -> tuple[int, int]:
     """Reserve `count` consecutive values of `kind`; returns (first, last)."""
     if kind not in KINDS or count < 1:
         raise ValueError(f"bad allocation {kind!r} x{count}")
     t = truth(kind, repo)  # read outside the lock: it is the slow part, and truth only grows
-    with locked(cdir):
+    with coord.locked(cdir, LOCK):
         path = cdir / "alloc.json"
         state = coord.read_json(path, {})
         first = max(t, int(state.get(kind, 0))) + 1
@@ -156,7 +108,7 @@ def allocate(kind: str, count: int, repo: pathlib.Path, cdir: pathlib.Path) -> t
 def seed(kind: str, value: int, cdir: pathlib.Path) -> int:
     """Raise the reserved high-water mark to `value` (never lowers it): records ids handed out before the allocator
     existed, such as an in-flight wave's code ranges. Returns the mark now in force."""
-    with locked(cdir):
+    with coord.locked(cdir, LOCK):
         path = cdir / "alloc.json"
         state = coord.read_json(path, {})
         state[kind] = max(int(state.get(kind, 0)), value)

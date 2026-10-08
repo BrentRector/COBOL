@@ -66,9 +66,10 @@ PB2514), while the lander (`-Mode lander`) never takes one and never waits. Duri
 the one whole-population run per train (MANDATORY-PRACTICES L12): ≈ 2–3 whole-population runs per 5-change train
 against ≈ 7–8, measured per train by `scripts/orchestrator/train_measure.py`. (2) Every implementer gate runs at `-Priority BelowNormal`, which Windows passes down to the build, the test
 hosts and every compiled program, so the lander's Normal-priority gate wins the cores. (3) PIPELINED
-LANDING: the next train's lander is dispatched while the previous one is still in CI; it merges and gates on the
-current origin/main, and before `push-main.sh` it BLOCKS until the previous train's head is an ancestor of
-origin/main, rebases, and re-gates only when the rebase touched code outside docs/kb/DEVLOG. CI remains the proof.
+LANDING UNDER ONE LANDING LEASE (kb/Work PB2537): the next train's lander is dispatched while the previous one is still
+in CI and brings its clusters in at once, then takes the landing lease (`scripts/orchestrator/landing_lease.py`), which
+waits for the previous lander's push-main to release it, and only then makes its final rebase and runs its gates, so
+it gates once and never loses the race to main (the R1 lander lost it three times on 2026-10-07). CI remains the proof.
 (4) Trains stay at 4–6 clusters. (5) The Conformance runner's compiled-program cache (kb/Work PB985) makes a
 re-gate after a test-only fix skip recompilation.
 

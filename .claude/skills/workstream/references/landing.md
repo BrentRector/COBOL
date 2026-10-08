@@ -4,6 +4,16 @@
 
 - **Land finished work first**; read-only fleets are staged behind landings. **One lander on main at a time** (DEVLOG
   numbering and fast-forward ordering); **one LANDING per lander transcript** (§2) — split the queue into fresh agents.
+- ⛔ **ONE LANDER ON MAIN AT A TIME IS A LEASE, NOT A COURTESY (kb/Work PB2537).** Every lander — the loop's `land`
+  unit and an attended one alike — takes the landing lease before its FINAL rebase and its gates:
+  `python scripts/orchestrator/landing_lease.py acquire --holder … --reason … --wait-min 9`, re-issued until `ACQUIRED`
+  (lander-train-brief step 2b). A second lander waits; it never gates against a main another lander is about to move.
+  The lease records the holder, the reason, the worktree, a heartbeat and an expiry (30 min after the last renew), so a
+  dead lander's lease is taken over; `renew` at every step, and `push-main.sh` re-takes it, refuses a landing while
+  another worktree holds it (exit 4), renews it while CI runs and releases it on exit. `next_unit.py` starts no `land`
+  unit while a lease is live; `stop.ps1 -Status` shows the holder. ⓜ push-main used to serialize only the push: on
+  2026-10-07 the R1 lander lost the race to trains 1034 and 1034b, re-gated three times (≈ 30 min of the whole machine
+  each) and ended SPLIT with every gate and CI green and nothing on main.
 - ⭐ **FIVE CLUSTERS PER LANDING (target 5; 4–6 is the band).** A landing is ~90 % fixed cost — bring the work in,
   build, gate, DEVLOG, commit, push — so ⓜ **10.4 M per cluster at k = 1 against 5.1 M at k = 5**, and 4.0 minutes
   of lander per cluster against 9.8. The corpus proves it directly: the golden lander landed 151 rows for 52.9 M =
@@ -21,7 +31,7 @@
   (~2.7 mechanisms/day delivered against ~24/day of capacity) purely because slots sat empty behind landings and
   behind the evidence lane. Keep a standing queue of apply-ready contracts so the dispatch is one turn.
 - A worktree-isolated agent cannot run git against the shared checkout (the harness refuses `-C`, `cd`, EnterWorktree):
-  landers gate in THEIR worktree, then `git fetch origin && git rebase origin/main` and land with
+  landers take the landing lease, `git fetch origin && git rebase origin/main`, gate in THEIR worktree, and land with
   **`bash scripts/push-main.sh`**; the orchestrator runs `git merge --ff-only origin/main` locally and removes dead
   worktrees itself (`git worktree remove --force`, `git branch -D`).
 - ⛔ **THE ONLY WAY A COMMIT REACHES `main` IS `bash scripts/push-main.sh`, AND THE SERVER ENFORCES IT.** `main`

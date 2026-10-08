@@ -5,7 +5,8 @@
 # the context cap sends STOP-UNIT and the unit hands off; an owner question stops the loop; open-watchers.ps1 opens
 # one titled, model-coloured Windows Terminal tab per agent (against a fake wt.exe); the campaign lane (-Cluster, kb/Work
 # PB2120) alternates with fix-lane waves, ends when its cluster lands, refuses an unknown cluster, and leaves the fix
-# lane's choice and prompt byte-identical.
+# lane's choice and prompt byte-identical; while another lander holds the landing lease (kb/Work PB2537) no land unit
+# starts, and stop.ps1 -Status names the holder.
 # Run: pwsh -NoProfile -File scripts/orchestrator/test_orchestrate.ps1
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -360,6 +361,34 @@ Check 'a landed cluster ends the lane' "$($c4.unit) $($c4.campaign)" 'wave lande
 New-FxNote 'PB904' 'open' 'HELD' 'PB901'
 $c5 = Next-Unit $nc @('--cluster', 'HELD', '--work', $fxWork) | ConvertFrom-Json
 Check 'a cluster with no ready note waits and runs the fix lane' "$($c5.unit) $($c5.campaign)" 'wave waiting'
+
+# 8c. ONE LANDER ON MAIN AT A TIME (kb/Work PB2537): while another lander holds the landing lease, finished branches
+# and a handoff naming `land` do not start a land unit; the land waits and the reason names the holder. An expired
+# lease binds no one, and with no lease the land runs as before.
+$lc = Join-Path $Root 'leaseunit'
+New-Item -ItemType Directory -Force -Path $lc | Out-Null
+& $fresh $lc
+$doneHandoff = Join-Path $lc 'handoff-done.json'
+Set-Content -Path $doneHandoff -Encoding utf8 -Value '{"outcome": "done", "branches_pending": [{"branch": "w9a", "status": "DONE"}]}'
+$landHandoff = Join-Path $lc 'handoff-land.json'
+Set-Content -Path $landHandoff -Encoding utf8 -Value '{"outcome": "done", "next_unit": "land", "next_unit_reason": "train ready"}'
+Check 'no lease: finished branches start a land unit' ((Next-Unit $lc @('--handoff', $doneHandoff)) | ConvertFrom-Json).unit 'land'
+$Lease = Join-Path $Here 'landing_lease.py'
+& python $Lease acquire --holder 'attended R1 lander' --reason 'R1' --worktree $fxRepo --coord $lc | Out-Null
+$l1 = (Next-Unit $lc @('--handoff', $doneHandoff)) | ConvertFrom-Json
+Check 'a held lease: finished branches wait, the loop runs a wave' $l1.unit 'wave'
+Check 'a held lease: the reason names the waiting branch and the holder' ($l1.reason -match '^nothing pending; land deferred \(w9a\): the landing lease is held by attended R1 lander') $true
+$l2 = (Next-Unit $lc @('--handoff', $landHandoff)) | ConvertFrom-Json
+Check 'a held lease: a handoff naming land waits too' "$($l2.unit) $($l2.reason -match 'land deferred \(named by the last handoff\)')" 'wave True'
+$l3 = (Next-Unit $lc @('--handoff', $doneHandoff, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json
+Check 'a held lease in the campaign lane: the lane decides, the land waits' "$($l3.unit) $($l3.reason -match 'land deferred')" 'campaign True'
+Check 'stop.ps1 -Status names the lease holder' ((& pwsh -NoProfile -File (Join-Path $Here 'stop.ps1') -Status -CoordDir $lc) -join ' ' -match 'landing lease: held by attended R1 lander') $true
+$later = (Get-Date).ToUniversalTime().AddHours(2).ToString('o')
+$l4 = (Next-Unit $lc @('--handoff', $doneHandoff, '--now', $later)) | ConvertFrom-Json
+Check 'an expired lease binds no one: the land runs' $l4.unit 'land'
+& python $Lease release --worktree $fxRepo --coord $lc | Out-Null
+Check 'a released lease: the land runs' ((Next-Unit $lc @('--handoff', $doneHandoff)) | ConvertFrom-Json).unit 'land'
+Check 'stop.ps1 -Status says the lease is free' ((& pwsh -NoProfile -File (Join-Path $Here 'stop.ps1') -Status -CoordDir $lc) -join ' ' -match 'landing lease: free') $true
 
 $camp = @('-RepoDir', $fxRepo, '-WorkDir', $fxWork)
 $r = Run-Orch 'campdry' 'good' (@('-DryRun', '-Cluster', 'CAMP') + $camp) $fresh

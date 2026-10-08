@@ -31,6 +31,10 @@
 # Exit:   0 = the commit is on main and its CI was green · 1 = CI red or the push refused · 2 = usage/state error
 #         3 = the landing check STOPPED the landing (scripts/orchestrator/landing_check.py: a file outside an R3
 #             wave's declared set, or one shared with earlier-dispatched in-flight work): re-plan, never retry as is
+#         4 = another lander holds the LANDING LEASE (scripts/orchestrator/landing_lease.py, kb/Work PB2537): main
+#             NOT touched; acquire it with `landing_lease.py acquire --wait-min 9`, rebase, re-gate, then re-run
+#         5 = the commit IS on main but its main-branch run's verdict could not be read (UNVERIFIED, kb/Work PB1639):
+#             read it by hand; never re-land it
 
 set -uo pipefail
 
@@ -43,7 +47,7 @@ while [ $# -gt 0 ]; do
     --branch-prefix) PREFIX="${2:?--branch-prefix needs a value}"; shift 2 ;;
     --no-delete)     DELETE_BRANCH=0; shift ;;
     --audit)         AUDIT=1; shift ;;
-    -h|--help)       sed -n '2,33p' "$0"; exit 0 ;;
+    -h|--help)       sed -n '2,37p' "$0"; exit 0 ;;
     *) echo "push-main.sh: unknown argument '$1'" >&2; exit 2 ;;
   esac
 done
@@ -51,6 +55,8 @@ done
 cd "$(dirname "$0")/.." || exit 2
 say() { printf '%s\n' "$*"; }
 die() { printf '⛔ push-main: %s\n' "$*" >&2; exit 2; }
+. scripts/python-resolve.sh
+LEASE=scripts/orchestrator/landing_lease.py
 
 command -v gh  >/dev/null 2>&1 || die "the GitHub CLI (gh) is not on PATH — the landing verdict cannot be read"
 gh auth status >/dev/null 2>&1 || die "gh is not authenticated (gh auth login)"
@@ -176,8 +182,65 @@ git fetch --quiet origin '+refs/heads/main:refs/remotes/origin/main' \
 BASE="$(git rev-parse refs/remotes/origin/main)"
 if [ "$BASE" = "$SHA" ]; then
   say "push-main: origin/main is already at $SHORT — nothing to land."
+  # A run that landed and was then cut off before its EXIT trap (a killed tool call) left this worktree's landing
+  # lease held; this re-run is where the landing ends, so it frees it (another worktree's lease is left alone: exit 4).
+  "$PY" "$LEASE" release --outcome "push-main.sh: $SHORT is already on main"
+  case $? in 0|4) ;; *) say "⛔ push-main: the landing lease could NOT be released (above): run $PY $LEASE release" ;; esac
   exit 0
 fi
+
+# ── ONE LANDER ON MAIN AT A TIME (kb/Work PB2537). This script used to serialize only the push itself, so a landing
+# whose rebase, gates and CI take ~50 min lost the race to every train that landed inside that window: on 2026-10-07
+# the R1 lander rebased and re-gated three times and ended SPLIT with every gate and CI green and nothing on main. A
+# lander takes the LANDING LEASE before its final rebase and gates (lander briefs, step 2b). Here the lease is
+# re-taken (idempotent for the worktree that holds it), taken when the caller holds none, and REFUSED while another
+# worktree holds it — so an unleased landing can no longer move main under a leased one. It is renewed every minute
+# while this script runs (the CI wait is its longest step) and released when it exits, landed or not. ──
+ON_BRANCH="$(git branch --show-current 2>/dev/null)"
+take_lease() {     # 0 = this worktree holds it; exits 4 when another worktree does; dies on anything else
+  "$PY" "$LEASE" acquire --holder "push-main.sh on ${ON_BRANCH:-a detached HEAD}" \
+      --reason "landing $SHORT (its caller took no lease before push-main)"
+  case $? in
+    0) return 0 ;;
+    4) echo "⛔ push-main: another lander holds the landing lease (above) — main NOT touched. Wait for it with
+     $PY $LEASE acquire --holder <you> --reason <what> --wait-min 9   (re-issue until ACQUIRED),
+     then rebase onto origin/main, re-gate, and re-run this script." >&2
+       exit 4 ;;
+    *) die "the landing lease could not be read or taken (above) — main NOT touched; fix it and re-run" ;;
+  esac
+}
+take_lease
+# The renewer outlives no one (it ends with this script) and holds no caller's pipe (its output is a file). It keeps
+# renewing through a transient failure and stops only on LOST (exit 4); its log is printed if the lease is gone later.
+LEASE_LOG="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/push-main-lease.$$")"
+renew_lease() {    # $1 = this script's pid: renew every minute while it lives
+  local n=0
+  while kill -0 "$1" 2>/dev/null; do
+    sleep 5
+    n=$((n + 1))
+    if [ "$n" -ge 12 ]; then
+      n=0
+      "$PY" "$LEASE" renew
+      [ $? -eq 4 ] && return
+    fi
+  done
+}
+renew_lease $$ > "$LEASE_LOG" 2>&1 &
+RENEWER=$!
+release_lease() {
+  local rc=$?
+  kill "$RENEWER" 2>/dev/null
+  "$PY" "$LEASE" release --outcome "push-main.sh exit $rc on $SHORT"
+  case $? in
+    0|4) ;;
+    *) printf '⛔ push-main: the landing lease was NOT released (above): every other lander waits on it until it expires.
+     Release it: %s %s release\n' "$PY" "$LEASE" >&2 ;;
+  esac
+  rm -f "$LEASE_LOG"
+  exit "$rc"
+}
+trap release_lease EXIT
+
 # ⛔ FAST-FORWARD ONLY. Refused HERE, before a run is spent, and refused again by the server at the push.
 if ! git merge-base --is-ancestor "$BASE" "$SHA"; then
   die "HEAD ($SHORT) is not a descendant of origin/main ($(git rev-parse --short=12 "$BASE")).
@@ -191,7 +254,6 @@ fi
 # declared set (R3 work) and with every in-flight branch (when either side is R3 work): a file outside the set, or
 # one shared with an earlier-dispatched branch, STOPS the landing before a run is spent, and the later branch
 # re-plans and rebases. Every landing passes here, so it is the ONE place the check runs. ──
-. scripts/python-resolve.sh
 if ! "$PY" scripts/orchestrator/landing_check.py --rev "$SHA" --base "$BASE"; then
   echo "⛔ push-main: the landing check STOPPED this landing (above): re-plan the named work and rebase — main NOT touched." >&2
   exit 3   # its own code (the header's Exit list): a STOP is a re-plan, never a usage error to retry
@@ -279,6 +341,18 @@ if [ "$(git rev-parse HEAD)" != "$SHA" ]; then
   say "⚠ HEAD moved while CI ran ($SHORT -> $(git rev-parse --short=12 HEAD)). Landing the VERIFIED sha $SHORT;"
   say "  the newer commit(s) are NOT landed — re-run this script to verify and land them."
 fi
+# The lease was renewed throughout the wait; a lease LOST meanwhile (taken over after an expiry) means another lander
+# may be about to move main, so this landing stops rather than racing it (kb/Work PB2537).
+"$PY" "$LEASE" check
+case $? in
+  0) ;;
+  1) take_lease ;;   # it expired and no one took it: no other lander can be moving main, so take it back
+  4) say "⛔ push-main: this worktree no longer holds the landing lease: another lander took it over (above) — main NOT"
+     say "   touched. The renewer's log:"; sed 's/^/      /' "$LEASE_LOG"
+     say "   Acquire it again, rebase onto origin/main, re-gate and re-run."
+     exit 4 ;;
+  *) die "the landing lease could not be checked (above) — main NOT touched; fix it and re-run" ;;
+esac
 say "push-main: ci-gate is green on $SHORT — fast-forwarding main …"
 if ! git push origin "$SHA:main"; then
   say "⛔ the push to main was REFUSED. Either origin/main moved (rebase and re-run) or the protection"
@@ -323,7 +397,7 @@ say "push-main: main run $MAIN_RUN = ${MAIN_CONCLUSION:-<no verdict read>}"
 if [ -z "$MAIN_CONCLUSION" ]; then
   say "  ⚠ UNVERIFIED: no conclusion could be read for main run $MAIN_RUN in 2 min — the commit IS on main; read it by hand:"
   say "    gh run view $MAIN_RUN --json conclusion"
-  exit 3
+  exit 5   # its own code (the header's Exit list): exit 3 is the landing check's STOP, which says "never retry as is"
 fi
 if [ "$MAIN_CONCLUSION" != "success" ]; then
   report_red "$MAIN_RUN" "AND IT IS ALREADY ON MAIN"

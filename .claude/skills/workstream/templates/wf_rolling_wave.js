@@ -127,7 +127,7 @@ function land(batch) {
     AUTH + `You are the train-${label} LANDER. Read E:\\COBOL\\.claude\\skills\\workstream\\templates\\lander-train-brief.md WHOLE and follow it, with these substitutions: ` +
     `{CLUSTERS} = ${clusters}; {DEVLOG_N} = ${args.devlog_n} (ALWAYS re-read the top entry of DEVLOG.md first and use top+1 — an earlier train of this wave may have landed); ` +
     `{TRAIN_MANIFEST} = ${S}\\train${label}-manifest.json — FIRST write that file with exactly this JSON:\n${manifest}\n` +
-    `PIPELINED: ${prev} may have just landed; fetch origin and rebase onto it before gating, and before push-main confirm origin/main has not moved again (rebase and re-gate per the brief if it has). ` +
+    `PIPELINED: ${prev} may still be landing; bring your clusters in, then take the landing lease (brief step 2b: landing_lease.py acquire --holder "train ${label} lander" --wait-min 9, re-issued until ACQUIRED; never gate while another lander holds main), and only then rebase onto origin/main and gate. ` +
     `New leads found in the reports get kb/Work notes with ids from ${leadIds} (orchestrator-allocated; use in order, return the unused). ` +
     `Before EACH new step ${STOP_LINE}checkpoint-commit in your worktree, write STATUS.md NEXT, and return. ` +
     `Land ONLY through bash scripts/push-main.sh. Run the CI audits locally before it (audit_code_citations, audit_doc_citations, audit_evidence_supersession, audit_witness_loss, drift_rules --check, work.py check). ` +
