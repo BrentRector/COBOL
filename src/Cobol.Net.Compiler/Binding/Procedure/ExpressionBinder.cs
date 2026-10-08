@@ -633,8 +633,8 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // STRICT — the --permissive leniency applied unconditionally. Edited or plain, class alphanumeric or
         // national is not class numeric (ISO §8.5.2.1 Table 2 / §8.8.1.1).
         _ when p.Item.Pic is { Category: PicCategory.Alphanumeric or PicCategory.National } pic =>
-            $"item '{p.Item.CobolName}' of category {pic.Category.ToString().ToLowerInvariant()}"
-            + (pic.EditMask is not null ? "-edited (an edited item is not a NUMERIC data item — ISO §8.5.2.1 "
+            $"item '{p.Item.CobolName}' of category {ItemCategory.CategoryName(pic)}"
+            + (pic.EditMask is not null ? " (an edited item is not a NUMERIC data item — ISO §8.5.2.1 "
                 + "Table 2; the de-editing grant is MOVE's alone, §14.9.25.4 GR6d1)" : ""),
         // ⛔ TOTAL BY CONSTRUCTION. The classifier has already said "not class numeric", so there is no
         // admissible shape left to fall through to — a pointer, a program-pointer, an object reference, a PIC A

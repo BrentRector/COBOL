@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Binding.Model;
 
 /// <summary>
@@ -26,26 +28,31 @@ namespace CobolNet.Binding.Model;
 /// item's category, which already resolves a bit / national group's as-if PICTURE (§13.18.29.4 GR1b/GR2b) and
 /// answers <see cref="PicCategory.Group"/> for the plain group. Never a second walk of <c>Pic</c> /
 /// <c>AsIfPic</c> / <c>GroupUsage</c>.</para>
-/// <para>⚠ WHAT THIS SCREEN DELIBERATELY DOES NOT SPLIT, said out loud: <see cref="PicCategory"/> has no
+/// <para>⛔ THE EDITED CATEGORIES ARE NOT THE PLAIN ONES (kb/Work PB850). <see cref="PicCategory"/> has no
 /// <c>AlphanumericEdited</c> or <c>NationalEdited</c> member — an alphanumeric-edited item carries category
 /// <see cref="PicCategory.Alphanumeric"/> and a national-edited one category <see cref="PicCategory.National"/>,
-/// each distinguished only by <see cref="PicInfo.EditMask"/> (data-model design D-N6; kb/Work PB492) — so a
-/// screen written here admits BOTH edited categories where the standard's category list names only the plain
-/// ones. Since PB492 that is a CHOICE rather than a blindness (<c>PicInfo.IsCharacterEdited</c> would decide it),
-/// and the choice is to keep erring toward accepting legal source. That is the established posture for a
-/// category screen in this compiler
-/// (<c>RecordLayout.CategoryOfItem</c>, §14.9.41.3 SR6 b) 2.: <i>"where the model cannot tell two categories
-/// apart the test passes — this screen exists to reject what the rule NAMES, never what this compiler cannot
-/// classify"</i>), and it errs toward accepting legal source rather than rejecting it. Category ALPHABETIC is
-/// visible (<c>PicInfo.IsAlphabetic</c>) and is excluded: §8.8.4.2.4's <i>"A class alphabetic operand shall be
-/// treated as though it were an operand of class alphanumeric"</i> is a COMPARISON rule, not a category
-/// identity.</para>
+/// each distinguished only by its edit mask (data-model design D-N6; kb/Work PB492) — but §8.5.2.1 Table 2 lists
+/// them as categories of their own, and §8.5.2.1 says <i>"Use of the name of a data class or data category in the
+/// rules of COBOL refers to the category unless class is specifically indicated"</i>. So a rule worded "category
+/// alphanumeric" or "category national" admits neither edited category, and the screen below reads the edit axis
+/// (<see cref="Table16Operand.IsEdited"/>) beside the category. Until PB850 it did not, and every rule reading it
+/// accepted an edited record key, FILE STATUS item, ASSIGN USING operand, READ / RETURN INTO record or SET …
+/// ADDRESS OF PROGRAM operand without a word. A REFERENCE-MODIFIED view of an edited item is not edited
+/// (§8.4.3.3.4 GR6 a) and b) rewrite both edited categories to the plain one), and
+/// <see cref="Table16Operand.Of(Place)"/> answers so. Category ALPHABETIC is visible (<c>PicInfo.IsAlphabetic</c>)
+/// and is excluded: §8.8.4.2.4's <i>"A class alphabetic operand shall be treated as though it were an operand of
+/// class alphanumeric"</i> is a COMPARISON rule, not a category identity.</para>
+/// <para>⛔ AND THE ONE SPELLING OF A CATEGORY'S NAME (<see cref="CategoryName(PicInfo)"/>). Five sites each wrote
+/// their own <c>PicCategory → words</c> map, and they had drifted: one printed "category-numericedited", one
+/// could not say "alphanumeric-edited" at all (kb/Work PB850's refuter). A message, a Table-16 heading and the
+/// activation description now read Table 2's name from here.</para>
 /// </summary>
 public static class ItemCategory
 {
-    /// <summary>Category ALPHANUMERIC (ISO §8.5.2.4): an elementary <c>PIC X</c> item, or an alphanumeric group
-    /// item (§13.18.29.4 GR3). Alphabetic (<c>PIC A</c>) is its own category and is excluded, as are numeric,
-    /// numeric-edited, national, boolean and the PICTURE-less pointer / object-reference usages.</summary>
+    /// <summary>Category ALPHANUMERIC (ISO §8.5.2.3): an elementary <c>PIC X</c> item, or an alphanumeric group
+    /// item (§13.18.29.4 GR3). Alphabetic (<c>PIC A</c>) and alphanumeric-edited (§8.5.2.4) are categories of their
+    /// own and are excluded, as are numeric, numeric-edited, national, boolean and the PICTURE-less pointer /
+    /// object-reference usages.</summary>
     public static bool IsAlphanumeric(DataItem item) => Admits(item, national: false);
 
     /// <summary>Category ALPHANUMERIC or category NATIONAL — the operand set §12.4.5.12.3 SR2 and §12.4.5.6.3 SR2
@@ -219,9 +226,57 @@ public static class ItemCategory
     {
         // §13.18.29.4 GR3's group arm, in its ONE spelling — never `item.IsGroup` alone (see IsAlphanumericGroup).
         { Category: PicCategory.Group } => IsAlphanumericGroup(item),
-        { Category: PicCategory.Alphanumeric, IsAlphabetic: false } => true,
-        { Category: PicCategory.National } => national,
+        // §8.5.2.1 Table 2: alphanumeric-edited (§8.5.2.4) and national-edited (§8.5.2.11) are categories of their
+        // own, so a rule naming the plain category admits neither (kb/Work PB850).
+        { Category: PicCategory.Alphanumeric, IsAlphabetic: false, IsEdited: false } => true,
+        { Category: PicCategory.National, IsEdited: false } => national,
         _ => false,
+    };
+
+    /// <summary>
+    /// ⛔ THE ONE SPELLING of an elementary item's §8.5.2.1 Table 2 CATEGORY — <i>"Alphabetic"</i>,
+    /// <i>"Alphanumeric-edited"</i>, <i>"Numeric-edited"</i>, <i>"Object-reference"</i>, <i>"Data-pointer"</i> … —
+    /// in lower case, as a message, the activation description (<c>ActivationDescriptions</c>) and a category
+    /// screen's face print it (kb/Work PB850).
+    /// <para>The model's <see cref="PicCategory"/> is coarser than Table 2: alphabetic and alphanumeric-edited ride
+    /// <see cref="PicCategory.Alphanumeric"/>, national-edited rides <see cref="PicCategory.National"/> and index
+    /// rides <see cref="PicCategory.Numeric"/> (class index is its USAGE). So the name is read from the
+    /// <see cref="Table16Operand"/> axes (the alphabetic rider wins over an edit mask, as it does for Table 16's
+    /// heading) plus the usage, never from <c>PicCategory.ToString()</c>, which printed "numericedited".</para>
+    /// </summary>
+    public static string CategoryName(PicInfo pic) => pic.Usage switch
+    {
+        Usage.Index => ActivationCategory.Index,
+        Usage.MessageTag => "message-tag",
+        _ => CategoryName(Table16Operand.Of(pic)),
+    };
+
+    /// <summary>The Table 2 category of a PLACE — the item's own, or for a REFERENCE-MODIFIED view §8.4.3.3.4 GR6's
+    /// (an edited or numeric item's view is alphanumeric or national; <see cref="Table16Operand.Of(Place)"/>).
+    /// Null for a group item, whose words are <see cref="Face"/>'s.</summary>
+    public static string? CategoryName(Place place) =>
+        place is RefModPlace ? CategoryName(Table16Operand.Of(place))
+        : place.Item.Pic is { } pic ? CategoryName(pic)
+        : null;
+
+    /// <summary>Is this one of §8.5.2.1 Table 2's three EDITED categories — numeric-edited, alphanumeric-edited or
+    /// national-edited? A recovery profile (no analysed category, kb/Work PB960) is none of them.</summary>
+    public static bool IsEditedCategory(PicInfo pic) =>
+        pic.AnalyzedCategory is PicCategory.NumericEdited || pic.IsCharacterEdited;
+
+    private static string CategoryName(Table16Operand operand) => operand.Category switch
+    {
+        PicCategory.Alphanumeric => operand.IsAlphabetic ? "alphabetic"
+            : operand.IsEdited ? "alphanumeric-edited" : ActivationCategory.Alphanumeric,
+        PicCategory.National => operand.IsEdited ? "national-edited" : ActivationCategory.National,
+        PicCategory.Numeric => ActivationCategory.Numeric,
+        PicCategory.NumericEdited => "numeric-edited",
+        PicCategory.Boolean => ActivationCategory.Boolean,
+        PicCategory.ObjectReference => "object-reference",
+        PicCategory.Pointer => ActivationCategory.DataPointer,
+        PicCategory.ProgramPointer => ActivationCategory.ProgramPointer,
+        PicCategory.FunctionPointer => ActivationCategory.FunctionPointer,
+        _ => throw new InvalidOperationException($"no ISO §8.5.2.1 Table 2 category for {operand.Category}"),
     };
 
     /// <summary>
@@ -318,8 +373,7 @@ public static class ItemCategory
     /// every plain group — harmless only while no group could fail the predicate, and wrong the moment the
     /// strongly-typed and variable-length exclusions began to bite.</para></summary>
     public static string Face(DataItem item) =>
-        item.Pic is { } pic
-            ? pic.IsAlphabetic ? "a category-alphabetic item" : $"a category-{pic.Category.ToString().ToLowerInvariant()} item"
+        item.Pic is { } pic ? $"a category-{CategoryName(pic)} item"
         : GroupKindsOf(item) switch
         {
             GroupKinds.None => "not an elementary or group data item",

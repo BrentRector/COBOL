@@ -3,6 +3,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using CobolNet.Binding;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding.Model;
 
@@ -421,24 +422,25 @@ internal static class RecordLayout
 
     /// <summary>ISO §14.9.41.3 SR6 b) 2. — <i>"It has the same class, category, and usage as that record key."</i>
     /// Class comes from the ONE §8.5.2.1 Table-2 classifier (<see cref="IntrinsicArgumentRules.ClassOfItem"/>),
-    /// never a second copy of that table. Where the model cannot tell two categories apart (it folds
-    /// alphanumeric-edited into alphanumeric) the test passes — this screen exists to reject what the rule names,
-    /// never what this compiler cannot classify.</summary>
+    /// never a second copy of that table, and category from the ONE spelling of a Table 2 category
+    /// (<see cref="ItemCategory.CategoryName(PicInfo)"/>), which tells alphanumeric-edited and national-edited from
+    /// the plain categories the model folds them into (kb/Work PB850: compared as a bare <see cref="PicCategory"/>,
+    /// an alphanumeric-edited operand passed as the same category as an alphanumeric key).</summary>
     private static bool SameClassCategoryUsage(DataItem operand, DataItem key) =>
         IntrinsicArgumentRules.ClassOfItem(operand) == IntrinsicArgumentRules.ClassOfItem(key)
         && CategoryOfItem(operand) == CategoryOfItem(key)
         && UsageOfItem(operand) == UsageOfItem(key);
 
-    /// <summary>The item's category: its PICTURE's (or a bit/national group's as-if PICTURE's), else — for an
-    /// ordinary group, which has no PICTURE at all — category alphanumeric (§13.18.29.4 GR3, "an alphanumeric
-    /// group item"). A group key with an elementary operand at its leftmost position is exactly the generic-key
-    /// shape SR6 b) is written for, so the group arm may not answer "no category".
+    /// <summary>The item's §8.5.2.1 Table 2 category name: its PICTURE's (or a bit/national group's as-if
+    /// PICTURE's), else — for an ordinary group, which has no PICTURE at all — category alphanumeric (§13.18.29.4
+    /// GR3, "an alphanumeric group item"). A group key with an elementary operand at its leftmost position is
+    /// exactly the generic-key shape SR6 b) is written for, so the group arm may not answer "no category".
     /// <para>⚠ NOT <see cref="Place.CategoryOf"/>, which looks similar and answers a DIFFERENT question: that is
     /// §8.4.3.3.3 GR6's rule for the category a REFERENCE-MODIFIED view takes (numeric becomes alphanumeric, and
     /// so on). SR6 b) 2. compares the items' OWN categories, so folding the two would import a rule about
     /// reference modification into a rule about record keys.</para></summary>
-    private static PicCategory CategoryOfItem(DataItem item) =>
-        item.OperandPic?.Category ?? PicCategory.Alphanumeric;
+    private static string CategoryOfItem(DataItem item) =>
+        item.OperandPic is { } pic ? ItemCategory.CategoryName(pic) : ActivationCategory.Alphanumeric;
 
     /// <summary>The item's USAGE (ISO §13.18.60), through THE ONE §8.5.2.1 usage reader
     /// (<see cref="ItemCategory.UsageOf"/>): the PICTURE's resolved usage for an elementary item, the as-if

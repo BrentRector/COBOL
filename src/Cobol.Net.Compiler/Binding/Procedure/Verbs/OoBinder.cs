@@ -234,15 +234,14 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // a second "not resolvable to storage" error on top named no rule (kb/Work PB1030).
             if (host.Expr.ResolveSending(mref).PlaceOrReported(ctx.Edition) is not { } msrc)
                 return BoundRejected.Reported(ctx.Edition);
-            // §14.9.23.3 SR8: "Identifier-2 shall reference an alphanumeric or national data item". The operand
-            // category is the ONE reader's (DataItem.OperandPic): an alphanumeric group has none and is "class and
-            // category alphanumeric" (§8.5.2.1); a national group is national and a bit group boolean (GR2b/GR1b of
-            // §13.18.29.4). The run-time selector (CobolObject.NormalizeMethodName) takes the item's character
-            // value whichever of the two classes it is (kb/Work PB1136).
-            bool selectorAdmitted = msrc.Item.OperandPic is { } selectorPic
-                ? selectorPic.Category is PicCategory.Alphanumeric or PicCategory.National
-                : msrc.Item.IsGroup;
-            if (!selectorAdmitted)
+            // §14.9.23.3 SR8: "Identifier-2 shall reference an alphanumeric or national data item" — a CATEGORY
+            // rule (§8.5.2.1), asked of the ONE category screen (kb/Work PB850): an alphanumeric group is "class and
+            // category alphanumeric" and a national group national, while alphabetic, the two edited categories,
+            // a bit group, a strongly-typed group and a variable-length group (§8.5.1.12.1 "not equivalent to an
+            // alphanumeric data item") are none of them; a reference-modified view takes §8.4.3.3.4 GR6's category.
+            // The run-time selector (CobolObject.NormalizeMethodName) takes the item's character value whichever of
+            // the two classes it is (kb/Work PB1136).
+            if (!ItemCategory.IsAlphanumericOrNational(msrc))
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
                     $"INVOKE: identifier-2 ('{mref.GetText()}') shall reference an alphanumeric or national data "

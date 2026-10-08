@@ -394,7 +394,12 @@ content-validation half is separately answered by the declined A.4.14 facility (
   `EditMask`: Table 16's separate national-edited ROW (`MoveValidity.Table16Refusal`, through `Table16Operand.Heading`), `InitializeCategory.NationalEdited`
   (§14.9.20.4 GR5c's category-name match, even though GR6c fills both with national SPACES), and the edition
   gate (`VersionConformancePass.PictureConstructId` → `national-edited-2002`, the FINER identity, so the usage
-  arm does not also fire `national-data-2002` on the same entry).
+  arm does not also fire `national-data-2002` on the same entry), and every rule worded "category alphanumeric"
+  or "category national" (§8.5.2.1: a category name in a rule means the category), which asks `ItemCategory`'s
+  one screen — its `Admits` reads `Table16Operand.IsEdited` beside the category (kb/Work PB850: until then the
+  record keys, FILE STATUS, ASSIGN USING, READ / RETURN INTO, the program-address-identifier and INVOKE's
+  identifier-2 all accepted an edited item silently). A message, the activation description and START's SR6 b) 2.
+  comparison name a category through `ItemCategory.CategoryName`, the ONE spelling of a Table 2 category.
   ⛔ **The category was a staged skeleton until PB492 and the shape of the bug is the reason this entry exists:**
   the analyzer RECOVERED the category to Alphanumeric and raised COBOLNET0899, so no such item could be defined
   at any edition — and every consumer that had grown an edited arm had grown only the ALPHANUMERIC half of it,

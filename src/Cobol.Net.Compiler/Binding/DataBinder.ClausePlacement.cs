@@ -401,7 +401,7 @@ public sealed partial class DataBinder
         if (pic.Category is not (PicCategory.Numeric or PicCategory.NumericEdited))
             return "the BLANK WHEN ZERO clause may be specified only for an elementary item described by its picture "
                 + "character-string as category numeric-edited or as numeric without the picture symbol 'S' "
-                + $"(ISO §13.18.8.3 SR1) — this item is {CategoryWords(pic)}";
+                + $"(ISO §13.18.8.3 SR1) — this item is of category {ItemCategory.CategoryName(pic)}";
         if (pic.Usage is not (Usage.Display or Usage.National))
             return "the subject of a BLANK WHEN ZERO clause shall be implicitly or explicitly described as usage "
                 + $"display or usage national (ISO §13.18.8.3 SR2) — this item's usage is {UsageFamilies.UsageWord(pic.Usage)}";
@@ -413,21 +413,8 @@ public sealed partial class DataBinder
         if (pic.Category is not (PicCategory.Alphanumeric or PicCategory.National or PicCategory.Boolean)
             || pic.EditMask is not null)
             return "the JUSTIFIED clause may be specified only for a data item whose category is alphabetic, "
-                + $"alphanumeric, boolean, or national (ISO §13.18.32.3 SR3) — this item is {CategoryWords(pic)}";
+                + $"alphanumeric, boolean, or national (ISO §13.18.32.3 SR3) — this item is of category "
+                + ItemCategory.CategoryName(pic);
         return null;
     }
-
-    /// <summary>The §8.5.2 category of <paramref name="pic"/>, in the standard's words, for a message.</summary>
-    private static string CategoryWords(PicInfo pic) => pic.Category switch
-    {
-        PicCategory.Alphanumeric when pic.EditMask is not null => "of category alphanumeric-edited",
-        PicCategory.Alphanumeric when pic.IsAlphabetic => "of category alphabetic",
-        PicCategory.Alphanumeric => "of category alphanumeric",
-        PicCategory.National when pic.EditMask is not null => "of category national-edited",
-        PicCategory.National => "of category national",
-        PicCategory.Numeric => "of category numeric",
-        PicCategory.NumericEdited => "of category numeric-edited",
-        PicCategory.Boolean => "of category boolean",
-        _ => $"of usage {UsageFamilies.UsageWord(pic.Usage)}",
-    };
 }

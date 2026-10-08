@@ -544,9 +544,8 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
             $"'{StrongTypeModel.TypeAnchor(item)?.TypeName ?? item.CobolName}' — the type-name of a strongly-typed group item (§8.5.2.1)",
         null => item.GroupUsage is GroupUsage.Bit ? "boolean (a bit group, §13.18.29.4 GR1 a)" : null,
         { Category: PicCategory.Alphanumeric or PicCategory.National, EditMask: null } => null,
-        { Category: PicCategory.Alphanumeric or PicCategory.National } p =>
-            $"{p.Category.ToString().ToLowerInvariant()}-edited",
-        { Category: var cat } => cat.ToString(),
+        // Every other category offends, named in §8.5.2.1 Table 2's words through the ONE spelling (kb/Work PB850).
+        { } p => ItemCategory.CategoryName(p),
     };
 
     /// <summary>A STRING / UNSTRING syntax-rule violation: reported at BIND (COBOLNET1651 — the compile fails) and

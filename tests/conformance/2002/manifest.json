@@ -779,7 +779,8 @@
   "pb2518_redefines_past_non_storage_entries",
   "pb1643_display_literal_comma_constant_invoke",
   "pb1930_content_function_identifier_arguments",
-  "pb2078_property_receivers_in_phrases"
+  "pb2078_property_receivers_in_phrases",
+  "pb850_edited_refmod_program_name"
   ],
   "pending": []
 }

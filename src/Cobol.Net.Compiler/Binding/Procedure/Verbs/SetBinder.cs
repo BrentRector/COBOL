@@ -873,9 +873,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     /// <summary>What the operand IS, for the SR1 refusal: its category when it has one (a reference-modified view's
     /// is §8.4.3.3.4 GR6's), else the group description <see cref="ItemCategory.Face"/> gives.</summary>
     private static string AddressNameFace(Place name) =>
-        name is RefModPlace rm ? $"of category {rm.Category.ToString().ToLowerInvariant()}"
-        : name.Item.Pic is { } pic ? $"of category {(pic.IsAlphabetic ? "alphabetic" : pic.Category.ToString().ToLowerInvariant())}"
-        : ItemCategory.Face(name.Item);
+        ItemCategory.CategoryName(name) is { } category ? $"of category {category}" : ItemCategory.Face(name.Item);
 
     /// <summary>⛔ identifier-1 OF AN ADDRESS-IDENTIFIER WHEN IT IS A FUNCTION-IDENTIFIER OR AN INLINE METHOD
     /// INVOCATION (§8.4.3.1.3 SR1; kb/Work PB1452) — bound ONCE (its activation registers a statement pre-op), then

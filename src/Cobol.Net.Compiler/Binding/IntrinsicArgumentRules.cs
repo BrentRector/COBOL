@@ -1305,9 +1305,8 @@ internal static class IntrinsicArgumentRules
     /// recovery profile (no class, PB960) fails open.</para></summary>
     private static string? EditedCategoryOf(BoundOperand op) =>
         op is BoundFieldOperand { Place: { DenotedItem: not null, Item: { IsGroup: false, Pic: { } pic } } }
-            ? pic.AnalyzedCategory is PicCategory.NumericEdited ? "numeric-edited"
-            : pic.IsCharacterEdited ? (pic.Category is PicCategory.National ? "national-edited" : "alphanumeric-edited")
-            : null
+            && ItemCategory.IsEditedCategory(pic)
+            ? ItemCategory.CategoryName(pic)
             : null;
 
     /// <summary>

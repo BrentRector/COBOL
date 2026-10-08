@@ -2530,7 +2530,15 @@
   "pb2518-redefines-past-intervening-storage-roots",
   "pb2518-redefines-in-unused-typedef",
   "pb1930-call-bare-function-identifier-by-reference",
-  "pb1930-call-content-alnum-function-numeric-formal"
+  "pb1930-call-content-alnum-function-numeric-formal",
+  "pb850-record-key-alphanumeric-edited",
+  "pb850-alternate-key-national-edited",
+  "pb850-file-status-alphanumeric-edited",
+  "pb850-read-into-alphanumeric-edited-record",
+  "pb850-assign-using-alphanumeric-edited",
+  "pb850-set-program-address-alphanumeric-edited",
+  "pb850-invoke-identifier-2-national-edited",
+  "pb850-start-operand-alphanumeric-edited"
  ],
  "pending": []
 }

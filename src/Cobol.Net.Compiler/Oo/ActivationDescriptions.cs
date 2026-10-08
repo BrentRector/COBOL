@@ -98,7 +98,9 @@ public static class ActivationDescriptions
         return new ActivationDescription
         {
             Shape = ActivationShape.Elementary,
-            Category = ElementaryCategory(p),
+            // §8.5.2.1 Table 2's category name (match rule 3 c)'s coarse half; the PICTURE identity in
+            // ElementaryClauses separates every finer distinction), in the compiler's ONE spelling (kb/Work PB850).
+            Category = ItemCategory.CategoryName(p),
             Usage = p.Usage.ToString(),
             Clauses = ElementaryClauses(item),
             AnyLength = item.IsAnyLength,
@@ -235,22 +237,6 @@ public static class ActivationDescriptions
 
     private static ActivationDescription With(ActivationDescription d, bool optional, bool byValue) =>
         d with { Optional = optional, ByValue = byValue };
-
-    /// <summary>The ISO §8.5.2 class-and-category name of an elementary item (§8.5.2.1 Table 2). The PICTURE identity in
-    /// <see cref="ElementaryClauses"/> separates every finer distinction; this is match rule 3 c)'s coarse half.</summary>
-    private static string ElementaryCategory(PicInfo p) => p.Category switch
-    {
-        PicCategory.Numeric => p.Usage is Usage.Index ? ActivationCategory.Index : ActivationCategory.Numeric,
-        PicCategory.NumericEdited => "numeric-edited",
-        PicCategory.Alphanumeric => p.IsAlphabetic ? "alphabetic"
-            : p.EditMask is not null ? "alphanumeric-edited" : ActivationCategory.Alphanumeric,
-        PicCategory.National => p.EditMask is not null ? "national-edited" : ActivationCategory.National,
-        PicCategory.Boolean => ActivationCategory.Boolean,
-        PicCategory.Pointer => ActivationCategory.DataPointer,
-        PicCategory.ProgramPointer => ActivationCategory.ProgramPointer,
-        PicCategory.FunctionPointer => ActivationCategory.FunctionPointer,
-        _ => p.Category.ToString(),
-    };
 
     /// <summary>⛔ ISO §9.3.6 match rule 3 e)'s identity of an elementary item — "the same ALIGNED, ANY LENGTH, BLANK
     /// WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses", with 3 e) 1. (currency strings) and 2.
