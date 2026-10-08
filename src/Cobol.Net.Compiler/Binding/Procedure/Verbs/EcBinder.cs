@@ -697,6 +697,10 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
                 case BoundCallProgram call:
                     Query(ProgramNames);
                     Query(ExternalNames);   // §14.9.4.4 GR3e — the CALL is the EC-EXTERNAL raise point (§14.8.4)
+                    // §14.9.4.4 GR3c / §8.4.3.2.4 GR6c — the activation's resources (the stack it needs; kb/Work PB2659).
+                    // PRECISE: an ACTIVATION raises it (ProgramTable.CallProgram), so it is not in ProgramNames, which a
+                    // CANCEL queries too.
+                    Query(["EC-PROGRAM-RESOURCES"]);
                     // A USER-FUNCTION activation is a DIFFERENT raise: a locate miss is EC-FUNCTION-NOT-FOUND
                     // (§8.4.3.2.4 GR6b), not EC-PROGRAM-NOT-FOUND, and GR6f sends it to "any declarative … that
                     // is associated with that exception condition". Without this Query the name never entered

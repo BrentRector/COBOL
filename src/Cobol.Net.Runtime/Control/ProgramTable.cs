@@ -119,8 +119,15 @@ public sealed class ProgramTable
     /// connectors. Both are RUN-UNIT-scoped (not main-compilation-group-scoped), so each applies even when the fatal
     /// EC or the open file originates in a SEPARATELY-COMPILED CALLed module whose descriptors the main group's
     /// entry wrapper never saw — the entry wrapper only catches <see cref="StopRun"/> (the normal-termination unwind
-    /// boundary; the STOP status itself is flushed run-unit-side by the <see cref="RunUnit.ExitStatus"/> setter).</summary>
-    public void RunMain(string path)
+    /// boundary; the STOP status itself is flushed run-unit-side by the <see cref="RunUnit.ExitStatus"/> setter).
+    /// <para>The whole of it runs on the run unit's own thread (<see cref="ActivationStack.RunOnRunUnitThread"/>,
+    /// kb/Work PB2659), whose stack is sized for COBOL activation frames, so a RECURSIVE program reaches a realistic
+    /// depth and the activation past the last one the stack can hold is §14.9.4.4 GR3c's EC-PROGRAM-RESOURCES rather
+    /// than a process kill. The thread is transparent: the <see cref="StopRun"/> unwind still reaches the entry
+    /// wrapper's catch on the calling thread.</para></summary>
+    public void RunMain(string path) => ActivationStack.RunOnRunUnitThread(() => RunMainOnThisThread(path));
+
+    private void RunMainOnThisThread(string path)
     {
         // The standard display device writes UTF-8 (fix-queue PB59; CONFORMANCE.md item 59). ⛔ The rule lives in
         // ONE place — CobolNet.Runtime.IO.StandardStreams — because this `if` used to BE that place and the
@@ -219,6 +226,18 @@ public sealed class ProgramTable
                       + "(ISO §8.4.3.2.4 GR6b — EC-FUNCTION-NOT-FOUND)"
                     : $"CALL '{ExternalizedNames.Form(name)}': program not found in the run unit (ISO §14.9.4.4 GR3b — EC-PROGRAM-NOT-FOUND)",
                 notFoundEc);
+        // §14.9.4.4 GR3c / §8.4.3.2.4 GR6c (kb/Work PB2659): "If the program is located but the resources necessary to
+        // execute the program are not available, the EC-PROGRAM-RESOURCES exception condition is set to exist, the program
+        // call is not successful". The one resource checked is the stack the activation needs (ActivationStack; Annex A.1
+        // items 14 and 89), asked before anything of the activation is set up, so a failed attempt leaves nothing to undo.
+        if (!ActivationStack.IsAvailable())
+            throw new CobolCallException(
+                notFoundEc == "EC-FUNCTION-NOT-FOUND"
+                    ? $"FUNCTION '{n.Name}': the stack the function activation needs {ActivationStack.Exhausted} "
+                      + "(ISO §8.4.3.2.4 GR6c — EC-PROGRAM-RESOURCES)"
+                    : $"CALL '{n.Name}': the stack the program needs {ActivationStack.Exhausted} "
+                      + "(ISO §14.9.4.4 GR3c — EC-PROGRAM-RESOURCES)",
+                "EC-PROGRAM-RESOURCES");
         if (n.Active > 0 && !n.Recursive)
             throw new CobolCallException(
                 $"CALL '{n.Name}': program is already active and has no RECURSIVE attribute (ISO §14.9.4.4 GR3f — EC-PROGRAM-RECURSIVE-CALL)",
@@ -338,13 +357,14 @@ public sealed class ProgramTable
             transferred = true;         // GR3g — control is transferred to the called program
             inst.Call(args, returning);
         }
-        catch (CobolCallException cx) when (transferred)
+        // ⛔ A FILTER, NEVER A CATCH-AND-RETHROW (kb/Work PB2659). A catch block runs on top of the stack the condition
+        // was thrown from, so a `throw;` inside it starts a NESTED dispatch there: a condition crossing N activation
+        // boundaries stacked N dispatches, and the EC-PROGRAM-RESOURCES of a recursion that had used the stack overflowed
+        // it again on the way out. The filter marks the condition during the dispatch's first pass — in the same
+        // innermost-boundary-first order the rethrow chain had — and declines it, so it passes through untouched.
+        catch (CobolCallException cx) when (transferred && MarkBoundaryCrossing(cx))
         {
-            // GR3d (kb/Work PB615): a formal the activated element could not adopt is THIS attempt's failure —
-            // consume the mark so the next boundary out sees an ordinary propagated condition. Otherwise GR3i.
-            if (cx.RaisedAtAdoption) cx.RaisedAtAdoption = false;
-            else cx.ControlTransferred = true;
-            throw;
+            throw new System.Diagnostics.UnreachableException("MarkBoundaryCrossing declines every condition");
         }
         finally
         {
@@ -383,6 +403,18 @@ public sealed class ProgramTable
         // ModuleStack identity), so only a pickup emitted in the activating element can take it, and an activator
         // that emitted none never has it raised — §14.9.18.4 GR1 b) for an unchecked activator. A discard here
         // was the CALL-only half of that rule; the INVOKE half had no chokepoint to put one in.
+    }
+
+    /// <summary>Mark a <see cref="CobolCallException"/> leaving the called program across its activation boundary
+    /// (<see cref="CallProgram"/>'s exception filter), and decline it — always false. GR3d (kb/Work PB615): a formal the
+    /// activated element could not adopt is THIS attempt's failure, so the mark is consumed and the next boundary out sees
+    /// an ordinary propagated condition. Otherwise the condition escaped the called program's execution, and §14.9.4.4
+    /// GR3i makes every enclosing CALL site ignore its ON EXCEPTION phrase (kb/Work PB233).</summary>
+    private static bool MarkBoundaryCrossing(CobolCallException cx)
+    {
+        if (cx.RaisedAtAdoption) cx.RaisedAtAdoption = false;
+        else cx.ControlTransferred = true;
+        return false;
     }
 
     /// <summary>⛔ ISO §14.2.3 GR9 AND GR10 AT A CALL WHOSE ACTIVATING ELEMENT DID NOT KNOW THE FORMALS (kb/Work PB2549). GR9

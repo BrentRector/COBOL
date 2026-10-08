@@ -266,8 +266,8 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
 
     /// <summary>The current statement's enabled level-3 names that a <see cref="CobolCallException"/> can
     /// actually carry (empty when none / no wrapper). ONE filter, asked once and split two ways below: an
-    /// enabled name outside <see cref="CobolCallException.CarriedNames"/> — EC-PROGRAM-RESOURCES and
-    /// EC-PROGRAM-ARG-OMITTED are the live examples, the latter having left this carrier at kb/Work PB133 —
+    /// enabled name outside <see cref="CobolCallException.CarriedNames"/> — EC-PROGRAM-ARG-OMITTED is the live
+    /// example, having left this carrier at kb/Work PB133 —
     /// has no raise site to match, so naming it in a catch filter emits a disjunct that can never be true, and
     /// a <c>&gt;&gt;TURN EC-ALL CHECKING ON</c> unit would emit a two-hundred-way one on every CALL.</summary>
     private List<string> EnabledCallNames() =>

@@ -170,6 +170,10 @@ public sealed class RunUnitStateDriftTests
         ["CobolNet.Runtime.CobolTable+Scratch`1::s_cell"] =
             "the out-of-range reference scratch cell: [ThreadStatic] (one per thread, so concurrent run units never "
             + "share it — kb/Work PB1069) and overwritten before EVERY use, so it carries nothing between uses",
+        ["CobolNet.Runtime.ActivationStack::t_activationFloor"] =
+            "the activation floor of the run unit's THREAD: [ThreadStatic], set once when ActivationStack starts the "
+            + "thread from that thread's own stack bounds, and a property of the thread's stack, not of any run unit's "
+            + "state (kb/Work PB2659)",
         ["CobolNet.Runtime.PointerImage::s_nextBase"] =
             "the pointer-image base allocator (kb/Work PB970 arm 2, DOC-A.1-216): its bases key the process-wide "
             + "area and name tables beside it, so it must count per PROCESS — a per-run-unit restart would hand a "

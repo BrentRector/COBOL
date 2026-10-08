@@ -3,6 +3,7 @@
   "enabled": [
   "pb2650_from_literal",
   "gn1_lock_mode_omitted_implementor_default",
+  "pb2659_call_resources_recursion",
   "pb2554_class_comma_driver_period",
   "pb2554_class_period_driver_comma",
   "pb2489_invoke_base_new",

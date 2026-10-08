@@ -35182,11 +35182,11 @@
   "subject": "CALL statement",
   "rule-digest": "30299686f99c",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/Control/ProgramTable.cs#CallProgram; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitCall; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitNotOnException; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitPropagationPickup",
-  "test-ref": "conformance:2023/pb133_arg_mismatch_checked; conformance:2023/pb133_arg_mismatch_lenient; conformance:2023/pb165_content_conformance; conformance:2023/pb165_dynamic_length_boundary; conformance:negative/pb165-content-nonconforming; conformance-test:ExceptionConditionConformanceTests.CallNotFound_Enabled_DeclarativeResumes; conformance:2023/ec_external_format_conflict; conformance:2023/ec_program_ptr_null; conformance:2002/pb606_call_not_on_propagated; conformance:negative/pb606-call-not-on-propagated-below-2002; unit:ProgramActivationMaskTests.FailedActivation_LeavesTheActivatorHalfUntouched; unit:ProgramActivationMaskTests.SuccessfulActivation_LatchesTheStatementFlagsAsTheActivatorHalf; conformance:2002/pb165_dynamic_call_description_check",
+  "code-location": "src/Cobol.Net.Runtime/Control/ProgramTable.cs#CallProgram; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitCall; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitNotOnException; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EmitPropagationPickup; src/Cobol.Net.Runtime/Control/ActivationStack.cs#IsAvailable",
+  "test-ref": "conformance:2023/pb133_arg_mismatch_checked; conformance:2023/pb133_arg_mismatch_lenient; conformance:2023/pb165_content_conformance; conformance:2023/pb165_dynamic_length_boundary; conformance:negative/pb165-content-nonconforming; conformance-test:ExceptionConditionConformanceTests.CallNotFound_Enabled_DeclarativeResumes; conformance:2023/ec_external_format_conflict; conformance:2023/ec_program_ptr_null; conformance:2002/pb606_call_not_on_propagated; conformance:negative/pb606-call-not-on-propagated-below-2002; unit:ProgramActivationMaskTests.FailedActivation_LeavesTheActivatorHalfUntouched; unit:ProgramActivationMaskTests.SuccessfulActivation_LatchesTheStatementFlagsAsTheActivatorHalf; conformance:2002/pb165_dynamic_call_description_check; conformance:2002/pb2659_call_resources_recursion",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "The two residuals this row carried are closed. (a) 3c: the implementor-defined runtime-resource set of a CALL is EMPTY and documented (docs/CONFORMANCE.md DOC-A.1-14, recorded CONFORMS by doc-rows-2), so EC-PROGRAM-RESOURCES has no raise site to add. (b) 3d's DESCRIPTION half on the dynamic Format-1 lane: now checked at activation under the enabled-in-both gate (14.8.2.3.2 / 14.8.2.3.3 rule 1 length, 14.8.2.2 group rule; golden 2002/pb165_dynamic_call_description_check, kb/Work PB165 w1015w). The Format-2 lane whose callee has no compile-time signature (a program-specifier resolved against an external repository, 12.3.8.4 GR10 c)) is the prototype registry's residual, recorded on SR-14.9.4.3-25 (b), not on this row's legs.",
+  "notes": "The two residuals this row carried are closed. (a) 3c: the implementor-defined runtime-resource set of a CALL is the stack the activation needs (docs/CONFORMANCE.md DOC-A.1-14, kb/Work PB2659): ProgramTable.CallProgram asks ActivationStack.IsAvailable first and raises EC-PROGRAM-RESOURCES (golden 2002/pb2659_call_resources_recursion, ON EXCEPTION at the exhausted depth). The GR3i boundary mark is an exception filter, so a condition crossing many boundaries is not rethrown once per boundary. (b) 3d's DESCRIPTION half on the dynamic Format-1 lane: now checked at activation under the enabled-in-both gate (14.8.2.3.2 / 14.8.2.3.3 rule 1 length, 14.8.2.2 group rule; golden 2002/pb165_dynamic_call_description_check, kb/Work PB165 w1015w). The Format-2 lane whose callee has no compile-time signature (a program-specifier resolved against an external repository, 12.3.8.4 GR10 c)) is the prototype registry's residual, recorded on SR-14.9.4.3-25 (b), not on this row's legs.",
   "state": "OK"
  },
  {
@@ -62077,11 +62077,11 @@
   "subject": "CALL statement (runtime resources that are checked)",
   "rule-digest": "30471a257ac5",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-14; src/Cobol.Net.Runtime/Control/ProgramTable.cs#ProbeSiblingModule; src/Cobol.Net.Runtime/Control/ProgramTable.cs#ResolveVisible; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EnabledCallNames",
-  "test-ref": "conformance:2023/l1_call_unloadable_module_not_found",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-14; src/Cobol.Net.Runtime/Control/ProgramTable.cs#ProbeSiblingModule; src/Cobol.Net.Runtime/Control/ProgramTable.cs#ResolveVisible; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EnabledCallNames; src/Cobol.Net.Runtime/Control/ActivationStack.cs#IsAvailable; src/Cobol.Net.Runtime/Control/ProgramTable.cs#CallProgram; src/Cobol.Net.Runtime/Control/ProgramTable.cs#RunMain",
+  "test-ref": "conformance:2023/l1_call_unloadable_module_not_found; conformance:2002/pb2659_call_resources_recursion; conformance:negative/pb2659-call-resources-below-2002; conformance-test:ActivationResourcesTests.UnhandledCall_PastTheStack_EndsAbnormally_AndClosesTheRunUnitsFiles; unit:ActivationStackTests.RecursiveCall_PastTheStack_IsEcProgramResources_AndUnwindsBalanced; unit:ActivationStackTests.RunUnitThread_RefusesAnActivation_BeforeTheRuntimesOwnMarginIsReached",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "A program-planted unloadable L1CRSMD.dll gives EC-PROGRAM-NOT-FOUND through both ON EXCEPTION and the declarative; the EC-PROGRAM-RESOURCES declarative never runs (empty checked set)",
+  "notes": "kb/Work PB2659: the checked set is ONE resource, the stack the activation needs (14.9.4.4 GR3c, cite.py --check OK 3)). The main program runs on a 384 MiB run-unit thread (ActivationStack.RunOnRunUnitThread); CallProgram asks ActivationStack.IsAvailable before GR3d-f and raises EC-PROGRAM-RESOURCES through the CALL carrier. Golden 2002/pb2659_call_resources_recursion: a self-CALLing RECURSIVE program passes depth 50,000, its one failing CALL takes ON EXCEPTION with status EC-PROGRAM-RESOURCES, every activation unwinds. Before: CLR stack overflow at depth ~250. A program-planted unloadable L1CRSMD.dll is still EC-PROGRAM-NOT-FOUND (locating is not a resource check; l1_call_unloadable_module_not_found).",
   "state": "OK"
  },
  {
@@ -63202,11 +63202,11 @@
   "subject": "Function-identifier (object time resources that are checked)",
   "rule-digest": "53c8bb23fd66",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-89; src/Cobol.Net.Runtime/Control/ProgramTable.cs#ProbeSiblingModule; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EnabledCallNames; src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs",
-  "test-ref": "conformance-test:FunctionLocateResourceWitnessTests.UnloadableSiblingModule_IsNotFound_NeverProgramResources; conformance-test:FunctionLocateResourceWitnessTests.LoadableSiblingModule_IsLocatedAndRuns; conformance-test:FunctionLocateResourceWitnessTests.ThrowingRegistrarSiblingModule_IsNotFound_NeverProgramResources",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-89; src/Cobol.Net.Runtime/Control/ProgramTable.cs#ProbeSiblingModule; src/Cobol.Net.Compiler/CodeGen/Verbs/CallEmitter.cs#EnabledCallNames; src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs; src/Cobol.Net.Runtime/Control/ActivationStack.cs#IsAvailable; src/Cobol.Net.Runtime/Control/ProgramTable.cs#CallProgram",
+  "test-ref": "conformance-test:FunctionLocateResourceWitnessTests.UnloadableSiblingModule_IsNotFound_NeverProgramResources; conformance-test:FunctionLocateResourceWitnessTests.LoadableSiblingModule_IsLocatedAndRuns; conformance-test:FunctionLocateResourceWitnessTests.ThrowingRegistrarSiblingModule_IsNotFound_NeverProgramResources; conformance-test:ActivationResourcesTests.RecursiveFunction_PastTheStack_IsEcProgramResources; unit:ActivationStackTests.RecursiveCall_PastTheStack_IsEcProgramResources_AndUnwindsBalanced",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "§8.4.3.2.4 6) b)/c): a foreign-image sibling .dll and a loadable sibling whose registrar throws both give EC-FUNCTION-NOT-FOUND, never EC-PROGRAM-RESOURCES (empty checked set); control: a real sibling module is located and runs",
+  "notes": "8.4.3.2.4 GR6c (cite.py --check OK 6)): the function arm of kb/Work PB2659's check - a self-referencing user-defined function past the stack ends in EC-PROGRAM-RESOURCES ('FUNCTION ... ISO 8.4.3.2.4 GR6c') and the abnormal termination, never a process kill; available memory is still not checked. A foreign-image sibling .dll and a loadable sibling whose registrar throws both stay EC-FUNCTION-NOT-FOUND (FunctionLocateResourceWitnessTests).",
   "state": "OK"
  },
  {
@@ -63397,11 +63397,11 @@
   "subject": "INVOKE statement (runtime resources that are checked)",
   "rule-digest": "add42d336522",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-102; src/Cobol.Net.Runtime/Control/RunUnit.cs#FactoryObject; src/Cobol.Net.Runtime/Control/CobolObject.cs#__CobolInvoke; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs",
-  "test-ref": "unit:FactoryInitializationFailureTests.ClassWhoseTypeInitializerThrows_IsEcOoMethod_EveryTime; unit:FactoryInitializationFailureTests.ClassThatInitializes_IsTheSameFactoryObjectEveryTime",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-102; src/Cobol.Net.Runtime/Control/RunUnit.cs#FactoryObject; src/Cobol.Net.Runtime/Control/CobolObject.cs#__CobolInvoke; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs; src/Cobol.Net.Runtime/Control/ActivationStack.cs#RequireForMethod; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitMethod",
+  "test-ref": "unit:FactoryInitializationFailureTests.ClassWhoseTypeInitializerThrows_IsEcOoMethod_EveryTime; unit:FactoryInitializationFailureTests.ClassThatInitializes_IsTheSameFactoryObjectEveryTime; conformance-test:ActivationResourcesTests.RecursiveMethod_PastTheStack_IsEcOoMethod; unit:ActivationStackTests.RecursiveMethod_PastTheStack_IsEcOoMethod",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "A.1 item 102 (required, documented; 14.9.23.4 GR7 b, cite.py --check OK: 'If the method is not found or the resources necessary to execute the method are not available, the EC-OO-METHOD exception condition is set to exist'). The implementor-defined checked set is ONE resource, the class's type initialization, and it is now implemented where it happens: RunUnit.FactoryObject maps a TypeInitializationException from the factory object's creation (the first reference to a class in a run unit, 9.3.14.2) to EC-OO-METHOD, so a class whose static data cannot be initialized raises the condition on every INVOKE of it instead of escaping as a raw .NET exception. Witness: FactoryInitializationFailureTests (a hand-written CobolObject whose static constructor throws, since no COBOL source can fail a generated initializer). Loading the class's assembly is documented as NOT a checked resource: the host binds it when the INVOKE's enclosing method is first prepared, before any statement of it runs, so a binding failure cannot be intercepted by a statement-level check; it is a deployment failure the host reports. Memory and activation depth are not checked (host failure). The Annex citation drift (A.1 cites GR7 e, the resource sentence is GR7 b) is noted in the row. kb/Work PB1422 w1015w.",
+  "notes": "14.9.23.4 GR7 b) (cite.py --check OK 7)): two resources are checked - the stack (kb/Work PB2659: the emitted head of every method body calls ActivationStack.RequireForMethod before the GR7 d) external check, EC-OO-METHOD) and the class's type initialization (RunUnit.FactoryObject, kb/Work PB1422). A self-invoking factory method past the stack ends in EC-OO-METHOD and the abnormal termination.",
   "state": "OK"
  },
  {
@@ -63848,11 +63848,11 @@
   "rule-digest": "609b635c0a70",
   "verdict": "CONFORMS",
   "code-location": "docs/CONFORMANCE.md#DOC-A.1-132; src/Cobol.Net.Compiler/Binding/IntrinsicCatalog.cs#IntrinsicCatalog; src/Cobol.Net.Runtime/Control/CobolModule.cs#CobolModule; src/Cobol.Net.Runtime/Control/ModuleStack.cs#ModuleStack",
-  "test-ref": "",
+  "test-ref": "conformance:2023/doc_a1_132_module_name_stack_deep; conformance:negative/doc-a1-132-module-name-below-2023",
   "derivation": "",
   "editions": "2023",
-  "notes": "§15.65.4 r1 (cite.py OK §15.65.4 1)) requires the type to be documented when more than one type of dynamic-length elementary item is supported; §8.5.1.10.2 (cite.py --find) makes the structure either implementor-defined or named by a DYNAMIC LENGTH STRUCTURE clause, and COBOL.NET supports both plus both classes (D-DL3, DOC-A.1-62), so the condition holds. Code: IntrinsicCatalog.cs:328 registers MODULE-NAME with IntrinsicType.Alphanumeric; CobolModule.Name(int) returns a System.String (the carrier of a structure-less DYNAMIC LENGTH item). Probe probe/mn.cob --std 2023: [MNPROG] LENGTH 6; ACTIVATING in main [ ] LENGTH 1; MOVE MODULE-NAME(STACK) to a PIC X DYNAMIC LENGTH item -> [MNPROG; ] length 8; --std 2014 -> COBOLNET1502. No golden or unit test pins the type (ModuleStackInvariantTests pins item 133's no-trailing-spaces), so Pinned by is honestly empty. Incidental: BYTE-LENGTH(FUNCTION MODULE-NAME(CURRENT)) is refused with a COBOLNET1627 message calling the argument a numeric literal - already owned by kb/Work PB1068. Previously the substance sat only in DOC-A.1-133's cell.",
-  "state": "GAP"
+  "notes": "15.65.4 r1 (cite.py OK 15.65.4 1)) requires the type to be documented when more than one type of dynamic-length elementary item is supported, and docs/CONFORMANCE.md DOC-A.1-132 documents it: alphanumeric, implementor-defined internal structure, no PREFIXED length-field bound. Witness (kb/Work PB2659 unblocked it): golden 2023/doc_a1_132_module_name_stack_deep, a RECURSIVE program 2200 activations deep, gets MODULE-NAME(STACK) of length 68201 = 2200*31+1 (r9, cite.py OK 15.65.4 9)) with EXCEPTION-STATUS spaces under EC-ALL checking - a PREFIXED structure would cap at 65535 and set EC-BOUND-FUNC-RET-VALUE (r2, cite.py OK 15.65.4 2)). Negative: COBOLNET1502 at 85/2002/2014. Code: IntrinsicCatalog registers MODULE-NAME with IntrinsicType.Alphanumeric; CobolModule.Name(int) returns a System.String.",
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-133",

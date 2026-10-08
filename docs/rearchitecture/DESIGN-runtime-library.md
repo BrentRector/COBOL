@@ -144,6 +144,49 @@ PROCESS-lifetime (console encoding, collation-subsystem configuration, the per-t
 subscript scratch cell). The RANDOM sequence was the sixth process-global store the consolidation missed (kb/Work
 PB307).
 
+**The run unit's thread and the activation resource check (kb/Work PB2659).** Every COBOL activation — a CALL, a
+user-defined function reference, an INVOKE or inline method invocation — is a chain of .NET frames on the thread that
+runs the run unit, so the depth a RECURSIVE program reaches (§8.6.6) is that thread's stack. `Control/ActivationStack`
+owns both halves of the rule:
+
+- **The thread.** `ProgramTable.RunMain` runs the main program and the §14.6.11 epilogue on a thread of its own
+  (`ActivationStack.RunOnRunUnitThread`) whose stack is `RunUnitThreadStackBytes` = 384 MiB of reserved address
+  space, committed only as deep as the run unit goes. The thread is transparent: the ambient `RunUnit` flows to it
+  with the execution context, it takes the caller's culture, and whatever escapes it (the `StopRun` unwind the
+  generated `Main` catches, or a defect) is rethrown on the calling thread. Before it, the main program ran on the
+  host's default stack (about 1 MB for a Windows main thread) and a self-CALLing program died of a CLR stack overflow at a
+  depth of about 250 — no exception condition, no §14.6.11 CLOSE.
+- **The check.** §14.9.4.4 GR3c, §8.4.3.2.4 GR6c and §14.9.23.4 GR7b give "the resources necessary to execute the
+  program are not available" a defined outcome, and Annex A.1 items 14, 89 and 102 let the implementor say which
+  resources are checked. The one checked here is the stack: `ActivationStack.IsAvailable` asks the .NET runtime's own
+  margin (`RuntimeHelpers.TryEnsureSufficientExecutionStack`, 128 KB on 64-bit, valid on any thread) and, on the run
+  unit's own thread, a larger `ActivationReserveBytes` (1 MiB) measured from the thread's start, so the deepest
+  activation keeps room for its own statements and for the handler of the activation that fails. `ProgramTable.CallProgram`
+  asks it first (before GR3d–f; a CALL and a function activation raise EC-PROGRAM-RESOURCES through the CALL
+  carrier), and the emitted head of every method body asks it through `ActivationStack.RequireForMethod`
+  (EC-OO-METHOD, before GR7 d). A PROPERTY clause's synthesized accessor executes no statement and is not checked.
+- **No catch-and-rethrow on the activation path.** A catch block runs on top of the stack the exception was thrown
+  from, so a `throw;` inside it starts a nested dispatch there. The GR3i boundary mark in `CallProgram` was such a
+  rethrow, and a condition crossing N boundaries stacked N dispatches: the EC-PROGRAM-RESOURCES of an exhausted
+  recursion overflowed the stack again while unwinding. The mark is an exception FILTER (`MarkBoundaryCrossing`),
+  which runs in the dispatch's first pass in the same innermost-first order and declines the condition.
+
+The size is chosen from measurement, not guessed. The target is the depth GnuCOBOL 3.2 reaches on its default 8 MB
+stack with a minimal self-CALLing program — 74,687 activations, after which it dies of SIGSEGV with no message —
+reached by the same program under its most expensive frame shape here. Measured per activation (deep recursion runs
+mostly in the JIT's first-tier frames) and the depth at 384 MiB:
+
+| program | KB per activation | depth at 384 MiB (Windows) | (Linux) |
+|---|---|---|---|
+| minimal RECURSIVE self-CALL | 1.5 | 256,126 | 143,146 |
+| the same under `>>TURN EC-ALL CHECKING ON` | 3.9 | 104,585 | 92,137 |
+| twenty statements and LOCAL-STORAGE | 2.5 | 156,190 | 139,121 |
+| the same under `>>TURN EC-ALL CHECKING ON` | 12.4 | 32,566 | 66,029 |
+
+(The Linux column ran the IL runtime without ReadyToRun code under WSL; fully optimized code — tiered compilation
+off — costs 1.2 to 4.3 KB per activation for the same four programs.) A recursion through PERFORM is not an
+activation and is not checked: §14.9.28.4 GR2 makes it undefined, and its NOTE 1 names the stack overflow.
+
 Rationale: `AsyncLocal` (not `ThreadStatic`) because the correct scope is the *logical* run-unit activation, and it
 subsumes `CobolModule`'s existing thread-locality while also being correct across `await`/thread-pool hops. Hot
 facades cache `RunUnit.Current` in a local at entry to avoid repeated `AsyncLocal` reads.

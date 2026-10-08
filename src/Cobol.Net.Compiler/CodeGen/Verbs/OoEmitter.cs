@@ -1012,6 +1012,14 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // This body's formals, for the §8.8.4.8.4 GR1c forwarding recognition (CallUnitState.WholeFormalProbe)
             // that every CALL and INVOKE argument inside the body consults (kb/Work PB757). Cleared below.
             callState.MethodFormals = m.Binding!.Formals;
+            string __mLit = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(m.Name.ToUpperInvariant(), quote: true);
+            string __cLit = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(m.Owner.Name.ToUpperInvariant(), quote: true);
+            // §14.9.23.4 GR7 b) (kb/Work PB2659): "If the method is not found or the resources necessary to execute the
+            // method are not available, the EC-OO-METHOD exception condition is set to exist, the method invocation is not
+            // successful" — the resource is the stack the activation needs (ActivationStack), asked first, as GR7 b)
+            // precedes d). Here, in the body, for the reason the frame push below is: a method is reached by a typed direct
+            // call, by __CobolInvoke and by an inline invocation, and this is the one place all three pass through.
+            w.Line(RuntimeApi.MethodActivationResources(__mLit, __cLit) + ";   // §14.9.23.4 GR7 b) — the activation's stack");
             // §14.9.23.4 GR7 d) BEFORE e): the external items are checked as part of the ACTIVATION ATTEMPT, so a
             // violation leaves before control is transferred — no module-stack frame, no storage seeded, no statement
             // run ("the method invocation is not successful"; kb/Work PB1138).
@@ -1030,8 +1038,6 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // universal __CobolInvoke switch, and by an inline invocation — one mechanism, not three arms.
             // Frame = (method name, declaring class as the compilation unit's outermost element, not nested), so
             // r7 CURRENT yields the class, r5 ACTIVATING the invoker, and r9 STACK the full chain.
-            string __mLit = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(m.Name.ToUpperInvariant(), quote: true);
-            string __cLit = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(m.Owner.Name.ToUpperInvariant(), quote: true);
             w.Line($"var __ms = {RuntimeApi.ModuleStack()}; __ms.Push({__mLit}, {__cLit}, false);   // §15.65.4 r5 — INVOKE is an activation");
             // The per-ACTIVATION data-pointer members (kb/Work PB956): save the activator's, start this activation
             // fresh, and restore in the activation's finally — so a recursive INVOKE on the same object neither

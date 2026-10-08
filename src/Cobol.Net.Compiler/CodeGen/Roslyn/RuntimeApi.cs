@@ -2366,6 +2366,13 @@ internal static class RuntimeApi
     /// <summary>The run unit's module stack, resolved once per activation — <c>CobolModule.Stack</c>.</summary>
     public static string ModuleStack() => $"{nameof(CobolModule)}.{nameof(CobolModule.Stack)}";
 
+    /// <summary>A method activation's resource check (ISO §14.9.23.4 GR7 b); kb/Work PB2659) — the head of every method
+    /// body that executes statements: <c>ActivationStack.RequireForMethod("M", "C")</c>, EC-OO-METHOD when the stack the
+    /// activation needs is not available. <paramref name="methodLiteral"/> and <paramref name="classLiteral"/> are C#
+    /// string literals.</summary>
+    public static string MethodActivationResources(string methodLiteral, string classLiteral) =>
+        $"{nameof(ActivationStack)}.{nameof(ActivationStack.RequireForMethod)}({methodLiteral}, {classLiteral})";
+
     /// <summary>Pop the activation frame pushed by <see cref="ModulePushMethod"/> — always in a finally.</summary>
     public static string ModulePop() => $"{nameof(CobolModule)}.{nameof(CobolModule.Pop)}()";
 

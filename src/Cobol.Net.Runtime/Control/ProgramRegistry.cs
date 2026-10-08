@@ -95,6 +95,7 @@ public sealed class CobolCallException(string message, string ecName = "EC-PROGR
         "EC-PROGRAM-NOT-FOUND",           // §14.9.4.4 GR3b
         "EC-PROGRAM-PTR-NULL",            // §14.9.4.4 GR3b, first sentence
         "EC-PROGRAM-RECURSIVE-CALL",      // §14.9.4.4 GR3f
+        "EC-PROGRAM-RESOURCES",           // §14.9.4.4 GR3c / §8.4.3.2.4 GR6c — the activation's stack (kb/Work PB2659)
     ];
 
     /// <summary>Is <paramref name="ec"/> a name this carrier can raise (<see cref="CarriedNames"/>)?</summary>
