@@ -1975,6 +1975,16 @@ internal static class RuntimeApi
     /// spelling the emitters compare a <c>CallEmitter.BoundaryLength</c> against.</summary>
     public const int UnstatedBoundaryLength = CobolArg.Unstated;
 
+    /// <summary>A registered formal that states nothing (<see cref="BoundaryItem"/>): neither compared nor landed, and present
+    /// only so the registered array stays positional.</summary>
+    public const string UnstatedBoundaryItem = "new " + nameof(BoundaryItem) + "(null)";
+
+    /// <summary>The registered CARRIER of a numeric formal (<see cref="CobolNet.Runtime.CarrierLanding{T}"/>; kb/Work PB2549):
+    /// <paramref name="clrType"/> is the formal's <c>PicInfo.ClrType</c>, the type argument <see cref="ArgLandForFormal"/>
+    /// lands with.</summary>
+    public static string CarrierLanding(string clrType) =>
+        $"{nameof(CobolNet.Runtime.CarrierLanding)}<{clrType}>.{nameof(CobolNet.Runtime.CarrierLanding<long>.Instance)}";
+
     /// <summary>The carrier of the predefined NULL written as a CALL / function-activation argument (kb/Work PB1630;
     /// <see cref="PredefinedNullArgument"/> states the rule).</summary>
     public static string PredefinedNullArgumentCarrier =>

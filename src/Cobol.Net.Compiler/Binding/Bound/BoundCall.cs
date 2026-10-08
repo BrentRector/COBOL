@@ -79,14 +79,14 @@ public sealed record BoundCallArg(CobolPassMode Mode, Place? Place, BoundOperand
 
     /// <summary>The CORRESPONDING FORMAL PARAMETER (ISO §14.2.3 GR2 — the positional correspondence), when the
     /// activated element's description is known to the ACTIVATING element at bind time, and null otherwise.
-    /// <para>⛔ It is null for exactly the crossing §14.2.3 GR9's FIRST branch describes — "a program for which
-    /// there is no program-specifier in the REPOSITORY paragraph of the activating runtime element and there is
-    /// no NESTED phrase specified on the CALL statement" — whose allocated record is "of the same length as the
-    /// argument" and whose argument "is moved to this allocated record without conversion". That is not an
-    /// accident of this implementation: the standard's own partition between the no-conversion crossing and the
-    /// COMPUTE/SET/MOVE crossing (GR9's second branch and GR10, and the same split in §14.8.2.3.3 rules 1 and
-    /// 2) is precisely the partition between "the activating element cannot know the formal" and "it can", and
-    /// §14.8.2's conformance loop in <c>CallBinder</c> is where it becomes known.</para>
+    /// <para>⛔ It is null whenever the activating element holds no signature of the activated program
+    /// (<see cref="BoundCallProgram.CalleeSignatureKnown"/> false): §14.2.3 GR9's FIRST branch — "a program for which
+    /// there is no program-specifier in the REPOSITORY paragraph of the activating runtime element and there is no
+    /// NESTED phrase specified on the CALL statement", whose argument "is moved to this allocated record without
+    /// conversion" — but ALSO a COMPUTE crossing the call site cannot see: a program-prototype whose details
+    /// §12.3.8.4 GR10 c) takes from the external repository, and a CALL by data-name or through a program-pointer
+    /// that reaches a program the element has a program-specifier for. Those are landed at the activation boundary
+    /// through the formal's registered carrier instead (<c>ProgramTable.CallProgram</c>; kb/Work PB2549).</para>
     /// <para>Set for a Format-2 CALL (AS NESTED or a program prototype with a §12.3.8.4 GR10 a) definition) and
     /// for a user-defined FUNCTION reference. <c>CallEmitter.ArgText</c> reads it to perform GR9/GR10's COMPUTE
     /// on the ACTIVATING side, where those rules put it (kb/Work PB640).</para></summary>

@@ -111,11 +111,31 @@ public readonly record struct CobolArg(CobolPassMode Mode, ManagedPointer Carrie
 /// <param name="Length">The item's fixed storage length (see <see cref="CobolArg.Length"/>); <see cref="CobolArg.Unstated"/> otherwise.</param>
 /// <param name="Description">The item's §14.8.2 / §14.8.3 description (<see cref="ActivationDescription"/>), stated where
 /// the run-time check needs it; null when unstated.</param>
-public readonly record struct BoundaryItem(NumProfile? Num, int Length = CobolArg.Unstated, ActivationDescription? Description = null)
+/// <param name="Landing">⛔ A NUMERIC FORMAL'S CARRIER (kb/Work PB2549): the typed landing that performs ISO §14.2.3 GR9 and
+/// GR10's "COMPUTE statement without the ROUNDED phrase" into a record of the formal's description (<see cref="Num"/>) when
+/// the activating element could not perform it at compile time (<see cref="Land"/>). Stated by EVERY unit for each of its
+/// numeric formals, whatever its checking state, because the crossing's conversion is not a check; null for every other
+/// item.</param>
+public readonly record struct BoundaryItem(NumProfile? Num, int Length = CobolArg.Unstated, ActivationDescription? Description = null,
+    CarrierLanding? Landing = null)
 {
-    /// <summary>True when the item states anything at all — a native cell of a category with no profile, a pointer, a
-    /// DYNAMIC LENGTH item and an ANY LENGTH item may state nothing, and nothing is comparable against them.</summary>
+    /// <summary>True when the item states anything to COMPARE — a native cell of a category with no profile, a pointer, a
+    /// DYNAMIC LENGTH item and an ANY LENGTH item may state nothing, and nothing is comparable against them. A formal
+    /// registered by a unit that does not check EC-PROGRAM-ARG-MISMATCH states its <see cref="Num"/> for its
+    /// <see cref="Landing"/> only, and is never compared (the check runs only when both sides enable it).</summary>
     public bool IsStated => Num is not null || Length != CobolArg.Unstated || Description is not null;
+
+    /// <summary>⛔ ISO §14.2.3 GR9's SECOND REGIME AND GR10 AT A RUN-TIME-LOCATED CALL (kb/Work PB2549): the argument
+    /// <paramref name="arg"/> landed into "a data item with the same description and the same number of bytes as the formal
+    /// parameter" by "a COMPUTE statement without the ROUNDED phrase" when this formal is numeric, so the activated element
+    /// reads the allocated record "as if it were the argument and it were passed by reference". The SAME landing the
+    /// activating element performs when it knows the formal at compile time (<see cref="CobolArgAdapt.LandForFormal{T}"/>,
+    /// through <see cref="CarrierLanding{T}"/>), so the two lanes cannot answer differently; <paramref name="checking"/> is
+    /// the activating CALL statement's EC-SIZE-TRUNCATION state, as there. The argument unchanged when this formal is not
+    /// numeric — its SET or MOVE is the activated element's adapter's (<see cref="CobolArgAdapt.Text"/> and its
+    /// siblings), exactly as on the compile-time lane.</summary>
+    public CobolArg Land(in CobolArg arg, bool checking) =>
+        Landing is { } landing && Num is { } formal ? landing.Land(arg, formal, checking) : arg;
 
     /// <summary>The item in the words of an EC-PROGRAM-ARG-MISMATCH message.</summary>
     public string Describe() =>
@@ -169,6 +189,44 @@ public readonly record struct BoundaryItem(NumProfile? Num, int Length = CobolAr
 
     private bool LengthsAgree(in BoundaryItem other) =>
         Length == CobolArg.Unstated || other.Length == CobolArg.Unstated || Length == other.Length;
+}
+
+/// <summary>
+/// ⛔ THE CARRIER OF A NUMERIC FORMAL, AS THE RUN TIME NEEDS IT TO LAND AN ARGUMENT (kb/Work PB2549). ISO §14.2.3 GR9
+/// allocates, for "a program for which there is a program-specifier in the REPOSITORY paragraph of the activating runtime
+/// element", "a data item with the same description and the same number of bytes as the formal parameter" and fills it by
+/// "a COMPUTE statement without the ROUNDED phrase" when the formal is numeric; GR10 does the same for BY VALUE on every
+/// lane. When the activating element holds no signature of the activated program (a CALL by data-name, a CALL through a
+/// program-pointer, a program-prototype whose details §12.3.8.4 GR10 c) takes from the external repository) only the
+/// activated unit knows the formal, so it registers each numeric formal's profile (<see cref="BoundaryItem.Num"/>) and this
+/// carrier, and the activation boundary lands the argument through <see cref="CobolArgAdapt.LandForFormal{T}"/> with the
+/// formal's own CLR carrier <typeparamref name="T"/> — the landing the activating element performs at compile time when it
+/// knows the formal, so the formal's adapter then sees a same-carrier, same-scale argument and aliases it. One stateless
+/// instance per carrier type (<see cref="CarrierLanding{T}.Instance"/>), so registering it allocates nothing per unit.
+/// </summary>
+public abstract class CarrierLanding
+{
+    private protected CarrierLanding() { }
+
+    /// <summary>Land <paramref name="arg"/> into a record of <paramref name="formal"/>'s description.</summary>
+    public abstract CobolArg Land(in CobolArg arg, in NumProfile formal, bool checking);
+}
+
+/// <summary>The <see cref="CarrierLanding"/> of a numeric formal whose CLR carrier is <typeparamref name="T"/> (the
+/// compiler's <c>PicInfo.ClrType</c>, the same type argument the compile-time landing is emitted with).</summary>
+public sealed class CarrierLanding<T> : CarrierLanding where T : struct, System.Numerics.INumberBase<T>
+{
+    /// <summary>The one instance per carrier type.</summary>
+    public static readonly CarrierLanding<T> Instance = new();
+
+    private CarrierLanding() { }
+
+    /// <inheritdoc/>
+    /// <remarks>The formal's scale is its profile's <see cref="NumProfile.FractionScale"/>: the compiler emits the profile
+    /// from the formal's <c>PicInfo</c>, whose <c>FractionDigits</c> IS its <c>Scale</c> (the remark on the compile-time
+    /// lane's <c>CobolArgAdapt.Land</c>), so the rescale target and the capacity discipline cannot disagree.</remarks>
+    public override CobolArg Land(in CobolArg arg, in NumProfile formal, bool checking) =>
+        CobolArgAdapt.LandForFormal<T>(arg, formal, formal.FractionScale, checking);
 }
 
 /// <summary>
@@ -610,17 +668,18 @@ public static class CobolArgAdapt
     /// "if a fatal exception condition has not been raised" — which a landing performed after the transfer can
     /// no longer honour. Before PB640 the whole landing ran callee-side, so an argument that overflowed the
     /// formal's description under checking arrived as DOC-A.1-70's low-order digits with no raise at all.</para>
-    /// <para>WHEN THE CALLER CANNOT. GR9's FIRST branch — a program with no program-specifier in the activating
-    /// element's REPOSITORY paragraph and no NESTED phrase — allocates a record "of the same length as the
-    /// argument" and moves it "without conversion", so there is no COMPUTE to perform and no formal description
-    /// to perform it against. The set of crossings that ARE a COMPUTE (a prototyped program, a NESTED CALL, a
-    /// method, a function) is exactly the set whose formal is knowable at the call site; §14.8.2.3.3 draws the
-    /// same partition for conformance. <see cref="NumValue"/> and <see cref="Num"/> therefore keep their own
-    /// landing for the residue, and for an already-landed argument it is the identity: the carrier IS the
-    /// formal's, at the formal's scale, within the formal's capacity.</para>
-    /// <para><paramref name="checking"/> is decided at COMPILE time from the CALL statement's own TURN state —
-    /// the same kernel selection the arithmetic store makes — so a unit with checking off emits the landing it
-    /// always had.</para></summary>
+    /// <para>WHEN THE CALLER CANNOT (kb/Work PB2549). GR9's FIRST branch — a program with no program-specifier in
+    /// the activating element's REPOSITORY paragraph and no NESTED phrase — allocates a record "of the same length
+    /// as the argument" and moves it "without conversion", so there is no COMPUTE. A COMPUTE crossing whose formal
+    /// the call site cannot know — a program-prototype whose details §12.3.8.4 GR10 c) takes from the external
+    /// repository, a CALL by data-name or through a program-pointer that reaches a program the element has a
+    /// program-specifier for — is landed by this same method at the activation boundary, through the formal's
+    /// registered carrier (<see cref="BoundaryItem.Land"/>, <see cref="CarrierLanding{T}"/>). <see cref="NumValue"/>
+    /// and <see cref="Num"/> keep their own landing for a non-COBOL activator, and for an already-landed argument
+    /// it is the identity: the carrier IS the formal's, at the formal's scale, within the formal's capacity.</para>
+    /// <para><paramref name="checking"/> is the CALL statement's own TURN state — decided at COMPILE time on the
+    /// compile-time lane, the same kernel selection the arithmetic store makes, and stated by the site on the
+    /// activation-boundary lane — so a unit with checking off lands as it always did.</para></summary>
     /// <typeparam name="T">The formal's carrier (<c>PicInfo.ClrType</c>), so the callee's own adapter sees a
     /// same-carrier same-scale argument and aliases it (§14.2.3 GR9's "treated … as if it were passed by
     /// reference") rather than converting it a second time.</typeparam>
@@ -893,10 +952,10 @@ public static class CobolArgAdapt
     /// <remarks>⛔ THE RESIDUAL LANDING, NOT THE ONLY ONE (kb/Work PB640). When the activating element could
     /// know the formal's description it has ALREADY performed this COMPUTE — <see cref="LandForFormal"/>, which
     /// is where GR9/GR10 put it — and the argument arrives on the formal's own carrier at the formal's own
-    /// scale, within its capacity, so the three arms below are the identity. This side stays because GR9's
-    /// first branch (a non-prototyped, non-NESTED program CALL) gives the caller no formal to land against and
-    /// because a non-COBOL activator supplies whatever it supplies; it shares
-    /// <see cref="LandScalar"/> with the activating side so the two cannot answer differently.</remarks>
+    /// scale, within its capacity, so the three arms below are the identity — and when it could not, the activation
+    /// boundary has (<see cref="BoundaryItem.Land"/>; kb/Work PB2549). This side stays because a non-COBOL activator
+    /// supplies whatever it supplies; it shares <see cref="LandScalar"/> with both so no lane can answer
+    /// differently.</remarks>
     public static ManagedPointer<T> NumValue<T>(CobolArg[] args, int i, NumProfile formal, int formalScale)
         where T : struct, System.Numerics.INumberBase<T> =>
         // Land's 16-byte-unsigned result is container BITS (R10); CreateTruncating reinterprets them exactly.

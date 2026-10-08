@@ -74,9 +74,11 @@ public sealed class ProgramTable
     /// what the activating CALL's receiver is checked against at §14.9.4.4 GR3 d); null for a unit with no RETURNING
     /// item.</param>
     /// <param name="formals">Each FORMAL's registered description (<see cref="BoundaryItem"/>; kb/Work PB165), in order —
-    /// what an activating element's argument is compared with at a dynamic CALL (§14.8.2). Registered only by a unit that
-    /// checks EC-PROGRAM-ARG-MISMATCH itself (the activated half of GR3d's enabled-in-both gate), so a unit that does not
-    /// carries none; an entry that states nothing is not compared.</param>
+    /// what an activating element's argument is compared with at a dynamic CALL (§14.8.2), and what it is LANDED through
+    /// at one (§14.2.3 GR9's second regime and GR10, <see cref="BoundaryItem.Land"/>; kb/Work PB2549). The whole description
+    /// is registered only by a unit that checks EC-PROGRAM-ARG-MISMATCH itself (the activated half of GR3d's
+    /// enabled-in-both gate); every other unit registers each NUMERIC formal's profile and carrier alone, because the
+    /// crossing's conversion is not a check. An entry that states nothing is neither compared nor landed.</param>
     public void Register(
         string path, string name, string? parentPath,
         bool initial, bool common, bool recursive,
@@ -185,14 +187,24 @@ public sealed class ProgramTable
     /// Failures raise <see cref="CobolCallException"/> — the call site's ON OVERFLOW / ON EXCEPTION phrase (when
     /// present) converts it to the exception branch (GR3h); otherwise the run unit terminates loudly.
     /// </summary>
-    /// <param name="programSpecifiers">The externalized names of the activating element's §12.3.8.2 program-specifiers,
-    /// stated by a site that describes its arguments for GR3 d) (kb/Work PB165): §14.8.2.3.2 and §14.8.2.3.3 give "a
+    /// <param name="programSpecifiers">The externalized names of the activating element's §12.3.8.2 program-specifiers
+    /// (empty when it writes none), stated by a site that held NO signature of the activated program when it was compiled
+    /// and either describes its arguments for GR3 d) (kb/Work PB165) or passes one BY CONTENT or BY VALUE (kb/Work
+    /// PB2549); null for a site with no argument left to land here — it held the signature, and checked and landed every
+    /// argument at compile time, or it passes every argument BY REFERENCE.
+    /// §14.8.2.3.2 and §14.8.2.3.3 give "a
     /// program for which there is a program-specifier in the REPOSITORY paragraph of the activating element" rule 2 (the
     /// clause identity, or a COMPUTE, SET or MOVE) and every other program rule 1 (the same length), and which program a
-    /// CALL reaches is known only here — a CALL by data-name or through a program-pointer can reach either.</param>
+    /// CALL reaches is known only here — a CALL by data-name or through a program-pointer can reach either. The same split
+    /// decides §14.2.3 GR9's crossing (kb/Work PB2549), so a site whose activated program's formals it did not know states
+    /// them whenever it passes an argument BY CONTENT, checking or not.</param>
+    /// <param name="siteSizeTruncationChecking">The CALL statement's EC-SIZE-TRUNCATION checking state, stated by a site whose
+    /// activated program's formals it did not know: §14.2.3 GR9/GR10's COMPUTE is the ACTIVATING element's (kb/Work PB640),
+    /// so its checking decides whether an argument that overflows its formal raises (§14.7.5) when the landing happens
+    /// here (<see cref="LandArguments"/>).</param>
     public void CallProgram(string name, string callerPath, CobolArg[] args, CobolArg? returning,
         string notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false,
-        string[]? programSpecifiers = null)
+        string[]? programSpecifiers = null, bool siteSizeTruncationChecking = false)
     {
         // The ACTIVATING element's EC-EXTERNAL half (§14.8.4.1 / §14.9.4.4 GR3e): the CALL statement guard's
         // checking flags, read HERE, before this activation's own checking scope opens below. The flags are a
@@ -254,6 +266,12 @@ public sealed class ProgramTable
                 $"CALL '{n.Name}': the RETURNING item of the called program ({sent.Describe()}) and the receiving item "
                 + $"({rcv.Item.Describe()}) do not conform: {retWhy} — ISO §14.8.3.3 via §14.9.4.4 GR3d — EC-PROGRAM-ARG-MISMATCH",
                 "EC-PROGRAM-ARG-MISMATCH");
+        // §14.2.3 GR9 / GR10 (kb/Work PB2549): the records the activating element allocates "during the process of
+        // initiating the activation", filled once the program is located and its arguments conform — still before GR3g's
+        // transfer, so an EC-SIZE-TRUNCATION the COMPUTE raises is this CALL statement's.
+        // A site that states no program-specifiers has no argument left to land here (see the parameter).
+        if (programSpecifiers is not null && n.Formals is { } landings)
+            args = LandArguments(args, landings, specifiedProgram, siteSizeTruncationChecking);
 
         ICobolProgram inst;
         bool freshInstance = n.Initial || n.Recursive;
@@ -367,6 +385,33 @@ public sealed class ProgramTable
         // was the CALL-only half of that rule; the INVOKE half had no chokepoint to put one in.
     }
 
+    /// <summary>⛔ ISO §14.2.3 GR9 AND GR10 AT A CALL WHOSE ACTIVATING ELEMENT DID NOT KNOW THE FORMALS (kb/Work PB2549). GR9
+    /// splits a BY CONTENT crossing on the program reached: for "a program for which there is no program-specifier in the
+    /// REPOSITORY paragraph of the activating runtime element" the argument "is moved to this allocated record without
+    /// conversion" (the argument passes untouched — the formal's adapter reads its image), while for "a program for which
+    /// there is a program-specifier" (<paramref name="specifiedProgram"/>) the record has the formal's description and, "if
+    /// the formal parameter is numeric, a COMPUTE statement without the ROUNDED phrase" fills it. GR10 makes every BY VALUE
+    /// crossing that COMPUTE whatever the program. Each such argument is landed through its formal's registered carrier
+    /// (<see cref="BoundaryItem.Land"/>), the landing the activating element performs itself whenever it knows the formal,
+    /// with the CALL statement's own EC-SIZE-TRUNCATION state (<paramref name="checking"/>). An omitted argument (§14.9.4.4
+    /// GR11) has nothing to send, and a BY REFERENCE one is GR8's shared storage. The caller's array is never written: the
+    /// landed arguments are a copy, made only when one changes.</summary>
+    private static CobolArg[] LandArguments(CobolArg[] args, BoundaryItem[] formals, bool specifiedProgram, bool checking)
+    {
+        CobolArg[]? landed = null;
+        for (int i = 0; i < args.Length && i < formals.Length; i++)
+        {
+            var a = args[i];
+            if (a.Carrier.IsNull || formals[i].Landing is null) continue;
+            if (!(a.Mode is CobolPassMode.Value || a.Mode is CobolPassMode.Content && specifiedProgram)) continue;
+            var to = formals[i].Land(a, checking);
+            if (to == a) continue;
+            landed ??= (CobolArg[])args.Clone();
+            landed[i] = to;
+        }
+        return landed ?? args;
+    }
+
     /// <summary>Resolve a program-address-identifier's ENTRY operand (ISO §8.4.3.13): locate the OUTERMOST
     /// program <paramref name="name"/> names (GR1/GR2 — "the address is that of the outermost program
     /// identified by the externalized program-name"; the §8.4.6.3 rule-4 scope, including the separately-
@@ -445,7 +490,7 @@ public sealed class ProgramTable
     /// held name is an OUTERMOST program's identity, so the §8.4.6.3 rule-4 leg of the SAME
     /// <see cref="CallProgram"/> resolution finds it from any caller (the singular-pattern rule).</summary>
     public void CallPointer(ProgramPointer target, string callerPath, CobolArg[] args, CobolArg? returning,
-        bool siteArgMismatchChecking = false, string[]? programSpecifiers = null)
+        bool siteArgMismatchChecking = false, string[]? programSpecifiers = null, bool siteSizeTruncationChecking = false)
     {
         // §14.9.4.4 GR3b names TWO DISTINCT conditions and the NULL case is the FIRST of them: "If the data item
         // referenced by identifier-1 contains the predefined address NULL, the EC-PROGRAM-PTR-NULL exception
@@ -461,7 +506,7 @@ public sealed class ProgramTable
                 + "(ISO §14.9.4.4 GR3b — EC-PROGRAM-PTR-NULL)", "EC-PROGRAM-PTR-NULL");
         }
         CallProgram(target.Name!, callerPath, args, returning, siteArgMismatchChecking: siteArgMismatchChecking,
-            programSpecifiers: programSpecifiers);
+            programSpecifiers: programSpecifiers, siteSizeTruncationChecking: siteSizeTruncationChecking);
     }
 
     /// <summary>Activate the function a FUNCTION-POINTER holds — a function-identifier written with

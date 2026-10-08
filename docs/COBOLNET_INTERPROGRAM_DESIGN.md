@@ -370,14 +370,27 @@ and cannot satisfy the landing's `struct, INumberBase<T>` constraint). The lande
 argument from that point on — which is exactly what makes the callee-side landing the identity, and what makes an
 image-carried formal see the record's own sign (kb/Work PB873).
 
-**When the caller cannot, and why that is the standard's own line.** GR9's FIRST branch — a program with no
-program-specifier in the activating element's REPOSITORY paragraph and no NESTED phrase — allocates a record
-*"of the same length as the argument"* and moves it *"without conversion"*. There is no COMPUTE there, and no
-formal description to perform one against. The set of crossings that ARE a COMPUTE (a prototyped program, a
-NESTED CALL, a method, a function) is precisely the set whose formal is knowable at the call site, and
-§14.8.2.3.3 draws the same partition for conformance (rule 1 vs rule 2 a)). `CobolArgAdapt.NumValue` / `Num`
-therefore keep the landing for that residue and for a non-COBOL activator, sharing `LandScalar` with the
-activating side so the two can never answer differently; `BoundCallArg.Formal` is null exactly on that branch.
+**When the caller cannot: the activation boundary lands, through the formal's registered carrier (kb/Work
+PB2549).** GR9's FIRST branch — a program with no program-specifier in the activating element's REPOSITORY
+paragraph and no NESTED phrase — allocates a record *"of the same length as the argument"* and moves it *"without
+conversion"*: no COMPUTE, and the argument passes untouched. But the COMPUTE crossings are NOT all knowable at the
+call site. A program-prototype whose details §12.3.8.4 GR10 c) takes *"from the external repository"*, and a CALL
+by data-name or through a program-pointer that reaches a program the element has a program-specifier for, are
+GR9's second branch (and every BY VALUE crossing is GR10's) with no `BoundCallArg.Formal` to land into — which
+program a CALL by data-name reaches is known only at run time. So the ACTIVATED unit registers, for each
+numeric formal and whatever its checking state, its profile and its CLR carrier (`BoundaryItem.Num` +
+`BoundaryItem.Landing`, a stateless `CarrierLanding<T>.Instance` with `T` the formal's `PicInfo.ClrType`, chosen by
+the same `CallEmitter.NumericLandingPic` the compile-time landing asks); a site that held no signature
+(`BoundCallProgram.CalleeSignatureKnown` false) and passes an argument BY CONTENT or BY VALUE states its
+program-specifiers (the empty array when it writes none) and its EC-SIZE-TRUNCATION state
+(`siteSizeTruncationChecking:`); and `ProgramTable.CallProgram`, once the program is located and its arguments
+conform and before GR3 g)'s transfer, lands each BY VALUE argument and each BY CONTENT one whose program the
+element has a specifier for (`LandArguments` → `BoundaryItem.Land` → `CobolArgAdapt.LandForFormal<T>`) — the same
+landing, with the same checked and unchecked dispositions, the activating element performs when it knows the
+formal. `CobolArgAdapt.NumValue` / `Num` keep their landing for a non-COBOL activator, sharing `LandScalar` with
+both, so no lane can answer differently. (GR9's MOVE leg — a non-numeric formal of a JUSTIFIED or edited
+description, a signed numeric argument into an alphanumeric formal — is still the activated element's adapter's
+image adoption on every lane; that is a separate defect.)
 
 **The raise needs no new machinery.** EC-SIZE-TRUNCATION is a FATAL ambient gate (`EcEmitter.FatalAmbientGates`)
 and a CALL/INVOKE is not an `IArithmeticStatement`, so a statement compiled under EC-SIZE checking already
@@ -387,7 +400,8 @@ built — before `ProgramRegistry.CallProgram` is entered, which is GR3 g)'s ord
 EXPRESSION-position activation (a user-defined function reference inside a per-evaluation condition window) as
 well as at statement position. The kernel is chosen at COMPILE time from `EcState.SizeTruncationChecking`,
 the same way the arithmetic store chooses `checkedLanding`, so a unit with checking off emits the landing it
-always had.
+always had. A crossing landed at the activation boundary (above) raises inside `ProgramRegistry.CallProgram`,
+still before the transfer and still inside the CALL statement's try/catch, under the state the site stated.
 
 **A FLOATING-POINT FORMAL IS A NUMERIC RECEIVER OF THE SAME COMPUTE (kb/Work PB1114).** §14.8.2.3.3 2) a) and
 §14.2.3 GR9/GR10 say *"if the formal parameter is numeric"* and name no floating-point exemption, yet the landing
@@ -880,7 +894,10 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   decides WHICH elementary rule applies — rule 2 for "a program for which there is a program-specifier in the
   REPOSITORY paragraph of the activating element", rule 1 otherwise — from the program it actually reached and the
   activating element's program-specifiers, which the describing site passes (`programSpecifiers:`), because a CALL by
-  data-name or through a program-pointer can reach either. It compares each pair with `BoundaryItem.ArgumentViolation`
+  data-name or through a program-pointer can reach either. The same split decides §14.2.3 GR9's crossing, so a site
+  with no signature that passes an argument BY CONTENT or BY VALUE states them too, checking or not, and the boundary
+  lands each such argument through its formal's registered carrier (see "When the caller cannot" above; kb/Work
+  PB2549). It compares each pair with `BoundaryItem.ArgumentViolation`
   under the enabled-in-both gate, before the callee runs: `ActivationRelations.CallArgumentViolation` answers every rule
   of §14.8.2 — the object-reference and class-pointer paragraphs, §14.8.2.2's strongly-typed, variable-length and
   alphanumeric-group sentences (the group core a universal INVOKE's bound method asks too), §14.8.2.3.2 rule 2's clause

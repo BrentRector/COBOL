@@ -182,11 +182,27 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     private static bool DescribesOperands(BoundCallProgram c, bool argMismatchChecking) =>
         argMismatchChecking && !c.CalleeSignatureKnown;
 
-    /// <summary>The <c>programSpecifiers:</c> argument of a site that describes its operands: the externalized names of the
-    /// activating element's §12.3.8.2 program-specifiers (its own and its containers', §12.3.8.3), or empty when it writes
-    /// none — every program it can reach is then on rule 1's lane.</summary>
-    private string ProgramSpecifiersText() => ctx.Data.ProgramSpecifiers.Count == 0 ? ""
-        : $", programSpecifiers: new string[] {{ {string.Join(", ", ctx.Data.ProgramSpecifiers.Values.Select(s => CsLiteral(s.ExternalizedName)))} }}";
+    /// <summary>⛔ WHETHER THIS SITE LEAVES §14.2.3 GR9 / GR10's COMPUTE TO THE ACTIVATION BOUNDARY (kb/Work PB2549): it held no
+    /// signature of the activated program (<see cref="BoundCallProgram.CalleeSignatureKnown"/> false, so no argument carries
+    /// the <see cref="BoundCallArg.Formal"/> <see cref="LandedForFormal"/> lands into) and passes some argument BY CONTENT or
+    /// BY VALUE. GR10 fills every BY VALUE record by "a COMPUTE statement without the ROUNDED phrase", and GR9 every BY
+    /// CONTENT one whose program the activating element has a program-specifier for — which program a CALL by data-name or
+    /// through a program-pointer reaches is known only at run time — so the site states its program-specifiers and its
+    /// EC-SIZE-TRUNCATION state, and <c>ProgramTable.CallProgram</c> lands each argument through the formal's registered
+    /// carrier.</summary>
+    private static bool LandsAtRunTime(BoundCallProgram c) =>
+        !c.CalleeSignatureKnown && c.Args.Any(a => !a.Omitted && a.Mode is CobolPassMode.Content or CobolPassMode.Value);
+
+    /// <summary>The <c>programSpecifiers:</c> argument of a site that held no signature of the activated program and
+    /// describes its operands (<see cref="DescribesOperands"/>) or leaves its crossings to the activation boundary
+    /// (<see cref="LandsAtRunTime"/>): the externalized names of the activating element's §12.3.8.2 program-specifiers (its
+    /// own and its containers', §12.3.8.3). When the element writes none every program it can reach is on rule 1's lane, so
+    /// a site with crossings to land states the EMPTY array (the runtime still lands its BY VALUE arguments, GR10) and one
+    /// with none states nothing. A site that states nothing (null) has no argument for the runtime to land: it held the
+    /// signature and landed every argument at compile time, or it passes every argument BY REFERENCE.</summary>
+    private string ProgramSpecifiersText(bool landsAtRunTime) => ctx.Data.ProgramSpecifiers.Count > 0
+        ? $", programSpecifiers: new string[] {{ {string.Join(", ", ctx.Data.ProgramSpecifiers.Values.Select(s => CsLiteral(s.ExternalizedName)))} }}"
+        : landsAtRunTime ? ", programSpecifiers: System.Array.Empty<string>()" : "";
 
     /// <summary>The <c>CobolArg[]</c> expression of one bound call's arguments — the ONE argument-array text of
     /// <see cref="EmitCall"/>, which renders every activation, statement-position or operand (kb/Work PB892).</summary>
@@ -214,7 +230,10 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         // ⛔ GR3d's activating half rides EVERY arm (kb/Work PB1040's sweep): the two pointer arms used to drop it, so
         // a CALL through a program-pointer or a function-pointer never raised the argument-count or RETURNING
         // mismatch that the same CALL by name did.
-        string site = (argMismatchChecking ? ", siteArgMismatchChecking: true" : "") + (describe ? ProgramSpecifiersText() : "");
+        bool landsAtRunTime = LandsAtRunTime(c);
+        string site = (argMismatchChecking ? ", siteArgMismatchChecking: true" : "")
+            + (describe || landsAtRunTime ? ProgramSpecifiersText(landsAtRunTime) : "")
+            + (landsAtRunTime && ecState.SizeTruncationChecking ? ", siteSizeTruncationChecking: true" : "");
         if (c.IsPointerTarget && c.DynamicName is BoundFieldOperand pf)
             return c.IsFunction
                 ? $"ProgramRegistry.CallFunctionPointer({PlaceRenderer.Read(pf.Place)}, {head}{site});"
@@ -402,7 +421,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         !a.Omitted
         && a.Mode is CobolPassMode.Content or CobolPassMode.Value
         && a.Formal is { } f
-        && f.Pic is { IsClassNumeric: true } fp
+        && NumericLandingPic(f) is { } fp
             ? RuntimeApi.ArgLandForFormal(built, fp.ProfileInitializer(ctx.SignEncoding), $"{fp.Scale}",
                                           fp.ClrType, ecState.SizeTruncationChecking)
             : built;
@@ -442,20 +461,37 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// states for a formal so that §14.8.2 has something to compare an argument with at a CALL whose activated program is
     /// located by name at run time — its storage length, measured by the function that measures the activating element's
     /// argument (<see cref="ArgumentLength"/>), and its description, built by the builder that describes that argument
-    /// (<see cref="ActivationDescriptions.OfPlace"/>), so the two sides cannot disagree about what they compare. Registered
-    /// only by a unit that checks EC-PROGRAM-ARG-MISMATCH. Never null: an element that states nothing is the unstated
+    /// (<see cref="ActivationDescriptions.OfPlace"/>), so the two sides cannot disagree about what they compare — stated
+    /// only by a unit that checks EC-PROGRAM-ARG-MISMATCH (<paramref name="describe"/>). A NUMERIC formal also states its
+    /// CARRIER (<c>CarrierLanding</c>; kb/Work PB2549) whatever the unit checks, so that §14.2.3 GR9's second regime and
+    /// GR10 can land an argument into it at a CALL whose activating element did not know it (<c>BoundaryItem.Land</c>):
+    /// the same profile and the same carrier type argument <see cref="LandedForFormal"/> lands with, from the one
+    /// <see cref="NumericLandingPic"/>. Never null: an element that states nothing is the unstated
     /// <c>new BoundaryItem(null)</c>, so the array stays positional.</summary>
-    internal static string RegisteredFormal(Place p, SignEncoding signEncoding) =>
-        RegisteredBoundary(p, signEncoding, ArgumentLength(p), ActivationDescriptions.OfPlace(p)) ?? "new BoundaryItem(null)";
+    internal static string RegisteredFormal(Place p, SignEncoding signEncoding, bool describe) =>
+        RegisteredBoundary(p, signEncoding, describe ? ArgumentLength(p) : RuntimeApi.UnstatedBoundaryLength,
+            describe ? ActivationDescriptions.OfPlace(p) : null,
+            p.DenotedItem is { } formal && NumericLandingPic(formal) is { } pic ? RuntimeApi.CarrierLanding(pic.ClrType) : null)
+        ?? RuntimeApi.UnstatedBoundaryItem;
 
-    private static string? RegisteredBoundary(Place p, SignEncoding signEncoding, int length, ActivationDescription? description)
+    private static string? RegisteredBoundary(Place p, SignEncoding signEncoding, int length, ActivationDescription? description,
+        string? landing = null)
     {
         string? profile = BoundaryProfile(p, signEncoding);
         return profile is null && length == RuntimeApi.UnstatedBoundaryLength && description is null ? null
             : $"new BoundaryItem({profile ?? "null"}"
               + $"{(length == RuntimeApi.UnstatedBoundaryLength ? "" : $", {length}")}"
-              + $"{(description is null ? "" : $", Description: {RuntimeApi.ActivationDescriptionNew(description)}")})";
+              + $"{(description is null ? "" : $", Description: {RuntimeApi.ActivationDescriptionNew(description)}")}"
+              + $"{(landing is null ? "" : $", Landing: {landing}")})";
     }
+
+    /// <summary>⛔ THE ONE TEST OF WHICH FORMALS §14.2.3 GR9's second regime and GR10 fill by "a COMPUTE statement without
+    /// the ROUNDED phrase" — "if the formal parameter is numeric" — and the <c>PicInfo</c> whose profile, scale and CLR
+    /// carrier the landing takes: a CLASS-numeric formal (<c>PicInfo.IsClassNumeric</c>, so a USAGE INDEX item — "of class
+    /// index", GR9's SET leg — is not one). Asked by the activating element's compile-time landing
+    /// (<see cref="LandedForFormal"/>) and by the activated unit's registration (<see cref="RegisteredFormal"/>), so the two
+    /// lanes of one crossing cannot disagree about which formals they land (kb/Work PB2549).</summary>
+    private static PicInfo? NumericLandingPic(DataItem formal) => formal.Pic is { IsClassNumeric: true } pic ? pic : null;
 
     /// <summary>⛔ THE ACTIVATING ELEMENT'S STATEMENT OF ONE ARGUMENT for §14.9.4.4 GR3 d)'s run-time comparison (kb/Work
     /// PB165) — wrapped around EVERY argument shape <see cref="ArgCarrierText"/> builds, so no arm can be left undescribed:
