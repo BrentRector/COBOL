@@ -19,7 +19,7 @@ internal sealed class NameAllocator
     private int _read;        // READ out-image temporaries (__rd)
     private int _ec;          // EC locals (__ior/__sizeEc/…; shared by the core hook, the EC wrappers, and CALL)
     private int _loop;        // PERFORM TIMES loop locals (nested inline performs must not collide)
-    private int _set;         // SET sender temporaries (__set/__cap)
+    private int _set;         // SET-family amount landings (__set/__cap/__amt; PERFORM VARYING's FROM __pv; SET SIZE __sz)
     private int _search;      // SEARCH loop labels
     private int _call;        // CALL activation temporaries
     private int _inspectTmp;  // INSPECT image/count/magnitude locals (__ins…)
@@ -29,7 +29,6 @@ internal sealed class NameAllocator
     private int _ptr;         // pointer temporaries (__ptrBy/__notAlloc)
     private int _sort;        // sort-family temporaries (__srt)
     private int _strUnstr;    // STRING/UNSTRING locals
-    private int _vary;        // PERFORM VARYING index-range-check temporaries (__pv)
 
     public int NextDep() => _dep++;
     public int NextSizeErr() => _sizeErr++;
@@ -47,5 +46,4 @@ internal sealed class NameAllocator
     public int NextPtr() => _ptr++;
     public int NextSort() => _sort++;
     public int NextStrUnstr() => _strUnstr++;
-    public int NextVary() => _vary++;
 }
