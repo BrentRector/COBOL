@@ -1486,6 +1486,33 @@
       "dns": 457,
       "label": "PB1430: inline invocation ne",
       "battery": null
+    },
+    {
+      "sha": "a2c2aa9b",
+      "date": "2026-10-07",
+      "gap": 146,
+      "closed": 4201,
+      "dns": 457,
+      "label": "PB2499: a mnemonic-name oper",
+      "battery": null
+    },
+    {
+      "sha": "82e96cfb",
+      "date": "2026-10-07",
+      "gap": 145,
+      "closed": 4202,
+      "dns": 457,
+      "label": "PB165: run-time 14.8.2/14.8.",
+      "battery": null
+    },
+    {
+      "sha": "8109e5cb",
+      "date": "2026-10-08",
+      "gap": 144,
+      "closed": 4203,
+      "dns": 457,
+      "label": "PB1470+PB1544: two-literal r",
+      "battery": null
     }
   ],
   "program": [
@@ -1509,6 +1536,18 @@
       "open": 106,
       "waiting": 0,
       "retire_landed": 9,
+      "retire_total": 10,
+      "external_landed": 2,
+      "external_total": 8
+    },
+    {
+      "sha": "c799a62b",
+      "date": "2026-10-08",
+      "total": 249,
+      "landed": 18,
+      "open": 231,
+      "waiting": 153,
+      "retire_landed": 10,
       "retire_total": 10,
       "external_landed": 2,
       "external_total": 8
