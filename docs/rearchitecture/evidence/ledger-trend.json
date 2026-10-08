@@ -1423,6 +1423,69 @@
       "dns": 457,
       "label": "PB812+PB1545+PB895+PB1567+PB",
       "battery": null
+    },
+    {
+      "sha": "e68c3365",
+      "date": "2026-10-07",
+      "gap": 156,
+      "closed": 4191,
+      "dns": 457,
+      "label": "PB1353+PB1670: >>SOURCE FORM",
+      "battery": null
+    },
+    {
+      "sha": "24a007fe",
+      "date": "2026-10-07",
+      "gap": 155,
+      "closed": 4192,
+      "dns": 457,
+      "label": "PB1457: SEARCH ALL Format 2",
+      "battery": null
+    },
+    {
+      "sha": "42a68e20",
+      "date": "2026-10-07",
+      "gap": 153,
+      "closed": 4194,
+      "dns": 457,
+      "label": "PB833: Table 19 file lock ac",
+      "battery": null
+    },
+    {
+      "sha": "68cb97c7",
+      "date": "2026-10-07",
+      "gap": 152,
+      "closed": 4195,
+      "dns": 457,
+      "label": "PB244: tables of variable-le",
+      "battery": null
+    },
+    {
+      "sha": "bddea9df",
+      "date": "2026-10-07",
+      "gap": 150,
+      "closed": 4197,
+      "dns": 457,
+      "label": "PB1508: OPTIONS and CONFIGUR",
+      "battery": null
+    },
+    {
+      "sha": "a8d7d11e",
+      "date": "2026-10-07",
+      "gap": 149,
+      "closed": 4198,
+      "dns": 457,
+      "label": "PB1045: one SR4 GLOBAL-claus",
+      "battery": null
+    },
+    {
+      "sha": "d4fe71e3",
+      "date": "2026-10-07",
+      "gap": 147,
+      "closed": 4200,
+      "dns": 457,
+      "label": "PB1430: inline invocation ne",
+      "battery": null
     }
   ],
   "program": [
@@ -1434,6 +1497,18 @@
       "open": 107,
       "waiting": 0,
       "retire_landed": 8,
+      "retire_total": 10,
+      "external_landed": 2,
+      "external_total": 8
+    },
+    {
+      "sha": "d4fe71e3",
+      "date": "2026-10-07",
+      "total": 118,
+      "landed": 12,
+      "open": 106,
+      "waiting": 0,
+      "retire_landed": 9,
       "retire_total": 10,
       "external_landed": 2,
       "external_total": 8
