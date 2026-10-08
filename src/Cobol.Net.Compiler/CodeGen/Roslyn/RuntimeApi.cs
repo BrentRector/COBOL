@@ -314,7 +314,7 @@ internal static class RuntimeApi
 
     /// <summary>THE edited MOVE-semantics store keyed on the receiver's picture (data-model design D21 / kb/Work PB66 —
     /// the form dispatch lives HERE, never at a call site): a floating-point numeric-edited receiver takes
-    /// <c>CobolEdit.FormatFloatMove</c> over the sender's exact form (an unscaled Int128 + scale, a CobolDec, or a
+    /// <c>CobolEdit.FormatFloatStore</c> (TRUNCATION) over the sender's exact form (an unscaled Int128 + scale, a CobolDec, or a
     /// binary64 — §14.9.25.4 GR6 item 4: overflow → EC-DATA-OVERFLOW + the pinned saturated image, underflow → zero);
     /// a fixed-point one the classic <c>CobolEdit.Format</c> over the value ALIGNED at the mask's scale
     /// (<paramref name="alignedFixed"/> — the caller's rescale, which a floating-point form never needs).</summary>
@@ -328,10 +328,22 @@ internal static class RuntimeApi
             return $"{nameof(CobolLocaleEdit)}.{nameof(CobolLocaleEdit.Format)}({alignedFixed}, {alignedScale}, "
                 + $"{Emit.EmitText.CsLiteral(le.Picture)}, {LocaleTagArg(le.Locale)}, {le.Size}{cfgArgs})";
         if (!pic.IsFloatEdited) return EditFormat(alignedFixed, alignedScale, Emit.EmitText.CsLiteral(pic.EditMask!), cfgArgs);
+        // MOVE semantics: the floating-point form truncates (§14.6.8.4 rule 2). The arithmetic no-phrase store
+        // names the receiver's own mode through EditFormatFloat instead (kb/Work PB2638).
+        return EditFormatFloat(pic, value, CobolRounding.Truncation, cfgArgs);
+    }
+
+    /// <summary>The floating-point numeric-edited form's UNCHECKED store — <c>CobolEdit.FormatFloatStore</c> over the
+    /// sender's exact form, the significand's dropped digits rounded by <paramref name="mode"/>. The CALLER names
+    /// the landing (kb/Work PB2638): a MOVE is TRUNCATION (§14.6.8.4 rule 2, <see cref="EditFormatFor"/>), and the
+    /// no-phrase arithmetic store is the receiver's §14.7.4.3 mode, where PROHIBITED lands truncated as every
+    /// unchecked store does (DOC-A.1-70).</summary>
+    public static string EditFormatFloat(PicInfo pic, Emit.NumX value, CobolRounding mode, string cfgArgs)
+    {
         string mask = Emit.EmitText.CsLiteral(pic.EditMask!);
         return value.Real || value.Dec
-            ? $"{nameof(CobolEdit)}.{nameof(CobolEdit.FormatFloatMove)}({value.Expr}, {mask}{cfgArgs})"
-            : $"{nameof(CobolEdit)}.{nameof(CobolEdit.FormatFloatMove)}({value.Expr}, {value.Scale}, {mask}{cfgArgs})";
+            ? $"{nameof(CobolEdit)}.{nameof(CobolEdit.FormatFloatStore)}({value.Expr}, {mask}, {RoundingText(mode)}{cfgArgs})"
+            : $"{nameof(CobolEdit)}.{nameof(CobolEdit.FormatFloatStore)}({value.Expr}, {value.Scale}, {mask}, {RoundingText(mode)}{cfgArgs})";
     }
 
     /// <summary>A locale-name reference rendered for a runtime call: the L1-normalized tag as a string literal,
@@ -387,13 +399,14 @@ internal static class RuntimeApi
         $"{nameof(CobolFloat)}.{nameof(CobolFloat.StoreScaledSingleChecked)}({converted})";
 
     /// <summary>The floating-point form's ARITHMETIC store (§14.7.5 cases 3/4 — false = the size error condition,
-    /// receiver unchanged): <c>CobolEdit.TryFormatFloat</c> over the result's exact form.</summary>
-    public static string EditTryFormatFloat(PicInfo pic, Emit.NumX value, string imgVar, string cfgArgs)
+    /// receiver unchanged; also §14.7.4.3 rule 7's PROHIBITED-inexact): <c>CobolEdit.TryFormatFloat</c> over the
+    /// result's exact form, the significand rounded by the receiver's <paramref name="mode"/> (kb/Work PB2638).</summary>
+    public static string EditTryFormatFloat(PicInfo pic, Emit.NumX value, CobolRounding mode, string imgVar, string cfgArgs)
     {
         string mask = Emit.EmitText.CsLiteral(pic.EditMask!);
         return value.Real || value.Dec
-            ? $"{nameof(CobolEdit)}.{nameof(CobolEdit.TryFormatFloat)}({value.Expr}, {mask}, out var {imgVar}{cfgArgs})"
-            : $"{nameof(CobolEdit)}.{nameof(CobolEdit.TryFormatFloat)}({value.Expr}, {value.Scale}, {mask}, out var {imgVar}{cfgArgs})";
+            ? $"{nameof(CobolEdit)}.{nameof(CobolEdit.TryFormatFloat)}({value.Expr}, {mask}, out var {imgVar}, {RoundingText(mode)}{cfgArgs})"
+            : $"{nameof(CobolEdit)}.{nameof(CobolEdit.TryFormatFloat)}({value.Expr}, {value.Scale}, {mask}, out var {imgVar}, {RoundingText(mode)}{cfgArgs})";
     }
 
     /// <summary>A floating-point literal as the EXACT standard-decimal operand (ISO §8.8.1.5.2 r1 — the literal's
@@ -404,11 +417,12 @@ internal static class RuntimeApi
     public static string DecFromParsedLiteral(Int128 sig, int exp10, string modeExpr) =>
         $"CobolDec.FromParsed({Emit.EmitText.IntLiteral(sig.ToString())}, {exp10}, {modeExpr})";
 
-    /// <summary>The compile-time floating-point edited image of a VALUE literal (<c>CobolEdit.FormatFloatMove</c> at
-    /// compile time — the same runtime, so the baked initial content is what a MOVE of the literal would store).</summary>
+    /// <summary>The compile-time floating-point edited image of a VALUE literal (<c>CobolEdit.FormatFloatStore</c> at
+    /// compile time with the MOVE landing, TRUNCATION — the same runtime, so the baked initial content is what a
+    /// MOVE of the literal would store).</summary>
     public static string EditComposeFloat(Int128 sig, int exp10, string picture, bool blankWhenZero, bool commaMode,
         IReadOnlyList<CobolEdit.EditRule>? edits = null) =>
-        CobolEdit.FormatFloatMove(new CobolDec(sig, exp10), picture, blankWhenZero, commaMode, edits?.ToArray());
+        CobolEdit.FormatFloatStore(new CobolDec(sig, exp10), picture, CobolRounding.Truncation, blankWhenZero, commaMode, edits?.ToArray());
 
     /// <summary>The trailing <c>edits:</c> named argument for a numeric-edited store carrying PICTURE EDITING
     /// phrases (ISO §13.18.40.2 Format 1) — the resolved render rules serialized as a
@@ -2486,7 +2500,7 @@ internal static class RuntimeApi
     /// editing sign control symbol's repetitions are digit positions (§13.18.40.5 rule 6) and the mask alone
     /// cannot say so (kb/Work PB491).</summary>
     public static int MaskScale(PicInfo pic, string mask, char currency) =>
-        CobolEdit.MaskScale(mask, currency, pic.DecimalPointIsComma, pic.EditingRules as CobolEdit.EditRule[]);
+        CobolEdit.MaskScale(mask, pic.EditingRules as CobolEdit.EditRule[], currency, pic.DecimalPointIsComma);
 
     /// <summary>ISO §13.18.8.4 GR3's content test over an operand's image — <c>CobolEdit.IsBlanked</c>.</summary>
     public static string EditIsBlanked(string read) => $"{nameof(CobolEdit)}.{nameof(CobolEdit.IsBlanked)}({read})";

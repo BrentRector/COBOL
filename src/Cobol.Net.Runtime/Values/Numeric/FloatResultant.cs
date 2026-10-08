@@ -58,12 +58,12 @@ public static class FloatResultant
 
     /// <summary>The unchecked landing of an exact scaled value <c>unscaled × 10^(−scale)</c>.</summary>
     public static double FromScaled(Int128 unscaled, int scale, CobolRounding mode, bool single) =>
-        LandExact(unscaled < 0, Magnitude(unscaled), scale, mode, single, out _);
+        LandExact(unscaled < 0, CobolDec.UAbs(unscaled), scale, mode, single, out _);
 
     /// <inheritdoc cref="TryFromReal"/>
     public static bool TryFromScaled(Int128 unscaled, int scale, CobolRounding mode, bool single, out double landed)
     {
-        landed = LandExact(unscaled < 0, Magnitude(unscaled), scale, mode, single, out Outcome o);
+        landed = LandExact(unscaled < 0, CobolDec.UAbs(unscaled), scale, mode, single, out Outcome o);
         return Admits(o, mode);
     }
 
@@ -82,12 +82,12 @@ public static class FloatResultant
     /// <summary>The unchecked landing of an SDIDI <c>Sig × 10^Exp</c> (exact — its significand never exceeds 34
     /// digits, so its magnitude always fits the carrier).</summary>
     public static double FromDec(CobolDec v, CobolRounding mode, bool single) =>
-        LandExact(v.Sig < 0, Magnitude(v.Sig), -v.Exp, mode, single, out _);
+        LandExact(v.Sig < 0, CobolDec.UAbs(v.Sig), -v.Exp, mode, single, out _);
 
     /// <inheritdoc cref="TryFromReal"/>
     public static bool TryFromDec(CobolDec v, CobolRounding mode, bool single, out double landed)
     {
-        landed = LandExact(v.Sig < 0, Magnitude(v.Sig), -v.Exp, mode, single, out Outcome o);
+        landed = LandExact(v.Sig < 0, CobolDec.UAbs(v.Sig), -v.Exp, mode, single, out Outcome o);
         return Admits(o, mode);
     }
 
@@ -142,7 +142,6 @@ public static class FloatResultant
     private static bool Admits(Outcome o, CobolRounding mode) =>
         o == Outcome.Exact || (o == Outcome.Rounded && mode != CobolRounding.Prohibited);
 
-    private static UInt128 Magnitude(Int128 v) => v < 0 ? (UInt128)(-(v + 1)) + 1 : (UInt128)v;   // total at MinValue
 
     /// <summary>A binary64 intermediate. Into a binary64 resultant it IS representable — every mode stores it
     /// unchanged; into a binary32 resultant it is the exact value <paramref name="v"/> to round (sticky 0).</summary>

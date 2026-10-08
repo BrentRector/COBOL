@@ -210,43 +210,24 @@ public static partial class CobolEdit
         // Pre-scan (on the full picture): fixed vs floating sign/currency — ONE occurrence is a fixed-insertion
         // character; TWO OR MORE form a floating string whose members are also digit positions (§13.18.40.4).
         // The currency symbol is the program's CURRENCY SIGN PICTURE SYMBOL (ISO §12.3.7 GR13; '$' per SR25).
-        char currencyChar = char.ToUpperInvariant(currency);
-        int plusCount = 0, minusCount = 0, currencyCount = 0;
-        foreach (char raw in pattern)
-        {
-            char p = char.ToUpperInvariant(raw);
-            if (p == '+') plusCount++;
-            else if (p == '-') minusCount++;
-            else if (p == currencyChar) currencyCount++;
-        }
-        bool isFixedPlus = plusCount == 1 && minusCount == 0;
-        bool isFixedMinus = minusCount == 1 && plusCount == 0;
-        bool isFixedCurrency = currencyCount == 1;
-
-        // Digit capacity: 9/Z/* always; floating $/+/- and a floating EXTENDED editing sign control character-1
-        // are digit positions, but the floating string reserves ONE position for the symbol itself.
+        // ⛔ The digit-position count is MaskFacts' — the ONE derivation Format, TryFormat, MaskCapacity,
+        // MaskScale and DeEdit all read (kb/Work PB2639) — never a loop of this method's own.
         // ⛔ §13.18.40.5 rule 6, first sentence: "The currency symbol, the extended editing sign control
         // symbols, if specified, and the fixed editing sign control symbols '+' and '-' are used as the floating
         // insertion symbols" — character-1 under a FOR phrase is one of them, and rule 6's fourth paragraph
         // ("The second floating symbol represents the leftmost limit of the numeric data that may be stored in
-        // the item") is what makes its repetitions digit positions. The rule that decided FLOATING was asked at
-        // bind, where the character-string is in hand, and travels on EditRule.Floating (kb/Work PB491).
-        int trueDigitCount = 0;
-        bool floatingChar1 = false;
-        foreach (char raw in pattern)
-        {
-            char p = char.ToUpperInvariant(raw);
-            if (p is '9' or 'Z' or '*') trueDigitCount++;
-            else if (p == currencyChar && !isFixedCurrency) trueDigitCount++;
-            else if (p == '+' && !isFixedPlus) trueDigitCount++;
-            else if (p == '-' && !isFixedMinus) trueDigitCount++;
-            else if (RuleFor(raw, edits) is { Floating: true }) { trueDigitCount++; floatingChar1 = true; }
-        }
-        bool hasFloating = currencyCount > 1 || plusCount > 1 || minusCount > 1 || floatingChar1;
-        int effectiveDigitCount = hasFloating ? trueDigitCount - 1 : trueDigitCount;
+        // the item") is what makes its repetitions digit positions, the floating string reserving ONE position
+        // for the symbol itself. The rule that decided FLOATING was asked at bind, where the character-string
+        // is in hand, and travels on EditRule.Floating (kb/Work PB491).
+        var facts = MaskFacts.Of(pattern, edits, currency);
+        char currencyChar = facts.CurrencyChar;
+        int plusCount = facts.Plus, minusCount = facts.Minus, currencyCount = facts.Currency;
+        bool isFixedPlus = facts.FixedPlus, isFixedMinus = facts.FixedMinus, isFixedCurrency = facts.FixedCurrency;
+        bool floatingChar1 = facts.FloatingChar1;
+        int effectiveDigitCount = facts.Capacity;
 
         // The mask's fraction scale: digit positions after the point (V in the picture, or the '.' insertion).
-        int fracDigits = FractionDigits(picture, currencyChar, isFixedCurrency, isFixedPlus, isFixedMinus);
+        int fracDigits = facts.FractionDigits(picture);
 
         // Align the operand to the mask's scale (truncation — §14.9.25 GR: excess fraction digits truncate) and
         // render the absolute digit string at the mask's capacity (excess INTEGER digits truncate high-order).
@@ -255,7 +236,7 @@ public static partial class CobolEdit
         // digits of the true value (§14.6.8.2 r4 "zero fill or truncation on either end"), not the low-order
         // digits of an Int128 wrap. MOVE 10^30 TO PIC Z(8)9.9(9) showed 123822295.304634368 for 0.000000000.
         Int128 scaled = CobolNum.RescaleStoreCap(value, valueScale, fracDigits, CobolRounding.Truncation);
-        string digits = Int128.Abs(scaled).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        string digits = CobolDec.UAbs(scaled).ToString(System.Globalization.CultureInfo.InvariantCulture);
         if (digits.Length < effectiveDigitCount) digits = digits.PadLeft(effectiveDigitCount, '0');
         else if (digits.Length > effectiveDigitCount) digits = digits[^effectiveDigitCount..];
 
@@ -500,16 +481,10 @@ public static partial class CobolEdit
         string rawPicture = picture;
         if (commaMode) picture = SwapSeparators(picture);   // canonicalize (§13.18.40.2 SR13) — digit POSITIONS are unchanged
         string pattern = picture.Replace("V", "").Replace("P", "");   // V and P hold no output position (§13.18.40.3)
-        char currencyChar = char.ToUpperInvariant(currency);
-        int plus = 0, minus = 0, cs = 0;
-        foreach (char raw in pattern)
-        {
-            char p = char.ToUpperInvariant(raw);
-            if (p == '+') plus++;
-            else if (p == '-') minus++;
-            else if (p == currencyChar) cs++;
-        }
-        bool fixedPlus = plus == 1 && minus == 0, fixedMinus = minus == 1 && plus == 0, fixedCs = cs == 1;
+        var facts = MaskFacts.Of(pattern, edits, currency);
+        char currencyChar = facts.CurrencyChar;
+        int minus = facts.Minus;
+        bool fixedCs = facts.FixedCurrency;
         int csWidth = currencyString is { Length: > 1 } ? currencyString.Length : 1;
 
         Int128 value = 0;
@@ -554,10 +529,9 @@ public static partial class CobolEdit
                 continue;
             }
             phys++;
-            bool digitPos = p is '9' or 'Z' or '*'
-                || (p == '+' && !fixedPlus)
-                || (p == '-' && !fixedMinus);
-            if (digitPos) { value = value * 10 + (c is >= '0' and <= '9' ? c - '0' : 0); continue; }
+            // The currency symbol and every FLOATING character-1 were answered above, so the digit positions
+            // left are 9/Z/* and a floating '+'/'-' — MaskFacts' own predicate, not a copy of it.
+            if (facts.IsDigitPosition(pattern[i])) { value = value * 10 + (c is >= '0' and <= '9' ? c - '0' : 0); continue; }
             if (c == '-') negative = true;                      // a fixed sign position holding minus
             else if (p == 'C' && c == 'C') negative = true;     // CR rendered (negative value)
             else if (p == 'D' && c == 'D') negative = true;     // DB rendered
@@ -571,7 +545,7 @@ public static partial class CobolEdit
             // Re-edit through the PUBLIC entry with the ORIGINAL mask and flag: the comma swap belongs to the
             // logical image (a currency string or an editing literal may itself hold a separator), so it is
             // Format's to apply, never a swap over the physical result.
-            string expected = Format(result, MaskScale(picture, currency, commaMode: false, edits), rawPicture,
+            string expected = Format(result, MaskScale(picture, edits, currency, commaMode: false), rawPicture,
                 blankWhenZero, currency, commaMode, edits, currencyString);
             if (expected != physical)
                 ExceptionState.DataIncompatibleError(
@@ -589,13 +563,13 @@ public static partial class CobolEdit
         bool blankWhenZero = false, char currency = '$', bool commaMode = false, EditRule[]? edits = null,
         string? currencyString = null)
     {
-        var (capacity, fracDigits) = MaskCapacity(picture, currency, commaMode);
+        var (capacity, fracDigits) = MaskCapacity(picture, edits, currency, commaMode);   // edits: PB2639
         // ⛔ The capacity test may never look at a WRAPPED alignment (kb/Work PB639): a widening the Int128
         // carrier cannot form is further from zero than any mask can show (§14.7.5 case 3), and the wrap can
         // land back inside `capacity` — a guard that silently passes exactly the magnitudes it exists to catch.
         if (!CobolNum.WideningFits(value, fracDigits - valueScale)) { image = string.Empty; return false; }
         Int128 scaled = CobolNum.Rescale(value, valueScale, fracDigits, CobolRounding.Truncation);
-        if (Int128.Abs(scaled) >= CobolNum.Pow10Wide(capacity)) { image = string.Empty; return false; }
+        if (CobolDec.UAbs(scaled) >= (UInt128)CobolNum.Pow10Wide(capacity)) { image = string.Empty; return false; }
         image = Format(value, valueScale, picture, blankWhenZero, currency, commaMode, edits, currencyString);
         return true;
     }
@@ -704,117 +678,29 @@ public static partial class CobolEdit
     }
 
     /// <summary>The mask's total digit-position capacity (9/Z/* plus floating-string members, less the ONE
-    /// position the floating symbol itself occupies) and its fraction scale — the §14.7.5 size-error bound.
-    /// Mirrors <see cref="Format"/>'s prologue exactly. Public so the compiler can reuse the ONE canonical
-    /// edited digit-position count for the HIGHEST/LOWEST-ALGEBRAIC PICTURE fold (§15.43/§15.58; singular-pattern).</summary>
-    public static (int Capacity, int FracDigits) MaskCapacity(string picture, char currency = '$', bool commaMode = false,
-        EditRule[]? edits = null)
+    /// position the floating symbol itself occupies) and its fraction scale — the §14.7.5 size-error bound. Both
+    /// come from <see cref="MaskFacts"/>, the same facts <see cref="Format"/> renders from, so the bound and the
+    /// image cannot disagree (kb/Work PB2639). <paramref name="edits"/> is required: a FLOATING extended editing
+    /// sign control symbol is a digit position (§13.18.40.5 rule 6) only when the rules are in hand, and a
+    /// caller with no PICTURE EDITING phrase says so with <c>null</c>. Public so the compiler can reuse the ONE
+    /// canonical edited digit-position count for the HIGHEST/LOWEST-ALGEBRAIC PICTURE fold (§15.43/§15.58;
+    /// singular-pattern).</summary>
+    public static (int Capacity, int FracDigits) MaskCapacity(string picture, EditRule[]? edits, char currency = '$',
+        bool commaMode = false)
     {
         if (commaMode) picture = SwapSeparators(picture);   // canonicalize (§13.18.40.2 SR13)
-        string pattern = picture.Replace("V", "").Replace("P", "");   // V and P hold no output position (§13.18.40.3)
-        char currencyChar = char.ToUpperInvariant(currency);
-        int plus = 0, minus = 0, cs = 0;
-        foreach (char raw in pattern)
-        {
-            char p = char.ToUpperInvariant(raw);
-            if (p == '+') plus++;
-            else if (p == '-') minus++;
-            else if (p == currencyChar) cs++;
-        }
-        bool fixedPlus = plus == 1 && minus == 0, fixedMinus = minus == 1 && plus == 0, fixedCs = cs == 1;
-        int digits = 0;
-        bool floatingChar1 = false;
-        foreach (char raw in pattern)
-        {
-            char p = char.ToUpperInvariant(raw);
-            if (p is '9' or 'Z' or '*') digits++;
-            else if (p == currencyChar && !fixedCs) digits++;
-            else if (p == '+' && !fixedPlus) digits++;
-            else if (p == '-' && !fixedMinus) digits++;
-            // A FLOATING extended editing sign control symbol's repetitions are digit positions (§13.18.40.5
-            // rule 6) — the same footing as a floating currency symbol's, and the same footing the analyzer's
-            // own DigitPositions count gives them (kb/Work PB491).
-            else if (RuleFor(raw, edits) is { Floating: true }) { digits++; floatingChar1 = true; }
-        }
-        bool hasFloating = cs > 1 || plus > 1 || minus > 1 || floatingChar1;
-        return (hasFloating ? digits - 1 : digits,
-                FractionDigits(picture, currencyChar, fixedCs, fixedPlus, fixedMinus, edits));
+        var facts = MaskFacts.Of(picture, edits, currency);
+        return (facts.Capacity, facts.FractionDigits(picture));
     }
 
     /// <summary>The mask's fraction scale — digit positions right of the point (<c>V</c> or <c>.</c>). Public so
     /// the compiler can fold the working scale of an edited RECEIVER at emit time (a quotient/ROUNDED result must
-    /// be computed and rounded AT this scale before editing, ISO §14.7.4/§14.7.7).</summary>
-    public static int MaskScale(string picture, char currency = '$', bool commaMode = false,
-        EditRule[]? edits = null)
+    /// be computed and rounded AT this scale before editing, ISO §14.7.4/§14.7.7). <paramref name="edits"/> is
+    /// required for the reason <see cref="MaskCapacity"/>'s is (kb/Work PB2639).</summary>
+    public static int MaskScale(string picture, EditRule[]? edits, char currency = '$', bool commaMode = false)
     {
         if (commaMode) picture = SwapSeparators(picture);   // canonicalize (§13.18.40.2 SR13) — the comma IS the decimal position
-        char currencyChar = char.ToUpperInvariant(currency);
-        int plus = 0, minus = 0, cs = 0;
-        foreach (char raw in picture)
-        {
-            char p = char.ToUpperInvariant(raw);
-            if (p == '+') plus++;
-            else if (p == '-') minus++;
-            else if (p == currencyChar) cs++;
-        }
-        return FractionDigits(picture, currencyChar, cs == 1, plus == 1 && minus == 0, minus == 1 && plus == 0);
-    }
-
-    /// <summary>Digit positions to the right of the point — the <c>V</c> in the picture, or the <c>.</c> insertion
-    /// character (only one of the two may appear, ISO §13.18.40.3).</summary>
-    private static int FractionDigits(string picture, char currencyChar, bool fixedCs, bool fixedPlus,
-        bool fixedMinus, EditRule[]? edits = null)
-    {
-        // A FLOATING extended editing sign control symbol is a digit position on exactly the same footing as a
-        // floating currency symbol (§13.18.40.5 rule 6 — the same sentence lists both among the floating
-        // insertion symbols), and §13.18.40.3 SR29 allows a floating string to reach past the decimal point, so
-        // it counts in both branches below (kb/Work PB491).
-        bool FloatingChar1(char c) => RuleFor(c, edits) is { Floating: true };
-        // PICTURE P scaling positions (§13.18.40.3): trailing P → a NEGATIVE mask scale (the value is a multiple
-        // of 10^P — PIC ZZZPP aligns 900 to unscaled 9, NC124A PICTURE-TEST-30); leading P → every digit position
-        // is fractional (scale = P-count + digit positions). P never coexists with V-fraction digits.
-        // ⛔ The leading/trailing split anchors on EVERY digit position — 9/Z/* AND a FLOATING string's member
-        // occurrences (§13.18.40.6 Table 10 puts 'P (left of decimal point)' beside floating cs and +/−) — never
-        // on only the literal 9/Z/* (kb/Work PB155: `PIC $$$$PP` has no 9/Z/* at all, so its rightmost P run
-        // read as LEADING and the mask scale came out +2 where the value is a multiple of 10^2, scale −2).
-        // A FIXED single +/−/cs is not a digit position and must not anchor (a trailing fixed sign sits right
-        // of a trailing P run: 99PPCR).
-        int pCount = 0;
-        foreach (char raw in picture) if (char.ToUpperInvariant(raw) == 'P') pCount++;
-        if (pCount > 0)
-        {
-            string up = picture.ToUpperInvariant();
-            bool IsDigitPos(char c) => c is '9' or 'Z' or '*'
-                || (c == currencyChar && !fixedCs) || (c == '+' && !fixedPlus) || (c == '-' && !fixedMinus)
-                || FloatingChar1(c);
-            int lastDigitPos = -1, digitPositions = 0;
-            bool sawFloating = false;
-            for (int i = 0; i < up.Length; i++)
-                if (IsDigitPos(up[i]))
-                {
-                    lastDigitPos = i;
-                    // the LEFTMOST occurrence of a floating string is the sign/currency itself, not a digit
-                    if (up[i] is not ('9' or 'Z' or '*') && !sawFloating) { sawFloating = true; continue; }
-                    digitPositions++;
-                }
-            if (lastDigitPos >= 0 && up.IndexOf('P', lastDigitPos) > lastDigitPos) return -pCount;
-            return pCount + digitPositions;
-        }
-        int point = picture.IndexOf('V');
-        if (point < 0) point = picture.IndexOf('.');
-        if (point < 0) return 0;
-        int n = 0;
-        for (int i = point + 1; i < picture.Length; i++)
-        {
-            char p = char.ToUpperInvariant(picture[i]);
-            if (p is '9' or 'Z' or '*') n++;
-            else if (p == currencyChar && !fixedCs) n++;
-            else if (p == '+' && !fixedPlus) n++;
-            else if (p == '-' && !fixedMinus) n++;
-            else if (FloatingChar1(picture[i])) n++;
-            else if (p is 'C' or 'D') break;   // CR/DB
-        }
-        return n;
+        return MaskFacts.Of(picture, edits, currency).FractionDigits(picture);
     }
 
     /// <summary>⭐ THE EDITED CHARACTER CATEGORIES' formatter — ISO §13.18.40.5 <b>Table 7</b> gives category

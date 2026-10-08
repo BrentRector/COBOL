@@ -1067,8 +1067,14 @@ of an unsupported facility.
   for `PIC 9.99E+9`; `-9.99999E+99` for a negative value into `-9.9(5)E+99`) — never arbitrary content; underflow
   stores the §13.18.40.5 rule-8 zero image (all digit positions zero, both signs positive; BLANK WHEN ZERO applies)
   with no exception. An ARITHMETIC statement's floating-point numeric-edited resultant takes the size error
-  condition in BOTH directions (§14.7.5 items 3 and 4 — the receiver unchanged) under ON SIZE ERROR / EC-SIZE
-  checking; without either, the MOVE disposition above. A de-editing MOVE from content that is not a possible
+  condition in BOTH directions (§14.7.5 items 3 and 4 — the receiver unchanged, EC-SIZE-TRUNCATION) under ON SIZE
+  ERROR / EC-SIZE checking; without either, the MOVE disposition above. The receiver's ROUNDED [MODE] rounds the
+  SIGNIFICAND at its last digit (§14.7.4.3 rules 3 to 10; a MOVE truncates, §14.6.8.4 rule 2): a carry out of
+  the last digit renormalizes and the exponent is tested after it (`9.996` into `+9.99E+99` is `+1.00E+01`,
+  §14.7.5 item 3 "after … any applicable rounding specifications"), and ROUNDED MODE IS PROHIBITED with a
+  significand that cannot be held exactly is the size error condition with the receiver unchanged (§14.7.4.3
+  rule 7; unchecked, it lands truncated like every unchecked store, A.1 item 70). Pinned by
+  `2023/pb2638_float_edited_rounded_store`. A de-editing MOVE from content that is not a possible
   result of editing into the picture (§14.6.13.2 rule 4 — the result "is undefined") raises EC-DATA-INCOMPATIBLE
   (fatal) under checking with the receiver unchanged; with checking off the image is read digit-for-digit
   (a non-digit position contributes zero, a missing exponent sign reads positive). Pinned by

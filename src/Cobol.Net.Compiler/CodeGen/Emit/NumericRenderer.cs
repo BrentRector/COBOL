@@ -858,7 +858,13 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // An exact wide operand has no quotient form of its own (§8.8.1.3 leaves the intermediate to the implementor, and
         // GnuCOBOL's own divide is inexact: shift_decimal then a truncating mpz_tdiv_q, numeric.c:2259-2261): the quotient
         // forms on the SDIDI by ROUND-TO-ODD (CobolDec.DivToOdd), so the one rounding at the receiver sees any tail.
-        if (a.Wide || b.Wide)
+        // ⛔ AND SO DOES THE FINAL TRANSFER INTO A FLOATING-POINT numeric-edited RESULTANT (kb/Work PB2638): it has no
+        // fraction scale to compute the quotient AT — the value normalizes into the mask and the store rounds its
+        // SIGNIFICAND by the receiver's mode — so the guard-scale branch below, whose scale is only the mask's
+        // working-scale hint, lost every digit of a small quotient (`1 / 3E24` into `+9.99E+99` stored +0.00E+00)
+        // and showed the store a truncated tail that cannot break a rounding tie. The round-to-odd SDIDI keeps
+        // 34 significant digits and the inexact marker, which is all that rounding (and PROHIBITED) reads.
+        if (a.Wide || b.Wide || (_outermost && _rcv.FloatEdited))
             return new NumX(RuntimeApi.DecDivToOdd(DecOperand(a), DecOperand(b)), 0, Dec: true);
         int ds;
         CobolRounding mode;

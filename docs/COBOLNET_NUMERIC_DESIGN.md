@@ -356,7 +356,11 @@ through `EmitText.UnscaledLit` rather than this rendering — kb/Work PB263 (BY 
 PB264 (BY VALUE: the fraction digits truncated away).
 
 **Float-integration edge cases.** The Real integration covers these paths: a float source/result into a
-NUMERIC-EDITED receiver (MOVE + COMPUTE) lands via `ToScaled` at the MASK scale (`CobolEdit.MaskScale`, NOT
+NUMERIC-EDITED receiver (MOVE + COMPUTE) lands via `ToScaled` at the MASK scale (`CobolEdit.MaskScale` — which, like
+`MaskCapacity`, takes the item's `EditRule[]` as a REQUIRED argument: the render, the size-error bound, the scale and
+the de-edit all read ONE `CobolEdit.MaskFacts` derivation of which mask symbols are digit positions, so a floating
+extended editing sign control symbol — §13.18.40.5 rule 6 — cannot be a digit in one and an insertion in another;
+kb/Work PB2639 — NOT
 `pic.Scale`, which is 0 for an edited item); every ROUNDED mode — NEAREST-TOWARD-ZERO included, where
 `MidpointRounding.ToZero` would have been wrong because it is DIRECTED and truncates all values, not just ties —
 comes from the ONE `CobolNum.RoundDiv` kernel over the exact expansion, so the float lane has no rounding rule of
@@ -902,6 +906,10 @@ EC-SIZE-TRUNCATION so storing rule 2 can leave the receiver unchanged), `TryStor
 from zero than ANY fixed-point receiver permits, because the widest decimal capacity is 10^38 − 1 and the widest
 binary container is `Int128` itself. It is MinValue-safe by construction (the bound is written on the signed
 value, never through `Int128.Abs`, which throws on `Int128.MinValue` — reachable through the R10 bits contract).
+**The magnitude has one spelling too (kb/Work PB2639): `CobolDec.UAbs(Int128) → UInt128`**, which holds 2^127
+exactly, so an unsigned receiver's absolute value (§14.9.25.4 GR6 b), every digit-capacity test (`InPictureRange`,
+`CobolEdit.TryFormat`, `CobolLocaleEdit`) and `InBinaryRange`/`WrapBinary` read the same MinValue-safe form; a signed
+16-byte COMP-5 holding −2^127 stored into an unsigned one is 2^127 and no size error.
 **The UNCHECKED store then splits on the receiver's capacity discipline, because "the low-order digits" means two
 different things:** a DISPLAY / COMP / PACKED receiver takes the DECIMAL low-order digits, so the widening is
 `RescaleStoreCap` (the ≤38-digit cap applied BEFORE the multiply — exact, since 10^D divides 10^38 for every

@@ -1100,10 +1100,13 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         return (v / den, v % den, den);
     }
 
-    /// <summary>The magnitude of a signed carrier value as an UNSIGNED one — total over <see cref="Int128"/>:
-    /// <c>-Int128.MinValue</c> wraps to itself and its bit pattern IS 2^127 as a <see cref="UInt128"/>, where
-    /// <c>Int128.Abs</c> throws and a negated-ternary stays negative (kb/Work PB2641). The ONE magnitude every
-    /// test over a carrier value that can be a signed 16-byte COMP-5 minimum asks.</summary>
+    /// <summary>⭐ THE MAGNITUDE OF AN Int128 CARRIER VALUE — the one spelling of "the absolute value" (ISO
+    /// §14.9.25.4 GR6 b: "When an unsigned numeric item is the receiving item, the absolute value of the sending
+    /// value is used") and of every digit-capacity test over a carrier value (§14.7.5 case 3), total over
+    /// <see cref="Int128"/>: <c>-Int128.MinValue</c> wraps to itself and its bit pattern IS 2^127 as a
+    /// <see cref="UInt128"/>, where <c>Int128.Abs</c> throws and a negated ternary stays negative (kb/Work PB2641,
+    /// PB2639). ⛔ Do not write a second one: <c>CobolNum</c>, <c>CobolEdit</c>, <c>CobolLocaleEdit</c>,
+    /// <c>FloatResultant</c> and the divide kernels all read this (train 1042b collapsed two copies into it).</summary>
     internal static UInt128 UAbs(Int128 v) => v < 0 ? (UInt128)(-v) : (UInt128)v;
 
     private static int DigitCount(Int128 mag)

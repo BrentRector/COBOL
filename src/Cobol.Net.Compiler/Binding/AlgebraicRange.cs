@@ -111,8 +111,8 @@ internal static class AlgebraicRanges
             // The EDITING rules travel with the mask: a FLOATING extended editing sign control symbol's
             // repetitions are digit positions (§13.18.40.5 rule 6), so the capacity is wrong without them
             // (kb/Work PB491).
-            var (cap, frac) = CobolNet.Runtime.CobolEdit.MaskCapacity(pic.EditMask!, '$', decimalPointIsComma,
-                pic.EditingRules as CobolNet.Runtime.CobolEdit.EditRule[]);
+            var (cap, frac) = CobolNet.Runtime.CobolEdit.MaskCapacity(pic.EditMask!,
+                pic.EditingRules as CobolNet.Runtime.CobolEdit.EditRule[], '$', decimalPointIsComma);
             scale = frac;
             unscaled = Pow10(cap) - 1;      // all-nines over the mask's digit positions (§13.18.40.4)
             signable = pic.EditMask!.IndexOf('+') >= 0 || pic.EditMask!.IndexOf('-') >= 0

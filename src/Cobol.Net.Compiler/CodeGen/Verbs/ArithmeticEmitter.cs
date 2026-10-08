@@ -420,8 +420,9 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         // what makes the next receiver category inherit it.
         //
         // A FLOATING-POINT numeric-edited receiver is deliberately OUT: it has no fixed fraction scale to test
-        // against (the significand truncates into the mask, D21/PB66), so r7's "cannot be represented exactly in
-        // the resultant identifier" is a different predicate there and is not this gate's to answer.
+        // against (D21/PB66), so r7's "cannot be represented exactly in the resultant identifier" is a different
+        // predicate there — the significand's digit count, not a scale — and CobolEdit.TryFormatFloat answers it
+        // in its own arm below (kb/Work PB2638).
         string? r7Inexact = null;
         if (ecState.SizeErrVar is not null && value.Real && mode == CobolRounding.Prohibited
             && target.Item.Pic is { IsFloat: false, IsFloatEdited: false } gpic
@@ -445,21 +446,25 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         // fraction scale with the receiver's mode (§14.7.4), then formatted.
         if (target.Item.Pic is { Category: PicCategory.NumericEdited, IsFloatEdited: true } fpic)
         {
-            // A FLOATING-POINT numeric-edited resultant (D21/PB66): the exact result normalizes into the mask; ROUNDED
-            // has no fixed scale to round to (the significand is truncated to the mask's digits, §14.6.8.4 GR2 →
-            // §13.18.40's alignment rules). Under ON SIZE ERROR / EC-SIZE both directions out of range are the size
-            // error condition (§14.7.5 cases 3 AND 4 — the receiver unchanged); without them the MOVE disposition
-            // (overflow → the pinned image, underflow → zero) stands.
+            // A FLOATING-POINT numeric-edited resultant (D21/PB66): the exact result normalizes into the mask, and the
+            // receiver's §14.7.4.3 mode rounds the SIGNIFICAND to the mask's digits (kb/Work PB2638) — a fixed-point
+            // receiver rounds at its fraction scale, this one at its significand's last digit, by the same rules 3 to
+            // 10 (rule 4: "rounded to the nearest value that can be represented in the resultant identifier"). The
+            // PROHIBITED test (rule 7) is the same question asked of the same significand, so TryFormatFloat answers
+            // it and the shared r7 gate above, which probes a FIXED scale, rightly leaves this receiver out. Under
+            // ON SIZE ERROR / EC-SIZE both directions out of range, and an inexact PROHIBITED, are the size error
+            // condition (§14.7.5 cases 3 AND 4 — the receiver unchanged; EC-SIZE-TRUNCATION like every sibling arm);
+            // without them the MOVE disposition (overflow → the pinned image, underflow → zero) stands, rounded.
             string fcfg = BwzFlag(target.Item) + EditCfg(target.Item.Pic);
             if (ecState.SizeErrVar is { } fflag)
             {
                 string fimg = $"__sv{ctx.Names.NextStoreTmp()}";
-                string fOnFail = ecState.SizeErrEcVar is { } fecn ? $"{{ {fflag} = true; {fecn} = \"EC-SIZE-OVERFLOW\"; }}" : $"{fflag} = true;";
-                w.Line($"if (!{RuntimeApi.EditTryFormatFloat(fpic, value, fimg, fcfg)}) {fOnFail}");
+                string fOnFail = ecState.SizeErrEcVar is { } fecn ? $"{{ {fflag} = true; {fecn} = \"EC-SIZE-TRUNCATION\"; }}" : $"{fflag} = true;";
+                w.Line($"if (!{RuntimeApi.EditTryFormatFloat(fpic, value, mode, fimg, fcfg)}) {fOnFail}");
                 w.Line($"else {PlaceRenderer.Write(target, fimg)}");
                 return;
             }
-            w.Line(PlaceRenderer.Write(target, RuntimeApi.EditFormatFor(fpic, value, "", "", fcfg)));
+            w.Line(PlaceRenderer.Write(target, RuntimeApi.EditFormatFloat(fpic, value, mode, fcfg)));
             return;
         }
         // A format-2 (LOCALE) numeric-edited resultant (kb/Work PB64 T6): the edit is the locale's LC_MONETARY at

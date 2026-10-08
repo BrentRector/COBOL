@@ -1,0 +1,16 @@
+C1 [  DEBIT 10.00]
+C2 [      9999.99]
+C3 [DEBIT 9999.99]
+C4 size error
+C4 kept [DEBIT 9999.99]
+C5 [ DEBIT 123.45]
+G1 [  1.50]
+G2 [ -1.50]
+G2 -> 9V99 150
+G2 -> S9V99 is -1.50
+G3 [   .25]
+G4 [  -.25]
+G5 [   .50]
+G6 [ 99.99]
+G7 size error
+G7 kept [ 99.99]

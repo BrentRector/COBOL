@@ -89,7 +89,7 @@ public static class CobolLocaleEdit
         var p = Parse(picture);
 
         bool negative = p.HasPlus && unscaled < 0;                          // GR18 '+' — absent ⇒ unsigned, |v|
-        Int128 mag = unscaled < 0 ? -unscaled : unscaled;
+        UInt128 mag = CobolDec.UAbs(unscaled);
 
         // r14 sentence 1 — align on the decimal point position, zero fill or SILENT truncation on either end.
         // Done over the digit STRING so a wide rescale cannot overflow the carrier. ⛔ HOISTED ABOVE r10 and
@@ -193,7 +193,7 @@ public static class CobolLocaleEdit
         out string edited, bool blankWhenZero = false)
     {
         var p = Parse(picture);
-        Int128 mag = unscaled < 0 ? -unscaled : unscaled;
+        UInt128 mag = CobolDec.UAbs(unscaled);
         int magDigits = mag == 0 ? 1 : mag.ToString().Length;
         if (magDigits - valueScale > p.DigitsLeft)
         {

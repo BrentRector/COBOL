@@ -45,7 +45,8 @@ namespace CobolNet.CodeGen;
 /// <param name="FloatEdited">
 /// True when the resultant identifier is a FLOATING-POINT numeric-edited item (data-model design D21 /
 /// kb/Work PB66). Such a receiver has NO fixed fraction scale for the ROUNDED transfer — the result normalizes
-/// into the mask and its significand is truncated to the mask's digits — so <see cref="Scale"/> carries the
+/// into the mask and the store rounds its significand to the mask's digits by the receiver's mode
+/// (<c>CobolEdit.TryFormatFloat</c> / <c>FormatFloatStore</c>, kb/Work PB2638) — so <see cref="Scale"/> carries the
 /// mask's significand scale only as a working-scale hint (<c>RuntimeApi.ReceiverScaleOf</c>) and is NOT the
 /// scale a final transfer rounds at. <see cref="FloatLanding"/> is the one reader.
 /// </param>
@@ -174,8 +175,9 @@ internal readonly record struct ReceiverContext(
     ///     the store's rescale is the identity and no second rounding can contradict it.</item>
     ///   <item><b>A FLOATING-POINT numeric-edited resultant</b> (<see cref="FloatEdited"/>) is never a final
     ///     transfer for this purpose: it has no fixed fraction scale to round at — the result normalizes into the
-    ///     mask and its significand is truncated to the mask's digits — so it quantizes at the capped working
-    ///     scale with TRUNCATION and the mask's own normalization does the rest (data-model D21 / kb/Work PB66).</item>
+    ///     mask and the STORE rounds its significand to the mask's digits by the receiver's mode (kb/Work PB2638)
+    ///     — so it quantizes at the capped working scale with TRUNCATION and the mask's own normalization does the
+    ///     rest (data-model D21 / kb/Work PB66).</item>
     ///   <item><b>EVERYTHING ELSE KEEPS THE BINARY64 AND QUANTIZES NOT AT ALL</b> — a NESTED intermediate, a
     ///     float receiver, a receiver-less render. There is no transfer here, so there is no scale to quantize
     ///     TO; the ONE quantization happens at the receiver store, on the whole expression's value.</item>

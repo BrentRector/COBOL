@@ -31,7 +31,7 @@ public class CobolEditMaskGeometryTests
     [InlineData("Z9.9(29)", 29)]
     [InlineData("9(5)", 0)]
     public void MaskScale_ShapesThePDecimalGeometry(string picture, int expected) =>
-        Assert.Equal(expected, CobolEdit.MaskScale(Expand(picture)));
+        Assert.Equal(expected, CobolEdit.MaskScale(Expand(picture), null));
 
     [Theory]
     // Capacity = digit positions (9/Z/* + floating members less the one symbol position); P holds none.
@@ -40,7 +40,7 @@ public class CobolEditMaskGeometryTests
     [InlineData("ZZZPP", 3)]
     [InlineData("ZZ9.99", 5)]
     public void MaskCapacity_CountsDigitPositionsOnly(string picture, int expectedCapacity) =>
-        Assert.Equal(expectedCapacity, CobolEdit.MaskCapacity(Expand(picture)).Capacity);
+        Assert.Equal(expectedCapacity, CobolEdit.MaskCapacity(Expand(picture), null).Capacity);
 
     private static string Expand(string picture)
     {

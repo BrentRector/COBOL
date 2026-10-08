@@ -119,7 +119,7 @@ internal sealed class EmitContext(CodeWriter writer, DataBinder data, NameAlloca
     /// COMMA when set (GR14). Empty under the default config, so the generated code of an ordinary program is
     /// unchanged. The ONE producer of these arguments — used by the orchestrator's MOVE/arithmetic edited stores,
     /// ACCEPT/STRING's edited receivers and the renderer's DeEdit, over BOTH numeric-edited forms (fixed-point
-    /// <c>Format</c>/<c>TryFormat</c>/<c>DeEdit</c> and floating-point <c>FormatFloatMove</c>/<c>TryFormatFloat</c>/
+    /// <c>Format</c>/<c>TryFormat</c>/<c>DeEdit</c> and floating-point <c>FormatFloatStore</c>/<c>TryFormatFloat</c>/
     /// <c>DeEditFloat</c>).
     /// <para>⛔ It also carries the item's PICTURE EDITING rules (<see cref="RuntimeApi.EditsArg"/>). They were a
     /// SEPARATE suffix every caller had to remember to append, and the two floating-point arms were exactly the

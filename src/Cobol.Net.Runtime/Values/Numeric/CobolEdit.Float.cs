@@ -79,53 +79,65 @@ public static partial class CobolEdit
     }
 
     /// <summary>The disposition of a floating-point edited store — the caller (MOVE vs arithmetic) decides what
-    /// each means (§14.9.25.4 GR6 item 4 vs §14.7.5 cases 3/4).</summary>
-    public enum FloatStoreOutcome { Ok, Overflow, Underflow }
+    /// each means (§14.9.25.4 GR6 item 4 vs §14.7.5 cases 3/4). <see cref="Inexact"/> is §14.7.4.3 rule 7's own
+    /// outcome, reported only for <see cref="CobolRounding.Prohibited"/> (kb/Work PB2638): the significand cannot
+    /// be represented exactly in the mask's digits, which is a size error and not a rounding.</summary>
+    public enum FloatStoreOutcome { Ok, Overflow, Underflow, Inexact }
 
     /// <summary>The MOVE store (ISO §14.9.25.4 GR6 item 4): a value farther from zero than the mask permits sets
     /// EC-DATA-OVERFLOW (fatal when the statement has it enabled) and — the content being "undefined" — stores the
     /// PINNED saturated image (all-nines significand at the maximum exponent, the value's sign; docs/CONFORMANCE.md);
     /// a value nearer to zero than the smallest nonzero the mask can hold "is treated as zero" — the rule-8 zero image,
-    /// no exception. <paramref name="value"/> × 10^−<paramref name="valueScale"/> is the sending value.</summary>
-    public static string FormatFloatMove(Int128 value, int valueScale, string picture, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
-        => FormatFloatMoveCore((BigInteger)value, -valueScale, picture, blankWhenZero, commaMode, edits);
+    /// no exception. <paramref name="value"/> × 10^−<paramref name="valueScale"/> is the sending value.
+    /// <para>⛔ <paramref name="mode"/> is the LANDING's, named by the caller (kb/Work PB2638): a MOVE passes
+    /// <see cref="CobolRounding.Truncation"/> (§14.6.8.4 rule 2 aligns and truncates), and the no-phrase
+    /// ARITHMETIC store passes the receiver's own §14.7.4.3 mode — ROUNDED applies to a floating-point edited
+    /// resultant exactly as to any other, at the significand's digit count; PROHIBITED lands truncated here, as
+    /// <c>CONFORMANCE.md</c> DOC-A.1-70 gives every unchecked store, and is raised only by <see cref="TryFormatFloat(Int128, int, string, out string, CobolRounding, bool, bool, EditRule[])"/>.</para></summary>
+    public static string FormatFloatStore(Int128 value, int valueScale, string picture, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
+        => FormatFloatStoreCore((BigInteger)value, -valueScale, picture, mode, blankWhenZero, commaMode, edits);
 
-    /// <summary>The MOVE store of a <see cref="CobolDec"/>-carried sender (a standard-decimal intermediate or another
+    /// <summary>The store of a <see cref="CobolDec"/>-carried sender (a standard-decimal intermediate or another
     /// floating-point edited item's de-edited value).</summary>
-    public static string FormatFloatMove(CobolDec value, string picture, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
-        => FormatFloatMoveCore((BigInteger)value.Sig, value.Exp, picture, blankWhenZero, commaMode, edits);
+    public static string FormatFloatStore(CobolDec value, string picture, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
+        => FormatFloatStoreCore((BigInteger)value.Sig, value.Exp, picture, mode, blankWhenZero, commaMode, edits);
 
-    /// <summary>The MOVE store of a binary64 sender — through the shortest round-trip decimal (<see cref="CobolDec.FromDouble"/>).</summary>
-    public static string FormatFloatMove(double value, string picture, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
-        => FormatFloatMove(CobolDec.FromDouble(value), picture, blankWhenZero, commaMode, edits);
+    /// <summary>The store of a binary64 sender — through the shortest round-trip decimal (<see cref="CobolDec.FromDouble"/>).</summary>
+    public static string FormatFloatStore(double value, string picture, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
+        => FormatFloatStore(CobolDec.FromDouble(value), picture, mode, blankWhenZero, commaMode, edits);
 
-    private static string FormatFloatMoveCore(BigInteger sig, int exp10, string picture, bool blankWhenZero, bool commaMode, EditRule[]? edits)
+    private static string FormatFloatStoreCore(BigInteger sig, int exp10, string picture, CobolRounding mode, bool blankWhenZero, bool commaMode, EditRule[]? edits)
     {
         var m = FloatMask.Parse(picture, commaMode, edits);
-        string image = FormatFloatCore(sig, exp10, m, blankWhenZero, out var outcome);
+        // An unchecked store never acts on Inexact: PROHIBITED is a request to raise, and this one cannot; the
+        // rounding kernel lands it truncated (DOC-A.1-70), the same as every unchecked fixed-point store.
+        string image = FormatFloatCore(sig, exp10, m, mode, blankWhenZero, out var outcome);
         if (outcome == FloatStoreOutcome.Overflow)
             ExceptionState.FloatOverflowError($"the value {sig}E{exp10} is farther from zero than the picture {picture} permits");
         return commaMode ? SwapSeparators(image) : image;
     }
 
     /// <summary>The ARITHMETIC store (ISO §14.7.5 cases 3 and 4 — both the size error condition, receiver unchanged):
-    /// false when the value is farther from zero OR nearer to zero than the mask permits (the caller raises the size
-    /// error and leaves the receiver alone), else the edited image in <paramref name="image"/>.</summary>
-    public static bool TryFormatFloat(Int128 value, int valueScale, string picture, out string image, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
-        => TryFormatFloatCore((BigInteger)value, -valueScale, picture, out image, blankWhenZero, commaMode, edits);
+    /// false when the value is farther from zero OR nearer to zero than the mask permits, or when
+    /// <paramref name="mode"/> is <see cref="CobolRounding.Prohibited"/> and the significand cannot be represented
+    /// exactly (§14.7.4.3 rule 7: the size error condition exists and the resultant is unchanged) — the caller
+    /// raises the size error and leaves the receiver alone — else the edited image in <paramref name="image"/>,
+    /// the significand rounded to the mask's digits by <paramref name="mode"/> (§14.7.4.3 rules 3 to 10).</summary>
+    public static bool TryFormatFloat(Int128 value, int valueScale, string picture, out string image, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
+        => TryFormatFloatCore((BigInteger)value, -valueScale, picture, out image, mode, blankWhenZero, commaMode, edits);
 
-    /// <inheritdoc cref="TryFormatFloat(Int128, int, string, out string, bool, bool)"/>
-    public static bool TryFormatFloat(CobolDec value, string picture, out string image, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
-        => TryFormatFloatCore((BigInteger)value.Sig, value.Exp, picture, out image, blankWhenZero, commaMode, edits);
+    /// <inheritdoc cref="TryFormatFloat(Int128, int, string, out string, CobolRounding, bool, bool, EditRule[])"/>
+    public static bool TryFormatFloat(CobolDec value, string picture, out string image, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
+        => TryFormatFloatCore((BigInteger)value.Sig, value.Exp, picture, out image, mode, blankWhenZero, commaMode, edits);
 
-    /// <inheritdoc cref="TryFormatFloat(Int128, int, string, out string, bool, bool)"/>
-    public static bool TryFormatFloat(double value, string picture, out string image, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
-        => TryFormatFloat(CobolDec.FromDouble(value), picture, out image, blankWhenZero, commaMode, edits);
+    /// <inheritdoc cref="TryFormatFloat(Int128, int, string, out string, CobolRounding, bool, bool, EditRule[])"/>
+    public static bool TryFormatFloat(double value, string picture, out string image, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
+        => TryFormatFloat(CobolDec.FromDouble(value), picture, out image, mode, blankWhenZero, commaMode, edits);
 
-    private static bool TryFormatFloatCore(BigInteger sig, int exp10, string picture, out string image, bool blankWhenZero, bool commaMode, EditRule[]? edits)
+    private static bool TryFormatFloatCore(BigInteger sig, int exp10, string picture, out string image, CobolRounding mode, bool blankWhenZero, bool commaMode, EditRule[]? edits)
     {
         var m = FloatMask.Parse(picture, commaMode, edits);
-        string img = FormatFloatCore(sig, exp10, m, blankWhenZero, out var outcome);
+        string img = FormatFloatCore(sig, exp10, m, mode, blankWhenZero, out var outcome);
         image = commaMode ? SwapSeparators(img) : img;
         return outcome == FloatStoreOutcome.Ok;
     }
@@ -140,8 +152,16 @@ public static partial class CobolEdit
     }
 
     /// <summary>The core: normalize (§14.6.8.4 GR1) by exact integer arithmetic to the mask's significand digit
-    /// count, decide the outcome against the exponent's capacity, render (§13.18.40.5 Table 7 + rule 8).</summary>
-    private static string FormatFloatCore(BigInteger sig, int exp10, in FloatMask m, bool blankWhenZero, out FloatStoreOutcome outcome)
+    /// count, round the dropped digits by <paramref name="mode"/> through the ONE rounding kernel
+    /// (<see cref="CobolNum.RoundDiv{T}"/>), decide the outcome against the exponent's capacity, render
+    /// (§13.18.40.5 Table 7 + rule 8).
+    /// <para>⛔ THE ROUNDING PRECEDES THE RANGE TEST (kb/Work PB2638). §14.7.5 case 3 is "after radix point
+    /// alignment and any applicable rounding specifications", so a significand that rounds up past its last digit
+    /// (<c>9.995</c> into <c>+9.99E+99</c> is <c>+1.00E+01</c>) is renormalized and its exponent re-checked against
+    /// the mask's capacity, and a value just under the underflow bound that rounds up to the smallest
+    /// representable nonzero is that value and not a size error. A MOVE passes TRUNCATION (§14.6.8.4 rule 2) and
+    /// never carries.</para></summary>
+    private static string FormatFloatCore(BigInteger sig, int exp10, in FloatMask m, CobolRounding mode, bool blankWhenZero, out FloatStoreOutcome outcome)
     {
         outcome = FloatStoreOutcome.Ok;
         // BLANK WHEN ZERO (§13.18.8.4 GR1) tests THE VALUE BEING STORED, here and at the underflow arm below —
@@ -150,15 +170,30 @@ public static partial class CobolEdit
         // zero image: all significand and exponent digits zero, both signs positive.
         if (sig.IsZero)
             return blankWhenZero ? new string(' ', m.Length) : RenderFloat(m, negative: false, new string('0', m.SigDigits), 0);
-        bool negative = sig.Sign < 0;
+        bool negative = sig.Sign < 0, inexact = false;
         BigInteger a = BigInteger.Abs(sig);
         int d = DigitCount(a);
-        // S = a × 10^k with exactly SigDigits digits (leading digit nonzero by construction; a division truncates —
-        // §14.6.8.4 GR2 → §13.18.40's alignment / truncation rules); the exponent that keeps the value:
+        // S = a × 10^k with exactly SigDigits digits (leading digit nonzero by construction; dropped digits round
+        // by `mode` — TRUNCATION for a MOVE, §14.6.8.4 GR2 → §13.18.40's alignment / truncation rules); the
+        // exponent that keeps the value:
         // value = a × 10^exp10 = (S × 10^−SigScale) × 10^E  ⇒  E = d + exp10 + SigScale − SigDigits.
         int k = m.SigDigits - d;
-        BigInteger s = k >= 0 ? a * BigInteger.Pow(10, k) : BigInteger.Divide(a, BigInteger.Pow(10, -k));
         int e = d + exp10 + m.SigScale - m.SigDigits;
+        var tenK = BigInteger.Pow(10, Math.Abs(k));
+        // k < 0 drops digits: the SIGNED value goes to the kernel, because TOWARD-GREATER and TOWARD-LESSER depend
+        // on the sign and the kernel takes the away-from-zero step from it (§14.7.4.3 rules 3, 8 and 9).
+        var s = k >= 0 ? a * tenK : BigInteger.Abs(CobolNum.RoundDiv(sig, tenK, mode));
+        if (k < 0)
+        {
+            // §14.7.4.3 rule 7: PROHIBITED and a nonzero dropped tail — the kernel lands such a value truncated
+            // (the unchecked disposition), the checked caller turns this outcome into the size error.
+            if (mode == CobolRounding.Prohibited && !(a % tenK).IsZero) inexact = true;
+            if (DigitCount(s) > m.SigDigits)     // rounded up past the last digit: 9.99|5 → 10.00
+            {
+                s /= 10;
+                e++;
+            }
+        }
         int maxExp = m.MaxExp;
         if (e > maxExp)
         {
@@ -172,6 +207,7 @@ public static partial class CobolEdit
             // the value BEING STORED is zero and §13.18.8.4 GR1 blanks.
             return blankWhenZero ? new string(' ', m.Length) : RenderFloat(m, negative: false, new string('0', m.SigDigits), 0);
         }
+        if (inexact) outcome = FloatStoreOutcome.Inexact;
         return RenderFloat(m, negative, s.ToString().PadLeft(m.SigDigits, '0'), e);
     }
 

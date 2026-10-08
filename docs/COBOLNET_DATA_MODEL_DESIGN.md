@@ -1074,20 +1074,25 @@ flag, `IsFloatEdited` — the sole discriminator (`Scale`/`DigitPositions` are 0
 full string); the parsed shape is NOT a second compile-time model — every reader that needs the significand's
 digits / scale / sign or the exponent's width (the VALUE checks in `DataBinder`, `IntrinsicBinder`'s algebraic
 fold, the runtime itself) parses `EditMask` through the ONE runtime parser `CobolEdit.FloatMask.Parse`. (5) the
-form dispatch lives in the choke points — `RuntimeApi.EditFormatFor` / `EditTryFormatFloat` / `EditComposeFloat`
+form dispatch lives in the choke points — `RuntimeApi.EditFormatFor` / `EditFormatFloat` / `EditTryFormatFloat` / `EditComposeFloat`
 (the emitter's edited STORE entries: MOVE, ACCEPT, DISPLAY, STRING, the arithmetic resultant, VALUE) and the edited
 READ (`NumericRenderer.FieldNum`) — never at the call sites. (6) the runtime (`CobolEdit.Float.cs`) gains the
 parsed-mask value type `CobolEdit.FloatMask` (parsed per call from the picture literal the generated code already
 carries — no per-item static field; the parse is a few dozen characters and the image store dominates) and the
-entry points `FormatFloatMove(value, picture, …)` (an Int128+scale, a `CobolDec` or a `double` sender — the MOVE
-disposition), `TryFormatFloat(…, out image)` (the arithmetic store — false on either divergence),
+entry points `FormatFloatStore(value, picture, mode, …)` (an Int128+scale, a `CobolDec` or a `double` sender — the
+UNCHECKED store; the caller names the landing: a MOVE passes TRUNCATION, the no-phrase arithmetic store the
+receiver's own §14.7.4.3 mode), `TryFormatFloat(…, out image, mode)` (the CHECKED arithmetic store — false on either
+divergence and on a PROHIBITED-inexact significand, §14.7.4.3 rule 7),
 `DeEditFloat(image, picture, …) → CobolDec`, `FloatExtremeImage` (the pinned overflow image, also the
 HIGHEST/LOWEST-ALGEBRAIC value's image). (7) store = normalize EXACTLY (integer arithmetic to the
-mask's integer-digit count, truncating), then render — no float on the store path (a binary64 sender enters
+mask's integer-digit count), round the dropped digits through the ONE `CobolNum.RoundDiv` kernel by the landing's
+mode (TRUNCATION for a MOVE, §14.6.8.4 rule 2; the receiver's ROUNDED [MODE] for an arithmetic store, §14.7.4.3 rules
+3-10 — a carry out of the last digit renormalizes and the exponent is tested AFTER it, §14.7.5 case 3 "after … any
+applicable rounding specifications"; kb/Work PB2638), then render — no float on the store path (a binary64 sender enters
 through `CobolDec.FromDouble`). (8) the MOVE overflow "undefined" content is PINNED to the saturated extreme image
 (all-nines significand at the maximum exponent, the value's sign) — a CONFORMANCE.md determination; MOVE
 underflow is the rule-8 zero image with no exception; the arithmetic store raises the size error on BOTH
-(receiver unchanged). (9) the §15.43.4 / §15.58.4 r1 well-formedness rule is enforced AT THE FUNCTION REFERENCE:
+(receiver unchanged), and names EC-SIZE-TRUNCATION like every sibling receiver arm. (9) the §15.43.4 / §15.58.4 r1 well-formedness rule is enforced AT THE FUNCTION REFERENCE:
 `HIGHEST-ALGEBRAIC` of a mask whose extreme exceeds the mode's intermediate (binary64 under NATIVE, decimal128
 under STANDARD-DECIMAL) is a diagnostic; the returned values are the all-nines-significand extremes (LOWEST = 0
 for an unsigned mask, as the standard's fixed-point NOTE table shows).

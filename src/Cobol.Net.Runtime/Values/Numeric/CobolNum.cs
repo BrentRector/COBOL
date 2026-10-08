@@ -158,7 +158,7 @@ public static partial class CobolNum
         if (receiver.Truncation == NumericTruncation.BinaryCapacity)
         {
             if (!InBinaryRange(v, receiver)) return false;
-            stored = receiver.Signed ? v : Int128.Abs(v);
+            stored = receiver.Signed ? v : BinaryMagnitude(v);
             return true;
         }
 
@@ -199,7 +199,7 @@ public static partial class CobolNum
         if (receiver.Truncation == NumericTruncation.BinaryCapacity)
         {
             if (!InBinaryRange(v, receiver)) return false;
-            stored = receiver.Signed ? v : Int128.Abs(v);
+            stored = receiver.Signed ? v : BinaryMagnitude(v);
             return true;
         }
         Int128 limit = Pow10Wide(receiver.Digits);
@@ -267,11 +267,10 @@ public static partial class CobolNum
         int bits = 8 * receiver.StorageLength;
         if (bits >= 128)
             return receiver.Signed ? value                          // Int128 IS the signed 16-byte container
-                 : value == Int128.MinValue ? value                  // |MinValue| = 2^127: its own bit pattern
-                 : Int128.Abs(value);                                // magnitude < 2^127: bits = value
+                 : BinaryMagnitude(value);                           // |MinValue| = 2^127: its own bit pattern
         Int128 modulus = (Int128)1 << bits;
         if (!receiver.Signed)
-            return Int128.Abs(value) % modulus;
+            return (Int128)(CobolDec.UAbs(value) % (UInt128)modulus);    // |MinValue| = 2^127, reduced like any other
         Int128 m = ((value % modulus) + modulus) % modulus;   // non-negative residue in [0, 2^bits)
         return m >= (modulus >> 1) ? m - modulus : m;          // fold the high half to the negative range
     }
@@ -288,10 +287,17 @@ public static partial class CobolNum
         if (bits >= 128) return true;
         Int128 modulus = (Int128)1 << bits;
         if (!receiver.Signed)
-            return Int128.Abs(value) < modulus;
+            return CobolDec.UAbs(value) < (UInt128)modulus;
         Int128 half = modulus >> 1;
         return value >= -half && value < half;
     }
+
+    /// <summary>The unsigned BinaryCapacity receiver's stored value for an in-range input: the magnitude
+    /// (§14.9.25.4 GR6 b) as the container's bits in the <see cref="Int128"/> carrier. A magnitude of 2^127
+    /// (only <see cref="Int128.MinValue"/> has it) is its own bit pattern, which the 16-byte tier's
+    /// <c>unchecked((UInt128))</c> store reinterprets exactly (kb/Work R10); every narrower container's
+    /// magnitude is below 2^120 and converts unchanged.</summary>
+    private static Int128 BinaryMagnitude(Int128 value) => unchecked((Int128)CobolDec.UAbs(value));
 
     // ── The UNSIGNED WIDE lane (kb/Work R10 — owner decision 2026-08-07: unsigned COMP-5 carriers are
     // ulong / UInt128, and the item owns its full container range, ISO §13.18.60.4 GR12). A value in
@@ -429,11 +435,11 @@ public static partial class CobolNum
         int shift = toScale - fromScale;
         if (value == 0) return 0;
         bool neg = value < 0;
-        // ⛔ Int128.Abs THROWS on Int128.MinValue, which this path can be handed: the R10 bits contract lets a
-        // 16-byte unsigned carrier's top-half value arrive as MinValue. Its magnitude is not representable, but
-        // its low 38 digits are — and a 39-digit magnitude always takes the cap branch below anyway, so
-        // pre-reducing modulo 10^38 loses nothing the result could have used.
-        Int128 mag = value == Int128.MinValue ? -(value % Pow10Wide(38)) : Int128.Abs(value);
+        // ⛔ The magnitude is Magnitude's (Int128.Abs THROWS on Int128.MinValue, which this path can be handed:
+        // the R10 bits contract lets a 16-byte unsigned carrier's top-half value arrive as MinValue). A 39-digit
+        // magnitude always takes the cap branch below anyway, so pre-reducing modulo 10^38 loses nothing the
+        // result could have used and brings it back inside the carrier.
+        Int128 mag = (Int128)(CobolDec.UAbs(value) % (UInt128)Pow10Wide(38));
         Int128 keep = Pow10Wide(Math.Max(0, 38 - shift));
         if (mag >= keep)
         {
@@ -550,7 +556,7 @@ public static partial class CobolNum
         < 0 when unscaled == 0 => 0,
         // |unscaled| ≤ long.MaxValue and at most 18 places keep the product inside Int128 (< 10^37); beyond
         // either bound the value is past every table's range, so it saturates by sign.
-        < 0 when -scale <= 18 && Int128.Abs(unscaled) <= long.MaxValue => Position(unscaled * Pow10Wide(-scale)),
+        < 0 when -scale <= 18 && CobolDec.UAbs(unscaled) <= (UInt128)long.MaxValue => Position(unscaled * Pow10Wide(-scale)),
         < 0 => unscaled > 0 ? long.MaxValue : long.MinValue,
         _ => Position(unscaled),
     };

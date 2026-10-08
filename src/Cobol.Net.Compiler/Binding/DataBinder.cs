@@ -3315,8 +3315,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         string mask = pic.EditMask ?? "";
         return (edited ? pic.DigitPositions - mask.Count(c => c == 'P') : pic.Digits,
                 pic.LocaleEdit is not null ? pic.Scale
-                    : edited ? CobolEdit.MaskScale(mask, '$', pic.DecimalPointIsComma,
-                        pic.EditingRules as CobolEdit.EditRule[]) : pic.Scale);
+                    : edited ? CobolEdit.MaskScale(mask, pic.EditingRules as CobolEdit.EditRule[],
+                        '$', pic.DecimalPointIsComma) : pic.Scale);
     }
 
     // (The former private DecodeString twin is retired — all callers use CobolNet.Common.CobolLiteral.Decode,

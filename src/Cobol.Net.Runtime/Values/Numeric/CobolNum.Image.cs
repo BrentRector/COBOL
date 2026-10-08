@@ -342,7 +342,7 @@ public static partial class CobolNum
     /// (§13.18.60.4 GR12 — "the implementor may allow a wider range"), so every container value is in range.</summary>
     private static bool InPictureRange(Int128 unscaled, in NumProfile item) =>
         item.Truncation == NumericTruncation.BinaryCapacity
-        || Int128.Abs(unscaled) < Pow10Wide(item.Digits);
+        || CobolDec.UAbs(unscaled) < (UInt128)Pow10Wide(item.Digits);
 
     /// <summary>An item with no byte representation (<see cref="NumericByteForm.None"/> — no shipping
     /// numeric usage since the R40 INDEX pin; the guard for an unstated future usage) reached a byte boundary. That is a

@@ -395,7 +395,7 @@ a DEVLOG entry per commit; commit AND push every checkpoint.
   Characterization 33/33 · NIST 353/0 audit-clean · differential 1323 cases, **0 flips**. ALL GREEN.
   **✅ PB66 CLOSED (DEVLOG 1322, 2026-08-18) — the floating-point numeric-edited PICTURE (symbol E) is LIVE** per
   data-model design D21: `PictureAnalyzer.AnalyzeFloatEdited` (COBOLNET1658 per violated rule; Table 10 rendered
-  from the PDF), the runtime `CobolEdit.Float.cs` (`FloatMask.Parse` the ONE parser; `FormatFloatMove` /
+  from the PDF), the runtime `CobolEdit.Float.cs` (`FloatMask.Parse` the ONE parser; `FormatFloatStore` /
   `TryFormatFloat` / `DeEditFloat`), the form dispatch in `RuntimeApi.EditFormatFor` + `NumericRenderer.FieldNum`,
   EC-DATA-OVERFLOW (unchecked → the pinned saturated image, CONFORMANCE.md §3) / EC-DATA-INCOMPATIBLE (new flag,
   fatal — and the fixed-point `DeEdit` now raises it too, by the exact `Format(DeEdit(x)) == x` round trip),

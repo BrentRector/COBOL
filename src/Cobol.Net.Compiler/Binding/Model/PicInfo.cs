@@ -698,7 +698,7 @@ public sealed record PicInfo(
     public int ReceiverScale() =>
         LocaleEdit is not null ? Scale
         : this is { Category: PicCategory.NumericEdited, EditMask: { } mask }
-            ? CobolNet.Runtime.CobolEdit.MaskScale(mask, '$', DecimalPointIsComma, EditingRules as CobolNet.Runtime.CobolEdit.EditRule[])
+            ? CobolNet.Runtime.CobolEdit.MaskScale(mask, EditingRules as CobolNet.Runtime.CobolEdit.EditRule[], '$', DecimalPointIsComma)
         : Scale;
 
     /// <summary>For a <see cref="PicCategory.ObjectReference"/> item: the FULL §13.18.60.2 description —
