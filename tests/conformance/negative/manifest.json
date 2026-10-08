@@ -432,6 +432,7 @@
   "pb1115-function-arg-interface-mismatch",
   "pb1115-function-arg-only-mismatch",
   "pb244-pointer-group-transfer-85",
+  "pb1071-pointer-member-image-85",
   "pb993-sort-merge-transfer-termination-below-2002",
   "pb892-performed-declarative-resume-below-2002",
   "pb892-operand-activation-below-2002",

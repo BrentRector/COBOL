@@ -72,7 +72,11 @@ internal sealed class PhysicalModel(EmitContext ctx)
     /// how the CARRIER becomes characters, and §13.18.60.3 SR12's national-form numeric is both at once — a
     /// native fixed-point carrier whose zoned digit run is written in national characters. Null on every
     /// non-national field.</param>
-    internal readonly record struct Physical(string Name, string Type, int Width, bool IsGroupStruct, string Init, string Comment, int Occurs = 0, DataItem? NumLeaf = null, IReadOnlyList<DataItem>? BitRun = null, DataItem? NatLeaf = null, bool SlotLeaf = false);
+    /// <param name="SlotLeaf">Set on a class pointer / class object leaf (<see cref="SlotWindow.CarriedBySlot"/>; kb/Work
+    /// PB244): the item whose slice of the one-way transfer image <c>GroupImageCodec.AsImageOf</c> renders — the
+    /// pointer's storage image (<c>PointerImage</c>, DOC-A.1-216; kb/Work PB1071) when
+    /// <see cref="SlotWindow.CarriesPointerImage"/>, else the reserved placeholder positions. Null on every other field.</param>
+    internal readonly record struct Physical(string Name, string Type, int Width, bool IsGroupStruct, string Init, string Comment, int Occurs = 0, DataItem? NumLeaf = null, IReadOnlyList<DataItem>? BitRun = null, DataItem? NatLeaf = null, DataItem? SlotLeaf = null);
 
     /// <summary>The memoized physical fields of a group's children (the root forest under the sentinel).
     /// <para>⚠ <paramref name="subs"/> is the OCCURRENCE CONTEXT (see <see cref="ValueInitializer.FieldInit"/>) and
@@ -199,10 +203,11 @@ internal sealed class PhysicalModel(EmitContext ctx)
                     c.IsGroup, Values.FieldInit(c, subs, recipe), comment, occurs, null, run);
                 continue;
             }
-            // A class pointer/object leaf (kb/Work PB244): its slice of the one-way transfer image is its reserved
-            // placeholder positions (D-SLOT) - GroupImageCodec.SlotPlaceholder, the same recipe the storage seed uses.
+            // A class pointer/object leaf (kb/Work PB244): its slice of the one-way transfer image is its pointer image
+            // (PB1071) or its reserved placeholder positions (D-SLOT) - GroupImageCodec.SlotImageOf, the same recipe
+            // the storage seed uses.
             yield return new Physical(c.CsName, c.FieldType, width, c.IsGroup, Values.FieldInit(c, subs, recipe), comment, occurs, numLeaf, null, natLeaf,
-                SlotWindow.CarriedBySlot(c));
+                SlotWindow.CarriedBySlot(c) ? c : null);
         }
     }
 

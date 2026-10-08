@@ -437,6 +437,36 @@ public sealed record SlotWindow(AccessPath Cell) : CellWindowCoding(Cell)
     /// table SORT reads and writes these with each element (kb/Work PB1922). Empty for an item holding none.</summary>
     public static IEnumerable<DataItem> MembersOf(DataItem item) =>
         CarriedBySlot(item) ? [item] : DataItem.DescendantsOf(item).Where(CarriedBySlot);
+
+    /// <summary>⛔ THE ONE test for "do this slot member's reserved positions hold a POINTER IMAGE?" (kb/Work PB1071;
+    /// DOC-A.1-216): the three pointer categories do — <c>PointerImage</c> defines the image, NULL as eight zero
+    /// positions — and the object reference, the one other slot-carried category, has no image and keeps its
+    /// reserved placeholder. The cell seed (<c>GroupImageCodec.SlotSeedOf</c>), the one-way group image (<c>SlotImageOf</c>) and the
+    /// ALLOCATE seed (<see cref="PointerImageOffsetsOf"/>) all ask it.</summary>
+    public static bool CarriesPointerImage(DataItem item) =>
+        CarriedBySlot(item) && item.Pic!.Category != PicCategory.ObjectReference;
+
+    /// <summary>The byte offset, within the storage class that <paramref name="root"/> heads, of EVERY pointer-image
+    /// run — each OCCURS occurrence of each <see cref="CarriesPointerImage"/> member (kb/Work PB1071). What
+    /// ALLOCATE seeds with the NULL image: §14.9.3.4 GR9 initializes "data items of class object or class pointer in
+    /// the allocated storage … to null", and DOC-A.1-216 gives NULL the zero image. <see cref="DataItem.ClassOffset"/>
+    /// is the occurrence-1 position, and each fixed OCCURS level on the member's path within its class displaces it
+    /// by (occurrence − 1) × that level's per-occurrence storage extent — the stride
+    /// <c>ReferenceResolver.WindowScopeOf</c> applies to a reference, so a seed and a reference cannot disagree.</summary>
+    public static IEnumerable<int> PointerImageOffsetsOf(DataItem root)
+    {
+        foreach (var member in MembersOf(root).Where(CarriesPointerImage))
+        {
+            IEnumerable<int> at = [member.ClassOffset];
+            for (DataItem? n = member; n is not null && ReferenceEquals(n.Class, member.Class); n = n.Parent)
+                if (n.Occurs is { } count)
+                {
+                    int stride = n.ByteWidth;
+                    at = at.SelectMany(b => Enumerable.Range(0, count).Select(i => b + i * stride));
+                }
+            foreach (int offset in at) yield return offset;
+        }
+    }
 }
 
 /// <summary>A <see cref="RedefViewPlace"/>'s DYNAMIC-LENGTH window (kb/Work PB1026): the member is a dynamic-length

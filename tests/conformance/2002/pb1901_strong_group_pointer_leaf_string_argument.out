@@ -1,4 +1,6 @@
-[AB        CD]
-[dc        ba]
+[AB|CD]
+UPPER-MID=NULL-IMAGE
+[dc|ba]
+REVERSE-MID=NULL-IMAGE
 12
 [XYZ]

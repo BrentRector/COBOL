@@ -589,14 +589,25 @@ content-validation half is separately answered by the declined A.4.14 facility (
     that exists or will exist, and the read renders the item's own `PicInfo.DefaultInitializer` as the null
     state — the same expression an ordinary declared pointer field is seeded from. FREE drops the slots with
     the image (§14.9.15.4 GR1a); they are one storage area.
+  - **The member's POSITIONS hold the pointer's storage image (kb/Work PB1071; docs/CONFORMANCE.md DOC-A.1-216).**
+    The slot holds the VALUE; the member's 8 reserved positions hold `PointerImage`'s image of it (NULL = eight zero
+    positions), so a byte window, a group MOVE/DISPLAY and the CALL boundary's BY CONTENT record agree. One author,
+    three keep-in-step sites: `CobolPtr.SlotWrite<T>` writes the image beside every slot store (a class-object member
+    has none and keeps its placeholder spaces); the cell seeds (`GroupImageCodec.SlotSeedOf`) start the positions at
+    `PointerImage.NullImage`; and ALLOCATE form 2 passes `CobolPtr.Allocate` the member offsets
+    `SlotWindow.PointerImageOffsetsOf` (each OCCURS occurrence, at the stride a reference applies) so its uniform fill
+    does not cover them (§14.9.3.4 GR9). `SlotWindow.CarriesPointerImage` is the one test of which slot members have an
+    image. Only a byte WRITE over the positions can disagree afterwards, and it is one-way: a pointer is never decoded
+    back from its bytes.
   - **The RECORD-STRUCT twin: a ONE-WAY transfer image (kb/Work PB244).** A strongly-typed group holding such a
     leaf in an ordinary record struct has no cell, but it has the same STORAGE: `DataItem.TransferImageCapable`
     admits it and `GroupImageCodec.EmitImageMethods` emits its `AsImage()` with each slot leaf contributing
-    `GroupImageCodec.SlotPlaceholder` — the one recipe the cell seed (`ImageInitOfOne`) also spells — and NO
+    `GroupImageCodec.SlotImageOf` — the pointer's live `PointerImage` (PB1071) or an object leaf's placeholder,
+    the same two recipes the cell seed (`ImageInitOfOne` → `SlotSeedOf`) spells — and NO
     `FromImage`. Only the TRANSFER readers ask it (DISPLAY, a MOVE's sending group, through the `transfer:`
     flag of `PlaceRenderer.GroupImage` / `SendingGroupImage` / `OperandText.AsStorageImage`). ⛔ It is NOT
-    folded into `IsImageCapable`: the placeholder image is not injective (two groups differing only in a
-    pointer render alike) and has no inverse, so every read-back (CALL/INVOKE copy-back, READ, a group MOVE
+    folded into `IsImageCapable`: the image has no inverse (a pointer's token decodes to no reference, and two
+    groups differing only in an object leaf render alike), so every read-back (CALL/INVOKE copy-back, READ, a group MOVE
     receiver) keeps asking the two-way capability and stays refused. (A strongly-typed group RELATION never
     reads an image at all: §8.8.4.2.12 compares it element by element — see the TYPEDEF paragraph below.)
   - **The slots belong to the CELL, never to the item**, and that is the whole point: EXTERNAL sharing,

@@ -35,22 +35,26 @@ public sealed class SourceEncodingDriftTests
 {
     private static readonly byte[] Bom = [0xEF, 0xBB, 0xBF];
 
-    /// <summary>Source trees whose files shall not begin with a byte-order mark, with why it matters.</summary>
+    /// <summary>Source trees whose files shall not begin with a byte-order mark, with why it matters. The test
+    /// sources are covered too (kb/Work PB927): the same bad tool write produced them, and a file a sweep reads
+    /// wrongly is a file the sweep misjudges.</summary>
     public static IEnumerable<object[]> Scopes =>
     [
-        ["*.g4", "the ANTLR grammar compiler rejects a BOM outright (error(50), 'came as a complete surprise')"],
-        ["*.cs", "the repo convention is BOM-less, and a stray BOM is the fingerprint of a bad tool write"],
+        ["src", "*.g4", "the ANTLR grammar compiler rejects a BOM outright (error(50), 'came as a complete surprise')"],
+        ["src", "*.cs", "the repo convention is BOM-less, and a stray BOM is the fingerprint of a bad tool write"],
+        ["tests", "*.cs", "the repo convention is BOM-less, and a stray BOM is the fingerprint of a bad tool write"],
     ];
 
     [Theory]
     [MemberData(nameof(Scopes))]
-    public void NoSourceFileStartsWithAByteOrderMark(string pattern, string why)
+    public void NoSourceFileStartsWithAByteOrderMark(string tree, string pattern, string why)
     {
         var offenders = new List<string>();
         byte[] head = new byte[3];   // hoisted: CA2014 forbids a stackalloc inside the loop
-        foreach (string f in Directory.EnumerateFiles(TestRepo.Src(), pattern, SearchOption.AllDirectories))
+        string root = TestRepo.At(tree);
+        foreach (string f in Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories))
         {
-            string rel = Path.GetRelativePath(TestRepo.Src(), f).Replace('\\', '/');
+            string rel = Path.GetRelativePath(root, f).Replace('\\', '/');
             // Generated/ and obj/ are BUILD OUTPUTS (feedback_generated_parser_is_a_build_output) — the tool
             // that writes them chooses their encoding, and they are never committed.
             if (rel.Contains("/obj/") || rel.Contains("/bin/") || rel.Contains("Generated/")
@@ -74,10 +78,10 @@ public sealed class SourceEncodingDriftTests
     /// above pass on a broken path (feedback_verdict_evidence_invariant).</summary>
     [Theory]
     [MemberData(nameof(Scopes))]
-    public void TheScanSeesFiles(string pattern, string why)
+    public void TheScanSeesFiles(string tree, string pattern, string why)
     {
         _ = why;
-        int n = Directory.EnumerateFiles(TestRepo.Src(), pattern, SearchOption.AllDirectories).Count();
-        Assert.True(n > 0, $"the {pattern} scan found no files under {TestRepo.Src()} — the scan is broken");
+        int n = Directory.EnumerateFiles(TestRepo.At(tree), pattern, SearchOption.AllDirectories).Count();
+        Assert.True(n > 0, $"the {pattern} scan found no files under {TestRepo.At(tree)} — the scan is broken");
     }
 }

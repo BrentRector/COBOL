@@ -74,6 +74,59 @@ public sealed class PointerImageTests
             CobolArgAdapt.Text([new CobolArg(CobolPassMode.Content, fslot, null)], 0, 8).Value);
     }
 
+    // ── A pointer MEMBER of a shared storage area (kb/Work PB1071): the slot holds the value, the 8 positions hold
+    //    the SAME codec's image of it. ISO §14.9.3.4 GR9 (null initial state), §14.9.39.4 GR20 (UP BY n moves the
+    //    address by n); the image itself is the implementor's, DOC-A.1-216. ──────────────────────────────────────────
+
+    [Fact]
+    public void Allocate_SeedsTheNullImageAtEachPointerMember_AndTheFillElsewhere()
+    {
+        var p = (CellPointer)CobolPtr.Allocate(20, 'x', out bool na, [2, 11]);
+        Assert.False(na);
+        Assert.Equal("xx" + PointerImage.NullImage + "x" + PointerImage.NullImage + "x", p.Cell.Ref);
+        // The CHARACTERS form (no members) is the plain fill.
+        Assert.Equal("xxxx", ((CellPointer)CobolPtr.Allocate(4, 'x', out _)).Cell.Ref);
+    }
+
+    [Fact]
+    public void SlotWrite_StoresTheValueAndItsImage_AndOnlyItsOwnPositions()
+    {
+        var area = new StorageCell { Ref = "ab" + PointerImage.NullImage + "cd" };
+        var target = new StorageCell { Ref = "ABCDEFGH" };
+
+        CobolPtr.SlotWrite(area, 2, ManagedPointer.At(target, 0));
+        Assert.True(ManagedPointer.SameTarget(ManagedPointer.At(target, 0), CobolPtr.SlotRead<ManagedPointer>(area, 2, ManagedPointer.Null)));
+        Assert.Equal("ab" + PointerImage.Of(ManagedPointer.At(target, 0)) + "cd", area.Ref);
+
+        CobolPtr.SlotWrite(area, 2, CobolPtr.UpBy(ManagedPointer.At(target, 0), 3));          // GR20: the address moves by 3
+        Assert.Equal(AsBigEndian(PointerImage.Of(ManagedPointer.At(target, 3))), AsBigEndian(area.Ref.Substring(2, 8)));
+
+        CobolPtr.SlotWrite(area, 2, ManagedPointer.Null);
+        Assert.Equal("ab" + PointerImage.NullImage + "cd", area.Ref);
+    }
+
+    [Fact]
+    public void SlotWrite_ProgramAndFunctionPointerMembers_StoreTheirImages_AndANullDataPointerIsZero()
+    {
+        var area = new StorageCell { Ref = PointerImage.NullImage + PointerImage.NullImage };
+        CobolPtr.SlotWrite(area, 0, new ProgramPointer("PROGA"));
+        CobolPtr.SlotWrite(area, 8, new FunctionPointer("F1"));
+        Assert.Equal(PointerImage.Of(new ProgramPointer("PROGA")) + PointerImage.Of(new FunctionPointer("F1")), area.Ref);
+
+        CobolPtr.SlotWrite<ManagedPointer?>(area, 0, null);                                   // a null data-pointer: the zero address
+        Assert.Equal(PointerImage.NullImage, area.Ref[..8]);
+    }
+
+    [Fact]
+    public void SlotWrite_AnObjectReferenceMember_HasNoImage_AndLeavesItsReservedPositions()
+    {
+        var area = new StorageCell { Ref = "        " };
+        CobolPtr.SlotWrite<object?>(area, 0, new object());
+        CobolPtr.SlotWrite<object?>(area, 0, null);
+        Assert.Equal("        ", area.Ref);
+        Assert.Null(PointerImage.OfSlot<object?>(null));
+    }
+
     [Fact]
     public void ByReference_PointerIntoCharacterFormal_StaysRefused()
     {

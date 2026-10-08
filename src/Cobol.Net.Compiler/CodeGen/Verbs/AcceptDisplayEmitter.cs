@@ -46,7 +46,7 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
             // A strongly-typed group with a class pointer/object leaf (kb/Work PB244): a legal identifier-1
             // (§14.9.11.3 SR1 bars only an item OF class pointer/object; a strongly-typed group's class is its
             // type-name, §8.5.2.1) whose GR1 device conversion is ours to define — CONFORMANCE.md A.1 item 56:
-            // its STORAGE image, each such leaf as its reserved placeholder positions (D-SLOT). The ONE-WAY
+            // its STORAGE image, each such leaf as its 8 positions (a pointer's storage image, kb/Work PB1071; an object's reserved placeholder, D-SLOT). The ONE-WAY
             // transfer reader (OperandText.AsTransferString), so comparison and read-back keep refusing a
             // non-injective, non-invertible image; an intrinsic function's string argument asks the same reader.
             : OperandText.AsTransferString(o, num, "DISPLAY of")).ToList();

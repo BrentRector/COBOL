@@ -917,8 +917,8 @@ public sealed class DataItem
     /// rendered as characters for a consumer that sends them OUT and never reads them back into the group nor
     /// compares them — the DISPLAY transfer (ISO §14.9.11.4 GR1/GR4/GR6) and a MOVE's sending group (§14.9.25.4
     /// GR4). It is <see cref="IsImageCapable"/> widened by exactly ONE leaf kind: a class pointer/object leaf
-    /// (<see cref="SlotWindow.CarriedBySlot"/>), which contributes its <see cref="ByteWidth"/> RESERVED
-    /// placeholder positions — the same positions it occupies in a byte-addressed storage area under D-SLOT
+    /// (<see cref="SlotWindow.CarriedBySlot"/>), which contributes its <see cref="ByteWidth"/> (8)
+    /// positions (a pointer's storage image, kb/Work PB1071; an object's reserved placeholder) — the same positions it occupies in a byte-addressed storage area under D-SLOT
     /// (COBOLNET_DATA_MODEL_DESIGN; the managed reference itself has no byte form, so it is not rendered).
     /// <para>⛔ WHY A SEPARATE CAPABILITY AND NOT A WIDER <see cref="IsImageCapable"/>: the placeholder image is
     /// NOT INJECTIVE (two groups differing only in a pointer render alike) and has no inverse (a pointer cannot

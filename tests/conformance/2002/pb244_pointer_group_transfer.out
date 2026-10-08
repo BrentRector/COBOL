@@ -1,5 +1,6 @@
-[abc        12        34        zz]
-[34        ]
-{abc        12        34        zz       }
-<abc        12        34        zz            >
+{abc|12|34|zz|       }
+GP=ADDRESS-IMAGE
+GSP=NULL-IMAGE
+<abc|12|34|zz|            >
+GP-AFTER-NULL=NULL-IMAGE
 33

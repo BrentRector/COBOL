@@ -307,7 +307,7 @@ the integer form of ABS shall not stand where an unsigned integer is required �
 CONCAT §15.18.3 r3 and BASECONVERT §15.12.3 r1 below base 11; the legal ABS form renders through the numeric-
 admitting string-argument visitor as its digits. **A strongly-typed group is an alphanumeric argument** (§15.3 item
 2: "treated as though they were of class and category alphanumeric, unless they are prohibited") — `ClassOfItem`
-answers Alphanumeric for it on purpose — and its pointer/object leaves read as the D-SLOT placeholder image through
+answers Alphanumeric for it on purpose — and its pointer leaves read as their DOC-A.1-216 storage image (kb/Work PB1071) and its object leaves as the D-SLOT placeholder image through
 `OperandText.AsTransferString` (the one-way reader DISPLAY and a MOVE sender also use; kb/Work PB1901). `CrossBlock` composes the projection with the cross rules'
 own alphabetic|alphanumeric merge — **projecting FIRST and merging SECOND**, because the projection is a class
 fact and the merge is a rule-level exception §15.59.3 r2 states outright ("with the exception that mixing of

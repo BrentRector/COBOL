@@ -78,13 +78,15 @@ public sealed class TierCRejectionTests
     /// object or pointer; a strongly-typed group's class is its type-name, §8.5.2.1) and a legal MOVE sender
     /// (§14.9.25.3 SR2 constrains only a strongly-typed RECEIVER). Both used to compile and abort at run time with
     /// the Tier-C loud — a green test pinned that refusal. They now transfer the group's ONE-WAY storage image:
-    /// the pointer leaf contributes its 8 reserved placeholder positions (spaces), exactly what the same group
-    /// shows from a BASED storage cell (D-SLOT; CONFORMANCE.md A.1 item 56).
+    /// the pointer leaf contributes its 8 positions holding the pointer's storage image (the predefined address
+    /// NULL is eight X"00" positions, kb/Work PB1071 — they were spaces before), exactly what the same group
+    /// shows from a BASED storage cell (D-SLOT; CONFORMANCE.md A.1 items 56 and 216).
     /// <para>⛔ THE GROUP IS A STRONG TYPEDEF, AND THAT IS FORCED BY THE STANDARD: §13.18.60.3 SR14 admits a
     /// POINTER usage only at level 1 or subordinate to a type declaration that includes the STRONG phrase
     /// (COBOLNET1724 rejects the ordinary-group spelling). Do NOT relax that screen to simplify a fixture.</para>
     /// <para>What stays refused is NOT this: comparison and every read-back ask the two-way capability, because
-    /// the placeholder image is neither injective nor invertible (<c>DataItem.TransferImageCapable</c>).</para></summary>
+    /// the image is neither injective (an object leaf's placeholder) nor invertible (a pointer's token decodes to
+    /// no reference) (<c>DataItem.TransferImageCapable</c>).</para></summary>
     private static string PointerGroupRun(string proc)
     {
         var (ok, stdout, detail) = new CobolNetCompiler(2023).CompileAndRun($$"""
@@ -107,11 +109,18 @@ public sealed class TierCRejectionTests
         return stdout.TrimEnd('\r', '\n');
     }
 
+    /// <summary>A NULL pointer's storage image: eight zero positions (DOC-A.1-216), built rather than written as
+    /// escapes so this file holds no NUL byte (<c>NulByteDriftTests</c>).</summary>
+    private static readonly string NullImage = new((char)0, 8);
+
+    // The two names below predate kb/Work PB1071: "placeholder positions" is what the pointer leaf's 8 positions were
+    // called when they held spaces. They are witnesses of traceability-inventory rows, which merge and never lose a
+    // witness (record_verdicts.py, kb/Work PB959), so the names stay and the assertions say what the positions hold.
     [Fact] public void DisplayPointerGroup_RendersPlaceholderPositions() =>
-        Assert.Equal("[abc        ]", PointerGroupRun("    DISPLAY \"[\" WS-GP \"]\"."));
+        Assert.Equal("[abc" + NullImage + "]", PointerGroupRun("    DISPLAY \"[\" WS-GP \"]\"."));
 
     [Fact] public void MovePointerGroup_SendsPlaceholderPositions() =>
-        Assert.Equal("[abc          ]", PointerGroupRun("    MOVE WS-GP TO WS-DST. DISPLAY \"[\" WS-DST \"]\"."));
+        Assert.Equal("[abc" + NullImage + "  ]", PointerGroupRun("    MOVE WS-GP TO WS-DST. DISPLAY \"[\" WS-DST \"]\"."));
 
     /// <summary>The R40 leg, pinned WORKING: an INDEX-leaf group displays its verbatim content — the leaf's
     /// occurrence number as 8 big-endian two's-complement bytes (the R40 pin; A.1 items 56 + 211). SET (one

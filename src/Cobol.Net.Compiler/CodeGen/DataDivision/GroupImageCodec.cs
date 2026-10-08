@@ -66,7 +66,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // without this the pointer contributed its PICTURE-less zero-width nothing and displaced the rest.
         // Placed beside the national coding below because it is the same kind of decision: how the member's
         // value carrier relates to the bytes it occupies.
-        if (SlotWindow.CarriedBySlot(item)) return SlotPlaceholder(item.ByteWidth);
+        if (SlotWindow.CarriedBySlot(item)) return SlotSeedOf(item);
         // ⛔ A DYNAMIC-LENGTH LEAF CONTRIBUTES NO BYTES AT ALL (kb/Work PB1026): its content rides the cell's
         // dynamic slot (Place.DynSlotWindow), and it occupies zero positions of the area's fixed run — its
         // ByteWidth, §8.5.1.12.3's "all dynamic-length elementary items are considered to be of zero length". Its
@@ -689,11 +689,26 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             : "(__e, __x) => __x";
 
     /// <summary>THE ONE RECIPE for what a class pointer/object leaf occupies in a byte image (kb/Work PB231 ->
-    /// PB244): <paramref name="width"/> RESERVED placeholder positions, spaces. The storage seed of a
-    /// byte-addressed area (<see cref="ImageInitOfOne"/> - D-SLOT) and the one-way transfer image
-    /// (<see cref="AsImageOf"/>) both spell it through here, so a strongly-typed group DISPLAYs the same
+    /// PB244, PB1071). A class-object leaf has no image: <paramref name="width"/> RESERVED placeholder positions,
+    /// spaces. A POINTER leaf's positions hold the image <c>PointerImage</c> defines (DOC-A.1-216 - the address in
+    /// the implementation's binary order, NULL as zero): <see cref="SlotSeedOf"/> is its seed, the NULL image, and
+    /// <see cref="SlotImageOf"/> its live value in a record struct. A shared cell keeps the same positions equal to
+    /// its slot through <c>CobolPtr.SlotWrite</c> and ALLOCATE's seed, so a strongly-typed group DISPLAYs the same
     /// characters whether it lives in a record struct or in a BASED/ADDRESS-OF storage cell.</summary>
-    internal static string SlotPlaceholder(int width) => $"new string(' ', {width})";
+    private static string SlotPlaceholder(int width) => $"new string(' ', {width})";
+
+    /// <summary>A slot-carried leaf's positions in a freshly seeded byte-addressed area: the NULL pointer image
+    /// (<see cref="SlotWindow.CarriesPointerImage"/>; ISO 14.9.3.4 GR9 and 13.18.63.4 initialize class pointer to
+    /// null) or the object's placeholder (<see cref="ImageInitOfOne"/> - D-SLOT).</summary>
+    private static string SlotSeedOf(DataItem item) =>
+        SlotWindow.CarriesPointerImage(item) ? RuntimeApi.PointerNullImage() : SlotPlaceholder(item.ByteWidth);
+
+    /// <summary>A slot-carried leaf field's slice of a record struct's one-way transfer image (<see cref="AsImageOf"/>),
+    /// every occurrence of a fixed table at once: the field's current pointer image, or the placeholder.</summary>
+    private static string SlotImageOf(PhysicalModel.Physical f, DataItem slot) =>
+        !SlotWindow.CarriesPointerImage(slot) ? SlotPlaceholder(f.Width)
+        : f.Occurs == 0 ? RuntimeApi.PointerImageOf(f.Name)
+        : $"string.Concat(System.Array.ConvertAll({f.Name}, __e => {RuntimeApi.PointerImageOf("__e")}))";
 
     /// <summary>The whole-group image facility of a record struct. <c>AsImage()</c> is emitted for every
     /// <see cref="DataItem.ElementTransferImageCapable"/> group; <c>FromImage</c> (and the bit / national faces)
@@ -894,10 +909,11 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             ? RuntimeApi.BitsPack(string.Join(" + ", run.Select(BitCarrierOf)),
                                   $"{run.Sum(BitLayout.RunBits)}")
         : f.Width == 0 ? "\"\""
-        // A class pointer/object leaf (kb/Work PB244) contributes its reserved placeholder positions, every
-        // occurrence at once (Width is already per-occurrence width x OCCURS). Reached only through the one-way
-        // AsImage of a TransferImageCapable group - FromImage is never emitted over such a leaf.
-        : f.SlotLeaf ? SlotPlaceholder(f.Width)
+        // A class pointer/object leaf (kb/Work PB244) contributes its slice of the one-way transfer image, every
+        // occurrence at once: the pointer's storage image (kb/Work PB1071) or the object's reserved placeholder
+        // positions. Reached only through the one-way AsImage of a TransferImageCapable group - FromImage is never
+        // emitted over such a leaf.
+        : f.SlotLeaf is { } slot ? SlotImageOf(f, slot)
         // ⛔ A NATIONAL LEAF IMAGES AS ITS BYTES (kb/Work PB327): two per character position, high-order first
         // (ISO §13.18.60.4 GR8 leaves the size to the implementor — D-N1 pins two, UTF-16BE), through the ONE
         // serializer CobolBits.NatBytes that the Tier-B window, the EXTERNAL/BASED cell seed and CONVERT's

@@ -47,8 +47,9 @@ public sealed class StorageCell
 
     /// <summary>⛔ THE MANAGED SLOTS OF THE SAME STORAGE AREA, keyed by the slot's BYTE OFFSET within it
     /// (kb/Work PB231 — the pointer third). A data item of class pointer or class object holds a managed
-    /// REFERENCE, which is not a byte sequence and therefore has no image in <see cref="Ref"/>; its bytes
-    /// there are reserved placeholder positions so that §14.9.3.4 GR3's "the amount of storage to be
+    /// REFERENCE, which is not a byte sequence and therefore has no VALUE in <see cref="Ref"/>; its bytes
+    /// there are reserved positions (a pointer's hold its storage image, which <c>CobolPtr.SlotWrite</c> keeps equal
+    /// to the slot's value, kb/Work PB1071; an object's are placeholders) so that §14.9.3.4 GR3's "the amount of storage to be
     /// allocated is the number of bytes required to hold an item as described by data-name-1" — and every
     /// following member's offset — stay exactly what a byte-addressed area says they are.
     /// <para>⛔ THE SLOTS BELONG TO THE CELL, NOT TO THE ITEM, and that is the whole reason they are here:

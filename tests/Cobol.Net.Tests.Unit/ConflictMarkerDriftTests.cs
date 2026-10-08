@@ -1,7 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 
-using System.Diagnostics;
 using System.Text;
 using CobolNet.Tests.Shared;
 using Xunit;
@@ -59,9 +58,6 @@ public sealed class ConflictMarkerDriftTests
     private static readonly string Split = new('=', Run);
     private static readonly string Theirs = new('>', Run);
 
-    /// <summary>The tracked-file list, taken from git once per test assembly.</summary>
-    private static readonly Lazy<IReadOnlyList<string>> TrackedFiles = new(ListTrackedFiles);
-
     /// <summary>Which of the four merge markers a line is.</summary>
     private enum Marker
     {
@@ -100,7 +96,7 @@ public sealed class ConflictMarkerDriftTests
     [Fact]
     public void NoTrackedFileCarriesAConflictMarker()
     {
-        SweepResult r = Sweep(TestRepo.Root, TrackedFiles.Value);
+        SweepResult r = Sweep(TestRepo.Root, TrackedTree.Files());
 
         AssertEveryFileWasRead(r);
         Assert.True(r.Offenders.Count == 0,
@@ -124,7 +120,7 @@ public sealed class ConflictMarkerDriftTests
     [Fact]
     public void TheSweepActuallyReadsTheTrackedTree()
     {
-        IReadOnlyList<string> tracked = TrackedFiles.Value;
+        IReadOnlyList<string> tracked = TrackedTree.Files();
         Assert.True(tracked.Count >= 1000,
             $"`git ls-files -z` reported only {tracked.Count} tracked path(s) under {TestRepo.Root} — the "
             + "enumeration is broken, so the conflict-marker sweep is scanning nothing.");
@@ -451,30 +447,6 @@ public sealed class ConflictMarkerDriftTests
         Marker.Split => Split,
         _ => Theirs,
     };
-
-    /// <summary>
-    /// <c>git ls-files -z</c> at the repo root. NUL-separated so a path with a space, a quote or a non-ASCII
-    /// character arrives verbatim rather than in git's C-quoted form.
-    /// </summary>
-    private static IReadOnlyList<string> ListTrackedFiles()
-    {
-        // ⭐ THROUGH THE ONE OBSERVER, not a seventh private launcher. `ProcessObserver.ObserveOrThrow` drains
-        // both pipes asynchronously (a synchronous read-one-then-the-other deadlocks whenever the child fills
-        // the second pipe — the hazard kb/Work/PB736 names one file over), and it RAISES on a launch failure or
-        // a timeout instead of handing back an empty string. That matters more here than anywhere: an empty
-        // stdout from a missing `git` would otherwise read as "the tree is clean".
-        // `feedback_one_rule_one_place`, and `ProcessObservationDriftTests` is what keeps it collapsed.
-        ProcessObservation obs = ProcessObserver.ObserveOrThrow(
-            new ProcessStartInfo("git", "ls-files -z") { WorkingDirectory = TestRepo.Root });
-
-        if (obs.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"`git ls-files -z` in {TestRepo.Root} exited {obs.ExitCode}: {obs.Stderr}");
-        }
-
-        return obs.Stdout.Split('\0', StringSplitOptions.RemoveEmptyEntries);
-    }
 
     /// <summary>A GUID-unique scratch directory — never a fixed shared path (<c>kb/Work/PB376</c>).</summary>
     private sealed class Scratch : IDisposable

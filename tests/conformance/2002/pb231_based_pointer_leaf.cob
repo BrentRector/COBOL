@@ -108,6 +108,10 @@
        01 P USAGE POINTER BASED.
        01 Q USAGE POINTER BASED.
        01 W PIC X(8) BASED.
+       01 WN USAGE BINARY-DOUBLE BASED.
+       01 WS-I0 USAGE BINARY-DOUBLE.
+       01 WS-I1 USAGE BINARY-DOUBLE.
+       01 WS-D PIC +9(4).
        01 WS-A USAGE POINTER.
        01 WS-B USAGE POINTER.
        01 WS-T PIC X(4) VALUE "ABCD".
@@ -123,12 +127,47 @@
            ELSE
               DISPLAY "GR9=SET"
            END-IF
-      *> GR3's byte quantity: the eight-byte window derefs, and its
-      *> bytes are the reserved placeholders, before and after.
-           DISPLAY "PRE=" FUNCTION ORD(W(1:1)) " " FUNCTION ORD(W(8:1))
+      *> GR3's byte quantity: the eight-byte window derefs. kb/Work
+      *> PB1071 (it OVERTURNS the earlier pin of PB231's reserved space
+      *> fill here): the window's bytes are the pointer's STORAGE IMAGE,
+      *> DOC-A.1-216 (docs/CONFORMANCE.md) - the predefined address NULL
+      *> is the zero address, a data-pointer is its area's base plus its
+      *> displacement as a binary integer (the BINARY-DOUBLE window WN
+      *> reads it as that integer) - and it follows the member's value.
+      *> The integer's size and representation are the implementor's
+      *> (13.18.60.4 GR23), so only the relations the standard fixes are
+      *> shown: 14.9.39.4 GR20 - SET UP BY 3 increments the ADDRESS by 3
+           IF W = LOW-VALUES
+              DISPLAY "PRE=ZERO-ADDRESS"
+           ELSE
+              DISPLAY "PRE=ADDRESS"
+           END-IF
            SET P TO ADDRESS OF WS-T
-           DISPLAY "POST=" FUNCTION ORD(W(1:1)) " "
-               FUNCTION ORD(W(8:1))
+           IF W = LOW-VALUES
+              DISPLAY "POST=ZERO-ADDRESS"
+           ELSE
+              DISPLAY "POST=ADDRESS"
+           END-IF
+           SET ADDRESS OF WN TO WS-A
+           MOVE WN TO WS-I0
+           SET P UP BY 3
+           MOVE WN TO WS-I1
+           COMPUTE WS-D = WS-I1 - WS-I0
+           DISPLAY "STEP=" WS-D
+           SET P DOWN BY 3
+           MOVE WN TO WS-I1
+           IF WS-I1 = WS-I0
+              DISPLAY "BACK=SAME"
+           ELSE
+              DISPLAY "BACK=DIFF"
+           END-IF
+           SET P TO NULL
+           IF W = LOW-VALUES
+              DISPLAY "NULLED=ZERO-ADDRESS"
+           ELSE
+              DISPLAY "NULLED=ADDRESS"
+           END-IF
+           SET P TO ADDRESS OF WS-T
       *> The slot holds a REAL address - dereference it.
            SET ADDRESS OF WS-U TO P
            DISPLAY "DEREF=[" WS-U "]"

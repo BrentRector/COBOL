@@ -267,7 +267,7 @@ internal static class OperandText
     {
         // A MOVE's sending group is a ONE-WAY transfer (kb/Work PB244): its characters go to the receiver and are
         // never read back into it, so a strongly-typed group with a class pointer/object leaf sends its storage
-        // image - the leaf's reserved placeholder positions - under §14.9.25.4 GR4.
+        // image - the leaf's 8 positions (a pointer's storage image, kb/Work PB1071) - under §14.9.25.4 GR4.
         BoundFieldOperand f => AsStorageImage(f.Place, context, transfer: true),
         _ => AsString(op, num, deSign: false),
     };
@@ -275,7 +275,7 @@ internal static class OperandText
     /// <summary>⛔ THE ONE-WAY STRING CHANNEL FOR A READ-ONLY CONSUMER OF A GROUP'S CHARACTERS (kb/Work PB244, PB1901):
     /// <see cref="AsString"/>, except that a strongly-typed group holding a class pointer/object leaf — a legal
     /// operand, the only conforming spelling of such a group being §13.18.60.3 SR14 — reads its STORAGE image, each
-    /// such leaf as its reserved placeholder positions (CONFORMANCE.md A.1 items 56 and 214, D-SLOT), instead of
+    /// such leaf as its 8 positions - a pointer's storage image, an object's reserved placeholder (CONFORMANCE.md A.1 items 56, 214 and 216, D-SLOT), instead of
     /// the Tier-C whole-group refusal. Comparison and read-back keep <see cref="AsString"/>: the placeholder image is
     /// neither injective nor invertible, so only a consumer that reads the characters and never reads them back may
     /// take it — DISPLAY, a MOVE's sending group (<see cref="NonElementaryMoveSender"/>), and an intrinsic

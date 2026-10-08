@@ -8,14 +8,16 @@
       *> was the wrong clause for an argument position.
       *> A strongly-typed group with a USAGE POINTER leaf is the only conforming home of a pointer inside a group
       *> (13.18.60.3 SR14, cite.py --check OK). It used to compile clean and ABORT at run time in the whole-group image refusal. Its
-      *> character image is the STORAGE image with each pointer leaf's 8 reserved positions as SPACES, never the
+      *> character image is the STORAGE image with each pointer leaf's 8 positions holding its storage image (kb/Work
+      *> PB1071, A.1 item 216: NULL is eight zero positions; they were SPACES before), never the
       *> reference (CONFORMANCE.md A.1 items 56 and 214; the image DISPLAY and a MOVE already read), so
-      *>   G holds "ab" + 8 placeholder positions + "cd"  = 12 characters
-      *>   UPPER-CASE(G)                                   = "AB" + 8 spaces + "CD"
-      *>   REVERSE(G)                                      = "dc" + 8 spaces + "ba"   (15.78.4: the characters
-      *>                                                      reversed, case untouched)
-      *> and the function result has the argument's length (15.97.4 r5; 15.78.4). The plain strong group G2 is
-      *> "xyz" and UPPER-CASE gives "XYZ".
+      *>   G holds "ab" + the NULL image (8 zero positions) + "cd"  = 12 characters
+      *>   UPPER-CASE(G)                                   = "AB" + 8 zero positions + "CD"
+      *>   REVERSE(G)                                      = "dc" + 8 zero positions + "ba"   (15.78.4: the
+      *>                                                      characters reversed, case untouched)
+      *> and the function result has the argument's length (15.97.4 r5; 15.78.4). The zero positions are control
+      *> characters, so they are asked (= LOW-VALUES) and the characters around them displayed. The plain strong
+      *> group G2 is "xyz" and UPPER-CASE gives "XYZ".
       *> Strongly-typed groups are COBOL 2002; the string-argument rule is unchanged in every later edition.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1901POS.
@@ -34,9 +36,19 @@
        PROCEDURE DIVISION.
        MAIN.
            MOVE FUNCTION UPPER-CASE(G) TO R12
-           DISPLAY "[" R12 "]"
+           DISPLAY "[" R12(1:2) "|" R12(11:2) "]"
+           IF R12(3:8) = LOW-VALUES
+              DISPLAY "UPPER-MID=NULL-IMAGE"
+           ELSE
+              DISPLAY "UPPER-MID=OTHER"
+           END-IF
            MOVE FUNCTION REVERSE(G) TO R12
-           DISPLAY "[" R12 "]"
+           DISPLAY "[" R12(1:2) "|" R12(11:2) "]"
+           IF R12(3:8) = LOW-VALUES
+              DISPLAY "REVERSE-MID=NULL-IMAGE"
+           ELSE
+              DISPLAY "REVERSE-MID=OTHER"
+           END-IF
            DISPLAY FUNCTION LENGTH(FUNCTION UPPER-CASE(G))
            MOVE FUNCTION UPPER-CASE(G2) TO R3
            DISPLAY "[" R3 "]"

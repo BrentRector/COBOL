@@ -890,11 +890,14 @@ internal static class RuntimeApi
     public static string PtrUpByAmount(string ptr, string scaled, string scale, bool down) =>
         $"{nameof(CobolPtr)}.{nameof(CobolPtr.UpByAmount)}({ptr}, {scaled}, {scale}, {(down ? "true" : "false")})";
 
-    /// <summary>ALLOCATE a fresh cell — <c>CobolPtr.Allocate</c> (GR1/GR2; GR6 zero fill).</summary>
     /// <summary>ALLOCATE — <c>CobolPtr.Allocate</c> over the FULL Int128 size (no emitter-side narrowing —
-    /// the PB22 wrap family), with the GR6/GR8 fill character and the GR5 not-available out-flag.</summary>
-    public static string PtrAllocate(string sizeInt128, string fillCharLiteral, string notAvailVar) =>
-        $"{nameof(CobolPtr)}.{nameof(CobolPtr.Allocate)}({sizeInt128}, {fillCharLiteral}, out {notAvailVar})";
+    /// the PB22 wrap family), with the GR6/GR8 fill character and the GR5 not-available out-flag.
+    /// <paramref name="nullImageOffsets"/> are the based item's pointer-member positions, seeded with the NULL
+    /// image (GR9; kb/Work PB1071) - empty for the CHARACTERS form.</summary>
+    public static string PtrAllocate(string sizeInt128, string fillCharLiteral, string notAvailVar,
+                                     IReadOnlyCollection<int>? nullImageOffsets = null) =>
+        $"{nameof(CobolPtr)}.{nameof(CobolPtr.Allocate)}({sizeInt128}, {fillCharLiteral}, out {notAvailVar}"
+        + (nullImageOffsets is { Count: > 0 } ? $", [{string.Join(", ", nullImageOffsets)}])" : ")");
 
     /// <summary>ALLOCATE with a native-float expression — <c>CobolPtr.AllocateReal</c> (GR1's round-UP on
     /// the double; kb/Work PB151).</summary>
@@ -1992,10 +1995,20 @@ internal static class RuntimeApi
         $"{nameof(CobolPtr)}.{nameof(CobolPtr.SlotRead)}<{carrierType}>({cellExpr}, {byteOffsetExpr}, {nullStateExpr})";
 
     /// <summary>Store a pointer-class member's MANAGED SLOT — <c>CobolPtr.SlotWrite</c>, the receiving twin of
-    /// <see cref="PtrSlotRead"/> (kb/Work PB231). The byte image is left untouched: the member's bytes there are
-    /// reserved placeholders, so a write through one description cannot disturb another's characters.</summary>
-    public static string PtrSlotWrite(string cellExpr, string byteOffsetExpr, string valueExpr) =>
-        $"{nameof(CobolPtr)}.{nameof(CobolPtr.SlotWrite)}({cellExpr}, {byteOffsetExpr}, {valueExpr})";
+    /// <see cref="PtrSlotRead"/> (kb/Work PB231). The runtime stores the slot AND the member's 8 positions' pointer
+    /// image (kb/Work PB1071); a class-object member has no image and its reserved positions are left alone, so a write
+    /// through one description cannot disturb another's characters. <paramref name="carrierType"/> is the member's own
+    /// carrier type, as for <see cref="PtrSlotRead"/>.</summary>
+    public static string PtrSlotWrite(string cellExpr, string byteOffsetExpr, string carrierType, string valueExpr) =>
+        $"{nameof(CobolPtr)}.{nameof(CobolPtr.SlotWrite)}<{carrierType}>({cellExpr}, {byteOffsetExpr}, {valueExpr})";
+
+    /// <summary>The NULL pointer image — <c>PointerImage.NullImage</c>, eight zero positions (DOC-A.1-216): what a
+    /// pointer member's reserved positions hold in a freshly seeded shared area (kb/Work PB1071).</summary>
+    public static string PointerNullImage() => $"{nameof(PointerImage)}.{nameof(PointerImage.NullImage)}";
+
+    /// <summary>The storage image of a pointer VALUE expression — <c>PointerImage.Of</c> (data-, program- or
+    /// function-pointer by the expression's static type; DOC-A.1-216).</summary>
+    public static string PointerImageOf(string valueExpr) => $"{nameof(PointerImage)}.{nameof(PointerImage.Of)}({valueExpr})";
 
     // ── A CELL-BACKED area's VARIABLE-LENGTH half (kb/Work PB1026, PB1042) — StorageCell's component slots ──────────
 

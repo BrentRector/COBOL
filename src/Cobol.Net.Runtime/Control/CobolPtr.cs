@@ -221,17 +221,36 @@ public static class CobolPtr
     /// INITIALIZED with CHARACTERS, the OPTIONS INITIALIZE clause's specified-fill-character when that
     /// clause is written (GR8), else the space (content undefined; space-filling is the conformant
     /// choice).</summary>
-    public static ManagedPointer Allocate(Int128 size, char fill, out bool notAvail)
+    /// <param name="nullImageAt">The positions of the area's class-pointer members (a based item's
+    /// <c>SlotWindow.PointerImageOffsetsOf</c>), each seeded with <see cref="PointerImage.NullImage"/> rather than
+    /// <paramref name="fill"/> - GR9's null initial state as the member's byte view sees it (kb/Work PB1071). Empty
+    /// for the CHARACTERS form, which has no members.</param>
+    public static ManagedPointer Allocate(Int128 size, char fill, out bool notAvail, ReadOnlySpan<int> nullImageAt = default)
     {
         notAvail = false;
         if (size <= 0) return ManagedPointer.Null;
         if (size > int.MaxValue) { notAvail = true; return ManagedPointer.Null; }
         try
         {
-            var cell = new StorageCell { Ref = new string(fill, (int)size), Allocated = true };
+            var cell = new StorageCell { Ref = Seeded((int)size, fill, nullImageAt), Allocated = true };
             return new CellPointer(cell, 0);
         }
         catch (OutOfMemoryException) { notAvail = true; return ManagedPointer.Null; }
+    }
+
+    /// <summary>The allocated area's initial image: <paramref name="size"/> positions of <paramref name="fill"/>,
+    /// except that each of the 8-position runs at <paramref name="nullImageAt"/> holds
+    /// <see cref="PointerImage.NullImage"/> (kb/Work PB1071) - a data item of class pointer in the allocated
+    /// storage is initialized to null (ISO 14.9.3.4 GR9), and DOC-A.1-216 gives NULL the zero image, so the byte
+    /// view of an unwritten pointer member agrees with its slot.</summary>
+    private static string Seeded(int size, char fill, ReadOnlySpan<int> nullImageAt)
+    {
+        if (nullImageAt.IsEmpty) return new string(fill, size);
+        return string.Create(size, (fill, at: nullImageAt.ToArray()), static (span, s) =>
+        {
+            span.Fill(s.fill);
+            foreach (int offset in s.at) PointerImage.NullImage.AsSpan().CopyTo(span[offset..]);
+        });
     }
 
     /// <summary>ALLOCATE with a NATIVE-FLOAT arithmetic-expression-1 (kb/Work PB151): GR1's "rounded up to
@@ -281,8 +300,28 @@ public static class CobolPtr
     public static T SlotRead<T>(StorageCell cell, int byteOffset, T nullState) =>
         cell.SlotAt(byteOffset) is T v ? v : nullState;
 
-    /// <summary>Store a managed slot — the receiving twin of <see cref="SlotRead{T}"/>. Returns the value so
-    /// the emitted store is an expression statement of the same shape the byte-window codings use.</summary>
-    public static void SlotWrite(StorageCell cell, int byteOffset, object? value) =>
+    /// <summary>Store a managed slot — the receiving twin of <see cref="SlotRead{T}"/> — AND the member's
+    /// storage IMAGE (kb/Work PB1071). The area is ONE storage area in two halves, and a pointer member's 8
+    /// storage positions hold the image <see cref="PointerImage"/> defines for its value (<c>docs/CONFORMANCE.md</c>
+    /// §7 DOC-A.1-216: the address in the implementation's binary order, NULL as zero), so a byte window over those
+    /// positions — a BASED <c>X(8)</c>, an <c>ADDRESS OF</c> alias, a group MOVE — reads the same thing the CALL
+    /// boundary's BY CONTENT record does. Both halves are written HERE, by the one store every pointer-member
+    /// write goes through, so they cannot be set apart. A class-object member has no image
+    /// (<see cref="PointerImage.OfSlot{T}"/> answers null for it) and its reserved positions are left alone.
+    /// <typeparamref name="T"/> is the member's own carrier type: a null reference alone cannot say whether it is
+    /// a NULL data-pointer (an image of zeros) or a NULL object reference (none).</summary>
+    public static void SlotWrite<T>(StorageCell cell, int byteOffset, T value)
+    {
         cell.SetSlotAt(byteOffset, value);
+        if (PointerImage.OfSlot(value) is { } image) cell.Ref = Spliced(cell.Ref, byteOffset, image);
+    }
+
+    /// <summary>The image <paramref name="at"/> positions into <paramref name="area"/> replaced by
+    /// <paramref name="image"/> — the cell's string is immutable, so the store builds the new one.</summary>
+    private static string Spliced(string area, int at, string image) =>
+        string.Create(area.Length, (area, at, image), static (span, s) =>
+        {
+            s.area.AsSpan().CopyTo(span);
+            s.image.AsSpan().CopyTo(span[s.at..]);
+        });
 }

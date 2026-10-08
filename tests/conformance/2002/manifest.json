@@ -481,6 +481,7 @@
     "pb231_based_bit_leaf",
     "pb231_based_national_leaf",
     "pb231_based_pointer_leaf",
+    "pb1071_pointer_member_image",
     "pb392_corresponding_group_kinds",
     "pb423_move_operand_class_admitted",
     "pb231_national_byte_window",

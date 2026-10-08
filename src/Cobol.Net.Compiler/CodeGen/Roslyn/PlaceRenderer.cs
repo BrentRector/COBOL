@@ -251,11 +251,11 @@ internal static class PlaceRenderer
         RedefViewPlace { Coding: NationalWindow n } v => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
             $"{RuntimeApi.NatWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({v.OffsetExpr})", n.Positions.ToString(), rhs)};",
         // Store a POINTER-CLASS member into the area's MANAGED SLOT (kb/Work PB231) — the receiving twin of the
-        // slot read. The BYTE image is deliberately untouched: the member's bytes there are reserved
-        // placeholders, so a write through one description cannot disturb another view's characters
-        // (§13.18.44.4 GR1 — one storage area, and every other member's positions are its own).
+        // slot read. The member's own 8 positions get the pointer IMAGE of the stored value (kb/Work PB1071, the
+        // DOC-A.1-216 image, written by the runtime's one store beside the slot) and no other member's positions are
+        // touched (§13.18.44.4 GR1 — one storage area, and every other member's positions are its own).
         RedefViewPlace { Coding: SlotWindow s } v =>
-            $"{RuntimeApi.PtrSlotWrite(RenderPath(s.Cell, AccessDir.Receiving), $"(int)({v.OffsetExpr})", rhs)};",
+            $"{RuntimeApi.PtrSlotWrite(RenderPath(s.Cell, AccessDir.Receiving), $"(int)({v.OffsetExpr})", v.ViewItem.ElementType, rhs)};",
         // Store a DYNAMIC-LENGTH member's new content into the cell's dynamic slot (kb/Work PB1026) — the receiving
         // twin of the slot read. rhs already carries §8.5.1.10.4's receiving rule (CobolDynString.Store).
         // The cell is reached RECEIVING: inside a dynamic-capacity table's element cell (kb/Work PB1042) the store
@@ -588,7 +588,7 @@ internal static class PlaceRenderer
     /// spelling <c>.AsImage()</c> itself to preserve its message, is exactly the copy this law forbids).</para></summary>
     /// <param name="transfer">True for a ONE-WAY TRANSFER consumer (DISPLAY, a MOVE's sending group - kb/Work
     /// PB244): the guard then asks <see cref="Place.TransferImageCapable"/>, which also admits a group with a class
-    /// pointer/object leaf (its reserved placeholder positions). Comparison and every read-back leave it false.</param>
+    /// pointer/object leaf (its pointer image or reserved placeholder). Comparison and every read-back leave it false.</param>
     public static string GroupImage(Place group, string context = "whole-group image of", bool transfer = false) => group switch
     {
         RedefViewPlace { Coding: NationalWindow, ViewItem.IsGroup: true } v => ByteWindowRead(v),   // the storage image — see ByteWindowRead (kb/Work PB1653)

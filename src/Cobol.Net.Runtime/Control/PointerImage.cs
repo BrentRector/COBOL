@@ -10,10 +10,11 @@ namespace CobolNet.Runtime;
 /// (<see cref="ManagedPointer"/> / <see cref="ProgramPointer"/> / <see cref="FunctionPointer"/>) and its STORAGE
 /// is 8 character positions; this is the one place that says what those 8 positions hold, for every consumer
 /// that must see the bytes rather than the reference — today the CALL boundary's BY CONTENT record (ISO §14.2.3
-/// GR9 — "That argument is moved to this allocated record without conversion"; <c>CobolArgAdapt</c>). A pointer
-/// MEMBER of a shared storage area keeps its value in the area's managed slot and its positions stay the kb/Work
-/// PB231 reserved fill; carrying this image there too is an open lead (the ALLOCATE fill, the group-image
-/// composer's seed and the slot store would all ask this codec), not a second codec.
+/// GR9 — "That argument is moved to this allocated record without conversion"; <c>CobolArgAdapt</c>) and the byte
+/// view of a pointer MEMBER of a shared storage area (a BASED, EXTERNAL or ADDRESS-OF cell, or an ALLOCATEd one):
+/// <c>CobolPtr.SlotWrite</c> keeps the member's positions equal to its slot's image, the cell seeds and ALLOCATE
+/// start them at <see cref="NullImage"/>, and the one-way group image of a record struct renders it (kb/Work
+/// PB1071). The slot holds the VALUE, the positions hold this image of it, and this codec is the only author.
 /// <para>THE DETERMINATION (CLAUDE.md rule 1's ISO → GnuCOBOL → IBM/Micro Focus precedence; the standard leaves
 /// size and representation to the implementor, §13.18.60.4 GR23/GR24/GR26): GnuCOBOL stores a pointer as the
 /// machine address — an unsigned integer in the byte order of the platform's native binary integers, so a
@@ -25,7 +26,7 @@ namespace CobolNet.Runtime;
 /// <list type="bullet">
 /// <item>NULL, of every category → eight X"00" positions.</item>
 /// <item>A data-pointer into a storage area → the area's BASE plus the pointer's displacement, as a signed 64-bit
-/// little-endian integer. Each area is given its base the first time one of its addresses is imaged: the k-th
+/// integer in this implementation's binary order, big-endian. Each area is given its base the first time one of its addresses is imaged: the k-th
 /// base is k × 2^32, so two areas' images never meet while a displacement stays inside ±2^31, and
 /// <c>SET P UP BY n</c> moves the image by exactly n — the address arithmetic GnuCOBOL programs expect.</item>
 /// <item>A program-pointer / function-pointer → a base drawn from the SAME allocator, one per (category,
@@ -72,6 +73,19 @@ public static class PointerImage
         ManagedPointer<ManagedPointer> d => Of(d.Value),
         ManagedPointer<ProgramPointer> pp => Of(pp.Value),
         ManagedPointer<FunctionPointer> fp => Of(fp.Value),
+        _ => null,
+    };
+
+    /// <summary>The storage image of the value a pointer MEMBER of a shared storage area keeps in its managed slot
+    /// (kb/Work PB1071), or null when the member has none: a class-object member (an object reference has no image
+    /// here, <see cref="OfCarrier"/>). <typeparamref name="T"/> is the member's own carrier type, because a null
+    /// data-pointer and a null object reference are both a null reference and only the type says which.</summary>
+    public static string? OfSlot<T>(T value) => value switch
+    {
+        ProgramPointer pp => Of(pp),
+        FunctionPointer fp => Of(fp),
+        ManagedPointer mp => Of(mp),
+        _ when typeof(ManagedPointer).IsAssignableFrom(typeof(T)) => NullImage,   // a null data-pointer: the zero address
         _ => null,
     };
 
