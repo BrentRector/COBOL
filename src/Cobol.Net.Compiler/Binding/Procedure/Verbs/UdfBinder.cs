@@ -285,9 +285,10 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
         // Through a function-pointer the callee is whatever the pointer HOLDS when the activation runs (GR6c):
         // the pointer operand rides DynamicName and the emitter's pointer arm reads its carrier.
         Pending.Add(pointer is null
-            ? new BoundCallProgram(fn.Externalized, null, callArgs, tempPlace, null, null) { IsFunction = true }
+            ? new BoundCallProgram(fn.Externalized, null, callArgs, tempPlace, null, null)
+                { IsFunction = true, CalleeSignatureKnown = true }
             : new BoundCallProgram(null, pointer, callArgs, tempPlace, null, null)
-                { IsFunction = true, IsPointerTarget = true });
+                { IsFunction = true, IsPointerTarget = true, CalleeSignatureKnown = true });
         // The reading expression: a BoundNumRef over the temp's Place. Every general-operand chokepoint
         // (MOVE source, DISPLAY, relation operands, function arguments — IntrinsicBinder.OperandOf) maps it
         // to a BoundFieldOperand, whose Place.Item carries the cloned category into Table-16 legality, the

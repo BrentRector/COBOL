@@ -3,6 +3,7 @@
 using CobolNet.Common;
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
+using CobolNet.Compiler.Oo;
 using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Generated;
@@ -701,10 +702,25 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
 
         // ON OVERFLOW is the COBOL-74-carried synonym for ON EXCEPTION, REMOVED at ISO 2023; the edition gate
         // (CallOnOverflowRemoved2023) moved to the post-bind VersionConformancePass (Step 14d), reading the flag.
+        // ⛔ A CALL WHOSE ACTIVATED PROGRAM NO SIGNATURE DESCRIBES HERE (a dynamic Format-1 CALL; a §12.3.8.4 GR10 c)
+        // prototype) has §14.8.2 / §14.8.3 asked at run time instead (§14.9.4.4 GR3 d); kb/Work PB165): each operand's
+        // description, built by the ONE builder a universal INVOKE's operands take, rides its CobolArg when the site
+        // checks EC-PROGRAM-ARG-MISMATCH.
+        if (callee is null)
+        {
+            for (int i = 0; i < args.Count; i++)
+                args[i] = args[i] with
+                {
+                    Description = ActivationDescriptions.OfCallArgument(args[i],
+                        args[i].ProgramAddress?.Prototype is { } addressed ? host.ProgramRestrictionIdentityOf(addressed) : null),
+                };
+        }
         return new BoundCallProgram(literalName, dynamicName, args, returning, onExc, notOnExc)
         {
             UsedOverflowSpelling = usedOverflow,
             IsPointerTarget = isPointerTarget,
+            CalleeSignatureKnown = callee is not null,
+            ReturningDescription = callee is null && returning is { } described ? ActivationDescriptions.OfPlace(described) : null,
         };
     }
 

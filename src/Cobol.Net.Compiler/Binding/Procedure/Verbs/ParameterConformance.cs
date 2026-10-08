@@ -266,7 +266,7 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
             BoundStringLiteral s =>
                 CobolNet.Compiler.Oo.OoConformance.ContentNonNumericLiteralMismatch(formal, s.Category),
             // A figurative constant and an ALL literal are alphanumeric VALUES whose category the context chooses
-            // (§8.3.2.1 / §8.3.3.6.4), so they take rule 2d's MOVE arm under any literal category.
+            // (§8.3.3.6.4 GR1), so they take rule 2d's MOVE arm under any literal category.
             BoundAllLiteral or BoundFigurative =>
                 CobolNet.Compiler.Oo.OoConformance.ContentAlphanumericLiteralMismatch(formal),
             // A numeric literal, an arithmetic expression and a boolean value (above) are DESCRIBED as the sending

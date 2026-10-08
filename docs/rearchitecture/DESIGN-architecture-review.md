@@ -679,7 +679,7 @@ The rules (each a drift assertion, listed with the measure that shows today's di
    type beside it (`PassPhase` with `IBindPass`); the family is the unit a §8.5 union declares, so the file and the type
    coincide again when the union lands.
 3. **File name equals its type** (for a family file, its root). Measured: 22 files are named for no type they declare
-   (`CallAbi.cs` holds `CobolPassMode`, `CobolArg`, `BoundaryClass`…; `EmitCore.cs` holds `EmitContext`, `NumX`,
+   (`CallAbi.cs` holds `CobolPassMode`, `CobolArg`, `BoundaryItem`…; `EmitCore.cs` holds `EmitContext`, `NumX`,
    `NumXCarrier`; `ReportWriter.cs` holds `CobolReport`; `ExceptionState.cs` holds `ExceptionEngine`).
 4. **A partial type splits only along a named concern, and the partial is named for it.** Measured: 11 of the 52
    candidates are partial, with 45 named concerns between them (`DataBinder.Reports.cs`, `CobolIntrinsics.Dec.cs`);
@@ -1201,7 +1201,7 @@ carries its order and blockers):
 | `CodeGen.SequentialIoEmitter` (R0-0031) | READ, WRITE, OPEN/CLOSE, RELEASE/RETURN (`Record`, `Read`, `Released`) | `ReadEmitter`; `WriteEmitter`; `OpenCloseEmitter`; `ReleaseReturnEmitter` | Emit(the statement's BoundStatement leaf, EmitContext), one emitter per leaf |
 | `Runtime.CobolEdit` (R0-0032) | §13.18.40 editing; the `Float` partial | `CobolEdit`; `FloatEdit` | CobolEdit keeps the emitted entries; FloatEdit is its owned floating-insertion editor |
 | `Frontend.Preprocessor.ReferenceFormatProcessor` (R0-0033) | the §6.5 logical conversion (one pass, PB1491) and the line builder (the partials) | `LogicalLineConverter`; `LogicalLineBuilder` | LogicalLineConverter.Convert(source text, reference format) → logical lines (§6.5, one pass) |
-| `Runtime.CobolArgAdapt` (R0-0034, `CallAbi.cs`) | one file holds the whole CALL ABI (`CobolPassMode`, `CobolArg`, `BoundaryClass`, `BoundaryItem`, `ICobolProgram`); adapters by boundary class | CallAbi.cs split one type per file (CobolPassMode, CobolArg, BoundaryClass, BoundaryItem, ICobolProgram); ArgumentAdapters, one per boundary class | BoundaryClass (existing) selects an IArgumentAdapter |
+| `Runtime.CobolArgAdapt` (R0-0034, `CallAbi.cs`) | one file holds the whole CALL ABI (`CobolPassMode`, `CobolArg`, `BoundaryItem`, `ICobolProgram`); adapters by boundary class | CallAbi.cs split one type per file (CobolPassMode, CobolArg, BoundaryItem, ICobolProgram); ArgumentAdapters, one per boundary class | a boundary-class selector picks an IArgumentAdapter (`BoundaryClass`, a §14.8.2.2 conformance class, was deleted by kb/Work PB165: `BoundaryItem.Description` carries those facts) |
 | `CodeGen.Emit.ConditionRenderer` (R0-0035) | the condition visitor; range membership (`Membership` 4), class conditions | `MembershipRenderer`; `ClassConditionRenderer` | Render(a BoundCondition leaf, EmitContext), ConditionRenderer keeping the dispatch |
 | `Runtime.CobolDec` (R0-0036) | standard-decimal arithmetic; the unscaled helpers | `CobolDec`; `DecUnscaled` | DecUnscaled, the unscaled-Int128 helpers CobolDec owns; emitted names unchanged |
 | `Frontend.Preprocessor.ConditionalCompilationProcessor` (R0-0037) | `>>IF`/`>>EVALUATE` evaluation, `>>DISPLAY` (the partial), the line walk | `DirectiveEvaluator`; `DisplayDirective` | DirectiveEvaluator.Evaluate(expression, compilation variables) → value |

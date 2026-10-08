@@ -2299,9 +2299,10 @@ reallocated).
 > "the same ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses" as the sender, and
 > §14.9.4.4 GR3 d) makes a violation EC-PROGRAM-ARG-MISMATCH "if checking for it is enabled in both the activated
 > program and activating runtime element", the call "not successful" (the callee never runs; GR3 h) 1. sends it to
-> ON EXCEPTION). Checked in both, WiseOwl COBOL raises it at call initiation over the facts a dynamic Format-1 CALL
-> can compare (the numeric item's PICTURE, SIGN and USAGE, and a text-carried item's character length;
-> `BoundaryItem.Conforms`). The standard names no outcome when checking is off in either element, and WiseOwl COBOL
+> ON EXCEPTION). Checked in both, WiseOwl COBOL raises it at call initiation: at a CALL whose activated program the
+> activating element holds no signature for, over both returning items' whole descriptions (§14.8.3 entire,
+> `BoundaryItem.ReturningViolation`; kb/Work PB165), elsewhere over the numeric item's PICTURE, SIGN and USAGE and a
+> text-carried item's character length. The standard names no outcome when checking is off in either element, and WiseOwl COBOL
 > follows the posture it already documents for the unchecked argument COUNT (`ProgramTable.CallProgram`: a missing
 > argument behaves as omitted, an excess one is ignored): the call proceeds and the result is stored in the
 > RECEIVER'S OWN width — a text receiver by the alphanumeric alignment of §14.6.8.5 ("aligned at the leftmost

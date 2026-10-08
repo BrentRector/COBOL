@@ -431,6 +431,9 @@ ANY LENGTH, positions, the §8.5.3.1 strong-type identity, the §8.5.1.12 layout
 phrases and, on a formal, OPTIONAL and BY VALUE. The compiler builds every description in ONE place
 (`Oo/ActivationDescriptions` — caller arguments and RETURNING in the binder, method formals and returning items as
 `static readonly` fields of the class half) and renders it through ONE renderer (`RuntimeApi.ActivationDescriptionNew`).
+The same description crosses a CALL whose activated program the activating element holds no signature for
+(`BoundaryItem.Description`, `ActivationRelations.CallArgumentViolation` / `CallReturningViolation`; kb/Work PB165 —
+COBOLNET_INTERPROGRAM_DESIGN), which shares the §14.8.2.2 group core and the §14.8.3 returning core with this lane.
 The generated case asks the standard's TWO relations of them (`ActivationRelations`), in the order §14.9.23.4 GR7
 prescribes (kb/Work PB1500):
 - **GR7 b) — resolution: `ActivationRelations.Matches` / `ReturningMatches`.** §9.3.6's match rules decide whether a

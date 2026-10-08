@@ -91,6 +91,12 @@ public sealed record BoundCallArg(CobolPassMode Mode, Place? Place, BoundOperand
     /// for a user-defined FUNCTION reference. <c>CallEmitter.ArgText</c> reads it to perform GR9/GR10's COMPUTE
     /// on the ACTIVATING side, where those rules put it (kb/Work PB640).</para></summary>
     public DataItem? Formal { get; init; }
+
+    /// <summary>The argument's §14.8.2 description (<c>ActivationDescriptions.OfCallArgument</c>) when the activating
+    /// element holds no signature of the activated program (<see cref="BoundCallProgram.CalleeSignatureKnown"/> false): what
+    /// §14.9.4.4 GR3 d) compares with the activated program's registered formal at call initiation (kb/Work PB165). Null
+    /// otherwise, and for an omitted argument.</summary>
+    public CobolNet.Runtime.ActivationDescription? Description { get; init; }
 }
 
 /// <summary><c>CALL {literal|identifier} [USING …] [RETURNING …] [ON …][NOT ON …]</c> (ISO §14.9.4 Format 1).
@@ -134,6 +140,20 @@ public sealed record BoundCallProgram(
     /// category of the operand and <see cref="IsFunction"/> always agree; the emitter's ONE invocation renderer
     /// reads the flag pair.</summary>
     public bool IsPointerTarget { get; init; }
+
+    /// <summary>True when the ACTIVATING element held the activated element's formal parameters and RETURNING item when it
+    /// was compiled — an AS NESTED call, a program-prototype whose details §12.3.8.4 GR10 a) / b) took from this
+    /// compilation group, a user-defined function (§12.3.8.4 GR11) — so §14.8.2 / §14.8.3 were checked at bind time and
+    /// every argument carries its <see cref="BoundCallArg.Formal"/>. False for the lanes whose activated program is located
+    /// by name at run time with no compile-time signature: a dynamic Format-1 CALL, and a program-prototype whose details
+    /// GR10 c) takes from the external repository. Only those describe their operands for §14.9.4.4 GR3 d)'s run-time
+    /// check (<c>CallEmitter</c>; kb/Work PB165).</summary>
+    public bool CalleeSignatureKnown { get; init; }
+
+    /// <summary>The RETURNING item's §14.8.3 description (<c>ActivationDescriptions.OfPlace</c>) when
+    /// <see cref="CalleeSignatureKnown"/> is false, for §14.9.4.4 GR3 d)'s run-time comparison with the activated program's
+    /// registered returning item (kb/Work PB165); null otherwise.</summary>
+    public CobolNet.Runtime.ActivationDescription? ReturningDescription { get; init; }
 }
 
 /// <summary><c>CANCEL {literal|identifier}…</c> (ISO §14.9.5): each target's next CALL finds its initial state

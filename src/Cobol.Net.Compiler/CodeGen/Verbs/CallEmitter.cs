@@ -5,6 +5,7 @@ using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.Binding.Bound;
 using CobolNet.CodeGen.Emit;
+using CobolNet.Compiler.Oo;
 using CobolNet.Runtime;
 
 namespace CobolNet.CodeGen;
@@ -169,21 +170,23 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         var ret = c.Returning is { } rp ? PlaceIdentification.Freeze(rp, hoist) : c.Returning;
         return c with { Args = args, Returning = ret };
     }
+    /// <summary>⛔ WHETHER THIS SITE DESCRIBES ITS OPERANDS FOR §14.9.4.4 GR3 d)'s RUN-TIME CONFORMANCE CHECK (kb/Work PB165): it
+    /// checks EC-PROGRAM-ARG-MISMATCH, and the activating element held no signature of the activated program when it was
+    /// compiled (<see cref="BoundCallProgram.CalleeSignatureKnown"/> false — a dynamic Format-1 CALL, or a program-prototype
+    /// whose details §12.3.8.4 GR10 c) takes from the external repository), so §14.8.2 / §14.8.3 could not be asked at bind
+    /// time. Which ELEMENTARY rule applies — §14.8.2.3.2 / §14.8.2.3.3 rule 1 ("the same length") for "a program for which
+    /// there is no program-specifier in the REPOSITORY paragraph of the activating element", rule 2 (the clause identity,
+    /// or a COMPUTE / SET / MOVE) for a program there is one for — depends on which program the CALL reaches, which a CALL
+    /// by data-name or through a program-pointer knows only at run time, so the site states the element's program-specifiers
+    /// (<see cref="ProgramSpecifiersText"/>) and <c>ProgramTable.CallProgram</c> decides.</summary>
+    private static bool DescribesOperands(BoundCallProgram c, bool argMismatchChecking) =>
+        argMismatchChecking && !c.CalleeSignatureKnown;
 
-    /// <summary>⛔ WHETHER THE ACTIVATED PROGRAM IS UNKNOWN TO THIS ACTIVATING ELEMENT — the lane §14.8.2.3.2 / §14.8.2.3.3 rule 1
-    /// governs (kb/Work PB165): "a program for which there is no program-specifier in the REPOSITORY paragraph of the activating
-    /// element and there is no NESTED phrase specified on the CALL statement", where "the formal parameter shall be of the same
-    /// length as the corresponding argument" and nothing is converted. A user-defined function, a method, a NESTED call and a
-    /// program-specifier's program take rule 2 (the PICTURE-level identity, or a COMPUTE/MOVE conversion that relates no
-    /// lengths), which the binder checks where the callee is known; the length rule would refuse legal source there, so a
-    /// call on those lanes describes no argument. A Format-1 CALL whose target is not a literal cannot tell which program it
-    /// will reach, so it is on this lane only when the element writes no program-specifier at all — the one answer it can
-    /// give soundly.</summary>
-    private bool IsDynamicLane(BoundCallProgram c) =>
-        !c.IsFunction
-        && (ctx.Data.ProgramSpecifiers.Count == 0
-            || (c.LiteralName is { } literal
-                && !ctx.Data.ProgramSpecifiers.Values.Any(s => ExternalizedNames.Same(s.ExternalizedName, literal))));
+    /// <summary>The <c>programSpecifiers:</c> argument of a site that describes its operands: the externalized names of the
+    /// activating element's §12.3.8.2 program-specifiers (its own and its containers', §12.3.8.3), or empty when it writes
+    /// none — every program it can reach is then on rule 1's lane.</summary>
+    private string ProgramSpecifiersText() => ctx.Data.ProgramSpecifiers.Count == 0 ? ""
+        : $", programSpecifiers: new string[] {{ {string.Join(", ", ctx.Data.ProgramSpecifiers.Values.Select(s => CsLiteral(s.ExternalizedName)))} }}";
 
     /// <summary>The <c>CobolArg[]</c> expression of one bound call's arguments — the ONE argument-array text of
     /// <see cref="EmitCall"/>, which renders every activation, statement-position or operand (kb/Work PB892).</summary>
@@ -205,12 +208,13 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// A pointer's carrier goes straight to the registry, never a name-string read.</summary>
     private string InvocationText(BoundCallProgram c, bool argMismatchChecking)
     {
-        string head = $"{CsLiteral(callState.SelfPath)}, {ArgsArrayText(c, describeArguments: argMismatchChecking && IsDynamicLane(c))}, "
-            + $"{(c.Returning is { } rp ? ReturningArgText(rp) : "null")}";
+        bool describe = DescribesOperands(c, argMismatchChecking);
+        string head = $"{CsLiteral(callState.SelfPath)}, {ArgsArrayText(c, describe)}, "
+            + $"{(c.Returning is { } rp ? ReturningArgText(rp, describe ? c.ReturningDescription : null) : "null")}";
         // ⛔ GR3d's activating half rides EVERY arm (kb/Work PB1040's sweep): the two pointer arms used to drop it, so
         // a CALL through a program-pointer or a function-pointer never raised the argument-count or RETURNING
         // mismatch that the same CALL by name did.
-        string site = argMismatchChecking ? ", siteArgMismatchChecking: true" : "";
+        string site = (argMismatchChecking ? ", siteArgMismatchChecking: true" : "") + (describe ? ProgramSpecifiersText() : "");
         if (c.IsPointerTarget && c.DynamicName is BoundFieldOperand pf)
             return c.IsFunction
                 ? $"ProgramRegistry.CallFunctionPointer({PlaceRenderer.Read(pf.Place)}, {head}{site});"
@@ -350,7 +354,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// snapshot the value into a cell AT CALL INITIATION — which also realizes the §14.9.4.4 GR3a once-only
     /// evaluation for those modes. (A BY REFERENCE accessor over a SUBSCRIPTED operand re-evaluates the
     /// subscript inside the closure — the GR3a capture-into-locals refinement is a known follow-up.)</summary>
-    public string ArgText(BoundCallArg a, bool describe) => LandedForFormal(a, ArgCarrierText(a, describe));
+    public string ArgText(BoundCallArg a, bool describe) => Described(LandedForFormal(a, ArgCarrierText(a)), a, describe);
 
     /// <summary>⛔ THE ACTIVATING ELEMENT'S §14.2.3 GR9/GR10 COMPUTE (kb/Work PB640) — wrapped around EVERY
     /// argument carrier shape <see cref="ArgCarrierText"/> builds, which is why it is a wrapper and not a
@@ -426,57 +430,55 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             : null;
 
     /// <summary>⛔ THE REGISTERED DESCRIPTION of a unit's RETURNING item (<c>BoundaryItem</c>, kb/Work PB1040): the same
-    /// two facts the activating element's <c>CobolArg</c> states for its receiver — <see cref="BoundaryProfile"/> and
-    /// <see cref="BoundaryLength"/> — emitted at the unit's <c>ProgramRegistry.Register</c>, so
-    /// §14.9.4.4 GR3 d) can compare the pair at call initiation. Null when it states neither.</summary>
-    internal static string? RegisteredReturning(Place p, SignEncoding signEncoding) =>
-        RegisteredBoundary(p, signEncoding, BoundaryLength(p));
+    /// facts the activating element's <c>CobolArg</c> states for its receiver — <see cref="BoundaryProfile"/> and
+    /// <see cref="BoundaryLength"/> always, and its §14.8.3 description (<see cref="ActivationDescriptions.OfPlace"/>) when
+    /// the unit checks EC-PROGRAM-ARG-MISMATCH itself (<paramref name="describe"/>; kb/Work PB165) — emitted at the unit's
+    /// <c>ProgramRegistry.Register</c>, so §14.9.4.4 GR3 d) can compare the pair at call initiation. Null when it states
+    /// nothing.</summary>
+    internal static string? RegisteredReturning(Place p, SignEncoding signEncoding, bool describe) =>
+        RegisteredBoundary(p, signEncoding, BoundaryLength(p), describe ? ActivationDescriptions.OfPlace(p) : null);
 
     /// <summary>⛔ THE REGISTERED DESCRIPTION of one FORMAL (<c>BoundaryItem</c>, kb/Work PB165): what the activated unit
-    /// states for a formal so that §14.8.2 has something to compare an argument with at a dynamic CALL. It is the same
-    /// description the activating element states for the argument (<see cref="ArgumentFacts"/>), measured by the same
-    /// functions, so the two sides cannot disagree about what a "length" counts. Never null: an element that states nothing
-    /// is the unstated <c>new BoundaryItem(null)</c>, so the array stays positional.</summary>
+    /// states for a formal so that §14.8.2 has something to compare an argument with at a CALL whose activated program is
+    /// located by name at run time — its storage length, measured by the function that measures the activating element's
+    /// argument (<see cref="ArgumentLength"/>), and its description, built by the builder that describes that argument
+    /// (<see cref="ActivationDescriptions.OfPlace"/>), so the two sides cannot disagree about what they compare. Registered
+    /// only by a unit that checks EC-PROGRAM-ARG-MISMATCH. Never null: an element that states nothing is the unstated
+    /// <c>new BoundaryItem(null)</c>, so the array stays positional.</summary>
     internal static string RegisteredFormal(Place p, SignEncoding signEncoding) =>
-        RegisteredBoundary(p, signEncoding, ArgumentLength(p)) ?? "new BoundaryItem(null)";
+        RegisteredBoundary(p, signEncoding, ArgumentLength(p), ActivationDescriptions.OfPlace(p)) ?? "new BoundaryItem(null)";
 
-    private static string? RegisteredBoundary(Place p, SignEncoding signEncoding, int length)
+    private static string? RegisteredBoundary(Place p, SignEncoding signEncoding, int length, ActivationDescription? description)
     {
         string? profile = BoundaryProfile(p, signEncoding);
-        var cls = BoundaryClassOf(p);
-        return profile is null && length == RuntimeApi.UnstatedBoundaryLength && cls == BoundaryClass.Other ? null
+        return profile is null && length == RuntimeApi.UnstatedBoundaryLength && description is null ? null
             : $"new BoundaryItem({profile ?? "null"}"
               + $"{(length == RuntimeApi.UnstatedBoundaryLength ? "" : $", {length}")}"
-              + $"{(cls == BoundaryClass.Other ? "" : $"{(length == RuntimeApi.UnstatedBoundaryLength ? ", Class: " : ", ")}BoundaryClass.{cls}")})";
+              + $"{(description is null ? "" : $", Description: {RuntimeApi.ActivationDescriptionNew(description)}")})";
     }
 
-    /// <summary>The class facts of a place's item that §14.8.2.2 / §14.8.3.2 hang a rule on (<see cref="BoundaryClass"/>;
-    /// kb/Work PB165): an alphanumeric group (not strongly typed, not variable-length), an elementary item of category
-    /// alphanumeric — a reference-modified operand is one (§8.4.3.3.4 GR6) — and the exempt strongly-typed and
-    /// variable-length groups.</summary>
-    internal static BoundaryClass BoundaryClassOf(Place p)
+    /// <summary>⛔ THE ACTIVATING ELEMENT'S STATEMENT OF ONE ARGUMENT for §14.9.4.4 GR3 d)'s run-time comparison (kb/Work
+    /// PB165) — wrapped around EVERY argument shape <see cref="ArgCarrierText"/> builds, so no arm can be left undescribed:
+    /// the argument's storage LENGTH (<see cref="ArgumentLength"/> — §14.8.2.3.2 / §14.8.2.3.3 rule 1's "same length") and
+    /// its DESCRIPTION (<see cref="BoundCallArg.Description"/>, built at bind time by the builder the activated unit's
+    /// registration uses). A reference-modified argument's length is its EVALUATED length (§8.4.3.3.4 GR5 c)), so its
+    /// description takes the positions of the slice the carrier holds, as a universal INVOKE's does
+    /// (<c>CobolInvokeArg.ReferenceModified</c>). Emitted only at a site that describes its arguments (<paramref name="describe"/>:
+    /// it checks EC-PROGRAM-ARG-MISMATCH and holds no signature of the activated program), so every other CALL's text is
+    /// what it always was.</summary>
+    private static string Described(string built, BoundCallArg a, bool describe)
     {
-        if (p is RefModPlace) return BoundaryClass.Alphanumeric;
-        if (p.DenotedItem is not { } item) return BoundaryClass.Other;
-        if (item.IsAsIfElementary) return BoundaryClass.Other;   // a bit / national group is the elementary item it is treated as
-        if (item.IsGroup)
-            return StrongTypeModel.IsStronglyTyped(item) || CrossingOf(p) is CallCrossing.VarGroup
-                ? BoundaryClass.Exempt : BoundaryClass.Group;
-        return item.Pic is { Category: PicCategory.Alphanumeric } ? BoundaryClass.Alphanumeric : BoundaryClass.Other;
+        if (!describe) return built;
+        int length = a.Place is { } p ? ArgumentLength(p) : RuntimeApi.UnstatedBoundaryLength;
+        string? description = a.Description is not { } d ? null
+            : a.Place is RefModPlace slice
+                ? $"({RuntimeApi.ActivationDescriptionNew(d)} with {{ Positions = {OperandText.FieldImage(slice)}.Length }})"
+                : RuntimeApi.ActivationDescriptionNew(d);
+        var facts = new List<string>(2);
+        if (length != RuntimeApi.UnstatedBoundaryLength) facts.Add($"Length = {length}");
+        if (description is not null) facts.Add($"Description = {description}");
+        return facts.Count == 0 ? built : $"({built} with {{ {string.Join(", ", facts)} }})";
     }
-
-    /// <summary>The statement of an ARGUMENT's description beyond its numeric profile — its storage length and class — as
-    /// the trailing named <c>CobolArg</c> constructor arguments (kb/Work PB165), or empty when it states neither. Emitted
-    /// only at a CALL site that checks EC-PROGRAM-ARG-MISMATCH: that is the one site where the activated unit's registered
-    /// formals are compared with it (§14.9.4.4 GR3 d)), so an unchecked CALL's text is what it always was.</summary>
-    private static string ArgumentFacts(Place p) => NamedFacts(ArgumentLength(p), BoundaryClassOf(p));
-
-    /// <summary>The trailing named <c>CobolArg</c> arguments of a stated length and class (empty for neither) — the ONE
-    /// spelling of them, for an argument (<see cref="ArgumentFacts"/>) and a RETURNING receiver
-    /// (<see cref="ReturningArgText"/>) alike.</summary>
-    private static string NamedFacts(int length, BoundaryClass cls) =>
-        $"{(length == RuntimeApi.UnstatedBoundaryLength ? "" : $", Length: {length}")}"
-        + $"{(cls == BoundaryClass.Other ? "" : $", Class: BoundaryClass.{cls}")}";
 
     /// <summary>⛔ THE STORAGE LENGTH an item states for §14.8.2.3.2 / §14.8.2.3.3 rule 1's "same length" (kb/Work PB165):
     /// <see cref="BoundaryLength"/> for a text-carried item, and the item's BYTE-LENGTH (<c>DataItem.ImageWidth</c>, the one
@@ -581,10 +583,12 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// the RECEIVER's shape.
     /// <para>⛔ It also states the receiver's fixed CHARACTER LENGTH (<see cref="BoundaryLength"/>, kb/Work PB1040): the
     /// delivery fits the result to it and the activation checks it against the callee's, §14.8.3.3's same-PICTURE
-    /// rule for the one boundary fact a string carrier does not carry itself.</para></summary>
-    private string ReturningArgText(Place rp) =>
+    /// rule for the one boundary fact a string carrier does not carry itself — and, at a site that describes its operands
+    /// (kb/Work PB165), the receiver's §14.8.3 <paramref name="description"/>.</para></summary>
+    private string ReturningArgText(Place rp, ActivationDescription? description) =>
         $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Reference)}, {RefCarrier(rp)}, {PlaceDescription(rp)}"
-        + $"{NamedFacts(BoundaryLength(rp), BoundaryClassOf(rp))}"
+        + $"{(BoundaryLength(rp) is var length && length != RuntimeApi.UnstatedBoundaryLength ? $", Length: {length}" : "")}"
+        + $"{(description is null ? "" : $", Description: {RuntimeApi.ActivationDescriptionNew(description)}")}"
         // A receiver whose values ride managed slots states its AREA, the storage §14.6.5's delivery places the result
         // in (§14.2.3 GR6 NOTE 1 — "the storage for the returning item is allocated in the activating source unit";
         // kb/Work PB1940): its references cannot cross as characters.
@@ -609,7 +613,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
 
     /// <summary>The C# <c>CobolArg</c> expression for one bound CALL argument BEFORE the §14.2.3 GR9/GR10
     /// landing <see cref="LandedForFormal"/> wraps around it.</summary>
-    private string ArgCarrierText(BoundCallArg a, bool describe)
+    private string ArgCarrierText(BoundCallArg a)
     {
         // §14.9.4.4 GR11 (kb/Work PB133 wave C): the omitted argument crosses as the NULL carrier —
         // CobolArgAdapt.Present answers false, the formal's adapters hand out the GR12 checked-raise carrier,
@@ -647,10 +651,9 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // description has no digit positions for a profile to state.
             // ⛔ …and a GROUP's §8.5.1.12 layout (kb/Work PB965) rides beside it: the one description a
             // variable-length group formal needs to meet a fixed-length group argument (§14.8.2.2).
-            // ⛔ …and, at a site that checks EC-PROGRAM-ARG-MISMATCH (`describe`), its storage LENGTH and CLASS (kb/Work
-            // PB165): the facts §14.8.2.3.2 / §14.8.2.3.3 rule 1 and §14.8.2.2 compare with the activated unit's registered
-            // formal at a dynamic CALL. A forwarded formal states its OWN description, which is the same place.
-            string meta = PlaceDescription(p) + (describe && a.Formal is null ? ArgumentFacts(p) : "");
+            // (Its §14.8.2 description and length for GR3 d)'s run-time check are stated around every arm by
+            // Described — kb/Work PB165. A forwarded formal states its OWN description, which is the same place.)
+            string meta = PlaceDescription(p);
             // ⛔ V59 RESIDUE FIX: the predicate is IsImageCapable, not the pre-V59 IsCharacterImage. A group whose
             // only non-character leaf is BINARY/PACKED now HAS a whole-group image — V59 gave those leaves their
             // pinned bytes — and `RecordStructEmitter` emits AsImage()/FromImage() for exactly IsImageCapable

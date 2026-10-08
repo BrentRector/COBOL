@@ -24,6 +24,20 @@ public enum ActivationShape
     VariableLengthGroup,
     /// <summary>A strongly-typed group item (§8.5.3): its class and category are its type-name (§8.5.2.1).</summary>
     StrongGroup,
+    /// <summary>A BY CONTENT / BY VALUE argument that is a VALUE with a character image and no storage of the activating
+    /// element's: a literal, a figurative constant, an ALL literal or a character-valued intrinsic function's value
+    /// (kb/Work PB165). <see cref="ActivationDescription.Category"/> is its category (a figurative constant's is
+    /// <see cref="ActivationCategory.Figurative"/> or <see cref="ActivationCategory.FigurativeZero"/>, whose category
+    /// the receiving context chooses, §8.3.3.6.4 GR1) and <see cref="ActivationDescription.Table16"/> its §14.9.25.3 Table 16
+    /// row.</summary>
+    Literal,
+    /// <summary>A BY CONTENT / BY VALUE argument that is an arithmetic expression or a numeric function's value: a numeric
+    /// COMPUTE sender with no character image, so a group formal's §14.9.25.4 GR4 character copy has nothing to copy
+    /// (kb/Work PB165, PB1946).</summary>
+    Expression,
+    /// <summary>The predefined NULL written as an argument (§8.4.3.10.3 SR1 a)): an identifier whose category is the
+    /// formal's class, so only a formal of class pointer or object reference takes it, by a SET (§14.8.2.3.3).</summary>
+    PredefinedNull,
 }
 
 /// <summary>The §13.18.60.2 kind of an object-reference description.</summary>
@@ -62,6 +76,14 @@ public static class ActivationCategory
     public const string FunctionPointer = "function-pointer";
     /// <summary>Class and category index (a USAGE INDEX item).</summary>
     public const string Index = "index";
+    /// <summary>Class and category numeric: the sending operand a COMPUTE takes (§8.8.1.1; §14.8.2.3.3 rule 2 a)).</summary>
+    public const string Numeric = "numeric";
+    /// <summary>A figurative constant other than ZERO, or an ALL literal (a <see cref="ActivationShape.Literal"/>): an
+    /// alphanumeric value whose category the receiving context chooses (§8.3.3.6.4 GR1).</summary>
+    public const string Figurative = "figurative";
+    /// <summary>The figurative constant ZERO (a <see cref="ActivationShape.Literal"/>): a <see cref="Figurative"/> that is
+    /// also the one figurative constant a COMPUTE takes as a sending operand (§8.8.1.1).</summary>
+    public const string FigurativeZero = "figurative-zero";
 }
 
 /// <summary>
@@ -72,6 +94,15 @@ public static class ActivationCategory
 /// them — §9.3.6's MATCH (resolution; a failure is EC-OO-METHOD after the INHERITS walk) and §14.8.2 / §14.8.3's
 /// CONFORMANCE (asked of the bound method by §14.9.23.4 GR7 c); a failure is EC-OO-UNIVERSAL). Both are in
 /// <see cref="ActivationRelations"/>.
+/// <para>⛔ THE SAME DESCRIPTION CROSSES A CALL (kb/Work PB165). A CALL whose activated program is located by name at run
+/// time has no compile-time formal to check an argument against — a dynamic Format-1 CALL, or a program-prototype whose
+/// details §12.3.8.4 GR10 c) takes from the external repository — so §14.9.4.4 GR3 d)'s "rules for conformance specified
+/// in 14.8.2, Parameters and 14.8.3, Returning items" are asked at call initiation: the activating element states each
+/// argument's and its RETURNING item's description on its <see cref="CobolArg"/>, the activated program registers its
+/// formals' and its RETURNING item's (<see cref="BoundaryItem.Description"/>), and <see cref="ActivationRelations.CallArgumentViolation"/> /
+/// <see cref="ActivationRelations.CallReturningViolation"/> compare them. A BY CONTENT or BY VALUE argument with no
+/// storage is described as the value it is (<see cref="ActivationShape.Literal"/>, <see cref="ActivationShape.Expression"/>,
+/// <see cref="ActivationShape.PredefinedNull"/>).</para>
 /// <para>It replaced a descriptor STRING compared for equality (<c>OoConformance.ConformanceDescriptor</c>), which
 /// could answer only "the two strings are equal": that is neither relation. Match rule 3 e) is an identity of a CLAUSE
 /// LIST (a group carries none of the clauses, so two groups match whatever their sizes and a group never matches a
@@ -192,6 +223,9 @@ public sealed record ActivationDescription
         ActivationShape.AsIfElementaryGroup => $"a {Category} group of {Positions} positions",
         ActivationShape.VariableLengthGroup => $"a variable-length group ({GroupCompatibility.Describe(Atoms ?? [])})",
         ActivationShape.StrongGroup => $"a strongly-typed group of type {Category}",
+        ActivationShape.Literal => $"a {Category} literal",
+        ActivationShape.Expression => "an arithmetic expression",
+        ActivationShape.PredefinedNull => "NULL",
         _ => $"{Category} {Clauses}",
     };
 }

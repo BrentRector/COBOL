@@ -132,8 +132,9 @@ public static class ProgramRegistry
 
     /// <inheritdoc cref="ProgramTable.CallProgram"/>
     public static void CallProgram(string name, string callerPath, CobolArg[] args, CobolArg? returning,
-        string notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false)
-        => RunUnit.Current.Programs.CallProgram(name, callerPath, args, returning, notFoundEc, siteArgMismatchChecking);
+        string notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false, string[]? programSpecifiers = null)
+        => RunUnit.Current.Programs.CallProgram(name, callerPath, args, returning, notFoundEc, siteArgMismatchChecking,
+            programSpecifiers);
 
     /// <inheritdoc cref="ProgramTable.Cancel"/>
     public static void Cancel(string name, string callerPath) => RunUnit.Current.Programs.Cancel(name, callerPath);
@@ -192,8 +193,9 @@ public static class ProgramRegistry
 
     /// <inheritdoc cref="ProgramTable.CallPointer"/>
     public static void CallPointer(ProgramPointer target, string callerPath, CobolArg[] args,
-        CobolArg? returning, bool siteArgMismatchChecking = false)
-        => RunUnit.Current.Programs.CallPointer(target, callerPath, args, returning, siteArgMismatchChecking);
+        CobolArg? returning, bool siteArgMismatchChecking = false, string[]? programSpecifiers = null)
+        => RunUnit.Current.Programs.CallPointer(target, callerPath, args, returning, siteArgMismatchChecking,
+            programSpecifiers);
 
     /// <inheritdoc cref="ProgramTable.CallFunctionPointer"/>
     public static void CallFunctionPointer(FunctionPointer target, string callerPath, CobolArg[] args,

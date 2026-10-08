@@ -20,6 +20,10 @@ namespace CobolNet.Runtime;
 /// matches a <c>PIC X(n)</c>; conformance then admits a formal group no larger than the argument (§14.8.2.2 rule 1)
 /// and refuses a larger one. Every argument here comes from <see cref="ActivationDescription"/>s the compiler built
 /// in one place (<c>ActivationDescriptions</c>).
+/// <para>A CALL whose activated program is located by name at run time asks the CONFORMANCE relations too
+/// (<see cref="CallArgumentViolation"/>, <see cref="CallReturningViolation"/>; kb/Work PB165), through
+/// <see cref="BoundaryItem"/> at <c>ProgramTable.CallProgram</c>. The §14.8.2.2 group rules, the §14.8.2.3.2
+/// object-reference identity and the §14.8.3 returning rules are ONE copy each, shared by both lanes.</para>
 /// </summary>
 public static class ActivationRelations
 {
@@ -38,21 +42,12 @@ public static class ActivationRelations
         {
             // 3 c) "is the same class and category": an object reference opposite an object reference only.
             if (argument.Shape is not ActivationShape.ObjectReference) return false;
-            return formal.ObjectKind switch
-            {
-                // 3 d) 1.–3.: the same description.
-                ObjectReferenceKind.Universal => argument.ObjectKind is ObjectReferenceKind.Universal,
-                ObjectReferenceKind.Interface => argument.ObjectKind is ObjectReferenceKind.Interface
-                    && CobolNames.Same(argument.ObjectName, formal.ObjectName),
-                ObjectReferenceKind.ObjectClass => argument.ObjectKind is ObjectReferenceKind.ObjectClass
-                    && CobolNames.Same(argument.ObjectName, formal.ObjectName)
-                    && argument.Factory == formal.Factory && argument.Only == formal.Only,
-                // 3 d) 4./5.: a condition on the VALUE, not on the argument's description — "the corresponding
-                // parameter shall evaluate to an object reference of the same class specified in the invocation" /
-                // "to the factory of the class specified in the invocation" (kb/Work PB1112's universal leg).
-                ObjectReferenceKind.ActiveClass => ActiveClassValueMatches(value, formal.Factory, receiver),
-                _ => false,
-            };
+            // 3 d) 4./5.: a condition on the VALUE, not on the argument's description — "the corresponding parameter
+            // shall evaluate to an object reference of the same class specified in the invocation" / "to the factory of
+            // the class specified in the invocation" (kb/Work PB1112's universal leg). 3 d) 1.–3.: the same description.
+            return formal.ObjectKind is ObjectReferenceKind.ActiveClass
+                ? ActiveClassValueMatches(value, formal.Factory, receiver)
+                : SameObjectReferenceDescription(argument, formal);
         }
         if (argument.Shape is ActivationShape.ObjectReference) return false;   // 3 c)
         // 3 c) the same class and category; 3 e) the same ALIGNED, ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH,
@@ -99,9 +94,46 @@ public static class ActivationRelations
             return "the formal parameter is described with the ANY LENGTH clause, which a method invoked through a "
                 + "universal object reference shall not have (ISO §14.9.23.4 GR7 c))";
         if (argument.Shape is ActivationShape.Omitted) return null;
-        // §14.8.2.2: "If either the formal parameter or the corresponding argument is a strongly-typed group item,
-        // both shall be of the same type" — the match already required the same type-NAME (§8.5.2.1: it is the
-        // class and category); the §8.5.3.1 equivalence of the two declarations is this.
+        // The match already required the same type-NAME of a strongly-typed group (§8.5.2.1: it is the class and
+        // category) and the same class of every other pair, so what §14.8.2.2 still asks is the type's §8.5.3.1
+        // equivalence, the §8.5.1.12 compatibility and rule 1's sizes — the ONE group arm the CALL lane asks too.
+        if (ReferenceGroupViolation(argument, formal) is { } groupWhy) return groupWhy;
+        // §14.8.2.3.2 "Additionally" b) / c): a bit / national group matches the same number of positions.
+        return formal.Shape is ActivationShape.AsIfElementaryGroup && formal.Positions != argument.Positions
+            ? $"the formal parameter ({formal}) and the argument ({argument}) have different numbers of positions "
+              + "(ISO §14.8.2.3.2 \"Additionally\" b) / c))"
+            : null;
+    }
+
+    /// <summary>§14.8.2.3.2's object-reference rules 1–3 (and §9.3.6 match rule 3 d) 1.–3., their twin): "If either …
+    /// is a universal object reference, the corresponding … shall be a universal object reference"; "… described with an
+    /// interface-name, … the same interface-name"; "… described with an object-class-name, … the same object-class-name,
+    /// and the FACTORY and ONLY phrases shall be the same". Two ACTIVE-CLASS descriptions are the same description when
+    /// their FACTORY phrases agree (rule 4 asks the invocation, which only a method has).</summary>
+    private static bool SameObjectReferenceDescription(ActivationDescription argument, ActivationDescription formal) =>
+        formal.ObjectKind switch
+        {
+            ObjectReferenceKind.Universal => argument.ObjectKind is ObjectReferenceKind.Universal,
+            ObjectReferenceKind.Interface => argument.ObjectKind is ObjectReferenceKind.Interface
+                && CobolNames.Same(argument.ObjectName, formal.ObjectName),
+            ObjectReferenceKind.ObjectClass => argument.ObjectKind is ObjectReferenceKind.ObjectClass
+                && CobolNames.Same(argument.ObjectName, formal.ObjectName)
+                && argument.Factory == formal.Factory && argument.Only == formal.Only,
+            ObjectReferenceKind.ActiveClass => argument.ObjectKind is ObjectReferenceKind.ActiveClass
+                && argument.Factory == formal.Factory,
+            _ => false,
+        };
+
+    /// <summary>⛔ ISO §14.8.2.2 FOR A PARAMETER PASSED BY REFERENCE, the one copy both lanes ask (a universal INVOKE's
+    /// bound method, <see cref="ParameterViolation"/>, and a CALL, <see cref="CallArgumentViolation"/>): "If either the
+    /// formal parameter or the corresponding argument is a strongly-typed group item, both shall be of the same type"
+    /// (§8.5.3.1's equivalence, <see cref="ActivationDescription.StrongType"/>); "If either … is a variable length group,
+    /// … shall be compatible, as described in 8.5.1.12"; and rule 1 for an alphanumeric group: "that argument or the
+    /// formal parameter … shall be an alphanumeric group item or an elementary item of category alphanumeric, and the
+    /// formal parameter shall be described with the same number or a smaller number of bytes as the corresponding
+    /// argument". Null when neither side is such a group, or when the pair conforms.</summary>
+    private static string? ReferenceGroupViolation(ActivationDescription argument, ActivationDescription formal)
+    {
         if (formal.Shape is ActivationShape.StrongGroup || argument.Shape is ActivationShape.StrongGroup)
             return formal.StrongType is not null
                    && string.Equals(formal.StrongType, argument.StrongType, StringComparison.Ordinal)
@@ -110,20 +142,201 @@ public static class ActivationRelations
                   + "declarations of one type-name are the same type only when equivalent (ISO §14.8.2.2; §8.5.3.1)";
         if (formal.Shape is ActivationShape.VariableLengthGroup || argument.Shape is ActivationShape.VariableLengthGroup)
             return VariableLengthViolation(argument, formal, "argument", "formal parameter");
-        return formal.Shape switch
-        {
-            // §14.8.2.2 rule 1: "the formal parameter shall be described with the same number or a smaller number of
-            // bytes as the corresponding argument" — the callee sees the argument's leading positions.
-            ActivationShape.AlphanumericGroup => formal.Positions <= argument.Positions ? null
-                : $"the formal parameter ({formal.Positions} character positions) is larger than the argument "
-                  + $"({argument.Positions}) (ISO §14.8.2.2 rule 1)",
-            // §14.8.2.3.2 "Additionally" b) / c): a bit / national group matches the same number of positions.
-            ActivationShape.AsIfElementaryGroup => formal.Positions == argument.Positions ? null
-                : $"the formal parameter ({formal}) and the argument ({argument}) have different numbers of positions "
-                  + "(ISO §14.8.2.3.2 \"Additionally\" b) / c))",
-            _ => null,
-        };
+        if (formal.Shape is not ActivationShape.AlphanumericGroup && argument.Shape is not ActivationShape.AlphanumericGroup)
+            return null;
+        if (!IsAlphanumericGroupPartner(formal) || !IsAlphanumericGroupPartner(argument))
+            return $"the formal parameter ({formal}) and the argument ({argument}): opposite an alphanumeric group the other "
+                + "item shall be an alphanumeric group item or an elementary item of category alphanumeric (ISO §14.8.2.2 rule 1)";
+        return formal.Positions <= argument.Positions ? null
+            : $"the formal parameter ({formal.Positions} character positions) is larger than the argument "
+              + $"({argument.Positions}) (ISO §14.8.2.2 rule 1)";
     }
+
+    /// <summary>⛔ ISO §14.8.2 FOR ONE ARGUMENT OF A CALL whose activated program is located by name at run time (kb/Work
+    /// PB165): a dynamic Format-1 CALL, or a program-prototype whose details §12.3.8.4 GR10 c) takes from the external
+    /// repository, so no formal was known when the activating element was compiled. §14.9.4.4 GR3 d): "the rules for
+    /// conformance specified in 14.8.2, Parameters and 14.8.3, Returning items apply. If a violation of these rules is
+    /// detected, the EC-PROGRAM-ARG-MISMATCH exception condition is set to exist". Null when the pair conforms, else the
+    /// reason.
+    /// <para><paramref name="specifiedProgram"/> selects the elementary rule both §14.8.2.3.2 and §14.8.2.3.3 split on: rule
+    /// 1 governs "a program for which there is no program-specifier in the REPOSITORY paragraph of the activating element
+    /// and there is no NESTED phrase", and there "the formal parameter shall be of the same length as the corresponding
+    /// argument" — a LENGTH, which this relation does not hold (<see cref="BoundaryItem.Length"/> does, and
+    /// <see cref="BoundaryItem.ArgumentViolation"/> asks it when this answers null); rule 2 governs a program "for which
+    /// there is a program-specifier", where BY REFERENCE "the definition of the formal parameter and the definition of the
+    /// argument shall have the same ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses"
+    /// and BY CONTENT / BY VALUE a COMPUTE, a SET or a MOVE shall be valid. Every other paragraph — the object-reference
+    /// and class-pointer rules, §14.8.2.2's group rules, the SET paragraph of §14.8.2.3.3 — governs both lanes alike.</para></summary>
+    public static string? CallArgumentViolation(CobolPassMode mode, ActivationDescription argument,
+        ActivationDescription formal, bool specifiedProgram)
+    {
+        if (argument.Shape is ActivationShape.Omitted) return null;
+        return mode is CobolPassMode.Reference
+            ? ByReferenceViolation(argument, formal, specifiedProgram)
+            : ByContentViolation(argument, formal, specifiedProgram);
+    }
+
+    /// <summary>Whether §14.8.2.3.2 / §14.8.2.3.3 rule 1's LENGTH sentence governs a pair: two items treated as
+    /// elementary (§14.8.2.1: a bit or national group is one) neither of which is of class object or pointer, and no
+    /// value without storage, whose length rule 1 cannot measure.</summary>
+    public static bool IsLengthRulePair(ActivationDescription argument, ActivationDescription formal) =>
+        IsElementaryData(argument) && IsElementaryData(formal);
+
+    private static bool IsElementaryData(ActivationDescription d) =>
+        d.Shape is ActivationShape.Elementary or ActivationShape.AsIfElementaryGroup && SetClass(d) is null;
+
+    /// <summary>§14.8.2.3.2, Elementary items passed by reference — and §14.8.2.2 rule 1 through
+    /// <see cref="ReferenceGroupViolation"/>.</summary>
+    private static string? ByReferenceViolation(ActivationDescription argument, ActivationDescription formal,
+        bool specifiedProgram)
+    {
+        // "If either the formal parameter or the corresponding argument is an object reference, the corresponding
+        // argument or formal parameter shall be an object reference following these rules" (rules 1–3).
+        if (formal.Shape is ActivationShape.ObjectReference || argument.Shape is ActivationShape.ObjectReference)
+            return formal.Shape is ActivationShape.ObjectReference && argument.Shape is ActivationShape.ObjectReference
+                   && SameObjectReferenceDescription(argument, formal)
+                ? null
+                : $"the formal parameter ({formal}) and the argument ({argument}) are not object references of the same "
+                  + "description (ISO §14.8.2.3.2 rules 1-3)";
+        // "If either the argument or the formal parameter is of class pointer, the corresponding formal parameter or
+        // argument shall be of class pointer and the corresponding items shall be of the same category. If either is a
+        // restricted pointer, both shall be restricted and of the same type" — the restriction is the USAGE clause's TO
+        // phrase, which Clauses carries (Unrestricted for none).
+        if (IsPointerClass(formal) || IsPointerClass(argument))
+            return IsPointerClass(formal) && IsPointerClass(argument)
+                   && string.Equals(formal.Category, argument.Category, StringComparison.Ordinal)
+                   && string.Equals(formal.Clauses, argument.Clauses, StringComparison.Ordinal)
+                ? null
+                : $"the formal parameter ({formal}) and the argument ({argument}) are not pointers of the same category and "
+                  + "restriction (ISO §14.8.2.3.2)";
+        if (ReferenceGroupViolation(argument, formal) is { } groupWhy) return groupWhy;
+        if (!IsElementaryData(argument) || !IsElementaryData(formal) || !specifiedProgram) return null;
+        // Rule 2. "Additionally" b) / c): a bit group matches an elementary bit item, a national group an elementary
+        // national item, of the same number of positions.
+        if (argument.Shape is ActivationShape.AsIfElementaryGroup || formal.Shape is ActivationShape.AsIfElementaryGroup)
+            return AsIfElementaryPartners(argument, formal) ? null
+                : $"the formal parameter ({formal}) and the argument ({argument}) do not match (ISO §14.8.2.3.2 "
+                  + "\"Additionally\" b) / c))";
+        // "Additionally" e): "If the argument is described with the ANY LENGTH clause, the corresponding formal parameter
+        // shall be described with the ANY LENGTH clause."
+        if (argument.AnyLength && !formal.AnyLength)
+            return $"the argument ({argument}) is described with the ANY LENGTH clause and the formal parameter is not "
+                + "(ISO §14.8.2.3.2 \"Additionally\" e))";
+        // "Additionally" d): an ANY LENGTH formal's "length is considered to match the length of the corresponding
+        // argument" — its one-symbol PICTURE has no length of its own (§13.18.2), so what remains comparable is the class
+        // and category and the usage. (§13.18.2.3 SR2 confines ANY LENGTH to a function, a contained program or a method,
+        // none of which a CALL reaches through a program-specifier: this arm is completeness, not a common path.)
+        if (formal.AnyLength)
+            return string.Equals(formal.Category, argument.Category, StringComparison.Ordinal)
+                   && string.Equals(formal.Usage, argument.Usage, StringComparison.Ordinal)
+                ? null
+                : $"the formal parameter ({formal}) and the argument ({argument}) are not of the same category and usage "
+                  + "(ISO §14.8.2.3.2 rule 2, \"Additionally\" d))";
+        return SameElementaryClauses(argument, formal) ? null
+            : $"the formal parameter ({formal}) and the argument ({argument}) are not described with the same ALIGN, "
+              + "BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §14.8.2.3.2 rule 2)";
+    }
+
+    /// <summary>§14.8.2.3.3, Elementary items passed by content or by value — and §14.8.2.2 rule 2 for a group.</summary>
+    private static string? ByContentViolation(ActivationDescription argument, ActivationDescription formal,
+        bool specifiedProgram)
+    {
+        // "If the formal parameter is of class pointer or an object reference described without the ACTIVE-CLASS phrase,
+        // the conformance rules shall be the same as if a SET statement were performed in the activating runtime element
+        // with the argument as the sending operand and the corresponding formal parameter as the receiving operand." The
+        // predefined NULL is the one value a SET sends there (§14.9.39.3 Formats 5, 7, 8, 9); it is no MOVE operand.
+        if (SetClass(formal) is { } setClass and not ActivationCategory.Index)
+            return argument.Shape is ActivationShape.PredefinedNull || MaySet(setClass, formal, argument) ? null
+                : $"the argument ({argument}) is not a valid sending operand of a SET into the formal parameter ({formal}) "
+                  + "(ISO §14.8.2.3.3)";
+        if (argument.Shape is ActivationShape.PredefinedNull)
+            return "NULL is a sending operand only of a SET into a data item of class pointer or object reference, and the "
+                + $"formal parameter ({formal}) is neither (ISO §14.8.2.3.3; §8.4.3.10.3)";
+        // §14.8.2.2 rule 2: "If the argument is passed by content, the conformance rules are the same as for a MOVE
+        // statement with the argument as the sending operand and the corresponding formal parameter as the receiving
+        // operand" — a strongly-typed group and a variable-length group included (their sentences are MOVE's SR2 / SR9
+        // too), and an arithmetic expression has no character image for a group move to copy (§14.9.25.4 GR4).
+        if (IsGroup(formal) || IsGroup(argument))
+            return argument.Shape is ActivationShape.Expression
+                ? $"an arithmetic expression has no character image for the group move into the formal parameter ({formal}) "
+                  + "to copy (ISO §14.8.2.2 rule 2; §14.9.25.4 GR4)"
+                : ContentMoveViolation(argument, formal);
+        if (!specifiedProgram) return null;   // rule 1 — the length sentence, BoundaryItem's
+        // Rule 2 b): "If the formal parameter is an index data item, … the same as for a SET statement": identifier-2 "shall
+        // reference a data item of class index" (§14.9.39.3 SR2), and SR3 refuses a literal or an expression.
+        if (formal.Category is ActivationCategory.Index)
+            return argument.Category is ActivationCategory.Index && argument.Shape is ActivationShape.Elementary ? null
+                : $"the argument ({argument}) is not a data item of class index, which a SET into an index data item "
+                  + "formal parameter requires (ISO §14.8.2.3.3 rule 2 b); §14.9.39.3 SR2 / SR3)";
+        // Rule 2 a): "If the formal parameter is numeric, the conformance rules are the same as for a COMPUTE statement" —
+        // a numeric sending operand (§8.8.1.1: an identifier of class numeric, a numeric literal, ZERO, an expression).
+        if (formal.Category is ActivationCategory.Numeric && !formal.AnyLength)
+            return argument.Category is ActivationCategory.Numeric or ActivationCategory.FigurativeZero ? null
+                : $"the argument ({argument}) is not a numeric sending operand of the COMPUTE into the numeric formal "
+                  + $"parameter ({formal}) (ISO §14.8.2.3.3 rule 2 a); §8.8.1.1)";
+        // Rule 2 c): an ANY LENGTH formal's "length is considered to match" — LENGTH only, so rule 2 d)'s MOVE asks the
+        // category pair. Rule 2 d): "Otherwise, the conformance rules are the same as for a MOVE statement".
+        return ContentMoveViolation(argument, formal);
+    }
+
+    /// <summary>The MOVE question of §14.8.2.2 rule 2 / §14.8.2.3.3 rule 2 d) with the argument as the sending operand:
+    /// <see cref="MayMove"/> for an argument with storage or a literal of a known category, and for a figurative constant
+    /// or an ALL literal, whose category the receiving context chooses (§8.3.3.6.4 GR1), a MOVE valid under ANY of the three
+    /// categories it can take — the reading the compiler's own screen gives the same argument when it knows the formal
+    /// (<c>OoConformance.ContentAlphanumericLiteralMismatch</c>).</summary>
+    private static string? ContentMoveViolation(ActivationDescription argument, ActivationDescription formal)
+    {
+        bool valid = argument.Category is ActivationCategory.Figurative or ActivationCategory.FigurativeZero
+            && argument.Shape is ActivationShape.Literal
+            ? FigurativeCategories.Any(c => MayMove(argument with { Table16 = c }, formal))
+            : MayMove(argument, formal);
+        return valid ? null
+            : $"the argument ({argument}) is not a valid sending operand of a MOVE to the formal parameter ({formal}) "
+              + "(ISO §14.8.2.3.3 rule 2 d) / §14.8.2.2 rule 2; §14.9.25.3)";
+    }
+
+    /// <summary>The Table 16 rows a figurative constant or an ALL literal can stand in (§8.3.3.6.4 GR1).</summary>
+    private static readonly Table16Category[] FigurativeCategories =
+        [Table16Category.Alphanumeric, Table16Category.National, Table16Category.Boolean];
+
+    /// <summary>ISO §14.8.3 for the RETURNING items of a CALL whose activated program is located by name at run time (kb/Work
+    /// PB165, PB1040): <paramref name="sending"/> is the activated program's returning item, <paramref name="receiving"/>
+    /// the activating element's. §14.8.3 does not split on the program-specifier as §14.8.2 does, so every lane asks the
+    /// one rule — <see cref="ReturningConformance"/>, with §14.8.3.3 "Additionally" 4) and 5) for ANY LENGTH. Null when
+    /// the pair conforms, else the reason.</summary>
+    public static string? CallReturningViolation(ActivationDescription receiving, ActivationDescription sending)
+    {
+        // 4) "If the receiving operand is described with the ANY LENGTH clause, the sending operand shall also be
+        // described with the ANY LENGTH clause."
+        if (receiving.AnyLength && !sending.AnyLength)
+            return $"the receiving item ({receiving}) is described with the ANY LENGTH clause and the returning item "
+                + $"({sending}) is not (ISO §14.8.3.3 \"Additionally\" 4))";
+        // 5) "If the sending operand is described with the ANY LENGTH clause, the length of the sending operand is
+        // considered to match the length of the receiving operand" — what remains comparable is the category and usage.
+        if (sending.AnyLength && !receiving.AnyLength)
+            return string.Equals(receiving.Category, sending.Category, StringComparison.Ordinal)
+                   && string.Equals(receiving.Usage, sending.Usage, StringComparison.Ordinal)
+                ? null
+                : $"the returning item ({sending}) and the receiving item ({receiving}) are not of the same category and "
+                  + "usage (ISO §14.8.3.3 \"Additionally\" 5))";
+        return ReturningConformance(receiving, sending);
+    }
+
+    private static bool IsPointerClass(ActivationDescription d) =>
+        d.Shape is ActivationShape.Elementary && d.Category is ActivationCategory.DataPointer
+            or ActivationCategory.ProgramPointer or ActivationCategory.FunctionPointer;
+
+    private static bool IsGroup(ActivationDescription d) =>
+        d.Shape is ActivationShape.AlphanumericGroup or ActivationShape.StrongGroup or ActivationShape.VariableLengthGroup;
+
+    /// <summary>§14.8.2.3.2 rule 2 / §14.8.3.3 / §9.3.6 match rule 3 e): the same class and category, the same clause
+    /// identity (<see cref="ActivationDescription.Clauses"/> — ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE
+    /// with its currency and DECIMAL-POINT IS COMMA facets, SIGN, USAGE and the LOCALE phrase's SIZE) and the same LOCALE
+    /// external identification ("Additionally" a)).</summary>
+    private static bool SameElementaryClauses(ActivationDescription a, ActivationDescription b) =>
+        string.Equals(a.Category, b.Category, StringComparison.Ordinal)
+        && string.Equals(a.Clauses, b.Clauses, StringComparison.Ordinal)
+        && SameLocaleIdentification(a, b);
 
     /// <summary>ISO §9.3.6 match rules 6 and 7, split on the INVOCATION's returning item <paramref name="receiving"/>:
     /// when it is "usage OBJECT REFERENCE, POINTER or INDEX" the method's returning item <paramref name="sending"/> "may
@@ -209,10 +422,24 @@ public static class ActivationRelations
         if (sending.AnyLength)
             return "the returning item is described with the ANY LENGTH clause, which a method invoked through a "
                 + "universal object reference shall not have (ISO §14.9.23.4 GR7 c))";
-        // §14.8.3.3 rule 1 / rule 2: "the conformance rules are the same as if a SET statement were performed" — and
-        // through a universal receiver which classes a SET admits is the object's run-time class, which the delivery
-        // checks (CobolObject.NarrowUniversal; rule 2 b) 4.: the sending operand has the universal description).
-        if (receiving.Shape is ActivationShape.ObjectReference) return null;
+        return ReturningConformance(receiving, sending);
+    }
+
+    /// <summary>⛔ ISO §14.8.3's conformance of a pair of returning items, the one copy a universal INVOKE's bound method
+    /// (<see cref="ReturningViolation"/>) and a CALL (<see cref="CallReturningViolation"/>) both ask; each lane asks its
+    /// own ANY LENGTH rule first. Null when the pair conforms, else the reason.</summary>
+    private static string? ReturningConformance(ActivationDescription receiving, ActivationDescription sending)
+    {
+        // §14.8.3.3: "If either of the operands is an object reference, the corresponding item shall be an object
+        // reference", and rule 1 / rule 2: "the conformance rules are the same as if a SET statement were performed" —
+        // which classes a SET admits is the object's run-time class, which the delivery checks
+        // (CobolObject.NarrowUniversal; rule 2 b) 4.: through a universal receiver the sending operand has the universal
+        // description).
+        if (receiving.Shape is ActivationShape.ObjectReference || sending.Shape is ActivationShape.ObjectReference)
+            return receiving.Shape is ActivationShape.ObjectReference && sending.Shape is ActivationShape.ObjectReference
+                ? null
+                : $"the returning item ({sending}) and the receiving item ({receiving}) are not both object references "
+                  + "(ISO §14.8.3.3)";
         if (receiving.Shape is ActivationShape.StrongGroup || sending.Shape is ActivationShape.StrongGroup)
             return receiving.StrongType is not null
                    && string.Equals(receiving.StrongType, sending.StrongType, StringComparison.Ordinal)

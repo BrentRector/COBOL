@@ -138,6 +138,69 @@ public static class ActivationDescriptions
         };
     }
 
+    /// <summary>The description of a PLACE an activation names — an argument or a RETURNING item: a reference-modified
+    /// operand is the unique data item §8.4.3.3.4 GR5 creates (<see cref="OfReferenceModification"/>), any other place
+    /// the item it denotes (<see cref="Of"/>). Null for a place that denotes no item and is not reference-modified.</summary>
+    public static ActivationDescription? OfPlace(Place p) =>
+        p is RefModPlace r ? OfReferenceModification(r) : p.DenotedItem is { } item ? Of(item) : null;
+
+    /// <summary>⛔ THE DESCRIPTION OF ONE CALL ARGUMENT whose activated program is located by name at run time (kb/Work
+    /// PB165) — what §14.9.4.4 GR3 d) compares with the activated program's registered formal
+    /// (<c>ActivationRelations.CallArgumentViolation</c>). An identifier is described as the place it is
+    /// (<see cref="OfPlace"/>), an address-identifier as the unique pointer item it creates (<see cref="OfAddress"/>;
+    /// <paramref name="programRestriction"/> is a program-address-identifier's prototype's signature class), and a BY
+    /// CONTENT / BY VALUE argument that has no storage as the sending VALUE §14.8.2.3.3 rule 2 names
+    /// (<see cref="OfValue"/>). Null for an omitted argument (§14.9.4.4 GR11), which has nothing to describe.</summary>
+    public static ActivationDescription? OfCallArgument(BoundCallArg a, string? programRestriction)
+    {
+        if (a.Omitted) return null;
+        // §14.9.4.2 Format 2's boolean-expression-1: a boolean value (§8.8.2), with the character image of its bits.
+        if (a.ContentBool is not null) return Value(ActivationShape.Literal, ActivationCategory.Boolean, Table16Category.Boolean);
+        if (a.DataAddress is { } data) return OfAddress(new BoundAddressOperand(data, null), null);
+        if (a.ProgramAddress is { } program) return OfAddress(new BoundAddressOperand(null, program), programRestriction);
+        if (a.Place is { } p) return OfPlace(p);
+        return a.Value is { } v ? OfValue(v) : null;
+    }
+
+    /// <summary>The description of a BY CONTENT / BY VALUE argument that has NO STORAGE, as the sending operand ISO
+    /// §14.8.2.3.3 rule 2 names — the same readings the compiler's own screen gives each shape when it knows the formal
+    /// (<c>ParameterConformance.ContentConformanceReason</c>): a nonnumeric literal is its category's Table 16 row; a
+    /// numeric literal (and a BY VALUE literal bound as an expression, §14.9.4.4 GR8) the numeric row of its own digits;
+    /// a figurative constant or an ALL literal an alphanumeric value of any category, ZERO also a numeric COMPUTE sender
+    /// (§8.8.1.1); a character-valued intrinsic function its §15.2 type's row; a numeric function or an arithmetic
+    /// expression a numeric value with no character image, of its function's row or — for an expression, which carries
+    /// no compile-time integer guarantee — the noninteger row (kb/Work PB1946); NULL a SET sender only. Null for a shape
+    /// none of these names.</summary>
+    public static ActivationDescription? OfValue(BoundOperand value) => value switch
+    {
+        BoundPredefinedNull => new ActivationDescription { Shape = ActivationShape.PredefinedNull },
+        BoundFigurative f => Value(ActivationShape.Literal,
+            f.Kind == 'Z' ? ActivationCategory.FigurativeZero : ActivationCategory.Figurative, Table16Category.None),
+        BoundAllLiteral => Value(ActivationShape.Literal, ActivationCategory.Figurative, Table16Category.None),
+        BoundStringLiteral s => Value(ActivationShape.Literal, CategoryName(s.Category), MoveTable16.SenderPosition(s).Heading),
+        BoundNumericLiteral n => Value(ActivationShape.Literal, ActivationCategory.Numeric, MoveTable16.SenderPosition(n).Heading),
+        BoundComputedOperand ce when Gr8ArgumentLiteral.NumericText(ce.Expr) is { } text =>
+            Value(ActivationShape.Literal, ActivationCategory.Numeric,
+                MoveTable16.SenderPosition(new BoundNumericLiteral(text)).Heading),
+        BoundComputedOperand { Expr: BoundIntrinsicCall { ResultCategory: not PicCategory.Numeric } ic } character =>
+            Value(ActivationShape.Literal, CategoryName(ic.ResultCategory), MoveTable16.SenderPosition(character).Heading),
+        BoundComputedOperand { Expr: BoundIntrinsicCall } function =>
+            Value(ActivationShape.Expression, ActivationCategory.Numeric, MoveTable16.SenderPosition(function).Heading),
+        BoundComputedOperand => Value(ActivationShape.Expression, ActivationCategory.Numeric, Table16Category.NumericNoninteger),
+        _ => null,
+    };
+
+    private static ActivationDescription Value(ActivationShape shape, string category, Table16Category table16) =>
+        new() { Shape = shape, Category = category, Table16 = table16 };
+
+    /// <summary>The §8.5.2 category name of a character-valued operand's <see cref="PicCategory"/>.</summary>
+    private static string CategoryName(PicCategory c) => c switch
+    {
+        PicCategory.National => ActivationCategory.National,
+        PicCategory.Boolean => ActivationCategory.Boolean,
+        _ => ActivationCategory.Alphanumeric,
+    };
+
     /// <summary>The description of a method's formal parameter: its item's, with the OPTIONAL phrase (§9.3.6 match
     /// rules 1 and 3 b)) and the BY VALUE phrase (rule 3 a)). Null when the item has no crossing form.</summary>
     public static ActivationDescription? OfFormal(OoFormal formal) =>
@@ -177,7 +240,7 @@ public static class ActivationDescriptions
     /// <see cref="ElementaryClauses"/> separates every finer distinction; this is match rule 3 c)'s coarse half.</summary>
     private static string ElementaryCategory(PicInfo p) => p.Category switch
     {
-        PicCategory.Numeric => p.Usage is Usage.Index ? ActivationCategory.Index : "numeric",
+        PicCategory.Numeric => p.Usage is Usage.Index ? ActivationCategory.Index : ActivationCategory.Numeric,
         PicCategory.NumericEdited => "numeric-edited",
         PicCategory.Alphanumeric => p.IsAlphabetic ? "alphabetic"
             : p.EditMask is not null ? "alphanumeric-edited" : ActivationCategory.Alphanumeric,

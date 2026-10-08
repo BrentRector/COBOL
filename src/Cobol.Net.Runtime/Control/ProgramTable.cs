@@ -185,8 +185,14 @@ public sealed class ProgramTable
     /// Failures raise <see cref="CobolCallException"/> — the call site's ON OVERFLOW / ON EXCEPTION phrase (when
     /// present) converts it to the exception branch (GR3h); otherwise the run unit terminates loudly.
     /// </summary>
+    /// <param name="programSpecifiers">The externalized names of the activating element's §12.3.8.2 program-specifiers,
+    /// stated by a site that describes its arguments for GR3 d) (kb/Work PB165): §14.8.2.3.2 and §14.8.2.3.3 give "a
+    /// program for which there is a program-specifier in the REPOSITORY paragraph of the activating element" rule 2 (the
+    /// clause identity, or a COMPUTE, SET or MOVE) and every other program rule 1 (the same length), and which program a
+    /// CALL reaches is known only here — a CALL by data-name or through a program-pointer can reach either.</param>
     public void CallProgram(string name, string callerPath, CobolArg[] args, CobolArg? returning,
-        string notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false)
+        string notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false,
+        string[]? programSpecifiers = null)
     {
         // The ACTIVATING element's EC-EXTERNAL half (§14.8.4.1 / §14.9.4.4 GR3e): the CALL statement guard's
         // checking flags, read HERE, before this activation's own checking scope opens below. The flags are a
@@ -220,29 +226,33 @@ public sealed class ProgramTable
                 "EC-PROGRAM-ARG-MISMATCH");
         // §14.8.2 via §14.9.4.4 GR3d (kb/Work PB165): each ARGUMENT meets its FORMAL's registered description at the same
         // point, for the same reason — a violation makes "the program call … not successful", so the callee never runs
-        // and never sees a window of the wrong length over the caller's storage. What a dynamic Format-1 CALL can
-        // compare is §14.8.2.3.2 / §14.8.2.3.3 rule 1's "same length" and §14.8.2.2's group rule
-        // (BoundaryItem.ArgumentConforms); the callee's adapters still refuse a category they cannot adopt. An omitted
-        // argument (§14.9.4.4 GR11) has no storage to describe. Unchecked, the call proceeds LENIENTLY, as it does for
-        // the argument count above.
+        // and never sees a window of the wrong length over the caller's storage. The activating element states each
+        // argument's description (and length) and the activated unit its formals' (BoundaryItem.ArgumentViolation over
+        // ActivationRelations.CallArgumentViolation): every §14.8.2 rule, with §14.8.2.3.2 / §14.8.2.3.3's elementary rule
+        // chosen by whether the activating element has a program-specifier for THIS program — rule 2's clause identity /
+        // COMPUTE / SET / MOVE when it does, rule 1's "same length" when it does not. An omitted argument (§14.9.4.4 GR11)
+        // has no storage to describe. Unchecked, the call proceeds LENIENTLY, as it does for the argument count above.
+        bool specifiedProgram = programSpecifiers is not null
+            && Array.Exists(programSpecifiers, s => ExternalizedNames.Same(s, n.CallName));
         if (mismatchChecked && n.Formals is { } formals)
             for (int i = 0; i < args.Length && i < formals.Length; i++)
-                if (!args[i].Carrier.IsNull && !args[i].Item.ArgumentConforms(args[i].Mode, formals[i]))
+                if (!args[i].Carrier.IsNull
+                    && args[i].Item.ArgumentViolation(args[i].Mode, formals[i], specifiedProgram) is { } why)
                     throw new CobolCallException(
                         $"CALL '{n.Name}': argument {i + 1} ({args[i].Item.Describe()}, {args[i].Mode.ToString().ToUpperInvariant()}) "
-                        + $"and the corresponding formal parameter ({formals[i].Describe()}) do not conform — "
+                        + $"and the corresponding formal parameter ({formals[i].Describe()}) do not conform: {why} — "
                         + "ISO §14.8.2 via §14.9.4.4 GR3d — EC-PROGRAM-ARG-MISMATCH",
                         "EC-PROGRAM-ARG-MISMATCH");
-        // §14.8.3 via §14.9.4.4 GR3d (kb/Work PB1040): the RETURNING items' conformance, the same check at the same
-        // point — "the program call is not successful", so the callee never runs. §14.8.3.3 gives a conforming pair
-        // the same PICTURE, SIGN and USAGE, hence the same length, and a result a string carrier takes at the wrong
-        // length would otherwise corrupt the receiver's image. What a dynamic Format-1 CALL can compare is the facts
-        // both sides state (BoundaryItem.Conforms: the numeric profile, the storage length and the group class).
-        // Unchecked, the call proceeds and the delivery stores into the receiver's own width (CobolArgAdapt.StoreReturn).
-        if (mismatchChecked && returning is { } rcv && n.Returning is { } sent && !rcv.Item.Conforms(sent))
+        // §14.8.3 via §14.9.4.4 GR3d (kb/Work PB1040, PB165): the RETURNING items' conformance, the same check at the same
+        // point — "the program call is not successful", so the callee never runs. §14.8.3 does not split on the
+        // program-specifier, so every lane asks the whole rule over the two descriptions (BoundaryItem.ReturningViolation
+        // over ActivationRelations.CallReturningViolation), and a result a string carrier takes at the wrong length can
+        // never corrupt the receiver's image. Unchecked, the call proceeds and the delivery stores into the receiver's own
+        // width (CobolArgAdapt.StoreReturn).
+        if (mismatchChecked && returning is { } rcv && n.Returning is { } sent && rcv.Item.ReturningViolation(sent) is { } retWhy)
             throw new CobolCallException(
                 $"CALL '{n.Name}': the RETURNING item of the called program ({sent.Describe()}) and the receiving item "
-                + $"({rcv.Item.Describe()}) do not conform — ISO §14.8.3.3 via §14.9.4.4 GR3d — EC-PROGRAM-ARG-MISMATCH",
+                + $"({rcv.Item.Describe()}) do not conform: {retWhy} — ISO §14.8.3.3 via §14.9.4.4 GR3d — EC-PROGRAM-ARG-MISMATCH",
                 "EC-PROGRAM-ARG-MISMATCH");
 
         ICobolProgram inst;
@@ -435,7 +445,7 @@ public sealed class ProgramTable
     /// held name is an OUTERMOST program's identity, so the §8.4.6.3 rule-4 leg of the SAME
     /// <see cref="CallProgram"/> resolution finds it from any caller (the singular-pattern rule).</summary>
     public void CallPointer(ProgramPointer target, string callerPath, CobolArg[] args, CobolArg? returning,
-        bool siteArgMismatchChecking = false)
+        bool siteArgMismatchChecking = false, string[]? programSpecifiers = null)
     {
         // §14.9.4.4 GR3b names TWO DISTINCT conditions and the NULL case is the FIRST of them: "If the data item
         // referenced by identifier-1 contains the predefined address NULL, the EC-PROGRAM-PTR-NULL exception
@@ -450,7 +460,8 @@ public sealed class ProgramTable
                 "CALL through a NULL program-pointer: the pointer contains the predefined address NULL "
                 + "(ISO §14.9.4.4 GR3b — EC-PROGRAM-PTR-NULL)", "EC-PROGRAM-PTR-NULL");
         }
-        CallProgram(target.Name!, callerPath, args, returning, siteArgMismatchChecking: siteArgMismatchChecking);
+        CallProgram(target.Name!, callerPath, args, returning, siteArgMismatchChecking: siteArgMismatchChecking,
+            programSpecifiers: programSpecifiers);
     }
 
     /// <summary>Activate the function a FUNCTION-POINTER holds — a function-identifier written with

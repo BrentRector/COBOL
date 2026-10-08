@@ -787,10 +787,10 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   figurative but NULL is refused at bind (it used to pass Table 16 and die at the callee's managed slot).
   ⚠ The §14.8.2.3.3 rules were once PRIVATE to INVOKE, and
   the CALL lane therefore had no by-content screen at all while `CobolArgAdapt`'s converting views silently
-  adapted whatever arrived; EXTRACTION, not a second copy, is what closed it. The DYNAMIC Format-1 lane checks the
-  COUNT, and each argument's LENGTH and group CLASS, at runtime (`BoundaryItem.ArgumentConforms`, the bullet below
-  on the argument's description; kb/Work PB165); a Format-2 CALL whose program-prototype has no compile-time
-  signature (§12.3.8.4 GR10 c) is not yet checked, which is P13's prototype registry.
+  adapted whatever arrived; EXTRACTION, not a second copy, is what closed it. A CALL whose activated program the
+  activating element holds no signature for — the DYNAMIC Format-1 lane, and a Format-2 CALL whose program-prototype
+  §12.3.8.4 GR10 c) resolves in the external repository — checks the COUNT and every argument's §14.8.2 conformance at
+  runtime (`BoundaryItem.ArgumentViolation`, the bullet below on the argument's description; kb/Work PB165).
 - **"The same PICTURE clause" is ONE identity (kb/Work PB1166).** Every identical-description rule — §8.5.3.1,
   §9.3.6 3), §9.3.8.2.3 rules 3/6, §14.8.2.3.2 rule 2, §14.8.3.3 — carries the same two exceptions (currency
   symbols match iff their currency STRINGS do; period/comma symbols match iff DECIMAL-POINT IS COMMA is in effect
@@ -837,14 +837,17 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   decoding and re-encoding it, which lost exactly the non-digit content (kb/Work PB962).
 - **⛔ The RETURNING pair's CONFORMANCE on the dynamic Format-1 lane (§14.9.4.4 GR3 d), §14.8.3.3; kb/Work PB1040).**
   The AS NESTED lane checks the pair at bind (COBOLNET1736); a CALL located by name at run time has no bind-time
-  screen, so the check is a call-initiation one over facts BOTH sides state: `BoundaryItem(Num, Length, Class)` — a numeric
-  item's `NumProfile` and a text-carried item's fixed character length — which the activating element sends on the
+  screen, so the check is a call-initiation one over facts BOTH sides state: `BoundaryItem(Num, Length, Description)` — a
+  numeric item's `NumProfile`, a text-carried item's fixed character length and, where the check needs it, the item's
+  whole `ActivationDescription` (below) — which the activating element sends on the
   returning `CobolArg` (`CobolArg.Length` beside `Num`/`Layout`; `CallEmitter.BoundaryLength` is the one measure, in
   `CallStringRead`'s unit) and the activated unit REGISTERS beside its formal counts (`ProgramRegistry.Register(…,
   returning:)`, `CallEmitter.RegisteredReturning`). `ProgramTable.CallProgram` compares them with
-  `BoundaryItem.Conforms` before the activation — numeric-vs-character never conforms, two profiles conform when they
-  state one PICTURE, SIGN and USAGE (`NumProfile.ConformsTo`), two lengths when equal; an item that states nothing
-  (a pointer, a DYNAMIC LENGTH / ANY LENGTH item, a variable-length group) is not compared — and a violation is
+  `BoundaryItem.ReturningViolation` before the activation — when both sides state a description, §14.8.3 whole
+  (`ActivationRelations.CallReturningViolation`: the §14.8.3.2 group rules, the §14.8.3.3 clause identity and its ANY
+  LENGTH rules 4 / 5, the one `ReturningConformance` core a universal INVOKE asks too); otherwise numeric-vs-character
+  never conforms, two profiles conform when they state one PICTURE, SIGN and USAGE (`NumProfile.ConformsTo`), two
+  lengths when equal, and an item that states nothing is not compared — and a violation is
   EC-PROGRAM-ARG-MISMATCH "if checking for it is enabled in both the activated program and activating runtime
   element" (`siteArgMismatchChecking && node.ArgMismatchChecking`, the same gate as the count check), with "the
   program call is not successful": the callee never runs and the receiver is untouched. **Unchecked**, the standard
@@ -853,24 +856,31 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   space-filled, right-truncated alphanumeric alignment; a numeric receiver reads the value the sender held under its
   own description). Every unit registers its count facts, a unit with no formals included (zero formals is a count),
   and every activation arm — by name, through a program-pointer, through a function-pointer — passes the activating
-  half of the gate. `BoundaryItem` also carries the group class (`BoundaryClass`: §14.8.3.2 pairs an alphanumeric
-  group only with a group or an elementary alphanumeric item of the same length, and lifts for a strongly-typed or
-  variable-length group).
-- **⛔ The ARGUMENT's description on the dynamic Format-1 lane (§14.9.4.4 GR3 d), §14.8.2.3.2 / §14.8.2.3.3 rule 1,
-  §14.8.2.2; kb/Work PB165).** The same `BoundaryItem`, one per FORMAL: a unit that checks EC-PROGRAM-ARG-MISMATCH
-  registers `formals:` at `ProgramRegistry.Register` (`CallEmitter.RegisteredFormal`), and a CALL site that checks it
-  states `Length:` and `Class:` on each data-item argument's `CobolArg` (`CallEmitter.ArgumentFacts`), so an unchecked
-  program's emitted text does not change. ONE measure on both sides: `CallEmitter.ArgumentLength` — the item's
-  BYTE-LENGTH (`DataItem.ImageWidth`, for a text-carried or a native item) — and `CallEmitter.BoundaryClassOf`.
-  `ProgramTable.CallProgram` compares each pair with `BoundaryItem.ArgumentConforms` under the enabled-in-both gate,
-  before the callee runs: elementary items by the rule "same length" (§14.8.2.3.2 / §14.8.2.3.3 rule 1, mode-blind), an
-  alphanumeric group BY REFERENCE by §14.8.2.2 1) (the other item a group or an elementary alphanumeric item, the
-  formal no longer than the argument), BY CONTENT by 2) (a MOVE, no length relation). The length rule is that of the
-  lane "a program with no program-specifier and no NESTED phrase", so `CallEmitter.IsDynamicLane` keeps it off a
-  function, a NESTED call, a program-specifier's program and an identifier-named target in an element that writes any
-  program-specifier — rule 2 converts there and the binder checks it where the callee is known. The facets beyond length
-  and class (JUSTIFIED, BLANK WHEN ZERO, ALIGN, the PICTURE's currency and locale facets: rule 2's identity, for a
-  prototype with no compile-time signature) are the next extension of `BoundaryItem`, not a second shape.
+  half of the gate.
+- **⛔ The ARGUMENT's description at a CALL whose activated program the activating element holds no signature for
+  (§14.9.4.4 GR3 d), §14.8.2; kb/Work PB165).** A dynamic Format-1 CALL and a program-prototype whose details §12.3.8.4
+  GR10 c) takes from the external repository (`BoundCallProgram.CalleeSignatureKnown` false) cannot ask §14.8.2 at bind
+  time, so the same `BoundaryItem`, one per FORMAL, carries it to run time. The DESCRIPTION is the
+  `ActivationDescription` a universal INVOKE carries (OO deep-dive D10), built by the ONE builder
+  (`ActivationDescriptions.OfCallArgument` / `OfPlace` / `OfValue` — a literal, a figurative constant, an expression and
+  NULL are described as the sending VALUE §14.8.2.3.3 rule 2 names), so no second description model exists. A unit that
+  checks EC-PROGRAM-ARG-MISMATCH registers `formals:` at `ProgramRegistry.Register` (`CallEmitter.RegisteredFormal`:
+  length and description), the binder describes every operand of such a CALL (`BoundCallArg.Description`,
+  `BoundCallProgram.ReturningDescription`), and a CALL site that checks it states them through ONE wrapper around every
+  argument shape (`CallEmitter.Described`: `Length` and `Description`; a reference-modified argument's description takes
+  the evaluated slice's positions), so an unchecked program's emitted text does not change. ONE length measure on both
+  sides: `CallEmitter.ArgumentLength`, the item's BYTE-LENGTH (`DataItem.ImageWidth`). `ProgramTable.CallProgram`
+  decides WHICH elementary rule applies — rule 2 for "a program for which there is a program-specifier in the
+  REPOSITORY paragraph of the activating element", rule 1 otherwise — from the program it actually reached and the
+  activating element's program-specifiers, which the describing site passes (`programSpecifiers:`), because a CALL by
+  data-name or through a program-pointer can reach either. It compares each pair with `BoundaryItem.ArgumentViolation`
+  under the enabled-in-both gate, before the callee runs: `ActivationRelations.CallArgumentViolation` answers every rule
+  of §14.8.2 — the object-reference and class-pointer paragraphs, §14.8.2.2's strongly-typed, variable-length and
+  alphanumeric-group sentences (the group core a universal INVOKE's bound method asks too), §14.8.2.3.2 rule 2's clause
+  identity BY REFERENCE and §14.8.2.3.3's SET / COMPUTE / MOVE validity BY CONTENT and BY VALUE — and leaves rule 1's
+  "same length" to `BoundaryItem.Length`. A GR10 c) prototype resolved through the external repository will carry a
+  compile-time signature (DESIGN-external-repository §8.2 step 3), and the binder then checks it as it checks any
+  in-group prototype.
 - CALL to a NULL program-pointer → EC-PROGRAM-PTR-NULL; unresolvable name → EC-PROGRAM-NOT-FOUND; both are activation failures and take the GR3h partition below.
 - **The GR3h/GR3i partition of a failed activation, and the ACTIVATION BOUNDARY that makes it decidable.** §14.9.4.4 GR3h routes a failure on THREE independent facts, and the emitted CALL expresses each one separately (`CallEmitter.EmitCall`; kb/Work PB233):
   1. **Which phrase is written.** Only ON EXCEPTION diverts — GR3h item 1 names it, and §14.6.13.1.3 #1 admits only "a conditional phrase without the NOT phrase". A CALL carrying only NOT ON EXCEPTION is governed by item 2 or item 3 exactly as a phrase-free CALL is. (It formerly emitted the catch on *either* phrase and silently discarded the failure.)
