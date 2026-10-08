@@ -475,46 +475,27 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         // no EditMask, and without it the store fell to the "arithmetic into a non-fixed-point target" LoudStmt.
         if (target.Item.Pic is { LocaleEdit: not null } lpic)
         {
-            int ls = lpic.Scale;
-            string lAligned(bool checkedPath) =>
-                value.Real ? RuntimeApi.FloatToScaled(value.Expr, $"{ls}", mode, checkedPath)
-                : value.Dec ? (checkedPath ? RuntimeApi.DecToUnscaledChecked(value.Expr, $"{ls}", mode)
-                                           : RuntimeApi.DecToUnscaled(value.Expr, $"{ls}", mode))
-                : value.Scale == ls ? value.Expr
-                : RuntimeApi.NumRescaleStore(value.Expr, $"{value.Scale}", $"{ls}", mode, checkedPath);
+            int ls = ScaleOf(target);
             string lcfg = BwzFlag(target.Item);   // no EditCfg, no EditsArg — a locale item takes neither
             if (ecState.SizeErrVar is { } lflag)
             {
                 string limg = $"__sv{ctx.Names.NextStoreTmp()}";
                 string lOnFail = ecState.SizeErrEcVar is { } lecn ? $"{{ {lflag} = true; {lecn} = \"EC-SIZE-TRUNCATION\"; }}" : $"{lflag} = true;";
-                w.Line($"{Gate(lOnFail)} (!{RuntimeApi.EditTryFormatLocale(lpic, lAligned(true), $"{ls}", limg, lcfg)}) {lOnFail}");
+                w.Line($"{Gate(lOnFail)} (!{RuntimeApi.EditTryFormatLocale(lpic, NumericRenderer.EditedLanding(value, ls, mode, checkedLanding: true), $"{ls}", limg, lcfg)}) {lOnFail}");
                 w.Line($"else {PlaceRenderer.Write(target, limg)}");
                 return;
             }
-            w.Line(PlaceRenderer.Write(target, RuntimeApi.EditFormatFor(lpic, value, lAligned(false), $"{ls}", lcfg)));
+            w.Line(PlaceRenderer.Write(target, RuntimeApi.EditFormatFor(lpic, value, NumericRenderer.EditedLanding(value, ls, mode, checkedLanding: false), $"{ls}", lcfg)));
             return;
         }
         if (target.Item.Pic is { Category: PicCategory.NumericEdited, EditMask: { } mask })
         {
-            int ms = RuntimeApi.MaskScale(target.Item.Pic!, mask, '$');
-            // The narrowing rescale: under ON SIZE ERROR / EC-SIZE, a PROHIBITED-inexact transfer to an edited
-            // receiver is a size error (ISO §14.7.4.3 r7 — the receiver stays UNCHANGED). The Dec path's
-            // .ToUnscaled and the numeric path's TryStore already throw/flag on that; the Int128 edited path used
-            // plain Rescale (silent truncation) — the DEVLOG-610-audited PROHIBITED leak. Use RescaleChecked in
-            // the checked branch so all three receiver categories agree; the unchecked branch stays silent
-            // (matching the numeric Store path's no-phrase behavior). The Dec arm's checked form is likewise
-            // ToUnscaledChecked (kb/Work PB74): the unchecked ToUnscaled hands EditTryFormat the low-order digits
-            // of an out-of-carrier value — 0 for 10 ** 100 — which the mask then "fits", no size error.
-            string Aligned(bool checkedPath) =>
-                // A float (Real) result lands at the mask scale via the runtime's ToScaled with the receiver's ROUNDED
-                // mode (D16 review: the edited-receiver arithmetic path was missed by the Real integration → CS1503) —
-                // the CHECKED landing under the phrase, the low-order digits without it (kb/Work PB77: the Real arm
-                // ignored checkedPath, so a no-phrase edited store of a value past the carrier formatted the sentinel).
-                value.Real ? RuntimeApi.FloatToScaled(value.Expr, $"{ms}", mode, checkedPath)
-                : value.Dec ? (checkedPath ? RuntimeApi.DecToUnscaledChecked(value.Expr, $"{ms}", mode)
-                                           : RuntimeApi.DecToUnscaled(value.Expr, $"{ms}", mode))
-                : value.Scale == ms ? value.Expr
-                : RuntimeApi.NumRescaleStore(value.Expr, $"{value.Scale}", $"{ms}", mode, checkedPath);
+            // The ONE receiver-scale rule (PicInfo.ReceiverScale: the MASK's fraction scale) and the ONE edited
+            // landing, NumericRenderer.EditedLanding, which the LOCALE arm above shares (kb/Work PB2163): under ON SIZE
+            // ERROR / EC-SIZE it is the CHECKED landing, so a PROHIBITED-inexact narrowing (ISO §14.7.4.3 r7) and a
+            // value past the carrier are size errors and the receiver stays UNCHANGED, as for every receiver category;
+            // the no-phrase landing keeps the low-order digits, as the numeric store does.
+            int ms = ScaleOf(target);
             // Under ON SIZE ERROR an edited resultant is capacity-checked too (ISO §14.7.5 case 3 + storing rule
             // 2): an aligned |value| exceeding the mask's digit positions sets the flag and leaves the receiver
             // UNCHANGED — Format's silent high-order truncation is MOVE behavior only (§14.9.25).
@@ -524,11 +505,11 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
                 // EC-SIZE checking latches the Table 13 condition: a store whose significant digits do not fit
                 // the receiver is EC-SIZE-TRUNCATION ("significant digits truncated in store").
                 string onFail = ecState.SizeErrEcVar is { } ecn1 ? $"{{ {eflag} = true; {ecn1} = \"EC-SIZE-TRUNCATION\"; }}" : $"{eflag} = true;";
-                w.Line($"{Gate(onFail)} (!{RuntimeApi.EditTryFormat(Aligned(true), $"{ms}", CsLiteral(mask), img, BwzFlag(target.Item) + EditCfg(target.Item.Pic))}) {onFail}");
+                w.Line($"{Gate(onFail)} (!{RuntimeApi.EditTryFormat(NumericRenderer.EditedLanding(value, ms, mode, checkedLanding: true), $"{ms}", CsLiteral(mask), img, BwzFlag(target.Item) + EditCfg(target.Item.Pic))}) {onFail}");
                 w.Line($"else {PlaceRenderer.Write(target, img)}");
                 return;
             }
-            w.Line(PlaceRenderer.Write(target, RuntimeApi.EditFormat(Aligned(false), $"{ms}", CsLiteral(mask), BwzFlag(target.Item) + EditCfg(target.Item.Pic))));
+            w.Line(PlaceRenderer.Write(target, RuntimeApi.EditFormat(NumericRenderer.EditedLanding(value, ms, mode, checkedLanding: false), $"{ms}", CsLiteral(mask), BwzFlag(target.Item) + EditCfg(target.Item.Pic))));
             return;
         }
         // A FLOATING-POINT resultant identifier (COMP-1/2, FLOAT-*, D16) — the float arm of THIS store, sharing the
@@ -599,8 +580,6 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         w.Line(PlaceRenderer.Write(target, target.Item.StoreAsImage ? RuntimeApi.NumFormatImage(stored, profile) : Narrow(stored, target.Item)));
     }
 
-    /// <summary>The receiver's working scale: an edited receiver's is its MASK's fraction scale (a `.`-pointed
-    /// mask has PicInfo.Scale 0 — the point lives in the mask, not in V); a numeric item's is its PIC scale.</summary>
     /// <summary>Wrap a wide (Int128) stored value for assignment into the receiver's CARRIER type: a ≤18-digit
     /// item stores as native <c>long</c> (the value is already truncated/rounded to the receiver's digits, so the
     /// cast is exact); an unsigned 8-byte BinaryCapacity item casts to its <c>ulong</c> carrier (the stored
@@ -616,6 +595,9 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         _ => $"(long)({expr})",
     };
 
+    /// <summary>The receiver's working scale: a masked edited receiver's is its MASK's fraction scale (a `.`-pointed
+    /// mask has PicInfo.Scale 0 — the point lives in the mask, not in V); a LOCALE-edited or numeric item's is its PIC
+    /// scale. The edited landing of StoreArith aligns at it (kb/Work PB2163).</summary>
     private int ScaleOf(Place p) =>
         // The ONE receiver-scale rule (PicInfo.ReceiverScale; PB64 T6 — this copy and MoveEmitter's
         // SenderContext were the same rule written twice, and both fell to pic.Scale = 0 for a LOCALE item).

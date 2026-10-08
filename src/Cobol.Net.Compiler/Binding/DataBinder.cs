@@ -3305,18 +3305,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <c>CobolEdit.MaskScale</c> — the '.' or V, P-signed; SR6 "no truncation of digits or sign" spans the
     /// digit positions, P excluded because P scales and stores nothing), or locale-edited format 2
     /// (DigitPositions at the analyzer's Scale — there is no mask for MaskScale to read, and 'P' does not
-    /// exist in format 2). The ONE (digits, scale) shape the §13.18.63.3 SR2/SR6 VALUE-fit check and the
-    /// §14.7.7 r2 composite of operands both align on (kb/Work PB155). Callers exclude floating-point forms
+    /// exist in format 2). The scale is <see cref="PicInfo.ReceiverScale"/>, the ONE receiver-scale rule, never a
+    /// second spelling of it here (kb/Work PB2163's sibling sweep). The ONE (digits, scale) shape the §13.18.63.3
+    /// SR2/SR6 VALUE-fit check and the §14.7.7 r2 composite of operands both align on (kb/Work PB155). Callers exclude floating-point forms
     /// first (<see cref="PicInfo.IsFloat"/> / <see cref="PicInfo.IsFloatEdited"/> — no fixed decimal
     /// alignment exists for them).</summary>
     internal (int Digits, int Scale) StoredShapeOf(PicInfo pic)
     {
         bool edited = pic.Category is PicCategory.NumericEdited;
         string mask = pic.EditMask ?? "";
-        return (edited ? pic.DigitPositions - mask.Count(c => c == 'P') : pic.Digits,
-                pic.LocaleEdit is not null ? pic.Scale
-                    : edited ? CobolEdit.MaskScale(mask, pic.EditingRules as CobolEdit.EditRule[],
-                        '$', pic.DecimalPointIsComma) : pic.Scale);
+        return (edited ? pic.DigitPositions - mask.Count(c => c == 'P') : pic.Digits, pic.ReceiverScale());
     }
 
     // (The former private DecodeString twin is retired — all callers use CobolNet.Common.CobolLiteral.Decode,

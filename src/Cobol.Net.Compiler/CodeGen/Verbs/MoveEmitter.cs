@@ -778,19 +778,18 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 // mask scale (it has none); the dispatch is RuntimeApi.EditFormatFor's, keyed on the receiver's picture.
                 if (pic.IsFloatEdited)
                     return RuntimeApi.EditFormatFor(pic, e, "", "", ArithmeticEmitter.BwzFlag(target) + ctx.EditCfg(pic));
-                // A float (Real) source lands into the edited receiver via the runtime's ToScaled at the RECEIVER's
-                // fraction scale (MOVE truncates toward zero, §14.6.8.2) — the edit Format takes a scaled Int128,
-                // not a double (D16 review: the numeric-edited path was missed by the Real integration → CS1503).
-                // NB the receiver scale is the ONE PicInfo.ReceiverScale rule, NOT pic.Scale (a masked item's Scale is 0 —
-                // the point is in the mask; a format-2 LOCALE item's IS pic.Scale — kb/Work PB64 T6).
+                // The edit Format takes a scaled Int128. A NATIVE scaled sender passes at its own scale: the formatter's
+                // own alignment IS the MOVE's truncation (§14.6.8.2). Every other carrier — a float (D16 review: CS1503),
+                // a STANDARD-DECIMAL intermediate (fix-queue PB65: CS1503), an unsigned-wide item (kb/Work PB2163's
+                // sibling sweep: CS1503) — lands at the RECEIVER's fraction scale through the ONE edited landing
+                // (NumericRenderer.EditedLanding), unchecked: a MOVE keeps the low-order digits past the carrier
+                // (kb/Work PB77) and carries an unsigned item's full container range (DOC-A.1-179). NB the receiver
+                // scale is the ONE PicInfo.ReceiverScale rule, NOT pic.Scale (a masked item's Scale is 0 — the point
+                // is in the mask; a format-2 LOCALE item's IS pic.Scale — kb/Work PB64 T6).
                 int ems = pic.ReceiverScale();
-                // A STANDARD-DECIMAL intermediate lands at the receiver's scale (the §14.7 final transfer — the same
-                // form ArithmeticEmitter's edited path uses; fix-queue PB65: MOVE FUNCTION E under the mode handed
-                // the CobolDec to the Int128 edit path, CS1503 on conforming source).
-                string editVal = e.Real ? RuntimeApi.FloatToScaled(e.Expr, $"{ems}", rounding, checkedLanding: false)   // a MOVE: §14.6.8.2 r4 truncation, low-order digits past the carrier (kb/Work PB77)
-                    : e.Dec ? RuntimeApi.DecToUnscaled(e.Expr, $"{ems}", rounding)
-                    : e.Expr;
-                int editScale = e.Real || e.Dec ? ems : e.Scale;
+                bool nativeScaled = e.Carrier == NumXCarrier.Scaled;
+                string editVal = nativeScaled ? e.Expr : NumericRenderer.EditedLanding(e, ems, rounding, checkedLanding: false);
+                int editScale = nativeScaled ? e.Scale : ems;
                 // The form dispatch (mask vs LOCALE) is EditFormatFor's — never a call-site EditMask deref.
                 return RuntimeApi.EditFormatFor(pic, e, editVal, $"{editScale}",
                     ArithmeticEmitter.BwzFlag(target) + ctx.EditCfg(pic));

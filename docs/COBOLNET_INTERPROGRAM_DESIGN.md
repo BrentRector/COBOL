@@ -854,8 +854,8 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   ⛔ The same fact governs how a picture is EDITED across the boundary (kb/Work PB2554, §12.3.7.4 GR14 b)): a formal
   described by a class under DECIMAL-POINT IS COMMA is edited, de-edited and scaled with the comma as its decimal
   separator whatever the INVOKING unit says. Every such consumer reads `PicInfo.DecimalPointIsComma` (read off
-  `Clause`), never `ctx.Data.DecimalPointIsComma` — `EmitCore.EditCfg(pic)`, `PicInfo.ReceiverScale()`,
-  `RuntimeApi.MaskScale`, `AlgebraicRanges.Of` and `ValueInitializer.EditedImageOfNumericValue` take the item, and
+  `Clause`), never `ctx.Data.DecimalPointIsComma` — `EmitCore.EditCfg(pic)`, `PicInfo.ReceiverScale()`
+  (the one receiver-scale rule, which every emitter and binder site asks), `AlgebraicRanges.Of` and `ValueInitializer.EditedImageOfNumericValue` take the item, and
   `DecimalPointModeDriftTests` closes the list of CodeGen / procedure-binder readers of the unit's own mode (NUMVAL's
   parse mode, a date-time format literal, the literal image — each about what the unit itself wrote or runs).
 - **A bit / national group is an ELEMENTARY item at the boundary** (§14.8.2.1 / §14.8.3.1 NOTE): it matches an

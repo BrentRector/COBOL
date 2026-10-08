@@ -841,8 +841,13 @@ is the same for a consumer with no float arm of its own (the DIVIDE … REMAINDE
 snapshotted `Int128 t = double`, PB85 — a native float lands truncated at `FloatWorkingScale`); the sign condition
 tests `Int128.Sign(dec.Sig)` (`RuntimeApi.DecSign` — exact at every exponent, never a landing);
 `NumericRenderer.StoreArgs`/`StoreExpr` are THE carrier switch at a fixed-point store, spelled once for the
-arithmetic store, the numeric MOVE and INVOKE BY CONTENT. **A new consumer of a `NumX` funnels through one of these
-or it is wrong for two of the four carriers.** Goldens `pb84_sdidi_intermediate_consumers` and
+arithmetic store, the numeric MOVE and INVOKE BY CONTENT; `NumericRenderer.EditedLanding` is its sibling at a
+fixed-scale numeric-EDITED receiver (the mask's or the LOCALE picture's scale, `PicInfo.ReceiverScale`), spelled once
+for the masked and LOCALE arms of `ArithmeticEmitter.StoreArith` and for the MOVE's non-native carriers (kb/Work
+PB2163), a `switch` over `NumX.Carrier` that throws on an unmapped carrier — the unsigned-wide carrier lands through
+`CobolNum.RescaleCheckedU` / `RescaleStoreCapU` at every scale; and `RuntimeApi.FloatEditEntry` is the same total
+switch for a floating-point edited receiver (`CobolEdit.FormatFloatStoreU` / `TryFormatFloatU` on that lane).
+**A new consumer of a `NumX` funnels through one of these or it is wrong for two of the four carriers.** Goldens `pb84_sdidi_intermediate_consumers` and
 `pb84_standard_decimal_intermediate_consumers`.
 
 **⛔ EVERY CARRIER'S LANDING PAST THE Int128 CARRIER HAS TWO FORMS, CHOSEN BY THE LANDING — NEVER BY THE VALUE

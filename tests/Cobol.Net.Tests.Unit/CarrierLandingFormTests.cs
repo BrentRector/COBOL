@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Numerics;
 using System.Text.RegularExpressions;
+using CobolNet.CodeGen.Emit;
 using CobolNet.Runtime;
 using CobolNet.Tests.Shared;
 using Xunit;
@@ -246,9 +247,15 @@ public sealed class CarrierLandingFormTests
             + @"string toScale, CobolRounding mode\)"), api);
         Assert.DoesNotContain("bool checkedPath = ", api);
 
+        // The edited receiver's landing is ONE helper (kb/Work PB2163: the masked and LOCALE arms of StoreArith each
+        // spelled the carrier switch): NumericRenderer.EditedLanding is the only receiver-bound rescale render, and
+        // both edited arms, checked and unchecked, call it.
         string ae = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "CodeGen", "Verbs", "ArithmeticEmitter.cs"));
+        string nr = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "CodeGen", "Emit", "NumericRenderer.cs"));
         Assert.DoesNotContain("RuntimeApi.NumRescale(", ae);
-        Assert.Equal(2, Regex.Matches(ae, @"RuntimeApi\.NumRescaleStore\(").Count);
+        Assert.DoesNotContain("RuntimeApi.NumRescaleStore(", ae);
+        Assert.Single(Regex.Matches(nr, @"RuntimeApi\.NumRescaleStore\("));
+        Assert.Equal(4, Regex.Matches(ae, @"NumericRenderer\.EditedLanding\(").Count);
     }
 
     /// <summary>Every fixed-point numeric store in the compiler funnels through the ONE landing
@@ -478,4 +485,76 @@ public sealed class CarrierLandingFormTests
     [InlineData(0.0, 0, false)]
     public void InexactAtScale_AsksTheExactValue_NotABinary64Product(double v, int scale, bool inexact) =>
         Assert.Equal(inexact, CobolFloat.InexactAtScale(v, scale));
+
+    // ── the edited landing (kb/Work PB2163) ──────────────────────────────────────────────────────────────────
+
+    /// <summary>The numeric-EDITED receiver's landing (<c>NumericRenderer.EditedLanding</c>, the ONE carrier switch
+    /// the masked and LOCALE arithmetic arms and the MOVE share) is TOTAL over <see cref="NumXCarrier"/> and always
+    /// hands the edit an <c>Int128</c>: the unsigned-wide carrier used to fall to the native arm and pass its
+    /// <c>UInt128</c> through unconverted — at its own scale verbatim — which was CS1503 on accepted source. A fifth
+    /// carrier fails this test (the switch throws on a carrier it does not map) before a user meets it.</summary>
+    [Fact]
+    public void EditedLanding_IsTotalOverTheNumXCarriers_AndNamesItsLandingForm()
+    {
+        foreach (var carrier in Enum.GetValues<NumXCarrier>())
+        {
+            var x = carrier switch
+            {
+                NumXCarrier.Scaled => new NumX("e", 2),
+                NumXCarrier.UnsignedWide => new NumX("u", 2, U: true),
+                NumXCarrier.Sdidi => new NumX("d", 0, Dec: true),
+                NumXCarrier.Binary64 => new NumX("r", 0, Real: true),
+                _ => throw new InvalidOperationException($"the test builds no operand for the new carrier {carrier}"),
+            };
+            foreach (bool checkedLanding in new[] { true, false })
+            {
+                string landed = NumericRenderer.EditedLanding(x, 2, CobolRounding.NearestEven, checkedLanding);
+                string expected = (carrier, checkedLanding) switch
+                {
+                    (NumXCarrier.Scaled, _) => "e",   // already at the receiver's scale: no rescale
+                    (NumXCarrier.UnsignedWide, true) => "CobolNum.RescaleCheckedU(u, 2, 2, CobolRounding.NearestEven)",
+                    (NumXCarrier.UnsignedWide, false) => "CobolNum.RescaleStoreCapU(u, 2, 2, CobolRounding.NearestEven)",
+                    (NumXCarrier.Sdidi, true) => "(d).ToUnscaledChecked(2, CobolRounding.NearestEven)",
+                    (NumXCarrier.Sdidi, false) => "(d).ToUnscaled(2, CobolRounding.NearestEven)",
+                    (_, true) => "CobolFloat.ToScaled(r, 2, CobolRounding.NearestEven)",
+                    (_, false) => "CobolFloat.ToScaledUnchecked(r, 2, CobolRounding.NearestEven)",
+                };
+                Assert.Equal(expected, landed);
+            }
+        }
+    }
+
+    /// <summary>The two unsigned-wide edited kernels (kb/Work PB2163), against values derived by hand. The
+    /// container maximum 2^128 − 1 = 340282366920938463463374607431768211455 (39 digits) widened to scale 2 keeps
+    /// its low-order 38 digits at that scale, the no-phrase disposition (DOC-A.1-70) and a MOVE's truncation; the
+    /// checked kernel refuses it (§14.7.5 case 3: past every edited receiver's capacity) and refuses a
+    /// PROHIBITED-inexact narrowing (§14.7.4.3 r7); a narrowing rounds the whole value by the mode.</summary>
+    [Fact]
+    public void UnsignedWideEditedKernels_KeepTheLowOrderDigits_OrRaise()
+    {
+        Assert.Equal(Int128.Parse("28236692093846346337460743176821145500"),
+            CobolNum.RescaleStoreCapU(UInt128.MaxValue, 0, 2, CobolRounding.Truncation));
+        Assert.Equal((Int128)124, CobolNum.RescaleStoreCapU(12355, 2, 0, CobolRounding.NearestAwayFromZero));
+        Assert.Equal((Int128)123, CobolNum.RescaleStoreCapU(12355, 2, 0, CobolRounding.Truncation));
+        Assert.Equal((Int128)1234500, CobolNum.RescaleCheckedU(12345, 0, 2, CobolRounding.Truncation));
+        Assert.Equal((Int128)124, CobolNum.RescaleCheckedU(12355, 2, 0, CobolRounding.NearestAwayFromZero));
+        Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(
+            () => CobolNum.RescaleCheckedU(UInt128.MaxValue, 0, 0, CobolRounding.Truncation)).EcName);
+        Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(
+            () => CobolNum.RescaleCheckedU(UInt128.MaxValue / 10, 0, 2, CobolRounding.Truncation)).EcName);
+        Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(
+            () => CobolNum.RescaleCheckedU(12355, 2, 0, CobolRounding.Prohibited)).EcName);
+        Assert.Equal("+3.4028E+38", CobolEdit.FormatFloatStoreU(UInt128.MaxValue, 0, "+9.9999E+99", CobolRounding.Truncation));
+        Assert.True(CobolEdit.TryFormatFloatU(12345, 0, "+9.9999E+99", out string img, CobolRounding.Truncation));
+        Assert.Equal("+1.2345E+04", img);
+        // Past Int128 the floating-point lane folds one digit round-to-odd, and that fold may neither invent nor hide
+        // an inexact result: 3 × 10^38 is exact at five significant digits, while 2^128 − 1 and 3 × 10^38 + 5 (whose
+        // only nonzero discarded digit is the one the fold drops) are not (§14.7.4.3 r7); AWAY-FROM-ZERO rounds up.
+        UInt128 threeE38 = UInt128.Parse("300000000000000000000000000000000000000");
+        Assert.True(CobolEdit.TryFormatFloatU(threeE38, 0, "+9.9999E+99", out string exact, CobolRounding.Prohibited));
+        Assert.Equal("+3.0000E+38", exact);
+        Assert.False(CobolEdit.TryFormatFloatU(UInt128.MaxValue, 0, "+9.9999E+99", out _, CobolRounding.Prohibited));
+        Assert.False(CobolEdit.TryFormatFloatU(threeE38 + 5, 0, "+9.9999E+99", out _, CobolRounding.Prohibited));
+        Assert.Equal("+3.4029E+38", CobolEdit.FormatFloatStoreU(UInt128.MaxValue, 0, "+9.9999E+99", CobolRounding.AwayFromZero));
+    }
 }

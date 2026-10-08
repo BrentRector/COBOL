@@ -431,7 +431,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
             // COBOL-85 de-editing move; the runtime walks the image against the mask's digit positions).
             && p.Item.Pic is { Category: PicCategory.NumericEdited, EditMask: { } dem }
         ? new NumX($"CobolEdit.DeEdit({PlaceRenderer.Read(p)}, {EmitText.CsLiteral(dem)}{ctx.EditCfg(p.Item.Pic)}{(p.Item.BlankWhenZero ? ", blankWhenZero: true" : "")})",
-            RuntimeApi.MaskScale(p.Item.Pic!, dem, '$'))
+            p.Item.Pic.ReceiverScale())
         : FieldNumCore(p, _sending);
 
     /// <summary>⛔ THE ONE RENDERING OF AN ALPHANUMERIC OR NATIONAL OPERAND READ IN A NUMERIC CONTEXT (ISO
@@ -1282,6 +1282,33 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         value.Dec ? $"{value.Expr}, {profile}"
         : value.Real ? $"{RuntimeApi.FloatToScaled(value.Expr, $"{recvScale}", mode, checkedLanding)}, {recvScale}, {profile}"
         : $"{value.Expr}, {value.Scale}, {profile}";
+
+    /// <summary>The unscaled <c>Int128</c> a rendered intermediate lands as at a numeric-EDITED receiver's fraction
+    /// scale (<paramref name="scale"/> — the mask's, or a format-2 LOCALE picture's: <c>PicInfo.ReceiverScale</c>)
+    /// for an ARITHMETIC statement's final transfer, which the edit then formats: the edited receiver's sibling of
+    /// <see cref="StoreArgs"/>, and the ONE place its carriers are told apart (kb/Work PB2163 — the masked and the
+    /// LOCALE arms of <c>ArithmeticEmitter.StoreArith</c> each spelled this switch). The receiver's ROUNDED
+    /// <paramref name="mode"/> applies here, at the receiver's scale, because the formatter only truncates.
+    /// <paramref name="checkedLanding"/> is the statement's landing form (an ON SIZE ERROR / EC-SIZE store): a float
+    /// lands through <c>ToScaled</c> or <c>ToScaledUnchecked</c> (the low-order digits past the carrier, kb/Work
+    /// PB77 — the Real arm used to ignore the form); an SDIDI through <c>ToUnscaledChecked</c> or <c>ToUnscaled</c>
+    /// (kb/Work PB74 — the unchecked form hands the formatter the low-order digits of an out-of-carrier value, which
+    /// the mask then "fits"); a native at another scale through <c>RescaleChecked</c> or <c>RescaleStoreCap</c>
+    /// (kb/Work PB639 — a widening past the carrier used to wrap before the capacity rule ran); an unsigned-wide
+    /// value (a 16-byte unsigned COMP-5 item, kb/Work R10) through <c>RescaleCheckedU</c> or <c>RescaleStoreCapU</c>
+    /// at EVERY scale, its own included, because the edit takes an <c>Int128</c> — it fell to the native arm and
+    /// handed the <c>UInt128</c> over unconverted, CS1503 on accepted source, until this switch was made total over
+    /// <see cref="NumXCarrier"/>. A MOVE into an edited receiver lands its non-native carriers here too, unchecked.</summary>
+    public static string EditedLanding(NumX value, int scale, CobolRounding mode, bool checkedLanding) => value.Carrier switch
+    {
+        NumXCarrier.Binary64 => RuntimeApi.FloatToScaled(value.Expr, $"{scale}", mode, checkedLanding),
+        NumXCarrier.Sdidi => checkedLanding ? RuntimeApi.DecToUnscaledChecked(value.Expr, $"{scale}", mode)
+                                            : RuntimeApi.DecToUnscaled(value.Expr, $"{scale}", mode),
+        NumXCarrier.UnsignedWide => RuntimeApi.NumRescaleStoreU(value.Expr, $"{value.Scale}", $"{scale}", mode, checkedLanding),
+        NumXCarrier.Scaled => value.Scale == scale ? value.Expr
+            : RuntimeApi.NumRescaleStore(value.Expr, $"{value.Scale}", $"{scale}", mode, checkedLanding),
+        var c => throw new InvalidOperationException($"no edited landing for the {c} carrier"),
+    };
 
     /// <summary>The EXPRESSION-POSITION store of a rendered intermediate into a fixed-point receiver —
     /// <see cref="StoreArgs"/> through <c>CobolNum.Store</c> (<c>StoreU</c> on the unsigned-wide lane, by name)

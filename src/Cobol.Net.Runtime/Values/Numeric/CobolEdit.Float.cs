@@ -97,6 +97,30 @@ public static partial class CobolEdit
     public static string FormatFloatStore(Int128 value, int valueScale, string picture, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
         => FormatFloatStoreCore((BigInteger)value, -valueScale, picture, mode, blankWhenZero, commaMode, edits);
 
+    /// <summary>The unsigned-wide lane of <see cref="FormatFloatStore(Int128, int, string, CobolRounding, bool, bool, EditRule[])"/>
+    /// (kb/Work R10's <see cref="UInt128"/> carrier, a 16-byte unsigned COMP-5 item's full container value), through
+    /// <see cref="UnsignedWideSignificand"/>. ⛔ Distinctly named, never an overload: an <c>int</c> constant converts
+    /// implicitly to both wide types (<c>CobolNum.StoreUOrRaise</c>).</summary>
+    public static string FormatFloatStoreU(UInt128 value, int valueScale, string picture, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
+    {
+        var (sig, scale) = UnsignedWideSignificand(value, valueScale);
+        return FormatFloatStore(sig, scale, picture, mode, blankWhenZero, commaMode, edits);
+    }
+
+    /// <summary>An unsigned-wide value as the <see cref="Int128"/> significand the fixed lane takes: exact when it fits;
+    /// past <see cref="Int128.MaxValue"/> (only a 39-digit container value) one decimal digit is folded
+    /// ROUND-TO-ODD: the 38-digit quotient keeps an ODD last digit whenever the dropped digit is nonzero. A floating-point
+    /// edited significand has far fewer than 37 digits, so every §14.7.4.3 mode, and PROHIBITED's exactness test
+    /// (rule 7), rounds the folded value exactly as it would the exact one: the same lowering argument the
+    /// standard-decimal intermediate's round-to-odd rests on (docs/CONFORMANCE.md DOC-A.1-123).</summary>
+    private static (Int128 Sig, int Scale) UnsignedWideSignificand(UInt128 value, int valueScale)
+    {
+        if (value <= (UInt128)Int128.MaxValue) return ((Int128)value, valueScale);
+        UInt128 q = value / 10;
+        if (value % 10 != 0 && q % 2 == 0) q++;
+        return ((Int128)q, valueScale - 1);
+    }
+
     /// <summary>The store of a <see cref="CobolDec"/>-carried sender (a standard-decimal intermediate or another
     /// floating-point edited item's de-edited value).</summary>
     public static string FormatFloatStore(CobolDec value, string picture, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
@@ -125,6 +149,14 @@ public static partial class CobolEdit
     /// the significand rounded to the mask's digits by <paramref name="mode"/> (§14.7.4.3 rules 3 to 10).</summary>
     public static bool TryFormatFloat(Int128 value, int valueScale, string picture, out string image, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
         => TryFormatFloatCore((BigInteger)value, -valueScale, picture, out image, mode, blankWhenZero, commaMode, edits);
+
+    /// <summary>The unsigned-wide lane of <see cref="TryFormatFloat(Int128, int, string, out string, CobolRounding, bool, bool, EditRule[])"/>
+    /// (distinctly named — see <see cref="FormatFloatStoreU"/>).</summary>
+    public static bool TryFormatFloatU(UInt128 value, int valueScale, string picture, out string image, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)
+    {
+        var (sig, scale) = UnsignedWideSignificand(value, valueScale);
+        return TryFormatFloat(sig, scale, picture, out image, mode, blankWhenZero, commaMode, edits);
+    }
 
     /// <inheritdoc cref="TryFormatFloat(Int128, int, string, out string, CobolRounding, bool, bool, EditRule[])"/>
     public static bool TryFormatFloat(CobolDec value, string picture, out string image, CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, EditRule[]? edits = null)

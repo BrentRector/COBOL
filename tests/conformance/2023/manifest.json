@@ -435,6 +435,7 @@
   "pb1900_float_edited_resultant_scale",
   "pb2638_float_edited_rounded_store",
   "pb2639_floating_char1_digit_positions",
+  "pb2163_unsigned_wide_into_edited",
   "pb2639_binary_minvalue_unsigned_magnitude",
   "pb66_float_edited_comma_mode",
   "pb66_float_edited_algebraic_and_checking",

@@ -340,11 +340,26 @@ internal static class RuntimeApi
     /// unchecked store does (DOC-A.1-70).</summary>
     public static string EditFormatFloat(PicInfo pic, Emit.NumX value, CobolRounding mode, string cfgArgs)
     {
-        string mask = Emit.EmitText.CsLiteral(pic.EditMask!);
-        return value.Real || value.Dec
-            ? $"{nameof(CobolEdit)}.{nameof(CobolEdit.FormatFloatStore)}({value.Expr}, {mask}, {RoundingText(mode)}{cfgArgs})"
-            : $"{nameof(CobolEdit)}.{nameof(CobolEdit.FormatFloatStore)}({value.Expr}, {value.Scale}, {mask}, {RoundingText(mode)}{cfgArgs})";
+        var (store, _, args) = FloatEditEntry(value);
+        return $"{nameof(CobolEdit)}.{store}({args}, {Emit.EmitText.CsLiteral(pic.EditMask!)}, {RoundingText(mode)}{cfgArgs})";
     }
+
+    /// <summary>The floating-point numeric-edited form's entry (unchecked and checked method names and the leading
+    /// value arguments) for a value's carrier — ONE choice for <see cref="EditFormatFloat"/> and
+    /// <see cref="EditTryFormatFloat"/>, total over <see cref="Emit.NumXCarrier"/> (the <see cref="FloatResultantEntry"/>
+    /// shape). The unsigned-wide carrier takes its own distinctly named entries (kb/Work PB2163's sibling sweep: it
+    /// fell to the scaled arm and handed a <c>UInt128</c> to the <c>Int128</c> overload, CS1503 on a MOVE or an
+    /// arithmetic store of a 16-byte unsigned COMP-5 item into a floating-point edited receiver).</summary>
+    private static (string Store, string Try, string Args) FloatEditEntry(Emit.NumX value) => value.Carrier switch
+    {
+        Emit.NumXCarrier.Binary64 or Emit.NumXCarrier.Sdidi =>
+            (nameof(CobolEdit.FormatFloatStore), nameof(CobolEdit.TryFormatFloat), value.Expr),
+        Emit.NumXCarrier.UnsignedWide =>
+            (nameof(CobolEdit.FormatFloatStoreU), nameof(CobolEdit.TryFormatFloatU), $"{value.Expr}, {value.Scale}"),
+        Emit.NumXCarrier.Scaled =>
+            (nameof(CobolEdit.FormatFloatStore), nameof(CobolEdit.TryFormatFloat), $"{value.Expr}, {value.Scale}"),
+        var c => throw new InvalidOperationException($"no floating-point edited entry for the {c} carrier"),
+    };
 
     /// <summary>A locale-name reference rendered for a runtime call: the L1-normalized tag as a string literal,
     /// or <c>null</c> for the current-locale form (the runtime resolves the category's current locale at use —
@@ -403,10 +418,8 @@ internal static class RuntimeApi
     /// result's exact form, the significand rounded by the receiver's <paramref name="mode"/> (kb/Work PB2638).</summary>
     public static string EditTryFormatFloat(PicInfo pic, Emit.NumX value, CobolRounding mode, string imgVar, string cfgArgs)
     {
-        string mask = Emit.EmitText.CsLiteral(pic.EditMask!);
-        return value.Real || value.Dec
-            ? $"{nameof(CobolEdit)}.{nameof(CobolEdit.TryFormatFloat)}({value.Expr}, {mask}, out var {imgVar}, {RoundingText(mode)}{cfgArgs})"
-            : $"{nameof(CobolEdit)}.{nameof(CobolEdit.TryFormatFloat)}({value.Expr}, {value.Scale}, {mask}, out var {imgVar}, {RoundingText(mode)}{cfgArgs})";
+        var (_, tryName, args) = FloatEditEntry(value);
+        return $"{nameof(CobolEdit)}.{tryName}({args}, {Emit.EmitText.CsLiteral(pic.EditMask!)}, out var {imgVar}, {RoundingText(mode)}{cfgArgs})";
     }
 
     /// <summary>A floating-point literal as the EXACT standard-decimal operand (ISO §8.8.1.5.2 r1 — the literal's
@@ -588,6 +601,12 @@ internal static class RuntimeApi
     /// ON SIZE ERROR / EC-SIZE machinery so storing rule 2 leaves the receiver unchanged.</summary>
     public static string NumRescaleStore(string value, string fromScale, string toScale, CobolRounding mode, bool checkedPath) =>
         $"{nameof(CobolNum)}.{(checkedPath ? nameof(CobolNum.RescaleChecked) : nameof(CobolNum.RescaleStoreCap))}({value}, {fromScale}, {toScale}, {RoundingText(mode)})";
+
+    /// <summary>The unsigned-wide lane of <see cref="NumRescaleStore"/> — <c>CobolNum.RescaleCheckedU</c> or
+    /// <c>CobolNum.RescaleStoreCapU</c>, the same two landing forms with no default (kb/Work PB2163's sibling sweep:
+    /// the edited landing handed the <c>UInt128</c> to the <c>Int128</c> kernels, CS1503).</summary>
+    public static string NumRescaleStoreU(string value, string fromScale, string toScale, CobolRounding mode, bool checkedPath) =>
+        $"{nameof(CobolNum)}.{(checkedPath ? nameof(CobolNum.RescaleCheckedU) : nameof(CobolNum.RescaleStoreCapU))}({value}, {fromScale}, {toScale}, {RoundingText(mode)})";
 
     /// <summary>The §14.9.12 GR6c/GR7 scaled division — <c>CobolNum.Divide</c>, or the size-error-throwing
     /// <c>CobolNum.DivideOrThrow</c> under a checked context.</summary>
@@ -2489,7 +2508,7 @@ internal static class RuntimeApi
     public static string NumCapDigits(string expr, int digits) =>
         $"{nameof(CobolNum)}.{nameof(CobolNum.CapDigits)}({expr}, {digits})";
 
-    /// <summary>The COMPILE-TIME WHEN-COMPILED stamp format (a typed passthrough like <see cref="MaskScale"/>):
+    /// <summary>The COMPILE-TIME WHEN-COMPILED stamp format (a typed passthrough like <see cref="EditCompose"/>):
     /// the §15.99.3 r2 compilation timestamp is baked as a constant with the SAME runtime formatter the
     /// generated CURRENT-DATE call uses.</summary>
     public static string DateFormat21(DateTimeOffset t) => CobolDate.Format21(t);
@@ -2497,15 +2516,6 @@ internal static class RuntimeApi
     /// <summary>The COMPILE-TIME fractional-second count of a literal time format (§15.79 — the result scale
     /// is format-derived at compile time), through the ONE runtime format analyzer.</summary>
     public static int DateFormatFractionDigits(string format) => CobolDate.FormatFractionDigits(format);
-
-    /// <summary>The COMPILE-TIME mask-scale computation (a typed passthrough, not a fragment): the emitters
-    /// compute a numeric-edited receiver's fraction scale from its edit mask at compile time with the SAME
-    /// runtime routine the generated code uses — one definition, anchored here. It takes the <see cref="PicInfo"/>
-    /// rather than the bare mask so the item's PICTURE EDITING rules always ride along: a FLOATING extended
-    /// editing sign control symbol's repetitions are digit positions (§13.18.40.5 rule 6) and the mask alone
-    /// cannot say so (kb/Work PB491).</summary>
-    public static int MaskScale(PicInfo pic, string mask, char currency) =>
-        CobolEdit.MaskScale(mask, pic.EditingRules as CobolEdit.EditRule[], currency, pic.DecimalPointIsComma);
 
     /// <summary>ISO §13.18.8.4 GR3's content test over an operand's image — <c>CobolEdit.IsBlanked</c>.</summary>
     public static string EditIsBlanked(string read) => $"{nameof(CobolEdit)}.{nameof(CobolEdit.IsBlanked)}({read})";

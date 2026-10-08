@@ -450,6 +450,50 @@ public static partial class CobolNum
         return neg ? -r : r;
     }
 
+    /// <summary>The unsigned-wide lane of <see cref="RescaleStoreCap"/> (kb/Work R10's <see cref="UInt128"/>
+    /// carrier — a 16-byte unsigned COMP-5 item's full container value): the value rescaled to
+    /// <paramref name="toScale"/> with <paramref name="mode"/>, keeping the LOW-ORDER 38 digits as an
+    /// <see cref="Int128"/> — every digit a numeric-edited receiver (at most 31 digit positions) can show, so the
+    /// edit's own high-order truncation then applies exactly as it does to the native lane (the no-phrase store's
+    /// DOC-A.1-70 disposition, and a MOVE's §14.6.8 truncation). The value is never routed through
+    /// <see cref="Widen"/>: a store carries the item's full container range, as <see cref="StoreU"/> does.
+    /// A narrowing rounds the WHOLE value first (the discarded digits decide the rounding); a widening reduces it to
+    /// its low-order 38 digits, which fit the <see cref="Int128"/>, and hands it to <see cref="RescaleStoreCap"/>'s
+    /// decimal high-order truncation. (Not <see cref="RescaleU"/>: its decade loop needs capacity × 10 ≤ 2^128, and
+    /// 10^39 is past it.) ⛔ Distinctly named, never an overload (see <see cref="StoreUOrRaise"/>).</summary>
+    public static Int128 RescaleStoreCapU(UInt128 value, int fromScale, int toScale, CobolRounding mode)
+    {
+        UInt128 cap = Pow10U(38);
+        return toScale < fromScale
+            ? (Int128)(RoundDiv(value, Pow10U(fromScale - toScale), mode) % cap)
+            : RescaleStoreCap((Int128)(value % cap), fromScale, toScale, mode);
+    }
+
+    /// <summary>The size-error-CHECKED unsigned-wide lane of <see cref="RescaleChecked"/>, for the same edited
+    /// final transfer under ON SIZE ERROR / EC-SIZE checking: a PROHIBITED-inexact narrowing (ISO §14.7.4.3 r7) or a
+    /// value whose alignment is past the <see cref="Int128"/> the edit takes, and so past every numeric-edited
+    /// receiver's digit capacity (§14.7.5 case 3), throws the EC-SIZE-TRUNCATION <see cref="CobolSizeError"/> that the
+    /// statement's machinery catches, leaving the receiver unchanged; an in-range value returns exact, and the
+    /// edit's TryFormat then makes the receiver's own capacity test.
+    /// ⛔ Distinctly named, never an overload (see <see cref="StoreUOrRaise"/>).</summary>
+    public static Int128 RescaleCheckedU(UInt128 value, int fromScale, int toScale, CobolRounding mode)
+    {
+        if (mode == CobolRounding.Prohibited && toScale < fromScale && value % Pow10U(fromScale - toScale) != 0)
+            throw new CobolSizeError("ROUNDED MODE IS PROHIBITED on an inexact transfer to an edited receiver "
+                + "(ISO §14.7.4.3 r7 — EC-SIZE-TRUNCATION; the receiver is left unchanged)", "EC-SIZE-TRUNCATION");
+        int up = toScale - fromScale;
+        bool fits = up <= 0 || value == 0 || (up <= 38 && value <= UInt128.MaxValue / Pow10U(up));
+        UInt128 v = !fits ? UInt128.MaxValue
+            : up > 0 ? value * Pow10U(up)
+            : up < 0 ? RoundDiv(value, Pow10U(-up), mode)
+            : value;
+        if (v > (UInt128)Int128.MaxValue)
+            throw new CobolSizeError($"radix point alignment to {toScale} fraction digits is further from zero "
+                + "than permitted for the receiving data item (ISO §14.7.5 case 3 — EC-SIZE-TRUNCATION; the "
+                + "receiver is left unchanged)", "EC-SIZE-TRUNCATION");
+        return (Int128)v;
+    }
+
     /// <summary>Compare an unsigned wide operand against an Int128-lane operand by algebraic VALUE at their own
     /// scales (ISO §8.8.4.2.4). Returns &lt;0 / 0 / &gt;0. A negative right side is always the lesser; the
     /// non-negative compare rides the both-unsigned overload.</summary>
