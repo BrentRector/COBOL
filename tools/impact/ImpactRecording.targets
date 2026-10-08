@@ -24,6 +24,12 @@
   <PropertyGroup Condition="'$(_CobolImpactProbed)' == 'true' or '$(_CobolImpactTests)' == 'true'">
     <NoWarn>$(NoWarn);CS0436</NoWarn>
   </PropertyGroup>
+  <!-- No ReadyToRun runtime images (kb/Work PB2528): ImpactInstrumenter weaves the probes into the portable runtime
+       assembly, so a compiled program must load THAT one for its runtime hits to be recorded. With no image beside
+       the compiler, AssemblyPackager.RuntimePath is the portable assembly. -->
+  <PropertyGroup>
+    <CobolRuntimeReadyToRun>false</CobolRuntimeReadyToRun>
+  </PropertyGroup>
 
   <ItemGroup Condition="'$(_CobolImpactProbed)' == 'true' or '$(_CobolImpactTests)' == 'true'">
     <Compile Include="$(MSBuildThisFileDirectory)ImpactProbe.cs" Link="_impact\ImpactProbe.cs" />

@@ -22,6 +22,66 @@
   </ItemGroup>
 
   <!--
+    THE READYTORUN RUNTIME (kb/Work PB2528, owner decision 2026-10-07; DESIGN-test-build-ci §3.16). Every compiled
+    COBOL program runs in its own process with this assembly beside it, so the JIT compiling the runtime's methods
+    is paid at every program start. The ordinary build therefore also produces this assembly precompiled
+    (ReadyToRun) for each platform in $(CobolRuntimeReadyToRunIdentifiers) (Directory.Build.props), and those images
+    are what the compiler deploys: the gates' programs and the WiseOwl.COBOL package run the same images.
+
+    * One image per platform comes from the SDK's own ReadyToRun publish of THIS project: Release, framework-
+      dependent, that RuntimeIdentifier, into bin/ReadyToRun/<rid>/. Release whatever the outer build's
+      configuration, so a Debug gate certifies the optimized runtime it ships. The images carry no source-control
+      stamp (as Debug, Directory.Build.props): an image is a function of its sources alone, so a commit that does not
+      touch the runtime leaves it byte-identical and the compiled-program cache keyed on it (PB985) keeps hitting.
+    * It is incremental through the SDK's own Inputs/Outputs: the compile and crossgen rerun exactly when the
+      runtime's sources or build files change; an unchanged runtime costs two up-to-date checks.
+    * Each image is a content item copied to ReadyToRun/<rid>/Cobol.Net.Runtime.dll in the output of every project
+      that references this one (the compiler, the CLI, the test hosts) and in the CLI's publish output, which is
+      what the tool package packs. CodeGen/AssemblyPackager.cs picks this platform's image.
+    * RuntimeIdentifiers + PublishReadyToRun are static so restore fetches the crossgen2 pack and each platform's
+      runtime pack; the portable build itself is unchanged.
+    * CobolRuntimeReadyToRun=false turns it off: tools/impact/ImpactRecording.targets does, because the impact
+      map's probes are woven into the portable assembly, which then is the one programs must load.
+  -->
+  <PropertyGroup>
+    <RuntimeIdentifiers>$(CobolRuntimeReadyToRunIdentifiers)</RuntimeIdentifiers>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <SelfContained>false</SelfContained>
+    <!-- Only Microsoft.NETCore.App is crossgen's reference set; do not fetch the ASP.NET Core and desktop packs. -->
+    <DisableTransitiveFrameworkReferenceDownloads>true</DisableTransitiveFrameworkReferenceDownloads>
+    <CobolRuntimeReadyToRun Condition="'$(CobolRuntimeReadyToRun)' == ''">true</CobolRuntimeReadyToRun>
+    <CobolRuntimeReadyToRunDir>$(MSBuildProjectDirectory)$([System.IO.Path]::DirectorySeparatorChar)bin$([System.IO.Path]::DirectorySeparatorChar)ReadyToRun$([System.IO.Path]::DirectorySeparatorChar)</CobolRuntimeReadyToRunDir>
+  </PropertyGroup>
+
+  <Target Name="_CobolReadyToRunPlatforms" Condition="'$(RuntimeIdentifier)' == '' and '$(CobolRuntimeReadyToRun)' == 'true'">
+    <ItemGroup>
+      <_CobolReadyToRunPlatform Include="$(CobolRuntimeReadyToRunIdentifiers)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Build the images before this project copies its own content (the images are part of it). -->
+  <Target Name="CobolRuntimeReadyToRunImages" AfterTargets="CoreCompile" DependsOnTargets="_CobolReadyToRunPlatforms"
+          Condition="'$(RuntimeIdentifier)' == '' and '$(CobolRuntimeReadyToRun)' == 'true'">
+    <ItemGroup>
+      <_CobolReadyToRunPublish Include="$(MSBuildProjectFullPath)">
+        <AdditionalProperties>Configuration=Release;RuntimeIdentifier=%(_CobolReadyToRunPlatform.Identity);PublishDir=$(CobolRuntimeReadyToRunDir)%(_CobolReadyToRunPlatform.Identity)$([System.IO.Path]::DirectorySeparatorChar);EnableSourceControlManagerQueries=false;IncludeSourceRevisionInInformationalVersion=false</AdditionalProperties>
+      </_CobolReadyToRunPublish>
+    </ItemGroup>
+    <MSBuild Projects="@(_CobolReadyToRunPublish)" Targets="Publish" BuildInParallel="$(BuildInParallel)" />
+  </Target>
+
+  <!-- Carry the images into every referencing project's output and publish output (AssignTargetPaths precedes both
+       GetCopyToOutputDirectoryItems and GetCopyToPublishDirectoryItems, which the referencing projects call). -->
+  <Target Name="_CobolReadyToRunContent" BeforeTargets="AssignTargetPaths" DependsOnTargets="_CobolReadyToRunPlatforms"
+          Condition="'$(RuntimeIdentifier)' == '' and '$(CobolRuntimeReadyToRun)' == 'true'">
+    <ItemGroup>
+      <None Include="$(CobolRuntimeReadyToRunDir)%(_CobolReadyToRunPlatform.Identity)$([System.IO.Path]::DirectorySeparatorChar)$(TargetFileName)"
+            Link="ReadyToRun$([System.IO.Path]::DirectorySeparatorChar)%(_CobolReadyToRunPlatform.Identity)$([System.IO.Path]::DirectorySeparatorChar)$(TargetFileName)"
+            CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+  <!--
     The collation subsystem's data (Collation/README.md): the DERIVED root collation table generated from Unicode
     CLDR/UCA data by scripts/collation/generate-collation-table.py, and the shipped locale tailorings. Embedded with
     STABLE logical names (the runtime opens them by these strings; the RootNamespace-derived default would change

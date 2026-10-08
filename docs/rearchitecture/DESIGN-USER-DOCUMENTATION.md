@@ -85,6 +85,16 @@ without its page is RED. Every citation a generated page prints passes `cite.py 
 | `WiseOwl.COBOL.Runtime` | the runtime library compiled programs reference | versioned in lockstep with the compiler |
 | `WiseOwl.COBOL.MSBuild` | optional: compile `.cob` items inside a .csproj | mirrors `WiseOwl.Demeanor.MSBuild`; decide in PB1613 |
 
+**The tool ships the ReadyToRun runtime (owner decision 2026-10-07, kb/Work PB2528; DESIGN-test-build-ci §3.16).**
+The `WiseOwl.COBOL` package is the CLI's publish output, and that output already carries
+`ReadyToRun/<rid>/Cobol.Net.Runtime.dll` for every platform of `CobolRuntimeReadyToRunIdentifiers` (`win-x64`,
+`linux-x64`), the same images the gates' programs run. The `cobol` command deploys the one for the platform it runs
+on beside every compiled program, and the portable runtime on any other platform. The CLI's publish fails if any
+image is missing (`CobolAssertReadyToRunRuntimePublished`), so the pack PB1613 adds needs no step of its own for
+them; which further platforms the package targets (`osx-arm64`, `linux-arm64`, `win-arm64`) is PB1613's choice, and
+each is one entry in that property. `WiseOwl.COBOL.Runtime`, for programs referenced from a .csproj, is a portable
+library package; a project that publishes with `PublishReadyToRun` precompiles it for its own platform.
+
 License metadata: `PackageLicenseExpression` `BUSL-1.1` (the SPDX id of the Business Source License 1.1) or
 `PackageLicenseFile` pointing at `LICENSE` — settled in PB1613 against how Demeanor's packages declare theirs. Package
 README = the Install + Getting started pages.

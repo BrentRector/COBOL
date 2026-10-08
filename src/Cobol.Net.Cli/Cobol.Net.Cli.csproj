@@ -21,6 +21,23 @@
     <InternalsVisibleTo Include="Cobol.Net.Tests.Unit" />
   </ItemGroup>
 
+  <!-- THE PACKAGE SHIPS EVERY READYTORUN RUNTIME IMAGE (kb/Work PB2528; DESIGN-test-build-ci §3.16). The CLI's publish
+       output is what the WiseOwl.COBOL tool package packs (PackAsTool publishes, then packs that). The runtime
+       project lays one image per platform of $(CobolRuntimeReadyToRunIdentifiers) at ReadyToRun/<rid>/ in every
+       referencing project's output; a publish that would ship without one of them fails here rather than ship a
+       package whose compiled programs JIT the runtime on that platform. -->
+  <Target Name="CobolAssertReadyToRunRuntimePublished" AfterTargets="ComputeResolvedFilesToPublishList"
+          Condition="'$(CobolRuntimeReadyToRun)' != 'false'">
+    <ItemGroup>
+      <_CobolReadyToRunExpected Include="$(CobolRuntimeReadyToRunIdentifiers)" />
+      <_CobolReadyToRunExpectedPath Include="@(_CobolReadyToRunExpected->'ReadyToRun$([System.IO.Path]::DirectorySeparatorChar)%(Identity)$([System.IO.Path]::DirectorySeparatorChar)Cobol.Net.Runtime.dll')" />
+      <_CobolReadyToRunPublished Include="@(ResolvedFileToPublish->'%(RelativePath)')" />
+      <_CobolReadyToRunMissing Include="@(_CobolReadyToRunExpectedPath)" Exclude="@(_CobolReadyToRunPublished)" />
+    </ItemGroup>
+    <Error Condition="'@(_CobolReadyToRunMissing)' != ''"
+           Text="The WiseOwl COBOL publish lacks the ReadyToRun runtime image(s) @(_CobolReadyToRunMissing, ', ') (kb/Work PB2528): src/Cobol.Net.Runtime builds one per platform of CobolRuntimeReadyToRunIdentifiers and the publish output must carry each." />
+  </Target>
+
   <!-- Opt-in build hook for the Obsidian vault code-reference notes (kb/Reference/, a GITIGNORED build output).
        NOT run by default: the build does not depend on these notes (unlike the ANTLR parser, which IS a build
        prerequisite). Enable on a build with -p:GenerateVaultReference=true (e.g. a docs/CI refresh). Normally the

@@ -1,7 +1,9 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using CobolNet.CodeGen;
 using CobolNet.Tests.Shared;
 using Xunit;
 
@@ -286,18 +288,25 @@ public sealed class CompiledProgramCacheDriftTests : IDisposable
             .Where(n => !names.Contains(n)).ToList();
         Assert.True(strays.Count == 0, "loaded product assemblies outside the keyed closure: " + string.Join(", ", strays));
 
-        string[] copies = [.. closure.Select(a => a.Location).Select(p =>
+        // The runtime every program is compiled against and deployed with is keyed too: it is the ReadyToRun image,
+        // not the assembly loaded here (kb/Work PB2528).
+        var files = CompiledProgramCache.ToolFiles();
+        Assert.Contains(AssemblyPackager.RuntimePath, files);
+        string[] copies = [.. files.Select((p, i) =>
         {
-            string copy = Path.Combine(_dir, "tool", Path.GetFileName(p));
+            string copy = Path.Combine(_dir, "tool", i.ToString(CultureInfo.InvariantCulture), Path.GetFileName(p));
             Directory.CreateDirectory(Path.GetDirectoryName(copy)!);
             File.Copy(p, copy);
             return copy;
         })];
-        string before = CompiledProgramCache.FingerprintOf(copies);
-        byte[] bytes = File.ReadAllBytes(copies[0]);
-        bytes[^1] ^= 0x01;
-        File.WriteAllBytes(copies[0], bytes);
-        Assert.NotEqual(before, CompiledProgramCache.FingerprintOf(copies));
+        foreach (int flipped in (int[])[0, files.ToList().IndexOf(AssemblyPackager.RuntimePath)])
+        {
+            string before = CompiledProgramCache.FingerprintOf(copies);
+            byte[] bytes = File.ReadAllBytes(copies[flipped]);
+            bytes[^1] ^= 0x01;
+            File.WriteAllBytes(copies[flipped], bytes);
+            Assert.NotEqual(before, CompiledProgramCache.FingerprintOf(copies));
+        }
     }
 
     /// <summary>A DEBUG build's bits do not depend on the commit it was built at (<c>Directory.Build.props</c>): the

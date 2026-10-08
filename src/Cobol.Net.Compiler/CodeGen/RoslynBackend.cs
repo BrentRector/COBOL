@@ -116,6 +116,9 @@ internal sealed class RoslynBackend : ICodeGenBackend
         string tpa = (string)(AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? "");   // not a compilation input: the host's own framework reference set
         var refs = tpa.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
             .Where(static p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))   // not a COBOL word: a file-system extension
+            // The host's own copy of the runtime is not the one the program runs with (kb/Work PB2528): that is
+            // AssemblyPackager.RuntimePath, added below, so the program binds against the very file it is deployed with.
+            .Where(static p => !string.Equals(Path.GetFileName(p), AssemblyPackager.RuntimeFileName, StringComparison.OrdinalIgnoreCase))   // not a COBOL word: a file name
             .Select(static p => (MetadataReference)MetadataReference.CreateFromFile(p))
             .ToList();
         // The WiseOwl COBOL runtime the generated program calls (CobolNum / CobolString).

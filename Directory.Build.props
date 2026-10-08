@@ -23,4 +23,12 @@
     <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
+  <!-- kb/Work PB2528 (owner decision 2026-10-07; DESIGN-test-build-ci §3.16): the platforms the WiseOwl COBOL runtime
+       is precompiled ReadyToRun for. src/Cobol.Net.Runtime builds one image per entry and every project that
+       references it carries them at ReadyToRun/<rid>/Cobol.Net.Runtime.dll; the CLI's publish (what the
+       WiseOwl.COBOL tool package packs) refuses to finish without every one; ReadyToRunRuntimeDriftTests requires
+       the platform each CI leg runs on. Adding a platform is one entry here. -->
+  <PropertyGroup>
+    <CobolRuntimeReadyToRunIdentifiers>win-x64;linux-x64</CobolRuntimeReadyToRunIdentifiers>
+  </PropertyGroup>
 </Project>

@@ -632,7 +632,7 @@ program — a green verdict about code that no longer exists — so the key is e
 
 | axis | how it is keyed | proof (`CompiledProgramCacheDriftTests`) |
 |---|---|---|
-| the compiler's own bits | SHA-256 of every non-framework assembly in `Cobol.Net.Compiler`'s reference closure (compiler, front end, editions, runtime, Roslyn, ANTLR) + the exact shared-framework build + culture + working directory | a byte flipped in one closure assembly changes the fingerprint; every loaded `Cobol.Net.*` product assembly is in the closure |
+| the compiler's own bits | SHA-256 of every non-framework assembly in `Cobol.Net.Compiler`'s reference closure (compiler, front end, editions, runtime, Roslyn, ANTLR) and of the runtime every program is compiled against and deployed with (`AssemblyPackager.RuntimePath`, the ReadyToRun image of §3.16, which is not the assembly loaded in-process) + the exact shared-framework build + culture + working directory (`CompiledProgramCache.ToolFiles`) | a byte flipped in one closure assembly, and in the deployed runtime, changes the fingerprint; every loaded `Cobol.Net.*` product assembly is in the closure |
 | every compile option | **reflection** over `CompilerDriver.Options`, rendered per TYPE; an unknown type THROWS | every property is flipped by type-derived value and must change the key — an option added tomorrow is covered with no edit |
 | the source | its full path and its content hash | an edit misses; the same text at another path misses |
 | copybooks, probes, environment | the compiler's OWN record, `CompilerDriver.Result.Inputs` (below), re-verified on every lookup | an edited copybook misses; a copybook that newly SHADOWS the one found misses; a `>>DEFINE … PARAMETER` variable set/changed misses |
@@ -1411,6 +1411,68 @@ misses (the rule of section 3.14.1, ORDER, DON'T SKIP).
   PB1957 lists every remaining difference). It catches platform assumptions, and CI through `push-main.sh` remains
   the proof.
 - The gate cap (section 3.14.6) does not span operating systems, so WSL legs are not counted against it.
+
+### 3.16 THE READYTORUN RUNTIME — the gates and the package run the same precompiled runtime (kb/Work PB2528)
+
+**Owner decision 2026-10-07:** "Build the COBOL runtime ReadyToRun for both the gates and the shipped WiseOwl.COBOL
+package (rebuilt automatically whenever runtime code changes)?" — "Yes, gates and package". Every Conformance case
+runs its compiled program as a child process, `dotnet <prog>.dll`, with `Cobol.Net.Runtime.dll` beside it, so the
+JIT compiling the runtime's methods was paid at every program start; the w1033 gate-speed diagnosis put the child at
+60–75 % of a case's single-thread cost.
+
+**The mechanism (one producer, one selector, two guards):**
+- **Producer: `src/Cobol.Net.Runtime/Cobol.Net.Runtime.csproj`.** After its own compile, target
+  `CobolRuntimeReadyToRunImages` runs the SDK's ReadyToRun publish of the same project once per platform in
+  `CobolRuntimeReadyToRunIdentifiers` (the root `Directory.Build.props`: `win-x64;linux-x64`, the operating systems
+  CI runs on), in Release whatever the outer configuration, framework-dependent, into `bin/ReadyToRun/<rid>/`, the
+  platforms in parallel. Crossgen2 compiles each platform's image from any host (a Windows build produces the
+  Linux image too). The images carry no source-control stamp, as Debug assemblies do not (§3.12): an image is a
+  function of its sources, so a commit that does not touch the runtime leaves it byte-identical. Incremental through
+  the SDK's own Inputs/Outputs: the compile and crossgen rerun exactly when the runtime's sources or build files
+  change, with no manual step. `RuntimeIdentifiers` and `PublishReadyToRun` are static properties so that restore
+  fetches the crossgen2 pack and each platform's runtime pack (`DisableTransitiveFrameworkReferenceDownloads` keeps
+  it to `Microsoft.NETCore.App`).
+- **Flow.** Target `_CobolReadyToRunContent` adds each image as a content item linked at
+  `ReadyToRun/<rid>/Cobol.Net.Runtime.dll`, so it reaches the output of every referencing project (the compiler,
+  the CLI, the three test hosts) and the CLI's publish output, which is what the `WiseOwl.COBOL` tool package packs
+  (`PackAsTool` publishes, then packs; DESIGN-USER-DOCUMENTATION §6).
+- **Selector: `src/Cobol.Net.Compiler/CodeGen/AssemblyPackager.cs#RuntimePath`.** This platform's image
+  (`ReadyToRunPlatform`: the operating-system family and processor architecture, which is what decides whether an
+  image's native code is usable, not `RuntimeInformation.RuntimeIdentifier`, which a distribution-built .NET reports as
+  e.g. `ubuntu.26.04-x64`); on a platform with no image, the portable assembly beside the compiler, the same source
+  compiled by the JIT. `RoslynBackend` binds every program against that one file (the host's own copy of the runtime
+  is dropped from the reference set) and `Package` deploys it, so a program runs with the file it was compiled
+  against. The compiled-program cache keys on it (`CompiledProgramCache.ToolFiles`, §3.12), because it is not the
+  assembly loaded into the test host.
+- **Guard 1: `CobolAssertReadyToRunRuntimePublished`** in `src/Cobol.Net.Cli/Cobol.Net.Cli.csproj` fails a CLI publish
+  that would ship without any declared platform's image.
+- **Guard 2: `ReadyToRunRuntimeDriftTests`** (Unit) reads the PE headers rather than the build's naming: the runtime
+  the compiler deploys is this platform's ReadyToRun image (managed native header present, machine field equal to
+  the architecture combined with the operating-system code of the .NET runtime's `pedecoder.h`) with no source stamp;
+  every declared platform's image is in the test host and in the CLI output, byte-identical; and the declared
+  platforms cover every `runs-on:` runner in `.github/workflows/` (a runner the test cannot name fails it).
+- **Off switch: `CobolRuntimeReadyToRun=false`.** `tools/impact/ImpactRecording.targets` sets it, because the impact
+  map's probes are woven into the portable runtime assembly (§3.13), which a recorded program must then load; the
+  drift test's arms require the portable assembly under `IMPACT_RECORDING`.
+
+**What the gate certifies.** The gates' programs load the Release ReadyToRun runtime, not the Debug build of it: the
+same image the package ships. `src/Cobol.Net.Runtime` has no `Debug.Assert`, and CI's Windows Conformance shards
+already ran Release, so no check is lost; the Debug portable assembly is still what the test hosts load in-process.
+
+**Measured** (2026-10-07, this host shared with other gates; probe `E:\COBOL-coord\scratch\w1033x\startup.py`:
+24 stride-sampled `tests/conformance/2023` programs, 21 runs each, the two runtimes interleaved run by run, 21 of 24
+outputs equal to the golden in both arms):
+
+| program start, median of per-program medians | Debug portable runtime (before) | ReadyToRun runtime (after) |
+|---|---|---|
+| run 1 | 104.7 ms | 74.5 ms (−29 %) |
+| run 2 | 102.8 ms | 76.5 ms (−26 %) |
+| quieter host, an earlier pair | 83.2 ms | 60.4 ms (−27 %) |
+
+Build cost (probe `buildcost.py`: `dotnet build Cobol.Net.sln -c Debug` with node reuse and the compiler server off,
+as the gate slot runs it, three rounds): a change to a runtime source costs 8.5–11.5 s with the images against
+4.3–7.1 s without, about **+4 s** (two Release compiles and two crossgens, in parallel); a no-op build is unchanged
+(2.3–4.6 s either way). A clean restore also downloads the crossgen2 pack and the two runtime packs once.
 
 ---
 

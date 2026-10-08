@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using CobolNet.CodeGen;
 using CobolNet.Frontend;
 using CobolNet.Tests.Shared;
 
@@ -165,7 +166,16 @@ internal static class CompiledProgramCache
     internal static string ToolFingerprint => s_tool.Value;
 
     private static readonly Lazy<string> s_tool =
-        new(() => FingerprintOf(CompilerClosure().Select(a => a.Location)), LazyThreadSafetyMode.ExecutionAndPublication);
+        new(() => FingerprintOf(ToolFiles()), LazyThreadSafetyMode.ExecutionAndPublication);
+
+    /// <summary>The files <see cref="ToolFingerprint"/> hashes: every assembly of <see cref="CompilerClosure"/> and
+    /// the runtime the compiler compiles every program against and deploys beside it
+    /// (<see cref="AssemblyPackager.RuntimePath"/>). That file is not the runtime loaded into this process: it is the
+    /// ReadyToRun image for this platform (kb/Work PB2528), built from the same sources in Release, so a change that
+    /// reaches only the image (a crossgen or Release-only build setting) would otherwise replay a stale one.</summary>
+    internal static IReadOnlyList<string> ToolFiles() =>
+        [.. CompilerClosure().Select(a => a.Location).Append(AssemblyPackager.RuntimePath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
 
     /// <summary>The tool fingerprint over an explicit assembly set (the drift test flips a byte in a copy).</summary>
     internal static string FingerprintOf(IEnumerable<string> assemblyFiles)

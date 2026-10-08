@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-290 drift tests.
+291 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -224,6 +224,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [PrototypePointerTypeDriftTests](../tests/Cobol.Net.Tests.Unit/PrototypePointerTypeDriftTests.cs) | ⛔ THE TYPE OF A RESTRICTED PROGRAM- OR FUNCTION-POINTER IS ITS PROTOTYPE'S SIGNATURE, SO NO RELATION COMPARES THE PROTOTYPE'S NAME (kb/Work PB2464). | `src/Cobol.Net.Compiler` |
 | [QualifiedNameClassDriftTests](../tests/Cobol.Net.Tests.Unit/QualifiedNameClassDriftTests.cs) | kb/Work PB919 — ISO §8.4.2.2.3 SR1's uniqueness obligation covers EVERY user-defined name, and it was enforced per name class with one class (index-names) never done. | `specs/ISO_COBOL.md` |
 | [ReadPreconditionOrderDriftTests](../tests/Cobol.Net.Tests.Unit/ReadPreconditionOrderDriftTests.cs) | ⛔ THE READ PRECONDITIONS ARE WRITTEN DOWN ONCE, AND IN THE STANDARD'S OWN ORDER (kb/Work PB336). | `src/Cobol.Net.Runtime/IO` |
+| [ReadyToRunRuntimeDriftTests](../tests/Cobol.Net.Tests.Unit/ReadyToRunRuntimeDriftTests.cs) | ⛔ THE RUNTIME A COMPILED PROGRAM LOADS IS THE READYTORUN IMAGE FOR ITS PLATFORM, AND THE TESTS AND THE PACKAGE LOAD THE SAME ONE (kb/Work PB2528, owner decision 2026-10-07; DESIGN-test-build-ci §3.16). | `Directory.Build.props`, `.github/workflows` |
 | [ReceiverBracketDriftTests](../tests/Cobol.Net.Tests.Unit/ReceiverBracketDriftTests.cs) | ⛔ A RECEIVING OBJECT PROPERTY IS ACCESSED WHEN ITS STATEMENT REACHES IT — ONE CLAIM, ONE PLACEMENT (kb/Work PB2078). | `src/Cobol.Net.Compiler/Binding`, `src/Cobol.Net.Compiler/CodeGen/Verbs` |
 | [ReceiverContextRestoreDriftTests](../tests/Cobol.Net.Tests.Unit/ReceiverContextRestoreDriftTests.cs) | ⛔ EVERY PUBLIC ENTRY OF NumericRenderer THAT SETS THE AMBIENT RECEIVER MUST RESTORE IT. | `src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs` |
 | [ReceivingResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/ReceivingResolutionDriftTests.cs) | ⛔ EVERY VERB BINDER STATES AN OPERAND'S ROLE WHEN IT RESOLVES IT (kb/Work PB881, CLAUDE.md rule 5). | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs`, `src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs` |
