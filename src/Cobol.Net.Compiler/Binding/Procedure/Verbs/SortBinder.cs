@@ -563,7 +563,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     /// <c>CurrentImage()</c>) and RETURN decomposes it back (determination D-FRA, docs/CONFORMANCE.md §3).</para></summary>
     private static DataItem? SortRecordOf(FileModel file) =>
         file.Records.Count > 0 && (file.Records[0].IsElementary || file.Records[0].IsImageCapable
-            || file.Records[0].CurrentExtentImageCapable)
+            || file.Records[0].RecordImageCapable)
             ? file.Records[0] : null;
 
     /// <summary>Bind one ASC/DESC key phrase's data-names into <paramref name="keys"/> (ISO §14.9.40 GR1 — the

@@ -1,0 +1,19 @@
+A1=[habcppx111yy222]
+A2=[habcppx111yy222   ]
+A3=[habcppx111yy222zzz333]
+B1 EQ
+B2 NE
+B2 GT
+A4=[habcppx111uuu77vvv88]
+C1=[habcppx111yy222   ]
+C2 EQ
+S=[habcppx111yy222]
+D1=[hQQppx111yy922rrr833] 3
+S=[hQQppx111yy922]
+D2=[hQQppx111yy922] 2
+F1=[hQQppx111] 1
+F2=[hQQppx111uuu77vvv88]
+F3=[hQQppx111yy922   ]
+F4 EQ
+F5=[hmppx111yy922]
+E1=[    00 00]

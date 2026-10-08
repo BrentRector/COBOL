@@ -15,8 +15,10 @@ namespace CobolNet.Tests.Conformance;
 /// fixture) and a POINTER/OBJECT-CLASS leaf (the R40 fleet's correction — every NUMERIC kind is in, the
 /// pointer/object categories had no image until kb/Work PB244 gave them the ONE-WAY transfer image —
 /// <c>DisplayPointerGroup_RendersPlaceholderPositions</c>/<c>MovePointerGroup_SendsPlaceholderPositions</c> pin it WORKING). DISPLAY of a COMPOSABLE variable-length group is NOT here: it renders the documented A.1 item-57
-/// format (<c>2023/pb164_vlg_display</c>); the DISPLAY loud lives on the UNCOMPOSABLE shape
-/// (<c>DisplayOdoTableOfDynamicElements_FailsLoudNotCs1061</c>). ACCEPT/STRING receivers and INSPECT's identifier-1
+/// format (<c>2023/pb164_vlg_display</c>, and kb/Work PB244's tables of variable-length elements, struct-resident or
+/// cell-backed); the variable-length loud that remains is a RECORD of an OCCURS DEPENDING table of variable-length
+/// elements (<c>WriteRecordWithOdoTableOfDynamicElements_StaysLoudNamingTheCount</c>) and the group MOVE / comparison
+/// / CALL of a DYNAMIC-CAPACITY table of them. ACCEPT/STRING receivers and INSPECT's identifier-1
 /// are BIND-screened by their own syntax rules (§14.9.1.3 SR6 / §14.9.43.3 SR11 / §14.9.22.3 SR1) and pinned as such.
 /// </summary>
 public sealed class TierCRejectionTests
@@ -211,15 +213,16 @@ public sealed class TierCRejectionTests
         Assert.Equal("2ab123c456", stdout.TrimEnd('\r', '\n'));
     }
 
-    /// <summary>kb/Work PB244 — the shape the CELL still cannot compose: an EXTERNAL (cell-backed) group whose
-    /// OCCURS DEPENDING table has variable-length ELEMENTS. The cell's table reservation holds one element's FIXED
-    /// run, and the element's own dynamic slots are not yet composed into the group image, so the statement
-    /// stays the named Tier-C loud — never a shortened image. (A struct-resident group composes:
-    /// <c>DisplayOdoTableOfDynamicElements_RendersEachOccurrenceAtItsCurrentExtent</c>.)</summary>
+    /// <summary>kb/Work PB244 — the cell-backed twin of
+    /// <c>DisplayOdoTableOfDynamicElements_RendersEachOccurrenceAtItsCurrentExtent</c>: an EXTERNAL (cell-backed)
+    /// group whose OCCURS DEPENDING table has variable-length ELEMENTS composes the same image, because one storage
+    /// has one rendering whatever area holds it (ISO §14.9.11.4 GR7, A.1 item 57; the table at its CURRENT count,
+    /// §13.18.38.4 GR8). The group is the table alone, so with the count 1 only the first occurrence ("ab", "123")
+    /// shows, and with 2 both do.</summary>
     [Fact]
-    public void DisplayCellBackedTableOfDynamicElements_StaysLoud()
+    public void DisplayCellBackedTableOfDynamicElements_RendersEachOccurrenceAtItsCurrentExtent()
     {
-        var (ok, _, detail) = new CobolNetCompiler(2023).CompileAndRun("""
+        var (ok, stdout, detail) = new CobolNetCompiler(2023).CompileAndRun("""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. TIERCRE5.
             DATA DIVISION.
@@ -231,13 +234,65 @@ public sealed class TierCRejectionTests
                   10 WS-GX-F PIC X(3).
             PROCEDURE DIVISION.
             MAIN.
+                MOVE 2 TO WS-GN.
+                MOVE "ab" TO WS-GX-D(1).
+                MOVE "123" TO WS-GX-F(1).
+                MOVE "c" TO WS-GX-D(2).
+                MOVE "456" TO WS-GX-F(2).
                 MOVE 1 TO WS-GN.
+                DISPLAY WS-GX.
+                MOVE 2 TO WS-GN.
                 DISPLAY WS-GX.
                 STOP RUN.
             """);
-        Assert.False(ok, "a cell-backed table of dynamic elements is not composed yet — loud, never a shortened image");
-        Assert.Contains("Tier-C", detail);
-        Assert.Contains("dynamic", detail);
+        Assert.True(ok, detail);
+        Assert.Equal(["ab123", "ab123c456"], stdout.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    /// <summary>kb/Work PB244 - the one statement that still refuses a group whose OCCURS DEPENDING table holds
+    /// variable-length ELEMENTS: a file RECORD of that shape. MOVE, comparison and CALL carry such a group (the
+    /// count is a parameter of the operand's access path), but a record read back is decomposed by a fixed list
+    /// of components, and the record's length cannot say how many occurrences it holds - the DEPENDING item is
+    /// data, not layout. The statement is the named loud (<c>DataItem.RecordImageCapable</c>), never a record
+    /// written at the wrong extent.</summary>
+    [Fact]
+    public void WriteRecordWithOdoTableOfDynamicElements_StaysLoudNamingTheCount()
+    {
+        string dat = Path.Combine(Path.GetTempPath(), $"tiercre6-{Guid.NewGuid():N}.dat");
+        try
+        {
+            var (ok, _, detail) = new CobolNetCompiler(2023).CompileAndRun($$"""
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. TIERCRE6.
+                ENVIRONMENT DIVISION.
+                INPUT-OUTPUT SECTION.
+                FILE-CONTROL.
+                    SELECT F ASSIGN TO "{{dat}}" ORGANIZATION SEQUENTIAL.
+                DATA DIVISION.
+                FILE SECTION.
+                FD F.
+                01 REC.
+                   05 REC-N PIC 9(1).
+                   05 REC-T OCCURS 1 TO 3 DEPENDING ON REC-N.
+                      10 REC-D PIC X DYNAMIC LENGTH LIMIT 5.
+                      10 REC-F PIC X.
+                PROCEDURE DIVISION.
+                MAIN.
+                    OPEN OUTPUT F.
+                    MOVE 1 TO REC-N.
+                    MOVE "a" TO REC-D(1).
+                    WRITE REC.
+                    CLOSE F.
+                    STOP RUN.
+                """);
+            Assert.False(ok, "a record of OCCURS DEPENDING variable-length elements cannot be read back - loud, never written");
+            Assert.Contains("OCCURS DEPENDING table of variable-length elements", detail);
+            Assert.Contains("data, not layout", detail);
+        }
+        finally
+        {
+            File.Delete(dat);
+        }
     }
 
     /// <summary>kb/Work PB244 shape (b), ISO §14.9.11.4 GR7 (A.1 item 57): a group with BOTH an OCCURS DEPENDING

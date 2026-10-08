@@ -22,6 +22,19 @@ public static class CobolTable
         return sb.ToString();
     }
 
+    /// <summary>The §8.5.1.12 carrier of the first <paramref name="count"/> occurrences of an OCCURS DEPENDING
+    /// <paramref name="table"/> whose elements are variable-length groups (kb/Work PB244): each occurrence's own
+    /// carrier, concatenated in occurrence order (<see cref="CobolVarGroup.Concat"/>) - the flattening a fixed-OCCURS
+    /// table of such elements gets, at the table's CURRENT count (§13.18.38.4 GR8; the MAXIMUM at an activation
+    /// boundary, which passes it). A count outside the table is clamped; the caller has already applied the
+    /// EC-BOUND-ODO clamp (<c>TableOdoExtent</c>).</summary>
+    public static CobolVarGroup ConcatVarImages<T>(T[] table, int count, Func<T, CobolVarGroup> carrier)
+    {
+        var occurrences = new CobolVarGroup[Math.Clamp(count, 0, table.Length)];
+        for (int i = 0; i < occurrences.Length; i++) occurrences[i] = carrier(table[i]);
+        return CobolVarGroup.Concat(occurrences);
+    }
+
     /// <summary>
     /// The table element at a 1-based <paramref name="occurrence"/> number, as a writable reference.
     /// <para><b>Out-of-range</b> (ISO §8.4.2.3.4 GR2): with EC-BOUND-SUBSCRIPT checking ON the condition is raised

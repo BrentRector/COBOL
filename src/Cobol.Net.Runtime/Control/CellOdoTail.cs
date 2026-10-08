@@ -13,9 +13,14 @@ namespace CobolNet.Runtime;
 /// without it, the take step that splits a record would hand the table's positions to a dynamic-length item
 /// that precedes it. <c>default</c> (<see cref="Present"/> false) is a group that holds no such table.
 /// </summary>
-/// <param name="Elem">One occurrence's width in character positions.</param>
+/// <param name="Elem">One occurrence's width in character positions OF THE GROUP'S FIXED RUN (a dynamic-capacity
+/// table inside an element reserves its one-element extent in the window and none in the run).</param>
 /// <param name="Max">The table's maximum occurrence count (OCCURS … TO integer-2).</param>
-public readonly record struct CellOdoTail(int Elem, int Max)
+/// <param name="Comps">How many variable-length COMPONENTS (dynamic-length items, dynamic-capacity tables) one
+/// occurrence holds - zero for an element of a fixed image (kb/Work PB244). The cell numbers a table's components
+/// per occurrence (<c>CellComponents</c>), and the table is the LAST thing of the group, so they are its last
+/// <c>Max * Comps</c> components and the occurrences beyond the count contribute none of them.</param>
+public readonly record struct CellOdoTail(int Elem, int Max, int Comps = 0)
 {
     /// <summary>True when the group holds the table.</summary>
     public bool Present => Max > 0;
@@ -28,4 +33,9 @@ public readonly record struct CellOdoTail(int Elem, int Max)
     /// only the part the DEPENDING item names is used). A count outside 0..<see cref="Max"/> is clamped, as the
     /// declared group's <c>__odo</c> argument already is (<c>TableOdoExtent</c>, EC-BOUND-ODO).</summary>
     public int CutAt(int count) => Present ? (Max - Math.Clamp(count, 0, Max)) * Elem : 0;
+
+    /// <summary>How many of the group's trailing COMPONENTS belong to the occurrences beyond <paramref name="count"/>
+    /// - the components the current extent drops with them (<see cref="CutAt"/> drops their fixed run). Zero for a
+    /// table whose elements hold none.</summary>
+    public int CutComponents(int count) => Present ? (Max - Math.Clamp(count, 0, Max)) * Comps : 0;
 }

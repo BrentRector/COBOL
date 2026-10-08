@@ -1,5 +1,8 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CellGroupShape = CobolNet.Runtime.CellGroupShape;
+using CellOdoTail = CobolNet.Runtime.CellOdoTail;
+
 namespace CobolNet.Binding.Model;
 
 /// <summary>
@@ -553,7 +556,8 @@ public static class CellComponents
 /// component and cut the run to the operand's current count (§13.18.38.4 GR8).</para></summary>
 public sealed record VarGroupWindow(AccessPath Cell, string DynBase, IReadOnlyList<int> DynFixedAt,
                                     IReadOnlyList<int> DynMax, IReadOnlyList<int> DynStructure,
-                                    IReadOnlyList<int> DynTable, (int Elem, int Max) Odo) : CellWindowCoding(Cell)
+                                    IReadOnlyList<int> DynTable, CellOdoTail Odo,
+                                    IReadOnlyList<CellGroupShape?> DynElem) : CellWindowCoding(Cell)
 {
     /// <summary>The coding for <paramref name="group"/> when it has components under it, else null. The layout is
     /// read off the class walk (<see cref="CellComponents.Of"/> over <see cref="DataItem.ClassOffset"/>), never
@@ -568,7 +572,32 @@ public sealed record VarGroupWindow(AccessPath Cell, string DynBase, IReadOnlyLi
                 parts.Select(p => p.Item.IsDynamicTable ? p.Item.OccursSpec?.Max ?? 0 : p.Item.DynMaxSize).ToList(),
                 parts.Select(p => p.Item.IsDynamicTable ? 0 : FileModel.StructureOf(p.Item)?.Code ?? 0).ToList(),
                 parts.Select(p => p.Item.IsDynamicTable ? p.Item.ByteWidth : 0).ToList(),
-                OdoModel.TableUnder(group) is { } table ? (table.ByteWidth, table.Occurs ?? 1) : (0, 0));
+                OdoOf(group),
+                parts.Select(p => p.Item.IsDynamicTable ? ElementShapeOf(p.Item) : null).ToList());
+    }
+
+    /// <summary>The OCCURS DEPENDING table <paramref name="group"/> holds as its trailing storage, as the cell's
+    /// <see cref="CellOdoTail"/>: the element's width in the group's FIXED RUN (the one-element extent a
+    /// dynamic-capacity table inside the element reserves in the window is not part of the run), the maximum count
+    /// and how many variable-length components one occurrence holds (<see cref="CellComponents.PerOccurrence"/>).</summary>
+    private static CellOdoTail OdoOf(DataItem group) =>
+        OdoModel.TableUnder(group) is { } table
+            ? new CellOdoTail(table.ByteWidth - CellComponents.Of(table).Where(p => p.Item.IsDynamicTable).Sum(p => p.Item.ByteWidth),
+                              table.Occurs ?? 1, CellComponents.PerOccurrence(table))
+            : default;
+
+    /// <summary>The window shape of one ELEMENT of the dynamic-capacity table <paramref name="table"/> when that
+    /// element is itself a variable-length group (a runtime-length item or a nested table inside it), else null: the
+    /// element cell is a scope of its own, numbered from zero (<see cref="CellComponents"/>), so its image is
+    /// composed with ITS shape (kb/Work PB244).</summary>
+    private static CellGroupShape? ElementShapeOf(DataItem table)
+    {
+        if (!table.IsGroup) return null;
+        var parts = CellComponents.Of(table).ToList();
+        return parts.Count == 0 ? null
+            : new CellGroupShape(table.ByteWidth, parts.Select(p => p.At).ToArray(),
+                parts.Select(p => p.Item.IsDynamicTable ? p.Item.ByteWidth : 0).ToArray(),
+                parts.Select(p => p.Item.IsDynamicTable ? ElementShapeOf(p.Item) : null).ToArray());
     }
 
     /// <summary>True when <paramref name="group"/> would take this coding.</summary>

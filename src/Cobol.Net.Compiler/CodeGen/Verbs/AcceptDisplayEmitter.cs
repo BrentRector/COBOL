@@ -24,11 +24,11 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
         // us, documented as CONFORMANCE.md A.1 item 57 (kb/Work PB164): the generated CurrentImage() — fixed
         // members by the record-image member law, dynamic members at their CURRENT extent, following the
         // §15.50.4 r7 LENGTH-sum geometry, so LENGTH(G) equals the displayed width (a NATIONAL member contributes
-        // the two bytes it occupies — D-N1; kb/Work PB327 dissolved the old one-character divergence; row 57 names the
-        // one shape that stays loud instead: a CELL-BACKED group holding a table whose ELEMENTS are
-        // variable-length groups — kb/Work PB244. An ODO table beside a dynamic member displays at its CURRENT
-        // count, and a table of variable-length elements shows each occurrence's own current image: the gate is
-        // CurrentImageCapable, the ONE-WAY image, because DISPLAY never reads the characters back).
+        // the two bytes it occupies — D-N1; kb/Work PB327 dissolved the old one-character divergence. An ODO table
+        // beside a dynamic member displays at its CURRENT count, and a table of variable-length elements - OCCURS
+        // DEPENDING or dynamic-capacity, in a declared group or a CELL-BACKED one (kb/Work PB244) - shows each
+        // occurrence's own current image: the gate is CurrentImageCapable, the ONE-WAY image, because DISPLAY never
+        // reads the characters back).
         // DISPLAY-ONLY by design: GR7 is a DISPLAY-statement determination, so the shared group-sender arm
         // (WRITE/RELEASE/compare) keeps its narrower, carrier-capable gate.
         // ⛔ `vp is not RedefViewPlace`: a Tier-B class-tier VIEW's Read() is its string WINDOW — spelling

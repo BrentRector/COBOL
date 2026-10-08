@@ -2370,8 +2370,9 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// term-by-term expression writes down (the standard's own phrase for r7c, "based on their current capacity",
     /// defines only the fixed-element case; a FIXED table of such elements is summed per occurrence below). Its
     /// length is the length of the group's own CURRENT IMAGE (kb/Work PB244 - <see cref="BoundIntrinsicCall.OverCurrentImage"/>,
-    /// the same composer DISPLAY uses, so LENGTH(G) equals the displayed width) wherever that image exists; a
-    /// group it cannot take (a cell-backed one) is reported as a named loud stage (§1.4), never as an
+    /// the same composer DISPLAY uses, so LENGTH(G) equals the displayed width) - for a struct-resident group
+    /// and, through the cell's own composition, for a cell-backed one (an EXTERNAL record, an ADDRESS-OF-taken
+    /// record); a group neither can take is reported as a named loud stage (§1.4), never as an
     /// under-count. A bit-bearing group (its ByteWidth is the §8.5.1.6.3 layout extent, not a sum) is likewise
     /// staged rather than corrected by subtraction.</para>
     /// </remarks>
@@ -2392,7 +2393,8 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // item 57: LENGTH(G) equals the displayed width), so the length is the image's, through the ONE composer
         // DISPLAY uses; a group the composer cannot take (a cell-backed or bit-bearing one) stays the named stage.
         BoundExpr ImageOrStage(string what) =>
-            group.CurrentImageCapable && !group.HasBitDescendant && inner is MemberPlace or DynTablePlace
+            group.CurrentImageCapable && !group.HasBitDescendant
+                && inner is MemberPlace or DynTablePlace or RedefViewPlace { Coding: VarGroupWindow }
                 ? new BoundIntrinsicCall(sig, [op], PicCategory.Numeric) { OverCurrentImage = true }
                 : Stage(what);
 

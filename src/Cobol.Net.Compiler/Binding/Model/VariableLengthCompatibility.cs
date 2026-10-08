@@ -112,12 +112,13 @@ internal static class VariableLengthCompatibility
                 into.Add(TableAtom(c, GroupAtomKind.DynamicTable, 1));
                 items.Add(c);
             }
-            else if (c.Occurs is { } times && c.IsGroup && c.OccursSpec?.DependingName is null
-                     && ReferenceResolver.HasVariableLengthSubordinate(c))
-                // A FIXED-OCCURS table whose element is a variable-length group (kb/Work PB244): every occurrence
-                // holds its own dynamic-length items "at the same relative byte positions" (§8.5.1.12.2), so the
-                // table is not an atom — it is `times` flattened copies of its element, exactly as the emitted
-                // carrier flattens them (GroupImageCodec VarPartKind.NestedTable).
+            else if (c.Occurs is { } times && c.IsGroup && ReferenceResolver.HasVariableLengthSubordinate(c))
+                // A FIXED-OCCURS or OCCURS DEPENDING table whose element is a variable-length group (kb/Work
+                // PB244): every occurrence holds its own dynamic-length items "at the same relative byte positions"
+                // (§8.5.1.12.2), so the table is not an atom — it is `times` flattened copies of its element
+                // (an OCCURS DEPENDING table at its MAXIMUM, as the plain one below is: §14.8.2.2 and §8.5.1.12.3
+                // sentence 3 resolved statically), exactly as the emitted carrier flattens them (GroupImageCodec
+                // VarPartKind.NestedTable / OdoTable).
                 for (int i = 0; i < times; i++) Atoms(c, into, items);
             else if (c.Occurs is { } n)
             {

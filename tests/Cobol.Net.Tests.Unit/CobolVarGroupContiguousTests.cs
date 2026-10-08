@@ -198,6 +198,90 @@ public sealed class CobolVarGroupContiguousTests
         Assert.Equal("abcxy", taken.DynAt(0));
     }
 
+    // ── kb/Work PB244, a TABLE OF VARIABLE-LENGTH ELEMENTS in a cell ───────────────────────────────────────────────
+    // Window H X(1) · T X(1)+dynamic-DD OCCURS 1 TO 3 DEPENDING, at its maximum (3 positions): Ref "Hxyz", the
+    // table's components (one per occurrence, ordinals 0..2, each BEFORE its occurrence's FX) "a", "bb", "ccc".
+
+    private static readonly CellOdoTail ElementTail = new(1, 3, Comps: 1);
+
+    private static StorageCell ElementCell()
+    {
+        var cell = new StorageCell { Ref = "Hxyz" };
+        cell.SetDynAt(0, "a");
+        cell.SetDynAt(1, "bb");
+        cell.SetDynAt(2, "ccc");
+        return cell;
+    }
+
+    [Theory]
+    [InlineData(3, "Haxbbyccc" + "z")]
+    [InlineData(2, "Haxbby")]
+    [InlineData(1, "Hax")]
+    [InlineData(0, "H")]
+    [InlineData(9, "Haxbbyccc" + "z")]
+    public void ACellWindowOfElementsWithComponents_DropsTheOccurrencesBeyondTheCount_WithTheirComponents(int count, string expected) =>
+        Assert.Equal(expected, ElementCell().ContiguousAt(0, 4, 0, [1, 2, 3], [0, 0, 0], ElementTail, count));
+
+    [Fact]
+    public void ACellWindowOfElementsWithComponents_CarriesOnlyTheCurrentOccurrencesComponents()
+    {
+        var carrier = ElementCell().VarGroupAt(0, 4, 0, [1, 2, 3], [0, 0, 0], ElementTail, 2);
+        Assert.Equal("Hxy", carrier.Fixed);
+        Assert.Equal(["a", "bb"], carrier.Dynamic);
+        Assert.Equal(1, ElementTail.CutAt(2));
+        Assert.Equal(1, ElementTail.CutComponents(2));
+        Assert.Equal(0, ElementTail.CutComponents(3));
+    }
+
+    [Fact]
+    public void AReceivingCellWindow_UsesOnlyTheCurrentOccurrences_AndTheRestKeepTheirContent()
+    {
+        // ISO §13.18.38.4 GR8 a): with the DEPENDING item outside the group, "only that part of the table area that is
+        // specified by the value of the data item ... at the start of the operation will be used" - occurrence 1 of 3.
+        var carrier = new CobolVarGroup("HNEW", ["n1", "n2", "n3"]);
+        var cell = ElementCell();
+        cell.StoreVarGroupAt(0, 4, 0, [1, 2, 3], [5, 5, 5], [0, 0, 0], ElementTail, 1, carrier);
+        Assert.Equal("HNyz", cell.Ref);   // H and occurrence 1 stored; occurrences 2 and 3 keep "y", "z"
+        Assert.Equal(["n1", "bb", "ccc"], [cell.DynAt(0), cell.DynAt(1), cell.DynAt(2)]);
+        // the maximum count (a depending item inside the group, a record read back, a boundary) stores them all
+        var whole = ElementCell();
+        whole.StoreVarGroupAt(0, 4, 0, [1, 2, 3], [5, 5, 5], [0, 0, 0], ElementTail, int.MaxValue, carrier);
+        Assert.Equal("HNEW", whole.Ref);
+        Assert.Equal(["n1", "n2", "n3"], [whole.DynAt(0), whole.DynAt(1), whole.DynAt(2)]);
+    }
+
+    [Fact]
+    public void ADynamicTableOfElementsWithComponents_IsComposedWithTheElementsOwnShape()
+    {
+        // Window H X(1) · TD dynamic-capacity table whose element is DD dynamic + FX X(1): the table is component 0,
+        // reserving its one-element extent (1) after H. Each element cell is a scope of its own, numbered from zero.
+        var cell = new StorageCell { Ref = "H " };
+        var table = cell.DynTableAt(0, 0, 1);
+        var first = table.RefReceiving(1);
+        first.Ref = "1";
+        first.SetDynAt(0, "ab");
+        var second = table.RefReceiving(2);
+        second.Ref = "2";
+        second.SetDynAt(0, "c");
+        var shape = new CellGroupShape(1, [0], [0]);
+        Assert.Equal("Hab1c2", cell.ContiguousAt(0, 2, 0, [1], [1], default, 0, [shape]));
+        // Without the shape the element is its fixed run only - the image the pre-PB244 composer gave, now the
+        // fixed-element lane (an element with no components of its own).
+        Assert.Equal("H12", cell.ContiguousAt(0, 2, 0, [1], [1], default, 0));
+    }
+
+    [Fact]
+    public void ConcatVarImages_TakesTheFirstCountOccurrencesCarriers_InOrder_AndClampsTheCount()
+    {
+        string[] table = ["a1", "b2", "c3"];
+        CobolVarGroup Carrier(string e) => new(e[1..], [e[..1]]);
+        var two = CobolTable.ConcatVarImages(table, 2, Carrier);
+        Assert.Equal("12", two.Fixed);
+        Assert.Equal(["a", "b"], two.Dynamic);
+        Assert.Equal(["a", "b", "c"], CobolTable.ConcatVarImages(table, 9, Carrier).Dynamic);
+        Assert.Empty(CobolTable.ConcatVarImages(table, 0, Carrier).Dynamic);
+    }
+
     [Fact]
     public void Concat_JoinsEveryOccurrencesFixedRunAndComponents_InOrder()
     {

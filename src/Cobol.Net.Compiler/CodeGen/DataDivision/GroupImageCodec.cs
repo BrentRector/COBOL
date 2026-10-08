@@ -388,6 +388,17 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     private static string AsVarImageParameters(DataItem group) =>
         DataItem.HasOdoBeneath(group) ? "int __odo, bool __agree = false" : "bool __agree = false";
 
+    /// <summary>The parameters of <c>FromVarImage</c>: the carrier, <c>__storage</c> (a LINKAGE formal's copy-in, kb/Work
+    /// PB1937) and, for a group that holds the OCCURS DEPENDING table, the RECEIVING count <c>__odo</c> - how many
+    /// occurrences the operation uses (kb/Work PB244; ISO §13.18.38.4 GR8 a): "If the data item referenced by data-name-1
+    /// is outside the group, only that part of the table area that is specified by the value of the data item ... at the
+    /// start of the operation will be used", so the occurrences past it keep their content). The default is the
+    /// MAXIMUM - GR8 b) for a receiving group whose DEPENDING item is inside it, and the activation boundary's own
+    /// copy-in, where "the maximum length is used" (§14.8.2.2).</summary>
+    private static string FromVarImageParameters(DataItem group) =>
+        DataItem.HasOdoBeneath(group) ? "CobolVarGroup __v, bool __storage = false, int __odo = int.MaxValue"
+                                      : "CobolVarGroup __v, bool __storage = false";
+
     private static string AsVarImageArguments(DataItem group) =>
         DataItem.HasOdoBeneath(group) ? "__odo, __agree" : "__agree";
 
@@ -443,10 +454,14 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         /// table is the last variable-length component (<see cref="ContiguousLayout"/>).</summary>
         OdoFixed,
         /// <summary>The group's OCCURS DEPENDING table itself, whose ELEMENTS are variable-length groups (kb/Work PB244):
-        /// a RUN-TIME multiplicity of components. It has an IMAGE — each of the first <c>__odo</c> occurrences' own
-        /// <c>CurrentImage()</c>, in order (§13.18.38.4 GR8) — and no place in the ordinal component carrier, so it
-        /// reaches <see cref="CurrentPartImage"/> only (<c>DataItem.CurrentImageCapable</c>; a carrier-capable group
-        /// never holds one).</summary>
+        /// <see cref="NestedTable"/> at a count that is a parameter. Its IMAGE is each of the first <c>__odo</c>
+        /// occurrences' own <c>CurrentImage()</c>, in order (§13.18.38.4 GR8); its CARRIER is those occurrences'
+        /// carriers concatenated (<c>CobolTable.ConcatVarImages</c>), and the receiving side takes every occurrence it
+        /// has from whatever was carried (<c>FromVarImage</c> loops to the maximum; a slice the carrier does not hold is
+        /// the §14.9.25.4 GR9b excess part). Its <see cref="VarPart.FixedWidth"/> / <see cref="VarPart.DynCount"/> are
+        /// the MAXIMUM's, so every offset is the one the maximum-length formal sees (§14.8.2.2) and the table, the
+        /// group's trailing storage (§13.18.38.3 SR22), keeps every earlier component where it is. It has no RECORD
+        /// form (<c>DataItem.RecordImageCapable</c>).</summary>
         OdoTable,
     }
 
@@ -477,7 +492,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             parts.Add(d.IsDynamicLength ? new VarPart(VarPartKind.DynLeaf, f, d, 0, 1)
                 : d.IsDynamicTable ? new VarPart(VarPartKind.DynTable, f, d, 0, 1)
                 : d.IsImageCapable ? new VarPart(VarPartKind.OdoFixed, f, d, f.Width, 0)
-                : d.OccursSpec?.DependingName is not null ? new VarPart(VarPartKind.OdoTable, f, d, 0, 0)
+                : d.OccursSpec?.DependingName is not null
+                    ? new VarPart(VarPartKind.OdoTable, f, d, (d.Occurs ?? 1) * VarFixedWidth(d), (d.Occurs ?? 1) * VarComponentCount(d), d.Occurs ?? 1)
                 : d.Occurs is { } n ? new VarPart(VarPartKind.NestedTable, f, d, n * VarFixedWidth(d), n * VarComponentCount(d), n)
                 : new VarPart(VarPartKind.Nested, f, d, VarFixedWidth(d), VarComponentCount(d)));
         }
@@ -488,7 +504,9 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// (zero for a group without one) — what the record layout takes out of the fixed run to make the table a
     /// variable-length component.</summary>
     private static int OdoTailWidth(DataItem group) =>
-        OdoModel.TableUnder(group) is { } t ? t.ImageWidth * (t.Occurs ?? 1) : 0;
+        OdoModel.TableUnder(group) is { } t && !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(t)
+            ? t.ImageWidth * (t.Occurs ?? 1)
+            : 0;   // a table of variable-length ELEMENTS is not a tail of the fixed run: it is flattened (VarPartKind.OdoTable)
 
     /// <summary>The character width of a variable-length group's FIXED run — its image with every
     /// variable-length component collapsed to nothing. This is the §8.5.1.12.3 accounting the compatibility
@@ -534,12 +552,19 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                         break;
                     case VarPartKind.Nested:
                     case VarPartKind.NestedTable:
+                    case VarPartKind.OdoTable:
                         // The nested group's own carrier (every occurrence's, in order, for a table), spliced in
-                        // place: its fixed run extends ours and its components take the next p.DynCount slots
-                        // (the flattening §8.5.1.12 requires).
-                        w.Line(p.Kind is VarPartKind.Nested
-                            ? $"var __n{n} = {p.Field.Name}.AsVarImage({AsVarImageArguments(p.Item!)});"
-                            : $"var __n{n} = {RuntimeApi.VarGroupConcat($"System.Array.ConvertAll({p.Field.Name}, __e => __e.AsVarImage(__agree))")};");
+                        // place: its fixed run extends ours and its components take the next slots (the flattening
+                        // §8.5.1.12 requires). An OCCURS DEPENDING table contributes the first __odo occurrences
+                        // (the current count at a statement, the maximum at a boundary); the receiver loops to its
+                        // own maximum below, and a slice the carrier did not carry is the GR9b excess part.
+                        w.Line($"var __n{n} = " + p.Kind switch
+                        {
+                            VarPartKind.Nested => $"{p.Field.Name}.AsVarImage({AsVarImageArguments(p.Item!)});",
+                            VarPartKind.NestedTable =>
+                                $"{RuntimeApi.VarGroupConcat($"System.Array.ConvertAll({p.Field.Name}, __e => __e.AsVarImage(__agree))")};",
+                            _ => $"{RuntimeApi.TableConcatVarImages(p.Field.Name, "__odo", "__e => __e.AsVarImage(__agree)")};",
+                        });
                         fixedParts.Add($"__n{n}.Fixed");
                         dynParts.Add($".. __n{n}.Dynamic");
                         n++;
@@ -571,15 +596,22 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // ⛔ THE EXTENT TABLE (D-FRA (v); kb/Work PB1053): the WRITE / REWRITE / RELEASE side sends where each
         // component of CurrentImage() ends, and the READ / RETURN side decomposes by it when it describes the record
         // received — so every layout round-trips, however many variable-length members flank a fixed one.
-        w.Line($"public readonly RecordExtents CurrentExtents({OdoParameter(group)}) => "
-            + $"{RuntimeApi.ContiguousLayoutField}.ExtentsOf(AsVarImage({OdoArgument(group)}));");
-        w.Line($"public void FromContiguousImage(string __r, RecordExtents? __e, bool __fixedForm = false) => FromVarImage({RuntimeApi.ContiguousLayoutField}.Decompose(__r, __e, __fixedForm));");
+        // The RECORD half exists only for a group a record can be (DataItem.RecordImageCapable): a table of
+        // variable-length ELEMENTS under OCCURS DEPENDING has a run-time multiplicity of components, which the
+        // layout above (the components at the table's maximum, enough for compare and the boundary) cannot split a
+        // record back into - the record's length does not say how many occurrences it holds.
+        if (group.RecordImageCapable)
+        {
+            w.Line($"public readonly RecordExtents CurrentExtents({OdoParameter(group)}) => "
+                + $"{RuntimeApi.ContiguousLayoutField}.ExtentsOf(AsVarImage({OdoArgument(group)}));");
+            w.Line($"public void FromContiguousImage(string __r, RecordExtents? __e, bool __fixedForm = false) => FromVarImage({RuntimeApi.ContiguousLayoutField}.Decompose(__r, __e, __fixedForm));");
+        }
         // ⛔ __storage (kb/Work PB1937) — the boundary copy-in of a LINKAGE formal: §14.2.3 GR8 makes the formal
         // "occupy the same storage area as the argument", so a dynamic-length member keeps the argument's WHOLE
         // content even when this description's LIMIT is smaller (the shortened copy was then written back over the
         // caller's). A read through this description agrees with its maximum (CurrentMemberImage: §14.6.13.2 rule 5,
         // kb/Work PB1118); every other store — a MOVE into the group — still truncates (§8.5.1.10.4).
-        using (w.Block("public void FromVarImage(CobolVarGroup __v, bool __storage = false)"))
+        using (w.Block($"public void FromVarImage({FromVarImageParameters(group)})"))
         {
             w.Line($"string __s = {RuntimeApi.StrStore("__v.Fixed", $"{totalFixed}")};");
             int off = 0, dynAt = 0;
@@ -589,11 +621,21 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                 {
                     case VarPartKind.Fixed:
                     case VarPartKind.OdoFixed:   // the whole maximum width: a carrier shorter than it pads (StrStore above)
+                        if (p.Kind is VarPartKind.OdoFixed)
+                        {
+                            // §13.18.38.4 GR8 a): only the first __odo occurrences are used, so the table's remaining
+                            // occurrences keep the content they have (the carrier's fixed run is spliced over the member's
+                            // CURRENT image from the first unused occurrence on).
+                            var (tailStart, elem, max) = OdoGeometry(p.Item!, p.Field.Width);
+                            w.Line($"if (__odo < {max}) __s = __s[..({off + tailStart} + __odo * {elem})] + "
+                                + $"{AsImageOf(p.Field)}[({tailStart} + __odo * {elem})..] + __s[{off + p.Field.Width}..];");
+                        }
                         EmitMemberFromImage(p.Field, off, w);
                         off += p.Field.Width;
                         break;
                     case VarPartKind.NestedTable:
-                        using (w.Block($"for (int __i = 0; __i < {p.Occurs}; __i++)"))
+                    case VarPartKind.OdoTable:   // every occurrence it USES (§13.18.38.4 GR8 a: __odo of them), to its maximum
+                        using (w.Block($"for (int __i = 0; __i < {(p.Kind is VarPartKind.OdoTable ? $"System.Math.Min({p.Occurs}, __odo)" : p.Occurs.ToString())}; __i++)"))
                             w.Line($"{p.Field.Name}[__i].FromVarImage(__v.Slice({off} + __i * {p.FixedWidth / p.Occurs}, "
                                 + $"{p.FixedWidth / p.Occurs}, {dynAt} + __i * {p.DynCount / p.Occurs}, {p.DynCount / p.Occurs}), __storage);");
                         off += p.FixedWidth;
@@ -627,7 +669,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                         dynAt++;
                         break;
                     case VarPartKind.Nested:
-                        w.Line($"{p.Field.Name}.FromVarImage(__v.Slice({off}, {p.FixedWidth}, {dynAt}, {p.DynCount}), __storage);");
+                        w.Line($"{p.Field.Name}.FromVarImage(__v.Slice({off}, {p.FixedWidth}, {dynAt}, {p.DynCount}), __storage"
+                            + $"{(DataItem.HasOdoBeneath(p.Item!) ? ", __odo" : "")});");
                         off += p.FixedWidth;
                         dynAt += p.DynCount;
                         break;
@@ -657,6 +700,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                 case VarPartKind.DynTable: layout.Add((off, p.Field.Width, p.Item!.OccursSpec?.Max ?? 0, 0)); break;
                 case VarPartKind.Nested: ContiguousLayout(p.Item!, off, layout); off += p.FixedWidth; break;
                 case VarPartKind.NestedTable:
+                case VarPartKind.OdoTable:   // the components at the table's MAXIMUM: where compare / the boundary look for them
                     for (int i = 0; i < p.Occurs; i++) ContiguousLayout(p.Item!, off + i * (p.FixedWidth / p.Occurs), layout);
                     off += p.FixedWidth;
                     break;

@@ -472,7 +472,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     private static string? VarCarrierWrite(Place g, DataItem other, string carrier) =>
         VariableLengthCompatibility.IsVariableLength(g.Item)
             ? g.Item.CurrentExtentImageCapable
-                ? PlaceRenderer.WriteVarGroupImage(g, carrier, "the receiving variable-length group")
+                ? PlaceRenderer.WriteVarGroupImage(g, carrier, "the receiving variable-length group", receivingOperand: true)
                 : null
             : VariableLengthCompatibility.CorrespondingSpans(g.Item, other) is { } spans && g.ImageCapable
                 ? PlaceRenderer.WriteGroupImage(g,
@@ -488,8 +488,8 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     private static string VarShapeReason(DataItem g, string role) =>
         VariableLengthCompatibility.IsVariableLength(g)
             ? $"{role}, '{g.CobolName ?? g.CsName}', is a variable-length group whose current extent this "
-              + "implementation cannot compose (an OCCURS DEPENDING member, or a runtime-length item inside a "
-              + "table element) — ISO §14.9.25.4 GR9 over §8.5.1.12; CONFORMANCE.md A.1 item 57"
+              + "implementation cannot compose (a runtime-length item inside a dynamic-capacity table's element) "
+              + "— ISO §14.9.25.4 GR9 over §8.5.1.12; CONFORMANCE.md A.1 item 57"
             : $"{role}, '{g.CobolName ?? g.CsName}', is a fixed-length group whose record image this "
               + "implementation cannot lay out in character positions (a USAGE BIT leaf, or a leaf with no "
               + "character image) — ISO §14.9.25.4 GR9 over §8.5.1.12.3; COBOLNET_DESIGN §4.2";

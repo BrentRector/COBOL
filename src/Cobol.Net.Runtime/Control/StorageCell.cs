@@ -195,8 +195,9 @@ public sealed class StorageCell
         return this;
     }
 
-    /// <summary>An element cell's character image — the element's fixed run (a composed group never holds a table
-    /// whose element has a component of its own: <c>DataItem.CurrentExtentImageCapable</c>).</summary>
+    /// <summary>An element cell's character image — the element's fixed run. An element that has a component of its
+    /// own (a table of variable-length ELEMENTS, <c>DataItem.CurrentImageCapable</c>) is composed with its
+    /// <see cref="CellGroupShape"/> instead (<see cref="ComponentAt"/>).</summary>
     private static readonly Func<StorageCell, string> ElementImage = static e => e.Ref;
 
     /// <summary>Distribute one occurrence's image into a freshly seeded element cell.</summary>
@@ -208,9 +209,20 @@ public sealed class StorageCell
 
     /// <summary>The current content of component <paramref name="ordinal"/>: a dynamic-length item's content, or a
     /// table's occurrences at its current capacity (<paramref name="tableWidth"/> &gt; 0 is its element width) —
-    /// §14.9.11.4 GR7's "every occurrence at its current capacity", the declared group's <c>CurrentImage</c> arm.</summary>
-    private string ComponentAt(int ordinal, int tableWidth) =>
-        tableWidth > 0 ? DynTableAt(ordinal, 0, tableWidth).CurrentImage(ElementImage) : DynAt(ordinal);
+    /// §14.9.11.4 GR7's "every occurrence at its current capacity", the declared group's <c>CurrentImage</c> arm.
+    /// A table whose ELEMENTS are variable-length groups (<paramref name="element"/>, kb/Work PB244) contributes each
+    /// occurrence at ITS current extent - the element cell composed with the element's own shape, exactly the
+    /// declared table's <c>CurrentImage(static __e =&gt; __e.CurrentImage())</c>.</summary>
+    private string ComponentAt(int ordinal, int tableWidth, CellGroupShape? element = null) =>
+        tableWidth > 0
+            ? DynTableAt(ordinal, 0, tableWidth).CurrentImage(element is null ? ElementImage : e => e.ContiguousAt(element))
+            : DynAt(ordinal);
+
+    /// <summary>The CONTIGUOUS image of the variable-length group an element cell holds, by its own
+    /// <paramref name="shape"/> (no OCCURS DEPENDING table lies inside a dynamic-capacity table's element:
+    /// <c>DataItem.CurrentExtentComposes</c>).</summary>
+    private string ContiguousAt(CellGroupShape shape) =>
+        ContiguousAt(0, shape.Width, 0, shape.DynFixedAt, shape.DynTable, default, 0, shape.Elems);
 
     /// <summary>Make the <paramref name="k"/>-th carried component the content of component <paramref name="ordinal"/>
     /// — the declared group's <c>FromVarImage</c> arm for arm: a dynamic-length item takes it truncated on the right at
@@ -239,7 +251,10 @@ public sealed class StorageCell
     public CobolVarGroup VarGroupAt(int fixedAt, int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
                                     ReadOnlySpan<int> dynTable, CellOdoTail tail, int count)
     {
-        var dyn = new string[dynFixedAt.Length];
+        // The occurrences beyond the OCCURS DEPENDING count carry no components (kb/Work PB244): the table is the
+        // group's trailing storage, so they are its last ones - the carrier a declared group builds
+        // (CobolTable.ConcatVarImages) holds the first `count` occurrences' only.
+        var dyn = new string[dynFixedAt.Length - tail.CutComponents(count)];
         for (int k = 0; k < dyn.Length; k++) dyn[k] = ComponentAt(dynBase + k, dynTable[k]);
         string run = RunOf(fixedAt, width, dynFixedAt, dynTable);
         return new CobolVarGroup(tail.Present ? run[..^tail.CutAt(count)] : run, dyn);
@@ -248,12 +263,25 @@ public sealed class StorageCell
     /// <summary>Distribute a component carrier into the group — the receiving twin of <see cref="VarGroupAt"/>,
     /// and the twin of a declared group's <c>FromVarImage</c>: the fixed run is stored at its width (padded or
     /// truncated, §14.9.25.4 GR9's fixed part) around the tables' reservations, and each component takes its
-    /// carried part (<see cref="StoreComponentAt"/>).</summary>
+    /// carried part (<see cref="StoreComponentAt"/>).
+    /// <para>A group that holds an OCCURS DEPENDING table (<paramref name="tail"/>, kb/Work PB244) uses only
+    /// <paramref name="count"/> of its occurrences (ISO §13.18.38.4 GR8 a: "only that part of the table area that is
+    /// specified by the value of the data item referenced by data-name-1 at the start of the operation will be
+    /// used"): the table's remaining occurrences keep their fixed run AND their components. The maximum count - GR8 b)
+    /// for a depending item inside the group, a record read back, the activation boundary - stores them all.</para></summary>
     public void StoreVarGroupAt(int fixedAt, int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
-                                ReadOnlySpan<int> dynMax, ReadOnlySpan<int> dynTable, CobolVarGroup v)
+                                ReadOnlySpan<int> dynMax, ReadOnlySpan<int> dynTable, CellOdoTail tail, int count,
+                                CobolVarGroup v)
     {
-        StoreRun(fixedAt, width, dynFixedAt, dynTable, v.Fixed);
-        for (int k = 0; k < dynFixedAt.Length; k++) StoreComponentAt(dynBase + k, dynTable[k], dynMax[k], v, k);
+        string run = v.Fixed;
+        if (tail.CutAt(count) is > 0 and var cut)
+        {
+            string current = RunOf(fixedAt, width, dynFixedAt, dynTable);
+            run = CobolString.Store(run, current.Length)[..^cut] + current[^cut..];
+        }
+        StoreRun(fixedAt, width, dynFixedAt, dynTable, run);
+        for (int k = 0, used = dynFixedAt.Length - tail.CutComponents(count); k < used; k++)
+            StoreComponentAt(dynBase + k, dynTable[k], dynMax[k], v, k);
     }
 
     /// <summary>A variable-length group of this area as its CONTIGUOUS image at its current extent — ISO
@@ -261,17 +289,20 @@ public sealed class StorageCell
     /// its neighbors whenever a procedural operation is applied to a group containing it". Each component sits at its
     /// fixed-run position — the declared group's <c>CurrentImage()</c>, composed from the cell.</summary>
     public string ContiguousAt(int fixedAt, int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
-                               ReadOnlySpan<int> dynTable, CellOdoTail tail, int count)
+                               ReadOnlySpan<int> dynTable, CellOdoTail tail, int count,
+                               CellGroupShape?[]? elems = null)
     {
         string run = RunOf(fixedAt, width, dynFixedAt, dynTable);
         var pos = RunPositions(dynFixedAt, dynTable);
         var sb = new System.Text.StringBuilder(run.Length);
         int at = 0;
-        for (int k = 0; k < pos.Length; k++)
+        // The occurrences beyond the OCCURS DEPENDING count drop their COMPONENTS with their fixed run (kb/Work PB244):
+        // the table is the group's trailing storage, so they are its last ones.
+        for (int k = 0, keep = pos.Length - tail.CutComponents(count); k < keep; k++)
         {
             sb.Append(run, at, pos[k] - at);
             at = pos[k];
-            sb.Append(ComponentAt(dynBase + k, dynTable[k]));
+            sb.Append(ComponentAt(dynBase + k, dynTable[k], elems?[k]));
         }
         // The OCCURS DEPENDING table is the TRAILING storage (§13.18.38.3 SR22) of the run, so the group's current
         // extent is its maximum image less the occurrences beyond the count (§13.18.38.4 GR8).
@@ -336,7 +367,7 @@ public sealed class StorageCell
                                   CellOdoTail tail, string image, RecordExtents? extents = null, bool fixedForm = false)
     {
         var layout = LayoutOf(width - Reserved(dynTable), RunPositions(dynFixedAt, dynTable), dynMax, dynStructure, dynTable, tail);
-        StoreVarGroupAt(fixedAt, width, dynBase, dynFixedAt, dynMax, dynTable,
+        StoreVarGroupAt(fixedAt, width, dynBase, dynFixedAt, dynMax, dynTable, tail, int.MaxValue,
             layout.Decompose(image ?? "", extents, fixedForm));
     }
 

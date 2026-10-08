@@ -374,23 +374,37 @@ public sealed class IntrinsicFunctionDifferentialTests
         // and pinning it GREEN held a gap open (feedback_green_test_can_hold_a_gap_open): §15.14.3 r1 admits
         // "a data item of any class or category" and §8.4.3.3.4 GR6 makes a ref-mod a data item, so that shape
         // is a conforming reference with the answer 2 (kb/Work PB61, AR-15.14.3-1). It is now the POSITIVE
-        // twin below. The one NAMED residue left in the LENGTH family is a runtime-length item INSIDE the element
-        // of an OCCURS DEPENDING table that lives in a CELL-BACKED group (an EXTERNAL record — the cell does not
-        // yet compose the element's own dynamic slots; VariableLengthGroupSum's documented loud stage): that is the
-        // shape that proves the doctrine now, and it stays loud with the shape in its message. (kb/Work PB244: the
-        // FIXED-OCCURS table of such elements is summed per occurrence, and a struct-resident table of them is the
-        // length of its current image — the positive twins, below.)
+        // twin below. The one NAMED residue left in the LENGTH family is a variable-length group that also holds
+        // USAGE BIT items (VariableLengthGroupSum's documented loud stage: its fixed extent is a §8.5.1.6.3 layout,
+        // not a sum): that is the shape that proves the doctrine now, and it stays loud with the shape in its
+        // message. (kb/Work PB244: the FIXED-OCCURS table of runtime-length elements is summed per occurrence, and
+        // an OCCURS DEPENDING or dynamic-capacity table of them - struct-resident or cell-backed - is the length of
+        // its current image — the positive twins, below.)
         var (ok, output, detail) = new CobolNetCompiler(2023).CompileAndRun(
             Program("01 WS-X PIC X(5) VALUE \"ABCDE\".\n01 T PIC 9(4).",
                 "    MOVE FUNCTION BYTE-LENGTH(WS-X(1:2)) TO T.\n    DISPLAY T."));
         Assert.True(ok, detail);
         Assert.Contains("0002", output);
         (ok, _, detail) = new CobolNetCompiler(2023).CompileAndRun(
-            Program("01 N PIC 9 EXTERNAL.\n01 G EXTERNAL.\n   05 TB OCCURS 1 TO 2 DEPENDING ON N.\n      10 D PIC X DYNAMIC LENGTH.\n01 T PIC 9(4).",
-                "    MOVE 1 TO N.\n    MOVE FUNCTION LENGTH(G) TO T.\n    DISPLAY T."));
+            Program("01 G.\n   05 BA PIC 1 USAGE BIT.\n   05 BB PIC 1 USAGE BIT.\n   05 D PIC X DYNAMIC LENGTH.\n01 T PIC 9(4).",
+                "    MOVE \"ab\" TO D.\n    MOVE FUNCTION LENGTH(G) TO T.\n    DISPLAY T."));
         Assert.False(ok);
         Assert.Contains("LENGTH", detail);
-        Assert.Contains("runtime-length element", detail);
+        Assert.Contains("USAGE BIT items and a runtime-length subordinate", detail);
+    }
+
+    /// <summary>kb/Work PB244 - the cell-backed twin of
+    /// <see cref="LengthOfAnOdoTableOfVariableLengthElements_SumsTheCurrentOccurrences"/>: an EXTERNAL group's OCCURS
+    /// DEPENDING table of variable-length elements is the length of the group's current image too (§15.50.4 rule 7;
+    /// A.1 item 57), here 2 + 1 for N = 2 - the cell composes the element's own dynamic slots.</summary>
+    [Fact]
+    public void LengthOfACellBackedOdoTableOfVariableLengthElements_SumsTheCurrentOccurrences()
+    {
+        var (ok, output, detail) = new CobolNetCompiler(2023).CompileAndRun(
+            Program("01 N PIC 9 EXTERNAL.\n01 G EXTERNAL.\n   05 TB OCCURS 1 TO 3 DEPENDING ON N.\n      10 D PIC X DYNAMIC LENGTH.\n01 T PIC 9(4).",
+                "    MOVE 2 TO N.\n    MOVE \"ab\" TO D(1).\n    MOVE \"c\" TO D(2).\n    MOVE \"zzz\" TO D(3).\n    MOVE FUNCTION LENGTH(G) TO T.\n    DISPLAY T."));
+        Assert.True(ok, detail);
+        Assert.Contains("0003", output);
     }
 
     /// <summary>kb/Work PB244 - an OCCURS DEPENDING table whose ELEMENTS are variable-length groups: each of the

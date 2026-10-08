@@ -133,7 +133,7 @@ internal static class PlaceRenderer
         // current extent — §8.5.1.11.2, the same composition a declared group's CurrentImage() performs.
         // (A plain read is the group's MAXIMUM image: the OCCURS DEPENDING count is an operand decision, made by
         // VarGroupCurrentImage through OdoGroupPlace — §13.18.38.4 GR8.)
-        RedefViewPlace { Coding: VarGroupWindow g } v => CellVarContiguous(v, g, g.Odo.Max.ToString()),
+        RedefViewPlace { Coding: VarGroupWindow g } v => CellVarContiguous(v, g, g.Odo.Max.ToString(), CurrentExtentUse.Record),
         RedefViewPlace v => ByteWindowRead(v),
         // The OCCURS DYNAMIC CAPACITY register (§13.18.38 GR15): a read-only view over the table's current capacity.
         CapacityRegisterPlace c => $"{RenderPath(c.Table, AccessDir.Sending)}.Capacity",
@@ -358,10 +358,10 @@ internal static class PlaceRenderer
     /// capability a declared group's composer is gated on (<see cref="DataItem.CurrentExtentImageCapable"/>): a table
     /// whose element holds a component of its own (kb/Work PB1042) has a run-time multiplicity of components that
     /// the element cell's fixed run does not carry, so it is the named loud, never a shortened image.</summary>
-    private static string CellVarContiguous(RedefViewPlace v, VarGroupWindow g, string count) =>
-        v.Item.CurrentExtentImageCapable
+    private static string CellVarContiguous(RedefViewPlace v, VarGroupWindow g, string count, CurrentExtentUse use) =>
+        v.Item.CanCompose(use)
             ? RuntimeApi.CellVarContiguous(RenderPath(g.Cell, AccessDir.Sending), $"(int)({v.OffsetExpr})", v.Width,
-                g.DynBase, g.DynFixedAt, g.DynTable, g.Odo, count)
+                g.DynBase, g.DynFixedAt, g.DynTable, g.Odo, count, g.DynElem)
             : EmitText.LoudValue("string", TierCIsland.Reason(v.Item, "variable-length group image of"));
 
     // The reference-modification start/length are `long`-valued expressions but the runtime takes `int` positions —
@@ -636,7 +636,7 @@ internal static class PlaceRenderer
         {
             // The cell's window holds the OCCURS DEPENDING table at its MAXIMUM, as the trailing storage of the run
             // (SR22); the operand's count cuts the carrier's fixed run to the current extent (kb/Work PB244).
-            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo) =>
+            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo, CurrentExtentUse.Carrier) =>
                 RuntimeApi.CellVarCarrier(RenderPath(g.Cell, AccessDir.Sending),
                     $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynTable, g.Odo, CellOdoCount(odo)),   // kb/Work PB1026, PB1042
             _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.CurrentExtentImageCapable =>
@@ -673,8 +673,8 @@ internal static class PlaceRenderer
     /// holds no such table — and a group that holds the table must be one the current-extent composer admits
     /// (<see cref="DataItem.CurrentExtentImageCapable"/>: the window cuts its fixed run, so the table has to be its
     /// trailing storage and nothing with a run-time multiplicity of components).</summary>
-    private static bool WindowComposes(RedefViewPlace v, string? odo) =>
-        odo is "" || (odo is not null && v.Item.CurrentExtentImageCapable);
+    private static bool WindowComposes(RedefViewPlace v, string? odo, CurrentExtentUse use) =>
+        odo is "" || (odo is not null && v.Item.CanCompose(use));
 
     /// <summary>The OCCURS DEPENDING count argument of the cell's group helpers: the operand's count, or zero for a
     /// group without the table (the helpers ignore it then — <c>CellOdoTail.Present</c> is false).</summary>
@@ -688,16 +688,30 @@ internal static class PlaceRenderer
     /// its own LIMIT is smaller, and a read through the formal's description then agrees with that LIMIT
     /// (§14.6.13.2 rule 5; kb/Work PB1937). Every other store — the copy-back into the caller's own item, a MOVE
     /// receiver — is a store through the receiving description and truncates (§8.5.1.10.4).</param>
-    public static string WriteVarGroupImage(Place group, string value, string context, bool formalStorage = false) => group switch
+    /// <param name="receivingOperand">True for a STATEMENT's receiving operand (the MOVE, §14.9.25.4 GR9): an OCCURS
+    /// DEPENDING table it holds is then used only to its CURRENT count when the DEPENDING item lies outside the group
+    /// (§13.18.38.4 GR8 a - <see cref="UsesCurrentExtent"/>, the law <see cref="WriteGroupImage"/> already applies to a
+    /// fixed-length receiver), and its remaining occurrences keep their content (kb/Work PB244). Every other writer -
+    /// the activation boundary's copy-in and copy-out ("the maximum length is used", §14.8.2.2), a record read back -
+    /// stores the whole table.</param>
+    public static string WriteVarGroupImage(Place group, string value, string context, bool formalStorage = false,
+                                            bool receivingOperand = false) =>
+        WriteVarGroupImageAt(group, value, context, formalStorage,
+            receivingOperand && group is OdoGroupPlace o && UsesCurrentExtent(o, AccessDir.Receiving)
+                ? OdoCountArgument(o, maximum: false)
+                : null);
+
+    private static string WriteVarGroupImageAt(Place group, string value, string context, bool formalStorage, string? odoCount) => group switch
     {
-        OdoGroupPlace o => WriteVarGroupImage(o.Inner, value, context, formalStorage),
+        OdoGroupPlace o => WriteVarGroupImageAt(o.Inner, value, context, formalStorage, odoCount),
         // A formal's copy-in keeps each dynamic-length member's whole content here too (kb/Work PB1937, PB2094: a
         // variable-length group formal's fresh area is a cell): no member LIMIT applies to that store.
         RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreCarrier(RenderPath(g.Cell, AccessDir.Receiving),
             $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt,
-            formalStorage ? g.DynMax.Select(_ => int.MaxValue) : g.DynMax, g.DynTable, value)};",   // kb/Work PB1026, PB1042
+            formalStorage ? g.DynMax.Select(_ => int.MaxValue) : g.DynMax, g.DynTable, g.Odo,
+            odoCount ?? g.Odo.Max.ToString(), value)};",   // kb/Work PB1026, PB1042, PB244
         _ when !group.Item.CurrentExtentImageCapable => EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),
-        _ => $"{GroupTarget(group)}.FromVarImage({value}{(formalStorage ? ", true" : "")});",
+        _ => $"{GroupTarget(group)}.FromVarImage({value}{(odoCount is null ? (formalStorage ? ", true" : "") : $", {(formalStorage ? "true" : "false")}, {odoCount}")});",
     };
 
     /// <summary>⛔ A VARIABLE-LENGTH GROUP'S CONTIGUOUS IMAGE at its current extent — ISO §8.5.1.11.2: "a
@@ -712,13 +726,13 @@ internal static class PlaceRenderer
     /// READ back, through the carrier's layout.</param>
     public static string VarGroupCurrentImage(Place group, string context, bool transfer = false)
     {
+        var use = transfer ? CurrentExtentUse.OneWayImage : CurrentExtentUse.Record;
         var (inner, odo) = PeelOdo(group, maximum: false);
         return inner.Undecorated switch
         {
             // the cell composition (kb/Work PB1026), cut to the OCCURS DEPENDING count when it holds the table (kb/Work PB244)
-            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo) => CellVarContiguous(v, g, CellOdoCount(odo)),
-            _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow }
-                   || !(transfer ? inner.Item.CurrentImageCapable : inner.Item.CurrentExtentImageCapable) =>
+            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo, use) => CellVarContiguous(v, g, CellOdoCount(odo), use),
+            _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.CanCompose(use) =>
                 EmitText.LoudValue("string", TierCIsland.Reason(inner.Item, context)),
             _ => $"{Read(inner)}.CurrentImage({odo})",
         };
@@ -768,10 +782,10 @@ internal static class PlaceRenderer
         var (inner, odo) = PeelOdo(group, maximum: false);
         return inner.Undecorated switch
         {
-            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo) => RuntimeApi.CellVarContiguousExtents(
+            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo, CurrentExtentUse.Record) => RuntimeApi.CellVarContiguousExtents(
                 RenderPath(g.Cell, AccessDir.Sending), v.Width, g.DynBase, g.DynFixedAt, g.DynMax, g.DynStructure, g.DynTable,
                 g.Odo, CellOdoCount(odo)),
-            _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.CurrentExtentImageCapable => "null",
+            _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.RecordImageCapable => "null",
             _ => $"{Read(inner)}.CurrentExtents({odo})",
         };
     }
@@ -788,10 +802,10 @@ internal static class PlaceRenderer
         OdoGroupPlace o => WriteVarGroupContiguous(o.Inner, record, extents, context, fixedForm),
         // the cell decomposition (kb/Work PB1026) — the same rule, over the cell's dynamic slots
         // (a window holding an OCCURS DEPENDING table takes it as the layout's last component — kb/Work PB244)
-        RedefViewPlace { Coding: VarGroupWindow g } v when !DataItem.HasOdoOnOrBeneath(v.Item) || v.Item.CurrentExtentImageCapable =>
+        RedefViewPlace { Coding: VarGroupWindow g } v when v.Item.RecordImageCapable =>
             $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Receiving),
             $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, g.DynStructure, g.DynTable, g.Odo, record, extents, fixedForm)};",
-        _ when group is RedefViewPlace { Coding: VarGroupWindow } || !group.Item.CurrentExtentImageCapable =>
+        _ when group is RedefViewPlace { Coding: VarGroupWindow } || !group.Item.RecordImageCapable =>
             EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),
         _ => $"{GroupTarget(group)}.FromContiguousImage({record}, {extents}{(fixedForm ? ", true" : "")});",
     };

@@ -48,6 +48,13 @@ internal static class TierCIsland
         // and the message PROMISES NOTHING about DISPLAY — some variable-length shapes (an in-element
         // runtime length, an OCCURS DEPENDING member) are loud under DISPLAY as well; CONFORMANCE.md
         // row 57 states which shapes render.
+        // A group that CARRIES (MOVE, comparison, CALL) but is not a RECORD (kb/Work PB244): its OCCURS DEPENDING table
+        // of variable-length elements has no recoverable count in a record read back. That is a fact about records, not
+        // the byte island, so it takes no island tail.
+        if (leafKind is null && item.CurrentExtentImageCapable && !item.RecordImageCapable)
+            return $"{context} '{item.CobolName}' with an OCCURS DEPENDING table of variable-length elements - a record "
+                + "read back cannot say how many occurrences it holds (the DEPENDING item is data, not layout; "
+                + "ISO §8.5.1.12, CONFORMANCE.md A.1 item 57)";
         string offender = leafKind is not null ? $"a {leafKind} leaf"
             : HasImagelessLeaf(item) ? "a pointer/object-class leaf (no character image)"
             : "a dynamic-length / dynamic-capacity member (a variable-length group has no fixed record window)";

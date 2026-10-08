@@ -1198,8 +1198,17 @@ boundary carrier (`AsVarImage`/`FromVarImage`) and the record layout (`CobolCont
 cannot disagree about a member. The member kinds: **Fixed** (the member-image law), **DynLeaf**, **DynTable**,
 **Nested** (a scalar variable-length group, flattened in place), **NestedTable** (a FIXED-OCCURS table of
 variable-length elements: `Occurs` flattened copies, a compile-time multiplicity — also `Atoms`' unrolling in the
-§8.5.1.12 correspondence and the per-occurrence `FUNCTION LENGTH` walk) and **OdoFixed** (a member of fixed image
-that holds the group's OCCURS DEPENDING table as its trailing storage, §13.18.38.3 SR22). The OCCURS DEPENDING count
+§8.5.1.12 correspondence and the per-occurrence `FUNCTION LENGTH` walk), **OdoFixed** (a member of fixed image
+that holds the group's OCCURS DEPENDING table as its trailing storage, §13.18.38.3 SR22) and **OdoTable** (that table
+when its ELEMENTS are variable-length groups: `NestedTable` at a count that is a parameter - the first `__odo`
+occurrences' carriers at a statement, all of them at a boundary - with the maximum's fixed width and component
+count, so every earlier component keeps its position; the receiving `FromVarImage` loops to the maximum and a
+slice the carrier did not carry is the §14.9.25.4 GR9b excess part; `Atoms` unrolls it at the maximum). A
+statement's RECEIVING operand uses the table only to the count §13.18.38.4 GR8 a) names (`FromVarImage`'s `__odo`,
+supplied by `PlaceRenderer.WriteVarGroupImage(receivingOperand: true)` through the same `UsesCurrentExtent` law the
+fixed-length receiver asks; `OdoFixed` splices the member's current image over the unused occurrences, `OdoTable` loops
+to the count, and a cell-backed window leaves them and their components alone - `StorageCell.StoreVarGroupAt`); the
+maximum is GR8 b) (a depending item inside a receiving group), the activation boundary and a record read back. The OCCURS DEPENDING count
 reaches the struct as the `__odo` parameter of `CurrentImage` / `AsVarImage` / `CurrentExtents` (a group that holds
 the table; `GroupImageCodec.OdoParameter`), supplied by `PlaceRenderer.PeelOdo` from the operand's `OdoGroupPlace`:
 the clamped CURRENT count for a statement's operand (§13.18.38.4 GR8), the MAXIMUM at an activation boundary
@@ -1215,19 +1224,30 @@ table at its maximum as the last of the fixed run, `VarGroupWindow.Odo` is its e
 runtime's `CellOdoTail` carries it beside the component layout (the layout's last component, `OdoTail: true`,
 so the take step never hands the table's positions to a dynamic item before it), and the operand's count
 (`PlaceRenderer.PeelOdo`, as for a declared group) cuts the fixed run to the current extent.
+A table of variable-length ELEMENTS in a cell is composed the same way: the cell numbers a table's components per
+occurrence (`CellComponents`), `CellOdoTail.Comps` says how many one occurrence holds (the table's are the group's last
+`Max * Comps`), and the occurrences beyond the count drop their components with their fixed run
+(`CellOdoTail.CutComponents`; the carrier `VarGroupAt` truncates its component list the same way). A dynamic-capacity
+table's elements are element cells that are a scope of their own, so an element that is itself a variable-length
+group is composed with ITS window shape (`CellGroupShape`, built by `VarGroupWindow` from the same
+`CellComponents` walk and passed beside the group's layout) - one level down as many times as the tables nest.
 
-**Run-time multiplicity: the one-way image (kb/Work PB244).** An OCCURS DEPENDING or dynamic-capacity table whose
-ELEMENTS are variable-length groups has a RUN-TIME multiplicity of components — the carrier's ordinal component list
-cannot hold it, and a record read back cannot say how many elements it holds (the DEPENDING item is data, not
-layout). The group has an IMAGE all the same: each occurrence's own current image, in occurrence order, up to the
-current count (§13.18.38.4 GR8) or capacity (§8.5.1.9.1). `DataItem.CurrentImageCapable` is that capability — the
-variable-length twin of `TransferImageCapable`: `CurrentExtentImageCapable` widened by exactly those tables, asked
-by the DISPLAY emitter and by FUNCTION LENGTH / BYTE-LENGTH (`BoundIntrinsicCall.OverCurrentImage`), while the
-carrier consumers (activation boundary, MOVE, comparison, record read-back) keep the narrower gate. The record
-struct then emits `CurrentImage` alone (`VarPartKind.OdoTable` renders through `CobolTable.ConcatImages`; a dynamic
-table's element lane calls the element's own `CurrentImage`). Still outside: a CELL-BACKED group holding such a
-table (the cell's element cells do not yet compose their own dynamic slots into the image), and every carrier
-consumer of a group that holds one.
+**Three uses of a variable-length group's current extent (kb/Work PB244).** `DataItem.CanCompose(CurrentExtentUse)` is the
+one spelling of which capability a consumer asks, and the three are nested: the **one-way image**
+(`CurrentImageCapable` - DISPLAY and FUNCTION LENGTH / BYTE-LENGTH through `BoundIntrinsicCall.OverCurrentImage`),
+the **component carrier** (`CurrentExtentImageCapable` - the activation boundary, MOVE, comparison, INITIALIZE,
+CORRESPONDING) and the **record** (`RecordImageCapable` - WRITE / REWRITE / RELEASE, READ / RETURN, a sort or indexed
+key). The image alone is well defined for every table of variable-length ELEMENTS: each occurrence's own current
+image, in occurrence order, up to the current count (§13.18.38.4 GR8) or capacity (§8.5.1.9.1), for a declared group
+(`VarPartKind.OdoTable` through `CobolTable.ConcatImages`; a dynamic table's element lane calls the element's own
+`CurrentImage`) and for a cell-backed one alike. The carrier takes an OCCURS DEPENDING table of such elements
+(`VarPartKind.OdoTable`, above) - a RUN-TIME multiplicity that is only a parameter, because the table is the group's
+trailing storage - but not a DYNAMIC-CAPACITY table of them: that component is one string, which cannot be split back
+into elements that each hold components of their own, so the carrier would need nested element carriers (the standard
+does define the operation: §14.6.9.2 moves "correspondingly numbered elements" by the rules of MOVE, §14.6.9.3
+compares them element by element). A RECORD cannot take an OCCURS DEPENDING table of them either: a record read back is
+decomposed by a FIXED list of components, and the record's own length cannot say how many occurrences it holds
+(the DEPENDING item is data, not layout), so those two stay the named loud (`TierCIsland.Reason`).
 
 **CORE ships whole:** declaration (all phrases, each once and in the printed order — §13.18.38.2 with §5.2.1, refused otherwise by `DataBinder.NarrowToDataDivisionFormats`, **COBOLNET2789**, kb/Work PB1265) · out-of-line growable storage · CAPACITY
 read + SET Format 14 write · implicit + explicit growth · INITIALIZED seeding · bounds/capacity ECs
@@ -1239,8 +1259,9 @@ variable-length group** in either direction and to or from a compatible FIXED gr
 a compatible pair** (§8.8.4.2.17, screened by §8.5.1.12.1 → **COBOLNET2492**) · **the CORRESPONDING verbs
 over an occurs-depending group** · the 2014 edition gate + matrix/VCR rows. **Staged LOUD
 (diagnostic, not a silent wrong answer):** whole-group image of a containing group in the statements that need a
-FIXED record window — WRITE/RELEASE (§14.6.9; the two shapes CONFORMANCE.md A.1 item 57 excludes from the
-current-extent composer stay loud in MOVE and in a relation as well) · ref-mod of a
+FIXED record window — WRITE/RELEASE (§14.6.9; the two shapes CONFORMANCE.md A.1 item 57 excludes - a dynamic-capacity
+table of variable-length elements as a MOVE / comparison / CALL operand, and a record holding an OCCURS DEPENDING
+table of them - stay loud) · ref-mod of a
 subordinate (**1526**, §13.7.1 SR6) · REDEFINES **object** carries an OCCURS clause of any format, dynamic included
 (**1701**, §13.18.44.3 SR5 sentence 1) · REDEFINES **subject** IS a dynamic table (**1525**, §13.18.44.4 GR1 +
 §8.5.1.9.1 — the one side no syntax rule names) · REDEFINES either side a variable-length group, i.e. with a

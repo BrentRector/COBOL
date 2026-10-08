@@ -18,13 +18,15 @@
       *>   A1 K=2: h + abc + x + y                         = habcxy    6
       *>   A2 K=3: the third occurrence joins              = habcxyz   7
       *>   A3 K=1: only the first occurrence is used       = habcx     5
-      *>   B1 MOVE G TO G2 at K=1, then K=3: the sender is the shorter group, so
-      *>      the receiver's excess table positions are space filled (14.9.25.4
-      *>      GR9b rule 3)                                 = habcx<2 spaces>
-      *>   B2 G2 set to Q mm 1 2 3, K=2, MOVE G2 TO G, K=3: the sender's two
-      *>      occurrences land, the excess third occurrence is space filled
-      *>                                                   = Qmm12<space>
-      *>   B3 K=3: G (Qmm12 ) is not G2 (Qmm123)          = NE
+      *>   B1 MOVE G TO G2 at K=1, then K=3: K is outside G2 and holds 1 at the
+      *>      start of the operation, so only the first occurrence of G2's table is
+      *>      used (13.18.38.4 GR8 a); the others were never written and are blank
+      *>                                                   = habcx<2 spaces>
+      *>   B2 G2 set to Q mm 1 2 3, K=2, MOVE G2 TO G, K=3: K is outside G and
+      *>      holds 2, so the sender's two occurrences land and the third lies
+      *>      beyond the part of G's table the operation uses (GR8 a) - it keeps
+      *>      the "z" it held                              = Qmm12z
+      *>   B3 K=3: G (Qmm12z) is not G2 (Qmm123)          = NE
       *>   B4 K=2: both groups use their first two occurrences = EQ
       *>   C  a Format-2 CALL passes the group BY REFERENCE at its MAXIMUM length
       *>      (14.8.2.2) and the formal occupies the argument's storage (14.2.3
