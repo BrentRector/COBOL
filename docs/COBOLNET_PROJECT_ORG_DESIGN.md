@@ -165,7 +165,7 @@ The legacy `CilEmitter` reached 2600 lines before being split into 11 `Cil*Emitt
 | `CodeGen/CodeWriter.cs` | unchanged (already single-purpose). | — |
 | `CodeGen/RoslynBackend.cs` | split: keep `Compile`; extract `ReferenceAssemblies.cs` + `RuntimeConfigWriter.cs` (each already a distinct concern in the file). | — |
 
-The free helpers (`DecodeCobolString`, `CsStringLiteral`, `Children`, `DataRefs`, `FirstToken`) become a small internal `EmitHelpers` static class or move next to their primary user. `RenderLiteralAsString` lives with whoever owns literals (the renderers).
+The free helpers (`DecodeCobolString`, `CsStringLiteral`, `Children`, `FirstToken`) become a small internal `EmitHelpers` static class or move next to their primary user. `RenderLiteralAsString` lives with whoever owns literals (the renderers).
 
 ---
 

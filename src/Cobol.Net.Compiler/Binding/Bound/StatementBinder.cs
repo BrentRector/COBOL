@@ -645,10 +645,6 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         _ => new BoundUnsupported($"statement '{FirstToken(s)}'"),
     };
 
-    /// <summary>STOP RUN [WITH {NORMAL|ERROR} [STATUS …]] / STOP literal (ISO §14.9.42). The status phrase is a
-    /// COBOL-2002 introduction — bind-time introduction gate (rearch bind-time migration Cluster 4; the parse-time
-    /// {is2002()}? predicate is gone). The phrase has no runtime effect in this compiler, so the gate is its only
-    /// binder obligation.</summary>
     // ── File I/O (ISO §14.9; COBOLNET_DESIGN §8) ───────────────────────────────────────────────────────────────
 
     /// <summary>Bind a RETRY phrase (ISO §14.7.9) — the FORM and, for the two that carry one, its arithmetic
@@ -697,17 +693,7 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         return new SizeErrorPhrase(onErr, notErr);
     }
 
-    // ── Conditions ─────────────────────────────────────────────────────────────────────────────────────────
-
-    internal static IEnumerable<Core.DataReferenceContext> DataRefs(IParseTree node)
-    {
-        for (int i = 0; i < node.ChildCount; i++)
-        {
-            var child = node.GetChild(i);
-            if (child is Core.DataReferenceContext dref) yield return dref;
-            else foreach (var inner in DataRefs(child)) yield return inner;
-        }
-    }
+    // ── Parse-tree helpers ─────────────────────────────────────────────────────────────────────────────────
 
     internal static IEnumerable<IParseTree> Children(IParseTree node)
     {
