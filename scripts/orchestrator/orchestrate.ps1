@@ -12,16 +12,20 @@ Design: docs/rearchitecture/DESIGN-orchestrator-loop.md (kb/Work PB1981). Each i
   3. circuit breaker: three consecutive units that fail (nonzero exit, invalid or missing handoff, or under
      -FastFailSeconds without a `done` handoff) stop the loop with an owner note; exponential backoff between failures
   4. budget.py decides go / hold-session / hold-day / stop-week
-  5. the next unit: -Unit for the first iteration, else next_unit.py (the handoff's next_unit, then the deterministic checks);
+  5. the next unit: next_unit.py (the OPERATOR's steer handoff.operator.json first, written by steer.ps1 and consumed when
+     its unit starts, kb/Work PB2596; -Unit writes the first unit through steer.ps1; then the last handoff's next_unit,
+     then the deterministic checks);
      with -Cluster LEAD[,LEAD...] the CAMPAIGN lane (kb/Work PB2120): next_unit.py alternates `campaign` waves
      (plan_wave.py --cluster LEAD) with fix-lane waves while a lead's cluster has a ready note, the ready leads taking
      turns, and a lead's lane ends when its cluster is landed. The alternation is the supervisor's rule: a handoff that
      names `wave` names only a wave, never its lane (kb/Work PB2522), and a lead whose ready note has waited through
-     more than one wave-type unit is logged `campaign LEAD ready for N h`
+     more than one wave-type unit is logged `campaign LEAD ready for N h`; an operator steer naming `campaign` runs the
+     first lead
   6. run `claude -p` with the unit prompt (first stream-json message on stdin, which stays open so the session outlives
      a model turn that ends with a Workflow in flight; the supervisor closes it when the stream is idle with no
-     background task), a fresh session id, stream-json to logs\; watch the context size and wind the unit down past
-     -MaxContextTokens or on STOP; kill only after the grace period
+     background task), a fresh session id, stream-json to logs\; watch the context size: past -MaxContextTokens the
+     unit gets STOP-UNIT only (start no new step, launch no fleet; a running fleet finishes), past -HardContextTokens or
+     on STOP also the loop's fleet stop, and only then a kill after the grace period (kb/Work PB2597, design 4.3)
   7. validate handoff.json against handoff.schema.json
   8. append one line to units.jsonl
 The Claude ACCOUNT the loop spends is a parameter (kb/Work PB2479; design section 2.1): -ConfigDir names its config dir,
@@ -47,7 +51,11 @@ param(
     [string]$ClaudeExe = 'claude',
     [string]$CoordDir = $(if ($env:COBOL_COORD_DIR) { $env:COBOL_COORD_DIR } else { 'E:\COBOL-coord' }),
     [string]$RepoDir = (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent),
-    [int]$MaxContextTokens = 150000,
+    # The context policy (kb/Work PB2597; design section 4.3 records the measurements behind both numbers).
+    # SOFT cap: STOP-UNIT only, so the unit starts no new step and launches no fleet, and a fleet already running finishes.
+    [int]$MaxContextTokens = 200000,
+    # HARD cap: STOP-UNIT plus the loop's fleet stop, as for STOP; the grace-period kill applies only after this.
+    [int]$HardContextTokens = 500000,
     [int]$MaxUnits = 0,
     [ValidateSet('acceptEdits', 'auto', 'bypassPermissions', 'dontAsk', 'plan', 'manual')]
     [string]$PermissionMode = 'bypassPermissions',   # owner 2026-10-04 (D1): allowed for the COBOL work; the repo's hooks are the guard
@@ -92,6 +100,9 @@ $GlobalStop = Join-Path $CoordDir 'scratch/STOP'
 $FleetStop = Join-Path $CoordDir 'scratch/STOP-loop'
 $Handoff = Join-Path $CoordDir 'handoff.json'
 $LastHandoff = Join-Path $CoordDir 'handoff.last.json'
+# The operator's steer (steer.ps1, kb/Work PB2596; design section 4.8): wins the next choice, consumed when its unit starts.
+$OperatorHandoff = Join-Path $CoordDir 'handoff.operator.json'
+$Steer = Join-Path $Here 'steer.ps1'
 $UnitsLog = Join-Path $CoordDir 'units.jsonl'
 $Questions = Join-Path $CoordDir 'OWNER-QUESTIONS.md'
 
@@ -205,12 +216,16 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
     $psi.StandardInputEncoding = [System.Text.UTF8Encoding]::new($false)
     $psi.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
     $psi.Environment['COBOL_COORD_DIR'] = $CoordDir
+    # Marks the session as a loop unit (coord.py LOOP_UNIT_ENV): dispatch_guard.py refuses its fleet launch once STOP-UNIT
+    # exists (kb/Work PB2597). An attended session never carries it.
+    $psi.Environment['COBOL_LOOP_UNIT'] = $unit
     # Exactly the loop's account: the dir for a named one; UNSET for the default (set to ~/.claude, Claude Code would look
     # for its sign-in in ~/.claude/.claude.json and find none). account.py child_config_dir is the one rule.
     if ($Account.child_config_dir) { $psi.Environment['CLAUDE_CONFIG_DIR'] = $Account.child_config_dir } else { [void]$psi.Environment.Remove('CLAUDE_CONFIG_DIR') }
 
     $stats = [ordered]@{ calls = 0; input = 0; output = 0; cache_read = 0; cache_creation = 0; peak_context = 0; peak_subagent_context = 0;
-        context = 0; cost_usd = $null; stop_unit_sent = $false; killed = $false }
+        context = 0; cost_usd = $null; stop_unit_sent = $false; fleet_stop_sent = $false; wind_down = $null; fleet_at_wind_down = $false
+        killed = $false }
     $seen = @{}
     $graceMin = if ($unit -in @('wave', 'campaign')) { 3 * $GraceMinutes } else { $GraceMinutes }
     $stopAt = $null
@@ -227,6 +242,7 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
     $anyEvent = $false
     $resultSeen = $false     # the model has ended a turn and nothing has started since
     $bgTasks = 0             # background tasks (a Workflow, a gate) the session reports as running
+    $fleetTasks = 0          # of those, the fleets: a Workflow (local_workflow) or a background agent (local_agent)
     $lastEventAt = Get-Date
     $stdinClosed = $false
     $unitStarted = Get-Date
@@ -274,7 +290,10 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
                 if ($ev -and $ev.PSObject.Properties['type']) {
                     if ($ev.type -eq 'assistant') { $resultSeen = $false }
                     elseif ($ev.type -eq 'result') { $resultSeen = $true }
-                    elseif ($ev.type -eq 'system' -and $ev.subtype -eq 'background_tasks_changed') { $bgTasks = @($ev.tasks).Count }
+                    elseif ($ev.type -eq 'system' -and $ev.subtype -eq 'background_tasks_changed') {
+                        $bgTasks = @($ev.tasks).Count
+                        $fleetTasks = @($ev.tasks | Where-Object { $_ -and $_.PSObject.Properties['task_type'] -and $_.task_type -in @('local_workflow', 'local_agent') }).Count
+                    }
                     if ($ev.type -eq 'assistant' -and $ev.message -and $ev.message.PSObject.Properties['usage']) {
                         # stream-json repeats one model call's usage on each content block: count each message id once.
                         $id = [string]$ev.message.id
@@ -318,23 +337,38 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
                 $lastCheckpoint = Get-Date
                 $lastBgChecked = $bgTasks
             }
-            # Two reasons to wind the unit down gracefully: its context passed the cap, or the owner created STOP. Both do
-            # the same thing, so no work is lost: STOP-UNIT (the unit hands off at its next step) and the LOOP's own fleet
-            # stop (every implementer and lander it dispatched checkpoints and returns SPLIT), then wait for the handoff.
+            # THE CONTEXT POLICY (kb/Work PB2597; design section 4.3). Two levels, so a fleet the unit paid to launch is
+            # never thrown away for the unit's own size:
+            #   soft  context > -MaxContextTokens: STOP-UNIT only. The unit starts no new step and launches no fleet
+            #         (dispatch_guard.py refuses it); a fleet already running finishes and lands, then the unit hands off.
+            #         No kill timer: a unit supervising a Workflow legitimately stays for hours.
+            #   hard  context > -HardContextTokens, or the owner created STOP: STOP-UNIT plus the LOOP's own fleet stop
+            #         (every implementer and lander it dispatched checkpoints and returns SPLIT), then the grace-period kill.
             # Never the global scratch\STOP: that is the owner's, and every session's agents obey it (kb/Work PB2483).
             $windDown = $null
-            if ($stats.context -gt $MaxContextTokens) { $windDown = "context $($stats.context) > ${MaxContextTokens}" }
-            elseif (Test-Stop) { $windDown = 'STOP file present' }
-            if (-not $stats.stop_unit_sent -and $windDown) {
-                Say "${windDown}: winding the unit down (STOP-UNIT and the loop's fleet stop $FleetStop; the unit checkpoints and hands off, the loop then ends if STOP is set)"
+            $stopFleet = $false
+            if ($stats.context -gt $HardContextTokens) { $windDown = 'context-hard'; $why = "context $($stats.context) > hard cap ${HardContextTokens}"; $stopFleet = $true }
+            elseif (Test-Stop) { $windDown = 'stop'; $why = 'STOP file present'; $stopFleet = $true }
+            elseif ($stats.context -gt $MaxContextTokens) { $windDown = 'context-soft'; $why = "context $($stats.context) > soft cap ${MaxContextTokens}" }
+            if ($stopFleet -and -not $stats.fleet_stop_sent) {
+                Say "${why}: winding the unit and its fleet down (STOP-UNIT and the loop's fleet stop $FleetStop; agents checkpoint and return SPLIT, the unit hands off, the loop then ends if STOP is set)"
                 # The fleet stop FIRST: the unit acts on STOP-UNIT and then expects the fleet stop to exist (its dispatched
                 # agents must see it); written the other way round, a loaded host showed the unit STOP-UNIT alone
                 # (test_orchestrate_winddown 4f, train 1037t, 2026-10-08).
                 New-Item -ItemType File -Force -Path $FleetStop | Out-Null
                 New-Item -ItemType File -Force -Path $StopUnit | Out-Null
-                $stats.stop_unit_sent = $true
+                $stats.fleet_stop_sent = $true
                 $stopAt = Get-Date
             }
+            if ($windDown -and -not $stats.stop_unit_sent) {
+                New-Item -ItemType File -Force -Path $StopUnit | Out-Null
+                $stats.stop_unit_sent = $true
+                $stats.fleet_at_wind_down = $fleetTasks -gt 0
+                if (-not $stopFleet) {
+                    Say "${why}: STOP-UNIT (the unit starts no new step and launches no fleet; $(if ($fleetTasks) { 'its running fleet finishes and lands first' } else { 'it hands off now' }))"
+                }
+            }
+            if ($windDown -and ($stopFleet -or -not $stats.wind_down)) { $stats.wind_down = $windDown }
             if ($stopAt -and ((Get-Date) - $stopAt).TotalMinutes -gt $graceMin -and -not $proc.HasExited) {
                 Say "no handoff $graceMin min after STOP-UNIT: killing the session (last resort)"
                 $proc.Kill($true)
@@ -377,7 +411,16 @@ $UnitCluster = ''
 
 if (-not (Take-Lock)) { exit 3 }
 $exitCode = 0
+$dryRunSteer = $null
 try {
+    # -Unit is the operator's steer for the first unit, written through steer.ps1 like any other (one steering path,
+    # kb/Work PB2596). A dry run writes it to a temporary file and reads it from there: it must leave nothing behind.
+    if ($Unit) {
+        if ($DryRun) { $dryRunSteer = Join-Path ([IO.Path]::GetTempPath()) "orchestrate-dryrun-$PID.handoff.operator.json"; $OperatorHandoff = $dryRunSteer }
+        if (Test-Path $OperatorHandoff) { Say "-Unit $Unit replaces the pending operator steer ($((Get-Content $OperatorHandoff -Raw | ConvertFrom-Json).next_unit_reason))" }
+        & pwsh -NoProfile -File $Steer -Unit $Unit -Reason 'named by orchestrate.ps1 -Unit at start' -OutFile $OperatorHandoff | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "steer.ps1 refused -Unit $Unit" }
+    }
     $leftover = Join-Path $CoordDir 'checkpoint.json'
     if ((Test-Path $leftover) -and -not $DryRun) {
         # The previous supervisor died mid-unit (a reboot, a kill): its last checkpoint is the only record. Turn it into the
@@ -419,19 +462,24 @@ try {
             continue
         }
 
-        if ($Unit -and $ran -eq 0) {
-            # -Unit campaign runs the first lead; next_unit.py takes the turns from then on.
-            $choice = [pscustomobject]@{ unit = $Unit; reason = 'named by -Unit' }
-            if ($Unit -eq 'campaign') { $choice | Add-Member cluster $Clusters[0] }
-        } else {
-            $na = @((Join-Path $Here 'next_unit.py'), '--repo', $RepoDir)
-            if (Test-Path $LastHandoff) { $na += @('--handoff', $LastHandoff) }
-            if ($lastFailed) { $na += '--last-failed' }
-            if ($lastStarted) { $na += @('--last-started', $lastStarted.ToString('o')) }
-            foreach ($lead in $Clusters) { $na += @('--cluster', $lead) }
-            if ($Clusters.Count -and $WorkDir) { $na += @('--work', $WorkDir) }
-            $choice = Invoke-Py $na | ConvertFrom-Json
+        $na = @((Join-Path $Here 'next_unit.py'), '--repo', $RepoDir)
+        if (Test-Path $OperatorHandoff) {
+            # The operator's steer is validated here too (steer.ps1 validated it when written; a hand edit since is caught):
+            # an invalid one is set aside LOUDLY, never ignored in silence (kb/Work PB2596).
+            if ([bool]((Get-Content $OperatorHandoff -Raw) | Test-Json -SchemaFile $Schema -ErrorAction SilentlyContinue)) {
+                $na += @('--operator-handoff', $OperatorHandoff)
+            } else {
+                $bad = Join-Path $CoordDir "logs/$(Get-Date -Format 'yyyyMMdd-HHmmss')-handoff.operator.invalid.json"
+                Move-Item $OperatorHandoff $bad -Force
+                Say "the operator steer does not validate against handoff.schema.json: set aside as $bad (steer with steer.ps1)"
+            }
         }
+        if (Test-Path $LastHandoff) { $na += @('--handoff', $LastHandoff) }
+        if ($lastFailed) { $na += '--last-failed' }
+        if ($lastStarted) { $na += @('--last-started', $lastStarted.ToString('o')) }
+        foreach ($lead in $Clusters) { $na += @('--cluster', $lead) }
+        if ($Clusters.Count -and $WorkDir) { $na += @('--work', $WorkDir) }
+        $choice = Invoke-Py $na | ConvertFrom-Json
         # With -Cluster every choice carries each lead's lane state (`campaigns`) and the starved leads (`starved`,
         # kb/Work PB2522): a landed lead's lane ends, and a ready note that waits through wave after wave is said aloud.
         $campaigns = if ($choice.PSObject.Properties['campaigns']) { $choice.campaigns } else { $null }
@@ -448,7 +496,10 @@ try {
         }
         $UnitCluster = if ($choice.PSObject.Properties['cluster']) { [string]$choice.cluster } else { '' }
         if ($choice.unit -eq 'campaign' -and $UnitCluster -notin $Clusters) {
-            $choice = [pscustomobject]@{ unit = 'wave'; reason = "a campaign was named but no campaign lane runs$(if ($UnitCluster) { " for $UnitCluster" }) (no -Cluster, or its cluster landed): $($choice.reason)" }
+            # The replacement keeps `operator`: a campaign STEER rewritten to a wave is still the steer this unit consumes,
+            # else it stays in place and rule 0 chooses it again on every later iteration (train 1039b review).
+            $choice = [pscustomobject]@{ unit = 'wave'; operator = [bool]($choice.PSObject.Properties['operator'] -and $choice.operator)
+                reason = "a campaign was named but no campaign lane runs$(if ($UnitCluster) { " for $UnitCluster" }) (no -Cluster, or its cluster landed): $($choice.reason)" }
             $UnitCluster = ''
         }
         if ($choice.unit -eq 'owner-question') {
@@ -470,7 +521,20 @@ try {
 
         # The loop's fleet stop left by a previous wind-down would stop this unit's fleet at its first step. Only the
         # loop's own: the owner's global stop is never the supervisor's to remove.
-        Remove-Item $StopUnit, $Handoff, $FleetStop, (Join-Path $CoordDir 'milestones.jsonl'), (Join-Path $CoordDir 'checkpoint.json') -Force -ErrorAction SilentlyContinue
+        Remove-Item $StopUnit, $FleetStop, (Join-Path $CoordDir 'milestones.jsonl'), (Join-Path $CoordDir 'checkpoint.json') -Force -ErrorAction SilentlyContinue
+        # handoff.json is the RUNNING unit's file. One found here was written by no unit of this run (a hand edit: the
+        # operator's instruction of 2026-10-07 23:50 was deleted here in silence); it is archived and said, never deleted.
+        if (Test-Path $Handoff) {
+            $orphan = "$logBase.handoff.orphan.json"
+            Move-Item $Handoff $orphan -Force
+            Say "a handoff.json no unit of this run wrote was archived as ${orphan}: it steers nothing (the operator steers with steer.ps1)"
+        }
+        # The operator's steer is consumed by the unit it chose: archived beside the unit's log and made the newest valid
+        # handoff, so the unit reads the operator's instruction as its previous handoff ({PREV_HANDOFF}).
+        if ($choice.PSObject.Properties['operator'] -and $choice.operator -and (Test-Path $OperatorHandoff)) {
+            Copy-Item $OperatorHandoff "$logBase.handoff.operator.json" -Force
+            Move-Item $OperatorHandoff $LastHandoff -Force
+        }
         Say "unit '$($choice.unit)' ($($choice.reason)) on $model, session $sessionId"
         $started = Get-Date
         $r = Invoke-Unit $choice.unit $model $sessionId $logBase
@@ -551,5 +615,6 @@ try {
     }
 } finally {
     Remove-Item $Lock -Force -ErrorAction SilentlyContinue
+    if ($dryRunSteer) { Remove-Item $dryRunSteer -Force -ErrorAction SilentlyContinue }
 }
 exit $exitCode

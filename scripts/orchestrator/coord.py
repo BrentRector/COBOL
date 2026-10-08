@@ -132,6 +132,18 @@ def locked(cdir: pathlib.Path, name: str) -> Iterator[None]:
         sharedfile.remove(lock, missing_ok=True)
 
 
+# THE UNIT'S WIND-DOWN SIGNAL (kb/Work PB2597, design section 4.3). The supervisor creates <coord>\STOP-UNIT to ask the
+# running unit to start no new step, and exports LOOP_UNIT_ENV (the unit's type) to the unit's session, so
+# scripts/hooks/dispatch_guard.py can refuse a fleet launch in a loop unit once the signal exists; an attended session
+# has no LOOP_UNIT_ENV and is never refused for the loop's signal.
+LOOP_UNIT_ENV = "COBOL_LOOP_UNIT"
+
+
+def stop_unit(override: str | None = None) -> pathlib.Path:
+    """The supervisor's wind-down signal to the running unit. Never creates the directory."""
+    return coord_path(override) / "STOP-UNIT"
+
+
 # Every coordination read and write goes through sharedfile.py: a reader holding a coordination file open on Windows
 # makes a writer's os.replace or unlink fail for milliseconds, and that one refusal is retried there (kb/Work PB2537,
 # PB2564).

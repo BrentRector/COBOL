@@ -23,6 +23,7 @@ closed per weekly-quota point.
 |---|---|
 | `scripts/orchestrator/orchestrate.ps1` | the supervisor loop (section 4); PowerShell 7 |
 | `scripts/orchestrator/next_unit.py` | the deterministic choice of the next unit (section 3.2) |
+| `scripts/orchestrator/steer.ps1` | the OPERATOR's one way to name the loop's next unit: a validated `handoff.operator.json` (section 4.8) |
 | `scripts/orchestrator/units/*.md` | `common.md` (the rules every unit obeys) plus one short prompt per unit type; they reference files, never paste them |
 | `scripts/orchestrator/handoff.schema.json` | the contract between a unit and the supervisor (section 5) |
 | `scripts/orchestrator/alloc.py` | the one locked allocator for DEVLOG numbers, `PB` ids and `COBOLNET` codes (section 6) |
@@ -54,11 +55,12 @@ the tools it runs). Contents:
 | `STOP` | the owner (`stop.ps1`) | closes work down as soon as possible without losing any: a running unit is wound down (below), then the loop ends; `stop.ps1 -Clear` removes it |
 | `checkpoint.json` | the supervisor (`checkpoint.py`) | the running unit's frequent handoff (section 5.1); moved to `logs\` when the unit ends, so a survivor means the supervisor died |
 | `milestones.jsonl` | the running unit's model | one line per milestone; moved to `logs\` when the unit ends |
-| `STOP-UNIT` | the supervisor | asks the running unit to write its handoff and end (section 4.3); created for the context cap and for `STOP` |
-| `scratch\STOP-loop` | the supervisor | the LOOP's fleet stop (section 4.6), created with `STOP-UNIT`: every implementer and lander the loop dispatched checkpoints, commits and returns `SPLIT`; removed at the start of the next unit |
+| `STOP-UNIT` | the supervisor | asks the running unit to start no new step, launch no fleet (`dispatch_guard.py` refuses one in a loop unit) and hand off once its current step ends (section 4.3); created for either context cap and for `STOP` |
+| `scratch\STOP-loop` | the supervisor | the LOOP's fleet stop (section 4.6), created with `STOP-UNIT` for `STOP` and for the HARD context cap only, never for the soft cap (section 4.3): every implementer and lander the loop dispatched checkpoints, commits and returns `SPLIT`; removed at the start of the next unit |
 | `scratch\STOP` | the owner (`stop.ps1 -Global`) | the GLOBAL stop (section 4.6): every agent of every session obeys it, and the loop ends; nothing but the owner's `stop.ps1 -Clear -Global` removes it |
-| `handoff.json` | the running unit | its handoff (section 5); the supervisor archives it per unit |
-| `handoff.last.json` | the supervisor | the newest VALID handoff, which the next unit reads and `next_unit.py` decides from |
+| `handoff.json` | the running unit | its handoff (section 5); the supervisor archives it per unit. One present when a unit STARTS was written by no unit of this run (a hand edit): the supervisor archives it as `logs\<time>-<unit>.handoff.orphan.json` and says so; it steers nothing (section 4.8) |
+| `handoff.last.json` | the supervisor | the newest VALID handoff, which the next unit reads and `next_unit.py` decides from: a unit's own, one the supervisor synthesized for a dead unit (section 5.1), or the operator's steer once its unit starts (section 4.8) |
+| `handoff.operator.json` | the operator (`steer.ps1`) | the operator's pending steer (section 4.8): validated against `handoff.schema.json`, it wins the next choice over every other handoff and is consumed (archived beside the unit's log, copied to `handoff.last.json`) when its unit starts |
 | `scratch\` | the units and their fleets | the fleet scratch directory (`{SCRATCH}`): specs, `groups.json`, the Workflow args, and `reports\`, which `plan_wave.py` reads for finishers; it persists across units |
 | `clusters-open.json`, `clusters-half.json` | `plan_wave.py` | the latest `fix_clusters.py --json` views it planned from |
 | `clusters-campaign-<lead>.json` | `plan_wave.py --cluster` | the latest campaign view it planned from: the open and half clusters, `deps` and `waiting` (section 9.1) |
@@ -121,10 +123,13 @@ it stays alive until its lander has landed. Its context stays small anyway, beca
 pointers (the rolling wave's `summary` is capped at 900 characters and the forensic detail is in the report files),
 and the unit polls nothing (it waits for the Workflow's completion signal).
 
-If the context cap fires (section 4.3) or the owner creates `STOP` while a Workflow runs, the unit does NOT end the
-session: the supervisor creates the loop's fleet stop `{FLEET_STOP}` (`scratch\STOP-loop`, with `STOP-UNIT`), so every implementer it dispatched checkpoints and returns `SPLIT` and every lander
-finishes or abandons its train at a cluster boundary, waits for the Workflow to return, writes a handoff with
-`next_unit: resume` that names every branch, worktree and report, and ends. The next unit is a fresh `resume`.
+If a wind-down is signalled while a Workflow runs, the unit does NOT end the session: supervising the fleet is its
+current step, so it waits for the Workflow to return, writes a handoff that names every unlanded branch, worktree and
+report (`next_unit: resume` when any is left), and ends. Whether the FLEET stops is the supervisor's decision, never
+the unit's (section 4.3): for the SOFT context cap it sends `STOP-UNIT` only, the fleet finishes its work and its
+trains land; for the owner's `STOP` or the HARD context cap it also creates the loop's fleet stop `{FLEET_STOP}`
+(`scratch\STOP-loop`), so every implementer it dispatched checkpoints and returns `SPLIT` and every lander finishes or
+abandons its train at a cluster boundary. The next unit is then a fresh `resume`.
 A kill (after `-GraceMinutes`) is the last resort, and it loses only uncheckpointed agent work: every agent
 checkpoints with WIP commits and a stamped `STATUS.md`, so `resume` rebuilds the state from disk with
 `status_delta.py`, `prune_worktrees.py` and the report files.
@@ -140,9 +145,13 @@ lost agent work exceeds that cost. Open decision D3.
 
 ### 3.2 The deterministic choice of the next unit
 
-`next_unit.py` reads the newest valid handoff (`handoff.last.json`) and applies these checks in order; the first
-that fires wins (the supervisor's `-Unit` overrides the first iteration only):
+`next_unit.py` reads the operator's pending steer (`handoff.operator.json`, section 4.8) and the newest valid handoff
+(`handoff.last.json`) and applies these checks in order; the first that fires wins:
 
+0. The operator's steer names `next_unit` → that unit, and the JSON carries `"operator": true` so the supervisor consumes
+   the steer when it starts the unit. It outranks every rule below, an unanswered `owner_question` included: the
+   operator is the one actor that sees the whole machine (the loop, the attended landings, the owner's answers).
+   `orchestrate.ps1 -Unit` is a steer like any other (section 4.8).
 1. The handoff carries `owner_question` → `owner-question` (stop).
 2. The handoff names `next_unit` → that unit; but a handoff naming `land` while another lander holds the landing lease
    (section 4.7) is passed over, and the rules below choose. A wave-type unit (`wave` or `campaign`) names only a WAVE: with
@@ -189,10 +198,10 @@ byte-identical to the fix lane's (`test_orchestrate_campaign.ps1` 8b and 8c).
 Parameters: `-DryRun` (prints the budget decision, the unit it would run and the exact `claude` command line, then
 exits; it starts nothing and, past a hold, says what it would run after it), `-ClaudeExe` (the executable; a test
 seam pointing at a fake that emits canned stream-json, not a wrapper; a `.ps1` or `.cmd` is launched through its
-shell), `-CoordDir`, `-RepoDir` (default the repository containing the script), `-MaxContextTokens` (default
-150000), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave` or `campaign`
+shell), `-CoordDir`, `-RepoDir` (default the repository containing the script), `-MaxContextTokens` (the SOFT
+context cap, default 200000) and `-HardContextTokens` (the HARD cap, default 500000; section 4.3), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave` or `campaign`
 unit gets three times this, because a lander train must be allowed to finish), `-BorrowDays` (passed to
-`budget.py`), `-Unit` (the first unit, overriding `next_unit.py` once), `-Cluster <lead>[,<lead>...]` (the campaign lanes, section 9.1: comma-separated because `pwsh -File` passes `-Cluster A,B` as one string; each validated at start), `-ConfigDir` (the Claude account the loop spends, section 2.1: default `account.py`'s resolution of `CLAUDE_CONFIG_DIR`; an unknown dir exits 2 before anything starts; every child runs with exactly that account's `CLAUDE_CONFIG_DIR`, unset for the default account; the log header and every `units.jsonl` line name the account), `-Watch` (section 13), `-Python`, and the
+`budget.py`), `-Unit` (the first unit: written as the operator's steer through `steer.ps1`, section 4.8; a dry run writes it to a temporary file it removes), `-Cluster <lead>[,<lead>...]` (the campaign lanes, section 9.1: comma-separated because `pwsh -File` passes `-Cluster A,B` as one string; each validated at start), `-ConfigDir` (the Claude account the loop spends, section 2.1: default `account.py`'s resolution of `CLAUDE_CONFIG_DIR`; an unknown dir exits 2 before anything starts; every child runs with exactly that account's `CLAUDE_CONFIG_DIR`, unset for the default account; the log header and every `units.jsonl` line name the account), `-Watch` (section 13), `-Python`, and the
 test seams `-TelemetryDir` (passed to `budget.py`), `-WorkDir` (the register `next_unit.py` and `work.py` read for `-Cluster`), `-IdleCloseSeconds` (default 20, section 4.6), `-CheckpointSeconds` (default 300, section 5.1) and `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
 (default 60). Exit codes: 0 stopped (`STOP`, `-MaxUnits`, `stop-week`, `-DryRun`), 3 another instance runs,
 4 circuit breaker, 5 an owner question is waiting, 2 `-Cluster` names no cluster any kb/Work note names (or `-Unit campaign` without `-Cluster`).
@@ -215,7 +224,9 @@ Each iteration, in this order:
 4. **Budget.** `python scripts/orchestrator/budget.py --json` decides: `go` continues; `hold-session` sleeps until
    the session reset it reports; `hold-day` sleeps until 03:05 America/Los_Angeles the next day; `stop-week` ends the
    loop. Sleeps wake every minute to honour `STOP`.
-5. **Next unit** (section 3.2).
+5. **Next unit** (section 3.2): the operator's steer first (validated again here: a hand-edited invalid one is moved to
+   `logs\<time>-handoff.operator.invalid.json` and said, never ignored in silence), then the last handoff and the
+   deterministic checks.
 6. **Run it**: `claude -p <prompt> --model <unit model> --permission-mode <mode> --permission-prompts none
    --output-format stream-json --verbose --session-id <fresh GUID>` from the repository root (plus `--chrome` for
    `meter`). The prompt is `units/common.md` followed by `units/<unit>.md` (`units/wave.md` for a `campaign` unit), with the substitutions `{COORD}`,
@@ -228,9 +239,11 @@ Each iteration, in this order:
    context the model just read). Only the unit's OWN messages count: a subagent's messages stream into the same log
    tagged with `parent_tool_use_id`, and that transcript is bounded by its own `maxTurns`, so the supervisor records
    them as `peak_subagent_context` and never winds the unit down for them (a lander subagent legitimately reaches
-   200k+ while the unit that dispatched it sits near 100k). When it passes `-MaxContextTokens`, or the owner creates `STOP`, the supervisor
-   creates `STOP-UNIT` and the loop's fleet stop `scratch\STOP-loop` and waits for the session to end; after the grace period it
-   kills the process tree.
+   200k+ while the unit that dispatched it sits near 100k). It applies the context policy of section 4.3: past
+   `-MaxContextTokens` it creates `STOP-UNIT` only; past `-HardContextTokens`, or when the owner creates `STOP`, it also
+   creates the loop's fleet stop `scratch\STOP-loop`, and only after that does the grace period run, after which it kills
+   the process tree. The unit's session carries `COBOL_LOOP_UNIT=<unit type>` (`coord.py` `LOOP_UNIT_ENV`), so
+   `dispatch_guard.py` knows a loop unit and refuses its fleet launch once `STOP-UNIT` exists.
    **The supervisor, not the model, decides when the unit is over.** The prompt is the first stream-json message
    (`--input-format stream-json`) and stdin stays open, because a one-shot `claude -p` waits for background tasks after its
    model ends a turn only up to `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` (600 s) and then terminates them (wave 1017,
@@ -247,7 +260,8 @@ Each iteration, in this order:
    failure for the breaker, and the next unit is `resume`.
 8. **Record** one line in `units.jsonl`: `{unit, reason, model, session_id, started_at, ended_at, duration_s,
    exit_code, handoff_outcome, next_unit, failed, log, calls, input, output, cache_read, cache_creation,
-   peak_context, cost_usd, stop_unit_sent, killed}`, plus, with `-Cluster`, `cluster` (the lead a `campaign` unit ran)
+   peak_context, peak_subagent_context, cost_usd, stop_unit_sent, fleet_stop_sent, wind_down (null, context-soft,
+   context-hard or stop), fleet_at_wind_down, killed}`, plus, with `-Cluster`, `cluster` (the lead a `campaign` unit ran)
    and `campaigns` (each lead's lane state at this choice), which `next_unit.py` reads back for the campaign turns and
    the starvation measure (section 3.2). This is the per-unit cost record PB1981 item 9 refits the cost
    law from. An owner question in a valid handoff then stops the loop (exit 5).
@@ -276,11 +290,48 @@ a hang. The default mode is `bypassPermissions` (decision D1, owner 2026-10-04: 
 gone, the hooks above are the only guard, which is why the WSL lifecycle commands are blocked by `forbidden_commands.py`
 (decision D4) and why a hook's block is the rule speaking, never something a unit routes around.
 
-### 4.3 The context cap (graceful stop)
+### 4.3 The context policy (graceful stop; kb/Work PB2597)
 
-The same protocol the workflows use for their agents: a file, checked before each new step, never a kill. The
-cap exists because a unit's cost per call grows with its context; at 150k the next unit's fresh start is cheaper
-than continuing.
+The same protocol the workflows use for their agents: a file, checked before each new step, never a kill. A cap exists
+because a unit's cost per call grows with its context, so past some size a fresh unit is cheaper than continuing. But a
+fleet costs far more than the unit that supervises it: on 2026-10-08 wave 1038's unit did an inline planner fix
+(PB2575) before planning, passed the old single cap of 150,000 (151,282 at 00:06:39), got `STOP-UNIT` and the loop's
+fleet stop, then STARTED its eight-implementer Workflow anyway (00:06:56), and all eight returned `SPLIT` before any
+work (00:10:03). So the policy has two levels, and the fleet stop belongs to the higher one only:
+
+| Level | Fires at | The supervisor creates | Kill timer | What happens |
+|---|---|---|---|---|
+| soft | `-MaxContextTokens`, default 200,000 | `STOP-UNIT` | none | the unit starts no new step and launches no fleet; a fleet already running finishes and its trains land; then the unit hands off |
+| hard | `-HardContextTokens`, default 500,000 | `STOP-UNIT` and `scratch\STOP-loop` | `-GraceMinutes` (three times for `wave`/`campaign`) | as for the owner's `STOP`: agents checkpoint and return `SPLIT`, the unit hands off `resume` |
+
+Three mechanisms keep a just-paid fleet from being thrown away:
+- **The soft cap never stops a fleet.** A unit supervising a running Workflow makes one call per wait (about every ten
+  minutes), so its own context is cheap next to the fleet's; the soft cap lets the fleet finish. It needs no special
+  case for the race in which the cap fires as the launch happens: whichever wins, no fleet stop is sent. The supervisor
+  records whether a fleet (`local_workflow` or `local_agent` background task) was running when the wind-down fired
+  (`fleet_at_wind_down`).
+- **No fleet launch after the signal.** `dispatch_guard.py` (rule 0) refuses a `Workflow` call and an implementer or
+  lander `Agent` call from a loop unit (the supervisor exports `COBOL_LOOP_UNIT`) while `STOP-UNIT` exists; the unit
+  prompts say to check `STOP-UNIT` immediately before the call. An attended session shares the coordination directory
+  but never carries the variable, so the loop's signal never refuses its dispatches.
+- **The fleet launch comes first** (`units/wave.md`): a wave unit does nothing but plan before its Workflow runs; a
+  defect found on the way becomes a kb/Work note, and one that makes the plan unusable is that unit's whole job (fixed
+  on a branch and handed off without a launch).
+
+The numbers, measured from `units.jsonl` and the unit logs on 2026-10-08 (the unit's own messages, section 4 step 6):
+- context when the fleet launched, 21 wave, campaign and land units since 2026-10-04: 70,337 to 113,385 (wave 1038's
+  151,282, after its inline side work, is the outlier the policy removes);
+- final peak of the units that completed normally on 2026-10-07: at most 137,718 (wave, 20:30; the trend rose from
+  117,318 and 118,732 the same day as prompts and skills grew), land units at most 120,303; two wave units of
+  2026-10-04 and 2026-10-05 reached 152,067 and 164,175 and still completed their fleets;
+- growth while and after supervising a fleet: up to about 94,000 (wave 2026-10-05 02:12, 70,337 to 164,175);
+- a fresh unit starts at about 55,000 to 66,000 (the meter units' peaks), and the model's context window is 1,000,000
+  (`modelUsage.contextWindow` in every unit's `result` event).
+So the soft cap is 200,000, about 1.45 times the largest normal peak (headroom for the trend), and the hard cap is
+500,000: three times the largest peak ever measured, half the window, leaving room for a wind-down; a fleet launched just
+under the soft cap still has more than three times the largest measured supervision growth before the hard cap.
+Re-measure both from `units.jsonl` (`peak_context`, `wind_down`, `fleet_at_wind_down`) when the prompts or the model
+change.
 
 ### 4.4 Replacing the daily-resume cron
 
@@ -297,7 +348,9 @@ registered by this change (open decision D2).
 | two supervisors run at once | double dispatch, id collisions, two landers racing `push-main.sh` | `orchestrate.lock` with a live-PID check |
 | a unit crashes at start (auth, a bad flag, a hook refusing everything) | the loop spins and burns quota | the circuit breaker: three fast or failed units stop the loop and write an owner note |
 | a unit ends without a handoff | the next unit starts blind | schema validation; an invalid handoff is a failure and the next unit is `resume`, which rebuilds state from disk |
-| a unit's context grows without bound | each call costs more than a fresh start | `STOP-UNIT` at `-MaxContextTokens` of the unit's own messages (not its subagents'), kill after the grace period |
+| a unit's context grows without bound | each call costs more than a fresh start | `STOP-UNIT` at the soft cap `-MaxContextTokens` of the unit's own messages (not its subagents'); the fleet stop and, after the grace period, a kill only at the hard cap `-HardContextTokens` (section 4.3) |
+| a wind-down throws away a fleet the unit just launched | a whole fleet's launch cost for nothing (wave 1038: eight implementers SPLIT before any work) | the soft cap sends no fleet stop; `dispatch_guard.py` refuses a fleet launch from a loop unit after `STOP-UNIT`; the wave unit launches before any side work (section 4.3) |
+| the operator's instruction is ignored | the loop runs a unit the operator ruled out (2026-10-07 23:53: a `resume`, then a `land` that would have raced an attended landing) | one steering path, `steer.ps1`, validated, outranking every handoff; a hand-written `handoff.json` is archived and said (section 4.8) |
 | a unit ends with a Workflow in flight | the agents die with the process | the wave unit stays alive until its lander landed; on a cap it stops the fleet gracefully first (section 3.1) |
 | a unit guesses an owner decision | a wrong irreversible landing | `owner_question` in the handoff stops the loop |
 | the quota runs out mid-week | the owner's other work (the TENET project) is starved | `budget.py`: `hold-day` at the cumulative daily allowance, `stop-week` at the weekly cap |
@@ -382,9 +435,33 @@ keep running r1 repeatedly for zero gain".
   hand on a harness of its own lines (held elsewhere, corrupt, released and taken over mid-run). `test_orchestrate_campaign.ps1` (8c) proves next_unit's deferral
   and the `stop.ps1 -Status` line.
 
+### 4.8 Steering the loop: the operator (kb/Work PB2596)
+
+The attended OPERATOR session (section 2.1) sees what no unit can: an attended landing in flight, the owner's answer to
+a question, a plan the owner changed. On 2026-10-07 at 23:50 it wrote its instruction (run a wave; hold push-main) into
+`handoff.json`; the supervisor deletes that file at every unit start and `next_unit.py` reads only `handoff.last.json`,
+which still held the synthesized handoff of a failed `meter` unit, so the 23:53 restart ran `resume`, whose handoff named
+a `land` unit that would have raced the operator's R2 lander at push-main. There is now ONE steering path:
+
+- **`pwsh scripts/orchestrator/steer.ps1 -Unit <wave|campaign|land|resume|meter> -Reason "<why>" [-Summary "<instruction>"]`**
+  writes `handoff.operator.json`: `{unit: operator, outcome: done, next_unit, next_unit_reason, summary}`, validated
+  against `handoff.schema.json` (which requires `next_unit` and its reason for unit `operator`) before it lands, written
+  atomically. `-Show` prints the pending steer, `-Withdraw` removes it, and `stop.ps1 -Status` shows it.
+- **Precedence**: it wins the next choice over every unit's handoff, a synthesized one included, and over every
+  deterministic check (section 3.2 rule 0). It may be written while a unit runs: that unit's own handoff, copied to
+  `handoff.last.json` when it ends, does not displace it.
+- **One choice**: when the supervisor starts the unit it chose, it archives the steer as `logs\<time>-<unit>.handoff.operator.json`
+  and moves it to `handoff.last.json`, so the unit reads the operator's instruction as its previous handoff
+  (`{PREV_HANDOFF}`). A dry run reads it and consumes nothing. A stop (`stop.ps1`, `-Clear`) leaves it pending.
+- **No second way**: `orchestrate.ps1 -Unit` writes its first unit through `steer.ps1`; a hand-edited invalid steer is
+  set aside as `logs\<time>-handoff.operator.invalid.json` with a log line; a `handoff.json` found when a unit starts
+  is archived as `.handoff.orphan.json` with a log line. Writing `handoff.last.json` by hand is not a path: the next
+  unit to end overwrites it.
+
 ## 5. The handoff (`handoff.schema.json`)
 
-Required: `schema_version` (1), `unit`, `outcome` (`done` · `split` · `failed` · `owner-question`), `summary`
+Required: `schema_version` (1), `unit` (a unit type, or `operator` for the operator's steer, section 4.8, which also
+requires `next_unit` and `next_unit_reason`), `outcome` (`done` · `split` · `failed` · `owner-question`), `summary`
 (at most 900 characters; the detail lives in files the handoff points at).
 Optional: `next_unit` (one of the unit types, or null to let the deterministic checks choose) with
 `next_unit_reason`; `branches_pending` (`{branch, worktree, report, status}`, status one of the rolling wave's
@@ -682,7 +759,8 @@ new terminal. A STOP file left on purpose by that procedure is named in the prom
 Python self-tests in the style of `scripts/hooks/test_dispatch_guard.py` (a script that prints a case count and
 exits nonzero on a failure; no framework): `test_alloc.py` (including two real parallel processes allocating
 concurrently with no duplicate), `test_inventory_ratchet.py` (a fabricated reopen, a GAP rise, the marker),
-`test_budget.py` (with each account's reset, readings and telemetry), `test_ledger_state.py` (owed until the current stamp is
+`test_budget.py` (with each account's reset, readings and telemetry), `scripts/hooks/test_dispatch_guard.py` (rule 0: a loop
+unit's fleet launch refused after `STOP-UNIT`, an attended session's not), `test_ledger_state.py` (owed until the current stamp is
 marked, owed again after an input-touching commit, not after an unrelated one; per account, the first mark needs `--url`),
 `account.py --self-test`, `mailbox.py --self-test` (section 15), `test_checkpoint.py` (real linked worktrees: committed, dirty, clean; a synthesized handoff checked
 against the schema's required and permitted keys), `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
@@ -690,11 +768,14 @@ real dispatch-spec template and `check_practices.py`'s same-file rule; the fix l
 partial last line), `landing_lease.py --self-test` (two landers, takeover, holder-only renew and release, a race;
 section 4.7; `LandingLeaseDriftTests` also pins its arms by name), `train_measure.py --self-test` (the batched-gating
 trial's per-train record and summary, kb/Work PB2515; `TrainMeasureDriftTests` also pins its arms), `landing_check.py
---self-test` (section 4.7's file-set guarantee). The supervisor's self-test is eleven parallel parts,
+--self-test` (section 4.7's file-set guarantee). The supervisor's self-test is twelve parallel parts,
 `scripts/orchestrator/test_orchestrate_*.ps1`, sharing the harness `testdata/orchestrate_test_lib.ps1`: they drive the
 loop with a fake `-ClaudeExe` (`testdata/fake-claude.ps1`) and `open-watchers.ps1` with a fake `wt.exe`
-(`testdata/fake-wt.ps1`), and also cover `start-session.ps1 -ConfigDir`, `stop.ps1` and `account-profile.ps1` (in a temp
-HOME). They need PowerShell 7 and are Windows-only (Windows Terminal, `Win32_Process`, `USERPROFILE`, junctions), which
+(`testdata/fake-wt.ps1`), and also cover `start-session.ps1 -ConfigDir`, `stop.ps1`, `steer.ps1` (section 4.8: validation,
+precedence over a synthesized handoff, a steer written while a unit runs, consumption, an orphan `handoff.json`,
+`-Unit`; `test_orchestrate_steer.ps1`), the context policy (section 4.3: the hard cap stops the fleet, the soft cap
+does not, and a loop unit's second launch is refused; `test_orchestrate_stop.ps1`) and `account-profile.ps1` (in a
+temp HOME). They need PowerShell 7 and are Windows-only (Windows Terminal, `Win32_Process`, `USERPROFILE`, junctions), which
 each part declares in its header (`# SELF-TEST-PLATFORM: windows — …`).
 
 **Every one of them runs in every gate and in CI, found by discovery (kb/Work PB2563).** `scripts/self_tests.py` finds

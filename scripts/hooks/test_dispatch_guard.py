@@ -79,11 +79,37 @@ def recorded(payload: dict) -> bool:
 if not recorded({"tool_name": "Workflow", "transcript_path": str(WITH_SKILL),
                  "tool_input": {"script": "wf_rolling_wave.js", "args": {"groups": [{"letter": "a", "notes": ["PB2296"]}]}}}):
     fails.append(("an admitted Workflow is recorded with the notes its args name", False))
+# rule 0 (kb/Work PB2597): in a LOOP UNIT (COBOL_LOOP_UNIT set by the supervisor) with STOP-UNIT present, no fleet
+# launch: a Workflow and an implementer or lander are refused even with the skill loaded and a checked brief; a read-only
+# role still passes; an attended session (no COBOL_LOOP_UNIT) sharing the coordination directory is never refused for it
+WF_OK = {"tool_name": "Workflow", "tool_input": {}, "transcript_path": str(WITH_SKILL)}
+
+
+def blocked_env(payload: dict, env: dict) -> bool:
+    r = subprocess.run([sys.executable, str(HOOK)], input=json.dumps(payload), capture_output=True, text=True,
+                       timeout=180, env=env)
+    return r.returncode == 2
+
+
+UNIT_ENV = dict(ENV, COBOL_LOOP_UNIT="wave")
+STOP_CASES = [
+    ("loop unit after STOP-UNIT: Workflow refused", WF_OK, UNIT_ENV, True),
+    ("loop unit after STOP-UNIT: implementer refused", agent("cobol-implementer", f"Follow {BRIEF}", WITH_SKILL), UNIT_ENV, True),
+    ("loop unit after STOP-UNIT: lander refused", agent("cobol-lander", f"Follow {BRIEF}", WITH_SKILL), UNIT_ENV, True),
+    ("loop unit after STOP-UNIT: a read-only role passes", agent("cobol-refuter", "Refute this", WITH_SKILL), UNIT_ENV, False),
+    ("attended session, the loop's STOP-UNIT present: Workflow passes", WF_OK, ENV, False),
+]
+STOP_CASES_AFTER = [("loop unit, no STOP-UNIT: Workflow passes", WF_OK, UNIT_ENV, False)]
+(COORD / "STOP-UNIT").write_text("", encoding="utf-8")
+fails += [(n, e) for n, p, env, e in STOP_CASES if blocked_env(p, env) != e]
+(COORD / "STOP-UNIT").unlink()
+fails += [(n, e) for n, p, env, e in STOP_CASES_AFTER if blocked_env(p, env) != e]
 HAND_BRIEF = TMP / "hand-brief.md"
 HAND_BRIEF.write_text("# Brief\nAuthor kb/Work PB2296 step 1.\n", encoding="utf-8")
 if not recorded(agent("general-purpose", f"Your brief is {HAND_BRIEF}. Read it first.", WITH_SKILL)):
     fails.append(("a dispatch naming only its brief file is recorded with the brief's notes", False))
 for n, e in fails:
     print(f"FAIL: expected {'BLOCK' if e else 'PASS'}: {n}")
-print(f"dispatch guard self-test: {len(CASES) + 4 - len(fails)}/{len(CASES) + 4} cases OK")
+TOTAL = len(CASES) + len(STOP_CASES) + len(STOP_CASES_AFTER) + 4
+print(f"dispatch guard self-test: {TOTAL - len(fails)}/{TOTAL} cases OK")
 sys.exit(1 if fails else 0)

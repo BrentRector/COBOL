@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Choose the orchestrator's next unit deterministically when the last handoff does not name one.
 
-    python scripts/orchestrator/next_unit.py [--handoff FILE] [--last-failed] [--last-started ISO] [--repo DIR]
-                                             [--cluster LEAD ... [--work DIR]]
+    python scripts/orchestrator/next_unit.py [--operator-handoff FILE] [--handoff FILE] [--last-failed]
+                                             [--last-started ISO] [--repo DIR] [--cluster LEAD ... [--work DIR]]
 
 Prints JSON {unit, reason}. The order (docs/rearchitecture/DESIGN-orchestrator-loop.md section 3.2), first match wins:
+  0. the OPERATOR's steer (steer.ps1, kb/Work PB2596) -> its next_unit; the JSON also carries `"operator": true`, which
+     tells the supervisor to consume the steer when it starts the unit. It wins over every unit's handoff (a synthesized
+     one included) and every check below, because the operator is the one actor that sees the whole machine. The
+     campaign rule does not re-decide it either; a `campaign` steer runs the first --cluster lead.
   1. the handoff carries owner_question            -> owner-question
   2. the handoff names next_unit                    -> that unit (but not `land` while the landing lease is held);
      a wave-type unit (`wave` or `campaign`) names only a WAVE, and with --cluster the campaign rule below decides
@@ -229,16 +233,25 @@ def base_choice(h: dict, cdir: pathlib.Path, repo: pathlib.Path, now: dt.datetim
 
 def choose(handoff: dict | None, cdir: pathlib.Path, repo: pathlib.Path, now: dt.datetime, last_failed: bool,
            last_started: dt.datetime | None, max_meter_age_h: float, acct_name: str,
-           clusters: list[str] | None = None, work_dir: pathlib.Path = work.WORK) -> dict:
+           clusters: list[str] | None = None, work_dir: pathlib.Path = work.WORK,
+           operator: dict | None = None) -> dict:
     h = handoff or {}
-    if h.get("owner_question"):
+    if operator and operator.get("next_unit"):
+        # Rule 0: the operator's steer names the unit itself, so neither rules 1-7 nor the campaign rule re-decide it.
+        choice = {"unit": operator["next_unit"], "reason": "the operator: " + operator.get("next_unit_reason", ""),
+                  "operator": True}
+        if choice["unit"] == "campaign" and clusters:
+            choice["cluster"] = clusters[0]  # a steer names no lead: it runs the first (`-Unit campaign` is a steer)
+        deferred = ""
+    elif h.get("owner_question"):
         return {"unit": "owner-question", "reason": "the last handoff asks the owner"}
-    choice, deferred = base_choice(h, cdir, repo, now, last_failed, last_started, max_meter_age_h, acct_name)
+    else:
+        choice, deferred = base_choice(h, cdir, repo, now, last_failed, last_started, max_meter_age_h, acct_name)
     if not clusters:
         return choice
     lanes = lane_states(clusters, work_dir)
     history = unit_history(cdir)
-    if choice["unit"] in WAVE_TYPES:
+    if choice["unit"] in WAVE_TYPES and not choice.get("operator"):
         # The handoff named THIS wave only when its next_unit is wave-type: a `land` the lease deferred named none.
         named = h.get("next_unit_reason", "") if h.get("next_unit") in WAVE_TYPES else None
         choice = campaign_choice(lanes, history, named)
@@ -248,8 +261,20 @@ def choose(handoff: dict | None, cdir: pathlib.Path, repo: pathlib.Path, now: dt
     return choice
 
 
+def read_handoff(path: str | None) -> dict | None:
+    """A handoff file's JSON, or None when it is not named, absent or unreadable."""
+    if not path:
+        return None
+    try:
+        return json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--operator-handoff", help="the operator's steer, handoff.operator.json, already validated by the "
+                    "supervisor against handoff.schema.json (absent or unreadable = none)")
     ap.add_argument("--handoff", help="the last unit's handoff.json (absent or unreadable = none)")
     ap.add_argument("--last-failed", action="store_true")
     ap.add_argument("--last-started", help="ISO time the last unit started")
@@ -260,17 +285,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="a campaign lane's lead (repeatable, in the supervisor's -Cluster order)")
     ap.add_argument("--work", default=str(work.WORK), help="the register directory (a test seam)")
     a = ap.parse_args(argv)
-    handoff = None
-    if a.handoff:
-        try:
-            handoff = json.loads(pathlib.Path(a.handoff).read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            handoff = None
+    handoff, operator = read_handoff(a.handoff), read_handoff(a.operator_handoff)
     now = dt.datetime.fromisoformat(a.now) if a.now else dt.datetime.now(dt.timezone.utc)
     started = dt.datetime.fromisoformat(a.last_started) if a.last_started else None
     acct = account.current()
     print(json.dumps(choose(handoff, coord.coord_dir(a.coord), pathlib.Path(a.repo), now, a.last_failed, started,
-                            acct.quota["meter_max_age_hours"], acct.name, a.cluster, pathlib.Path(a.work))))
+                            acct.quota["meter_max_age_hours"], acct.name, a.cluster, pathlib.Path(a.work), operator)))
     return 0
 
 

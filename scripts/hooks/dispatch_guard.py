@@ -6,6 +6,8 @@ Owner, 2026-09-30, after an orchestrator hand-wrote three implementer briefs fro
 .claude/skills/workstream/SKILL.md (MANDATORY-PRACTICES O9): "Reconfigure such that all future sessions cannot skip
 learning this." A sentence in CLAUDE.md or memory was already there and was skipped, so the rule is structural:
 
+  0. In a unit of the orchestrator loop (the supervisor exports COBOL_LOOP_UNIT), a Workflow call or an implementer or
+     lander Agent call is refused while the supervisor's wind-down signal <coord>/STOP-UNIT exists (kb/Work PB2597).
   1. Agent (cobol-implementer or cobol-lander) and Workflow calls need a Skill call for `workstream` earlier in THIS
      session's transcript (or a /workstream command). The skill is what carries the mandatory practices.
   2. An Agent call for cobol-implementer or cobol-lander must name, in its prompt, a RENDERED spec
@@ -26,10 +28,14 @@ hook must never wedge a session).
      is silent, like every other hook failure. The landing check (landing_check.py) is the guarantee behind it.
 """
 import json
+import os
 import pathlib
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "orchestrator"))
+import coord  # noqa: E402  (the one definition of STOP-UNIT and the loop-unit marker)
 
 try:
     data = json.load(sys.stdin)
@@ -105,6 +111,14 @@ if tool not in ("Agent", "Workflow"):
     sys.exit(0)
 
 role = args.get("subagent_type", "") if tool == "Agent" else ""
+# Rule 0 (kb/Work PB2597): a unit of the orchestrator loop launches NO fleet once the supervisor has signalled its
+# wind-down. Wave 1038's unit started an eight-implementer Workflow 17 s after STOP-UNIT and the loop's fleet stop, and
+# all eight returned SPLIT before any work. Only a loop unit (the supervisor exports coord.LOOP_UNIT_ENV) is refused; an
+# attended session sharing the coordination directory never is.
+if (tool == "Workflow" or role in JUDGMENT_ROLES) and os.environ.get(coord.LOOP_UNIT_ENV) and coord.stop_unit().exists():
+    block(f"the supervisor has signalled this {os.environ[coord.LOOP_UNIT_ENV]} unit's wind-down ({coord.stop_unit()} "
+          "exists): launch no fleet. Write the handoff naming the plan (its specs and args file are reusable) and every "
+          "branch, then end; a fresh unit launches it (kb/Work PB2597, units/common.md).")
 if tool == "Agent" and role not in JUDGMENT_ROLES:
     record_hand_dispatch(args, role)
     sys.exit(0)

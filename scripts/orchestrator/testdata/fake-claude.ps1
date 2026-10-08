@@ -6,6 +6,10 @@
 #   bigsubagent a subagent's calls exceed the cap while the unit's own context stays small; hands off done
 #   owner      a valid handoff carrying an owner question
 #   wakes      ends a turn with a background task running, is woken when it finishes, then hands off done
+#   softcap    passes a small soft cap while its Workflow runs: records whether the fleet stop exists (it must not) and
+#              whether the dispatch guard refuses a second fleet launch from this loop unit, then its fleet finishes
+#   steersme   the operator steers the NEXT unit while this one runs (once per coordination dir); hands off naming land
+# Every mode records the previous handoff it was given (prev-handoff-seen.json), as a unit reads {PREV_HANDOFF}.
 # Like the real session, a mode that emits `result` then STAYS ALIVE until the supervisor closes stdin (eof.txt records it).
 # Every invocation appends its arguments and its CLAUDE_CONFIG_DIR (the account it runs as) to FAKE_CLAUDE_MARK, so a
 # test can prove whether it ran and with what.
@@ -23,6 +27,8 @@ if ($env:FAKE_CLAUDE_MARK) { Add-Content -Path $env:FAKE_CLAUDE_MARK -Value ((($
 $coord = $env:COBOL_COORD_DIR
 $handoff = Join-Path $coord 'handoff.json'
 $sid = $args[[array]::IndexOf($args, '--session-id') + 1]
+$prev = Join-Path $coord 'handoff.last.json'
+if (Test-Path $prev) { Copy-Item $prev (Join-Path $coord 'prev-handoff-seen.json') -Force }
 if ($env:FAKE_CLAUDE_MODE -eq 'silent') {
     # A unit hung at start: it read its prompt and then emits NOTHING, not even `init` (the startup watchdog must kill it).
     Start-Sleep -Seconds 600
@@ -88,6 +94,38 @@ switch ($env:FAKE_CLAUDE_MODE) {
         # The wind-down must never create the owner's GLOBAL stop: other sessions' agents obey it (kb/Work PB2483).
         Set-Content -Path (Join-Path $coord 'global-stop-seen.txt') -Value (Test-Path (Join-Path $coord 'scratch/STOP'))
         Hand @{ schema_version = 1; unit = 'wave'; outcome = 'split'; summary = 'wound down by STOP'; next_unit = 'resume' }
+        Emit @{ type = 'result'; subtype = 'success'; session_id = $sid }
+        WaitEof
+        exit 0
+    }
+    'softcap' {
+        # The Workflow is running when the unit's context passes the soft cap (a supervision wait call).
+        Emit @{ type = 'system'; subtype = 'background_tasks_changed'; tasks = @(@{ task_id = 'wf1'; task_type = 'local_workflow' }); session_id = $sid }
+        Start-Sleep -Milliseconds 300
+        Call 'msg_1' 5000
+        $deadline = (Get-Date).AddSeconds(60)
+        while (-not (Test-Path (Join-Path $coord 'STOP-UNIT')) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+        Start-Sleep -Milliseconds 500   # a fleet stop, if the supervisor (wrongly) sent one, lands with STOP-UNIT
+        Set-Content -Path (Join-Path $coord 'soft-fleet-stop-seen.txt') -Value (Test-Path (Join-Path $coord 'scratch/STOP-loop'))
+        Set-Content -Path (Join-Path $coord 'loop-unit-env.txt') -Value $env:COBOL_LOOP_UNIT
+        # A second fleet launch from this unit, as the real CLI would run the PreToolUse hook for it.
+        '{"tool_name":"Workflow","tool_input":{}}' | & python (Join-Path $PSScriptRoot '../../hooks/dispatch_guard.py') 2>$null
+        Set-Content -Path (Join-Path $coord 'guard-exit.txt') -Value $LASTEXITCODE
+        Emit @{ type = 'system'; subtype = 'background_tasks_changed'; tasks = @(); session_id = $sid }   # the fleet landed
+        Call 'msg_2' 6000
+        Hand @{ schema_version = 1; unit = 'wave'; outcome = 'done'; summary = 'fleet finished after the soft cap'; next_unit = $null }
+        Emit @{ type = 'result'; subtype = 'success'; session_id = $sid }
+        WaitEof
+        exit 0
+    }
+    'steersme' {
+        Call 'msg_1' 5000
+        $mark = Join-Path $coord 'steered.txt'
+        if (-not (Test-Path $mark)) {
+            & pwsh -NoProfile -File (Join-Path $PSScriptRoot '../steer.ps1') -Unit resume -Reason 'operator: hold the land unit' -CoordDir $coord | Out-Null
+            Set-Content -Path $mark -Value 'steered'
+        }
+        Hand @{ schema_version = 1; unit = 'wave'; outcome = 'done'; summary = 'names land'; next_unit = 'land'; next_unit_reason = 'branches ready' }
         Emit @{ type = 'result'; subtype = 'success'; session_id = $sid }
         WaitEof
         exit 0

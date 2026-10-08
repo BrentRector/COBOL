@@ -12,8 +12,9 @@
   imminent, the machine must go down); use it only when every session's work must wind down.
   -Clear removes STOP, STOP-UNIT and the loop's fleet stop so the loop (or the logon start, which honours STOP) can run;
   -Clear -Global also removes the global stop (the loop will not start while it exists).
-  -Status prints what is running, which stops are pending, whether a ledger publish is owed, and who holds the landing
-  lease (scripts/orchestrator/landing_lease.py, kb/Work PB2537).
+  -Status prints what is running, which stops are pending, the operator's pending steer (steer.ps1 names the next
+  unit; a stop never clears it), whether a ledger publish is owed, and who holds the landing lease
+  (scripts/orchestrator/landing_lease.py, kb/Work PB2537).
 #>
 [CmdletBinding()]
 param(
@@ -48,6 +49,8 @@ if ($Status) {
     Write-Host ("orchestrator: " + $(if ($r) { "running (pid $($r.pid), since $($r.started_at))" } else { 'not running' }))
     Write-Host ("STOP pending: " + (Test-Path $stop) + "; unit winding down (STOP-UNIT): " + (Test-Path $stopUnit) +
         "; loop fleet stop (scratch/STOP-loop): " + (Test-Path $fleetStop) + "; GLOBAL stop (scratch/STOP): " + (Test-Path $globalStop))
+    $steer = Join-Path $CoordDir 'handoff.operator.json'   # the operator's pending steer (steer.ps1, kb/Work PB2596)
+    Write-Host ("operator steer: " + $(if (Test-Path $steer) { $s = Get-Content $steer -Raw | ConvertFrom-Json; "next unit '$($s.next_unit)' ($($s.next_unit_reason))" } else { 'none pending' }))
     Write-Host ("ledger: " + ((& python (Join-Path $PSScriptRoot 'ledger_state.py') owed --coord $CoordDir) -join ' '))
     # who holds main (kb/Work PB2537): free, held by a lander (holder, worktree, heartbeat, expiry, reason), or dead
     Write-Host ((& python (Join-Path $PSScriptRoot 'landing_lease.py') status --coord $CoordDir) -join ' ')

@@ -2,13 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/BrentRector/COBOL/scripts/orchestrator/handoff.schema.json",
   "title": "Orchestrator unit handoff",
-  "description": "What one orchestrator unit hands the supervisor and the next unit (docs/rearchitecture/DESIGN-orchestrator-loop.md section 5). Pointers, not prose: the detail lives in the files it names.",
+  "description": "What one orchestrator unit hands the supervisor and the next unit (docs/rearchitecture/DESIGN-orchestrator-loop.md section 5), or what the OPERATOR hands the next unit through steer.ps1 (unit `operator`, section 4.8). Pointers, not prose: the detail lives in the files it names.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "unit", "outcome", "summary"],
   "properties": {
     "schema_version": {"const": 1},
-    "unit": {"enum": ["wave", "campaign", "land", "resume", "meter"]},
+    "unit": {"enum": ["wave", "campaign", "land", "resume", "meter", "operator"]},
     "outcome": {"enum": ["done", "split", "failed", "owner-question"]},
     "summary": {"type": "string", "minLength": 1, "maxLength": 900},
     "next_unit": {"enum": ["wave", "campaign", "land", "resume", "meter", "owner-question", null]},
@@ -79,6 +79,18 @@
     {
       "if": {"properties": {"unit": {"const": "meter"}, "outcome": {"const": "done"}}, "required": ["unit", "outcome"]},
       "then": {"required": ["meter_reading"]}
+    },
+    {
+      "if": {"properties": {"unit": {"const": "operator"}}, "required": ["unit"]},
+      "then": {
+        "required": ["next_unit", "next_unit_reason"],
+        "properties": {
+          "outcome": {"const": "done"},
+          "next_unit": {"enum": ["wave", "campaign", "land", "resume", "meter"]},
+          "next_unit_reason": {"minLength": 1},
+          "synthesized": {"const": false}
+        }
+      }
     }
   ]
 }

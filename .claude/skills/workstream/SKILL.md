@@ -33,6 +33,11 @@ description: Use BEFORE dispatching any fleet, lander, implementer or adjudicati
 > - **STOP** (`pwsh scripts/orchestrator/stop.ps1`, `-Status`, `-Clear`) winds a running unit and the LOOP's fleet down
 >   without losing work (its own `scratch\STOP-loop`): agents checkpoint-commit and return `SPLIT`; a kill only after the
 >   grace period. `-Global` adds the owner's `scratch\STOP`, which stops every session's agents (kb/Work PB2483).
+> - **Steering** (PB2596): the operator names the next unit ONLY with `pwsh scripts/orchestrator/steer.ps1 -Unit <unit>
+>   -Reason "<why>" [-Summary "<instruction>"]` (validated; it outranks every handoff, a synthesized one included, and is
+>   consumed by the unit it chose). A hand-written `handoff.json` or `handoff.last.json` steers nothing.
+> - **The context policy** (PB2597): past the soft cap (200k) a unit gets `STOP-UNIT` only, so a running fleet finishes
+>   and no new one launches (`dispatch_guard.py` refuses it); the fleet stop comes only with `STOP` or the hard cap (500k).
 > - **One allocator** (`alloc.py`), the quota estimate (`budget.py`, with the owner's `-BorrowDays`), the closed-rows ratchet,
 >   the planner (`plan_wave.py`, which plans from branches and worktrees, never from remembered reports).
 >

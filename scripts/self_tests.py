@@ -317,7 +317,7 @@ def verdict(results: list[Result], platform: str, wall: float,
     red = [r for r in ran if r.rc != 0]
     skipped = [r for r in results if r.rc is None]
     by_reason: dict[tuple[str, str], list[str]] = {}
-    for r in skipped:  # one reason, said once, however many files share it (the eleven test_orchestrate parts do)
+    for r in skipped:  # one reason, said once, however many files share it (the twelve test_orchestrate parts do)
         by_reason.setdefault((r.test.platform or "", r.test.platform_reason), []).append(r.test.path)
     not_run = (f" ({len(skipped)} not run on {platform}: "
                + "; ".join(f"{', '.join(paths)} — {p}-only: {reason}" for (p, reason), paths in by_reason.items()) + ")"

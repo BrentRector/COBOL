@@ -1,7 +1,9 @@
 #Requires -Version 7.0
 # SELF-TEST-PLATFORM: windows — the orchestrator loop is Windows-hosted: these cases drive Windows Terminal (a fake wt.exe), Win32_Process, USERPROFILE and directory junctions
 # Self-test for orchestrate.ps1 (stop), driven by a fake -ClaudeExe (testdata/fake-claude.ps1); no Pester, no real
-# session. Proves: stop.ps1, a second instance refused, the context cap and a subagent's context, an owner question.
+# session. Proves: stop.ps1, a second instance refused, the hard and soft context caps (the soft cap never stops a
+# running fleet and a loop unit cannot launch one after STOP-UNIT, kb/Work PB2597) and a subagent's context, an owner
+# question.
 # One of the parallel parts of the orchestrate.ps1 self-test (testdata/orchestrate_test_lib.ps1 is their harness;
 # kb/Work PB2563). Run: pwsh -NoProfile -File scripts/orchestrator/test_orchestrate_stop.ps1, or every
 # self-test at once: python scripts/self_tests.py
@@ -39,11 +41,24 @@ $r = Run-Orch 'stale' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeco
     param($c) Set-Content -Path (Join-Path $c 'orchestrate.lock') -Value (@{ pid = 999999; started_at = 'long ago' } | ConvertTo-Json -Compress) }
 Check 'stale lock taken over' $r.runs 1
 
-# 7. the context cap sends STOP-UNIT and the unit hands off gracefully (no kill)
+# 7. the HARD context cap sends STOP-UNIT and the loop's fleet stop, and the unit hands off gracefully (no kill)
 $r = Run-Orch 'cap' 'bigcontext' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0', '-MaxContextTokens', '1000')
 Check 'cap: STOP-UNIT sent' $r.units[0].stop_unit_sent $true
+Check 'cap: past the hard cap the fleet stop is sent too' "$($r.units[0].wind_down) $($r.units[0].fleet_stop_sent)" 'context-hard True'
 Check 'cap: not killed' $r.units[0].killed $false
 Check 'cap: handoff split' $r.units[0].handoff_outcome 'split'
+
+# 7c. THE SOFT CAP NEVER THROWS A FLEET AWAY (kb/Work PB2597): past -MaxContextTokens with a Workflow running, the unit gets
+# STOP-UNIT only: no fleet stop (its fleet finishes), no kill; and the dispatch guard refuses a SECOND fleet launch from this
+# loop unit (the supervisor marks the session with COBOL_LOOP_UNIT; wave 1038 launched eight implementers after the signal)
+$r = Run-Orch 'softcap' 'softcap' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0', '-MaxContextTokens', '1000', '-HardContextTokens', '100000')
+Check 'soft cap: STOP-UNIT sent, recorded as the soft wind-down with a fleet running' "$($r.units[0].stop_unit_sent) $($r.units[0].wind_down) $($r.units[0].fleet_at_wind_down)" 'True context-soft True'
+Check 'soft cap: no fleet stop, so the running fleet is not thrown away' "$($r.units[0].fleet_stop_sent) $((Get-Content (Join-Path $r.coord 'soft-fleet-stop-seen.txt') -Raw).Trim())" 'False False'
+Check 'soft cap: the unit is marked as a loop unit' ((Get-Content (Join-Path $r.coord 'loop-unit-env.txt') -Raw).Trim()) 'wave'
+Check 'soft cap: a fleet launch after STOP-UNIT is refused by the dispatch guard' ((Get-Content (Join-Path $r.coord 'guard-exit.txt') -Raw).Trim()) '2'
+Check 'soft cap: the fleet finished and the unit handed off done, not killed' "$($r.units[0].handoff_outcome) $($r.units[0].killed)" 'done False'
+Check 'soft cap: the supervisor says the fleet finishes first' ($r.out -match 'soft cap 1000: STOP-UNIT .*its running fleet finishes and lands first') $true
+Check 'the shipped soft and hard caps (measured, design 4.3)' ((Get-Content $Orch -Raw) -match '\[int\]\$MaxContextTokens = 200000,' -and (Get-Content $Orch -Raw) -match '\[int\]\$HardContextTokens = 500000,') $true
 
 # 7b. a SUBAGENT's context past the cap is not the unit's context: the unit is not wound down
 $r = Run-Orch 'capsub' 'bigsubagent' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0', '-MaxContextTokens', '50000')

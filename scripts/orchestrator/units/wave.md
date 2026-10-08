@@ -2,11 +2,18 @@ UNIT: wave.
 
 1. Load the `workstream` skill (dispatch_guard.py refuses the Workflow call otherwise) and follow
    .claude/skills/workstream/templates/MANDATORY-PRACTICES.md.
+   THE FLEET LAUNCH COMES FIRST (kb/Work PB2597): before the Workflow runs, do nothing but steps 1 to 3. A defect you
+   find on the way (a planner bug, a tooling gap) becomes a kb/Work note (id from alloc.py) named in the handoff, never
+   inline work in this unit. Only when it makes the plan unusable is fixing it this unit's whole job: commit the fix on
+   its own branch, list it DONE in `branches_pending`, hand off WITHOUT launching, and the next units land it and plan
+   afresh. (Wave 1038's unit fixed the planner inline, passed the context cap, launched anyway, and its eight
+   implementers returned SPLIT before any work.)
 2. `python scripts/orchestrator/plan_wave.py --from-budget --borrow-days {BORROW_DAYS} --scratch {SCRATCH} --stop-file {FLEET_STOP}{CLUSTER_ARG}` plans the wave deterministically,
    allocates codes and lead ids, renders the specs with make_dispatch_specs.py and runs check_practices.py. Read its
    table. Change the plan only for a reason you write into the handoff; re-run it rather than editing groups.json.
-3. Start `.claude/skills/workstream/templates/wf_rolling_wave.js` with the args file it wrote
-   ({SCRATCH}\wf-args-w<wave>.json), and run stall_watch.py beside it as the skill says.
+3. Check {STOP_UNIT} IMMEDIATELY before the call; if it exists, do not launch: hand off naming the args file (the
+   specs are reusable by the next unit). Otherwise start `.claude/skills/workstream/templates/wf_rolling_wave.js` with
+   the args file it wrote ({SCRATCH}\wf-args-w<wave>.json), and run stall_watch.py beside it as the skill says.
 4. Stay in this session until the Workflow returns and its last lander train has landed (the Workflow dies with this
    process). The supervisor keeps this session alive and wakes you when a background task finishes, but do not rely on
    being woken: wave 1017's one-shot session was terminated 600 s after its model ended a turn with the Workflow
