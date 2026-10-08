@@ -88,6 +88,32 @@ public sealed class SortTransferRuleDriftTests
         Assert.Equal(1, hooks);
     }
 
+    /// <summary>⛔ AN AS-IF STATEMENT ASKS THE EXPLICIT STATEMENT'S UNCOVERED-FATAL QUESTION (kb/Work PB2700, DOC-A.1-103).
+    /// The abnormal termination of a fatal status nothing covers is rendered by ONE method,
+    /// <c>SequentialIoEmitter.EmitUncoveredFatalTermination</c>, which is the only renderer of
+    /// <c>TerminateOnUncoveredFatalStatus</c> in the code generator; and the SORT/MERGE emitter reaches it from ONE place,
+    /// its disposition, so no as-if statement can skip it. Before PB2700 the hook suppressed it for every as-if statement
+    /// and a SORT whose USING file was missing carried on silently.</summary>
+    [Fact]
+    public void UncoveredFatalTermination_HasOneRenderer_AndTheDispositionAsksIt()
+    {
+        string codegen = TestRepo.Src("Cobol.Net.Compiler", "CodeGen");
+        var renderers = new List<string>();
+        foreach (string file in Directory.EnumerateFiles(codegen, "*.cs", SearchOption.AllDirectories))
+        {
+            if (Path.GetFileName(file) == "RuntimeApi.cs") continue;
+            foreach (var (line, i) in File.ReadAllLines(file).Select((l, i) => (l.TrimStart(), i)))
+                if (!line.StartsWith("//", StringComparison.Ordinal) && line.Contains("RuntimeApi.TerminateOnUncoveredFatalStatus(", StringComparison.Ordinal))
+                    renderers.Add($"{Path.GetRelativePath(codegen, file)}:{i + 1}");
+        }
+        Assert.True(renderers.Count == 1 && renderers[0].StartsWith(Path.Combine("Verbs", "SequentialIoEmitter.cs"), StringComparison.Ordinal),
+            "TerminateOnUncoveredFatalStatus must be rendered only by SequentialIoEmitter.EmitUncoveredFatalTermination:\n" + string.Join("\n", renderers));
+
+        string sort = TestRepo.Src("Cobol.Net.Compiler", "CodeGen", "Verbs", "SortEmitter.cs");
+        var code = File.ReadAllLines(sort).Where(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(1, code.Count(l => l.Contains("seqIo.EmitUncoveredFatalTermination(", StringComparison.Ordinal)));
+    }
+
     /// <summary>§9.1.13.1's fatal class is asked through <c>IoStatusClass.Fatal</c> (which renders the runtime's
     /// <c>ExceptionCatalog.IsFatalIoStatus</c>) — never re-spelled in the emitters.</summary>
     [Fact]

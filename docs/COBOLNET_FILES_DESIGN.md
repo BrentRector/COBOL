@@ -1571,6 +1571,22 @@ GIVING file whose WRITE terminated it is still open afterwards (determination in
 `SortTransferRuleDriftTests` pins every cell and that the hook is reached from ONE place in the emitter. Witness:
 `2002/pb993_sort_merge_transfer_termination` (nine legs, one per cell family).
 
+**Before the table, the question every explicit I-O statement asks (kb/Work PB2700; DOC-A.1-103).** The table is what
+a CONTINUED run unit does with the SORT/MERGE; whether the run unit continues is §9.1.13.1's implementor choice, and
+the as-if statement is performed "as if" the statement "had been executed", so it gets the explicit statement's
+answer: a fatal status on a file with no FILE STATUS clause, no USE procedure applied and no checking enabled for its
+condition ends the run unit. `SequentialIoEmitter.EmitUseHook` computes that condition for every hook; an explicit
+statement renders it at once, while a SORT/MERGE hook (`verbDisposes`) returns it as `UseHookResult.Uncovered` and
+`SortEmitter.EmitDisposition` renders it through the same `SequentialIoEmitter.EmitUncoveredFatalTermination`,
+first, ahead of the table's cell. It sits in the disposition rather than the hook because the GIVING write's
+boundary paragraph — "if no such USE procedure is specified, the processing of the file is terminated" — is the one
+rule that continues past a status nothing covers, and its test runs between the hook and the disposition. Under
+EC-I-O checking the `__IoCheckEc` hook's `__verbRule` keeps the enabled-and-unhandled case the verb's
+(§14.6.13.1.3 2)), so the returned condition also requires the raised condition's mask bit to be clear. Before
+PB2700 the hook suppressed the question outright for every as-if statement, so `SORT … USING` a missing file
+skipped its output procedure and the program carried on. Witnesses: `DocA1Item103WitnessTests` (SORT USING, MERGE
+USING, SORT GIVING; the checked control) and `85/pb2700_sort_merge_missing_using_covered` (the covered arms).
+
 **A SUCCESSFUL as-if READ or WRITE is a READ or WRITE too: it stores its status and offers EC-I-O-WARNING (kb/Work
 PB749).** §9.1.13.1 sets the I-O status *"during the execution of a CLOSE, DELETE, OPEN, READ, REWRITE, START, UNLOCK
 or WRITE statement"* and says *"Any I-O status associated with an unsuccessful completion or a nonzero successful

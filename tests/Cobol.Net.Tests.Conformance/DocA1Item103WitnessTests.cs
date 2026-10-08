@@ -188,4 +188,135 @@ public sealed class DocA1Item103WitnessTests
                 DISPLAY "DONE".
                 STOP RUN.
             """, "AT-END\nDONE");
+
+    // ── The SORT/MERGE implicit transfers (kb/Work PB2700) ──────────────────────────────────────────────────────────
+    // Each as-if statement is performed "as if an OPEN statement with the INPUT phrase ... had been executed"
+    // (§14.9.40.4 GR12 a), §14.9.24.4 GR7 a)) — "as if an OPEN statement with the OUTPUT and SHARING WITH NO OTHER
+    // phrases had been executed" for a GIVING file (GR15 a), GR12 a)) — so its fatal status meets the same §9.1.13.1
+    // determination as the explicit OPEN's. The verb's rules ("the SORT is terminated") are what the CONTINUED run
+    // unit does with the statement. Before PB2700 the implicit OPEN's hook never asked the question: the SORT ended
+    // and the program carried on silently with nothing sorted. The covered arms (FILE STATUS, USE) are the corpus
+    // golden 85/pb2700_sort_merge_missing_using_covered.
+
+    [Fact]   // §9.1.13.6 rule 5 → the USING file's implicit OPEN INPUT is '35'; nothing covers it → the run unit ends.
+    public void SortUsingFileMissing_NoFileStatusNoUse_TerminatesAbnormally()
+        => AssertTerminates("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. L1D103G.
+            ENVIRONMENT DIVISION.
+            INPUT-OUTPUT SECTION.
+            FILE-CONTROL.
+                SELECT F ASSIGN TO "l1d103g-no-such-file.dat"
+                    ORGANIZATION IS SEQUENTIAL.
+                SELECT SW ASSIGN TO "l1d103g.tmp".
+            DATA DIVISION.
+            FILE SECTION.
+            FD F.
+            01 F-REC PIC X(4).
+            SD SW.
+            01 SW-REC PIC X(4).
+            PROCEDURE DIVISION.
+            MAIN-S SECTION.
+            MAIN-P.
+                DISPLAY "BEFORE".
+                SORT SW ON ASCENDING KEY SW-REC USING F OUTPUT PROCEDURE IS OP-S.
+                DISPLAY "AFTER-SORT".
+                STOP RUN.
+            OP-S SECTION.
+            OP-P.
+                DISPLAY "IN-OP".
+            """, "EC-I-O-PERMANENT-ERROR", "SORT USING implicit OPEN", "BEFORE");
+
+    [Fact]   // The MERGE twin: GR7 a) names only a nonfatal OPEN status, so the fatal '35' is §9.1.13.1's to dispose of.
+    public void MergeUsingFileMissing_NoFileStatusNoUse_TerminatesAbnormally()
+        => AssertTerminates("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. L1D103H.
+            ENVIRONMENT DIVISION.
+            INPUT-OUTPUT SECTION.
+            FILE-CONTROL.
+                SELECT F1 ASSIGN TO "l1d103h-no-such-file-1.dat"
+                    ORGANIZATION IS SEQUENTIAL.
+                SELECT F2 ASSIGN TO "l1d103h-no-such-file-2.dat"
+                    ORGANIZATION IS SEQUENTIAL.
+                SELECT SW ASSIGN TO "l1d103h.tmp".
+            DATA DIVISION.
+            FILE SECTION.
+            FD F1.
+            01 F1-REC PIC X(4).
+            FD F2.
+            01 F2-REC PIC X(4).
+            SD SW.
+            01 SW-REC PIC X(4).
+            PROCEDURE DIVISION.
+            MAIN-S SECTION.
+            MAIN-P.
+                DISPLAY "BEFORE".
+                MERGE SW ON ASCENDING KEY SW-REC USING F1 F2 OUTPUT PROCEDURE IS OP-S.
+                DISPLAY "AFTER-MERGE".
+                STOP RUN.
+            OP-S SECTION.
+            OP-P.
+                DISPLAY "IN-OP".
+            """, "EC-I-O-PERMANENT-ERROR", "MERGE USING implicit OPEN", "BEFORE");
+
+    [Fact]   // The GIVING arm: OPEN OUTPUT cannot create a file in a directory that does not exist ('30', fatal).
+    public void SortGivingOpenFails_NoFileStatusNoUse_TerminatesAbnormally()
+        => AssertTerminates("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. L1D103I.
+            ENVIRONMENT DIVISION.
+            INPUT-OUTPUT SECTION.
+            FILE-CONTROL.
+                SELECT G ASSIGN TO "l1d103i-no-such-dir/g.dat"
+                    ORGANIZATION IS SEQUENTIAL.
+                SELECT SW ASSIGN TO "l1d103i.tmp".
+            DATA DIVISION.
+            FILE SECTION.
+            FD G.
+            01 G-REC PIC X(4).
+            SD SW.
+            01 SW-REC PIC X(4).
+            PROCEDURE DIVISION.
+            MAIN-S SECTION.
+            MAIN-P.
+                DISPLAY "BEFORE".
+                SORT SW ON ASCENDING KEY SW-REC INPUT PROCEDURE IS IP-S GIVING G.
+                DISPLAY "AFTER-SORT".
+                STOP RUN.
+            IP-S SECTION.
+            IP-P.
+                MOVE "AAAA" TO SW-REC.
+                RELEASE SW-REC.
+            """, "EC-I-O-PERMANENT-ERROR", "SORT GIVING implicit OPEN", "BEFORE");
+
+    [Fact]   // CONTROL: with checking ENABLED for the condition, §14.6.13.1.3 2) gives the status to the SORT's own rules
+             // (kb/Work PB993): the SORT is terminated and the run unit continues — the "not enabled" half of the question.
+    public void SortUsingFileMissing_CheckingEnabled_FollowsTheVerbRule()
+        => AssertContinues("""
+            >>TURN EC-I-O CHECKING ON
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. L1D103J.
+            ENVIRONMENT DIVISION.
+            INPUT-OUTPUT SECTION.
+            FILE-CONTROL.
+                SELECT F ASSIGN TO "l1d103j-no-such-file.dat"
+                    ORGANIZATION IS SEQUENTIAL.
+                SELECT SW ASSIGN TO "l1d103j.tmp".
+            DATA DIVISION.
+            FILE SECTION.
+            FD F.
+            01 F-REC PIC X(4).
+            SD SW.
+            01 SW-REC PIC X(4).
+            PROCEDURE DIVISION.
+            MAIN-S SECTION.
+            MAIN-P.
+                SORT SW ON ASCENDING KEY SW-REC USING F OUTPUT PROCEDURE IS OP-S.
+                DISPLAY "AFTER-SORT " FUNCTION EXCEPTION-STATUS.
+                STOP RUN.
+            OP-S SECTION.
+            OP-P.
+                DISPLAY "IN-OP".
+            """, "AFTER-SORT EC-I-O-PERMANENT-ERROR");
 }

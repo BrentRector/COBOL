@@ -91,11 +91,15 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             NotNormal(id);
             Completed($"__ior{id} == DispatchResult.Normal || __ior{id} == DispatchResult.HandledNonfatal");
             // Checking enabled for THIS status's condition has already terminated (or dispatched) inside __IoCheckEc;
-            // what reaches here with NoHandler is a status whose condition is not enabled.
-            EmitUncoveredFatalTermination($"__ior{id} == DispatchResult.NoHandler");
-            return new UseHookResult(notNormalLabel is not null, $"__ior{id} == DispatchResult.Normal");
+            // what reaches here with NoHandler is a status whose condition is not enabled. Under __verbRule an
+            // ENABLED fatal condition with no procedure returns NoHandler too (the verb disposes of it, §14.6.13.1.3
+            // 2)), so a SORT/MERGE transfer adds the "not enabled" half an explicit statement gets from that throw.
+            string noHandler = $"__ior{id} == DispatchResult.NoHandler";
+            string notEnabled = $"({mask} & ExceptionCatalog.IoBit({RuntimeApi.FileIoConditionName(FileKeyExpr(file))} ?? \"\")) == 0";
+            return new UseHookResult(notNormalLabel is not null, $"__ior{id} == DispatchResult.Normal",
+                Uncovered(verbDisposes ? $"{noHandler} && {notEnabled}" : noHandler));
         }
-        if (!dispatch.UseDecls) { Completed("false"); EmitUncoveredFatalTermination(null); return default; }
+        if (!dispatch.UseDecls) { Completed("false"); return new UseHookResult(false, null, Uncovered(null)); }
         // An ON EXCEPTION phrase is the statement's own handler for EVERY unsuccessful family (§14.9.10.4
         // GR20c) — no declarative runs, and the plain path has no EC to raise, so the hook is a no-op.
         if (onExceptionHandled) { Completed("false"); return default; }
@@ -108,15 +112,14 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             w.Line(dispatch.ResumeTransfer($"__ior{id}"));
             NotNormal(id);
             Completed($"__ior{id} == DispatchResult.Normal");
-            EmitUncoveredFatalTermination($"__ior{id} == DispatchResult.NoHandler");
-            return new UseHookResult(notNormalLabel is not null, null);
+            return new UseHookResult(notNormalLabel is not null, null, Uncovered($"__ior{id} == DispatchResult.NoHandler"));
         }
         // The non-EC form cannot report a resume action, and it does not need to: RESUME is a §14.9.33 statement
         // of the EC model, so a group without it has no declarative that can end in one. It answers only whether
         // a procedure ran (and, returning, completed normally) — discarded except by the SORT/MERGE transfers.
         string call = $"__IoCheck({FileKeyExpr(file)}, {(atEndHandled ? "true" : "false")}, {(invalidKeyHandled ? "true" : "false")})";
         string? ranVar = useCompletedVar;
-        if (ranVar is null && file.FileStatusName is null && !verbDisposes)
+        if (ranVar is null && file.FileStatusName is null)
         {
             // The termination below turns on whether a procedure ran, so the answer is captured rather than discarded.
             ranVar = $"__ran{ctx.Names.NextEc()}";
@@ -124,8 +127,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         }
         else if (useCompletedVar is not null) Completed(call);
         else w.Line($"{call};");
-        EmitUncoveredFatalTermination(ranVar is null ? null : $"!{ranVar}");
-        return default;
+        return new UseHookResult(false, null, Uncovered(ranVar is null ? null : $"!{ranVar}"));
 
         // ⛔ A FATAL I-O STATUS WITH NEITHER A FILE STATUS CLAUSE NOR AN APPLICABLE USE PROCEDURE TERMINATES THE RUN
         // UNIT (kb/Work PB322 E, Annex A.1 item 103, docs/CONFORMANCE.md DOC-A.1-103). §9.1.13.1 leaves the action
@@ -134,16 +136,33 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         // unit when the file has no FILE STATUS clause (cobc/codegen.c). A program that wrote a FILE STATUS clause sees
         // the status and carries on; so does one with an applicable USE procedure (`noProcedure` is the C# test that
         // none ran), and a statement's own ON EXCEPTION phrase covers every family (§14.9.10.4 GR20 c): the early
-        // return above). A SORT/MERGE implicit transfer is the VERB's rule (§14.6.13.1.3 2): `verbDisposes`.
-        // The test is on the STATUS VALUE (§9.1.13.1 fatal classes) and the CLAUSE, both fixed per file at compile
-        // time, so a program whose files all carry FILE STATUS emits nothing new.
-        void EmitUncoveredFatalTermination(string? noProcedure)
+        // return above). The test is on the STATUS VALUE (§9.1.13.1 fatal classes) and the CLAUSE, both fixed per
+        // file at compile time, so a program whose files all carry FILE STATUS emits nothing new.
+        // ⛔ A SORT/MERGE IMPLICIT TRANSFER (`verbDisposes`) ASKS THE SAME QUESTION (kb/Work PB2700). Each as-if
+        // statement is performed "as if" that statement "had been executed" (§14.9.40.4 GR12, GR15; §14.9.24.4 GR7,
+        // GR12), so §9.1.13.1's action for its fatal status is the one the explicit statement gets; the verb's rules
+        // say what becomes of the SORT/MERGE when the run unit continues. The verb's disposition
+        // (SortEmitter.EmitDisposition) emits the termination AFTER its one rule that continues past a status nothing
+        // covers (the GIVING WRITE's boundary), so for it this hook RETURNS the condition rather than emitting it.
+        UncoveredFatal? Uncovered(string? noProcedure)
         {
-            if (file.FileStatusName is not null || onExceptionHandled || verbDisposes || successArm) return;
-            string key = FileKeyExpr(file);
-            string cond = IoStatusClass.Fatal(RuntimeApi.FileStatus(key)) + (noProcedure is null ? "" : $" && {noProcedure}");
-            w.Line($"if ({cond}) {RuntimeApi.TerminateOnUncoveredFatalStatus(key, CsLiteral(verb))};");
+            if (file.FileStatusName is not null || onExceptionHandled || successArm) return null;
+            if (verbDisposes) return new UncoveredFatal(noProcedure);
+            EmitUncoveredFatalTermination(file, verb, noProcedure);
+            return null;
         }
+    }
+
+    /// <summary>⛔ THE ONE RENDERING OF DOC-A.1-103's ABNORMAL TERMINATION (kb/Work PB322 E, PB2700): a FATAL I-O status
+    /// (§9.1.13.1) on a file whose unsuccessful statement nothing covered ends the run unit through
+    /// <c>CobolFile.TerminateOnUncoveredFatalStatus</c>. <paramref name="noProcedure"/> is the C# test that nothing
+    /// covered it (null: nothing could). Called by every explicit statement's hook (<see cref="EmitUseHook"/>) and by the
+    /// SORT/MERGE implicit transfers' disposition; <paramref name="verb"/> names the statement in the message.</summary>
+    internal void EmitUncoveredFatalTermination(FileModel file, string verb, string? noProcedure)
+    {
+        string key = FileKeyExpr(file);
+        string cond = IoStatusClass.Fatal(RuntimeApi.FileStatus(key)) + (noProcedure is null ? "" : $" && {noProcedure}");
+        ctx.Writer.Line($"if ({cond}) {RuntimeApi.TerminateOnUncoveredFatalStatus(key, CsLiteral(verb))};");
     }
 
     /// <summary>A NOT phrase's body, behind <see cref="UseHookResult.NotPhraseGate"/> when the statement's hook can
@@ -160,8 +179,17 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// <summary>What <see cref="EmitUseHook"/> tells its statement: whether the hook can leave the statement by a
     /// transfer the USE-procedure's completion rules turn on (<see cref="Terminable"/>, the SORT/MERGE
     /// implicit transfers), and the C# condition the statement's NOT phrase must also satisfy
-    /// (<see cref="NotPhraseGate"/>, kb/Work PB1120 — null when no EC-I-O hook can interrupt a success).</summary>
-    internal readonly record struct UseHookResult(bool Terminable, string? NotPhraseGate);
+    /// (<see cref="NotPhraseGate"/>, kb/Work PB1120 — null when no EC-I-O hook can interrupt a success).
+    /// <para><see cref="Uncovered"/> is set for the SORT/MERGE implicit transfers only (kb/Work PB2700): the question
+    /// DOC-A.1-103 asks of a fatal status, which the verb's disposition renders; null when the file's FILE STATUS
+    /// clause covers the status. An explicit statement's hook renders that termination itself.</para></summary>
+    internal readonly record struct UseHookResult(bool Terminable, string? NotPhraseGate, UncoveredFatal? Uncovered = null);
+
+    /// <summary>DOC-A.1-103's "nothing covers this status" for a file with no FILE STATUS clause:
+    /// <see cref="NoProcedure"/> is the C# test that no USE procedure applied and no checking is enabled for the raised
+    /// condition, or null when nothing could apply (the unit has no declaratives) — the argument
+    /// <see cref="EmitUncoveredFatalTermination"/> takes.</summary>
+    internal readonly record struct UncoveredFatal(string? NoProcedure);
 
     /// <summary>Emit the file registry init + one <c>Register</c> per SELECTed sequential file (at <c>Main</c> start).
     /// The ASSIGN target becomes a host path at run time (the runtime's <c>ResolveHostPath</c>); the record width is the

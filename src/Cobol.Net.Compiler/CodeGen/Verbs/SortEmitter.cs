@@ -377,15 +377,16 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
                     EmitRelativeKeyStore(output);
             using (w.Block($"if ({IoStatusClass.Unsuccessful(ws)})"))
             {
-                string? used = EmitTransferUse(output, TransferIo.GivingWrite, tx);
+                var hook = EmitTransferUse(output, TransferIo.GivingWrite, tx);
                 // "On the first attempt to write outside the externally defined boundaries of the file, any USE
                 // AFTER EXCEPTION procedure … is executed; if that USE procedure completes normally or if no such
                 // USE procedure is specified, the processing of the file is terminated as in General rule 15c"
                 // (MERGE GR12's paragraph: "as in General rule 12c") — the CLOSE below. The boundary is the one
                 // write failure whose rule is specific, so it is tested BEFORE the general disposition (a '34' is
-                // fatal by §9.1.13.1's class, and would otherwise terminate the whole statement).
+                // fatal by §9.1.13.1's class, and would otherwise terminate the whole statement — or, with nothing
+                // covering it, the run unit: this is the one rule that continues past a status nothing covers).
                 w.Line($"if ({IoStatusClass.WriteBoundary(ws)}) break;   // GR15 / MERGE GR12 — terminated as in GR15c");
-                EmitDisposition(ws, used, TransferIo.GivingWrite, tx);
+                EmitDisposition(output, ws, hook, TransferIo.GivingWrite, tx);
             }
             EmitSuccessfulTransferHook(output, ws, TransferIo.GivingWrite, tx, otherwise: true);
         }
@@ -444,9 +445,11 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
         }
         seqIo.EmitStoreFileStatus(file);   // §9.1.13.1 / §12.4.5.8.4 GR1 — before the declarative, not after it
         // A failed implicit OPEN reaches a USE declarative (GR12a / GR15a); one that does not complete normally
-        // terminates the SORT/MERGE (§14.9.40.4 GR17), and the verb's own rule then disposes of the status —
-        // GR15's "If a fatal exception condition exists for file-name-3 as a result of the implicit OPEN during
-        // file initiation, the SORT is terminated" among them (kb/Work PB993).
+        // terminates the SORT/MERGE (§14.9.40.4 GR17). A FATAL status nothing covers then ends the run unit exactly
+        // as the explicit OPEN's does (DOC-A.1-103 — a missing non-OPTIONAL USING file, kb/Work PB2700), and
+        // otherwise the verb's own rule disposes of the status — GR15's "If a fatal exception condition exists for
+        // file-name-3 as a result of the implicit OPEN during file initiation, the SORT is terminated" among them
+        // (kb/Work PB993).
         EmitTransferHook(file, RuntimeApi.FileStatus(f), io, tx);
     }
 
@@ -484,8 +487,11 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
     /// <para><b>The default is §9.1.13.1's.</b> A fatal status (3x/4x/7x, and 9x, which this implementation
     /// defines as fatal) is disposed of "after the execution of any applicable exception processing statement, or
     /// if none applies, after completion of the normal input-output control system error processing", and this
-    /// implementation CONTINUES the run unit: "control is transferred to the end of the statement that produced the
-    /// fatal exception condition unless the rules for that statement define other behavior". The statement that
+    /// implementation CONTINUES the run unit whenever the program can see the failure (DOC-A.1-103: a FILE STATUS
+    /// clause, an applicable USE procedure, or checking enabled for the condition — the uncovered case ends the run unit
+    /// before this table is read, <see cref="EmitDisposition"/>; kb/Work PB2700): "control is transferred to the end
+    /// of the statement that produced the fatal exception condition unless the rules for that statement define other
+    /// behavior". This table is that continuation's statement half. The statement that
     /// produced it is the SORT/MERGE — the as-if statement is not a statement of the program (§14.9.33.4 GR2 a) 1.)
     /// — so the default fatal disposition is TERMINATE. §14.6.13.1.3 2) ("If the executed statement is a MERGE or
     /// SORT statement, then the rules for those statements apply") puts these rules ahead of the run-unit
@@ -533,21 +539,40 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
     /// as-if statement produced.</summary>
     private void EmitTransferHook(FileModel file, string status, TransferIo io, Transfer tx, bool atEndHandled = false)
     {
-        string? used = EmitTransferUse(file, io, tx, atEndHandled);
-        EmitDisposition(status, used, io, tx);
+        var hook = EmitTransferUse(file, io, tx, atEndHandled);
+        EmitDisposition(file, status, hook, io, tx);
     }
+
+    /// <summary>What an as-if statement's USE hook hands its disposition: <see cref="Used"/>, the "an applicable USE
+    /// procedure completed normally" local (declared only where <see cref="RuleFor"/>'s cell turns on it), and
+    /// <see cref="Uncovered"/>, DOC-A.1-103's "nothing covers this status" question (null when the file's FILE STATUS
+    /// clause covers it) — <see cref="SequentialIoEmitter.UseHookResult.Uncovered"/>.</summary>
+    private readonly record struct TransferHook(string? Used, SequentialIoEmitter.UncoveredFatal? Uncovered);
+
+    /// <summary>The as-if statement as the abnormal-termination message names it (after the verb).</summary>
+    private static string AsIfStatement(TransferIo io) => io switch
+    {
+        TransferIo.UsingOpen => "USING implicit OPEN",
+        TransferIo.UsingRead => "USING implicit READ",
+        TransferIo.UsingClose => "USING implicit CLOSE",
+        TransferIo.GivingOpen => "GIVING implicit OPEN",
+        TransferIo.GivingWrite => "GIVING implicit WRITE",
+        TransferIo.GivingClose => "GIVING implicit CLOSE",
+        _ => throw new ArgumentOutOfRangeException(nameof(io), io, null),
+    };
 
     /// <summary>The as-if statement's USE hook: jumps to the end label when the procedure does not complete
     /// normally (§14.9.40.4 GR17; §14.9.33.4 GR2 a) 1.), and, only where the rule turns on it, declares the
-    /// "an applicable USE procedure completed normally" local and returns its name.</summary>
-    private string? EmitTransferUse(FileModel file, TransferIo io, Transfer tx, bool atEndHandled = false,
+    /// "an applicable USE procedure completed normally" local.</summary>
+    private TransferHook EmitTransferUse(FileModel file, TransferIo io, Transfer tx, bool atEndHandled = false,
         bool successArm = false)
     {
         // A successful statement's hook has no disposition to turn on its completion: nothing is disposed of.
         string? used = !successArm && RuleFor(tx.Merge, io).NeedsCompletion ? $"__sru{ctx.Names.NextSort()}" : null;
-        tx.Terminable |= seqIo.EmitUseHook(file, "SORT/MERGE", atEndHandled: atEndHandled, notNormalLabel: tx.EndLabel,
-            verbDisposes: true, useCompletedVar: used, successArm: successArm).Terminable;
-        return used;
+        var hook = seqIo.EmitUseHook(file, "SORT/MERGE", atEndHandled: atEndHandled, notNormalLabel: tx.EndLabel,
+            verbDisposes: true, useCompletedVar: used, successArm: successArm);
+        tx.Terminable |= hook.Terminable;
+        return new TransferHook(used, hook.Uncovered);
     }
 
     /// <summary>⛔ A SUCCESSFUL as-if READ / WRITE'S FILE STATUS STORE AND EC HOOK (kb/Work PB749): the status the
@@ -574,14 +599,21 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
             EmitTransferUse(file, io, tx, successArm: true);
     }
 
-    /// <summary>Render <see cref="RuleFor"/>'s cell for one as-if statement: a fatal status, then any other
-    /// unsuccessful one. A Continue cell emits nothing.</summary>
-    private void EmitDisposition(string status, string? used, TransferIo io, Transfer tx)
+    /// <summary>⛔ THE ONE DISPOSITION OF AN AS-IF STATEMENT'S UNSUCCESSFUL STATUS, after its USE procedure. First the
+    /// question every explicit I-O statement asks (DOC-A.1-103, kb/Work PB2700): a FATAL status that nothing covered —
+    /// no FILE STATUS clause, no USE procedure applied, no checking enabled for its condition — ends the run unit, because
+    /// §9.1.13.1 leaves the run unit's fate to the implementor ("The implementor may either continue or terminate the
+    /// execution of the run unit") and the as-if statement is performed "as if" that statement "had been executed".
+    /// Then <see cref="RuleFor"/>'s cell, which is what the CONTINUED run unit does with the SORT/MERGE: a fatal
+    /// status, then any other unsuccessful one. A Continue cell emits nothing.</summary>
+    private void EmitDisposition(FileModel file, string status, TransferHook hook, TransferIo io, Transfer tx)
     {
         var w = ctx.Writer;
+        if (hook.Uncovered is { } uncovered)
+            seqIo.EmitUncoveredFatalTermination(file, $"{(tx.Merge ? "MERGE" : "SORT")} {AsIfStatement(io)}", uncovered.NoProcedure);
         var rule = RuleFor(tx.Merge, io);
-        string fatal = Render(rule.FatalCompleted, rule.FatalOtherwise, used, tx);
-        string nonfatal = Render(rule.NonfatalCompleted, rule.NonfatalOtherwise, used, tx);
+        string fatal = Render(rule.FatalCompleted, rule.FatalOtherwise, hook.Used, tx);
+        string nonfatal = Render(rule.NonfatalCompleted, rule.NonfatalOtherwise, hook.Used, tx);
         string tag = $"   // {(tx.Merge ? "MERGE" : "SORT")} {io} — the implicit-transfer rule (kb/Work PB993)";
         if (fatal.Length > 0)
             w.Line($"if ({IoStatusClass.Fatal(status)}) {{ {fatal} }}{tag}");
