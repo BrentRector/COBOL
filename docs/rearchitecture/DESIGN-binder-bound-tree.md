@@ -538,6 +538,19 @@ receiving-side `ScreenResultant` (which DID have the index arm), and this classi
 used. The extraction is what closes the index-data-item, pointer and object holes without a new rule, and what
 preserves the 2026-08-02 numeric-edited owner decision by construction rather than by a hand-written arm.
 
+**⛔ A word that stands for a literal is resolved in ONE place, `ExpressionBinder.LiteralAliasOf` (kb/Work PB1544).**
+A constant-name ("as if literal-1 … were written where constant-name-1 is written", §13.10.4 GR1) and a
+symbolic-character ("defines a figurative constant", §12.3.7.4 GR11 a)) both arrive as a bare data reference. The
+resolution returns a `LiteralAlias` (the constant's definition or the symbolic character's value), `AliasOperand` binds
+it to the shape the written literal takes (a symbolic-character is the bare `BoundAllLiteral`, `BeginsWithAll = false`:
+fill when the context sizes it, one character when it does not, §8.3.3.6.4 GR2/GR3), and every procedure position asks
+it: `FieldOperand`, the numeric-expression `RefExpr` (COBOLNET0844 for a non-numeric alias), the receiving refusal
+(COBOLNET1548), intrinsic and user-function arguments, INSPECT operands, the UNSTRING sender refusal, CALL Format 2's
+keyword-less, BY CONTENT and BY VALUE literal-2 (§14.9.4.3 SR23 asked of the alias) and INVOKE's literal-2 (§14.9.23.3
+SR16). A numeric constant-name in a BY CONTENT / BY VALUE / intrinsic-argument position keeps the expression path a
+written numeric literal takes there. The chain had been written separately in six binders, and the positions missing a
+half refused conforming source; `LiteralAliasResolutionDriftTests` holds every procedure binder to the one resolution.
+
 ### 3.7 Statement PRE-ops and the ONE sending-value materialization
 
 Several general rules say a value is computed **once, before the statement's effect**, and then used several

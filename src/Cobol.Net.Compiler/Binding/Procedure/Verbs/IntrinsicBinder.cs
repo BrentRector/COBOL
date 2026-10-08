@@ -2862,30 +2862,22 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // §8.4.3.13.4 GR1), which a user-defined function's BY VALUE pointer formal admits (SR10) and each
         // intrinsic's own §15.x argument-class rule accepts or refuses by name. A refusal was reported there.
         if (a.addressIdentifier() is { } ai) return host.Ptr.AddressIdentifierOperand(ai, "a function argument");
-        // ⛔ A CONSTANT-NAME SUBSTITUTES ITS LITERAL, OF ITS OWN CLASS — HERE, BEFORE THE NUMERIC PATH BELOW
-        // (fix-queue R01). §13.10.4 GR1: "the effect of specifying constant-name-1 in other than this entry is as
-        // if literal-1 … were written where constant-name-1 is written", and §13.10.3 SR2 admits it "anywhere
-        // that a format specifies a literal of the class and category of constant-name-1". An intrinsic argument
-        // is such a position for whatever class the function's own §15.x argument rule admits.
-        // Without this arm the reference fell to `BindFunctionArgumentExpr` — the §8.8.1.1 NUMERIC-expression
-        // bind — and an alphanumeric or national constant was rejected as "not a numeric operand", in EVERY
-        // intrinsic argument position. `FUNCTION UPPER-CASE(K-TEXT)` did not compile while
-        // `FUNCTION UPPER-CASE("abcdef")` did, for source §13.10.4 GR1 makes identical.
+        // ⛔ A LITERAL ALIAS SUBSTITUTES ITS LITERAL, OF ITS OWN CLASS — HERE, BEFORE THE NUMERIC PATH BELOW (fix-queue
+        // R01, kb/Work PB1577, PB1544). A constant-name: §13.10.4 GR1 "the effect of specifying constant-name-1 in other
+        // than this entry is as if literal-1 … were written where constant-name-1 is written", and §13.10.3 SR2 admits
+        // it "anywhere that a format specifies a literal of the class and category of constant-name-1". A
+        // symbolic-character "defines a figurative constant" (§12.3.7.4 GR11 a)), which "may be used whenever 'literal'
+        // appears in a format" (§8.3.3.6.3 SR1) — `FUNCTION ORD(SPACE)` compiles, so `FUNCTION ORD(S67)` does. An
+        // intrinsic argument is such a position for whatever class the function's own §15.x argument rule admits.
+        // Without this arm the reference fell to `BindFunctionArgumentExpr` — the §8.8.1.1 NUMERIC-expression bind —
+        // and an alphanumeric or national constant was "not a numeric operand", a symbolic-character "not defined".
+        // Asked of the ONE alias resolution (ExpressionBinder.LiteralAliasOf), so the shape is the one every position
+        // gets: the substituted literal, or the bare figurative (taken once here, §8.3.3.6.4 GR3).
         // ⚠ A NUMERIC constant deliberately falls through: the expression path already substitutes it correctly
         // (ExpressionBinder.RefExpr → BoundNumLiteral) and it must keep participating in arithmetic — an argument
         // like `FUNCTION MAX(K-NUM + 1)` is an expression, not a bare literal, and only that path can bind it.
-        if (SoleDataReference(a) is { } cref
-            && ctx.Data.ConstantOf(cref) is { Category: not PicCategory.Numeric } k)
-            return new BoundStringLiteral(k.Text) { Category = k.Category };
-        // ⛔ A SYMBOLIC-CHARACTER IS A FIGURATIVE CONSTANT, AND A FIGURATIVE STANDS IN AN INTRINSIC ARGUMENT (kb/Work
-        // PB1577). §8.3.3.6 SR1 / §12.3.7.4 GR11 make it a figurative constant usable wherever one is, and
-        // `FUNCTION ORD(SPACE)` compiles — but the bare word S67 fell to the numeric-expression path below, which
-        // resolves data items only, so `FUNCTION ORD(S67)` drew COBOLNET1639 "not defined" about a name SPECIAL-NAMES
-        // declared. Its value is the ONE character it was defined as, of the alphabet's class (national when it was
-        // defined FOR NATIONAL) — exactly what a one-character literal of that class is.
-        if (SoleDataReference(a) is { } sref && ctx.Data.SymbolicOf(sref) is { } sym)
-            return new BoundStringLiteral(sym.Value)
-            { Category = sym.National ? PicCategory.National : PicCategory.Alphanumeric };
+        if (SoleDataReference(a) is { } aliasRef && host.Expr.LiteralAliasOf(aliasRef) is { IsNumeric: false } alias)
+            return host.Expr.AliasOperand(alias);
         // An argument is NOT an §8.8.1.1 arithmetic expression: its legality comes from this function's own §15.x
         // ARGUMENT RULE, and the string functions admit alphanumeric data. The named entry says so at the call
         // site — TRIM / SUBSTITUTE / FIND-STRING / CONVERT over a PIC X item are legal (DA6).

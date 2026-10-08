@@ -313,8 +313,9 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
         // constant is national; when identifier-1 is of class boolean, the figurative constant is of class
         // boolean" — so it is never recorded and can never be the mismatch. The ALL-literal figurative literal-5
         // is the exception: SR3's class sentence is written over "literal-1, literal-2, or literal-4", and an
-        // `ALL N"…"` carries the class of the LITERAL written in it, so SR4 asks it like any literal.
-        if (!bound.Figurative || bound.Op is BoundAllLiteral)
+        // `ALL N"…"` carries the class of the LITERAL written in it, so SR4 asks it like any literal. The BARE symbolic
+        // character is a BoundAllLiteral too (its fill semantics), but no word ALL is written and it is not recorded.
+        if (!bound.Figurative || bound.Op is BoundAllLiteral { BeginsWithAll: true })
             _sr4Operands?.Add(Sr4Entry(bound.Op));
         return bound;
     }
@@ -397,21 +398,22 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
             return (ScreenZeroLength(litOp, c), false);
         if (c.dataReference() is { } dref)
         {
-            // ⛔ A CONSTANT-NAME IS A LITERAL HERE (kb/Work PB1127): §13.10.3 SR2 "may be used anywhere that a format
-            // specifies a literal", §13.10.4 GR1 "as if literal-1 ... were written" — so it substitutes BEFORE the
-            // identifier arm below, which would refuse it as an undefined data-name. The SAME bound shape the written
-            // literal produces, so SR3's class/zero-length screens and SR4/SR6/SR7/SR9 all see it as one.
-            if (host.Expr.ConstantOperand(dref) is { } konst)
-                return konst is BoundNumericLiteral
+            // ⛔ A LITERAL ALIAS IS A LITERAL HERE, through the ONE alias resolution (kb/Work PB1127, PB110, PB1544). A
+            // constant-name: §13.10.3 SR2 "may be used anywhere that a format specifies a literal", §13.10.4 GR1 "as if
+            // literal-1 ... were written" — so it substitutes BEFORE the identifier arm below, which would refuse it as
+            // an undefined data-name, in the SAME bound shape the written literal produces, so SR3's class/zero-length
+            // screens and SR4/SR6/SR7/SR9 all see it as one. A bare symbolic-character IS a figurative constant
+            // (§12.3.7.4 GR11 a)) — the bare figurative operand, one character, with the SR6 / GR14 figurative expansion
+            // the literal figuratives get, and identifier-1's class (SR3), so SR4 does not record it.
+            if (host.Expr.LiteralAliasOf(dref) is { } alias)
+                return alias.IsNumeric
                     ? (BoundOperandError.Report(ctx.Edition, DiagnosticCatalog.StatementOperandRule,
                         $"INSPECT operand '{dref.GetText()}' is a numeric constant-name; each INSPECT literal shall be an "
                         + "alphanumeric, boolean, or national literal (ISO §14.9.22.3 SR3, §13.10.3 SR2)",
                         $"INSPECT operand '{dref.GetText()}' (ISO §14.9.22.3 SR3)"), false)
-                    : (ScreenZeroLength(konst, c), false);
-            // A bare symbolic character IS a figurative constant (§12.3.7.4 GR11; kb/Work PB110) — one character,
-            // with the SR6 / GR14 figurative expansion the literal figuratives get.
-            if (ctx.Data.SymbolicOf(dref) is { } sym)
-                return (new BoundStringLiteral(sym.Value) { Category = sym.National ? PicCategory.National : PicCategory.Alphanumeric }, true);
+                    : alias.Constant is not null
+                        ? (ScreenZeroLength(host.Expr.AliasOperand(alias), c), false)
+                        : (host.Expr.AliasOperand(alias), true);
             if (host.Expr.ResolveSending(dref) is var pr && pr.Place is not { } p)
                 return (pr.OperandError(ctx.Edition), false);   // the resolver's answer (kb/Work PB1030)
             ctx.Validation.CheckInspectOperandUsage(p, dref.GetText());   // SR2 — pure check

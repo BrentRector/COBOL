@@ -4,6 +4,7 @@
   "pb2554_class_comma_driver_period",
   "pb2554_class_period_driver_comma",
   "pb2489_invoke_base_new",
+  "pb1544_literal_alias_arguments",
   "pb2466_renames_half_national_byte",
   "pb1045_global_constant_beside_class",
   "pb2093_member_names_like_generated_members",

@@ -175,10 +175,14 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         // data item referenced by identifier-1 is the sending operand") — whereas STRING's identifier-1/literal-1 and
         // both verbs' delimiter operands DO specify a literal, so StrUnstrSender, which serves all four positions,
         // substitutes the constant's literal there and is right to. This is the one position it must refuse: the
-        // receiving side already does (COBOLNET1548), and without this the two arms disagree.
-        if (un.strUnstrSender().dataReference() is { } constRef && ctx.Data.ConstantOf(constRef) is not null)
-            return Reject($"UNSTRING sender '{senderText}' is a constant-name, which stands only where a format specifies a "
-                + "literal; identifier-1 is a data item (ISO §14.9.48.3 SR8; §13.10.3 SR2)");
+        // receiving side already does (COBOLNET1548), and without this the two arms disagree. A symbolic-character is a
+        // literal by the same ONE alias resolution (a figurative constant, §12.3.7.4 GR11 a); kb/Work PB1544).
+        if (un.strUnstrSender().dataReference() is { } aliasRef && host.Expr.LiteralAliasOf(aliasRef) is { } alias)
+            return Reject(alias.Constant is not null
+                ? $"UNSTRING sender '{senderText}' is a constant-name, which stands only where a format specifies a "
+                    + "literal; identifier-1 is a data item (ISO §14.9.48.3 SR8; §13.10.3 SR2)"
+                : $"UNSTRING sender '{senderText}' is a symbolic-character, a figurative constant (ISO §12.3.7.4 GR11 a)); "
+                    + "identifier-1 is a data item (ISO §14.9.48.3 SR8)");
         // SR2 — identifier-1 (the sender) shall be category alphanumeric or national (a fixed-length group and a
         // reference-modified slice are alphanumeric-image senders and remain permitted). A numeric item — INCLUDING
         // usage DISPLAY, whose zoned image would otherwise be examined as characters — a numeric-edited item, or a

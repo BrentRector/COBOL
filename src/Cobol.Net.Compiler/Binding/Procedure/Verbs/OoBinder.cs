@@ -996,12 +996,24 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // receiving chokepoint refused it as a receiving operand; under BY CONTENT the sending resolver, which knows
         // no constant-names, answered "not defined". Only an EXPLICIT BY REFERENCE keeps it identifier-3 — the one
         // branch whose operand is identifier-3 or OMITTED — and the receiving chokepoint's §13.10.4 GR1 refusal is
-        // then the right verdict.
+        // then the right verdict. A symbolic-character is literal-2 the same way — a figurative constant (§12.3.7.4
+        // GR11 a)), which "may be used whenever 'literal' appears in a format" (§8.3.3.6.3 SR1) — and both are asked of
+        // the ONE alias resolution (kb/Work PB1544: the symbolic-character fell to the sending resolver, "not defined").
         BoundOperand? literal2 = null;
         string? constantName = null;
-        if (dref is not null && !explicitReference && host.Expr.ConstantOperand(dref) is { } constantLiteral)
+        if (dref is not null && !explicitReference && host.Expr.LiteralAliasOf(dref) is { } alias)
         {
-            literal2 = constantLiteral;
+            // §14.9.23.3 SR16 — "If literal-2 or its corresponding formal parameter is specified with the BY VALUE
+            // phrase, literal-2 shall be a numeric literal" — asked of the literal the alias stands for, as the
+            // written literal is asked above (only a numeric constant-name satisfies it).
+            if (byValue && !alias.IsNumeric)
+            {
+                Err($"BY VALUE {alias.Word}: the argument is the {alias.Described}, and literal-2 shall be a numeric "
+                    + "literal when it or its corresponding formal parameter is specified with the BY VALUE phrase "
+                    + "(ISO §14.9.23.3 SR16)");
+                return null;
+            }
+            literal2 = host.Expr.AliasOperand(alias);
             constantName = dref.GetText();
             dref = null;
             arithCtx = null;

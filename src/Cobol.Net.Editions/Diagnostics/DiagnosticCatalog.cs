@@ -213,8 +213,9 @@ public static class DiagnosticCatalog
         "ISO §13.10.3 / §7.3.6.2");
     public static readonly DiagnosticDescriptor ConstantAsReceiver = new(
         "COBOLNET1548", "constant-as-receiver", EditionSeverity.Error,
-        "A constant-name or a data item of a CONSTANT RECORD shall not be specified as a receiving operand — a "
-        + "constant substitutes a literal, and a structured constant's content cannot be modified.",
+        "A constant-name, a symbolic-character or a data item of a CONSTANT RECORD shall not be specified as a "
+        + "receiving operand — a constant-name substitutes a literal, a symbolic-character is a figurative constant "
+        + "(§12.3.7.4 GR11 a)), and a structured constant's content cannot be modified.",
         "ISO §13.10.3 SR2 / §13.18.15.3 SR2");
     public static readonly DiagnosticDescriptor ConstantRecordRule = new(
         "COBOLNET1549", "constant-record-rule", EditionSeverity.Error,
@@ -4708,6 +4709,21 @@ public static class DiagnosticCatalog
         + "(§8.4.3.14.1) and maintained by the input-output control system, so a report-section SOURCE operand or "
         + "expression, PRESENT WHEN condition, SUM addend or VARYING expression cannot name it. Move it to a data "
         + "item in a procedure division statement and name that item.", "ISO §8.4.3.14.3 SR1");
+
+    /// <summary>COBOLNET3146 — a relation condition whose subject and object are both literals (kb/Work PB1470).
+    /// ISO §8.8.4.2.1 closes its general rules with an unnumbered sentence (cite.py stamps it "13)"): "A relation
+    /// condition shall contain at least one reference to an operand that is not a literal." It is neither a general
+    /// format nor a syntax rule, so §4.2.2 asks for its "warning mechanism" to indicate it. A WARNING by determination
+    /// (docs/CONFORMANCE.md D-RELLITERAL): the severity is implementor latitude, and the owner's precedence follows
+    /// GnuCOBOL 3.2, which warns (-Wconstant-expression) and compiles the relation.</summary>
+    public static readonly DiagnosticDescriptor RelationOperandsAllLiteral = new(
+        "COBOLNET3146", "relation-operands-all-literal", EditionSeverity.Warning,
+        "Both operands of a relation condition are literals. ISO §8.8.4.2.1: \"A relation condition shall contain at "
+        + "least one reference to an operand that is not a literal.\" A figurative constant (§8.3.3.6, including a "
+        + "symbolic-character) and a constant-name (§13.10.4 GR1) are literals, so `IF 1 = 1`, `IF \"A\" = SPACE`, "
+        + "`IF ZERO = ZERO` and `PERFORM UNTIL 1 = 2` each compare two literals. The program compiles and the relation "
+        + "is evaluated as written; the warning is the §4.2.2 indication that the source is outside the standard.",
+        "ISO §8.8.4.2.1");
 
     // ── COBOLNET2030/2031 — the two §14.9.20.3 screens INITIALIZE never asked at the one place identifier-1 and
     //    its REPLACING operands are resolved (kb/Work PB416). The statement's other two unasked rules need no new

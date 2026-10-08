@@ -1,5 +1,6 @@
 {
  "enabled": [
+  "pb1470_relation_of_two_literals_runs",
   "pb1027_plain_write_is_after_advancing_85",
   "pb1914_debugging_line_continued_under_clause",
   "pb1914_debugging_line_between_literal_parts",

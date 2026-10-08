@@ -219,7 +219,8 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // the class and category alphanumeric" (both cite.py-verified). So it belongs wherever an alphanumeric
         // literal belongs — a relation condition (§8.8.4.2.1 constrains only that not BOTH operands be
         // literals, so a literal on one side is admitted; the phantom "§8.8.4.1.1" this used to cite does not
-        // exist — cite.py --check, kb/Work PB182, whose note owns the remaining sites), MOVE, STRING, an
+        // exist — cite.py --check, kb/Work PB182, whose note owns the remaining sites; the both-literals half is
+        // StatementValidation.CheckRelationHasNonLiteralOperand's, kb/Work PB1470), MOVE, STRING, an
         // intrinsic argument. CobolLiteral.DecodeHex is the ONE hex codec (landed by DA1 for the §12.3.7 ALPHABET
         // path); this reuses it rather than decoding again.
         if (nn.HEXLIT() is { } hx) return new BoundStringLiteral(CobolLiteral.DecodeHex(hx.GetText()));
@@ -389,8 +390,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         : host.Rw.CounterExpr(dref) is { } rcx ? new BoundComputedOperand(rcx)
         : host.Rw.VaryingExpr(dref) is { } rvx ? new BoundComputedOperand(rvx)   // a report VARYING counter in scope (§13.18.64.3 SR2)
         : IndexFieldOf(dref) is { } ix ? new BoundComputedOperand(new BoundIndexRef(ix))
-        : ConstantOperand(dref) is { } konst ? konst   // a constant-name substitutes its literal (§13.10.3 SR2)
-        : ctx.Data.SymbolicOf(dref) is { } sym ? SymbolicOperand(sym)   // a symbolic character is a figurative constant (§12.3.7.4 GR11; PB110)
+        : LiteralAliasOperand(dref) is { } alias ? alias   // a constant-name or symbolic-character stands for a literal (kb/Work PB1544)
         : ctx.Refs.Resolve(dref) is var r && r.Place is { } p ? new BoundFieldOperand(p) : r.OperandError(ctx.Edition);   // kb/Work PB1030
 
     /// <summary>The §13.18.38.3 r7 screen for an operand slot OUTSIDE the five contexts that may reference an
@@ -438,20 +438,55 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         return true;
     }
 
-    /// <summary>The bound literal a bare constant-name reference substitutes, or <see langword="null"/> when
-    /// <paramref name="dref"/> names no constant (ISO §13.10.3 SR2 / §13.10.4 GR1 — "as if [the] literal were
-    /// written where constant-name-1 is written"): the SAME bound shape the equivalent plain literal would
-    /// produce (the <see cref="ConcatOperand"/> precedent). A numeric constant rides <see cref="CheckLiteral"/>
-    /// so the edition digit-cap window applies to the substituted literal exactly as to a written one.</summary>
-    internal BoundOperand? ConstantOperand(Core.DataReferenceContext dref) =>
-        ctx.Data.ConstantOf(dref) is not { } k ? null
-        : k.Category switch
-        {
-            PicCategory.Numeric => NumericLiteralOperand(k.Text),
-            PicCategory.National => new BoundStringLiteral(k.Text) { Category = PicCategory.National },
-            PicCategory.Boolean => new BoundStringLiteral(k.Text) { Category = PicCategory.Boolean },
-            _ => new BoundStringLiteral(k.Text),
-        };
+    /// <summary>A word that stands for a LITERAL where the program wrote a data reference (kb/Work PB1544): a
+    /// constant-name, whose effect "is as if literal-1 … were written where constant-name-1 is written" (ISO §13.10.4
+    /// GR1; §13.10.3 SR2: it "may be used anywhere that a format specifies a literal"), or a symbolic-character, which
+    /// "defines a figurative constant" (§12.3.7.4 GR11 a); §8.3.2.2.29), and a figurative constant "may be used
+    /// whenever 'literal' appears in a format" (§8.3.3.6.3 SR1). Exactly one of <paramref name="Constant"/> and
+    /// <paramref name="Symbolic"/> is set.</summary>
+    /// <param name="Word">The word as written, for diagnostics.</param>
+    internal sealed record LiteralAlias(string Word, DataBinder.ConstantDef? Constant, (string Value, bool National)? Symbolic)
+    {
+        /// <summary>A numeric constant-name: the one alias a numeric-literal position admits (a symbolic-character is
+        /// never numeric — §8.3.3.6.3 SR1 a) admits only ZERO where a literal is restricted to numeric).</summary>
+        public bool IsNumeric => Constant is { Category: PicCategory.Numeric };
+
+        /// <summary>The alias named for a diagnostic, with the rule that makes it a literal.</summary>
+        public string Described => Constant is not null
+            ? $"constant-name '{Word}', which substitutes the literal {Constant.RawText} (ISO §13.10.4 GR1)"
+            : $"symbolic-character '{Word}', a figurative constant (ISO §12.3.7.4 GR11 a))";
+    }
+
+    /// <summary>⛔ THE ONE LITERAL-ALIAS RESOLUTION (kb/Work PB1544): the constant-name table, then the SPECIAL-NAMES
+    /// symbolic characters, for a BARE data reference — or <see langword="null"/>. Every procedure-division position
+    /// that admits a literal asks HERE (an operand, an intrinsic argument, an INSPECT operand, CALL and INVOKE's
+    /// literal-2, the receiving and numeric-expression refusals), so the next literal position gets both kinds by
+    /// calling one method. The chain used to be written separately in six binders; a CALL Format-2 BY CONTENT or BY
+    /// VALUE argument and INVOKE had neither half, or only the constant half, and refused conforming source.
+    /// <c>LiteralAliasResolutionDriftTests</c> fails when a procedure binder reads either table itself.</summary>
+    internal LiteralAlias? LiteralAliasOf(Core.DataReferenceContext dref) =>
+        ctx.Data.ConstantOf(dref) is { } k ? new(DataBinder.WrittenText(dref), k, null)
+        : ctx.Data.SymbolicOf(dref) is { } s ? new(DataBinder.WrittenText(dref), null, s)
+        : null;
+
+    /// <summary>The bound operand <paramref name="alias"/> stands for: the SAME shape the equivalent written literal
+    /// produces (the <see cref="ConcatOperand"/> precedent) — a numeric constant through <see cref="NumericLiteralOperand"/>,
+    /// so the edition digit-cap window applies to the substituted literal exactly as to a written one — and a
+    /// symbolic-character as <see cref="SymbolicOperand"/>, the bare figurative.</summary>
+    internal BoundOperand AliasOperand(LiteralAlias alias) =>
+        alias.Constant is { } k
+            ? k.Category switch
+            {
+                PicCategory.Numeric => NumericLiteralOperand(k.Text),
+                PicCategory.National => new BoundStringLiteral(k.Text) { Category = PicCategory.National },
+                PicCategory.Boolean => new BoundStringLiteral(k.Text) { Category = PicCategory.Boolean },
+                _ => new BoundStringLiteral(k.Text),
+            }
+            : SymbolicOperand(alias.Symbolic!.Value);
+
+    /// <summary><see cref="LiteralAliasOf"/> bound through <see cref="AliasOperand"/>, or <see langword="null"/>.</summary>
+    internal BoundOperand? LiteralAliasOperand(Core.DataReferenceContext dref) =>
+        LiteralAliasOf(dref) is { } alias ? AliasOperand(alias) : null;
 
 
     /// <summary>Bind a data reference in a numeric-expression position: an INDEXED BY index-name reads its
@@ -471,10 +506,11 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         : host.Rw.VaryingExpr(dref) is { } rvx ? rvx   // a report VARYING counter in scope (§13.18.64.3 SR2)
         : IndexFieldOf(dref) is { } ix ? IndexNameExpr(dref, ix, context)
         // A constant-name substitutes its literal (§13.10.3 SR2 / §13.10.4 GR1) — in a numeric-expression
-        // position only a NUMERIC constant is legal, exactly as for a written literal (§8.8.1.1).
-        : ctx.Data.ConstantOf(dref) is { } k
-            ? k.Category is PicCategory.Numeric ? NumericLiteralExpr(k.Text)
-                : NonNumericConstantExpr(dref.GetText(), k.Category)
+        // position only a NUMERIC constant is legal, exactly as for a written literal (§8.8.1.1); a symbolic-character
+        // is a figurative constant other than ZERO, never a numeric operand (kb/Work PB1544).
+        : LiteralAliasOf(dref) is { } alias
+            ? alias.Constant is { Category: PicCategory.Numeric } k ? NumericLiteralExpr(k.Text)
+                : NonNumericAliasExpr(alias)
         : ctx.Refs.Resolve(dref) is var r && r.Place is { } p ? OperandRef(dref, p, context)
         : r.ExprError(ctx.Edition);   // kb/Work PB1030 — the resolver's answer picks Refused or Unbuilt
 
@@ -534,7 +570,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// </para>
     /// <para>
     /// Reuses <c>COBOLNET0844</c> rather than minting a code: 0844 already IS "not a numeric operand (ISO
-    /// §8.8.1.1)", raised by <see cref="NonNumericConstantExpr"/> for a non-numeric constant-name and for a
+    /// §8.8.1.1)", raised by <see cref="NonNumericAliasExpr"/> for a non-numeric constant-name and for a
     /// national/boolean literal in this same position. A data item is the third shape of ONE rule, not a new rule.
     /// </para></summary>
     private BoundExpr OperandRef(Core.DataReferenceContext dref, Place p, OperandContext context)
@@ -645,14 +681,19 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
             + "(ISO §8.5.2.1 Table 2)",
     };
 
-    /// <summary>Reject a non-numeric constant-name in a numeric-expression position (ISO §8.8.1.1 — arithmetic
-    /// operands shall be numeric; the constant stands for its literal, §13.10.3 SR2), mirroring the written
+    /// <summary>Reject a non-numeric literal alias in a numeric-expression position (ISO §8.8.1.1 — arithmetic
+    /// operands shall be numeric): a constant-name stands for its literal (§13.10.3 SR2), and a symbolic-character is a
+    /// figurative constant other than ZERO, the only one §8.3.3.6.3 SR1 a) admits where a literal is restricted to
+    /// numeric (kb/Work PB1544: it used to fall to name resolution and be reported "not defined"). Mirrors the written
     /// national/boolean-literal rejection above (COBOLNET0844).</summary>
-    private BoundExprError NonNumericConstantExpr(string name, PicCategory category)
+    private BoundExprError NonNumericAliasExpr(LiteralAlias alias)
     {
-        ctx.Edition.Error("COBOLNET0844", $"constant-name '{name}' substitutes a literal of category "
-            + $"{category} and is not a numeric operand (ISO §8.8.1.1 / §13.10.3 SR2)");
-        return BoundExprError.Refused(ctx.Edition, $"constant-name '{name}' in a numeric context");
+        ctx.Edition.Error("COBOLNET0844", alias.Constant is { } k
+            ? $"constant-name '{alias.Word}' substitutes a literal of category {k.Category} and is not a numeric operand "
+                + "(ISO §8.8.1.1 / §13.10.3 SR2)"
+            : $"symbolic-character '{alias.Word}' is a figurative constant other than ZERO and is not a numeric operand "
+                + "(ISO §8.8.1.1; §12.3.7.4 GR11 a); §8.3.3.6.3 SR1 a))");
+        return BoundExprError.Refused(ctx.Edition, $"'{alias.Word}' in a numeric context");
     }
 
     /// <summary>Resolve a LINAGE-COUNTER reference to its file (ISO §8.4.3.14): in the grammar alternative
@@ -855,11 +896,15 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         if (ctx.Refs.IsObjectViewOfQualifiedItem(dref))
             return new(DiagnosticCatalog.ObjectViewReceiving.Code, $"'{DataBinder.WrittenText(dref)}' is written as a "
                 + "receiving operand: an object-view shall not be specified as a receiving operand (ISO §8.4.3.5.3 SR2)");
-        // A constant-name substitutes a LITERAL (ISO §13.10.3 SR2 / §13.10.4 GR1) — a literal can never be a
-        // receiving operand; without this the name would fall to Refs.Resolve and fail as merely "unresolved".
-        if (ctx.Data.ConstantOf(dref) is not null)
-            return new(DiagnosticCatalog.ConstantAsReceiver.Code, $"constant-name '{DataBinder.WrittenText(dref)}' shall "
-                + "not be specified as a receiving operand — it substitutes a literal (ISO §13.10.4 GR1)");
+        // A constant-name substitutes a LITERAL (ISO §13.10.3 SR2 / §13.10.4 GR1) and a symbolic-character IS one, a
+        // figurative constant (§12.3.7.4 GR11 a)) — a literal can never be a receiving operand; without this the name
+        // would fall to Refs.Resolve and fail as merely "unresolved" (a symbolic-character did, kb/Work PB1544).
+        if (LiteralAliasOf(dref) is { } alias)
+            return new(DiagnosticCatalog.ConstantAsReceiver.Code, alias.Constant is not null
+                ? $"constant-name '{alias.Word}' shall not be specified as a receiving operand — it substitutes a literal "
+                    + "(ISO §13.10.4 GR1)"
+                : $"symbolic-character '{alias.Word}' shall not be specified as a receiving operand — it is a figurative "
+                    + "constant (ISO §12.3.7.4 GR11 a)), and a literal is never a receiving operand");
         return null;
     }
 

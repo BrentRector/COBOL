@@ -1563,6 +1563,42 @@ internal sealed class StatementValidation(DataBinder data)
         return false;
     }
 
+    /// <summary>⛔ ISO §8.8.4.2.1 — "A relation condition shall contain at least one reference to an operand that is not
+    /// a literal" (the clause's closing unnumbered sentence; <c>cite.py</c> stamps it "13)", kb/Work PB222). A figurative
+    /// constant is a literal (§8.3.3.6 is a clause of §8.3.3 Literals, and a symbolic-character is "a user-defined
+    /// figurative constant", §8.3.2.2.29), and so is a constant-name, whose effect "is as if literal-1 … were written
+    /// where constant-name-1 is written" (§13.10.4 GR1). So `IF 1 = 1`, `IF "A" = SPACE`, `IF ZERO = ZERO` and
+    /// `PERFORM UNTIL 1 = 2` each compare two literals (kb/Work PB1470).
+    /// <para>The rule is about a relation CONDITION, so it is asked where one is written
+    /// (<c>ConditionBinder.WrittenRelational</c>: IF, PERFORM UNTIL, SEARCH WHEN, a boolean relation, an abbreviated
+    /// relation's inserted subject, and an EVALUATE partial-expression, which §14.9.13.3 SR8 treats "as though it were
+    /// specified as condition-2"). It is NOT asked at <see cref="CheckRelationalOperands"/>, whose EVALUATE callers pair
+    /// a selection subject with a selection object: §14.9.13.3 SR10's Table 15 is the rule for which pairs are
+    /// permitted, and it already refuses a literal object against a literal subject while permitting a range-expression
+    /// against one.</para>
+    /// <para>"A literal" is what the source WROTE: a function-identifier folded at bind time (a LENGTH fold) is a
+    /// <see cref="BoundNumericLiteral"/> with <see cref="BoundNumericLiteral.FunctionValue"/> set and references a
+    /// function, and an arithmetic expression of literals (<c>IF 1 + 1 = 2</c>) is an expression; neither is a
+    /// literal. The severity is a WARNING at every edition (§4.2.2: "This warning mechanism shall indicate violations
+    /// of such rules"; docs/CONFORMANCE.md D-RELLITERAL follows GnuCOBOL, which warns), and the relation keeps the
+    /// value it always had.</para></summary>
+    public void CheckRelationHasNonLiteralOperand(BoundOperand subject, BoundOperand obj)
+    {
+        if (!IsWrittenLiteral(subject) || !IsWrittenLiteral(obj)) return;
+        data.Edition.Warning(DiagnosticCatalog.RelationOperandsAllLiteral,
+            "both operands of this relation condition are literals (a figurative constant, a symbolic-character and a "
+            + "constant-name are literals: §8.3.3.6, §8.3.2.2.29, §13.10.4 GR1), and ISO §8.8.4.2.1 requires that \"A "
+            + "relation condition shall contain at least one reference to an operand that is not a literal\" — compare "
+            + "a data item; the relation is evaluated as written");
+    }
+
+    /// <summary>A bound operand that is a literal as the source wrote it (see
+    /// <see cref="CheckRelationHasNonLiteralOperand"/>): every literal and figurative shape the operand binder
+    /// produces, a B-op-free boolean literal included, and never a bind-time-folded function value.</summary>
+    private static bool IsWrittenLiteral(BoundOperand o) =>
+        o is BoundStringLiteral or BoundAllLiteral or BoundFigurative or BoundNumericLiteral { FunctionValue: false }
+            or BoundBoolOperand { Expr: BoundBoolLiteral };
+
     // ── The relational-operand SR checkpoint (ISO §8.8.4.2.2 / §8.8.4.2.3; lifted from ConditionBinder's
     //    CheckedRelational at P7 Step 10t/3 — the 10o deviation-(b) pure-lift discharged). ────────────────────
 

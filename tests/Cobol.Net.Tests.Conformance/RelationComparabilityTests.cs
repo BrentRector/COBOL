@@ -21,7 +21,8 @@ namespace CobolNet.Tests.Conformance;
 /// read from the compiler's table, so a change to <c>RelationComparability</c> that drifts from the list fails one
 /// cell. Adding an operand kind is one row of <see cref="Kinds"/>; every pair it forms is then checked
 /// automatically. A pair of two literals / figuratives is skipped: §8.8.4.2.1's "A relation condition shall contain
-/// at least one reference to an operand that is not a literal" is a different rule (kb/Work PB1470).</para>
+/// at least one reference to an operand that is not a literal" is a different rule, whose own pair matrix is
+/// <see cref="RelationLiteralOperandTests"/> (kb/Work PB1470).</para>
 /// </summary>
 public sealed class RelationComparabilityTests
 {

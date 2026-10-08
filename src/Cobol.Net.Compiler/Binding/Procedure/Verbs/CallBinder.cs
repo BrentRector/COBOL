@@ -281,10 +281,14 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 var (cLit, cBareLit, cDref, cBool, cArith) = Gr8Classify(
                     byContent.literal(), null,
                     byContent.booleanExpression(), byContent.arithmeticExpression());
+                // A bare word that stands for a literal — a constant-name (§13.10.4 GR1) or a symbolic-character
+                // (§12.3.7.4 GR11 a)) — is literal-2, never identifier-2 (kb/Work PB1544), asked of the ONE alias
+                // resolution.
+                var cAlias = cDref is null ? null : host.Expr.LiteralAliasOf(cDref);
                 // §14.9.4.2 FORMAT 1's BY CONTENT IS `{ identifier-2 } …` AND NOTHING ELSE. An expression operand
                 // is legal only under Format 2, which the AS phrase selects — so accepting one here without that
                 // phrase would admit illegal source, the exact trade this item refused to make in the grammar.
-                if (!formatTwo && (cBool is not null || cLit is not null
+                if (!formatTwo && (cBool is not null || cLit is not null || cAlias is not null
                                    || (cArith is not null && cDref is null && !IsSoleIdentifierExpression(cArith)))
                     && !Format1VendorSpelling(
                         $"CALL … USING BY CONTENT {byContent.GetText()}: an expression operand belongs to the "
@@ -296,7 +300,11 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 // tree (kb/Work PB221 — this arm used to commit the probe's Place, so `BY CONTENT E(XE)` with
                 // `XE PIC X(4)` compiled clean while the BY REFERENCE operand of the same statement drew
                 // COBOLNET0844, and a function-bearing subscript bound occurrence 1).
-                if (cDref is not null && ctx.Refs.Probe(cDref) is not null)
+                // A NON-numeric alias is literal-2 by its own arm; a numeric constant-name keeps the expression arm a
+                // written numeric literal takes (RefExpr substitutes it), so the two spellings bind alike.
+                if (cAlias is { IsNumeric: false } contentAlias)
+                    args.Add(new BoundCallArg(CobolPassMode.Content, null, host.Expr.AliasOperand(contentAlias)));
+                else if (cDref is not null && ctx.Refs.Probe(cDref) is not null)
                 {
                     // Discriminated as identifier-2: the committed answer decides, never a fall-through to the
                     // expression arms (kb/Work PB1030).
@@ -359,6 +367,14 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                     // is the earlier alternative and subsumes every numeric literal and the figurative ZERO).
                     Sr23LiteralIsNumeric(vlit, "BY VALUE");
                     args.Add(new BoundCallArg(CobolPassMode.Value, null, host.Expr.NullAdmittingOperand(vlit)));
+                }
+                else if (vDref is not null && host.Expr.LiteralAliasOf(vDref) is { IsNumeric: false } valueAlias)
+                {
+                    // A non-numeric constant-name or a symbolic-character is literal-2 (kb/Work PB1544), and SR23 is
+                    // asked of the literal it stands for — reported BY NAME, as for the written literal above (a
+                    // numeric constant-name keeps the expression arm below, which a written numeric literal takes).
+                    Sr23AliasIsNumeric(valueAlias, "BY VALUE");
+                    args.Add(new BoundCallArg(CobolPassMode.Value, null, host.Expr.AliasOperand(valueAlias)));
                 }
                 else if (vDref is { } vdref && ctx.Refs.Probe(vdref) is not null)
                 {
@@ -452,12 +468,14 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 // so `CALL … AS NESTED USING K` is a bare LITERAL-2 argument, never identifier-2 — and
                 // literal-2 never meets Syntax rule 3, so GR9 a)2 assumes BY CONTENT (or GR9 b) BY VALUE).
                 // The old arm resolve-RECEIVED it and drew COBOLNET1548 "constant-name shall not be specified
-                // as a receiving operand", rejecting conforming Format-2 source (kb/Work PB238).
-                if (formatTwo && host.Expr.ConstantOperand(bare) is { } bareConst)
+                // as a receiving operand", rejecting conforming Format-2 source (kb/Work PB238). A symbolic-character
+                // is literal-2 the same way — a figurative constant (§12.3.7.4 GR11 a)), asked of the ONE alias
+                // resolution (kb/Work PB1544; it drew COBOLNET1639 "not defined").
+                if (formatTwo && host.Expr.LiteralAliasOf(bare) is { } bareAlias)
                 {
                     var kMode = Gr9BareLiteralMode(calleeFormals, args.Count);
-                    if (kMode is CobolPassMode.Value) Sr23ConstantIsNumeric(bare, kMode);
-                    args.Add(new BoundCallArg(kMode, null, bareConst));
+                    if (kMode is CobolPassMode.Value) Sr23AliasIsNumeric(bareAlias, "a BY VALUE formal parameter");
+                    args.Add(new BoundCallArg(kMode, null, host.Expr.AliasOperand(bareAlias)));
                     continue;
                 }
                 CobolPassMode bareMode = mode;
@@ -1123,19 +1141,19 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
             + "(ISO §14.9.4.3 SR23)");
     }
 
-    /// <summary>The <see cref="Sr23LiteralIsNumeric"/> twin for a constant-name argument. §13.10.4 GR1 makes
-    /// it literal-2 by substitution and §13.10.4 GR2 gives it the SUBSTITUTED literal's class and category,
-    /// so SR23 is a question about that literal and never about the name (§13.10.3 SR2 is the admission —
-    /// a constant-name "may be used anywhere that a format specifies a literal of [its] class and
-    /// category" — which is why the Format-2 literal-2 slot accepts one at all).</summary>
-    private void Sr23ConstantIsNumeric(Core.DataReferenceContext dref, CobolPassMode mode)
+    /// <summary>The <see cref="Sr23LiteralIsNumeric"/> twin for a literal-alias argument (kb/Work PB1544). A
+    /// constant-name is literal-2 by substitution (§13.10.4 GR1) with the SUBSTITUTED literal's class and category
+    /// (GR2), so SR23 is a question about that literal and never about the name (§13.10.3 SR2 is the admission — a
+    /// constant-name "may be used anywhere that a format specifies a literal of [its] class and category"); a
+    /// symbolic-character is a figurative constant other than ZERO, the only one §8.3.3.6.3 SR1 a) admits where a
+    /// literal is restricted to numeric, so it never satisfies SR23.</summary>
+    private void Sr23AliasIsNumeric(ExpressionBinder.LiteralAlias alias, string subject)
     {
-        if (ctx.Data.ConstantOf(dref) is not { } k || k.Category is PicCategory.Numeric) return;
+        if (alias.IsNumeric) return;
         ctx.Edition.Error(DiagnosticCatalog.CallByValueLiteralKind,
-            $"CALL … USING {DataBinder.WrittenText(dref)} with a {(mode is CobolPassMode.Value ? "BY VALUE" : "BY CONTENT")} "
-            + $"formal parameter: the constant-name substitutes the {k.Category.ToString().ToLowerInvariant()} "
-            + $"literal {k.RawText} (ISO §13.10.4 GR1/GR2), and §14.9.4.3 SR23 requires literal-2 to be a numeric "
-            + "literal when the corresponding formal parameter is specified with the BY VALUE phrase");
+            $"CALL … USING {alias.Word} with {subject}: the argument is the {alias.Described}, and §14.9.4.3 SR23 "
+            + "requires literal-2 to be a numeric literal when it or its corresponding formal parameter is specified "
+            + "with the BY VALUE phrase");
     }
 
     /// <summary>The §14.9.4.3 SR22 class screen, shared by the EXPLICIT BY VALUE arm and the Format-2

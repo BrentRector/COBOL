@@ -321,7 +321,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
                     ctx.Edition.Error("COBOLNET1511", "both operands of a boolean relation shall be "
                         + "boolean-valued (ISO §8.8.4.2.2)");
             }
-            return CheckedRelational(left, op, right);
+            return WrittenRelational(left, op, right);
         }
         // A bare boolean expression ⇒ a simple boolean condition (§8.8.4.3).
         if (HasBoolOp(be[0])) return BindSimpleBooleanCondition(BindBoolExpr(be[0]));
@@ -615,7 +615,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         }
         string op = MapOperator(ar.comparisonOperator().GetText());
         carry.Op = op;
-        return CheckedRelational(subject, op, ComparisonOperand(ar.comparisonOperand()));
+        return WrittenRelational(subject, op, ComparisonOperand(ar.comparisonOperand()));
     }
 
     /// <summary>⛔ ISO §8.8.4.12.3 SR1 — a succeeding relation that omits its subject (or its subject and operator)
@@ -935,7 +935,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             // SEARCH WHEN, PERFORM UNTIL and the abbreviated-relation path had the same hole.
             // (A boolean-EXPRESSION relation — `IF (a B-AND b) = c` — is staged residue this increment; the
             // item↔item boolean compares of the data increment ride CheckedRelational's 0844 guard below.)
-            return CheckedRelational(subject, op, right);
+            return WrittenRelational(subject, op, right);
         }
 
         // A bare single operand — resolve as a sole-operand condition (88 / switch / simple-boolean / abbreviated).
@@ -980,7 +980,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         // A bare object after a boolean relation would be an abbreviation (§8.8.4.12.1 2), which SR1 forbids.
         if (carry.BooleanRelation) return RefuseAbbreviationAfterBooleanRelation(vo is null ? "operand" : DataBinder.WrittenText(vo));
         if (carry is { Subject: { } subject, Op: { } op })
-            return CheckedRelational(subject, op, bindOperand());
+            return WrittenRelational(subject, op, bindOperand());
         return RefuseNonCondition(vo);
     }
 
@@ -1231,6 +1231,19 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
 
     /// <summary>r10's "the larger item referenced" with a positionless operand contributing nothing.</summary>
     private static int? LargerOf(int? a, int? b) => a is null ? b : b is null ? a : System.Math.Max(a.Value, b.Value);
+
+    /// <summary>A relation CONDITION as the program wrote it — IF, PERFORM UNTIL, SEARCH WHEN, a boolean relation, an
+    /// abbreviated relation's inserted subject, an EVALUATE partial-expression's spliced subject (§14.9.13.3 SR8). Asks
+    /// the one rule that is about a written condition and not about a compared pair — ISO §8.8.4.2.1's "at least one
+    /// reference to an operand that is not a literal" (<see cref="StatementValidation.CheckRelationHasNonLiteralOperand"/>,
+    /// kb/Work PB1470), of the operands as WRITTEN (an EVALUATE subject's intermediate reads through to the operand it
+    /// holds) — then builds the node through <see cref="CheckedRelational"/>. EVALUATE's subject/object pairs and
+    /// ranges reach <see cref="CheckedRelational"/> directly: §14.9.13.3 SR10's Table 15 governs them.</summary>
+    private BoundCondition WrittenRelational(BoundOperand left, string op, BoundOperand right)
+    {
+        ctx.Validation.CheckRelationHasNonLiteralOperand(Written(left), Written(right));
+        return CheckedRelational(left, op, right);
+    }
 
     /// <summary>The ONE <see cref="BoundRelational"/> construction checkpoint — the §8.8.4.2.2 boolean
     /// relation rules ride every site (IF / EVALUATE pairing + ranges / PERFORM UNTIL / SEARCH): a boolean
