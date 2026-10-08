@@ -259,7 +259,7 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
             bound.Add(new BoundParagraph(table.Paragraphs[i].Cobol, sentences, lastLine));
         }
         // Append the exception-checking (Format-3) PERFORM handler pc-ranges (imp-2/3/4) above the whole main pc
-        // space (ISO §14.9.28.4 GR17; §9.1-C). handlerBase == table.HandlerBasePc == the frozen main count, so
+        // space (ISO §14.9.28.4 GR17; §9.1-C). handlerBase == the frozen main count, so
         // bound[handlerBase + k] is the k-th handler — matching the pc AddF3Handler stored on each BoundExceptionMatch.
         int handlerBase = bound.Count;
         bound.AddRange(table.F3Handlers);
@@ -390,8 +390,8 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
             finally { data.Options = savedOptions; }
         }
         // Append the exception-checking (Format-3) PERFORM handler pc-ranges (imp-2/3/4) above the whole class pc
-        // space (ISO §14.9.28.4 GR17; design SSOT §9.10 — the SAME allocation the program path uses at Bind():163).
-        // Empty until the F3-in-a-method un-reject (increment M4) — a class with no method-F3 stays byte-identical.
+        // space (ISO §14.9.28.4 GR17; design SSOT §9.10 — the SAME allocation the program path uses in Bind). A class
+        // with no method-F3 appends nothing and stays byte-identical.
         int handlerBase = bound.Count;
         bound.AddRange(table.F3Handlers);
         Ctx.UntilExit.Report(bound, Ctx.Edition);   // §14.9.28.3 SR8 out-of-line "under" — as in Bind (kb/Work PB434)

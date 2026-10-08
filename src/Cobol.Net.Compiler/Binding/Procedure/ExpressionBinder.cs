@@ -164,8 +164,8 @@ internal static class OperandContextRules
 /// <see cref="CheckLiteral"/> carrying its DECIMAL-POINT normalization + edition digit-cap window AS-IS — the
 /// sanctioned binder-side pattern), and the RECEIVING family (<see cref="ResolveReceiving"/> — THE one
 /// receiving-side chokepoint — ResolveTargets / Receivers×3 / RoundingOf §14.7.4). Host edges that remain
-/// (host.Intrinsic / host.Rw) flip at 10t; the generic tree statics DataRefs/Children STAY on
-/// <see cref="StatementBinder"/> (they are not expression-specific).
+/// (host.Intrinsic / host.Rw) flip at 10t; the generic tree static Children STAYS on
+/// <see cref="StatementBinder"/> (it is not expression-specific).
 /// </summary>
 internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
 {
