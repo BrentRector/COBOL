@@ -10,6 +10,10 @@ cost the orchestrator a hand-written groups.json; this computes it.
 
 1. AWAITING LANDING: an open note whose newest report is DONE and whose branch is not on main yet is excluded (the
    `land` unit lands it first; re-planning it would dispatch the same work twice).
+   HELD BY A DISPATCH: an open note that a dispatch-ledger group names (a wave this loop or another session planned,
+   launched or not, or a hand dispatch within HAND_TTL_SECONDS) and that no report written since that dispatch names
+   is excluded too, and waits with the group named: its work is another agent's, or a planned wave's that has not
+   launched yet (held_by_dispatch, kb/Work PB2806). An aborted dispatch is released with --release.
 2. FINISHERS FIRST: an open note whose newest report says SPLIT or NOT STARTED (its branch landed, gone, or still
    unlanded: the finisher then cherry-picks the branch's commits, because a `land` unit lands only DONE branches;
    kb/Work PB2575), a `status: half` note, and an UNLANDED branch (prune_worktrees.classify) whose commit subjects
@@ -305,6 +309,28 @@ def record_dispatch(coord_dir: pathlib.Path, wave: str, groups: list[Any], termi
     coord.write_json(path, {"groups": keep})
 
 
+def held_by_dispatch(coord_dir: pathlib.Path, reports: list[Report], terminal: Callable[[str], bool],
+                     now: float | None = None) -> dict[str, str]:
+    """{open note: the dispatch holding it}: every note a dispatch-ledger group names (the entries
+    inflight_file_sets reads as source 3, hand entries within HAND_TTL_SECONDS) unless the note is terminal or a
+    report written at or after the group's `at` names one of the group's notes. Such a report answers the dispatch,
+    and step 1 (awaiting landing) and step 2 (finishers) govern its notes from then on; an unanswered group is still
+    running, or was planned and not launched (another session's wave waiting for the operator's GO), so its notes are
+    not planned again (kb/Work PB2806: the fix lane read no ledger, and wave 1044 re-planned seven of wave 1045's
+    eight groups)."""
+    clock = now if now is not None else time.time()
+    held: dict[str, str] = {}
+    for g in coord.read_json(coord_dir / DISPATCH_LEDGER, {"groups": []}).get("groups", []):
+        mine, at = set(g.get("notes", [])), g.get("at", 0.0)
+        if g.get("hand") and clock - at > HAND_TTL_SECONDS:
+            continue
+        if any(mine & set(r.ids) and r.path.stat().st_mtime >= at for r in reports):
+            continue
+        for nid in sorted(i for i in mine if not terminal(i)):
+            held.setdefault(nid, f"dispatch w{g.get('wave')}{g.get('letter', '')}")
+    return held
+
+
 def release_dispatch(coord_dir: pathlib.Path, selector: str) -> list[dict[str, Any]]:
     """Drop the dispatch-ledger entries `selector` names (a wave `1040`, a group `1040a`, or a note id `PB2249`) and
     return them. A wave entry never expires on a clock (an expired entry would release the files of a wave still
@@ -522,9 +548,11 @@ def finisher_pred(rep: Report | None, branch: str | None, cls: str, nid_list: li
 def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: list[dict[str, Any]],
          reports: list[Report], classify: Callable[[str], str], unlanded: dict[str, list[str]],
          rules: dict[str, Any], budget_points: float, max_groups: int | None = None,
-         deps: dict[str, list[str]] | None = None, busy: dict[str, set[str]] | None = None) -> dict[str, Any]:
+         deps: dict[str, list[str]] | None = None, busy: dict[str, set[str]] | None = None,
+         held: dict[str, str] | None = None) -> dict[str, Any]:
     """`clusters` and `half_clusters` are fix_clusters.py --json views of the open and the half notes; they also
     define which notes are plannable at all (fix_clusters applies .agent-fleet.json's kind and skip flags).
+    `held`, {note: the dispatch holding it} from held_by_dispatch, applies in BOTH lanes: a held note waits.
 
     A CAMPAIGN (`--cluster`, kb/Work PB2120) passes `deps`, {note: its open blockers}, and clusters that carry a
     `depth` (their place in the blocked_by topology, ranked first). A group whose notes have blockers runs AFTER the
@@ -560,9 +588,14 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
             awaiting.setdefault(r.branch or str(r.path), []).append(nid)
 
     taken: set[str] = {i for ids in awaiting.values() for i in ids}
+    waiting: dict[str, str] = {}
+    # A note an unreported dispatch holds is another agent's, or a planned wave's not launched yet (kb/Work PB2806).
+    for nid in sorted(open_ids & set(held or {}) - taken, key=work.id_order):
+        waiting[nid] = (f"held by {held[nid]}, which has no report yet: re-planning it would dispatch the same work "
+                        f"twice (plan_wave.py --release that dispatch if it was aborted)")
+        taken.add(nid)
     # A note that needs a frontier model under the owner's per-dispatch approval is never planned (MANDATORY-PRACTICES
     # P1): an unattended wave cannot ask, and routing it to Opus would pre-empt the owner's choice.
-    waiting: dict[str, str] = {}
     for nid in sorted(open_ids - taken, key=work.id_order):
         if any(re.search(pat, notes[nid].body) for pat in rules["routing"]["owner_approval_patterns"]):
             waiting[nid] = "needs the owner's approval of a frontier model for this dispatch (P1): ask in the attended session"
@@ -742,11 +775,16 @@ def previous_train(repo: pathlib.Path) -> str:
     return "the previous train (see DEVLOG.md)"
 
 
-def next_wave(repo: pathlib.Path, reports: list[Report]) -> int:
-    """One past the highest wave OR train number in the reports directory or the newest 200 DEVLOG lines. A wave's
-    first train is labelled with the wave number, so a train label counts as taken too (kb/Work PB2562: trains 1035
-    and 1036 came from waves 1031 and 1032, the planner proposed wave 1035, and "Train 1034" had already landed twice)."""
+def next_wave(repo: pathlib.Path, reports: list[Report], coord_dir: pathlib.Path | None = None) -> int:
+    """One past the highest wave OR train number in the reports directory, the dispatch ledger (`coord_dir`) or the
+    newest 200 DEVLOG lines. A wave's first train is labelled with the wave number, so a train label counts as taken
+    too (kb/Work PB2562: trains 1035 and 1036 came from waves 1031 and 1032, the planner proposed wave 1035, and
+    "Train 1034" had already landed twice). A wave planned but with no report yet (another session's, awaiting the
+    operator's GO) is taken as well, or the next wave reuses its number and overwrites its specs (kb/Work PB2806)."""
     seen = [r.wave for r in reports]
+    if coord_dir is not None:
+        seen += [int(g["wave"]) for g in coord.read_json(coord_dir / DISPATCH_LEDGER, {"groups": []}).get("groups", [])
+                 if str(g.get("wave", "")).isdigit()]
     with open(repo / "DEVLOG.md", encoding="utf-8", errors="replace") as f:
         for _, line in zip(range(200), f):
             seen += [int(w) for w in re.findall(r"\b(?:[Ww]aves?|[Tt]rains?) (\d{3,})", line)]
@@ -891,10 +929,11 @@ def main(argv: list[str] | None = None) -> int:
                for i in items):
             busy["the open external-repository slices"] = work.slice_file_set()
     p = plan(notes, clusters, half_clusters, reports, classify, unlanded, rules, budget_points,
-             a.max_groups or rules["wave"]["max_groups"], deps=deps, busy=busy)
+             a.max_groups or rules["wave"]["max_groups"], deps=deps, busy=busy,
+             held=held_by_dispatch(cdir, reports, terminal))
     waiting.update(p["waiting"])
 
-    wave = str(next_wave(REPO, reports)) if a.wave == "next" else str(a.wave)
+    wave = str(next_wave(REPO, reports, cdir)) if a.wave == "next" else str(a.wave)
     train = rules["wave"]["train_size"]
     peek_code = alloc.peek("code", REPO, cdir)
     peek_pb = alloc.peek("pb", REPO, cdir)

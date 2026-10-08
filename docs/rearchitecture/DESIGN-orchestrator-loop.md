@@ -599,14 +599,20 @@ of one account bracket a measured spend (open decisions D6, D8).
 
 `python scripts/orchestrator/plan_wave.py (--budget-points P | --from-budget) [--wave N|next] [--scratch DIR]
 [--reports DIR] [--clusters-json FILE] [--half-clusters-json FILE] [--no-branches] [--max-groups N] [--dry-run]`.
-`--wave` defaults to one past the highest wave in the reports directory or the newest DEVLOG lines.
+`--wave` defaults to one past the highest wave in the reports directory, the dispatch ledger or the newest DEVLOG
+lines (a wave planned with no report yet, another session's included, holds its number: kb/Work PB2806).
 
 The plannable notes are exactly those `fix_clusters.py --json` lists (the submodule's view of `kb/Work`, which
 applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status: open`, once over `status: half`.
 
 1. **Awaiting landing.** A note whose newest report is `DONE` and names a branch that is not on `main` yet
    (`prune_worktrees.classify`, reused: `UNLANDED` or `CHECK`) is excluded and listed: re-planning it would dispatch
-   work that already exists. The `land` or `resume` unit deals with it first.
+   work that already exists. The `land` or `resume` unit deals with it first. **Held by a dispatch** (both lanes,
+   `held_by_dispatch`, kb/Work PB2806): a note a dispatch-ledger group names (a planned wave, launched or not, or a
+   hand dispatch within its TTL) that no report written since that dispatch names is excluded too, and waits with the
+   group named; it is in an agent's hands, or in a planned wave the operator has not launched yet. The fix lane read
+   no ledger until then, and wave 1044 re-planned seven of the eight groups another session's recorded, unlaunched
+   wave 1045 held. An aborted dispatch is released with `--release`.
 2. **Finishers first.** (a) A note whose newest report (by wave, then time; header lines only) says `SPLIT` or
    `NOT STARTED`, whatever its branch's state (a `land` unit lands only `DONE` branches, so an unlanded `SPLIT` branch
    held for one was stranded; kb/Work PB2575): one finisher group per predecessor report. (b) The half

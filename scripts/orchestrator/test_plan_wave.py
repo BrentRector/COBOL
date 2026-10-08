@@ -171,6 +171,35 @@ check("its pred cherry-picks the unlanded branch",
 check("done with a note not started still awaits landing", p5["awaiting_landing"].get("worktree-wf_hhh-5"),
       ["PB7", "PB12"])
 
+# 6c. A NOTE AN UNREPORTED DISPATCH HOLDS IS NOT PLANNED AGAIN, IN EITHER LANE (kb/Work PB2806): the fix lane read no
+#     ledger, and wave 1044 re-planned seven of the eight groups another session's recorded, unlaunched wave 1045 held.
+#     A report written since the dispatch answers it (steps 1 and 2 govern), a terminal note is never held, and a hand
+#     entry expires after HAND_TTL_SECONDS.
+HD = TMP / "held"
+HD_REPORTS = HD / "reports"
+HD_REPORTS.mkdir(parents=True)
+pw.record_dispatch(HD, "1045", [pw.Group(kind="cluster", notes=["PB5", "PB2"], file="", files=["src/X.cs"], letter="a"),
+                                pw.Group(kind="cluster", notes=["PB8"], file="", files=["src/Y.cs"], letter="b"),
+                                pw.Group(kind="cluster", notes=["PB9"], file="", files=["src/Z.cs"], letter="c")],
+                   lambda i: False)
+HD_AT = {g["letter"]: g["at"] for g in coord.read_json(HD / pw.DISPATCH_LEDGER, {})["groups"]}
+for name, nid, when in (("w1045b-PB8-report.md", "PB8", HD_AT["b"] + 60), ("w1031c-PB9-report.md", "PB9", HD_AT["c"] - 3600)):
+    (HD_REPORTS / name).write_text(f"DONE\n# {nid} group\n**branch:** `worktree-wf_held-{nid}` · **HEAD:** `5555555ee`\n\n"
+                                   "## Reproduced?\n", encoding="utf-8")
+    __import__("os").utime(HD_REPORTS / name, (when, when))
+LEDGER_DOC = coord.read_json(HD / pw.DISPATCH_LEDGER, {})
+LEDGER_DOC["groups"].append({"wave": "hand", "letter": "", "notes": ["PB10"], "files": ["src/W.cs"], "hand": True,
+                             "at": HD_AT["a"] - pw.HAND_TTL_SECONDS - 60})
+coord.write_json(HD / pw.DISPATCH_LEDGER, LEDGER_DOC)
+check("held: unanswered groups only, terminal notes and expired hand entries never",
+      pw.held_by_dispatch(HD, pw.load_reports(HD_REPORTS), lambda i: i == "PB2", now=HD_AT["a"] + 120),
+      {"PB5": "dispatch w1045a", "PB9": "dispatch w1045c"})
+p6 = pw.plan(notes, CLUSTERS, HALF, reports, lambda b: CLASS.get(b, "ABSENT"), UNLANDED, RULES, budget_points=100,
+             held={"PB5": "dispatch w1045a"})
+check("a held note is planned in no group and waits naming its dispatch",
+      (any("PB5" in g.notes for g in p6["groups"]), "w1045a" in p6["waiting"].get("PB5", "")), (False, True))
+check("its cluster's other notes are still planned", any("PB2" in g.notes for g in p6["groups"]), True)
+
 # 7. the group JSON renders through the real template and passes check_practices' same-file rule
 gjson = [pw.as_group_json(g, "77", notes, "COBOLNET0001-COBOLNET0003") for g in p["groups"]]
 CFG77 = {"wave": "77", "base": "abc", "scratch": str(TMP), "stop_file": str(coord.fleet_stop(TMP, "w77"))}
@@ -593,6 +622,10 @@ with tempfile.TemporaryDirectory() as td:
     (tdir / "DEVLOG.md").write_text("## Entry 2 — Train 1036 (wave 1032: D, E)" + NL + "## Entry 1 — wave 1034 dispatched" + NL,
                                      encoding="utf-8")
     check("next_wave counts a train label above every wave number", pw.next_wave(tdir, []), 1037)
+    # PB2806: a wave recorded in the dispatch ledger with no report yet (another session's) is a taken number too
+    pw.record_dispatch(tdir, "1045", [pw.Group(kind="cluster", notes=["PB5"], file="", files=["src/X.cs"], letter="a")],
+                       lambda i: False)
+    check("next_wave counts a dispatched wave with no report", pw.next_wave(tdir, [], tdir), 1046)
 
 for f in fails:
     print("FAIL:", f)
