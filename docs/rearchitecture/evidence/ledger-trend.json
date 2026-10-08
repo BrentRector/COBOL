@@ -1611,6 +1611,18 @@
       "retire_total": 10,
       "external_landed": 2,
       "external_total": 8
+    },
+    {
+      "sha": "685b4431",
+      "date": "2026-10-08",
+      "total": 250,
+      "landed": 40,
+      "open": 210,
+      "waiting": 153,
+      "retire_landed": 10,
+      "retire_total": 10,
+      "external_landed": 2,
+      "external_total": 8
     }
   ]
 }
