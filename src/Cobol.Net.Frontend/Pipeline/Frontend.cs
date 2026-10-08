@@ -72,12 +72,6 @@ public sealed class Frontend
     /// resultant lines — the &gt;&gt;TURN / &gt;&gt;FLAG anchors — stay directly comparable to token lines.</summary>
     public SourceLineMap LineMap { get; private set; } = SourceLineMap.Identity("<source>", 0);
 
-    /// <summary>The frontend's <c>&gt;&gt;COBOL-WORDS</c> override layer (ISO §7.3.10) — the per-group
-    /// reserved/context-sensitive/intrinsic word-table modification the lexer's <c>CobolWordsRewriter.Plan</c>
-    /// applies to the token stream and the compiler's composed <c>ReservedWordSet</c> / intrinsic resolution
-    /// consult. <see cref="CobolWordsMap.Empty"/> when the source has no COBOL-WORDS directive.</summary>
-    public CobolWordsMap CobolWordsMap => Directives.CobolWordsMap;
-
     /// <summary>EVERY directive-derived fact the binder consumes, as ONE record (kb/Work PB65 — the fifth
     /// positional parameter on <c>Bind</c> was the growing-list shape). Reflects the LAST parsed source, with
     /// §14.9.28.4 GR14's implicit PUSH ALL / POP ALL already replayed into every event timeline (kb/Work PB1004,

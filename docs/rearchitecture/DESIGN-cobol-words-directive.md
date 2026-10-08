@@ -266,9 +266,10 @@ the EFFECTIVE word:
 
 ## §8 Threading
 
-`Frontend.CobolWordsMap` (built in `Preprocess`, applied in `LexAndParse`) → `CompilerDriver` →
-`BinderDriver.Bind(..., cobolWordsMap)` → `VersionConformancePass.Run(ctx, edition, sink, cobolWordsMap)` (the
-composed set + SR3/SR4 validation) and the bind session (for `IntrinsicBinder`). Empty map ⇒ every consumer is
+`DirectiveResults.CobolWordsMap` (built in `Preprocess`, applied in `LexAndParse`, exposed as
+`Frontend.Directives`, the one directive-output record, kb/Work PB65) → `CompilerDriver` →
+`BinderDriver.Bind(..., directives)` → the bind session's `CobolWords`, which `VersionConformancePass.Run` reads (the
+composed set + SR3/SR4 validation) and `IntrinsicBinder` reads. Empty map ⇒ every consumer is
 a no-op and output is byte-identical (the zero-overhead invariant).
 
 ## §9 Increment plan

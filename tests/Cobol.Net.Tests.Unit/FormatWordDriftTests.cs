@@ -77,7 +77,7 @@ public sealed class FormatWordDriftTests
     private static IEnumerable<string> Violations(CobolParserCore.CompilationUnitContext tree, CnFrontend fe,
         int edition, HashSet<string> words, string label)
     {
-        var reserved = ReservedWordSet.Compose(fe.CobolWordsMap);
+        var reserved = ReservedWordSet.Compose(fe.Directives.CobolWordsMap);
         foreach (var w in Descendants<CobolParserCore.CobolWordContext>(tree))
         {
             if (w.Start.Type != CobolLexer.IDENTIFIER) continue;

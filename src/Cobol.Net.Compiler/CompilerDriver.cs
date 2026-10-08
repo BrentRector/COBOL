@@ -147,7 +147,7 @@ public static class CompilerDriver
         // diagnostics (the four-compilers rule: a construct the targeted edition lacks or forbids REJECTS the
         // program) are semantic errors, not runtime guards; they fail the compile here, BEFORE emit — a removed
         // or not-yet-introduced construct may have no emit path at all (exit criterion 9: no codegen on an
-        // errored tree). frontend.TurnEvents are the >>TURN directive events (ISO §7.3.25) that build the
+        // errored tree). frontend.Directives carries the >>TURN directive events (ISO §7.3.25) that build the
         // group's compile-time TurnState (deep-dive D10).
         var edition = new Binding.EditionContext(options.DialectLevel, options.Permissive)
         {
