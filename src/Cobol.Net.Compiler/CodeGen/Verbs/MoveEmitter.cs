@@ -575,6 +575,120 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         _ => false,
     };
 
+    /// <summary>⛔ THE VALUE OF A RECORD THAT EXISTS ONLY AS A VALUE, FILLED BY A MOVE (kb/Work PB2587) — the C# expression
+    /// of a FIXED- or DYNAMIC-length elementary record of <paramref name="record"/>'s description after a MOVE from
+    /// <paramref name="source"/>. ISO §14.2.3 GR9's second regime allocates, for a non-numeric formal, "a data item with
+    /// the same description and the same number of bytes as the formal parameter" and fills it by "otherwise, a MOVE
+    /// statement": the activating element performs that MOVE and the activated element reads the record "as if it were
+    /// the argument and it were passed by reference", so the record never has a place of its own.
+    /// <para>The two arms a MOVE into an elementary receiver takes, chosen by the ONE GR4 sender test
+    /// (<see cref="MoveClassifier.IsGroupSender"/>): a GROUP sender is §14.9.25.4 GR4's move "as if it were an
+    /// alphanumeric to alphanumeric elementary move, except that there is no conversion" — the sender's storage through
+    /// the one representation codec, fitted to the record's bytes and decoded into its characters exactly as
+    /// <see cref="EmitGroupToElementaryMove"/> decodes a receiving place — and every other sender is the elementary
+    /// conversion <see cref="ConvertSource"/>, editing and alignment included (GR6).</para></summary>
+    public string RecordValue(BoundOperand source, DataItem record) =>
+        MoveClassifier.IsGroupSender(source)
+            ? GroupRecord(record, OperandText.NonElementaryMoveSender(source, num, "group MOVE into"))
+            : ConvertSource(source, record);
+
+    /// <summary>⛔ THE SAME RECORD, FILLED AT THE ACTIVATION BOUNDARY (kb/Work PB2587) — the C# expression of
+    /// <see cref="RecordValue"/>'s record over a sending operand known only at run time, <paramref name="sending"/> (a C#
+    /// expression of a <see cref="MoveSending"/>, which the activating element renders from its argument: see
+    /// <c>CallEmitter.MoveSendingText</c>). It is what an activated unit registers for each non-numeric elementary formal
+    /// (<see cref="MoveLanding"/>), so a CALL that could not see the formal — a CALL by data-name or through a
+    /// program-pointer, or a prototype whose details §12.3.8.4 GR10 c) takes from the external repository — fills the
+    /// record exactly as one that could.
+    /// <para>The receiving half is THIS emitter's, arm for arm: GR4's group move (<see cref="GroupRecord"/>), a figurative
+    /// constant repeated to the record's size (§8.3.3.6.4 GR2, edited by an edited receiver exactly as
+    /// <see cref="ConvertSource"/> edits one), a value edited into a numeric-edited receiver at its own scale, and every
+    /// other sender's characters through <see cref="CharacterStore"/>.</para></summary>
+    public string MovedRecord(DataItem record, string sending)
+    {
+        var pic = record.OperandPic!;
+        string chars = RuntimeApi.MoveSendingCharacters(sending);
+        string fill = RuntimeApi.MoveSendingFill(sending);
+        string wN = $"{pic.Length}";
+        // §8.3.3.6.4 GR2: the fill repeated to the record's character positions — never for a dynamic-length record, which
+        // has no fixed size, so a figurative's one character is its whole content (§8.3.3.6.4 GR3 b)).
+        string repeated = RuntimeApi.StrStore(RuntimeApi.StrRepeat(chars, wN), wN);
+        string elementary =
+            record.IsDynamicLength ? CharacterStore(record, chars, "")
+            // A numeric-edited record EDITS a value (ZERO included) and takes a fill's characters unedited, as
+            // ConvertSource's figurative and ALL-literal arms store them.
+            : pic.Category is PicCategory.NumericEdited && !pic.IsCharacterEdited
+                ? $"({RuntimeApi.MoveSendingNumeric(sending)} ? {EditedValue(record, sending)} "
+                  + $": {fill} ? {repeated} : {CharacterStore(record, chars, wN)})"
+            : CharacterStore(record, $"({fill} ? {repeated} : {chars})", wN);
+        return $"({RuntimeApi.MoveSendingGroup(sending)} ? {GroupRecord(record, chars)} : {elementary})";
+    }
+
+    /// <summary>A run-time VALUE <paramref name="sending"/> edited into the numeric-edited <paramref name="record"/>
+    /// (§14.9.25.4 GR6 — "any editing specified for … the receiving data item"): aligned at the record's own scale
+    /// (<see cref="MoveSending.AtScale"/>, §14.6.8.2's truncation) for a fixed-point mask or a LOCALE picture, and handed
+    /// over as binary64 to a floating-point one — the forms <see cref="RuntimeApi.EditFormatFor"/> takes from
+    /// <see cref="ConvertSource"/>'s numeric arm.</summary>
+    private string EditedValue(DataItem record, string sending)
+    {
+        var pic = record.OperandPic!;
+        string cfg = ArithmeticEmitter.BwzFlag(record) + ctx.EditCfg(pic);
+        if (pic.IsFloatEdited)
+            return RuntimeApi.EditFormatFor(pic, new NumX(RuntimeApi.MoveSendingBinary64(sending), 0, Real: true), "", "", cfg);
+        int scale = pic.ReceiverScale();
+        string aligned = RuntimeApi.MoveSendingAtScale(sending, scale);
+        return RuntimeApi.EditFormatFor(pic, new NumX(aligned, scale), aligned, $"{scale}", cfg);
+    }
+
+    /// <summary>§14.9.25.4 GR4's GROUP MOVE into an elementary RECORD: the sending group's storage image
+    /// <paramref name="sent"/>, fitted "as if it were an alphanumeric to alphanumeric elementary move" (the receiver's
+    /// JUSTIFIED included) to the record's bytes and decoded into its characters by the one storage decode — with no
+    /// conversion and no editing. A dynamic-length record takes the image whole (§8.5.1.10.4), as
+    /// <see cref="EmitGroupToElementaryMove"/> stores a dynamic-length place.</summary>
+    private static string GroupRecord(DataItem record, string sent) =>
+        record.IsDynamicLength
+            ? ReceivingStore.Characters(record, sent, "")
+            : ReceivingStore.StorageCharacters(record, ReceivingStore.Characters(record, sent, $"{record.ByteWidth}"),
+                $"{ReceivingStore.StoragePositions(record)}");
+
+    /// <summary>⛔ THE RECEIVING HALF OF AN ELEMENTARY MOVE OF CHARACTERS (kb/Work PB2587) — the store of
+    /// <paramref name="chars"/> (a C# string expression holding the sending operand's characters, its operational sign
+    /// already dropped, §14.9.25.4 GR6 a)) into an elementary receiver of <paramref name="target"/>'s non-numeric
+    /// description, at <paramref name="width"/> (the PICTURE length, or an ANY LENGTH receiver's runtime length). ONE
+    /// place for both the MOVE statement (<see cref="ConvertSource"/>) and §14.2.3 GR9's record at the activation boundary
+    /// (<see cref="MovedRecord"/>), so a receiving rule cannot be taught to one and not the other:
+    /// <list type="bullet">
+    ///   <item>a DYNAMIC-LENGTH receiver takes the characters whole (§8.5.1.10.4 — <see cref="ReceivingStore.Characters"/>);</item>
+    ///   <item>an alphanumeric-edited or national-edited one edits them by simple insertion (§13.18.40.5 Table 7), the mask
+    ///     AND the item's EDITING rules from the one PicInfo (kb/Work PB490);</item>
+    ///   <item>a NUMERIC-EDITED one reads them as an unsigned integer and edits it (§14.9.25.4 GR5 — NC104A MOVE-TEST-F1-39:
+    ///     "12345" → $12,345.00);</item>
+    ///   <item>an ALPHANUMERIC or NATIONAL one aligns them (§14.6.8: left-justified, space-filled, a JUSTIFIED one
+    ///     right-justified — §13.18.32; the national substrate is the character one under the D-N4 correspondence);</item>
+    ///   <item>a BOOLEAN one pads and left-fills with boolean ZEROS (§14.6.8.6; JUSTIFIED §13.18.32 GR2).</item>
+    /// </list></summary>
+    private string CharacterStore(DataItem target, string chars, string width)
+    {
+        if (target.IsDynamicLength) return ReceivingStore.Characters(target, chars, "");
+        var pic = target.OperandPic!;
+        if (pic.IsCharacterEdited) return RuntimeApi.EditFormatSimpleInsertion(chars, pic);
+        switch (pic.Category)
+        {
+            case PicCategory.NumericEdited:
+            {
+                string unsignedInt = RuntimeApi.NumFromAlphanumeric(chars, sending: true);
+                return RuntimeApi.EditFormatFor(pic, new NumX(unsignedInt, 0), unsignedInt, "0",
+                    ArithmeticEmitter.BwzFlag(target) + ctx.EditCfg(pic));
+            }
+            case PicCategory.Boolean:
+                return RuntimeApi.StrStoreBoolean(chars, width, target.Justified);
+            case PicCategory.Alphanumeric or PicCategory.National:
+                return ReceivingStore.Characters(target, chars, width);
+            default:
+                throw new InvalidOperationException(
+                    $"MoveEmitter.CharacterStore: a {pic.Category} receiver is not a character receiver ({target.CobolName})");
+        }
+    }
+
     /// <summary>The C# expression a MOVE source converts to when stored into <paramref name="target"/>.
     /// <paramref name="runtimeWidth"/> — the receiver's RUNTIME character count expression for an ANY LENGTH
     /// receiver (ISO §13.18.2 GR1: the item behaves as n repetitions of its picture symbol where n is the
@@ -601,7 +715,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         // DynStore path is exhaustive. A PIC X/N dynamic-length item carries no edit mask, so this precedes the
         // fixed-width figurative/ALL and numeric-edited paths below.
         if (target.IsDynamicLength)   // the ONE elementary character receiving store owns §8.5.1.10.4 (kb/Work PB871)
-            return ReceivingStore.Characters(target, OperandText.AsString(source, num, deSign: true), "");
+            return CharacterStore(target, OperandText.AsString(source, num, deSign: true), "");
         string wN = runtimeWidth ?? pic.Length.ToString();   // the string-category store width (§13.18.2 GR1)
         // ⛔ A WHOLE-WIDTH FILL GOES THROUGH THE EDITOR, NEVER AROUND IT, when the receiver edits. §8.3.3.6.4 GR2
         // and §14.9.25.4 GR6 are two different steps and both apply: the figurative / ALL-literal source is first
@@ -650,9 +764,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 BoundAllLiteral al => CsLiteral(EmitText.RepeatToWidth(al.Literal, pic.Length)),
                 _ => OperandText.AsString(source, num, deSign: true),
             };
-            // The mask AND the item's EDITING rules come from the one PicInfo — never a call-site mask deref
-            // (kb/Work PB490: all three edited-character emit sites dropped PicInfo.EditingRules).
-            return RuntimeApi.EditFormatSimpleInsertion(aeSrc, pic);
+            return CharacterStore(target, aeSrc, wN);
         }
 
         switch (pic.Category)
@@ -686,28 +798,12 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
             // Table 16): the sending characters are treated as an unsigned integer and EDITED into the mask
             // (§14.9.25.4 GR5 — NC104A MOVE-TEST-F1-39: "12345" → $12,345.00), never a plain character copy.
             // (A GROUP sender never reaches here — GR4 makes that a group move, no editing: EmitGroupToElementaryMove.)
-            case PicCategory.NumericEdited:
-            {
-                string unsignedInt = RuntimeApi.NumFromAlphanumeric(OperandText.AsString(source, num, deSign: true), sending: true);
-                return RuntimeApi.EditFormatFor(pic, new NumX(unsignedInt, 0), unsignedInt, "0",
-                    ArithmeticEmitter.BwzFlag(target) + ctx.EditCfg(pic));
-            }
-            case PicCategory.Alphanumeric:
-                // A signed numeric source drops its operational sign into an alphanumeric receiver (ISO §14.9.25.4 GR6a);
-                // a JUSTIFIED receiver right-justifies (left space-fill / left truncation, §14.9.25.4 GR6c).
-                // wN: an ANY LENGTH receiver stores at its runtime length (§13.18.2 GR1), else Pic.Length.
-                return ReceivingStore.Characters(target, OperandText.AsString(source, num, deSign: true), wN);
-            // A NATIONAL receiver stores exactly like alphanumeric on the character substrate (§14.6.8.5 —
-            // left-justify, national-space pad, right truncation; JUSTIFIED per §13.18.32): A→N widening,
-            // N→N, 9→N digit imaging, and boolean→N all ride AsString under the D-N4 Latin-1 identity
-            // correspondence (§14.9.25.4 GR6/GR6a).
-            case PicCategory.National:
-                return ReceivingStore.Characters(target, OperandText.AsString(source, num, deSign: true), wN);
-            // A BOOLEAN receiver pads/left-fills with boolean ZEROS (§14.6.8.6; JUSTIFIED §13.18.32 GR2).
-            // Figurative ZERO already early-returned above as a '0' fill; the SR7-illegal figurative shapes
-            // never reach emit (bind-rejected, MoveCategoryLegality).
-            case PicCategory.Boolean:
-                return RuntimeApi.StrStoreBoolean(OperandText.AsString(source, num, deSign: true), wN, target.Justified);
+            // Every other sender into a numeric-edited, alphanumeric, national or boolean receiver is its characters
+            // (a signed numeric source drops its operational sign, ISO §14.9.25.4 GR6a) through the ONE receiving half.
+            // Figurative ZERO into a boolean receiver already early-returned above as a '0' fill; the SR7-illegal
+            // figurative shapes never reach emit (bind-rejected, MoveCategoryLegality).
+            case PicCategory.NumericEdited or PicCategory.Alphanumeric or PicCategory.National or PicCategory.Boolean:
+                return CharacterStore(target, OperandText.AsString(source, num, deSign: true), wN);
             case PicCategory.Numeric:
                 // A digit-only ALL "literal" repeats across the RECEIVER's digit positions (ISO §8.3.3.6.4 GR2 —
                 // repetition to the associated item's size, truncated from the right; §14.9.25.4 GR6d3b — a

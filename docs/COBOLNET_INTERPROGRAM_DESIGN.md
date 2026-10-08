@@ -399,9 +399,30 @@ conform and before GR3 g)'s transfer, lands each BY VALUE argument and each BY C
 element has a specifier for (`LandArguments` → `BoundaryItem.Land` → `CobolArgAdapt.LandForFormal<T>`) — the same
 landing, with the same checked and unchecked dispositions, the activating element performs when it knows the
 formal. `CobolArgAdapt.NumValue` / `Num` keep their landing for a non-COBOL activator, sharing `LandScalar` with
-both, so no lane can answer differently. (GR9's MOVE leg — a non-numeric formal of a JUSTIFIED or edited
-description, a signed numeric argument into an alphanumeric formal — is still the activated element's adapter's
-image adoption on every lane; that is a separate defect.)
+both, so no lane can answer differently.
+
+**GR9's MOVE leg — the record of a non-numeric formal (kb/Work PB2587).** GR9's second regime fills the record of a
+formal that is neither numeric nor *"of class index, object, or pointer"* by *"otherwise, a MOVE statement"*: a
+JUSTIFIED formal right-justifies, an edited one edits (§14.9.25.4 GR6), a signed numeric argument loses its
+operational sign and a binary one is converted to digits (GR6 a)), a boolean formal fills with boolean zeros
+(§14.6.8.6), and a GROUP argument is GR4's unedited, unconverted group move. ONE test says which formals take it
+(`CallEmitter.IsMovedFormal`: an elementary — or bit / national group — formal of a category that is not numeric,
+not slot-carried and not ANY LENGTH, whose record is the argument itself; a group formal's GR4 move is its text
+adapter's character copy), and ONE receiving half fills it (`MoveEmitter.CharacterStore`, which the MOVE statement's
+`ConvertSource` also stores through, plus `GroupRecord` for GR4):
+- *The activating element knows the formal* (`BoundCallArg.Formal` — a NESTED or GR10 a) CALL, a function, the
+  typed INVOKE): it performs the MOVE itself, `MoveEmitter.RecordValue` over the argument operand, and the record
+  crosses as a character cell with no numeric description (`CallEmitter.MovedArgText`). The INVOKE lane reaches the
+  same `RecordValue` for a literal, a figurative constant and a group argument.
+- *It does not* (the run-time-located lanes above, which include a program defined LATER in the same compilation
+  group — §12.3.8.4 GR10 a) takes the details only from a definition *"specified previously"*): the activating
+  element states the SENDING half of the MOVE for each BY CONTENT argument (`CobolArg.Sending`, a `MoveSending`
+  rendered by `CallEmitter.WithMoveSending` from the argument's description — its characters as a MOVE sends them,
+  the group / figurative-fill flags and the algebraic value a numeric-edited receiver edits; an evaluated expression
+  is read back from its cell, `CobolArgAdapt.WithValueSending`), the activated unit registers the RECEIVING half
+  as a compiled record builder (`BoundaryItem.Landing` = `MoveLanding`, rendered by `MoveEmitter.MovedRecord` from
+  the formal's own description), and `ProgramTable.LandArguments` applies it for exactly the BY CONTENT arguments
+  whose program the element has a program-specifier for — GR9's FIRST regime still crosses *"without conversion"*.
 
 **The raise needs no new machinery.** EC-SIZE-TRUNCATION is a FATAL ambient gate (`EcEmitter.FatalAmbientGates`)
 and a CALL/INVOKE is not an `IArithmeticStatement`, so a statement compiled under EC-SIZE checking already

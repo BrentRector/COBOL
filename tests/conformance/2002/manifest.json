@@ -765,6 +765,7 @@
   "pb165_dynamic_call_description_check",
   "pb165_repository_prototype_description_check",
   "pb2549_runtime_located_call_landing",
+  "pb2587_content_move_leg",
   "pb2671_omitted_formal_category_default",
   "pb1089_currency_literal7_class_pairings",
   "pb876_national_value_no_editing_bwz_inert",

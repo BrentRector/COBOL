@@ -791,11 +791,14 @@ internal sealed class ProgramEmitter
                     ? CallEmitter.RegisteredReturning(retPlace, Current.Ctx.SignEncoding, describe: u.Data.ArgMismatchChecking) : null;
                 // Each FORMAL's registered description (kb/Work PB165), for §14.8.2's argument comparison at a dynamic
                 // CALL — the whole description only by a unit that checks EC-PROGRAM-ARG-MISMATCH itself (GR3d's activated
-                // half) — and each NUMERIC formal's carrier from every unit, for §14.2.3 GR9's second regime and GR10 at a
-                // CALL whose activating element did not know it (kb/Work PB2549). Emitted only when some formal states
-                // anything, so a unit with no numeric formal that does not check keeps its Register line as it was.
+                // half) — and each NUMERIC formal's carrier and each non-numeric ELEMENTARY formal's record builder from every
+                // unit, for §14.2.3 GR9's second regime and GR10 at a CALL whose activating element did not know it (kb/Work
+                // PB2549, PB2587). Emitted only when some formal states anything, so a unit whose formals are all groups,
+                // pointers or ANY LENGTH items and that does not check keeps its Register line as it was. The record builder
+                // reads only the formal's own description (its PicInfo carries its currency sign and decimal point), so the
+                // current unit's emitters render it for every unit.
                 var formalItems = u.Data.LinkageFormals.Select(f => u.Refs.ResolveItem(f.Item) is { } fp
-                    ? CallEmitter.RegisteredFormal(fp, Current.Ctx.SignEncoding, describe: u.Data.ArgMismatchChecking)
+                    ? Current.Call.RegisteredFormal(fp, describe: u.Data.ArgMismatchChecking)
                     : RuntimeApi.UnstatedBoundaryItem).ToList();
                 string formalsText = formalItems.Any(s => s != RuntimeApi.UnstatedBoundaryItem)
                     ? $", formals: new BoundaryItem[] {{ {string.Join(", ", formalItems)} }}" : "";

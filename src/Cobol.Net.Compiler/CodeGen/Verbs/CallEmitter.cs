@@ -224,9 +224,12 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
 
     /// <summary>The <c>CobolArg[]</c> expression of one bound call's arguments — the ONE argument-array text of
     /// <see cref="EmitCall"/>, which renders every activation, statement-position or operand (kb/Work PB892).</summary>
-    private string ArgsArrayText(BoundCallProgram c, bool describeArguments) => c.Args.Count == 0
-        ? "System.Array.Empty<CobolArg>()"
-        : $"new CobolArg[] {{ {string.Join(", ", c.Args.Select(a => ArgText(a, describeArguments)))} }}";
+    private string ArgsArrayText(BoundCallProgram c, bool describeArguments)
+    {
+        if (c.Args.Count == 0) return "System.Array.Empty<CobolArg>()";
+        bool landsAtRunTime = LandsAtRunTime(c);
+        return $"new CobolArg[] {{ {string.Join(", ", c.Args.Select(a => ArgText(a, describeArguments, landsAtRunTime)))} }}";
+    }
 
     /// <summary>⛔ THE ONE ACTIVATION-INVOCATION RENDERER — <see cref="EmitCall"/> renders every activation through it —
     /// statement-position and operand (kb/Work PB892) — so the three activation
@@ -390,8 +393,87 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// BY REFERENCE builds an accessor carrier over the caller's storage (§14.2.3 GR8); BY CONTENT/BY VALUE
     /// snapshot the value into a cell AT CALL INITIATION — which also realizes the §14.9.4.4 GR3a once-only
     /// evaluation for those modes. (A BY REFERENCE accessor over a SUBSCRIPTED operand re-evaluates the
-    /// subscript inside the closure — the GR3a capture-into-locals refinement is a known follow-up.)</summary>
-    public string ArgText(BoundCallArg a, bool describe) => Described(LandedForFormal(a, ArgCarrierText(a)), a, describe);
+    /// subscript inside the closure — the GR3a capture-into-locals refinement is a known follow-up.)
+    /// <para><paramref name="landsAtRunTime"/> (<see cref="LandsAtRunTime"/>): the site leaves GR9 / GR10 to the activation
+    /// boundary, so each BY CONTENT argument also states itself as the sending operand of GR9's MOVE
+    /// (<see cref="WithMoveSending"/>).</para></summary>
+    private string ArgText(BoundCallArg a, bool describe, bool landsAtRunTime)
+    {
+        string built = Described(LandedForFormal(a, ArgCarrierText(a)), a, describe);
+        return landsAtRunTime ? WithMoveSending(a, built) : built;
+    }
+
+    /// <summary>⛔ THE ACTIVATING ELEMENT'S HALF OF §14.2.3 GR9's MOVE AT A SITE THAT CANNOT SEE THE FORMAL (kb/Work PB2587):
+    /// the BY CONTENT argument <paramref name="a"/>'s <c>CobolArg</c> (<paramref name="built"/>) with its
+    /// <c>Sending</c> stated — what a MOVE's SENDER decides, rendered from the argument's own description, for the activated
+    /// unit's <c>MoveLanding</c> to apply the receiver's half to when the program reached is one the element has a
+    /// program-specifier for and the formal is a non-numeric elementary item (<c>ProgramTable.LandArguments</c>):
+    /// <list type="bullet">
+    ///   <item>a GROUP item — §14.9.25.4 GR4's move: its storage image through the one representation codec
+    ///     (<see cref="OperandText.NonElementaryMoveSender"/>), flagged so the receiver neither converts nor edits;</item>
+    ///   <item>an elementary item or literal — its characters as a MOVE sends them (<see cref="OperandText.AsString"/>,
+    ///     the operational sign dropped — GR6 a)) and, for a numeric or numeric-edited one (de-edited, GR5), its value,
+    ///     which a numeric-edited receiver edits;</item>
+    ///   <item>a figurative constant or ALL literal — one occurrence, flagged for repetition to the receiver's size
+    ///     (§8.3.3.6.4 GR2), ZERO also as the value 0;</item>
+    ///   <item>an arithmetic expression, a function-identifier or a boolean expression — read back from the cell it was
+    ///     evaluated into ONCE (§14.9.4.4 GR3 a)), never evaluated again (<c>CobolArgAdapt.WithValueSending</c>).</item>
+    /// </list>
+    /// Nothing for an argument with no MOVE to send — omitted, BY REFERENCE or BY VALUE, a pointer, an address-identifier,
+    /// NULL — or whose formal the site knows (then it performed the MOVE itself, <see cref="MovedFormal"/>).</summary>
+    private string WithMoveSending(BoundCallArg a, string built)
+    {
+        if (a.Omitted || a.Mode is not CobolPassMode.Content || a.Formal is not null) return built;
+        if (a.ContentBool is not null || a.Value is BoundComputedOperand) return RuntimeApi.ArgWithValueSending(built);
+        string? sending = a.Place is { } p ? PlaceSending(p) : a.Value switch
+        {
+            BoundStringLiteral or BoundNumericLiteral => ElementarySending(a.Value),
+            BoundFigurative f => RuntimeApi.MoveSendingNew(FigurativeArgumentImage(f, null, ctx.Data), fill: true,
+                value: f.Kind == 'Z' ? ("0", 0) : null),
+            BoundAllLiteral all => RuntimeApi.MoveSendingNew(FigurativeArgumentImage(all, null, ctx.Data), fill: true),
+            _ => null,
+        };
+        return sending is null ? built : $"({built} with {{ Sending = {sending} }})";
+    }
+
+    /// <summary>The sending operand of an argument PLACE (<see cref="WithMoveSending"/>), read under the forwarded formal's
+    /// presence guard exactly as its carrier is (§8.8.4.8.4 GR1c, §14.9.4.4 GR12), or null for storage a MOVE cannot send:
+    /// a pointer or object reference, an index item, a group with no boundary image.</summary>
+    private string? PlaceSending(Place p)
+    {
+        if (SlotWindow.CarriedBySlot(p.Item) || p.DenotedItem is { Pic.Usage: Usage.Index }
+            || HasNoBoundaryImage(p))
+            return null;
+        var op = new BoundFieldOperand(p);
+        string sending = MoveClassifier.IsGroupSender(op)
+            ? RuntimeApi.MoveSendingNew(OperandText.NonElementaryMoveSender(op, num, "CALL argument"), group: true)
+            : ElementarySending(op);
+        return callState.WholeFormalProbe(p) is { } probe ? $"({OmittedTest(probe)} ? null : {sending})" : sending;
+    }
+
+    /// <summary>A GROUP argument with no image to cross as (a pointer / object-class leaf, a variable-length shape outside
+    /// the current-extent gate — <see cref="Place.BoundaryImageCapable"/>, asked of the OPERAND, kb/Work PB204): the carrier
+    /// arm stages it loud and the MOVE's sending half states nothing for it. A redefinition view is the group's storage
+    /// and always has one.</summary>
+    private static bool HasNoBoundaryImage(Place p) => p.Item.IsGroup && !p.BoundaryImageCapable && p is not RedefViewPlace;
+
+    /// <summary>An elementary sender's characters as a MOVE sends them, and the value of a numeric or numeric-edited one
+    /// (§14.9.25.4 GR5's de-editing is the numeric read's own) — see <see cref="WithMoveSending"/>.</summary>
+    private string ElementarySending(BoundOperand op)
+    {
+        string chars = OperandText.AsString(op, num, deSign: true);
+        bool numeric = op switch
+        {
+            BoundNumericLiteral => true,
+            BoundFieldOperand f => f.Place.DenotedItem?.Pic?.Category is PicCategory.Numeric or PicCategory.NumericEdited,
+            _ => false,
+        };
+        if (!numeric) return RuntimeApi.MoveSendingNew(chars);
+        NumX x = num.AsNum(op, ReceiverContext.None, SendingRef.MoveToNumeric);
+        return x.Real ? RuntimeApi.MoveSendingNew(chars, real: x.Expr)
+            : x.Dec ? RuntimeApi.MoveSendingNew(chars)
+            : RuntimeApi.MoveSendingNew(chars, value: (x.Expr, x.Scale));
+    }
 
     /// <summary>⛔ THE ACTIVATING ELEMENT'S §14.2.3 GR9/GR10 COMPUTE (kb/Work PB640) — wrapped around EVERY
     /// argument carrier shape <see cref="ArgCarrierText"/> builds, which is why it is a wrapper and not a
@@ -484,19 +566,32 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// CARRIER (<c>CarrierLanding</c>; kb/Work PB2549) whatever the unit checks, so that §14.2.3 GR9's second regime and
     /// GR10 can land an argument into it at a CALL whose activating element did not know it (<c>BoundaryItem.Land</c>):
     /// the same profile and the same carrier type argument <see cref="LandedForFormal"/> lands with, from the one
-    /// <see cref="NumericLandingPic"/>. Never null: an element that states nothing is the unstated
-    /// <c>new BoundaryItem(null)</c>, so the array stays positional.</summary>
-    internal static string RegisteredFormal(Place p, SignEncoding signEncoding, bool describe) =>
-        RegisteredBoundary(p, signEncoding, describe ? ArgumentLength(p) : RuntimeApi.UnstatedBoundaryLength,
-            describe ? ActivationDescriptions.OfPlace(p) : null,
-            p.DenotedItem is { } formal && NumericLandingPic(formal) is { } pic ? RuntimeApi.CarrierLanding(pic.ClrType) : null)
+    /// <see cref="NumericLandingPic"/>. A non-numeric ELEMENTARY formal (<see cref="IsMovedFormal"/>) states its RECORD
+    /// BUILDER instead (<c>MoveLanding</c>; kb/Work PB2587) — GR9's "otherwise, a MOVE statement", the receiving half
+    /// rendered by the MOVE emitter (<c>MoveEmitter.MovedRecord</c>) over the sending half the activating element states.
+    /// Never null: an element that states nothing is the unstated <c>new BoundaryItem(null)</c>, so the array stays
+    /// positional.</summary>
+    internal string RegisteredFormal(Place p, bool describe) =>
+        RegisteredBoundary(p, ctx.SignEncoding, describe ? ArgumentLength(p) : RuntimeApi.UnstatedBoundaryLength,
+            describe ? ActivationDescriptions.OfPlace(p) : null, p.DenotedItem is { } formal ? FormalLanding(formal) : null)
         ?? RuntimeApi.UnstatedBoundaryItem;
+
+    /// <summary>The registered landing of <paramref name="formal"/> (<c>BoundaryItem.Landing</c>), or null when the crossing
+    /// converts nothing into it: the numeric COMPUTE's carrier or the MOVE's record builder (see
+    /// <see cref="RegisteredFormal"/>).</summary>
+    private string? FormalLanding(DataItem formal)
+    {
+        const string sending = "__s";
+        return NumericLandingPic(formal) is { } pic ? RuntimeApi.CarrierLanding(pic.ClrType)
+            : IsMovedFormal(formal) ? RuntimeApi.MoveLandingNew(sending, move.MovedRecord(formal, sending))
+            : null;
+    }
 
     private static string? RegisteredBoundary(Place p, SignEncoding signEncoding, int length, ActivationDescription? description,
         string? landing = null)
     {
         string? profile = BoundaryProfile(p, signEncoding);
-        return profile is null && length == RuntimeApi.UnstatedBoundaryLength && description is null ? null
+        return profile is null && length == RuntimeApi.UnstatedBoundaryLength && description is null && landing is null ? null
             : $"new BoundaryItem({profile ?? "null"}"
               + $"{(length == RuntimeApi.UnstatedBoundaryLength ? "" : $", {length}")}"
               + $"{(description is null ? "" : $", Description: {RuntimeApi.ActivationDescriptionNew(description)}")}"
@@ -683,7 +778,10 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         if (a.ContentBool is { } cb)
         {
             string bv = BooleanRenderer.RenderAtItemWidth(cb, num);
-            return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell({bv}), null)";
+            // A known formal's record is filled by GR9's MOVE (kb/Work PB2587) through the one boolean-argument store
+            // the INVOKE lane uses; with no formal known the value crosses as itself (GR9's first regime).
+            return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell("
+                + $"{(a.Formal is { } bf ? BooleanArgumentRecord(bv, bf) : bv)}), null)";
         }
         // ⛔ AN ADDRESS-IDENTIFIER CROSSES AS A DETACHED POINTER VALUE IN EVERY MODE (kb/Work PB239). §14.9.4.3
         // SR4 makes it a SENDING operand even BY REFERENCE and SR5 withholds the receiving role, so the carrier is
@@ -727,7 +825,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // pointer/object-class leaf, or a variable-length shape outside the current-extent gate) is loud.
             // Asked of the OPERAND (Place.BoundaryImageCapable — a subscripted dynamic-table element has an image
             // although its entry does not, kb/Work PB189).
-            if (p.Item.IsGroup && !p.BoundaryImageCapable && p is not RedefViewPlace)
+            if (HasNoBoundaryImage(p))
                 return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell("
                     + LoudValue("string", TierCIsland.Reason(p.Item, "CALL USING group"))
                     + "), null)";
@@ -760,6 +858,11 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Reference)}, "
                     + $"{Forwarded(probe, RefCarrier(p))}, {meta}{AreaArgument(p)})";
             }
+            // §14.2.3 GR9's MOVE leg (kb/Work PB2587): the record of a known non-numeric formal's description, filled by
+            // the MOVE — read through the same omitted-formal guard as the snapshot below, so a forwarded omitted formal
+            // stays omitted and is never read (§8.8.4.8.4 GR1c, §14.9.4.4 GR12).
+            if (MovedFormal(a) is { } record)
+                return MovedArgText(Forwarded(probe, $"ManagedPointer<string>.Cell({move.RecordValue(new BoundFieldOperand(p), record)})"));
             // BY CONTENT — "a record … allocated by the activating element" (§14.2.3 GR9) — and BY VALUE with
             // an identifier argument (a UDF BY VALUE formal, §8.4.3.2.4 GR5c): both are value snapshots at
             // call initiation; the mode rides the wire so the arg is honest about which rule produced it
@@ -781,6 +884,14 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         }
         switch (a.Value)
         {
+            // §14.2.3 GR9's MOVE leg (kb/Work PB2587) for every operand shape a MOVE can send — a nonnumeric or numeric
+            // literal, a figurative constant, an arithmetic expression (§14.8.2.3.3 rule 2 d) takes its VALUE as the
+            // sending operand, kb/Work PB1946) or a function-identifier — into the record of a known non-numeric
+            // formal's description. `12.5` into PIC ZZ9.99 is edited and `-5` into PIC X(4) loses its sign (§14.9.25.4
+            // GR6), a literal into a JUSTIFIED formal is right-justified, and a figurative fills an edited formal's data
+            // positions while its insertion positions keep their own characters.
+            case { } sent when sent is not BoundPredefinedNull && MovedFormal(a) is { } record:
+                return MovedArgText($"ManagedPointer<string>.Cell({move.RecordValue(sent, record)})");
             case BoundStringLiteral s:
                 return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell({CsLiteral(s.Value)}), null)";
             // ⛔ ONE NUMERIC-ARGUMENT FUNNEL for both non-place arms (kb/Work PB263 + PB264). A numeric literal
@@ -789,19 +900,12 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // (CallBinder's byValue arm goes through BindByValueExpr) — and the two arms used to derive a
             // carrier and a scale EACH. They disagreed, so ONE rule ("a numeric literal argument crosses with
             // its exact value") produced three different wrong answers depending on how it was spelled.
-            // ⛔ …EXCEPT INTO A KNOWN ELEMENTARY FORMAL OF ANOTHER CATEGORY (kb/Work PB1113). §14.2.3 GR9 fills the
-            // formal's allocated record by "a MOVE statement" when the formal is not numeric, so the literal crosses
-            // as that record — the receiving category's ONE MOVE store, the INVOKE lane's twin — and not as a numeric
-            // cell the callee's adapter would read as digits: `12.5` into PIC ZZ9.99 printed "125   " and `-5` into
-            // PIC X(4) the sign-overpunched "N   " (measured), where the MOVE edits and drops the sign (§14.9.25.4 GR6).
-            // A GROUP formal is §14.9.25.4 GR4's non-elementary move — "as if it were an alphanumeric to
+            // ⛔ …EXCEPT INTO A KNOWN FORMAL OF ANOTHER CATEGORY (kb/Work PB1113): an elementary one took the MOVE leg
+            // above, and a GROUP formal is §14.9.25.4 GR4's non-elementary move — "as if it were an alphanumeric to
             // alphanumeric elementary move … no conversion": the literal's own characters, as the written
             // `MOVE -12 TO G` and the INVOKE lane store them (the numeric cell crossed as the overpunched "1K").
             case BoundNumericLiteral n when a.Formal is { IsGroup: true }:
                 return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell({CsLiteral(n.Text)}), null)";
-            case BoundNumericLiteral n when a.Formal is { Pic: { } fp }
-                                            && fp.Category is not PicCategory.Numeric && SlotWindow.CarriedBySlot(a.Formal) is false:
-                return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell({move.ConvertSource(n, a.Formal)}), null)";
             case BoundNumericLiteral n:
                 return NumericArgText(a.Mode, n.Text, ctx.SignEncoding);
             case BoundComputedOperand ce when Gr8ArgumentLiteral.NumericText(ce.Expr) is { } ct:
@@ -814,15 +918,6 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // that category does: its character image, through the ONE string channel (OperandText.AsString).
             case BoundComputedOperand { Expr: BoundIntrinsicCall { ResultCategory: PicCategory.Alphanumeric or PicCategory.National or PicCategory.Boolean } } sc:
                 return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell({OperandText.AsString(sc, num)}), null)";
-            // ⛔ AN ARITHMETIC EXPRESSION INTO A KNOWN ELEMENTARY FORMAL OF ANOTHER CATEGORY (kb/Work PB1946, verdict
-            // PB1936) crosses as that formal's allocated record, exactly as the numeric literal above does: §14.2.3 GR9
-            // fills it by "a MOVE statement" when the formal is not numeric, and §14.8.2.3.3 rule 2 d) takes the
-            // expression's VALUE as the MOVE's sending operand. The receiving category's ONE MOVE store edits it into a
-            // numeric-edited mask; a numeric cell would be read by the callee's adapter as digits ("12.50" as "125").
-            case BoundComputedOperand moved when a.Formal is { IsGroup: false, Pic: { } mp }
-                                                 && mp.Category is not PicCategory.Numeric
-                                                 && SlotWindow.CarriedBySlot(a.Formal) is false:
-                return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, ManagedPointer<string>.Cell({move.ConvertSource(moved, a.Formal)}), null)";
             case BoundComputedOperand expr:
             {
                 // A GENUINE runtime expression snapshots its computed value (§14.2.3 GR9/GR10 — the CALL BY
@@ -889,6 +984,54 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 return $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Content)}, ManagedPointer<string>.Cell("
                     + LoudValue("string", "CALL USING argument form") + "), null)";
         }
+    }
+
+    /// <summary>⛔ THE FORMAL WHOSE RECORD §14.2.3 GR9's MOVE LEG FILLS (kb/Work PB2587), or null. GR9's second regime — "a
+    /// program for which there is a program-specifier in the REPOSITORY paragraph of the activating runtime element", "a
+    /// program and the NESTED phrase is specified on the CALL statement", "a function" — allocates "a data item with the
+    /// same description and the same number of bytes as the formal parameter" and fills it, when the formal is neither
+    /// numeric (the COMPUTE, <see cref="LandedForFormal"/>) nor "of class index, object, or pointer" (the SET), by
+    /// "otherwise, a MOVE statement". The activating element performs it when it knows the formal
+    /// (<see cref="BoundCallArg.Formal"/>, set only on that regime): a BY CONTENT argument to an ELEMENTARY formal (a bit
+    /// or national group is "treated as an elementary item", §14.9.25.4 GR4) of a category that is not numeric and not
+    /// slot-carried. Excluded: a GROUP formal, whose GR4 group move is the character copy the formal's own text adapter
+    /// already performs, and an ANY LENGTH formal, whose record is "a data item of the same category, usage, and length
+    /// as the argument" and so the argument itself. BY VALUE has no MOVE leg (GR10 names only the COMPUTE and the SET).</summary>
+    private static DataItem? MovedFormal(BoundCallArg a) =>
+        !a.Omitted && a.Mode is CobolPassMode.Content && a.Formal is { } f && IsMovedFormal(f) ? f : null;
+
+    /// <summary>⛔ THE ONE TEST OF WHICH FORMALS §14.2.3 GR9's MOVE LEG FILLS (see <see cref="MovedFormal"/>) — asked by the
+    /// activating element's compile-time MOVE and by the activated unit's registration (<see cref="RegisteredFormal"/>), so
+    /// the two lanes of one crossing cannot disagree about which formals they move into (kb/Work PB2587; the
+    /// <see cref="NumericLandingPic"/> of the MOVE).</summary>
+    internal static bool IsMovedFormal(DataItem f) =>
+        f is { IsAnyLength: false, OperandPic: { Category: not PicCategory.Numeric } }
+        && (f.IsElementary || f.IsAsIfElementary) && !SlotWindow.CarriedBySlot(f);
+
+    /// <summary>The <c>CobolArg</c> of GR9's moved record (<see cref="MovedFormal"/>): <paramref name="carrier"/>, a cell
+    /// holding the record's characters, BY CONTENT and with no numeric description — the record is of the formal's
+    /// non-numeric description, which the activated element's own text adapter reads (GR11).</summary>
+    private static string MovedArgText(string carrier) =>
+        $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Content)}, {carrier}, null)";
+
+    /// <summary>⛔ THE RECORD OF A KNOWN FORMAL FILLED FROM A BOOLEAN VALUE (kb/Work PB46, PB2587) — the C# string expression
+    /// a BY CONTENT boolean-expression-1 or boolean literal-2 (<paramref name="value"/>, a '0'/'1' string) crosses as into
+    /// <paramref name="formal"/>, for the CALL and function lanes (<see cref="ArgCarrierText"/>) and the INVOKE lane alike.
+    /// <para>⛔ ANY LENGTH IS TESTED FIRST, AND THE ORDER IS THE WHOLE POINT. §13.18.2.3 SR1 admits the picture symbol '1'
+    /// as well as 'N' and 'X', so a category-BOOLEAN formal can carry ANY LENGTH — and §13.18.2.4 GR1b then makes n "the
+    /// length of the corresponding argument", not the one symbol its PICTURE spells (measured: `01 AL PIC 1 ANY LENGTH`
+    /// received B"1000" as B"1" while the category test came first). Otherwise §14.8.2.3.3 rule 2d makes the crossing the
+    /// MOVE store for the formal's category: a BOOLEAN receiver pads and truncates in boolean ZEROS (§14.6.8.6), an
+    /// ALPHANUMERIC one in spaces with the boolean characters moved as-is (§14.9.25.4 GR6a — "If the sending item is of
+    /// class boolean, its boolean value shall be moved"), and a GROUP formal takes the characters as §14.9.25.4 GR4's
+    /// group move does — an alphanumeric copy to the group's image width, space-filled (kb/Work PB1113).</para></summary>
+    internal static string BooleanArgumentRecord(string value, DataItem formal)
+    {
+        int width = Math.Max(1, formal.Pic?.Length ?? 0);
+        return formal.IsGroup ? RuntimeApi.StrStore(value, $"{BoundaryImageWidth(formal)}")
+            : formal.IsAnyLength ? value
+            : formal.Pic!.Category is PicCategory.Boolean ? RuntimeApi.StrStoreBoolean(value, $"{width}", formal.Justified)
+            : ReceivingStore.Characters(formal, value, $"{width}");   // the ONE elementary character store (kb/Work PB871)
     }
 
     /// <summary>⛔ THE ONE VALUE OF A FIGURATIVE-CONSTANT / ALL-LITERAL ARGUMENT (kb/Work PB1418 + PB1617) — the C#

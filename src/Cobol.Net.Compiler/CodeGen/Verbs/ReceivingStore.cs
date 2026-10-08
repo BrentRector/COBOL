@@ -72,12 +72,7 @@ internal static class ReceivingStore
     public static string StorageArea(Place target, string area, string positions)
     {
         var item = target.Item;
-        string chars = item.Pic switch
-        {
-            { Usage: Usage.National } => RuntimeApi.NatReadWindow(area, "0", positions),
-            { Usage: Usage.Bit } => RuntimeApi.BitsUnpack(area, positions),
-            _ => area,
-        };
+        string chars = StorageCharacters(item, area, positions);
         bool nativeNumeric = item.Pic is { Category: PicCategory.Numeric } && !item.StoreAsImage
             && target is not RedefViewPlace and not NumericImagePlace;
         return PlaceRenderer.Write(target, nativeNumeric ? Emit.NumericRenderer.CarrierOfImage(chars, item) : chars);
@@ -87,9 +82,25 @@ internal static class ReceivingStore
     /// positions (<see cref="NationalWindow.PositionsOf"/>), boolean BIT positions (the PICTURE length), else its
     /// character positions; an ANY LENGTH receiver's comes from its carrier at run time (§13.18.2.4 GR1 b).</summary>
     public static string StoragePositions(Place target) =>
-        target.Item.IsAnyLength ? AnyLengthWidth(target)
-        : target.Item.Pic is { Usage: Usage.Bit } bitPic ? $"{bitPic.Length}"
-        : $"{NationalWindow.PositionsOf(target.Item) ?? target.Item.ImageWidth}";
+        target.Item.IsAnyLength ? AnyLengthWidth(target) : $"{StoragePositions(target.Item)}";
+
+    /// <summary>The position count of a FIXED-length item in its own units — <see cref="StoragePositions(Place)"/> for an
+    /// item that is not ANY LENGTH, whose count its description alone fixes.</summary>
+    public static int StoragePositions(DataItem item) =>
+        item.Pic is { Usage: Usage.Bit } bitPic ? bitPic.Length : NationalWindow.PositionsOf(item) ?? item.ImageWidth;
+
+    /// <summary>The CHARACTERS of an elementary item whose storage holds the bytes <paramref name="area"/> — the decode
+    /// half of <see cref="StorageArea"/> for every carrier that is not a native numeric cell: a NATIONAL item's UTF-16BE
+    /// pairs through <c>CobolBits.NatReadWindow</c> (D-N1), a USAGE BIT item's packed bits through
+    /// <c>CobolBits.Unpack</c>, every other string-backed item the bytes as they are. Asked by <see cref="StorageArea"/>
+    /// and by <c>MoveEmitter.RecordValue</c>, whose receiving record exists only as a value (kb/Work PB2587), so a group
+    /// move decodes its receiver one way whether the receiver is a place or a record.</summary>
+    public static string StorageCharacters(DataItem item, string area, string positions) => item.Pic switch
+    {
+        { Usage: Usage.National } => RuntimeApi.NatReadWindow(area, "0", positions),
+        { Usage: Usage.Bit } => RuntimeApi.BitsUnpack(area, positions),
+        _ => area,
+    };
 
     /// <summary>The SIZE of a receiving operand in CHARACTER POSITIONS at execution — a C# int expression, because an
     /// ANY LENGTH receiver's size is its carrier's (ISO §13.18.2.4 GR1 b), "n is the length of the corresponding

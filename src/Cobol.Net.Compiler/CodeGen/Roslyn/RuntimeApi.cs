@@ -2057,6 +2057,50 @@ internal static class RuntimeApi
     public static string CarrierLanding(string clrType) =>
         $"{nameof(CobolNet.Runtime.CarrierLanding)}<{clrType}>.{nameof(CobolNet.Runtime.CarrierLanding<long>.Instance)}";
 
+    /// <summary>The registered RECORD BUILDER of a non-numeric elementary formal (<see cref="CobolNet.Runtime.MoveLanding"/>;
+    /// kb/Work PB2587): a static lambda over the sending operand <paramref name="parameter"/> whose body
+    /// <paramref name="record"/> is the receiving half of §14.2.3 GR9's MOVE (<c>MoveEmitter.MovedRecord</c>).</summary>
+    public static string MoveLandingNew(string parameter, string record) =>
+        $"new {nameof(MoveLanding)}(static {parameter} => {record})";
+
+    /// <summary>A <see cref="MoveSending"/> member of the sending operand <paramref name="sending"/> (kb/Work PB2587) — the one
+    /// spelling of the record builder's reads.</summary>
+    public static string MoveSendingCharacters(string sending) => $"{sending}.{nameof(MoveSending.Characters)}";
+
+    /// <inheritdoc cref="MoveSendingCharacters"/>
+    public static string MoveSendingGroup(string sending) => $"{sending}.{nameof(MoveSending.Group)}";
+
+    /// <inheritdoc cref="MoveSendingCharacters"/>
+    public static string MoveSendingFill(string sending) => $"{sending}.{nameof(MoveSending.Fill)}";
+
+    /// <inheritdoc cref="MoveSendingCharacters"/>
+    public static string MoveSendingNumeric(string sending) => $"{sending}.{nameof(MoveSending.Numeric)}";
+
+    /// <summary>The sending value aligned at <paramref name="scale"/> — <see cref="MoveSending.AtScale"/>.</summary>
+    public static string MoveSendingAtScale(string sending, int scale) => $"{sending}.{nameof(MoveSending.AtScale)}({scale})";
+
+    /// <summary>The sending value as binary64 — <see cref="MoveSending.Binary64"/>.</summary>
+    public static string MoveSendingBinary64(string sending) => $"{sending}.{nameof(MoveSending.Binary64)}";
+
+    /// <summary>A sending operand the activating element states for its argument (<see cref="MoveSending"/>; kb/Work PB2587):
+    /// <paramref name="characters"/> always, the flags and the value only when set, so the common case reads as itself.</summary>
+    public static string MoveSendingNew(string characters, bool group = false, bool fill = false,
+        (string Unscaled, int Scale)? value = null, string? real = null)
+    {
+        var parts = new List<string> { characters };
+        if (group) parts.Add($"{nameof(MoveSending.Group)}: true");
+        if (fill) parts.Add($"{nameof(MoveSending.Fill)}: true");
+        if (value is not null || real is not null) parts.Add($"{nameof(MoveSending.Numeric)}: true");
+        if (value is { } v) parts.Add($"{nameof(MoveSending.Unscaled)}: (Int128)({v.Unscaled}), {nameof(MoveSending.Scale)}: {v.Scale}");
+        if (real is not null) parts.Add($"{nameof(MoveSending.Real)}: (double)({real})");
+        return $"new {nameof(MoveSending)}({string.Join(", ", parts)})";
+    }
+
+    /// <summary>An argument evaluated into its cell, with its sending operand read back from that cell —
+    /// <see cref="CobolArgAdapt.WithValueSending"/> (kb/Work PB2587).</summary>
+    public static string ArgWithValueSending(string arg) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.WithValueSending)}({arg})";
+
     /// <summary>The carrier of the predefined NULL written as a CALL / function-activation argument (kb/Work PB1630;
     /// <see cref="PredefinedNullArgument"/> states the rule).</summary>
     public static string PredefinedNullArgumentCarrier =>

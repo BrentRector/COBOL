@@ -78,8 +78,14 @@ public enum CobolPassMode
 /// side makes — through the formal, through a second formal passed the same argument, or through the activating
 /// element's own description while the activated one is active — is the same store. Null for an argument whose
 /// storage is not a cell (it then crosses through <see cref="Carrier"/> alone and an area formal holds a copy).</param>
+/// <param name="Sending">⛔ The argument as the SENDING OPERAND OF §14.2.3 GR9's MOVE (<see cref="MoveSending"/>; kb/Work
+/// PB2587), stated for a BY CONTENT argument at a CALL whose activating element holds no signature of the activated program,
+/// so the activation boundary can fill a non-numeric formal's record when the program reached is one the element has a
+/// program-specifier for (<see cref="MoveLanding"/>). Null everywhere else: the activating element that knows the formal
+/// performs the MOVE itself, and BY REFERENCE and BY VALUE have no MOVE leg.</param>
 public readonly record struct CobolArg(CobolPassMode Mode, ManagedPointer Carrier, NumProfile? Num, GroupAtom[]? Atoms = null,
-    int Length = CobolArg.Unstated, ActivationDescription? Description = null, CellPointer? Area = null)
+    int Length = CobolArg.Unstated, ActivationDescription? Description = null, CellPointer? Area = null,
+    MoveSending? Sending = null)
 {
     /// <summary><see cref="Length"/> of an item with no fixed character length.</summary>
     public const int Unstated = -1;
@@ -111,11 +117,13 @@ public readonly record struct CobolArg(CobolPassMode Mode, ManagedPointer Carrie
 /// <param name="Length">The item's fixed storage length (see <see cref="CobolArg.Length"/>); <see cref="CobolArg.Unstated"/> otherwise.</param>
 /// <param name="Description">The item's §14.8.2 / §14.8.3 description (<see cref="ActivationDescription"/>), stated where
 /// the run-time check needs it; null when unstated.</param>
-/// <param name="Landing">⛔ A NUMERIC FORMAL'S CARRIER (kb/Work PB2549): the typed landing that performs ISO §14.2.3 GR9 and
-/// GR10's "COMPUTE statement without the ROUNDED phrase" into a record of the formal's description (<see cref="Num"/>) when
-/// the activating element could not perform it at compile time (<see cref="Land"/>). Stated by EVERY unit for each of its
-/// numeric formals, whatever its checking state, because the crossing's conversion is not a check; null for every other
-/// item.</param>
+/// <param name="Landing">⛔ THE FORMAL'S LANDING (kb/Work PB2549, PB2587): what fills a record of the formal's description
+/// when the activating element could not at compile time (<see cref="Land"/>) — a NUMERIC formal's typed carrier
+/// (<see cref="CarrierLanding{T}"/>, ISO §14.2.3 GR9 and GR10's "COMPUTE statement without the ROUNDED phrase" into
+/// <see cref="Num"/>'s description) or a non-numeric elementary formal's record builder (<see cref="MoveLanding"/>, GR9's
+/// "otherwise, a MOVE statement"). Stated by EVERY unit for each such formal, whatever its checking state, because the
+/// crossing's conversion is not a check; null for every other item (a group formal, whose GR4 move is its text adapter's
+/// character copy, and a formal of class index, object or pointer).</param>
 public readonly record struct BoundaryItem(NumProfile? Num, int Length = CobolArg.Unstated, ActivationDescription? Description = null,
     CarrierLanding? Landing = null)
 {
@@ -125,17 +133,17 @@ public readonly record struct BoundaryItem(NumProfile? Num, int Length = CobolAr
     /// <see cref="Landing"/> only, and is never compared (the check runs only when both sides enable it).</summary>
     public bool IsStated => Num is not null || Length != CobolArg.Unstated || Description is not null;
 
-    /// <summary>⛔ ISO §14.2.3 GR9's SECOND REGIME AND GR10 AT A RUN-TIME-LOCATED CALL (kb/Work PB2549): the argument
+    /// <summary>⛔ ISO §14.2.3 GR9's SECOND REGIME AND GR10 AT A RUN-TIME-LOCATED CALL (kb/Work PB2549, PB2587): the argument
     /// <paramref name="arg"/> landed into "a data item with the same description and the same number of bytes as the formal
-    /// parameter" by "a COMPUTE statement without the ROUNDED phrase" when this formal is numeric, so the activated element
-    /// reads the allocated record "as if it were the argument and it were passed by reference". The SAME landing the
-    /// activating element performs when it knows the formal at compile time (<see cref="CobolArgAdapt.LandForFormal{T}"/>,
-    /// through <see cref="CarrierLanding{T}"/>), so the two lanes cannot answer differently; <paramref name="checking"/> is
-    /// the activating CALL statement's EC-SIZE-TRUNCATION state, as there. The argument unchanged when this formal is not
-    /// numeric — its SET or MOVE is the activated element's adapter's (<see cref="CobolArgAdapt.Text"/> and its
-    /// siblings), exactly as on the compile-time lane.</summary>
-    public CobolArg Land(in CobolArg arg, bool checking) =>
-        Landing is { } landing && Num is { } formal ? landing.Land(arg, formal, checking) : arg;
+    /// parameter" — by "a COMPUTE statement without the ROUNDED phrase" when this formal is numeric, by "otherwise, a MOVE
+    /// statement" when it is a non-numeric elementary item — so the activated element reads the allocated record "as if it
+    /// were the argument and it were passed by reference". The SAME fill the activating element performs when it knows the
+    /// formal at compile time (<see cref="CarrierLanding{T}"/> runs <see cref="CobolArgAdapt.LandForFormal{T}"/>, and
+    /// <see cref="MoveLanding"/> the record builder the compiler renders from the receiving half of that MOVE), so the two
+    /// lanes cannot answer differently; <paramref name="checking"/> is the activating CALL statement's EC-SIZE-TRUNCATION
+    /// state, as there. The argument unchanged when this formal states no landing — a formal of class index, object or
+    /// pointer, whose SET is the activated element's adapter's.</summary>
+    public CobolArg Land(in CobolArg arg, bool checking) => Landing is { } landing ? landing.Land(arg, Num, checking) : arg;
 
     /// <summary>The item in the words of an EC-PROGRAM-ARG-MISMATCH message.</summary>
     public string Describe() =>
@@ -192,28 +200,30 @@ public readonly record struct BoundaryItem(NumProfile? Num, int Length = CobolAr
 }
 
 /// <summary>
-/// ⛔ THE CARRIER OF A NUMERIC FORMAL, AS THE RUN TIME NEEDS IT TO LAND AN ARGUMENT (kb/Work PB2549). ISO §14.2.3 GR9
-/// allocates, for "a program for which there is a program-specifier in the REPOSITORY paragraph of the activating runtime
-/// element", "a data item with the same description and the same number of bytes as the formal parameter" and fills it by
-/// "a COMPUTE statement without the ROUNDED phrase" when the formal is numeric; GR10 does the same for BY VALUE on every
-/// lane. When the activating element holds no signature of the activated program (a CALL by data-name, a CALL through a
-/// program-pointer, a program-prototype whose details §12.3.8.4 GR10 c) takes from the external repository) only the
-/// activated unit knows the formal, so it registers each numeric formal's profile (<see cref="BoundaryItem.Num"/>) and this
-/// carrier, and the activation boundary lands the argument through <see cref="CobolArgAdapt.LandForFormal{T}"/> with the
-/// formal's own CLR carrier <typeparamref name="T"/> — the landing the activating element performs at compile time when it
-/// knows the formal, so the formal's adapter then sees a same-carrier, same-scale argument and aliases it. One stateless
-/// instance per carrier type (<see cref="CarrierLanding{T}.Instance"/>), so registering it allocates nothing per unit.
+/// ⛔ THE FORMAL, AS THE RUN TIME NEEDS IT TO FILL THE RECORD AN ARGUMENT CROSSES INTO (kb/Work PB2549, PB2587). ISO §14.2.3
+/// GR9 allocates, for "a program for which there is a program-specifier in the REPOSITORY paragraph of the activating
+/// runtime element", "a data item with the same description and the same number of bytes as the formal parameter" and
+/// fills it by "a COMPUTE statement without the ROUNDED phrase" if the formal is numeric and by "otherwise, a MOVE
+/// statement"; GR10 does the COMPUTE for BY VALUE on every lane. When the activating element holds no signature of the
+/// activated program (a CALL by data-name, a CALL through a program-pointer, a program-prototype whose details §12.3.8.4
+/// GR10 c) takes from the external repository — which includes a program defined LATER in the same compilation group) only
+/// the activated unit knows the formal, so it registers one of these for each formal the crossing converts into, and the
+/// activation boundary fills the record through it — the fill the activating element performs at compile time when it
+/// knows the formal: <see cref="CarrierLanding{T}"/> for a numeric formal and <see cref="MoveLanding"/> for a non-numeric
+/// elementary one. Each is stateless or holds only compiled code, so registering it allocates nothing per activation.
 /// </summary>
 public abstract class CarrierLanding
 {
     private protected CarrierLanding() { }
 
-    /// <summary>Land <paramref name="arg"/> into a record of <paramref name="formal"/>'s description.</summary>
-    public abstract CobolArg Land(in CobolArg arg, in NumProfile formal, bool checking);
+    /// <summary>Fill a record of the formal's description from <paramref name="arg"/>; <paramref name="formal"/> is the
+    /// formal's numeric profile (<see cref="BoundaryItem.Num"/>), null for a non-numeric formal.</summary>
+    public abstract CobolArg Land(in CobolArg arg, NumProfile? formal, bool checking);
 }
 
 /// <summary>The <see cref="CarrierLanding"/> of a numeric formal whose CLR carrier is <typeparamref name="T"/> (the
-/// compiler's <c>PicInfo.ClrType</c>, the same type argument the compile-time landing is emitted with).</summary>
+/// compiler's <c>PicInfo.ClrType</c>, the same type argument the compile-time landing is emitted with). One stateless
+/// instance per carrier type (<see cref="Instance"/>).</summary>
 public sealed class CarrierLanding<T> : CarrierLanding where T : struct, System.Numerics.INumberBase<T>
 {
     /// <summary>The one instance per carrier type.</summary>
@@ -224,9 +234,59 @@ public sealed class CarrierLanding<T> : CarrierLanding where T : struct, System.
     /// <inheritdoc/>
     /// <remarks>The formal's scale is its profile's <see cref="NumProfile.FractionScale"/>: the compiler emits the profile
     /// from the formal's <c>PicInfo</c>, whose <c>FractionDigits</c> IS its <c>Scale</c> (the remark on the compile-time
-    /// lane's <c>CobolArgAdapt.Land</c>), so the rescale target and the capacity discipline cannot disagree.</remarks>
-    public override CobolArg Land(in CobolArg arg, in NumProfile formal, bool checking) =>
-        CobolArgAdapt.LandForFormal<T>(arg, formal, formal.FractionScale, checking);
+    /// lane's <c>CobolArgAdapt.Land</c>), so the rescale target and the capacity discipline cannot disagree. A formal that
+    /// states no profile has no COMPUTE to perform.</remarks>
+    public override CobolArg Land(in CobolArg arg, NumProfile? formal, bool checking) =>
+        formal is { } f ? CobolArgAdapt.LandForFormal<T>(arg, f, f.FractionScale, checking) : arg;
+}
+
+/// <summary>
+/// ⛔ THE RECORD OF A NON-NUMERIC ELEMENTARY FORMAL, FILLED BY §14.2.3 GR9's MOVE AT THE ACTIVATION BOUNDARY (kb/Work
+/// PB2587). The activated unit's compiler renders the RECEIVING half of "a MOVE statement" into a record of the formal's
+/// description — the alignment, space or boolean-zero fill and JUSTIFIED of §14.6.8, the editing of an edited formal and
+/// GR4's unedited group move (§14.9.25.4 GR4, GR6) — as <see cref="Record"/>, over the SENDING half the activating element
+/// states for the argument (<see cref="CobolArg.Sending"/>, which it renders from the argument's own description). The
+/// record crosses as a character cell BY CONTENT with no numeric description, which the formal's text adapter reads as its
+/// own (GR11). An argument that states no sending operand — a non-COBOL activator's — crosses unchanged.
+/// </summary>
+/// <param name="Record">The record's characters for one sending operand — the compiler's receiving half of the MOVE.</param>
+public sealed class MoveLanding(Func<MoveSending, string> Record) : CarrierLanding
+{
+    /// <inheritdoc/>
+    public override CobolArg Land(in CobolArg arg, NumProfile? formal, bool checking) =>
+        arg.Carrier.IsNull || arg.Sending is not { } sent ? arg
+            : arg with { Carrier = ManagedPointer<string>.Cell(Record(sent)), Num = null, Sending = null };
+}
+
+/// <summary>
+/// ⛔ THE SENDING OPERAND OF §14.2.3 GR9's MOVE, AS THE ACTIVATING ELEMENT STATES IT FOR A FORMAL IT DOES NOT KNOW (kb/Work
+/// PB2587). ISO §14.9.25.4 splits a MOVE into what the SENDER decides — GR4's group move (no conversion, no editing), GR6
+/// a)'s "the operational sign is not moved" and its 'P' positions "considered to have the value zero", GR5's de-editing of
+/// a numeric-edited sender, a figurative constant's repetition (§8.3.3.6.4 GR2) — and what the RECEIVER decides; the two
+/// sides of a run-time-located CALL are compiled apart, so the activating element renders its half here from the
+/// argument's description, and <see cref="MoveLanding"/> applies the receiver's.
+/// </summary>
+/// <param name="Characters">The sender's characters as a MOVE into an alphanumeric receiver sends them: a numeric sender's
+/// digits without its operational sign, a group's storage image, one occurrence of a figurative constant.</param>
+/// <param name="Group">The sender is a group item — §14.9.25.4 GR4's move: no conversion and no editing.</param>
+/// <param name="Fill">The sender is a figurative constant or ALL literal, repeated to the receiver's size (§8.3.3.6.4 GR2).</param>
+/// <param name="Numeric">The sender has an algebraic value — a numeric or numeric-edited (de-edited, GR5) item, a numeric
+/// literal, an arithmetic expression or ZERO — which a numeric-edited receiver edits (<see cref="Unscaled"/> at
+/// <see cref="Scale"/>, or <see cref="Real"/>).</param>
+/// <param name="Unscaled">The fixed-point value, unscaled.</param>
+/// <param name="Scale">The fixed-point value's fraction scale.</param>
+/// <param name="Real">The value of a floating-point sender, null for a fixed-point one.</param>
+public readonly record struct MoveSending(string Characters, bool Group = false, bool Fill = false, bool Numeric = false,
+    Int128 Unscaled = default, int Scale = 0, double? Real = null)
+{
+    /// <summary>The value aligned at <paramref name="scale"/> — §14.6.8.2's alignment, which truncates (a MOVE has no
+    /// ROUNDED phrase).</summary>
+    public Int128 AtScale(int scale) => Real is { } r
+        ? CobolFloat.ToScaledUnchecked(r, scale, CobolRounding.Truncation)
+        : CobolNum.Rescale(Unscaled, Scale, scale, CobolRounding.Truncation);
+
+    /// <summary>The value as binary64, for a floating-point edited receiver.</summary>
+    public double Binary64 => Real ?? CobolFloat.ScaledToDouble(Unscaled, Scale);
 }
 
 /// <summary>
@@ -726,6 +786,24 @@ public static class CobolArgAdapt
             return arg with { Num = formal };
         return arg with { Carrier = ManagedPointer<T>.Cell(landed), Num = formal };
     }
+
+    /// <summary>⛔ AN EVALUATED ARGUMENT AS GR9's MOVE SENDS IT (kb/Work PB2587): <paramref name="arg"/> — the cell an
+    /// arithmetic expression or a function-identifier was evaluated into ONCE, at call initiation (§14.9.4.4 GR3 a)) — with
+    /// its <see cref="CobolArg.Sending"/> read back from that cell, so the expression is never evaluated a second time. A
+    /// fixed-point value sends the characters a MOVE of an intrinsic function's value sends (<see cref="CobolNum.FormatFunctionText"/>
+    /// without its sign, §14.9.25.4 GR6 a)) and its algebraic value; a binary64 one its display form
+    /// (<see cref="CobolFloat.Display"/>) and its value; a character value its characters.</summary>
+    public static CobolArg WithValueSending(CobolArg arg) => arg with
+    {
+        Sending = arg.Carrier switch
+        {
+            ManagedPointer<string> s => new MoveSending(s.Value ?? ""),
+            ManagedPointer<double> d => new MoveSending(CobolFloat.Display(d.Value), Numeric: true, Real: d.Value),
+            var c when ReadNumericCell(c) is { } v =>
+                new MoveSending(CobolNum.FormatFunctionText(v, arg.Scale, deSign: true), Numeric: true, Unscaled: v, Scale: arg.Scale),
+            _ => null,
+        },
+    };
 
     /// <summary>The write half of <see cref="ReadNumericCell"/>; false when the cell is not a native numeric.</summary>
     private static bool WriteNumericCell(ManagedPointer p, Int128 v)

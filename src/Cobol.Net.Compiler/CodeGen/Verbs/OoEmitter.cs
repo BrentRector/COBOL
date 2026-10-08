@@ -1601,33 +1601,17 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // §8.8.2 rule 10 — the value's length is the largest boolean ITEM referenced (literals only carry
                 // no item width, so the receiver's store fits them). The same width §14.9.8.4 GR3 states for a
                 // boolean COMPUTE, carried at run time by the ONE renderer EmitComputeBoolean uses (kb/Work PB589).
-                string bv = BooleanRenderer.RenderAtItemWidth(cb, Num);
-                int bw = Math.Max(1, a.Formal.Pic?.Length ?? 0);
-                // ⛔ ANY LENGTH IS TESTED FIRST, AND THE ORDER IS THE WHOLE POINT. §13.18.2.3 SR1 admits the
-                // picture symbol '1' as well as 'N' and 'X', so a category-BOOLEAN formal can carry ANY LENGTH
-                // — and §13.18.2.4 GR1b then makes n "the length of the corresponding argument", not the one
-                // symbol its PICTURE spells. With the category test first, `01 AL PIC 1 ANY LENGTH` received
-                // B"1000" as B"1" (measured: `AL=[1] LEN=1`), silently, while the alphanumeric twin beside it
-                // was right — the same two-arm asymmetry this whole fix exists to remove, reproduced inside
-                // the new arm. §14.8.2.3.3 rule 2c is the conformance half of the same rule.
-                // Otherwise §14.8.2.3.3 rule 2d ⇒ the MOVE store for the formal's category: a BOOLEAN receiver
-                // pads and truncates in boolean ZEROS (§14.6.8.6), an ALPHANUMERIC one in spaces with the
-                // boolean characters moved as-is (§14.9.25.4 GR6a — "If the sending item is of class boolean,
-                // its boolean value shall be moved"). A GROUP formal takes the characters as §14.9.25.4 GR4's group
-                // move does — an alphanumeric copy to the group's image width, space-filled (kb/Work PB1113: Table 16
-                // exempts a group receiver, so the value verdict admits it).
-                Decl("string", a.Formal.IsGroup ? RuntimeApi.StrStore(bv, $"{CallEmitter.BoundaryImageWidth(a.Formal)}")
-                    : a.Formal.IsAnyLength ? bv
-                    : a.Formal.Pic!.Category is PicCategory.Boolean
-                        ? RuntimeApi.StrStoreBoolean(bv, $"{bw}", a.Formal.Justified)
-                    : ReceivingStore.Characters(a.Formal, bv, $"{bw}"));   // the ONE elementary character store (kb/Work PB871)
+                Decl("string", CallEmitter.BooleanArgumentRecord(BooleanRenderer.RenderAtItemWidth(cb, Num), a.Formal));
             }
             // A figurative-constant / ALL-literal literal-2 (kb/Work PB1617): §14.2.3 GR9's MOVE into the method
             // formal's allocated record, filled to that record's character positions (§8.3.3.6.4 GR2) by the ONE
             // argument fill the CALL and function lanes use. A group formal is the case that makes it load-bearing:
             // the image arm below would space-pad one occurrence.
+            // An ELEMENTARY non-numeric formal's record is the MOVE's (kb/Work PB2587's sweep), so an edited formal's
+            // insertion positions keep their own characters (`SPACE` into PIC XX/XX is "  /  ", §14.9.25.4 GR6).
             else if (a.ContentFill is { } fill)
-                Decl("string", CallEmitter.FigurativeArgumentImage(fill, a.Formal, Ctx.Data));
+                Decl("string", CallEmitter.IsMovedFormal(a.Formal) ? U.Move.RecordValue(fill, a.Formal)
+                    : CallEmitter.FigurativeArgumentImage(fill, a.Formal, Ctx.Data));
             else if (OoVarGroupCarried(a.Formal))
             {
                 // §14.8.2.2's variable-length sentence at the INVOKE boundary (kb/Work PB204): the carrier is
@@ -1697,14 +1681,25 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 string read = a.Source is { } gsp
                     ? a.ByContent ? CallEmitter.CallContentRead(gsp) : CallEmitter.CallStringRead(gsp)
                     : CsLiteral(a.StringLiteral ?? "");
-                Decl("string", RuntimeApi.StrStore(read, $"{fw}"));
+                // A GROUP argument BY CONTENT into an ELEMENTARY formal is §14.2.3 GR9's MOVE into the formal's record,
+                // and a group sender makes it §14.9.25.4 GR4's group move (kb/Work PB2587's sweep): the receiver's
+                // JUSTIFIED still applies and a national or bit formal decodes the group's bytes — the CALL lane's one
+                // record value (MoveEmitter.RecordValue), not a plain width fit.
+                Decl("string", a.ByContent && CallEmitter.IsMovedFormal(a.Formal) && a.Source is { } gms
+                    ? U.Move.RecordValue(new BoundFieldOperand(gms), a.Formal)
+                    : RuntimeApi.StrStore(read, $"{fw}"));
             }
             else if (stringCarried)
                 Decl("string", a.Source is { } sp
                     ? OoStringReadOf(sp, a, qualProfile)
                     : a.StringLiteral is { } slit
                     // An ANY LENGTH formal sees the literal AT ITS OWN length (§13.18.2 GR1) — no width-fit.
-                    ? a.Formal.IsAnyLength ? CsLiteral(slit) : RuntimeApi.StrStore(CsLiteral(slit), $"{CallEmitter.ElementaryFormalWindow(a.Formal)}")
+                    ? a.Formal.IsAnyLength ? CsLiteral(slit)
+                        // §14.2.3 GR9's MOVE into a non-numeric formal's record (kb/Work PB2587's sweep): a JUSTIFIED formal
+                        // right-justifies the literal and an edited one edits it (§14.9.25.4 GR6), as the CALL lane does.
+                        : CallEmitter.IsMovedFormal(a.Formal)
+                            ? U.Move.RecordValue(new BoundStringLiteral(slit), a.Formal)
+                            : RuntimeApi.StrStore(CsLiteral(slit), $"{CallEmitter.ElementaryFormalWindow(a.Formal)}")
                     // A numeric literal into a formal of ANOTHER category (alphanumeric, numeric-edited, national):
                     // §14.8.2.3.3 rule 2d's MOVE, stored by the receiving category's ONE MOVE store — the store the
                     // identifier arm reaches through OoStringReadOf (kb/Work PB1113: the sign is not moved into an
@@ -2027,8 +2022,10 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // so the moment the screen was corrected this line became load-bearing.
         return fp.Category is PicCategory.Alphanumeric && sp.Item.Pic?.Category == PicCategory.Alphanumeric
                 && fp.EditMask is null
-            // The proven identical-category fast path, byte-for-byte as before: a plain width fit.
-            ? RuntimeApi.StrStore(read, $"{Math.Max(1, fp.Length)}")
+            // The identical-category fast path: the read itself, stored by the ONE elementary character store — which is
+            // what right-justifies a JUSTIFIED formal (§14.9.25.4 GR6 a) / §14.6.8; kb/Work PB2587's sweep: a plain width
+            // fit here left-justified `ABCD` in a PIC X(6) JUSTIFIED RIGHT method formal).
+            ? ReceivingStore.Characters(a.Formal, read, $"{Math.Max(1, fp.Length)}")
             : U.Move.ConvertSource(new BoundFieldOperand(sp), a.Formal);
     }
 

@@ -89,7 +89,8 @@ public sealed record BoundCallArg(CobolPassMode Mode, Place? Place, BoundOperand
     /// through the formal's registered carrier instead (<c>ProgramTable.CallProgram</c>; kb/Work PB2549).</para>
     /// <para>Set for a Format-2 CALL (AS NESTED or a program prototype with a §12.3.8.4 GR10 a) definition) and
     /// for a user-defined FUNCTION reference. <c>CallEmitter.ArgText</c> reads it to perform GR9/GR10's COMPUTE
-    /// on the ACTIVATING side, where those rules put it (kb/Work PB640).</para></summary>
+    /// (kb/Work PB640) and GR9's MOVE into a non-numeric formal's record (kb/Work PB2587) on the ACTIVATING side, where
+    /// those rules put them; when it is null the site states the MOVE's sending half instead (<c>CobolArg.Sending</c>).</para></summary>
     public DataItem? Formal { get; init; }
 
     /// <summary>The argument's §14.8.2 description (<c>ActivationDescriptions.OfCallArgument</c>) when the activating
