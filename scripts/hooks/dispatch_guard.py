@@ -42,7 +42,7 @@ sys.stderr.reconfigure(encoding="utf-8")
 REPO = pathlib.Path(__file__).resolve().parents[2]
 CHECK = REPO / ".claude" / "skills" / "workstream" / "check_practices.py"
 PLAN_WAVE = REPO / "scripts" / "orchestrator" / "plan_wave.py"
-READ_ONLY_ROLES = {"cobol-refuter", "cobol-adjudicator", "cobol-locator", "Explore", "Plan", "claude-code-guide",
+READ_ONLY_ROLES = {"cobol-refuter", "cobol-adjudicator", "cobol-locator", "cobol-reviewer", "Explore", "Plan", "claude-code-guide",
                    "statusline-setup"}
 TEMPLATES = REPO / ".claude" / "skills" / "workstream" / "templates"
 JUDGMENT_ROLES = {"cobol-implementer", "cobol-lander"}

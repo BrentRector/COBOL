@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-293 drift tests.
+294 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -40,6 +40,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [AnnexA3RegisterDriftTests](../tests/Cobol.Net.Tests.Unit/AnnexA3RegisterDriftTests.cs) | The drift guard for docs/CONFORMANCE.md §2 — the Annex A.3 processor-dependent element register, which ISO §4.2.6 makes NORMATIVE user documentation and not a summary table: "To meet the requirements of standard COBOL, the implementor shall document the processor-dependent language elements for which the implementation claims support", and "The absence of processor-dependent elements from an imple… | `docs/CONFORMANCE.md`, `src` |
 | [AnnexBCDriftTests](../tests/Cobol.Net.Tests.Unit/AnnexBCDriftTests.cs) | ⛔ THE ANNEX B AND ANNEX C TABLES ARE THE STANDARD'S, LIST FOR LIST (kb/Work PB1402). | `specs/ISO_COBOL.md` |
 | [ArchCensusDriftTests](../tests/Cobol.Net.Tests.Unit/ArchCensusDriftTests.cs) | ⛔ THE ARCHITECTURE CENSUS CANNOT SILENTLY SKIP A PROJECT (kb/Work PB2115; docs/rearchitecture/DESIGN-architecture-review.md §3 R0): the newest committed census record under docs/rearchitecture/evidence/arch-census/ covers every product project of Cobol.Net.sln (each src/Cobol.Net.* project), its census population equals the built assembly's compiled type population for each, and its type table hol… | `scripts/arch/census.py`, `Cobol.Net.sln`, `docs/rearchitecture/evidence/arch-census` |
+| [ArchReviewFleetDriftTests](../tests/Cobol.Net.Tests.Unit/ArchReviewFleetDriftTests.cs) | ⛔ THE R2 REVIEW FLEET'S SUBSYSTEMS PARTITION THE CODE, AND ITS TOOLS CAN STILL FAIL (kb/Work PB2558–PB2561; docs/rearchitecture/DESIGN-architecture-review.md §3 R2): scripts/arch/r2_subsystems.py --check finds every reviewed file of the committed tree in exactly one subsystem (no hole, no overlap) and the design's subsystem block equal to the table it is rendered from; and the fleet's instruments … | `scripts/arch/test_wf_r2_review.mjs`, `scripts/arch` |
 | [ArgumentOrderDriftTests](../tests/Cobol.Net.Tests.Unit/ArgumentOrderDriftTests.cs) | ⛔ EVERY FUNCTION-IDENTIFIER'S ARGUMENT LIST IS EVALUATED LEFT TO RIGHT THROUGH ONE WINDOW (kb/Work PB1423, CLAUDE.md rule 5). | `src/Cobol.Net.Compiler` |
 | [ArgumentSubstituteDriftTests](../tests/Cobol.Net.Tests.Unit/ArgumentSubstituteDriftTests.cs) | ⛔ NO INTRINSIC GUARD SPELLS ITS OWN SUBSTITUTED TEXT RESULT (kb/Work PB383, PB470). | `src/Cobol.Net.Runtime/Intrinsics` |
 | [ArithmeticModeScreenDriftTests](../tests/Cobol.Net.Tests.Unit/ArithmeticModeScreenDriftTests.cs) | The §4.2.6 non-support screen for ARITHMETIC IS STANDARD-BINARY fires for EVERY kind of source unit that can carry an OPTIONS paragraph — and the set of such units is read out of the GRAMMAR, not out of a list somebody remembered to update. | `src/Cobol.Net.Frontend/Grammar` |

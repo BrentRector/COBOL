@@ -126,20 +126,101 @@ for that dispatch (R69 §4), the refuter is Opus, and the section lands as §8 o
 - **The .NET and C# target** (§5.5).
 
 ### R2 — The review fleet (findings, not fixes)
-One review agent per (subsystem × dimension), in chunks of four, each finding adversarially verified. It follows
-`.claude/skills/review` over `brent-tools:review`, extended by `brent-tools:architecture-audit` for whole-codebase
-mode.
-- **Subsystems:** preprocessor · lexer and grammar · parser drivers and the syntax tree · data binding · procedure
-  binding · reference resolution · validation and edition gating · lowering and the bound tree · Roslyn code
-  generation · OO · runtime values and numerics · runtime I/O · runtime control and exceptions · editions and
-  diagnostics · CLI · tests, scripts and CI.
+The fleet as built (kb/Work PB2558–PB2561, after the owner-approved adversarial review of its first brief, w1034:
+seven blocking findings B1–B7 and seven non-blocking N1–N7, all answered here). It follows `.claude/skills/review`
+over `brent-tools:review`, extended by `brent-tools:architecture-audit` Phase 2 for whole-codebase mode. Every part
+is tracked tooling with a self-test, so the next batch is a command, never a brief written from memory.
+- **Subsystems are computed file sets** (B1). `scripts/arch/r2_subsystems.py` holds the table below, the one place
+  it is written; this block is rendered from it (`--write-design`), and `--check` fails when the block differs or
+  when the sets do not PARTITION the reviewed code (a file in no subsystem is a hole, a file in two an overlap). The
+  drift test `ArchReviewFleetDriftTests` runs the check on the committed tree, so a new folder no subsystem owns is
+  red until the table owns it. At 8be230068: 1,503 files, 0 holes, 0 overlaps. The runtime's collation, Unicode and
+  globalization code is a seventeenth subsystem, and the source generator belongs to the bound tree it generates for.
+<!-- r2-subsystems:begin -->
+| Subsystem (`key`) | Files: include | except |
+|---|---|---|
+| preprocessor (`preprocessor`) | `src/Cobol.Net.Frontend/Preprocessor/**` | — |
+| lexer and grammar (`lexer-grammar`) | `src/Cobol.Net.Frontend/Grammar/**` `src/Cobol.Net.Frontend/*.ps1` | — |
+| parser drivers and the syntax tree (`parser-tree`) | `src/Cobol.Net.Frontend/{Parsing,Cst,Expressions,Pipeline,Common}/**` `src/Cobol.Net.Frontend/*.csproj` | — |
+| data binding (`data-binding`) | `src/Cobol.Net.Compiler/Binding/*.cs` `src/Cobol.Net.Compiler/Binding/Model/**` `src/Cobol.Net.Compiler/Binding/Passes/**` | `src/Cobol.Net.Compiler/Binding/ReferenceResolver*.cs` `src/Cobol.Net.Compiler/Binding/RefResolution.cs` `src/Cobol.Net.Compiler/Binding/QualifiedNameClasses.cs` `src/Cobol.Net.Compiler/Binding/EcNameResolution.cs` `src/Cobol.Net.Compiler/Binding/ReportGroupResolution.cs` `src/Cobol.Net.Compiler/Binding/Oo*.cs` `src/Cobol.Net.Compiler/Binding/Prototype*.cs` |
+| procedure binding (`procedure-binding`) | `src/Cobol.Net.Compiler/Binding/Procedure/**` | — |
+| reference resolution (`reference-resolution`) | `src/Cobol.Net.Compiler/Binding/ReferenceResolver*.cs` `src/Cobol.Net.Compiler/Binding/RefResolution.cs` `src/Cobol.Net.Compiler/Binding/QualifiedNameClasses.cs` `src/Cobol.Net.Compiler/Binding/EcNameResolution.cs` `src/Cobol.Net.Compiler/Binding/ReportGroupResolution.cs` | — |
+| validation and edition gating (`validation`) | `src/Cobol.Net.Compiler/Validation/**` `src/Cobol.Net.Compiler/Binding/Validation/**` | — |
+| lowering and the bound tree (`bound-tree`) | `src/Cobol.Net.Compiler/Binding/Bound/**` `src/Cobol.Net.Compiler.SourceGen/**` | — |
+| Roslyn code generation (`codegen`) | `src/Cobol.Net.Compiler/CodeGen/**` `src/Cobol.Net.Compiler/*.{cs,csproj}` | — |
+| OO (`oo`) | `src/Cobol.Net.Compiler/Oo/**` `src/Cobol.Net.Compiler/Binding/Oo*.cs` `src/Cobol.Net.Compiler/Binding/Prototype*.cs` | — |
+| runtime values and numerics (`runtime-values`) | `src/Cobol.Net.Runtime/{Values,Intrinsics,Verbs}/**` `src/Cobol.Net.Runtime/*.{cs,csproj}` | — |
+| runtime collation, Unicode and globalization (`runtime-text`) | `src/Cobol.Net.Runtime/{Collation,Unicode,Globalization}/**` | — |
+| runtime I/O (`runtime-io`) | `src/Cobol.Net.Runtime/IO/**` | — |
+| runtime control and exceptions (`runtime-control`) | `src/Cobol.Net.Runtime/{Control,Exceptions}/**` | — |
+| editions and diagnostics (`editions-diagnostics`) | `src/Cobol.Net.Editions/**` `src/Cobol.Net.Frontend/Diagnostics/**` | — |
+| CLI (`cli`) | `src/Cobol.Net.Cli/**` | — |
+| tests, scripts and CI (`tests-scripts-ci`) | `tests/**` `scripts/**` `tools/**` `.github/**` `.claude/**` `Directory.*.props` `Cobol.Net.sln` | — |
+
+Under review: `src/**/*.{cs,g4,ps1,csproj}`, `tests/**/*.{cs,csproj,props,py,ps1,sh}`, `scripts/**/*.{py,ps1,sh,js,mjs,cs,yml}`, `tools/**/*.{cs,csproj,targets,sh,py,ps1}`, `.github/**/*.yml`, `.claude/**/*.{py,js,ps1}`, `Directory.*.props`, `Cobol.Net.sln`. Left out: `**/*.{g.cs,g.i.cs,Designer.cs}` (generated, by the census rule `generated`; reviewed through its generator); `**/Generated/**` (a build output, the ANTLR parser, never committed); `**/obj/**` (a build output); `tools/claude-skills/**` (the pinned public-skills submodule, BrentRector/claude-skills, reviewed in its own repository).
+<!-- r2-subsystems:end -->
+- **Shards a reviewer can read whole** (B2). Each subsystem is cut by path into balanced shards of at most 6,000
+  physical lines at the pin (the census `lines` column is per type, and a partial type's files fall in different
+  shards, so only a file-level size adds up); a single larger file is its own shard. At 8be230068 the binding family
+  is 9 + 5 + 1 shards, code generation 5, the runtime 10, the CLI 1. A shard over 4,000 lines gets two finders that
+  start from opposite ends (base `review` Scale: audit). Every finder appends a `read` line for each file it read
+  WHOLE; the workflow diffs the union against the shard's files and sends a finisher to exactly the remainder (twice
+  at most), and a pair still missing a file is reported INCOMPLETE.
+- **The census and member index of the pin** (B7). The fleet reads one pinned commit, and its census record and
+  member index are recorded at that commit first (`census.py --commit`, `member_index.py --record`); every reviewer
+  cites the record of the tree it reads, and the shards and inputs are computed from it.
+- **Mechanical inputs, once** (B4). `scripts/arch/r2_inputs.py --pin <tree> --out <dir>` runs the semgrep
+  invariants, the analyzers at `AnalysisLevel=latest-all` (one C# project at a time in a detached worktree of the pin,
+  each cached; `--projects` measures some now, and a shard's input is written once the projects holding its files
+  are measured, because csc on `Cobol.Net.Compiler` with every rule on ran past 2,000 CPU-seconds and 28 GB while
+  the leaf projects took under a minute), the drift-rule query
+  per file and the open-notes scan ONCE, caches each step, and writes one self-contained input per shard: its files
+  and lines, those facts filtered to its files, the census rows for it (god classes, unreachable and test-only
+  families, folder/namespace disagreements, clone families touching it) and the measured namespace edges of its
+  namespaces. **Duplication** is ONE whole-codebase pass over the census clone report (every family, each copy
+  mapped to its shard, a cross-shard family one finding), plus each shard's "two mechanisms, one rule in two places"
+  lens. **Performance** gets the R0 baseline record and `perf_baseline.py --against`; a claim without a measurement
+  on the pin is a lead (N3). **Modern C#** is analyzer-first: a finding is one analyzer rule (`wave_kind: modernize`,
+  `analyzer_rule`), and a point without a rule id is a lead (N2).
+- **The workflow** is `.claude/skills/workstream/templates/wf_r2_review.js` (`check_practices.py` holds its required
+  parts; `scripts/arch/test_wf_r2_review.mjs` dry-runs every arm with stubbed agents). Every agent is the read-only
+  role `cobol-reviewer` (Opus, effort high, 120 turns, the read-only hook, the bar; N1). It APPENDS one JSON line
+  per decision to its own checkpoint file the moment it decides (B3): `review-<shard>--<dimension>--f<k>.jsonl`,
+  `null-<pair>.jsonl`, `refute-<pair>--c<j>--<lens>.jsonl`; on start it skips what its file holds, so a relaunch
+  with the same args resumes across the operator's restarts (Workflow resume is same-session only). Width: eight
+  agents at once across every stage; a stop file (the owner's `scratch\STOP` or the fleet's `scratch\STOP-r2`) ends
+  the batch after the agent that saw it.
+- **Verification** (B6). Every finding is attacked by three skeptics with distinct lenses — the site (real, current,
+  not already a note), the rule (it applies, the target agrees with §8, the wave kind and severity), the scenario (it
+  occurs; the measurement; a defect is a spec defect) — in chunks of four findings per transcript. A finding stands
+  when two of the three fail to refute it. A pair that found NOTHING is examined by an agent that tries to find what
+  the finders missed, and a null result is accepted only when the pair is complete and examined.
+- **Every finding carries** (B5) its id, kind (finding · lead · defect), title, the rule it breaks, a concrete
+  scenario, the target, the repository-relative `files` (each must exist in the pin), the exact `sites`, the
+  `members` a wave would move or change, the `census_ids` it rests on, its `design_ref` (§8.x, or the PBnnnn that
+  already plans it), its wave kind (extract · unify · move-and-rename · data-ize · delete · modernize · a
+  defect for the fix lane, with its harm), calibrated severity (Critical · Warning · Suggestion; long-lived, high
+  consequence), `existing_note` and `owner_question`.
+- **Deciding and filing.** `scripts/arch/r2_collect.py --out <batch dir>` reads the JSON lines FROM DISK (never the
+  workflow's return) and decides each finding (upheld · refuted · unverified · lead · invalid · already tracked),
+  each pair's completeness and each null. `python scripts/arch/file_census_notes.py --r2 <batch dir>/collected.json`
+  files every UPHELD finding as one note in the **`PB1754` cluster** (N6; the planner's `--cluster PB1754` reads it):
+  `kind: analysis` for a restructuring finding, `kind: defect` for a defect the fleet hands the fix lane, its sites as
+  backticked paths and its members as the `**Moves or changes:**` line, so `fix_clusters.py`, the member index and
+  `plan_wave.py` compute the wave's file set (§8.7) rather than anyone listing it. Ids come from `alloc.py`; the
+  finding id on the note's `r2_ids:` line makes a re-run file only what is new; a path the committed tree no longer
+  has is refused as stale.
+- **Running a batch** (MANDATORY-PRACTICES O8, N7): read `scripts/orchestrator/budget.py` before each batch; write
+  its args with `r2_inputs.py --out <dir> --batch <label> --shards <ids>` (the SMALL shards first, so the shape is
+  measured before binding's 76,000 lines); launch the workflow with that `batch-args.json`; start
+  `tools/claude-skills/skills/agent-fleet/references/stall_watch.py <its transcript dir>` beside it; collect; file.
 - **Dimensions:** the four of `PROMPT.md` §4 (architecture · full code · performance · duplication and efficiency),
-  plus modern-C# conformance (§5.5).
+  plus modern-C# conformance (§5.5). Their criteria are written once, in `.claude/skills/review/SKILL.md`, the base
+  skill's `references/dimensions.md` and §5; the workflow adds only each batch's inputs (N4).
 - **When:** after R1's approval (PB2118), between fix-lane trains under the file-set partition (§2; R69 §2 as the
-  owner amended it on 2026-10-07): the fleet writes findings, never code, so it collides with no train.
-- **Every finding** carries its site, the rule it breaks, a concrete scenario, the proposed target, and its R3 wave.
-  Findings are filed as `kb/Work` notes of `kind: analysis` in an `arch-review` cluster, grouped by the file they
-  touch (`fix_clusters.py`), so R3's waves are computed rather than hand-picked.
+  owner amended it on 2026-10-07): the fleet writes findings, never code, so it collides with no train. Authority:
+  R1's approval (2026-10-07 17:42 PDT, "Yes, approve and land"), this section, and the standing Workflow opt-in
+  (kb/Work R49) (N5).
 
 ### R3 — Restructuring waves (behavior-neutral, one mechanism each)
 Rolling waves, one mechanism per implementer. Each wave is one of:
@@ -337,7 +418,8 @@ production type. Scripts follow the same no-wrapper rule.
 - **The split start** (R69): an R3 or Delete wave in a subsystem a fix-lane train is also editing. Mitigation: the
   wave's brief declares its file set, checked against the in-flight trains' file sets before dispatch; a collision
   defers the wave, never the train.
-- **Cost.** About 16 subsystems × 5 dimensions of review agents, then tens of R3 waves. R2's findings set R3's real
+- **Cost.** 17 subsystems cut into about 75 shards (`r2_subsystems.py`) × 5 dimensions of review agents, each
+  finding with three skeptics, then tens of R3 waves. R2's findings set R3's real
   size, and the owner sees the estimate before R3 starts.
 
 ## 7. Owner decisions (tracked in PB1754, never here)
@@ -1615,5 +1697,5 @@ Draft 5 held for GAP near zero now wait only for the slices whose files their ca
 can still share a computed caller, because the partition checks in-flight work and not the wave's own other groups
 (kb/Work PB2424).
 
-What the estimate does not contain, by design: R2's findings (16 subsystems × 5 dimensions, §3), which set R3's real
+What the estimate does not contain, by design: R2's findings (17 subsystems in shards × 5 dimensions, §3), which set R3's real
 size; the R4 waves (§8.5: 5 union steps plus §5.5's analyzer rules); and any wave list.

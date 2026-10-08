@@ -40,6 +40,10 @@ BRIEFS = {
     # PB2483: a stop is scoped; every workflow names the owner's global stop AND the fleet's own.
     'wf_lane3_adjudicate.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r'CHECKPOINT PER RULE', r"model: 'opus'", r"agentType: 'cobol-adjudicator'", r"agentType: 'cobol-refuter'"],
     'wf_lane3_refute.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r"model: 'opus'", r"agentType: 'cobol-refuter'"],
+    # PB2558-PB2561 (the R2 adversarial review): per-decision JSON lines, the scoped stops, the read-only reviewer role,
+    # the completeness pass, the examined null and the three-lens skeptics, decided on disk by r2_collect.py.
+    'wf_r2_review.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r'CHECKPOINT PER DECISION',
+                        r"agentType: 'cobol-reviewer'", r'r2_collect\.py', r'null-check', r'LENSES'],
     'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'-Mode implementer', r'\{global_stop\}', r'\{stop_file\}',
                                      r'until grep -q', r'where\.py', r'orient\.py', r'semgrep/verify\.py', r'cite\.py --check',
                                      r'Turn cap 220', r'code site', r'leg-1-Conformance\.trx', r'drift_rules\.py', r'STATUS-AT:',

@@ -22,8 +22,10 @@ import subprocess
 import sys
 
 DEVLOG = pathlib.Path(__file__).resolve().parents[1] / "DEVLOG.md"
-#: The entry blocks start immediately after the ordering note, so the first `## Entry` IS the insertion point.
-ANCHOR = b"\r\n## Entry "
+#: The entry blocks start immediately after the ordering note, so the first `## Entry` IS the insertion point. The
+#: file is unnormalized: a heading may follow an LF line end, so the anchor is the LF alone (`\r\n## Entry` skipped an
+#: LF-preceded newest entry and inserted the w1034 entry BELOW 1927, 2026-10-07).
+ANCHOR = b"\n## Entry "
 
 
 def main(argv: list[str]) -> int:
@@ -34,7 +36,7 @@ def main(argv: list[str]) -> int:
     at = body.find(ANCHOR)
     if at < 0:
         sys.exit("no '## Entry' heading found — DEVLOG.md is not in the expected shape")
-    at += 2  # keep the blank line that separates the ordering note from the first entry
+    at += 1  # past the line end: keep the blank line that separates the ordering note from the first entry
 
     added = 0
     for name in argv:

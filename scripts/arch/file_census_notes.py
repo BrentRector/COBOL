@@ -3,7 +3,16 @@
 
     python scripts/arch/file_census_notes.py <findings.json> --ids PB2155-PB2214[,PB2215-PB2274] [--targets T.json]
                                              [--rerender] [--dry-run] [--notes-dir DIR]
+    python scripts/arch/file_census_notes.py --r2 <batch dir>/collected.json [--ids PBa-PBb] [--dry-run]
     python scripts/arch/file_census_notes.py --self-test
+
+R2 (kb/Work PB2560; DESIGN-architecture-review §3 R2): `--r2` files each UPHELD finding of a review batch (decided by
+scripts/arch/r2_collect.py from the fleet's JSON lines) as one note of cluster PB1754 — `kind: analysis` for a
+restructuring finding, `kind: defect` for a defect the fleet hands the fix lane — with its sites as backticked paths
+(so `work.py note_sites`, `fix_clusters.py` and the planner resolve them), its members as the `**Moves or changes:**`
+line (the member index computes the wave's callers from it), its census findings as `census_refs:` (never
+`census_ids:`, which is the census filer's own key), and its finding id on `r2_ids:` (the idempotence key). Ids come
+from `scripts/orchestrator/alloc.py` unless --ids is given. A note naming a path the committed tree lacks is refused.
 
 One note = one mechanism a single Delete / Unify / Move / Extract wave can take. The grouping is fixed by kind:
   dead-artifact       one note per (class, directory)
@@ -563,6 +572,204 @@ def file_notes(findings_path, id_pool, notes_dir, dry_run, targets=None, rerende
     return written, skipped, id_pool[len(groups) + len(new_keys):], sorted(rewritten)
 
 
+# ── R2: the review fleet's upheld findings (kb/Work PB2560; DESIGN-architecture-review §3 R2; the R2 review's B5) ──
+R2_PREFIX = {"extract": "Extract:", "unify": "Unify:", "move-and-rename": "Move/rename:", "data-ize": "Data-ize:",
+             "delete": "Delete:", "modernize": "Modernize:", "defect-for-fix-lane": "Defect:"}
+R2_MODEL = {"extract": EXTRACT_MODEL, "unify": EXTRACT_MODEL, "data-ize": EXTRACT_MODEL,
+            "move-and-rename": "Sonnet (a rewriter-driven wave, R69 §4); a judgment it meets returns NEEDS-OPUS",
+            "delete": "Sonnet (a measured deletion, R69 §4); a judgment it meets returns NEEDS-OPUS",
+            "modernize": "Sonnet (one analyzer rule with its code fix, §5.5; R69 §4)",
+            "defect-for-fix-lane": "the fix lane's routing (`model_rules.json`)"}
+R2_SEVERITY = {"Critical": "MAJOR", "Warning": "MINOR"}
+R2_HARM = {"wrong-answer": "wrong_answer", "crashes": "crashes", "silent": "silent",
+           "rejects-legal-source": "rejects_legal_source", "under-rejects": "under_rejects"}
+R2_FRONTMATTER = """---
+title: "{title}"
+id: {nid}
+kind: {kind}
+status: open
+severity: {severity}
+area: {area}
+wrong_answer: {wrong_answer}
+crashes: {crashes}
+silent: {silent}
+rejects_legal_source: {rejects_legal_source}
+under_rejects: {under_rejects}
+process_only: {process_only}
+blocked: false
+blocked_by: []
+cluster: ["PB1754"]
+spec_refs: []
+inventory_rows: []
+closes_rows: []
+closes_rows_reason: "{reason}"
+tags: [cobolsharp, work, {kind}, r2]
+---
+"""
+
+
+def scan_r2(notes_dir):
+    """-> {R2 finding id: note id} from every note's `r2_ids:` line (the idempotence key of an R2 filing)."""
+    out = {}
+    for name in os.listdir(notes_dir):
+        if name.endswith(".md"):
+            with open(os.path.join(notes_dir, name), encoding="utf-8") as fh:
+                for line in fh:
+                    if line.startswith("r2_ids:"):
+                        for x in line[len("r2_ids:"):].split(","):
+                            if x.strip():
+                                out.setdefault(x.strip(), name[:-3])
+    return out
+
+
+def render_r2(rec, nid, pin, areas):
+    wave = rec["wave_kind"]
+    defect = wave == "defect-for-fix-lane" or rec["kind"] == "defect"
+    harm = {v: "true" if k in (rec.get("harm") or []) else "false" for k, v in R2_HARM.items()}
+    title = "%s — %s %s (R2 %s at %s)" % (nid, R2_PREFIX[wave], rec["title"].rstrip("."), rec["pair"], pin[:9])
+    fm = R2_FRONTMATTER.format(
+        title=title.replace('"', "'"), nid=nid, kind="defect" if defect else "analysis",
+        severity=R2_SEVERITY.get(rec["severity"], "MINOR"),
+        area=areas.get(re.sub(r"-[0-9]+$", "", rec["shard"]), "architecture") if defect else "architecture",
+        process_only="false" if defect else "true",
+        reason=("open; an R2 review finding for the fix lane (PB1754): the inventory row it touches is decided when it "
+                "is fixed") if defect else
+               ("behavior-neutral restructuring (an R2 finding of the PB1754 review, DESIGN-architecture-review §3 R2); "
+                "no inventory row"), **harm)
+    body = [fm.rstrip("\n"), "", "r2_ids: " + rec["id"]]
+    if rec.get("census_ids"):
+        body.append("census_refs: " + ", ".join(rec["census_ids"]))
+    body += ["", "**Wave kind:** %s. **Model:** %s." % (wave, R2_MODEL[wave]), "", "**Sites:**"]
+    named = set()
+    for s in rec["sites"]:
+        m = re.match(r"^(\S+?)(:[\d,-]+)?(?:\s+\((.+)\))?$", s.strip())
+        path, lines, sym = (m.group(1), m.group(2) or "", m.group(3)) if m else (s, "", None)
+        named.add(path)
+        body.append("- `%s%s`%s" % (path, lines, " (%s)" % sym if sym else ""))
+    body += ["- `%s`" % f for f in rec["files"] if f not in named]
+    body.append("")
+    if not defect:
+        body += file_set_lines(rec.get("members"))
+    body += ["**Rule it breaks:** " + rec["rule"], "", "**Scenario:** " + rec["scenario"], ""]
+    measured = "R2 batch finding `%s` (pair %s), read in the pinned tree at %s; skeptics %s." % (
+        rec["id"], rec["pair"], pin[:12], ", ".join("%s %s" % (k, v) for k, v in sorted(rec.get("votes", {}).items())))
+    if rec.get("measurement"):
+        measured += " Measurement: " + rec["measurement"]
+    if rec.get("analyzer_rule"):
+        measured += " Analyzer rule: `%s`." % rec["analyzer_rule"]
+    body += ["**Measured how:** " + measured, ""]
+    if rec.get("corrections"):
+        body += ["**Skeptics' corrections:** " + " | ".join(json.dumps(c, ensure_ascii=False) for c in rec["corrections"]), ""]
+    body += ["**Target:** " + rec["target"], "", "**Design reference:** " + rec["design_ref"] + ".", ""]
+    if rec.get("owner_question"):
+        body += ["**Owner question:** " + rec["owner_question"], ""]
+    if not defect:
+        body += [contract("delete" if wave == "delete" else "extract"), ""]
+    return "\n".join(body), title
+
+
+def alloc_ids(n):
+    """`n` kb/Work ids from the ONE locked allocator (scripts/orchestrator/alloc.py)."""
+    if n == 0:
+        return []
+    out = subprocess.run([sys.executable, os.path.join(REPO, "scripts", "orchestrator", "alloc.py"), "pb", str(n)],
+                         capture_output=True, text=True, check=True).stdout.strip().splitlines()[-1]
+    m = re.fullmatch(r"PB(\d+)(?:-PB(\d+))?", out.strip())
+    if not m:
+        raise SystemExit("alloc.py answered %r" % out)
+    a, b = int(m.group(1)), int(m.group(2) or m.group(1))
+    if b - a + 1 != n:
+        raise SystemExit("alloc.py reserved %s for %d notes" % (out, n))
+    return ["PB%d" % k for k in range(a, b + 1)]
+
+
+def file_r2(collected_path, id_pool, notes_dir, dry_run, path_root=REPO, areas=None):
+    """-> (written, skipped {reason: [finding ids]}, unused ids). Only UPHELD findings are filed; a finding already
+    filed (its id on an `r2_ids:` line) is skipped; a note naming a path the committed tree lacks is refused."""
+    with open(collected_path, encoding="utf-8") as fh:
+        rep = json.load(fh)
+    if areas is None:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import r2_subsystems
+        areas = {s["key"]: s["area"] for s in r2_subsystems.TABLE}
+    done = scan_r2(notes_dir)
+    skipped = {}
+    for b in ("refuted", "unverified", "leads", "invalid", "already_tracked"):
+        if rep.get(b):
+            skipped["not upheld: " + b] = [r["id"] for r in rep[b]]
+    tracked = work.tracked_paths(pathlib.Path(path_root))
+    todo = []
+    for r in rep.get("upheld", []):
+        named = set(r["files"]) | {x.strip().split(" ")[0].split(":")[0] for x in r["sites"]}
+        missing = sorted(p for p in named if p not in tracked and not work.is_build_output(p))
+        if r["id"] in done:
+            skipped.setdefault("already-filed", []).append(r["id"])
+        elif missing:   # the pin's path is gone from the committed tree: a stale finding, re-reviewed, never filed
+            skipped.setdefault("stale-path", []).append("%s (%s)" % (r["id"], ", ".join(missing)))
+        else:
+            todo.append(r)
+    if id_pool is None:   # ids go only to the notes written: a stale or filed finding takes none
+        id_pool = ["PB(new%d)" % (i + 1) for i in range(len(todo))] if dry_run else alloc_ids(len(todo))
+    if len(todo) > len(id_pool):
+        raise SystemExit("need %d ids, only %d allocated" % (len(todo), len(id_pool)))
+    written = []
+    for r, nid in zip(todo, id_pool):
+        text, title = render_r2(r, nid, rep["pin"], areas)
+        path = os.path.join(notes_dir, nid + ".md")
+        if os.path.exists(path):
+            raise SystemExit("refusing to overwrite " + path)
+        if not dry_run:
+            with open(path, "w", encoding="utf-8", newline="\r\n") as fh:
+                fh.write(text)
+        written.append((nid, r["wave_kind"], title))
+    return written, skipped, id_pool[len(written):]
+
+
+def self_test_r2():
+    def rec(i, **kw):
+        r = {"id": "s1--architecture--f1#%d" % i, "pair": "s1--architecture", "shard": "s1", "dimension": "architecture",
+             "kind": "finding", "title": "split T", "rule": "§5.1 single responsibility", "scenario": "two reasons",
+             "target": "T and U", "files": ["src/T.cs"], "sites": ["src/T.cs:10-90 (N.T.F)"], "members": ["N.T.F"],
+             "census_ids": ["R0-0001"], "design_ref": "§8.3", "wave_kind": "extract", "severity": "Warning",
+             "existing_note": "", "owner_question": "", "votes": {"rule": "upheld", "scenario": "upheld", "site": "refuted"},
+             "corrections": []}
+        r.update(kw)
+        return r
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "src"))
+        for f in ("T.cs", "D.cs"):
+            open(os.path.join(tmp, "src", f), "w").close()
+        stage(tmp)
+        nd = os.path.join(tmp, "Work")
+        os.mkdir(nd)
+        cp = os.path.join(tmp, "collected.json")
+        with open(cp, "w", encoding="utf-8") as fh:
+            json.dump({"pin": "abcdef0123456789", "upheld": [
+                rec(1), rec(2, wave_kind="defect-for-fix-lane", kind="defect", harm=["wrong-answer"], files=["src/D.cs"],
+                           sites=["src/D.cs:3"], severity="Critical"),
+                rec(3, files=["src/Gone.cs"], sites=["src/Gone.cs:1"])],
+                "refuted": [rec(9)], "leads": [rec(8)]}, fh)
+        areas = {"s1": "binding"}
+        w, s, tail = file_r2(cp, ["PB9101", "PB9102", "PB9103"], nd, False, tmp, areas)
+        assert [x[0] for x in w] == ["PB9101", "PB9102"] and tail == ["PB9103"], (w, tail)
+        assert s["stale-path"][0].startswith("s1--architecture--f1#3") and s["not upheld: refuted"] and s["not upheld: leads"], s
+        with open(os.path.join(nd, "PB9101.md"), encoding="utf-8") as fh:
+            a = fh.read()
+        assert "kind: analysis" in a and 'cluster: ["PB1754"]' in a and "r2_ids: s1--architecture--f1#1" in a, a
+        assert "census_refs: R0-0001" in a and "census_ids:" not in a, a   # never claims a census finding's filing key
+        assert "- `src/T.cs:10-90` (N.T.F)" in a and "**Moves or changes:** `N.T.F`." in a and "Extract:" in a, a
+        assert "severity: MINOR" in a and "area: architecture" in a and "skeptics rule upheld, scenario upheld, site refuted" in a
+        with open(os.path.join(nd, "PB9102.md"), encoding="utf-8") as fh:
+            d = fh.read()
+        assert "kind: defect" in d and "wrong_answer: true" in d and "area: binding" in d and "severity: MAJOR" in d, d
+        assert "process_only: false" in d and "**Moves or changes" not in d, d
+        parsed = work.parse_frontmatter(a)
+        assert parsed and parsed["kind"] == "analysis" and parsed["status"] == "open", parsed
+        w2, s2, _ = file_r2(cp, ["PB9104", "PB9105"], nd, False, tmp, areas)
+        assert not w2 and s2["already-filed"] == ["s1--architecture--f1#1", "s1--architecture--f1#2"], (w2, s2)
+    print("self-test R2 OK")
+
+
 def stage(root):
     """The self-test's scratch tree as a git repository with every file staged: `work.named_missing_paths` reads the
     git index, so a planted file exists for it only once staged."""
@@ -684,6 +891,7 @@ def self_test():
         except SystemExit as e:
             assert "T-missing" in str(e), e
     print("self-test OK")
+    self_test_r2()
 
 
 def main():
@@ -697,10 +905,22 @@ def main():
                                       "doc), docs/rearchitecture/evidence/arch-census/targets/<sha>.json")
     ap.add_argument("--rerender", action="store_true", help="with --targets: rewrite every open note the targets file "
                                                             "renders whose text differs from it")
+    ap.add_argument("--r2", metavar="COLLECTED", help="file the UPHELD findings of an R2 batch (r2_collect.py's "
+                                                      "collected.json) as PB1754 notes; ids from --ids, else alloc.py")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
+    if a.r2:
+        pool = parse_ranges(a.ids) if a.ids else None   # no --ids: exactly as many as needed, from alloc.py
+        written, skipped, tail = file_r2(a.r2, pool, a.notes_dir, a.dry_run)
+        for nid, wave, title in written:
+            print("%s%s  %s" % ("(dry) " if a.dry_run else "", nid, title))
+        print("notes: %d" % len(written))
+        for k, v in sorted(skipped.items()):
+            print("not filed [%s]: %d (%s)" % (k, len(v), ", ".join(v[:6]) + (" ..." if len(v) > 6 else "")))
+        print("unused ids: %s" % (", ".join(tail) if tail else "none"))
+        return 0
     if not a.findings or not a.ids:
         ap.error("findings file and --ids are required")
     targets = None
