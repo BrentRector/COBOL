@@ -565,6 +565,13 @@ check("a planted R3 note naming the generated file AND its grammar passes the bu
 check("an untracked path is missing even if a local file has that name",
       work.named_missing_paths("`src/Cobol.Net.Frontend/obj/project.assets.json`"), ["src/Cobol.Net.Frontend/obj/project.assets.json"])
 
+# PB2562: a train label is a taken wave number, because a wave's first train is labelled with the wave number.
+with tempfile.TemporaryDirectory() as td:
+    tdir = pathlib.Path(td)
+    (tdir / "DEVLOG.md").write_text("## Entry 2 — Train 1036 (wave 1032: D, E)" + NL + "## Entry 1 — wave 1034 dispatched" + NL,
+                                     encoding="utf-8")
+    check("next_wave counts a train label above every wave number", pw.next_wave(tdir, []), 1037)
+
 for f in fails:
     print("FAIL:", f)
 print(f"plan_wave self-test: {len(checked) - len(fails)}/{len(checked)} checks OK")

@@ -737,11 +737,13 @@ def previous_train(repo: pathlib.Path) -> str:
 
 
 def next_wave(repo: pathlib.Path, reports: list[Report]) -> int:
-    """One past the highest wave number in the reports directory or the newest 200 DEVLOG lines."""
+    """One past the highest wave OR train number in the reports directory or the newest 200 DEVLOG lines. A wave's
+    first train is labelled with the wave number, so a train label counts as taken too (kb/Work PB2562: trains 1035
+    and 1036 came from waves 1031 and 1032, the planner proposed wave 1035, and "Train 1034" had already landed twice)."""
     seen = [r.wave for r in reports]
     with open(repo / "DEVLOG.md", encoding="utf-8", errors="replace") as f:
         for _, line in zip(range(200), f):
-            seen += [int(w) for w in re.findall(r"\b[Ww]aves? (\d{3,})", line)]
+            seen += [int(w) for w in re.findall(r"\b(?:[Ww]aves?|[Tt]rains?) (\d{3,})", line)]
     return max(seen, default=0) + 1
 
 
