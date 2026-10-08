@@ -123,7 +123,11 @@ names the constant-name argument (A, PB1544), COBOLNET2967/2968 say "the imperat
 programs use the identified-object temporary for the SET (A2), the exact wide product (G, pb91, pb1143), the CALL/INVOKE
 argument at the formal's scale (G PB289: pb1114 ×2, pb1422, pb923's MAX now stores at the formal's scale) and the
 floating-point edited quotient at the guard scale (G review: pb66, output unchanged). Re-recorded as
-`arch-oracle/0342e990a973`. The Linux gate and CI ran on this head before main moved.
+`arch-oracle/0342e990a973`. The Linux gate ran GREEN on the gated head. push-main's landing check then STOPPED the
+train three times falsely (PB2609): it bound `w1040w-gn1-close`, `w1040u-recursion-depth` and `w1040s-a1-116-118`
+to this train's OWN lander dispatch-ledger entries (the dispatch guard records a lander with every id its brief's
+files mention; PB2614's lander arm) and dated them by the earliest. The orchestrator released those three entries
+with `plan_wave.py --release PB2609` after a simulated check without them passed with 0 stops, and re-ran push-main.
 
 ## Entry 1934 — 2026-10-08 01:29 PDT — Train 1039: wave 1039's D, F, C, B, E plus the planner fold-in — BASE's factory, the decimal-point mode read off the item, the edited categories told apart, GR9/GR10 at the activation boundary, SPECIAL-NAMES constant-names, the reservation gate without exclusions, classConditionName, signed comma-decimal list literals (PB2489, PB2554, PB850, PB2549, PB667, PB1941 part, PB1942, PB845, PB2501, PB2292, PB2506, PB2562, PB2575)
 
