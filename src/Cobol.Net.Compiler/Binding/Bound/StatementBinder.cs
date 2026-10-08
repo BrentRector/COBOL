@@ -459,8 +459,8 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
             Ctx.Validation.ScreenSortMergeRecordReferences(io, io.Start.Text.ToUpperInvariant(), Ctx.Refs);
         var core = BindStatementCore(s);
         // ISO §14.9.14.3 SR1, §14.9.17.3 SR2, §14.9.42.3 SR1 (kb/Work PB397) — the three rules stated over a
-        // statement SEQUENCE (a bare EXIT alone in its paragraph; a Format 1 GO TO and a STOP last in their
-        // sequence), asked HERE because this is the one funnel every statement passes through and the position is a
+        // statement SEQUENCE (a bare EXIT alone in its paragraph; a Format 1 GO TO and a STOP RUN last in their
+        // consecutive sequence of imperative statements, kb/Work PB2610), asked HERE because this is the one funnel every statement passes through and the position is a
         // function of the parse tree alone. The verb has bound as usual, so its own operand errors still report.
         if (PlacementRules.RefusedOutOfSequence(Ctx, s)) core = BoundRejected.Reported(data.Edition);
         // ISO §14.9.49.3 SR11 (kb/Work PB363) — asked HERE, of every statement bound in a USE BEFORE REPORTING

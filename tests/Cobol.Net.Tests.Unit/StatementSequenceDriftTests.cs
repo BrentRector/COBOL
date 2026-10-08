@@ -53,6 +53,24 @@ public sealed class StatementSequenceDriftTests
         Assert.Same(statements[1], StatementPosition.Of(statements[0]).Following);
     }
 
+    /// <summary>kb/Work PB2610 — §14.9.17.3 SR2's "consecutive sequence of imperative statements" ends at a
+    /// CONDITIONAL statement (§14.5.1): the GO TO before an IF with no END-IF ends its run though it is not the last
+    /// statement of its sentence; before the same IF delimited by END-IF (imperative, §14.5.3.2) it does not.</summary>
+    [Theory]
+    [InlineData("GO TO P IF X = 1 DISPLAY \"A\".", true)]
+    [InlineData("GO TO P ADD 1 TO X ON SIZE ERROR DISPLAY \"A\".", true)]
+    [InlineData("GO TO P IF X = 1 DISPLAY \"A\" END-IF.", false)]
+    [InlineData("GO TO P ADD 1 TO X ON SIZE ERROR DISPLAY \"A\" END-ADD.", false)]
+    [InlineData("GO TO P DISPLAY \"A\".", false)]
+    [InlineData("GO TO P.", true)]
+    public void EndsImperativeRun_StopsAtAConditionalStatement(string sentence, bool ends)
+    {
+        var goTo = Parse(p => p.sentence(), sentence).statement(0);
+        var position = StatementPosition.Of(goTo);
+        Assert.Equal(ends, position.EndsImperativeRun);
+        Assert.Equal(position.Count == 1, position.IsLast);
+    }
+
     [Fact]
     public void Position_InAPhrase_IsNotASentence()
     {

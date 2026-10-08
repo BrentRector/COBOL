@@ -7016,25 +7016,29 @@ public static class DiagnosticCatalog
         + "(§14.9.14.4 GR1): put it alone in its own paragraph, or write CONTINUE where a no-op statement is meant.",
         "ISO §14.9.14.3 SR1");
 
-    /// <summary>COBOLNET2967 — §14.9.17.3 SR2: a Format 1 GO TO followed by another statement in its consecutive
-    /// sequence of imperative statements.</summary>
+    /// <summary>COBOLNET2967 — §14.9.17.3 SR2: a Format 1 GO TO followed by an imperative statement in its
+    /// consecutive sequence of imperative statements (a following CONDITIONAL statement ends that sequence; kb/Work
+    /// PB2610).</summary>
     public static readonly DiagnosticDescriptor GoToNotLast = new(
         "COBOLNET2967", "go-to-not-last", EditionSeverity.Error,
-        "A Format 1 GO TO statement is followed by another statement in the same consecutive sequence of imperative "
-        + "statements, so control never reaches that statement. ISO §14.9.17.3 SR2: \"If a GO TO statement "
+        "A Format 1 GO TO statement is followed by an imperative statement in the same consecutive sequence of "
+        + "imperative statements, so control never reaches that statement. ISO §14.9.17.3 SR2: \"If a GO TO statement "
         + "represented by format 1 appears in a consecutive sequence of imperative statements within a sentence, it "
-        + "shall appear as the last statement in that sequence.\" Move the GO TO to the end of its sequence, or "
-        + "end the sentence with a period; a Format 2 (DEPENDING) GO TO may be followed by a statement.",
+        + "shall appear as the last statement in that sequence.\" A conditional statement (ISO §14.5.1: one whose "
+        + "conditional phrase is written without its explicit scope terminator, such as an IF with no END-IF) ends "
+        + "that sequence, so a GO TO may precede one. Move the GO TO to the end of its sequence, or end the sentence "
+        + "with a period; a Format 2 (DEPENDING) GO TO may be followed by a statement.",
         "ISO §14.9.17.3 SR2");
 
-    /// <summary>COBOLNET2968 — §14.9.42.3 SR1: a STOP statement followed by another statement in its block.</summary>
+    /// <summary>COBOLNET2968 — §14.9.42.3 SR1: a STOP RUN statement followed by an imperative statement in its block
+    /// (read as §14.9.17.3 SR2's consecutive sequence of imperative statements; D-SEQ, kb/Work PB2610).</summary>
     public static readonly DiagnosticDescriptor StopNotLast = new(
         "COBOLNET2968", "stop-not-last", EditionSeverity.Error,
-        "A STOP statement is followed by another statement in the same block of code, so that statement can never "
-        + "execute. ISO §14.9.42.3 SR1: \"The STOP statement shall be specified only as the last statement in any "
-        + "discreet block of code.\" The standard does not define \"discreet block of code\"; this implementation "
-        + "reads it as the consecutive sequence of imperative statements (a "
-        + "sentence's statements, or the statements of one phrase of a conditional statement) that "
+        "A STOP statement is followed by an imperative statement in the same block of code, so that statement can "
+        + "never execute. ISO §14.9.42.3 SR1: \"The STOP statement shall be specified only as the last statement in "
+        + "any discreet block of code.\" The standard does not define \"discreet block of code\"; this implementation "
+        + "reads it as the consecutive sequence of imperative statements (within one sentence, or within one phrase "
+        + "of another statement, and ended by a conditional statement) that "
         + "§14.9.17.3 SR2 states for GO TO and that IBM and Micro Focus document for STOP "
         + "(docs/CONFORMANCE.md §3, D-SEQ).",
         "ISO §14.9.42.3 SR1");

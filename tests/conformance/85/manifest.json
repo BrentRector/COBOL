@@ -403,7 +403,8 @@
   "pb1643_display_literal_decimal_comma",
   "pb850_edited_subordinate_key_group",
   "pb2506_signed_comma_decimal_argument",
-  "pb845_national_bit_user_words"
+  "pb845_national_bit_user_words",
+  "pb2610_go_to_before_conditional"
  ],
  "pending": []
 }

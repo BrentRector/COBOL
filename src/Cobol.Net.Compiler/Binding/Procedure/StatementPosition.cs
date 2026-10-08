@@ -18,6 +18,13 @@ using Core = CobolParserCore;
 /// the last statement of its consecutive sequence of imperative statements) and §14.9.42.3 SR1 (STOP is the last
 /// statement of its block) — and each was accepted silently, because the binder had no place to ask.
 ///
+/// <para><b>A sequence of statements and a consecutive sequence of IMPERATIVE statements are different things</b>
+/// (kb/Work PB2610). §14.5.1: "Any statement with a conditional phrase that is not terminated by its explicit scope
+/// terminator is a conditional statement", so a sentence or phrase may end in a conditional statement (an IF or an
+/// EVALUATE without its END-, an ADD with ON SIZE ERROR and no END-ADD), and that statement is not part of the
+/// imperative run before it. §14.9.17.3 SR2 is stated over the imperative run, so its predicate is
+/// <see cref="EndsImperativeRun"/>, never <see cref="IsLast"/>: <c>GO TO P2 IF A = 1 DISPLAY "Y".</c> is legal.</para>
+///
 /// <para><b>Why a view over the parse tree and not binder state.</b> The grammar makes the sequence a rule of its
 /// own: every <c>statement</c> is written as an element of exactly one <c>sentence</c> (<c>statement+ DOT</c>) or
 /// exactly one <c>statementBlock</c> (<c>statement+</c>, the imperative-statement of a phrase of a conditional or
@@ -28,8 +35,8 @@ using Core = CobolParserCore;
 ///
 /// <para><b>The two sequence kinds are different on purpose.</b> A <c>sentence</c>'s statements end at its period;
 /// a <c>statementBlock</c>'s end at the phrase's end (ELSE, END-IF, WHEN, ...). §14.9.17.3 SR2 and §14.9.42.3 SR1
-/// are stated over EITHER, so <see cref="IsLast"/> is asked of both; §14.9.14.3 SR1 is stated over the SENTENCE
-/// only, so <see cref="IsSentenceByItself"/> is false for an EXIT inside a phrase — the sentence it is in is the
+/// are stated over EITHER, so <see cref="EndsImperativeRun"/> is asked of both; §14.9.14.3 SR1 is stated over the
+/// SENTENCE only, so <see cref="IsSentenceByItself"/> is false for an EXIT inside a phrase — the sentence it is in is the
 /// enclosing statement's.</para>
 /// </summary>
 internal readonly struct StatementPosition
@@ -52,9 +59,16 @@ internal readonly struct StatementPosition
     /// <summary>How many statements the sequence has.</summary>
     public int Count => _siblings.Length;
 
-    /// <summary>Is the statement the last of its sequence — the predicate §14.9.17.3 SR2 and §14.9.42.3 SR1
-    /// state as "the last statement in that sequence" / "the last statement in any discreet block"?</summary>
+    /// <summary>Is the statement the last of its sequence (the sentence's or the phrase's statements)?</summary>
     public bool IsLast => Index == _siblings.Length - 1;
+
+    /// <summary>Does the statement end its CONSECUTIVE SEQUENCE OF IMPERATIVE STATEMENTS — the predicate §14.9.17.3
+    /// SR2 states as "the last statement in that sequence" (and D-SEQ reads §14.9.42.3 SR1's "discreet block of code"
+    /// as the same run)? True when nothing follows it in its sequence, or when what follows is a CONDITIONAL
+    /// statement (§14.5.1, <see cref="ConditionalStatements.IsConditional"/>), which ends the imperative run. A
+    /// conditional statement is always the last of its sequence (§14.5.3.3 3) and 4): only a separator period or
+    /// the end of a containing statement or phrase ends it), so the next statement is the only one to ask.</summary>
+    public bool EndsImperativeRun => IsLast || ConditionalStatements.IsConditional(Following);
 
     /// <summary>The statement written immediately after this one in the sequence. Only valid when
     /// <see cref="IsLast"/> is false.</summary>
@@ -125,16 +139,18 @@ internal static partial class PlacementRules
         DiagnosticCatalog.GoToNotLast, "ISO §14.9.17.3 SR2",
         "A Format 1 GO TO that appears in a consecutive sequence of imperative statements shall be the last "
         + "statement in that sequence",
-        FollowedBy);
+        FollowedByAnImperative);
 
-    /// <summary>§14.9.42.3 SR1 — STOP ends its block of code (read as the same sequence; D-SEQ).</summary>
+    /// <summary>§14.9.42.3 SR1 — STOP ends its block of code (read as the same imperative run; D-SEQ).</summary>
     private static readonly SequenceRule StopLast = new(
         DiagnosticCatalog.StopNotLast, "ISO §14.9.42.3 SR1",
         "The STOP statement shall be specified only as the last statement in any discreet block of code",
-        FollowedBy);
+        FollowedByAnImperative);
 
-    private static string? FollowedBy(StatementPosition p) =>
-        p.IsLast ? null : $"is followed by {p.Following.Start.Text.ToUpperInvariant()} in the same sequence, which can never execute";
+    private static string? FollowedByAnImperative(StatementPosition p) =>
+        p.EndsImperativeRun ? null
+            : $"is followed by the imperative statement {p.Following.Start.Text.ToUpperInvariant()} in the same "
+              + "sequence, which can never execute";
 
     /// <summary>The sequence rule that governs <paramref name="s"/>, or null for the statements that carry none
     /// (almost all of them — the probe is one type test on the statement's only child, so the funnel pays nothing

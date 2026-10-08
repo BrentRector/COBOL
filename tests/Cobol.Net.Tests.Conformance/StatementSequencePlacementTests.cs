@@ -16,7 +16,9 @@ namespace CobolNet.Tests.Conformance;
 ///         rest are Formats 2-4 and carry no such rule.)</item>
 ///   <item>§14.9.17.3 SR2 — "If a GO TO statement represented by format 1 appears in a consecutive sequence of
 ///         imperative statements within a sentence, it shall appear as the last statement in that sequence."
-///         (Format 2, DEPENDING, is not constrained.)</item>
+///         (Format 2, DEPENDING, is not constrained. A following CONDITIONAL statement — §14.5.1, "Any statement
+///         with a conditional phrase that is not terminated by its explicit scope terminator is a conditional
+///         statement" — ends the imperative sequence, so the GO TO is its last statement; kb/Work PB2610.)</item>
 ///   <item>§14.9.42.3 SR1 — "The STOP statement shall be specified only as the last statement in any discreet block
 ///         of code." Read as the same consecutive sequence (docs/CONFORMANCE.md D-SEQ); STOP RUN only, since the
 ///         X3.23-1985 STOP literal continues with the next statement.</item>
@@ -78,6 +80,16 @@ public sealed class StatementSequencePlacementTests
     [InlineData("SQG03", "MAIN-PARA.\n    IF W-N = 0 GO TO P2 ELSE GO TO P3 END-IF.\nP2.\n    STOP RUN.\nP3.\n    STOP RUN.\n")]
     // Format 2 (DEPENDING): control falls through to the next statement when no name is selected (GR2).
     [InlineData("SQG04", "MAIN-PARA.\n    GO TO P2 P3 DEPENDING ON W-N DISPLAY \"A\".\nP2.\n    STOP RUN.\nP3.\n    STOP RUN.\n")]
+    // kb/Work PB2610 — followed by a CONDITIONAL statement (§14.5.1: a conditional phrase written without the
+    // explicit scope terminator), which ends the consecutive sequence of IMPERATIVE statements SR2 binds: an IF, an
+    // EVALUATE, an ADD with ON SIZE ERROR, a STRING with ON OVERFLOW, a SEARCH with AT END and WHEN, and the same
+    // inside an IF's THEN phrase (§14.9.19.3 SR1 lets statement-1 end in a conditional statement).
+    [InlineData("SQG05", "MAIN-PARA.\n    GO TO P2\n    IF W-N = 0 DISPLAY \"A\".\nP2.\n    STOP RUN.\n")]
+    [InlineData("SQG06", "MAIN-PARA.\n    GO TO P2\n    EVALUATE W-N WHEN 0 DISPLAY \"A\".\nP2.\n    STOP RUN.\n")]
+    [InlineData("SQG07", "MAIN-PARA.\n    GO TO P2\n    ADD 1 TO W-N ON SIZE ERROR DISPLAY \"A\".\nP2.\n    STOP RUN.\n")]
+    [InlineData("SQG08", "MAIN-PARA.\n    GO TO P2\n    STRING \"A\" DELIMITED BY SIZE INTO W-S\n        ON OVERFLOW DISPLAY \"A\".\nP2.\n    STOP RUN.\n")]
+    [InlineData("SQG09", "MAIN-PARA.\n    GO TO P2\n    SEARCH W-T AT END DISPLAY \"A\"\n        WHEN W-T (W-X) = \"B\" DISPLAY \"B\".\nP2.\n    STOP RUN.\n")]
+    [InlineData("SQG10", "MAIN-PARA.\n    IF W-N = 0 GO TO P2\n        ADD 1 TO W-N ON SIZE ERROR DISPLAY \"A\" END-IF.\nP2.\n    STOP RUN.\n")]
     public void Format1GoTo_LastInItsSequence_IsAccepted(string pid, string procedure)
     {
         foreach (int edition in EditionHarness.Editions)
@@ -96,6 +108,12 @@ public sealed class StatementSequencePlacementTests
     // Inside an inline PERFORM body and an ON SIZE ERROR phrase.
     [InlineData("SQG14", "MAIN-PARA.\n    PERFORM 2 TIMES GO TO P2 DISPLAY \"A\" END-PERFORM.\nP2.\n    STOP RUN.\n")]
     [InlineData("SQG15", "MAIN-PARA.\n    ADD 1 TO W-N ON SIZE ERROR GO TO P2 DISPLAY \"A\" END-ADD.\nP2.\n    STOP RUN.\n")]
+    // A statement written WITH its explicit scope terminator is a delimited scope statement, which is imperative
+    // (§14.5.3.2), so it continues the GO TO's sequence (kb/Work PB2610's boundary).
+    [InlineData("SQG16", "MAIN-PARA.\n    GO TO P2\n    IF W-N = 0 DISPLAY \"A\" END-IF.\nP2.\n    STOP RUN.\n")]
+    [InlineData("SQG17", "MAIN-PARA.\n    GO TO P2\n    ADD 1 TO W-N ON SIZE ERROR DISPLAY \"A\" END-ADD.\nP2.\n    STOP RUN.\n")]
+    // An ADD with no conditional phrase is imperative: it has no END-ADD and no phrase, and is no conditional statement.
+    [InlineData("SQG18", "MAIN-PARA.\n    GO TO P2\n    ADD 1 TO W-N.\nP2.\n    STOP RUN.\n")]
     public void Format1GoTo_FollowedByAStatement_IsRefused(string pid, string procedure)
     {
         foreach (int edition in EditionHarness.Editions)
@@ -109,6 +127,8 @@ public sealed class StatementSequencePlacementTests
     // Last of a THEN phrase followed by an ELSE phrase, and followed by statements after END-IF.
     [InlineData("SQS02", "MAIN-PARA.\n    IF W-N = 0 STOP RUN ELSE DISPLAY \"A\" END-IF.\n    STOP RUN.\n")]
     [InlineData("SQS03", "MAIN-PARA.\n    IF W-N = 0 DISPLAY \"A\" STOP RUN END-IF DISPLAY \"B\".\n    STOP RUN.\n")]
+    // Followed by a conditional statement, which ends the imperative sequence D-SEQ reads as the block (kb/Work PB2610).
+    [InlineData("SQS04", "MAIN-PARA.\n    DISPLAY \"A\" STOP RUN\n    IF W-N = 0 DISPLAY \"B\".\n")]
     public void Stop_LastInItsBlock_IsAccepted(string pid, string procedure)
     {
         foreach (int edition in EditionHarness.Editions)
@@ -123,6 +143,8 @@ public sealed class StatementSequencePlacementTests
     [InlineData("SQS11", "MAIN-PARA.\n    DISPLAY \"A\" STOP RUN DISPLAY \"B\".\n")]
     [InlineData("SQS12", "MAIN-PARA.\n    IF W-N = 0 STOP RUN DISPLAY \"A\" END-IF.\n    STOP RUN.\n")]
     [InlineData("SQS13", "MAIN-PARA.\n    PERFORM 2 TIMES STOP RUN DISPLAY \"A\" END-PERFORM.\n    STOP RUN.\n")]
+    // Followed by a DELIMITED (so imperative) EVALUATE: it continues STOP's sequence.
+    [InlineData("SQS14", "MAIN-PARA.\n    STOP RUN\n    EVALUATE W-N WHEN 0 DISPLAY \"A\" END-EVALUATE.\n")]
     public void Stop_FollowedByAStatement_IsRefused(string pid, string procedure)
     {
         foreach (int edition in EditionHarness.Editions)
@@ -150,6 +172,9 @@ public sealed class StatementSequencePlacementTests
         DATA DIVISION.
         WORKING-STORAGE SECTION.
         01 W-N PIC 9(2) VALUE 0.
+        01 W-S PIC X(4).
+        01 W-TB.
+           05 W-T PIC X OCCURS 3 INDEXED BY W-X.
         PROCEDURE DIVISION.
         {procedure.Replace("\n", "\n    ")}
         """;
