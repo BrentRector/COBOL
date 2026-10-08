@@ -216,7 +216,7 @@ internal static class IntrinsicResultType
         if (IsIndexOperand(args[0])) return IntrinsicType.Index;
         // ⛔ "ARGUMENT-1 DECIDES" IS TRUE ONLY WHEN ARGUMENT-1 HAS A CLASS TO DECIDE WITH (fix-queue PB48).
         // §8.3.3.6.4 GR4 makes the figurative ZERO the numeric value '0' or the character '0' "depending on
-        // context", so as argument-1 it carries no category and `CategoryOf(args, 0)` answers null — which fell
+        // context", so as argument-1 it carries no category and `OperandCategory` answers null — which fell
         // straight through to the numeric row. `FUNCTION MAX(ZERO "A")` therefore typed its RESULT numeric while
         // IntrinsicBinder chose the STRING comparison body for the same call, and the two halves of one decision
         // disagreeing surfaced as "FUNCTION MAX (no numeric render recipe)" at run time.
@@ -248,11 +248,6 @@ internal static class IntrinsicResultType
         i < args.Count
         && (OperandCategory(args[i]) is PicCategory.National
             || IntrinsicArgumentRules.StaticUsageOf(args[i]) is Usage.National);
-
-    /// <summary>The statically knowable data category of argument <paramref name="i"/>, or null when it has no
-    /// fixed static category (a group, a figurative, an ALL literal, an error operand).</summary>
-    private static PicCategory? CategoryOf(IReadOnlyList<BoundOperand> args, int i) =>
-        i < args.Count ? OperandCategory(args[i]) : null;
 
     /// <summary>The category of the first argument that HAS one — the §15.59.1 / §15.63.1 uniform-argument row
     /// read through §15.59.3 r2 (all arguments are of the same class), so a leading class-neutral figurative
