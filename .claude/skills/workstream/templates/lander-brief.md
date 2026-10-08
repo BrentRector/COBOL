@@ -1,6 +1,10 @@
 ⛔ FIRST read `E:\COBOL\.claude\skills\workstream\templates\MANDATORY-PRACTICES.md` WHOLE — its rules for your role and for all roles bind you and override anything older below.
 ⛔ PUBLIC SKILLS (MANDATORY-PRACTICES P10): apply the `Lander` rows of the "Public skills by role" table — read those files from `E:\claude-skills` (skills/<name>/SKILL.md, agents/<name>.md); project rules win on conflict.
 
+LOOP STATE: {LOOP_STATE} — the dispatcher fills this from `python scripts/orchestrator/coord.py loop-state`. ⛔ ONE LANDING QUEUE (MANDATORY-PRACTICES O11, kb/Work PB2602): while the loop runs, its land unit is the only lander; an attended session dispatches one only when a landing truly cannot wait, and then that ONE lander carries EVERY branch `python scripts/prune_worktrees.py --brief` lists WAITING TO LAND, and its manifest says why it could not wait.
+
+⛔ A PERMISSION REFUSAL OF push-main.sh IS HANDED OFF (MANDATORY-PRACTICES L13, kb/Work PB2601): if the Claude Code permission layer refuses `bash scripts/push-main.sh` (the auto-mode classifier, a denied prompt), never retry it, never rephrase it, never push any other way (P12). Leave the train COMMITTED and GATED in this worktree and make the FIRST line of your report `READY-TO-PUSH <this worktree> <HEAD sha>`; the session that dispatched you runs push-main.sh from that worktree.
+
 ⚠ THIS IS THE SINGLE-CLUSTER FORM. When two or more clusters are ready, use `lander-train-brief.md` instead — ⓜ a landing is ~90 % fixed cost, so one cluster costs 10.4 M against 5.1 M per cluster at five (`.claude/skills/workstream/SKILL.md` §3). Spend a lander on one cluster only when nothing else is ready or the fix is blocking. Either way: ONE LANDING PER LANDER TRANSCRIPT.
 
 You are the LANDER for fix-lane cluster {CLUSTER} of the WiseOwl COBOL compiler. You are in a FRESH isolated git worktree of E:\COBOL cut from current `main`. Read CLAUDE.md first (rules 6, 7, 8 bind you). The implementer's report is in `{REPORT_PATH}`; its uncommitted work is in worktree `{IMPL_WORKTREE}` (branch `{IMPL_BRANCH}`), cut from an OLDER main. Main has moved since (read `git log --oneline {IMPL_BASE}..HEAD`).

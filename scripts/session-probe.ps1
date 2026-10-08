@@ -78,6 +78,12 @@ if (Test-Path 'tests/version-matrix/traceability-inventory.json') {
     Write-Host "invent : not built yet (P14 Step 0)"
 }
 
+# ⛔ NO BRANCH IS LEFT UNDECIDED (owner 2026-10-08 00:00 PDT, kb/Work PB2600; MANDATORY-PRACTICES O10). Every local
+# branch and detached worktree is IN FLIGHT, WAITING TO LAND, LANDED or needs a DECISION; the rows someone must act on
+# print here every session, so an undecided branch can no longer be carried forward from handoff to handoff unseen.
+# The rule lives once, in prune_worktrees.py; the probe prints its --brief form and never recomputes it.
+& python scripts/prune_worktrees.py --brief 2>&1 | ForEach-Object { Write-Host "branch : $_" }
+
 # ⛔ A DISABLED GATE MUST NOT BE INVISIBLE. Reported here because the probe is the one thing every session reads,
 # and "CI is off" is exactly the kind of live state that rots into a false sense of coverage
 # (feedback_green_gates_arent_evidence) — the battery is NOT a superset of CI: it is Windows/DEBUG only, so the

@@ -3,12 +3,17 @@ UNIT: land.
 Finished implementer branches are waiting for a lander.
 1. Load the `workstream` skill; read .claude/skills/workstream/references/landing.md and
    .claude/skills/workstream/templates/lander-train-brief.md.
-2. The candidates are the previous handoff's `branches_pending` with status DONE, cross-checked with
-   `python scripts/prune_worktrees.py` (UNLANDED and CHECK rows). Dispatch one cobol-lander train over them, with
-   lead ids from `python scripts/orchestrator/alloc.py pb 5`, and stay until it lands or reports every drop. The lander
+2. The candidates are EVERY branch `python scripts/prune_worktrees.py --brief` lists WAITING TO LAND (its newest
+   `w<wave><letter>-PB<lead>-report.md` under {SCRATCH}\reports says DONE: the loop's own branches AND the attended
+   session's, which writes its finished branches' reports there instead of dispatching a lander while the loop runs,
+   MANDATORY-PRACTICES O11, kb/Work PB2602), plus the previous handoff's `branches_pending` with status DONE. Carry
+   them ALL in ONE train. Dispatch one cobol-lander train over them, its prompt naming `LOOP STATE: running` (the
+   dispatch guard refuses a lander call without it), with lead ids from `python scripts/orchestrator/alloc.py pb 5`,
+   and stay until it lands or reports every drop. A lander whose push-main.sh the permission layer refused reports
+   `READY-TO-PUSH <worktree> <sha>` (L13): hand that line off in `summary`; never push some other way. The lander
    takes the LANDING LEASE before its final rebase and gates (lander-train-brief step 2b, kb/Work PB2537): if
    `python scripts/orchestrator/landing_lease.py status` names another holder, the lander waits for it rather than
-   gating against a main that holder is about to move; push-main.sh releases it.
+   gating against a main that holder is about to move; push-main.sh releases it. After the push, `python scripts/prune_worktrees.py --apply` removes the branches that landed.
 3. Render the ledger in the same turn: `python scripts/spec/gen_ledger.py --out {COORD}\ledger.html`. You cannot PUBLISH it
    (a headless session has no Artifact tool): the supervisor announces the owed publish after you end, and the attended
    session publishes `{COORD}\ledger.html` to the owner's artifact. Do not look for a way around that.

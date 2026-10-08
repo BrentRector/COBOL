@@ -38,11 +38,67 @@ def load(p):
         return {}
 
 
-def check():
+# The permission mode the owner decided for sessions in this repository (owner decision 2026-09-20): scripts/start-session.ps1
+# starts every session with --dangerously-skip-permissions, which Claude Code records as `bypassPermissions`. A session
+# started any other way runs in its account's `permissions.defaultMode` (account 2's is "auto"), where the classifier
+# can refuse push-main.sh (kb/Work PB2601). The self-test holds start-session.ps1 to the flag this constant stands for.
+OWNER_PERMISSION_MODE = "bypassPermissions"
+START_SESSION = REPO / "scripts" / "start-session.ps1"
+
+
+def session_permission_mode(payload: dict | None) -> tuple[str | None, str]:
+    """(the session's permission mode, where it was read), measured, never assumed: the hook payload's `permission_mode`
+    when Claude Code sends one, else the last mode the session's transcript recorded (a `permission-mode` record, and a
+    `permissionMode` field on each user record: measured 2026-10-08 on this repository's transcripts). (None, why) when
+    neither says."""
+    payload = payload or {}
+    if payload.get("permission_mode"):
+        return str(payload["permission_mode"]), "the hook payload"
+    path = payload.get("transcript_path")
+    if not path:
+        return None, "no permission_mode and no transcript_path in the hook payload"
+    mode = None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if '"permissionMode"' not in line:
+                    continue
+                try:
+                    mode = json.loads(line).get("permissionMode") or mode
+                except ValueError:
+                    continue
+    except OSError as exc:
+        return None, f"the transcript is unreadable ({exc})"
+    return (mode, "the transcript") if mode else (None, "the transcript records no permission mode yet")
+
+
+def permission_mode_line(payload: dict | None, default_mode: str | None) -> tuple[str, str]:
+    """(status, detail) of the TOOLING line `permission mode` (kb/Work PB2601)."""
+    mode, source = session_permission_mode(payload)
+    fix = (f"the owner decided `{OWNER_PERMISSION_MODE}` for this repository (2026-09-20): restart the session with "
+           "`pwsh scripts/start-session.ps1` (it passes --dangerously-skip-permissions), or the auto-mode classifier "
+           "can refuse push-main.sh and a lander must then hand off READY-TO-PUSH (MANDATORY-PRACTICES L13)")
+    if mode == OWNER_PERMISSION_MODE:
+        return "OK", f"{mode} (read from {source})"
+    if mode:
+        return "ASK-OWNER", f"this session runs `{mode}` (read from {source}), NOT the owner's mode — {fix}"
+    return "N/A", (f"UNMEASURED: {source}; this account's settings default to `{default_mode or 'default'}`"
+                   + ("" if default_mode == OWNER_PERMISSION_MODE else f" — if this session was not started by "
+                      f"start-session.ps1 it is not in the owner's mode: {fix}"))
+
+
+def check(payload: dict | None = None):
     out = []
     add = lambda status, what, detail="": out.append(f"  {status:9} {what}" + (f" — {detail}" if detail else ""))
 
     add("OK", "Workflow tool", "STANDING owner opt-in (R49): run fleets through Workflow without asking")
+
+    if CLOUD:
+        add("N/A", "permission mode", "cloud session")
+    else:
+        default_mode = (load(CONFIG / "settings.json").get("permissions") or {}).get("defaultMode")
+        status, detail = permission_mode_line(payload, default_mode)
+        add(status, "permission mode", detail)
 
     missing = [r for r in ROLES if not (REPO / ".claude" / "agents" / f"{r}.md").exists()]
     add("OK" if not missing else "ASK-OWNER", "role agents (.claude/agents)",
@@ -129,6 +185,42 @@ def check():
     return head + "\n".join(out) + "\n"
 
 
+def self_test() -> int:
+    """The permission-mode line on each measured shape, and start-session.ps1 still starting the owner's mode."""
+    import tempfile
+    fails = []
+    with tempfile.TemporaryDirectory() as d:
+        tr = pathlib.Path(d) / "t.jsonl"
+        tr.write_text('{"type":"permission-mode","permissionMode":"auto"}\n{"type":"user","permissionMode":"auto"}\n'
+                      'not json "permissionMode"\n{"type":"user","permissionMode":"bypassPermissions"}\n', encoding="utf-8")
+        empty = pathlib.Path(d) / "e.jsonl"
+        empty.write_text('{"type":"user"}\n', encoding="utf-8")
+        cases = [({"permission_mode": "bypassPermissions"}, "auto", "OK"),
+                 ({"permission_mode": "auto"}, "auto", "ASK-OWNER"),
+                 ({"permission_mode": "default", "transcript_path": str(tr)}, None, "ASK-OWNER"),   # the payload wins
+                 ({"transcript_path": str(tr)}, "auto", "OK"),                                     # the LAST record
+                 ({"transcript_path": str(empty)}, "auto", "N/A"),
+                 ({"transcript_path": str(pathlib.Path(d) / "missing.jsonl")}, None, "N/A"),
+                 (None, "auto", "N/A")]
+        for payload, default, want in cases:
+            got, detail = permission_mode_line(payload, default)
+            if got != want:
+                fails.append(f"{payload} (default {default}): want {want}, got {got} — {detail}")
+        if "start-session.ps1" not in permission_mode_line({"permission_mode": "auto"}, None)[1]:
+            fails.append("a wrong mode does not name the fix (start-session.ps1)")
+    flag = "--dangerously-skip-permissions"
+    if not any(l.lstrip().startswith("& $ClaudeExe") and flag in l    # the launch itself, not its dry-run echo
+               for l in START_SESSION.read_text(encoding="utf-8").splitlines()):
+        fails.append(f"{START_SESSION.name} no longer starts claude with {flag}: OWNER_PERMISSION_MODE "
+                     f"({OWNER_PERMISSION_MODE}) no longer describes how sessions start")
+    for f in fails:
+        print(f"FAIL  {f}")
+    print(f"=== TOOLING_CHECK SELF-TEST: {'GREEN' if not fails else f'RED ({len(fails)})'} ===")
+    return 1 if fails else 0
+
+
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
+    if "--self-test" in sys.argv[1:]:
+        sys.exit(self_test())
     print(check())

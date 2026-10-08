@@ -108,7 +108,7 @@ one session.
 |---|---|---|---|
 | `wave` | Opus (the orchestrator's judgment; the implementers are routed per group by `model_rules.json`) | nothing pending to land or resume and the budget says `go` | its Workflow returned, the last lander train landed through `push-main.sh`, the ledger refreshed (`python scripts/spec/gen_ledger.py`, `references/landing.md`) and the handoff written |
 | `campaign` | Opus | only with `-Cluster <lead>[,<lead>...]`: a wave-type unit is due (a handoff named `wave` or `campaign`, or nothing else fired), a lead's cluster has a ready note and the last wave-type unit was not a `campaign`; the ready leads take turns (section 3.2, section 9.1) | as `wave`; its prompt is `units/wave.md` with `--cluster <lead>` on the `plan_wave.py` call |
-| `land` | Opus | finished implementer branches exist with no lander (a previous wave unit ended early), or a handoff says `next_unit: land` | the train landed (or was dropped with reasons) and the ledger rendered to `{COORD}\ledger.html` (section 14) |
+| `land` | Opus | finished implementer branches exist with no lander (a previous wave unit ended early), or a handoff says `next_unit: land` | the train landed (or was dropped with reasons) and the ledger rendered to `{COORD}\ledger.html` (section 14). It carries EVERY branch `prune_worktrees.py` lists WAITING TO LAND, the attended session's included: while the loop runs the attended session dispatches no lander and writes its finished branches' DONE reports for this unit instead (MANDATORY-PRACTICES O11, kb/Work PB2602) |
 | `resume` | Opus | the previous unit died, timed out, was stopped with a Workflow in flight, or handed off `split` | it has classified every pending branch and report (finish, land, re-plan) and handed off the next unit |
 | `meter` | Sonnet, with `--chrome` | the newest reading in `readings.json` is older than 3 hours | the reading is appended (`budget.py --record`) and the handoff written |
 | `owner-question` | none | a handoff carries `owner_question` | immediately: the supervisor appends the question to `OWNER-QUESTIONS.md` and STOPS; it never guesses and never starts a session for it |
@@ -289,6 +289,13 @@ commit with a stale `STATUS.md`. `--permission-prompts none` makes anything that
 a hang. The default mode is `bypassPermissions` (decision D1, owner 2026-10-04: allowed for the COBOL work). With prompts
 gone, the hooks above are the only guard, which is why the WSL lifecycle commands are blocked by `forbidden_commands.py`
 (decision D4) and why a hook's block is the rule speaking, never something a unit routes around.
+
+An ATTENDED session is started by `scripts/start-session.ps1` with `--dangerously-skip-permissions` (owner decision
+2026-09-20), i.e. `bypassPermissions`. A session started any other way runs in its account's `permissions.defaultMode`
+(account 2's is `auto`), whose classifier refused a lander's `push-main.sh` on 2026-10-08 (kb/Work PB2601). So the
+session-start TOOLING block measures the mode (the hook payload's `permission_mode`, else the last `permissionMode`
+the transcript recorded) and prints `ASK-OWNER permission mode` when it is not the owner's; and a lander refused
+`push-main.sh` hands the gated train off as `READY-TO-PUSH <worktree> <sha>` (MANDATORY-PRACTICES L13).
 
 ### 4.3 The context policy (graceful stop; kb/Work PB2597)
 

@@ -13,6 +13,7 @@ import tempfile
 HOOK = pathlib.Path(__file__).with_name("dispatch_guard.py")
 REPO = pathlib.Path(__file__).resolve().parents[2]
 BRIEF = REPO / ".claude" / "skills" / "workstream" / "templates" / "fix-lane-implementer-brief.md"
+LANDER = REPO / ".claude" / "skills" / "workstream" / "templates" / "lander-train-brief.md"
 TMP = pathlib.Path(tempfile.mkdtemp())
 
 WITH_SKILL = TMP / "with.jsonl"
@@ -36,6 +37,12 @@ CASES = [
     ("implementer, unchecked rendered spec", agent("cobol-implementer", f"Follow {BAD_SPEC}", WITH_SKILL), True),
     ("implementer, template brief, skill loaded", agent("cobol-implementer", f"Follow {BRIEF}", WITH_SKILL), False),
     ("lander, skill not loaded", agent("cobol-lander", f"Follow {BRIEF}", WITHOUT_SKILL), True),
+    # rule 4 (kb/Work PB2602): a lander dispatch names the loop's state, filled in
+    ("lander, no loop state", agent("cobol-lander", f"Follow {LANDER}", WITH_SKILL), True),
+    ("lander, placeholder loop state", agent("cobol-lander", f"Follow {LANDER}. LOOP STATE: {{LOOP_STATE}}", WITH_SKILL), True),
+    ("lander, loop state named", agent("cobol-lander", f"Follow {LANDER}. LOOP STATE: stopped (no orchestrate.lock)",
+                                       WITH_SKILL), False),
+    ("implementer needs no loop state", agent("cobol-implementer", f"Follow {BRIEF}", WITH_SKILL), False),
     ("workflow, skill not loaded", {"tool_name": "Workflow", "tool_input": {}, "transcript_path": str(WITHOUT_SKILL)}, True),
     ("workflow, skill loaded", {"tool_name": "Workflow", "tool_input": {}, "transcript_path": str(WITH_SKILL)}, False),
     ("read-only role needs no spec", agent("cobol-refuter", "Try to overturn this verdict", WITHOUT_SKILL), False),

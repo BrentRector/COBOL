@@ -155,3 +155,73 @@ def read_json(path: pathlib.Path, default: Any) -> Any:
 def write_json(path: pathlib.Path, value: Any) -> None:
     """Write to a sibling temp file and rename over the target, so a crash never leaves a half-written file."""
     sharedfile.replace_text(path, json.dumps(value, indent=1) + "\n")
+
+
+def process_name(pid: int) -> str | None:
+    """The image name of the live process `pid`, or None when no process has that id (read-only; no psutil here)."""
+    if os.name == "nt":
+        import subprocess  # noqa: PLC0415
+        out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"], capture_output=True, text=True,
+                             encoding="utf-8", errors="replace").stdout
+        m = re.match(r'^"([^"]+)","(\d+)"', out.strip())
+        return m.group(1) if m and int(m.group(2)) == pid else None
+    try:
+        return pathlib.Path(f"/proc/{pid}/comm").read_text().strip()
+    except OSError:
+        return None
+
+
+# THE LOOP'S LOCK (orchestrate.ps1 Take-Lock): {"pid", "started_at", "host"}, held while the supervisor runs; a lock
+# whose PID is gone is stale, exactly as the supervisor itself judges it. While the loop runs, its land unit is the ONE
+# landing queue: the attended session dispatches no lander (MANDATORY-PRACTICES O11, kb/Work PB2602).
+LOOP_LOCK = "orchestrate.lock"
+
+
+def loop_state(override: str | None = None) -> tuple[str, str]:
+    """('running' | 'stopped', the evidence) for the orchestrator loop, from its lock file."""
+    lock = coord_path(override) / LOOP_LOCK
+    try:
+        held = json.loads(lock.read_text(encoding="utf-8-sig"))
+    except FileNotFoundError:
+        return "stopped", f"no {LOOP_LOCK}"
+    except (OSError, ValueError) as exc:   # mid-write or damaged: assume the loop owns main rather than race it
+        return "running", f"{LOOP_LOCK} unreadable ({exc}); assumed running"
+    pid = held.get("pid") if isinstance(held, dict) else None
+    if isinstance(pid, int) and process_name(pid):
+        return "running", f"{LOOP_LOCK}: PID {pid} since {held.get('started_at', '?')}"
+    return "stopped", f"stale {LOOP_LOCK} (PID {pid} is gone)"
+
+
+
+def _self_test() -> int:
+    """loop_state on each lock shape: absent, live PID, dead PID, unreadable."""
+    import tempfile
+    fails = []
+    with tempfile.TemporaryDirectory() as d:
+        lock = pathlib.Path(d) / LOOP_LOCK
+        cases = [(None, "stopped"), ({"pid": os.getpid(), "started_at": "t"}, "running"),
+                 ({"pid": 2 ** 22 + 12345}, "stopped"), ("{not json", "running")]
+        for content, want in cases:
+            if content is None:
+                lock.unlink(missing_ok=True)
+            else:
+                lock.write_text(content if isinstance(content, str) else json.dumps(content), encoding="utf-8")
+            got, why = loop_state(d)
+            if got != want:
+                fails.append(f"lock {content!r}: want {want}, got {got} ({why})")
+    for f in fails:
+        print(f"FAIL  {f}")
+    print(f"=== COORD SELF-TEST: {'GREEN' if not fails else f'RED ({len(fails)})'} ===")
+    return 1 if fails else 0
+
+
+if __name__ == "__main__":
+    import sys
+    if sys.argv[1:] == ["loop-state"]:   # what a lander dispatch brief names (MANDATORY-PRACTICES O11)
+        state, why = loop_state()
+        print(f"LOOP STATE: {state} ({why})")
+        sys.exit(0)
+    if sys.argv[1:] == ["--self-test"]:
+        sys.exit(_self_test())
+    print("usage: python scripts/orchestrator/coord.py loop-state | --self-test", file=sys.stderr)
+    sys.exit(2)

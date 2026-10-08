@@ -97,28 +97,41 @@ def probe() -> str:
             ["pwsh", "-NoProfile", "-Command",
              f"[Console]::OutputEncoding=[Text.Encoding]::UTF8; & '{PROBE.as_posix()}'"],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=90, cwd=str(REPO),
+            timeout=240, cwd=str(REPO),   # the branch survey (prune_worktrees.py, ~20-40 s) runs inside it; the hook allows 300
         )
         return ((r.stdout or "") + (r.stderr or "")).strip() or "session-probe produced no output"
     except Exception as exc:  # noqa: BLE001 - a hook must never break the session
         return f"session-probe failed: {exc}"
 
 
-def tooling() -> str:
+def hook_payload() -> dict:
+    """The SessionStart payload on stdin (session_id, transcript_path, source, …); {} when there is none (a hand run)."""
+    try:
+        if sys.stdin is None or sys.stdin.isatty():
+            return {}
+        data = json.loads(sys.stdin.read() or "{}")
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def tooling(payload: dict) -> str:
     # R49: every adopted capability is checked at session start; what needs the owner becomes a question, not a skip.
+    # The payload carries what only the session knows, e.g. its permission mode (kb/Work PB2601).
     try:
         sys.dont_write_bytecode = True   # no __pycache__ litter in the tree on every session start
         sys.path.insert(0, str(pathlib.Path(__file__).parent))
         import tooling_check
-        return "\n\n" + tooling_check.check()
+        return "\n\n" + tooling_check.check(payload)
     except Exception as exc:  # noqa: BLE001 - a hook must never break the session
         return f"\n\nTOOLING check failed: {exc} — ASK-OWNER: run python scripts/hooks/tooling_check.py and report"
 
 
+payload = hook_payload()   # read FIRST: the probe's child processes inherit stdin and could consume it
 text = init_cloud_submodules() + local_skills_hint() + (
     "Mechanical live state (scripts/session-probe.ps1). Plan §0 is the live-state SSOT; "
     "this is the computed half.\n\n" + probe()
-) + tooling()
+) + tooling(payload)
 json.dump(
     {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": text}},
     sys.stdout,

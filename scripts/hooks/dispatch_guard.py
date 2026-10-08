@@ -26,6 +26,10 @@ hook must never wedge a session).
      script and args) AND from every brief, spec or args file it names, one level deep: a prompt that names only its
      brief carries its notes there (Draft 9, the eighth refuter's K2). Recording never blocks: a failure to record
      is silent, like every other hook failure. The landing check (landing_check.py) is the guarantee behind it.
+  4. A cobol-lander Agent call names the orchestrator loop's state, filled in (`LOOP STATE: running|stopped`, from
+     `python scripts/orchestrator/coord.py loop-state`), in its prompt or its rendered spec: while the loop runs its
+     land unit is the one landing queue (MANDATORY-PRACTICES O11, kb/Work PB2602: attended landers raced it for main,
+     and every train was rebased, re-gated and re-run in CI each time the other landed).
 """
 import json
 import os
@@ -52,6 +56,7 @@ READ_ONLY_ROLES = {"cobol-refuter", "cobol-adjudicator", "cobol-locator", "cobol
                    "statusline-setup"}
 TEMPLATES = REPO / ".claude" / "skills" / "workstream" / "templates"
 JUDGMENT_ROLES = {"cobol-implementer", "cobol-lander"}
+LOOP_STATE = re.compile(r"LOOP STATE:\s*(?:running|stopped)\b")   # rule 4: filled in, never the {LOOP_STATE} placeholder
 LOADED = re.compile(
     r'"skill"\s*:\s*"(?:[\w-]+:)?workstream"'                     # a Skill tool call
     r'|<command-name>/?workstream</command-name>'                  # the user typed /workstream
@@ -147,6 +152,14 @@ if tool == "Agent":
         sys.exit(0)
     if "=== PRACTICES CHECK: GREEN ===" not in out.stdout:
         block("check_practices.py is not GREEN over this brief:\n" + (out.stdout + out.stderr)[-1500:])
+    # ONE LANDING QUEUE (MANDATORY-PRACTICES O11, kb/Work PB2602): a lander dispatch names the loop's state, filled in,
+    # so the dispatcher has looked before racing the loop's land unit for main.
+    named = prompt + "".join(p.read_text(encoding="utf-8", errors="replace") for p in specs)
+    if role == "cobol-lander" and not LOOP_STATE.search(named):
+        block("a lander dispatch must name the loop's state, filled in: `LOOP STATE: running` or `LOOP STATE: stopped` "
+              "(from `python scripts/orchestrator/coord.py loop-state`). While the loop runs its land unit is the ONE "
+              "landing queue: write the attended branch's DONE report instead, or, if it truly cannot wait, dispatch "
+              "ONE lander carrying every WAITING TO LAND branch and say why (MANDATORY-PRACTICES O11, kb/Work PB2602).")
     record_hand_dispatch(args, role)
 else:
     record_hand_dispatch(args, "", "Workflow")

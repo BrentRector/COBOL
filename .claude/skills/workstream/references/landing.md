@@ -14,6 +14,34 @@
   unit while a lease is live; `stop.ps1 -Status` shows the holder. ⓜ push-main used to serialize only the push: on
   2026-10-07 the R1 lander lost the race to trains 1034 and 1034b, re-gated three times (≈ 30 min of the whole machine
   each) and ended SPLIT with every gate and CI green and nothing on main.
+- ⛔ **ONE LANDING QUEUE WHILE THE LOOP RUNS (MANDATORY-PRACTICES O11, kb/Work PB2602).** Check first:
+  `python scripts/orchestrator/coord.py loop-state`. While it prints `LOOP STATE: running`, the loop's land unit is the
+  only lander: the attended session dispatches no lander and runs no rolling wave (its trains are landers). A finished
+  attended branch becomes a report the land unit collects — the file name EXACTLY
+  `<coord>\scratch\reports\w<wave><letter>-PB<lead>-report.md` (plan_wave.py `REPORT_NAME`: `w1038v-PB2600-report.md`
+  is seen, `w1038v-PB2600-report-v2.md` is not), its header:
+
+  ```
+  Status: DONE
+  Worktree: E:\COBOL\.claude\worktrees\<name>
+  Branch: <branch>
+  HEAD: <sha>
+  Base: <sha>
+  ```
+
+  `python scripts/prune_worktrees.py --brief` then lists it WAITING TO LAND, and the next land unit carries ALL such
+  branches in ONE train. If a landing truly cannot wait, exactly ONE lander carries EVERY WAITING TO LAND branch and
+  its manifest says why. Every lander dispatch names `LOOP STATE: running|stopped` (filled in);
+  `scripts/hooks/dispatch_guard.py` refuses a `cobol-lander` call that does not. ⓜ 2026-10-08: attended landers and
+  the land unit raced for main, and every train was rebased, re-gated and re-run in CI each time the other landed.
+- ⛔ **A refused `push-main.sh` is handed off, never retried (MANDATORY-PRACTICES L13, kb/Work PB2601).** A lander
+  whose `bash scripts/push-main.sh` the permission layer refuses leaves the train committed and gated and ends with the
+  first line `READY-TO-PUSH <worktree> <sha>`; the dispatching session runs push-main.sh from that worktree.
+- ⛔ **No branch is left undecided (MANDATORY-PRACTICES O10, owner 2026-10-08, kb/Work PB2600).** After every landing,
+  `python scripts/prune_worktrees.py` (the lifecycle survey) then `--apply`, which deletes the LANDED branches; a branch
+  that will not land is ABANDONED by a line in its kb/Work note (naming the branch, the word ABANDONED, the reason) and
+  then `--apply --abandon <branch>`. Nothing is archived (owner 00:52: "Archiving to a bundle serves no use and wastes
+  disk space").
 - ⭐ **FIVE CLUSTERS PER LANDING (target 5; 4–6 is the band).** A landing is ~90 % fixed cost — bring the work in,
   build, gate, DEVLOG, commit, push — so ⓜ **10.4 M per cluster at k = 1 against 5.1 M at k = 5**, and 4.0 minutes
   of lander per cluster against 9.8. The corpus proves it directly: the golden lander landed 151 rows for 52.9 M =
@@ -33,7 +61,8 @@
 - A worktree-isolated agent cannot run git against the shared checkout (the harness refuses `-C`, `cd`, EnterWorktree):
   landers take the landing lease, `git fetch origin && git rebase origin/main`, gate in THEIR worktree, and land with
   **`bash scripts/push-main.sh`**; the orchestrator runs `git merge --ff-only origin/main` locally and removes dead
-  worktrees itself (`git worktree remove --force`, `git branch -D`).
+  worktrees itself with `python scripts/prune_worktrees.py --apply` (never a hand `git branch -D`: the survey's
+  classification is the only thing that tells a landed branch from unlanded work, O10).
 - ⛔ **THE ONLY WAY A COMMIT REACHES `main` IS `bash scripts/push-main.sh`, AND THE SERVER ENFORCES IT.** `main`
   carries a REQUIRED status check — `ci-gate`, the terminal job of the workflow — with `enforce_admins: true`, so a
   bare `git push origin HEAD:main` of an unverified commit is REFUSED. Admin exemption was never an option: every
