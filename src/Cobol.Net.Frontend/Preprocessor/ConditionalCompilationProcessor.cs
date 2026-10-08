@@ -53,7 +53,7 @@ public static partial class ConditionalCompilationProcessor
     /// <param name="leaveDirectives">The ISO §7.3 directive keywords whose emitting-branch lines are LEFT IN the
     /// text for a downstream dedicated stage (the WiseOwl COBOL pipeline: TURN, PROPAGATE, REF-MOD-ZERO-LENGTH,
     /// FLAG-02/FLAG-14, COBOL-WORDS, LEAP-SECOND — <c>Frontend.LeftDirectives</c>); an omitted-branch line still
-    /// drops with its branch. Null/empty (the legacy caller) consumes every recognized directive here. ONE set,
+    /// drops with its branch. Null/empty consumes every recognized directive here. ONE set,
     /// not one bool per directive (kb/Work PB65 — the sixth flag was the shape's own reproach).</param>
     public static string Process(string text, IReadOnlySet<string>? leaveDirectives = null,
         DiagnosticBag? diagnostics = null, string? sourcePath = null, int dialectLevel = 2023,
@@ -68,8 +68,8 @@ public static partial class ConditionalCompilationProcessor
     /// statements (via <paramref name="copyProcessor"/>) and feeds each incorporated copybook back through the SAME
     /// driver (shared DEFINE / IF-EVALUATE / FlagScan state across the copybook boundary); an omitted-branch COPY is
     /// never expanded (so a false-path missing copybook raises no error). REPLACE (Step 3) is applied over the fully
-    /// expanded text. Greenfield-only — the legacy pipeline keeps the separate <see cref="Process"/> + COPY calls,
-    /// byte-identical. Design SSOT: <c>docs/rearchitecture/DESIGN-cc-in-copy.md</c>.
+    /// expanded text. <see cref="Process"/> is the same driver with no COPY processor (conditional compilation
+    /// alone). Design SSOT: <c>docs/rearchitecture/DESIGN-cc-in-copy.md</c>.
     /// </summary>
     public static string ProcessWithCopy(string text, CopyProcessor copyProcessor,
         IReadOnlySet<string>? leaveDirectives, DiagnosticBag? diagnostics, string? sourcePath, int dialectLevel,
@@ -137,7 +137,7 @@ public static partial class ConditionalCompilationProcessor
         // fresh id per incorporated copybook), which every frame records when it opens.
         private int _textCounter;
         private int _currentText;
-        // COPY interleave context (null = pure CC, the legacy shape): the copybook engine + the per-group include
+        // COPY interleave context (null = pure CC, the Process entry): the copybook engine + the per-group include
         // set + the current nesting depth (threaded through the recursion for the SR1 circular / depth-20 guards).
         private readonly CopyProcessor? _copy;
         private readonly HashSet<string> _alreadyIncluded = new(CobolNames.Comparer);

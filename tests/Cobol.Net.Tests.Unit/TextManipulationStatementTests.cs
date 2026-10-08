@@ -28,7 +28,7 @@ public sealed class TextManipulationStatementTests : IDisposable
     private (string Text, DiagnosticBag Diags) Run(string mainText, int edition = 2023)
     {
         var bag = new DiagnosticBag();
-        var copy = new CopyProcessor([_dir], bag, "t.cob", dialectLevel: edition, permissive: false);
+        var copy = new CopyProcessor([_dir], bag, dialectLevel: edition, permissive: false);
         string text = ConditionalCompilationProcessor.ProcessWithCopy(mainText, copy,
             CobolNet.Frontend.Frontend.LeftDirectives, diagnostics: bag, sourcePath: "t.cob", dialectLevel: edition);
         return (text, bag);

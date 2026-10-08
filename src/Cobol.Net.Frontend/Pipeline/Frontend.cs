@@ -253,7 +253,7 @@ public sealed class Frontend
         // a main-source >>IF still gates a COPY (omitted-branch COPY is never expanded) and REPLACE (Step 3) runs over
         // the expanded group. leave* keep the post-85 directive families flowing to their dedicated stages below.
         // COPY runs BEFORE NIST substitution so placeholders inside copied library text are substituted.
-        var copy = new CopyProcessor(_copySearchPaths, diagnostics, sourcePath,
+        var copy = new CopyProcessor(_copySearchPaths, diagnostics,
             dialectLevel: DialectLevel, permissive: Permissive, inputs: Inputs, ccvsIndicators: NistTestName is not null,
             implicitFormatOps: formatOps,   // library text's share of GR14's implicit PUSH/POP ALL (kb/Work PB1066)
             referenceFormatGates: referenceFormatGates);   // library text reports through the compilation's reference-format gates (PB1640)

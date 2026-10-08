@@ -88,7 +88,7 @@ public sealed class SourceLineMapTests : IDisposable
     {
         Copybook("three.cpy", "01 C1 PIC X.\n01 C2 PIC X.\n01 C3 PIC X.\n");
         var bag = new DiagnosticBag();
-        var copy = new CopyProcessor([_dir], bag, "t.cob", dialectLevel: 2023, permissive: false);
+        var copy = new CopyProcessor([_dir], bag, dialectLevel: 2023, permissive: false);
         var main = MappedText.Identity("01 A PIC X.\nCOPY three.\n01 B PIC X.\n", "t.cob");
         var m = ConditionalCompilationProcessor.ProcessWithCopyMapped(main, copy,
             CobolNet.Frontend.Frontend.LeftDirectives, diagnostics: bag, sourcePath: "t.cob", dialectLevel: 2023);
@@ -110,7 +110,7 @@ public sealed class SourceLineMapTests : IDisposable
     {
         // REPLACE is Step 3 of the merged text-manipulation driver (ISO §7.2.1), run over the expanded group.
         var bag = new DiagnosticBag();
-        var copy = new CopyProcessor([_dir], bag, "t.cob", dialectLevel: 2023, permissive: false);
+        var copy = new CopyProcessor([_dir], bag, dialectLevel: 2023, permissive: false);
         var m = ConditionalCompilationProcessor.ProcessWithCopyMapped(
             MappedText.Identity("01 A PIC X.\nREPLACE ==A== BY ==B==.\n01 C PIC X.\n01 A PIC X.\n", "t.cob"),
             copy, CobolNet.Frontend.Frontend.LeftDirectives, diagnostics: bag, sourcePath: "t.cob", dialectLevel: 2023);

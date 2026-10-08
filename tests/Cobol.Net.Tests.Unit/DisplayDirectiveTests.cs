@@ -21,7 +21,7 @@ public sealed class DisplayDirectiveTests
     private static (CompileOutputLine[] Output, DiagnosticBag Bag) Run(string directives)
     {
         var bag = new DiagnosticBag();
-        var copy = new CopyProcessor([], bag, "t.cob", dialectLevel: 2023, permissive: false);
+        var copy = new CopyProcessor([], bag, dialectLevel: 2023, permissive: false);
         ConditionalCompilationProcessor.ProcessWithCopy(directives + " PROCEDURE DIVISION.\n", copy,
             CobolNet.Frontend.Frontend.LeftDirectives, diagnostics: bag, sourcePath: "t.cob", dialectLevel: 2023);
         return (bag.CompileOutput.ToArray(), bag);

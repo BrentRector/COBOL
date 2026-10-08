@@ -15,7 +15,6 @@ namespace CobolNet.Frontend.Preprocessor;
 public sealed class CopyProcessor(
     IEnumerable<string>? searchPaths = null,
     DiagnosticBag? diagnostics = null,
-    string sourceName = "<source>",
     int dialectLevel = 85,
     bool permissive = false,
     CompilationInputs? inputs = null,
@@ -25,7 +24,7 @@ public sealed class CopyProcessor(
 {
     /// <summary>The compilation's ambient-input gateway (kb/Work PB985): every copybook probe and read below goes
     /// through it, so the record names each library text the group incorporated AND each candidate that was not
-    /// there. A caller that passes none (the standalone preprocess CLI) gets a private one.</summary>
+    /// there. A caller that passes none (a unit test) gets a private one.</summary>
     private readonly CompilationInputs _inputs = inputs ?? new CompilationInputs();
 
     // One COBOLNET0902 per compilation for the VCR-row-4 gate (COPY REPLACING non-pseudo-text, W3 — DEVLOG 598).
@@ -59,15 +58,12 @@ public sealed class CopyProcessor(
     /// GnuCOBOL's list and order; see <see cref="LocateInLibrary"/>).</summary>
     private static readonly string[] CopybookSuffixes = [".CPY", ".CBL", ".COB", ".cpy", ".cbl", ".cob"];
 
-    private readonly List<string> _searchPaths = new(searchPaths ?? []);
+    /// <summary>The configured search paths, fixed at construction (<see cref="LibraryPlaces"/>).</summary>
+    private readonly string[] _searchPaths = [.. searchPaths ?? []];
 
-    // Diagnostic plumbing (DEVLOG 307). Optional so the standalone preprocess CLI and tests can construct
-    // a CopyProcessor without a bag; when absent, nothing is reported.
+    // Diagnostic plumbing (DEVLOG 307). Optional so a unit test can construct a CopyProcessor without a bag; when
+    // absent, nothing is reported.
     private readonly DiagnosticBag? _diagnostics = diagnostics;
-    private readonly string _sourceName = sourceName;
-
-    /// <summary>Add a directory to search for copybooks.</summary>
-    public void AddSearchPath(string path) => _searchPaths.Add(path);
 
     /// <summary>The reference format each text was read in, by file (kb/Work PB1067): the compilation group's, which
     /// the caller registers after normalizing it, and each library text's, registered as it is normalized — so a
@@ -110,26 +106,6 @@ public sealed class CopyProcessor(
     /// from, never an ordinal of the text being processed.</summary>
     private void Report(DiagnosticDescriptor descriptor, SourceOrigin at, params object[] args)
         => _diagnostics?.Report(descriptor, at.ToLocation(), TextSpan.Empty, args);
-
-    /// <summary>
-    /// Process all COPY and REPLACE statements in the source text — the standalone path (the product runs the
-    /// merged driver, <see cref="ConditionalCompilationProcessor.Manipulate"/>). This path keeps the historical
-    /// search, which adds <paramref name="sourceDir"/> as the first configured search path; WiseOwl
-    /// COBOL's own default library (DOC-A.1-40) does not search the source directory.
-    /// </summary>
-    public string Process(string sourceText, string sourceDir)
-    {
-        if (!_searchPaths.Contains(sourceDir))
-            _searchPaths.Insert(0, sourceDir);
-
-        string expanded = ExpandCopyStatements(sourceText, new HashSet<string>(CobolNames.Comparer), 0);
-        return ApplyReplaceStatements(expanded, _diagnostics, _sourceName, EditionInfo.Of(dialectLevel, permissive));
-    }
-
-    /// <summary>The REPLACE pass over a plain text (the standalone <see cref="Process"/>).</summary>
-    internal static string ApplyReplaceStatements(string text, DiagnosticBag? diagnostics = null,
-        string sourceName = "<source>", EditionInfo? edition = null)
-        => ApplyReplaceStatements(MappedText.Identity(text, sourceName), diagnostics, edition).Text;
 
     /// <summary>
     /// Step 3 of text manipulation (§7.2.1): the REPLACE statements of the conditionally-processed compilation group
@@ -463,11 +439,6 @@ public sealed class CopyProcessor(
         return sb.Finish();
     }
 
-    /// <summary>The recursive COPY-only expansion behind <see cref="Process"/> (the standalone path): the ONE
-    /// one-level expander, <see cref="ExpandCopiesOneLevel"/>, fed with itself as the copybook expander.</summary>
-    private string ExpandCopyStatements(string text, HashSet<string> alreadyIncluded, int depth)
-        => ExpandCopiesOneLevel(text, alreadyIncluded, depth, (copybook, d) => ExpandCopyStatements(copybook, alreadyIncluded, d));
-
     /// <summary>The disposition of one resolved COPY statement.</summary>
     internal enum CopyOutcome { Found, NotFound, Circular }
 
@@ -482,8 +453,7 @@ public sealed class CopyProcessor(
     /// <summary>Parse and resolve ONE COPY statement whose keyword is at <paramref name="copyIdx"/> — parse it
     /// (<see cref="ParseCopyStatement"/>, advancing <paramref name="afterCopy"/> past its separator period), find the
     /// copybook, and return its NormalizeCopybook+ApplyReplacements text (NOT recursively expanded — the caller
-    /// recurses). Shared by <see cref="ExpandCopyStatements"/> (legacy path) and <see cref="ExpandCopiesOneLevel"/>
-    /// (the merged CC+COPY driver), so the two never diverge.</summary>
+    /// recurses: <see cref="ExpandCopiesOneLevel"/> hands the text to the merged CC+COPY driver).</summary>
     internal OneCopyResult ResolveOneCopy(MappedText mapped, int copyIdx, HashSet<string> alreadyIncluded, bool inLibraryText,
         out int afterCopy)
     {
@@ -731,21 +701,16 @@ public sealed class CopyProcessor(
         => _diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.CopyStatementPlacement.Code,
             message, at.ToLocation(), default);
 
-    /// <summary>Expand every COPY statement in <paramref name="text"/> ONE level (no recursion into the copybook):
+    /// <summary>Expand every COPY statement in <paramref name="mapped"/> ONE level (no recursion into the copybook):
     /// for each found copybook, its resolved text is handed to <paramref name="expandCopybook"/> (the merged
     /// CC+COPY driver, which processes the copybook's own directives AND its nested COPY), and the result is
-    /// spliced with the same blank-line framing as <see cref="ExpandCopyStatements"/>. This is the COPY half of the
-    /// interleaved text-manipulation driver (ISO §7.2.1) — the CC half drives, calling this only on emitting-branch
-    /// text so an omitted-branch COPY is never expanded (design SSOT <c>DESIGN-cc-in-copy.md</c>).</summary>
-    internal string ExpandCopiesOneLevel(string text, HashSet<string> alreadyIncluded, int depth,
-        Func<string, int, string> expandCopybook)
-        => ExpandCopiesOneLevel(MappedText.Identity(text, _sourceName), alreadyIncluded, depth,
-            (m, d, _) => MappedText.Identity(expandCopybook(m.Text, d), m.Lines[0].File)).Text;
-
-    /// <summary>The MAPPED one-level expansion (kb/Work PB82): the text before a COPY keeps its origins, the
+    /// spliced between two framing newlines. This is the COPY half of the interleaved text-manipulation driver
+    /// (ISO §7.2.1) — the CC half drives, calling this only on emitting-branch text so an omitted-branch COPY is
+    /// never expanded (design SSOT <c>DESIGN-cc-in-copy.md</c>).
+    /// <para>MAPPED (kb/Work PB82): the text before a COPY keeps its origins, the
     /// incorporated copybook's lines carry the copybook's, and the framing newlines belong to the COPY statement's
     /// own line — so a diagnostic or EXCEPTION-LOCATION inside copied text names the copybook file and line, and
-    /// one after the COPY names the main source's own line, not the resultant ordinal.
+    /// one after the COPY names the main source's own line, not the resultant ordinal.</para>
     /// <para><paramref name="expandCopybook"/> receives the copybook, its depth, and the 0-based line piece of the
     /// RETURNED text at which the copybook's expansion begins — the one fact the merged driver needs to place a
     /// directive met inside the copybook in the resultant line frame (kb/Work PB1066).</para></summary>

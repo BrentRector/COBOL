@@ -29,7 +29,7 @@ public sealed class DirectiveWithinStatementTests : IDisposable
     {
         File.WriteAllText(Path.Combine(_dir, "cb1.cpy"), " DISPLAY \"CB1\".\n");
         var bag = new DiagnosticBag();
-        var copy = new CopyProcessor([_dir], bag, "t.cob", dialectLevel: 2023, permissive: false);
+        var copy = new CopyProcessor([_dir], bag, dialectLevel: 2023, permissive: false);
         string text = ConditionalCompilationProcessor.ProcessWithCopy(mainText, copy,
             CobolNet.Frontend.Frontend.LeftDirectives, diagnostics: bag, sourcePath: "t.cob", dialectLevel: 2023);
         return (text, bag);
@@ -103,7 +103,7 @@ public sealed class DirectiveWithinStatementTests : IDisposable
         File.WriteAllText(Path.Combine(_dir, "cb1.cpy"), " DISPLAY \"CB1\".\n");
         if (copybook is not null) File.WriteAllText(Path.Combine(_dir, "cb2.cpy"), copybook);
         var bag = new DiagnosticBag();
-        var copy = new CopyProcessor([_dir], bag, "t.cob", dialectLevel: 2023, permissive: false);
+        var copy = new CopyProcessor([_dir], bag, dialectLevel: 2023, permissive: false);
         var converted = ReferenceFormatProcessor.NormalizeToFreeFormMapped(fixedFormText, null, "t.cob", true, out var formats);
         copy.RegisterReferenceFormat("t.cob", formats);
         var text = ConditionalCompilationProcessor.ProcessWithCopyMapped(converted, copy,

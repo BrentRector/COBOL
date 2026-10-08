@@ -25,9 +25,10 @@ deliberately, so a main-source `>>IF` can gate a `COPY` statement. Consequence: 
 2. A **missing copybook in a false branch** must NOT error (today it works because CC blanks the false-branch
    COPY line before `CopyProcessor` runs). **This is why a simple order-swap (COPY-first) is unacceptable** —
    it would expand the false-branch COPY and raise a spurious CBL3620.
-3. Byte-identity of the standalone entry points: `ConditionalCompilationProcessor.Process` and `CopyProcessor.Process` keep their exact
-   behavior (the standalone `preprocess` CLI + the direct unit tests depend on them; the legacy compiler that also
-   called them is deleted, P15 Cut 2).
+3. Byte-identity of the conditional-compilation-only entry point: `ConditionalCompilationProcessor.Process` (the
+   merged driver with no COPY processor) keeps its exact behavior, because the direct unit tests depend on it. The
+   COPY-only entry point `CopyProcessor.Process` and its string-only helpers are deleted: after the legacy compiler
+   went (P15 Cut 2) nothing called them (kb/Work PB2200).
 4. The H3 line-count-preserving discipline: the five downstream directive-collection stages
    (TURN/PROPAGATE/REF-MOD/FLAG/COBOL-WORDS) run AFTER, on the final expanded text; the `linesBefore` baseline is
    captured after the merged driver. The merged driver itself changes line counts (COPY inserts lines) — it runs
@@ -183,11 +184,10 @@ and therefore stay in RESULTANT space — the map is consulted only at the user-
 
 ## §4 Wiring (greenfield only)
 
-`Frontend.Preprocess`: replace the two calls `ConditionalCompilationProcessor.Process(...)` (before COPY) +
-`CopyProcessor.Process(...)` with ONE `CopyConditionalProcessor.Process(text, sourceDir, copySearchPaths,
-dialect, permissive, diag, sourcePath)` returning the fully expanded free-form text (COPY incorporated, CC
-applied, REPLACE applied). Everything downstream (NIST, TURN/…/COBOL-WORDS, the H3 baseline) is unchanged. The
-legacy `Compilation.cs` and the `preprocess` CLI keep the two separate calls — byte-identical.
+`Frontend.Preprocess` makes ONE call, `ConditionalCompilationProcessor.Manipulate(normalized, copy, …)`, with a
+`CopyProcessor` built from the compilation's copy search paths, and gets back the fully expanded text (COPY
+incorporated, CC applied, REPLACE applied) with its source map. Everything downstream (NIST,
+TURN/…/COBOL-WORDS, the H3 baseline) is unchanged. There is no second, COPY-only path.
 
 ## §5 Increments
 
