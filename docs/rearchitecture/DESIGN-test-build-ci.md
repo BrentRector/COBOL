@@ -401,7 +401,8 @@ checkout (a failed regen fails the build — keep).
   reviewed-re-baselined in this change set"), a top STATE banner naming the current phase, and the owner-decisions
   table. This is what a future engineer resumes the REARCH from; the plan §0 banner is the feature-drive live
   state and cross-links to it.
-- **DEVLOG.md** — unchanged discipline (descending, real timestamp, one entry per commit) per the existing
+- **DEVLOG.md** — unchanged discipline (descending, real timestamp, one entry per landing on main, checked by `push-main.sh` through
+  `scripts/orchestrator/landing_devlog.py`, kb/Work PB2605) per the existing
   `feedback_devlog*` memories. Each rearch phase commit references its ROADMAP phase id.
 - **`docs/DOC_INDEX.md`** — add rows for `COBOLNET_REARCHITECTURE_PLAN.md` (the migration SSOT / ROADMAP),
   `DIAGNOSTICS.md`, this doc, and the sibling `DESIGN-*` / `PHASE-*` docs; keep the "one canonical doc per subsystem" rule.

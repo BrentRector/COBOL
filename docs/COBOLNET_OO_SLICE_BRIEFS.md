@@ -479,7 +479,7 @@ regression trap). Compiled strict `--std 2002`, run, byte-compared by CorpusRunn
   exactly the "flipped gated check needs an adversarial sweep, not just a corpus dry-run" lesson
   (`project_p1_diagnostics`).
 - **Docs in the same change set:** deep-dive updates (row 11 above — `feedback_follow_the_deep_dive`),
-  grammar comments already carry the doc-sync content (`feedback_grammar_preauthorized`), DEVLOG entry per commit.
+  grammar comments already carry the doc-sync content (`feedback_grammar_preauthorized`), DEVLOG entry per landing on main (kb/Work PB2605).
 
 ## 6. Explicitly OUT of scope (forward obligations, recorded so they are not re-derived)
 

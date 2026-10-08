@@ -37,7 +37,10 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
 6. **Keep the docs CURRENT in the same change set.** Every doc except `DEVLOG.md` describes the CURRENT compiler.
    The historical narrative lives ONLY in `DEVLOG.md`, which is DESCENDING — add each new entry at the TOP, under
    the ordering note, headed `## Entry NNN — YYYY-MM-DD HH:MM TZ — Title` (stamp from `date "+%Y-%m-%d %H:%M %Z"`).
-7. **Work autonomously.** Commit AND push every checkpoint, with a forensic commit message and a DEVLOG entry.
+   **One entry per landing on main** (owner 2026-10-08, kb/Work PB2605: the rule covers "Only commits landing on
+   main"; a worktree's checkpoint commits carry none): `push-main.sh` refuses a landing that adds no entry.
+7. **Work autonomously.** Commit AND push every checkpoint, with a forensic commit message; each landing on main
+   carries its DEVLOG entry (rule 6).
    Grammar changes are pre-authorized. Prompt only for genuine owner decisions — one at a time, as a bare question.
 
 8. **⛔ THERE IS EXACTLY ONE WORK REGISTER — `kb/Work/` — AND YOU MAY NOT CREATE ANOTHER.** One note per item

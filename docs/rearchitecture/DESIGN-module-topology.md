@@ -502,7 +502,7 @@ the topology work as **behavior-preserving mechanical steps**, each independentl
     is now *just a deletion*, not a rename big-bang.
 
 **Discipline per commit:** guard-fast + greenfield suites green; a shared-`.g4` change (waves 1) runs the FULL legacy
-guard; each extracted class ships with the header block; DEVLOG entry per commit.
+guard; each extracted class ships with the header block; DEVLOG entry per landing on main (kb/Work PB2605).
 
 ---
 

@@ -49,7 +49,7 @@ records blast radius + gate results.
 
 ## Key concepts
 - CobolSharp (the legacy byte-array engine, NIST-oracle era) → **2026-06-08 pivot** → COBOL.NET (typed-native, spec-first).
-- DEVLOG.md is the ONLY historical doc; descending order; real date+time header stamps per commit.
+- DEVLOG.md is the ONLY historical doc; descending order; real date+time header stamps; one entry per landing on main (kb/Work PB2605).
 - Legacy compiler survives only as a differential oracle until G8/P15 cut-over.
 - Doctrine sources: [[PROMPT]], [[CLAUDE]], [[CONSTRAINTS]].
 

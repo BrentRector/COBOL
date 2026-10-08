@@ -51,7 +51,8 @@ Owner-emphasized, repeatedly corrected:
 - **Never default to deferral** — the complete correct-per-spec implementation regardless of effort; a
   GAP/reject-legal-source is debt, allowed only by explicit owner decision.
 - **Root-cause fixes only** — never work around a compiler bug by editing valid source; fix the compiler.
-- **Fully autonomous** — commit AND push every checkpoint; a conformance test + a DEVLOG entry per feature commit;
+- **Fully autonomous** — commit AND push every checkpoint; a conformance test per feature commit + a DEVLOG entry per landing on main
+  (kb/Work PB2605);
   guard-green every commit.
 - **Spec-first is the ONLY going priority** — convert each verified fix into a spec-derived golden.
 

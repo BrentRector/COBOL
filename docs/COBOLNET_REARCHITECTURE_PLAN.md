@@ -20,7 +20,7 @@ never how we got here — narrative belongs in `DEVLOG.md`.**
 dirty/unpushed · next-free diagnostic · VCR todos · corpus counts · inventory GAP) → ④ work the top of **NEXT**
 below — spec-first, § cited, complete-not-test-scoped; design questions → the `docs/COBOLNET_DESIGN.md` §0.5
 deep-dives; fixes → the queue entry, which carries the exact verified fix → ⑤ before ending: update THIS §0 and add
-a DEVLOG entry per commit; commit AND push every checkpoint.
+a DEVLOG entry per landing on main (kb/Work PB2605); commit AND push every checkpoint.
 
 ### Where we are
 
@@ -3285,7 +3285,7 @@ Close the version-correctness program to zero open work and make the greenfield 
 
 `NOT STARTED`
 
-> The executing session updates this line to `IN PROGRESS @ step N` after each step, and to `DONE` when all exit criteria hold. Also append a DEVLOG entry per commit boundary (descending, real timestamp) referencing `PHASE-14`.
+> The executing session updates this line to `IN PROGRESS @ step N` after each step, and to `DONE` when all exit criteria hold. Also add a DEVLOG entry per landing on main (descending, real timestamp; kb/Work PB2605) referencing `PHASE-14`.
 
 ---
 
@@ -4187,7 +4187,7 @@ claims cannot rot:
 ---
 
 ### 8. Commit / DEVLOG discipline (per project rules)
-Every commit boundary above gets a DEVLOG entry at the TOP of `DEVLOG.md` (descending; real `date "+%Y-%m-%d %H:%M %Z"`
+Every landing on main above gets a DEVLOG entry (kb/Work PB2605) at the TOP of `DEVLOG.md` (descending; real `date "+%Y-%m-%d %H:%M %Z"`
 stamp; `## Entry NNN — … — Title`), referencing "P15 / G8". Commit messages are forensic and end with the mandated
 Co-Authored-By / Claude-Session trailers. Push every checkpoint (fully-autonomous rule). After the phase, update
 this plan's §0 + `CLAUDE.md` PIVOT STATE to "G8 COMPLETE".

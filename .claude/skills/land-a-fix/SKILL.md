@@ -67,7 +67,9 @@ Use the `gate` skill. Read the verdict line, then commit as a separate call.
 
 - `DEVLOG.md`: insert a new entry directly beneath the ordering note (DESCENDING, newest first). Header
   `## Entry NNN — YYYY-MM-DD HH:MM TZ — Title`, stamped from `date "+%Y-%m-%d %H:%M %Z"`. Write narratively —
-  what changed, why, what broke, what was learned. Log the failures too.
+  what changed, why, what broke, what was learned. Log the failures too. One entry per LANDING ON MAIN, not per
+  commit (owner 2026-10-08, kb/Work PB2605): `push-main.sh` refuses a landing whose range adds no new, stamped,
+  top-placed entry (exit 6, `scripts/orchestrator/landing_devlog.py`).
 - Commit message: write it to a scratchpad file and use `git commit -F <file>`. Do NOT inline a PowerShell
   here-string in the Bash tool — it is POSIX sh and the markers leak into the message.
 - **Update the item's `kb/Work/` note in the SAME commit** — `status: landed`, and `closes_rows:` naming the

@@ -35,6 +35,8 @@
 #             NOT touched; acquire it with `landing_lease.py acquire --wait-min 9`, rebase, re-gate, then re-run
 #         5 = the commit IS on main but its main-branch run's verdict could not be read (UNVERIFIED, kb/Work PB1639):
 #             read it by hand; never re-land it
+#         6 = the landing carries no new DEVLOG entry, or a malformed or misplaced one (scripts/orchestrator/
+#             landing_devlog.py, kb/Work PB2605): main NOT touched; write the entry at the TOP, commit, re-run
 
 set -uo pipefail
 
@@ -47,7 +49,7 @@ while [ $# -gt 0 ]; do
     --branch-prefix) PREFIX="${2:?--branch-prefix needs a value}"; shift 2 ;;
     --no-delete)     DELETE_BRANCH=0; shift ;;
     --audit)         AUDIT=1; shift ;;
-    -h|--help)       sed -n '2,37p' "$0"; exit 0 ;;
+    -h|--help)       sed -n '2,39p' "$0"; exit 0 ;;
     *) echo "push-main.sh: unknown argument '$1'" >&2; exit 2 ;;
   esac
 done
@@ -247,6 +249,18 @@ if ! git merge-base --is-ancestor "$BASE" "$SHA"; then
      Rebase first:  git fetch origin && git rebase origin/main
      A landing is a pure fast-forward; this script never force-pushes."
 fi
+
+# ── EVERY LANDING ON MAIN CARRIES A NEW DEVLOG ENTRY (owner 2026-10-08, kb/Work PB2605: the rule covers "Only commits
+# landing on main"; an implementer's WIP checkpoints carry none, the lander writes the train's one). Checked HERE, on
+# this landing's own range (DEVLOG.md at $BASE against DEVLOG.md at $SHA), because every landing passes here and a
+# commit cannot know whether it will land. Refused before a run is spent. ──
+"$PY" scripts/orchestrator/landing_devlog.py --rev "$SHA" --base "$BASE"
+case $? in
+  0) ;;
+  1) echo "⛔ push-main: this landing carries no valid new DEVLOG entry (above) — main NOT touched." >&2
+     exit 6 ;;
+  *) die "the DEVLOG landing check could not read the range (above) — main NOT touched" ;;
+esac
 
 # ── THE FILE-SET PARTITION'S GUARANTEE (kb/Work PB2118 Drafts 9-10; DESIGN-architecture-review §8.7). The planner admits
 # an R3 restructuring wave on its COMPUTED file set, an estimate three refuter rounds each found a hole in; this is
