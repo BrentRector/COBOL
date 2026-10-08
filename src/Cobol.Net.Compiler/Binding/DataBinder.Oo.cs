@@ -549,14 +549,11 @@ public sealed partial class DataBinder
     /// binding registered, taken off the statement's pending list so they run immediately before THIS property's
     /// accessor — §8.4.3.1.4 GR1 applies identifier-3 (a)–c)) before the property (d)), and the property's GET is
     /// hoisted ahead of every pre-op of the statement (<c>OoWrapPropertyOps</c>), so left on that list they would run
-    /// after the accessor that reads their result.</para>
-    /// <para><paramref name="SelectedByValue"/>: identifier-3 selects its object through a value read at run time (a
-    /// data-name subscript, a function-identifier), which a RECEIVING property carries only through a per-receiver
-    /// <see cref="Interleaved"/> bracket (kb/Work PB2078).</para></summary>
+    /// after the accessor that reads their result.</para></summary>
     internal sealed record OoPendingPropertyOp(
         DataItem Temp, Bound.InvokeForm Form, Place? Receiver, string ClassCsName,
         OoMethodSymbol? Get, OoMethodSymbol? Set, string PropName, string ReceiverName,
-        IReadOnlyList<Bound.BoundStatement> Prelude, string? InterfaceCsName = null, bool SelectedByValue = false)
+        IReadOnlyList<Bound.BoundStatement> Prelude, string? InterfaceCsName = null)
     {
         /// <summary>The emitted type that qualifies <paramref name="accessor"/>'s formal statics at the call site.</summary>
         public string? OwnerCsNameOf(OoMethodSymbol accessor) => InterfaceCsName ?? accessor.Owner?.CsName;
@@ -568,16 +565,19 @@ public sealed partial class DataBinder
         public bool Interleaved { get; set; }
     }
 
-    /// <summary>⛔ THE ONE CLAIM A RECEIVER-LOOP BINDER MAKES (kb/Work PB2078): <paramref name="receiver"/> is a RECEIVING
-    /// operand of a statement whose emitter places each receiver's accessors itself
-    /// (<c>ReceiverBracketEmitter.Receive</c>). When it is an object-property reference this marks the pending op, so
-    /// <c>OoBinder.OoWrapPropertyOps</c> brackets it per receiver; any other place is none of this method's business.
+    /// <summary>⛔ THE ONE CLAIM A RECEIVER-PLACING BINDER MAKES (kb/Work PB2078): each of <paramref name="receivers"/> is a
+    /// RECEIVING operand of a statement whose emitter places each receiver's accessors itself where the statement identifies
+    /// and stores it (<c>ReceiverBracketEmitter.Identify / Receive / Settle</c>). When it is an object-property reference
+    /// this marks the pending op, so <c>OoBinder.OoWrapPropertyOps</c> brackets it per receiver; any other place (and a
+    /// null, an absent phrase) is none of this method's business.
     /// The claim and the emitter's <c>Receive</c> are one contract: a claimed property whose bracket the emitter never
-    /// places fails the compilation (<c>ReceiverBracketEmitter.Enter</c>).</summary>
-    internal void OoClaimInterleavedReceiver(Place receiver)
+    /// places fails the compilation (<c>ReceiverBracketEmitter.Emit</c>).</summary>
+    internal void OoClaimInterleavedReceiver(params IEnumerable<Place?> receivers)
     {
-        foreach (var op in OoPendingPropertyOps)
-            if (ReferenceEquals(op.Temp, receiver.Item)) { op.Interleaved = true; return; }
+        foreach (var receiver in receivers)
+            if (receiver is not null)
+                foreach (var op in OoPendingPropertyOps)
+                    if (ReferenceEquals(op.Temp, receiver.Item)) { op.Interleaved = true; break; }
     }
 
     /// <summary>The unit's un-drained property-reference ops (statement-scoped: BindStatement marks the
@@ -650,6 +650,13 @@ public sealed partial class DataBinder
     /// method.</summary>
     internal DataItem OoCreateSelfTemp(string containingClass, bool factory) =>
         OoCreateObjectReferenceTemp(ObjectRefDescriptor.ActiveClass(containingClass, factory), "__SELF-TEMP-", "__self");
+
+    /// <summary>Synthesize the temporary that holds the object a RECEIVING object-property reference identified (kb/Work
+    /// PB2078): identifier-3 is evaluated into it once, when the statement identifies the receiver, and the property's GET
+    /// and SET both reach that object (§8.4.3.9.4 GR3 — one temporary, one property of one object), however the
+    /// statement changes identifier-3's subscripts in between. Described as identifier-3 is.</summary>
+    internal DataItem OoCreateIdentifiedObjectTemp(ObjectRefDescriptor description) =>
+        OoCreateObjectReferenceTemp(description, "__OBJ-TEMP-", "__obj");
 
     /// <summary>The ONE object-reference temporary: a USAGE OBJECT REFERENCE item described
     /// <paramref name="description"/>, the description every object-reference rule then asks of it. The same

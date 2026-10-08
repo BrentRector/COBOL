@@ -16,7 +16,7 @@ using static CobolNet.CodeGen.Emit.EmitText;
 /// GO TO … DEPENDING. The out-of-line PERFORM's bounded dispatch reads <see cref="DispatchState.DispatchName"/>;
 /// VARYING/SEARCH index advances ride the ONE SET-target store pair on <see cref="SetEmitter"/>.</summary>
 internal sealed class ControlFlowEmitter(EmitContext ctx, NumericRenderer num, ConditionRenderer cond,
-    DispatchState dispatch, SetEmitter set)
+    DispatchState dispatch, SetEmitter set, ReceiverBracketEmitter brackets)
 {
     /// <summary>The statement dispatcher — property-wired by <see cref="UnitEmitters"/> (IF branches,
     /// inline-PERFORM bodies, and SEARCH arms nest arbitrary statement lists — a cyclic edge no ctor order
@@ -365,7 +365,7 @@ internal sealed class ControlFlowEmitter(EmitContext ctx, NumericRenderer num, C
                     if (k == levels.Count - 1)
                     {
                         body();
-                        set.AugmentSetTarget(levels[k].Var, down: false, RenderPerEvaluation(levels[k].By), "PERFORM VARYING");
+                        Augment(levels[k]);
                     }
                     else
                     {
@@ -383,7 +383,7 @@ internal sealed class ControlFlowEmitter(EmitContext ctx, NumericRenderer num, C
                         // CCVS-85 expectation, which GR13 e) 2 contradicts — see the method doc-comment, the
                         // docs/CONFORMANCE.md §3 determination and kb/Work PB436.
                         InitVaryingTarget(v, levels[k + 1]);
-                        set.AugmentSetTarget(levels[k].Var, down: false, RenderPerEvaluation(levels[k].By), "PERFORM VARYING");
+                        Augment(levels[k]);
                     }
                 }
             }
@@ -407,7 +407,7 @@ internal sealed class ControlFlowEmitter(EmitContext ctx, NumericRenderer num, C
                         EmitAfter(k + 1);
                     }
                     w.Line($"if ({cond.Render(levels[k].Until)}) break;");
-                    set.AugmentSetTarget(levels[k].Var, down: false, RenderPerEvaluation(levels[k].By), "PERFORM VARYING");
+                    Augment(levels[k]);
                 }
             }
         }
@@ -433,7 +433,7 @@ internal sealed class ControlFlowEmitter(EmitContext ctx, NumericRenderer num, C
         NumX from = RenderPerEvaluation(lv.From);
         if (lv.Var is not SetIndexTarget)
         {
-            set.StoreSetTarget(lv.Var, from);
+            brackets.Receive(lv.Var, () => set.StoreSetTarget(lv.Var, from));   // GR12: identified as it is set (kb/Work PB2078)
             return;
         }
         string guard = set.LandAmount(from, SetAmountRule.IndexTo, "PERFORM VARYING … FROM", out string tmp, "pv");
@@ -452,6 +452,15 @@ internal sealed class ControlFlowEmitter(EmitContext ctx, NumericRenderer num, C
                     + $"{EmitText.CsLiteral("PERFORM VARYING index-name initialized from a non-positive item (ISO 14.9.28.4 GR3)")});");
             set.StoreSetTarget(lv.Var, new NumX(tmp, 0));
         }
+    }
+
+    /// <summary>Augment a PERFORM VARYING (or AFTER) level's induction variable by its BY operand (GR13), the variable
+    /// identified as it is augmented (GR12) — an object-property variable's accessors around THIS store (kb/Work
+    /// PB2078).</summary>
+    private void Augment(VaryingLevel lv)
+    {
+        NumX by = RenderPerEvaluation(lv.By);
+        brackets.Receive(lv.Var, () => set.AugmentSetTarget(lv.Var, down: false, by, "PERFORM VARYING"));
     }
 
     /// <summary>Render a varying-phrase operand AT the setting or augmenting operation that reads it, emitting
@@ -603,7 +612,9 @@ internal sealed class ControlFlowEmitter(EmitContext ctx, NumericRenderer num, C
         w.Line($"__search{id}:");
         EmitSearchWhens(s, id);
         w.Line($"{s.IndexField} += 1;");
-        if (s.AlsoVaried is { } also) set.AugmentSetTarget(also, down: false, new NumX("1", 0), "SEARCH VARYING");
+        // §14.9.37.4 GR3 b): identifier-2 is incremented with the search index, so an object-property identifier-2 is SET with each
+        // increment, before the next WHEN evaluation can read it (kb/Work PB2078).
+        if (s.AlsoVaried is { } also) brackets.Receive(also, () => set.AugmentSetTarget(also, down: false, new NumX("1", 0), "SEARCH VARYING"));
         unsuccessful($"{s.IndexField} > {bound}", "EC-RANGE-SEARCH-NO-MATCH", s.CheckSearchNoMatch);
         w.Line($"goto __search{id};");
     }

@@ -120,6 +120,13 @@ public sealed record BoundCallProgram(
     public BoundStatement WithActivatorChecking(CobolNet.Runtime.Exceptions.EcCheckingProfile profile)
         => this with { ActivatorChecking = profile };
 
+    /// <summary>The CALL's RECEIVING operands in written order — each BY REFERENCE argument (the activated program may
+    /// change it) and the RETURNING item (§14.9.4.4 GR4) — every one identified at the start of the statement (GR3 a)).
+    /// The ONE list both the binder's claim of an object-property receiver and the emitter's placement of its accessors
+    /// read (kb/Work PB2078).</summary>
+    public static IEnumerable<Place?> Receivers(IEnumerable<BoundCallArg> args, Place? returning) =>
+        [.. args.Where(a => a.Mode == CobolPassMode.Reference).Select(a => a.Place), returning];
+
 
     /// <summary>True when this node is the lowering of a user-defined FUNCTION reference (M2-UDF): a locate
     /// miss stamps EC-FUNCTION-NOT-FOUND (Fatal, ISO §8.4.3.2.4 GR6b / Table 13) rather than the CALL's

@@ -33,6 +33,9 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
     {
         var w = ctx.Writer;
         var s = IdentifyOperands(statement);   // §14.6.4 7) — identified once, before the first character moves (kb/Work PB1123)
+        // ⛔ kb/Work PB2078: the same identification for an object-property identifier-3 / identifier-4 — its object and,
+        // for the read pointer, its GET — before the first operation; each SET follows that receiver's own store.
+        brackets.Identify(s.Into, s.Pointer);
         int id = ctx.Names.NextStrUnstr();
         string ptr = $"__strPtr{id}", ptr0 = $"__strPtr0{id}", ovf = $"__strOvf{id}", acc = $"__strInto{id}";
         w.Line(s.Pointer is { } p0
@@ -52,8 +55,7 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         // identifier-3 denotes no item, and §8.5.1.10.4 makes it a fixed-length item of the current length.
         bool dynInto = s.Into.DenotedItem is { IsDynamicLength: true };
         string old = $"__strOld{id}";
-        // ⛔ kb/Work PB2078: identifier-3 is a RECEIVING operand read once and stored once, so an object-property
-        // identifier-3 has its GET before the image is read and its SET after the store -- around ITS access
+        // ⛔ kb/Work PB2078: identifier-3 is stored once, so an object-property identifier-3 has its SET after that store
         // (ReceiverBracketEmitter.Receive), and not after the statement's ON OVERFLOW phrase bodies.
         brackets.Receive(s.Into, null, () =>
         {
@@ -86,9 +88,10 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         // GR6: the pointer item changes only as characters move. Storing it back unconditionally re-wrote an
         // unchanged pointer through its host carrier — a saturated value past long (kb/Work PB1033) — so it is
         // stored only when it moved, and a pointer that overflowed before any transfer keeps its exact value.
+        // An object-property pointer is SET with its store (kb/Work PB2078), so the overflow phrases read the new value.
         if (s.Pointer is { } p)
             using (w.Block($"if ({ptr} != {ptr0})"))
-                arith.StoreArith(p, new NumX(ptr, 0), CobolRounding.Truncation);
+                brackets.Receive(p, null, () => arith.StoreArith(p, new NumX(ptr, 0), CobolRounding.Truncation));
         EmitOverflow(ovf, "EC-OVERFLOW-STRING", s.OnOverflow, s.NotOnOverflow);   // GR8b
     }
 
@@ -112,6 +115,10 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         // (kb/Work PB1123): §14.9.48.4 states no other timing, so `UNSTRING S INTO I UE(I)` stores into UE(1), the
         // occurrence I named before the first store changed it.
         var s = IdentifyOperands(statement);
+        // ⛔ kb/Work PB2078: an object-property receiver is identified with the others — its object, and the GET of a read
+        // POINTER or TALLYING item — before the first operation; each SET follows that receiver's own store, before the
+        // overflow phrases. A receiving area the statement never reaches keeps its identification and is not SET.
+        brackets.Identify([.. s.Receivers.SelectMany(r => new[] { r.Target, r.DelimiterIn, r.CountIn }), s.Pointer, s.Tallying]);
         int id = ctx.Names.NextStrUnstr();
         string src = $"__unsSrc{id}", dels = $"__unsDel{id}", alls = $"__unsAll{id}",
                ptr = $"__unsPtr{id}", tly = $"__unsTly{id}", ovf = $"__unsOvf{id}";
@@ -199,7 +206,7 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
                         w.Line(PlaceRenderer.Write(s.Delimiting!, ReceivingStore.Characters(s.Delimiting!.Item, dlm, "")));
                         move.Emit(ds);
                     }
-                    if (r.CountIn is { } ci) arith.StoreArith(ci, new NumX(cnt, 0), CobolRounding.Truncation);   // GR11e
+                    if (r.CountIn is { } ci) brackets.Receive(ci, null, () => arith.StoreArith(ci, new NumX(cnt, 0), CobolRounding.Truncation));   // GR11e
                     w.Line($"{tly} += 1;");                                           // GR14 — per receiver acted upon
                 }
             }
@@ -209,13 +216,14 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         // acted upon; without an overlap that is "its value at the beginning plus the count". Stored BEFORE the pointer
         // so that, when both name one item, the pointer is the last value stored (D-UNS3; libcob cob_unstring_finish).
         if (s.Tallying is { } t)
-            arith.StoreArith(t, new NumX($"({NumericRenderer.Align(num.AsNum(new BoundFieldOperand(t), ReceiverContext.None), 0)} + {tly})", 0),
-                CobolRounding.Truncation);
+            brackets.Receive(t, null, () => arith.StoreArith(t,
+                new NumX($"({NumericRenderer.Align(num.AsNum(new BoundFieldOperand(t), ReceiverContext.None), 0)} + {tly})", 0),
+                CobolRounding.Truncation));
         // GR13 — stored only when the pointer moved (the STRING twin's reason: kb/Work PB1033), so a pointer that
         // was out of range before any examination keeps its exact value.
         if (s.Pointer is { } p)
             using (w.Block($"if ({ptr} != {ptr}__0)"))
-                arith.StoreArith(p, new NumX(ptr, 0), CobolRounding.Truncation);
+                brackets.Receive(p, null, () => arith.StoreArith(p, new NumX(ptr, 0), CobolRounding.Truncation));
         EmitOverflow(ovf, "EC-OVERFLOW-UNSTRING", s.OnOverflow, s.NotOnOverflow);   // GR16b
     }
 

@@ -124,6 +124,7 @@ internal sealed class SearchBinder(BinderContext ctx, StatementBinder host)
                     admitted = false;
                 }
                 if (!admitted) return BoundRejected.Reported(ctx.Edition);
+                ctx.Data.OoClaimInterleavedReceiver(p);   // SET with each increment, before the next WHEN reads it (kb/Work PB2078)
                 also = new SetPlaceTarget(p);
             }
             else return BoundRejected.Reported(ctx.Edition);   // the receiving chokepoint reported it — not a deferral (kb/Work PB236, PB881)

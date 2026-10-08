@@ -151,6 +151,12 @@ internal sealed partial class ControlFlowBinder
         bool firstLevel)
     {
         if (host.Set.SetTargetOf(dref) is not { } var) return null;
+        // §14.9.28.4 GR12: "Item identification for identifier-2, identifier-5, index-name-1, or index-name-3 is done each
+        // time the content of the data item referenced by the identifier ... is set or augmented", so ControlFlowEmitter
+        // places an object-property induction variable's accessors around each setting and augmenting store, where the
+        // UNTIL condition's next evaluation sees the value (kb/Work PB2078: around the whole PERFORM, the condition read
+        // the property's old value and the loop never ended).
+        if (var is SetPlaceTarget { Place: var claimed }) ctx.Data.OoClaimInterleavedReceiver(claimed);
         // §14.9.28.3 SR2 — "Each identifier shall reference a numeric elementary item described in the data
         // division": the varied identifier is a class-closed position of the ONE operand-class screen. A PIC X
         // induction variable used to compile and throw at run time.

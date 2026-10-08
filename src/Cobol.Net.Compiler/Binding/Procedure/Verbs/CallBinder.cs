@@ -812,6 +812,10 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                         args[i].ProgramAddress?.Prototype is { } addressed ? host.ProgramRestrictionIdentityOf(addressed) : null),
                 };
         }
+        // The CALL's receivers -- each BY REFERENCE argument and the RETURNING item -- are identified at its start
+        // (§14.9.4.4 GR3 a)) and stored at the return, before either EXCEPTION phrase runs: CallEmitter places an
+        // object-property receiver's accessors there (kb/Work PB2078).
+        ctx.Data.OoClaimInterleavedReceiver(BoundCallProgram.Receivers(args, returning));
         return new BoundCallProgram(literalName, dynamicName, args, returning, onExc, notOnExc)
         {
             UsedOverflowSpelling = usedOverflow,

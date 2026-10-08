@@ -96,7 +96,6 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         // sending resolver these sites used knew none of them.
         if (host.Expr.ResolveReceiving(st.stringIntoPhrase().dataReference()) is not { } into)
             return new BoundUnsupported("STRING INTO operand");   // the chokepoint reported it — not a deferral (kb/Work PB236)
-        ctx.Data.OoClaimInterleavedReceiver(into);   // StringEmitter places an object-property identifier-3's accessors around its access (kb/Work PB2078)
         string intoText = DataBinder.WrittenText(st.stringIntoPhrase().dataReference());
         // §14.9.43.3 SR4–SR6, SR11 — bind-time rejections (kb/Work PB88: each was a run-time loud stage on ILLEGAL
         // source, the wrong-stage family; the statement compiled clean and died when control reached it).
@@ -150,6 +149,9 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         List<BoundStatement>? onOvf = null, notOvf = null;
         if (st.stringOnOverflow() is { } ov)
             (onOvf, notOvf) = PhraseBlocks.Split(ov.statementBlock(), PhraseBlocks.StartsWithNot(ov), b => host.BindBlocks([b]));
+        // StringEmitter identifies identifier-3 and identifier-4 at the start and stores each before ON OVERFLOW, so an
+        // object-property receiver's accessors go there (kb/Work PB2078).
+        ctx.Data.OoClaimInterleavedReceiver(into, pointer);
         return new BoundStringStmt(sendings, into, pointer, onOvf, notOvf)
         {
             // §14.9.43.4 GR2 — a figurative literal-1 / literal-2 takes identifier-3's usage (kb/Work PB1185).
@@ -358,6 +360,9 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
                 target.DenotedItem is not null && target.Item.OperandPic is { Category: PicCategory.Numeric }
                     ? host.Move.BindMoveOf(new BoundFigurative('Z'), [target], ImplicitMovePhrase.UnstringInto)
                     : null));
+        // StringEmitter identifies every receiver at the start and stores each before ON OVERFLOW (kb/Work PB2078); the
+        // INTO and DELIMITER IN receivers are claimed by the implicit MOVEs that store them (MoveBinder.BindMoveOf).
+        ctx.Data.OoClaimInterleavedReceiver([.. receivers.Select(r => r.CountIn), pointer, tallying]);
         return new BoundUnstringStmt(source, delims, receivers, pointer, tallying, onOvf, notOvf)
         {
             CharacterCategory = itemCategory, Examined = examined, Delimiting = delimiting,

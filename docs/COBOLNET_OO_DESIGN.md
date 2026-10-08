@@ -380,17 +380,29 @@ statement is a statement-level pre-op, but one written in a per-evaluation windo
 condition, a SEARCH WHEN, an EVALUATE object, a non-first AND/OR operand, a VARYING BY / AFTER FROM operand — is
 drained by that window (`UdfBinder.Mark` marks BOTH pending lists; `OoBinder.OoDrainPropertyGets`) and fetched at
 each evaluation, and not at all when a short-circuit never reaches it. Every such reference is sending, so the
-window never needs the GR2 SET. A RECEIVING reference of a statement that stores its
-receivers one at a time — the arithmetic statements and MOVE — is accessed receiver by receiver instead (kb/Work PB2078;
-§14.7.7 4) b) "Item identification for the receiving data items is done as each data item is accessed", §14.9.25.4 GR1): the
-binder that builds the receiver list CLAIMS a property receiver (`DataBinder.OoClaimInterleavedReceiver`, made in
-`ExpressionBinder.ReceiverOf` and the written MOVE), `OoBinder.OoWrapPropertyOps` then gives it a `ReceiverBracket`
-(identifier-3's Prelude and the GET before, the SET after) under a `BoundReceiverBrackets` node instead of hoisting its steps
-around the statement, and `ReceiverBracketEmitter.Receive` — called by `MoveEmitter` and by `ArithmeticEmitter.GuardedStore`,
-the one store funnel — places them around that receiver's access and store, skipping the SET for a receiver whose store raised
-a size error. An unplaced bracket fails the compile, so a receiver loop that forgets `Receive` cannot drop a GET or a SET.
-Every other statement keeps the statement-level GET and SET and refuses a receiver whose object is selected by a run-time value
-(a subscript naming a data item, a function-identifier; COBOLNET0899), because GET and SET would evaluate it twice. INTERFACE PROPERTIES (kb/Work PB1449): §11.7.2's METHOD-ID format is shared by
+window never needs the GR2 SET. A RECEIVING reference identifies ONE object (kb/Work PB2078; §14.6.4 "Item identification is the process of identifying
+a specific data item referenced by an identifier by evaluating all of that identifier's references", §8.4.3.9.4 GR3): `OoBinder.OoWrapPropertyOps`
+evaluates identifier-3 once, with its Prelude, into an identified-object temporary (`DataBinder.OoCreateIdentifiedObjectTemp`),
+and both accessors invoke on that temporary, so the GET and the SET reach the same object however the statement changes
+identifier-3's subscripts in between. WHERE the steps go is the statement's: a binder that places its receivers CLAIMS each
+property receiver (`DataBinder.OoClaimInterleavedReceiver`), the wrap gives it a `ReceiverBracket` (the OPEN steps: the
+identification and the GET; the CLOSE steps: the SET) under a `BoundReceiverBrackets` node, and `ReceiverBracketEmitter` places
+it at one of two timings. IDENTIFIED AS IT IS STORED (`Receive` opens the bracket just before the receiver's store and closes
+it just after): the arithmetic statements (§14.7.7 4) b), through `ArithmeticEmitter.GuardedStore`, skipping the SET for a
+receiver whose store raised a size error), every MOVE built by `MoveBinder.BindMoveOf` — the written MOVE and the implicit
+moves of READ / RETURN … INTO, ACCEPT FROM, UNSTRING INTO / DELIMITER IN and INITIALIZE (§14.9.25.4 GR1) — SET Format 1
+(§14.9.39.4 GR2), a PERFORM VARYING induction variable at each setting and augmenting store (§14.9.28.4 GR12; the UNTIL
+condition's next evaluation reads the new value) and the SEARCH VARYING item at each increment (§14.9.37.4 GR3 b)).
+IDENTIFIED AT THE STATEMENT'S START and SET with its store (`Identify` opens the brackets as the statement's first operation,
+§14.6.4 7); `Receive` or `Settle` closes each): STRING (INTO, POINTER), UNSTRING (every INTO / DELIMITER IN / COUNT IN,
+POINTER, TALLYING) and CALL (each BY REFERENCE argument and the RETURNING item, §14.9.4.4 GR3 a), SET at a successful
+return, OUTSIDE the activation's try: a condition the SET method raises arises after a successful call, which GR3 i) hands
+to 14.6.13.1 and never to ON EXCEPTION; `CallPropertyReceiverPartitionTests`) — so the SET runs before the statement's
+ON / NOT ON phrases, which may read the property. Every other statement keeps
+the statement-level shape (the identification and GET before it, the SET after it), which IS §14.6.4 7)'s identification
+at the start for a statement without a phrase body that reads its own receiver: INSPECT (§14.9.22.4 GR6), ACCEPT from a
+device, INVOKE RETURNING (§14.9.23.4 GR7 a)), SET Format 5 (GR9 states no per-receiver identification) and the pointer
+formats. An unplaced bracket fails the compile, so an emitter that forgets its placement cannot drop a GET or a SET. INTERFACE PROPERTIES (kb/Work PB1449): §11.7.2's METHOD-ID format is shared by
 definitions and prototypes and §11.7.4 GR6/GR7 make a GET/SET phrase a get/set property method, so an interface's
 `METHOD-ID. GET|SET PROPERTY p` prototype joins its roster under the same pinned `__GET_<P>`/`__SET_<P>` name;
 `ValidateImplements` pairs it with the class's accessor (explicit or clause-defined) by that roster key, the C#

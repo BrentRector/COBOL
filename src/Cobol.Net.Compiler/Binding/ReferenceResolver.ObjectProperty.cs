@@ -275,33 +275,9 @@ public sealed partial class ReferenceResolver
         var temp = data.OoCreatePropertyTemp(model, name);
         data.OoPendingPropertyOps.Add(new DataBinder.OoPendingPropertyOp(
             temp, receiver.Form, receiver.Receiver, receiver.Interface?.CsName ?? receiver.Class!.CsName,
-            get, set, name, objWritten, prelude, InterfaceCsName: receiver.Interface?.CsName,
-            SelectedByValue: SelectsByValue((IParseTree?)objRef ?? terminal)));
+            get, set, name, objWritten, prelude, InterfaceCsName: receiver.Interface?.CsName));
         return (temp, null);
     }
-
-    /// <summary>True when identifier-3 selects its object through a value read at run time: a subscript or argument
-    /// written with a data-name (or an index-name), or a function-identifier. Such an object can be a different one at
-    /// the property's SET than at its GET, or than at the moment §14.7.7 4) b) and §14.9.25.4 GR1 identify the receiver
-    /// (kb/Work PB2078), so <c>OoBinder.OoWrapPropertyOps</c> refuses it as a RECEIVING operand of a statement that does
-    /// not place its receivers' accessors one at a time (<c>ReceiverBracketEmitter</c>: the arithmetic statements and
-    /// MOVE do).</summary>
-    private static bool SelectsByValue(IParseTree? tree) => tree switch
-    {
-        null or ITerminalNode => false,
-        Core.FunctionCallContext => true,
-        Core.SubscriptPartContext list => NamesAValue(list),
-        _ => Enumerable.Range(0, tree.ChildCount).Any(i => SelectsByValue(tree.GetChild(i))),
-    };
-
-    /// <summary>True when a subscript or argument list names anything read at run time — a data-name or index-name
-    /// (any word: a literal or a figurative constant is no word token) or a function-identifier, at any depth.</summary>
-    private static bool NamesAValue(IParseTree tree) => tree switch
-    {
-        ITerminalNode t => IsNameToken(t.Symbol),
-        Core.FunctionCallContext => true,
-        _ => Enumerable.Range(0, tree.ChildCount).Any(i => NamesAValue(tree.GetChild(i))),
-    };
 
     /// <summary>The roster an object-reference item of <paramref name="item"/>'s description selects (§8.4.3.9.3 SR3/SR4):
     /// FACTORY OF selects the factory half (kb/Work PB389), an interface-typed reference its prototype closure (kb/Work

@@ -64,16 +64,16 @@ internal sealed class UnitEmitters
         Evaluate = new EvaluateEmitter(Ctx, Cond);
         Initialize = new InitializeEmitter(Ctx, Move);
         Corresponding = new CorrespondingEmitter(Ctx, Num, Move, Arith, Ec);
-        Inspect = new InspectEmitter(Ctx, Num, Arith, Brackets);
+        Inspect = new InspectEmitter(Ctx, Num, Arith);
         Strings = new StringEmitter(Ctx, Num, Arith, Ec, Move, Brackets);
         Ptr = new PtrEmitter(Ctx, Num, ecState, Ec);
-        Set = new SetEmitter(Ctx, Num, Arith, Ptr, Move);
+        Set = new SetEmitter(Ctx, Num, Arith, Ptr, Move, Brackets);
         KeyedIo = new KeyedIoEmitter(Ctx, Num, Refs, Arith, Move);
         SeqIo = new SequentialIoEmitter(Ctx, Num, Refs, dispatchState, ecState, callState, KeyedIo, Arith, Ec, Move);
         Sort = new SortEmitter(Ctx, Refs, SeqIo, Move, Arith, Ec);   // no NumericRenderer since RELEASE moved to the ONE record-area channel (kb/Work PB327)
         ReportWriter = new ReportWriterEmitter(Ctx, Num, Refs, Move, Cond, dispatchState);
-        ControlFlow = new ControlFlowEmitter(Ctx, Num, Cond, dispatchState, Set);
-        Call = new CallEmitter(Ctx, Num, ecState, callState, Ec, Move, dispatchState, Ptr);
+        ControlFlow = new ControlFlowEmitter(Ctx, Num, Cond, dispatchState, Set, Brackets);
+        Call = new CallEmitter(Ctx, Num, ecState, callState, Ec, Move, dispatchState, Ptr, Brackets);
         Statements = new StatementEmitter(this, oo, dispatchState);
         Dispatch = new DispatchEmitter(Ctx, dispatchState, ecState, AlterSwitch, ReportWriter, SeqIo, Ec, Statements);
 

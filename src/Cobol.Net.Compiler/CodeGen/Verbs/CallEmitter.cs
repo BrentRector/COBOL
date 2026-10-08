@@ -50,7 +50,7 @@ internal enum CallCrossing
 /// the ONE CALL-boundary string-carrier trio (<see cref="CallPlaceIsString"/>/<see cref="CallStringRead"/>/
 /// <see cref="CallStringWrite"/>) Report Writer and the program-class emission reuse.</summary>
 internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState ecState, CallUnitState callState,
-    EcEmitter ec, MoveEmitter move, DispatchState dispatch, PtrEmitter ptr)
+    EcEmitter ec, MoveEmitter move, DispatchState dispatch, PtrEmitter ptr, ReceiverBracketEmitter brackets)
 {
     /// <summary>The statement dispatcher — property-wired by <see cref="UnitEmitters"/> (the ON/NOT-ON
     /// EXCEPTION phrase bodies nest arbitrary statement lists, a cyclic edge no ctor order can satisfy).</summary>
@@ -74,6 +74,10 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         // another BY REFERENCE argument could re-aim them mid-call; each variable index is hoisted into a
         // statement-local evaluated here, once.
         c = HoistOnceOnlyIdentification(c);
+        // ⛔ kb/Work PB2078: the same identification for an object-property receiver -- its object, and the GET of a BY
+        // REFERENCE argument -- here; its SET runs at the return (Settle below), before either EXCEPTION phrase reads it.
+        var receivers = BoundCallProgram.Receivers(c.Args, c.Returning).ToList();
+        brackets.Identify(receivers);
         // An EC-active group's CALL site consumes a callee-staged RAISING propagation itself (the pickup below
         // runs the §14.9.49 F3 selection and honors RESUME); an EC-free site emits none, and the staging — which
         // names THIS activation (kb/Work PB892 Arm B) — is then never raised anywhere (§14.9.18.4 GR1 b)).
@@ -100,14 +104,24 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // implementation's loud abnormal termination). A NOT ON phrase can only be reached by a normal
             // return, so it needs no guard here — GR3i.
             w.Line(invocation);
+            brackets.Settle(receivers);
             string? propagatedBare = EmitPropagationPickup(c, reportRaised: c.NotOnException is not null);
             if (c.NotOnException is { } notBare) EmitNotOnException(notBare, callErr: null, propagatedBare);
             return false;
         }
         int id = ctx.Names.NextCall();
         if (hasPhrase) w.Line($"bool __callErr{id} = false;");
+        // ⛔ A RECEIVING PROPERTY'S SET RUNS OUTSIDE THE ACTIVATION'S EXCEPTION PARTITION (kb/Work PB2078, train 1039b review). The catch arms
+        // below are §14.9.4.4 GR3h's "program not successfully called"; a condition the SET method raises (its own failed
+        // CALL, say) arises after a SUCCESSFUL call, which GR3i hands to 14.6.13.1, never to ON EXCEPTION. So the SET is
+        // settled after the try, on a successful return only (a failed activation stored nothing).
+        string? called = brackets.Settles(receivers) ? $"__callOk{id}" : null;
+        if (called is not null) w.Line($"bool {called} = false;");
         using (w.Block("try"))
+        {
             w.Line(invocation);
+            if (called is not null) w.Line($"{called} = true;");
+        }
         // The arms, in the ONE order that keeps each reachable (a narrower filter must precede a broader one):
         //   1. enabled EC-PROGRAM-*/EC-EXTERNAL-*  → status set, then the phrase (item 1) or the declaratives (item 2)
         //   2. enabled non-EC-PROGRAM carriers     → status set, then the declaratives ALWAYS (item 2, 2nd disjunct)
@@ -126,6 +140,10 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 + $"&& {RuntimeApi.CallEcIsProgramOrExternalText($"__cp{pid}.EcName")}) {{ {flag} = true; }}"
                 + "   // §14.9.4.4 GR3h item 1 (checking not enabled → no status is set) / GR3i");
         }
+        if (called is not null)
+            using (w.Block($"if ({called})")) brackets.Settle(receivers);
+        else
+            brackets.Settle(receivers);   // nothing to close: marks an accessor-less bracket placed
         // §14.9.4.4 GR3i's two outcomes of a SUCCESSFUL call are ALTERNATIVES (kb/Work PB606): "If an exception
         // condition is propagated from the called program, execution continues as specified in 14.6.13.1 …;
         // otherwise, control is transferred … to imperative-statement-2". So the propagation is picked up FIRST

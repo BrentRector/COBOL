@@ -14,7 +14,7 @@ using static CobolNet.CodeGen.Emit.EmitText;
 /// <summary>The INSPECT verb emitter (P7 Step 9d — a real collaborator over the per-unit
 /// <see cref="EmitContext"/>, extracted from the CSharpEmitter partial of the same name). Every
 /// runtime-member fragment routes through <see cref="RuntimeApi"/>.</summary>
-internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, ArithmeticEmitter arith, ReceiverBracketEmitter brackets)
+internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, ArithmeticEmitter arith)
 {
     /// <summary>
     /// INSPECT (ISO §14.9.22) → one image snapshot + runtime cycle calls. Identifier-1's character image is read
@@ -27,19 +27,12 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     /// overlap what the statement reads, and the statement is then the single shared cycle). Tally counts ADD into their counters (GR11); a
     /// REPLACING/CONVERTING result stores back through the target's <see cref="Place"/>, re-signing a signed
     /// numeric target with its retained original sign (GR4d).
+    /// <para>An object-property identifier-1 or tally counter (kb/Work PB2078) needs no placement here: GR6 identifies every
+    /// identifier once, as the first operation, and INSPECT has no phrase body, so the statement-level accessors
+    /// (<c>OoBinder.OoWrapPropertyOps</c>: identifier-3 evaluated once, the GET before the statement, the SET after it) are
+    /// exactly that identification.</para>
     /// </summary>
     public void Emit(BoundInspect statement)
-    {
-        // ⛔ kb/Work PB2078: identifier-1 of Formats 2-4 is a RECEIVING operand read and stored back ONCE, so an
-        // object-property identifier-1 has its GET before the image is read and its SET after the store -- around
-        // ITS access (ReceiverBracketEmitter.Receive), not around the statement's phrase bodies.
-        if (statement.Target is BoundFieldOperand { Place: { } receiver })
-            brackets.Receive(receiver, null, () => EmitInspect(statement));
-        else
-            EmitInspect(statement);
-    }
-
-    private void EmitInspect(BoundInspect statement)
     {
         var w = ctx.Writer;
         // ⛔ GR6 — ITEM IDENTIFICATION IS THE FIRST OPERATION, AND IT IS DONE ONCE (kb/Work PB1123): every operand's

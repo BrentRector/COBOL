@@ -38,13 +38,21 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// the classified need, both COBOLNET0843. The taxonomy is TOTAL — a non-nullable answer from an exhaustive
     /// visitor, so a new bound statement cannot compile without deciding each Place's polarity, and nothing here
     /// guesses whether a side-effecting accessor runs (kb/Work PB1275).
+    /// <para>⛔ ONE OBJECT PER RECEIVING REFERENCE (kb/Work PB2078). A receiving property's identifier-3 is evaluated ONCE,
+    /// into an identified-object temporary, with its Prelude, and both accessors invoke on that temporary — so the GET and
+    /// the SET always reach the object identified (§14.6.4; §8.4.3.9.4 GR3), wherever the steps go.</para>
     /// <para>⛔ WHERE THE STEPS GO (kb/Work PB2078). A reference the statement's binder CLAIMED as one of its receivers
-    /// (<see cref="DataBinder.OoClaimInterleavedReceiver"/>: the arithmetic statements, every MOVE built by
-    /// <c>MoveBinder.BindMoveOf</c> -- the written MOVE and the implicit moves of READ / RETURN … INTO, ACCEPT, UNSTRING and
-    /// INITIALIZE -- STRING INTO and INSPECT identifier-1, whose emitters store their receivers one at a time) gets a
-    /// <see cref="ReceiverBracket"/> under a <see cref="BoundReceiverBrackets"/> —
-    /// its Prelude and GET just before ITS access, its SET just after ITS store (§14.7.7 4) b), §14.9.25.4 GR1). Every
-    /// other reference keeps the statement-level shape, GETs and Prelude before the statement and SETs after it.</para></summary>
+    /// (<see cref="DataBinder.OoClaimInterleavedReceiver"/>) gets a <see cref="ReceiverBracket"/> under a
+    /// <see cref="BoundReceiverBrackets"/>, and the statement's emitter places it where the statement's rules identify and
+    /// store that receiver (<c>ReceiverBracketEmitter</c>): identified as it is stored — the arithmetic statements
+    /// (§14.7.7 4) b)), every MOVE built by <c>MoveBinder.BindMoveOf</c> (the written MOVE and the implicit moves of READ /
+    /// RETURN … INTO, ACCEPT, UNSTRING and INITIALIZE; §14.9.25.4 GR1), SET Format 1 (§14.9.39.4 GR2), a PERFORM VARYING
+    /// induction variable (§14.9.28.4 GR12) and the SEARCH VARYING item; or identified at the statement's start and SET
+    /// with its store, before the statement's phrase bodies — STRING, UNSTRING and CALL (§14.6.4 7), §14.9.4.4 GR3 a)).
+    /// Every other reference keeps the statement-level shape, the Prelude and GET before the statement and the SET after
+    /// it, which is §14.6.4 7)'s identification at the start for a statement with no phrase body that reads its own
+    /// receiver: INSPECT (§14.9.22.4 GR6), ACCEPT, INVOKE RETURNING (§14.9.23.4 GR7 a)), SET Format 5 (GR9 states no
+    /// per-receiver identification) and the pointer formats (whose receivers cannot change an identifier-3).</para></summary>
     public BoundStatement OoWrapPropertyOps(BoundStatement core, int mark)
     {
         var ops = ctx.Data.OoPendingPropertyOps;
@@ -64,28 +72,26 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             string where = $"'{op.PropName}' OF '{op.ReceiverName}'";
             var tempPlace = ctx.Refs.ResolveItem(op.Temp)!;
 
-            // ⛔ kb/Work PB2078: a statement-level GET runs before the statement and SET after it, each rendering
-            // identifier-3 afresh, so an object selected through a run-time value is one object at the GET and another
-            // at the SET (`ADD 1 TO I, BAL OF AR(I)` stored AR(1)'s BAL + 1 into AR(2)), and neither is the receiver
-            // §14.7.7 4) b) and §14.9.25.4 GR1 identify "as each data item is accessed". A statement whose emitter
-            // stores its receivers one at a time claims them (DataBinder.OoClaimInterleavedReceiver) and the accessors
-            // go around THAT receiver's store below; every other statement refuses the shape, as it did before PB1425
-            // admitted the subscript.
-            if (needSet && op.SelectedByValue && !op.Interleaved)
-            {
-                ctx.Edition.Error(DiagnosticCatalog.ReceivingReferenceNotImplemented,
-                    $"the object-property reference {where} is a RECEIVING operand of a statement that does not store its "
-                    + "receivers one at a time, and its object is selected by a run-time value (a data-name subscript or a "
-                    + "function-identifier): identifying that object when the statement reaches it (ISO §14.7.7 4) b), "
-                    + "§14.9.25.4 GR1) is implemented for the arithmetic statements, MOVE and the implicit moves "
-                    + "(READ / RETURN … INTO, ACCEPT, UNSTRING INTO, INITIALIZE), STRING INTO and INSPECT identifier-1 only");
-                continue;
-            }
-
             // identifier-3's own evaluation first (§8.4.3.1.4 GR1 a)–c) before d)), then the GET — once, whichever
-            // accessors the polarity needs: the SET of a receiving property uses the same evaluated receiver.
+            // accessors the polarity needs.
             List<BoundStatement> open = [.. op.Prelude], close = [];
-            if (needGet && PropertyGet(op) is { } get) open.Add(get);
+            // ⛔ ONE OBJECT PER RECEIVING REFERENCE (kb/Work PB2078). Item identification evaluates "all of that
+            // identifier's references" once (ISO §14.6.4), and a property used as a receiving item has ONE temporary
+            // (§8.4.3.9.4 GR2/GR3), so its GET and its SET reach the object identifier-3 named when the statement identified
+            // the receiver. Rendering identifier-3 again at the SET reached another object whenever the statement changed a
+            // subscript in between (`UNSTRING Y DELIMITED BY "," INTO I NM OF AR(I)` stored into AR(2); the SET of
+            // `ADD 1 TO I, BAL OF AR(I)` went to AR(2) with AR(1)'s value; a BY REFERENCE argument can replace an
+            // unsubscripted identifier-3), so identifier-3 is evaluated into a temporary here, with the Prelude, and both
+            // accessors invoke on that temporary. Where the steps go is the statement's: around ITS receiver for a statement
+            // that claimed it, else before and after the whole statement.
+            var receiver = op.Receiver;
+            if (needSet && op.Form == InvokeForm.Instance && receiver is { Item: { IsCompilerTemp: false, Pic.ObjectRef: { } described } })
+            {
+                var identified = ctx.Refs.ResolveItem(ctx.Data.OoCreateIdentifiedObjectTemp(described))!;
+                open.Add(new BoundSetObjectRef([identified], receiver, SourceIsNull: false, SourceIsSelf: false));
+                receiver = identified;
+            }
+            if (needGet && PropertyGet(op, receiver) is { } get) open.Add(get);
             if (needSet)
             {
                 if (op.Set is null)
@@ -93,7 +99,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                         $"the object-property reference {where} is a RECEIVING operand but the class has no "
                         + "SET property method (ISO §8.4.3.9.3 SR4 — WITH NO SET, or no accessor defined)");
                 else
-                    close.Add(new BoundInvoke(op.Form, op.ClassCsName, op.Receiver, op.Set.CsName, null,
+                    close.Add(new BoundInvoke(op.Form, op.ClassCsName, receiver, op.Set.CsName, null,
                         [new BoundInvokeArg(op.Set.Binding!.Formals[0].Item, tempPlace, null, null, WriteBack: false)],
                         null, op.OwnerCsNameOf(op.Set)));
             }
@@ -122,7 +128,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// property method RETURNING the reference's temp — or null after SR3's diagnostic when the class has no GET.
     /// ONE builder for both places a GET is placed: the statement-level wrap (<see cref="OoWrapPropertyOps"/>) and
     /// a per-evaluation window (<see cref="OoDrainPropertyGets"/>).</summary>
-    private BoundInvoke? PropertyGet(DataBinder.OoPendingPropertyOp op)
+    private BoundInvoke? PropertyGet(DataBinder.OoPendingPropertyOp op, Place? receiver)
     {
         if (op.Get is null)
         {
@@ -131,7 +137,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 + "class has no GET property method (ISO §8.4.3.9.3 SR3 — WITH NO GET, or no accessor defined)");
             return null;
         }
-        return new BoundInvoke(op.Form, op.ClassCsName, op.Receiver, op.Get.CsName, ctx.Refs.ResolveItem(op.Temp)!, null, op.Get.Binding!.Returning, op.OwnerCsNameOf(op.Get));
+        return new BoundInvoke(op.Form, op.ClassCsName, receiver, op.Get.CsName, ctx.Refs.ResolveItem(op.Temp)!, null, op.Get.Binding!.Returning, op.OwnerCsNameOf(op.Get));
     }
 
     /// <summary>Drain the property references registered since <paramref name="mark"/> for a PER-EVALUATION
@@ -153,7 +159,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         foreach (var op in taken)
         {
             gets.AddRange(op.Prelude);   // identifier-3's evaluation precedes its accessor (see OoPendingPropertyOp)
-            if (PropertyGet(op) is { } get) gets.Add(get);
+            if (PropertyGet(op, op.Receiver) is { } get) gets.Add(get);
         }
         return gets;
     }

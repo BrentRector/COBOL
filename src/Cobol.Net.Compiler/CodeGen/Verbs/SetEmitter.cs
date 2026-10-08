@@ -12,7 +12,8 @@ namespace CobolNet.CodeGen;
 /// <summary>The SET-family emitter (P7 Step 9i — a real collaborator over the per-unit
 /// <see cref="EmitContext"/>): SET … TO / UP-DOWN BY / pointer F4 senders / OCCURS-DYNAMIC capacity /
 /// condition-names TO TRUE, plus the ONE SET-target store/augment pair PERFORM VARYING and SEARCH ride.</summary>
-internal sealed class SetEmitter(EmitContext ctx, NumericRenderer num, ArithmeticEmitter arith, PtrEmitter ptr, MoveEmitter move)
+internal sealed class SetEmitter(EmitContext ctx, NumericRenderer num, ArithmeticEmitter arith, PtrEmitter ptr, MoveEmitter move,
+    ReceiverBracketEmitter brackets)
 {
     /// <summary>The DATA DIVISION emitter of THIS unit, built once on first use — the SET lane reaches it for
     /// exactly one thing: <see cref="DataEmitter.ValueImageOf"/>, the ONE §13.18.63 VALUE recipe §14.9.39.4 GR6
@@ -44,8 +45,10 @@ internal sealed class SetEmitter(EmitContext ctx, NumericRenderer num, Arithmeti
     {
         var w = ctx.Writer;
         string guard = LandAmount(s.Value, SetAmountRule.IndexTo, "SET … TO", out string tmp, "set");
+        // GR2: each receiver is identified as it is changed, so an object-property receiver's accessors go around ITS store
+        // (kb/Work PB2078).
         using (w.Block($"if ({guard})"))
-            foreach (var t in s.Targets) StoreSetTarget(t, new NumX(tmp, 0));
+            foreach (var t in s.Targets) brackets.Receive(t, () => StoreSetTarget(t, new NumX(tmp, 0)));
     }
 
     /// <summary>⛔ THE ONE SET-FAMILY AMOUNT LANDING at the emitter — the two-lane render that keeps an amount's
