@@ -96,11 +96,16 @@ public sealed record ActivationDescription
     /// an alphanumeric group's alphanumeric.</summary>
     public string Category { get; init; } = "";
 
+    /// <summary>The <see cref="Clauses"/> of a class pointer described without a TO phrase (an unrestricted pointer).</summary>
+    public const string Unrestricted = "*";
+
     /// <summary>ISO §9.3.6 match rule 3 e) — the identity of "the same ALIGNED, ANY LENGTH, BLANK WHEN ZERO, DYNAMIC
     /// LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses", with rule 3 e) 1.'s currency strings and 2.'s
     /// DECIMAL-POINT IS COMMA state folded into the PICTURE part, as one canonical text (empty for a group, which
     /// carries none of the clauses). The class-pointer restriction (§14.8.2.3.2's class-pointer paragraph) is its
-    /// USAGE clause's TO phrase and is part of it too. The LOCALE phrase's external identification is not an
+    /// USAGE clause's TO phrase and is part of it too: <c>TO</c> a data-pointer's TYPE identity, or the SIGNATURE class of a
+    /// program- or function-pointer's prototype (§13.18.60.4 GR25 / GR26; kb/Work PB2464), <see cref="Unrestricted"/> for
+    /// none. The LOCALE phrase's external identification is not an
     /// identity (<see cref="LocaleExternal"/>).</summary>
     public string Clauses { get; init; } = "";
 

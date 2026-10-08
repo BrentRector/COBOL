@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Model;
 using CobolNet.Compiler.Oo;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding;
 
@@ -78,6 +79,23 @@ internal static class PrototypeSignatures
         OoConformance.DescriptionMismatch(a, b) is null
         && (a.IsGroup == b.IsGroup)
         && (!a.IsGroup || StrongTypeModel.SameElementaryLayout(a, b));
+
+    /// <summary>⛔ THE TYPE OF A RESTRICTED PROGRAM- OR FUNCTION-POINTER ITEM (kb/Work PB2464) — the one reader of
+    /// <see cref="DataItem.PointerRestrictionIdentity"/>: <c>TO name</c> of the signature class
+    /// (<see cref="PrototypeSignatureClasses"/>) the item's prototype belongs to, so two pointers restricted to
+    /// differently named prototypes of ONE signature have equal identities (ISO §13.18.60.4 GR25 / GR26 type the pointer
+    /// by that signature; §14.8.2.3.2 "of the same type"). Before the unit's prototype tables resolve it, and for a
+    /// prototype the group does not hold, the identity is the prototype's own name — what every relation compared before.
+    /// Null for an unrestricted pointer and for any other item. Every relation that asks whether two restricted
+    /// prototype-pointers are of the same type reads THIS: the typed comparator
+    /// (<see cref="OoConformance.DescriptionMismatch"/>), and, through <c>ActivationDescriptions</c>, the §9.3.6 match,
+    /// the §14.8.2 / §14.8.3 conformance and the SET validity of a universal INVOKE.</summary>
+    public static string? RestrictionIdentity(DataItem pointer) =>
+        pointer.Pic is { RestrictedPrototypeName: { } name } ? pointer.PointerRestrictionIdentity ?? OwnIdentity(name) : null;
+
+    /// <summary>The identity of a prototype that is a signature class of its own — <c>TO name</c> (folded), the spelling
+    /// of a pointer's USAGE clause.</summary>
+    public static string OwnIdentity(string prototypeName) => "TO " + CobolNames.Fold(prototypeName);
 
     /// <summary>The number of positional USING formals a prototype declares — the RUN-TIME screen's granularity
     /// (ISO §14.9.39.4 GR14 via <c>ProgramTable.FunctionSignatureMatches</c>, which can see only the run-unit

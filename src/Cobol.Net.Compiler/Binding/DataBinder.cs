@@ -3517,6 +3517,29 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 item.Pic = item.Pic with { RestrictedTypeDecl = decl };
     }
 
+    /// <summary>⛔ Attach to every restricted PROGRAM- or FUNCTION-pointer this forest declares the TYPE its
+    /// <c>TO prototype-name-1</c> gives it (kb/Work PB2464): the signature class of the prototype
+    /// (<see cref="DataItem.PointerRestrictionIdentity"/>; ISO §13.18.60.4 GR25 / GR26 type the pointer by the
+    /// prototype's SIGNATURE, not its name). The prototype tables exist only once the group's REPOSITORY has resolved
+    /// (<c>BinderDriver.ProgramPrototypesOf</c> / <c>UserFunctionsOf</c>, after every unit's DATA has bound), so this
+    /// is the prototype twin of <see cref="ResolveRestrictedTypes"/> run at the point those tables are built —
+    /// <c>BinderDriver.ResolvePointerRestrictions</c>, over every forest that declares pointers (a method's LINKAGE
+    /// roots are on its class's). A name the table does not hold resolves to nothing, and the pointer keeps its own name
+    /// as its identity (<see cref="PrototypeSignatures.RestrictionIdentity"/>).</summary>
+    internal void ResolveRestrictedPrototypes(
+        IReadOnlyDictionary<string, ProgramPrototype> programs,
+        IReadOnlyDictionary<string, UserFunctionSignature> functions, PrototypeSignatureClasses classes)
+    {
+        foreach (var item in AllItems())
+            if (item.Pic is { RestrictedPrototypeName: { } name } pic)
+                item.PointerRestrictionIdentity = pic.Category switch
+                {
+                    PicCategory.ProgramPointer when programs.TryGetValue(name, out var program) => classes.ProgramIdentity(program),
+                    PicCategory.FunctionPointer when functions.TryGetValue(name, out var function) => classes.FunctionIdentity(function),
+                    _ => null,
+                };
+    }
+
     /// <summary>The completion state of each of THIS unit's type declarations under <see cref="ExpandTemplate"/>:
     /// absent — not started; false — in progress (its members are being expanded); true — complete.</summary>
     private readonly Dictionary<DataItem, bool> _templateComplete = new(ReferenceEqualityComparer.Instance);

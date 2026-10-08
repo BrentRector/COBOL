@@ -147,29 +147,28 @@ public static class ActivationDescriptions
     /// item of class pointer and category data-pointer", restricted to its operand's type when that is a
     /// strongly-typed group or a restricted data-pointer (GR2, <see cref="StrongTypeModel.AddressOfRestriction"/>) —
     /// and §8.4.3.13.4 GR1 a program-address-identifier one of category program-pointer, restricted by its prototype
-    /// (GR3). Described exactly as <see cref="Of"/> describes a pointer ITEM of the same restriction.</summary>
-    public static ActivationDescription OfAddress(BoundAddressOperand address) => address.Data is { } data
+    /// (GR3). Described exactly as <see cref="Of"/> describes a pointer ITEM of the same restriction.
+    /// <paramref name="programRestriction"/> is the program-address-identifier's prototype's signature class
+    /// (<see cref="PrototypeSignatureClasses"/>, resolved by the invoking unit's prototype table), null when it names none.</summary>
+    public static ActivationDescription OfAddress(BoundAddressOperand address, string? programRestriction) => address.Data is { } data
         ? Pointer(ActivationCategory.DataPointer, Restriction(StrongTypeModel.AddressOfRestriction(data.Item)))
-        : Pointer(ActivationCategory.ProgramPointer, Restriction(address.Program!.Prototype));
+        : Pointer(ActivationCategory.ProgramPointer, programRestriction ?? ActivationDescription.Unrestricted);
 
     private static ActivationDescription Pointer(string category, string restriction) => new()
     {
         Shape = ActivationShape.Elementary, Category = category, Usage = category, Clauses = restriction,
     };
 
-    /// <summary>A program- or function-pointer's restriction — its USAGE clause's TO phrase (§14.8.2.3.2's
-    /// class-pointer paragraph: "if either is a restricted pointer, both shall be restricted and of the same type")
-    /// — or "*" for none.</summary>
-    private static string Restriction(string? prototype) => prototype is null ? "*" : "TO " + CobolNames.Fold(prototype);
-
-    /// <summary>A data-pointer's restriction (the same paragraph): the whole TYPE identity it is restricted to,
+    /// <summary>A data-pointer's restriction (§14.8.2.3.2's class-pointer paragraph: "if either is a restricted
+    /// pointer, both shall be restricted and of the same type"): the whole TYPE identity it is restricted to,
     /// <see cref="StrongTypeModel.TypeRestriction.Key"/> — the §8.5.3.1 identity of the declaration (so two
     /// non-equivalent declarations of one type-name in two source elements are two restrictions), and for the address
     /// of a strongly-typed group SUBORDINATE to a type declaration its position and length (§8.4.3.11.4 GR2 "restricted to the
     /// type of identifier-1", kb/Work PB1408) — so that address never matches a formal restricted to the whole
-    /// record's type.</summary>
+    /// record's type. A program- or function-pointer's restriction is its prototype's signature class
+    /// (<see cref="PrototypeSignatures.RestrictionIdentity"/>).</summary>
     private static string Restriction(StrongTypeModel.TypeRestriction type) =>
-        type.IsRestricted ? "TO " + type.Key : "*";
+        type.IsRestricted ? "TO " + type.Key : ActivationDescription.Unrestricted;
 
     private static ActivationDescription With(ActivationDescription d, bool optional, bool byValue) =>
         d with { Optional = optional, ByValue = byValue };
@@ -205,7 +204,7 @@ public static class ActivationDescriptions
         if (p.Category is PicCategory.Pointer)
             return Restriction(StrongTypeModel.PointerRestriction(item));
         if (p.Category is PicCategory.ProgramPointer or PicCategory.FunctionPointer)
-            return Restriction(p.RestrictedPrototypeName);
+            return PrototypeSignatures.RestrictionIdentity(item) ?? ActivationDescription.Unrestricted;
         // An ANY LENGTH item's one-symbol picture has no length of its own (§13.18.2.3 SR1).
         string picture = item.IsAnyLength ? "*" + (p.Clause?.CharacterString ?? "") : p.Clause?.Key ?? "";
         string locale = p.LocaleEdit is { } le ? $"|LOCALE {(le.Locale.IsCurrent ? "-" : "N")} SIZE {le.Size} {le.Picture}" : "";

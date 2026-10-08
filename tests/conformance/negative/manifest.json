@@ -3,6 +3,9 @@
  "enabled": [
   "pb1966-supplementary-letters-past-margin-r",
   "pb545-type-file-objref-nested",
+  "pb2464-prototype-pointer-signature-type-below-2002",
+  "pb2464-function-pointer-signature-type-below-2014",
+  "pb2464-typed-pointer-signature-mismatch",
   "pb2076-universal-returning-move-match-below-2002",
   "pb552-value-through-not-ascending",
   "pb1545-hex-alphanumeric-literal-below-2002",

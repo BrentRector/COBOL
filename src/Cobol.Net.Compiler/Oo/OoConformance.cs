@@ -836,10 +836,15 @@ public static class OoConformance
                     return $"restricted data-pointer mismatch (formal {PointerRestrictionText(f.RestrictedTypeName, "type")}, "
                         + $"argument {PointerRestrictionText(a.RestrictedTypeName, "type")} — §14.8.2.3.2: if either is a "
                         + "restricted pointer, both shall be restricted and of the same type)";
-                if (!CobolNames.Same(f.RestrictedPrototypeName, a.RestrictedPrototypeName))
+                // A restricted PROGRAM- or FUNCTION-pointer is typed by the SIGNATURE of its prototype (§13.18.60.4 GR25 /
+                // GR26), so "the same type" is the same signature class — never the prototype's NAME, which would refuse
+                // two differently named prototypes of one signature (kb/Work PB2464).
+                if (!string.Equals(PrototypeSignatures.RestrictionIdentity(formal), PrototypeSignatures.RestrictionIdentity(arg),
+                        StringComparison.Ordinal))
                     return $"restricted pointer mismatch (formal {PointerRestrictionText(f.RestrictedPrototypeName, "prototype")}, "
                         + $"argument {PointerRestrictionText(a.RestrictedPrototypeName, "prototype")} — §14.8.2.3.2: if either "
-                        + "is a restricted pointer, both shall be restricted and of the same type)";
+                        + "is a restricted pointer, both shall be restricted and of the same type, and a prototype pointer's "
+                        + "type is its prototype's signature, §13.18.60.4 GR25 / GR26)";
                 return null;
             default:
                 // Unreachable by construction: PicCategory.Group never reaches here (formal.IsGroup returned

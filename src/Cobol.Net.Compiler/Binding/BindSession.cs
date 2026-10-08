@@ -69,6 +69,11 @@ internal sealed class BindSession
     }
     private GroupRepository? _repository;
 
+    /// <summary>The group's prototype signature classes (kb/Work PB2464) — the TYPE of every restricted program- or
+    /// function-pointer, resolved per unit by <c>DataBinder.ResolveRestrictedPrototypes</c> as each unit's prototype
+    /// tables are built.</summary>
+    public PrototypeSignatureClasses SignatureClasses { get; } = new();
+
     private int _uidBand;
 
     /// <summary>Take the next disjoint 100k uid band (one per DataBinder, so nested-class struct/profile names

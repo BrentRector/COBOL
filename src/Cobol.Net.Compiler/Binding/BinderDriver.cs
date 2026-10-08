@@ -164,6 +164,7 @@ internal sealed class BinderDriver
         // to each directly or indirectly contained source unit"), and until kb/Work PB1100 the class bodies bound
         // first, against no table, so every user-function reference in a method drew COBOLNET1505.
         session.Repository = BuildGroupRepository(units, classes, session);
+        ResolvePointerRestrictions(units, classes, oo.InterfaceData, session);
         foreach (var cls in classes) oo.BindClassBody(cls);
 
         // The whole-group middle-end (P6 Steps 3–4): the DECLARED manifest — ProcedureBinding →
@@ -794,6 +795,30 @@ internal sealed class BinderDriver
         return new GroupRepository(units);
     }
 
+    /// <summary>⛔ Give every restricted program- or function-pointer in the group the TYPE its prototype's signature
+    /// gives it (kb/Work PB2464; ISO §13.18.60.4 GR25 / GR26 — <see cref="DataBinder.ResolveRestrictedPrototypes"/>), once
+    /// the REPOSITORY tables exist and BEFORE any body binds or any description is built. It covers EVERY forest that
+    /// declares one — each program unit's, each class's OBJECT and FACTORY forests and each interface's prototype
+    /// formals — through the same per-forest tables the procedure binders read, so that two items compared by the
+    /// typed comparator or by a universal INVOKE's descriptions are never one stamped and one not (which would make
+    /// an item and its twin disagree when their prototype is not its own signature class's founder).</summary>
+    private static void ResolvePointerRestrictions(IReadOnlyList<BoundUnit> units, IReadOnlyList<OoClassUnit> classes,
+        IReadOnlyDictionary<OoInterfaceSymbol, DataBinder> interfaces, BindSession session)
+    {
+        var repository = session.Repository;
+        void Resolve(DataBinder data, BoundUnit? unit, int position) => data.ResolveRestrictedPrototypes(
+            ProgramPrototypesOf(data, unit, repository, position), UserFunctionsOf(data, unit, repository, position),
+            session.SignatureClasses);
+        foreach (var unit in units) Resolve(unit.Data, unit, unit.SourcePosition);
+        foreach (var cls in classes)
+        {
+            int position = cls.Symbol.Ctx.Start.StartIndex;   // the position OoDriver.BindClassBody searches the group at
+            Resolve(cls.Data, null, position);
+            Resolve(cls.FactoryData, null, position);
+        }
+        foreach (var (iface, data) in interfaces) Resolve(data, null, iface.Ctx.Start.StartIndex);
+    }
+
     /// <summary>The PROCEDURE half of unit binding (phase 2): every unit's DATA is already bound
     /// (<see cref="BindUnitData"/>) and the group's <see cref="GroupRepository"/> is built, so a
     /// <c>FUNCTION user-name(args)</c> reference resolves its callee's RETURNING/USING descriptions from the
@@ -823,6 +848,7 @@ internal sealed class BinderDriver
             // kb/Work PB237 — the unit's visible program prototypes (§12.3.8.2 specifiers resolved through
             // §12.3.8.4 GR10, plus §8.4.6.8's containing-program spelling).
             ProgramPrototypes = ProgramPrototypesOf(data, unit, session.Repository, unit.SourcePosition),
+            SignatureClasses = session.SignatureClasses,   // kb/Work PB2464 — the pointer types ResolvePointerRestrictions stamped
             UnitRecursive = unit.Recursive,   // §14.9.7.3 SR1 / §14.9.36.3 SR1 (kb/Work PB137)
         };
         binder.ConfigureEc(session.Turn, session.DirectiveSites, unit.Name);   // the EC bind context (TURN fold + directive sites + §15.30 location element)

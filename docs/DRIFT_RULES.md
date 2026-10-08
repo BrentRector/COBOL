@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-286 drift tests.
+287 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -219,6 +219,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [ProcedureRangeEmptinessDriftTests](../tests/Cobol.Net.Tests.Unit/ProcedureRangeEmptinessDriftTests.cs) | ⛔ "IS THIS PROCEDURE RANGE EMPTY?" IS NOT A QUESTION THE NUMBERS CAN ANSWER, AND FOR YEARS EVERY CONSUMER ANSWERED IT WITH THE NUMBERS (kb/Work PB440). | `src/Cobol.Net.Compiler` |
 | [ProcessObservationDriftTests](../tests/Cobol.Net.Tests.Unit/ProcessObservationDriftTests.cs) | Keeps the child-process observer collapsed to ONE implementation, and proves it can actually tell a non-observation from a wrong answer. | `tests` |
 | [ProgramNameScopeDriftTests](../tests/Cobol.Net.Tests.Unit/ProgramNameScopeDriftTests.cs) | ⛔ ISO §8.4.6.3 2)'s COMMON-program exception is written ONCE, in ProgramNameScope, and BOTH scope implementations ask it (kb/Work PB1460): the bind-time AS NESTED table (BinderDriver.NestedCallablesOf) and the run-time resolver (ProgramTable.ResolveVisible). | — |
+| [PrototypePointerTypeDriftTests](../tests/Cobol.Net.Tests.Unit/PrototypePointerTypeDriftTests.cs) | ⛔ THE TYPE OF A RESTRICTED PROGRAM- OR FUNCTION-POINTER IS ITS PROTOTYPE'S SIGNATURE, SO NO RELATION COMPARES THE PROTOTYPE'S NAME (kb/Work PB2464). | `src/Cobol.Net.Compiler` |
 | [QualifiedNameClassDriftTests](../tests/Cobol.Net.Tests.Unit/QualifiedNameClassDriftTests.cs) | kb/Work PB919 — ISO §8.4.2.2.3 SR1's uniqueness obligation covers EVERY user-defined name, and it was enforced per name class with one class (index-names) never done. | `specs/ISO_COBOL.md` |
 | [ReadPreconditionOrderDriftTests](../tests/Cobol.Net.Tests.Unit/ReadPreconditionOrderDriftTests.cs) | ⛔ THE READ PRECONDITIONS ARE WRITTEN DOWN ONCE, AND IN THE STANDARD'S OWN ORDER (kb/Work PB336). | `src/Cobol.Net.Runtime/IO` |
 | [ReceiverBracketDriftTests](../tests/Cobol.Net.Tests.Unit/ReceiverBracketDriftTests.cs) | ⛔ A RECEIVING OBJECT PROPERTY IS ACCESSED WHEN ITS STATEMENT REACHES IT — ONE CLAIM, ONE PLACEMENT (kb/Work PB2078). | `src/Cobol.Net.Compiler/Binding`, `src/Cobol.Net.Compiler/CodeGen/Verbs` |

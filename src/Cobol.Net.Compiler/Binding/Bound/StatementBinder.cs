@@ -123,8 +123,21 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
     /// program-prototype-name (§8.3.2 case-insensitive). It is the §14.9.4.3 SR16 / §14.9.5.3 SR3 lookup, and its
     /// hit's <c>Signature</c> is what §14.9.4.4 GR7 means by "program-prototype-name-1 is used to determine the
     /// characteristics of the called program". Built per unit in BinderDriver.BindUnitProcedure, the
-    /// NestedCallables precedent; null in unit-test direct construction and in class-unit binders.</summary>
+    /// NestedCallables precedent (and, for a class's methods, in <c>OoDriver.BindClassBody</c>); null in unit-test
+    /// direct construction.</summary>
     public IReadOnlyDictionary<string, ProgramPrototype>? ProgramPrototypes { get; set; }
+
+    /// <summary>The group's prototype signature classes (kb/Work PB2464), beside the tables that name the prototypes
+    /// they classify; null in unit-test direct construction.</summary>
+    internal PrototypeSignatureClasses? SignatureClasses { get; init; }
+
+    /// <summary>The TYPE of a pointer restricted to program-prototype <paramref name="prototypeName"/> — its signature
+    /// class (<see cref="PrototypeSignatureClasses"/>), the identity a program-address-identifier argument is described
+    /// with. A name the unit's table does not hold has its own name for identity.</summary>
+    internal string ProgramRestrictionIdentityOf(string prototypeName) =>
+        ProgramPrototypes?.TryGetValue(prototypeName, out var p) == true && SignatureClasses is { } classes
+            ? classes.ProgramIdentity(p)
+            : PrototypeSignatures.OwnIdentity(prototypeName);
 
     /// <summary>A program-prototype-name's bound signature, through the §8.4.6.8 scope table
     /// (<see cref="ProgramPrototypes"/>) its declaration was already screened against — THE ONE reader every

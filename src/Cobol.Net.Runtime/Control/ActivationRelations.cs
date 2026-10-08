@@ -164,22 +164,22 @@ public static class ActivationRelations
     /// identifier-13 shall have the same signature".</item>
     /// </list>
     /// A pointer's restriction is its USAGE clause's TO phrase as <see cref="ActivationDescription.Clauses"/> carries
-    /// it ("*" for none): the prototype's NAME, so two differently named prototypes of one signature do not match (kb/Work PB2464).</summary>
+    /// it (<see cref="ActivationDescription.Unrestricted"/> for none): for a prototype pointer the SIGNATURE class of its
+    /// prototype (§13.18.60.4 GR25 / GR26), so two differently named prototypes of one signature share one restriction
+    /// and the pair is admitted — which is what "the same signature" of SR20 / SR22 asks (kb/Work PB2464); for a
+    /// data-pointer its TYPE identity.</summary>
     private static bool MaySet(string setClass, ActivationDescription receiving, ActivationDescription sending)
     {
         if (!string.Equals(SetClass(sending), setClass, StringComparison.Ordinal)) return false;
         return setClass switch
         {
-            ActivationCategory.ProgramPointer => receiving.Clauses == Unrestricted
+            ActivationCategory.ProgramPointer => receiving.Clauses == ActivationDescription.Unrestricted
                                                  || string.Equals(receiving.Clauses, sending.Clauses, StringComparison.Ordinal),
             ActivationCategory.DataPointer or ActivationCategory.FunctionPointer =>
                 string.Equals(receiving.Clauses, sending.Clauses, StringComparison.Ordinal),
             _ => true,
         };
     }
-
-    /// <summary>The <see cref="ActivationDescription.Clauses"/> of a class pointer described without a TO phrase.</summary>
-    private const string Unrestricted = "*";
 
     /// <summary>§9.3.6 rule 7: is a MOVE of <paramref name="sending"/> to <paramref name="receiving"/> valid by ISO
     /// §14.9.25.3? Its syntax rules over two data items, in SR order: SR1 (neither of class index, object or pointer —

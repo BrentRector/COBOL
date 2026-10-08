@@ -1,0 +1,50 @@
+      *> reject-at: 85
+      *> kb/Work PB2464 - the edition floor of the positive golden
+      *> 2002/pb2464_prototype_pointer_signature_type: a CLASS-ID, a
+      *> PROTOTYPE program and USAGE PROGRAM-POINTER TO are COBOL 2002
+      *> features, so the pointer-type crossing cannot be written at
+      *> --std 85 (COBOLNET0900).
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. P1N IS PROTOTYPE.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 L-X PIC 9(4).
+       PROCEDURE DIVISION USING L-X.
+       END PROGRAM P1N.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2464N.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           PROGRAM P1N
+           CLASS C2464N.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 PT1 IS TYPEDEF USAGE PROGRAM-POINTER TO P1N.
+       01 U USAGE OBJECT REFERENCE.
+       01 R1 TYPE PT1.
+       PROCEDURE DIVISION.
+       MAIN-P.
+           INVOKE C2464N "NEW" RETURNING U
+           INVOKE U "RP1" RETURNING R1
+           STOP RUN.
+       END PROGRAM PB2464N.
+
+       IDENTIFICATION DIVISION.
+       CLASS-ID. C2464N INHERITS FROM BASE.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS BASE.
+       IDENTIFICATION DIVISION.
+       OBJECT.
+       PROCEDURE DIVISION.
+       METHOD-ID. RP1.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LP USAGE POINTER.
+       PROCEDURE DIVISION RETURNING LP.
+           SET LP TO NULL.
+       END METHOD RP1.
+       END OBJECT.
+       END CLASS C2464N.
