@@ -535,6 +535,16 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         // bit-group area formal windows its bits at BitsPerCharacter × the area's offset (PlaceRenderer), the same unit.
         string at = view.Bit is { } bit ? $"({bit.OffsetExpr}) / {BitLayout.BitsPerCharacter}" : view.OffsetExpr;
         string offset = start is null ? at : $"({at}) + ({start}) - 1";
+        // ⛔ A VARIABLE-LENGTH GROUP'S AREA ALSO BEGINS AT A COMPONENT (kb/Work PB2094): its dynamic-length items and
+        // dynamic-capacity tables are slots of the cell numbered from the group's first component ordinal
+        // (VarGroupWindow.DynBase), so the area states that ordinal and the group's §8.5.1.12 atoms, and a formal of the
+        // same storage numbers its own components from there (CobolArgAdapt.Area). A group whose atoms cannot be stated
+        // (a USAGE BIT leaf makes a character position non-positional) states no area: no description could be shown
+        // to share its storage, so the formal holds a copy.
+        if (view.Coding is VarGroupWindow g)
+            return view.DenotedItem is { } group && VariableLengthCompatibility.GroupAtoms(group) is { } atoms
+                ? RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset, g.DynBase, RuntimeApi.GroupAtomsNew(atoms))
+                : null;
         return RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset);
     }
 
@@ -545,6 +555,20 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
 
     /// <summary>The trailing named <c>Area</c> argument of a BY REFERENCE <c>CobolArg</c>, or empty when it has none.</summary>
     private string AreaArgument(Place p) => ArgumentArea(p) is var area && area != "null" ? $", Area: {area}" : "";
+
+    /// <summary>⛔ THE BY CONTENT RECORD OF A GROUP WHOSE VALUES RIDE MANAGED SLOTS (kb/Work PB1940): ISO §14.2.3 GR9 —
+    /// "the activated runtime element operates as if the record in the linkage section were allocated by the activating
+    /// runtime element during the process of initiating the activation and as if this record does not occupy the same
+    /// storage area as the argument". A strongly-typed group with an object-reference or pointer leaf has no character
+    /// image to snapshot, so its record is a DETACHED COPY of its area — the characters and every reference
+    /// (<c>CobolArgAdapt.ContentRecord</c>) — stated as the argument's <c>Area</c>, which the formal (of the same type,
+    /// §14.8.2.2) is laid over: GR9's MOVE between two groups of one type, with the references set. Empty for every
+    /// other BY CONTENT argument, which crosses as its value.</summary>
+    private string ContentRecordArgument(BoundCallArg a, Place p) =>
+        a.Mode is CobolPassMode.Content && CobolNet.Compiler.Oo.OoClassTable.LeafCarried(p.Item)
+        && ArgumentArea(p) is var area && area != "null"
+            ? $", Area: {RuntimeApi.ArgAdaptContentRecord(area, p.Item.ByteWidth)}"
+            : "";
 
     /// <summary>The C# array literal of a §8.5.1.12 layout.</summary>
     internal static string LayoutArray(int[] layout) => $"new int[] {{ {string.Join(", ", layout)} }}";
@@ -558,7 +582,11 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// rule for the one boundary fact a string carrier does not carry itself.</para></summary>
     private string ReturningArgText(Place rp) =>
         $"new CobolArg({RuntimeApi.PassModeText(CobolPassMode.Reference)}, {RefCarrier(rp)}, {PlaceDescription(rp)}"
-        + $"{NamedFacts(BoundaryLength(rp), BoundaryClassOf(rp))})";
+        + $"{NamedFacts(BoundaryLength(rp), BoundaryClassOf(rp))}"
+        // A receiver whose values ride managed slots states its AREA, the storage §14.6.5's delivery places the result
+        // in (§14.2.3 GR6 NOTE 1 — "the storage for the returning item is allocated in the activating source unit";
+        // kb/Work PB1940): its references cannot cross as characters.
+        + $"{(rp.DenotedItem is { } g && CobolNet.Compiler.Oo.OoClassTable.LeafCarried(g) ? AreaArgument(rp) : "")})";
 
     /// <summary>⛔ THE FIXED CHARACTER LENGTH a place's text-carried storage has across the activation boundary
     /// (<see cref="CobolArg.Length"/>; kb/Work PB1040), <see cref="CobolArg.Unstated"/> when it has none. ONE
@@ -690,7 +718,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 // pointer. A SET between two items of the same category IS this copy (kb/Work PB663).
                 _ => $"ManagedPointer<{CallCellCarrier(p)}>.Cell({PlaceRenderer.Read(p)})",
             };
-            return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, {Forwarded(probe, snapshot)}, {meta})";
+            return $"new CobolArg({RuntimeApi.PassModeText(a.Mode)}, {Forwarded(probe, snapshot)}, {meta}{ContentRecordArgument(a, p)})";
         }
         switch (a.Value)
         {

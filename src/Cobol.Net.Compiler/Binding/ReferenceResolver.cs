@@ -934,14 +934,15 @@ public sealed partial class ReferenceResolver(DataBinder data)
             if (indexExprs.Count != outerCount + levels.Count) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }   // an item-path caller's count
             if (BuildBackingPath(sc, [.. indexExprs.Take(outerCount)]) is not { } classBacking) { gap = new(DeferredShape.NestedClassBacking, item); return null; }
             indexExprs = [.. indexExprs.Skip(outerCount)];
-            if (WindowScopeOf(classBacking, BuildCellPath(sc), levels, indexExprs) is not { } scope) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }
+            if (WindowScopeOf(classBacking, BuildCellPath(sc), levels, indexExprs, CellOrdinalBase(sc)) is not { } scope) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }
             // A dynamic-capacity table referenced by its subscript IS its element, at offset zero of the element cell.
             string offset = (item.IsDynamicTable ? 0 : item.ClassOffset) + scope.Terms;
             // A BASED class's window is displaced by the data-address pointer's runtime offset (ISO §13.18.5
             // — the view addresses wherever the pointer currently points; Phase-4b increment 2). The backing
             // property renders FIRST in both Read and Write, so the Deref null/bounds traps (GR3/GR4) fire
-            // before the null-lenient OffsetOf. (A BASED record holds no dynamic-capacity table — §13.18.5.3 SR2 —
-            // so the displacement is always the record scope's.)
+            // before the null-lenient OffsetOf. Only the record SCOPE is displaced: a dynamic-capacity table's element
+            // cell (an area formal may hold one — kb/Work PB2094) has offsets of its own; its component ordinals are
+            // displaced the same way (CellOrdinalBase, inside the scope walk).
             string? based = null;
             if (sc.BasedPointerField is { } addr && !scope.Nested)
             {
@@ -1619,6 +1620,14 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 OmittedFormalGuard.Of(cls.Canonical) is { } g ? g with { CarrierPrefix = cls.BackingCellCsName } : null)])
             : null;
 
+    /// <summary>⛔ THE COMPONENT-ORDINAL BASE OF A CELL-BACKED CLASS'S RECORD SCOPE (kb/Work PB2094), as the leading term of
+    /// its ordinal displacement: a class laid over storage through its data-address pointer — a BASED item, an AREA formal
+    /// (§14.2.3 GR8) — numbers its components from the pointer's <c>CellPointer.DynBase</c>, the ordinal twin of the
+    /// <c>CobolPtr.OffsetOf</c> its character window is displaced by (an area formal over a subordinate variable-length
+    /// group begins at that group's first component). Empty for a class that owns its cell.</summary>
+    internal static string CellOrdinalBase(RedefinesClass cls) =>
+        cls.BasedPointerField is { } addr ? $" + CobolPtr.DynBaseOf({addr})" : "";
+
     /// <summary>The subscript levels of a reference to <paramref name="item"/> WITHIN its Tier-B class
     /// <paramref name="cls"/>, outermost first: every fixed OCCURS level and every dynamic-capacity table level on
     /// its path (§8.4.2.3.3 SR3 — one subscript per OCCURS clause, a dynamic table's included).</summary>
@@ -1653,9 +1662,9 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// <c>Ref</c> is the backing and whose own offsets and ordinals start again at zero. Null when such a level lies in
     /// a class with no cell.</summary>
     private static WindowScope? WindowScopeOf(AccessPath backing, AccessPath? cell, IReadOnlyList<DataItem> levels,
-                                              IReadOnlyList<string> indexExprs)
+                                              IReadOnlyList<string> indexExprs, string ordinalBase)
     {
-        string terms = "", bitTerms = "", ordinalTerms = "";
+        string terms = "", bitTerms = "", ordinalTerms = ordinalBase;
         bool nested = false;
         for (int k = 0; k < levels.Count; k++)
         {
@@ -2107,7 +2116,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
             var outer = SubscriptLevelsWithin(table, cc);
             outer.RemoveAt(outer.Count - 1);   // the table itself
             if (outerIndexExprs.Count < outer.Count) return null;   // an enclosing table with no index — ambiguous
-            return WindowScopeOf(rootCell, rootCell, outer, outerIndexExprs) is { Cell: { } scopeCell } s
+            return WindowScopeOf(rootCell, rootCell, outer, outerIndexExprs, CellOrdinalBase(cc)) is { Cell: { } scopeCell } s
                 ? scopeCell.Add(CellTableSegment.Of(table, $"{table.ClassDynOrdinal}{s.OrdinalTerms}"))
                 : null;
         }

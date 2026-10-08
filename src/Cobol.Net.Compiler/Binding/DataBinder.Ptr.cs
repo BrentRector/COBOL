@@ -170,16 +170,21 @@ public sealed partial class DataBinder
         bool IsUserFunction(string fn) => UserFunctionNames.Contains(fn) || UnitSelfName is { } self && CobolNames.Same(fn, self);
         var own = OoIsClassUnit
             ? OoBoundMethods.Where(m => m.Ctx?.procedureDivision() is not null)
-                .SelectMany(m => ScanByReferenceOperands(m.Ctx!.procedureDivision(), IsUserFunction).Select(t => (t.Name, t.Qualifiers, t.Invoke, Method: (OoMethodSymbol?)m)))
+                .SelectMany(m => ScanByReferenceOperands(m.Ctx!.procedureDivision(), IsUserFunction).Select(t => (t.Name, t.Qualifiers, t.Invoke, t.SlotsOnly, Method: (OoMethodSymbol?)m)))
             : program.procedureDivision() is { } opd
-                ? ScanByReferenceOperands(opd, IsUserFunction).Select(t => (t.Name, t.Qualifiers, t.Invoke, Method: (OoMethodSymbol?)null))
+                ? ScanByReferenceOperands(opd, IsUserFunction).Select(t => (t.Name, t.Qualifiers, t.Invoke, t.SlotsOnly, Method: (OoMethodSymbol?)null))
                 : [];
-        var operands = own.Select(t => (t.Name, t.Qualifiers, t.Invoke, t.Method, Contained: false))
+        var operands = own.Select(t => (t.Name, t.Qualifiers, t.Invoke, t.SlotsOnly, t.Method, Contained: false))
             .Concat(program.nestedProgram().SelectMany(n => ScanByReferenceOperands(n, IsUserFunction))
-                .Select(t => (t.Name, t.Qualifiers, t.Invoke, Method: (OoMethodSymbol?)null, Contained: true)));
-        foreach (var (name, quals, invoke, method, contained) in operands)
+                .Select(t => (t.Name, t.Qualifiers, t.Invoke, t.SlotsOnly, Method: (OoMethodSymbol?)null, Contained: true)));
+        foreach (var (name, quals, invoke, slotsOnly, method, contained) in operands)
         {
             if (ResolveByReferenceOperand(name, quals, method) is not { } hit) continue;
+            // ⛔ A GROUP WHOSE VALUES RIDE MANAGED SLOTS CROSSES ONLY AS AN AREA (kb/Work PB1940): a strongly-typed group
+            // with an object-reference or pointer leaf has no character image, so its BY CONTENT record (§14.2.3 GR9) is
+            // a detached copy of its area and a CALL's RETURNING delivery (§14.6.5) is a store into its receiver's area.
+            // Either needs the operand in a cell; every other BY CONTENT operand or RETURNING receiver crosses as a value.
+            if (slotsOnly && !CobolNet.Compiler.Oo.OoClassTable.LeafCarried(hit)) continue;
             DataItem root = hit.Root;
             if (contained && !CallGlobalRoots.Contains(root)) continue;
             if (AlreadyInACell(root) || root.Section is EntrySection.Linkage || !CellCanCarry(root)) continue;
@@ -189,6 +194,24 @@ public sealed partial class DataBinder
             if (invoke && OoIsObjectData(root)) continue;
             if (ForceStringCanonical(root, "BY REFERENCE operand") is { } cls) ClaimAddressableCell(cls);
         }
+
+        // ⛔ THE ACTIVATED HALF FOR A RETURNING ITEM WHOSE VALUES RIDE MANAGED SLOTS (kb/Work PB1940): a strongly-typed
+        // group with an object-reference or pointer leaf is delivered as its AREA (§14.6.5 — "the content of the data item
+        // referenced by that RETURNING phrase"; CobolArgAdapt.StoreReturnArea), its characters and its references into the
+        // receiver's area, so the item itself lives in a cell.
+        if (!OoIsClassUnit && LinkageReturning is { } ret)
+            ClaimSlotCarriedCell(ret, "RETURNING item");
+    }
+
+    /// <summary>Claim <paramref name="root"/> onto a cell when it is a group whose values ride managed slots (a
+    /// strongly-typed group with an object-reference or pointer leaf), which a program activation carries only as a cell
+    /// AREA (kb/Work PB1940): a program's RETURNING item, and a user-defined function's caller-side result temporary
+    /// (§8.4.3.2.4 GR1 — the receiver of the function's RETURNING delivery, created as the function-identifier binds).</summary>
+    internal void ClaimSlotCarriedCell(DataItem root, string what)
+    {
+        if (CobolNet.Compiler.Oo.OoClassTable.LeafCarried(root) && !AlreadyInACell(root) && CellCanCarry(root)
+            && ForceStringCanonical(root, what) is { } cls)
+            ClaimAddressableCell(cls);
     }
 
     /// <summary>True when <paramref name="root"/>'s storage is ALREADY a cell (or the pointer-routed window over one), so
@@ -235,8 +258,11 @@ public sealed partial class DataBinder
     /// fact of the function's header, not of the reference, so every one is a candidate. Only an operand that IS one
     /// identifier is yielded (<see cref="OperandIdentifier"/>): a subscript, a reference modifier's operands or an
     /// arithmetic expression's terms are SENDING operands of the reference, never passed — and an expression argument
-    /// is passed by content. An address-identifier is ADDRESS OF's own surface.</summary>
-    internal static IEnumerable<(string Name, List<string> Qualifiers, bool Invoke)> ScanByReferenceOperands(IParseTree root,
+    /// is passed by content. An address-identifier is ADDRESS OF's own surface.
+    /// <para>Also yielded, tagged <c>SlotsOnly</c> (kb/Work PB1940): each CALL USING operand passed BY CONTENT and each CALL
+    /// RETURNING receiver — claimed only when it is a group whose values ride managed slots, which crosses only as an
+    /// area.</para></summary>
+    internal static IEnumerable<(string Name, List<string> Qualifiers, bool Invoke, bool SlotsOnly)> ScanByReferenceOperands(IParseTree root,
         Func<string, bool> isUserFunction)
     {
         foreach (var node in PtrDescendants(root))
@@ -249,7 +275,7 @@ public sealed partial class DataBinder
                 {
                     IParseTree? operand = ia.REFERENCE() is not null ? ia.dataReference()
                         : ia.CONTENT() is null && ia.VALUE() is null ? ia.arithmeticExpression() : null;
-                    if (operand is not null && OperandIdentifier(operand) is { } ih) yield return (ih.Name, ih.Qualifiers, true);
+                    if (operand is not null && OperandIdentifier(operand) is { } ih) yield return (ih.Name, ih.Qualifiers, true, false);
                 }
                 continue;
             }
@@ -257,18 +283,26 @@ public sealed partial class DataBinder
                 && isUserFunction(fname.GetText()))
             {
                 foreach (var farg in fargs.functionArgument())
-                    if (OperandIdentifier(farg) is { } h) yield return (h.Name, h.Qualifiers, false);
+                    if (OperandIdentifier(farg) is { } h) yield return (h.Name, h.Qualifiers, false, false);
+                continue;
+            }
+            if (node is Core.CallReturningPhraseContext ret)
+            {
+                if (HeadOf(ret.dataReference()) is { } rh) yield return (rh.Name, rh.Qualifiers, false, true);
                 continue;
             }
             if (node is not Core.CallUsingPhraseContext phrase) continue;
-            bool byReference = true;
+            // The phrase in force (§14.9.4.4 GR5 — transitive until the next BY phrase): null = BY VALUE.
+            bool? byReference = true;
             foreach (var arg in phrase.callArgument())
             {
                 IParseTree? operand;
                 if (arg.callByReference() is { } r) { byReference = true; operand = r.dataReference(); }
-                else if (arg.callByContent() is not null || arg.callByValue() is not null) { byReference = false; operand = null; }
-                else operand = byReference ? arg.arithmeticExpression() : null;
-                if (operand is not null && OperandIdentifier(operand) is { } h) yield return (h.Name, h.Qualifiers, false);
+                else if (arg.callByContent() is { } c) { byReference = false; operand = c.arithmeticExpression(); }
+                else if (arg.callByValue() is not null) { byReference = null; operand = null; }
+                else operand = byReference is null ? null : arg.arithmeticExpression();
+                if (operand is not null && OperandIdentifier(operand) is { } h)
+                    yield return (h.Name, h.Qualifiers, false, byReference is false);
             }
         }
 

@@ -279,8 +279,8 @@ internal sealed class ProgramEmitter
 
         // Per-formal carrier shape, resolved once: a carrier-resident formal aliases per access; an AREA formal (a
         // group / redefined / addressed one) is laid over its argument's cell, and its crossing names the carrier it
-        // is FILLED from when the argument has no cell (kb/Work PB2087); a variable-length group formal round-trips
-        // its §8.5.1.12 image at the activation boundary.
+        // is FILLED from when the argument has no cell (kb/Work PB2087) — a variable-length group formal's is its
+        // §8.5.1.12 component carrier (kb/Work PB2094).
         var formals = data.LinkageFormals
             .Select(f =>
             {
@@ -603,15 +603,18 @@ internal sealed class ProgramEmitter
                 // so nothing is copied and every store either element makes is the other's. Only an argument with no
                 // cell area — BY CONTENT (GR9's record allocated by the activating element), a BY VALUE formal
                 // (GR10's), or storage that is not a cell — gets a fresh area FILLED from the argument's carrier
-                // below; a BY REFERENCE one is stored back at return. A variable-length group formal, whose area no
-                // cell carries (DataBinder.CellCanCarry), is the one shape whose carrier field takes that copy itself.
+                // below; a BY REFERENCE one is stored back at return. A variable-length group formal is an area formal
+                // like any other (kb/Work PB2094): it states its atoms and its seeded fresh cell, and is laid over an
+                // argument of the same storage. A formal whose area no cell carries (DataBinder.CellCanCarry) is the one
+                // shape whose carrier field takes the copy itself.
                 string copyCarrier = f.CarrierField;
                 string copyGuard = RuntimeApi.ArgAdaptPresent("__args", f.Position);
                 string adopt = FormalAdopt(f, crossing, carrier, Math.Max(1, CallEmitter.BoundaryImageWidth(f.Item)));
                 if (f.IsArea)
                 {
                     copyCarrier = AreaCopyCarrier(f);
-                    w.Line($"{f.CarrierField} = {RuntimeApi.ArgAdaptArea("__args", f.Position, f.Item.Class!.Width, f.ByValue)};");
+                    var (shape, fresh) = new DataEmitter(Current.Ctx).AreaFormalShape(f.Item);
+                    w.Line($"{f.CarrierField} = {RuntimeApi.ArgAdaptArea("__args", f.Position, f.Item.Class!.Width, f.ByValue, shape, fresh)};");
                     w.Line($"ManagedPointer<{carrier}>? {copyCarrier} = null;");
                     copyGuard += $" && !{RuntimeApi.ArgAdaptAliased("__args", f.Position, f.CarrierField)}";
                 }
@@ -691,6 +694,12 @@ internal sealed class ProgramEmitter
     /// </list></summary>
     private static string ReturningDelivery(Place ret)
     {
+        // A strongly-typed group with an object-reference or pointer leaf has no character image: its content is its
+        // AREA — the characters and the references of its cell — delivered into the receiver's area (kb/Work PB1940;
+        // DataBinder.PtrBindBasedAndAddressables claims both onto cells).
+        if (ret.DenotedItem is { } leafGroup && CobolNet.Compiler.Oo.OoClassTable.LeafCarried(leafGroup)
+            && CallEmitter.AreaOf(ret) is { } area)
+            return RuntimeApi.ArgAdaptStoreReturnArea("__ret", area, leafGroup.ByteWidth);
         string? atoms = CallEmitter.BoundaryAtoms(ret);
         if (CallEmitter.CallPlaceIsVarGroup(ret))
             return RuntimeApi.ArgAdaptStoreReturn("__ret", PlaceRenderer.VarGroupBoundaryImage(ret, "RETURNING item"), atoms!);

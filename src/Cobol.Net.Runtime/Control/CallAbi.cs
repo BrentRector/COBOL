@@ -66,7 +66,9 @@ public enum CobolPassMode
 /// layout to meet a compatible group of a different shape (§14.8.3.2), a numeric receiver's profile. A bare
 /// carrier could state neither.</remarks>
 /// <param name="Area">⛔ THE ARGUMENT'S STORAGE AREA, when the activating element's storage for it lives in a
-/// <see cref="StorageCell"/> (kb/Work PB2087): the cell and the character offset at which the argument begins. ISO
+/// <see cref="StorageCell"/> (kb/Work PB2087): the cell and the character offset at which the argument begins — and, for
+/// a variable-length group, the component ordinal it begins at and its §8.5.1.12 atoms (<see cref="CellPointer.DynBase"/>,
+/// <see cref="CellPointer.Shape"/>; kb/Work PB2094). ISO
 /// §14.2.3 GR8: "If the argument is passed by reference, the activated runtime element operates as if the formal
 /// parameter occupies the same storage area as the argument." An elementary formal already aliases through
 /// <see cref="Carrier"/>'s per-access accessors; a formal whose storage is an AREA (a group, a REDEFINED or an
@@ -325,26 +327,75 @@ public static class CobolArgAdapt
     /// from the argument's carrier (and, BY REFERENCE, stores back at return); <see cref="Aliased"/> tells the two
     /// apart. An omitted argument (GR11) gets a fresh cell whose pointer answers <see cref="ManagedPointer.IsNull"/>
     /// true, so the omitted-argument condition (§8.8.4.8.4 GR1) reads the same carrier every other formal's does
-    /// while an unchecked reference still has storage to read (the documented GR12 leniency).</para></summary>
-    public static CellPointer Area(CobolArg[] args, int i, int areaWidth, bool byValueFormal) =>
+    /// while an unchecked reference still has storage to read (the documented GR12 leniency).</para>
+    /// <para>A VARIABLE-LENGTH group formal (kb/Work PB2094) states its §8.5.1.12 atoms as <paramref name="formalShape"/>
+    /// and the seeded fresh cell its description starts from as <paramref name="fresh"/> (its dynamic-capacity tables
+    /// already present, §8.5.1.9.1); every other formal passes null for both.</para></summary>
+    public static CellPointer Area(CobolArg[] args, int i, int areaWidth, bool byValueFormal, GroupAtom[]? formalShape,
+                                   Func<StorageCell>? fresh) =>
         Present(args, i)
-            ? Area(args[i].Mode is CobolPassMode.Reference && !byValueFormal ? args[i].Area : null, present: true, areaWidth)
-            : Area(null, present: false, areaWidth);
+            // A BY CONTENT argument states an area only when the activating element allocated its record as one
+            // (ContentRecord: a group whose values ride managed slots — kb/Work PB1940), and that record IS GR9's.
+            ? Area(args[i].Mode is CobolPassMode.Reference or CobolPassMode.Content && !byValueFormal ? args[i].Area : null,
+                present: true, areaWidth, formalShape, fresh)
+            : Area(null, present: false, areaWidth, formalShape, fresh);
 
-    /// <summary>The ONE area decision behind <see cref="Area(CobolArg[], int, int, bool)"/>, for the program ABI and the
-    /// METHOD ABI alike (kb/Work PB2087 — a method formal crosses as its carrier, its <paramref name="sharedArea"/> and its
-    /// omitted flag): <paramref name="sharedArea"/> — the argument's own area, supplied only BY REFERENCE to a BY
-    /// REFERENCE formal — when it can hold <paramref name="areaWidth"/> positions in a live cell, else a FRESH cell, which
-    /// answers <see cref="ManagedPointer.IsNull"/> when the argument is not <paramref name="present"/> (§14.9.4.4 GR11 /
-    /// §14.9.23.4 GR9).</summary>
-    public static CellPointer Area(CellPointer? sharedArea, bool present, int areaWidth)
+    /// <summary>⛔ THE BY CONTENT RECORD OF A GROUP WHOSE VALUES RIDE MANAGED SLOTS (kb/Work PB1940; ISO §14.2.3 GR9 — "as if
+    /// the record in the linkage section were allocated by the activating runtime element … and as if this record does
+    /// not occupy the same storage area as the argument"): a detached copy of the <paramref name="width"/> positions of
+    /// <paramref name="area"/>, its references included (<see cref="StorageCell.CopyArea"/>). Null when there is no live
+    /// area to copy (an omitted formal forwarded on), so the formal takes a fresh one.</summary>
+    public static CellPointer? ContentRecord(CellPointer? area, int width) =>
+        area is { } a && a.Generation == a.Cell.Generation && a.Offset >= 0 && a.Offset <= (long)a.Cell.Ref.Length - width
+            ? new CellPointer(a.Cell.CopyArea(a.Offset, width), 0)
+            : null;
+
+    /// <summary>⛔ THE RETURNING DELIVERY OF A GROUP WHOSE VALUES RIDE MANAGED SLOTS (kb/Work PB1940): ISO §14.6.5 — the
+    /// result "is the content of the data item referenced by that RETURNING phrase" — placed into the receiver's AREA
+    /// (<see cref="CobolArg.Area"/>, the activating element's storage: §14.2.3 GR6 NOTE 1) as the characters and the
+    /// references of the <paramref name="width"/> positions of the returning item's own area <paramref name="source"/>. The
+    /// two are of the same type (§14.8.3.2), so the positions correspond one to one. No receiver, no delivery; a
+    /// receiver that states no area cannot hold the references, and §14.9.4.4 GR3 d) answers the non-conforming pair
+    /// with EC-PROGRAM-ARG-MISMATCH — never a silent character image without them.</summary>
+    public static void StoreReturnArea(CobolArg? ret, CellPointer source, int width)
+    {
+        if (ret is not { } r || r.Carrier.IsNull) return;
+        if (r.Area is not { } a || a.Generation != a.Cell.Generation || a.Offset < 0 || a.Offset > (long)a.Cell.Ref.Length - width)
+            throw new CobolCallException(
+                "RETURNING delivery: the receiver of a strongly-typed group with an object-reference or pointer leaf states "
+                + "no storage area to hold its references — ISO §14.6.5; §14.9.4.4 GR3d — EC-PROGRAM-ARG-MISMATCH",
+                "EC-PROGRAM-ARG-MISMATCH");
+        a.Cell.StoreArea(a.Offset, source.Cell.CopyArea(source.Offset, width));
+    }
+
+    /// <summary>The ONE area decision behind <see cref="Area(CobolArg[], int, int, bool, GroupAtom[], Func{StorageCell})"/>,
+    /// for the program ABI and the METHOD ABI alike (kb/Work PB2087 — a method formal crosses as its carrier, its
+    /// <paramref name="sharedArea"/> and its omitted flag): <paramref name="sharedArea"/> — the argument's own area,
+    /// supplied only BY REFERENCE to a BY REFERENCE formal — when it can hold <paramref name="areaWidth"/> positions in a
+    /// live cell and the formal's description can be laid over it, else a FRESH cell, which answers
+    /// <see cref="ManagedPointer.IsNull"/> when the argument is not <paramref name="present"/> (§14.9.4.4 GR11 /
+    /// §14.9.23.4 GR9).
+    /// <para>⛔ A VARIABLE-LENGTH GROUP IS LAID OVER ONLY ITS OWN STORAGE (kb/Work PB2094). Its components are slots of the
+    /// cell, not character positions, so a description lies over an area holding components exactly when both have the
+    /// same storage, or the formal describes a prefix of it (<see cref="GroupCompatibility.LaysOver"/>): then each of the formal's components IS the argument's,
+    /// displaced by the area's <see cref="CellPointer.DynBase"/>. A compatible pair of another shape (§8.5.1.12 — a
+    /// fixed-capacity table opposite a dynamic-capacity one, a fixed-length group opposite a variable-length one) takes a
+    /// fresh cell filled through the reshaping carrier and, BY REFERENCE, stored back at return.</para></summary>
+    public static CellPointer Area(CellPointer? sharedArea, bool present, int areaWidth, GroupAtom[]? formalShape,
+                                   Func<StorageCell>? fresh)
     {
         if (!present)
-            return new CellPointer(new StorageCell { Ref = new string(' ', areaWidth) }, 0) { OmittedArgument = true };
-        if (sharedArea is { } a && a.Generation == a.Cell.Generation && a.Offset >= 0 && a.Offset <= (long)a.Cell.Ref.Length - areaWidth)
+            return new CellPointer(FreshArea(areaWidth, fresh), 0) { OmittedArgument = true, Shape = formalShape };
+        if (sharedArea is { } a && a.Generation == a.Cell.Generation && a.Offset >= 0 && a.Offset <= (long)a.Cell.Ref.Length - areaWidth
+            && (a.Shape is { } shape ? formalShape is not null && GroupCompatibility.LaysOver(formalShape, shape) : formalShape is null))
             return a;
-        return new CellPointer(new StorageCell { Ref = new string(' ', areaWidth) }, 0);
+        return new CellPointer(FreshArea(areaWidth, fresh), 0) { Shape = formalShape };
     }
+
+    /// <summary>A fresh area of <paramref name="areaWidth"/> positions: the formal's own seeded cell when it states one,
+    /// else a space-filled cell.</summary>
+    private static StorageCell FreshArea(int areaWidth, Func<StorageCell>? fresh) =>
+        fresh?.Invoke() ?? new StorageCell { Ref = new string(' ', areaWidth) };
 
     /// <summary>The storage area a CARRIER-RESIDENT formal occupies when argument <paramref name="i"/> is supplied BY
     /// REFERENCE from a cell (kb/Work PB2089) — its <see cref="CobolArg.Area"/>, else null. ISO §14.2.3 GR8 makes the

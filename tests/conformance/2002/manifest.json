@@ -752,7 +752,8 @@
   "pb2113_subscript_expressions_and_arguments",
   "pb311_date_day_windowing_r6_bounds",
   "pb2095_bit_item_by_reference_area",
-  "pb2096_global_formal_forward_area"
+  "pb2096_global_formal_forward_area",
+  "pb1940_strong_objref_group_content_returning"
   ],
   "pending": []
 }

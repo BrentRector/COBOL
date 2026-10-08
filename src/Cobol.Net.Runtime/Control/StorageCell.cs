@@ -70,6 +70,37 @@ public sealed class StorageCell
     /// <see cref="SlotAt"/>.</summary>
     public void SetSlotAt(int byteOffset, object? value) => (_slots ??= [])[byteOffset] = value;
 
+    /// <summary>⛔ A DETACHED COPY OF THE AREA <paramref name="width"/> positions from <paramref name="offset"/> (kb/Work
+    /// PB1940): a new cell holding those characters of <see cref="Ref"/> and the managed slots keyed inside them, each
+    /// shifted to the same position of the copy. It is ISO §14.2.3 GR9's record "allocated by the activating runtime
+    /// element" for a group whose values ride the slots (a strongly-typed group with an object-reference or pointer
+    /// leaf): the copy keeps every reference, which a character image would drop, and "does not occupy the same storage
+    /// area as the argument". Only byte-offset slots are copied — the area is a group with no variable-length component
+    /// (such a group crosses on its §8.5.1.12 carrier).</summary>
+    public StorageCell CopyArea(long offset, int width)
+    {
+        int at = checked((int)offset);
+        var copy = new StorageCell { Ref = Ref.Substring(at, width) };
+        if (_slots is { } m)
+            foreach (var (key, value) in m)
+                if (key >= at && key < at + width) copy.SetSlotAt(key - at, value);
+        return copy;
+    }
+
+    /// <summary>The receiving twin of <see cref="CopyArea"/> (kb/Work PB1940): make the positions of this cell from
+    /// <paramref name="offset"/> hold <paramref name="source"/> — its characters, and its managed slots in place of the
+    /// ones keyed inside those positions here.</summary>
+    public void StoreArea(long offset, StorageCell source)
+    {
+        int at = checked((int)offset), width = source.Ref.Length;
+        Ref = string.Concat(Ref.AsSpan(0, at), source.Ref, Ref.AsSpan(at + width));
+        if (_slots is { } m)
+            foreach (int key in m.Keys.Where(k => k >= at && k < at + width).ToList()) m.Remove(key);
+        if (source._slots is { } s)
+            foreach (var (key, value) in s)
+                if (key >= 0) SetSlotAt(key + at, value);
+    }
+
     // ── THE VARIABLE-LENGTH HALF OF THE SAME AREA (kb/Work PB1026, PB1042) ──────────────────────────────────────
     //
     // A cell-backed area (an EXTERNAL record, an EXTERNAL file's out-of-line record, an ADDRESS-OF-taken record) may

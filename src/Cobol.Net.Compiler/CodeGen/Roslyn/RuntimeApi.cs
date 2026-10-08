@@ -1884,14 +1884,16 @@ internal static class RuntimeApi
 
     /// <summary>The storage of an AREA formal (§14.2.3 GR8; kb/Work PB2087) — <c>CobolArgAdapt.Area</c>: the argument's
     /// own cell area when it can hold <paramref name="areaWidth"/> positions BY REFERENCE, else a fresh cell.</summary>
-    public static string ArgAdaptArea(string args, int position, int areaWidth, bool byValueFormal) =>
-        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Area)}({args}, {position}, {areaWidth}, {(byValueFormal ? "true" : "false")})";
+    public static string ArgAdaptArea(string args, int position, int areaWidth, bool byValueFormal, string formalShape, string fresh) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Area)}({args}, {position}, {areaWidth}, {(byValueFormal ? "true" : "false")}, {formalShape}, {fresh})";
 
     /// <summary>The storage of a METHOD's area formal (§14.2.3 GR8; kb/Work PB2087) — <c>CobolArgAdapt.Area</c>'s one
     /// decision over the method ABI's area parameter and presence: the argument's own area when it can hold
-    /// <paramref name="areaWidth"/> positions, else a fresh cell.</summary>
-    public static string ArgAdaptAreaOf(string sharedArea, string present, int areaWidth) =>
-        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Area)}({sharedArea}, {present}, {areaWidth})";
+    /// <paramref name="areaWidth"/> positions and the formal can be laid over it, else a fresh cell.
+    /// <paramref name="formalShape"/> and <paramref name="fresh"/> are a variable-length formal's atoms and seeded cell
+    /// (kb/Work PB2094; <see cref="AreaFormalShape"/>), "null" for every other formal.</summary>
+    public static string ArgAdaptAreaOf(string sharedArea, string present, int areaWidth, string formalShape, string fresh) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Area)}({sharedArea}, {present}, {areaWidth}, {formalShape}, {fresh})";
 
     /// <summary>The storage area a carrier-resident BY REFERENCE formal occupies (§14.2.3 GR8; kb/Work PB2089) —
     /// <c>CobolArgAdapt.ArgumentArea</c>: its argument's <c>CobolArg.Area</c>, or null.</summary>
@@ -1903,8 +1905,30 @@ internal static class RuntimeApi
         $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.Aliased)}({args}, {position}, {area})";
 
     /// <summary>The storage area of a cell-backed argument (kb/Work PB2087): a data pointer at <paramref name="offset"/>
-    /// characters into <paramref name="cell"/> — the <c>CobolArg.Area</c> an area formal is laid over.</summary>
-    public static string ArgArea(string cell, string offset) => $"new {nameof(CellPointer)}({cell}, {offset})";
+    /// characters into <paramref name="cell"/> — the <c>CobolArg.Area</c> an area formal is laid over. A variable-length
+    /// group's area also states the component ordinal it begins at and its §8.5.1.12 atoms (<paramref name="dynBase"/>,
+    /// <paramref name="shape"/>; kb/Work PB2094), so a formal of the same storage numbers its components from there.</summary>
+    public static string ArgArea(string cell, string offset, string? dynBase = null, string? shape = null) =>
+        dynBase is null
+            ? $"new {nameof(CellPointer)}({cell}, {offset})"
+            : $"new {nameof(CellPointer)}({cell}, {offset}) {{ {nameof(CellPointer.DynBase)} = (int)({dynBase}), {nameof(CellPointer.Shape)} = {shape} }}";
+
+    /// <summary>The BY CONTENT record of a group whose values ride managed slots (§14.2.3 GR9; kb/Work PB1940) —
+    /// <c>CobolArgAdapt.ContentRecord</c>: a detached copy of <paramref name="width"/> positions of <paramref name="area"/>.</summary>
+    public static string ArgAdaptContentRecord(string area, int width) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.ContentRecord)}({area}, {width})";
+
+    /// <summary>The RETURNING delivery of a group whose values ride managed slots (§14.6.5; kb/Work PB1940) —
+    /// <c>CobolArgAdapt.StoreReturnArea</c>: the returning item's area <paramref name="source"/> into the receiver's.</summary>
+    public static string ArgAdaptStoreReturnArea(string ret, string source, int width) =>
+        $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.StoreReturnArea)}({ret}, {source}, {width})";
+
+    /// <summary>The emitted (atoms, fresh cell) pair a VARIABLE-LENGTH group area formal states to
+    /// <c>CobolArgAdapt.Area</c> (kb/Work PB2094) — its §8.5.1.12 atoms and a factory of the seeded cell its own
+    /// description starts from (§8.5.1.9.1: a dynamic-capacity table exists at its FROM capacity) — or ("null", "null")
+    /// for every other area formal.</summary>
+    public static (string Shape, string Fresh) AreaFormalShape(string? atoms, string? seededCell) =>
+        atoms is null ? ("null", "null") : (atoms, $"static () => {seededCell}");
 
     /// <summary>RETURNING delivery into the caller's item (§14.6.5) — <c>CobolArgAdapt.StoreReturn</c>.
     /// <paramref name="description"/> is the SENDING item's description when it has one — its

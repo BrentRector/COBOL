@@ -691,8 +691,11 @@ internal static class PlaceRenderer
     public static string WriteVarGroupImage(Place group, string value, string context, bool formalStorage = false) => group switch
     {
         OdoGroupPlace o => WriteVarGroupImage(o.Inner, value, context, formalStorage),
+        // A formal's copy-in keeps each dynamic-length member's whole content here too (kb/Work PB1937, PB2094: a
+        // variable-length group formal's fresh area is a cell): no member LIMIT applies to that store.
         RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreCarrier(RenderPath(g.Cell, AccessDir.Receiving),
-            $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, g.DynTable, value)};",   // kb/Work PB1026, PB1042
+            $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt,
+            formalStorage ? g.DynMax.Select(_ => int.MaxValue) : g.DynMax, g.DynTable, value)};",   // kb/Work PB1026, PB1042
         _ when !group.Item.CurrentExtentImageCapable => EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),
         _ => $"{GroupTarget(group)}.FromVarImage({value}{(formalStorage ? ", true" : "")});",
     };

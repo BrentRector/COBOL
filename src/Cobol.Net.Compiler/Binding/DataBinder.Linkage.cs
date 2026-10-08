@@ -916,20 +916,17 @@ public sealed partial class DataBinder
     /// question an OPTIONAL claim asks before calling <see cref="ForceStringCanonical"/>, which classifies a refused
     /// class Rejected (every reference then fails loud) — right for a surface that cannot exist without the cell
     /// (EXTERNAL, BASED, ADDRESS OF), wrong for one that only gains aliasing from it (a boundary-aliased area). True
-    /// when every leaf of the area rides the cell AND the area holds no variable-length component: a dynamic-capacity
-    /// table or a dynamic-length item crosses a boundary on its own §8.5.1.12 carrier (kb/Work PB204), and the area-formal
-    /// description (a BASED-style class over the argument's cell) does not yet carry one. ⚠ That is an IMPLEMENTATION
-    /// limit, not a rule: §13.18.5.3 SR2 bars a dynamic-length item or a variable-length group as the subject of a WRITTEN
-    /// BASED clause and says nothing about a formal, and §14.2.3 GR8 still makes such a formal occupy its argument's
-    /// storage — so the copy a variable-length group formal keeps is an open defect (reported by the PB2087 finisher,
-    /// wave 1023 A), never latitude.</summary>
+    /// when every leaf of the area rides the cell.
+    /// <para>⛔ A VARIABLE-LENGTH GROUP RIDES THE CELL TOO (kb/Work PB2094). Its dynamic-length items and dynamic-capacity
+    /// tables are the cell's components (<see cref="AssignCellComponents"/>), and an area formal laid over its argument
+    /// numbers its components from the area's component ordinal as it displaces its characters by the area's offset
+    /// (<c>CellPointer.DynBase</c>, <c>ReferenceResolver.CellOrdinalBase</c>), so §14.2.3 GR8 — "the activated runtime
+    /// element operates as if the formal parameter occupies the same storage area as the argument" — holds for it as
+    /// for any group. §13.18.5.3 SR2 bars a variable-length group only as the subject of a WRITTEN BASED clause.</para></summary>
     private static bool CellCanCarry(DataItem root)
     {
         var members = root.Class?.Members ?? [root];
-        return CellResidueOf(members.SelectMany(LeavesOf)) is null && !members.Any(HoldsVariableLengthComponent);
-
-        static bool HoldsVariableLengthComponent(DataItem n) =>
-            n.IsDynamicTable || DynSlotWindow.CarriedBySlot(n) || n.Children.Any(HoldsVariableLengthComponent);
+        return CellResidueOf(members.SelectMany(LeavesOf)) is null;
     }
 
     /// <summary>Number <paramref name="node"/>'s variable-length COMPONENTS in its scope from ordinal

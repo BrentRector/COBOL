@@ -47,6 +47,20 @@ internal sealed class DataEmitter
     /// <summary>See <see cref="GroupImageCodec.CellDynSeeds"/>.</summary>
     public string CellDynSeeds(DataItem item, bool useValues = true) => _codec.CellDynSeeds(item, useValues);
 
+    /// <summary>⛔ THE ONE STATEMENT OF WHAT A VARIABLE-LENGTH GROUP AREA FORMAL BRINGS TO ITS AREA DECISION (kb/Work PB2094),
+    /// for the program ABI and the method ABI alike: its §8.5.1.12 atoms — <c>CobolArgAdapt.Area</c> lays it over its
+    /// argument's area only when the two have the same storage — and the seeded cell its own description starts from
+    /// when it is not laid over one (a fresh area holds every dynamic-capacity table at its FROM capacity, §8.5.1.9.1,
+    /// so a reference through it never meets a missing table). §13.18.63.4 GR3: "In the linkage section, VALUE clauses
+    /// take effect only during the execution of an explicit or implicit INITIALIZE statement", so the seed is the
+    /// space-filled image with no VALUE applied. ("null",
+    /// "null") for every other area formal.</summary>
+    public (string Shape, string Fresh) AreaFormalShape(DataItem formal) =>
+        VarGroupWindow.Applies(formal) && VariableLengthCompatibility.GroupAtoms(formal) is { } atoms
+            ? RuntimeApi.AreaFormalShape(RuntimeApi.GroupAtomsNew(atoms),
+                $"new StorageCell {{ Ref = new string(' ', {formal.Class!.Width}) }}{CellDynSeeds(formal, useValues: false)}")
+            : RuntimeApi.AreaFormalShape(null, null);
+
     /// <summary>See <see cref="ValueInitializer.InitializerFrom"/> — the §13.18.63 VALUE recipe over an operand
     /// the caller supplies (the report section's format-4 lane; kb/Work PB506).</summary>
     public string ValueImageOf(DataItem item, string raw) => _values.InitializerFrom(item, raw);

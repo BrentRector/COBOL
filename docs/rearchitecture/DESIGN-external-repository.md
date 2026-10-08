@@ -1703,8 +1703,9 @@ specifier's literal is literal-4; §12.3.8.4 GR11 c) is run into b)'s paragraph 
   composes a run unit through `EnsureRegistered()`; their mentions of `__CobolModule.Register()`,
   `ProgramRegistry.CallProgram` and `ICobolProgram.Call` go (DOC-A.1-116 is kb/Work PB1253's item-116 row), and
   DOC-A.1-167's "Diverges today" sentence goes with R48's implementation (§4.3).
-- `kb/Work/PB1940.md`: blocked by PB2087, its fix replaced by PB2087 item 5 (a strongly-typed group with a pointer or
-  object leaf crosses as a cell area with managed slots); its repro becomes one of PB2087's goldens.
+- `kb/Work/PB1940.md`: its fix is PB2087 item 5 (a strongly-typed group with a pointer or object leaf crosses as a cell
+  area with managed slots). PB2087 landed the BY REFERENCE leg; PB1940 landed BY CONTENT (a detached copy of the area)
+  and RETURNING (a store into the receiver's area) on the same cell carrier, with no leaf vector on the program ABI.
 - `docs/VERSION_CHANGE_REFERENCE.md`: no row changes; the REPOSITORY rows' witnesses gain §17.1's 85 arm.
 - `src` XML remarks listed in §12's last row.
 

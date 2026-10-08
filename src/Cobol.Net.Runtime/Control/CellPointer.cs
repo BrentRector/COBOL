@@ -32,6 +32,23 @@ public sealed class CellPointer(StorageCell cell, long offset, int generation) :
     /// a null dereference.</summary>
     public bool OmittedArgument { get; init; }
 
+    /// <summary>⛔ THE COMPONENT ORDINAL THE ADDRESSED AREA BEGINS AT (kb/Work PB2094). A variable-length group's
+    /// dynamic-length items and dynamic-capacity tables have no character positions in <see cref="StorageCell.Ref"/>:
+    /// they ride the cell's slots, numbered in storage order across the WHOLE cell (ISO §8.5.1.10.3: "Dynamic-length
+    /// elementary items may be physically located in memory within the record they are subordinate to, or they may be
+    /// located elsewhere in the computer's memory"). An area that begins inside a record — a subordinate group passed
+    /// BY REFERENCE — therefore begins at a component ordinal as well as at a character offset, and a description laid
+    /// over the area (an area formal, §14.2.3 GR8) numbers its own components from here, exactly as it displaces its
+    /// character positions by <see cref="Offset"/>. Zero for an area that holds no component or begins at the cell's
+    /// first one, and for every pointer a statement computes (ADDRESS OF, SET … UP BY), which address bytes.</summary>
+    public int DynBase { get; init; }
+
+    /// <summary>The §8.5.1.12 atoms of the variable-length group whose storage this area is (kb/Work PB2094), or null for
+    /// any other area. A description of another shape cannot be laid over the area — its components would name other
+    /// slots — so <see cref="CobolArgAdapt.Area(CellPointer?, bool, int, GroupAtom[]?, Func{StorageCell}?)"/> lays a
+    /// formal over it only when the formal describes that storage or a prefix of it (<see cref="GroupCompatibility.LaysOver"/>).</summary>
+    public GroupAtom[]? Shape { get; init; }
+
     /// <inheritdoc/>
     public override bool IsNull => OmittedArgument;
 }

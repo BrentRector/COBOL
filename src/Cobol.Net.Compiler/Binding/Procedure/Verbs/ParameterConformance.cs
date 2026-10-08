@@ -55,21 +55,19 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     internal void CheckArgument(DataItem formal, BoundCallArg arg, int position, ActivationSite site)
     {
         if (arg.Omitted) return;
-        // ⛔ A CARRIER RESIDUE, NOT A CONFORMANCE RULE (kb/Work PB1116, PB2087). Two strong groups of one type CONFORM
-        // (§14.8.2.2 — OoConformance decides it for every lane). A group with a pointer or object-reference leaf has no
-        // character image: its managed values ride the MANAGED SLOTS of a StorageCell. BY REFERENCE from storage that IS
-        // a cell, the program ABI carries it whole — the argument's area, which the formal's description is laid over
-        // (§14.2.3 GR8; CobolArg.Area) — and the activating element claims every group it passes by reference onto a
-        // cell (DataBinder.PtrBindBasedAndAddressables). Any other crossing would copy the image and silently drop the
-        // references, so the CALL / function lanes refuse it HERE, at compile time, naming the real reason.
+        // ⛔ A CARRIER RESIDUE, NOT A CONFORMANCE RULE (kb/Work PB1116, PB2087, PB1940). Two strong groups of one type
+        // CONFORM (§14.8.2.2 — OoConformance decides it for every lane). A group with a pointer or object-reference leaf has
+        // no character image: its managed values ride the MANAGED SLOTS of a StorageCell, so the program ABI carries it
+        // only as an AREA — BY REFERENCE the argument's own (§14.2.3 GR8), BY CONTENT a detached copy of it (GR9's record,
+        // CobolArgAdapt.ContentRecord) — and the activating element claims every such operand onto a cell
+        // (DataBinder.PtrBindBasedAndAddressables). The one argument left is storage no claim reaches (a LINKAGE item that
+        // is not a formal): a copy of its image would silently drop the references, so it is refused HERE, naming why.
         if (CobolNet.Compiler.Oo.OoClassTable.LeafCarried(formal)
-            && !(arg.Mode is CobolPassMode.Reference && arg.Place is { Item.Root.Class: { IsCellBacked: true } }))
+            && SlotCarrierResidue(arg.Mode is CobolPassMode.Reference or CobolPassMode.Content ? arg.Place : null) is { } residue)
         {
             ctx.Edition.Error(site.Conformance,
                 $"{site.Callee} argument {position}: formal parameter '{formal.CobolName}' is a strongly-typed group with "
-                + "an object-reference or pointer leaf and so no character image; the argument conforms (ISO §14.8.2.2 — "
-                + "both of the same type), but this activation boundary carries such a group only BY REFERENCE from "
-                + "storage that shares its managed slots (§14.2.3 GR8; COBOLNET_INTERPROGRAM_DESIGN, area formals)");
+                + $"an object-reference or pointer leaf; the argument conforms (ISO §14.8.2.2 — both of the same type), but {residue}");
             return;
         }
         if (arg.DataAddress is not null || arg.ProgramAddress is not null)
@@ -158,15 +156,23 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
         return CobolNet.Compiler.Oo.OoConformance.DescriptionMismatch(activated, receiving, anyLengthActivationRelax: true);
     }
 
-    /// <summary>The CALL / function lanes' twin of <see cref="CheckArgument"/>'s carrier residue for the RETURNING item
-    /// (kb/Work PB1116): a strong group with no character image conforms by §14.8.3.2 but the program ABI cannot yet
-    /// deliver it. Null when the item is carried. Not asked by INVOKE, whose boundary carries the leaf vector.</summary>
-    internal static string? ReturningCarrierResidue(DataItem activated) =>
-        CobolNet.Compiler.Oo.OoClassTable.LeafCarried(activated)
+    /// <summary>The CALL lane's twin of <see cref="CheckArgument"/>'s carrier residue for the RETURNING item (kb/Work
+    /// PB1116, PB1940): a strong group with no character image is delivered into its receiver's AREA
+    /// (<c>CobolArgAdapt.StoreReturnArea</c>), so the receiver must be storage that is a cell. Null when it is. Not asked
+    /// by INVOKE, whose boundary carries the leaf vector.</summary>
+    internal static string? ReturningCarrierResidue(DataItem activated, Place receiver) =>
+        CobolNet.Compiler.Oo.OoClassTable.LeafCarried(activated) && SlotCarrierResidue(receiver) is { } residue
             ? $"the returning item '{activated.CobolName}' is a strongly-typed group with an object-reference or pointer "
-              + "leaf and so no character image; this activation boundary does not yet carry such a group (it crosses an "
-              + "INVOKE as its leaf vector; COBOLNET_DESIGN §4.2)"
+              + $"leaf; {residue}"
             : null;
+
+    /// <summary>Why <paramref name="operand"/> cannot carry a group whose values ride managed slots across a program
+    /// activation (kb/Work PB1940), or null when its storage is a cell: the boundary carries such a group only as a cell
+    /// AREA, and a character image would drop its references.</summary>
+    private static string? SlotCarrierResidue(Place? operand) =>
+        operand is { Item.Root.Class: { IsCellBacked: true } } ? null
+        : "this activation boundary carries such a group only as a storage area of a cell, and the operand's storage is "
+          + "not one (§14.2.3 GR8 / GR9; COBOLNET_INTERPROGRAM_DESIGN, area formals)";
 
     /// <summary>⛔ THE ONE reading of a figurative ZERO argument into an elementary NUMERIC formal (kb/Work PB1617
     /// for INVOKE, PB1634 for CALL). §14.8.2.3.3 2) a): "If the formal parameter is numeric, the conformance rules

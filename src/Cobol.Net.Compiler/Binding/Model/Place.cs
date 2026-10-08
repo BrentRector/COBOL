@@ -186,6 +186,17 @@ public sealed record DynTablePlace(AccessPath Path, DataItem ElementItem) : Plac
 /// </summary>
 public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int Width, DataItem ViewItem) : Place
 {
+    /// <summary>A cell window over a dynamic-capacity table IS one occurrence — the element at offset zero of its element
+    /// cell (<c>ReferenceResolver</c>; the table has no window of its own) — so its capability is the element shape's,
+    /// exactly the <see cref="DynTablePlace"/> law (kb/Work PB189). The cell arm lacked it, so a group MOVE into one
+    /// occurrence of a cell-backed table (an EXTERNAL record's, or a record passed BY REFERENCE — kb/Work PB2094) was
+    /// the Tier-C loud.</summary>
+    public override bool ImageCapable => ViewItem.IsDynamicTable ? ViewItem.ElementImageCapable : ViewItem.IsImageCapable;
+
+    /// <summary>The <see cref="ImageCapable"/> law applied to the one-way transfer image (kb/Work PB244).</summary>
+    public override bool TransferImageCapable =>
+        ViewItem.IsDynamicTable ? ViewItem.ElementTransferImageCapable : ViewItem.TransferImageCapable;
+
     /// <summary>⛔ THE WINDOW'S CODING — how the member's VALUE CARRIER relates to the bytes of the class's one
     /// backing. Null is the identity coding (an alphanumeric / edited / byte-form-numeric member, whose carrier
     /// IS its bytes); <see cref="BitWindow"/> re-expresses the window in BIT positions (kb/Work PB203);

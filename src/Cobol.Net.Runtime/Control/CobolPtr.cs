@@ -91,6 +91,11 @@ public static class CobolPtr
     /// FIRST on every generated read/write path, so this never masks a null dereference).</summary>
     public static long OffsetOf(ManagedPointer? p) => p is CellPointer w ? w.Offset : 0;
 
+    /// <summary>The window pointer's component-ordinal base (<see cref="CellPointer.DynBase"/>; kb/Work PB2094) — the
+    /// ordinal twin of <see cref="OffsetOf"/>, by which a description laid over the area displaces the slots of its
+    /// dynamic-length items and dynamic-capacity tables. 0 for the null carrier, for the same reason.</summary>
+    public static int DynBaseOf(ManagedPointer? p) => p is CellPointer w ? w.DynBase : 0;
+
     /// <summary>The LOWEST value a data-pointer data item may hold, as a character-position displacement from
     /// the origin of the storage it addresses (ISO §14.9.39.4 GR20's "the range of values allowed by the
     /// implementor for a data-pointer data item"; §A.1 216 requires it documented, and

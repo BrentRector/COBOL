@@ -192,7 +192,7 @@ internal sealed record ViewCursor(
     /// backing it starts from is never read. Null outside a cell-backed class.</summary>
     public static ViewCursor? AtCellTable(DataItem table) =>
         ReferenceResolver.BuildCellPath(table.Class) is { } cell
-            ? new ViewCursor(cell, "0", 0, table, "", Cell: cell)
+            ? new ViewCursor(cell, "0", 0, table, "", Cell: cell) { OrdinalTerms = ReferenceResolver.CellOrdinalBase(table.Class!) }
             : null;
 
     private AccessPath ElementCell(AccessPath cell, string oneBasedIndex) =>

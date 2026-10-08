@@ -673,7 +673,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                           + "division header declares none (ISO §14.8.3.1)");
             else if (returning is { } rr && calleeSig.Returning is { } cr
                      && (host.Params.ReturningConformanceReason(cr, rr.Item)
-                         ?? ParameterConformance.ReturningCarrierResidue(cr)) is { } rwhy)   // kb/Work PB1116
+                         ?? ParameterConformance.ReturningCarrierResidue(cr, rr)) is { } rwhy)   // kb/Work PB1116, PB1940
                 ctx.Edition.Error(DiagnosticCatalog.CallReturningConformance,
                     $"{calleeWhere} RETURNING '{rr.Item.CobolName}' does not conform to the activated "
                     + $"program's returning item '{cr.CobolName}': {rwhy} (ISO §14.8.3 via §14.9.4.3 SR25)");

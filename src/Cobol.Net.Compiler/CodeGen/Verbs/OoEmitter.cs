@@ -70,6 +70,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // group's ELEMENTARY value — never the cell's raw backing, whose packed bits are not the crossing's alphabet
         // (kb/Work PB2087: a bit-group area formal over an argument with no cell read `0011` for B"1010").
         OoCrossingType(root) == "string" ? CallEmitter.CallStringRead(MethodCellPlace(root))
+        // A variable-length group crosses as its §8.5.1.12 component carrier (kb/Work PB2094: its area is a cell now).
+        : OoVarGroupCarried(root) ? PlaceRenderer.VarGroupBoundaryImage(MethodCellPlace(root), "OO method boundary value of")
         // A strong group with no character image crosses as its leaf vector (kb/Work PB1116) — the cell's managed slots.
         : OoClassTable.LeafCarried(root) ? PlaceRenderer.GroupLeaves(MethodCellPlace(root))
         : PlaceRenderer.Read(MethodCellPlace(root));
@@ -77,6 +79,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// <summary>The inverse of <see cref="MethodCellFormalLoad"/>: store the argument into the root's cell.</summary>
     private string MethodCellFormalStore(DataItem root, string value) =>
         OoCrossingType(root) == "string" ? CallEmitter.CallStringWrite(MethodCellPlace(root), value)
+        : OoVarGroupCarried(root) ? PlaceRenderer.WriteVarGroupImage(MethodCellPlace(root), value, "OO method formal copy-in of",
+            formalStorage: true)
         : OoClassTable.LeafCarried(root) ? PlaceRenderer.WriteGroupLeaves(MethodCellPlace(root), value)
         : PlaceRenderer.Write(MethodCellPlace(root), value);
 
@@ -1083,7 +1087,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     }
                     if (bf.IsArea)
                     {
-                        w.Line($"{bf.CarrierLocal} = {RuntimeApi.ArgAdaptAreaOf(bf.ByValue ? "null" : bf.AreaParam, $"!{bf.OmittedFlag}", root.Class!.Width)};   "
+                        var (shape, fresh) = fields.AreaFormalShape(root);
+                        w.Line($"{bf.CarrierLocal} = {RuntimeApi.ArgAdaptAreaOf(bf.ByValue ? "null" : bf.AreaParam, $"!{bf.OmittedFlag}", root.Class!.Width, shape, fresh)};   "
                             + $"// LINKAGE formal {root.CobolName} — laid over the argument's area (§14.2.3 GR8)");
                         w.Line($"if (!{bf.OmittedFlag} && !ReferenceEquals({bf.CarrierLocal}, {bf.AreaParam})) {{ {MethodCellFormalStore(root, $"{bf.ParamName}.Value")} }}   "
                             + "// no area to share: the fresh cell takes the argument's value (§14.2.3 GR9 / GR10)");
@@ -1293,7 +1298,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                         + "// BY REFERENCE store-back of a fresh area (§14.2.3 GR8)");
                 else
                     w.Line($"if (!{f.OmittedFlag}) {f.ParamName}.Value = {MethodBoundaryValue(fields, f.Item, "OO method BY REFERENCE copy-out")};   "
-                        + "// BY REFERENCE copy-out of a variable-length group formal (§8.5.1.12; see DataBinder.CellCanCarry)");
+                        + "// BY REFERENCE copy-out of a formal whose area no cell carries (see DataBinder.CellCanCarry)");
             }
             if (m.Binding!.Returning is { } r)
             {

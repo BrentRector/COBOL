@@ -275,6 +275,8 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
         // model deep-clones its subtree (CreateCompilerTemp's group leg) so the FieldEmitter declares the
         // struct with its AsImage/FromImage codec — the CALL boundary's group crossing form.
         var temp = ctx.Data.CreateCompilerTemp(fn.Returning, "__FNRES-", "__fnres", name);
+        // A result whose values ride managed slots is delivered into the temporary's AREA (kb/Work PB1940).
+        ctx.Data.ClaimSlotCarriedCell(temp, "FUNCTION result temporary");
         if (ctx.Refs.ResolveItem(temp) is not { } tempPlace)
             return BoundExprError.Unbuilt(ctx.Edition, $"FUNCTION {name} result temporary");
 

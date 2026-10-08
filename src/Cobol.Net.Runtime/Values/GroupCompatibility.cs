@@ -287,6 +287,37 @@ public static class GroupCompatibility
     /// BIT leaf, whose shared-byte runs make a character position non-positional, §8.5.1.6.3).</summary>
     public static GroupAtom[] FixedRun(int positions) => [new GroupAtom(GroupAtomKind.Fixed, positions, positions)];
 
+    /// <summary>⛔ True when a description with atoms <paramref name="formal"/> can be LAID OVER storage described by
+    /// <paramref name="area"/> (kb/Work PB2094): the formal's <see cref="Layout"/> is the area's, or a prefix of it whose
+    /// last fixed run may be shorter — every component, every table and every fixed run before it at the same character
+    /// position and of the same kind and extent — and every pair of tables has elements of the same storage, recursively
+    /// (an elementary element is the one fixed run of its characters). That is the condition under which each component
+    /// of the formal IS the area's component at the same ordinal, so §14.2.3 GR8's "the formal parameter occupies the same
+    /// storage area as the argument" holds per component; a shorter formal simply describes fewer of the positions. Unlike
+    /// <see cref="SameShape"/> it ignores how fixed material is divided into elementary items: storage, not description.</summary>
+    public static bool LaysOver(GroupAtom[] formal, GroupAtom[] area) => Overlays(formal, area, prefix: true);
+
+    private static bool Overlays(GroupAtom[] formal, GroupAtom[] area, bool prefix)
+    {
+        int[] f = Layout(formal), a = Layout(area);
+        if (prefix ? f.Length > a.Length : f.Length != a.Length) return false;
+        for (int k = 0; k < f.Length; k += 3)
+        {
+            bool shorterTail = prefix && k + 3 == f.Length && f[k] == CobolVarGroup.LayoutFixed && f[k + 1] <= a[k + 1];
+            if (f[k] != a[k] || f[k + 2] != a[k + 2] || f[k + 1] != a[k + 1] && !shorterTail) return false;
+        }
+        var (tf, ta) = (formal.Where(x => x.IsTable).ToArray(), area.Where(x => x.IsTable).ToArray());
+        for (int i = 0; i < tf.Length; i++)
+            if (!Overlays(tf[i].Element ?? FixedRun(tf[i].ElementChars), ta[i].Element ?? FixedRun(ta[i].ElementChars), prefix: false))
+                return false;
+        return true;
+    }
+
+    /// <summary>True when <paramref name="atoms"/> hold a variable-length component — a dynamic-length item or a
+    /// dynamic-capacity table, at any depth (§8.5.1.12.1's definition of a variable-length group).</summary>
+    public static bool HasComponent(GroupAtom[] atoms) =>
+        atoms.Any(x => x.IsComponent || x.Element is { } e && HasComponent(e));
+
     /// <summary>True when the two layouts are the same atom for atom (element atoms included) — a pair whose carriers
     /// need no reshaping (<see cref="CobolVarGroup.Reshape"/>).</summary>
     public static bool SameShape(GroupAtom[] a, GroupAtom[] b)

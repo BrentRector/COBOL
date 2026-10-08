@@ -170,8 +170,9 @@ a cell — `DataBinder.PtrBindBasedAndAddressables`). In the body a RESIDENT for
 program arm's test) reads and writes through its carrier on every access — its path IS `__lnk{Uid}.Value` — and an AREA
 formal (group / REDEFINED / addressed) is described as a BASED item whose per-activation pointer `CobolArgAdapt.Area` sets to
 the argument's area; only an argument with no area gives it a fresh cell, filled from the carrier and, BY REFERENCE, stored
-back at return. A formal no cell carries (a variable-length group, `DataBinder.CellCanCarry`) keeps a local copied through
-the carrier (an open GR8 defect, kb/Work PB2094). A strongly-typed group with an object-reference or pointer leaf
+back at return. A variable-length group formal is an area formal too (kb/Work PB2094): it is laid over an argument of the
+same storage, its components numbered from the area's component ordinal (`CellPointer.DynBase`), and a fresh area is its
+own seeded cell filled through the component carrier. A strongly-typed group with an object-reference or pointer leaf
 (`OoClassTable.LeafCarried` — no character image) crosses as its LEAF VECTOR; where one side lives in a cell (an area
 formal, or a group claimed onto a cell because it is passed BY REFERENCE) the vector is composed and distributed member by
 member through `PlaceCursor` (`PlaceRenderer.GroupLeaves` / `WriteGroupLeaves`), in its record struct's field order, so
