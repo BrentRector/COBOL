@@ -36,7 +36,29 @@ internal sealed class KeyedStoreTable
     public IndexedStore AttachIndexed(string host, Action<IndexedStore> loadFirst)
         => Attach(host, () => { var s = new IndexedStore(); loadFirst(s); return s; });
 
-    private T Attach<T>(string host, Func<T> create) where T : class
+    /// <summary>⛔ ATTACH TO A STORE THAT IS BEING CREATED — <c>OPEN OUTPUT</c>, §14.9.27.4 GR18: a new, EMPTY store
+    /// for <paramref name="host"/> that no other connector of this run unit holds (kb/Work PB754).
+    /// <para>Emptying a store is a mutation every attached connector would see instantly (kb/Work PB143), so it is
+    /// only ever done HERE, where the precondition that makes it safe is checked rather than remembered: Table 19
+    /// refuses every OUTPUT open beside any other open connector — §9.1.13.9 1) e), <i>"An attempt is made to open a
+    /// physical file in the output mode and the physical file is currently open by another file connector"</i> —
+    /// and <c>FileRegistry.OpenShared</c> runs that arbitration BEFORE the connector's OPEN body. An entry that
+    /// still exists here therefore means the arbitration was bypassed, and the answer is a loud defect, never a
+    /// silent emptying of records another connector is reading (the analogous impossible state in
+    /// <see cref="Attach{T}"/> is answered the same way).</para></summary>
+    public T AttachCreated<T>(string host) where T : KeyedStore, new()
+    {
+        if (_byHost.TryGetValue(host, out var e))
+            throw new InvalidOperationException(
+                $"physical file '{host}' is being created by OPEN OUTPUT while {e.Attached} other connector(s) of this "
+                + "run unit hold it open; Table 19 refuses that OPEN (§9.1.13.9 1) e)), so reaching here is an "
+                + "arbitration defect (kb/Work PB754)");
+        var store = new T();
+        _byHost[host] = new Entry { Store = store, Attached = 1 };
+        return store;
+    }
+
+    private T Attach<T>(string host, Func<T> create) where T : KeyedStore
     {
         if (_byHost.TryGetValue(host, out var e))
         {
@@ -63,6 +85,45 @@ internal sealed class KeyedStoreTable
     public void Clear() => _byHost.Clear();
 }
 
+/// <summary>⭐ What every keyed record store knows about its agreement with the PHYSICAL FILE — the state the
+/// cross-run-unit coherence of <c>KeyedConnector</c> runs on (kb/Work PB2660; ISO §9.1.15, <i>"Multiple paths of
+/// access may exist in the same runtime element, contained elements, separate runtime elements within the same run
+/// unit, or runtime elements in different run units"</i>).
+/// <para>The store is this run unit's copy of the physical file. Within the run unit it IS the truth (kb/Work
+/// PB143); across run units the file is, and these numbers say how far the copy may be trusted: whether it has
+/// changed since it last agreed with the file (<see cref="Version"/> against <see cref="PersistedVersion"/>), which
+/// image of the file it agreed with (<see cref="Generation"/>, the stamp every persist writes —
+/// <see cref="RecordFraming.GenerationOffset"/>), and whether a statement of this run unit is already inside the
+/// store's cross-run-unit mutex (<see cref="StatementDepth"/>).</para></summary>
+internal abstract class KeyedStore
+{
+    /// <summary>Bumped by EVERY change to the records — the organizations' mutators are the only writers.</summary>
+    public long Version { get; private set; }
+
+    /// <summary>The <see cref="Version"/> at which the store last agreed with the physical file: set by the load
+    /// and by every persist, so <c>Version != PersistedVersion</c> is exactly "this run unit holds records the
+    /// file does not".</summary>
+    public long PersistedVersion { get; set; }
+
+    /// <summary>The generation stamp of the physical file image the store last loaded or persisted.</summary>
+    public ulong Generation { get; set; }
+
+    /// <summary>How many statements of this run unit are inside the store's cross-run-unit mutex. A run unit is one
+    /// thread of control, so a nested entry re-enters rather than deadlocking against itself.</summary>
+    public int StatementDepth { get; set; }
+
+    /// <summary>The handle holding the store's cross-run-unit mutex while <see cref="StatementDepth"/> is non-zero —
+    /// null when no statement is inside it, or when the host cannot carry the lock.</summary>
+    public Microsoft.Win32.SafeHandles.SafeFileHandle? MutexHolder { get; set; }
+
+    /// <summary>The <see cref="Version"/> when the outermost statement entered — so the statement persists only
+    /// what IT changed.</summary>
+    public long VersionAtEntry { get; set; }
+
+    /// <summary>Record that the records changed — called by every mutator, and by nothing else.</summary>
+    protected void Mutated() => Version++;
+}
+
 /// <summary>The shared RELATIVE record store: RRN (1-based, §12.4.5.13 GR1) → record image, plus the ONE
 /// number a sequential-access release needs — <see cref="Highest"/>, the highest RRN existing in the physical
 /// file right now.
@@ -78,7 +139,7 @@ internal sealed class KeyedStoreTable
 /// <para>Maintained rather than scanned because a sequential extend asks for it once per WRITE, and a
 /// <c>SortedDictionary</c> has no O(1) maximum — scanning would have made an n-record append O(n²). Only the
 /// removal OF the maximum pays a scan, and only then.</para></summary>
-internal sealed class RelativeStore
+internal sealed class RelativeStore : KeyedStore
 {
     private readonly SortedDictionary<long, StoredFrame> _slots = new();
 
@@ -97,7 +158,7 @@ internal sealed class RelativeStore
 
     /// <summary>The bytes the frames of the persisted store would occupy after <see cref="Put"/>(<paramref
     /// name="rrn"/>, <paramref name="record"/>): every record's frame plus a <see cref="RecordFraming.GapBytes"/>
-    /// tag for every empty slot below the highest RRN — the same image <see cref="RecordFraming.WriteStore"/>
+    /// tag for every empty slot below the highest RRN — the same image <see cref="RecordFraming.ComposeStore"/>
     /// composes, so the keyed WRITE and REWRITE can answer §14.9.51.4 GR33 b)'s '24' BEFORE the record is
     /// released (Annex A.1 item 107; kb/Work PB1192).</summary>
     public long FramedBytesAfterPut(long rrn, StoredFrame record)
@@ -127,6 +188,7 @@ internal sealed class RelativeStore
     public void Put(long rrn, StoredFrame record)
     {
         if (_slots.TryGetValue(rrn, out StoredFrame replaced)) _recordBytes -= RecordFraming.FrameBytes(replaced);
+        Mutated();
         _slots[rrn] = record;
         _recordBytes += RecordFraming.FrameBytes(record);
         if (rrn > Highest) Highest = rrn;
@@ -138,6 +200,7 @@ internal sealed class RelativeStore
     public bool Remove(long rrn)
     {
         if (!_slots.TryGetValue(rrn, out StoredFrame removed)) return false;
+        Mutated();
         _slots.Remove(rrn);
         _recordBytes -= RecordFraming.FrameBytes(removed);
         if (rrn == Highest) Highest = _slots.Count == 0 ? 0 : _slots.Keys.Max();
@@ -147,6 +210,7 @@ internal sealed class RelativeStore
     /// <summary>Empty the store (OPEN OUTPUT, and the OPEN I-O/EXTEND creation of an absent OPTIONAL file).</summary>
     public void Clear()
     {
+        Mutated();
         _slots.Clear();
         _recordBytes = 0;
         Highest = 0;
@@ -177,7 +241,7 @@ internal sealed class KeyedRec
 /// <summary>The shared INDEXED record store: the records plus the release-ordinal mint — shared so a WRITE
 /// through one connector takes the next GLOBAL ordinal and §14.9.30.4 GR26's duplicate-alternate retrieval
 /// order holds across connectors.</summary>
-internal sealed class IndexedStore
+internal sealed class IndexedStore : KeyedStore
 {
     private readonly List<KeyedRec> _recs = [];
 
@@ -201,6 +265,7 @@ internal sealed class IndexedStore
     /// <summary>Release a record into the store (a WRITE, or the OPEN's load).</summary>
     public void Add(KeyedRec rec)
     {
+        Mutated();
         _recs.Add(rec);
         RecordBytes += FrameBytes(rec.Image, rec.Extents);
     }
@@ -210,6 +275,7 @@ internal sealed class IndexedStore
     public void Replace(KeyedRec rec, string image, RecordExtents? extents)
     {
         RecordBytes += FrameBytes(image, extents) - FrameBytes(rec.Image, rec.Extents);
+        Mutated();
         rec.Image = image;
         rec.Extents = extents;
     }
@@ -218,6 +284,7 @@ internal sealed class IndexedStore
     public bool Remove(KeyedRec rec)
     {
         if (!_recs.Remove(rec)) return false;
+        Mutated();
         RecordBytes -= FrameBytes(rec.Image, rec.Extents);
         return true;
     }
@@ -225,6 +292,7 @@ internal sealed class IndexedStore
     /// <summary>Empty the store (OPEN OUTPUT, the absent-OPTIONAL creation, and the OPEN's reload).</summary>
     public void Clear()
     {
+        Mutated();
         _recs.Clear();
         RecordBytes = 0;
     }

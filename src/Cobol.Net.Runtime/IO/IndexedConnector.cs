@@ -226,23 +226,17 @@ public sealed class IndexedConnector : KeyedConnector
                 Attach();
                 break;
             case FileOpenMode.Output:
-            {
-                var fs = TakeFileLock(create: true);       // §14.9.27.4 GR18 — OUTPUT creates the physical file
-                Attach();
-                _st.Clear();                               // OPEN OUTPUT empties the SHARED view (kb/Work PB143)
-                _nextOrdinal = 1;
-                RecordFraming.WriteStore(fs, DeclaredAttributes, []);
+                TakeFileLock(create: true);                // §14.9.27.4 GR18 — OUTPUT creates the physical file
+                AttachCreated();                           // a new, EMPTY store no other connector holds (kb/Work PB754)
+                Persist(_st);                              // a new physical file; the header IS its §9.1.6 attributes
                 break;
-            }
             case FileOpenMode.IO:
                 if (!exists)
                 {
                     if (!IsOptional) return FileStatusCode.FileNotFound;   // '35' — spec-pinned
-                    var io = TakeFileLock(create: true);
-                    Attach();
-                    _st.Clear();
-                    _nextOrdinal = 1;
-                    RecordFraming.WriteStore(io, DeclaredAttributes, []);   // §14.9.27 GR17
+                    TakeFileLock(create: true);
+                    Attach();                              // empty by construction: the file was absent (kb/Work PB754)
+                    Persist(_st);                          // created as if OPEN OUTPUT + CLOSE (§14.9.27 GR17)
                     status = FileStatusCode.OptionalFileNotFound;
                     break;
                 }
@@ -253,11 +247,9 @@ public sealed class IndexedConnector : KeyedConnector
                 if (!exists)
                 {
                     if (!IsOptional) return FileStatusCode.FileNotFound;
-                    var ex = TakeFileLock(create: true);
-                    Attach();
-                    _st.Clear();
-                    _nextOrdinal = 1;
-                    RecordFraming.WriteStore(ex, DeclaredAttributes, []);
+                    TakeFileLock(create: true);
+                    Attach();                              // empty by construction: the file was absent (kb/Work PB754)
+                    Persist(_st);                          // §14.9.27 GR17
                     status = FileStatusCode.OptionalFileNotFound;
                 }
                 else { TakeFileLock(create: false); Attach(); }
@@ -283,6 +275,41 @@ public sealed class IndexedConnector : KeyedConnector
         _st = s;
     }
 
+    /// <summary>Attach to the store an <c>OPEN OUTPUT</c> is creating — empty, its release-ordinal mint at 1, and held
+    /// by no other connector (<see cref="KeyedStoreTable.AttachCreated{T}"/>, kb/Work PB754).</summary>
+    private void AttachCreated() =>
+        _st = SharedStores is { } t ? t.AttachCreated<IndexedStore>(HostPath) : new IndexedStore();
+
+    /// <inheritdoc/>
+    private protected override KeyedStore AttachedStore => _st;
+
+    /// <inheritdoc/>
+    private protected override void Fill(KeyedStore into, List<StoredFrame?> frames)
+    {
+        var store = (IndexedStore)into;
+        store.Clear();
+        store.NextOrdinal = 1;
+        // A varying file's frames keep their exact stored lengths (§13.18.43 GR15 reports them on READ);
+        // fixed frames normalize to the record width.
+        foreach (StoredFrame? stored in frames)
+            if (stored is { } frame)
+                // The physical file order IS the release order under every key (§14.9.30.4 GR26) — PersistOrder
+                // wrote it that way, so one ordinal per record fills the whole vector (kb/Work PB341).
+                store.Add(new KeyedRec
+                {
+                    Image = IsVarying ? frame.Image : Fit(frame.Image),
+                    Extents = IsVarying ? frame.Extents : null,   // a fitted fixed record is not the image a table describes
+                    Ordinals = ReleaseOrdinals(store.NextOrdinal++),
+                });
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>In <see cref="PersistOrder"/> — the ONE physical order that reproduces §14.9.30.4 GR26's duplicate
+    /// retrieval order under EVERY key of reference after the reload. Materialized, because the compose enumerates
+    /// the frames twice.</remarks>
+    private protected override IEnumerable<StoredFrame?> PersistFrames() =>
+        PersistOrder().Select(r => (StoredFrame?)new StoredFrame(r.Image, r.Extents)).ToList();
+
     /// <summary>The indexed CLOSE body (§14.9.6): a writable mode persists the store in <see cref="PersistOrder"/>
     /// — the ONE physical order that reproduces §14.9.30.4 GR26's duplicate retrieval order under EVERY key of
     /// reference after the reload — so the order survives a CLOSE/OPEN cycle and run-unit termination.
@@ -304,8 +331,7 @@ public sealed class IndexedConnector : KeyedConnector
             if (!PersistIsReachable(owed))
                 throw new IOException($"the §9.1.15 file lock on '{HostPath}' was not held at the CLOSE, "
                     + "so the record store cannot be persisted");
-            if (owed && Store is { } fs)
-                RecordFraming.WriteStore(fs, DeclaredAttributes, PersistOrder().Select(r => (StoredFrame?)new StoredFrame(r.Image, r.Extents)).ToList(), CodeSet);
+            if (owed) PersistIfChanged(_st);
         }
         finally
         {
@@ -918,25 +944,4 @@ public sealed class IndexedConnector : KeyedConnector
     /// and the extent table it was released with.</summary>
     private string KeyOf(KeyedRec rec, int keyIndex) => KeyOf(rec.Image, rec.Extents, keyIndex);
 
-    private void Load(IndexedStore into)
-    {
-        into.Clear();
-        into.NextOrdinal = 1;
-        // ⛔ NO SECOND PRESENCE QUESTION, AND NO SECOND HANDLE (kb/Work PB771) — see RelativeConnector.Load:
-        // the load reads the store through the connector's OWN handle, its §9.1.15 file lock, and the handle's
-        // existence is the answer this used to ask HostFile.Probe for a second time in the same OPEN.
-        if (Store is not { } fs) return;
-        // A varying file's frames keep their exact stored lengths (§13.18.43 GR15 reports them on READ);
-        // fixed frames normalize to the record width.
-        foreach (StoredFrame? stored in RecordFraming.ReadStore(fs, CodeSet))
-            if (stored is { } frame)
-                // The physical file order IS the release order under every key (§14.9.30.4 GR26) — PersistOrder
-                // wrote it that way, so one ordinal per record fills the whole vector (kb/Work PB341).
-                into.Add(new KeyedRec
-                {
-                    Image = IsVarying ? frame.Image : Fit(frame.Image),
-                    Extents = IsVarying ? frame.Extents : null,   // a fitted fixed record is not the image a table describes
-                    Ordinals = ReleaseOrdinals(into.NextOrdinal++),
-                });
-    }
 }

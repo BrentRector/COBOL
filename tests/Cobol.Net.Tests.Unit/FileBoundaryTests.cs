@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Unit;
 /// item 107, the store's capacity <see cref="RecordFraming.MaxStoreBytes"/>) and §9.1.13.6 item 3 ('34', a
 /// sequential file — Annex A.1 item 108, the host medium's capacity, <see cref="HostFile.IsMediumBoundary"/>).
 /// The capacity test is ARITHMETIC over the one size formula (<see cref="RecordFraming.FrameBytes"/>), so these
-/// tests hold that formula against the bytes <see cref="RecordFraming.WriteStore"/> really composes: a drift
+/// tests hold that formula against the bytes <see cref="RecordFraming.ComposeStore"/> really composes: a drift
 /// between them would let a store past the boundary be released, or refuse one inside it.</item>
 /// <item>The file coded character set of Annex A.1 item 31 (owner decision kb/Work R47): ISO/IEC 8859-1, with a
 /// strict encoding so an unrepresentable character can never become a silent <c>?</c>.</item>
@@ -137,7 +137,7 @@ public sealed class FileBoundaryTests : IDisposable
     public void MaxStoreBytes_IsTheLargestArrayTheStoreIsComposedIn() =>
         Assert.Equal(RecordFraming.MaxStoreBytes, (long)Array.MaxLength);
 
-    /// <summary>The relative store's size arithmetic agrees with the image <see cref="RecordFraming.WriteStore"/>
+    /// <summary>The relative store's size arithmetic agrees with the image <see cref="RecordFraming.ComposeStore"/>
     /// composes, through every mutation: a release above the highest RRN (gap tags), a replacement by a longer
     /// record, a record with an extent table, a removal of the highest record (its gap tags go with it).</summary>
     [Fact]
@@ -183,10 +183,11 @@ public sealed class FileBoundaryTests : IDisposable
             Composed(attributes, store.Recs.Select(r => (StoredFrame?)new StoredFrame(r.Image, r.Extents))));
     }
 
-    /// <summary>The relative boundary, exactly: a 4-character fixed record's store is a 20-byte header, a 4-byte
-    /// gap tag for every empty slot below the record and the record's own 8-byte frame — so RRN 536 870 891 is
-    /// the last that fits <see cref="RecordFraming.MaxStoreBytes"/> (2 147 483 588 bytes) and 536 870 892 the first
-    /// that does not (2 147 483 592). Beyond the store, GR29 b)'s highest permitted RRN (2 147 483 647) splits
+    /// <summary>The relative boundary, exactly: a 4-character fixed record's store is a 28-byte header (format 3,
+    /// whose last 8 bytes are the generation stamp — kb/Work PB2660), a 4-byte gap tag for every empty slot below the
+    /// record and the record's own 8-byte frame — so RRN 536 870 889 is the last that fits
+    /// <see cref="RecordFraming.MaxStoreBytes"/> (2 147 483 588 bytes) and 536 870 890 the first that does not
+    /// (2 147 483 592). Beyond the store, GR29 b)'s highest permitted RRN (2 147 483 647) splits
     /// '24' (a relative record number that does not fit — the invalid key condition) from '34' (one that is not
     /// permitted at all). Nothing is released by either, so the CLOSE persists only the in-bounds record.</summary>
     [Fact]
@@ -194,14 +195,14 @@ public sealed class FileBoundaryTests : IDisposable
     {
         var c = new RelativeConnector(Host("rel.dat"), 4, KeyedAccess.Random, 18);
         long header = RecordFraming.HeaderBytes(c.DeclaredAttributes);
-        Assert.Equal(20, header);
+        Assert.Equal(28, header);
         var probe = new RelativeStore();
         var four = new StoredFrame("ABCD", null);
-        Assert.True(header + probe.FramedBytesAfterPut(536_870_891, four) <= RecordFraming.MaxStoreBytes);
-        Assert.True(header + probe.FramedBytesAfterPut(536_870_892, four) > RecordFraming.MaxStoreBytes);
+        Assert.True(header + probe.FramedBytesAfterPut(536_870_889, four) <= RecordFraming.MaxStoreBytes);
+        Assert.True(header + probe.FramedBytesAfterPut(536_870_890, four) > RecordFraming.MaxStoreBytes);
 
         Assert.Equal(FileStatusCode.Success, c.Open(FileOpenMode.Output));
-        c.SetPendingKey(536_870_892);
+        c.SetPendingKey(536_870_890);
         Assert.Equal(FileStatusCode.BoundaryViolation, c.Write("ABCD"));
         c.SetPendingKey(RelativeConnector.HighestRelativeRecordNumber);
         Assert.Equal(FileStatusCode.BoundaryViolation, c.Write("ABCD"));
@@ -346,8 +347,7 @@ public sealed class FileBoundaryTests : IDisposable
 
     private static long Composed(FixedFileAttributes attributes, IEnumerable<StoredFrame?> frames)
     {
-        var ms = new MemoryStream();
-        RecordFraming.WriteStore(ms, attributes, frames);
+        using var ms = RecordFraming.ComposeStore(attributes, frames, generation: 0);
         return ms.Length;
     }
 }

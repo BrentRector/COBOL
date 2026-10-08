@@ -40,10 +40,10 @@ public sealed class FixedFormRecordDriftTests
     public void TheRegistrysGovernedWriteAndRewrite_AskForTheFixedForm()
     {
         string registry = Runtime("FileRegistry.cs");
-        Assert.True(MemberAsks(registry, "public string WriteShared(", ".FixedForm("),
-            "FileRegistry.WriteShared must pass the record through FileConnector.FixedForm before the connector sees it — "
+        Assert.True(MemberAsks(registry, "private string WriteSharedInStatement(", ".FixedForm("),
+            "FileRegistry.WriteShared (its body, WriteSharedInStatement — kb/Work PB2660) must pass the record through FileConnector.FixedForm before the connector sees it — "
             + "a file of fixed-length records cannot frame the record or carry its extent table (D-FRA (vi)).");
-        Assert.True(MemberAsks(registry, "public string RewriteShared(", ".FixedForm("),
+        Assert.True(MemberAsks(registry, "private string RewriteSharedInStatement(", ".FixedForm("),
             "FileRegistry.RewriteShared must pass the record through FileConnector.FixedForm, as WriteShared does.");
     }
 

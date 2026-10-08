@@ -40,7 +40,7 @@ public static class FileCharacterSet
     public static bool HasCharacterWithoutByteImage(ReadOnlySpan<char> record) => StorageByte.AnyWithoutByte(record);
 
     /// <summary>⛔ THE NATIVE → CHANNEL mapping of a record image about to be written — every physical write of
-    /// record data passes through here (<c>FileConnector.ToMedium</c>, <see cref="RecordFraming.WriteStore"/>).
+    /// record data passes through here (<c>FileConnector.ToMedium</c>, <see cref="RecordFraming.ComposeStore"/>).
     /// The HIGH-VALUE character takes its byte 0xFF (<see cref="StorageByte"/>), and a CODE-SET conversion
     /// (§13.18.13.4 GR6 b) then replaces each native channel character with its coded character; with none
     /// (GR7) the channel IS the medium. The output statement has already refused a record holding a character

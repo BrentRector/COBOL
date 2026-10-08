@@ -37,7 +37,7 @@ internal sealed class RunUnitFileLock : IDisposable
 {
     /// <summary>The offset of the first protocol byte: 2<sup>62</sup>, beyond any file a host can hold, so the
     /// regions never overlap a byte a record or another lock user could touch.</summary>
-    private const long RegionBase = 1L << 62;
+    private const long RegionBase = HostRegionLocks.RegionBase;
 
     /// <summary>The byte a column is published on. ⛔ A WIRE VALUE: changing it splits the run units of two
     /// runtime versions into groups that cannot see each other.</summary>
@@ -81,7 +81,7 @@ internal sealed class RunUnitFileLock : IDisposable
         try
         {
             var own = Table19.Column(sharing, mode);
-            switch (OfdRegionLocks.HoldShared(region, ByteOf(own)))
+            switch (OfdRegionLocks.Hold(region, ByteOf(own), exclusive: false, wait: false))
             {
                 case OfdRegionLocks.Result.Held: return Outcome.Refused;   // someone holds our byte exclusively: not our protocol, not ours to override
                 case OfdRegionLocks.Result.Unavailable: return Outcome.Unavailable;

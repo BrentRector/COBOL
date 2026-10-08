@@ -85,14 +85,16 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
         // rejected with the sidecar, and one is what a `*.dat:*` enumeration would add here.
         Assert.Equal([Path.GetFileName(host)], Directory.GetFiles(_dir).Select(Path.GetFileName).Order());
 
-        // The whole of what a LATER RUN can know is these bytes: magic + version 2 (PB1602), 'R'elative, 'F'ixed,
-        // min 10, max 10, no keys. Nothing in this process holds them.
+        // The whole of what a LATER RUN can know is these bytes: magic + version 3 (PB2660), 'R'elative, 'F'ixed,
+        // min 10, max 10, no keys, and the generation stamp of the store's one persist (its creation). Nothing in
+        // this process holds them.
         byte[] head = File.ReadAllBytes(host);
         Assert.Equal(
-            [(byte)'C', (byte)'B', (byte)'N', (byte)'F', (byte)'S', (byte)'T', (byte)'R', 2,
-             (byte)'R', (byte)'F', 10, 0, 0, 0, 10, 0, 0, 0, 0, 0],
-            head[..20]);
-        Assert.Equal(20, head.Length);   // an empty store is its header and nothing else
+            [(byte)'C', (byte)'B', (byte)'N', (byte)'F', (byte)'S', (byte)'T', (byte)'R', 3,
+             (byte)'R', (byte)'F', 10, 0, 0, 0, 10, 0, 0, 0, 0, 0,
+             1, 0, 0, 0, 0, 0, 0, 0],
+            head[..28]);
+        Assert.Equal(28, head.Length);   // an empty store is its header and nothing else
 
         // §14.9.27.4 GR10 — organization and record size both differ: the OPEN is unsuccessful, '39'.
         Assert.Equal(FileStatusCode.FixedAttributeConflict, OpenContradictingRelativeConnector(host));

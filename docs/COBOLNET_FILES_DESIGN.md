@@ -467,7 +467,7 @@ what an opt-out from the key check means.
 
 **⚠ THIS IS A FORMAT CHANGE TO RELATIVE AND INDEXED DATA FILES, and it is owner-visible.** The framed store now
 begins with a header (magic + version, organization, record type, the two record sizes, the key table) and the
-frames follow it; `RecordFraming.WriteStore` stamps it from the writing connector's `DeclaredAttributes` on every
+frames follow it; `RecordFraming.ComposeStore` stamps it from the writing connector's `DeclaredAttributes` on every
 persist, so a store always describes itself. A relative or indexed file written by an earlier build carries no
 header and is therefore **refused with '39'** rather than silently misread — the loud failure is the point, and
 it is the reason the header is required rather than optional. The SEQUENTIAL formats are untouched: a
@@ -842,7 +842,7 @@ their whole record store was loaded at the OPEN and rewritten at the CLOSE throu
 file"* — protected a keyed file from nothing outside the run unit, and the CLOSE then truncated it and rewrote
 it from the OPEN's snapshot, discarding another run unit's records with '00' reported on both sides. Measured,
 on both organizations, before the fix. `KeyedConnector` now takes and holds the handle for the life of the
-OPEN and the store travels THROUGH it (`RecordFraming.ReadStore`/`WriteStore` take a stream, not a path),
+OPEN and the store travels THROUGH it (`KeyedConnector.Load`/`Persist` read and write positionally through that handle; `RecordFraming` only composes and decodes the image),
 which is also what keeps kb/Work PB713 closed: a second handle for the load would ask for access the
 connector's own `FileShare.None` forbids. `FileLockPostureDriftTests.EveryOrganizationHoldsALiveFileLockWhileOpen`
 measures the lock from a handle OUTSIDE the connector for every (organization × open mode), and
@@ -2018,7 +2018,7 @@ answer that every organization's WRITE and REWRITE asks, in the connector, befor
    CLOSE, so its externally-defined boundary (§9.1.13.5 item 4; Annex A.1 item 107) is the store image's
    capacity, `RecordFraming.MaxStoreBytes`. `RecordFraming.FrameBytes` is the ONE size formula — the stores keep a
    running total through their only mutators (`RelativeStore.FramedBytesAfterPut`, `IndexedStore.RecordBytes`)
-   and `WriteStore` sizes its composition with it — so `KeyedConnector.StoreHolds` answers §14.9.51.4 GR33 b) /
+   and `ComposeStore` sizes its composition with it — so `KeyedConnector.StoreHolds` answers §14.9.51.4 GR33 b) /
    GR42 d)'s '24' in O(1), at the WRITE. A relative store is persisted from its sparse slots LAZILY
    (`RelativeStore.Ordinal`), never through an array sized by the highest RRN. GR29 b)'s highest permitted RRN
    is `RelativeConnector.HighestRelativeRecordNumber`; above it is '34'.

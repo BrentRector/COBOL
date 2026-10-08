@@ -1,6 +1,22 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using Microsoft.Win32.SafeHandles;
+
 namespace CobolNet.Runtime.IO;
+
+/// <summary>Who holds the record lock a statement has run into (ISO §9.1.16) — the answer the RETRY discipline
+/// needs as well as the conflict itself, because only a holder OUTSIDE the run unit can give the lock back while a
+/// statement waits (§14.7.9.3; <c>RetryAttempt.HolderOutsideRunUnit</c>, kb/Work PB1163).</summary>
+internal enum RecordLockHolder
+{
+    /// <summary>No other file connector holds it.</summary>
+    None,
+    /// <summary>Another file connector of THIS run unit holds it (this table says so).</summary>
+    ThisRunUnit,
+    /// <summary>A file connector of ANOTHER run unit holds it (the host's byte-range lock says so — kb/Work
+    /// PB2660).</summary>
+    AnotherRunUnit,
+}
 
 /// <summary>
 /// The physical-file sharing/record-lock registry (ISO §9.1.15 sharing / §9.1.16 record locking; design D1 —
@@ -23,6 +39,16 @@ internal sealed class PhysicalFileTable
             new(StringComparer.OrdinalIgnoreCase);
         /// <summary>record-id → the connector name that holds its lock.</summary>
         public readonly Dictionary<string, string> RecordLocks = new(StringComparer.Ordinal);
+
+        /// <summary>record-id → the handle through which that lock is PUBLISHED to other run units
+        /// (<see cref="HostRegionLocks.RecordLockByte"/>, kb/Work PB2660) — a subset of <see cref="RecordLocks"/>:
+        /// a lock taken through a connector with no <c>RecordLockHandle</c>, or on a host that cannot carry the
+        /// byte-range lock, is this run unit's alone. Every release gives the published byte back.</summary>
+        public readonly Dictionary<string, SafeFileHandle> Published = new(StringComparer.Ordinal);
+
+        /// <summary>How many of <see cref="Published"/>'s locks each handle holds — the handle holds
+        /// <see cref="HostRegionLocks.LockPresenceByte"/> while its count is above zero.</summary>
+        public readonly Dictionary<SafeFileHandle, int> PublishedPerHandle = [];
 
         /// <summary>⭐ The SEQUENTIAL release-ordinal mint for this physical file (kb/Work PB739): the ordinal
         /// of the record most recently released to the operating environment through any sharing-active
@@ -88,8 +114,13 @@ internal sealed class PhysicalFileTable
 
     /// <summary>Acquire a lock on <paramref name="recId"/> for connector <paramref name="name"/>; re-locking a
     /// record the connector already holds is idempotent (GR8 self-access). Enforces the connector ceiling (54)
-    /// and the run-unit ceiling (53). Returns 00 on grant.</summary>
-    public string LockRecord(State st, string name, string recId)
+    /// and the run-unit ceiling (53). Returns 00 on grant.
+    /// <para>⛔ AND PUBLISHES IT to every other run unit through <paramref name="holder"/>'s
+    /// <c>RecordLockHandle</c> (kb/Work PB2660): §9.1.16 makes a locked record inaccessible to a file connector
+    /// <i>"in the same or a different run unit"</i>, and this table is one run unit's. A byte another run unit
+    /// already holds refuses the grant with '51' — the host's answer is the arbiter between run units, exactly as
+    /// this table is within one.</para></summary>
+    public string LockRecord(State st, string name, string recId, FileConnector? holder)
     {
         if (st.RecordLocks.TryGetValue(recId, out var owner))
             return string.Equals(owner, name, StringComparison.OrdinalIgnoreCase)
@@ -100,21 +131,71 @@ internal sealed class PhysicalFileTable
             if (string.Equals(o, name, StringComparison.OrdinalIgnoreCase)) mine++;
         if (mine >= ConnectorLockMax) return FileStatusCode.ConnectorLockLimit;   // 54 (GR7)
         if (TotalRunUnitLocks() >= RunUnitLockMax) return FileStatusCode.RunUnitLockLimit;   // 53 (GR7)
+        if (holder?.RecordLockHandle is { } handle)
+        {
+            switch (Publish(handle, holder.RecordLockHandleWritable, HostRegionLocks.RecordLockByte(recId)))
+            {
+                case OfdRegionLocks.Result.Held: return FileStatusCode.RecordLocked;   // 51 — another run unit holds it
+                case OfdRegionLocks.Result.Ok: Published(st, recId, handle); break;
+            }
+        }
         st.RecordLocks[recId] = name;
         return FileStatusCode.Success;
     }
 
-    /// <summary>True when <paramref name="recId"/> is locked by a connector OTHER than <paramref name="name"/>.</summary>
-    public static bool IsLockedByOther(State st, string name, string recId) =>
-        st.RecordLocks.TryGetValue(recId, out var owner)
-        && !string.Equals(owner, name, StringComparison.OrdinalIgnoreCase);
+    /// <summary>Take the record's byte for this run unit: exclusively wherever the host allows it — through a
+    /// writable handle, and through any handle on Windows; through a read-only handle where an exclusive lock needs a
+    /// writable one (an <c>OPEN INPUT</c> connector on Linux, <see cref="HostRegionLocks.ExclusiveNeedsWritableHandle"/>)
+    /// as a SHARED hold that is then TESTED, and given back if another handle holds the byte too — publish, then test,
+    /// the <see cref="RunUnitFileLock"/> pattern, so two run units can never both believe they hold it.</summary>
+    private static OfdRegionLocks.Result Publish(SafeFileHandle handle, bool writable, long recordByte)
+    {
+        bool exclusive = writable || !HostRegionLocks.ExclusiveNeedsWritableHandle;
+        var taken = HostRegionLocks.Hold(handle, recordByte, exclusive, wait: false);
+        if (taken != OfdRegionLocks.Result.Ok || exclusive) return taken;
+        if (HostRegionLocks.HeldByAnother(handle, recordByte) != OfdRegionLocks.Result.Held) return taken;
+        HostRegionLocks.Release(handle, recordByte);
+        return OfdRegionLocks.Result.Held;
+    }
+
+    /// <summary>Record a published lock, and announce the first one of a handle on the presence byte.</summary>
+    private static void Published(State st, string recId, SafeFileHandle handle)
+    {
+        st.Published[recId] = handle;
+        int held = st.PublishedPerHandle.GetValueOrDefault(handle);
+        st.PublishedPerHandle[handle] = held + 1;
+        if (held == 0)
+            _ = HostRegionLocks.Hold(handle, HostRegionLocks.LockPresenceByte, exclusive: false, wait: false);
+    }
+
+    /// <summary>Whether a file connector of ANOTHER run unit holds any record lock on the physical file
+    /// <paramref name="asker"/>'s handle is open on — the presence byte, one host question (kb/Work PB2660).</summary>
+    public static bool AnotherRunUnitHoldsLocks(FileConnector asker) =>
+        asker.RecordLockHandle is { } handle
+        && HostRegionLocks.HeldByAnother(handle, HostRegionLocks.LockPresenceByte) == OfdRegionLocks.Result.Held;
+
+    /// <summary>⛔ THE ONE QUESTION "is <paramref name="recId"/> locked by a file connector OTHER than
+    /// <paramref name="name"/>?" — and by whom. This run unit's table answers for this run unit; for a record it
+    /// does not list, the host answers for every other run unit, asked through <paramref name="asker"/>'s
+    /// <c>RecordLockHandle</c> (§9.1.16, <i>"in the same or a different run unit"</i>; kb/Work PB2660). A connector
+    /// with no such handle can only learn about its own run unit.</summary>
+    public static RecordLockHolder HolderOf(State st, string name, string recId, FileConnector? asker)
+    {
+        if (st.RecordLocks.TryGetValue(recId, out var owner))
+            return string.Equals(owner, name, StringComparison.OrdinalIgnoreCase)
+                ? RecordLockHolder.None : RecordLockHolder.ThisRunUnit;
+        return asker?.RecordLockHandle is { } handle
+            && HostRegionLocks.HeldByAnother(handle, HostRegionLocks.RecordLockByte(recId)) == OfdRegionLocks.Result.Held
+            ? RecordLockHolder.AnotherRunUnit
+            : RecordLockHolder.None;
+    }
 
     /// <summary>Release every record lock held by <paramref name="name"/> on <paramref name="st"/> (UNLOCK, CLOSE).</summary>
     public static void ReleaseAllForConnector(State st, string name)
     {
         var mine = st.RecordLocks.Where(kv => string.Equals(kv.Value, name, StringComparison.OrdinalIgnoreCase))
             .Select(kv => kv.Key).ToList();
-        foreach (var k in mine) st.RecordLocks.Remove(k);
+        foreach (var k in mine) Unlock(st, k);
     }
 
     /// <summary>Release a single record lock a connector holds (the LOCK MODE single-lock discipline, GR6).</summary>
@@ -122,7 +203,20 @@ internal sealed class PhysicalFileTable
     {
         if (st.RecordLocks.TryGetValue(recId, out var owner)
             && string.Equals(owner, name, StringComparison.OrdinalIgnoreCase))
-            st.RecordLocks.Remove(recId);
+            Unlock(st, recId);
+    }
+
+    /// <summary>The ONE release of a record lock: out of this run unit's table, and its published byte given back to
+    /// every other run unit.</summary>
+    private static void Unlock(State st, string recId)
+    {
+        st.RecordLocks.Remove(recId);
+        if (!st.Published.Remove(recId, out var handle)) return;
+        HostRegionLocks.Release(handle, HostRegionLocks.RecordLockByte(recId));
+        int left = st.PublishedPerHandle[handle] - 1;
+        if (left > 0) { st.PublishedPerHandle[handle] = left; return; }
+        st.PublishedPerHandle.Remove(handle);
+        HostRegionLocks.Release(handle, HostRegionLocks.LockPresenceByte);
     }
 
     /// <summary>Release every record lock <paramref name="name"/> holds EXCEPT one on <paramref name="keepId"/>
@@ -135,7 +229,7 @@ internal sealed class PhysicalFileTable
             .Where(kv => string.Equals(kv.Value, name, StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(kv.Key, keepId, StringComparison.Ordinal))
             .Select(kv => kv.Key).ToList();
-        foreach (var k in mine) st.RecordLocks.Remove(k);
+        foreach (var k in mine) Unlock(st, k);
     }
 
     /// <summary>Would acquiring one NEW lock (a record <paramref name="name"/> does not already hold) exceed a

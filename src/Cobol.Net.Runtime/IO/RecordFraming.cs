@@ -53,7 +53,7 @@ internal readonly record struct StoredFrame(string Image, RecordExtents? Extents
 /// Two access shapes over the SAME record layout, differing in ONE thing — whether a STORE HEADER precedes the
 /// frames:
 /// <list type="bullet">
-/// <item><b>Store-level</b> (<see cref="WriteStore"/>/<see cref="ReadStore"/>/<see cref="ReadHeader"/>) — the
+/// <item><b>Store-level</b> (<see cref="ComposeStore"/>/<see cref="DecodeStore"/>/<see cref="ReadHeader"/>) — the
 /// whole-file rewrite/load the keyed connectors use (relative slots + the indexed persist order —
 /// IndexedConnector.PersistOrder). It opens with the header described below.</item>
 /// <item><b>Stream-level</b> (<see cref="WritePrefix"/>/<see cref="PrefixLength"/>/<see cref="FrameStarts"/>) —
@@ -84,13 +84,14 @@ internal readonly record struct StoredFrame(string Image, RecordExtents? Extents
 /// this is the same answer for the same reason. Nothing is written beside a data file. Layout, all
 /// little-endian, immediately followed by the frames:</para>
 /// <code>
-///   0   8  magic "CBNFSTR" + format version (currently 1)
+///   0   8  magic "CBNFSTR" + format version (currently 3)
 ///   8   1  organization    'R' relative · 'I' indexed
 ///   9   1  record type     'F' fixed · 'V' varying
 ///  10   4  minimum logical record size (bytes)
 ///  14   4  maximum logical record size (bytes)
 ///  18   2  key count (0 for a relative store)
-///  20  ..  per key: offset(4) length(4) flags(1: bit0 DUPLICATES) suppress-length(2) suppress(Latin-1)
+///  20   8  generation — the cross-run-unit coherence stamp (kb/Work PB2660; see GenerationOffset)
+///  28  ..  per key: offset(4) length(4) flags(1: bit0 DUPLICATES) suppress-length(2) suppress(Latin-1)
 ///          collation-length(1) collation(ASCII fingerprint)
 /// </code>
 /// <para>A format version this build does not know is <see cref="StoreFormat.Foreign"/> and NOT "attributes not
@@ -115,12 +116,16 @@ internal static class RecordFraming
     /// located either, so the only safe answer is to refuse the store instead of reading past it.
     /// <para>Version 2 (kb/Work PB1602) writes a key's SUPPRESS WHEN value as exact UTF-16 code units with an
     /// Int32 count. Version 1 wrote it through Latin-1 and so could not record every legal declaration. A
-    /// version-1 store is Foreign to this build: no reader for it is kept.</para></summary>
-    private const byte FormatVersion = 2;
+    /// version-1 store is Foreign to this build: no reader for it is kept.</para>
+    /// <para>Version 3 (kb/Work PB2660) adds the store GENERATION to the fixed header (<see cref="GenerationOffset"/>),
+    /// the stamp by which a run unit learns that another run unit has rewritten the store. A version-2 store is
+    /// Foreign to this build, as version 1 is: no reader for it is kept (there is no backward-compatibility
+    /// requirement, CLAUDE.md rule 4).</para></summary>
+    private const byte FormatVersion = 3;
 
-    /// <summary>The fixed part of the header — magic, organization, record type, the two record sizes and the
-    /// key count. Per-key descriptors follow it.</summary>
-    private const int FixedHeaderBytes = 20;
+    /// <summary>The fixed part of the header — magic, organization, record type, the two record sizes, the key
+    /// count and the generation. Per-key descriptors follow it.</summary>
+    private const int FixedHeaderBytes = 28;
 
     // ── The store's capacity — the externally-defined boundary of a relative or indexed file ───────────────
 
@@ -128,7 +133,7 @@ internal static class RecordFraming
     /// physical relative or indexed file (ISO §9.1.13.5 item 4, <i>"The implementor specifies the manner in which
     /// these boundaries are defined"</i>; Annex A.1 item 107, docs/CONFORMANCE.md <c>DOC-A.1-107</c>;
     /// kb/Work PB1192). It is <see cref="Array.MaxLength"/> because the whole image is composed in one array by
-    /// <see cref="WriteStore"/> and taken back in one by <see cref="ReadStore"/>: a store one byte larger could be
+    /// <see cref="ComposeStore"/> and taken back in one by <see cref="DecodeStore"/>: a store one byte larger could be
     /// neither persisted nor loaded. The keyed connectors test it AT THE WRITE (§14.9.51.4 GR33 b) / GR42 d)'s
     /// '24'), so a record the store cannot hold is refused before it is released instead of being reported '00'
     /// and failing at the CLOSE.</summary>
@@ -142,7 +147,7 @@ internal static class RecordFraming
     /// <summary>The bytes one record occupies in the store: its 4-byte length word, its extent table (if any)
     /// and one byte per character — the file coded character set is one byte per character position
     /// (<see cref="FileCharacterSet"/>), and a CODE-SET conversion is a per-character map, so the payload length
-    /// is the image's. The ONE size formula, shared by the WRITE-time boundary test and <see cref="WriteStore"/>'s
+    /// is the image's. The ONE size formula, shared by the WRITE-time boundary test and <see cref="ComposeStore"/>'s
     /// composition, so the two cannot disagree about what fits.</summary>
     public static long FrameBytes(StoredFrame frame) => 4L + ExtentTableBytes(frame.Extents) + frame.Image.Length;
 
@@ -151,56 +156,52 @@ internal static class RecordFraming
     public static long HeaderBytes(FixedFileAttributes attributes)
     {
         var header = new MemoryStream(FixedHeaderBytes + (64 * attributes.Keys.Count));
-        WriteHeader(header, attributes);
+        WriteHeader(header, attributes, generation: 0);
         return header.Length;
     }
 
     // ── Store-level (byte) shape — the keyed connectors' whole-store persist/load ───────────────────────────
 
-    /// <summary>Write the whole store: the §9.1.6 header, then one frame per ordinal position; null = an empty
-    /// (gap) slot.
+    /// <summary>Compose the whole store: the §9.1.6 header stamped with <paramref name="generation"/>, then one frame
+    /// per ordinal position; null = an empty (gap) slot. The image is returned, never written: the connector writes
+    /// it through its own handle (<c>KeyedConnector</c>), so this class stays the FRAMING and owns no I/O.
     /// <para>The header is stamped on EVERY persist, from the writing connector's own declared attributes, so a
     /// store always describes itself. That is not a re-establishment of §9.1.6's "at the time it is created":
     /// a connector whose attributes disagreed with the file's could not have opened it (§14.9.27.4 GR10 answered
     /// '39' before <c>OpenCore</c>), so every persist writes back the attributes the file already had — except
     /// under the documented <c>COBOLNET_KEYCHECK</c> opt-out, where a connector admitted with a different key
     /// table writes ITS key table, which is what opting out of the key check means.</para>
-    /// <para>⛔ IT WRITES THROUGH THE CONNECTOR'S OWN HANDLE, AND THE WHOLE STORE IS ONE <c>Write</c>
-    /// (kb/Work PB771). The handle is the connector's §9.1.15 FILE LOCK — the only thing that says anything to
-    /// another run unit — so the persist cannot take a second one: a <c>SHARING WITH NO OTHER</c> connector's
-    /// <see cref="FileShare.None"/> would refuse it, and the previous shape (a fresh
-    /// <c>HostFile.OpenAuxiliary(path, FileMode.Create, …)</c> per persist) is exactly why the keyed
-    /// organizations held no lock at all. The stream is TRUNCATED here rather than by a <c>FileMode.Create</c>
-    /// at open, because the handle outlives every persist and a store may shrink. Composing the bytes first and
-    /// writing them once also makes the persist independent of the handle's buffer size — which the posture
-    /// decides (<see cref="HostFile.OpenConnectorStream"/>) and which a whole-store rewrite must not depend
-    /// on.</para></summary>
-    /// <param name="fs">The connector's own open handle on the physical file, positioned anywhere.</param>
+    /// <para>⛔ THE IMAGE IS COMPOSED WHOLE, so the persist is ONE positional write through the connector's own
+    /// handle (kb/Work PB771 — the handle is its §9.1.15 FILE LOCK, so the persist cannot take a second one) and
+    /// it never depends on a stream buffer: a buffered read of a store another run unit has since rewritten would
+    /// hand back the superseded bytes (kb/Work PB2660).</para></summary>
     /// <param name="attributes">The writing connector's §9.1.6 fixed file attributes — the header's content.</param>
     /// <param name="frames">One entry per ordinal position; null = an empty (gap) slot. The frames are the
     /// records in the NATIVE character set. Enumerated TWICE — once to size the image, once to compose it — so
     /// a relative store passes its slots lazily instead of materializing one entry per relative record number
     /// (a dense array sized by the highest RRN overflowed at a large key and allocated millions of slots for
     /// one record — kb/Work PB1192).</param>
+    /// <param name="generation">The store's GENERATION — see <see cref="GenerationOffset"/>.</param>
     /// <param name="codeSet">The file's §13.18.13 CODE-SET conversion, or null for the native character set
     /// (GR7). ⛔ It converts the PAYLOAD and not the frame: the 4-byte length prefix, the gap tag and this
     /// header are the §9.1.7.2 framing this processor adds, not data of the record (see
     /// <see cref="CodeSetConversion"/>).</param>
-    public static void WriteStore(Stream fs, FixedFileAttributes attributes, IEnumerable<StoredFrame?> frames,
-        CodeSetConversion? codeSet = null)
+    /// <returns>The composed image; its <see cref="MemoryStream.Length"/> is the store's size.</returns>
+    public static MemoryStream ComposeStore(FixedFileAttributes attributes, IEnumerable<StoredFrame?> frames,
+        ulong generation, CodeSetConversion? codeSet = null)
     {
         // Sized EXACTLY, by the one size formula the WRITE-time boundary test uses, so the compose never doubles.
         long size = HeaderBytes(attributes);
         foreach (StoredFrame? f in frames) size += f is { } frame ? FrameBytes(frame) : GapBytes;
         // ⛔ The keyed WRITE and REWRITE refuse a record the store cannot hold ('24', DOC-A.1-107), so a store
         // past the boundary here is a defect upstream of this call; it must not become a truncated file. Raised
-        // BEFORE the stream is touched, as an IOException, so the CLOSE reports §9.1.13.6 item 1's '30' and the
+        // BEFORE the file is touched, as an IOException, so the statement reports §9.1.13.6 item 1's '30' and the
         // physical file keeps its previous image.
         if (size > MaxStoreBytes)
             throw new IOException($"the record store ({size} bytes) exceeds the {MaxStoreBytes}-byte capacity of a "
                 + "relative or indexed file");
         var composed = new MemoryStream((int)size);
-        WriteHeader(composed, attributes);
+        WriteHeader(composed, attributes, generation);
         Span<byte> len = stackalloc byte[4];
         foreach (StoredFrame? stored in frames)
         {
@@ -212,72 +213,81 @@ internal static class RecordFraming
             }
             // The file coded character set's STRICT encoding (kb/Work PB690): the keyed WRITE/REWRITE refused any
             // record holding a character with no byte image ('91'), so an exception here is a missed refusal —
-            // loud, raised before the stream is truncated — never a silent '?'.
+            // loud, raised before the file is truncated — never a silent '?'.
             byte[] payload = FileCharacterSet.Medium.GetBytes(FileCharacterSet.ToChannel(frame.Image, codeSet));
             BinaryPrimitives.WriteUInt32LittleEndian(len, FrameWord(payload.Length, frame.Extents));
             composed.Write(len);
             if (frame.Extents is { } extents) composed.Write(EncodeExtentTable(extents));
             composed.Write(payload, 0, payload.Length);
         }
-        fs.Seek(0, SeekOrigin.Begin);
-        fs.SetLength(0);
-        fs.Write(composed.GetBuffer(), 0, (int)composed.Length);
-        fs.Flush();
+        return composed;
     }
 
-    /// <summary>Read the whole store back: one entry per frame, null for a gap. A torn tail ends the store.
-    /// A file whose header this build does not understand yields NO frames — its layout is unknown, so the
+    /// <summary>Decode a whole store image: one entry per frame, null for a gap. A torn tail ends the store.
+    /// An image whose header this build does not understand yields NO frames — its layout is unknown, so the
     /// bytes after it are not frames this build can locate. (A keyed OPEN never reaches here on such a file:
     /// <see cref="ReadHeader"/> answered <see cref="StoreFormat.Foreign"/> and the OPEN was '39' before
-    /// <c>OpenCore</c> ran. The arm exists because <c>OPEN OUTPUT</c> loads before it truncates, and it must
-    /// load nothing rather than garbage.)
-    /// <para>⛔ IT READS THROUGH THE CONNECTOR'S OWN HANDLE, IN ONE PASS (kb/Work PB771), for the reason
-    /// <see cref="WriteStore"/> gives: that handle IS the connector's §9.1.15 file lock, so the load cannot take
-    /// a second one. The whole file is taken in a single <c>Read</c> and parsed in memory — the store's records
-    /// are materialized as strings anyway, so the transient byte array is proportionate, and it makes the load
-    /// independent of the handle's posture-decided buffer size instead of paying two reads per frame through
-    /// it.</para></summary>
-    /// <param name="fs">The connector's own open handle on the physical file, positioned anywhere.</param>
+    /// <c>OpenCore</c> ran.)
+    /// <para>The connector reads the image in ONE positional read through its own handle — its §9.1.15 file lock
+    /// (kb/Work PB771) — and never through a stream buffer (kb/Work PB2660, see <see cref="ComposeStore"/>).</para></summary>
+    /// <param name="image">The whole physical file in its first <paramref name="size"/> bytes (a rented buffer may
+    /// be longer).</param>
+    /// <param name="size">The physical file's length.</param>
     /// <param name="codeSet">The file's §13.18.13 CODE-SET conversion, or null — see
-    /// <see cref="WriteStore"/>. The frames come back in the NATIVE character set (§13.18.13.4 GR6 a).</param>
-    public static List<StoredFrame?> ReadStore(Stream fs, CodeSetConversion? codeSet = null)
+    /// <see cref="ComposeStore"/>. The frames come back in the NATIVE character set (§13.18.13.4 GR6 a).</param>
+    public static List<StoredFrame?> DecodeStore(byte[] image, int size, CodeSetConversion? codeSet = null)
     {
         var frames = new List<StoredFrame?>();
-        fs.Seek(0, SeekOrigin.Begin);
-        int size = checked((int)fs.Length);
-        // RENTED, not allocated: a keyed store is routinely past the 85 KB large-object threshold and this runs
-        // once per OPEN, so a fresh array per open would be LOH churn for a buffer that dies immediately.
-        byte[] all = ArrayPool<byte>.Shared.Rent(size);
-        try
+        // The ONE decoder still answers "where do the frames start" — over the bytes already in hand, so a header
+        // this build cannot read still yields no frames (see the summary of DecodeHeader).
+        var over = new MemoryStream(image, 0, size, writable: false);
+        if (DecodeHeader(over) is null) return frames;   // empty, or a layout this build cannot locate frames in
+        int at = (int)over.Position;
+        while (at + 4 <= size)
         {
-            fs.ReadExactly(all, 0, size);
-            // The ONE decoder still answers "where do the frames start" — over the bytes already in hand, so a
-            // header this build cannot read still yields no frames (see the summary of DecodeHeader). The length
-            // is the FILE's, never the rented array's, which is only >= it.
-            var over = new MemoryStream(all, 0, size, writable: false);
-            if (DecodeHeader(over) is null) return frames;   // empty, or a layout this build cannot locate frames in
-            int at = (int)over.Position;
-            while (at + 4 <= size)
+            uint word = BinaryPrimitives.ReadUInt32LittleEndian(image.AsSpan(at, size - at));
+            at += 4;
+            if (word == GapTag) { frames.Add(null); continue; }
+            RecordExtents? extents = null;
+            if ((word & ExtentFlag) != 0)
             {
-                uint word = BinaryPrimitives.ReadUInt32LittleEndian(all.AsSpan(at));
-                at += 4;
-                if (word == GapTag) { frames.Add(null); continue; }
-                RecordExtents? extents = null;
-                if ((word & ExtentFlag) != 0)
-                {
-                    if (DecodeExtentTable(all.AsSpan(at, size - at), out int tableBytes) is not { } table) break;   // torn
-                    extents = table;
-                    at += tableBytes;
-                }
-                uint n = word & ~ExtentFlag;
-                if ((long)at + n > size) break;          // a torn tail ends the store (long: n is a uint)
-                string image = Encoding.Latin1.GetString(all, at, (int)n);
-                at += (int)n;
-                frames.Add(new StoredFrame(FileCharacterSet.FromChannel(image, codeSet), extents));
+                if (DecodeExtentTable(image.AsSpan(at, size - at), out int tableBytes) is not { } table) break;   // torn
+                extents = table;
+                at += tableBytes;
             }
-            return frames;
+            uint n = word & ~ExtentFlag;
+            if ((long)at + n > size) break;          // a torn tail ends the store (long: n is a uint)
+            string payload = Encoding.Latin1.GetString(image, at, (int)n);
+            at += (int)n;
+            frames.Add(new StoredFrame(FileCharacterSet.FromChannel(payload, codeSet), extents));
         }
-        finally { ArrayPool<byte>.Shared.Return(all); }
+        return frames;
+    }
+
+    // ── The store GENERATION — the cross-run-unit coherence stamp (kb/Work PB2660) ───────────────────────────
+
+    /// <summary>⛔ THE STORE'S GENERATION lives in the fixed header at this offset, 8 bytes little-endian, and it
+    /// is stamped by EVERY persist: the persisting connector writes one more than the generation it read from the
+    /// file under the store's cross-run-unit mutex. A connector that may meet another run unit's writer
+    /// (<c>KeyedConnector</c>, kb/Work PB2660) reads these 8 bytes at the start of each statement and reloads the
+    /// store only when they differ from the generation its in-memory store reflects — so the common statement pays
+    /// one small read, never a whole-store load. It is the keyed twin of the sequential organization's
+    /// <c>PhysicalFileTable.State.ReleaseGeneration</c>, which can live in memory because a sequential sibling is
+    /// in the same run unit; another run unit can only be told through the file.</summary>
+    public const int GenerationOffset = 20;
+
+    /// <summary>The bytes a reader takes to learn a store's generation: the fixed part of the header.</summary>
+    public const int GenerationProbeBytes = FixedHeaderBytes;
+
+    /// <summary>The generation stamped in <paramref name="fixedHeader"/> — the first
+    /// <see cref="GenerationProbeBytes"/> bytes of a store — or null when they are not a header this build
+    /// understands (an empty file included).</summary>
+    public static ulong? DecodeGeneration(ReadOnlySpan<byte> fixedHeader)
+    {
+        if (fixedHeader.Length < FixedHeaderBytes || !fixedHeader[..Magic.Length].SequenceEqual(Magic)
+            || fixedHeader[Magic.Length] != FormatVersion)
+            return null;
+        return BinaryPrimitives.ReadUInt64LittleEndian(fixedHeader[GenerationOffset..]);
     }
 
     /// <summary>The §9.1.6 fixed file attributes the store at <paramref name="path"/> RECORDS — the read half of
@@ -305,7 +315,7 @@ internal static class RecordFraming
 
     /// <summary>Write the store header. Kept beside <see cref="DecodeHeader"/> so the two halves of one byte
     /// layout cannot drift apart.</summary>
-    private static void WriteHeader(Stream fs, FixedFileAttributes a)
+    private static void WriteHeader(Stream fs, FixedFileAttributes a, ulong generation)
     {
         var head = new byte[FixedHeaderBytes];
         Magic.CopyTo(head);
@@ -315,6 +325,7 @@ internal static class RecordFraming
         BinaryPrimitives.WriteInt32LittleEndian(head.AsSpan(10), a.MinRecordSize);
         BinaryPrimitives.WriteInt32LittleEndian(head.AsSpan(14), a.MaxRecordSize);
         BinaryPrimitives.WriteUInt16LittleEndian(head.AsSpan(18), (ushort)a.Keys.Count);
+        BinaryPrimitives.WriteUInt64LittleEndian(head.AsSpan(GenerationOffset), generation);
         fs.Write(head, 0, head.Length);
         Span<byte> word = stackalloc byte[4];
         foreach (var k in a.Keys)
@@ -370,7 +381,7 @@ internal static class RecordFraming
 
     /// <summary>Decode the store header from the CURRENT position, leaving the stream on the first frame; null
     /// when the bytes are not a header this build understands (an empty file included). The ONE decoder — both
-    /// <see cref="ReadStore"/> and <see cref="ReadHeader"/> reach the frames through it, so "where do the frames
+    /// <see cref="DecodeStore"/> and <see cref="ReadHeader"/> reach the frames through it, so "where do the frames
     /// start" has exactly one answer.</summary>
     private static FixedFileAttributes? DecodeHeader(Stream fs)
     {
@@ -415,7 +426,7 @@ internal static class RecordFraming
     /// This is the positioning index a §14.9.30.4 GR21 BACKWARD sequential READ needs on a RECORD VARYING file,
     /// whose frames are not uniformly wide the way a fixed record-sequential file's blocks are. Only the length
     /// prefixes are read — each payload is SEEKED over, never materialized — so the index costs one pass and no
-    /// record storage. A torn tail ends the store, the same rule <see cref="ReadStore"/> applies.
+    /// record storage. A torn tail ends the store, the same rule <see cref="DecodeStore"/> applies.
     /// <para>⛔ IT INDEXES THE CONNECTOR'S OWN OPEN STREAM, NOT A PATH. Only a backward READ on an ALREADY-OPEN
     /// varying file asks for this index, so the presence question is already answered and asking the host again
     /// would be a second answer to it: <see cref="HostFile.Probe"/> is the ONE place the runtime asks the
@@ -464,7 +475,7 @@ internal static class RecordFraming
     /// file is shorter than or longer than the minimum or maximum length of records allowed for the fixed file
     /// attributes for that file" — a SUCCESSFUL completion that a '39' at the OPEN would make unreachable.</para>
     /// <para>Only the FIRST frame is tested, and that is the rule rather than a shortcut: a torn or ragged TAIL
-    /// already ends the store for <see cref="FrameStarts"/> and <see cref="ReadStore"/>, so a full walk would
+    /// already ends the store for <see cref="FrameStarts"/> and <see cref="DecodeStore"/>, so a full walk would
     /// answer a question the framing has already settled, at a cost proportional to the file. It is also what
     /// the surveyed implementation does. A file shorter than one prefix states nothing and is not a conflict.
     /// An I/O failure likewise answers "no conflict" — the authority statuses are the connector's own stream's

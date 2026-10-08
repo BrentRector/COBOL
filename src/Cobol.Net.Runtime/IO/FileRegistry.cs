@@ -618,24 +618,42 @@ public sealed class FileRegistry
         _files.TryGetValue(name, out var c) && c is RelativeConnector r ? r.LastSlot : 0;
 
     /// <summary>Keyed WRITE (§14.9.51) — returns the I-O status.</summary>
-    public string WriteKeyed(string name, string image, int length) => Require(name) switch
+    public string WriteKeyed(string name, string image, int length)
     {
-        RelativeConnector r => r.Write(image, length),
-        IndexedConnector ix => ix.Write(image, length),
-        var other => throw MisroutedVerb("keyed WRITE", name, other),
-    };
+        var c = Require(name);
+        using var statement = c.BeginStatement();   // kb/Work PB2660
+        return statement.Complete(c switch
+        {
+            RelativeConnector r => r.Write(image, length),
+            IndexedConnector ix => ix.Write(image, length),
+            var other => throw MisroutedVerb("keyed WRITE", name, other),
+        });
+    }
 
     /// <summary>Keyed REWRITE (§14.9.35) — returns the I-O status.</summary>
-    public string RewriteKeyed(string name, string image, int length) => Require(name) switch
+    public string RewriteKeyed(string name, string image, int length)
     {
-        RelativeConnector r => r.Rewrite(image, length),
-        IndexedConnector ix => ix.Rewrite(image, length),
-        var other => throw MisroutedVerb("keyed REWRITE", name, other),
-    };
+        var c = Require(name);
+        using var statement = c.BeginStatement();   // kb/Work PB2660
+        return statement.Complete(c switch
+        {
+            RelativeConnector r => r.Rewrite(image, length),
+            IndexedConnector ix => ix.Rewrite(image, length),
+            var other => throw MisroutedVerb("keyed REWRITE", name, other),
+        });
+    }
 
     /// <summary>DELETE RECORD (§14.9.10 F1); for indexed random/dynamic the prime key is sliced from
     /// <paramref name="keyedRecordImage"/> (GR3) — relative uses the staged relative key (GR4).</summary>
-    public string DeleteRecord(string name, string keyedRecordImage, RecordExtents? areaExtents = null) => Require(name) switch
+    public string DeleteRecord(string name, string keyedRecordImage, RecordExtents? areaExtents = null)
+    {
+        var c = Require(name);
+        using var statement = c.BeginStatement();   // kb/Work PB2660
+        return statement.Complete(DeleteRecordInStatement(c, name, keyedRecordImage, areaExtents));
+    }
+
+    private static string DeleteRecordInStatement(FileConnector c, string name, string keyedRecordImage,
+        RecordExtents? areaExtents) => c switch
     {
         RelativeConnector r => r.Delete(),
         IndexedConnector ix => ix.Delete(keyedRecordImage, areaExtents),
@@ -650,24 +668,28 @@ public sealed class FileRegistry
     public string ReadKeyedNext(string name, out string image)
     {
         image = "";
-        return Require(name) switch
+        var c = Require(name);
+        using var statement = c.BeginStatement();   // kb/Work PB2660
+        return statement.Complete(c switch
         {
             RelativeConnector r => r.ReadNext(out image),
             IndexedConnector ix => ix.ReadNext(out image),
             var other => throw MisroutedVerb("keyed READ NEXT", name, other),   // the PB140 sweep's missed arm
-        };
+        });
     }
 
     /// <summary>Sequential keyed READ PREVIOUS (§14.9.30 F1, COBOL-2002+; compiler edition-gated).</summary>
     public string ReadKeyedPrevious(string name, out string image)
     {
         image = "";
-        return Require(name) switch
+        var c = Require(name);
+        using var statement = c.BeginStatement();   // kb/Work PB2660
+        return statement.Complete(c switch
         {
             RelativeConnector r => r.ReadPrevious(out image),
             IndexedConnector ix => ix.ReadPrevious(out image),
             var other => throw MisroutedVerb("keyed READ PREVIOUS", name, other),
-        };
+        });
     }
 
     /// <summary>⛔ A READ whose record has just landed in the record area and whose OCCURS DEPENDING ON item then
@@ -691,7 +713,7 @@ public sealed class FileRegistry
         if (c.RecordLockHeldBeforeRead is { } held && c.LastReadRecordId is { Length: > 0 } lockedId)
         {
             var st = _physical.For(c.HostPath);
-            if (held) _physical.LockRecord(st, name, lockedId);
+            if (held) _physical.LockRecord(st, name, lockedId, c);
             else PhysicalFileTable.ReleaseSingle(st, name, lockedId);
         }
         c.ApplyUnsuccessfulReadPosition();
@@ -705,26 +727,35 @@ public sealed class FileRegistry
         RecordExtents? areaExtents = null)
     {
         image = "";
-        return Require(name) switch
+        var c = Require(name);
+        using var statement = c.BeginStatement();   // kb/Work PB2660
+        return statement.Complete(c switch
         {
             RelativeConnector r => r.ReadRandom(out image),
             IndexedConnector ix => ix.ReadRandom(keyIndex, keyedRecordImage, out image, areaExtents),
             var other => throw MisroutedVerb("keyed READ", name, other),
-        };
+        });
     }
 
     /// <summary>START on a relative file (§14.9.41 GR8–GR12) — a numeric RRN comparison.</summary>
-    public string StartRelative(string name, string op, long rrn) =>
-        Require(name) is RelativeConnector r ? r.Start(op, rrn)
-        : throw MisroutedVerb("START (relative)", name, Require(name));
+    public string StartRelative(string name, string op, long rrn)
+    {
+        var c = Require(name);
+        using var statement = c.BeginStatement();   // kb/Work PB2660 — START selects from the file as it is now
+        return c is RelativeConnector r ? r.Start(op, rrn) : throw MisroutedVerb("START (relative)", name, c);
+    }
 
     /// <summary>START on an indexed file (§14.9.41 GR13–GR17) — a leftmost-length partial-key comparison whose
     /// search key is sliced out of <paramref name="keyedRecordImage"/>, the RECORD AREA (GR17 a); kb/Work
     /// PB355), exactly as the random READ's and DELETE's key values are.</summary>
     public string StartIndexed(string name, int keyIndex, string op, string keyedRecordImage, StartKeyLength length,
-        RecordExtents? areaExtents = null) =>
-        Require(name) is IndexedConnector ix ? ix.Start(keyIndex, op, keyedRecordImage, length, areaExtents)
-        : throw MisroutedVerb("START (indexed)", name, Require(name));
+        RecordExtents? areaExtents = null)
+    {
+        var c = Require(name);
+        using var statement = c.BeginStatement();   // kb/Work PB2660 — START selects from the file as it is now
+        return c is IndexedConnector ix ? ix.Start(keyIndex, op, keyedRecordImage, length, areaExtents)
+            : throw MisroutedVerb("START (indexed)", name, c);
+    }
 
     /// <summary>START FIRST/LAST (COBOL-2002+), on EVERY organization — the standard writes the rule three
     /// times, once per organization heading: §14.9.41.4 GR11/GR12 (RELATIVE FILES), GR18/GR19 (INDEXED FILES)
@@ -732,13 +763,18 @@ public sealed class FileRegistry
     /// LAST the REQUIRED phrase on a sequential-organization file, so this is the only shape a conforming START
     /// on one can have, and leaving the arm out made the statement the standard requires the one this switch
     /// threw on (kb/Work PB352).</summary>
-    public string StartFirstLast(string name, bool last) => Require(name) switch
+    public string StartFirstLast(string name, bool last)
     {
-        RelativeConnector r => r.StartFirstLast(last),
-        IndexedConnector ix => ix.StartFirstLast(last),
-        SequentialConnector s => s.StartFirstLast(last),
-        var other => throw MisroutedVerb("START FIRST/LAST", name, other),
-    };
+        var c = Require(name);
+        using var statement = c.BeginStatement();   // kb/Work PB2660 — START selects from the file as it is now
+        return c switch
+        {
+            RelativeConnector r => r.StartFirstLast(last),
+            IndexedConnector ix => ix.StartFirstLast(last),
+            SequentialConnector s => s.StartFirstLast(last),
+            var other => throw MisroutedVerb("START FIRST/LAST", name, other),
+        };
+    }
 
     /// <summary>DELETE FILE (§14.9.10 Format 2, COBOL-2023): an OPEN connector → '41' (GR13); the physical file
     /// currently open by ANOTHER file connector → the file sharing conflict, '62' (GR15 / §9.1.13.9 item 2),
@@ -1161,7 +1197,18 @@ public sealed class FileRegistry
     /// is sound because GR7's denial is not the record operation conflict condition, so §14.9.30.4 GR10 a) never
     /// governed it — GR18 does, and the caller applies GR18 by invalidating the position the retrieval
     /// advanced.</para></summary>
-    private static bool NoRecordIsLocked(PhysicalFileTable.State st) => st.RecordLocks.Count == 0;
+    private static bool NoRecordIsLocked(PhysicalFileTable.State st, FileConnector c) =>
+        st.RecordLocks.Count == 0 && !AnotherRunUnitMayLock(c);
+
+    /// <summary>⛔ Does a file connector of ANOTHER run unit hold a lock on a record of this connector's physical
+    /// file (kb/Work PB2660)? Only possible when this connector publishes and tests record locks across run units
+    /// (<c>RecordLockHandle</c>) and its own sharing mode admits another connector at all — under
+    /// <c>SHARING WITH NO OTHER</c> nobody else is there (§9.1.15 1), "exclusive access"), and §12.4.5.9.4 GR3 makes
+    /// the LOCK MODE clause of no effect — and then the host's presence byte answers it in one question. When it
+    /// does, the hot-path shortcuts below that read "this run unit's table is empty" as "no record is locked" no
+    /// longer hold, and the governed verbs ask the host about the record itself.</summary>
+    private static bool AnotherRunUnitMayLock(FileConnector c) =>
+        c.HostSharing != FileSharing.NoOther && PhysicalFileTable.AnotherRunUnitHoldsLocks(c);
 
     /// <summary>⛔ THE HOT-PATH GATE of §9.1.16 governance: is there ANY record-lock question for this
     /// statement to answer? Only two things can make one — some connector holds a lock on this physical file
@@ -1174,8 +1221,8 @@ public sealed class FileRegistry
     /// — has to cost a <c>Count</c> test and nothing more. In particular it keeps
     /// <c>FileConnector.MutationTargetRecordId</c> and <c>LastReadRecordId</c> off the plain REWRITE / DELETE /
     /// READ paths, which on the keyed organizations allocate a key or an ordinal string per statement.</para></summary>
-    private static bool RecordLocksGovern(ConnectorShare meta, PhysicalFileTable.State st, string name) =>
-        st.RecordLocks.Count > 0 || LocksEffective(meta, st, name);
+    private static bool RecordLocksGovern(ConnectorShare meta, PhysicalFileTable.State st, string name, FileConnector c) =>
+        !NoRecordIsLocked(st, c) || LocksEffective(meta, st, name);
 
     /// <summary>⛔ THE ONE RECORD-OPERATION-CONFLICT CHECK, for every verb that states it and every
     /// organization: is the record identified by the statement locked by ANOTHER file connector? The three
@@ -1201,13 +1248,20 @@ public sealed class FileRegistry
         bool ignoringLock, FileRetryKind retryKind, long retryAmount)
     {
         if (ignoringLock) return null;                                       // §14.9.30.4 GR12
-        if (!PhysicalFileTable.IsLockedByOther(st, name, recId)) return null;
-        // The record-lock table is this run unit's own — every lock in it is held by one of its file connectors —
-        // so the holder is always inside the run unit (kb/Work PB1163).
+        var c = Require(name);
+        if (PhysicalFileTable.HolderOf(st, name, recId, c) == RecordLockHolder.None) return null;
+        // WHO holds it decides what a RETRY may wait for (kb/Work PB1163): a connector of this run unit cannot give
+        // the lock back while this statement waits, a connector of another run unit can (kb/Work PB2660) — and the
+        // wait lets go of the store's statement mutex, or that run unit could never execute the statement that
+        // releases it.
         string conflict = RetryLoop(
-            () => RetryAttempt.InRunUnit(PhysicalFileTable.IsLockedByOther(st, name, recId)
-                ? FileStatusCode.RecordLocked : FileStatusCode.Success),
-            retryKind, retryAmount);
+            () => PhysicalFileTable.HolderOf(st, name, recId, c) switch
+            {
+                RecordLockHolder.None => RetryAttempt.InRunUnit(FileStatusCode.Success),
+                RecordLockHolder.ThisRunUnit => RetryAttempt.InRunUnit(FileStatusCode.RecordLocked),
+                _ => RetryAttempt.OutsideRunUnit(FileStatusCode.RecordLocked),
+            },
+            retryKind, retryAmount, waiter: c);
         if (conflict == FileStatusCode.Success) return null;
         SetStatusOf(name, conflict);   // the status assignment drops the '43' gate (PB140); every
         // caller decides BEFORE committing, so GR10 a)/d) hold with no action at all (kb/Work PB338)
@@ -1268,7 +1322,7 @@ public sealed class FileRegistry
         c.RecordLockHeldBeforeRead = st.RecordLocks.TryGetValue(recId, out var holder)
             && string.Equals(holder, name, StringComparison.OrdinalIgnoreCase);
         if (ReadSetsRecordLock(meta, phrase) && LocksEffective(meta, st, name))
-            _physical.LockRecord(st, name, recId);              // GR11 c)/d)
+            _physical.LockRecord(st, name, recId, c);           // GR11 c)/d)
         else if (meta.Multiple && phrase == FileRecordLock.WithNoLock)
             PhysicalFileTable.ReleaseSingle(st, name, recId);   // GR11 b)
     }
@@ -1329,6 +1383,14 @@ public sealed class FileRegistry
     public string ReadShared(string name, bool previous, FileRecordLock phrase, bool advancingOnLock,
         bool ignoringLock, FileRetryKind retryKind, long retryAmount, out string image)
     {
+        using var statement = Require(name).BeginStatement();   // kb/Work PB2660 — one step to every other run unit
+        return statement.Complete(ReadSharedInStatement(name, previous, phrase, advancingOnLock, ignoringLock, retryKind, retryAmount, out image));
+    }
+
+    /// <summary>The body of <see cref="ReadShared"/>, inside its connector's store statement.</summary>
+    private string ReadSharedInStatement(string name, bool previous, FileRecordLock phrase, bool advancingOnLock,
+        bool ignoringLock, FileRetryKind retryKind, long retryAmount, out string image)
+    {
         image = "";
         var c = Require(name);   // unregistered = compiler defect, never an invented '30' (kb/Work PB140/PB360)
         c.RecordLockHeldBeforeRead = null;   // this READ has run no lock action yet (ApplyPostReadLockActions sets it)
@@ -1341,7 +1403,7 @@ public sealed class FileRegistry
         {
             // The pre-read legs. ADVANCING ON LOCK takes neither peek nor conflict check: GR22 rules the
             // conflict condition out and its skip-scan below is post-read on every organization.
-            string peek = advancingOnLock || NoRecordIsLocked(st) ? "" : c.PeekSequentialRecordId(previous);
+            string peek = advancingOnLock || NoRecordIsLocked(st, c) ? "" : c.PeekSequentialRecordId(previous);
             if (peek.Length > 0)
             {
                 if (ConflictOnLockedRecord(name, st, peek, ignoringLock, retryKind, retryAmount) is { } pre)
@@ -1358,13 +1420,14 @@ public sealed class FileRegistry
             }
             string status = ReadFormat1Step(name, c, previous, out image);
             if (status.Length == 0 || status[0] != '0') return status;   // at end (GR24) or a mode/position failure
-            if (!RecordLocksGovern(meta, st, name)) return status;   // no lock on the file and none to set
+            if (!RecordLocksGovern(meta, st, name, c)) return status;   // no lock on the file and none to set
             string recId = c.LastReadRecordId;
             if (recId.Length == 0) return status;                        // no record identity to govern
             // ⛔ §14.9.30.4 GR22 — THE ONE ADVANCING ON LOCK SKIP-SCAN, reached by all three organizations. The
             // locked record HAS been read, so the file position indicator has advanced, which is exactly what
             // "as if the locked record were read" requires; the same READ statement then runs again.
-            if (advancingOnLock && !ignoringLock && PhysicalFileTable.IsLockedByOther(st, name, recId)) continue;
+            if (advancingOnLock && !ignoringLock
+                && PhysicalFileTable.HolderOf(st, name, recId, c) != RecordLockHolder.None) continue;
             // The ceiling is tested at the earliest point the target record is known: BEFORE the read where the
             // peek ran (this call is then a no-op), and here on the two paths that take no peek — GR22's
             // skip-scan, whose record is settled only now, and a physical file holding no locks at all, where
@@ -1412,13 +1475,21 @@ public sealed class FileRegistry
     public string ReadKeyedShared(string name, int keyIndex, string keyedRecordImage, FileRecordLock phrase,
         bool ignoringLock, FileRetryKind retryKind, long retryAmount, out string image, RecordExtents? areaExtents = null)
     {
+        using var statement = Require(name).BeginStatement();   // kb/Work PB2660 — one step to every other run unit
+        return statement.Complete(ReadKeyedSharedInStatement(name, keyIndex, keyedRecordImage, phrase, ignoringLock, retryKind, retryAmount, out image, areaExtents));
+    }
+
+    /// <summary>The body of <see cref="ReadKeyedShared"/>, inside its connector's store statement.</summary>
+    private string ReadKeyedSharedInStatement(string name, int keyIndex, string keyedRecordImage, FileRecordLock phrase,
+        bool ignoringLock, FileRetryKind retryKind, long retryAmount, out string image, RecordExtents? areaExtents)
+    {
         image = "";
         var c = Require(name);   // unregistered = compiler defect, never an invented '30' (kb/Work PB140/PB360)
         c.RecordLockHeldBeforeRead = null;   // this READ has run no lock action yet (ApplyPostReadLockActions sets it)
         var meta = ShareOf(name);             // §12.4.5.9.4 GR1 b) 2. for a clause-less connector — never an early exit
         var st = _physical.For(c.HostPath);   // the connector's LIVE association (§12.4.5.3 GR3), never a cached copy
         ReleasePriorRecordLocks(meta, st, name);   // §14.9.30.4 GR11 a) / §12.4.5.9.4 GR6 — on EXECUTION
-        string peek = NoRecordIsLocked(st) ? "" : c.PeekRandomReadRecordId(keyIndex, keyedRecordImage, areaExtents);
+        string peek = NoRecordIsLocked(st, c) ? "" : c.PeekRandomReadRecordId(keyIndex, keyedRecordImage, areaExtents);
         if (peek.Length > 0)
         {
             if (ConflictOnLockedRecord(name, st, peek, ignoringLock, retryKind, retryAmount) is { } pre)
@@ -1431,7 +1502,7 @@ public sealed class FileRegistry
         }
         string status = ReadKeyed(name, keyIndex, keyedRecordImage, out image, areaExtents);
         if (status.Length == 0 || status[0] != '0') return status;   // invalid key (§9.1.14) or a mode failure
-        if (!RecordLocksGovern(meta, st, name)) return status;   // no lock on the file and none to set
+        if (!RecordLocksGovern(meta, st, name, c)) return status;   // no lock on the file and none to set
         string recId = c.LastReadRecordId;
         if (recId.Length > 0) ApplyPostReadLockActions(meta, st, name, c, recId, phrase);   // GR11 b)/c)/d)
         return status;
@@ -1445,6 +1516,15 @@ public sealed class FileRegistry
     public string WriteShared(string name, string image, int length, FileRecordLock phrase,
         FileRetryKind retryKind, long retryAmount, LinagePage? page, WriteAdvance advance = default,
         RecordExtents? extents = null, bool nationalRecord = false)
+    {
+        using var statement = Require(name).BeginStatement();   // kb/Work PB2660 — one step to every other run unit
+        return statement.Complete(WriteSharedInStatement(name, image, length, phrase, retryKind, retryAmount, page, advance, extents, nationalRecord));
+    }
+
+    /// <summary>The body of <see cref="WriteShared"/>, inside its connector's store statement.</summary>
+    private string WriteSharedInStatement(string name, string image, int length, FileRecordLock phrase,
+        FileRetryKind retryKind, long retryAmount, LinagePage? page, WriteAdvance advance,
+        RecordExtents? extents, bool nationalRecord)
     {
         _ = retryKind; _ = retryAmount;   // §14.9.51 GR16 — see the summary; kept in the signature as the bound RETRY carrier
         var c = Require(name);   // unregistered = compiler defect, never an invented '30' (kb/Work PB140/PB360)
@@ -1463,7 +1543,7 @@ public sealed class FileRegistry
         var (medium, mediumExtents) = c.FixedForm(image, extents);
         string status = WriteAnyOrg(c, medium, length, page, advance, mediumExtents, nationalRecord);
         if (wantLock && status.Length > 0 && status[0] == '0' && c.LastWrittenRecordId is { Length: > 0 } recId)
-            _physical.LockRecord(st, name, recId);   // GR11 — the just-released record's lock is set
+            _physical.LockRecord(st, name, recId, c);   // GR11 — the just-released record's lock is set
         return status;
     }
 
@@ -1474,13 +1554,21 @@ public sealed class FileRegistry
     public string RewriteShared(string name, string image, int length, FileRecordLock phrase,
         FileRetryKind retryKind, long retryAmount, RecordExtents? extents = null, bool nationalRecord = false)
     {
+        using var statement = Require(name).BeginStatement();   // kb/Work PB2660 — one step to every other run unit
+        return statement.Complete(RewriteSharedInStatement(name, image, length, phrase, retryKind, retryAmount, extents, nationalRecord));
+    }
+
+    /// <summary>The body of <see cref="RewriteShared"/>, inside its connector's store statement.</summary>
+    private string RewriteSharedInStatement(string name, string image, int length, FileRecordLock phrase,
+        FileRetryKind retryKind, long retryAmount, RecordExtents? extents, bool nationalRecord)
+    {
         var c = Require(name);   // unregistered = compiler defect, never an invented '30' (kb/Work PB140/PB360)
         var meta = ShareOf(name);             // §12.4.5.9.4 GR1 b) 2. for a clause-less connector — never an early exit
         var st = _physical.For(c.HostPath);   // the connector's LIVE association (§12.4.5.3 GR3), never a cached copy
         // The record identity costs an allocation on the keyed organizations, so it is taken only when some
         // §9.1.16 question can have a non-trivial answer; with no lock on the file and none to set, every arm
         // below is a no-op whatever the target is (kb/Work PB669).
-        string target = RecordLocksGovern(meta, st, name) ? c.MutationTargetRecordId(image, extents) : "";
+        string target = RecordLocksGovern(meta, st, name, c) ? c.MutationTargetRecordId(image, extents) : "";
         ReleasePriorRecordLocks(meta, st, name, target);   // §14.9.35.4 GR12 a) 2. — released at the beginning
         if (target.Length > 0)
         {
@@ -1502,7 +1590,7 @@ public sealed class FileRegistry
         if (status.Length > 0 && status[0] == '0' && target.Length > 0)
         {
             if (phrase == FileRecordLock.WithLock && LocksEffective(meta, st, name))
-                _physical.LockRecord(st, name, target);                      // GR12c — set at completion
+                _physical.LockRecord(st, name, target, c);                   // GR12c — set at completion
             else if (!meta.Multiple || phrase == FileRecordLock.WithNoLock)
                 PhysicalFileTable.ReleaseSingle(st, name, target);           // GR12a1 (single) / GR12b (multiple + NO LOCK)
         }
@@ -1522,11 +1610,19 @@ public sealed class FileRegistry
     public string DeleteShared(string name, string keyedRecordImage, FileRetryKind retryKind, long retryAmount,
         RecordExtents? areaExtents = null)
     {
+        using var statement = Require(name).BeginStatement();   // kb/Work PB2660 — one step to every other run unit
+        return statement.Complete(DeleteSharedInStatement(name, keyedRecordImage, retryKind, retryAmount, areaExtents));
+    }
+
+    /// <summary>The body of <see cref="DeleteShared"/>, inside its connector's store statement.</summary>
+    private string DeleteSharedInStatement(string name, string keyedRecordImage, FileRetryKind retryKind, long retryAmount,
+        RecordExtents? areaExtents)
+    {
         var c = Require(name);   // unregistered = compiler defect, never an invented '30' (kb/Work PB140/PB360)
         var meta = ShareOf(name);             // §12.4.5.9.4 GR1 b) 2. for a clause-less connector — never an early exit
         var st = _physical.For(c.HostPath);   // the connector's LIVE association (§12.4.5.3 GR3), never a cached copy
         // The record identity is taken only when a §9.1.16 question can have a non-trivial answer (kb/Work PB669).
-        string target = RecordLocksGovern(meta, st, name) ? c.MutationTargetRecordId(keyedRecordImage, areaExtents) : "";
+        string target = RecordLocksGovern(meta, st, name, c) ? c.MutationTargetRecordId(keyedRecordImage, areaExtents) : "";
         ReleasePriorRecordLocks(meta, st, name, target);   // §14.9.10.4 GR7 a) 2. — released at the beginning
         if (target.Length > 0
             // §14.9.10.4 GR6 — the ONE conflict check; GR6 b)/c) then leave the record present and the record
@@ -1595,11 +1691,12 @@ public sealed class FileRegistry
     /// <summary>Acquire a lock on <paramref name="recId"/> for connector <paramref name="name"/> (§12.4.5.9 GR7
     /// ceilings enforced). Returns 00 on grant.</summary>
     public string LockRecord(string name, string recId) =>
-        _physical.LockRecord(_physical.For(HostPathOf(name)), name, recId);
+        _physical.LockRecord(_physical.For(HostPathOf(name)), name, recId, _files.GetValueOrDefault(name));
 
     /// <summary>True when <paramref name="recId"/> is locked by a connector OTHER than <paramref name="name"/>.</summary>
     public bool IsLockedByOther(string name, string recId) =>
-        PhysicalFileTable.IsLockedByOther(_physical.For(HostPathOf(name)), name, recId);
+        PhysicalFileTable.HolderOf(_physical.For(HostPathOf(name)), name, recId, _files.GetValueOrDefault(name))
+            != RecordLockHolder.None;
 
     /// <summary>Release every record lock held by <paramref name="name"/> on its physical file (UNLOCK, CLOSE).</summary>
     public void ReleaseAllForConnector(string name)
@@ -1636,16 +1733,17 @@ public sealed class FileRegistry
     /// unit held and released moments later.</para>
     /// <para>Every landing goes through <see cref="ExhaustionStatus"/> — the status is a function of the
     /// conflict's own class, NEVER a literal at a call site.</para></summary>
-    public static string RetryLoop(Func<RetryAttempt> attempt, FileRetryKind kind, long amount)
+    public static string RetryLoop(Func<RetryAttempt> attempt, FileRetryKind kind, long amount,
+        FileConnector? waiter = null)
     {
         var a = attempt();
         if (!IsConflict(a.Status)) return a.Status;   // GR4 — success, or an unsuccessful status that is not a conflict
         if (kind == FileRetryKind.Times)
             // GR1 — n further attempts after the initial failure; a zero or negative n makes none (GR4a).
-            for (long i = 0; i < amount && IsConflict(a.Status); i++) a = Reattempt(attempt, a);
+            for (long i = 0; i < amount && IsConflict(a.Status); i++) a = Reattempt(attempt, a, waiter);
         else if (kind == FileRetryKind.Forever)
             // GR3 — until the operation completes, for as long as the holder is one that can release.
-            do a = Reattempt(attempt, a);
+            do a = Reattempt(attempt, a, waiter);
             while (IsConflict(a.Status) && a.HolderOutsideRunUnit);
         // The two arms with no `else` are deliberate, not forgotten: FileRetryKind.None makes no further
         // attempt by GR4a, and FileRetryKind.Seconds makes none because GR2 clamps its period to this
@@ -1664,14 +1762,21 @@ public sealed class FileRegistry
     /// <summary>The next attempt after <paramref name="previous"/> failed: it waits <see cref="RetryInterval"/> first
     /// only when the previous conflict's holder is outside the run unit, the one case a wait can change the
     /// answer.</summary>
-    private static RetryAttempt Reattempt(Func<RetryAttempt> attempt, RetryAttempt previous)
+    private static RetryAttempt Reattempt(Func<RetryAttempt> attempt, RetryAttempt previous, FileConnector? waiter)
     {
         if (previous.HolderOutsideRunUnit)
         {
-            if (PauseObserver.Value is { } observe) observe(RetryInterval);
-            else Thread.Sleep(RetryInterval);
+            if (waiter is not null) waiter.WaitOutsideStatement(Pause);
+            else Pause();
         }
         return attempt();
+    }
+
+    /// <summary>One RETRY interval — observed instead of slept when a test is watching.</summary>
+    private static void Pause()
+    {
+        if (PauseObserver.Value is { } observe) observe(RetryInterval);
+        else Thread.Sleep(RetryInterval);
     }
 
     /// <summary>Test seam: when set, a retry pause is REPORTED instead of performed, so a test asserts WHETHER the

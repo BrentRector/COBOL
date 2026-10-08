@@ -379,7 +379,7 @@ cannot admit this run unit's second connector while refusing a foreign process. 
   long-lived host handle carrying its posture** — §9.1.15 3) names none, so all three owe the lock (kb/Work
   PB771). `KeyedConnector` is where RELATIVE and INDEXED hold theirs: `TakeFileLock` on each `OpenCore` arm that
   has a physical file and `ReleaseFileLock` in the CLOSE and on an unsuccessful OPEN. ⛔ **It is the SAME handle
-  the store travels through** — `RecordFraming.ReadStore`/`WriteStore` take a stream, not a path — because a
+  the store travels through** — `KeyedConnector.Load`/`Persist` read and write positionally through it, and `RecordFraming` only composes and decodes the image — because a
   second handle for the load or the persist would ask for access the connector's own `FileShare.None` forbids,
   which is kb/Work PB713's defect re-opened by its own cure. The handle's ACCESS is `FileConnector.HostAccess`,
   not the open mode's floor, because a whole-store organization reads the physical file in every writable mode
@@ -523,6 +523,85 @@ reader that had taken record 1 went on serving its snapshot after a sibling REWR
 concurrent read/update pass computed from data the same run unit had already replaced, silently. The invalidation
 rule was already written down in `SeekToRecord`'s doc comment — for the connector's OWN seek, never for a sibling's
 write.)
+
+**And ACROSS RUN UNITS: a keyed store another run unit may write is a COPY, kept coherent one statement at a time
+(kb/Work PB2660).** §9.1.15 3) admits concurrent writers in other run units — *"The sharing with all other mode
+allows concurrent access to a physical file through other file connectors specifying input, I-O, or extend mode"*,
+and *"Multiple paths of access may exist … or runtime elements in different run units"* — and §9.1.16 binds them to
+each other's record locks: *"While locked by a given file connector, a record is not accessible to another file
+connector in the same or a different run unit, except by the execution of a READ statement with the IGNORING LOCK
+phrase"*, answered by §9.1.13.8 1)'s `51`. The `KeyedStoreTable` store is ONE run unit's, so before PB2660 a second
+run unit's `READ … WITH LOCK` of a record the first held answered `00`, its `REWRITE` and `WRITE` answered `00`, and
+the first run unit's CLOSE then rewrote the file from the image it had read at its OPEN — measured on both keyed
+organizations. Three pieces close it, and each lives in one place:
+
+- **The store GENERATION (`RecordFraming.GenerationOffset`, store format 3).** Eight bytes in the fixed header,
+  stamped by every persist with one more than the generation the file carried at that moment. A run unit compares
+  them with the generation its store reflects (`KeyedStore.Generation`) and reloads only when they differ, so a
+  statement costs one small positional read, not a whole-store load. It is the cross-run-unit twin of
+  `PhysicalFileTable.State.ReleaseGeneration` above, which can live in memory only because a sequential sibling is
+  in the same run unit.
+- **The coherent STATEMENT (`KeyedConnector.BeginStatement` → `StoreStatement`).** A connector whose file lock
+  admits another writer (`FileLockPosture.AdmitsAnotherWriter` — only `ALL OTHER`) runs every record statement
+  inside the store's cross-run-unit MUTEX (`HostRegionLocks.StoreMutexByte`): it enters (taking the mutex, waiting
+  for another run unit's statement to finish, and reloading when the generation moved), the statement runs its
+  record-lock check, its operation and its lock actions, and `Complete` persists what THIS statement changed
+  before the mutex is given back. `FileRegistry` wraps every keyed record entry point in one, so to every other
+  run unit a statement is one step — which is what §12.4.5.9.4 GR8's *"The setting of a record lock is part of the
+  operation of an I-O statement"* needs, and why a check-then-act race between two run units cannot exist. A
+  connector whose lock admits no other writer cannot meet one (Table 19 refuses that writer's OPEN in every run
+  unit, PB833), so it keeps the whole-store model — loaded at the OPEN, persisted at the CLOSE, and the CLOSE now
+  persists only when the store holds records the file does not (`KeyedStore.Version` against
+  `PersistedVersion`). ⚠ The price of keeping the whole-store FORMAT is paid by the coherent connector alone: each
+statement that changes the records persists the whole store, O(store) per mutating statement, so a bulk load
+through an `ALL OTHER` connector is quadratic in the records — a record-level in-place format would remove it, and
+is the next step if that cost is ever measured to matter. Every load and every persist, coherent or not, runs under
+the mutex, so no run unit reads a
+  store another is half-way through rewriting. The store's bytes are read and written POSITIONALLY through the
+  connector's own handle (`KeyedConnector.Load`/`Persist`, `RandomAccess`), never through the `FileStream`'s
+  buffer, which would hand back an image another run unit has replaced; `RecordFraming` only composes
+  (`ComposeStore`) and decodes (`DecodeStore`) the image. A persist the medium refuses is the statement's own
+  §9.1.13.6 item 1 `30`.
+- **Published RECORD LOCKS (`PhysicalFileTable.LockRecord` / `HolderOf`, `HostRegionLocks.RecordLockByte`).** Every
+  lock the run unit grants through a connector that has a `RecordLockHandle` (the keyed organizations) is also held
+  as a byte-range lock on that handle, on one byte of the record region (SHA-256 of the record identity, 60 bits,
+  far beyond any record), and every release gives it back. `HolderOf` answers the conflict question once:
+  this run unit's table for its own connectors, the host for every other run unit — and says WHICH, because only a
+  holder outside the run unit can release while a statement waits (`RetryAttempt.HolderOutsideRunUnit`,
+  kb/Work PB1163). A `RETRY` against such a holder waits OUTSIDE the mutex (`FileConnector.WaitOutsideStatement`),
+  since the holder can only release by executing a statement of its own, and re-enters before its next attempt;
+  `RETRY FOREVER` against it is therefore not DOC-A.1-109's deadlock. Two distinct records share a byte with
+  probability 2^-60, and the only consequence would be an over-cautious `51` across run units, never a missed one.
+
+**The host primitive is `HostRegionLocks` (`IO/Sharing/`), and the byte map is its one table.** Windows
+`LockFileEx`/`UnlockFileEx` (per handle, mandatory for the covered bytes, all of which lie at 2^62 or beyond); Linux
+open-file-description locks through `OfdRegionLocks` (classic `fcntl` locks are per process). Linux refuses an
+exclusive lock through a descriptor not open for writing, so an `OPEN INPUT` connector holds the mutex SHARED (a
+reader never changes the store) and, on Linux only, publishes a record lock shared and then TESTS it, giving it back
+if another handle holds the byte — publish then test, as `RunUnitFileLock` does. A Windows reader publishes its record
+lock EXCLUSIVELY (`HostRegionLocks.ExclusiveNeedsWritableHandle`): `LockFileEx` takes an exclusive lock through a
+read-only handle, and its locks are per handle, so a test through the handle that holds the byte shared meets its own
+hold and answers held with nobody else holding it. The region map: `RegionBase` = 2^62; the five
+Table 19 column bytes at +0..+4 (`RunUnitFileLock`); the store mutex at +0x100; the LOCK-PRESENCE byte at +0x101,
+held shared by every handle that holds at least one published record lock, so a statement asks that one byte
+(`PhysicalFileTable.AnotherRunUnitHoldsLocks`) before it pays for a record identity, a SHA-256 and a record byte; the
+record region at 2^62 + 2^60 for 2^60 bytes. A host without byte-range locks (macOS) answers `Unavailable` everywhere, and each run unit keeps
+only its own record locks and store (docs/CONFORMANCE.md DOC-A.1-75). `CrossRunUnitKeyedStoreDriftTests` measures
+it with two `FileRegistry` instances (two run units sharing no table and no handle): `51` on `READ WITH LOCK` and
+`REWRITE`, `IGNORING LOCK`, a sibling's `WRITE` visible at the next statement, every run unit's update surviving
+every CLOSE, and a `RETRY` (n TIMES and FOREVER) that waits outside the mutex.
+
+⛔ **The SEQUENTIAL organization does not publish its record locks yet** — `SequentialConnector` has no
+`RecordLockHandle`, so a sequential file's record lock is still its run unit's alone.
+
+**Emptying a keyed store is done in ONE place: `KeyedStoreTable.AttachCreated` (kb/Work PB754).** An `OPEN OUTPUT`
+creates the file (§14.9.27.4 GR18, *"After the creation of the file, the file contains no records"*), and emptying
+a store is a mutation every attached connector sees instantly, so the creation attaches a NEW empty store and
+refuses, loudly, to create one another connector of the run unit still holds — Table 19 has already refused that
+OPEN (§9.1.13.9 1) e)), so reaching it is an arbitration defect. The absent-OPTIONAL creation arms (§14.9.27.4 GR17)
+attach normally: the file was absent, so the store is empty by construction. No connector calls `Clear()` on a store
+(`CrossRunUnitKeyedStoreDriftTests.NoConnectorClearsASharedStore`); the organizations' `Fill` — a load or reload,
+which every attached connector must see — is the only other emptying.
 
 The static `CobolFile` facade (kept for the emitted surface) becomes a pure delegator to `RunUnit.Current.Files`.
 The `Keyed*` static methods at `IndexedFile.cs:570-707` are **deleted**; their callers in `CobolFile.cs` collapse to a

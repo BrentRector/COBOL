@@ -381,12 +381,14 @@ public static class HostFile
         FileShare share, FileOptions options = FileOptions.None) =>
         new(hostPath, mode, access, share, bufferSize: 1, options);
 
-    /// <summary>A RELATIVE or INDEXED connector's own long-lived handle — its §9.1.15 file lock, and the ONE stream
-    /// its whole store is loaded from at the OPEN and persisted through at the CLOSE (kb/Work PB771). Its buffer
-    /// IS the connector's input-output areas (<see cref="InputOutputAreaBuffer"/>), in every posture: the store
-    /// is read through this handle once, by a handle that has read nothing before, and written once, so no
-    /// buffered image can go stale between two reads — the hazard that keeps the sequential read handle
-    /// (<see cref="OpenConnectorStream"/>) unbuffered does not arise. <paramref name="share"/> is
+    /// <summary>A RELATIVE or INDEXED connector's own long-lived handle — its §9.1.15 file lock, the ONE handle its
+    /// whole store is loaded and persisted through (kb/Work PB771), and the handle its cross-run-unit store mutex
+    /// and record locks are held by (kb/Work PB2660). Its stream buffer is sized as the connector's input-output
+    /// areas (<see cref="InputOutputAreaBuffer"/>), but the store's bytes never pass through it: the load and the
+    /// persist are POSITIONAL reads and writes on the handle (<c>KeyedConnector.Load</c>/<c>Persist</c>), because a
+    /// connector that may meet another run unit's writer re-reads a file that run unit has rewritten, and a stream
+    /// buffer would hand back the superseded bytes — the hazard that keeps the sequential read handle
+    /// (<see cref="OpenConnectorStream"/>) unbuffered. <paramref name="share"/> is
     /// <see cref="FileConnector.HostShare"/>, the posture <see cref="FileLockPosture"/> derived.</summary>
     public static FileStream OpenConnectorStore(string hostPath, FileMode mode, FileAccess access,
         FileShare share, int areas) =>

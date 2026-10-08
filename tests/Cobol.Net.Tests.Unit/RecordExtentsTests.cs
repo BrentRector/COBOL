@@ -94,10 +94,10 @@ public sealed class RecordExtentsTests
     public void TheStoreFraming_CarriesTheTable_OutsideTheRecord()
     {
         var extents = new RecordExtents([0, 3], [2, 4]);
-        using var ms = new MemoryStream();
         var attributes = new FixedFileAttributes(FixedFileAttributes.Relative, true, 5, 17, []);
-        RecordFraming.WriteStore(ms, attributes, [new StoredFrame(Written, extents), null, new StoredFrame("PLAIN", null)]);
-        var back = RecordFraming.ReadStore(ms);
+        using var ms = RecordFraming.ComposeStore(attributes,
+            [new StoredFrame(Written, extents), null, new StoredFrame("PLAIN", null)], generation: 0);
+        var back = RecordFraming.DecodeStore(ms.GetBuffer(), (int)ms.Length);
         Assert.Equal(3, back.Count);
         Assert.Equal(Written, back[0]!.Value.Image);
         Assert.Equal([2, 4], back[0]!.Value.Extents!.Lengths);

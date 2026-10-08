@@ -44,6 +44,7 @@ internal static class OfdRegionLocks
 
     private const int F_OFD_GETLK = 36;
     private const int F_OFD_SETLK = 37;
+    private const int F_OFD_SETLKW = 38;
     private const short F_RDLCK = 0;
     private const short F_WRLCK = 1;
     private const short F_UNLCK = 2;
@@ -58,6 +59,7 @@ internal static class OfdRegionLocks
     private const int S_IFREG = 0x8000;
     private const int EACCES = 13;
     private const int EAGAIN = 11;
+    private const int EINTR = 4;
 
     [DllImport("libc", EntryPoint = "open", SetLastError = true)]
     private static extern int NativeOpen([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int flags);
@@ -124,13 +126,24 @@ internal static class OfdRegionLocks
         return (mode & S_IFMT) == S_IFREG;
     }
 
-    /// <summary>Hold a SHARED lock on the one byte at <paramref name="offset"/> through
-    /// <paramref name="handle"/>'s description: compatible with every other shared holder of the byte,
-    /// incompatible with an exclusive one.</summary>
-    internal static Result HoldShared(SafeFileHandle handle, long offset)
+    /// <summary>The ABI this binding was written for — callers holding a descriptor they did not get from
+    /// <see cref="Open"/> (a connector's own store handle, kb/Work PB2660) ask it before any native call.</summary>
+    internal static bool Available => AbiMatches;
+
+    /// <summary>Hold a lock on the one byte at <paramref name="offset"/> through <paramref name="handle"/>'s
+    /// description — EXCLUSIVE (incompatible with every other holder; the descriptor must be open for writing) or
+    /// SHARED (compatible with every other shared holder, incompatible with an exclusive one). With
+    /// <paramref name="wait"/> the call blocks until the byte can be had (<c>F_OFD_SETLKW</c>, re-issued when a
+    /// signal interrupts it); without it a conflicting holder answers <see cref="Result.Held"/> at once.</summary>
+    internal static Result Hold(SafeFileHandle handle, long offset, bool exclusive, bool wait)
     {
-        var request = new Flock { Type = F_RDLCK, Whence = 0, Start = offset, Length = 1 };
-        return Classify(handle, F_OFD_SETLK, ref request, onSuccess: Result.Ok);
+        while (true)
+        {
+            var request = new Flock { Type = exclusive ? F_WRLCK : F_RDLCK, Whence = 0, Start = offset, Length = 1 };
+            var result = Classify(handle, wait ? F_OFD_SETLKW : F_OFD_SETLK, ref request, onSuccess: Result.Ok,
+                out bool interrupted);
+            if (!interrupted) return result;
+        }
     }
 
     /// <summary>Does a description OTHER than <paramref name="handle"/>'s hold the byte at
@@ -155,15 +168,21 @@ internal static class OfdRegionLocks
         _ = Classify(handle, F_OFD_SETLK, ref request, onSuccess: Result.Ok);
     }
 
-    private static Result Classify(SafeFileHandle handle, int command, ref Flock request, Result onSuccess)
+    private static Result Classify(SafeFileHandle handle, int command, ref Flock request, Result onSuccess) =>
+        Classify(handle, command, ref request, onSuccess, out _);
+
+    private static Result Classify(SafeFileHandle handle, int command, ref Flock request, Result onSuccess,
+        out bool interrupted)
     {
+        interrupted = false;
         bool added = false;
         try
         {
             handle.DangerousAddRef(ref added);
             if (NativeFcntl((int)handle.DangerousGetHandle(), command, ref request) >= 0) return onSuccess;
             int errno = Marshal.GetLastPInvokeError();
-            if (errno is EAGAIN or EACCES) return Result.Held;   // F_OFD_SETLK's refusal: another description holds an incompatible lock
+            if (errno is EAGAIN or EACCES) return Result.Held;
+            if (errno == EINTR) { interrupted = true; return Result.Unavailable; }   // a signal broke a waiting request   // F_OFD_SETLK's refusal: another description holds an incompatible lock
             return Result.Unavailable;   // EINVAL (this kernel has no OFD locks), ENOLCK, EOPNOTSUPP, ENOSYS, EBADF — none of them is a conflict
         }
         finally { if (added) handle.DangerousRelease(); }

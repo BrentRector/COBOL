@@ -605,6 +605,25 @@ public abstract class FileConnector
     /// post-read lock acquisition targets; §14.9.30 GR11c/d).</summary>
     public virtual string LastReadRecordId => "";
 
+    /// <summary>The handle through which this connector's record locks are PUBLISHED to other run units
+    /// (<see cref="HostRegionLocks"/>, kb/Work PB2660) — §9.1.16, <i>"While locked by a given file connector, a
+    /// record is not accessible to another file connector in the same or a different run unit"</i>. Null for a
+    /// connector whose locks only its own run unit can see; <see cref="PhysicalFileTable"/> then keeps them in its
+    /// table alone.</summary>
+    internal virtual Microsoft.Win32.SafeHandles.SafeFileHandle? RecordLockHandle => null;
+
+    /// <summary>Whether <see cref="RecordLockHandle"/> is open for writing, so it can hold an EXCLUSIVE lock
+    /// (<see cref="HostRegionLocks.Hold"/>).</summary>
+    internal virtual bool RecordLockHandleWritable => false;
+
+    /// <summary>Enter one record statement's hold on the connector's store — see <see cref="StoreStatement"/>.
+    /// Inert for every organization but the keyed ones.</summary>
+    internal virtual StoreStatement BeginStatement() => default;
+
+    /// <summary>Run a RETRY phrase's wait for a holder in ANOTHER run unit (§14.7.9.3) outside this connector's
+    /// store statement, so that run unit can execute the statement that gives the lock back (kb/Work PB2660).</summary>
+    internal virtual void WaitOutsideStatement(Action wait) => wait();
+
     /// <summary>Whether THIS connector already held a record lock on <see cref="LastReadRecordId"/> when the governed READ
     /// that made it available began its own §14.9.30.4 GR11 lock actions — null when that READ ran none (no record
     /// locking governs the file, or the record has no identity). A READ whose record then proves unsuccessful AFTER
@@ -784,7 +803,7 @@ public abstract class FileConnector
         // attributes "apply to the file at the time it is created", and the two moments the OPEN statement
         // CREATES a file — GR18's OUTPUT, GR17's absent OPTIONAL I-O/EXTEND — are exactly the moments each
         // organization's OpenCore writes its own store: the RELATIVE and INDEXED arms call
-        // RecordFraming.WriteStore, whose HEADER is those attributes, and the sequential arms write a format
+        // KeyedConnector.Persist (RecordFraming.ComposeStore), whose HEADER is those attributes, and the sequential arms write a format
         // that records none. So the establishment rides the format instead of a second step beside it, which is
         // what "no sidecar of any type" means and what removes the failure mode the second step had (kb/Work
         // PB684: a catalog this process could not write left the PREVIOUS file's attributes in force).
