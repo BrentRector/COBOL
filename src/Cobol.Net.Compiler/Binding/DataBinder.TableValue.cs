@@ -74,10 +74,10 @@ public sealed partial class DataBinder
             item.TableValuePlan = new TableValuePlan
             {
                 Dims = dims,
-                Literals = TableValueOdometer.Resolve(dims, specs),
+                Phrases = TableValueOdometer.Resolve(dims, specs),
             };
-            // The emitters' fast-path guard: an OCCURS entry whose subtree has no table VALUE composes ONE
-            // element initializer and repeats it, exactly as both lanes always did.
+            // The emitters' fast-path guard: an OCCURS entry whose subtree has no table VALUE is one uniform run
+            // (TableValueRuns.Of) without walking the subtree for plans.
             for (DataItem? a = item; a is not null; a = a.Parent) a.ContainsTableValue = true;
 
             // ── §13.18.63.4 GR16: the initial capacity this clause gives each DYNAMIC dimension. "If more than

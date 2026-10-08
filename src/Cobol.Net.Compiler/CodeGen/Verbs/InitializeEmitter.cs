@@ -74,8 +74,8 @@ internal sealed class InitializeEmitter(EmitContext ctx, MoveEmitter move)
             case InitializeOccurrenceSelect sel:
                 // ISO §14.9.20.4 GR5c1c/GR6a3 — the only per-occurrence arm of the expansion: a Format-2 (table)
                 // VALUE keys a different literal to each occurrence, and the occurrences it does not key are not
-                // receiving-operands under the VALUE phrase at all. Arms are mutually exclusive by construction
-                // (one per distinct literal), so the if/else-if chain is a decision, not a fall-through.
+                // receiving-operands under the VALUE phrase at all. The arms come LAST PHRASE FIRST (§13.18.63.4
+                // GR15), so the if/else-if chain's first holding arm is the literal the occurrence takes.
                 bool first = true;
                 foreach (var arm in sel.Arms)
                 {
@@ -95,14 +95,21 @@ internal sealed class InitializeEmitter(EmitContext ctx, MoveEmitter move)
         }
     }
 
-    /// <summary>The run-time test for one <see cref="InitializeOccurrenceArm"/>: the loop variables of the
-    /// subject's OCCURS chain (most inclusive first, ISO §13.18.63.3 SR20's order) matched against each occurrence
-    /// tuple the arm covers — a conjunction per tuple, disjoined over the tuples. The tuples are bind-time
-    /// constants, so nothing but the loop variables is read at run time.</summary>
-    private static string OccurrenceTest(IReadOnlyList<Position> occurrences, IReadOnlyList<Subscripts> tuples) =>
-        string.Join(" || ", tuples.Select(t =>
+    /// <summary>The run-time test for one <see cref="InitializeOccurrenceArm"/>: each <see cref="OccurrenceSpan"/>
+    /// the arm covers — the occurrence numbers it pins compared for equality, and the rank its terms weigh tested
+    /// against the phrase's run and residue (<c>CobolTable.InSpan</c>) — disjoined over the spans. Every weight and
+    /// bound is a bind-time constant, so nothing but the occurrence numbers is read at run time (kb/Work PB1722).</summary>
+    private static string OccurrenceTest(IReadOnlyList<Position> occurrences, IReadOnlyList<OccurrenceSpan> spans) =>
+        string.Join(" || ", spans.Select(s =>
         {
-            string conj = string.Join(" && ", occurrences.Select((o, i) => $"{PositionRenderer.Render(o)} == {t[i]}"));
-            return occurrences.Count > 1 && tuples.Count > 1 ? $"({conj})" : conj;
+            var parts = s.Pinned.Select(p => $"{PositionRenderer.Render(occurrences[p.Occurrence])} == {p.Value}").ToList();
+            if (s.Terms.Count > 0)
+            {
+                string rank = $"{s.Constant}L" + string.Concat(s.Terms.Select(t =>
+                    $" + ({PositionRenderer.Render(occurrences[t.Occurrence])} - 1) * {t.Weight}L"));
+                parts.Add(RuntimeApi.TableInSpan(rank, s.Lo, s.Hi, s.Modulus, s.Residue));
+            }
+            string conj = parts.Count == 0 ? "true" : string.Join(" && ", parts);
+            return parts.Count > 1 && spans.Count > 1 ? $"({conj})" : conj;
         }));
 }

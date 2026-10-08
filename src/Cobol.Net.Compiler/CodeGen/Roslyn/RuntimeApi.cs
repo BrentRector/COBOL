@@ -1130,6 +1130,16 @@ internal static class RuntimeApi
     public static string StrRefModPosition(string expr, string profile) =>
         $"{nameof(CobolString)}.{nameof(CobolString.RefModPosition)}({expr}, {profile})";
 
+    /// <summary>A fixed table's initial elements — <c>CobolTable.Fill&lt;T&gt;(count, (int param) =&gt; element)</c>,
+    /// the element composed afresh per occurrence (kb/Work PB1722).</summary>
+    public static string TableFill(string elementType, int count, string param, string element) =>
+        $"{nameof(CobolTable)}.{nameof(CobolTable.Fill)}<{elementType}>({count}, (int {param}) => {element})";
+
+    /// <summary>The INITIALIZE … TO VALUE occurrence test over one Format-2 phrase's rank range —
+    /// <c>CobolTable.InSpan(rank, lo, hi, modulus, residue)</c> (kb/Work PB1722).</summary>
+    public static string TableInSpan(string rank, long lo, long hi, int modulus, int residue) =>
+        $"{nameof(CobolTable)}.{nameof(CobolTable.InSpan)}({rank}, {lo}L, {hi}L, {modulus}, {residue})";
+
     /// <summary>A FIXED OCCURS element access — the ref-returning <c>CobolTable.At(path, oneBasedIndex)</c>
     /// (ISO §8.4.2.3.4 GR2 — a benign out-of-range occurrence, subscript-checking off in COBOL-85).</summary>
     public static string TableAt(string path, string oneBasedIndex) =>

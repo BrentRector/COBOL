@@ -25,7 +25,7 @@ internal sealed class _PRG_CHAR_OCCURS : ICobolProgram
     internal static readonly NumProfile _P_1 = new NumProfile { Digits = 2, FractionDigits = 0, Signed = false, SignKind = NumericSign.TrailingOverpunch, Truncation = NumericTruncation.DigitCount, ByteForm = NumericByteForm.Zoned, StorageLength = 0 };
     internal static readonly NumProfile _P_2 = new NumProfile { Digits = 2, FractionDigits = 0, Signed = false, SignKind = NumericSign.TrailingOverpunch, Truncation = NumericTruncation.DigitCount, ByteForm = NumericByteForm.Zoned, StorageLength = 0 };
     private long _IX_1 = 1;   // INDEX-NAME IX
-    private _T_0 WS_TBL = new _T_0 { WS_ELEM = new long[] { 0L, 0L, 0L, 0L, 0L } };   // WS-TBL
+    private _T_0 WS_TBL = new _T_0 { WS_ELEM = CobolTable.Fill<long>(5, (int __o0) => 0L) };   // WS-TBL
     private long J = 0L;   // J
 
     public void Call(CobolArg[] __args, CobolArg? __ret)

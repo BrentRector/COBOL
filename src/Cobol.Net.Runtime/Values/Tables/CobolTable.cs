@@ -257,6 +257,25 @@ public static class CobolTable
         return list.ToArray();
     }
 
+    /// <summary>⛔ A FIXED TABLE'S INITIAL ELEMENTS, built at run time: <paramref name="element"/> composes occurrence
+    /// <c>o</c> (1..<paramref name="count"/>) afresh for every element, so an element that holds a nested table gets
+    /// its own array and no two occurrences share storage. It is what lets the compiler emit a table's initial
+    /// state in text proportional to its DESCRIPTION rather than to its element count (kb/Work PB1722: an array
+    /// literal of one hundred million element initializers is what a `10000 x 10000` table used to compile to).</summary>
+    public static T[] Fill<T>(int count, Func<int, T> element)
+    {
+        var all = new T[count];
+        for (int i = 0; i < all.Length; i++) all[i] = element(i + 1);
+        return all;
+    }
+
+    /// <summary>Whether an occurrence's RANK lies in the run <paramref name="lo"/>..<paramref name="hi"/> of a
+    /// Format-2 (table) VALUE phrase AND is the run position that takes literal number <paramref name="residue"/>
+    /// of <paramref name="modulus"/> (ISO §13.18.63.4 GR13: the literals "are reused, in the order specified") — the
+    /// run-time occurrence test of INITIALIZE … TO VALUE (§14.9.20.4 GR6 a) 3.).</summary>
+    public static bool InSpan(long rank, long lo, long hi, int modulus, int residue) =>
+        rank >= lo && rank <= hi && (modulus == 1 || (rank - lo) % modulus == residue);
+
     /// <summary>The intrinsic argument list assembled from written operands and <see cref="AllArgs{T}"/> enumerations,
     /// in source order — the ONE array a <c>params T[]</c> body receives.</summary>
     public static T[] ArgConcat<T>(params T[][] parts)

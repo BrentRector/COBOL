@@ -632,32 +632,14 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
             return;
         }
 
-        // The dimensions identifier-1 PINNED select a bind-time slice of the plan; the ones the expansion loops
-        // over stay as run-time tests, in the same most-inclusive-first order the arms' tuples are written in.
+        // The dimensions identifier-1 PINNED fold at bind time; the ones the expansion loops over stay as run-time
+        // tests, in the same most-inclusive-first order the plan's tuples are written in.
         var vars = new List<Position>();
-        var varAt = new List<int>();
+        var varIndex = new int[key.Count];
         for (int i = 0; i < key.Count; i++)
-            if (key[i].Var is { } v) { vars.Add(v); varAt.Add(i); }
-
-        // Deterministic codegen: the plan's map has no defined enumeration order, so walk its tuples in odometer
-        // order (Subscripts.Compare — §13.18.63.4 GR12's own fill order) before grouping.
-        var tuples = plan.Literals.Keys.ToList();
-        tuples.Sort(Subscripts.Compare);
-
-        var order = new List<string>();
-        var byLiteral = new Dictionary<string, List<Subscripts>>(StringComparer.Ordinal);
-        foreach (var subs in tuples)
         {
-            if (subs.Count != key.Count) continue;                       // not this plan's shape — LiteralAt agrees
-            bool inSlice = true;
-            for (int i = 0; i < key.Count; i++)
-                if (key[i].Fixed is { } f && subs[i] != f) { inSlice = false; break; }
-            if (!inSlice) continue;
-            string lit = plan.Literals[subs];
-            if (!byLiteral.TryGetValue(lit, out var group)) { byLiteral[lit] = group = []; order.Add(lit); }
-            var proj = new int[vars.Count];
-            for (int j = 0; j < vars.Count; j++) proj[j] = subs[varAt[j]];
-            group.Add(new Subscripts(proj));
+            varIndex[i] = -1;
+            if (key[i].Var is { } v) { varIndex[i] = vars.Count; vars.Add(v); }
         }
 
         // GR5c re-asked for every occurrence the clause does NOT key: GR5c1c is false there, so the item falls to
@@ -667,14 +649,56 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
         // Every dimension pinned at bind time — the occurrence is known, so there is no test to emit.
         if (vars.Count == 0)
         {
-            var only = order.Count > 0 ? ElementaryAction(cur, item, cat, spec, order[0]) : otherwise;
+            var pinned = new int[key.Count];
+            for (int i = 0; i < key.Count; i++) pinned[i] = key[i].Fixed!.Value;
+            var only = item.ValueAt(new Subscripts(pinned)) is { } lit
+                ? ElementaryAction(cur, item, cat, spec, lit) : otherwise;
             if (only is not null) actions.Add(only);
             return;
         }
+
+        // ⛔ ONE ARM PER DISTINCT LITERAL OF EACH PHRASE, NEVER ONE TEST PER OCCURRENCE (kb/Work PB1722): each phrase's
+        // run is a rank range (TableValuePlan.RankForm) and its literals a residue class modulo the list (GR13). The
+        // phrases are written LAST FIRST, so the first arm that holds is GR15's "last specified FROM phrase".
         var arms = new List<InitializeOccurrenceArm>();
-        foreach (string lit in order)
-            if (ElementaryAction(cur, item, cat, spec, lit) is { } act)
-                arms.Add(new InitializeOccurrenceArm(byLiteral[lit], act));
+        for (int pi = plan.Phrases.Count - 1; pi >= 0; pi--)
+        {
+            var phrase = plan.Phrases[pi];
+            var (split, weights, lo, hi) = plan.RankForm(phrase);
+            var equal = new List<(int, int)>();
+            bool reachable = true;
+            for (int i = 0; i < split && reachable; i++)
+            {
+                if (key[i].Fixed is { } f) reachable = f == phrase.From[i];
+                else equal.Add((varIndex[i], phrase.From[i]));
+            }
+            if (!reachable) continue;                       // identifier-1 pinned an occurrence outside the run
+            long constant = 0;
+            var terms = new List<(int, long)>();
+            for (int i = split; i < key.Count; i++)
+            {
+                long w = weights[i - split];
+                if (key[i].Fixed is { } f) constant = TableValuePlan.SaturatingAdd(constant, TableValuePlan.SaturatingMultiply(f - 1, w));
+                else terms.Add((varIndex[i], w));
+            }
+            int k = phrase.Literals.Count;
+            if (terms.Count == 0 && (constant < lo || constant > hi)) continue;
+            var residues = new List<(string Literal, List<OccurrenceSpan> Spans)>();
+            for (int j = 0; j < k; j++)
+            {
+                if (terms.Count == 0 && (constant - lo) % k != j) continue;   // the bind-time rank names one literal
+                var span = new OccurrenceSpan(equal, terms, constant, lo, hi, k, j);
+                string lit = phrase.Literals[j];
+                int at = residues.FindIndex(r => string.Equals(r.Literal, lit, StringComparison.Ordinal));
+                if (at >= 0) residues[at].Spans.Add(span);
+                else residues.Add((lit, [span]));
+            }
+            foreach (var (lit, spans) in residues)
+                // A literal no store follows from (GR5c's qualification is the same for every literal of the clause,
+                // so it is all of them) leaves the occurrence to the tail, as an occurrence no phrase keys.
+                if ((ElementaryAction(cur, item, cat, spec, lit) ?? otherwise) is { } act)
+                    arms.Add(new InitializeOccurrenceArm(spans, act));
+        }
         if (arms.Count == 0)
         {
             if (otherwise is not null) actions.Add(otherwise);

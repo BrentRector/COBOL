@@ -45,12 +45,18 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // occurrence against its own subscript tuple — so it covers a SUBORDINATE-item table VALUE and a
         // multi-dimension odometer without a second rule being written here (kb/Work PB505). An occurrence
         // outside every FROM..TO range takes the same VALUE-less image it always took.
-        if (useValues && item.ContainsTableValue && item.Occurs is { } occ and > 0)
-            return "(" + string.Join(" + ", Enumerable.Range(1, occ)
-                .Select(o => ImageInitOfOne(item, useValues, subs.With(o), recipe))) + ")";
-        string one = ImageInitOfOne(item, useValues, item.Occurs is > 0 ? subs.With(1) : subs, recipe);
-        return item.Occurs is { } n and > 1 ? RuntimeApi.StrRepeat(one, $"{n}") : one;
+        // Composed once per occurrence RUN, never once per occurrence (kb/Work PB1722).
+        return item.Occurs is { } occ and > 0
+            ? OccurrenceRunEmit.Image(OccurrenceRunsOf(item, useValues, subs, occ),
+                o => ImageInitOfOne(item, useValues, subs.With(o), recipe))
+            : ImageInitOfOne(item, useValues, subs, recipe);
     }
+
+    /// <summary>The runs of a fixed table's occurrences that seed alike: the table VALUE's runs where VALUEs apply
+    /// (<see cref="TableValueRuns.Of"/>), else one uniform run — the twin of the record-struct lane's, so the
+    /// image and bit lanes compose the same occurrences once.</summary>
+    private static IReadOnlyList<OccurrenceRun> OccurrenceRunsOf(DataItem item, bool useValues, Subscripts subs, int occ) =>
+        useValues ? TableValueRuns.Of(item, subs, occ) : OccurrenceRunEmit.Uniform(occ);
     /// <param name="subs">The subscript tuple of THIS occurrence — the twin of
     /// <see cref="ValueInitializer.InitializerFor"/>'s parameter of the same name, so the image lane and the
     /// native-field lane compose one occurrence from the same literal text (kb/Work PB208/PB505).</param>
@@ -130,7 +136,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                 + string.Concat(CellScopeSeeds(table, values, subs.With(o)));
         }
         return ValueInitializer.DynTableNew(table, nameof(CobolNet.Runtime.StorageCell), Element, SeedRecipe.InitialState,
-            useValues);
+            useValues, subs);
     }
 
     /// <summary>One MEMBER's contribution to its group's compile-time image seed — the COMPILE-TIME twin of
@@ -188,8 +194,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                 // Length: the two are equal by AreaOf's contract, and asking the LAYOUT keeps the image the
                 // group's full width even if a future area were handed back short (Pack zero-fills the rest).
                 return area.Bits
-                    ? RuntimeApi.BitsPack(EmitText.CsLiteral(area.Text), $"{BitLayout.ExtentBits(item)}")
-                    : EmitText.CsLiteral(area.Text);
+                    ? RuntimeApi.BitsPack(area.CsExpression(), $"{BitLayout.ExtentBits(item)}")
+                    : area.CsExpression();
 
             // ⛔ A BIT GROUP'S IMAGE IS ITS PACKED AREA, NOT ITS MEMBERS' IMAGES CONCATENATED. Each bit member
             // images as its own ceil(n/8) characters, and §8.5.1.6.3 makes same-level bit members SHARE bytes —
@@ -917,11 +923,9 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // BG PIC X(2).`: [0000|0000|0000], where the SAME declaration without the alias — the record-struct
         // lane — gave [1010|0101|1010]. §13.18.63.4 GR12/GR13 govern this lane exactly as they govern the other
         // two, so it asks DataItem.ValueAt with the occurrence tuple like they do.
-        if (useValues && m.ContainsTableValue && m.Occurs is { } occ and > 0)
-            return "(" + string.Join(" + ", Enumerable.Range(1, occ)
-                .Select(o => OneBitCarrierOf(m, useValues, subs.With(o)))) + ")";
-        string one = OneBitCarrierOf(m, useValues, m.Occurs is > 0 ? subs.With(1) : subs);
-        return m.Occurs is { } n and > 1 ? RuntimeApi.StrRepeat(one, $"{n}") : one;
+        return m.Occurs is { } occ and > 0
+            ? OccurrenceRunEmit.Image(OccurrenceRunsOf(m, useValues, subs, occ), o => OneBitCarrierOf(m, useValues, subs.With(o)))
+            : OneBitCarrierOf(m, useValues, subs);
     }
 
     /// <summary>ONE occurrence of a bit run member’s initial carrier — see <see cref="InitialBitCarrierOf"/>,

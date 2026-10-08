@@ -319,6 +319,7 @@
   "pb1579-constant-occurs-bound-beyond-limit",
   "pb1579-currency-sign-long-numeric",
   "pb1579-table-value-subscript-as-written",
+  "pb1722-table-value-overwritten-literal-class",
   "w70c-pb1268-turn-bound-odo-below-2002",
   "w70c-pb1174-table-sort-below-2002",
   "w70c-pb1117-turn-below-2002",

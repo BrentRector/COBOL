@@ -87,16 +87,14 @@ internal sealed class ValueInitializer(EmitContext ctx)
         // undefined", and the initial-state seed is a conforming choice for it (docs/CONFORMANCE.md DOC-A.1-61).
         if (item.IsDynamicTable)
             return DynTableNew(item, item.ElementType, (o, r) => ElementInit(item, outer.With(o), r), recipe,
-                valuesSeedInitialState: true);
+                valuesSeedInitialState: true, outer);
+        // ⛔ A FIXED TABLE IS BUILT AT RUN TIME FROM ITS OCCURRENCE RUNS (kb/Work PB1722): one element composed per
+        // run period (TableValueRuns — one uniform run when no table VALUE is in the subtree), never one array-literal
+        // element per occurrence. The literal grew with the element count whether or not a VALUE was written: a
+        // 1000 x 1000 table emitted 20 MB of C# and took 35 s and 1.9 GB to compile.
         if (item.Occurs is { } n)
-        {
-            // Without a table VALUE in the subtree every occurrence is identical — compose ONE and repeat it (the
-            // shape both lanes always had, and the reason a 49-level CCVS record still emits in linear time).
-            if (!item.ContainsTableValue)
-                return $"new {item.ElementType}[] {{ {string.Join(", ", Enumerable.Repeat(ElementInit(item, outer.With(1), recipe), n))} }}";
-            return $"new {item.ElementType}[] {{ "
-                 + string.Join(", ", Enumerable.Range(1, n).Select(o => ElementInit(item, outer.With(o), recipe))) + " }";
-        }
+            return OccurrenceRunEmit.Array(item.ElementType, n, TableValueRuns.Of(item, outer, n),
+                o => ElementInit(item, outer.With(o), recipe), outer.Count);
         return ElementInit(item, outer, recipe);
     }
 
@@ -118,8 +116,10 @@ internal sealed class ValueInitializer(EmitContext ctx)
     /// the INITIALIZED phrase's composition when it differs — keyed to ITS occurrence whatever the initial state did,
     /// because §8.5.1.9.5's INITIALIZE … TO VALUE sends "the literal in the VALUE clause that corresponds to the
     /// occurrence being initialized" (§14.9.20.4 GR6 a) 3.).</summary>
+    /// <param name="outer">The occurrence context above the table (one subscript per enclosing OCCURS level), from
+    /// which <see cref="TableValueRuns.Of"/> reads the runs the per-occurrence seed switch is built over.</param>
     internal static string DynTableNew(DataItem item, string elementType, Func<int, SeedRecipe, string> elementAt,
-                                       SeedRecipe recipe, bool valuesSeedInitialState)
+                                       SeedRecipe recipe, bool valuesSeedInitialState, Subscripts outer)
     {
         var s = item.OccursSpec!;
         int min = s.InitialCap ?? 0;
@@ -133,42 +133,22 @@ internal sealed class ValueInitializer(EmitContext ctx)
                  + (created == opening ? "null" : $"() => {created}") + ")";
         }
         int cap = Math.Max(min, item.TableValueInitialCapacity ?? min);
-        string openingAt = openingKeyed ? OccurrenceSwitch(o => elementAt(o, recipe), cap) : $"(int __i) => {elementAt(0, recipe)}";
-        string createdAt = s.Initialized ? OccurrenceSwitch(o => elementAt(o, SeedRecipe.Initialize), cap) : openingAt;
+        var runs = TableValueRuns.Of(item, outer, cap);
+        string openingAt = openingKeyed ? OccurrenceSwitch(runs, o => elementAt(o, recipe)) : $"(int __i) => {elementAt(0, recipe)}";
+        string createdAt = s.Initialized ? OccurrenceSwitch(runs, o => elementAt(o, SeedRecipe.Initialize)) : openingAt;
         return $"new CobolDynTable<{elementType}>({openingAt}, {min}, {expected}, "
              + $"{(createdAt == openingAt ? "null" : createdAt)}, {(openingKeyed ? cap : min)})";
     }
 
     /// <summary>⛔ THE ONE per-occurrence seed switch (kb/Work PB1042 made it shared): <paramref name="elementAt"/>
     /// composes the element of occurrence <c>o</c> — the record-struct lane's typed element, or a cell-backed area's
-    /// element cell (<c>GroupImageCodec.CellDynSeeds</c>) — and the switch (<c>(int __i) =&gt; __i switch { … }</c> over 1..<paramref name="cap"/>) folds IDENTICAL arms into one, since the common case is one literal over a whole range. Occurrence 0
-    /// identifies no table element (§13.18.63.3 SR20 admits none below 1), so it is the tuple that deliberately
-    /// matches no FROM..TO range: the element as it stands with no table VALUE keyed to it.</summary>
-    internal static string OccurrenceSwitch(Func<int, string> elementAt, int cap)
-    {
-        string dflt = elementAt(0);
-        var arms = new List<string>();
-        var pending = new List<int>();
-        string? pendingText = null;
-        void Flush()
-        {
-            if (pendingText is null || pendingText == dflt) { pending.Clear(); pendingText = null; return; }
-            arms.Add($"{string.Join(" or ", pending)} => {pendingText},");
-            pending.Clear();
-            pendingText = null;
-        }
-        for (int o = 1; o <= cap; o++)
-        {
-            string text = elementAt(o);
-            if (pendingText is not null && !string.Equals(text, pendingText, StringComparison.Ordinal)) Flush();
-            pendingText = text;
-            pending.Add(o);
-        }
-        Flush();
-        return arms.Count == 0
-            ? $"(int __i) => {dflt}"
-            : $"(int __i) => __i switch {{ {string.Join(" ", arms)} _ => {dflt} }}";
-    }
+    /// element cell (<c>GroupImageCodec.CellDynSeeds</c>) — once per run period over the table's opening capacity
+    /// (<paramref name="runs"/>, kb/Work PB1722), and <see cref="OccurrenceRunEmit.Switch"/> writes one arm per run.
+    /// Occurrence 0 identifies no table element (§13.18.63.3 SR20 admits none below 1), so it is the tuple that
+    /// deliberately matches no FROM..TO range: the element as it stands with no table VALUE keyed to it, which every
+    /// occurrence outside the runs takes.</summary>
+    internal static string OccurrenceSwitch(IReadOnlyList<OccurrenceRun> runs, Func<int, string> elementAt) =>
+        OccurrenceRunEmit.Switch(runs, elementAt, elementAt(0));
     /// <summary>The C# initializer expression for an elementary item, from its VALUE clause or the COBOL default.</summary>
     public string InitializerFor(DataItem item, Subscripts subs = default, SeedRecipe recipe = SeedRecipe.InitialState)
         // ⛔ THE ONE READER for "what initializes this item at this occurrence" — DataItem.ValueAt: the Format-1

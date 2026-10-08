@@ -15,8 +15,94 @@ namespace CobolNet.CodeGen;
 /// — the record-struct lane (<see cref="GroupValueSlicer.ComposedInit"/>) and the character-image lane
 /// (<see cref="GroupImageCodec.ImageInitOf"/>) — must never disagree about it. Restating "is this a bit group?"
 /// at a call site is how <c>GroupImageCodec.ImageInitOfOne</c> came to carry a NARROWER copy of the previous
-/// exclusion (kb/Work PB207); one producer, one answer.</para></summary>
-internal readonly record struct GroupArea(string Text, bool Bits);
+/// exclusion (kb/Work PB207); one producer, one answer.</para>
+/// <para>⛔ <b>The area is never materialized at its full width</b> (kb/Work PB1722): it is
+/// <paramref name="Head"/> (the literal's own positions) followed by <paramref name="Unit"/> repeated to
+/// <paramref name="Width"/> — the figurative's one character, the ALL literal, or the GR7 pad — so a group VALUE
+/// over a table of a hundred million positions is a few characters at compile time, its windows are compared by
+/// phase (<see cref="SameWindow"/>), and the image lane repeats the unit at run time (<see cref="CsExpression"/>).
+/// <paramref name="Unit"/> is reduced to its minimal period, so two windows of the repeated part are equal exactly
+/// when their phases are.</para></summary>
+internal readonly record struct GroupArea(string Head, string Unit, int Width, bool Bits)
+{
+    /// <summary>The area whose positions are <paramref name="head"/> (truncated to <paramref name="width"/>)
+    /// followed by <paramref name="unit"/> repeated.</summary>
+    public static GroupArea Of(string head, string unit, int width, bool bits) =>
+        new(head.Length > width ? head[..width] : head, MinimalPeriod(unit), width, bits);
+
+    /// <summary>The position at <paramref name="i"/> (0-based).</summary>
+    public char At(int i) => i < Head.Length ? Head[i] : Unit[(i - Head.Length) % Unit.Length];
+
+    /// <summary>The <paramref name="count"/> positions from <paramref name="at"/> as an area of their own;
+    /// positions past <see cref="Width"/> read <paramref name="pad"/> (a bit member's implicit filler, §8.5.1.6.3).</summary>
+    public GroupArea Window(int at, int count, char pad)
+    {
+        if (at + count > Width)
+        {
+            var chars = new char[count];
+            for (int i = 0; i < count; i++) chars[i] = at + i < Width ? At(at + i) : pad;
+            return Of(new string(chars), pad.ToString(), count, Bits);
+        }
+        if (at < Head.Length) return Of(Head.Substring(at, Math.Min(Head.Length - at, count)), Unit, count, Bits);
+        int phase = (at - Head.Length) % Unit.Length;
+        return Of("", Unit[phase..] + Unit[..phase], count, Bits);
+    }
+
+    /// <summary>Whether the windows of <paramref name="count"/> positions at <paramref name="a"/> and
+    /// <paramref name="b"/> hold the same positions. Two windows wholly inside the repeated part are equal exactly
+    /// when their phases agree (or, shorter than the unit, when their characters do); anything else is compared
+    /// position by position, which only a window reaching into <see cref="Head"/> needs.</summary>
+    public bool SameWindow(int a, int b, int count)
+    {
+        char pad = Bits ? '0' : ' ';
+        if (a + count > Width || b + count > Width) return Window(a, count, pad).Text == Window(b, count, pad).Text;
+        if (a >= Head.Length && b >= Head.Length && count >= Unit.Length)
+            return (a - Head.Length) % Unit.Length == (b - Head.Length) % Unit.Length;
+        for (int i = 0; i < count; i++)
+            if (At(a + i) != At(b + i)) return false;
+        return true;
+    }
+
+    /// <summary>How many occurrences of a <paramref name="stride"/>-position element it takes the repeated part to
+    /// come back to the same phase — the period a table's windows repeat with there.</summary>
+    public int PeriodFor(int stride) => Unit.Length / (int)Binding.Model.TableValuePlan.Gcd(Unit.Length, stride);
+
+    /// <summary>The positions, materialized — for a LEAF's window, whose width its PICTURE bounds.</summary>
+    public string Text
+    {
+        get
+        {
+            if (Width <= Head.Length) return Head[..Width];
+            var sb = new System.Text.StringBuilder(Head, Width);
+            while (sb.Length < Width) sb.Append(Unit, 0, Math.Min(Unit.Length, Width - sb.Length));
+            return sb.ToString();
+        }
+    }
+
+    /// <summary>The area as a C# string expression: the head, then the unit repeated at run time
+    /// (<c>CobolString.Repeat</c>), then the unit's partial tail.</summary>
+    public string CsExpression()
+    {
+        int rest = Width - Head.Length, reps = rest / Unit.Length, part = rest % Unit.Length;
+        var parts = new List<string>();
+        if (Head.Length > 0) parts.Add(EmitText.CsLiteral(Head));
+        if (reps > 0) parts.Add(reps == 1 ? EmitText.CsLiteral(Unit) : RuntimeApi.StrRepeat(EmitText.CsLiteral(Unit), $"{reps}"));
+        if (part > 0) parts.Add(EmitText.CsLiteral(Unit[..part]));
+        return parts.Count switch { 0 => "\"\"", 1 => parts[0], _ => "(" + string.Join(" + ", parts) + ")" };
+    }
+
+    private static string MinimalPeriod(string unit)
+    {
+        for (int p = 1; p < unit.Length; p++)
+        {
+            if (unit.Length % p != 0) continue;
+            bool periodic = true;
+            for (int i = p; i < unit.Length && periodic; i++) periodic = unit[i] == unit[i - p];
+            if (periodic) return unit[..p];
+        }
+        return unit;
+    }
+}
 
 /// <summary>The group-VALUE positional distributor (P7 Step 9l; ISO §13.18.63): a GROUP-level VALUE
 /// initializes the whole area as ONE value of the group's own category, sliced positionally over the
@@ -41,7 +127,7 @@ internal sealed class GroupValueSlicer(EmitContext ctx, PhysicalModel phys)
         // BASED backing is seeded by GroupImageCodec.ImageInitOf, which applies the SAME AreaOf rule to the
         // same group).
         if (recipe is SeedRecipe.InitialState && AreaOf(group, ctx, subs) is { } area && DistributableSubtree(group))
-            return area.Bits ? SliceBitInit(group, area.Text) : SliceInit(group, area.Text);
+            return area.Bits ? SliceBitInit(group, area, subs.Count) : SliceInit(group, area, subs.Count);
         var parts = phys.PhysicalChildrenOf(group, subs, recipe).Select(f => $"{f.Name} = {f.Init}");
         return $"new {group.StructName} {{ {string.Join(", ", parts)} }}";
     }
@@ -118,22 +204,20 @@ internal sealed class GroupValueSlicer(EmitContext ctx, PhysicalModel phys)
         // THE one §8.3.3.6.2 operand classifier decides which format this text is (kb/Work PB461): Formats 1-5
         // (ALL optional) fill the area, Format 6 (ALL literal-1) repeats literal-1 into it — both by §8.3.3.6.4
         // GR2, and both spellings the parse tree can produce.
-        var op = FigurativeConstants.Classify(raw);
-        string? text =
-            op.Kind is { } kind
-                ? new string(FigurativeConstants.FillChar(kind, ctx.Data.Collating,
-                        group.AsIfPic?.Category ?? PicCategory.Alphanumeric, ctx.Data.NationalCollating), width)
-            : op.AllLiteral is { } all ? EmitText.RepeatToWidth(CobolLiteral.Decode(all), width)
-            : CobolLiteral.IsStringLiteral(raw) ? CobolLiteral.Decode(raw)
-            : null;
-        if (text is null) return null;
         // GR7 sends the literal through §14.6.8, whose arm is chosen by the RECEIVING item's category: a
         // category-boolean area is filled "into the corresponding boolean positions … with ZERO fill or
         // truncation to the right" (§14.6.8.6 — the boolean zero, not the space that would not be a boolean
         // position at all), every other category with space fill (§14.6.8.5). GR7's own exception applies to
-        // both: initialization is not affected by JUSTIFIED and no editing takes place.
-        char pad = bits ? '0' : ' ';
-        return new GroupArea(text.Length >= width ? text[..width] : text.PadRight(width, pad), bits);
+        // both: initialization is not affected by JUSTIFIED and no editing takes place. The repeat is the area's
+        // UNIT, never a full-width string (kb/Work PB1722).
+        string pad = bits ? "0" : " ";
+        var op = FigurativeConstants.Classify(raw);
+        if (op.Kind is { } kind)
+            return GroupArea.Of("", FigurativeConstants.FillChar(kind, ctx.Data.Collating,
+                group.AsIfPic?.Category ?? PicCategory.Alphanumeric, ctx.Data.NationalCollating).ToString(), width, bits);
+        if (op.AllLiteral is { } all && CobolLiteral.Decode(all) is { Length: > 0 } unit)
+            return GroupArea.Of("", unit, width, bits);
+        return CobolLiteral.IsStringLiteral(raw) ? GroupArea.Of(CobolLiteral.Decode(raw), pad, width, bits) : null;
     }
 
     /// <summary>Whether the group's subtree can take the area text as a compile-time POSITIONAL slice per
@@ -178,7 +262,7 @@ internal sealed class GroupValueSlicer(EmitContext ctx, PhysicalModel phys)
 
     /// <summary>Build the composed initializer of <paramref name="item"/> from its positional <paramref name="slice"/>
     /// of the group VALUE text — each subordinate (and each OCCURS occurrence) takes its own window.</summary>
-    private static string SliceInit(DataItem item, string slice)
+    private static string SliceInit(DataItem item, GroupArea slice, int depth)
     {
         // A native (long-stored) CHARACTER-FORM numeric leaf decodes its zoned slice to the unscaled value
         // (sign-aware overpunch/separate decode — the same ParseDisplay every image read uses). Both usages
@@ -187,8 +271,8 @@ internal sealed class GroupValueSlicer(EmitContext ctx, PhysicalModel phys)
         // drift from DistributableSubtree's admission above. String-stored leaves (alphanumeric / edited /
         // national / boolean / StoreAsImage) keep the characters.
         if (!item.IsGroup && !item.StoreAsImage && item.Pic is { IsCharacterFormNumeric: true })
-            return $"({item.ElementType}){RuntimeApi.NumParseDisplay(EmitText.CsLiteral(slice), item.ProfileName)}";
-        if (!item.IsGroup) return EmitText.CsLiteral(slice);
+            return $"({item.ElementType}){RuntimeApi.NumParseDisplay(EmitText.CsLiteral(slice.Text), item.ProfileName)}";
+        if (!item.IsGroup) return EmitText.CsLiteral(slice.Text);
         var parts = new List<string>();
         int off = 0;
         foreach (var c in item.Children)
@@ -196,14 +280,19 @@ internal sealed class GroupValueSlicer(EmitContext ctx, PhysicalModel phys)
             int w = c.ImageWidth;
             if (c.Occurs is { } n)
             {
-                var elems = new List<string>();
-                for (int k = 0; k < n; k++) elems.Add(SliceInit(c, slice.Substring(off + k * w, w)));
-                parts.Add($"{c.CsName} = new {c.ElementType}[] {{ {string.Join(", ", elems)} }}");
+                // One element composed per run of windows that repeat (kb/Work PB1722): a figurative fill makes the
+                // whole table one run and an ALL literal a periodic one, so the text no longer grows with the
+                // element count.
+                int at = off;
+                var runs = OccurrenceRunEmit.RunsOfRepeats(n, slice.PeriodFor(w),
+                    (a, b) => slice.SameWindow(at + (a - 1) * w, at + (b - 1) * w, w));
+                parts.Add($"{c.CsName} = " + OccurrenceRunEmit.Array(c.ElementType, n, runs,
+                    o => SliceInit(c, slice.Window(at + (o - 1) * w, w, ' '), depth + 1), depth));
                 off += w * n;
             }
             else
             {
-                parts.Add($"{c.CsName} = {SliceInit(c, slice.Substring(off, w))}");
+                parts.Add($"{c.CsName} = {SliceInit(c, slice.Window(off, w, ' '), depth)}");
                 off += w;
             }
         }
@@ -225,9 +314,9 @@ internal sealed class GroupValueSlicer(EmitContext ctx, PhysicalModel phys)
     /// <para>A redefining member overlays its target and occupies no positions of its own (§13.18.44), so it
     /// takes no slice; <see cref="DistributableSubtree"/> has already excluded any subtree that has one, and
     /// skipping it here states the rule rather than relying on that.</para></summary>
-    private static string SliceBitInit(DataItem item, string area)
+    private static string SliceBitInit(DataItem item, GroupArea area, int depth)
     {
-        if (!item.IsGroup) return EmitText.CsLiteral(area);
+        if (!item.IsGroup) return EmitText.CsLiteral(area.Text);
         var parts = new List<string>();
         foreach (var c in item.Children)
         {
@@ -243,11 +332,12 @@ internal sealed class GroupValueSlicer(EmitContext ctx, PhysicalModel phys)
                 // kb/Work PB487; §13.18.1.4 GR2 splits them, because an ALIGNED occurrence still occupies only
                 // its declared bits but the NEXT one starts at the following byte.
                 int stride = BitLayout.StrideBits(c);
-                var elems = new List<string>();
-                for (int k = 0; k < n; k++) elems.Add(SliceBitInit(c, BitWindow(area, at + k * stride, per)));
-                parts.Add($"{c.CsName} = new {c.ElementType}[] {{ {string.Join(", ", elems)} }}");
+                var runs = OccurrenceRunEmit.RunsOfRepeats(n, area.PeriodFor(stride),   // kb/Work PB1722
+                    (a, b) => area.SameWindow(at + (a - 1) * stride, at + (b - 1) * stride, per));
+                parts.Add($"{c.CsName} = " + OccurrenceRunEmit.Array(c.ElementType, n, runs,
+                    o => SliceBitInit(c, BitWindow(area, at + (o - 1) * stride, per), depth + 1), depth));
             }
-            else parts.Add($"{c.CsName} = {SliceBitInit(c, BitWindow(area, at, per))}");
+            else parts.Add($"{c.CsName} = {SliceBitInit(c, BitWindow(area, at, per), depth)}");
         }
         return $"new {item.StructName} {{ {string.Join(", ", parts)} }}";
     }
@@ -257,7 +347,5 @@ internal sealed class GroupValueSlicer(EmitContext ctx, PhysicalModel phys)
     /// <see cref="AreaOf"/> uses. A window can run past the area only when the group's own extent exceeds the
     /// positions the walk assigns (implicit filler, §8.5.1.6.3), so the fill is filler bits, which
     /// §13.18.63's all-zero boolean initial state makes zeros.</summary>
-    private static string BitWindow(string area, int at, int count) =>
-        at >= area.Length ? new string('0', count)
-        : area.Substring(at, Math.Min(count, area.Length - at)).PadRight(count, '0');
+    private static GroupArea BitWindow(GroupArea area, int at, int count) => area.Window(at, count, '0');
 }

@@ -319,14 +319,22 @@ The grammar gives `dataReference : cobolWord dataReferenceSuffix*`, and subscrip
 - **Level-66 RENAMES** folds into the REDEFINES/RENAMES tiers (§4) as a COMPOSED view over existing fields (adds no
   storage). The binder must **stop skipping 66s.**
 - **VALUE init** is one recursive object-initializer composed from the leaves, emitted in the static field decl
-  (program) or the instance ctor (OO). Extensions: group VALUE, OCCURS VALUE (`Tbl = [.. n elements]`), figurative
-  constants (§11), and the **Format 2 (table) VALUE** (§13.18.63.2 — literals keyed to occurrence ranges by a
-  mandatory `FROM (subscript)` phrase). Its per-occurrence map (GR12's odometer over the whole subscript tuple,
-  GR13 cyclic reuse under TO, GR14 no-TO = fill to the maximum, GR15 later-FROM-wins, GR16's dynamic initial
-  capacity) is resolved in the BINDER — `DataBinder.ResolveTableValues`, a post-forest pass that also enforces
-  §13.18.63.3 SR18–SR23 — and stored as a `TableValuePlan` on the entry. **`DataItem.ValueAt(subs)` is THE reader
-  and BOTH storage lanes take it**: `ValueInitializer.InitializerFor` builds the record-struct array literal and
-  `GroupImageCodec.ImageInitOf` composes the per-occurrence character images (kb/Work PB208 — the image lane read
+  (program) or the instance ctor (OO). Extensions: group VALUE, OCCURS VALUE, figurative constants (§11), and the
+  **Format 2 (table) VALUE** (§13.18.63.2 — literals keyed to occurrence ranges by a mandatory `FROM (subscript)`
+  phrase). Its resolution (GR12's odometer over the whole subscript tuple, GR13 cyclic reuse under TO, GR14 no-TO =
+  fill to the maximum, GR15 later-FROM-wins, GR16's dynamic initial capacity) is done in the BINDER —
+  `DataBinder.ResolveTableValues`, a post-forest pass that also enforces §13.18.63.3 SR18–SR23 — and stored as a
+  `TableValuePlan` on the entry: its well-formed PHRASES, never an element map (kb/Work PB1722).
+  **⛔ A table's initial state is emitted from its OCCURRENCE RUNS, never element by element** (kb/Work PB1722):
+  `TableValueRuns.Of` answers which occurrences of a level initialize alike (one uniform run without a table VALUE
+  in the subtree; with one, the phrases' breaks and each run's GR13 period), and `OccurrenceRunEmit` composes one
+  element per run period — a fixed table as `CobolTable.Fill<T>(n, o => …)` built at run time, an image as
+  `CobolString.Repeat` of the period, a dynamic table's seed switch as one arm per run. A group VALUE's area
+  (`GroupArea`) is its literal head plus a repeated unit, never a full-width string, and INITIALIZE … TO VALUE
+  tests rank ranges (`TableValuePlan.RankForm`, `CobolTable.InSpan`). So the emitted C# is proportional to the
+  DESCRIPTION: a `10000 x 10000` table used to compile to an array literal of a hundred million initializers.
+  **`DataItem.ValueAt(subs)` is THE reader and EVERY storage lane takes it**: `ValueInitializer.InitializerFor` builds
+  the record-struct elements and `GroupImageCodec.ImageInitOf` composes the per-occurrence character images (kb/Work PB208 — the image lane read
   only `item.RawValue`, which is null for a table VALUE, and repeated ONE occurrence image, so a format-2 VALUE was
   silently discarded for every image-stored leaf). Both lanes thread the OCCURRENCE CONTEXT — the subscripts of
   the OCCURS levels already entered — so the VALUE may sit on an entry SUBORDINATE to the OCCURS (§13.18.63.3 SR18)

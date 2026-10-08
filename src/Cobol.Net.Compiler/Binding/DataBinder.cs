@@ -3172,8 +3172,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 using var _ = Edition.At(item);
                 string where = $"data item '{item.CobolName ?? "FILLER"}'";
                 if (item.RawValue is { } raw) ScreenNumericEditedLiteralClass(pic, raw, where);
+                // Each literal the clause WRITES, once — not once per table element it initializes (kb/Work PB1722).
                 if (item.TableValuePlan is { } plan)
-                    foreach (var lit in plan.Literals.Values) ScreenNumericEditedLiteralClass(pic, lit, where);
+                    foreach (var lit in plan.Phrases.SelectMany(p => p.Literals).Distinct(StringComparer.Ordinal))
+                        ScreenNumericEditedLiteralClass(pic, lit, where);
             }
             foreach (var c in item.Children) Walk(c);
         }

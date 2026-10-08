@@ -632,6 +632,31 @@ public sealed class FlagDirectiveTests
         Assert.DoesNotContain(warnings, w => w.Contains("COBOLNET1620", StringComparison.Ordinal));
     }
 
+    /// <summary>kb/Work PB1952 — §7.3.14.4 GR4 d) and e) are asked of every source element, a METHOD included: its
+    /// operands resolve in its own name scope (§11.7.4 GR5) over its class half's forest. The method-local AE and IX
+    /// and the object's OAE and OX are each flagged once; before the fix the pass resolved nothing in a method and
+    /// none of the four warned.</summary>
+    [Fact]
+    public void Compile_MethodBody_FlagsMoveToSameNameAndIndexSet()
+    {
+        const string source =
+            "       >>FLAG-02 MOVE-TO-SAME-NAME ON\n" +
+            "       >>FLAG-02 RANGE-EXCEPTION-FOR-INDEX ON\n" +
+            "       IDENTIFICATION DIVISION.\n       CLASS-ID. FLGMC.\n" +
+            "       IDENTIFICATION DIVISION.\n       OBJECT.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n" +
+            "       01 OT.\n          05 OTE PIC X OCCURS 3 INDEXED BY OX.\n       01 OAE PIC XX/X.\n" +
+            "       PROCEDURE DIVISION.\n" +
+            "       IDENTIFICATION DIVISION.\n       METHOD-ID. GO1.\n       DATA DIVISION.\n       LOCAL-STORAGE SECTION.\n" +
+            "       01 AE PIC XX/X.\n       01 T.\n          05 TE PIC X OCCURS 3 INDEXED BY IX.\n" +
+            "       PROCEDURE DIVISION.\n" +
+            "       >>TURN EC-RANGE-INDEX CHECKING ON\n" +
+            "           MOVE AE TO AE\n           MOVE OAE TO OAE\n           SET IX TO 2\n           SET OX TO 2\n" +
+            "           DISPLAY AE.\n       END METHOD GO1.\n       END OBJECT.\n       END CLASS FLGMC.\n";
+        var flagged = CompileWarnings(source).Where(w => w.Contains("COBOLNET1620", StringComparison.Ordinal)).ToList();
+        Assert.Equal(2, flagged.Count(w => w.Contains("MOVE-TO-SAME-NAME", StringComparison.Ordinal)));
+        Assert.Equal(2, flagged.Count(w => w.Contains("RANGE-EXCEPTION-FOR-INDEX", StringComparison.Ordinal)));
+    }
+
     [Fact]
     public void Compile_MoveToSameName_NotFlagged_WhenDirectiveOff()
     {

@@ -79,18 +79,33 @@ public sealed record InitializeLoop(string Var, AllCount Count, IReadOnlyList<In
 /// <paramref name="Occurrences"/> are the run-time occurrence numbers of the subject's OCCURS chain that the
 /// expansion does not pin at bind time — each an enclosing <see cref="InitializeLoop"/> variable, or a subscript
 /// identifier-1 itself wrote as an expression (a typed position) — MOST INCLUSIVE FIRST — exactly the order §13.18.63.3 SR20 keys the plan's subscript tuples by, so an
-/// arm's <see cref="InitializeOccurrenceArm.When"/> tuples index straight into them. Arms are TESTED IN ORDER and
-/// are mutually exclusive by construction (one arm per distinct literal, the occurrences sharing it coalesced —
-/// the same folding <c>ValueInitializer.OccurrenceSwitch</c> does, so a literal spanning a thousand occurrences is one
-/// branch and not a thousand).</para></summary>
+/// arm's <see cref="InitializeOccurrenceArm.When"/> spans index straight into them. Arms are TESTED IN ORDER and the
+/// first that holds wins: they are written phrase by phrase from the LAST phrase of the clause back (§13.18.63.4
+/// GR15, "the value defined by the last specified FROM phrase in the VALUE clause is assigned to the table
+/// element"), one arm per distinct literal of a phrase, each a RANK RANGE over the phrase's run (kb/Work PB1722) —
+/// so the select is O(literals written), never O(occurrences): a phrase over a hundred million elements is one
+/// arm.</para></summary>
 public sealed record InitializeOccurrenceSelect(
     IReadOnlyList<Position> Occurrences,
     IReadOnlyList<InitializeOccurrenceArm> Arms,
     InitializeAction? Otherwise) : InitializeAction;
 
-/// <summary>One arm of an <see cref="InitializeOccurrenceSelect"/>: the occurrence tuples that take
-/// <paramref name="Do"/>. Never empty — an arm with no tuple is dropped at bind time.</summary>
-public sealed record InitializeOccurrenceArm(IReadOnlyList<Subscripts> When, InitializeAction Do);
+/// <summary>One arm of an <see cref="InitializeOccurrenceSelect"/>: the occurrence spans that take
+/// <paramref name="Do"/> (any one of them holding). Never empty — an arm with no span is dropped at bind time.</summary>
+public sealed record InitializeOccurrenceArm(IReadOnlyList<OccurrenceSpan> When, InitializeAction Do);
+
+/// <summary>ONE residue class of one Format-2 (table) VALUE phrase over the select's run-time occurrence numbers
+/// (<see cref="InitializeOccurrenceSelect.Occurrences"/>, indexed by position in that list): the occurrence numbers in
+/// <paramref name="Pinned"/> equal their values (the dimensions on which the phrase's FROM and TO agree), and the
+/// RANK <c><paramref name="Constant"/> + Σ (occurrence − 1) × weight</c> over <paramref name="Terms"/> lies in
+/// <paramref name="Lo"/>..<paramref name="Hi"/> at the position (rank − Lo) ≡ <paramref name="Residue"/> modulo
+/// <paramref name="Modulus"/> — the literal list's length, §13.18.63.4 GR13's cyclic reuse
+/// (<see cref="TableValuePlan.RankForm"/>). With no term the rank is a bind-time constant the binder has already
+/// found inside the span, and only <paramref name="Pinned"/> is tested.</summary>
+public sealed record OccurrenceSpan(
+    IReadOnlyList<(int Occurrence, int Value)> Pinned,
+    IReadOnlyList<(int Occurrence, long Weight)> Terms,
+    long Constant, long Lo, long Hi, int Modulus, int Residue);
 
 /// <summary>An implicit <c>SET</c> … <c>TO NULL</c> (ISO §14.9.20.4 GR4/GR6c): a data-pointer, program-pointer, or
 /// object-reference receiver is initialized to its predefined NULL value. This is a SET, NOT a MOVE — it does not

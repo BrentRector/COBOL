@@ -57,11 +57,17 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     // built over (BinderDriver.Reparent adopts the children) — and the CURRENT unit's data + resolver, set by
     // VisitUnit as the walk enters each unit's subtree so an operand resolves in ITS OWN COBOL name scope (duplicate
     // data-names across programs must not cross-resolve; an index-name is likewise unit-scoped).
-    // Null outside any program unit (an OO METHOD body — a documented advisory false-NEGATIVE, never a false-positive:
-    // the flag simply does not fire there, which is safe for a migration aid).
+    // A METHOD body selects its class half's data + resolver with the method's own name scope active (kb/Work PB1952;
+    // it used to resolve nothing there, so d and e never fired in a method). Null only outside every source element.
     private readonly IReadOnlyDictionary<CobolParserCore.IdentificationDivisionContext, BoundUnit> _unitByIdentification;
+    private readonly IReadOnlyDictionary<CobolParserCore.MethodDefinitionContext, MethodNameScope> _methodScopes;
     private DataBinder? _currentData;
     private ReferenceResolver? _currentRefs;
+
+    /// <summary>Where a METHOD's operands resolve: the OBJECT or FACTORY forest that holds the method, its resolver,
+    /// and the method's own §11.7.4 GR5 name scope, which shadows that forest's names while the method's body is
+    /// walked.</summary>
+    private sealed record MethodNameScope(DataBinder Data, ReferenceResolver Refs, OoMethodDataScope Scope);
     // The current unit's USE-declarative open modes (FLAG-14 d I-O-DECLARATIVE), read from the bound model: whether
     // it has ANY open-mode declarative (USE … ON INPUT/OUTPUT/I-O/EXTEND — the INVALID-KEY rule) and whether it has
     // an INPUT / I-O one (the AT-END rule). Reset per unit in VisitProgramUnit (a nested unit does not inherit).
@@ -101,8 +107,10 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
         IReadOnlySet<string> fileStatusNames, IReadOnlySet<string> fileStatus88Is04, IReadOnlySet<string> fileStatus88Is07,
         RefModZeroLengthState refModZl, TurnState turn,
         IReadOnlyDictionary<CobolParserCore.IdentificationDivisionContext, BoundUnit> unitByIdentification,
+        IReadOnlyDictionary<CobolParserCore.MethodDefinitionContext, MethodNameScope> methodScopes,
         IReadOnlySet<object> activationSites) : base(sink)
     {
+        _methodScopes = methodScopes;
         _flag = flag;
         _sink = sink;
         _linageWriteTargets = linageWriteTargets;
@@ -161,11 +169,20 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
         }
 
         // Map each program unit (outermost AND contained) to its bound model so VisitUnit can select the current
-        // unit's data + resolver for the name-resolving detectors (d/e). OO class method bodies have no entry —
-        // their MOVE/SET operands are not resolved (the documented advisory edge; _current* stays null there).
+        // unit's data + resolver for the name-resolving detectors (d/e); the methods are mapped below.
         var unitByIdentification = new Dictionary<CobolParserCore.IdentificationDivisionContext, BoundUnit>();
         foreach (var unit in group.Units)
             if (unit.Ctx.identificationDivision() is { } identification) unitByIdentification[identification] = unit;
+
+        // ⛔ AND EVERY METHOD (kb/Work PB1952): §7.3.14.4 GR4 d) and e) are asked of every source element, and a
+        // method's operands resolve in the forest of the OBJECT or FACTORY that holds it, through the method's own
+        // name scope (§11.7.4 GR5 — a method-local name shadows object data). Each bound method is mapped to that
+        // binder, its resolver and its scope, the same overlay the statement binder activates (ActiveMethodScope).
+        var methodScopes = new Dictionary<CobolParserCore.MethodDefinitionContext, MethodNameScope>();
+        foreach (var cls in group.Classes)
+            foreach (var (data, refs) in new[] { (cls.Data, cls.Refs), (cls.FactoryData, cls.FactoryRefs) })
+                foreach (var m in data.OoBoundMethods)
+                    if (m.Ctx is { } mctx) methodScopes[mctx] = new MethodNameScope(data, refs, m.DataScope);
 
         // The binder's record of the function activations and property references that look like data references
         // (DataBinder.ActivationSites) — every forest of the group, class and program alike.
@@ -173,7 +190,7 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
         foreach (var binder in group.AllBindersAndInterfaces()) activationSites.UnionWith(binder.ActivationSites);
 
         var pass = new FlagConformancePass(flag, sink, linage, varying, fileStatus, fs88_04, fs88_07,
-            group.Session.RefModZeroLength, group.Session.Turn, unitByIdentification, activationSites);
+            group.Session.RefModZeroLength, group.Session.Turn, unitByIdentification, methodScopes, activationSites);
         pass.VisitPositioned(group.Tree);
         pass.FlagEcProgramDirectives();   // b EC-PROGRAM-EXCEPTIONS — cross-ref >>TURN lines with the source elements that call/invoke
     }
@@ -224,7 +241,17 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
 
     public override object? VisitInterfaceDefinition(CobolParserCore.InterfaceDefinitionContext ctx) => VisitElement(ctx);
 
-    public override object? VisitMethodDefinition(CobolParserCore.MethodDefinitionContext ctx) => VisitElement(ctx);
+    /// <summary>A method is a source element whose operands resolve in its own name scope over its class half's
+    /// forest (kb/Work PB1952): the scope is activated on that binder for the walk of the method — the overlay the
+    /// statement binder activates while it binds the same statements — and restored on exit.</summary>
+    public override object? VisitMethodDefinition(CobolParserCore.MethodDefinitionContext ctx)
+    {
+        if (!_methodScopes.TryGetValue(ctx, out var method)) return VisitElement(ctx);
+        var saved = (_currentData, _currentRefs, method.Data.ActiveMethodScope);
+        (_currentData, _currentRefs, method.Data.ActiveMethodScope) = (method.Data, method.Refs, method.Scope);
+        try { return VisitElement(ctx); }
+        finally { (_currentData, _currentRefs, method.Data.ActiveMethodScope) = saved; }
+    }
 
     /// <summary>Open the source element <paramref name="ctx"/> for the walk of its subtree and close it on exit.</summary>
     private object? VisitElement(ParserRuleContext ctx)
@@ -669,15 +696,17 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     /// <summary>Flag the SET once (GR4 e) when a receiving operand is an index-name of the current unit AND
     /// EC-RANGE-INDEX checking is enabled at the statement line — the same <see cref="TurnState"/> read i uses for
     /// EC-BOUND-REF-MOD; the fold honours the exception hierarchy, so an enabling <c>&gt;&gt;TURN EC-RANGE</c> /
-    /// <c>EC-ALL</c> also counts. No-op outside a resolvable program unit (an OO method body — the advisory edge).</summary>
+    /// <c>EC-ALL</c> also counts. A method resolves through its own scope (VisitMethodDefinition, kb/Work PB1952).</summary>
     private void FlagIndexSet(IReadOnlyList<CobolParserCore.DataReferenceContext> receivers, int line)
     {
         if (_currentData is null) return;
         foreach (var recv in receivers)
         {
             DataReferenceCst r = recv;
+            // An index-name VISIBLE where the statement stands: the method's own (§11.7.4 GR5) or the unit's, through
+            // the one scope-aware lookup the binder resolves the same SET with (kb/Work PB1952).
             if (r.Register != SpecialRegister.None || r.BaseName is not { } name
-                || !_currentData.IndexNames.Declares(name)) continue;
+                || _currentData.Symbols.IndexCandidates(name, [], _currentData.ActiveScope) is not { Count: > 0 }) continue;
             if (_turn.Enabled("EC-RANGE-INDEX", null, line))
                 Flag(FlagOption.Flag02RangeExceptionForIndex, line,
                     "the SET of an index-name while EC-RANGE-INDEX checking is enabled");
