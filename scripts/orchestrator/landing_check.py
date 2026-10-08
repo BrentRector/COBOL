@@ -9,13 +9,20 @@ then the index's blind spots, then its staleness), so the planner's set is an AD
 be caught, never silently landed. This is the second line: before a landing reaches main it compares what the landing
 ACTUALLY changed with
 
-  1. its DECLARED file set, when it lands R3 work: the set the dispatch ledger recorded for its notes when they were
-     planned (or, for a hand dispatch never recorded, the set computed now). A changed file that existed on main and
-     lies outside that set STOPS the landing: the wave touched a file nothing protected;
+  1. its DECLARED file set, for the R3 work it lands: the set the dispatch ledger recorded for those notes when they
+     were planned, read from the FULL ledger (a landing flips its own notes to terminal, and that declaration is
+     still the authority for it), or, for a note no entry records, the set computed now. A file an R3 commit changed
+     that existed on main and lies outside that set STOPS the landing: the wave touched a file nothing protected;
   2. every OTHER in-flight branch's actual changes (plan_wave.inflight_file_sets: worktrees, unlanded branches, the
-     dispatch ledger's declared sets), when either side is R3 work. A shared file stops the LATER of the two (by
-     dispatch time: the ledger's `at`, else the branch's first commit): it re-plans and rebases onto the earlier
-     after that lands. The earlier one lands, and the check names the branch that must rebase.
+     dispatch ledger's declared sets), when the shared file is R3 work on either side. A shared file stops the LATER
+     of the two (by dispatch time: the ledger's `at`, else the branch's first commit): it re-plans and rebases onto
+     the earlier after that lands. The earlier one lands, and the check names the branch that must rebase.
+
+R3 work is attributed PER COMMIT (PB2703). A train is MIXED: the lander makes one commit per cluster, and some clusters
+work on R3 notes while the rest are fix lane or tooling. The landing's R3 work is the commits that work on an R3 note
+(the ids leading the subject, or an R3 status the commit flips) and the partition files those commits change; a
+fix-lane commit in the same train is fix lane, so its files neither leave the R3 set (1) nor make a shared file R3 (2).
+A squashed commit that names both kinds is R3 whole: it stops rather than land silently.
 
 Draft 10 (the ninth refuter's K1-K3). Every diff is read with --no-renames (plan_wave.changed_files), so a moved file
 counts at its old path too. An in-flight branch is R3 work because its DISPATCH says so, never by its commit wording
@@ -143,9 +150,17 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
     terminal = lambda n: status.get(n) in work.TERMINAL_STATUSES  # noqa: E731
     mine = {p for p in plan_wave.changed_files(git, f"{base}...{rev}") if inside(p)}
     notes = work_notes(git, base, rev)
-    mine_r3 = sorted(notes & r3, key=lambda s: int(s[2:]))
-    ledger = [g for g in coord.read_json(coord_dir / plan_wave.DISPATCH_LEDGER, {"groups": []}).get("groups", [])
-              if not all(terminal(i) for i in g.get("notes", []))]
+    # R3 work is attributed PER COMMIT (PB2703): a train is MIXED — one commit per cluster (lander-train-brief step 5),
+    # some clusters R3 notes, the rest fix lane or tooling — so the R3 work is the commits that work on an R3 note and
+    # the partition files THEY change, never the whole landing's diff. A squashed commit naming both kinds is R3 whole.
+    r3_notes, mine_r3_files = set(), set()
+    for sha in git("rev-list", "--reverse", f"{base}..{rev}").stdout.split():
+        if hit := work_notes(git, f"{sha}^", sha) & r3:
+            r3_notes |= hit
+            mine_r3_files |= {p for p in plan_wave.changed_files(git, f"{sha}^", sha) if inside(p)}
+    mine_r3 = sorted(r3_notes, key=lambda s: int(s[2:]))
+    full_ledger = coord.read_json(coord_dir / plan_wave.DISPATCH_LEDGER, {"groups": []}).get("groups", [])
+    ledger = [g for g in full_ledger if not all(terminal(i) for i in g.get("notes", []))]
     manifests = train_manifests(coord_dir)
     members = [m for m in manifests if m["notes"] & notes]   # THIS landing's train members (K3)
     my_at = min([g["at"] for g in ledger if "at" in g and set(g.get("notes", [])) & notes]
@@ -154,13 +169,18 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
     stops, warnings = [], []
 
     if mine_r3:   # 1. the declared set
-        recorded = [g for g in ledger if set(g.get("notes", [])) & set(mine_r3)]
-        declared = ({f.replace(chr(92), "/") for g in recorded for f in g.get("files", [])} if recorded
-                    else declared_for(mine_r3))
-        existed = {p for p in mine if git("cat-file", "-e", f"{base}:{p}").returncode == 0}
+        # From the FULL ledger, terminal or not: the declaration recorded when the work was planned is the authority
+        # for the landing that makes those notes terminal (`work.load` reads the LANDING's tree, where its own notes
+        # are already landed, PB2703). A note no entry records falls back to the set computed now.
+        recorded = [g for g in full_ledger if set(g.get("notes", [])) & r3_notes]
+        unrecorded = sorted(r3_notes - {n for g in recorded for n in g.get("notes", [])}, key=lambda s: int(s[2:]))
+        declared = {f.replace(chr(92), "/") for g in recorded for f in g.get("files", [])}
+        declared |= declared_for(unrecorded) if unrecorded else set()
+        source = " + ".join(s for s, on in (("the dispatch ledger", recorded), ("computed now", unrecorded)) if on)
+        existed = {p for p in mine_r3_files if git("cat-file", "-e", f"{base}:{p}").returncode == 0}
         if outside := sorted(existed - declared):
             stops.append(f"R3 work ({', '.join(mine_r3)}) changed {len(outside)} file(s) outside its declared file set "
-                         f"({'the dispatch ledger' if recorded else 'computed now'}): {', '.join(outside[:8])}"
+                         f"({source}): {', '.join(outside[:8])}"
                          f"{' …' if len(outside) > 8 else ''} — re-plan: the planner's set missed them (a member_index "
                          f"hole: file a kb/Work note), and check them against the in-flight work before landing")
 
@@ -216,8 +236,9 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
             shared = {f for f in mine & files if inside(f)}
             if not shared:
                 continue
-        if not mine_r3 and not their_notes & r3:
-            continue                                       # fix lane against fix lane: a train merges them
+        if not shared & mine_r3_files and not their_notes & r3:
+            continue                                       # fix lane against fix lane: a train merges them (PB2703:
+                                                           # per file — only a file an R3 commit changed is R3 here)
         names = f"{', '.join(sorted(shared)[:5])}{' …' if len(shared) > 5 else ''}"
         if their_at < my_at:
             unbound = (" It is " + (f"{', '.join(sorted(their_notes)[:4])} work by its {how}" if how != "nothing"
@@ -433,6 +454,44 @@ def self_test() -> int:
            check(repo, "origin/main", "f-c", cdir, items, rules, never, git), 1, 0)
     sh("branch", "-D", "f-c")
     drop("wt-start")
+
+    # ── PB2703: a MIXED train (one commit per cluster: R3 and fix lane) is attributed per commit ──
+    def commits(name: str, *steps: tuple[str, dict[str, str], int]) -> None:
+        sh("checkout", "-q", "-b", name, "origin/main")
+        for msg, edits, when in steps:
+            for f, t in edits.items():
+                write(f, t)
+            sh("add", "-A")
+            sh("commit", "-qm", msg, when=when)
+        sh("checkout", "-q", "main")
+
+    ledger(a_set, {"wave": "2", "letter": "b", "notes": ["PB9002"], "files": ["src/C.cs"], "at": 1_000_300})
+    commits("mixed", ("PB9001: extract in set", {"src/A.cs": "// moved\n"}, 1_000_200),
+            ("PB9100: fix-lane cluster", {"src/B.cs": "// fixed\n"}, 1_000_250))
+    expect("PB2703a: a mixed train's fix-lane commit editing a file outside the R3 set lands",
+           check(repo, "origin/main", "mixed", cdir, items, rules, never, git), 0, 0)
+    branch("f-early", "PB9101: earlier fix", {"src/B.cs": "// earlier fix\n"}, 1_000_050)
+    expect("PB2703b: ... its fix-lane file shared with an EARLIER in-flight fix-lane branch lands",
+           check(repo, "origin/main", "mixed", cdir, items, rules, never, git), 0, 0)
+    sh("branch", "-D", "f-early")
+    branch("f-early2", "PB9101: earlier fix", {"src/A.cs": "// earlier fix\n"}, 1_000_050)
+    expect("PB2703b': ... while its R3 commit's file shared with an EARLIER in-flight branch STOPS",
+           check(repo, "origin/main", "mixed", cdir, items, rules, never, git), 1, 0)
+    sh("branch", "-D", "f-early2")
+    sh("branch", "-D", "mixed")
+    flipped = [dict(i, status="landed") if i["id"] == "PB9002" else i for i in items]   # as the landing's tree reads
+    commits("r-self", ("PB9002: delete, and land the note", {"src/C.cs": "// deleted\n", "kb/Work/PB9002.md":
+                                                             "---\nid: PB9002\nstatus: landed\n---\n"}, 1_000_400))
+    expect("PB2703c: R3 work that flips its own note to landed keeps its (now terminal) ledger declaration: lands",
+           check(repo, "origin/main", "r-self", cdir, flipped, rules, never, git), 0, 0)
+    sh("branch", "-D", "r-self")
+    commits("squashed", ("PB9001+PB9100: both kinds in one", {"src/A.cs": "// moved\n", "src/B.cs": "// fix\n"},
+                         1_000_200))
+    expect("PB2703d: ONE commit naming an R3 id and a fix-lane id is R3 whole: its file outside the set STOPS",
+           check(repo, "origin/main", "squashed", cdir, items, rules, never, git), 1, 0)
+    sh("branch", "-D", "squashed")
+    ledger()
+
     ids = sorted(subject_ids("PB9000-PB9002: a range" + chr(10) + "PB9100+PB9101: two"))
     expect("N5: a subject range names every note in it",
            ([] if ids == ["PB9000", "PB9001", "PB9002", "PB9100", "PB9101"] else [ids], []), 0, 0)

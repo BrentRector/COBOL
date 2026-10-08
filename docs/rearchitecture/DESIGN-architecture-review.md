@@ -1616,10 +1616,14 @@ WORKS ON (the ids leading its commit subjects, ranges expanded, and the notes wh
 only mentions a note does not work on it) and compares the landing's ACTUAL diff (`git diff --name-only --no-renames
 origin/main...<rev>`: a moved file counts at its old path too, and the planner's admission reads diffs the same way,
 through one reader, `plan_wave.changed_files`) with
-(1) its declared file set, when it lands R3 work: the set the dispatch ledger recorded when the work was planned or
-admitted, or the set computed now for work never recorded; a changed file that existed on `main` and lies outside it
-stops the landing; and (2) every other in-flight branch's actual diff and every dispatched group's whole declared
-set until its notes are terminal, started or not (`inflight_file_sets`), when either side is R3 work: a shared file
+(1) its declared file set, for the R3 work it lands: the set the dispatch ledger recorded when the work was planned or
+admitted, read from the FULL ledger (the landing flips its own notes to terminal, and that declaration stays its
+authority), or the set computed now for a note never recorded; a file an R3 commit changed that existed on `main` and
+lies outside it stops the landing; and (2) every other in-flight branch's actual diff and every dispatched group's
+whole declared set until its notes are terminal, started or not (`inflight_file_sets`), when the shared file is R3
+work on either side. R3 work is attributed PER COMMIT (PB2703): a train is mixed, one commit per cluster, so the
+landing's R3 work is the commits that work on an R3 note and the files those commits change; its fix-lane commits
+neither leave the R3 set nor make a shared file R3, and a squashed commit naming both kinds is R3 whole. A shared file
 stops the LATER of the two by dispatch time (the ledger's `at`, one millisecond apart per group so a wave never ties,
 else the branch's first commit), which re-plans and rebases onto the earlier once it lands, and the earlier one lands
 with a warning naming the branch that must rebase. An in-flight branch is R3 work because its DISPATCH says so, never
@@ -1637,10 +1641,12 @@ run on a thread pool, and a branch's register changes are one patch, not two rea
 dispatch ledger to compare with, so the server-side check is the existing `ci-gate`, and the forbidden-commands hook
 refuses a bare push to `main`. The domain is
 the campaign's code roots and extensions (`model_rules.json` `campaign`) without `.md`: a document both sides edit is
-a text merge the rebase resolves. Its self-test (`--self-test`, a CI step, 20 cases) plants an out-of-set edit, a
+a text merge the rebase resolves. Its self-test (`--self-test`, a CI step, 25 cases) plants an out-of-set edit, a
 two-branch overlap, a rename each way, a `WIP checkpoint:`-only R3 worktree, a train against its own implementer
-(recorded, unrecorded, re-resolved with and without its manifest, and beside a stranger) and a started wave's
-untouched declared file, in a scratch repository, and fails with the check disabled.
+(recorded, unrecorded, re-resolved with and without its manifest, and beside a stranger), a started wave's
+untouched declared file, and a mixed train (a fix-lane commit outside the R3 set and sharing a file with earlier
+fix-lane work, an R3 commit sharing one with earlier work, an R3 commit that lands its own note, and a squashed commit
+of both kinds), in a scratch repository, and fails with the check disabled.
 
 The register
 verifies alone what it can (`python scripts/spec/work.py check`): every path an open PB2119 note names exists in
