@@ -894,7 +894,9 @@ value of the typed RECORD KEY / RELATIVE KEY field.
   character positions), and a NUMERIC key decodes algebraically through its own profile (§8.8.4.2.4); a BOOLEAN key
   does not exist — §14.9.40.3 SR6 c) / SR14 c) / §14.9.24.3 SR4 c) refuse it (`SortKeyAdmission`).
 - **The SORT/MERGE procedure PHASE lives in the sort store (kb/Work PB349).** A store exists only while its
-  SORT/MERGE statement executes (`Init` → `Close`); the emitter marks the INPUT and OUTPUT procedure ranges with
+  SORT/MERGE statement executes (`Init` → `Close`) and belongs to the RUN UNIT that executes it (`RunUnit.SortFiles`,
+  kb/Work PB1570 — ISO §14.6.1: a run unit shares nothing with another but messages, process files and switches, so
+  the EC-SORT-MERGE-ACTIVE scan sees only its own run unit's procedures); the emitter marks the INPUT and OUTPUT procedure ranges with
   `CobolSort.EnterProcedure`, `Sort` ends the input phase, and an output-procedure at-end sets the GR3 latch. The
   program's RELEASE and RETURN STATEMENTS render the checked entries `ReleaseStatement` / `ReturnStatement`, which
   test that phase before acting — §14.9.32.4 GR1 EC-FLOW-RELEASE, §14.9.34.4 GR1 EC-FLOW-RETURN, §14.9.34.4 GR3

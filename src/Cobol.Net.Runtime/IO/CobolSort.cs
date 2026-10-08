@@ -61,39 +61,6 @@ public static class CobolSort
             Layout is { } l ? l.Position(image, Offset, extents) : Offset;
     }
 
-    /// <summary>The per-SD store: released images (in release order — the stability anchor GR3 requires), the
-    /// USING stream boundaries for MERGE, and the return cursor.</summary>
-    private sealed class Store
-    {
-        /// <summary>Each released record with the extent table it was released with (D-FRA (v); kb/Work PB1053).</summary>
-        public readonly List<StoredFrame> Records = [];
-        public readonly List<int> StreamStarts = [];   // MERGE: index where each USING file's records begin
-        public int Cursor;
-        public int LastReturnedLength;
-        /// <summary>The extent table of the most recently RETURNed record — null when it carries none.</summary>
-        public RecordExtents? LastReturnedExtents;
-        /// <summary>The ALPHANUMERIC collating sequence snapshotted at statement start (ISO §14.6.6 r5) — see
-        /// <see cref="Init(string, CobolCollation?, CobolCollation?)"/>.</summary>
-        public CobolCollation? Collation;
-        /// <summary>Its NATIONAL twin — GR5 determines the two sequences SEPARATELY, so they snapshot
-        /// separately and a statement may carry one, both or neither.</summary>
-        public CobolCollation? NatCollation;
-        /// <summary>Which procedure of the executing SORT/MERGE statement is running — the state §14.9.32.4 GR1
-        /// ("within the range of an input procedure being executed by a SORT statement that references the
-        /// file-name") and §14.9.34.4 GR1 ("within the range of an output procedure being executed by a MERGE or
-        /// SORT statement that references file-name-1") test. The store exists only between <see cref="Init(string,
-        /// CobolCollation?, CobolCollation?)"/> and <see cref="Close"/>, so "no store" is "no statement executing".</summary>
-        public ProcedurePhase Phase;
-        /// <summary>§14.9.34.4 GR3's latch: the at end condition has occurred for this file in the current output
-        /// procedure, so a further RETURN is EC-SORT-MERGE-RETURN.</summary>
-        public bool AtEndReached;
-    }
-
-    /// <summary>The procedure phase of an executing SORT/MERGE (see <see cref="Store.Phase"/>). <c>None</c> covers
-    /// every part of the statement that runs no program procedure: the USING/GIVING transfers and the sequence
-    /// phase — a USE declarative that runs from an implicit transfer is not in the range of either procedure.</summary>
-    private enum ProcedurePhase { None, Input, Output }
-
     /// <summary>⛔ THE SORT/MERGE STATEMENT'S OWN RAISES ARE MARKED HERE (kb/Work PB1036). The five entries the
     /// statement itself executes — <see cref="Init(string, CobolCollation?, CobolCollation?)"/>, <see cref="FileNotOpen"/>,
     /// the implicit <see cref="Release(string, string, int, int, int)"/>, <see cref="Sort"/> and <see cref="Merge"/> —
@@ -110,13 +77,10 @@ public static class CobolSort
         return false;
     }
 
-    private static readonly Dictionary<string, Store> Files = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>The ambient run unit's sort-merge stores (kb/Work PB1570) — run-unit state, never process state.</summary>
+    private static SortFileTable Stores => RunUnit.Current.SortFiles;
 
-    private static Store Get(string name)
-    {
-        if (!Files.TryGetValue(name, out var f)) Files[name] = f = new Store();
-        return f;
-    }
+    private static SortStore Get(string name) => Stores.Get(name);
 
     /// <summary>Begin a SORT/MERGE statement on <paramref name="name"/>: a fresh, empty store (ISO §14.9.40 GR9a —
     /// the release phase starts). Re-executing a SORT on the same SD reuses the connector with a clean buffer.</summary>
@@ -133,7 +97,7 @@ public static class CobolSort
     /// ("If the range of the input procedure causes the execution of any MERGE, RETURN, or format 1 SORT
     /// statements, the EC-SORT-MERGE-ACTIVE exception condition is set to exist"), GR13 and §14.9.24.4 GR8 (the
     /// output procedure's MERGE, RELEASE or format 1 SORT) all forbid a SORT/MERGE while any procedure of an
-    /// executing SORT/MERGE runs — whatever file it names. A raise therefore leaves an enclosing statement on the
+    /// executing SORT/MERGE runs — whatever file it names, in THIS run unit (kb/Work PB1570). A raise therefore leaves an enclosing statement on the
     /// same file intact. With checking off the results are undefined (GR10) and the statement runs.</para></summary>
     public static void Init(string name, CobolCollation? collation, CobolCollation? national)
     {
@@ -143,7 +107,7 @@ public static class CobolSort
 
     private static void InitCore(string name, CobolCollation? collation, CobolCollation? national)
     {
-        if (ExceptionState.SortMergeActiveChecking && AnyProcedureRunning(ProcedurePhase.Input, ProcedurePhase.Output))
+        if (ExceptionState.SortMergeActiveChecking && Stores.AnyInPhase([ProcedurePhase.Input, ProcedurePhase.Output]))
             ExceptionState.SortMergeActiveError($"SORT/MERGE on {name}: executed within the range of an input or "
                 + "output procedure of an executing SORT/MERGE statement (ISO §14.9.40.4 GR10 / GR13, §14.9.24.4 GR8)");
         var f = Get(name);
@@ -200,10 +164,11 @@ public static class CobolSort
     public static bool ReleaseStatement(string name, string image, int min, int max, int? size = null,
         RecordExtents? extents = null)
     {
-        if (ExceptionState.SortMergeActiveChecking && AnyProcedureRunning(ProcedurePhase.Output))
+        if (ExceptionState.SortMergeActiveChecking && Stores.AnyInPhase([ProcedurePhase.Output]))
             ExceptionState.SortMergeActiveError($"RELEASE for sort file {name}: executed within the range of an "
                 + "output procedure of an executing SORT/MERGE statement (ISO §14.9.40.4 GR13, §14.9.24.4 GR8)");
-        if (!Files.TryGetValue(name, out var f) || f.Phase != ProcedurePhase.Input)
+        var f = Stores.Find(name);
+        if (f is null || f.Phase != ProcedurePhase.Input)
             ExceptionState.FlowReleaseError($"RELEASE for sort file {name}: not within the range of an input "
                 + "procedure being executed by a SORT statement that references it (ISO §14.9.32.4 GR1)");
         image ??= "";
@@ -225,18 +190,6 @@ public static class CobolSort
         : size <= image.Length ? image[..size]
         : image.PadRight(size);
 
-    /// <summary>Is a procedure of an executing SORT/MERGE statement — in one of <paramref name="phases"/> —
-    /// running? The -ACTIVE rules (§14.9.40.4 GR10 / GR13, §14.9.24.4 GR8) name "the range of the input
-    /// procedure" / "the range of the output procedure" of ANY executing statement, not only of the file the
-    /// offending statement names. Asked only while EC-SORT-MERGE-ACTIVE checking is enabled.</summary>
-    private static bool AnyProcedureRunning(params ReadOnlySpan<ProcedurePhase> phases)
-    {
-        foreach (var store in Files.Values)
-            if (phases.Contains(store.Phase))
-                return true;
-        return false;
-    }
-
     /// <summary>The RETURN STATEMENT (ISO §14.9.34.4). GR1: a RETURN "may be executed only when it is within the
     /// range of an output procedure being executed by a MERGE or SORT statement that references file-name-1. If it
     /// is executed at any other time, the EC-FLOW-RETURN exception condition is set to exist." GR3: "After the
@@ -250,10 +203,11 @@ public static class CobolSort
     /// written for that range wins over GR1's general "any other time" (docs/CONFORMANCE.md §3 D-SMA).</para></summary>
     public static bool ReturnStatement(string name, out string image)
     {
-        if (ExceptionState.SortMergeActiveChecking && AnyProcedureRunning(ProcedurePhase.Input))
+        if (ExceptionState.SortMergeActiveChecking && Stores.AnyInPhase([ProcedurePhase.Input]))
             ExceptionState.SortMergeActiveError($"RETURN for sort-merge file {name}: executed within the range of "
                 + "an input procedure of an executing SORT statement (ISO §14.9.40.4 GR10)");
-        if (!Files.TryGetValue(name, out var f) || f.Phase != ProcedurePhase.Output)
+        var f = Stores.Find(name);
+        if (f is null || f.Phase != ProcedurePhase.Output)
             ExceptionState.FlowReturnError($"RETURN for sort-merge file {name}: not within the range of an output "
                 + "procedure being executed by a MERGE or SORT statement that references it (ISO §14.9.34.4 GR1)");
         else if (f.AtEndReached)
@@ -471,7 +425,7 @@ public static class CobolSort
 
     /// <summary>End the SORT/MERGE statement: drop the buffered records (the sort file has no persistent storage —
     /// ISO §9 sort-merge file model: only RELEASE/RETURN/SORT/MERGE ever reference it).</summary>
-    public static void Close(string name) => Files.Remove(name);
+    public static void Close(string name) => Stores.Remove(name);
 
     // ── Key comparison (ISO §14.9.40 GR8 / §14.9.24 GR3 — ONE policy for SORT and MERGE) ─────────────────────
 

@@ -26,8 +26,8 @@ namespace CobolNet.Tests.Unit;
 /// <para>The second test is the structure that makes the next case automatic: it enumerates EVERY writable static
 /// field the runtime assembly declares and fails on one that is not a documented PROCESS-lifetime store. A new
 /// run-unit store written as a static cannot pass without someone writing, here, why it outlives the run unit.
-/// (A <c>static readonly</c> reference to a mutable collection is not caught — the runtime's are immutable
-/// tables or caches keyed by immutable inputs.)</para>
+/// (A <c>static readonly</c> reference to a mutable collection is the sibling blind spot — kb/Work PB1570 — and
+/// <see cref="NoStaticMutableCollection_OutsideTheDocumentedProcessStores"/> closes it by the same register.)</para>
 /// </remarks>
 public sealed class RunUnitStateDriftTests
 {
@@ -204,6 +204,84 @@ public sealed class RunUnitStateDriftTests
             .ToHashSet(StringComparer.Ordinal);
         var stale = ProcessLifetimeStatics.Keys.Where(k => !live.Contains(k)).ToList();
         Assert.True(stale.Count == 0, "ProcessLifetimeStatics names field(s) that no longer exist: " + string.Join(", ", stale));
+    }
+
+    /// <summary>Every <c>static readonly</c> MUTABLE COLLECTION in <c>Cobol.Net.Runtime</c>, with the reason it is
+    /// PROCESS state (kb/Work PB1570). <see cref="NoWritableStatic_OutsideTheDocumentedProcessStores"/> cannot see
+    /// these — the field is read-only, its CONTENTS are not — and that blind spot hid <c>CobolSort</c>'s sort-file
+    /// store (a <c>static readonly Dictionary</c> of every executing SORT/MERGE statement, shared by every run unit
+    /// in the process) until two run units sorted at once. A new entry is a claim that what the collection holds
+    /// is immutable-keyed derived data or a once-per-process fact, never a run unit's state: write the reason.</summary>
+    private static readonly Dictionary<string, string> ProcessLifetimeCollections = new(StringComparer.Ordinal)
+    {
+        ["CobolNet.Runtime.Collation.Cache.CollationKeyCache::s_perCollator"] =
+            "memo of collation keys per collator: derived from immutable collators, keyed by the collator object",
+        ["CobolNet.Runtime.Collation.Cldr.CldrLocaleLoader::s_cache"] =
+            "memo of parsed CLDR locale data, keyed by locale name: derived from immutable embedded data",
+        ["CobolNet.Runtime.Collation.CollationEngine::s_locales"] =
+            "memo of resolved locale collations, keyed by locale name: derived from immutable CLDR data",
+        ["CobolNet.Runtime.Collation.CollationEngine::s_collators"] =
+            "memo of collators, keyed by (table, options): derived from immutable inputs",
+        ["CobolNet.Runtime.Collation.Locale.LocaleManager::s_infos"] =
+            "memo of locale facts, keyed by locale name: derived from immutable platform data",
+        ["CobolNet.Runtime.Globalization.LocaleFacts::s_cache"] =
+            "memo of locale facts, keyed by locale name: derived from immutable platform data",
+        ["CobolNet.Runtime.LocaleCollation::s_orders"] =
+            "memo of order vectors, keyed by the (immutable) collator",
+        ["CobolNet.Runtime.Globalization.MonetaryFacts::s_cache"] =
+            "memo of monetary facts, keyed by the (immutable) LocaleFacts object",
+        ["CobolNet.Runtime.CobolIntrinsics::s_orderingCollators"] =
+            "memo of collators for FUNCTION ORDERING, keyed by (table, level): derived from immutable inputs",
+        ["CobolNet.Runtime.Exceptions.EcCheckingProfile::Cache"] =
+            "memo of checking profiles, keyed by the profile's immutable name",
+        ["CobolNet.Runtime.Exceptions.ExceptionCatalog::Table"] =
+            "the standard's exception-condition table (Table 12), built once by the static initializer and never mutated",
+        ["CobolNet.Runtime.PointerImage::s_areaBases"] =
+            "see PointerImage::s_nextBase in " + nameof(ProcessLifetimeStatics) + ": pointer-image bases count per PROCESS",
+        ["CobolNet.Runtime.PointerImage::s_nameBases"] =
+            "see PointerImage::s_nextBase in " + nameof(ProcessLifetimeStatics) + ": pointer-image bases count per PROCESS",
+        ["CobolNet.Runtime.IO.RecordLayoutNotice::Reported"] =
+            "the (file, host path) pairs already noticed on standard error: a once-per-process diagnostic latch, locked",
+    };
+
+    private static readonly HashSet<string> MutableCollectionDefinitions =
+    [
+        "System.Collections.Generic.Dictionary`2", "System.Collections.Generic.HashSet`1",
+        "System.Collections.Generic.List`1", "System.Collections.Generic.Queue`1",
+        "System.Collections.Generic.Stack`1", "System.Collections.Generic.SortedDictionary`2",
+        "System.Collections.Generic.SortedSet`1", "System.Collections.Generic.LinkedList`1",
+        "System.Collections.Concurrent.ConcurrentDictionary`2", "System.Collections.Concurrent.ConcurrentQueue`1",
+        "System.Collections.Concurrent.ConcurrentStack`1", "System.Collections.Concurrent.ConcurrentBag`1",
+        "System.Runtime.CompilerServices.ConditionalWeakTable`2",
+    ];
+
+    /// <summary>kb/Work PB1570 — the structure that makes the next case automatic: a <c>static readonly</c> mutable
+    /// collection in the runtime must be a documented PROCESS-lifetime store, so a run unit's state cannot hide in
+    /// one (<see cref="RunUnit"/> owns it instead).</summary>
+    [Fact]
+    public void NoStaticMutableCollection_OutsideTheDocumentedProcessStores()
+    {
+        var found = new HashSet<string>(StringComparer.Ordinal);
+        foreach (Type t in typeof(RunUnit).Assembly.GetTypes())
+        {
+            if (IsCompilerGenerated(t)) continue;
+            foreach (FieldInfo f in t.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+                                                 | BindingFlags.DeclaredOnly))
+            {
+                if (f.IsLiteral || f.IsDefined(typeof(CompilerGeneratedAttribute))) continue;
+                Type ft = f.FieldType;
+                if (ft.IsGenericType && MutableCollectionDefinitions.Contains(ft.GetGenericTypeDefinition().FullName!))
+                    found.Add($"{t.FullName}::{f.Name}");
+            }
+        }
+        var offenders = found.Where(k => !ProcessLifetimeCollections.ContainsKey(k)).Order().ToList();
+        Assert.True(offenders.Count == 0,
+            "static mutable collection(s) in Cobol.Net.Runtime — run-unit state belongs on RunUnit (ISO §14.6.1; "
+            + "kb/Work PB1570); a genuinely process-lifetime store is documented in ProcessLifetimeCollections:\n  "
+            + string.Join("\n  ", offenders));
+        var stale = ProcessLifetimeCollections.Keys.Where(k => !found.Contains(k)).Order().ToList();
+        Assert.True(stale.Count == 0,
+            "ProcessLifetimeCollections names field(s) that are no longer static mutable collections: " + string.Join(", ", stale));
     }
 
     private static bool IsCompilerGenerated(Type t)

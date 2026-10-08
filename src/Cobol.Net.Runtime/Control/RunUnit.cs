@@ -59,6 +59,10 @@ public sealed class RunUnit
     /// <summary>The run-unit file-connector registry (§9.1; owns the physical-file sharing table).</summary>
     public FileRegistry Files { get; } = new();
 
+    /// <summary>The run unit's sort-merge file stores (ISO §14.9.40 / §14.9.24; kb/Work PB1570) — the in-memory SD
+    /// buffers of the SORT/MERGE statements this run unit executes, which no other run unit can see or mutate.</summary>
+    public SortFileTable SortFiles { get; } = new();
+
     /// <summary>The run unit's ONE current FUNCTION RANDOM sequence (ISO §15.75.3 r4 — the implementor seed belongs
     /// to "the first reference to this function in the run unit"; kb/Work PB307).</summary>
     public RandomSequence Random { get; } = new();

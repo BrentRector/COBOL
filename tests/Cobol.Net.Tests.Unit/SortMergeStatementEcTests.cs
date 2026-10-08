@@ -13,7 +13,6 @@ namespace CobolNet.Tests.Unit;
 /// two are detected by one statement (docs/CONFORMANCE.md §3 D-SMA), that a raise leaves the statement's action
 /// undone, and that checking off keeps the pre-PB1036 behaviour byte for byte. Each test uses its own sort-merge
 /// file name — the store is keyed by name — and restores every flag it sets.</summary>
-[Collection("process-globals")]   // CobolSort's file-name store is one static Dictionary: a class that Init/Close-es a sort file while another's RETURN enumerates it throws "Collection was modified" (wave 1021 gate)
 public sealed class SortMergeStatementEcTests
 {
     private static readonly CobolSort.Key[] OneCharKey = [new(0, 1, false, CobolSort.KeyClass.Alphanumeric, default)];

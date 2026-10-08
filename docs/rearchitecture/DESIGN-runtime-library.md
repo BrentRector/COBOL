@@ -105,6 +105,7 @@ public sealed class RunUnit
     public FileRegistry   Files      { get; }   // was static CobolFile registries
     public IClock         Clock      { get; set; } = SystemClock.Instance;   // was AcceptSource.Now
     public RandomSequence Random     { get; }   // was static CobolIntrinsics._random (kb/Work PB307, §15.75.3 r4)
+    public SortFileTable  SortFiles  { get; }   // was static CobolSort.Files (kb/Work PB1570, §14.6.1 + §14.9.40.4 GR10)
 
     /// A host's run unit for the duration of `body`; the generated Main begins its own with RunUnit.Begin().
     public static void Run(Action<RunUnit> body)
@@ -119,7 +120,7 @@ public sealed class RunUnit
 ```
 **A new run unit is a new `RunUnit` object — on every path.** `RunUnit.Begin()` (the emitted driver's
 `ProgramRegistry.Reset()`) and `RunUnit.Run` both construct one, so every member — program table, EXTERNAL store,
-MODULE-NAME stack, files, switches, locale, RANDOM sequence, report flow, exception status, the per-class FACTORY
+MODULE-NAME stack, files, switches, locale, RANDOM sequence, sort-merge file stores, report flow, exception status, the per-class FACTORY
 OBJECTS (`RunUnit.FactoryObject<F>()`, ISO §9.3.14.2: created before the first reference "by a run unit") and the
 termination status — is fresh by construction. Only the declared HOST CONFIGURATION (`RunUnit.HostConfiguration`:
 the clock seam and the object-time debug switch) is carried from the ambient run unit being replaced. The earlier
