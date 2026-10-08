@@ -70,4 +70,28 @@ public sealed class RedefinesTargetTests
         Assert.True(ok, detail);
         Assert.Equal("abcdef", stdout.Trim());
     }
+
+    /// <summary>kb/Work PB2518 — a REDEFINES clause inside a TYPEDEF is screened where the type is DECLARED, used or not
+    /// (the roots-only walk never reached a template), and a used type is diagnosed once, not once per clone.</summary>
+    [Theory]
+    [InlineData("05 A PIC X(2).\n   05 C PIC X.\n   05 B REDEFINES A PIC X(2).\n", "COBOLNET2739")]   // SR10 across storage
+    [InlineData("05 A PIC X.\n   05 B REDEFINES A PIC X(2).\n", "COBOLNET1539")]                      // SR8 size screen
+    [InlineData("05 A PIC X.\n   05 B REDEFINES ZZ PIC X(2).\n", "COBOLNET1654")]                    // unresolved data-name-2
+    public void RedefinerInsideUnusedTypedef_IsScreenedAtTheDeclaration(string members, string code)
+    {
+        string src = Head + "01 T TYPEDEF.\n   " + members + "01 U PIC X.\nPROCEDURE DIVISION.\n    STOP RUN.\n";
+        var (ok, errors, _) = EditionHarness.CompileFull(src, 2023);
+        Assert.False(ok);
+        EditionHarness.AssertHasDiagnostic(errors, code);
+    }
+
+    [Fact]
+    public void RedefinerInsideUsedTypedef_IsDiagnosedOnce()
+    {
+        string src = Head + "01 T TYPEDEF.\n   05 A PIC X(2).\n   05 C PIC X.\n   05 B REDEFINES A PIC X(2).\n01 U TYPE T.\n01 V TYPE T.\n"
+            + "PROCEDURE DIVISION.\n    STOP RUN.\n";
+        var (ok, errors, _) = EditionHarness.CompileFull(src, 2023);
+        Assert.False(ok);
+        Assert.Single(errors, e => e.Contains("COBOLNET2739", StringComparison.Ordinal));
+    }
 }

@@ -26542,11 +26542,11 @@
   "subject": "REDEFINES clause",
   "rule-digest": "5c9e5d755778",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveRedefines; src/Cobol.Net.Compiler/Binding/DataBinder.cs#TemplateItems",
-  "test-ref": "conformance:negative/pb93-redefines-later-sibling; conformance-test:RedefinesTargetTests.LaterSiblingTarget_IsRejected; conformance:negative/pb2071-template-redefines-unresolved",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveRedefines; src/Cobol.Net.Compiler/Binding/DataBinder.cs#TemplateItems; src/Cobol.Net.Compiler/Binding/DataBinder.RedefinesEntry.cs#ScreenRedefinesEntry",
+  "test-ref": "conformance:negative/pb93-redefines-later-sibling; conformance-test:RedefinesTargetTests.LaterSiblingTarget_IsRejected; conformance:negative/pb2071-template-redefines-unresolved; conformance:85/pb2518_redefines_only_redefinitions_between; conformance:2002/pb2518_redefines_past_non_storage_entries; conformance:negative/pb2518-redefines-past-intervening-storage; conformance:negative/pb2518-redefines-past-intervening-storage-roots; conformance:negative/pb2518-redefines-in-unused-typedef; conformance-test:RedefinesTargetTests.RedefinerInsideUnusedTypedef_IsScreenedAtTheDeclaration; conformance-test:RedefinesTargetTests.RedefinerInsideUsedTypedef_IsDiagnosedOnce",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "LANDED 2026-08-18 (PB93). The redefining entries FOLLOW the entries defining the area: the lookup admits preceding siblings only, so `05 A REDEFINES B. 05 B.` is COBOLNET1654 (it used to bind to the later B). The 'without intervening entries that define new storage areas' half is the ClassifyRedefinesClasses layout invariant (a redefiner overlays its target's area wherever it stands among the siblings).",
+  "notes": "LANDED 2026-08-18 (PB93): the redefining entries FOLLOW the entries defining the area - the lookup admits preceding siblings only, so `05 A REDEFINES B. 05 B.` is COBOLNET1654. LANDED 2026-10-07 (PB2518): the 'without intervening entries that define new storage areas' half is asked by ScreenRedefinesEntry/FirstInterveningStorage over the scope the pair was resolved in (the subject's siblings, or the roots of its own section): every entry between data-name-2 and the subject must itself be a redefinition, else COBOLNET2739. The overlay layout (ClassifyRedefinesClasses) tolerates a gap and never diagnosed one; the earlier note naming it the witness was wrong (a layout that tolerates the violation is not a diagnosis). A CONSTANT entry and a TYPEDEF template are off the scope and define no storage.",
   "state": "OK"
  },
  {

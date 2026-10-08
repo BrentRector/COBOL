@@ -10,19 +10,34 @@ namespace CobolNet.Binding;
 /// subject and data-name-2 as WRITTEN, before the storage-class machinery (<c>ClassifyRedefinesClasses</c>) lays the
 /// overlay out: SR1 (position in the entry — <c>ScreenLeadingClausePosition</c>, DataBinder.ClausePlacement.cs, beside
 /// its §13.16.3 SR4 TYPEDEF twin), SR2 (identical level-numbers), SR3 (not a level-1 file-section entry),
-/// SR8 (the size screen, in BITS, with its level-1-without-EXTERNAL exception), SR13 (data-name-2 is no CONSTANT
-/// RECORD) and SR15 (alignment). The clause-placement table had named <c>ResolveRedefines</c> as the home of the
+/// SR8 (the size screen, in BITS, with its level-1-without-EXTERNAL exception), SR10 (no entry that defines new
+/// storage between data-name-2 and the subject), SR13 (data-name-2 is no CONSTANT RECORD) and SR15 (alignment). The clause-placement table had named <c>ResolveRedefines</c> as the home of the
 /// "level and position rules" and nothing was there: data-name-2 was found by name alone, so a 77 and an 01 were
 /// interchangeable and the SR8 comment ASSUMED SR3.
 /// </summary>
 public sealed partial class DataBinder
 {
     /// <summary>The entry-level rules over the RESOLVED pair (subject, data-name-2), asked once per REDEFINES clause by
-    /// <see cref="ResolveRedefines"/> — the one place both entries are known.</summary>
-    private void ScreenRedefinesEntry(DataItem item, DataItem target)
+    /// <see cref="ResolveRedefines"/> — the one place both entries are known. <paramref name="scope"/> is the entry
+    /// sequence the pair was resolved in (the subject's siblings, or the roots of its own section), in source order.</summary>
+    private void ScreenRedefinesEntry(DataItem item, DataItem target, IReadOnlyList<DataItem> scope)
     {
         string name = item.CobolName ?? "FILLER";
         string tname = target.CobolName ?? "FILLER";
+
+        // SR10 — "The entries giving the new descriptions of the storage area shall follow the entries defining the
+        // area of data-name-2, without intervening entries that define new storage areas." Every entry between
+        // data-name-2 and the subject of the entry is a REDEFINITION (it gives another description of the same area and
+        // defines none of its own) or breaks the rule: `05 A PIC X(2). 05 C PIC X. 05 B REDEFINES A` reaches PAST C. The
+        // overlay layout (ClassifyRedefinesClasses) tolerates the gap, which is why nothing else could see it. A
+        // compiler temporary is no entry of the program, and at top level only the roots of the subject's own section
+        // lie between the pair (ResolveRedefines picked data-name-2 among exactly those).
+        if (FirstInterveningStorage(item, target, scope) is { } between)
+            Edition.Error(DiagnosticCatalog.RedefinesEntryRule,
+                $"'{name}' REDEFINES '{tname}': the entry '{between.CobolName ?? "FILLER"}' between them defines new "
+                + "storage — the entries giving the new descriptions of the storage area shall follow the entries "
+                + "defining the area of data-name-2, without intervening entries that define new storage areas "
+                + "(ISO §13.18.44.3 SR10)");
 
         // SR2 — a 77 and an 01 are both roots, so name resolution alone cannot tell them apart; the written
         // level-numbers can.
@@ -74,6 +89,23 @@ public sealed partial class DataBinder
                     + "the same as the alignment of the data item referenced by data-name-2 (ISO §13.18.44.3 SR15; "
                     + "§8.5.1.6.3)");
         }
+    }
+
+    /// <summary>The first entry of <paramref name="scope"/> after <paramref name="target"/> and before the subject that
+    /// DEFINES storage (§13.18.44.3 SR10) — an entry with no REDEFINES clause of its own; null when the pair is adjacent
+    /// or only redefinitions lie between them (several redefinitions of one area are the clause's whole purpose, SR7).</summary>
+    private static DataItem? FirstInterveningStorage(DataItem item, DataItem target, IReadOnlyList<DataItem> scope)
+    {
+        bool afterTarget = false;
+        foreach (var entry in scope)
+        {
+            if (ReferenceEquals(entry, item)) return null;
+            if (ReferenceEquals(entry, target)) { afterTarget = true; continue; }
+            if (afterTarget && entry.RedefinesTargetName is null && !entry.IsCompilerTemp
+                && (item.Parent is not null || entry.Section == item.Section))
+                return entry;
+        }
+        return null;
     }
 
     /// <summary>The storage a REDEFINES overlay measures (§13.18.44.3 SR8 / §13.18.44.4 GR1), in bits: a bit item

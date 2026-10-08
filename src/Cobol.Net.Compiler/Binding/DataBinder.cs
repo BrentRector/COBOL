@@ -7122,13 +7122,21 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// §13.18.44.3 syntax rules hold of the source as written (§4.3), and a type declaration nothing instantiates is
     /// still source. Walking <see cref="Roots"/> alone, an unused template's `REDEFINES NOSUCH`, its oversized
     /// redefinition (SR8) or its redefinition of a table (SR5) compiled clean, and a used one was reported only through
-    /// the copies its TYPE subjects hold. <see cref="TemplateItems"/> adds the template members; a template gets no storage class
-    /// (<see cref="ClassifyRedefinesClasses"/> asks it only the clause rules).</para></summary>
+    /// the copies its TYPE subjects hold. The walk is the <see cref="CompositionForest"/> (the template members are on it;
+    /// kb/Work PB2518) and only WRITTEN entries are screened, so a type is diagnosed once, at its declaration; a template
+    /// gets no storage class (<see cref="ClassifyRedefinesClasses"/> asks it only the clause rules).</para></summary>
     internal void ResolveRedefines()
     {
-        foreach (var item in AllItems().Concat(TemplateItems()))
-            if (item.RedefinesTargetName is { } tname)
+        // ⛔ THE COMPOSED FOREST, BUT ONLY WRITTEN ENTRIES ARE ASKED (kb/Work PB2518). A TYPEDEF template is off Roots, so
+        // the roots-only walk never reached a redefiner INSIDE a type declaration: `01 T TYPEDEF. 05 A PIC X.
+        // 05 B REDEFINES A PIC X(2).` compiled clean unless some entry said TYPE T — and then the screens ran on the
+        // CLONE. Every clone is resolved (its target feeds the layout), but the rules are about what the programmer
+        // WROTE, so only an entry that is no clone (ClonedFrom null) is screened: a type is diagnosed once, at its
+        // declaration, used or not. A template's own level-01 entry stays out (it has no siblings to redefine).
+        foreach (var item in CompositionForest())
+            if (item.RedefinesTargetName is { } tname && !(item.Parent is null && item.IsTypedef))
             {
+                bool written = item.ClonedFrom is null;
                 using var _ = Edition.At(item);
                 // A subordinate (02+) redefiner scopes to its own siblings (correct in every scope). A top-level
                 // 01/77 method redefiner must scope to the OWNING METHOD's own roots (§13.18.44.3 SR — the target
@@ -7164,14 +7172,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     RedefinitionKind.Clause);
                 // A method 01 REDEFINES whose target isn't in the method's own roots is a scope error (never a
                 // silent cross-scope bind to an object/program item) — §13.18.44.3 SR.
-                if (item.RedefinesTarget is null && item.Parent is null && OoRootOwner.ContainsKey(item.Root))
+                if (written && item.RedefinesTarget is null && item.Parent is null && OoRootOwner.ContainsKey(item.Root))
                     // 1577, renumbered from a bare "COBOLNET1518" that collided with the locale-module
                     // non-support meaning (review V11 — the code comes from the catalog descriptor, never a literal).
                     Edition.Error(DiagnosticCatalog.MethodRedefinesScope,
                         $"REDEFINES target '{tname}' of method data item "
                         + $"'{item.CobolName ?? "FILLER"}' is not a preceding item in the same method scope "
                         + "(ISO §13.18.44.3 — a method item may not redefine object or program data)");
-                else if (item.RedefinesTarget is null)
+                else if (written && item.RedefinesTarget is null)
                     // kb/Work PB93: the PROGRAM-scope miss used to be silent — the item kept RedefinesTargetName (so
                     // BitLayout / ImageWidth / ByteWidth skipped it as an overlay) against a null RedefinesTarget (so
                     // the emitter gave it its own field): a storage shape no edition defines. ONE diagnostic; the
@@ -7184,20 +7192,21 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // §13.18.44.3 SR7 (kb/Work PB93 sweep): data-name-2 shall be the entry that ORIGINALLY defined the area
                 // — a redefiner naming a redefiner is a chain ISO forbids and the field's vendors accept: error strict,
                 // warning under --permissive with the chain semantics (ClassifyRedefinesClasses chases the anchor).
-                if (item.RedefinesTarget is { RedefinesTargetName: not null } viaRedefiner)
+                if (written && item.RedefinesTarget is { RedefinesTargetName: not null } viaRedefiner)
                     Edition.Removed(DiagnosticCatalog.RedefinesOfRedefinition.Code,
                         $"'{item.CobolName ?? "FILLER"}' REDEFINES '{viaRedefiner.CobolName ?? "FILLER"}', which is itself "
                         + "a redefinition — data-name-2 shall be the entry that originally defined the storage area "
                         + "(ISO §13.18.44.3 SR7)");
                 // §13.18.44.3 SR16: data-name-2 (the redefined item) shall not be described with the ANY
                 // LENGTH clause — a runtime-length item has no fixed storage area a redefiner could overlay.
-                if (item.RedefinesTarget is { IsAnyLength: true })
+                if (written && item.RedefinesTarget is { IsAnyLength: true })
                     Edition.Error("COBOLNET1542", $"'{item.CobolName ?? "FILLER"}' REDEFINES "
                         + $"'{tname}': the redefined item is described with the ANY LENGTH clause "
                         + "(ISO §13.18.44.3 SR16 — data-name-2 shall not be ANY LENGTH)");
-                // §13.18.44.3 SR1-SR3, SR8, SR13, SR15 — the entry-level rules over the resolved pair
-                // (DataBinder.RedefinesEntry.cs; kb/Work PB1280). SR8, which used to be written out here, is one of them.
-                if (item.RedefinesTarget is { } entryTarget) ScreenRedefinesEntry(item, entryTarget);
+                // §13.18.44.3 SR1-SR3, SR8, SR10, SR13, SR15 — the entry-level rules over the resolved pair
+                // (DataBinder.RedefinesEntry.cs; kb/Work PB1280). SR8, which used to be written out here, is one of them,
+                // and SR10 (no entry defining new storage between the pair, kb/Work PB2518) is asked over the same scope.
+                if (written && item.RedefinesTarget is { } entryTarget) ScreenRedefinesEntry(item, entryTarget, scope);
             }
 
         // Each alias is resolved in the scope of its OWNER: the record whose level-66 entries it is, or — for an alias a

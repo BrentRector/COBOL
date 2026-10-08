@@ -7,6 +7,9 @@
       *> kb/Work PB1283: the former alias AB (A THRU B, B a SHORTER redefinition of A) is not legal source -
       *> 13.18.45.3 SR11: "The end of the storage area described by data-name-3 shall follow the end of the storage
       *> area described by data-name-2" (cite.py --check 13.18.45.3 -> OK 11)); see negative/pb1283-renames-thru-redefinition.
+      *> kb/Work PB2518: H stands directly after G1 - 13.18.44.3 SR10 ("without intervening entries that define new
+      *> storage areas", cite.py --check 13.18.44.3 -> OK 10)) - it used to follow G2, which the screen now refuses.
+      *> A redefinition adds no storage, so G2 and every offset below are where they were.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB96RN.
        DATA DIVISION.
@@ -17,8 +20,8 @@
           05 C PIC X(2) VALUE "ef".
           05 G.
              10 G1 PIC X(2) VALUE "gh".
-             10 G2 PIC X(2) VALUE "ij".
              10 H REDEFINES G1 PIC X.
+             10 G2 PIC X(2) VALUE "ij".
        66 AC RENAMES A THRU C.
        66 BC RENAMES B THRU C.
        66 CG RENAMES C THRU G1.

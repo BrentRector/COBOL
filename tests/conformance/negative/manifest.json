@@ -2510,7 +2510,10 @@
   "pb2071-template-redefines-dynamic-length",
   "pb2071-template-redefines-typed-table",
   "pb2071-template-redefines-outside-group",
-  "pb2071-template-redefines-in-nested-strong"
+  "pb2071-template-redefines-in-nested-strong",
+  "pb2518-redefines-past-intervening-storage",
+  "pb2518-redefines-past-intervening-storage-roots",
+  "pb2518-redefines-in-unused-typedef"
  ],
  "pending": []
 }

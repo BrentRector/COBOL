@@ -215,9 +215,14 @@ siblings, and at top level among the roots of the subject's own section (SR10). 
 `DataBinder.ClausePlacement.cs` because §13.16.3 SR4 fixes the TYPEDEF clause's position in the same words, kb/Work
 PB486) and
 `ScreenRedefinesEntry` (asked once per resolved clause: SR2 identical level-numbers, SR3 no REDEFINES in a level-1
-file-section entry, SR8 the size screen in BITS with its level-1-without-EXTERNAL exemption, SR13 no CONSTANT RECORD
+file-section entry, SR8 the size screen in BITS with its level-1-without-EXTERNAL exemption, SR10 no entry that defines new
+storage between data-name-2 and the subject — every entry of the resolution scope between the pair must itself be a
+redefinition, kb/Work PB2518 — SR13 no CONSTANT RECORD
 target, SR15 alignment — a subject that needs a byte boundary over a data-name-2 that begins mid-byte) are COBOLNET2739
 (SR8 keeps COBOLNET1539). The storage classification (`ClassifyRedefinesClasses`) runs after them and may assume them.
+`ResolveRedefines` walks the COMPOSED forest (`CompositionForest`: roots, `TYPE` / `SAME AS` clones and the `TYPEDEF`
+templates, which are off `Roots`) so every redefiner has its target, but it screens only the entries the programmer WROTE
+(`ClonedFrom` null): a redefiner inside a type declaration is diagnosed once, at the declaration, used or not (kb/Work PB2518).
 
 **⛔ THE RENAMES CLAUSE'S ENTRY-LEVEL RULES ARE THE SAME SHAPE** (kb/Work PB1283; `DataBinder.RenamesEntry.cs`,
 COBOLNET2740). The operands are found by name in the owner's subtree, which includes the owner, so each resolved operand is

@@ -6678,17 +6678,19 @@ public static class DiagnosticCatalog
 
     /// <summary>COBOLNET2739 — a REDEFINES clause violates one of its ENTRY-level syntax rules (kb/Work PB1280): not the
     /// first clause of its entry (§13.18.44.3 SR1), a subject and data-name-2 of different level-numbers (SR2), a
-    /// level-1 file-section entry (SR3), a CONSTANT RECORD as data-name-2 (SR13), or a subject whose required alignment
-    /// differs from data-name-2's (SR15). The size screen (SR8) keeps COBOLNET1539. One code for the rule family; the
-    /// message names the rule.</summary>
+    /// level-1 file-section entry (SR3), an entry that defines new storage between data-name-2 and the subject (SR10),
+    /// a CONSTANT RECORD as data-name-2 (SR13), or a subject whose required alignment differs from data-name-2's
+    /// (SR15). The size screen (SR8) keeps COBOLNET1539. One code for the rule family; the message names the rule.</summary>
     public static readonly DiagnosticDescriptor RedefinesEntryRule = new(
         "COBOLNET2739", "redefines-entry-rule", EditionSeverity.Error,
         "A REDEFINES clause violates one of its entry-level syntax rules. It shall immediately follow the entry-name "
         + "clause, or the level-number when there is none (SR1); the level-numbers of data-name-2 and the subject of the "
         + "entry shall be identical (SR2); it shall not be specified in a level-1 entry in the file section (SR3); "
-        + "data-name-2 shall not be described with the CONSTANT RECORD clause (SR13); and the subject's required "
-        + "alignment shall be the same as the alignment of data-name-2 (SR15).",
-        "ISO §13.18.44.3 SR1, SR2, SR3, SR13, SR15");
+        + "the entries giving the new descriptions of the storage area shall follow the entries defining the area of "
+        + "data-name-2, without intervening entries that define new storage areas (SR10); data-name-2 shall not be "
+        + "described with the CONSTANT RECORD clause (SR13); and the subject's required alignment shall be the same as "
+        + "the alignment of data-name-2 (SR15).",
+        "ISO §13.18.44.3 SR1, SR2, SR3, SR10, SR13, SR15");
 
     /// <summary>COBOLNET2740 — a RENAMES entry violates one of its entry-level syntax rules (kb/Work PB1283): it does not
     /// immediately follow the last entry of its record (§13.18.45.3 SR2), an operand is subject to an OCCURS clause

@@ -761,7 +761,8 @@
   "pb1508_options_period_bracket",
   "pb1430_operator_separator_spaces",
   "pb2516_constant_between_records",
-  "pb2071_unused_template_redefines_conforms"
+  "pb2071_unused_template_redefines_conforms",
+  "pb2518_redefines_past_non_storage_entries"
   ],
   "pending": []
 }
