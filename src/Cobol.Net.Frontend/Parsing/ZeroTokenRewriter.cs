@@ -6,15 +6,17 @@ using CobolNet.Frontend.Generated;
 namespace CobolNet.Frontend.Parsing;
 
 /// <summary>
-/// Post-lexer token rewriting pass that converts ZERO tokens to INTEGERLIT("0")
-/// when they appear in arithmetic contexts. This avoids adding ZERO to the
+/// Post-lexer token rewriting pass that converts a figurative zero (ZERO, ZEROS or ZEROES) to the virtual
+/// ZERO_ARITH token (text "0") when it appears in an arithmetic context. This avoids adding the figurative to the
 /// grammar's primaryExpression rule, which causes exponential ANTLR prediction time.
 ///
-/// Arithmetic context is detected by adjacency to arithmetic operators:
-///   ZERO followed by  +, -, *, /, **   → rewrite to INTEGERLIT
-///   ZERO preceded by  +, -, *, /, **   → rewrite to INTEGERLIT
+/// Arithmetic context is detected by adjacency (<see cref="PrecedingArithmeticContext"/>,
+/// <see cref="FollowingArithmeticContext"/>):
+///   ZERO followed by  +, -, *, /, **   → rewrite to ZERO_ARITH
+///   ZERO preceded by  +, -, *, /, **   → rewrite to ZERO_ARITH
 ///   ZERO followed by  )                → rewrite (closing a parenthesized expression)
 ///   ZERO preceded by  (                → rewrite (opening a parenthesized expression)
+///   ZERO beside the ref-mod :          → rewrite (a reference-modification position or length)
 ///
 /// All other ZERO tokens are left unchanged — they remain figurative constants
 /// for VALUE, MOVE, comparison, and other non-arithmetic contexts.
@@ -44,20 +46,8 @@ namespace CobolNet.Frontend.Parsing;
 public static class ZeroTokenRewriter
 {
     /// <summary>
-    /// The set of token types that, when adjacent to ZERO, indicate arithmetic context.
-    /// </summary>
-    private static readonly HashSet<int> ArithmeticOperators = new()
-    {
-        CobolLexer.PLUS,
-        CobolLexer.MINUS,
-        CobolLexer.STAR,
-        CobolLexer.SLASH,
-        CobolLexer.POWER,
-    };
-
-    /// <summary>
     /// Token types that indicate ZERO is inside an expression when they precede it.
-    /// Includes arithmetic operators and LPAREN (e.g., "(ZERO + 1)").
+    /// Includes arithmetic operators, LPAREN (e.g., "(ZERO + 1)") and the ref-mod COLON.
     /// </summary>
     private static readonly HashSet<int> PrecedingArithmeticContext = new()
     {
@@ -78,7 +68,7 @@ public static class ZeroTokenRewriter
 
     /// <summary>
     /// Token types that indicate ZERO is inside an expression when they follow it.
-    /// Includes arithmetic operators and RPAREN (e.g., "(1 + ZERO)").
+    /// Includes arithmetic operators, RPAREN (e.g., "(1 + ZERO)") and the ref-mod COLON.
     /// </summary>
     private static readonly HashSet<int> FollowingArithmeticContext = new()
     {
