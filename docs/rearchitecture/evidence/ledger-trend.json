@@ -1540,6 +1540,15 @@
       "dns": 457,
       "label": "PB2671: unbound and omitted",
       "battery": null
+    },
+    {
+      "sha": "9697e84f",
+      "date": "2026-10-08",
+      "gap": 104,
+      "closed": 4243,
+      "dns": 457,
+      "label": "PB1636: the owner's 32 signe",
+      "battery": null
     }
   ],
   "program": [
@@ -1585,6 +1594,18 @@
       "total": 250,
       "landed": 24,
       "open": 226,
+      "waiting": 153,
+      "retire_landed": 10,
+      "retire_total": 10,
+      "external_landed": 2,
+      "external_total": 8
+    },
+    {
+      "sha": "9fa72ad4",
+      "date": "2026-10-08",
+      "total": 250,
+      "landed": 30,
+      "open": 220,
       "waiting": 153,
       "retire_landed": 10,
       "retire_total": 10,
