@@ -112,10 +112,6 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
                                                                     // program unit; parallel to _f3Handlers — the
                                                                     // per-method slice source, design SSOT §9.10)
 
-    /// <summary>The first appended Format-3 handler pc = the frozen main paragraph count (declaratives + all
-    /// nondeclarative paragraphs). A handler registered as the k-th lands at this pc + k, matching its eventual
-    /// index once StatementBinder appends the side-list.</summary>
-    public int HandlerBasePc => _paras.Count;
     public IReadOnlyList<BoundParagraph> F3Handlers => _f3Handlers;
     public IReadOnlyList<int> F3HandlerOwners => _f3Owners;
 
@@ -124,7 +120,9 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
     public IReadOnlyList<OoMethodScope?> F3HandlerMethods => _f3HandlerMethod;
 
     /// <summary>Register one already-bound Format-3 handler body (imp-2/3/4) as a synthetic pc-range paragraph and
-    /// return its pc (<see cref="HandlerBasePc"/> + the registration ordinal — dense, collision-free). The body is a
+    /// return its pc: the frozen main paragraph count (declaratives + all nondeclarative paragraphs) + the
+    /// registration ordinal — dense, collision-free, and equal to its index once StatementBinder appends the
+    /// side-list (the base it records as <c>BoundProgram.F3HandlerBasePc</c>). The body is a
     /// single sentence-group (a handler has no paragraph structure); an empty body still gets one no-op pc (the
     /// bounded <c>__RunUse</c>/<c>__Dispatch(pc,pc)</c> needs a range). Registered in NO name map — unreferenceable
     /// (the <see cref="AddAnonymousParagraph"/> precedent). Nesting-safe: a handler that itself binds an inner F3

@@ -767,7 +767,6 @@ bind loop never re-binds them):
 ```csharp
 private readonly List<BoundParagraph> _f3Handlers = [];
 private readonly List<int> _f3Owners = [];              // owning PerformId per handler (parallel)
-public int HandlerBasePc => _paras.Count;               // mainCount — frozen after CollectParagraphs
 public IReadOnlyList<BoundParagraph> F3Handlers => _f3Handlers;
 public IReadOnlyList<int> F3HandlerOwners => _f3Owners;
 
@@ -783,7 +782,8 @@ public int AddF3Handler(IReadOnlyList<BoundStatement> body, int performId, int l
 }
 ```
 Handler `useId` (for `__useActive[id]`, reused by `__RunUse`) is DERIVED, not stored:
-`useId(pc) = declCount + (pc − HandlerBasePc)`; `__useActive` is sized `declCount + H`.
+`useId(pc) = declCount + (pc − F3HandlerBasePc)`, where `F3HandlerBasePc` is `mainCount` (`_paras.Count`, frozen
+after CollectParagraphs) as `StatementBinder` records it on `BoundProgram` (C below); `__useActive` is sized `declCount + H`.
 
 **B. `EcBindExceptionPerform` redirects imp-2/3/4 into pc-ranges** — the in-context binding (overlay popped at the
 current line 69; `InF3When` at 74) is preserved verbatim; only the DESTINATION changes from an inline list to
@@ -819,7 +819,7 @@ lines 64–69), so imp-2/3/4 bind against base `TurnState` for free.
 
 **C. `StatementBinder.Bind` appends the side-list after the main loop** and records the base pc:
 ```csharp
-int handlerBase = bound.Count;                    // == table.HandlerBasePc == mainCount
+int handlerBase = bound.Count;                    // == mainCount (_paras.Count, frozen)
 bound.AddRange(table.F3Handlers);                 // pcs handlerBase..handlerBase+H-1, 1:1 with allocation
 return new BoundProgram(bound, table.EntryPc, table.Declaratives, Ctx.EcState.BuildFeatures(),
     DebugSubjects: table.DebugSubjects.Count > 0 ? table.DebugSubjects : null,
@@ -1181,7 +1181,7 @@ handler-region hook), `ControlFlowEmitter.cs` (`EmitExceptionPerform`), `Stateme
 
 **The two coupled problems** (both real; the second is the deeper one the §9.1-B comment under-states):
 1. **pc-reachability.** A program's `__Dispatch` covers `[0 .. Paragraphs.Count−1]` — the whole pc space, so the
-   handler pcs appended at `HandlerBasePc = mainCount` are ordinary `case`s it can reach via `__RunUse(id, pc, pc)`.
+   handler pcs appended at `F3HandlerBasePc = mainCount` are ordinary `case`s it can reach via `__RunUse(id, pc, pc)`.
    A CLASS has NO class-level dispatcher: each METHOD emits its OWN `__MDispatch(startPc, exitPc)` local function whose
    `switch` carries cases ONLY for that method's contiguous slice `[m.Binding.EntryPc .. EndPc]` (`OoEmitter.EmitMethod`
    → `DispatchEmitter.EmitDispatchMethod(bound, w, "int __MDispatch(...)", EntryPc, EndPc)`). A handler pc appended above
