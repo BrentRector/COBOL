@@ -7,7 +7,8 @@ namespace CobolNet.CodeGen;
 
 /// <summary>
 /// ⛔ <b>THE ONE PLACE A RECEIVER'S OBJECT-PROPERTY ACCESSORS ARE PLACED</b> (kb/Work PB2078). A statement that stores its
-/// receivers one at a time (the arithmetic statements and MOVE) calls <see cref="Receive"/> around each receiver's
+/// receivers one at a time (the arithmetic statements, MOVE and so every implicit move, STRING INTO and INSPECT's
+/// identifier-1) calls <see cref="Receive"/> around each receiver's
 /// access-and-store; when that receiver is an object property its <see cref="ReceiverBracket"/> — identifier-3's evaluation
 /// and the §8.4.3.9.4 GR1 GET before, the GR2 SET after — is emitted there, and nowhere else.
 /// <para>ISO §14.7.7 4) b): the intermediate result "is stored in or combined with and then stored in each single

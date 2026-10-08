@@ -1422,7 +1422,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
                 // A sole numeric LITERAL stays a literal operand — against an alphanumeric/group operand it
                 // participates as its WRITTEN character form, leading zeros intact (ISO §8.8.4.2.1), which a
                 // computed wrapper would lose.
-                : SoleNumLiteral(expr) is { } lit ? new BoundNumericLiteral(host.Expr.CheckLiteral(lit))
+                : SoleNumLiteral(expr) is { } lit ? host.Expr.NumericLiteralOperand(lit)
                 // The ONE expression→operand mapping (IntrinsicBinder.OperandOf): a user-function reference
                 // binds to a BoundNumRef over its result temp, which MUST surface as a FIELD operand here so
                 // the temp's cloned category (§8.4.3.2.4 GR1) drives the relation's class dispatch — a raw

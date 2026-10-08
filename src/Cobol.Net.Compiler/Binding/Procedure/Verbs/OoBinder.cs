@@ -39,8 +39,10 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// visitor, so a new bound statement cannot compile without deciding each Place's polarity, and nothing here
     /// guesses whether a side-effecting accessor runs (kb/Work PB1275).
     /// <para>⛔ WHERE THE STEPS GO (kb/Work PB2078). A reference the statement's binder CLAIMED as one of its receivers
-    /// (<see cref="DataBinder.OoClaimInterleavedReceiver"/>: the arithmetic statements and MOVE, whose emitters store
-    /// their receivers one at a time) gets a <see cref="ReceiverBracket"/> under a <see cref="BoundReceiverBrackets"/> —
+    /// (<see cref="DataBinder.OoClaimInterleavedReceiver"/>: the arithmetic statements, every MOVE built by
+    /// <c>MoveBinder.BindMoveOf</c> -- the written MOVE and the implicit moves of READ / RETURN … INTO, ACCEPT, UNSTRING and
+    /// INITIALIZE -- STRING INTO and INSPECT identifier-1, whose emitters store their receivers one at a time) gets a
+    /// <see cref="ReceiverBracket"/> under a <see cref="BoundReceiverBrackets"/> —
     /// its Prelude and GET just before ITS access, its SET just after ITS store (§14.7.7 4) b), §14.9.25.4 GR1). Every
     /// other reference keeps the statement-level shape, GETs and Prelude before the statement and SETs after it.</para></summary>
     public BoundStatement OoWrapPropertyOps(BoundStatement core, int mark)
@@ -75,7 +77,8 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     $"the object-property reference {where} is a RECEIVING operand of a statement that does not store its "
                     + "receivers one at a time, and its object is selected by a run-time value (a data-name subscript or a "
                     + "function-identifier): identifying that object when the statement reaches it (ISO §14.7.7 4) b), "
-                    + "§14.9.25.4 GR1) is implemented for the arithmetic statements and MOVE only");
+                    + "§14.9.25.4 GR1) is implemented for the arithmetic statements, MOVE and the implicit moves "
+                    + "(READ / RETURN … INTO, ACCEPT, UNSTRING INTO, INITIALIZE), STRING INTO and INSPECT identifier-1 only");
                 continue;
             }
 
@@ -962,7 +965,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         var boolCtx = arg.Bool;
         var arithCtx = arg.Arith;
         var nonNumCtx = arg.Literal?.nonNumericLiteral();
-        string? numLitRaw = arg.Literal?.numericLiteral()?.GetText();
+        BoundNumericLiteral? writtenLit = arg.Literal?.numericLiteral() is { } numericLit ? host.Expr.NumericLiteralOperand(numericLit.GetText()) : null;
         if (boolCtx is not null && ConditionBinder.UnwrapBareBool(boolCtx) is { } bare)
         {
             boolCtx = null;
@@ -973,9 +976,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // it when the boolean/arithmetic arms are not taken, and the two paths must agree: the literal arm
         // admits an unsigned integer into an ALPHANUMERIC formal by the MOVE rules, which the expression arm
         // (§14.8.2.3.3 rule 2a, category-numeric formals only) correctly does not.
-        if (numLitRaw is null && arithCtx is not null && ConditionBinder.SoleNumLiteral(arithCtx) is { } soleNum)
+        if (writtenLit is null && arithCtx is not null && ConditionBinder.SoleNumLiteral(arithCtx) is { } soleNum)
         {
-            numLitRaw = soleNum;
+            writtenLit = host.Expr.NumericLiteralOperand(soleNum);
             arithCtx = null;
         }
 
@@ -1047,7 +1050,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // A function the binder FOLDED to its value (FUNCTION LENGTH of a fixed-length item, …) has no
             // temporary to materialize — its value is a compile-time constant, so it crosses through the literal
             // arms below, whose conformance screen is rule 2 d)'s MOVE question, never the expression arm.
-            if (fnOperand is BoundNumericLiteral foldedNum) { numLitRaw = foldedNum.Text; arithCtx = null; }
+            if (fnOperand is BoundNumericLiteral foldedNum) { writtenLit = foldedNum; arithCtx = null; }
             else if (fnOperand is BoundStringLiteral { Category: PicCategory.Alphanumeric } foldedText)
             { foldedAlnum = foldedText.Value; arithCtx = null; }
             // ⛔ A NUMERIC-typed function takes the SAME lane (kb/Work PB1007). It used to stay on the expression arm,
@@ -1058,6 +1061,10 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // (OoConformance.ContentMismatch → Table 16): an INTEGER function (§15.2 item 5) conforms to an
             // alphanumeric formal and a NUMERIC one (item 4, the Noninteger row) does not — the answer
             // `MOVE FUNCTION f TO x` gets for the same pair.
+            // A USER function's result IS a temporary data item (§8.4.3.2.4 GR1) -- an object reference, a pointer, an
+            // alphanumeric item -- so it crosses as that place, like the inline invocation above (kb/Work PB1930: it fell
+            // to the expression arm and an object-reference formal drew COBOLNET0828).
+            else if (fnOperand is BoundFieldOperand { Place: { } resultTemp }) inlinePlace = resultTemp;
             else if (fnOperand is not BoundComputedOperand { Expr: BoundIntrinsicCall }) { }
             else if (host.SendingValue.Materialize(fnOperand, "invokearg") is { } fnTemp) inlinePlace = fnTemp;
             else
@@ -1238,14 +1245,14 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // rules rather than erroring. A constant-name arrived above already substituted (§13.10.4 GR1).
         literal2 ??= foldedAlnum is not null ? new BoundStringLiteral(foldedAlnum)
             : nonNumCtx is not null ? host.Expr.NullAdmittingOperand(nonNumCtx)   // §8.4.3.10.3 SR1 a): a method-invocation argument
-            : numLitRaw is not null ? new BoundNumericLiteral(numLitRaw)
+            : writtenLit is not null ? writtenLit
             : null;
         // Into a numeric formal §14.8.2.3.3 rule 2a's COMPUTE reads the figurative constant ZERO as the numeric value
         // zero — §8.3.3.6.3 SR1 a) makes ZERO the one figurative a numeric literal's position admits, and §8.8.1.1 names
         // it among a COMPUTE's operands — so it takes the numeric-literal lane (its verdict and its carrier split), and
         // only a character-carried formal takes the fill below (kb/Work PB1617).
         literal2 = ParameterConformance.ArgumentForFormal(literal2, formal);
-        string literalText = constantName ?? nonNumCtx?.GetText() ?? numLitRaw ?? foldedAlnum ?? "";
+        string literalText = constantName ?? nonNumCtx?.GetText() ?? writtenLit?.Image ?? foldedAlnum ?? "";
         switch (literal2)
         {
             case BoundStringLiteral { Value.Length: 0 }:

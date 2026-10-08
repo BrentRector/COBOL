@@ -101,7 +101,7 @@
   "pb1425-object-view-interface-phrase",
   "pb1425-property-object-trailing-subscript",
   "pb1425-property-name-subscript-before-self",
-  "pb2078-property-receiver-selected-by-value-accept",
+  "pb2078-property-receiver-selected-by-value-inspect-tally",
   "pb1455-subscript-before-qualifier",
   "pb1507-initial-in-recursive-program",
   "pb1507-initial-indirectly-in-recursive-program",
@@ -2526,7 +2526,9 @@
   "pb2071-template-redefines-in-nested-strong",
   "pb2518-redefines-past-intervening-storage",
   "pb2518-redefines-past-intervening-storage-roots",
-  "pb2518-redefines-in-unused-typedef"
+  "pb2518-redefines-in-unused-typedef",
+  "pb1930-call-bare-function-identifier-by-reference",
+  "pb1930-call-content-alnum-function-numeric-formal"
  ],
  "pending": []
 }

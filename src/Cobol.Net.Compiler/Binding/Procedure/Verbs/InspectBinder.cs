@@ -93,6 +93,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
         {
             if ((target = host.Expr.ResolveReceiving(ins.dataReference())) is null)
                 return BoundRejected.Reported(ctx.Edition);   // the receiving chokepoint reported it — not a deferral (kb/Work PB236)
+            ctx.Data.OoClaimInterleavedReceiver(target);      // InspectEmitter places an object-property identifier-1's accessors around its access (kb/Work PB2078)
         }
         else if (host.Expr.ResolveSending(ins.dataReference()) is var sent && (target = sent.Place) is null)
             return sent.Refusal(ctx.Edition);   // the resolver's answer (kb/Work PB1030)

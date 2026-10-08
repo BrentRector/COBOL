@@ -201,6 +201,11 @@ public sealed record BoundNumLiteral(string Text, BinaryFloatCarrier? Carrier = 
     /// item folds to <c>999</c> and is a NUMERIC function (§15.43.1), which §8.4.3.2.3 SR11 refuses where an integer
     /// is required "even though a particular reference … might yield an integer value" (kb/Work PB1421).</summary>
     public IntrinsicType? FunctionType { get; init; }
+
+    /// <summary>The decimal separator the source wrote the literal with — see
+    /// <see cref="BoundNumericLiteral.DecimalSeparator"/>, which <c>IntrinsicBinder.OperandOf</c> carries it to
+    /// (kb/Work PB1643).</summary>
+    public char DecimalSeparator { get; init; } = '.';
 }
 
 /// <summary>The ISO/IEC 60559 binary interchange format a <see cref="BoundNumLiteral"/>'s value is exactly a value
@@ -489,6 +494,21 @@ public sealed record BoundNumericLiteral(string Text) : BoundOperand
 
     /// <summary>The folded function's §15.2 type — see <see cref="BoundNumLiteral.FunctionType"/>.</summary>
     public IntrinsicType? FunctionType { get; init; }
+
+    /// <summary>The decimal separator the SOURCE wrote this literal with: the comma under DECIMAL-POINT IS COMMA
+    /// (ISO §12.3.7.4 GR14 a): "The character written in numeric literals to represent the decimal separator shall
+    /// be the comma"; a contained program inherits it, §12.3.4 GR1), else the period. <see cref="Text"/> is always
+    /// the canonical dot-decimal value spelling the numeric decoders read; this is only the spelling of the
+    /// literal's CHARACTER image (<see cref="Image"/>). Default '.', which is right for every literal the compiler
+    /// synthesizes (a count, a zero placeholder). Set by <c>ExpressionBinder.NumericLiteralOperand</c>, the one
+    /// producer of a literal the program wrote (kb/Work PB1643).</summary>
+    public char DecimalSeparator { get; init; } = '.';
+
+    /// <summary>The literal's character image as the program wrote it (DOC-A.1-56: a numeric literal displays as
+    /// written, the program's decimal separator included, as GnuCOBOL does outside its vendor configurations that
+    /// set <c>pretty-display: no</c>): <see cref="Text"/> with its decimal point spelled
+    /// <see cref="DecimalSeparator"/>.</summary>
+    public string Image => DecimalSeparator == '.' ? Text : Text.Replace('.', DecimalSeparator);
 }
 
 /// <summary>A reference to a data item (its category decides string-vs-numeric rendering).</summary>

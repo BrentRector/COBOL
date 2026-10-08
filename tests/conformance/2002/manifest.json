@@ -773,7 +773,10 @@
   "pb1430_operator_separator_spaces",
   "pb2516_constant_between_records",
   "pb2071_unused_template_redefines_conforms",
-  "pb2518_redefines_past_non_storage_entries"
+  "pb2518_redefines_past_non_storage_entries",
+  "pb1643_display_literal_comma_constant_invoke",
+  "pb1930_content_function_identifier_arguments",
+  "pb2078_property_receivers_in_phrases"
   ],
   "pending": []
 }

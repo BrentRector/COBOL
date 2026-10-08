@@ -398,7 +398,8 @@
   "pb1943_sum_counter_ref_mod",
   "pb397_sequence_placement_legal",
   "pb1954_report_level_hierarchy_legal",
-  "pb2518_redefines_only_redefinitions_between"
+  "pb2518_redefines_only_redefinitions_between",
+  "pb1643_display_literal_decimal_comma"
  ],
  "pending": []
 }

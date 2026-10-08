@@ -96,6 +96,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         // sending resolver these sites used knew none of them.
         if (host.Expr.ResolveReceiving(st.stringIntoPhrase().dataReference()) is not { } into)
             return new BoundUnsupported("STRING INTO operand");   // the chokepoint reported it — not a deferral (kb/Work PB236)
+        ctx.Data.OoClaimInterleavedReceiver(into);   // StringEmitter places an object-property identifier-3's accessors around its access (kb/Work PB2078)
         string intoText = DataBinder.WrittenText(st.stringIntoPhrase().dataReference());
         // §14.9.43.3 SR4–SR6, SR11 — bind-time rejections (kb/Work PB88: each was a run-time loud stage on ILLEGAL
         // source, the wrong-stage family; the statement compiled clean and died when control reached it).

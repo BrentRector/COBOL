@@ -116,12 +116,6 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
             && host.Expr.ScreenIndexNameOperand(source, sdref.GetText(), "a MOVE sending operand"))
             source = BoundOperandError.Refused(ctx.Edition, $"MOVE of the index-name '{DataBinder.WrittenText(sdref)}' (ISO §13.18.38.3 r7)");
         var resolved = host.Expr.ResolveTargets(targets.dataReference());
-        // ⛔ kb/Work PB2078: MoveEmitter stores the receivers one at a time ("Item identification for identifier-2 is
-        // performed immediately before the data is moved to the respective data item", §14.9.25.4 GR1), so a receiver
-        // that is an object property has its accessors placed around ITS store (ReceiverBracketEmitter.Receive). Only
-        // the written MOVE claims: the implicit moves of READ / RETURN … INTO and WRITE … FROM keep the accessors
-        // around their statement.
-        foreach (var target in resolved) ctx.Data.OoClaimInterleavedReceiver(target);
         return BindMoveOf(source, resolved);
     }
 
@@ -163,6 +157,15 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
             // statement" rule inherits it here), and so does SR2 (data-model D17).
             MoveCategoryLegality(source, targets, implicitOf);
         }
+        // ⛔ kb/Work PB2078: MoveEmitter stores the receivers one at a time ("Item identification for identifier-2 is
+        // performed immediately before the data is moved to the respective data item", §14.9.25.4 GR1), so a receiver
+        // that is an object property has its accessors placed around ITS store (ReceiverBracketEmitter.Receive). The claim
+        // is made HERE, in the one constructor of a MOVE, so the written MOVE and every implicit move a phrase defines
+        // (READ / RETURN … INTO, ACCEPT, UNSTRING … INTO, INITIALIZE) get it by construction: whichever statement emits
+        // this node through MoveEmitter.Emit places the accessors around the store itself, which also keeps them from
+        // running after the statement's own phrase bodies (`READ f INTO P NOT AT END DISPLAY P`). A claim whose node is
+        // emitted any other way fails the compilation (ReceiverBracketEmitter.Emit), never drops the accessors.
+        foreach (var target in targets) ctx.Data.OoClaimInterleavedReceiver(target);
         // A ref-mod slice store on a numeric-DISPLAY receiver needs image backing for ANY sender (§8.4.3.3.4 GR6;
         // the W2 adversarial-review round-trip-loss fix — see MarkRefModStoreImage).
         MarkRefModStoreImage(targets);

@@ -237,7 +237,22 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// (ISO §8.3.3.3.2).</summary>
     public BoundOperand LiteralOperand(Core.LiteralContext lit) =>
         NonNumericLiteralOperand(lit.nonNumericLiteral())
-        ?? new BoundNumericLiteral(CheckLiteral(lit.GetText()));
+        ?? NumericLiteralOperand(lit.GetText());
+
+    /// <summary>⛔ THE ONE PRODUCER OF A NUMERIC LITERAL OPERAND THE PROGRAM WROTE (a literal, or the constant-name that
+    /// substitutes one): the value is <see cref="CheckLiteral"/>'s canonical dot-decimal text, and the literal keeps
+    /// the program's decimal separator for its character image. ISO §14.9.11.4 GR1 leaves the conversion of a literal
+    /// to the device to the implementor, and §12.3.7.4 GR14 a) makes the comma the character "written in numeric
+    /// literals to represent the decimal separator", so `DISPLAY 1,5` under DECIMAL-POINT IS COMMA shows `1,5`
+    /// (DOC-A.1-56; kb/Work PB1643 — it showed `1.5`, because one text field was both the value and the image).</summary>
+    public BoundNumericLiteral NumericLiteralOperand(string asWritten) =>
+        new(CheckLiteral(asWritten)) { DecimalSeparator = ctx.Data.DecimalSeparator };
+
+    /// <summary>The arithmetic-expression-tier twin of <see cref="NumericLiteralOperand"/>: the same literal, the same
+    /// separator, as a <see cref="BoundNumLiteral"/> (it reaches a character image through
+    /// <c>IntrinsicBinder.OperandOf</c>, e.g. a numeric literal argument of a function).</summary>
+    private BoundNumLiteral NumericLiteralExpr(string asWritten) =>
+        new(CheckLiteral(asWritten)) { DecimalSeparator = ctx.Data.DecimalSeparator };
 
     /// <summary>⛔ THE ONE PRODUCER OF <see cref="BoundPredefinedNull"/> — the operand slot of a §8.4.3.10.3 SR1
     /// context, which the predefined NULL may occupy: "it may be used only as a sending operand in an INITIALIZE or
@@ -256,7 +271,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// <summary>The <c>literal</c>-node twin of <see cref="NullAdmittingOperand(Core.NonNumericLiteralContext?)"/>
     /// — the same §8.4.3.10.3 SR1 admission, else <see cref="LiteralOperand"/>'s mapping.</summary>
     public BoundOperand NullAdmittingOperand(Core.LiteralContext lit) =>
-        NullAdmittingOperand(lit.nonNumericLiteral()) ?? new BoundNumericLiteral(CheckLiteral(lit.GetText()));
+        NullAdmittingOperand(lit.nonNumericLiteral()) ?? NumericLiteralOperand(lit.GetText());
 
     /// <summary>The §8.4.3.10.3 SR1 refusal — the ONE diagnostic for NULL written in a slot the rule does not list
     /// (kb/Work PB1427). It replaced the per-statement NULL arms (the STOP/GOBACK status, DISPLAY, MOVE screens),
@@ -432,7 +447,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         ctx.Data.ConstantOf(dref) is not { } k ? null
         : k.Category switch
         {
-            PicCategory.Numeric => new BoundNumericLiteral(CheckLiteral(k.Text)),
+            PicCategory.Numeric => NumericLiteralOperand(k.Text),
             PicCategory.National => new BoundStringLiteral(k.Text) { Category = PicCategory.National },
             PicCategory.Boolean => new BoundStringLiteral(k.Text) { Category = PicCategory.Boolean },
             _ => new BoundStringLiteral(k.Text),
@@ -458,7 +473,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // A constant-name substitutes its literal (§13.10.3 SR2 / §13.10.4 GR1) — in a numeric-expression
         // position only a NUMERIC constant is legal, exactly as for a written literal (§8.8.1.1).
         : ctx.Data.ConstantOf(dref) is { } k
-            ? k.Category is PicCategory.Numeric ? new BoundNumLiteral(CheckLiteral(k.Text))
+            ? k.Category is PicCategory.Numeric ? NumericLiteralExpr(k.Text)
                 : NonNumericConstantExpr(dref.GetText(), k.Category)
         : ctx.Refs.Resolve(dref) is var r && r.Place is { } p ? OperandRef(dref, p, context)
         : r.ExprError(ctx.Edition);   // kb/Work PB1030 — the resolver's answer picks Refused or Unbuilt
@@ -1024,7 +1039,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// docs/rearchitecture/DESIGN-binder-bound-tree.md's funnel entry table rather than left to be rediscovered.</param>
     private BoundExpr NumLiteral(Core.LiteralContext lit, string? positionRule = null) =>
         NonNumericInNumericContext(lit.nonNumericLiteral(), lit.GetText(), positionRule)
-        ?? new BoundNumLiteral(CheckLiteral(lit.GetText()));
+        ?? NumericLiteralExpr(lit.GetText());
 
     /// <summary>⛔ THE ONE <c>nonNumericLiteral</c> → NUMERIC-CONTEXT reading (ISO §8.8.1.1), the numeric-side twin
     /// of <see cref="NonNumericLiteralOperand"/>. Returns null when the node is absent (so the caller falls back to
@@ -1119,7 +1134,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         return BoundExprError.Refused(ctx.Edition, $"literal '{text}' in a numeric context");
     }
 
-    /// <summary>Normalize the decimal separator (DECIMAL-POINT IS COMMA, ISO §12.3.7 GR14a — the comma form
+    /// <summary>Normalize the decimal separator (DECIMAL-POINT IS COMMA, ISO §12.3.7.4 GR14 a) — the comma form
     /// canonicalizes to dot-decimal so every emit-side decoder sees one shape) and edition-gate the digit count
     /// (ISO §8.3.3.3.2 — 1..18 at COBOL-85, 1..31 at 2002+). The ONE literal chokepoint for the expression paths.</summary>
     public string CheckLiteral(string text)
@@ -1182,7 +1197,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
 
     private BoundExpr BindPrimary(Core.PrimaryExpressionContext pe, OperandContext context)
     {
-        if (pe.numericLiteral() is { } num) return new BoundNumLiteral(CheckLiteral(num.GetText()));
+        if (pe.numericLiteral() is { } num) return NumericLiteralExpr(num.GetText());
         if (pe.ZERO_ARITH() is not null) return new BoundNumLiteral("0");
         if (pe.dataReference() is { } dref) return RefExpr(dref, context);
         if (pe.arithmeticExpression() is { } paren) return BindExprCore(paren, context);

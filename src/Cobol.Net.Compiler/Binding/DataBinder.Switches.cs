@@ -311,6 +311,11 @@ public sealed partial class DataBinder
     /// SPECIAL-NAMES is walked at the top of <see cref="Bind"/>.</summary>
     public bool DecimalPointIsComma { get; private set; }
 
+    /// <summary>The character a numeric literal of this program writes its decimal separator with (ISO §12.3.7.4 GR14 a):
+    /// ',' under DECIMAL-POINT IS COMMA, else '.'. A contained program inherits the container's
+    /// (<see cref="InheritConfiguration"/>, §12.3.4 GR1).</summary>
+    public char DecimalSeparator => DecimalPointIsComma ? ',' : '.';
+
     /// <summary>
     /// The unit's CURRENCY SIGN SET (ISO §12.3.7): every currency PICTURE SYMBOL (uppercase-keyed — §12.3.7.3
     /// r20 / §8.1.3 GR3 make the letter cases equivalent) → the currency STRING it stands for (GR13) AND the CLASS
@@ -367,7 +372,7 @@ public sealed partial class DataBinder
     }
 
     /// <summary>Normalize a NUMERIC literal's source text to the canonical dot-decimal form the whole emit-side
-    /// decode pipeline consumes (ISO §12.3.7 GR14a: under DECIMAL-POINT IS COMMA "the character written in
+    /// decode pipeline consumes (ISO §12.3.7.4 GR14 a): under DECIMAL-POINT IS COMMA "the character written in
     /// numeric literals to represent the decimal separator shall be the comma" — and §8.3.3.3.2 admits ONLY the
     /// decimal point in a fixed-point literal, so the OTHER separator is diagnosed in each mode; the legacy's
     /// unconditional acceptance of both is a version-invariant non-conformance, not ported). The ONE literal
@@ -376,7 +381,7 @@ public sealed partial class DataBinder
     public string NormalizeNumericLiteral(string text)
     {
         // The normalization ALGORITHM is the ONE shared CobolNet.Common.NumericLiteral.Normalize (Frontend), so the
-        // compile-time expression evaluator applies the identical §12.3.7 GR14a rule; the binder retains ownership
+        // compile-time expression evaluator applies the identical §12.3.7.4 GR14 a) rule; the binder retains ownership
         // of the COBOLNET0895 diagnostic (its own channel/descriptor), routing the returned issue to it verbatim.
         string norm = Common.NumericLiteral.Normalize(text, DecimalPointIsComma, out var issue);
         switch (issue)

@@ -13,7 +13,8 @@ using static CobolNet.CodeGen.Emit.EmitText;
 /// <summary>The STRING / UNSTRING verb emitter (P7 Step 9d — a real collaborator over the per-unit
 /// <see cref="EmitContext"/>, extracted from the CSharpEmitter.StringUnstring partial). Every runtime-member
 /// fragment routes through <see cref="RuntimeApi"/>.</summary>
-internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, ArithmeticEmitter arith, EcEmitter ec, MoveEmitter move)
+internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, ArithmeticEmitter arith, EcEmitter ec, MoveEmitter move,
+    ReceiverBracketEmitter brackets)
 {
     /// <summary>The statement dispatcher — property-wired by <see cref="UnitEmitters"/> (the ON/NOT-ON
     /// OVERFLOW phrase bodies nest arbitrary statement lists, a cyclic edge no ctor order can satisfy).</summary>
@@ -51,31 +52,37 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         // identifier-3 denotes no item, and §8.5.1.10.4 makes it a fixed-length item of the current length.
         bool dynInto = s.Into.DenotedItem is { IsDynamicLength: true };
         string old = $"__strOld{id}";
-        if (dynInto)
+        // ⛔ kb/Work PB2078: identifier-3 is a RECEIVING operand read once and stored once, so an object-property
+        // identifier-3 has its GET before the image is read and its SET after the store -- around ITS access
+        // (ReceiverBracketEmitter.Receive), and not after the statement's ON OVERFLOW phrase bodies.
+        brackets.Receive(s.Into, null, () =>
         {
-            w.Line($"string {old} = {ReadImage(s.Into)};");
-            w.Line($"string {acc} = {old}.PadRight({ReceivingStore.DynamicReceivingSize(s.Into.Item)});");
-        }
-        else
-            w.Line($"string {acc} = {ReadImage(s.Into)};");
-        foreach (var snd in s.Sendings)
-        {
-            // GR3a: the sender's CONTENT transfers per the alphanumeric-to-alphanumeric move mechanics — its raw
-            // character image (a numeric sender contributes its sign-carrying zoned image), not a converted value.
-            // GR2: a figurative literal-1 / literal-2 is a one-character item of identifier-3's usage, so its
-            // HIGH-/LOW-VALUE comes from THAT usage's program collating sequence (§8.3.3.6.4 GR6; kb/Work PB1185).
-            string src = OperandText.AsString(snd.Value, num, characterCategory: s.CharacterCategory);
-            string delim = snd.BySize || snd.Delimiter is null ? "null"
-                : OperandText.AsString(snd.Delimiter, num, characterCategory: s.CharacterCategory);
-            w.Line($"{acc} = {RuntimeApi.StrTransfer(acc, src, delim, ptr, ovf)};");
-        }
-        if (dynInto)
-            // GR6 advances the pointer once per character moved, so a moved character's position is below the
-            // final pointer: the content reaches position ptr-1 exactly when anything moved (ptr != its start).
-            w.Line(PlaceRenderer.Write(s.Into, ReceivingStore.Characters(s.Into.Item,
-                $"{acc}.Substring(0, {ptr} != {ptr0} ? System.Math.Max({old}.Length, (int)({ptr} - 1)) : {old}.Length)", "")));
-        else
-            WriteImage(s.Into, acc);
+            if (dynInto)
+            {
+                w.Line($"string {old} = {ReadImage(s.Into)};");
+                w.Line($"string {acc} = {old}.PadRight({ReceivingStore.DynamicReceivingSize(s.Into.Item)});");
+            }
+            else
+                w.Line($"string {acc} = {ReadImage(s.Into)};");
+            foreach (var snd in s.Sendings)
+            {
+                // GR3a: the sender's CONTENT transfers per the alphanumeric-to-alphanumeric move mechanics — its raw
+                // character image (a numeric sender contributes its sign-carrying zoned image), not a converted value.
+                // GR2: a figurative literal-1 / literal-2 is a one-character item of identifier-3's usage, so its
+                // HIGH-/LOW-VALUE comes from THAT usage's program collating sequence (§8.3.3.6.4 GR6; kb/Work PB1185).
+                string src = OperandText.AsString(snd.Value, num, characterCategory: s.CharacterCategory);
+                string delim = snd.BySize || snd.Delimiter is null ? "null"
+                    : OperandText.AsString(snd.Delimiter, num, characterCategory: s.CharacterCategory);
+                w.Line($"{acc} = {RuntimeApi.StrTransfer(acc, src, delim, ptr, ovf)};");
+            }
+            if (dynInto)
+                // GR6 advances the pointer once per character moved, so a moved character's position is below the
+                // final pointer: the content reaches position ptr-1 exactly when anything moved (ptr != its start).
+                w.Line(PlaceRenderer.Write(s.Into, ReceivingStore.Characters(s.Into.Item,
+                    $"{acc}.Substring(0, {ptr} != {ptr0} ? System.Math.Max({old}.Length, (int)({ptr} - 1)) : {old}.Length)", "")));
+            else
+                WriteImage(s.Into, acc);
+        });
         // GR6: the pointer item changes only as characters move. Storing it back unconditionally re-wrote an
         // unchanged pointer through its host carrier — a saturated value past long (kb/Work PB1033) — so it is
         // stored only when it moved, and a pointer that overflowed before any transfer keeps its exact value.

@@ -284,7 +284,8 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 // §14.9.4.2 FORMAT 1's BY CONTENT IS `{ identifier-2 } …` AND NOTHING ELSE. An expression operand
                 // is legal only under Format 2, which the AS phrase selects — so accepting one here without that
                 // phrase would admit illegal source, the exact trade this item refused to make in the grammar.
-                if (!formatTwo && (cBool is not null || cLit is not null || (cArith is not null && cDref is null))
+                if (!formatTwo && (cBool is not null || cLit is not null
+                                   || (cArith is not null && cDref is null && !IsSoleIdentifierExpression(cArith)))
                     && !Format1VendorSpelling(
                         $"CALL … USING BY CONTENT {byContent.GetText()}: an expression operand belongs to the "
                         + "program-prototype CALL (ISO §14.9.4.2 Format 2), which the AS phrase selects. "
@@ -308,9 +309,9 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 else if (cBareLit is { } cbl && host.Expr.NullAdmittingOperand(cbl) is { } cblOp)
                     args.Add(new BoundCallArg(CobolPassMode.Content, null, cblOp));
                 else if (cArith is { } cax)
-                    // Format-2 arithmetic-expression-1: bind through the ONE expression path and pass its value.
-                    args.Add(new BoundCallArg(CobolPassMode.Content, null,
-                        IntrinsicBinder.OperandOf(host.Expr.BindExpr(cax))));
+                    // Format-2 arithmetic-expression-1 (or a sole function-/method-identifier, GR8): bind through the
+                    // ONE expression path and pass its value.
+                    args.Add(ExpressionArg(cax, CobolPassMode.Content));
                 else if (cBool is { } cbx)
                     args.Add(BooleanContentArg(cbx));
                 else
@@ -384,6 +385,23 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                         $"CALL … USING {vBareLit.GetText()} with BY VALUE: literal-2 shall be a NUMERIC "
                         + "literal (ISO §14.9.4.3 SR23)");
                 }
+                else if (vArith is { } vsole && IsSoleIdentifierExpression(vsole))
+                {
+                    // identifier-4 that is a function-identifier or an inline method invocation (§14.9.4.4 GR8, kb/Work
+                    // PB1930): a SENDING temporary of ITS OWN class, which SR22 screens as it screens any identifier-4
+                    // (a function returning an object reference or a pointer crosses BY VALUE).
+                    var soleOperand = ExpressionOperand(vsole);
+                    ValueClassScreen(IntrinsicArgumentRules.ClassOf(soleOperand), DataBinder.WrittenText(vsole));
+                    args.Add(OperandArg(soleOperand, CobolPassMode.Value));
+                }
+                else if (vArith is { } vomit && ConditionBinder.SoleDataReference(vomit) is { } vomitRef
+                         && host.Intrinsic.KeywordOmittedFunction(vomitRef) is { } vomitFn)
+                {
+                    // the same identifier with the word FUNCTION omitted (§8.4.3.2.3 SR2) -- it parses as a data reference
+                    var omittedOperand = IntrinsicBinder.OperandOf(vomitFn);
+                    ValueClassScreen(IntrinsicArgumentRules.ClassOf(omittedOperand), DataBinder.WrittenText(vomit));
+                    args.Add(OperandArg(omittedOperand, CobolPassMode.Value));
+                }
                 else if (vArith is { } vax)
                 {
                     // arithmetic-expression-1 — the genuine residue.
@@ -413,6 +431,15 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
             }
             else if (ConditionBinder.SoleDataReference(a.arithmeticExpression()) is { } bare)
             {
+                // §8.4.3.2.3 SR2: a repository function-name written WITHOUT the word FUNCTION parses as a data reference
+                // (KeywordOmittedFunction yields to a declared data item) -- it is a function-identifier, so it takes the
+                // temporary's arm, never the data item's (kb/Work PB1930).
+                if (host.Intrinsic.KeywordOmittedFunction(bare) is { } omittedFn)
+                {
+                    if (AddBareTemporaryArg(IntrinsicBinder.OperandOf(omittedFn), DataBinder.WrittenText(bare)) is { } omittedRefusal)
+                        return omittedRefusal;
+                    continue;
+                }
                 // Format 1: a bare argument takes the prevailing transitive mode — §14.9.4.4 GR5 names
                 // BY REFERENCE and BY CONTENT only. Format 2 (kb/Work PB131): GR5 is a FORMAT 1 rule; GR9
                 // takes the keyword-less identifier's mode from the CORRESPONDING FORMAL, resolved at bind
@@ -520,8 +547,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                     args.Add(new BoundCallArg(CobolPassMode.Content, np, null));
                 }
                 else if (nArith is { } nax)
-                    args.Add(new BoundCallArg(CobolPassMode.Content, null,
-                        IntrinsicBinder.OperandOf(host.Expr.BindExpr(nax))));
+                    args.Add(ExpressionArg(nax, CobolPassMode.Content));
                 else
                     return new BoundUnsupported($"CALL USING argument '{bBool.GetText()}'");
             }
@@ -529,9 +555,14 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
             {
                 // A SOLE reference never reaches here — it took the keyword-less identifier arm above (§14.9.4.4 GR8).
                 // What is left is a real arithmetic-expression-1: `N + 1` is ONE argument (kb/Work PB1135, decision R59).
+                if (IsSoleIdentifierExpression(bArith))
+                {
+                    // A function-identifier is identifier-2 (§14.9.4.4 GR8), not an expression: Format 1 admits it.
+                    if (AddBareTemporaryArg(ExpressionOperand(bArith), DataBinder.WrittenText(bArith)) is { } refusal) return refusal;
+                    continue;
+                }
                 if (!formatTwo && !BareNeedsFormat2(bArith.GetText())) return BoundRejected.Reported(ctx.Edition);
-                args.Add(new BoundCallArg(CobolPassMode.Content, null,
-                    IntrinsicBinder.OperandOf(host.Expr.BindExpr(bArith))));
+                args.Add(ExpressionArg(bArith, CobolPassMode.Content));
             }
         }
 
@@ -547,6 +578,51 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
             return new BoundCallArg(CobolPassMode.Content, null, null) { ContentBool = bound };
         }
 
+        // ⛔ A FUNCTION-IDENTIFIER IS AN IDENTIFIER, NOT arithmetic-expression-1 (kb/Work PB1930) — §14.9.4.4 GR8: "An
+        // argument that consists merely of a single identifier or literal is regarded as an identifier or literal rather
+        // than an arithmetic or boolean expression." §8.4.3.1.2 makes FUNCTION f(…) Format 1 of an identifier, an inline
+        // method invocation Format 4, an object-view Format 5 and SELF / SUPER Format 6, and §8.4.3.2.1 / §8.4.3.4.4 GR1
+        // make each reference "the unique data item" (a temporary) its function or method returns. `arithmeticExpression`
+        // subsumes all four, so a sole one reached the expression spine and was screened by §8.8.1.1, which refused
+        // `BY CONTENT FUNCTION UPPER-CASE(X)` and a function returning an object reference or a pointer as "not a numeric
+        // operand" (COBOLNET0844). The recovery is the ConditionBinder / EvaluateBinder / SET / INVOKE one: the sole
+        // identifier binds through its own door; an expression binds as before. A user function's or invocation's result
+        // is a temporary data item, so it crosses as a PLACE (the object-reference or pointer SET copy, §14.2.3 GR9, is
+        // the place crossing); an intrinsic function's computed value crosses as an operand (CallEmitter.ArgText).
+        BoundCallArg ExpressionArg(Core.ArithmeticExpressionContext ax, CobolPassMode argMode) =>
+            OperandArg(ExpressionOperand(ax), argMode);
+
+        BoundOperand ExpressionOperand(Core.ArithmeticExpressionContext ax) =>
+            ConditionBinder.SoleFunctionCall(ax) is { } sfc ? host.Intrinsic.IntrinsicOperand(sfc)
+                : ConditionBinder.SoleOoIdentifier(ax) is { } soi ? host.Oo.OoIdentifierOperand(soi)
+                : ConditionBinder.SoleDataReference(ax) is { } kd && host.Intrinsic.KeywordOmittedFunction(kd) is { } kof
+                    ? IntrinsicBinder.OperandOf(kof)   // §8.4.3.2.3 SR2: the word FUNCTION omitted
+                : IntrinsicBinder.OperandOf(host.Expr.BindExpr(ax));
+
+        // A KEYWORD-LESS function-/method-identifier (Format 1's identifier-2, Format 2's GR9). It is never "a data item
+        // defined in the file, working-storage, local-storage, or linkage section" (SR3), so GR9 a)2 assumes BY CONTENT
+        // and GR9 b) BY VALUE when the corresponding formal is BY VALUE (the literal's rule, Gr9BareLiteralMode), whose
+        // SR22 class screen then applies; Format 1's prevailing mode (GR5) must be BY CONTENT.
+        BoundStatement? AddBareTemporaryArg(BoundOperand operand, string text)
+        {
+            if (!formatTwo && mode is not CobolPassMode.Content)
+                return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.CallOperandSection,
+                    $"CALL … USING {text}: a function-identifier or inline method invocation references a temporary, not a "
+                    + "data item defined in the file, working-storage, local-storage, or linkage section (ISO §14.9.4.3 SR3), "
+                    + "so it can cross only BY CONTENT");
+            var temporaryMode = formatTwo ? Gr9BareLiteralMode(calleeFormals, args.Count) : CobolPassMode.Content;
+            if (temporaryMode is CobolPassMode.Value) ValueClassScreen(IntrinsicArgumentRules.ClassOf(operand), text);
+            args.Add(OperandArg(operand, temporaryMode));
+            return null;
+        }
+
+        // A temporary (a user function's or an invocation's result) is a PLACE; an intrinsic function's value, a folded
+        // constant and an expression are OPERANDS (CallEmitter.ArgText's two lanes).
+        static BoundCallArg OperandArg(BoundOperand operand, CobolPassMode argMode) =>
+            operand is BoundFieldOperand { Place: { } temp }
+                ? new BoundCallArg(argMode, temp, null)
+                : new BoundCallArg(argMode, null, operand);
+
         // §14.9.4.4 GR9 for a keyword-less LITERAL-2 (or a constant-name, which substitutes one): a literal is
         // never "a data item defined in the file, working-storage, local-storage, or linkage section", so it
         // never meets Syntax rule 3 — GR9 a)2 gives BY CONTENT, and GR9 b) gives BY VALUE whenever the
@@ -555,6 +631,9 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         static CobolPassMode Gr9BareLiteralMode(IReadOnlyList<LinkageFormal>? formals, int pos) =>
             formals is not null && pos < formals.Count && formals[pos].ByValue
                 ? CobolPassMode.Value : CobolPassMode.Content;
+
+        static bool IsSoleIdentifierExpression(Core.ArithmeticExpressionContext ax) =>
+            ConditionBinder.SoleFunctionCall(ax) is not null || ConditionBinder.SoleOoIdentifier(ax) is not null;
 
         bool BareNeedsFormat2(string text) =>
             Format1VendorSpelling(

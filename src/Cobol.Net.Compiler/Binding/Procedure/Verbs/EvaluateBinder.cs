@@ -968,7 +968,7 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
                 : ConditionBinder.SoleOoIdentifier(expr) is { } soi ? host.Oo.OoIdentifierOperand(soi)
                 // A sole numeric LITERAL stays a literal operand — against an alphanumeric/group operand it
                 // participates as its WRITTEN character form, leading zeros intact (ISO §8.8.4.2.1).
-                : ConditionBinder.SoleNumLiteral(expr) is { } lit ? new BoundNumericLiteral(host.Expr.CheckLiteral(lit))
+                : ConditionBinder.SoleNumLiteral(expr) is { } lit ? host.Expr.NumericLiteralOperand(lit)
                 // The ONE expression→operand mapping, as on the relation side: a user-function reference binds to
                 // a BoundNumRef over its result temp and MUST surface as a FIELD operand so the temp's cloned
                 // category (§8.4.3.2.4 GR1) drives the class dispatch; a raw BoundComputedOperand — which this

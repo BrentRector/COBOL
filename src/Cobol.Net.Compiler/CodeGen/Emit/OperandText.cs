@@ -614,7 +614,8 @@ internal static class OperandText
         // PIC S9 VALUE -5 gave "5 " and `MOVE -5 TO WS-X` gave "-5": the same value, two answers, one of them
         // wrong. It went unmeasured for as long as it did because the RELATION half of the arm was unreachable —
         // a signed literal was classified as an arithmetic expression, so it could never arrive here at all.
-        public string Visit(BoundNumericLiteral n) => EmitText.CsLiteral(deSign ? DeSign(n.Text) : n.Text);
+        // The image is the literal AS WRITTEN: its decimal separator is the program's (BoundNumericLiteral.Image, PB1643).
+        public string Visit(BoundNumericLiteral n) => EmitText.CsLiteral(deSign ? DeSign(n.Image) : n.Image);
         public string Visit(BoundFieldOperand n) => FieldAsString(n.Place, deSign, sending);
         // THE CURRENT RECORD (ISO §14.9.30.4 GR4 b) / §14.9.34.4 GR5 b) — kb/Work PB339): the record area's
         // image sliced to the §13.18.43.4 GR16 byte count. deSign is moot (the operand is alphanumeric by

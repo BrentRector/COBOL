@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-292 drift tests.
+293 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -187,6 +187,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [NulByteDriftTests](../tests/Cobol.Net.Tests.Unit/NulByteDriftTests.cs) | ⛔ NO TRACKED TEXT FILE UNDER src/ OR tests/ CONTAINS A NUL BYTE, because a file with one is BINARY to every sweep this project runs, and a file a sweep cannot read has been exempt from every sibling sweep ever run (kb/Work/PB927). | `tests/nist/valid/NC107A.txt`, `src/Planted.cs`, `src/Clean.cs`, `src/Wide.cpy`, `src/Asset.bin`, `src/Gone.cs` |
 | [NumericByteFormDriftTests](../tests/Cobol.Net.Tests.Unit/NumericByteFormDriftTests.cs) | ⛔ THE BYTE-FORM TABLE (V59 step 2). Every USAGE has exactly ONE byte representation, stated here as a table so that adding a usage to the compiler cannot silently inherit a representation it was never given. | — |
 | [NumericEditedValueEditionGateDriftTests](../tests/Cobol.Net.Tests.Unit/NumericEditedValueEditionGateDriftTests.cs) | ⛔ ONE RULE, EVERY FORMAT: ISO §13.18.63.3 SR6's edition reaches every general format of the VALUE clause that can carry a numeric literal on a numeric-edited subject. | — |
+| [NumericLiteralImageDriftTests](../tests/Cobol.Net.Tests.Unit/NumericLiteralImageDriftTests.cs) | ⛔ A NUMERIC LITERAL THE PROGRAM WROTE KEEPS THE PROGRAM'S DECIMAL SEPARATOR — ONE PRODUCER (kb/Work PB1643). | `src/Cobol.Net.Compiler/Binding`, `src/Cobol.Net.Compiler`, `src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs` |
 | [NumericRoundUpSiteDriftTests](../tests/Cobol.Net.Tests.Unit/NumericRoundUpSiteDriftTests.cs) | ⛔ THE DRIFT TEST for the "rounded up to the next whole number" landing (kb/Work PB142-B). | `src`, `specs/ISO_COBOL.md` |
 | [OccursOperandCaptureDriftTests](../tests/Cobol.Net.Tests.Unit/OccursOperandCaptureDriftTests.cs) | ⛔ A data-name-n CLAUSE OPERAND IS CAPTURED IN ONE PLACE, AND A CAPTURE THAT DROPS WHAT WAS WRITTEN IS A NAMED EXCEPTION, NEVER A DEFAULT (kb/Work PB885). | `src/Cobol.Net.Compiler` |
 | [OmittedFormalGuardDriftTests](../tests/Cobol.Net.Tests.Unit/OmittedFormalGuardDriftTests.cs) | kb/Work PB971 — the *-ARG-OMITTED rule is ONE rule written three times, keyed to the kind of the activated element that owns the formal (ISO §14.9.4.4 GR12 program, §8.4.3.2.4 GR8 function, §14.9.23.4 GR10 method). | — |

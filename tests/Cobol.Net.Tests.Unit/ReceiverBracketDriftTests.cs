@@ -45,13 +45,35 @@ public sealed class ReceiverBracketDriftTests
     [Fact]
     public void EveryClaim_IsMadeBy_ABinderWhoseEmitterPlacesTheBracket()
     {
-        // The claim sites: the arithmetic receivers (ReceiverOf), the DIVIDE REMAINDER receiver, the written MOVE.
+        // The claim sites: the arithmetic receivers (ReceiverOf), the DIVIDE REMAINDER receiver, BindMoveOf (the written
+        // MOVE and every implicit move), STRING INTO and INSPECT identifier-1.
         var claimants = new List<string>();
         foreach (var file in Directory.EnumerateFiles(Binding(), "*.cs", SearchOption.AllDirectories))
             if (File.ReadAllText(file).Contains("OoClaimInterleavedReceiver(") && Path.GetFileName(file) != "DataBinder.Oo.cs")
                 claimants.Add(Path.GetFileName(file));
         claimants.Sort(StringComparer.Ordinal);
-        Assert.Equal(["ArithmeticBinder.cs", "ExpressionBinder.cs", "MoveBinder.cs"], claimants);
+        Assert.Equal(["ArithmeticBinder.cs", "ExpressionBinder.cs", "InspectBinder.cs", "MoveBinder.cs", "StringUnstringBinder.cs"],
+            claimants);
+    }
+
+    [Fact]
+    public void TheOneMoveConstructor_ClaimsItsTargets_SoEveryImplicitMoveGetsTheBracket()
+    {
+        // BindMoveOf is the one constructor of a MOVE (the written statement and every implicit move a phrase defines), so the
+        // claim lives there and not in the written MOVE's binder: a phrase added tomorrow inherits it by construction.
+        string src = File.ReadAllText(Binding("Procedure", "Verbs", "MoveBinder.cs"));
+        Assert.Single(Regex.Matches(src, @"OoClaimInterleavedReceiver\("));
+        int ctor = src.IndexOf("public BoundMove BindMoveOf(", StringComparison.Ordinal);
+        int claim = src.IndexOf("OoClaimInterleavedReceiver(", StringComparison.Ordinal);
+        Assert.True(ctor >= 0 && claim > ctor && claim < src.IndexOf("new BoundMove(", ctor, StringComparison.Ordinal),
+            "the one claim is not inside BindMoveOf before the BoundMove is built");
+    }
+
+    [Fact]
+    public void StringAndInspectEmitters_PlaceTheirReceiver_ThroughTheBracketFunnel()
+    {
+        Assert.Contains("brackets.Receive(s.Into, null, () =>", File.ReadAllText(Verbs("StringEmitter.cs")));
+        Assert.Contains("brackets.Receive(receiver, null, () => EmitInspect(statement));", File.ReadAllText(Verbs("InspectEmitter.cs")));
     }
 
     [Fact]

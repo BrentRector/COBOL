@@ -221,7 +221,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
 
     public static BoundOperand OperandOf(BoundExpr e) => e switch
     {
-        BoundNumLiteral l => new BoundNumericLiteral(l.Text) { FunctionValue = l.FunctionValue, FunctionType = l.FunctionType },   // a folded function (LENGTH …) keeps saying so, and its type
+        BoundNumLiteral l => new BoundNumericLiteral(l.Text) { FunctionValue = l.FunctionValue, FunctionType = l.FunctionType, DecimalSeparator = l.DecimalSeparator },   // a folded function (LENGTH …) keeps saying so, and its type
         BoundNumRef r => new BoundFieldOperand(r.Place),            // a user-function result temp (M2-UDF-1)
         BoundExprError err => BoundOperandError.Carry(err.Feature, err.IsUnbuilt),
         _ => new BoundComputedOperand(e),
