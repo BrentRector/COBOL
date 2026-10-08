@@ -862,6 +862,15 @@ one — what the evaluate-once identification asks before it hoists).
   the expression binder. A `functionArgument` that is not an `arithmeticExpression` (a nonnumeric literal, a boolean
   expression, `OMITTED`, an address identifier, a phrase word) and the word ALL outside §8.4.2.3.3 SR6's two contexts
   never reach the hook: the resolver refuses them by name — COBOLNET2363 (kb/Work PB1030).
+- ⛔ **an expression whose worst case passes the host's `long` routes the WHOLE position to the D18 temporary too**
+  (kb/Work PB2616). `PositionRenderer` renders `+ - *` as C# `long` arithmetic, but §8.4.2.3.4 1) b) takes the
+  subscript from "the evaluation of arithmetic-expression-1", so a product past 18 digits must not wrap into another
+  occurrence. `Position.ExceedsLongArithmetic` decides it at COMPILE TIME from the operands' digit bounds (a literal is
+  its own magnitude, an item read is `10^digits − 1` widened by trailing P positions, `+ -` add the bounds, `*`
+  multiplies them; index cells and statement locals are bounded by the host's `int`), after the walk has built its
+  node and before its screens flush. Narrow operands (`T(I + 1)`, `T(I * 2)` over `PIC 9(18)`) keep the `long` fast
+  path; `A * B - C * D` over `PIC 9(21)` takes the expression binder's exact lane and then meets the §8.4.2.3.4 GR2
+  bound check once, on the result.
 
 The PB136 declaration-informed cut (Annex D.3.5.3 `DOG (XCOUNTER (- YCOUNTER))`: a name that cannot be subscripted
 gives its paren to a NEW subscript) is applied to the tree (`CollectCuts`): the resolver records the cut

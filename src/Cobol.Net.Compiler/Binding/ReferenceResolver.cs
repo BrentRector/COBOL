@@ -2365,6 +2365,13 @@ public sealed partial class ReferenceResolver(DataBinder data)
         List<PendingScreen>? pending = null;
         bool functionChecked = false;
         if (Additive(expr.additiveExpression()) is not { } bound) return MaterializePosition(seg, position);
+        // ⛔ AN EXPRESSION THAT CAN PASS THE HOST'S long IS NOT A DIRECT SHAPE (kb/Work PB2616): §8.4.2.3.4 1) b) takes the
+        // subscript from "the evaluation of arithmetic-expression-1", and the typed walk renders + - * as C# long
+        // arithmetic, so `A * B - C * D` over PIC 9(21) operands wrapped and selected another element. Decided at
+        // compile time from the operands' digit bounds (Position.ExceedsLongArithmetic); the narrow common case
+        // keeps the fast path, the rest is bound through the ONE expression binder, like every other shape the walk
+        // cannot render.
+        if (bound.ExceedsLongArithmetic) return MaterializePosition(seg, position);
         if (pending is not null && !_probing)   // R30 purity: a probe never diagnoses (kb/Work PB157)
             foreach (var ps in pending)
                 if (ps.Item is { } it) ScreenPositionOperandClass(it, ps.Name, position);

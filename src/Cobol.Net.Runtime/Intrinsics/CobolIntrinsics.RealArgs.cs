@@ -269,6 +269,41 @@ public static partial class CobolIntrinsics
         return CobolDec.FromDouble(Math.Pow((double)b, (double)e));
     }
 
+    /// <summary>⛔ Native <c>**</c> of a SCALED or SDIDI-carried base to an INTEGER exponent (kb/Work PB2617) — the twin of
+    /// <see cref="PowNativeIntDec"/> for a base that is not an integer. §8.8.1.3 leaves the method of native evaluation to
+    /// the implementor and the precedence follows GnuCOBOL (CLAUDE.md rule 1), whose <c>cob_decimal_pow</c> raises a
+    /// decimal to an integer power by an exact <c>mpz_pow_ui</c> and adds <c>scale × n</c>; a binary64 <c>Math.Pow</c> is
+    /// the approximation of the NON-integer exponent only. So the power is formed on the exact 256-bit lane
+    /// (<see cref="CobolWide.TryPow"/>) and lowered once to the SDIDI by round-to-odd, exactly as every nested wide
+    /// intermediate is; a power past that lane is the square-and-multiply chain of <see cref="CobolDec.MulToOdd"/>
+    /// (34 digits, round-to-odd, range-checked). A negative exponent is §8.8.1.5.4 r3's reciprocal <c>1 / (b ** |e|)</c>,
+    /// and the §8.8.1.2 rule-6 screen is <see cref="CheckPowRule6"/>'s, written once.</summary>
+    public static CobolDec PowNativeDec(CobolDec b, Int128 e)
+    {
+        CheckPowRule6(Int128.Sign(b.Sig), (double)e);
+        if (b.Sig == 0) return new CobolDec(0, 0);   // rule 6a held: the exponent is positive
+        if (e == 0) return CobolDec.From(1, 0);
+        Int128 n = Int128.Abs(e);
+        CobolDec power = PowMagnitudeToOdd(b, n);
+        return e < 0 ? CobolDec.DivToOdd(CobolDec.From(1, 0), power) : power;
+    }
+
+    /// <summary><c>b ** n</c> for n &gt; 0 — the exact wide lane while the power fits it, else the round-to-odd SDIDI chain.</summary>
+    private static CobolDec PowMagnitudeToOdd(CobolDec b, Int128 n)
+    {
+        long scaledExp = n <= int.MaxValue ? (long)b.Exp * (long)n : long.MaxValue;
+        if (scaledExp is > int.MinValue and <= int.MaxValue
+            && CobolWide.TryPow(CobolWide.From(b.Sig), (long)n, out CobolWide exact))
+            return exact.ToDec(-(int)scaledExp);
+        CobolDec power = CobolDec.From(1, 0), square = b;
+        for (Int128 m = n; m > 0; m >>= 1)
+        {
+            if ((m & 1) != 0) power = CobolDec.MulToOdd(power, square);
+            if (m > 1) square = CobolDec.MulToOdd(square, square);
+        }
+        return power;
+    }
+
     /// <summary>§15.7 ABS — the absolute value of a floating-point argument.</summary>
     public static double AbsReal(double v) => Math.Abs(v);
 

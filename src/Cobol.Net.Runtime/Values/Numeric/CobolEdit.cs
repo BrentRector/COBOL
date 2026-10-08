@@ -472,7 +472,7 @@ public static partial class CobolEdit
     /// exception, the result undefined) the image is verified to be an editing result — <see cref="Format"/> of the
     /// de-edited value at the mask's scale (with the item's BLANK WHEN ZERO, <paramref name="blankWhenZero"/>) must
     /// reproduce it: Format IS the one editor, so the round trip is the exact test (kb/Work PB66 sweep — the
-    /// floating-point form's <c>DeEditFloat</c> validates position by position); the fatal exception is raised
+    /// floating-point form's <c>DeEditFloat</c> runs the same round trip through <c>FormatFloatCore</c>); the fatal exception is raised
     /// before any receiver is written. With checking off the digit positions are read as before.</summary>
     public static Int128 DeEdit(string image, string picture, char currency = '$', bool commaMode = false,
         EditRule[]? edits = null, string? currencyString = null, bool blankWhenZero = false)

@@ -304,7 +304,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         var b = IntegerValuedLiteral(n.Base) ?? n.Base.Accept(this);
         var e = IntegerValuedLiteral(n.Exp) ?? n.Exp.Accept(this);
         _outermost = outer;
-        return Power(b, e, NonNegativeIntegerLiteral(n.Exp));
+        return Power(b, e, IntegerLiteralValue(n.Exp));
     }
 
     /// <summary>A numeric LITERAL whose algebraic VALUE is an integer the native carrier can hold, as a scale-0
@@ -321,12 +321,21 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// <para>Not applied under a standard arithmetic mode: there every operand is an SDIDI by §8.8.1.5.2 r1 and
     /// this arm does not exist. Not applied past <see cref="Int128"/>: the exact arm's carrier cannot hold it, and
     /// the Dec lane it would otherwise reach is the right home.</para></summary>
-    private NumX? IntegerValuedLiteral(BoundExpr x)
+    private NumX? IntegerValuedLiteral(BoundExpr x) =>
+        !StandardDecimal && IntegerLiteralValue(x) is { } v
+            ? new NumX(EmitText.IntLiteral(v.ToString(System.Globalization.CultureInfo.InvariantCulture)), 0)
+            : null;
+
+    /// <summary>The integer VALUE of a numeric literal operand (<see cref="IntegerValuedLiteral"/>'s test), or
+    /// <c>null</c> when it is not a literal, is not an integer, or does not fit <see cref="Int128"/>. Read from the
+    /// BOUND TREE, never from a rendered expression text — an operand does not render as its bare digits (a first
+    /// cut of the exponent test did <c>long.TryParse(e.Expr)</c> and silently stopped matching). A
+    /// <c>BoundNegate</c> wrapper is deliberately NOT unwrapped: the exponent <c>-2</c> is an expression, not a
+    /// literal, and the exponent arms read its sign at run time.</summary>
+    private static Int128? IntegerLiteralValue(BoundExpr x)
     {
-        if (StandardDecimal) return null;
         // `BoundNumLiteral` is the ONE literal shape an arithmetic expression's operands take — the operand-level
-        // `BoundNumericLiteral` never reaches a `BoundPower`, which is why `NonNegativeIntegerLiteral` matches the
-        // same single node.
+        // `BoundNumericLiteral` never reaches a `BoundPower`.
         string? text = x is BoundNumLiteral l ? l.Text : null;
         if (text is null || !CobolNet.Common.NumericLiteral.TryParseExact(text, out Int128 sig, out int exp10))
             return null;
@@ -337,20 +346,9 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
             if (Int128.Abs(sig) > Int128.MaxValue / 10) return null;   // past the exact arm's own carrier
             sig *= 10;
         }
-        return new NumX(EmitText.IntLiteral(sig.ToString(System.Globalization.CultureInfo.InvariantCulture)), 0);
+        return sig;
     }
 
-    /// <summary>Is this exponent a literal integer that is not negative? Read from the BOUND TREE, never from the
-    /// rendered expression text — a first cut did <c>long.TryParse(e.Expr)</c> and silently stopped matching,
-    /// because an operand does not render as its bare digits, which put every literal exponent back on the
-    /// approximation arm and re-opened the defect the arm exists to close. See <see cref="Power"/>.</summary>
-    /// <remarks>A <c>BoundNegate</c> wrapper is deliberately NOT unwrapped: it can only make the exponent
-    /// negative, which is precisely the case that must stay on the approximation arm.</remarks>
-    private static bool NonNegativeIntegerLiteral(BoundExpr e) =>
-        e is BoundNumLiteral { Text: var t }
-        && long.TryParse(t, System.Globalization.NumberStyles.AllowLeadingSign,
-                         System.Globalization.CultureInfo.InvariantCulture, out long v)
-        && v >= 0;
     public NumX Visit(BoundIntrinsicCall n) => Intrinsics.RenderNum(n);   // FUNCTION call (ISO §15)
     public NumX Visit(BoundExprError n) => new(EmitText.LoudValue("long", n.Feature), 0);
 
@@ -421,7 +419,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
             // A FLOATING-POINT numeric-edited sender de-edits to its EXACT value — a CobolDec on the Dec lane (D21/PB66:
             // a significand with its own power of ten; never a double); EC-DATA-INCOMPATIBLE for impossible content.
             && p.Item.Pic is { Category: PicCategory.NumericEdited, IsFloatEdited: true, EditMask: { } fem }
-        ? new NumX($"CobolEdit.DeEditFloat({PlaceRenderer.Read(p)}, {EmitText.CsLiteral(fem)}{ctx.EditCfg(p.Item.Pic)})", 0, Dec: true)
+        ? new NumX($"CobolEdit.DeEditFloat({PlaceRenderer.Read(p)}, {EmitText.CsLiteral(fem)}{ctx.EditCfg(p.Item.Pic)}{(p.Item.BlankWhenZero ? ", blankWhenZero: true" : "")})", 0, Dec: true)
         : p.DenotedItem is not null && !p.Item.StoreAsImage
             // A format-2 (LOCALE) sender DE-EDITS through CobolLocaleEdit under the locale current NOW
             // (§13.18.40.5 r11; §14.6.13.2 r4 — impossible content is EC-DATA-INCOMPATIBLE); the scale is the
@@ -1082,8 +1080,11 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
             ? new NumX(RuntimeApi.NumFromAlphanumeric(OperandText.AsString(v, this), sending: false), 0)
             : AsNum(v, ReceiverContext.None);
 
-    /// <summary>Exponentiation (ISO §8.8.1.2: a native-arithmetic exponentiation whose result has no exact
-    /// representation is an IMPLEMENTOR-DEFINED approximation): computed in double, quantized through the ONE
+    /// <summary>Exponentiation (ISO §8.8.1.2). ⛔ THREE ARMS, DECIDED BY THE OPERANDS' CARRIERS: an INTEGER EXPONENT over an
+    /// integer base (<c>PowNativeIntDec</c>) or over a scaled / SDIDI base (the exact wide lane or <c>PowNativeDec</c>,
+    /// kb/Work PB2617) is EXACT — binary64 is never the method for a power that has an exact decimal value — and the rest
+    /// is the arm below. A native-arithmetic exponentiation whose result has no exact
+    /// representation is an IMPLEMENTOR-DEFINED approximation, computed in double and quantized through the ONE
     /// <c>CobolIntrinsics.FromDouble</c> at the landing <see cref="ReceiverContext.FloatLanding"/> chooses — the
     /// resultant identifier's scale + the statement's ROUNDED mode when the power IS the transfer, the
     /// <c>max(Receiver.Scale, 9)</c> working scale with TRUNCATION when it is a nested intermediate (kb/Work
@@ -1092,7 +1093,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// scale-0 <c>(long)</c> truncation lost every fractional power result and turned the double artifact in
     /// <c>SQRT(10) ** 2</c> = 9.999999988 into 9 (IF136A F-SQRT-25); the 9-digit floor mirrors the float-intrinsic
     /// working scale (a receiver-less context renders at scale 0 — the P7.3 <see cref="ReceiverContext.None"/>).</summary>
-    private NumX Power(NumX b, NumX e, bool expIsNonNegativeLiteral = false)
+    private NumX Power(NumX b, NumX e, Int128? literalExponent)
     {
         b = LowerWide(DeU(b));   // exponentiation is arithmetic — the unsigned-wide Widen funnel applies (kb/Work R10);
         e = LowerWide(DeU(e));   // an exact wide base/exponent has no power form: it enters on the SDIDI (kb/Work PB1900)
@@ -1140,12 +1141,33 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // Consumers: a relation compares Decs exactly (CobolDec.Compare); an intrinsic with a Dec argument routes
         // to its SDIDI body under native too (IntrinsicRenderer.RenderNum); an Int128 landing that cannot hold the
         // value raises EC-SIZE-OVERFLOW (CobolDec.ToUnscaledIntermediate — A.1 item 179, "checked") instead of
-        // returning modular digits. `expIsNonNegativeLiteral` no longer selects a body — kept for the callers'
-        // §8.8.1.2 rule-6 screening context only.
-        _ = expIsNonNegativeLiteral;
+        // returning modular digits.
         bool integerOperands = !b.Real && !e.Real && !b.Dec && !e.Dec && b.Scale == 0 && e.Scale == 0;
         if (integerOperands)
             return new NumX(RuntimeApi.Intrinsic("PowNativeIntDec", $"{b.Expr}, {e.Expr}"), 0, Dec: true);
+        // ⛔ A FIXED-POINT OR SDIDI BASE RAISED TO AN INTEGER EXPONENT IS EXACT TOO (kb/Work PB2617). The integer-base arm
+        // above was the only exact one, so `COMPUTE R = A ** 2` over `A PIC 9V9(10)` took the binary64 approximation
+        // below (1.26215515697488189772 where `A * A` stores the exact 1.26215515697488187881), and the same program
+        // answered differently for `A ** 2`, `A ** N` and `A * A` — the receiver-shape defect PB32 removed from the
+        // integer base, one carrier over. §8.8.1.3 leaves native evaluation to the implementor and the precedence
+        // follows GnuCOBOL (CLAUDE.md rule 1), whose cob_decimal_pow raises a decimal to an integer exponent by an
+        // exact mpz_pow_ui with scale × n; binary64 is the approximation of a NON-integer exponent only. The test is
+        // the exponent's CARRIER (scale 0, no Dec/Real: an integer by construction), like the arm above.
+        //   · A literal exponent n ≥ 1 has the compile-time result scale (base scale × n) and digit bound (base digits ×
+        //     n), so while that bound fits the exact wide lane the power IS a NumX.Wide (settled once at the public
+        //     entry, like a nested product): `A ** 2` is `A * A` by construction, rounded once at the receiver.
+        //   · Every other integer exponent (a data item, a negative or zero literal, a bound past the wide lane, a base
+        //     with no digit bound) lands on the SDIDI, which owns its scale at run time: CobolIntrinsics.PowNativeDec
+        //     is the same exact power (the wide lane at run time, then the round-to-odd chain), the §8.8.1.5.4 r3
+        //     reciprocal for a negative exponent, and the §8.8.1.2 rule-6 screen.
+        if (!b.Real && !e.Real && !e.Dec && e.Scale == 0 && (b.Dec || b.Scale != 0))
+        {
+            if (literalExponent is { } n && n >= 1 && b.Digits > 0 && !b.Dec && (long)b.Digits * (long)n <= RuntimeApi.WideMaxDigits)
+                return n == 1
+                    ? b
+                    : new NumX(RuntimeApi.WidePow(WideOperand(b), (int)n), b.Scale * (int)n, Digits: b.Digits * (int)n, Wide: true);
+            return new NumX(RuntimeApi.Intrinsic("PowNativeDec", $"{DecOperand(b)}, {e.Expr}"), 0, Dec: true);
+        }
         // D16 (NATIVE): a float base/exponent OR a float receiver keeps the result FLOATING (native double) — skip
         // the FromDouble quantize-back that a pure fixed-point power needs, so a float ** stays in the float pipeline.
         // A receiver-less exponentiation keeps the binary64 result for the same reason the float-intrinsic family

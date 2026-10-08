@@ -1,0 +1,13 @@
+A*B-C*D       I=1
+A*B-C*D+1     I=2
+A*B-(C*D-2)   I=3
+CAUGHT=EC-BOUND-SUBSCRIPT             
+P*Q+2         I=9 (unchanged)
+CAUGHT=EC-BOUND-SUBSCRIPT             
+P*Q           I=9 (unchanged)
+P+1-4294967295 I=2
+TXT(A*B-C*D+1:1) RCH=Y
+CAUGHT=EC-BOUND-REF-MOD               
+TXT(P*Q+2:1) RCH=? (unchanged)
+A-10**20+1    I=2
+literals      I=2

@@ -787,7 +787,7 @@ depending on magnitude — and that is deliberate and documented here rather tha
 **⚠ SCALE IS WHY THE EXACT ARM IS RESTRICTED TO A SCALE-0 BASE.** A scale-*s* base to the *n* has scale *s·n*, so
 `1.5 ** 30` needs ~36 significant digits before a receiver is considered and there is no compile-time scale to
 give the result; a scale-0 base raised to an integer is scale 0 **whatever the exponent**, so the result scale is
-known without knowing the exponent's value. A fractional base keeps the approximation arm.
+known without knowing the exponent's value. A fractional base has no such scale, so it is part (c)'s.
 **⚠ AND A NEGATIVE EXPONENT IS THE RECIPROCAL, NOT AN INTEGER.** A first cut returned the exact integer at scale 0
 unconditionally and turned `COMPUTE R = 2 ** -2` into **0.0000** instead of 0.2500 — which is why the result
 carrier is the SDIDI, whose scale is a run-time fact (`2 ** -2` is the Dec 0.25; the exponent's SIGN is a run-time
@@ -947,6 +947,20 @@ context, so `A ** 2` was exact under `COMPUTE` and binary64 under `DISPLAY`/an `
 `IF FUNCTION MOD(A ** 2, B) = 930000007` evaluate FALSE. Testing the OPERANDS before the receiver restores §15.4's
 rule that a function's value must not depend on the shape of its receiver. Pinned by
 `2023/pb18_native_power_exact_and_rule6`.
+
+**(c) A scaled or SDIDI base to an INTEGER exponent is exact too (kb/Work PB2617).** Part (a) was written for an
+integer base; a FRACTIONAL base (`A PIC 9V9(10)`) still took the binary64 approximation, so `COMPUTE R = A ** 2` stored
+1.26215515697488189772 where `A * A` stores the exact 1.26215515697488187881, and `A ** 2`, `A ** N` and `A * A`
+disagreed. §8.8.1.3 leaves the method to the implementor and the precedence follows GnuCOBOL, whose `cob_decimal_pow`
+raises a decimal to an integer exponent by an exact `mpz_pow_ui` and adds `scale × n`; binary64 is the approximation of
+a NON-integer exponent only. `NumericRenderer.Power` therefore decides by the operands' CARRIERS: an exponent that is an
+integer by construction (scale 0, neither Dec nor Real) over a scaled or Dec base takes (1) for a literal exponent
+n ≥ 1 whose digit bound (`base digits × n`) fits the exact wide lane, `CobolWide.Pow` as a `NumX.Wide` of scale
+`base scale × n` — settled once at the public entry like a nested product, so `A ** 2` IS `A * A` — and (2) for
+every other integer exponent (a data item, zero or a negative literal, a bound past 77 digits) `CobolIntrinsics.PowNativeDec`,
+which owns its scale at run time: the same exact power (the wide lane, then the round-to-odd `MulToOdd` chain), the
+reciprocal `1 / (b ** |e|)` of §8.8.1.5.4 r3 for a negative exponent, and `CheckPowRule6`'s §8.8.1.2 rule-6 screen.
+The integer-base arm of (a) keeps its owner-decided past-the-carrier approximation.
 
 ### D25. The ALPHANUMERIC SENDING OPERAND has THREE methods, one per rule — a SIZE rule (`FromAlphanumeric`), an EXCEPTION rule (`FromAlphanumericSending`) and a rule-free digit decode (`DigitMagnitude`) — and the emit side asks which of them applies through `SendingRefRules`, never at the call site. (kb/Work PB426 + PB844.)
 

@@ -78,6 +78,26 @@ public readonly struct CobolWide
         return true;
     }
 
+    /// <summary>The exact power <paramref name="a"/>^<paramref name="n"/> of the unscaled value (the caller multiplies the
+    /// scale by <paramref name="n"/>), for <paramref name="n"/> ≥ 1 — square-and-multiply over <see cref="Mul"/>. Every
+    /// square it forms is a factor of the result, so the intermediates are never wider than the answer and the
+    /// compiler's digit bound (<c>base digits × n</c> ≤ <see cref="MaxDigits"/>) proves the call cannot overflow.</summary>
+    public static CobolWide Pow(CobolWide a, int n) =>
+        TryPow(a, n, out CobolWide power) ? power : throw Overflow();
+
+    /// <summary><see cref="Pow"/> where the power may leave the 256-bit range: false then (the caller falls back to the SDIDI).</summary>
+    public static bool TryPow(CobolWide a, long n, out CobolWide power)
+    {
+        power = From(1);
+        CobolWide square = a;
+        for (long m = n; m > 0; m >>= 1)
+        {
+            if ((m & 1) != 0 && !TryMul(power, square, out power)) return false;
+            if (m > 1 && !TryMul(square, square, out square)) return false;
+        }
+        return true;
+    }
+
     /// <summary><paramref name="a"/> × 10^<paramref name="digits"/> — the alignment of the lower-scaled operand of a sum
     /// to the higher scale.</summary>
     public static CobolWide Up(CobolWide a, int digits) =>

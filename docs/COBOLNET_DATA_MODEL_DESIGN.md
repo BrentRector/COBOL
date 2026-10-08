@@ -1083,7 +1083,11 @@ entry points `FormatFloatStore(value, picture, mode, …)` (an Int128+scale, a `
 UNCHECKED store; the caller names the landing: a MOVE passes TRUNCATION, the no-phrase arithmetic store the
 receiver's own §14.7.4.3 mode), `TryFormatFloat(…, out image, mode)` (the CHECKED arithmetic store — false on either
 divergence and on a PROHIBITED-inexact significand, §14.7.4.3 rule 7),
-`DeEditFloat(image, picture, …) → CobolDec`, `FloatExtremeImage` (the pinned overflow image, also the
+`DeEditFloat(image, picture, …, blankWhenZero) → CobolDec` (an all-spaces image of a BLANK WHEN ZERO item is zero,
+§13.18.8.4 GR3; under EC-DATA-INCOMPATIBLE checking the de-edited value is re-rendered through `FormatFloatCore` with the
+item's BLANK WHEN ZERO and must reproduce the image — the fixed-point `DeEdit`'s round trip, so an un-normalized
+significand, a zero with an exponent and any misplaced character are one mismatch; kb/Work PB2643),
+`FloatExtremeImage` (the pinned overflow image, also the
 HIGHEST/LOWEST-ALGEBRAIC value's image). (7) store = normalize EXACTLY (integer arithmetic to the
 mask's integer-digit count), round the dropped digits through the ONE `CobolNum.RoundDiv` kernel by the landing's
 mode (TRUNCATION for a MOVE, §14.6.8.4 rule 2; the receiver's ROUNDED [MODE] for an arithmetic store, §14.7.4.3 rules

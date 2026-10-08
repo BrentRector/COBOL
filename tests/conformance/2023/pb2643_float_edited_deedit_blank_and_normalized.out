@@ -1,0 +1,13 @@
+blanked [         ]
+blank BWZ to numeric N=+0000000
+blank BWZ to float-edited FR=+0.00E+00
+normal 120 N=+0012000 from [+1.20E+02]
+CAUGHT=EC-DATA-INCOMPATIBLE
+non-normalized N=+0000700 (unchanged)
+CAUGHT=EC-DATA-INCOMPATIBLE
+zero with exponent N=+0000700 (unchanged)
+CAUGHT=EC-DATA-INCOMPATIBLE
+BWZ item holding zero image N=+0000700 (unchanged)
+CAUGHT=EC-DATA-INCOMPATIBLE
+spaces without BWZ N=+0000700 (unchanged)
+zero image N=+0000000

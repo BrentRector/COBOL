@@ -49,6 +49,65 @@ public abstract record Position
         PositionOffset { Terms.Count: 0 } o => o.Origin.IsSelfEvaluating,
         _ => false,
     };
+
+    /// <summary>⛔ TRUE WHEN THIS DIRECTLY RENDERED POSITION CANNOT BE EVALUATED IN THE HOST'S <c>long</c> (kb/Work
+    /// PB2616). <c>CodeGen.PositionRenderer</c> renders <c>+ - *</c> as C# <c>long</c> arithmetic, but §8.4.2.3.4
+    /// 1) b) makes the subscript "the result of the evaluation of arithmetic-expression-1" — the expression's value,
+    /// not a 64-bit machine product that wraps — so an expression whose worst case does not fit the host's
+    /// <c>long</c> is not a shape this carrier may render. The worst case is a COMPILE-TIME digit bound: a
+    /// literal is its own magnitude, an item read is the largest value its PICTURE can hold
+    /// (<c>10^digits − 1</c>, widened by trailing P positions), and an operator composes its operands' bounds
+    /// (<c>+ -</c> add them, <c>*</c> multiplies them). Narrow operands (the ordinary <c>T(I + 1)</c>) keep the
+    /// <c>long</c> fast path; a position that answers true is bound through the ONE expression binder instead
+    /// (<c>ReferenceResolver.MaterializePosition</c>), whose intermediate rule is the arithmetic statements'
+    /// (§8.8.1.3 native arithmetic, kb/Work PB1900) and whose result then meets the §8.4.2.3.4 bound check.
+    /// <para>A bare leaf never answers true: an item read is a single <c>CobolTable.Occ</c> and does no arithmetic. Every
+    /// operator node answers for itself, and a leaf that is itself past <c>long</c> (a 19–38 digit item) makes its
+    /// parent operator exceed, since a saturated read is not the value.</para></summary>
+    public bool ExceedsLongArithmetic => Bound(this, out _);
+
+    /// <summary>The worst-case magnitude of <paramref name="p"/> in an <see cref="Int128"/> that saturates, and
+    /// whether an operator node beneath it (or it) exceeds the host's <c>long</c>.</summary>
+    private static bool Bound(Position p, out Int128 bound)
+    {
+        switch (p)
+        {
+            case PositionConstant c:
+                bound = Int128.Abs(c.Value);
+                return false;
+            case PositionItemRead { Item.Pic: { } pic } read:
+                bound = DigitsBound(read.Form == PositionReadForm.Digits ? pic.Length : pic.Digits + pic.TrailingPScaling);
+                return false;
+            case PositionGroup g:
+                return Bound(g.Inner, out bound);
+            case PositionNegate n:
+                return Bound(n.Operand, out bound);
+            case PositionBinary b:
+                bool exceeds = Bound(b.Left, out Int128 l) | Bound(b.Right, out Int128 r);
+                bound = b.Op == PositionOperator.Multiply
+                    ? (l == 0 || r == 0 ? 0 : r > Int128.MaxValue / l ? Int128.MaxValue : l * r)
+                    : l > Int128.MaxValue - r ? Int128.MaxValue : l + r;
+                return exceeds || bound > long.MaxValue;
+            case PositionIndexCell or PositionLocal or PositionLocalElement:
+                // An index cell, a statement local and a table(ALL) vector element are occurrence numbers and loop
+                // counters: bounded by the host's int (a table's extent), never by a PICTURE.
+                bound = int.MaxValue;
+                return false;
+            default:
+                // An address term (an offset, a pointer displacement) has no digit bound the walk can state: it is as
+                // wide as the host's long, so any operator over it exceeds — never a silent assumption.
+                bound = long.MaxValue;
+                return false;
+        }
+    }
+
+    /// <summary><c>10^digits − 1</c>, saturating at <see cref="Int128.MaxValue"/> (a PICTURE is at most 38 digits).</summary>
+    private static Int128 DigitsBound(int digits)
+    {
+        Int128 v = 1;
+        for (int i = 0; i < digits && v < Int128.MaxValue / 10; i++) v *= 10;
+        return v - 1;
+    }
 }
 
 /// <summary>A compile-time integer: an integer literal, an integer constant-name's value, a folded term.</summary>

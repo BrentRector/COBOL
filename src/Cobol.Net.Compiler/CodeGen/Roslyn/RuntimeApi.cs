@@ -702,6 +702,11 @@ internal static class RuntimeApi
     public static string WideMul(string left, string right) =>
         $"{nameof(CobolWide)}.{nameof(CobolWide.Mul)}({left}, {right})";
 
+    /// <summary>The exact power of a wide value to a compile-time integer exponent ≥ 1 (the caller multiplies the scale by
+    /// <paramref name="exponent"/>; kb/Work PB2617).</summary>
+    public static string WidePow(string wide, int exponent) =>
+        $"{nameof(CobolWide)}.{nameof(CobolWide.Pow)}({wide}, {exponent})";
+
     /// <summary>A wide value aligned UP by <paramref name="digits"/> decimal places (× 10^digits).</summary>
     public static string WideUp(string wide, int digits) =>
         digits == 0 ? wide : $"{nameof(CobolWide)}.{nameof(CobolWide.Up)}({wide}, {digits})";

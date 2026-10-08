@@ -243,57 +243,57 @@ public static partial class CobolEdit
     }
 
     /// <summary>DE-EDIT a floating-point numeric-edited image (ISO §14.9.25.4 GR5): the significand's digit positions
-    /// and sign, the 'E', the exponent's sign and digits, back to the exact value <c>±S × 10^(E − SigScale)</c>. Content
-    /// that is not a possible result of any editing operation on the item (§14.6.13.2 rule 4) raises
-    /// EC-DATA-INCOMPATIBLE — fatal when the statement has it enabled — and otherwise contributes zero for a
-    /// non-digit (the tolerant direction the zoned/packed decoders take).</summary>
-    public static CobolDec DeEditFloat(string image, string picture, bool commaMode = false, EditRule[]? edits = null)
+    /// and sign, the 'E', the exponent's sign and digits, back to the exact value <c>±S × 10^(E − SigScale)</c>.
+    /// An ALL-SPACES image of an item with BLANK WHEN ZERO (<paramref name="blankWhenZero"/>) is that item's zero
+    /// (§13.18.8.4 GR3: the sending data item's "value … is considered to be zero"). Under EC-DATA-INCOMPATIBLE
+    /// checking (§14.6.13.2 rule 4: content "not a possible result for any editing operation in that data item"),
+    /// the image is verified to be an editing result by the fixed-point form's own test — <see cref="FormatFloatCore"/>
+    /// of the de-edited value, with the item's BLANK WHEN ZERO, must reproduce it, so a significand that §14.6.8.4 GR1
+    /// would have normalized (a leading zero on a nonzero value), a nonzero exponent on a zero value and every
+    /// misplaced character are one and the same mismatch — and the fatal exception is raised before any receiver is
+    /// written. With checking off a non-digit contributes zero (the tolerant direction the zoned/packed decoders take).</summary>
+    public static CobolDec DeEditFloat(string image, string picture, bool commaMode = false, EditRule[]? edits = null,
+        bool blankWhenZero = false)
     {
         var m = FloatMask.Parse(picture, commaMode, edits);
+        if (blankWhenZero && IsBlanked(image)) return new CobolDec(0, 0);   // §13.18.8.4 GR3
         if (commaMode) image = SwapSeparators(image);
-        bool incompatible = false, negative = false;
+        bool negative = false;
         BigInteger s = BigInteger.Zero;
         int i = 0;
-        char At() => i < image.Length ? image[i] : '\0';
+        char At() => i < image.Length ? image[i] : (char)0;
         foreach (char c in m.SigPattern)
         {
-            // An IS-form character-1 stands for its whole literal-1 (GR14 'es'): the image must carry it verbatim.
+            // An IS-form character-1 stands for its whole literal-1 (GR14 'es'): it holds no digit and no sign.
             if (RuleFor(c, m.Edits) is { SimpleInsertion: true } r)
             {
-                if (!Matches(image, i, r.Pos)) incompatible = true;
                 i += r.Width;
                 continue;
             }
             char ch = At(); i++;
             switch (c)
             {
-                case '9':
-                    s = s * 10 + (char.IsAsciiDigit(ch) ? ch - '0' : 0);   // a non-digit contributes zero at its position
-                    if (!char.IsAsciiDigit(ch)) incompatible = true;
-                    break;
-                case '+':
-                    if (ch == '-') negative = true; else if (ch != '+') incompatible = true;
-                    break;
-                case '-':
-                    if (ch == '-') negative = true; else if (ch != ' ') incompatible = true;
-                    break;
-                case 'B': if (ch != ' ') incompatible = true; break;
-                default: if (ch != c) incompatible = true; break;   // '.', ',', '0', '/'
+                case '9': s = s * 10 + (char.IsAsciiDigit(ch) ? ch - '0' : 0); break;   // a non-digit contributes zero at its position
+                case '+' or '-': if (ch == '-') negative = true; break;
             }
         }
-        if (At() != 'E') incompatible = true; i++;
-        char es = At(); i++;
-        bool expNeg = es == '-';
-        if (es is not ('+' or '-')) incompatible = true;
+        i++;   // the 'E'
+        bool expNeg = At() == '-'; i++;
         int e = 0;
         for (int k = 0; k < m.ExpDigits; k++)
         {
             char ch = At(); i++;
-            if (char.IsAsciiDigit(ch)) e = e * 10 + (ch - '0'); else incompatible = true;
+            if (char.IsAsciiDigit(ch)) e = e * 10 + (ch - '0');
         }
-        if (incompatible)
-            ExceptionState.DataIncompatibleError($"the content '{image}' is not a possible result of editing into {picture}");
         if (expNeg) e = -e;
+        if (ExceptionState.DataIncompatibleChecking)
+        {
+            // The image's own digits fit the mask, so the round trip drops none and the mode is moot.
+            string expected = FormatFloatCore(negative ? -s : s, e - m.SigScale, m, CobolRounding.Truncation, blankWhenZero, out _);
+            if (expected != image)
+                ExceptionState.DataIncompatibleError(
+                    $"the content '{image}' is not a possible result of editing into {picture} (a de-editing MOVE, ISO 14.6.13.2 rule 4)");
+        }
         // The significand's digits fit Int128 (≤ 36 digits, SR15).
         Int128 sig = (Int128)s;
         return new CobolDec(negative ? -sig : sig, e - m.SigScale);
