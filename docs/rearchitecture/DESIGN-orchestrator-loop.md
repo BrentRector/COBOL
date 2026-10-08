@@ -520,11 +520,12 @@ of one account bracket a measured spend (open decisions D6, D8).
 The plannable notes are exactly those `fix_clusters.py --json` lists (the submodule's view of `kb/Work`, which
 applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status: open`, once over `status: half`.
 
-1. **Awaiting landing.** A note whose newest report names a branch that is not on `main` yet
+1. **Awaiting landing.** A note whose newest report is `DONE` and names a branch that is not on `main` yet
    (`prune_worktrees.classify`, reused: `UNLANDED` or `CHECK`) is excluded and listed: re-planning it would dispatch
    work that already exists. The `land` or `resume` unit deals with it first.
 2. **Finishers first.** (a) A note whose newest report (by wave, then time; header lines only) says `SPLIT` or
-   `NOT STARTED`, with that report's branch landed or gone: one finisher group per predecessor report. (b) The half
+   `NOT STARTED`, whatever its branch's state (a `land` unit lands only `DONE` branches, so an unlanded `SPLIT` branch
+   held for one was stranded; kb/Work PB2575): one finisher group per predecessor report. (b) The half
    clusters, one finisher group each. (c) An `UNLANDED` branch whose commit subjects name an open note no report
    covers. Each finisher's `pred` is a fixed paragraph naming the predecessor report, branch, worktree, head and the
    branch's class (cherry-pick if unlanded, orient from the report if landed). A finisher on a primary file absorbs

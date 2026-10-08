@@ -8,11 +8,13 @@
 Design: docs/rearchitecture/DESIGN-orchestrator-loop.md section 9 (kb/Work PB1981 item 3). Waves 1011-1015 each
 cost the orchestrator a hand-written groups.json; this computes it.
 
-1. AWAITING LANDING: an open note whose newest report's branch is not on main yet is excluded (the `land` unit
-   lands it first; re-planning it would dispatch the same work twice).
-2. FINISHERS FIRST: an open note whose newest report (its branch landed or gone) says SPLIT or NOT STARTED, a
-   `status: half` note, and an UNLANDED branch (prune_worktrees.classify) whose commit subjects name an open note
-   with no report. One finisher group per predecessor; its `pred` names the predecessor report and branch.
+1. AWAITING LANDING: an open note whose newest report is DONE and whose branch is not on main yet is excluded (the
+   `land` unit lands it first; re-planning it would dispatch the same work twice).
+2. FINISHERS FIRST: an open note whose newest report says SPLIT or NOT STARTED (its branch landed, gone, or still
+   unlanded: the finisher then cherry-picks the branch's commits, because a `land` unit lands only DONE branches;
+   kb/Work PB2575), a `status: half` note, and an UNLANDED branch (prune_worktrees.classify) whose commit subjects
+   name an open note with no report. One finisher group per predecessor; its `pred` names the predecessor report and
+   branch.
 3. CLUSTERS from fix_clusters.py --json (the public submodule's view of kb/Work), minus the notes above, ranked by
    inventory rows claimed (the sum of each note's `inventory_rows`), then harm. A finisher on a cluster's primary
    file absorbs that cluster's notes up to the cap of five.
@@ -548,10 +550,14 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
     finisher_by_rep: dict[pathlib.Path, list[str]] = {}
     for nid, r in newest.items():
         cls = classify(r.branch) if r.branch else "ABSENT"
-        if cls not in LANDED_CLASSES:
-            awaiting.setdefault(r.branch or str(r.path), []).append(nid)
-        elif r.status in FINISH_STATUSES or r.not_started:
+        # A SPLIT or NOT STARTED report is unfinished whatever its branch's state: a `land` unit lands only DONE
+        # branches (units/land.md), so holding an unlanded SPLIT branch for one stranded it (kb/Work PB2575). Its
+        # finisher cherry-picks the branch's commits (finisher_pred's UNLANDED arm). A DONE report that names a
+        # note NOT started still lands first: its finished work is the land unit's.
+        if r.status in FINISH_STATUSES or (cls in LANDED_CLASSES and r.not_started):
             finisher_by_rep.setdefault(r.path, []).append(nid)
+        elif cls not in LANDED_CLASSES:
+            awaiting.setdefault(r.branch or str(r.path), []).append(nid)
 
     taken: set[str] = {i for ids in awaiting.values() for i in ids}
     # A note that needs a frontier model under the owner's per-dispatch approval is never planned (MANDATORY-PRACTICES

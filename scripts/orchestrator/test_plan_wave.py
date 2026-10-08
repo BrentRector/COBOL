@@ -149,6 +149,28 @@ p4 = pw.plan(notes, CLUSTERS, HALF, reports, lambda b: CLASS.get(b, "ABSENT"), U
 check("max groups", len(p4["groups"]), 2)
 check("trains", p["trains"], -(-len(p["groups"]) // RULES["wave"]["train_size"]))
 
+# 6b. A SPLIT REPORT ON AN UNLANDED BRANCH IS A FINISHER, NOT "AWAITING LANDING" (kb/Work PB2575): a `land` unit lands
+#     only DONE branches, so holding it stranded the work (waves 1020 D and 1032 A). Its pred cherry-picks the branch.
+#     A DONE report that names a note NOT started still waits for its landing. Own reports, so check 8's golden holds.
+SPLIT_REPORTS = TMP / "reports-split"
+SPLIT_REPORTS.mkdir()
+(SPLIT_REPORTS / "w1020d-PB5-report.md").write_text(
+    "SPLIT\n# PB5 group\n**Status:** SPLIT at the turn cap · **worktree:** `E:\\COBOL\\.claude\\worktrees\\wf_ggg-4` · "
+    "**branch:** `worktree-wf_ggg-4` · **HEAD:** `3333333cc`\n\n## Reproduced?\n", encoding="utf-8")
+(SPLIT_REPORTS / "w1020e-PB7-report.md").write_text(
+    "DONE\n# PB7 group (PB12 NOT started)\n**branch:** `worktree-wf_hhh-5` · **HEAD:** `4444444dd`\n\n## Reproduced?\n",
+    encoding="utf-8")
+SPLIT_CLASS = {"worktree-wf_ggg-4": "UNLANDED", "worktree-wf_hhh-5": "UNLANDED"}
+p5 = pw.plan(notes, CLUSTERS, HALF, pw.load_reports(SPLIT_REPORTS), lambda b: SPLIT_CLASS.get(b, "ABSENT"), {}, RULES,
+             budget_points=100)
+g5 = next((g for g in p5["groups"] if "PB5" in g.notes), None)
+check("split on an unlanded branch is a finisher", (g5.kind if g5 else None, "PB5" in str(p5["awaiting_landing"])),
+      ("finisher", False))
+check("its pred cherry-picks the unlanded branch",
+      bool(g5) and all(s in g5.pred for s in ("worktree-wf_ggg-4", "UNLANDED", "cherry-pick")), True)
+check("done with a note not started still awaits landing", p5["awaiting_landing"].get("worktree-wf_hhh-5"),
+      ["PB7", "PB12"])
+
 # 7. the group JSON renders through the real template and passes check_practices' same-file rule
 gjson = [pw.as_group_json(g, "77", notes, "COBOLNET0001-COBOLNET0003") for g in p["groups"]]
 CFG77 = {"wave": "77", "base": "abc", "scratch": str(TMP), "stop_file": str(coord.fleet_stop(TMP, "w77"))}
