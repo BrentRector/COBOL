@@ -39,16 +39,15 @@ public static partial class CobolIntrinsics
     public static CobolDec AbsDec(CobolDec a) => a.Sig < 0 ? new CobolDec(-a.Sig, a.Exp) : a;
 
     /// <summary>§15.44 INTEGER — the greatest integer not greater than the argument (floor).</summary>
-    public static CobolDec FloorDec(CobolDec a)
-    {
-        Int128 t = a.ToUnscaled(0, CobolRounding.Truncation);
-        // Truncation is toward zero; a negative value with a dropped nonzero fraction floors one lower.
-        if (a.Sig < 0 && CobolDec.Compare(CobolDec.From(t, 0), a) != 0) t -= 1;
-        return CobolDec.From(t, 0);
-    }
+    /// <remarks>⛔ ON THE DECIMAL, NEVER THROUGH AN Int128 LANDING (kb/Work PB2630): <c>ToUnscaled</c> is the UNCHECKED
+    /// final-transfer arm, which keeps only the low-order digits of a magnitude of 10^38 or more - INTEGER(10 ** 40)
+    /// answered 0 where §15.44.4 r1 requires 10^40, which the SDIDI holds exactly. The ONE rule is
+    /// <see cref="CobolDec.FloorToInteger"/>.</remarks>
+    public static CobolDec FloorDec(CobolDec a) => a.FloorToInteger();
 
-    /// <summary>§15.49 INTEGER-PART — truncation toward zero.</summary>
-    public static CobolDec TruncDec(CobolDec a) => CobolDec.From(a.ToUnscaled(0, CobolRounding.Truncation), 0);
+    /// <summary>§15.49 INTEGER-PART — truncation toward zero (<see cref="CobolDec.TruncateToInteger"/>; the same
+    /// no-landing rule as <see cref="FloorDec"/>, so FRACTION-PART and the MOD/REM equivalent expressions inherit it).</summary>
+    public static CobolDec TruncDec(CobolDec a) => a.TruncateToInteger();
 
     /// <summary>§15.42 FRACTION-PART — argument − INTEGER-PART(argument), exact (aligned subtraction).</summary>
     public static CobolDec FractionPartDec(CobolRounding mode, CobolDec a) => CobolDec.Sub(a, TruncDec(a), mode);

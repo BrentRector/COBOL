@@ -77,7 +77,13 @@ internal static class ObjectComputerEmit
     /// <c>Place.Item.Pic</c>, null for every group, so <c>FUNCTION UPPER-CASE(NG)</c> over a GROUP-USAGE NATIONAL
     /// group mapped case through the ALPHANUMERIC locale where its elementary twin used the national one.</summary>
     public static string ClassificationArg(CobolNet.Binding.Bound.BoundOperand op)
-        => $", __CLASSIFY.For({(IntrinsicResultType.OperandCategory(op) is PicCategory.National ? "true" : "false")})";
+        => $", {ClassificationExpr(op)}";
+
+    /// <summary>The selector as an expression - <c>__CLASSIFY.For(national)</c> - for a consumer that names the argument
+    /// (the ANYCASE matchers, whose "LOWER-CASE function without the LOCALE argument" fold takes the classification by
+    /// §15.57.4 r3; kb/Work PB2631) rather than appending it positionally.</summary>
+    public static string ClassificationExpr(CobolNet.Binding.Bound.BoundOperand op)
+        => $"__CLASSIFY.For({(IntrinsicResultType.OperandCategory(op) is PicCategory.National ? "true" : "false")})";
 
     private static string Kind(LocalePhrase? p) => p is null ? "LocalePhraseKind.None" : $"LocalePhraseKind.{p.Kind}";
     private static string Tag(LocalePhrase? p) => p?.Tag is { } t ? EmitText.CsLiteral(t) : "null";

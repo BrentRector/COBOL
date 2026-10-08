@@ -249,11 +249,19 @@ public static partial class CobolIntrinsics
         CheckPowRule6((double)b, (double)e);
         if (e >= 0)
         {
+            // ⛔ A BASE OF 0, 1 OR -1 NEVER LEAVES THE CARRIER, SO ITS POWER IS NOT A LOOP (kb/Work PB2632): §8.8.1.2
+            // r6a admits a zero base with any positive exponent (the screen above took 0 ** 0) and nothing bounds
+            // the exponent of 1 or -1, so `B ** N` with a data-item N of 999999999999999999 ran 10^18 multiplications
+            // for a constant result. The value is 0 (b = 0), 1 (b = 1) or +/-1 by the exponent's parity (b = -1).
+            if (b == 0 || b == 1) return CobolDec.From(b, 0);
+            if (b == -1) return CobolDec.From((e & 1) == 0 ? 1 : -1, 0);
+            // |b| >= 2: every multiplication at least doubles the magnitude, so the loop leaves the carrier - and
+            // stops - after at most 127 steps whatever the exponent.
             Int128 r = 1, mag = Int128.Abs(b);
             bool fits = true;
-            for (Int128 i = 0; i < e && fits; i++)
+            for (Int128 i = 0; i < e; i++)
             {
-                if (mag > 1 && Int128.Abs(r) > Int128.MaxValue / mag) { fits = false; break; }
+                if (Int128.Abs(r) > Int128.MaxValue / mag) { fits = false; break; }
                 r *= b;
             }
             if (fits) return CobolDec.From(r, 0);

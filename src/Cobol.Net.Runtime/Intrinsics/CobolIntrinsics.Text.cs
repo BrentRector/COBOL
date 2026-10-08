@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Runtime.Collation;
+using CobolNet.Runtime.Globalization;
 
 namespace CobolNet.Runtime;
 
@@ -407,7 +408,7 @@ public static partial class CobolIntrinsics
     /// (rules 3/4 — a substituted argument-3 is never re-scanned; occurrences count over argument-1, non-
     /// overlapping). A zero-length argument-1 or any zero-length argument-2 sets EC-ARGUMENT-FUNCTION and returns
     /// a zero-length value (rule 1). FIRST/LAST target the pair's first/last occurrence in the source.</summary>
-    public static string Substitute(string source, string[] froms, string[] tos, int[] modes)
+    public static string Substitute(string source, string[] froms, string[] tos, int[] modes, LocaleFacts? classification = null)
     {
         if (source.Length == 0 || froms.Any(f => f.Length == 0))                 // §15.87.4 rule 1
         {
@@ -417,11 +418,12 @@ public static partial class CobolIntrinsics
                 "SUBSTITUTE argument-1 or an argument-2 is of zero length (§15.87.4 rule 1)");
         }
         int k = froms.Length;
-        // ANYCASE (rule 5) folds via LOWER-CASE (ToLowerInvariant — the implementor-defined §15.57 fold, matching
-        // FindString), NOT invariant upper-fold: length-preserving, so positions over the lowered images align.
-        string srcLower = source.ToLowerInvariant();
+        // ANYCASE (rule 5) folds via LOWER-CASE without the LOCALE argument - the ONE fold every ANYCASE matcher
+        // reads (CobolLocale.LowerCase: the module's CHARACTER CLASSIFICATION when it has one, §15.57.4 r3, else the
+        // implementor's correspondence, r4; kb/Work PB2631). Length-preserving, so positions over the lowered images align.
+        string srcLower = CobolLocale.LowerCase(source, classification);
         var fromsLower = new string[k];
-        for (int p = 0; p < k; p++) fromsLower[p] = froms[p].ToLowerInvariant();
+        for (int p = 0; p < k; p++) fromsLower[p] = CobolLocale.LowerCase(froms[p], classification);
         static bool MatchAt(string s, string sLower, int i, string f, string fLower, bool anycase) =>
             i + f.Length <= s.Length
             && (anycase ? string.CompareOrdinal(sLower, i, fLower, 0, f.Length) == 0
@@ -463,7 +465,7 @@ public static partial class CobolIntrinsics
     /// decided here and set EC-ARGUMENT-FUNCTION with a zero-length result: an odd element count (an argument-2 without
     /// its argument-3), a keyword flag on an argument-3 element, or FIRST together with LAST. The substitution itself is
     /// the ONE <see cref="Substitute"/> kernel.</summary>
-    public static string SubstituteFlat(string source, string[][] parts, int[] partFlags)
+    public static string SubstituteFlat(string source, string[][] parts, int[] partFlags, LocaleFacts? classification = null)
     {
         int n = 0;
         foreach (var p in parts) n += p.Length;
@@ -501,14 +503,15 @@ public static partial class CobolIntrinsics
                     tos[at / 2] = parts[p][e];
                 }
             }
-        return Substitute(source, froms, tos, modes);
+        return Substitute(source, froms, tos, modes, classification);
     }
 
     /// <summary>FIND-STRING (§15.37.4): the 1-based character position of argument-2 (<paramref name="needle"/>)
     /// within argument-1 (<paramref name="hay"/>). With <paramref name="last"/> the LAST occurrence is sought
     /// (rule 1); <paramref name="skip"/> is argument-3 — the number of matches to ignore before determining the
     /// position returned (rule 2, counted from the first occurrence, or from the last when <paramref name="last"/>);
-    /// <paramref name="anycase"/> folds case per LOWER-CASE without a locale (rule 4). A zero-length argument-1 or
+    /// <paramref name="anycase"/> folds case per LOWER-CASE without a LOCALE argument (rule 4) - under the module's
+    /// <paramref name="classification"/> when it has one (§15.57.4 r3). A zero-length argument-1 or
     /// argument-2 (rule 5), or no remaining match (rule 3), returns 0. An OCCURRENCE is any character position at
     /// which argument-2 matches a substring of argument-1 (§15.37.4 rule 1 — a plain substring match, OVERLAPPING
     /// occurrences included; §15.37 defines no consumption/advance and never references INSPECT's scanning).</summary>
@@ -521,11 +524,14 @@ public static partial class CobolIntrinsics
     /// where rule 3 requires zero; under <c>&gt;&gt;TURN EC-ARGUMENT-FUNCTION CHECKING ON</c> it terminated the
     /// run unit on conforming source. kb/Work R08 removed the same narrowing ONE LEVEL DOWN (an <c>(int)</c>
     /// cast inside this body) and left the <c>Int128</c>→<c>long</c> one at the intake.</remarks>
-    public static long FindString(string hay, string needle, bool last, Int128 skip, bool anycase)
+    public static long FindString(string hay, string needle, bool last, Int128 skip, bool anycase,
+                                  LocaleFacts? classification = null)
     {
         if (hay.Length == 0 || needle.Length == 0) return 0;                     // §15.37.4 rule 5
-        string h = anycase ? hay.ToLowerInvariant() : hay;                       // rule 4 — the LOWER-CASE fold
-        string n = anycase ? needle.ToLowerInvariant() : needle;
+        // rule 4 - the LOWER-CASE-without-LOCALE fold, ONE for every ANYCASE matcher (kb/Work PB2631): the module's
+        // CHARACTER CLASSIFICATION when it has one (§15.57.4 r3), else the implementor's correspondence (r4).
+        string h = anycase ? CobolLocale.LowerCase(hay, classification) : hay;
+        string n = anycase ? CobolLocale.LowerCase(needle, classification) : needle;
         var positions = new List<int>();
         for (int i = 0; (i = h.IndexOf(n, i, StringComparison.Ordinal)) >= 0; i++)   // every match position (overlapping incl., rule 1)
             positions.Add(i + 1);                                                // 1-based character position
@@ -607,9 +613,11 @@ public static partial class CobolIntrinsics
     /// </summary>
     /// <param name="orderingTable">The DECODED literal-9 of the ORDER TABLE clause the call's ordering-name-1
     /// resolves to, or <see langword="null"/> for §15.85.3 r5's default table 'ISO 14651_2020_TABLE1'.</param>
-    /// <param name="level">Argument-4, the ordering level; <c>0</c> means it was not specified, which §15.85.4 r1
-    /// resolves to "the highest level defined in the ordering table" — four here (the ISO/IEC 14651-style
-    /// four-level ordering: primary, secondary, tertiary, and the shifted variable weights).</param>
+    /// <param name="level">Argument-4, the ordering level; <see langword="null"/> means it was not specified, which
+    /// §15.85.4 r1 resolves to "the highest level defined in the ordering table" — four here (the ISO/IEC 14651-style
+    /// four-level ordering: primary, secondary, tertiary, and the shifted variable weights). A specified value of
+    /// zero or less violates §15.85.3 r6 (EC-ARGUMENT-FUNCTION); one past the table's highest is §15.85.4 r2's
+    /// EC-ORDER-NOT-SUPPORTED.</param>
     /// <remarks>
     /// <para><b>r2 — the unavailable table or level.</b> "If the cultural ordering table is not available on the
     /// processor, or the specified ordering level is not available, or the level number specified by argument-4
@@ -632,11 +640,19 @@ public static partial class CobolIntrinsics
     /// default ordering table names — variable elements (space, punctuation, symbols) ignored through level 3
     /// and weighted at level 4 — so <c>"a-b"</c> and <c>"ab"</c> compare equal at levels 1–3 and differ at 4.</para>
     /// </remarks>
-    public static string StandardCompare(string? a, string? b, string? orderingTable, long level)
+    public static string StandardCompare(string? a, string? b, string? orderingTable, long? level)
     {
+        // ⛔ §15.85.3 r6 is an ARGUMENT rule, decided on the VALUE of a specified argument-4 (kb/Work PB2631): a data
+        // item holding 0 or a negative integer violates "shall be a positive nonzero integer" and sets
+        // EC-ARGUMENT-FUNCTION - it is neither "unspecified" (the old 0 sentinel silently compared at level 4) nor a
+        // level the table does not define (r2's EC-ORDER-NOT-SUPPORTED, which a NEGATIVE one raised instead). The
+        // result is DOC-A.1-90's fixed one-character class: one space.
+        if (level is <= 0)
+            return Exceptions.ExceptionState.ArgumentErrorSpaces(
+                $"FUNCTION STANDARD-COMPARE argument-4 {level} shall be a positive nonzero integer (§15.85.3 r6)", 1);
         // r1: an unspecified argument-4 is the highest level the ordering table defines. The derived table's
         // levels are UCA's four, so that is 4 — Quaternary under Shifted, which IS CollationEngine.Standard.
-        long lvl = level == 0 ? 4 : level;
+        long lvl = level ?? 4;
         CollationTable table;
         if (orderingTable is null)
             table = CollationTable.Root;                       // r5's default table 'ISO 14651_2020_TABLE1'

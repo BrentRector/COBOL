@@ -90,10 +90,10 @@ public sealed class StandardCompareTests
     public void OmittedLevel_IsTheHighestLevelTheTableDefines()
     {
         Assert.Equal(CobolIntrinsics.StandardCompare("a-b", "ab", null, 4),
-                     CobolIntrinsics.StandardCompare("a-b", "ab", null, 0));
-        Assert.Equal("<", CobolIntrinsics.StandardCompare("a-b", "ab", null, 0));
+                     CobolIntrinsics.StandardCompare("a-b", "ab", null, null));
+        Assert.Equal("<", CobolIntrinsics.StandardCompare("a-b", "ab", null, null));
         Assert.NotEqual(CobolIntrinsics.StandardCompare("a-b", "ab", null, 3),
-                        CobolIntrinsics.StandardCompare("a-b", "ab", null, 0));
+                        CobolIntrinsics.StandardCompare("a-b", "ab", null, null));
     }
 
     // ── §15.85.4 r4 / r6 / r7 — the operands and the result ──────────────────────────────────────────────────
@@ -104,12 +104,12 @@ public sealed class StandardCompareTests
     [Fact]
     public void TrailingSpaces_AreTruncated_AllSpacesToOne()
     {
-        Assert.Equal("=", CobolIntrinsics.StandardCompare("abc", "abc   ", null, 0));
-        Assert.Equal("=", CobolIntrinsics.StandardCompare("abc  ", "abc", null, 0));
-        Assert.Equal("=", CobolIntrinsics.StandardCompare("     ", " ", null, 0));
-        Assert.Equal("=", CobolIntrinsics.StandardCompare("", "", null, 0));
-        Assert.Equal("<", CobolIntrinsics.StandardCompare("", " ", null, 0));   // "" stays ""; "   " becomes " "
-        Assert.Equal("=", CobolIntrinsics.StandardCompare(null, "", null, 0));
+        Assert.Equal("=", CobolIntrinsics.StandardCompare("abc", "abc   ", null, null));
+        Assert.Equal("=", CobolIntrinsics.StandardCompare("abc  ", "abc", null, null));
+        Assert.Equal("=", CobolIntrinsics.StandardCompare("     ", " ", null, null));
+        Assert.Equal("=", CobolIntrinsics.StandardCompare("", "", null, null));
+        Assert.Equal("<", CobolIntrinsics.StandardCompare("", " ", null, null));   // "" stays ""; "   " becomes " "
+        Assert.Equal("=", CobolIntrinsics.StandardCompare(null, "", null, null));
     }
 
     /// <summary>§15.85.4 r6 — the three returned values — and r7: "The length of the returned value is 1."</summary>
@@ -118,19 +118,19 @@ public sealed class StandardCompareTests
     {
         foreach (string r in new[]
         {
-            CobolIntrinsics.StandardCompare("a", "a", null, 0),
-            CobolIntrinsics.StandardCompare("a", "b", null, 0),
-            CobolIntrinsics.StandardCompare("b", "a", null, 0),
-            CobolIntrinsics.StandardCompare("resume", "Résumé", null, 0),
+            CobolIntrinsics.StandardCompare("a", "a", null, null),
+            CobolIntrinsics.StandardCompare("a", "b", null, null),
+            CobolIntrinsics.StandardCompare("b", "a", null, null),
+            CobolIntrinsics.StandardCompare("resume", "Résumé", null, null),
         })
         {
             Assert.Equal(1, r.Length);
             Assert.Contains(r, new[] { "<", "=", ">" });
         }
-        Assert.Equal("=", CobolIntrinsics.StandardCompare("abc", "abc", null, 0));
+        Assert.Equal("=", CobolIntrinsics.StandardCompare("abc", "abc", null, null));
         // Culturally sensitive, and "not necessarily a character-by-character comparison" (§15.85.4's NOTE):
         // ordinally 'R' (0x52) < 'r' (0x72), so a code-unit comparison would answer ">" here.
-        Assert.Equal("<", CobolIntrinsics.StandardCompare("resume", "Résumé", null, 0));
+        Assert.Equal("<", CobolIntrinsics.StandardCompare("resume", "Résumé", null, null));
     }
 
     // ── §15.85.3 r5 / §12.3.7.4 GR17 — which ordering table ──────────────────────────────────────────────────
@@ -158,9 +158,9 @@ public sealed class StandardCompareTests
     [Fact]
     public void ALocaleTag_NamesItsTailoredOrderingTable()
     {
-        Assert.Equal("<", CobolIntrinsics.StandardCompare("ñu", "nz", Default, 0));
-        Assert.Equal(">", CobolIntrinsics.StandardCompare("ñu", "nz", "es-ES", 0));
-        Assert.Equal("<", CobolIntrinsics.StandardCompare("ñu", "nz", null, 0));
+        Assert.Equal("<", CobolIntrinsics.StandardCompare("ñu", "nz", Default, null));
+        Assert.Equal(">", CobolIntrinsics.StandardCompare("ñu", "nz", "es-ES", null));
+        Assert.Equal("<", CobolIntrinsics.StandardCompare("ñu", "nz", null, null));
     }
 
     // ── §15.85.4 r2 — EC-ORDER-NOT-SUPPORTED ─────────────────────────────────────────────────────────────────
@@ -172,12 +172,11 @@ public sealed class StandardCompareTests
     /// checking enabled it throws for the statement guard to dispatch to a USE declarative.
     /// </summary>
     [Theory]
-    [InlineData("NO SUCH TABLE", 0L)]
-    [InlineData("zz-Nowhere-42", 0L)]      // not a locale .NET knows and not the default name
+    [InlineData("NO SUCH TABLE", null)]
+    [InlineData("zz-Nowhere-42", null)]    // not a locale .NET knows and not the default name
     [InlineData(null, 5L)]                 // a level the table does not define
-    [InlineData(null, -1L)]
     [InlineData("ISO 14651_2020_TABLE1", 9L)]
-    public void UnavailableTableOrLevel_RaisesEcOrderNotSupported(string? table, long level)
+    public void UnavailableTableOrLevel_RaisesEcOrderNotSupported(string? table, long? level)
     {
         RunUnit.Run(_ => UnderChecking(() =>
         {
@@ -189,6 +188,33 @@ public sealed class StandardCompareTests
             Assert.True(ExceptionState.LastFatal);
             Assert.Contains("15.85.4 r2", ex.Message);
         }));
+    }
+
+    /// <summary>kb/Work PB2631 - §15.85.3 r6: "Argument-4, if specified, shall be a positive nonzero integer". A
+    /// SPECIFIED zero or negative level (a data item's run-time value) violates the ARGUMENT rule: EC-ARGUMENT-FUNCTION,
+    /// and with checking off the one-character substituted result (row DOC-A.1-90) is one space. Level 0 used to mean
+    /// "unspecified" and compared at level 4; a negative one raised EC-ORDER-NOT-SUPPORTED, which is r2's rule for a
+    /// level the table does not define.</summary>
+    [Theory]
+    [InlineData(0L)]
+    [InlineData(-1L)]
+    [InlineData(long.MinValue)]
+    public void ASpecifiedNonPositiveLevel_IsAnArgumentError_NotAnOmittedOrUnsupportedLevel(long level)
+    {
+        RunUnit.Run(_ =>
+        {
+            ExceptionState.Clear();
+            Assert.Equal(" ", CobolIntrinsics.StandardCompare("a-b", "ab", null, level));
+            Assert.Null(ExceptionState.LastName);                                  // checking off: nothing recorded
+            bool saved = ExceptionState.ArgumentFunctionChecking;
+            ExceptionState.ArgumentFunctionChecking = true;
+            try
+            {
+                var ex = Assert.Throws<CobolFatalException>(() => CobolIntrinsics.StandardCompare("a-b", "ab", null, level));
+                Assert.Equal("EC-ARGUMENT-FUNCTION", ex.EcName);
+            }
+            finally { ExceptionState.ArgumentFunctionChecking = saved; }
+        });
     }
 
     /// <summary>
@@ -208,7 +234,7 @@ public sealed class StandardCompareTests
             try
             {
                 ExceptionState.Clear();
-                Assert.Equal("=", CobolIntrinsics.StandardCompare("a", "b", "NO SUCH TABLE", 0));
+                Assert.Equal("=", CobolIntrinsics.StandardCompare("a", "b", "NO SUCH TABLE", null));
                 Assert.Equal("=", CobolIntrinsics.StandardCompare("a", "b", null, 5));
                 Assert.Null(ExceptionState.LastName);
             }

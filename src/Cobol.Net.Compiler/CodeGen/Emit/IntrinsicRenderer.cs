@@ -319,7 +319,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
                     return new NumX(RuntimeApi.Intrinsic("TestNumvalCLocale",
                         $"{Str(ic.Args[0])}, {LocaleTagArg(ic)}{AnycaseFlag(ic)}{DigitCapFlag}"), 0);
                 return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod,
-                    $"{Str(ic.Args[0])}, {Str(ic.Args[1])}{CommaFlag}{AnycaseFlag(ic)}{DigitCapFlag}"), 0);
+                    $"{Str(ic.Args[0])}, {Str(ic.Args[1])}{CommaFlag}{AnycaseFlag(ic)}{DigitCapFlag}{AnycaseClassification(ic)}"), 0);
 
             // The §15.90/§15.91 date validators — integer verdict chains (year → month → day), scale 0.
             // ⛔ THE WIDE INTAKE, because the two functions are TOTAL (kb/Work PB254 — see IntArgWide):
@@ -332,7 +332,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
                 // §15.37.4 r2/r3 answer for every integer — ignore that many matches, else 0 (PB254).
                 return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod,
                     $"{Str(ic.Args[0])}, {Str(ic.Args[1])}, {(ic.FindLast ? "true" : "false")}, "
-                    + $"{(ic.Args.Count > 2 ? IntArgWide(ic, 2) : "0")}, {(ic.Anycase ? "true" : "false")}"), 0);
+                    + $"{(ic.Args.Count > 2 ? IntArgWide(ic, 2) : "0")}, {(ic.Anycase ? "true" : "false")}{AnycaseClassification(ic)}"), 0);
             case "Ord":                                                         // §15.70 — PCS-relative ordinal (H5: weights only when flagged)
                 return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, $"{Str(ic.Args[0])}{Collate(ic)}"), 0);
             case "Length" or "ByteLength" when ic.OverCurrentImage && ic.Args[0] is BoundFieldOperand { Place: { } vg }:
@@ -396,7 +396,9 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
                 // is claimed by RenderDec's own arm under either arithmetic mode, which is what lets this arm
                 // consume the operand at its OWN scale.
                 NumX t = RawArg(ic, 1);
-                return new NumX(RuntimeApi.DateFn(sig.RuntimeMethod, $"{IntArg(ic, 0)}, {t.Expr}, {t.Scale}{LeapSecondFlag}"), t.Scale + 5);
+                // A trailing-P argument (negative scale) is whole seconds first (the runtime's WholeSecondsAtScale), so
+                // the exact result is read at max(scale, 0) + 5 (kb/Work PB2633).
+                return new NumX(RuntimeApi.DateFn(sig.RuntimeMethod, $"{IntArg(ic, 0)}, {t.Expr}, {t.Scale}{LeapSecondFlag}"), Math.Max(0, t.Scale) + 5);
             }
             case "IntegerOfFormattedDate":                                       // §15.48 — analyze a2 per format a1 → integer date
                 return new NumX(RuntimeApi.DateFn(sig.RuntimeMethod, $"{Str(ic.Args[0])}, {Str(ic.Args[1])}{LeapSecondFlag}"), 0);
@@ -1182,7 +1184,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
             "NumvalC" when ic.LocaleWritten => Dec(RuntimeApi.Intrinsic("NumvalCLocaleDec",
                 $"{Str(ic.Args[0])}, {LocaleTagArg(ic)}{AnycaseFlag(ic)}{DigitCapFlag}")),
             "NumvalC" => Dec(RuntimeApi.Intrinsic("NumvalCDec",
-                $"{Str(ic.Args[0])}, {Str(ic.Args[1])}{CommaFlag}{AnycaseFlag(ic)}{DigitCapFlag}")),
+                $"{Str(ic.Args[0])}, {Str(ic.Args[1])}{CommaFlag}{AnycaseFlag(ic)}{DigitCapFlag}{AnycaseClassification(ic)}")),
             "NumvalF" => Dec(RuntimeApi.Intrinsic("NumvalFDec", $"{mode}, {Str(ic.Args[0])}{CommaFlag}{DigitCapFlag}")),
             // SQRT (§15.84.4 r2; kb/Work PB116): the one function whose standard-mode value is FIXED — the
             // 34-digit correctly-rounded root; without this arm it fell to RenderFloat's binary64 Math.Sqrt.
@@ -1370,6 +1372,17 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// flag), rendered only when present so the default-free call stays byte-stable.</summary>
     private static string AnycaseFlag(BoundIntrinsicCall ic) => ic.Anycase ? ", anycase: true" : "";
 
+    /// <summary>⛔ THE CLASSIFICATION AN ANYCASE FOLD READS (§15.57.4 r3; kb/Work PB2631). ANYCASE is DEFINED as "the rules
+    /// for the LOWER-CASE function without the LOCALE argument" (§15.37.4 r4, §15.87.4 r5, §15.68.3 r4f), and that
+    /// function maps case through the module's CHARACTER CLASSIFICATION when it has one - so the matchers receive the
+    /// same selector the UPPER-CASE / LOWER-CASE arms do (<see cref="ObjectComputerEmit.ClassificationExpr"/>, keyed on
+    /// argument-1's class), only when the module HAS a classification and an ANYCASE comparison is in play, which keeps
+    /// every other emission byte-stable.</summary>
+    private string AnycaseClassification(BoundIntrinsicCall ic) =>
+        ctx.Data.Classification is not null
+        && (ic.Anycase || (ic.SubstituteModes?.Any(m => (m & 4) != 0) ?? false))
+            ? $", classification: {ObjectComputerEmit.ClassificationExpr(ic.Args[0])}" : "";
+
     /// <summary>The §15.93.4/§15.94.4 r1b digit-cap named argument, DERIVED FROM THE MODE
     /// (<see cref="ArithmeticModes.NumvalDigitCap"/> — the one table, keyed on the mode the standard keys its
     /// three sub-notes on). Omitted when the cap is the runtime's own default, so the generated call stays
@@ -1484,7 +1497,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
             "StandardCompare" =>
                 RuntimeApi.Intrinsic(sig.RuntimeMethod, $"{Str(ic.Args[0])}, {Str(ic.Args[1])}, "
                     + $"{(ic.OrderingTable is { } ot ? EmitText.CsLiteral(ot) : "null")}, "
-                    + $"{(ic.Args.Count > 2 ? ArgInt(ic.Args[2]) : "0")}"),
+                    + $"{(ic.Args.Count > 2 ? ArgInt(ic.Args[2]) : "null")}"),   // null = argument-4 unspecified (§15.85.4 r1); a specified 0 is §15.85.3 r6's violation
             // The LOCALE functions (§15.51–§15.54; kb/Work PB64 T4): the bound LocaleRef travels as the named locale's
             // L1-normalized tag (null ⇒ the locale current for the category at use — §14.6.6 r7/r8); the runtime
             // resolves availability (EC-LOCALE-MISSING) and content (EC-LOCALE-INVALID) at use.
@@ -1608,7 +1621,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
                 : $"new string[] {{ {Str(a)} }}");
             return RuntimeApi.Intrinsic("SubstituteFlat", $"{Str(ic.Args[0])}, "
                 + $"new string[][] {{ {string.Join(", ", parts)} }}, "
-                + $"new int[] {{ {string.Join(", ", ic.SubstituteModes ?? [])} }}");
+                + $"new int[] {{ {string.Join(", ", ic.SubstituteModes ?? [])} }}{AnycaseClassification(ic)}");
         }
         var froms = new List<string>();
         var tos = new List<string>();
@@ -1620,7 +1633,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         return RuntimeApi.Intrinsic(ic.Sig.RuntimeMethod, $"{Str(ic.Args[0])}, "
             + $"new string[] {{ {string.Join(", ", froms)} }}, "
             + $"new string[] {{ {string.Join(", ", tos)} }}, "
-            + $"new int[] {{ {string.Join(", ", ic.SubstituteModes ?? [])} }}");
+            + $"new int[] {{ {string.Join(", ", ic.SubstituteModes ?? [])} }}{AnycaseClassification(ic)}");
     }
 
     // ── String-channel argument rendering (P7 Step 12 — the ONE NumericRenderer under the default receiver) ──

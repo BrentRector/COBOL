@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime.Globalization;
+
 namespace CobolNet.Runtime;
 
 /// <summary>
@@ -426,10 +428,10 @@ public static partial class CobolIntrinsics
     /// <summary>NUMVAL-C's §15.68.4 r1 value as an SDIDI, exact at the parsed scale — the projection EVERY
     /// arithmetic mode uses; the currency and grouping rules are the one scan's.</summary>
     public static CobolDec NumvalCDec(string text, string currency, bool commaMode = false, bool anycase = false,
-                                      int digitCap = 31)
+                                      int digitCap = 31, LocaleFacts? classification = null)
     {
         if (InvalidCurrency(currency)) return CobolDec.From(NumvalCInvalidCurrency(currency), 0);
-        NvParse p = NvScan(text, commaMode, currency, anycase, digitCap, allowGroup: true);
+        NvParse p = NvScan(text, commaMode, currency, anycase, digitCap, allowGroup: true, classification);
         if (p.ErrPos != 0) return CobolDec.From(NumvalCReject(p, text, digitCap), 0);
         return CobolDec.From(p.Neg ? -p.Unscaled : p.Unscaled, p.Frac);
     }
@@ -613,7 +615,7 @@ public static partial class CobolIntrinsics
     /// after the decimal separator; DECIMAL-POINT IS COMMA SWAPS the two roles (r4d). Verdicts: 0 (r1a) /
     /// first-error position (r1b, same sub-notes as TEST-NUMVAL) / LENGTH+1 (r1c).</summary>
     public static long TestNumvalC(string text, string currency, bool commaMode = false, bool anycase = false,
-        int digitCap = 31)
+        int digitCap = 31, LocaleFacts? classification = null)
     {
         // §15.68.3 r2 via §15.94.3 r1 — an invalid runtime currency raises EC-ARGUMENT-FUNCTION; the
         // checking-off verdict is the r1c "no specific character in error" LENGTH+1 leg (no character OF
@@ -626,7 +628,7 @@ public static partial class CobolIntrinsics
                 + "any case (§15.68.3 rule 2 via §15.94.3 rule 1)");
             return text.Length + 1;
         }
-        return NvScan(text, commaMode, currency, anycase, digitCap, allowGroup: true).ErrPos;
+        return NvScan(text, commaMode, currency, anycase, digitCap, allowGroup: true, classification).ErrPos;
     }
 
     // ── The ONE positional format scan per family (fix-queue PB60) ─────────────────────────────────────────────
@@ -648,17 +650,24 @@ public static partial class CobolIntrinsics
     private readonly record struct NvParse(long ErrPos, bool CapHit, bool Neg, Int128 Unscaled, int Frac);
 
     private static NvParse NvScan(string text, bool commaMode, string currency, bool anycase,
-        int digitCap, bool allowGroup)
+        int digitCap, bool allowGroup, LocaleFacts? classification = null)
     {
         char dec = commaMode ? ',' : '.';
         char group = commaMode ? '.' : ',';
         string cur = currency.Trim();                                 // r2 — argument-2's edge spaces are ignored
-        var cmp = anycase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        // §15.68.3 r4f: ANYCASE matches the currency "as if all uppercase letters in argument-1 and in the currency
+        // string were replaced by their corresponding lowercase letters as specified in the rules for the LOWER-CASE
+        // function without the LOCALE argument" - the ONE fold (CobolLocale.LowerCase, the module's CHARACTER
+        // CLASSIFICATION per §15.57.4 r3 when it has one), applied to the comparison images only: it is
+        // length-preserving, so every error position stays ordinal in the ORIGINAL text (kb/Work PB2631 - this
+        // site compared through OrdinalIgnoreCase, the UPPERCASE fold, and disagreed with FIND-STRING and SUBSTITUTE).
+        string matchText = anycase ? CobolLocale.LowerCase(text, classification) : text;
+        string matchCur = anycase ? CobolLocale.LowerCase(cur, classification) : cur;
         int n = text.Length, i = 0, digits = 0, frac = -1;
         Int128 unscaled = 0;
-        bool anyDigit = false, sawDot = false, leadSign = false, sawCur = false, neg = false;
+        bool anyDigit = false, sawDot = false, leadSign = false, sawCur = false, neg = false, pendingGroup = false;
         bool AtCurrency() => cur.Length > 0 && !sawCur
-            && i + cur.Length <= n && text.AsSpan(i, cur.Length).Equals(cur, cmp);
+            && i + cur.Length <= n && string.CompareOrdinal(matchText, i, matchCur, 0, cur.Length) == 0;
         while (i < n && text[i] == ' ') i++;                          // leading space-string (§15.67.3 r2 — SPACE only)
         if (i < n && text[i] is '+' or '-') { leadSign = true; neg = text[i] == '-'; i++; }   // format-A sign, BEFORE the currency
         while (i < n && text[i] == ' ') i++;
@@ -670,15 +679,23 @@ public static partial class CobolIntrinsics
             if (char.IsAsciiDigit(c))
             {
                 anyDigit = true;
+                pendingGroup = false;                                 // r4a: a grouping separator is ", digit" - a digit clears it
                 if (++digits > digitCap) return new(i + 1, true, false, 0, 0);   // r1b sub-notes 2/4
                 unscaled = unscaled * 10 + (c - '0');
                 if (frac >= 0) frac++;
                 continue;
             }
-            if (allowGroup && c == group && !sawDot && anyDigit) continue;   // grouping only BEFORE the decimal (§15.68.4 r2)
+            // §15.68.3 r4a: a grouping separator is `digit [ , digit ] ...` - admitted only as ", digit", never
+            // doubled and never ahead of the decimal separator, a space, a sign or the end of the text
+            // (kb/Work PB2631). Grouping only BEFORE the decimal separator (§15.68.4 r2).
+            if (allowGroup && c == group && !sawDot && anyDigit && !pendingGroup) { pendingGroup = true; continue; }
+            if (pendingGroup) break;
             if (c == dec && !sawDot) { sawDot = true; frac = 0; continue; }
             break;
         }
+        // A grouping separator no digit followed: the character that is not a digit is the first one in error
+        // (§15.94.4 r1b); text that ends right after the separator is valid-but-incomplete (r1c, LENGTH+1).
+        if (pendingGroup) return new(i < n ? i + 1 : n + 1, false, false, 0, 0);
         // No digit anywhere: a scan that BROKE on a real character reports that character (r1b — e.g. a
         // misplaced sign); a scan that ran off the end with only valid-but-incomplete content (" +.",
         // all-spaces, zero-length) is the r1c LENGTH+1 leg.

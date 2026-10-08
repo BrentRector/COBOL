@@ -51,21 +51,10 @@ public static class CtNumeric
         return new CobolDec(bits[3] < 0 ? -magnitude : magnitude, -scale);
     }
 
-    /// <summary>The integer part of <paramref name="v"/>, truncated toward zero — the §15.49 INTEGER-PART value
-    /// §7.3.6.3 GR3 applies to an arithmetic expression's final result. Exact; the result's exponent is at least
-    /// zero.</summary>
-    public static CobolDec IntegerPart(CobolDec v)
-    {
-        if (v.Sig == 0) return new CobolDec(0, 0);
-        if (v.Exp >= 0) return v;
-        // A carrier significand has at most 34 digits (< 10^38), so dropping 38 or more digits leaves zero.
-        return -v.Exp >= 38 ? new CobolDec(0, 0) : new CobolDec(v.ToUnscaled(0, CobolRounding.Truncation), 0);
-    }
-
     /// <summary>True when <paramref name="v"/> has no fractional part.</summary>
-    public static bool IsInteger(CobolDec v) => CobolDec.Compare(IntegerPart(v), v) == 0;
+    public static bool IsInteger(CobolDec v) => CobolDec.Compare(v.TruncateToInteger(), v) == 0;
 
-    /// <summary>The number of digits of an integer value as <see cref="IntegerPart"/> returns it (exponent at least
+    /// <summary>The number of digits of an integer value as <see cref="CobolDec.TruncateToInteger"/> returns it (exponent at least
     /// zero); zero has one digit.</summary>
     public static int IntegerDigits(CobolDec integer)
     {
@@ -80,7 +69,7 @@ public static class CtNumeric
     /// the truncating transfer drops no nonzero digit of an integer.</summary>
     public static Int128 ToInt128(CobolDec integer) => integer.ToUnscaledChecked(0, CobolRounding.Truncation);
 
-    /// <summary>The integer-literal text of an integer value as <see cref="IntegerPart"/> returns it (§7.3.6.3 GR3:
+    /// <summary>The integer-literal text of an integer value as <see cref="CobolDec.TruncateToInteger"/> returns it (§7.3.6.3 GR3:
     /// "the resultant value shall be considered to be an integer numeric literal") — sign, digits, no point; zero is
     /// <c>0</c>.</summary>
     public static string ToIntegerText(CobolDec integer)

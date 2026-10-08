@@ -114,7 +114,7 @@ public sealed class CompileTimeExpressionEvaluator
         // (§8.3.3.3.2) — reachable only under standard arithmetic, whose 34-digit intermediates can carry a
         // product of two 31-digit operands that no literal of this edition can spell.
         if (EvalArith(expr, where) is not { } result) return null;
-        CobolDec truncated = CtNumeric.IntegerPart(result);
+        CobolDec truncated = result.TruncateToInteger();
         int digits = CtNumeric.IntegerDigits(truncated);
         if (digits > _literalDigits)
         {

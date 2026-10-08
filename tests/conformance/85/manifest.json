@@ -1,5 +1,7 @@
 {
  "enabled": [
+  "pb2633_codomain_bound_trailing_p_receiver",
+  "pb2632_power_of_zero_one_minus_one",
   "pb1470_relation_of_two_literals_runs",
   "pb1027_plain_write_is_after_advancing_85",
   "pb1914_debugging_line_continued_under_clause",

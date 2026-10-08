@@ -60,6 +60,53 @@ public sealed class TestNumvalScannerTests
         Assert.Equal(4, CobolIntrinsics.TestNumval(" +."));
     }
 
+    /// <summary>kb/Work PB2631 - §15.68.3 r4a: the grouping separator is `digit [ , digit ] ...`, admitted only as
+    /// ", digit". The character after a separator that is not a digit is the first one in error (§15.94.4 r1b); a text
+    /// that ends right after it is valid-but-incomplete (r1c, LENGTH + 1). The value twin rides the same scan, so
+    /// the non-conforming forms are rejected there too (no fabricated 1.5 / 12).</summary>
+    [Theory]
+    [InlineData("1,", false, 3)]
+    [InlineData("1,,2", false, 3)]
+    [InlineData("1,.5", false, 3)]
+    [InlineData("1, 2", false, 3)]
+    [InlineData("1,-", false, 3)]
+    [InlineData("1,CR", false, 3)]
+    [InlineData(",1", false, 1)]
+    [InlineData("1,2,", false, 5)]
+    [InlineData("1,2,3", false, 0)]
+    [InlineData("1,2.5", false, 0)]
+    [InlineData("1,5-", false, 0)]
+    [InlineData("1,2.5,3", false, 6)]
+    [InlineData("1.", true, 3)]
+    [InlineData("1..2", true, 3)]
+    [InlineData("1.,5", true, 3)]
+    [InlineData("1.2.", true, 5)]
+    [InlineData("1.2.3,5", true, 0)]
+    [InlineData("1,5.2", true, 4)]
+    public void GroupingSeparator_NeedsADigitAfterIt(string text, bool commaMode, long expected)
+    {
+        Assert.Equal(expected, CobolIntrinsics.TestNumvalC(text, "$", commaMode));
+        // Never accepted by the value twin when the validator rejects (one scan, kb/Work PB60): checking off, the
+        // §15.3 default 0 comes back; a conforming text keeps its value (always nonzero here).
+        bool conforming = expected == 0;
+        CobolDec value = CobolIntrinsics.NumvalCDec(text, "$", commaMode);
+        Assert.Equal(conforming, CobolDec.Compare(value, new CobolDec(0, 0)) != 0);
+    }
+
+    /// <summary>kb/Work PB2631 - §15.68.3 r4 f defines ANYCASE by the LOWER-CASE fold, the SAME one FIND-STRING (§15.37.4
+    /// r4) and SUBSTITUTE (§15.87.4 r5) use. The KELVIN SIGN (U+212A) lowercases to "k" but its uppercase is itself, so a
+    /// lowercase-fold matcher accepts it for the currency "k" and an uppercase-fold one (OrdinalIgnoreCase, the old
+    /// NUMVAL-C comparison) does not - the three families must agree on the same letters.</summary>
+    [Fact]
+    public void AnycaseCurrency_UsesTheLowerCaseFold_TheOtherAnycaseMatchersUse()
+    {
+        const string kelvin = "K";
+        Assert.Equal(1L, CobolIntrinsics.FindString(kelvin, "k", last: false, skip: 0, anycase: true));
+        Assert.Equal("Y", CobolIntrinsics.Substitute(kelvin, ["k"], ["Y"], [4]));
+        Assert.Equal(0L, CobolIntrinsics.TestNumvalC(kelvin + "12", "k", anycase: true));
+        Assert.Equal(1L, CobolIntrinsics.TestNumvalC(kelvin + "12", "k", anycase: false));
+    }
+
     [Fact]
     public void AnycaseCurrency_FoldsPerR4f()
     {

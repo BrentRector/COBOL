@@ -70,7 +70,7 @@ public sealed class CobolDateIntegerDateRangeTests
         Assert.Equal(0L, CobolDate.TestFormattedDatetime("YYYYWwwD", "9999W527"));
         Assert.Equal(0L, CobolDate.TestFormattedDatetime("YYYY-Www-D", "9999-W52-7"));
         Assert.Equal(0L, CobolDate.TestFormattedDatetime("YYYYWwwDThhmmss", "9999W527T101112"));
-        Assert.Equal(36672L, CobolDate.SecondsFromFormattedTime("YYYYWwwDThhmmss", "9999W527T101112", 0));
+        Assert.Equal((Int128)36672, CobolDate.SecondsFromFormattedTime("YYYYWwwDThhmmss", "9999W527T101112", 0));
     }
 
     /// <summary>…and TEST still reports the right POSITION for genuinely invalid data, so the new arm did not

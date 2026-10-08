@@ -8,8 +8,11 @@ namespace CobolNet.Runtime;
 /// these compile-time constants on every numeric store/rescale/format (<c>CobolNum.Pow10/Pow10Wide</c>,
 /// <c>CobolDec.Pow10</c>, <c>CobolDate.Pow10</c>, <c>CobolIntrinsics.Pow10D/Pow10I</c>, <c>CobolFloat.Pow10</c>).
 /// The tables are built by the same cumulative ×10 recurrence the deleted loops used, so every value in range is
-/// bit-identical to what the loops produced; an out-of-table exponent falls back to that same loop (and a
-/// negative exponent returns 1 — zero loop iterations — exactly as before).
+/// bit-identical to what the loops produced. ⛔ AN OUT-OF-TABLE EXPONENT IS A LOUD FAILURE, NEVER A VALUE
+/// (kb/Work PB2633, PB648): the fallback loop the tables replaced silently WRAPPED the Int128 past 10^38 and
+/// answered 1 for a negative exponent, so a caller that forgot a bound — <c>FromDoubleBounded</c> at a
+/// trailing-P receiver's scale of -2 asked for 10^39 — computed with a plausible wrong power. A caller that can
+/// legitimately reach an out-of-table exponent handles that case itself, where the scale is known.
 /// </summary>
 internal static class Pow10
 {
@@ -21,17 +24,17 @@ internal static class Pow10
     public static long AsLong(int n) => L[n];
 
     /// <summary>10^<paramref name="n"/> as an <see cref="Int128"/> (n in 0..38 — the wide intermediate range,
-    /// COBOLNET_DESIGN §18 #4; an out-of-range n falls back to the loop the table replaced).</summary>
+    /// COBOLNET_DESIGN §18 #4; an out-of-range n throws — 10^39 does not fit the carrier and a negative power is
+    /// not an integer).</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="n"/> is outside 0..38.</exception>
     public static Int128 AsWide(int n)
     {
-        if ((uint)n < (uint)W.Length) return W[n];
-        Int128 r = 1;
-        for (int i = 0; i < n; i++) r *= 10;
-        return r;
+        if ((uint)n >= (uint)W.Length) throw OutOfTable(nameof(AsWide), n, W.Length - 1);
+        return W[n];
     }
 
     /// <summary>5^<paramref name="n"/> as an <see cref="Int128"/> (n in 0..54 — 5^54 &lt; 2^126, the widest power
-    /// of five the carrier holds; an out-of-table n falls back to the same loop). This is 10^n's ODD COFACTOR
+    /// of five the carrier holds; an out-of-table n throws, as <see cref="AsWide"/> does). This is 10^n's ODD COFACTOR
     /// (10^n = 5^n·2^n), which is what an EXACT binary64 expansion needs: a double is ±m·2^e, so
     /// m·10^n = m·5^n·2^(e+n) turns a decimal rescaling into ONE integer multiply and ONE shift with no rounding
     /// anywhere (<c>CobolFloat.TryExactScaled</c>, kb/Work PB623).
@@ -42,13 +45,16 @@ internal static class Pow10
     /// 10^22 are not even the correctly-rounded powers of ten.) A caller that wants 10^n as a double is either
     /// converting a scaled value — <c>CobolFloat.ScaledToDouble</c>, whose own exact-power table is bounded at
     /// 10^22 for that reason — or reintroducing PB623.</para></summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="n"/> is outside 0..54.</exception>
     public static Int128 FiveAsWide(int n)
     {
-        if ((uint)n < (uint)F.Length) return F[n];
-        Int128 r = 1;
-        for (int i = 0; i < n; i++) r *= 5;
-        return r;
+        if ((uint)n >= (uint)F.Length) throw OutOfTable(nameof(FiveAsWide), n, F.Length - 1);
+        return F[n];
     }
+
+    private static ArgumentOutOfRangeException OutOfTable(string method, int n, int max) =>
+        new(nameof(n), n, $"Pow10.{method}: the exponent must be in 0..{max}; a wider power does not fit the Int128 carrier "
+            + "and a negative one is not an integer, so the caller handles that case where the scale is known");
 
     private static long[] BuildLong()
     {

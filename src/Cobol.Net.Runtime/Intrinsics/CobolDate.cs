@@ -323,6 +323,18 @@ public static class CobolDate
     private static bool LongIsoYear(int y) => ISOWeek.GetWeeksInYear(y) == 53;   // §15.3.1.7 — a "long" ISO year has 53 weeks
     private static bool HasWeek(List<Seg> segs) { foreach (var s in segs) if (s.IsField && s.Field == Fld.Week) return true; return false; }
 
+    /// <summary>⛔ A SECONDS ARGUMENT WITH A TRAILING-P PICTURE HAS A NEGATIVE SCALE (kb/Work PB2633; PictureAnalyzer:
+    /// scale = -trailingP): <c>PIC 9(3)PP</c> holding 36000 is the unscaled 360 at scale -2. Every body below that
+    /// splits the value with a power of ten reads it as whole seconds first - <c>Pow10.AsWide(-2)</c> used to answer 1
+    /// and FORMATTED-TIME rendered 00:06:00 for ten o'clock. Called AFTER the §7.3.17.4 screen, so the value is a
+    /// standard numeric time form (below 86 401 seconds) and the multiplication cannot leave the carrier.</summary>
+    internal static void WholeSecondsAtScale(ref Int128 secUnscaled, ref int secScale)
+    {
+        if (secScale >= 0) return;
+        secUnscaled *= Pow10.AsWide(-secScale);
+        secScale = 0;
+    }
+
     /// <summary>Emit a formatted value from integer date form + seconds-past-midnight (unscaled/scale) + an
     /// optional UTC offset in minutes (§15.38–15.41). A date-only / time-only format ignores the components it
     /// does not reference. An ill-formed format sets EC-ARGUMENT-FUNCTION and yields the §15.3 default "".</summary>
@@ -344,6 +356,7 @@ public static class CobolDate
         // 18 's' wide, CONFORMANCE.md item 202, so nothing renderable is lost): that bounds the decimal split's
         // divisor at 10^18 (a long) and the post-validation value at < 86,400 × 10^18 ≈ 8.6e22, inside
         // decimal's 28-digit significand, so the split below is exact.
+        WholeSecondsAtScale(ref secUnscaled, ref secScale);
         if (secScale > 18)
         {
             secUnscaled = CobolNum.Rescale(secUnscaled, secScale, 18, CobolRounding.Truncation);
@@ -583,7 +596,7 @@ public static class CobolDate
     /// still answers 0 (§15.92.4 — it reports "the ordinal character position at which the first error … was
     /// detected", and no CHARACTER of "9999W526" is in error; the identical '6' in "2009W526" is valid) and
     /// SECONDS-FROM-FORMATTED-TIME still returns its seconds.</param>
-    private static int Analyze(string format, string data, out long integerDate, out long secondsScaled,
+    private static int Analyze(string format, string data, out long integerDate, out Int128 secondsScaled,
                                out int fracDigits, out bool dateRepresentable, bool leapSecond = false)
     {
         integerDate = 0; secondsScaled = 0; fracDigits = 0; dateRepresentable = true;
@@ -694,7 +707,7 @@ public static class CobolDate
         // of three separate range expressions that must each stay right.
         dateRepresentable = integerDate is > 0 and <= MaxIntegerDate || (!hasCal && !hasOrd && !hasWeek);
 
-        secondsScaled = ((long)hh * 3600 + mi * 60 + ss) * (long)Pow10.AsWide(fracDigits) + frac;  // §15.79.4
+        secondsScaled = (Int128)((long)hh * 3600 + mi * 60 + ss) * Pow10.AsWide(fracDigits) + frac;  // §15.79.4 - Int128: 86 400 x 10^18 is 8.6E+22, past long
         return 0;
     }
 
@@ -716,16 +729,18 @@ public static class CobolDate
     }
 
     /// <summary>SECONDS-FROM-FORMATTED-TIME (§15.79): the hh/mm/ss subfields of a2 as (H*3600+M*60+S), scaled to
-    /// the format's fractional-second count (the renderer supplies the matching result scale). Invalid → default 0.</summary>
-    public static long SecondsFromFormattedTime(string format, string data, int scale, bool leapSecond = false)
+    /// the format's fractional-second count (the renderer supplies the matching result scale). Invalid → default 0.
+    /// Int128, not long (kb/Work PB2631): a format may carry up to 18 fraction digits (CONFORMANCE.md item 202), and
+    /// 86 400 seconds scaled by 10^18 is 8.6E+22, past the 9.2E+18 a long holds - the product used to wrap silently.</summary>
+    public static Int128 SecondsFromFormattedTime(string format, string data, int scale, bool leapSecond = false)
     {
         // `dateRepresentable` is deliberately ignored: the seconds come from the TIME subfields, which §15.79.4
         // computes without reference to the date, so a combined format whose DATE lands past 9999-12-31 still has
         // a well-defined result here (PB23).
-        int e = Analyze(format, data, out _, out long secs, out int f, out _, leapSecond);
+        int e = Analyze(format, data, out _, out Int128 secs, out int f, out _, leapSecond);
         if (e != 0)
             return Exceptions.ExceptionState.ArgumentError($"SECONDS-FROM-FORMATTED-TIME: '{data}' invalid per '{format}' (§15.79.3)");
-        return scale == f ? secs : scale > f ? secs * (long)Pow10.AsWide(scale - f) : secs / (long)Pow10.AsWide(f - scale);
+        return scale == f ? secs : scale > f ? secs * Pow10.AsWide(scale - f) : secs / Pow10.AsWide(f - scale);
     }
 
     /// <summary>TEST-FORMATTED-DATETIME (§15.92): 0 when a2 is valid per a1, else the 1-based position of the first
@@ -743,9 +758,12 @@ public static class CobolDate
     /// <see cref="CombinedDatetimeDec"/> instead (kb/Work PB620). The §15.17.3 argument screen is shared by both
     /// carriers — see <see cref="CombinedDatetimeOutOfRange"/>.</summary>
     public static Int128 CombinedDatetime(long integerDate, Int128 secUnscaled, int secScale, bool leapSecond = false)
-        => CombinedDatetimeOutOfRange(integerDate, CobolDec.From(secUnscaled, secScale), leapSecond)
-            ? 0
-            : (Int128)integerDate * Pow10.AsWide(secScale + 5) + secUnscaled;
+    {
+        if (CombinedDatetimeOutOfRange(integerDate, CobolDec.From(secUnscaled, secScale), leapSecond)) return 0;
+        // The result is read at scale max(secScale, 0) + 5: a trailing-P argument (negative scale) is whole seconds first.
+        WholeSecondsAtScale(ref secUnscaled, ref secScale);
+        return (Int128)integerDate * Pow10.AsWide(secScale + 5) + secUnscaled;
+    }
 
     /// <summary>
     /// COMBINED-DATETIME on the SDIDI carrier — §15.17.4 r1's equivalent arithmetic expression written out,

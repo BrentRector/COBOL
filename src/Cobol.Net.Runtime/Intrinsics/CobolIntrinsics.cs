@@ -324,7 +324,12 @@ public static partial class CobolIntrinsics
     public static Int128 FromDoubleBounded(double d, int scale, CobolRounding mode, Int128 max37, bool checkedLanding = false)
     {
         Int128 q = FromDouble(d, scale, mode, checkedLanding);
-        Int128 limit = max37 / Pow10.AsWide(37 - scale);
+        // ⛔ A TRAILING-P RECEIVER HAS A NEGATIVE SCALE (PictureAnalyzer: scale = -trailingP; kb/Work PB2633). Every
+        // codomain constant is a scale-37 value below 10^38 (π is 3.14…), so at scale ≤ -1 the divisor 10^(37-scale)
+        // is ≥ 10^38 and the limit is floor(max37 / 10^(37-scale)) = 0 - the bound lands as zero units of 10^-scale
+        // (ACOS(-1) = 3.14 is 0 hundreds, §14.7.4.3 r2 truncation). The divisor is never formed past 10^38: the
+        // wrapped 10^39 it used to be made the limit -1 and ACOS landed as -100 at scale -2 for every argument.
+        Int128 limit = scale < 0 ? Int128.Zero : max37 / Pow10.AsWide(37 - scale);
         return q > limit ? limit : q < -limit ? -limit : q;
     }
 

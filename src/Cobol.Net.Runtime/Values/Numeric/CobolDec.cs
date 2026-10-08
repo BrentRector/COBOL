@@ -93,6 +93,31 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
     /// the value is an integer (<see cref="HasFraction"/>) or that truncation is the documented continue.</summary>
     public Int128 TruncatedInteger() => ToUnscaledIntermediate(0, CobolRounding.Truncation);
 
+    /// <summary>The integer part, truncated toward zero, AS AN SDIDI - the §15.49.4 r1 INTEGER-PART value, whose
+    /// equivalent arithmetic expression is SIGN(x) * INTEGER(ABS(x)), exact and independent of the Int128
+    /// carrier (kb/Work PB2630): a value with a non-negative exponent is already an integer and comes back
+    /// unchanged, so 10^40 is not "landed" at scale 0 (which kept only its low-order digits and answered 0); any
+    /// other value drops its <c>-Exp</c> fraction digits. The result's exponent is at least zero. This is the ONE
+    /// integer-part rule: INTEGER-PART, FRACTION-PART, the standard-decimal MOD/REM equivalent expressions and the
+    /// compile-time §7.3.6.3 GR3 truncation all read it.</summary>
+    public CobolDec TruncateToInteger()
+    {
+        if (Sig == 0) return new CobolDec(0, 0);
+        if (Exp >= 0) return this;
+        return new CobolDec(DivRemPow10(Sig, -Exp).Q, 0);
+    }
+
+    /// <summary>The greatest integer not greater than the value, AS AN SDIDI - §15.44.4 r1 INTEGER (kb/Work PB2630),
+    /// exact and independent of the Int128 carrier: <see cref="TruncateToInteger"/> lowered by one when a negative
+    /// value dropped a nonzero fraction. A value with a non-negative exponent is an integer and comes back unchanged.</summary>
+    public CobolDec FloorToInteger()
+    {
+        if (Sig == 0) return new CobolDec(0, 0);
+        if (Exp >= 0) return this;
+        var (q, rem, _) = DivRemPow10(Sig, -Exp);
+        return new CobolDec(Sig < 0 && rem != 0 ? q - 1 : q, 0);
+    }
+
     /// <summary>The multiplicative identity (the §8.8.1.5.4 r1/r3 constant 1).</summary>
     private static readonly CobolDec One = new(1, 0);
 
@@ -740,8 +765,12 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         // (scaleUp − k = digits(den) − 3 ≤ 36 for a ≤39-digit divisor), so the second factor always fits.
         UInt128 num = UAbs(a.Sig);
         int scaleUp = Math.Max(0, 34 + DigitCount(den) - DigitCount(num) + 1);
-        int k = Math.Min(scaleUp, 38 - DigitCount(num));
-        num *= (UInt128)Pow10.AsWide(k);                                    // exact — digits(num) + k ≤ 38
+        // ⛔ A 39-DIGIT NUMERATOR HAS NO HEADROOM (kb/Work PB2633 - found when Pow10.AsWide stopped answering 1 for -1):
+        // an Int128 significand reaches 1.7E+38, so 38 - digits(num) is -1 there, and `AsWide(-1)` multiplied by 1
+        // while the second factor below still counted that -1 as an extra step, scaling the quotient 10 times too
+        // far. The first step is clamped to zero; the second then carries the whole pre-scale (≤ 36 for a ≤39-digit divisor).
+        int k = Math.Max(0, Math.Min(scaleUp, 38 - DigitCount(num)));
+        num *= (UInt128)Pow10.AsWide(k);                                    // exact — digits(num) + k ≤ 38 (k = 0 above it)
         var (hi, lo) = Mul128(num, (UInt128)Pow10.AsWide(scaleUp - k));   // scaleUp − k ≤ 36
         var (q, rem) = DivRem256(hi, lo, den);
 

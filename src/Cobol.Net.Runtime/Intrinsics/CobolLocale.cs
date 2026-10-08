@@ -115,6 +115,7 @@ public static class CobolLocale
         // the substituted result, and it reads the CLASS rather than spelling a literal (see LocaleSubstitutePositions).
         if (CobolDate.SecondsOutOfStandardFormFor("LOCALE-TIME-FROM-SECONDS", secUnscaled, secScale, leapSecond))
             return ArgumentSubstitute.Spaces(LocaleSubstitutePositions);
+        CobolDate.WholeSecondsAtScale(ref secUnscaled, ref secScale);   // a trailing-P argument has a negative scale
         Int128 pow = Pow10.AsWide(secScale);
         long whole = (long)(secUnscaled / pow);
         Int128 frac = secUnscaled % pow;

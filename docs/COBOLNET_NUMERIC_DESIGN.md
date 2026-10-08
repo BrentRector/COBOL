@@ -388,8 +388,8 @@ keeps its binary64 too (D20, kb/Work PB653), and both answers now come from the 
 
 **Corollaries that fall out of (a) and (b), both landed with it.** `CobolIntrinsics.Numval`/`NumvalC`/`NumvalF`
 return `Int128` and saturate there through one shared `Rescaled` helper (which also BOUNDS the decimal shift
-before calling `Pow10.AsWide`, whose fallback loop wraps past 10³⁸ — an unbounded `E±nn` would otherwise multiply
-by a wrapped power and yield a plausible wrong value instead of a saturated one). And `NumericRenderer.Align`
+before calling `Pow10.AsWide`, which THROWS outside its 0..38 table (it used to wrap past 10³⁸ and answer 1 for a negative
+exponent, kb/Work PB2633 — an unbounded `E±nn` would otherwise reach a caller that computed with a plausible wrong power). And `NumericRenderer.Align`
 gained a `Real` arm: rule (b) lets a binary64 reach the receiver-less integral sites (subscript, SET amount,
 PERFORM VARYING FROM/BY, report VARYING, RETRY count), and without it the double expression went straight to a
 caller expecting a scaled integral — the PB2 shape. It was already reachable through a COMP-2 operand, so the arm

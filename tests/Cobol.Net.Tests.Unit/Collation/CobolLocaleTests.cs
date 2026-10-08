@@ -92,6 +92,19 @@ public sealed class CobolLocaleTests
         });
     }
 
+    /// <summary>kb/Work PB2633 - a trailing-P seconds argument (PIC 9(3)PP holding 36000 is the unscaled 360 at scale
+    /// -2) is whole seconds: 36000 s = 10:00:00. <c>Pow10.AsWide(-2)</c> used to answer 1 (00:06:00).</summary>
+    [Fact]
+    public void TimeFromSeconds_ATrailingPArgument_IsWholeSeconds()
+    {
+        RunUnit.Run(ru =>
+        {
+            ru.Locale.Set(LocaleCategory.All, "");
+            Assert.Equal("10:00:00", CobolLocale.TimeFromSeconds(360, -2, null));
+            Assert.Equal("00:05:00", CobolLocale.TimeFromSeconds(3, -2, null));
+        });
+    }
+
     [Fact]
     public void TimeFromSeconds_CarriesTheFraction_AndScreensTheStandardForm()
     {
