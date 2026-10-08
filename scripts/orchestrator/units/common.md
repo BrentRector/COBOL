@@ -12,7 +12,9 @@ supervisor starts the next unit after you end.
   `{"at":"<ISO time>","what":"<one sentence>"}` plus `"shas"` or `"branches"` when there are some. If you die at minute 100, the
   supervisor builds your handoff from these lines and the checkpoint; whatever you did not write down is lost.
 - End by writing {HANDOFF}: JSON valid against scripts/orchestrator/handoff.schema.json, `summary` at most 900
-  characters; the detail lives in the files it names. Then end your turn.
+  characters; the detail lives in the files it names. Then end your turn. A `next_unit` of `wave` (or `campaign`)
+  names a wave, not its lane: when campaign lanes run, the supervisor alternates campaign and fix-lane waves itself
+  (kb/Work PB2522), so name `wave` and put any lane preference in `next_unit_reason`, where it is logged.
 - A decision only the owner can make: never guess. End with `outcome: owner-question` and `owner_question`
   (CLAUDE.md rule 7; memory feedback_spec_before_asking_owner: search the ISO text first).
 - Ids and codes only from `python scripts/orchestrator/alloc.py` (never read "next free" by hand). Land only through

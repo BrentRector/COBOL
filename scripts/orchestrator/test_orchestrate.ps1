@@ -5,8 +5,9 @@
 # the context cap sends STOP-UNIT and the unit hands off; an owner question stops the loop; open-watchers.ps1 opens
 # one titled, model-coloured Windows Terminal tab per agent (against a fake wt.exe); the campaign lane (-Cluster, kb/Work
 # PB2120) alternates with fix-lane waves, ends when its cluster lands, refuses an unknown cluster, and leaves the fix
-# lane's choice and prompt byte-identical; while another lander holds the landing lease (kb/Work PB2537) no land unit
-# starts, and stop.ps1 -Status names the holder.
+# lane's choice and prompt byte-identical; a handoff's `wave` gets its lane from that rule, several leads take turns,
+# and a starved lead is reported and logged (kb/Work PB2522); while another lander holds the landing lease (kb/Work
+# PB2537) no land unit starts, the deferral survives the campaign rule, and stop.ps1 -Status names the holder.
 # Run: pwsh -NoProfile -File scripts/orchestrator/test_orchestrate.ps1
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -362,7 +363,86 @@ New-FxNote 'PB904' 'open' 'HELD' 'PB901'
 $c5 = Next-Unit $nc @('--cluster', 'HELD', '--work', $fxWork) | ConvertFrom-Json
 Check 'a cluster with no ready note waits and runs the fix lane' "$($c5.unit) $($c5.campaign)" 'wave waiting'
 
-# 8c. ONE LANDER ON MAIN AT A TIME (kb/Work PB2537): while another lander holds the landing lease, finished branches
+# 8c. THE ALTERNATION IS THE SUPERVISOR'S, NOT THE MODEL'S (kb/Work PB2522): a handoff that names a generic `wave` decided
+# the unit FIRST, so the campaign rule was unreachable while handoffs named a unit (PB2151 sat ready 05:40-14:31 PDT on
+# 2026-10-07). A handoff's `wave` now yields `campaign` when the lane says so; `land`, `resume` and an owner question
+# still outrank it.
+$hc = Join-Path $Root 'nextunit-handoff'
+New-Item -ItemType Directory -Force -Path $hc | Out-Null
+& $fresh $hc
+function Set-Handoff([string]$coord, [string]$name, [hashtable]$fields) {
+    $h = [ordered]@{ schema_version = 1; unit = 'wave'; outcome = 'done'; summary = 'fixture' }
+    foreach ($k in $fields.Keys) { $h[$k] = $fields[$k] }
+    $p = Join-Path $coord "handoff-$name.json"
+    Set-Content -Path $p -Encoding utf8 -Value ($h | ConvertTo-Json -Compress -Depth 5)
+    return $p
+}
+Set-Content -Path (Join-Path $hc 'units.jsonl') -Encoding utf8 -Value '{"unit":"campaign","cluster":"CAMP"}', '{"unit":"wave"}'
+$hw = Set-Handoff $hc 'wave' @{ next_unit = 'wave'; next_unit_reason = 'a wave should run the finishers' }
+$h1 = Next-Unit $hc @('--handoff', $hw, '--cluster', 'CAMP', '--work', $fxWork) | ConvertFrom-Json
+Check 'a handoff naming wave after a fix-lane wave, with a ready campaign note: campaign' "$($h1.unit) $($h1.campaign) $($h1.cluster)" 'campaign run CAMP'
+Check 'the campaign choice keeps the handoff''s reason' ($h1.reason -match 'the handoff named wave: a wave should run the finishers') $true
+Add-Content -Path (Join-Path $hc 'units.jsonl') -Encoding utf8 -Value '{"unit":"campaign","cluster":"CAMP"}'
+$h2 = Next-Unit $hc @('--handoff', $hw, '--cluster', 'CAMP', '--work', $fxWork) | ConvertFrom-Json
+Check 'a handoff naming wave after a campaign wave: the fix-lane wave' "$($h2.unit) $($h2.campaign)" 'wave between'
+Check 'the fix-lane choice keeps the handoff''s reason' ($h2.reason -match 'a wave should run the finishers') $true
+$hcm = Set-Handoff $hc 'campaign' @{ next_unit = 'campaign'; next_unit_reason = 'the campaign again' }
+Check 'a handoff naming campaign right after a campaign wave: the fix-lane wave' ((Next-Unit $hc @('--handoff', $hcm, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json).unit 'wave'
+Add-Content -Path (Join-Path $hc 'units.jsonl') -Encoding utf8 -Value '{"unit":"wave"}'
+$hl = Set-Handoff $hc 'land' @{ next_unit = 'land'; next_unit_reason = 'three branches are DONE' }
+Check 'a handoff naming land outranks the campaign' ((Next-Unit $hc @('--handoff', $hl, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json).unit 'land'
+$hr = Set-Handoff $hc 'resume' @{ next_unit = 'resume'; next_unit_reason = 'finish the gates' }
+Check 'a handoff naming resume outranks the campaign' ((Next-Unit $hc @('--handoff', $hr, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json).unit 'resume'
+$ho = Set-Handoff $hc 'owner' @{ outcome = 'owner-question'; next_unit = 'wave'; owner_question = @{ question = 'A or B?'; context = 'fixture' } }
+Check 'an owner question outranks the campaign' ((Next-Unit $hc @('--handoff', $ho, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json).unit 'owner-question'
+Check 'without -Cluster a handoff''s wave is unchanged (byte for byte)' (Next-Unit $hc @('--handoff', $hw)) '{"unit": "wave", "reason": "named by the last handoff: a wave should run the finishers"}'
+
+# 8d. MORE THAN ONE CAMPAIGN (-Cluster A,B): the ready clusters take campaign turns round-robin, least recently run first,
+# still alternating with fix-lane waves; a landed cluster leaves the list and the others go on.
+New-FxNote 'PB905' 'open' 'CAMP2' ''
+$rr = Join-Path $Root 'nextunit-rr'
+New-Item -ItemType Directory -Force -Path $rr | Out-Null
+& $fresh $rr
+Set-Content -Path (Join-Path $rr 'units.jsonl') -Encoding utf8 -Value '{"unit":"campaign","cluster":"CAMP"}', '{"unit":"wave"}'
+$m1 = Next-Unit $rr @('--cluster', 'CAMP', '--cluster', 'CAMP2', '--work', $fxWork) | ConvertFrom-Json
+Check 'two campaigns: the one that has not run goes next' "$($m1.unit) $($m1.cluster)" 'campaign CAMP2'
+Add-Content -Path (Join-Path $rr 'units.jsonl') -Encoding utf8 -Value '{"unit":"campaign","cluster":"CAMP2"}'
+Check 'two campaigns: a fix-lane wave between them' ((Next-Unit $rr @('--cluster', 'CAMP', '--cluster', 'CAMP2', '--work', $fxWork)) | ConvertFrom-Json).unit 'wave'
+Add-Content -Path (Join-Path $rr 'units.jsonl') -Encoding utf8 -Value '{"unit":"wave"}'
+$m3 = Next-Unit $rr @('--cluster', 'CAMP', '--cluster', 'CAMP2', '--work', $fxWork) | ConvertFrom-Json
+Check 'two campaigns: then the least recently run one' "$($m3.unit) $($m3.cluster)" 'campaign CAMP'
+$m4 = Next-Unit $rr @('--cluster', 'DONE', '--cluster', 'CAMP2', '--work', $fxWork) | ConvertFrom-Json
+Check 'a landed cluster among two: reported landed, the other runs' "$($m4.campaigns.DONE) $($m4.unit) $($m4.cluster)" 'landed campaign CAMP2'
+
+# 8e. STARVATION IS VISIBLE: units.jsonl records each choice's per-cluster state, so the choice reports a cluster that has
+# had a ready note through more than one wave-type unit without a campaign wave of its own.
+$sv = Join-Path $Root 'nextunit-starved'
+New-Item -ItemType Directory -Force -Path $sv | Out-Null
+& $fresh $sv
+$t0 = (Get-Date).ToUniversalTime()
+Set-Content -Path (Join-Path $sv 'units.jsonl') -Encoding utf8 -Value @(
+    (@{ unit = 'campaign'; cluster = 'CAMP'; started_at = $t0.AddHours(-12).ToString('o'); campaigns = @{ CAMP = 'ready' } } | ConvertTo-Json -Compress),
+    (@{ unit = 'resume'; started_at = $t0.AddHours(-9).ToString('o'); campaigns = @{ CAMP = 'ready' } } | ConvertTo-Json -Compress),
+    (@{ unit = 'wave'; started_at = $t0.AddHours(-9).AddMinutes(2).ToString('o'); campaigns = @{ CAMP = 'ready' } } | ConvertTo-Json -Compress),
+    (@{ unit = 'land'; started_at = $t0.AddHours(-6).ToString('o'); campaigns = @{ CAMP = 'ready' } } | ConvertTo-Json -Compress),
+    (@{ unit = 'wave'; started_at = $t0.AddHours(-5).ToString('o'); campaigns = @{ CAMP = 'ready' } } | ConvertTo-Json -Compress))
+$hs = Set-Handoff $sv 'starved' @{ next_unit = 'land'; next_unit_reason = 'a train is ready' }
+$s1 = Next-Unit $sv @('--handoff', $hs, '--cluster', 'CAMP', '--work', $fxWork) | ConvertFrom-Json
+$st1 = @($s1.starved | Where-Object { $_ })   # absent before the change: an empty list, never an error
+Check 'a starved campaign is reported even when another unit is chosen' "$($s1.unit) $($st1.Count) $(if ($st1) { "$($st1[0].cluster) $($st1[0].waves)" })" 'land 1 CAMP 2'
+Check 'the starvation is measured from the first choice that saw it ready' $(if ($st1) { [Math]::Round([double]$st1[0].hours) }) 9
+# (ConvertFrom-Json turns the ISO string into a DateTime)
+Check 'the starvation names the last campaign wave' $(if ($st1) { ([datetime]$st1[0].last_campaign_at).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm') }) $t0.AddHours(-12).ToString('yyyy-MM-ddTHH:mm')
+Set-Content -Path (Join-Path $sv 'units.jsonl') -Encoding utf8 -Value @(
+    (@{ unit = 'campaign'; cluster = 'CAMP'; started_at = $t0.AddHours(-3).ToString('o'); campaigns = @{ CAMP = 'ready' } } | ConvertTo-Json -Compress),
+    (@{ unit = 'wave'; started_at = $t0.AddHours(-2).ToString('o'); campaigns = @{ CAMP = 'ready' } } | ConvertTo-Json -Compress))
+$s2 = Next-Unit $sv @('--handoff', $hs, '--cluster', 'CAMP', '--work', $fxWork) | ConvertFrom-Json
+Check 'a cluster that waited through one wave only is not starved' @($s2.starved | Where-Object { $_ }).Count 0
+# a line written before the supervisor recorded the lane's state proves nothing: the walk stops there (never over-reports)
+Set-Content -Path (Join-Path $sv 'units.jsonl') -Encoding utf8 -Value '{"unit":"wave"}', '{"unit":"wave"}', '{"unit":"wave"}'
+Check 'unrecorded lines are not counted as waiting' @((Next-Unit $sv @('--handoff', $hs, '--cluster', 'CAMP', '--work', $fxWork) | ConvertFrom-Json).starved | Where-Object { $_ }).Count 0
+
+# 8f. ONE LANDER ON MAIN AT A TIME (kb/Work PB2537): while another lander holds the landing lease, finished branches
 # and a handoff naming `land` do not start a land unit; the land waits and the reason names the holder. An expired
 # lease binds no one, and with no lease the land runs as before.
 $lc = Join-Path $Root 'leaseunit'
@@ -382,6 +462,8 @@ $l2 = (Next-Unit $lc @('--handoff', $landHandoff)) | ConvertFrom-Json
 Check 'a held lease: a handoff naming land waits too' "$($l2.unit) $($l2.reason -match 'land deferred \(named by the last handoff\)')" 'wave True'
 $l3 = (Next-Unit $lc @('--handoff', $doneHandoff, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json
 Check 'a held lease in the campaign lane: the lane decides, the land waits' "$($l3.unit) $($l3.reason -match 'land deferred')" 'campaign True'
+$l5 = (Next-Unit $lc @('--handoff', $landHandoff, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json
+Check 'a held lease, a handoff naming land, the campaign lane: the deferred land named no wave' "$($l5.unit) $($l5.reason -match 'land deferred \(named by the last handoff\)') $($l5.reason -match 'the handoff named wave')" 'campaign True False'
 Check 'stop.ps1 -Status names the lease holder' ((& pwsh -NoProfile -File (Join-Path $Here 'stop.ps1') -Status -CoordDir $lc) -join ' ' -match 'landing lease: held by attended R1 lander') $true
 $later = (Get-Date).ToUniversalTime().AddHours(2).ToString('o')
 $l4 = (Next-Unit $lc @('--handoff', $doneHandoff, '--now', $later)) | ConvertFrom-Json
@@ -407,6 +489,27 @@ $inv = Get-Content (Join-Path $r.coord 'fake-invocations.txt') -Raw
 Check 'the campaign unit''s plan_wave call carries --cluster' ($inv -match 'STOP-loop --cluster CAMP` plans the wave') $true
 Check 'the campaign unit is recorded as such' $r.units[0].unit 'campaign'
 Check 'the campaign unit runs on opus' ($inv -match '--model \| opus') $true
+Check 'the campaign unit''s units.jsonl line names its cluster' $r.units[0].cluster 'CAMP'
+# two campaign leads: each is validated and named at start, and the chosen one's lead reaches the prompt and units.jsonl
+$r = Run-Orch 'camptwo' 'good' (@('-Cluster', 'CAMP,CAMP2', '-MaxUnits', '1', '-FastFailSeconds', '0') + $camp) {
+    param($c) & $fresh $c; Set-Content -Path (Join-Path $c 'units.jsonl') -Encoding utf8 -Value '{"unit":"campaign","cluster":"CAMP"}', '{"unit":"wave"}' }
+$inv = if ($r.runs) { Get-Content (Join-Path $r.coord 'fake-invocations.txt') -Raw } else { '' }
+Check 'two leads: the supervisor names both lanes' (($r.out -match 'campaign lane: cluster CAMP, 2 open') -and ($r.out -match 'campaign lane: cluster CAMP2, 1 open')) $true
+Check 'two leads: the least recently run lead''s campaign runs' "$($r.units[-1].unit) $($r.units[-1].cluster)" 'campaign CAMP2'
+Check 'two leads: its plan_wave call carries that lead' ($inv -match 'STOP-loop --cluster CAMP2` plans the wave') $true
+Check 'the choice''s per-cluster state is recorded in units.jsonl' "$($r.units[-1].campaigns.CAMP) $($r.units[-1].campaigns.CAMP2)" 'ready ready'
+$r = Run-Orch 'camponeleft' 'good' (@('-DryRun', '-Cluster', 'DONE,CAMP') + $camp) $fresh
+Check 'two leads, one landed: its lane ends and the other goes on' (($r.out -match 'campaign DONE: every note is landed or retired; the campaign lane ends \(campaigns CAMP go on\)') -and ($r.out -match "would run unit 'campaign' .*\n.*with --cluster CAMP>")) $true
+# a ready note that waited through more than one wave-type unit is announced by the supervisor (kb/Work PB2522)
+$r = Run-Orch 'campstarved' 'good' (@('-DryRun', '-Cluster', 'CAMP') + $camp) {
+    param($c) & $fresh $c
+    $t = (Get-Date).ToUniversalTime()
+    Set-Content -Path (Join-Path $c 'units.jsonl') -Encoding utf8 -Value @(
+        (@{ unit = 'campaign'; cluster = 'CAMP'; started_at = $t.AddHours(-10).ToString('o') } | ConvertTo-Json -Compress),
+        (@{ unit = 'wave'; started_at = $t.AddHours(-9).ToString('o'); campaigns = @{ CAMP = 'ready' } } | ConvertTo-Json -Compress),
+        (@{ unit = 'land'; started_at = $t.AddHours(-6).ToString('o'); campaigns = @{ CAMP = 'ready' } } | ConvertTo-Json -Compress),
+        (@{ unit = 'wave'; started_at = $t.AddHours(-5).ToString('o'); campaigns = @{ CAMP = 'ready' } } | ConvertTo-Json -Compress)) }
+Check 'a starved campaign is announced' ($r.out -match 'campaign CAMP ready for 9\.\d h \(2 wave-type unit\(s\)\), last campaign wave at \d{4}-\d\d-\d\d \d\d:\d\d') $true
 $r = Run-Orch 'wavedefault' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0')
 $inv = Get-Content (Join-Path $r.coord 'fake-invocations.txt') -Raw
 Check 'the fix lane''s wave prompt is unchanged (no --cluster, no placeholder)' (($inv -match 'STOP-loop` plans the wave') -and ($inv -notmatch '--cluster') -and ($inv -notmatch 'CLUSTER_ARG')) $true

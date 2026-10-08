@@ -105,7 +105,7 @@ one session.
 | Unit | Model | Starts when | Ends when |
 |---|---|---|---|
 | `wave` | Opus (the orchestrator's judgment; the implementers are routed per group by `model_rules.json`) | nothing pending to land or resume and the budget says `go` | its Workflow returned, the last lander train landed through `push-main.sh`, the ledger refreshed (`python scripts/spec/gen_ledger.py`, `references/landing.md`) and the handoff written |
-| `campaign` | Opus | only with `-Cluster <lead>`: the cluster has a ready note and the last wave-type unit was not a `campaign` (section 9.1) | as `wave`; its prompt is `units/wave.md` with `--cluster <lead>` on the `plan_wave.py` call |
+| `campaign` | Opus | only with `-Cluster <lead>[,<lead>...]`: a wave-type unit is due (a handoff named `wave` or `campaign`, or nothing else fired), a lead's cluster has a ready note and the last wave-type unit was not a `campaign`; the ready leads take turns (section 3.2, section 9.1) | as `wave`; its prompt is `units/wave.md` with `--cluster <lead>` on the `plan_wave.py` call |
 | `land` | Opus | finished implementer branches exist with no lander (a previous wave unit ended early), or a handoff says `next_unit: land` | the train landed (or was dropped with reasons) and the ledger rendered to `{COORD}\ledger.html` (section 14) |
 | `resume` | Opus | the previous unit died, timed out, was stopped with a Workflow in flight, or handed off `split` | it has classified every pending branch and report (finish, land, re-plan) and handed off the next unit |
 | `meter` | Sonnet, with `--chrome` | the newest reading in `readings.json` is older than 3 hours | the reading is appended (`budget.py --record`) and the handoff written |
@@ -145,7 +145,14 @@ that fires wins (the supervisor's `-Unit` overrides the first iteration only):
 
 1. The handoff carries `owner_question` → `owner-question` (stop).
 2. The handoff names `next_unit` → that unit; but a handoff naming `land` while another lander holds the landing lease
-   (section 4.7) is passed over, and the rules below choose.
+   (section 4.7) is passed over, and the rules below choose. A wave-type unit (`wave` or `campaign`) names only a WAVE: with
+   `--cluster` the campaign rule at the end of this list decides which lane it runs, and the handoff's reason is kept
+   in the choice's reason (kb/Work PB2522). Rule 2 used to return the named unit outright, ahead of the campaign rule,
+   so a model that wrote `wave` in every handoff starved a ready campaign note indefinitely: PB2151, the legacy
+   retirement's last note, sat ready and undispatched 2026-10-07 05:40–14:31 PDT through eight units (three of them
+   fix-lane waves) while every supervisor start logged `campaign lane: cluster PB2108, 1 open note(s), 1 ready`. The alternation is the
+   supervisor's rule, not the model's. A handoff's `land`, `resume` or `meter`, and an owner question (rule 1), still
+   outrank the campaign.
 3. The newest meter reading is older than 3 hours (`quota.meter_max_age_hours`), or there is none → `meter`.
 4. The repository is dirty (ignoring `.claude/settings.local.json`) or has unpushed commits → `resume`.
 5. The last unit failed (as the breaker counts it) or ended `split`, or a branch that `prune_worktrees.classify`
@@ -157,12 +164,25 @@ that fires wins (the supervisor's `-Unit` overrides the first iteration only):
    the landing lease is held by <holder> …`. The land runs at the first choice after the lease is released or dies.
 7. Otherwise → `wave`. (A stale ledger page is not a reason for a unit: a headless unit cannot publish it, section 14.
    The earlier rule 7 compared a repo file that never existed, so it sent every idle loop to `land`.)
-   With `--cluster <lead>` (the supervisor's `-Cluster`, section 9.1) this rule decides the lane: `campaign` when the
-   cluster has a ready note (`work.py`'s `cluster_order`) and the newest `wave` or `campaign` line of `units.jsonl` is
-   not a `campaign`, so campaign waves alternate with fix-lane waves; otherwise `wave`. The JSON then also carries
-   `campaign`: `run`, `between`, `waiting` (no ready note), `landed` (every note that names the cluster is landed or
-   retired: the supervisor ends the lane and runs the fix lane alone) or `unknown`. Without `--cluster` the output is
-   byte-identical to the fix lane's (`test_orchestrate.ps1` 8b).
+
+**The campaign rule** (`--cluster <lead>`, repeatable: the supervisor's `-Cluster`, section 9.1) decides the lane of
+every wave-type choice, from rule 2 or rule 7: `campaign` when a lead's cluster has a ready note (`work.py`'s
+`cluster_order`) and the newest `wave` or `campaign` line of `units.jsonl` is not a `campaign`, so campaign waves
+alternate with fix-lane waves; otherwise `wave`. Among several ready leads the one whose own last `campaign` line is
+oldest (never run counts as oldest; ties in `-Cluster` order) takes the turn, and the JSON names it in `cluster`. A
+wave-type choice also carries `campaign` for the lane as a whole: `run`, `between`, `waiting` (no lead has a ready
+note), `landed` (every lead's cluster is landed or retired) or `unknown`. A land the landing lease deferred (rule 6,
+or a handoff's `land` at rule 2) stays at the end of that choice's reason, and a deferred handoff `land` names no wave:
+the campaign rule then treats the wave as rule 7's (`next_unit.py#base_choice` returns the deferral beside the
+choice; `test_orchestrate.ps1` 8f). With `--cluster` EVERY choice but an owner
+question carries `campaigns` (`{lead: ready | waiting | landed | unknown}`; the supervisor ends a lead's lane at
+`landed`, runs the fix lane alone once no lead is left, and records the map in that unit's `units.jsonl` line) and
+`starved`: each lead whose ready note has waited through MORE THAN ONE wave-type unit since its own last campaign
+wave, with `hours`, `waves` and `last_campaign_at`, which the supervisor logs as `campaign <lead> ready for N h (W
+wave-type unit(s)), last campaign wave at T`. The measure walks `units.jsonl` back from the newest line and stops at
+the lead's own campaign line or at a line that did not record the lead `ready`, so a gap in the record (every line
+written before the record existed) under-reports and never over-reports. Without `--cluster` the output is
+byte-identical to the fix lane's (`test_orchestrate.ps1` 8b and 8c).
 
 ## 4. The supervisor loop (`orchestrate.ps1`)
 
@@ -172,7 +192,7 @@ seam pointing at a fake that emits canned stream-json, not a wrapper; a `.ps1` o
 shell), `-CoordDir`, `-RepoDir` (default the repository containing the script), `-MaxContextTokens` (default
 150000), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave` or `campaign`
 unit gets three times this, because a lander train must be allowed to finish), `-BorrowDays` (passed to
-`budget.py`), `-Unit` (the first unit, overriding `next_unit.py` once), `-Cluster <lead>` (the campaign lane, section 9.1; validated at start), `-ConfigDir` (the Claude account the loop spends, section 2.1: default `account.py`'s resolution of `CLAUDE_CONFIG_DIR`; an unknown dir exits 2 before anything starts; every child runs with exactly that account's `CLAUDE_CONFIG_DIR`, unset for the default account; the log header and every `units.jsonl` line name the account), `-Watch` (section 13), `-Python`, and the
+`budget.py`), `-Unit` (the first unit, overriding `next_unit.py` once), `-Cluster <lead>[,<lead>...]` (the campaign lanes, section 9.1: comma-separated because `pwsh -File` passes `-Cluster A,B` as one string; each validated at start), `-ConfigDir` (the Claude account the loop spends, section 2.1: default `account.py`'s resolution of `CLAUDE_CONFIG_DIR`; an unknown dir exits 2 before anything starts; every child runs with exactly that account's `CLAUDE_CONFIG_DIR`, unset for the default account; the log header and every `units.jsonl` line name the account), `-Watch` (section 13), `-Python`, and the
 test seams `-TelemetryDir` (passed to `budget.py`), `-WorkDir` (the register `next_unit.py` and `work.py` read for `-Cluster`), `-IdleCloseSeconds` (default 20, section 4.6), `-CheckpointSeconds` (default 300, section 5.1) and `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
 (default 60). Exit codes: 0 stopped (`STOP`, `-MaxUnits`, `stop-week`, `-DryRun`), 3 another instance runs,
 4 circuit breaker, 5 an owner question is waiting, 2 `-Cluster` names no cluster any kb/Work note names (or `-Unit campaign` without `-Cluster`).
@@ -227,7 +247,9 @@ Each iteration, in this order:
    failure for the breaker, and the next unit is `resume`.
 8. **Record** one line in `units.jsonl`: `{unit, reason, model, session_id, started_at, ended_at, duration_s,
    exit_code, handoff_outcome, next_unit, failed, log, calls, input, output, cache_read, cache_creation,
-   peak_context, cost_usd, stop_unit_sent, killed}`. This is the per-unit cost record PB1981 item 9 refits the cost
+   peak_context, cost_usd, stop_unit_sent, killed}`, plus, with `-Cluster`, `cluster` (the lead a `campaign` unit ran)
+   and `campaigns` (each lead's lane state at this choice), which `next_unit.py` reads back for the campaign turns and
+   the starvation measure (section 3.2). This is the per-unit cost record PB1981 item 9 refits the cost
    law from. An owner question in a valid handoff then stops the loop (exit 5).
 9. **Loop**, until `-MaxUnits` units have run.
 
@@ -576,10 +598,20 @@ itself), ordered by `blocked_by:`.
   or still sit in two chains (they did not merge, or the group's own file belongs to another chain), waits for a later
   wave. Its spec says it is a DEPENDENCY
   SUCCESSOR and to return BLOCKED if its blocker did not finish.
-- **The supervisor** (`orchestrate.ps1 -Cluster <lead>`) checks the cluster exists at start, passes it to
-  `next_unit.py`, which alternates `campaign` and fix-lane `wave` units (section 3.2 rule 7), and ends the lane when
-  every note naming the cluster is landed or retired; the loop then runs the fix lane alone. A `campaign` unit is a
-  `wave` unit whose `plan_wave.py` call carries `--cluster` (the `{CLUSTER_ARG}` placeholder).
+- **The supervisor** (`orchestrate.ps1 -Cluster <lead>[,<lead>...]`) checks each cluster exists at start, passes
+  them to `next_unit.py`, whose campaign rule (section 3.2) alternates `campaign` and fix-lane `wave` units and gives
+  the ready leads their campaign turns least recently run first, and ends a lead's lane when every note naming its
+  cluster is landed or retired; once no lead is left the loop runs the fix lane alone. A `campaign` unit is a `wave`
+  unit whose `plan_wave.py` call carries `--cluster <the lead whose turn it is>` (the `{CLUSTER_ARG}` placeholder).
+  Several leads are for INDEPENDENT campaigns: a lead that is itself a note of another lead's cluster (PB2119, the
+  Delete program, is both a lead and a note of the architecture review PB1754) would be planned twice, once as a
+  note of the outer campaign and once as its own lane, so the operator passes the outer lead or the inner one, not
+  both. Between independent lanes the file-set partition still holds: a campaign group whose files meet another
+  lane's dispatched, still-open group (`inflight-groups.json`, `plan_wave.py#inflight_file_sets`) waits.
+- **The handoff names a wave, the supervisor names its lane** (kb/Work PB2522). A unit's handoff is written by the
+  model from what it sees, so it may name `wave` every time; the campaign rule therefore applies to a handoff's `wave`
+  (or `campaign`) as it does to rule 7, and a ready lead that has waited through more than one wave-type unit is logged
+  `campaign <lead> ready for N h` at every choice until its turn comes.
 - **The fix lane is unchanged** without `--cluster`: `test_plan_wave.py` check 8 compares the whole fixture plan with a
   golden that the planner wrote before this lane existed, and `test_orchestrate.ps1` 8b compares `next_unit.py`'s
   choice and the wave prompt.

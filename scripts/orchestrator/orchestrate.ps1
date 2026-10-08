@@ -13,8 +13,11 @@ Design: docs/rearchitecture/DESIGN-orchestrator-loop.md (kb/Work PB1981). Each i
      -FastFailSeconds without a `done` handoff) stop the loop with an owner note; exponential backoff between failures
   4. budget.py decides go / hold-session / hold-day / stop-week
   5. the next unit: -Unit for the first iteration, else next_unit.py (the handoff's next_unit, then the deterministic checks);
-     with -Cluster LEAD the CAMPAIGN lane (kb/Work PB2120): next_unit.py alternates `campaign` waves (plan_wave.py
-     --cluster LEAD) with fix-lane waves while the cluster has a ready note, and the lane ends when the cluster is landed
+     with -Cluster LEAD[,LEAD...] the CAMPAIGN lane (kb/Work PB2120): next_unit.py alternates `campaign` waves
+     (plan_wave.py --cluster LEAD) with fix-lane waves while a lead's cluster has a ready note, the ready leads taking
+     turns, and a lead's lane ends when its cluster is landed. The alternation is the supervisor's rule: a handoff that
+     names `wave` names only a wave, never its lane (kb/Work PB2522), and a lead whose ready note has waited through
+     more than one wave-type unit is logged `campaign LEAD ready for N h`
   6. run `claude -p` with the unit prompt (first stream-json message on stdin, which stays open so the session outlives
      a model turn that ends with a Workflow in flight; the supervisor closes it when the stream is idle with no
      background task), a fresh session id, stream-json to logs\; watch the context size and wind the unit down past
@@ -52,7 +55,8 @@ param(
     [int]$BorrowDays = 0,
     [ValidateSet('', 'wave', 'campaign', 'land', 'resume', 'meter')]
     [string]$Unit = '',
-    # The campaign lane: the kb/Work cluster (its lead note's id, or a campaign name) whose waves run between fix-lane waves.
+    # The campaign lane: the kb/Work clusters (each a lead note's id, or a campaign name; several are comma-separated,
+    # because `pwsh -File` passes `-Cluster A,B` as one string) whose waves run between fix-lane waves, in turn.
     [string]$Cluster = '',
     # Test seam: the register directory next_unit.py and work.py read (default kb/Work).
     [string]$WorkDir = '',
@@ -164,7 +168,7 @@ function Build-Prompt([string]$unit, [string]$scratch, [string]$sessionId) {
         param($t)
         $t.Replace('{TASKS_DIR}', $tasksDir).Replace('{COORD}', $CoordDir).Replace('{HANDOFF}', $Handoff).Replace('{STOP_UNIT}', $StopUnit).
            Replace('{PREV_HANDOFF}', $LastHandoff).Replace('{SCRATCH}', $scratch).Replace('{FLEET_STOP}', $FleetStop).Replace('{GLOBAL_STOP}', $GlobalStop).
-           Replace('{BORROW_DAYS}', "$BorrowDays").Replace('{CLUSTER_ARG}', $(if ($unit -eq 'campaign') { " --cluster $Cluster" } else { '' }))
+           Replace('{BORROW_DAYS}', "$BorrowDays").Replace('{CLUSTER_ARG}', $(if ($unit -eq 'campaign') { " --cluster $UnitCluster" } else { '' }))
     }
     $common = & $sub (Get-Content (Join-Path $Here 'units/common.md') -Raw)
     $own = & $sub (Get-Content (Join-Path $Here "units/$(Get-PromptFile $unit).md") -Raw)
@@ -354,15 +358,18 @@ if ($Account.child_config_dir) { $env:CLAUDE_CONFIG_DIR = $Account.child_config_
 Say "account: $($Account.name) (config dir $($Account.config_dir); week resets weekday $($Account.weekly_reset.weekday) $($Account.weekly_reset.hour):$('{0:d2}' -f [int]$Account.weekly_reset.minute) $($Account.weekly_reset.tz))"
 
 # The campaign lane needs a cluster the register knows: a misspelled one would quietly run the fix lane alone.
-if ($Unit -eq 'campaign' -and -not $Cluster) { Say '-Unit campaign needs -Cluster <lead>'; exit 2 }
-if ($Cluster) {
-    $wa = @((Join-Path (Split-Path $Here -Parent) 'spec/work.py'), 'next', '--cluster', $Cluster, '--json')
+$Clusters = [Collections.Generic.List[string]]@($Cluster -split '[,\s]+' | Where-Object { $_ })
+if ($Unit -eq 'campaign' -and -not $Clusters.Count) { Say '-Unit campaign needs -Cluster <lead>'; exit 2 }
+foreach ($lead in $Clusters) {
+    $wa = @((Join-Path (Split-Path $Here -Parent) 'spec/work.py'), 'next', '--cluster', $lead, '--json')
     if ($WorkDir) { $wa += @('--work', $WorkDir) }
     $view = & $Python @wa 2>&1
-    if ($LASTEXITCODE -ne 0) { Say "no kb/Work note names the cluster '$Cluster' in its cluster: list; refusing to start"; exit 2 }
+    if ($LASTEXITCODE -ne 0) { Say "no kb/Work note names the cluster '$lead' in its cluster: list; refusing to start"; exit 2 }
     $v = ($view -join "`n") | ConvertFrom-Json
-    Say "campaign lane: cluster $Cluster, $(@($v.notes).Count) open note(s), $(@($v.notes | Where-Object { $_.ready }).Count) ready"
+    Say "campaign lane: cluster $lead, $(@($v.notes).Count) open note(s), $(@($v.notes | Where-Object { $_.ready }).Count) ready"
 }
+# The lead the current `campaign` unit runs (its prompt's --cluster and its units.jsonl line).
+$UnitCluster = ''
 
 if (-not (Take-Lock)) { exit 3 }
 $exitCode = 0
@@ -409,21 +416,36 @@ try {
         }
 
         if ($Unit -and $ran -eq 0) {
+            # -Unit campaign runs the first lead; next_unit.py takes the turns from then on.
             $choice = [pscustomobject]@{ unit = $Unit; reason = 'named by -Unit' }
+            if ($Unit -eq 'campaign') { $choice | Add-Member cluster $Clusters[0] }
         } else {
             $na = @((Join-Path $Here 'next_unit.py'), '--repo', $RepoDir)
             if (Test-Path $LastHandoff) { $na += @('--handoff', $LastHandoff) }
             if ($lastFailed) { $na += '--last-failed' }
             if ($lastStarted) { $na += @('--last-started', $lastStarted.ToString('o')) }
-            if ($Cluster) { $na += @('--cluster', $Cluster) + $(if ($WorkDir) { @('--work', $WorkDir) } else { @() }) }
+            foreach ($lead in $Clusters) { $na += @('--cluster', $lead) }
+            if ($Clusters.Count -and $WorkDir) { $na += @('--work', $WorkDir) }
             $choice = Invoke-Py $na | ConvertFrom-Json
         }
-        if ($Cluster -and $choice.PSObject.Properties['campaign'] -and $choice.campaign -eq 'landed') {
-            Say "campaign ${Cluster}: every note is landed or retired; the campaign lane ends and the fix lane continues"
-            $Cluster = ''
+        # With -Cluster every choice carries each lead's lane state (`campaigns`) and the starved leads (`starved`,
+        # kb/Work PB2522): a landed lead's lane ends, and a ready note that waits through wave after wave is said aloud.
+        $campaigns = if ($choice.PSObject.Properties['campaigns']) { $choice.campaigns } else { $null }
+        if ($campaigns) {
+            foreach ($lead in @($Clusters)) {
+                if ($campaigns.PSObject.Properties[$lead] -and $campaigns.$lead -eq 'landed') {
+                    [void]$Clusters.Remove($lead)
+                    Say "campaign ${lead}: every note is landed or retired; the campaign lane ends$(if ($Clusters.Count) { " (campaigns $($Clusters -join ', ') go on)" } else { ' and the fix lane continues' })"
+                }
+            }
+            foreach ($s in @($choice.starved | Where-Object { $_ })) {
+                Say "campaign $($s.cluster) ready for $('{0:0.0}' -f [double]$s.hours) h ($($s.waves) wave-type unit(s)), last campaign wave at $(if ($s.last_campaign_at) { Get-Date $s.last_campaign_at -Format 'yyyy-MM-dd HH:mm' } else { 'none recorded' })"
+            }
         }
-        if ($choice.unit -eq 'campaign' -and -not $Cluster) {
-            $choice = [pscustomobject]@{ unit = 'wave'; reason = "a campaign was named but no campaign lane runs (no -Cluster, or its cluster landed): $($choice.reason)" }
+        $UnitCluster = if ($choice.PSObject.Properties['cluster']) { [string]$choice.cluster } else { '' }
+        if ($choice.unit -eq 'campaign' -and $UnitCluster -notin $Clusters) {
+            $choice = [pscustomobject]@{ unit = 'wave'; reason = "a campaign was named but no campaign lane runs$(if ($UnitCluster) { " for $UnitCluster" }) (no -Cluster, or its cluster landed): $($choice.reason)" }
+            $UnitCluster = ''
         }
         if ($choice.unit -eq 'owner-question') {
             $q = Get-Content $LastHandoff -Raw | ConvertFrom-Json
@@ -438,7 +460,7 @@ try {
         $logBase = Join-Path $CoordDir "logs/$stamp-$($choice.unit)"
         if ($DryRun) {
             Say "DRY RUN: would run unit '$($choice.unit)' ($($choice.reason)) on $model, session $sessionId, account $($Account.name) (transcripts under $(Get-ProjectTranscriptDir $sessionId))"
-            Say "DRY RUN: $ClaudeExe -p <units/common.md + units/$(Get-PromptFile $choice.unit).md$(if ($choice.unit -eq 'campaign') { " with --cluster $Cluster" })> --model $model --permission-mode $PermissionMode --permission-prompts none --output-format stream-json --verbose --session-id $sessionId$(if ($choice.unit -eq 'meter') { ' --chrome' }) > $logBase.jsonl"
+            Say "DRY RUN: $ClaudeExe -p <units/common.md + units/$(Get-PromptFile $choice.unit).md$(if ($choice.unit -eq 'campaign') { " with --cluster $UnitCluster" })> --model $model --permission-mode $PermissionMode --permission-prompts none --output-format stream-json --verbose --session-id $sessionId$(if ($choice.unit -eq 'meter') { ' --chrome' }) > $logBase.jsonl"
             break
         }
 
@@ -484,6 +506,10 @@ try {
             started_at = $started.ToString('o'); ended_at = (Get-Date).ToString('o'); duration_s = [Math]::Round($duration, 1)
             exit_code = $r.exit; handoff_outcome = $outcome; next_unit = $(if ($h -and $h.PSObject.Properties['next_unit']) { $h.next_unit } else { $null })
             failed = $failed; log = "$logBase.jsonl" }
+        # The campaign record next_unit.py reads back: whose turn a campaign was, and each lead's lane at this choice
+        # (the round-robin and the starvation measure, kb/Work PB2522).
+        if ($UnitCluster) { $line['cluster'] = $UnitCluster }
+        if ($campaigns) { $line['campaigns'] = $campaigns }
         foreach ($k in $r.stats.Keys) { $line[$k] = $r.stats[$k] }
         Add-Content -Path $UnitsLog -Encoding utf8 -Value ($line | ConvertTo-Json -Compress -Depth 5)
         Say "unit '$($choice.unit)' ended: exit $($r.exit), handoff $outcome, $([Math]::Round($duration)) s, $($r.stats.calls) calls$(if ($failed) { " — FAILURE $failures of 3" })"
