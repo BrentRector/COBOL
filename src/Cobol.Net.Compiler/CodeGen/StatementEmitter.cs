@@ -42,6 +42,7 @@ internal sealed class StatementEmitter : IBoundStatementVisitor<bool>
     private readonly ControlFlowEmitter _controlFlow;
     private readonly CallEmitter _call;
     private readonly EcEmitter _ecEmit;
+    private readonly ReceiverBracketEmitter _brackets;
     private readonly OoEmitter _oo;
 
     public StatementEmitter(UnitEmitters u, OoEmitter oo, DispatchState dispatchState)
@@ -67,6 +68,7 @@ internal sealed class StatementEmitter : IBoundStatementVisitor<bool>
         _controlFlow = u.ControlFlow;
         _call = u.Call;
         _ecEmit = u.Ec;
+        _brackets = u.Brackets;
         _oo = oo;
     }
 
@@ -249,6 +251,8 @@ internal sealed class StatementEmitter : IBoundStatementVisitor<bool>
         foreach (var member in n.Members) terminated = EmitStatement(member);
         return terminated;
     }
+
+    public bool Visit(BoundReceiverBrackets n) => _brackets.Emit(n);   // kb/Work PB2078 - the accessors go around each receiver
 
     public bool Visit(BoundSequence n)
     {

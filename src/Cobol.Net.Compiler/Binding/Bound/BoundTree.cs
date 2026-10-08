@@ -2023,6 +2023,42 @@ public interface IActivatingStatement
 /// step, so a statement without one binds byte-identically.</para></summary>
 public sealed record BoundActivationSite(BoundStatement Inner) : BoundStatement;
 
+/// <summary>One RECEIVING object property's accessors, bound to the moment its statement reaches the receiver
+/// (kb/Work PB2078): <paramref name="Open"/> is identifier-3's evaluation and the §8.4.3.9.4 GR1 GET (the latter
+/// only when the statement also READS the property), run immediately before the receiver is accessed;
+/// <paramref name="Close"/> is the GR2 SET, run immediately after the receiver is stored — and not at all when that
+/// store raised a size error. <paramref name="Temp"/> is the property's compiler temporary, the item the
+/// statement's receiver <see cref="Place"/> denotes.</summary>
+public sealed record ReceiverBracket(DataItem Temp, IReadOnlyList<BoundStatement> Open, IReadOnlyList<BoundStatement> Close);
+
+/// <summary>⛔ A STATEMENT WHOSE RECEIVING OBJECT PROPERTIES ARE ACCESSED ONE RECEIVER AT A TIME (kb/Work PB2078).
+/// ISO §14.7.7 4) b) stores the intermediate result "in or combined with and then stored in each single resulting
+/// data item in the left-to-right order" and says "Item identification for the receiving data items is done as each
+/// data item is accessed"; §14.9.25.4 GR1 identifies each MOVE receiver "immediately before the data is moved to the
+/// respective data item". A property receiver is that data item's stand-in (§8.4.3.9.4 GR1–GR3), so its GET belongs
+/// just before ITS access and its SET just after ITS store — not around the whole statement, where
+/// <c>ADD 1 TO I, BAL OF AR(I)</c> fetched AR(1) and stored AR(2), and <c>ADD 1 TO BAL OF D, BAL OF D</c> fetched
+/// the second receiver before the first had stored.
+/// <para>The per-receiver steps ride <paramref name="Brackets"/>, not the arithmetic or MOVE node, because they are
+/// ACTIVATIONS: <c>EcBinder</c> stamps and queries them through this node exactly as through a
+/// <see cref="BoundSequence"/> step, and the emitters that loop over a statement's receivers
+/// (<c>ReceiverBracketEmitter.Receive</c>) place them. Created by <c>OoBinder.OoWrapPropertyOps</c> for the
+/// properties a binder CLAIMED as receivers of such a statement (<c>DataBinder.OoClaimInterleavedReceiver</c>); the
+/// emitter fails loudly when a claimed bracket is never placed, so a receiver loop that forgets <c>Receive</c> cannot
+/// silently drop a GET or a SET.</para></summary>
+public sealed record BoundReceiverBrackets(BoundStatement Inner, IReadOnlyList<ReceiverBracket> Brackets) : BoundStatement
+{
+    /// <summary>Every statement the brackets hold, in source order of the receivers — what an EC pass must reach.</summary>
+    public IEnumerable<BoundStatement> AllSteps() => Brackets.SelectMany(b => b.Open.Concat(b.Close));
+
+    /// <summary>This node with <paramref name="map"/> applied to <see cref="Inner"/> and to every bracket step.</summary>
+    public BoundReceiverBrackets Mapped(Func<BoundStatement, BoundStatement> map) => this with
+    {
+        Inner = map(Inner),
+        Brackets = [.. Brackets.Select(b => b with { Open = [.. b.Open.Select(map)], Close = [.. b.Close.Select(map)] })],
+    };
+}
+
 /// <summary><c>RAISE EXCEPTION exception-name-1</c> (ISO §14.9.29; SR1 — level-3 only, validated at bind).
 /// The TURN decision is baked in at bind time (§14.6.13.1.1: an exception condition is raised only when checking
 /// is enabled): <paramref name="Enabled"/> false + nonfatal ⇒ the statement is a no-op (§14.6.13.1.4 first

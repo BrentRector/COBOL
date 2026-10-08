@@ -216,10 +216,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// <see cref="IsBooleanValueOperand"/> reads, from the definition <c>UdfBinder.UdfActivate</c> clones.</summary>
     private bool IsBooleanUserFunction(string written) =>
         ctx.CobolWords.Resolve(written) is { } name
-        && (ctx.Data.UserFunctionNames.Contains(name)
-            || CobolNames.Same(name, host.UdfSelfName))
-        && host.UserFunctions is { } functions && functions.TryGetValue(name, out var fn)
-        && fn.Returning?.OperandPic?.Category is PicCategory.Boolean;
+        && host.Intrinsic.ReturningItemOf(name)?.OperandPic?.Category is PicCategory.Boolean;
 
     /// <summary>The sole <c>functionCall</c> primary of an arithmetic expression (no operators, signs or
     /// parentheses around it), or null — the function-identifier twin of <see cref="SoleDataRef"/>, over the ONE

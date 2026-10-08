@@ -240,7 +240,12 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// the ordinary paths — whose diagnostics already name those cases. The candidates are the NEAREST declaring
     /// source element's (§8.4.6.2.1 3); <c>SymbolTable.TryResolveUnqualified</c>), so a contained program's own
     /// FUNCTION-POINTER hides a container's GLOBAL one of the same name instead of counting it as a rival.</summary>
-    private Place? FunctionPointerNamed(string name)
+    private Place? FunctionPointerNamed(string name) =>
+        FunctionPointerItemNamed(name) is { } only ? ctx.Refs.ResolveItem(only) : null;
+
+    /// <summary><see cref="FunctionPointerNamed"/>'s test, answering the declared item itself — for the readers that
+    /// need its description and no <see cref="Place"/> (<see cref="ReturningItemOf(string)"/>).</summary>
+    private DataItem? FunctionPointerItemNamed(string name)
     {
         if (!ctx.Symbols.TryResolveUnqualified(name, ctx.ActiveScope, out var candidates)) return null;
         DataItem? only = null;
@@ -250,7 +255,31 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             if (only is not null) return null;   // ambiguous — qualification is not part of the name form
             only = c;
         }
-        return only is not null && only.SubscriptLevels().Count == 0 ? ctx.Refs.ResolveItem(only) : null;
+        return only is not null && only.SubscriptLevels().Count == 0 ? only : null;
+    }
+
+    /// <summary>⛔ THE ONE DIAGNOSTIC-FREE ANSWER TO "WHAT DOES THIS FUNCTION-IDENTIFIER RETURN" (§8.4.3.2.4 GR1): the
+    /// RETURNING item whose "description, class, and category" the identifier's temporary takes — of the REPOSITORY-declared
+    /// user function or the containing function itself (function-prototype-name-1) and of a FUNCTION-POINTER
+    /// (function-pointer-name-1, through the prototype its USAGE TO phrase names) — or null for an intrinsic function (its
+    /// description is the catalog's, <see cref="IntrinsicCatalog"/>), a name that is neither, and a function whose
+    /// definition has no RETURNING item. Nothing is bound and nothing is reported, so a resolver PROBE may ask it
+    /// (kb/Work PB2073) and so may a routing predicate (<see cref="ConditionBinder"/>'s boolean-operand test); the
+    /// activation (<see cref="UdfBinder"/>) reads the same <see cref="UserFunctionSignature.Returning"/> when it binds.</summary>
+    internal DataItem? ReturningItemOf(Core.FunctionCallContext fc) =>
+        fc.functionName() is { } written ? ReturningItemOf(FunctionWord.OfToken(written.Start, ctx.CobolWords).Name) : null;
+
+    /// <summary><see cref="ReturningItemOf(Core.FunctionCallContext)"/> for a function name already resolved through
+    /// >>COBOL-WORDS (<see cref="FunctionWord.Name"/>), in <see cref="BindFunctionResult"/>'s dispatch order: the user
+    /// function first (§12.3.8.2 GR12), the function-pointer second.</summary>
+    internal DataItem? ReturningItemOf(string name)
+    {
+        string? prototype = ctx.Data.UserFunctionNames.Contains(name) || CobolNet.Runtime.CobolNames.Same(name, host.UdfSelfName)
+            ? name
+            : FunctionPointerItemNamed(name)?.Pic?.RestrictedPrototypeName;
+        return prototype is not null && host.UserFunctions is { } functions && functions.TryGetValue(prototype, out var fn)
+            ? fn.Returning
+            : null;
     }
 
     /// <summary>The §8.4.3.2 SR2 FUNCTION-keyword-OMITTED reference form (M2-UDF-4): a data reference whose head

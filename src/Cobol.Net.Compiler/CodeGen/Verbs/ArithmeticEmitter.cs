@@ -15,7 +15,8 @@ using static CobolNet.CodeGen.Emit.EmitText;
 /// bodies plus the shared services every numeric-storing verb consumes — the <c>EmitArith</c> ON SIZE ERROR /
 /// EC-SIZE two-phase wrapper (writes the <see cref="EcState"/> statement scratch the checked stores read — the
 /// EC↔arithmetic interlock) and the <c>StoreArith</c> store funnel.</summary>
-internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, EcState ecState, EcEmitter ec)
+internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, EcState ecState, EcEmitter ec,
+    ReceiverBracketEmitter brackets)
 {
     /// <summary>The statement dispatcher — property-wired by <see cref="UnitEmitters"/> (the phrase bodies
     /// nest arbitrary statement lists, a cyclic edge no ctor order can satisfy).</summary>
@@ -40,7 +41,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             // undefined results anyway (§14.6.13.1.3). Pre-snapshotting all receiver reads before the first store would
             // close it; deferred to avoid restructuring the byte-critical arithmetic store loop for an undefined case.
             foreach (var r in targets)
-                GuardedStore(ise, () =>
+                GuardedStore(ise, r.Place, () =>
                     // The combine IS the final transfer to r (receiver ← receiver op value): outermost, so a MULTIPLY
                     // BY product past the carrier rounds once at r's scale with r's mode (NumericRenderer.Multiply).
                     StoreArith(r.Place, num.Combine(num.FieldNum(r.Place), op, value, RcvFor(r, ise), outermost: true), r.Rounding));
@@ -64,7 +65,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             // ONE initial evaluation (§14.7.7 GR4 + NOTE 3): materialized with several receivers so a receiver
             // aliasing a sender cannot change the value the remaining receivers store.
             if (targets.Count > 1) v = Snapshot(v);
-            foreach (var r in targets) GuardedStore(ise, () => StoreArith(r.Place, v, r.Rounding));
+            foreach (var r in targets) GuardedStore(ise, r.Place, () => StoreArith(r.Place, v, r.Rounding));
         });
 
     /// <summary><c>MULTIPLY a BY b GIVING r…</c> (ISO §14.9.26): the product is each receiver's FINAL TRANSFER, so — like the
@@ -85,7 +86,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             NumX ax = num.Render(a, opRcv), bx = num.Render(b, opRcv);
             if (targets.Count > 1) { ax = Snapshot(ax); bx = Snapshot(bx); }
             foreach (var r in targets)
-                GuardedStore(ise, () =>
+                GuardedStore(ise, r.Place, () =>
                     StoreArith(r.Place, num.Combine(ax, "*", bx, RcvFor(r, ise), outermost: true), r.Rounding));
         });
 
@@ -116,7 +117,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
                 // ROUNDED mode (§14.9.12.4 / §14.7.4). Operand sub-divisions (rendered above at :75-76) stay nested.
                 // Each receiver's quotient can raise its OWN size error (a PROHIBITED-inexact at r's scale) —
                 // guarded per receiver so the raise does not abandon the receivers to its right (PB129).
-                GuardedStore(ise, () =>
+                GuardedStore(ise, r.Place, () =>
                     StoreArith(r.Place, num.Combine(q, "/", divisorX, RcvFor(r, ise), outermost: true), r.Rounding));
             }
         });
@@ -167,7 +168,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             // standard mode — instead of a raw C# splice whose Int128 product wrapped silently (PB129).
             NumX remainder = num.Combine(dividend, "-",
                 num.Combine(new NumX(qtc, qs), "*", divisor, rcv), rcv);   // GR7: dividend − subsidiaryQuotient × divisor
-            GuardedStore(ise, () => StoreArith(d.Quotient.Place,
+            GuardedStore(ise, d.Quotient.Place, () => StoreArith(d.Quotient.Place,
                 d.Quotient.Rounding == CobolRounding.Truncation
                     ? new NumX(qt, qs)
                     : new NumX(RuntimeApi.NumDivide(ise, dividend.Expr, $"{dividend.Scale}", divisor.Expr, $"{divisor.Scale}", $"{qs}", d.Quotient.Rounding), qs),
@@ -176,9 +177,9 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             // statement's flag when checking is on (the quotient's raise leaves the remainder untouched).
             if (ise)
                 using (w.Block($"if (!{ecState.SizeErrVar})"))
-                    GuardedStore(true, () => StoreArith(d.Remainder, remainder, CobolRounding.Truncation));
+                    GuardedStore(true, d.Remainder, () => StoreArith(d.Remainder, remainder, CobolRounding.Truncation));
             else
-                StoreArith(d.Remainder, remainder, CobolRounding.Truncation);   // REMAINDER has no ROUNDED phrase
+                brackets.Receive(d.Remainder, null, () => StoreArith(d.Remainder, remainder, CobolRounding.Truncation));   // REMAINDER has no ROUNDED phrase
         });
 
     /// <summary>COMPUTE: the RHS is rendered per receiver (so a quotient is computed at that receiver's scale + mode)
@@ -236,20 +237,20 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
                 {
                     NumX ax = Snapshot(num.Render(product.Left, rcv)), bx = Snapshot(num.Render(product.Right, rcv));
                     foreach (var r in c.Targets)
-                        GuardedStore(ise, () =>
+                        GuardedStore(ise, r.Place, () =>
                             StoreArith(r.Place, num.Combine(ax, "*", bx, RcvFor(r, ise), outermost: true), r.Rounding));
                     return;
                 }
                 NumX v = Snapshot(num.Render(c.Rhs, rcv));
                 foreach (var r in c.Targets)
-                    GuardedStore(ise, () => StoreArith(r.Place, v, r.Rounding));
+                    GuardedStore(ise, r.Place, () => StoreArith(r.Place, v, r.Rounding));
                 return;
             }
             foreach (var r in c.Targets)
                 // Single receiver: the RHS's top-level division (if any) IS the final transfer to r — render it
                 // outermost so an outermost quotient rounds at r's scale + mode and a nested quotient does not
                 // inherit r's mode (CA5; §14.7.7 rule 3 NOTE 1).
-                GuardedStore(ise, () =>
+                GuardedStore(ise, r.Place, () =>
                     StoreArith(r.Place, num.Render(c.Rhs, RcvFor(r, ise), outermost: true), r.Rounding));
         });
 
@@ -265,7 +266,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             var (carrier, value) = NumericRenderer.IntakeCarrier(
                 num.Render(p.Value, ReceiverContext.None with { InSizeError = ise }));
             var position = new NumX(RuntimeApi.PositionValueOf(carrier, value.Expr, value.Scale, p.RefMod), 0);
-            GuardedStore(ise, () => StoreArith(p.Temp, position, CobolRounding.Truncation));
+            GuardedStore(ise, p.Temp, () => StoreArith(p.Temp, position, CobolRounding.Truncation));
         });
 
     /// <summary>The size-error catch pair (kb/Work PB129 — factored so the outer statement try and every
@@ -291,12 +292,13 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
     /// data item to the right" — and §14.7.5 storing rule 2 requires the untouched receivers to hold the values
     /// they would have had. The old single statement-wide try let one receiver's PROHIBITED/overflow raise
     /// abandon every receiver to its right. The unchecked fast path is byte-identical to before.</summary>
-    private void GuardedStore(bool inSizeError, Action emitOne)
-    {
-        if (!inSizeError) { emitOne(); return; }
-        using (ctx.Writer.Block("try")) emitOne();
-        WriteSizeCatches(ecState.SizeErrVar!, ecState.SizeErrEcVar);
-    }
+    private void GuardedStore(bool inSizeError, Place receiver, Action emitOne)
+        => brackets.Receive(receiver, inSizeError ? ecState.SizeErrVar : null, () =>
+        {
+            if (!inSizeError) { emitOne(); return; }
+            using (ctx.Writer.Block("try")) emitOne();
+            WriteSizeCatches(ecState.SizeErrVar!, ecState.SizeErrEcVar);
+        });
 
     /// <summary>The <see cref="ReceiverContext"/> for receiver <paramref name="r"/> (P7 Step 3 — the pure
     /// factory replacing the mutable <c>SetTarget</c> context writes).</summary>

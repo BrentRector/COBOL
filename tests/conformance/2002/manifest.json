@@ -37,6 +37,7 @@
   "pb1425_object_property_identifier",
   "pb1425_property_of_qualified_view",
   "pb1425_property_of_function_refmod",
+  "pb2078_property_receivers_in_turn",
   "pb1136_invoke_selector_forms",
   "pb1165_active_class_returning_subclass",
   "pb1275_property_set_formats",

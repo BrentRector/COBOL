@@ -567,7 +567,8 @@ public sealed partial class DataBinder
     /// hoisted ahead of every pre-op of the statement (<c>OoWrapPropertyOps</c>), so left on that list they would run
     /// after the accessor that reads their result.</para>
     /// <para><paramref name="SelectedByValue"/>: identifier-3 selects its object through a value read at run time (a
-    /// data-name subscript, a function-identifier), which a RECEIVING property cannot yet carry (kb/Work PB2078).</para></summary>
+    /// data-name subscript, a function-identifier), which a RECEIVING property carries only through a per-receiver
+    /// <see cref="Interleaved"/> bracket (kb/Work PB2078).</para></summary>
     internal sealed record OoPendingPropertyOp(
         DataItem Temp, Bound.InvokeForm Form, Place? Receiver, string ClassCsName,
         OoMethodSymbol? Get, OoMethodSymbol? Set, string PropName, string ReceiverName,
@@ -575,6 +576,24 @@ public sealed partial class DataBinder
     {
         /// <summary>The emitted type that qualifies <paramref name="accessor"/>'s formal statics at the call site.</summary>
         public string? OwnerCsNameOf(OoMethodSymbol accessor) => InterfaceCsName ?? accessor.Owner?.CsName;
+
+        /// <summary>True once the binder that built the statement's receiver list CLAIMED this property as one of its
+        /// receivers (<see cref="DataBinder.OoClaimInterleavedReceiver"/>): that statement's emitter accesses each
+        /// receiver in turn, so the accessors go around THIS receiver (<c>BoundReceiverBrackets</c>, kb/Work PB2078)
+        /// instead of around the whole statement.</summary>
+        public bool Interleaved { get; set; }
+    }
+
+    /// <summary>⛔ THE ONE CLAIM A RECEIVER-LOOP BINDER MAKES (kb/Work PB2078): <paramref name="receiver"/> is a RECEIVING
+    /// operand of a statement whose emitter places each receiver's accessors itself
+    /// (<c>ReceiverBracketEmitter.Receive</c>). When it is an object-property reference this marks the pending op, so
+    /// <c>OoBinder.OoWrapPropertyOps</c> brackets it per receiver; any other place is none of this method's business.
+    /// The claim and the emitter's <c>Receive</c> are one contract: a claimed property whose bracket the emitter never
+    /// places fails the compilation (<c>ReceiverBracketEmitter.Enter</c>).</summary>
+    internal void OoClaimInterleavedReceiver(Place receiver)
+    {
+        foreach (var op in OoPendingPropertyOps)
+            if (ReferenceEquals(op.Temp, receiver.Item)) { op.Interleaved = true; return; }
     }
 
     /// <summary>The unit's un-drained property-reference ops (statement-scoped: BindStatement marks the

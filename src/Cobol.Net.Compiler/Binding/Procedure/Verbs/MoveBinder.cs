@@ -116,6 +116,12 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
             && host.Expr.ScreenIndexNameOperand(source, sdref.GetText(), "a MOVE sending operand"))
             source = BoundOperandError.Refused(ctx.Edition, $"MOVE of the index-name '{DataBinder.WrittenText(sdref)}' (ISO §13.18.38.3 r7)");
         var resolved = host.Expr.ResolveTargets(targets.dataReference());
+        // ⛔ kb/Work PB2078: MoveEmitter stores the receivers one at a time ("Item identification for identifier-2 is
+        // performed immediately before the data is moved to the respective data item", §14.9.25.4 GR1), so a receiver
+        // that is an object property has its accessors placed around ITS store (ReceiverBracketEmitter.Receive). Only
+        // the written MOVE claims: the implicit moves of READ / RETURN … INTO and WRITE … FROM keep the accessors
+        // around their statement.
+        foreach (var target in resolved) ctx.Data.OoClaimInterleavedReceiver(target);
         return BindMoveOf(source, resolved);
     }
 

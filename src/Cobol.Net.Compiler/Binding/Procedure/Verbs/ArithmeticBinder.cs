@@ -160,6 +160,7 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
                 : div.divideByPhrase() is { } b ? host.Expr.BindExpr(b.sendingOperand())
                 : a;
             ctx.Validation.CheckComposite("DIVIDE", [dividend, divisor], quotients);
+            ctx.Data.OoClaimInterleavedReceiver(r);   // the quotient was claimed with the other Receivers (ExpressionBinder.ReceiverOf)
             return new BoundDivideRemainder(dividend, divisor, quotients[0], r, sizeErr);
         }
 

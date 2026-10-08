@@ -14,7 +14,8 @@ using static CobolNet.CodeGen.Emit.EmitText;
 /// <see cref="EmitContext"/>, extracted from the orchestrator partial): the pure per-kind MOVE renderer
 /// (the dispatch travels on <c>BoundMove.Kinds</c>, P7 Step 7) and <c>ConvertSource</c> — the ONE MOVE
 /// conversion path Report Writer's synthetic print items and INITIALIZE's implicit stores share.</summary>
-internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, ReferenceResolver refs)
+internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, ReferenceResolver refs,
+    ReceiverBracketEmitter brackets)
 {
     /// <summary>Render one MOVE — a PURE per-store renderer since P7 Step 7: the dispatch travels on the node
     /// (<see cref="BoundMove.Stores"/>, classified once by <see cref="MoveClassifier"/> at construction — ISO
@@ -26,47 +27,58 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     /// (kb/Work PB425). Rendering <c>m.Source</c> here is the defect that shape prevents.</para></summary>
     public void Emit(BoundMove m)
     {
+        // ⛔ kb/Work PB2078: each receiver is accessed and stored in turn, so an object-property receiver has its
+        // accessors placed around ITS store (ISO §14.9.25.4 GR1 — item identification for identifier-2 is performed
+        // immediately before the data is moved to the respective data item).
         for (int i = 0; i < m.Targets.Count; i++)
         {
-            var target = m.Targets[i];
-            var (source, kind, origin) = m.Stores[i];
-            // ⛔ ISO §14.9.25.4 GR1's ZERO-LENGTH-ITEM clause — "If identifier-1 is a zero-length item, it is as
-            // if literal-1 were specified as a zero-length literal" — which lands in the GR2/GR3 substitution the
-            // store above already carries for a written literal. Whether the sending ITEM is zero-length is a
-            // RUNTIME state (§8.5.1.10), so this is the one arm of the rule that must be a runtime test; the
-            // classifier decides WHEN one is needed and over which sending place (kb/Work PB425). The length is
-            // read ONCE and both arms are the two stores the rule names, side by side.
-            if (MoveClassifier.ZeroLengthItemRoute(source, target) is { } zlSend)
-            {
-                // The LENGTH to test is the sending operand's CURRENT one. For the elementary shapes (§8.5.4
-                // items 3, 4, and 6/9 after their materialization) that is the carrier's own `.Length`; for a
-                // GROUP (items 1, 2, 5, 7 — kb/Work PB896) it is the group's SENDING VALUE, which §13.18.38.4
-                // GR8 a) already narrows to the occurs-depending current extent — through THE ONE group value
-                // reader, because a bit or national group's plain Read() is its STRUCT and has no length at all
-                // (kb/Work PB943: `NG.Length`, CS1061). Asking the plain place would also read the MAXIMUM extent
-                // and the test could never fire.
-                string len = zlSend.CurrentRecord is { } curRec ? OperandText.CurrentRecordLength(curRec)   // §8.5.4 item 5 — the record length is §13.18.43.4 GR16's byte count
-                    : zlSend.Place.Item.IsGroup
-                    ? $"{PlaceRenderer.SendingGroupValue(zlSend.Place, "zero-length-item test of")}.Length"
-                    : $"{PlaceRenderer.Read(zlSend.Place)}.Length";
-                // ⛔ BOTH ARMS ARE THE STATEMENT'S OWN DISPATCH. GR1's substitution changes the move's KIND — a
-                // group sender becomes a literal one, so GR4's first sentence makes the zero-length arm an
-                // ELEMENTARY move while the non-zero arm stays the group move (kb/Work PB896) — and the zero arm's
-                // kind is whatever the substituted figurative dispatches to against THIS receiver: the image fill
-                // into a numeric one, the edited fill into an edited one, a slice fill into a reference-modified
-                // one, a group fill into a group (kb/Work PB943 — the arm used to be hard-wired to the elementary
-                // store, which is why the route could only ever serve the numeric receivers it was filtered to).
-                var fig = MoveClassifier.ZeroLengthItemFigurative(zlSend);
-                ctx.Writer.Line($"if ({len} == 0) {{");
-                EmitStore(target, fig, MoveClassifier.Kind(fig, target), MoveSenderOrigin.ZeroLengthItem);
-                ctx.Writer.Line("} else {");
-                EmitStore(target, source, kind, origin, m.Stores[i].Prefill);
-                ctx.Writer.Line("}");
-                continue;
-            }
-            EmitStore(target, source, kind, origin, m.Stores[i].Prefill);
-            EmitElementMoves(m, i);
+            int at = i;
+            brackets.Receive(m.Targets[at], null, () => EmitReceiver(m, at));
         }
+    }
+
+    /// <summary>The access-and-store of receiving operand <paramref name="i"/> of <paramref name="m"/> — the body of
+    /// <see cref="Emit"/>'s per-receiver loop.</summary>
+    private void EmitReceiver(BoundMove m, int i)
+    {
+        var target = m.Targets[i];
+        var (source, kind, origin) = m.Stores[i];
+        // ⛔ ISO §14.9.25.4 GR1's ZERO-LENGTH-ITEM clause — "If identifier-1 is a zero-length item, it is as
+        // if literal-1 were specified as a zero-length literal" — which lands in the GR2/GR3 substitution the
+        // store above already carries for a written literal. Whether the sending ITEM is zero-length is a
+        // RUNTIME state (§8.5.1.10), so this is the one arm of the rule that must be a runtime test; the
+        // classifier decides WHEN one is needed and over which sending place (kb/Work PB425). The length is
+        // read ONCE and both arms are the two stores the rule names, side by side.
+        if (MoveClassifier.ZeroLengthItemRoute(source, target) is { } zlSend)
+        {
+            // The LENGTH to test is the sending operand's CURRENT one. For the elementary shapes (§8.5.4
+            // items 3, 4, and 6/9 after their materialization) that is the carrier's own `.Length`; for a
+            // GROUP (items 1, 2, 5, 7 — kb/Work PB896) it is the group's SENDING VALUE, which §13.18.38.4
+            // GR8 a) already narrows to the occurs-depending current extent — through THE ONE group value
+            // reader, because a bit or national group's plain Read() is its STRUCT and has no length at all
+            // (kb/Work PB943: `NG.Length`, CS1061). Asking the plain place would also read the MAXIMUM extent
+            // and the test could never fire.
+            string len = zlSend.CurrentRecord is { } curRec ? OperandText.CurrentRecordLength(curRec)   // §8.5.4 item 5 — the record length is §13.18.43.4 GR16's byte count
+                : zlSend.Place.Item.IsGroup
+                ? $"{PlaceRenderer.SendingGroupValue(zlSend.Place, "zero-length-item test of")}.Length"
+                : $"{PlaceRenderer.Read(zlSend.Place)}.Length";
+            // ⛔ BOTH ARMS ARE THE STATEMENT'S OWN DISPATCH. GR1's substitution changes the move's KIND — a
+            // group sender becomes a literal one, so GR4's first sentence makes the zero-length arm an
+            // ELEMENTARY move while the non-zero arm stays the group move (kb/Work PB896) — and the zero arm's
+            // kind is whatever the substituted figurative dispatches to against THIS receiver: the image fill
+            // into a numeric one, the edited fill into an edited one, a slice fill into a reference-modified
+            // one, a group fill into a group (kb/Work PB943 — the arm used to be hard-wired to the elementary
+            // store, which is why the route could only ever serve the numeric receivers it was filtered to).
+            var fig = MoveClassifier.ZeroLengthItemFigurative(zlSend);
+            ctx.Writer.Line($"if ({len} == 0) {{");
+            EmitStore(target, fig, MoveClassifier.Kind(fig, target), MoveSenderOrigin.ZeroLengthItem);
+            ctx.Writer.Line("} else {");
+            EmitStore(target, source, kind, origin, m.Stores[i].Prefill);
+            ctx.Writer.Line("}");
+            return;
+        }
+        EmitStore(target, source, kind, origin, m.Stores[i].Prefill);
+        EmitElementMoves(m, i);
     }
 
     /// <summary>ISO §14.6.9.2's last sentence, after a §14.9.25.4 GR9 group transfer into receiver

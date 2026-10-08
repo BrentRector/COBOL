@@ -38,9 +38,11 @@ public sealed partial class ReferenceResolver
     /// <summary>What the object of an object property selects: the accessors' invocation form, the receiver place for
     /// the instance form, and the roster the accessors are looked up on — a class (its instance or, with
     /// <paramref name="Factory"/>, its factory half) or an interface. A computed object (a view, a function) arrives as an
-    /// instance <paramref name="Receiver"/> with no roster, and the roster is read from the receiver's description.</summary>
+    /// instance <paramref name="Receiver"/> with no roster, and the roster is read from the receiver's description.
+    /// <paramref name="Described"/> is that description for a PROBE of a computed object whose temporary does not exist
+    /// yet (a function's result, kb/Work PB2073): the function's RETURNING item, read without binding the activation.</summary>
     internal readonly record struct PropertyReceiver(InvokeForm Form, Place? Receiver, OoClassSymbol? Class,
-        OoInterfaceSymbol? Interface, bool Factory);
+        OoInterfaceSymbol? Interface, bool Factory, DataItem? Described = null);
 
     /// <summary>The procedure binder's reading of a non-word object (<c>propertyObject</c>) — SELF, SUPER (with its
     /// <c>object-class-name-1</c> qualifier when the chain spelled one), an object-view, a function-identifier, NULL —
@@ -229,9 +231,10 @@ public sealed partial class ReferenceResolver
         if (receiver is { Class: null, Interface: null })
         {
             // A computed object (a view, a function) — its roster is its temporary's description.
-            // Its binder reported a non-object identifier; a universal one is SR2's, reported by RosterOf.
-            if (receiver.Receiver is not { } computed
-                || RosterOf(computed.Item, receiver, name, objWritten, out _) is not { } typed)
+            // Its binder reported a non-object identifier; a universal one is SR2's, reported by RosterOf. A probe has
+            // no temporary, only the description the activation would give it (PropertyReceiver.Described).
+            if ((receiver.Receiver?.Item ?? receiver.Described) is not { } computed
+                || RosterOf(computed, receiver, name, objWritten, out _) is not { } typed)
                 return !_probing ? (null, Refusal()) : default;
             receiver = typed;
         }
@@ -280,7 +283,9 @@ public sealed partial class ReferenceResolver
     /// <summary>True when identifier-3 selects its object through a value read at run time: a subscript or argument
     /// written with a data-name (or an index-name), or a function-identifier. Such an object can be a different one at
     /// the property's SET than at its GET, or than at the moment §14.7.7 4) b) and §14.9.25.4 GR1 identify the receiver
-    /// (kb/Work PB2078), so <c>OoBinder.OoWrapPropertyOps</c> refuses it as a RECEIVING operand.</summary>
+    /// (kb/Work PB2078), so <c>OoBinder.OoWrapPropertyOps</c> refuses it as a RECEIVING operand of a statement that does
+    /// not place its receivers' accessors one at a time (<c>ReceiverBracketEmitter</c>: the arithmetic statements and
+    /// MOVE do).</summary>
     private static bool SelectsByValue(IParseTree? tree) => tree switch
     {
         null or ITerminalNode => false,

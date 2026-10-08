@@ -37,7 +37,12 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// accessor must exist, on the instance or factory roster per the reference form) check HERE, against
     /// the classified need, both COBOLNET0843. The taxonomy is TOTAL — a non-nullable answer from an exhaustive
     /// visitor, so a new bound statement cannot compile without deciding each Place's polarity, and nothing here
-    /// guesses whether a side-effecting accessor runs (kb/Work PB1275).</summary>
+    /// guesses whether a side-effecting accessor runs (kb/Work PB1275).
+    /// <para>⛔ WHERE THE STEPS GO (kb/Work PB2078). A reference the statement's binder CLAIMED as one of its receivers
+    /// (<see cref="DataBinder.OoClaimInterleavedReceiver"/>: the arithmetic statements and MOVE, whose emitters store
+    /// their receivers one at a time) gets a <see cref="ReceiverBracket"/> under a <see cref="BoundReceiverBrackets"/> —
+    /// its Prelude and GET just before ITS access, its SET just after ITS store (§14.7.7 4) b), §14.9.25.4 GR1). Every
+    /// other reference keeps the statement-level shape, GETs and Prelude before the statement and SETs after it.</para></summary>
     public BoundStatement OoWrapPropertyOps(BoundStatement core, int mark)
     {
         var ops = ctx.Data.OoPendingPropertyOps;
@@ -46,6 +51,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         ops.RemoveRange(mark, ops.Count - mark);
 
         List<BoundStatement> pre = [], post = [];
+        List<ReceiverBracket> brackets = [];
         foreach (var op in taken)
         {
             // TOTAL over every bound statement (kb/Work PB1275): §8.4.3.9.3 SR5/SR6 admit a property wherever a
@@ -56,24 +62,27 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             string where = $"'{op.PropName}' OF '{op.ReceiverName}'";
             var tempPlace = ctx.Refs.ResolveItem(op.Temp)!;
 
-            // ⛔ kb/Work PB2078: the GET runs before the statement and the SET after it, each rendering identifier-3
-            // afresh, so an object selected through a run-time value is one object at the GET and another at the SET
-            // (`ADD 1 TO I, BAL OF AR(I)` stored AR(1)'s BAL + 1 into AR(2)), and neither is the receiver §14.7.7 4) b)
-            // and §14.9.25.4 GR1 identify "as each data item is accessed". Until each receiver's accessors interleave
-            // with its own store, that receiving shape is refused, as it was before PB1425 admitted the subscript.
-            if (needSet && op.SelectedByValue)
+            // ⛔ kb/Work PB2078: a statement-level GET runs before the statement and SET after it, each rendering
+            // identifier-3 afresh, so an object selected through a run-time value is one object at the GET and another
+            // at the SET (`ADD 1 TO I, BAL OF AR(I)` stored AR(1)'s BAL + 1 into AR(2)), and neither is the receiver
+            // §14.7.7 4) b) and §14.9.25.4 GR1 identify "as each data item is accessed". A statement whose emitter
+            // stores its receivers one at a time claims them (DataBinder.OoClaimInterleavedReceiver) and the accessors
+            // go around THAT receiver's store below; every other statement refuses the shape, as it did before PB1425
+            // admitted the subscript.
+            if (needSet && op.SelectedByValue && !op.Interleaved)
             {
                 ctx.Edition.Error(DiagnosticCatalog.ReceivingReferenceNotImplemented,
-                    $"the object-property reference {where} is a RECEIVING operand whose object is selected by a "
-                    + "run-time value (a data-name subscript or a function-identifier): identifying that object when the "
-                    + "statement reaches it (ISO §14.7.7 4) b), §14.9.25.4 GR1) is not yet implemented for a property");
+                    $"the object-property reference {where} is a RECEIVING operand of a statement that does not store its "
+                    + "receivers one at a time, and its object is selected by a run-time value (a data-name subscript or a "
+                    + "function-identifier): identifying that object when the statement reaches it (ISO §14.7.7 4) b), "
+                    + "§14.9.25.4 GR1) is implemented for the arithmetic statements and MOVE only");
                 continue;
             }
 
             // identifier-3's own evaluation first (§8.4.3.1.4 GR1 a)–c) before d)), then the GET — once, whichever
             // accessors the polarity needs: the SET of a receiving property uses the same evaluated receiver.
-            pre.AddRange(op.Prelude);
-            if (needGet && PropertyGet(op) is { } get) pre.Add(get);
+            List<BoundStatement> open = [.. op.Prelude], close = [];
+            if (needGet && PropertyGet(op) is { } get) open.Add(get);
             if (needSet)
             {
                 if (op.Set is null)
@@ -81,18 +90,28 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                         $"the object-property reference {where} is a RECEIVING operand but the class has no "
                         + "SET property method (ISO §8.4.3.9.3 SR4 — WITH NO SET, or no accessor defined)");
                 else
-                    post.Add(new BoundInvoke(op.Form, op.ClassCsName, op.Receiver, op.Set.CsName, null,
+                    close.Add(new BoundInvoke(op.Form, op.ClassCsName, op.Receiver, op.Set.CsName, null,
                         [new BoundInvokeArg(op.Set.Binding!.Formals[0].Item, tempPlace, null, null, WriteBack: false)],
                         null, op.OwnerCsNameOf(op.Set)));
             }
+            if (op.Interleaved) brackets.Add(new ReceiverBracket(op.Temp, [.. open.Select(Operand)], [.. close.Select(Operand)]));
+            else
+            {
+                pre.AddRange(open);
+                post.AddRange(close);
+            }
         }
-        if (pre.Count + post.Count == 0) return core;
+        if (pre.Count + post.Count + brackets.Count == 0) return core;
         // §8.4.3.9.4 GR1/GR2: each accessor is invoked "as though" by an INVOKE, but it is written as an OPERAND of
         // the statement, so a condition it propagates resumes after THAT statement — the operand-activation mark
         // UdfBinder.DrainPending gives a function reference (kb/Work PB892; §14.9.33.4 GR2 a) 2.). Its checking
-        // profile is EcBinder.EcWrap's sequence stamp, which reaches these steps.
-        ctx.Data.OperandEvaluations += pre.Count + post.Count;
-        return new BoundSequence([.. pre.Select(Operand), core, .. post.Select(Operand)]);
+        // profile is EcBinder.EcWrap's sequence stamp, which reaches these steps (and the brackets' through
+        // BoundReceiverBrackets).
+        ctx.Data.OperandEvaluations += pre.Count + post.Count + brackets.Sum(b => b.Open.Count + b.Close.Count);
+        BoundStatement inner = brackets.Count == 0 ? core : new BoundReceiverBrackets(core, brackets);
+        return pre.Count + post.Count == 0
+            ? inner
+            : new BoundSequence([.. pre.Select(Operand), inner, .. post.Select(Operand)]);
         static BoundStatement Operand(BoundStatement s) => s with { OperandEvaluation = true };
     }
 

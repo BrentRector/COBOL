@@ -921,6 +921,17 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         return null;
     }
 
+    /// <summary>⛔ THE ONE CONSTRUCTION OF AN ARITHMETIC <see cref="Receiver"/> (kb/Work PB2078). Every arithmetic
+    /// emitter stores its receivers one at a time through <c>ReceiverBracketEmitter.Receive</c>, so a receiver that is an
+    /// object property has its accessors placed around ITS store (ISO §14.7.7 4) b): "Item identification for the
+    /// receiving data items is done as each data item is accessed") — the CLAIM that says so is made here, where the
+    /// receiver list is built, and nowhere else.</summary>
+    private Receiver ReceiverOf(Place resolved, Core.RoundedPhraseContext? rounded)
+    {
+        ctx.Data.OoClaimInterleavedReceiver(resolved);
+        return new Receiver(resolved, RoundingOf(rounded));
+    }
+
     /// <summary>Resolve <c>receivingArithmeticOperand</c>s (the GIVING / TO / FROM / INTO resultants) to
     /// <see cref="Receiver"/>s, each carrying its own ROUNDED mode and screened per the caller's syntax rule
     /// (<paramref name="editedOk"/> — GIVING-style positions admit numeric-edited, in-place ones do not);
@@ -928,7 +939,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     public List<Receiver> Receivers(IEnumerable<Core.ReceivingArithmeticOperandContext> ops, bool editedOk, string clause) =>
         ops.Select(o => ResolveReceiving(o.dataReference()) is { } p
                 && ScreenResultant(p, o.dataReference().GetText(), editedOk, clause) is { } sp
-                ? new Receiver(sp, RoundingOf(o.roundedPhrase())) : null)
+                ? ReceiverOf(sp, o.roundedPhrase()) : null)
            .OfType<Receiver>().ToList();
 
     /// <summary>Resolve the in-place <c>MULTIPLY … BY</c> receivers (<c>multiplyByOperand</c> = receiving operand +
@@ -936,7 +947,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     public List<Receiver> Receivers(IEnumerable<Core.MultiplyByOperandContext> ops) =>
         ops.Select(o => o.receivingOperand()?.dataReference() is { } d && ResolveReceiving(d) is { } p
                 && ScreenResultant(p, d.GetText(), editedOk: false, "§14.9.26.3 SR1") is { } sp
-                ? new Receiver(sp, RoundingOf(o.roundedPhrase())) : null)
+                ? ReceiverOf(sp, o.roundedPhrase()) : null)
            .OfType<Receiver>().ToList();
 
     /// <summary>Resolve the <c>COMPUTE</c> Format-1 resultants (<c>computeStore</c> = data reference + optional
@@ -944,7 +955,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     public List<Receiver> Receivers(IEnumerable<Core.ComputeStoreContext> stores) =>
         stores.Select(s => ResolveReceiving(s.dataReference()) is { } p
                 && ScreenResultant(p, s.dataReference().GetText(), editedOk: true, "§14.9.8.3 SR1") is { } sp
-                ? new Receiver(sp, RoundingOf(s.roundedPhrase())) : null)
+                ? ReceiverOf(sp, s.roundedPhrase()) : null)
               .OfType<Receiver>().ToList();
 
     /// <summary>Bind any numeric node (expression, operand wrapper, literal, or data reference) as an ISO §8.8.1.1

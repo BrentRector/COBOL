@@ -22,6 +22,7 @@ internal sealed class UnitEmitters
     public ConditionRenderer Cond { get; }
     public ReferenceResolver Refs { get; }
 
+    public ReceiverBracketEmitter Brackets { get; }
     public MoveEmitter Move { get; }
     public EcEmitter Ec { get; }
     public ArithmeticEmitter Arith { get; }
@@ -54,9 +55,10 @@ internal sealed class UnitEmitters
 
         // Acyclic construction order (each ctor takes only already-built collaborators); the cycles close
         // via the property wiring below.
-        Move = new MoveEmitter(Ctx, Num, Refs);
+        Brackets = new ReceiverBracketEmitter(Ctx);
+        Move = new MoveEmitter(Ctx, Num, Refs, Brackets);
         Ec = new EcEmitter(Ctx, ecState, dispatchState);
-        Arith = new ArithmeticEmitter(Ctx, Num, ecState, Ec);
+        Arith = new ArithmeticEmitter(Ctx, Num, ecState, Ec, Brackets);
         AlterSwitch = new AlterSwitchEmitter(Ctx, dispatchState);
         AcceptDisplay = new AcceptDisplayEmitter(Ctx, Num, Move);
         Evaluate = new EvaluateEmitter(Ctx, Cond);
@@ -79,6 +81,7 @@ internal sealed class UnitEmitters
         // EmitStatement; KeyedIo consumes SequentialIo's file-I/O common services although SeqIo's ctor
         // already took KeyedIo for the shared READ/REWRITE bodies).
         Ec.Statements = Statements;
+        Brackets.Statements = Statements;
         Arith.Statements = Statements;
         Evaluate.Statements = Statements;
         Strings.Statements = Statements;

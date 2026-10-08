@@ -353,7 +353,11 @@ function-identifier | NULL`), bound by `OoBinder.OoBindPropertyObject` through t
 SELF / SUPER / `object-class-name-1 OF SUPER` select the accessor exactly as an INVOKE through them selects a method
 (the ONE `OoBinder.OoPredefinedSearchRoot` — §8.4.3.8.3 SR1/SR4, §8.4.3.8.4 GR2–GR4) and invoke it on `this` / `base`
 (`OoPendingPropertyOp.Form`); a view or a function is bound to its temporary, whose evaluating pre-ops travel with the
-property (`OoPendingPropertyOp.Prelude`) so they run before its GET. `K OF SUPER` is one spelling of two formats —
+property (`OoPendingPropertyOp.Prelude`) so they run before its GET. The pure PROBE (`ReferenceResolver.IsObjectPropertyReference`,
+asked by CALL / INVOKE for §14.9.4.3 SR20's BY CONTENT omission and by a user function's argument manner) cannot bind a view's
+conformance check or a function's activation, so it reads the object's DESCRIPTION instead and the committing arm reads it off the
+temporary it bound: a view's last phrase, a function's RETURNING item (§8.4.3.2.4 GR1, the function-prototype-name and the
+function-pointer-name forms alike, `IntrinsicBinder.ReturningItemOf`; kb/Work PB2073). `K OF SUPER` is one spelling of two formats —
 the qualified SUPER (K a class-name) and the property K of SUPER — decided by the symbol in ONE place,
 `ReferenceResolver.QualifiedSuperClass`; the qualified SUPER's only home is the invocation receiver, elsewhere §8.4.3.8.3
 SR3 (COBOLNET2900). Likewise `A OF G AS C` reads as the property A of a view and as a view of the qualified item
@@ -370,7 +374,17 @@ statement is a statement-level pre-op, but one written in a per-evaluation windo
 condition, a SEARCH WHEN, an EVALUATE object, a non-first AND/OR operand, a VARYING BY / AFTER FROM operand — is
 drained by that window (`UdfBinder.Mark` marks BOTH pending lists; `OoBinder.OoDrainPropertyGets`) and fetched at
 each evaluation, and not at all when a short-circuit never reaches it. Every such reference is sending, so the
-window never needs the GR2 SET. INTERFACE PROPERTIES (kb/Work PB1449): §11.7.2's METHOD-ID format is shared by
+window never needs the GR2 SET. A RECEIVING reference of a statement that stores its
+receivers one at a time — the arithmetic statements and MOVE — is accessed receiver by receiver instead (kb/Work PB2078;
+§14.7.7 4) b) "Item identification for the receiving data items is done as each data item is accessed", §14.9.25.4 GR1): the
+binder that builds the receiver list CLAIMS a property receiver (`DataBinder.OoClaimInterleavedReceiver`, made in
+`ExpressionBinder.ReceiverOf` and the written MOVE), `OoBinder.OoWrapPropertyOps` then gives it a `ReceiverBracket`
+(identifier-3's Prelude and the GET before, the SET after) under a `BoundReceiverBrackets` node instead of hoisting its steps
+around the statement, and `ReceiverBracketEmitter.Receive` — called by `MoveEmitter` and by `ArithmeticEmitter.GuardedStore`,
+the one store funnel — places them around that receiver's access and store, skipping the SET for a receiver whose store raised
+a size error. An unplaced bracket fails the compile, so a receiver loop that forgets `Receive` cannot drop a GET or a SET.
+Every other statement keeps the statement-level GET and SET and refuses a receiver whose object is selected by a run-time value
+(a subscript naming a data item, a function-identifier; COBOLNET0899), because GET and SET would evaluate it twice. INTERFACE PROPERTIES (kb/Work PB1449): §11.7.2's METHOD-ID format is shared by
 definitions and prototypes and §11.7.4 GR6/GR7 make a GET/SET phrase a get/set property method, so an interface's
 `METHOD-ID. GET|SET PROPERTY p` prototype joins its roster under the same pinned `__GET_<P>`/`__SET_<P>` name;
 `ValidateImplements` pairs it with the class's accessor (explicit or clause-defined) by that roster key, the C#

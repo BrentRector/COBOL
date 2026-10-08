@@ -51,7 +51,8 @@ internal sealed partial class OoBinder
             return null;
         }
         if (probe)
-            return po.objectView() is { } pv ? DescribedByView(pv) : null;
+            return po.objectView() is { } pv ? DescribedByView(pv)
+                : po.functionCall() is { } fc ? DescribedByFunction(fc) : null;
 
         BoundExpr bound = po.objectView() is { } ov ? OoBindObjectView(ov) : host.Intrinsic.BindIntrinsic(ReferenceResolver.WithoutResultRefMods(po).functionCall()!);
         return OoObjectReferenceTemporary(bound, po, DiagnosticCatalog.PropertyObject.Code,
@@ -67,5 +68,16 @@ internal sealed partial class OoBinder
             var found = OoNameResolution.Lookup(host.OoClasses, last, last.className().GetText(), OoNameResolution.Want.Either);
             return found.Ok ? new(InvokeForm.Instance, null, found.Class, found.Interface, last.FACTORY() is not null) : null;
         }
+
+        // A probe's reading of a function-identifier (kb/Work PB2073): activating it is a side effect, so the probe takes
+        // the description its result temporary WOULD carry — §8.4.3.2.4 GR1: "the description, class, and category of
+        // the temporary data item is that specified by the description in the linkage section of the item specified in
+        // the RETURNING phrase" of the function (prototype) — and the resolver reads the roster off it, the same fact
+        // the committing arm reads off the bound temporary. An intrinsic function, or one that returns no object
+        // reference, answers null: it is no property's object.
+        ReferenceResolver.PropertyReceiver? DescribedByFunction(Core.FunctionCallContext fc) =>
+            host.Intrinsic.ReturningItemOf(fc) is { Pic.Category: PicCategory.ObjectReference } item
+                ? new(InvokeForm.Instance, null, null, null, false, item)
+                : null;
     }
 }

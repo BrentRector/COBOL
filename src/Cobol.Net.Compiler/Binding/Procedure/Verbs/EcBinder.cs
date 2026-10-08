@@ -501,6 +501,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
         : node switch
         {
             BoundSequence seq => new BoundSequence([.. seq.Steps.Select(st => StampActivators(st, profile))]),
+            BoundReceiverBrackets brackets => brackets.Mapped(st => StampActivators(st, profile)),
             BoundImplicitSeries ser =>
                 new BoundImplicitSeries([.. ser.Members.Select(st => StampActivators(st, profile))]),
             BoundActivationSite site => new BoundActivationSite(StampActivators(site.Inner, profile)),
@@ -524,7 +525,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
         // THIS element's §7.3.25 state at THIS line into the run. The recursion reaches the activations a
         // desugar hoisted into a sequence (a user-function reference inside a COMPUTE); a new activating node
         // inherits the stamp by implementing IActivatingStatement, never by remembering to set a property.
-        if (bound is IActivatingStatement or BoundSequence or BoundImplicitSeries or BoundActivationSite)   // the shapes a profile lands on
+        if (bound is IActivatingStatement or BoundSequence or BoundImplicitSeries or BoundActivationSite or BoundReceiverBrackets)   // the shapes a profile lands on
             bound = StampActivators(bound, ctx.EcState.Turn.ProfileAt(line));
         var enabled = new List<(string Ec, FileModel? File)>();
         void Query(IEnumerable<string> names, FileModel? file = null)
@@ -544,6 +545,14 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
             if (node is BoundSequence seq)
             {
                 foreach (var step in seq.Steps) QueryFor(step);
+                return;
+            }
+            // The per-receiver accessors of a statement that stores its receivers one at a time (kb/Work PB2078) are
+            // activations exactly like a sequence's hoisted steps: the statement keeps its families and they add theirs.
+            if (node is BoundReceiverBrackets receivers)
+            {
+                QueryFor(receivers.Inner);
+                foreach (var step in receivers.AllSteps()) QueryFor(step);
                 return;
             }
             // An implicit-statement series (ISO §14.9.20.4 GR3 and its six siblings — see BoundImplicitSeries) is
@@ -920,7 +929,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
         if (enabled.Count == 0) return bound;
         // A sequence's steps can re-contribute a family (two hoisted activations ⇒ ProgramNames twice) —
         // the checked wrapper carries each (name, connector) once.
-        if (bound is BoundSequence or BoundImplicitSeries or BoundActivationSite) enabled = enabled.Distinct().ToList();
+        if (bound is BoundSequence or BoundImplicitSeries or BoundActivationSite or BoundReceiverBrackets) enabled = enabled.Distinct().ToList();
         ctx.EcState.Checked = true;
         if (enabled.Any(e => e.Ec.StartsWith("EC-I-O", StringComparison.Ordinal))) ctx.EcState.IoChecked = true;
         // §15.32.3 r3: the recorded name comes from Table 12's 'Statement name' column, resolved from the

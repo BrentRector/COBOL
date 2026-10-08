@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-284 drift tests.
+285 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -220,6 +220,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [ProgramNameScopeDriftTests](../tests/Cobol.Net.Tests.Unit/ProgramNameScopeDriftTests.cs) | ⛔ ISO §8.4.6.3 2)'s COMMON-program exception is written ONCE, in ProgramNameScope, and BOTH scope implementations ask it (kb/Work PB1460): the bind-time AS NESTED table (BinderDriver.NestedCallablesOf) and the run-time resolver (ProgramTable.ResolveVisible). | — |
 | [QualifiedNameClassDriftTests](../tests/Cobol.Net.Tests.Unit/QualifiedNameClassDriftTests.cs) | kb/Work PB919 — ISO §8.4.2.2.3 SR1's uniqueness obligation covers EVERY user-defined name, and it was enforced per name class with one class (index-names) never done. | `specs/ISO_COBOL.md` |
 | [ReadPreconditionOrderDriftTests](../tests/Cobol.Net.Tests.Unit/ReadPreconditionOrderDriftTests.cs) | ⛔ THE READ PRECONDITIONS ARE WRITTEN DOWN ONCE, AND IN THE STANDARD'S OWN ORDER (kb/Work PB336). | `src/Cobol.Net.Runtime/IO` |
+| [ReceiverBracketDriftTests](../tests/Cobol.Net.Tests.Unit/ReceiverBracketDriftTests.cs) | ⛔ A RECEIVING OBJECT PROPERTY IS ACCESSED WHEN ITS STATEMENT REACHES IT — ONE CLAIM, ONE PLACEMENT (kb/Work PB2078). | `src/Cobol.Net.Compiler/Binding`, `src/Cobol.Net.Compiler/CodeGen/Verbs` |
 | [ReceiverContextRestoreDriftTests](../tests/Cobol.Net.Tests.Unit/ReceiverContextRestoreDriftTests.cs) | ⛔ EVERY PUBLIC ENTRY OF NumericRenderer THAT SETS THE AMBIENT RECEIVER MUST RESTORE IT. | `src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs` |
 | [ReceivingResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/ReceivingResolutionDriftTests.cs) | ⛔ EVERY VERB BINDER STATES AN OPERAND'S ROLE WHEN IT RESOLVES IT (kb/Work PB881, CLAUDE.md rule 5). | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs`, `src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs` |
 | [ReceivingStoreDriftTests](../tests/Cobol.Net.Tests.Unit/ReceivingStoreDriftTests.cs) | kb/Work PB871 — the ELEMENTARY CHARACTER RECEIVING STORE lives in ONE place, CodeGen/Verbs/ReceivingStore.cs. | `src/Cobol.Net.Compiler/CodeGen/Verbs`, `src/Cobol.Net.Compiler/CodeGen/Verbs/ReceivingStore.cs`, `src/Cobol.Net.Compiler/CodeGen/Verbs/AcceptDisplayEmitter.cs` |
