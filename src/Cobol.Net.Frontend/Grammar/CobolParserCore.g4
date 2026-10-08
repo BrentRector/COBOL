@@ -1569,9 +1569,12 @@ setSwitchStatement
     : SET setSwitchPhrase+
     ;
 
-// ONE printed Format-3 unit: `{ mnemonic-name-1 } … TO { ON | OFF }`.
+// ONE printed Format-3 unit: `{ mnemonic-name-1 } … TO { ON | OFF }`. Each receiver is a mnemonic-name — a WORD
+// (§8.3.2.2.16), never a dataReference, so a subscript, reference modification or qualifier on it is no SET
+// statement (kb/Work PB2499 — `SET MYSW (1) TO ON` used to bind the word and drop the suffix; acceptSource and
+// displayUpon spell the same slot the same way).
 setSwitchPhrase
-    : dataReference+ TO (ON | OFF)
+    : cobolWord+ TO (ON | OFF)
     ;
 
 // SET dataReference+ TO arithmeticExpression (COBOL-85 §14.9.39 Format 1)
@@ -1865,6 +1868,15 @@ acceptStatement
     : ACCEPT dataReference (FROM acceptSource)? screenTail? END_ACCEPT?   // END-ACCEPT: 2002+ (gated in VersionConformancePass; kb/Work PB134)
     ;
 
+// ⛔ THE FORMAT-1 SLOT IS A WORD, NOT A dataReference (kb/Work PB2499). §14.9.1.2 Format 1 prints
+// `ACCEPT identifier-1 [ FROM mnemonic-name-1 ]`, and a mnemonic-name "identifies an implementor-defined
+// device-name, feature-name, or switch-name" (§8.3.2.2.16) — a WORD, with no data description to subscript or
+// reference-modify and no qualified format in §8.4.2.2.2. The arm used to be `dataReference`, which admits
+// `cobolWord dataReferenceSuffix*`, and the binder read only the word, so `ACCEPT X FROM MYIN (1)`,
+// `FROM MYIN (1:1)` and `FROM MYIN OF WS-G` compiled clean and the suffix vanished. `displayUpon` and
+// `setSwitchPhrase` spell the same printed slot the same way: the three mnemonic-name-1 positions whose
+// grammar CAN tell a mnemonic from an identifier (WRITE ADVANCING cannot — its mnemonic arm shares
+// identifier-2's `dataReference`, so SequentialIoBinder.MnemonicOperand refuses the suffix there instead).
 acceptSource
     : DATE YYYYMMDD
     | DATE
@@ -1872,7 +1884,7 @@ acceptSource
     | DAY YYYYDDD
     | DAY
     | DAY_OF_WEEK
-    | dataReference
+    | cobolWord
     ;
 
 // ==========================================

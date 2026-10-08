@@ -62,7 +62,7 @@ internal sealed class AcceptDisplayBinder(BinderContext ctx, StatementBinder hos
             return new BoundUnsupported("ACCEPT receiving operand");   // the chokepoint reported it — not a deferral (kb/Work PB236)
 
         // Format 2 is FROM a temporal source; FROM omitted / FROM mnemonic is the Format 1 device transfer.
-        bool temporal = ac.acceptSource() is { } tsrc && tsrc.dataReference() is null;
+        bool temporal = ac.acceptSource() is { } tsrc && tsrc.cobolWord() is null;
 
         // §14.9.1.3 SR1 (identifier-1) / SR3 (identifier-2): the excluded receiver CLASSES both formats share.
         // SR1 — "neither a strongly-typed group item nor a data item of class index, message-tag, object, or
@@ -98,7 +98,7 @@ internal sealed class AcceptDisplayBinder(BinderContext ctx, StatementBinder hos
         if (ac.acceptSource() is not { } src)
             return new BoundAccept(target, AcceptKind.Device) { HasEndTerminator = endTerm };   // GR5 — FROM omitted: the implementor default (stdin)
 
-        if (src.dataReference() is { } mnemonic)
+        if (src.cobolWord() is { } mnemonic)
         {
             var accepted = BindAcceptFromMnemonic(target, mnemonic);
             return accepted is BoundAccept mba ? mba with { HasEndTerminator = endTerm } : accepted;
@@ -160,10 +160,12 @@ internal sealed class AcceptDisplayBinder(BinderContext ctx, StatementBinder hos
 
     /// <summary><c>ACCEPT … FROM mnemonic-name-1</c> (ISO §14.9.1 Format 1, SR2): the mnemonic shall be declared in
     /// SPECIAL-NAMES and associated with a device CAPABLE OF INPUT. An undeclared name or an output-only device is
-    /// a bind-time rejection — the legacy silently treated every FROM word as the console; the spec says reject.</summary>
-    private BoundStatement BindAcceptFromMnemonic(Place target, Core.DataReferenceContext mnemonic)
+    /// a bind-time rejection — the legacy silently treated every FROM word as the console; the spec says reject.
+    /// The operand is the WORD the grammar admits (<c>acceptSource</c>'s <c>cobolWord</c> arm, kb/Work PB2499), so
+    /// there is no subscript, reference modification or qualifier here to read or to lose.</summary>
+    private BoundStatement BindAcceptFromMnemonic(Place target, Core.CobolWordContext mnemonic)
     {
-        string name = mnemonic.cobolWord()?.GetText() ?? mnemonic.GetText();
+        string name = mnemonic.GetText();
         if (MnemonicDevice(mnemonic, name, "ACCEPT FROM", "14.9.1.3", DeviceCapability.Input, "capable of input") is null)
             return BoundRejected.Reported(ctx.Edition);   // reported — not a deferral (kb/Work PB236)
         return new BoundAccept(target, AcceptKind.Device);

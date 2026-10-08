@@ -1350,6 +1350,19 @@ spells the printed `{ statement | NEXT SENTENCE }` braces; its POSITION is decid
 (`StatementBinder.IsNextSentenceArm`), because narrowing it in the grammar would re-parse the illegal
 `IF A NEXT SENTENCE DISPLAY X.` with DISPLAY as the sentence's next statement — a silent change of meaning.
 
+**The mnemonic-name slots (kb/Work PB2499).** Four statements print a `mnemonic-name-1` operand: ACCEPT Format 1
+(`FROM`, §14.9.1.2), DISPLAY Format 1 (`UPON`, §14.9.11.2), SET Format 3 (`{ mnemonic-name-1 } … TO { ON | OFF }`,
+§14.9.39.2) and WRITE Format 1 (`ADVANCING`, §14.9.51.2). A mnemonic-name is a WORD (§8.3.2.2.16): it has no data
+description to subscript or reference-modify, and no §8.4.2.2.2 format qualifies one. So wherever the grammar CAN
+tell the slot from an identifier it spells it `cobolWord` — `acceptSource`'s mnemonic arm, `displayUpon`,
+`setSwitchPhrase` — and the suffix is a syntax error that `CobolErrorStrategy.MnemonicSuffixMessage` re-codes as
+COBOLNET2269 from the parser state (the just-completed slot context for ACCEPT/DISPLAY; the SET statement whose
+suffixed list ends at `TO ON|OFF` for Format 3). WRITE's slot shares identifier-2's `dataReference`, so only the
+SPECIAL-NAMES registry tells them apart: `SequentialIoBinder.MnemonicOperand` asks the registry about the
+reference's WORD and `BindAdvancing` refuses the suffix with the same COBOLNET2269 text. Both layers word it through
+the one `Parsing/MnemonicNameSlot.SuffixMessage`. The ACCEPT and SET slots used to be `dataReference` with binders
+that read only the word, so the suffix compiled clean and vanished.
+
 ### 3.12 The lexer keeps every distinction the standard draws (kb/Work PB510, PB569)
 
 **One token per reserved word.** ZERO, ZEROS and ZEROES — and SPACE/SPACES, HIGH-VALUE/HIGH-VALUES,

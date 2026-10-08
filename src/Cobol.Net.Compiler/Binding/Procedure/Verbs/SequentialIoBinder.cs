@@ -4,6 +4,7 @@ using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Generated;
+using CobolNet.Frontend.Parsing;
 using CobolNet.Editions;
 
 namespace CobolNet.Binding.Procedure;
@@ -231,8 +232,7 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
         }
         // SR13: with a LINAGE clause, the ADVANCING phrase shall not name a SPECIAL-NAMES mnemonic (the
         // implementor positioning rules and the logical-page model are mutually exclusive).
-        ctx.Validation.CheckWriteAdvancingMnemonic(file, adv is not null
-            && adv.dataReference() is { } mref && ctx.Mnemonics.Of(adv).ContainsKey(mref.GetText()));   // SR13 — pure check
+        ctx.Validation.CheckWriteAdvancingMnemonic(file, MnemonicOperand(adv) is not null);   // SR13 — pure check
         // SR17: the COBOL-2023 pair of words may not carry the PAGE operand (GR25 g)/h) place the record
         // "depending on the phrase used", which the pair leaves unanswered).
         ctx.Validation.CheckWriteBeforeAfterPage(
@@ -401,8 +401,14 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
         if (wba is null) return null;
         bool before = wba.BEFORE() is not null;   // §14.9.51.4 GR25 e)/f): BEFORE, alone or with AFTER, presents first
         if (wba.PAGE() is not null) return new BoundAdvancing(before, true, null);
-        if (wba.dataReference() is { } m && ctx.Mnemonics.Of(wba).TryGetValue(m.GetText(), out var system))
+        if (MnemonicOperand(wba) is (var m, var name, var system))
         {
+            // A mnemonic-name is a WORD (§8.3.2.2.16), so it takes no subscript, reference modification or
+            // qualifier (kb/Work PB2499). The grammar cannot refuse one in THIS slot (it is identifier-2's
+            // dataReference too), so this arm does, with the one message the parse layer gives the other three.
+            if (m.dataReferenceSuffix().Length > 0)
+                ctx.Edition.Error(DiagnosticCatalog.StatementFormatShape,
+                    MnemonicNameSlot.SuffixMessage("WRITE … ADVANCING", name, "§14.9.51.2 Format 1"));
             // ⛔ LINE / LINES BELONG TO THE COUNT ALTERNATIVE ONLY (kb/Work PB1189). §14.9.51.2 Format 1 prints
             // `{ identifier-2 | integer-1 } [ LINE | LINES ]` and `{ mnemonic-name-1 | PAGE }` as the two operand
             // alternatives, so `mnemonic-name-1 LINES` is no WRITE statement. The grammar cannot tell a mnemonic
@@ -410,11 +416,11 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
             // PAGE twin is a parse error because PAGE is a keyword. The word used to be dropped in silence.
             if ((wba.LINE() ?? wba.LINES()) is { } word)
                 ctx.Edition.Error(DiagnosticCatalog.StatementFormatShape,
-                    $"WRITE … ADVANCING {DataBinder.WrittenText(m)} {word.GetText()}: '{DataBinder.WrittenText(m)}' "
+                    $"WRITE … ADVANCING {DataBinder.WrittenText(m)} {word.GetText()}: '{name}' "
                     + "is a mnemonic-name, and ISO §14.9.51.2 Format 1 writes LINE or LINES only after the count "
                     + "alternative { identifier-2 | integer-1 } — the other alternative is { mnemonic-name-1 | PAGE } "
                     + $"with no such word. Remove '{word.GetText()}'.");
-            return FeatureAdvancing(before, m.GetText(), system);
+            return FeatureAdvancing(before, name, system);
         }
         BoundOperand lines =
             wba.integerLiteral() is { } il ? new BoundNumericLiteral(il.GetText())
@@ -468,6 +474,21 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
                 return;
         }
     }
+
+    /// <summary>⛔ mnemonic-name-1 OR identifier-2 — ASKED OF THE REFERENCE'S WORD (kb/Work PB2499's WRITE arm).
+    /// §14.9.51.2 Format 1 prints both in the ADVANCING operand and the grammar parses both as one
+    /// <c>dataReference</c>, so only the SPECIAL-NAMES registry tells them apart. The lookup used to key on the
+    /// reference's WHOLE text, so <c>ADVANCING MYTOP (1)</c> missed the mnemonic, fell through to the data
+    /// resolver and drew "'MYTOP (1)' is not defined — no declaration … gives the name 'MYTOP'" for a name
+    /// SPECIAL-NAMES does declare. Keyed on the word, the suffixed mnemonic reaches its own arm, where
+    /// <see cref="BindAdvancing"/> refuses the suffix by name. Pure (no report), because the SR13 screen asks it
+    /// too.</summary>
+    private (Core.DataReferenceContext Ref, string Name, ImplementorName System)? MnemonicOperand(
+        Core.WriteBeforeAfterContext? wba)
+        => wba?.dataReference() is { } m && m.cobolWord() is { } word
+           && ctx.Mnemonics.Of(wba).TryGetValue(word.GetText(), out var system)
+            ? (m, word.GetText(), system)
+            : null;
 
     /// <summary>The ADVANCING operand is a SPECIAL-NAMES mnemonic-name. §14.9.51.3 SR16: "<i>When mnemonic-name-1
     /// is specified, the name is associated with a feature-name specified by the implementor.</i>" — so a switch's

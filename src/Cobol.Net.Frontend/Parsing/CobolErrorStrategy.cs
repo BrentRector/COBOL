@@ -243,6 +243,11 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
         // STATE (the half-built or just-completed SEARCH context), never from a scan for a keyword.
         if (SearchFormatShapeMessage(recognizer, token, stream) is { } searchMsg)
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOLNET2269, searchMsg, 0));
+        // ⛔ 0e'. A SUBSCRIPT, REFERENCE MODIFICATION OR QUALIFIER ON A MNEMONIC-NAME (kb/Work PB2499). ACCEPT's
+        // FROM, DISPLAY's UPON and SET Format 3's receivers are spelled `cobolWord` because a mnemonic-name is a word
+        // (§8.3.2.2.16), so the suffix arrives here — read from the PARSER STATE, worded by MnemonicNameSlot.
+        if (MnemonicSuffixMessage(recognizer, token, stream) is { } mnemonicMsg)
+            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOLNET2269, mnemonicMsg, 0));
         // ⛔ 0f. AN INLINE METHOD INVOCATION'S EMPTY PARENTHESIS PAIR (kb/Work PB1430). `inlineInvocationSegment`
         // requires its argumentList inside the optional parentheses, so `O :: "M" ( )` arrives here, at the '(' or
         // the ')'. Outranks 0a for the same reason 0d does: the empty pair is the cause wherever the parse gives up.
@@ -457,6 +462,60 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
                             + "§5.2.7), so a further key condition is written as an AND phrase of the one WHEN.";
         return null;
     }
+
+    // ── A suffix on a mnemonic-name (kb/Work PB2499) ──
+
+    /// <summary>The <see cref="MnemonicNameSlot"/> message for a subscript, reference modification or qualifier
+    /// written on a mnemonic-name in a slot the grammar spells as a word, or null. Two shapes, each read from the
+    /// parser state:
+    /// <list type="bullet">
+    ///   <item>ACCEPT … FROM and DISPLAY … UPON — the statement COMPLETED at the word, so the slot's context
+    ///         (<c>acceptSource</c>'s word arm, <c>displayUpon</c>) is the rightmost descendant of an enclosing
+    ///         context and ends immediately before the offending '(' / OF / IN.</item>
+    ///   <item>SET Format 3 — no SET format admits the suffixed list, so the failure is inside the SET statement
+    ///         itself; it is Format 3's when the receiving list that holds the suffix ends at <c>TO ON</c> or
+    ///         <c>TO OFF</c>, which only Format 3 writes.</item>
+    /// </list></summary>
+    private static string? MnemonicSuffixMessage(Parser recognizer, IToken token, ITokenStream stream)
+    {
+        if (IsMnemonicSuffixStart(token.Type))
+            for (var c = recognizer.Context; c is not null; c = c.Parent as ParserRuleContext)
+                for (var d = LastRuleChild(c); d is not null; d = LastRuleChild(d))
+                {
+                    var (slot, format, word) = d switch
+                    {
+                        CobolParserCore.AcceptSourceContext a => ("ACCEPT … FROM", "§14.9.1.2 Format 1", a.cobolWord()),
+                        CobolParserCore.DisplayUponContext u => ("DISPLAY … UPON", "§14.9.11.2 Format 1", u.cobolWord()),
+                        _ => (null, null, null),
+                    };
+                    if (word?.Stop is { } stop && NextDefault(stream, stop.TokenIndex)?.TokenIndex == token.TokenIndex)
+                        return MnemonicNameSlot.SuffixMessage(slot!, word.GetText(), format!);
+                }
+
+        for (RuleContext? c = recognizer.Context; c is not null; c = c.Parent)
+            if (c is CobolParserCore.SetStatementContext set)
+            {
+                // SET word … <suffix> … TO {ON | OFF}: the first suffix names its word; the list must end at TO ON/OFF.
+                IToken? suffixed = null;
+                for (var t = NextDefault(stream, set.Start.TokenIndex); t is not null; t = NextDefault(stream, t.TokenIndex))
+                {
+                    if (t.Type is CobolLexer.DOT or TokenConstants.EOF) return null;
+                    if (t.Type == CobolLexer.TO)
+                        return suffixed is not null && NextDefault(stream, t.TokenIndex)?.Type is CobolLexer.ON or CobolLexer.OFF
+                            ? MnemonicNameSlot.SuffixMessage("SET … TO ON/OFF", suffixed.Text, "§14.9.39.2 Format 3")
+                            : null;
+                    if (suffixed is null && IsMnemonicSuffixStart(t.Type))
+                        suffixed = PreviousDefault(stream, t.TokenIndex);
+                }
+                return null;
+            }
+        return null;
+    }
+
+    /// <summary>A token that opens a subscript or reference modification (any of the three '(' twins) or a
+    /// qualifier (OF / IN) — the suffixes a <c>dataReference</c> admits and a mnemonic-name does not.</summary>
+    private static bool IsMnemonicSuffixStart(int type) =>
+        IsOpenParen(type) || type is CobolLexer.OF or CobolLexer.IN;
 
     /// <summary>True when the default-channel tokens from <paramref name="index"/> spell <c>[AT] END</c>.</summary>
     private static bool IsAtEndAhead(ITokenStream stream, int index)

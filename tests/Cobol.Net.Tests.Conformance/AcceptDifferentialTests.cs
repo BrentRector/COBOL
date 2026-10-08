@@ -74,6 +74,33 @@ public sealed class AcceptDifferentialTests
             expected: "ABC       ]",
             stdin: "ABC\n");
 
+    // §14.9.1.2 Format 1 `ACCEPT identifier-1 [ FROM mnemonic-name-1 ]`: the FROM operand is the WORD SPECIAL-NAMES
+    // declares (§8.3.2.2.16), associated here with SYSIN — this implementation's input device (§14.9.1.3 SR2) — so
+    // the transfer reads standard input exactly as the FROM-less form does (§14.9.1.4 GR4a: stored aligned to the
+    // left, the tail space-filled). The positive half of kb/Work PB2499, whose negatives (negative/pb2499-accept-mnemonic-*) refuse a
+    // subscript, reference modification or qualifier on the same word: the grammar slot became a word, and this
+    // pins that the word itself still binds and runs.
+    [Fact]
+    public void Device_FromMnemonicName_ReadsTheAssociatedInputDevice()
+        => AssertOutputs("""
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. ACCDEVMN.
+                ENVIRONMENT DIVISION.
+                CONFIGURATION SECTION.
+                SPECIAL-NAMES.
+                    SYSIN IS MYIN.
+                DATA DIVISION.
+                WORKING-STORAGE SECTION.
+                01 WS-X PIC X(6).
+                PROCEDURE DIVISION.
+                MAIN-PARA.
+                    ACCEPT WS-X FROM MYIN.
+                    DISPLAY WS-X "]".
+                    STOP RUN.
+                """,
+            expected: "BXYZ  ]",
+            stdin: "BXYZ\n");
+
     // §14.9.1.4 GR4b: a transfer LARGER than the receiver keeps only the LEFTMOST characters that fit; the rest
     // of the record is IGNORED — the next ACCEPT starts a fresh record, never the leftover of this one.
     [Fact]
