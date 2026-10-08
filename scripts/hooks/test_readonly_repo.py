@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Self-test for readonly_repo.py — a write inside a git tree is blocked, a write in a non-repo directory passes.
-Run: python scripts/hooks/test_readonly_repo.py   (CI `audits` job and build-local run it too.)"""
+Run: python scripts/hooks/test_readonly_repo.py   (every gate and CI run it through scripts/self_tests.py.)"""
 import json
 import pathlib
 import subprocess

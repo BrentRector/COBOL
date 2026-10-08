@@ -67,6 +67,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+import sharedfile  # this directory's: the one Windows share-retry rule for the settings file (kb/Work PB2564)
+
 REPO = Path(__file__).resolve().parents[1]
 SLOT_DIR_NAME = "cobol-gate-slots"
 SETTINGS_FILE = "settings.json"
@@ -274,7 +276,7 @@ class GateSettings:
     @classmethod
     def read(cls, directory: Path) -> "GateSettings":
         path = directory / SETTINGS_FILE
-        text = _read_shared(path)
+        text = sharedfile.read_text(path)  # every gate polls it each second: the share retry (PB2564)
         if text is None:
             return cls(directory)
         try:
@@ -336,41 +338,10 @@ class GateSettings:
                 elif s is not None:
                     out[k] = {"value": s.value, "until": s.until.isoformat() if s.until else None, "why": s.why,
                               "set_by": s.set_by, "set_at": s.set_at}
-            _replace_shared(directory / SETTINGS_FILE, json.dumps(out, indent=1, sort_keys=True) + "\n")
+            sharedfile.replace_text(directory / SETTINGS_FILE, json.dumps(out, indent=1, sort_keys=True) + "\n")
         return cls.read(directory)
 
 
-# Windows refuses to replace, or to open, a file another process is opening or replacing at that instant (Python
-# opens without FILE_SHARE_DELETE). Every gate polls the settings each second, so the writer and the readers retry
-# that one refusal briefly; anything else, or the refusal outlasting the retries, is raised.
-_SHARE_RETRIES, _SHARE_PAUSE_S = 100, 0.02
-
-
-def _read_shared(path: Path) -> str | None:
-    for attempt in range(_SHARE_RETRIES):
-        try:
-            return path.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            return None
-        except PermissionError:
-            if attempt == _SHARE_RETRIES - 1:
-                raise
-            time.sleep(_SHARE_PAUSE_S)
-    raise AssertionError("unreachable: the last attempt returns or raises")
-
-
-def _replace_shared(path: Path, text: str) -> None:
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    for attempt in range(_SHARE_RETRIES):
-        try:
-            os.replace(tmp, path)
-            return
-        except PermissionError:
-            if attempt == _SHARE_RETRIES - 1:
-                tmp.unlink(missing_ok=True)
-                raise
-            time.sleep(_SHARE_PAUSE_S)
 
 
 class _Mutex:

@@ -29,13 +29,13 @@ closed per weekly-quota point.
 | `scripts/orchestrator/inventory_ratchet.py` | the closed-rows ratchet (section 7) |
 | `scripts/orchestrator/budget.py` | the weekly and session quota estimator (section 8) |
 | `scripts/orchestrator/plan_wave.py` + `model_rules.json` | the deterministic wave planner and its routing and cost constants (section 9) |
-| `scripts/orchestrator/coord.py` | names the coordination directory, loads `model_rules.json`, writes JSON atomically, and holds its one short mutex (`locked(cdir, name)`: the allocator's and the landing lease's) |
+| `scripts/orchestrator/coord.py` | names the coordination directory, loads `model_rules.json`, reads and writes JSON atomically through `scripts/sharedfile.py` (the one Windows share-retry rule, which `gate_slot.py` uses too; kb/Work PB2564), and holds its one short mutex (`locked(cdir, name)`: the allocator's and the landing lease's) |
 | `scripts/orchestrator/landing_lease.py` | the landing lease: one lander on main at a time (section 4.7) |
 | `scripts/orchestrator/mailbox.py` | the two attended sessions' mailbox: send, list, take, finish and watch messages, and `operator-session.json` (section 15) |
 | `scripts/account-profile.ps1` | seeds a named account's config dir from the default one (section 2.1) |
 | `scripts/orchestrator/account.py` | the ONE resolver of the Claude account a script runs as: its config dir, its global config and account id, its row of `model_rules.json` `accounts` (section 2.1) |
 | `scripts/orchestrator/watch_agent.py`, `watch-agent.ps1`, `open-watchers.ps1` | the token-free view of running agents in Windows Terminal tabs (section 13) |
-| `scripts/orchestrator/test_*.py`, `test_orchestrate.ps1`, `testdata/` | the self-tests and their fakes (section 12) |
+| `scripts/orchestrator/test_*.py`, `test_orchestrate_*.ps1`, `testdata/` | the self-tests and their fakes (section 12) |
 
 The coordination directory lives OUTSIDE every git worktree so that no worktree, branch switch or `git clean` can
 lose it, and every session and agent sees the same copy. Default `E:\COBOL-coord`; override with the environment
@@ -174,7 +174,7 @@ wave-type choice also carries `campaign` for the lane as a whole: `run`, `betwee
 note), `landed` (every lead's cluster is landed or retired) or `unknown`. A land the landing lease deferred (rule 6,
 or a handoff's `land` at rule 2) stays at the end of that choice's reason, and a deferred handoff `land` names no wave:
 the campaign rule then treats the wave as rule 7's (`next_unit.py#base_choice` returns the deferral beside the
-choice; `test_orchestrate.ps1` 8f). With `--cluster` EVERY choice but an owner
+choice; `test_orchestrate_campaign.ps1` 8f). With `--cluster` EVERY choice but an owner
 question carries `campaigns` (`{lead: ready | waiting | landed | unknown}`; the supervisor ends a lead's lane at
 `landed`, runs the fix lane alone once no lead is left, and records the map in that unit's `units.jsonl` line) and
 `starved`: each lead whose ready note has waited through MORE THAN ONE wave-type unit since its own last campaign
@@ -182,7 +182,7 @@ wave, with `hours`, `waves` and `last_campaign_at`, which the supervisor logs as
 wave-type unit(s)), last campaign wave at T`. The measure walks `units.jsonl` back from the newest line and stops at
 the lead's own campaign line or at a line that did not record the lead `ready`, so a gap in the record (every line
 written before the record existed) under-reports and never over-reports. Without `--cluster` the output is
-byte-identical to the fix lane's (`test_orchestrate.ps1` 8b and 8c).
+byte-identical to the fix lane's (`test_orchestrate_campaign.ps1` 8b and 8c).
 
 ## 4. The supervisor loop (`orchestrate.ps1`)
 
@@ -321,7 +321,7 @@ split with a claim undecided. One session's stop must never abort another sessio
 | `<scratch>\STOP-<scope>` (FLEET) | the fleet's own dispatcher: the supervisor's wind-down (`STOP-loop`), an attended session winding down its wave (`STOP-w<wave>`) | only the agents whose dispatch names it |
 
 - **One definition.** `coord.py` `global_stop()` and `fleet_stop(scratch, scope)` name the files for every Python tool;
-  `orchestrate.ps1` and `stop.ps1` use the same two names (`$GlobalStop`, `$FleetStop`), and `test_orchestrate.ps1` proves
+  `orchestrate.ps1` and `stop.ps1` use the same two names (`$GlobalStop`, `$FleetStop`), and `test_orchestrate_winddown.ps1` proves
   they agree (the supervisor's wind-down is exactly what `stop.ps1 -Clear` removes).
 - **Every dispatch names both.** `plan_wave.py --stop-file` (default `<scratch>\STOP-w<wave>`; the wave unit passes
   `{FLEET_STOP}`, the loop's) writes `stop_file` into `groups.json` and the Workflow args together with `global_stop`;
@@ -379,7 +379,7 @@ keep running r1 repeatedly for zero gain".
   one of six parallel acquires; answers push-main's `check`; exits 2 on a file that is not a lease; and runs
   next_unit's `choose` in process to show no `land` unit starts while a lease is live. The bash layer
   (push-main's exit mapping, renewer and trap) has no automated test: it needs gh and a remote; it was exercised by
-  hand on a harness of its own lines (held elsewhere, corrupt, released and taken over mid-run). `test_orchestrate.ps1` 8c proves next_unit's deferral
+  hand on a harness of its own lines (held elsewhere, corrupt, released and taken over mid-run). `test_orchestrate_campaign.ps1` (8c) proves next_unit's deferral
   and the `stop.ps1 -Status` line.
 
 ## 5. The handoff (`handoff.schema.json`)
@@ -613,7 +613,7 @@ itself), ordered by `blocked_by:`.
   (or `campaign`) as it does to rule 7, and a ready lead that has waited through more than one wave-type unit is logged
   `campaign <lead> ready for N h` at every choice until its turn comes.
 - **The fix lane is unchanged** without `--cluster`: `test_plan_wave.py` check 8 compares the whole fixture plan with a
-  golden that the planner wrote before this lane existed, and `test_orchestrate.ps1` 8b compares `next_unit.py`'s
+  golden that the planner wrote before this lane existed, and `test_orchestrate_campaign.ps1` (8b) compares `next_unit.py`'s
   choice and the wave prompt.
 
 Measured on 2026-10-07 (dry runs, budget 3 points, before wave 1025 landed): `--cluster PB2108` plans six groups in
@@ -687,16 +687,23 @@ marked, owed again after an input-touching commit, not after an unrelated one; p
 against the schema's required and permitted keys), `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
 real dispatch-spec template and `check_practices.py`'s same-file rule; the fix lane's whole plan against a golden the pre-campaign planner wrote; the campaign lane's selection, `blocked_by` order, `after:` derivation and waits, and `work.py check`'s topology rules, section 9.1), `test_watch_agent.py` (a transcript with a
 partial last line), `landing_lease.py --self-test` (two landers, takeover, holder-only renew and release, a race;
-section 4.7; `LandingLeaseDriftTests` runs it in every Unit run), `train_measure.py --self-test` (the batched-gating trial's per-train record and summary, kb/Work
-PB2515; `TrainMeasureDriftTests` runs it in every Unit run). CI runs the hook self-tests in the `audits` job (`python3 scripts/hooks/test_forbidden_commands.py
-&& ...`); the orchestrator tests would be one more step there
-(`for t in scripts/orchestrator/test_*.py; do python3 "$t"; done`). They need no build; `test_plan_wave.py` imports
-`check_practices.py`, which that job already has with its submodule. `test_inventory_ratchet.py` reads the
-inventory at `HEAD`, which the job's full-history checkout provides. The supervisor's self-test,
-`pwsh scripts/orchestrator/test_orchestrate.ps1`, drives the loop with a fake `-ClaudeExe`
-(`testdata/fake-claude.ps1`) and `open-watchers.ps1` with a fake `wt.exe` (`testdata/fake-wt.ps1`); it needs
-PowerShell 7 and git, so it would run in the `windows-build-test` job; it also covers `start-session.ps1 -ConfigDir`,
-`stop.ps1` and `account-profile.ps1` (in a temp HOME). The workflow file is not edited by this change.
+section 4.7; `LandingLeaseDriftTests` also pins its arms by name), `train_measure.py --self-test` (the batched-gating
+trial's per-train record and summary, kb/Work PB2515; `TrainMeasureDriftTests` also pins its arms), `landing_check.py
+--self-test` (section 4.7's file-set guarantee). The supervisor's self-test is eleven parallel parts,
+`scripts/orchestrator/test_orchestrate_*.ps1`, sharing the harness `testdata/orchestrate_test_lib.ps1`: they drive the
+loop with a fake `-ClaudeExe` (`testdata/fake-claude.ps1`) and `open-watchers.ps1` with a fake `wt.exe`
+(`testdata/fake-wt.ps1`), and also cover `start-session.ps1 -ConfigDir`, `stop.ps1` and `account-profile.ps1` (in a temp
+HOME). They need PowerShell 7 and are Windows-only (Windows Terminal, `Win32_Process`, `USERPROFILE`, junctions), which
+each part declares in its header (`# SELF-TEST-PLATFORM: windows — …`).
+
+**Every one of them runs in every gate and in CI, found by discovery (kb/Work PB2563).** `scripts/self_tests.py` finds
+each `test_*.py`/`test_*.ps1` and each script that handles `--self-test` under `scripts/` and runs them all in parallel,
+each with a private `COBOL_COORD_DIR`, so none touches the live coordination directory. It is one of the gate driver's
+audits (`run_gate_legs.py` `AUDITS`, before the gate slot), a leg of `linux-gate.sh`, and a step of CI's `audits` job
+(Linux) and `windows-build-test` job (Windows, where the Windows-only parts run); a self-test for the other platform is
+reported `NOT RUN on <platform>` with its declared reason, never skipped silently. `test_plan_wave.py` imports
+`check_practices.py`, so the runner fetches the `tools/claude-skills` submodule when a checkout lacks it.
+`test_inventory_ratchet.py` reads the inventory at `HEAD`, which CI's full-history checkout provides.
 
 ## 14. Publishing the ledger after every landing
 

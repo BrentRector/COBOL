@@ -1,4 +1,4 @@
-# A fake `claude -p` for test_orchestrate.ps1: emits canned stream-json and writes a handoff, per FAKE_CLAUDE_MODE.
+# A fake `claude -p` for the orchestrate.ps1 self-tests (test_orchestrate_*.ps1): emits canned stream-json and writes a handoff, per FAKE_CLAUDE_MODE.
 #   good       two model calls, a valid handoff, exit 0
 #   fastfail   exit 1 at once, no output
 #   nohandoff  one call, exit 0, no handoff
@@ -49,7 +49,9 @@ switch ($env:FAKE_CLAUDE_MODE) {
     'nohandoff' { Call 'msg_1' 5000; exit 0 }
     'bigcontext' {
         Call 'msg_1' 900000
-        $deadline = (Get-Date).AddSeconds(60)
+        # A hang guard, never a speed bound: the supervisor writes STOP-UNIT within seconds, but the self-test runner runs
+        # this beside 59 others on a shared host, where a 60 s guard expired (train 1037t, 2026-10-08).
+        $deadline = (Get-Date).AddSeconds(600)
         while (-not (Test-Path (Join-Path $coord 'STOP-UNIT')) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
         Hand @{ schema_version = 1; unit = 'wave'; outcome = 'split'; summary = 'stopped at STOP-UNIT'; next_unit = 'resume' }
         exit 0
@@ -78,7 +80,9 @@ switch ($env:FAKE_CLAUDE_MODE) {
         # The owner creates STOP while this unit runs; the supervisor must wind the unit down (STOP-UNIT and the fleet STOP).
         Call 'msg_1' 5000
         Set-Content -Path (Join-Path $coord 'STOP') -Value 'owner'
-        $deadline = (Get-Date).AddSeconds(60)
+        # A hang guard, never a speed bound: the supervisor writes STOP-UNIT within seconds, but the self-test runner runs
+        # this beside 59 others on a shared host, where a 60 s guard expired (train 1037t, 2026-10-08).
+        $deadline = (Get-Date).AddSeconds(600)
         while (-not (Test-Path (Join-Path $coord 'STOP-UNIT')) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
         Set-Content -Path (Join-Path $coord 'fleet-stop-seen.txt') -Value (Test-Path (Join-Path $coord 'scratch/STOP-loop'))
         # The wind-down must never create the owner's GLOBAL stop: other sessions' agents obey it (kb/Work PB2483).

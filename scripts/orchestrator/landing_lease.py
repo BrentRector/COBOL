@@ -59,7 +59,9 @@ from typing import Any
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent))
 import coord  # noqa: E402
+import sharedfile  # noqa: E402
 
 FILE = "landing-lease.json"
 LOG = "landing-lease.jsonl"
@@ -228,7 +230,7 @@ def release(cdir: pathlib.Path, worktree: str, outcome: str) -> int:
         if not _same_tree(lease["worktree"], worktree):
             _say(f"landing-lease: NOT released: {describe(lease, now)}; only its own worktree releases it")
             return HELD_ELSEWHERE
-        coord.sharing_retry((cdir / FILE).unlink)
+        sharedfile.remove(cdir / FILE, missing_ok=False)
         held = (now - _when(lease["acquired_at"])).total_seconds() / 60
         _log(cdir, {"at": _iso(now), "event": "release", "holder": lease["holder"], "worktree": lease["worktree"],
                     "held_min": round(held, 1), "outcome": outcome})

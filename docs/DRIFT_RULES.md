@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-295 drift tests.
+296 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -256,6 +256,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [ScreenFacilityConstructDriftTests](../tests/Cobol.Net.Tests.Unit/ScreenFacilityConstructDriftTests.cs) | The Annex A.4.2 (screen handling) REFUSAL, held from the three directions a negative golden cannot reach (kb/Work PB260). | `tests/version-matrix/cobol-words.json`, `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4`, `src/Cobol.Net.Frontend/Grammar`, `src/Cobol.Net.Frontend/Grammar/Core/CobolScreen.g4`, `src/Cobol.Net.Frontend/Grammar/Core/CobolSpecialNames.g4` |
 | [SearchAllFormat2RuleCoverageDriftTests](../tests/Cobol.Net.Tests.Unit/SearchAllFormat2RuleCoverageDriftTests.cs) | ⛔ THE GUARD THAT KEEPS "ONE MODEL, SEVEN PREDICATES" TRUE (kb/Work PB445). | `specs/ISO_COBOL.md`, `src/Cobol.Net.Compiler/Binding/Validation/SearchAllFormat2Rules.cs`, `src/Cobol.Net.Compiler/Binding/Model/OdoModel.cs` |
 | [SearchOperandResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/SearchOperandResolutionDriftTests.cs) | ⛔ THE PB443 INVARIANT: a SEARCH operand is a WRITTEN REFERENCE, resolved by ISO §8.4.2.2 — never a BASE WORD looked up and tie-broken by declaration order. | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SearchBinder.cs` |
+| [SelfTestDiscoveryDriftTests](../tests/Cobol.Net.Tests.Unit/SelfTestDiscoveryDriftTests.cs) | ⛔ EVERY SCRIPT SELF-TEST RUNS IN EVERY GATE AND IN CI, THROUGH ONE DISCOVERING RUNNER (kb/Work PB2563): scripts/self_tests.py finds every self-test under scripts/, and the local gate's audits, the Linux gate and CI's jobs all run that runner and name no self-test by hand. | `scripts/self_tests.py`, `scripts/run_gate_legs.py`, `scripts/linux-gate.sh`, `.github/workflows/build-and-test.yml`, `scripts/build-local.ps1`, `scripts/build-local.sh` … |
 | [SendingOperandDriftTests](../tests/Cobol.Net.Tests.Unit/SendingOperandDriftTests.cs) | ⛔ THE SENDING OPERAND {identifier-n \| literal-n} IS WRITTEN ONCE, AS sendingOperand (kb/Work PB2114). | — |
 | [SendingRefDriftTests](../tests/Cobol.Net.Tests.Unit/SendingRefDriftTests.cs) | ⛔ A NEW SendingRef MEMBER MUST DEFAULT TO CHECKED, NEVER TO EXEMPT. | — |
 | [SetDiagnosticNamesReceiversDriftTests](../tests/Cobol.Net.Tests.Unit/SetDiagnosticNamesReceiversDriftTests.cs) | ⛔ THE DRIFT TEST for the SET diagnostics' ELIDED RECEIVERS (kb/Work PB388's last half). | `src` |

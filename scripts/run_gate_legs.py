@@ -30,12 +30,15 @@ ONE GATE, in this order (§3.14.3):
   2. a fresh RUN DIRECTORY `TestResults/build-local/<UTC stamp>-<nonce>/` holding the listings, the plan, every trx,
      log and identity record, and the verdict file — nothing at a fixed name, so no earlier gate's file is read as
      this one's; the newest earlier run holding a verdict gives the plan its timings and reds; five are kept;
-  3. the audits (the one list below) — in implementer mode FAIL-FAST: a red audit ends the gate RED right there, with
+  3. the audits (the one list below, run CONCURRENTLY; one of them is every script self-test, found by
+     scripts/self_tests.py — kb/Work PB2563) — in implementer mode FAIL-FAST: a red audit ends the gate RED right there, with
      no leg run (kb/Work PB2523) — then the GnuCOBOL corpus fetch. Both run BEFORE the slot (kb/Work PB2524): they
      read only the tree, and inside the slot they were 35-45 % of its hold while every other implementer gate queued;
   4. the gate slot (implementer only), always after the lock, so no two gates can wait on each other in a cycle; then
      the solution build and the SHA-256 of every binary the legs will run;
-  5. `--list-tests` per assembly (scrubbed), the plan, then per leg the three assemblies CONCURRENTLY, each through the
+  5. `--list-tests` per assembly (scrubbed), then BESIDE the legs the self-tests that read the built assemblies
+     (`self_tests.py --built`, joined after the legs; a red one makes the gate RED), the plan, then per leg the three
+     assemblies CONCURRENTLY, each through the
      leg handshake (all three COBOLNET_GATE_* variables, or none) and printed through scripts/test_leg_report.py;
      an assembly the plan gives no case in a leg is not invoked for it;
   6. the POPULATION CHECK (scripts/test_population.py) per assembly over its legs' trx files, the publish of every
@@ -100,20 +103,23 @@ NOT_RUN_SHOWN = 10
 #: builds (kb/Work PB2523 — four of wave 1034's eight first-run reds were audit-only, each found after a whole ~6-min
 #: population); the lander's gate goes on building and testing, so its one run shows every red of the train. And they
 #: run OUTSIDE the implementer's gate slot (kb/Work PB2524): the slot rations builds and test legs, not reading the tree.
+#: They run CONCURRENTLY, each its own process with its output captured and printed whole (kb/Work PB2563), so the
+#: phase costs its slowest audit, not their sum.
+#: ⛔ SELF-TESTS is EVERY script self-test, found by discovery (scripts/self_tests.py; kb/Work PB2563) — never a self-test
+#: named here by hand: this tuple once named five while eleven orchestrator self-tests ran in no gate at all. The few
+#: that read the BUILT assemblies run after the build (`self_tests.py --built`, `Host.built_self_tests`).
 AUDITS = (
     ("CITATIONS", ["scripts/spec/audit_code_citations.py", "--check"]),
     ("DOC CITATIONS", ["scripts/spec/audit_doc_citations.py", "--check"]),
     ("EVIDENCE SUPERSESSION", ["scripts/spec/audit_evidence_supersession.py", "--check"]),
     ("DRIFT RULES INDEX", ["scripts/spec/drift_rules.py", "--check"]),
-    ("GUARD HOOK SELF-TEST", ["scripts/hooks/test_forbidden_commands.py"]),
-    ("READ-ONLY HOOK SELF-TEST", ["scripts/hooks/test_readonly_repo.py"]),
-    ("WORKTREE RM-ALLOW HOOK SELF-TEST", ["scripts/hooks/test_worktree_rm_allow.py"]),
     ("WITNESS LOSS", ["scripts/spec/audit_witness_loss.py", "--check"]),
     ("RULE CATALOG", ["scripts/spec/extract_rule_catalog.py", "--check"]),
     ("SPEC CORRECTIONS", ["scripts/spec/verify_publishable.py"]),
-    ("CITE SELF-TEST", ["scripts/spec/cite.py", "--self-test"]),
-    ("LEDGER PLAN SELF-TEST", ["scripts/spec/ledger_plan.py", "--self-test"]),
+    ("SELF-TESTS", ["scripts/self_tests.py"]),
 )
+#: The post-build half of the self-tests: the ones declaring `SELF-TEST-NEEDS: build` (scripts/self_tests.py).
+BUILT_SELF_TESTS = ["scripts/self_tests.py", "--built"]
 #: The git-ignored GPL corpus ExternalCorpusPopulationDriftTests measure (kb/Work PB209, PB897): absent in a fresh
 #: worktree, so the gate fetches it; a failed fetch makes the gate RED, attributed to the fetch.
 CORPUS_MARKER = Path("tests/external/gnucobol/tests/testsuite.src")
@@ -153,14 +159,35 @@ class Host:
     def default_base(self) -> str:
         return self.git("merge-base", "HEAD", "origin/main")
 
+    def _captured(self, cmd: list[str], spawn: Spawn) -> tuple[int, str, float]:
+        t = time.monotonic()
+        r = subprocess.run([sys.executable, *cmd], cwd=self.repo, capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", **spawn())
+        return r.returncode, (r.stdout or "") + (r.stderr or ""), time.monotonic() - t
+
     def audits(self, spawn: Spawn, say: Callable[[str], None]) -> list[str]:
-        """The audits (AUDITS), every one of them. Returns the RED reasons; output goes straight to the console."""
+        """The audits (AUDITS), every one of them, CONCURRENTLY. Each audit's whole output is printed as one block when
+        it finishes, so no two interleave. Returns the RED reasons."""
         reds = []
-        for name, cmd in AUDITS:
-            if subprocess.run([sys.executable, *cmd], cwd=self.repo, **spawn()).returncode != 0:
-                say(f"=== {name}: RED (see above) ===")
-                reds.append(f"{name} RED")
-        return reds
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(AUDITS)) as pool:
+            futures = {pool.submit(self._captured, cmd, spawn): name for name, cmd in AUDITS}
+            for f in concurrent.futures.as_completed(futures):
+                name = futures[f]
+                rc, text, secs = f.result()
+                say(f"--- audit {name} ({secs:.1f}s) ---")
+                for line in text.rstrip().splitlines():
+                    say(line)
+                if rc != 0:
+                    say(f"=== {name}: RED (see above) ===")
+                    reds.append(f"{name} RED")
+        return sorted(reds, key=[f"{n} RED" for n, _ in AUDITS].index)
+
+    def built_self_tests(self, spawn: Spawn) -> tuple[list[str], list[str]]:
+        """The self-tests that read the built assemblies (BUILT_SELF_TESTS), after the build. Returns (the RED reasons,
+        the output lines): the gate prints them when it joins this, so they never interleave with a leg's report."""
+        rc, text, secs = self._captured(BUILT_SELF_TESTS, spawn)
+        lines = [f"--- post-build self-tests ({secs:.1f}s) ---", *text.rstrip().splitlines()]
+        return ([] if rc == 0 else ["POST-BUILD SELF-TESTS RED"]), lines
 
     def fetch_corpus(self, spawn: Spawn, say: Callable[[str], None]) -> list[str]:
         """The GnuCOBOL corpus fetch when the worktree lacks it. Returns the RED reason, if any."""
@@ -409,6 +436,17 @@ class Gate:
         except PopulationError as e:
             return self._finish(out, run, "NOT RUN", f"the population could not be listed: {e}", 2)
 
+        # The self-tests that read the BUILT assemblies (kb/Work PB2563) run beside the legs: they only list tests, and
+        # the legs are the gate's longest step, so they add no wall time. Joined, and printed, after the legs.
+        post_build_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        post_build = post_build_pool.submit(self.host.built_self_tests, spawn)
+        try:
+            return self._legs_and_checks(out, run, listings, binaries, started, spawn, post_build)
+        finally:
+            post_build_pool.shutdown(wait=True)
+
+    def _legs_and_checks(self, out: Outcome, run: Path, listings: dict[str, Counter], binaries: dict,
+                         started: float, spawn: Spawn, post_build: concurrent.futures.Future) -> Outcome:
         plan, digest = self._plan(out, listings, run)
         legs = self._legs(plan)
         to_run = legs
@@ -432,6 +470,12 @@ class Gate:
         reds = [r for r in out.runs if r.red]
         if reds:
             out.timings["first_red_s"] = round(min(r.finished_s for r in reds), 1)
+        t = time.monotonic()
+        post_reds, post_lines = post_build.result()
+        out.timings["post_build_self_tests_wait_s"] = round(time.monotonic() - t, 1)
+        for line in post_lines:
+            self.say(line)
+        out.reasons += post_reds
 
         self._check_populations(out, listings, legs, run)
         self._publish_timings(out, run, listings)
@@ -690,6 +734,12 @@ class FakeHost(Host):
         self.events.append("audits")
         return ["DRIFT RULES INDEX RED"] if "audit" in self.plant else []
 
+    def built_self_tests(self, spawn):
+        self.events.append("post-build self-tests")
+        if "post-build" in self.plant:
+            return ["POST-BUILD SELF-TESTS RED"], ["--- post-build self-tests (0.0s) ---", "PLANTED-POST-BUILD-RED"]
+        return [], ["--- post-build self-tests (0.0s) ---"]
+
     def fetch_corpus(self, spawn, say) -> list[str]:
         self.events.append("fetch")
         return []
@@ -889,8 +939,18 @@ def self_test() -> int:
         arm("the audits and the corpus fetch run BEFORE the gate slot is taken, and a red audit never queues for one "
             "(kb/Work PB2524)",
             h.slots_taken == 0 and h.events == ["audits"] and o.slot is None
-            and gate("implementer", "order")[1].events == ["audits", "fetch", "slot", "build", "publish"],
+            and gate("implementer", "order")[1].events == ["audits", "fetch", "slot", "build", "post-build self-tests",
+                                                           "publish"],
             str(h.events))
+        o, h = gate("implementer", "post-build", plant={"post-build"})
+        arm("a red post-build self-test (one that reads the built assemblies, kb/Work PB2563) runs beside the legs and "
+            "makes the gate RED after them, its output printed whole",
+            o.verdict == "RED" and o.exit_code == 1 and "POST-BUILD SELF-TESTS RED" in o.line
+            and sorted(o.legs_invoked) == [1, 2] and not any(r.red for r in o.runs)
+            and said("PLANTED-POST-BUILD-RED"), o.line)
+        o, h = gate("lander", "post-build-lander", plant={"post-build"})
+        arm("a red post-build self-test in -Mode lander is RED too",
+            o.verdict == "RED" and "POST-BUILD SELF-TESTS RED" in o.line, o.line)
         o, h = gate("lander", "publish-lander")
         o2, h2 = gate("implementer", "publish-stopped", plant={"red-leg1"})
         arm("every gate that ran a leg publishes its measured durations to the shared timings store, the lander's and "

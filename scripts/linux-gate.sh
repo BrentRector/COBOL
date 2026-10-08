@@ -99,20 +99,31 @@ echo "linux-gate: Linux clone of HEAD ${head:0:9} at $snap"
 [ "$dirty" -gt 0 ] && echo "linux-gate: NOTE — $dirty uncommitted tracked change(s) are NOT tested (the clone is HEAD)"
 
 bad=""; ran=""
-# CI's audits job runs the guard-hook self-tests on Linux (forbidden_commands, readonly_repo, worktree_rm_allow). They are
-# path-sensitive, so this gate runs the same set on the clone: a drive-letter path that Linux reads as relative turned CI
-# red on 2026-10-07 after a green Windows run (kb/Work PB2142). Seconds; never skipped.
-hooks_rc=0
-for t in scripts/hooks/test_forbidden_commands.py scripts/hooks/test_readonly_repo.py scripts/hooks/test_worktree_rm_allow.py; do
-  ( cd "$snap" && python3 "$t" ) > "$out/hooks-$(basename "$t" .py).log" 2>&1 || hooks_rc=1
-done
-if [ $hooks_rc -eq 0 ]; then
-  echo "leg hooks: GREEN (3 guard-hook self-tests on Linux)"; ran="$ran hooks"
-else
-  echo "leg hooks: RED — a guard-hook self-test failed on Linux (TestResults/linux-gate/hooks-*.log)"
-  grep -h "FAIL" "$out"/hooks-*.log | sed 's/^/    /'
-  bad="$bad hooks"
-fi
+# Every script self-test, on Linux, through the ONE runner CI runs (kb/Work PB2563): CI's audits job runs
+# `python3 scripts/self_tests.py`, and greenfield-unit runs `python3 scripts/self_tests.py --built` after its build.
+# The runner DISCOVERS the self-tests, so this gate never names one (a hand list here went stale: it ran three guard-hook
+# self-tests while CI ran six). They are path-sensitive: a drive-letter path that Linux reads as relative turned CI red on
+# 2026-10-07 after a green Windows run (kb/Work PB2142). `selftests` runs first and is never skipped; `selftests-built`
+# runs after the unit and conformance legs have built the assemblies it reads.
+selftests_leg() {  # <leg name> [runner arguments…]
+  local name="$1"; shift
+  local start rc secs verdict
+  start=$(date +%s)
+  ( cd "$snap" && "${nice_prefix[@]}" "$py" scripts/self_tests.py "$@" ) > "$out/$name.log" 2>&1
+  rc=$?
+  secs=$(( $(date +%s) - start ))
+  verdict="$(grep -E '^=== SELF-TESTS: ' "$out/$name.log" | tail -1)"
+  if [ $rc -eq 0 ] && [[ "$verdict" == "=== SELF-TESTS: GREEN"* ]]; then
+    echo "leg $name: GREEN in ${secs}s — $verdict"; ran="$ran $name"
+  else
+    # A red runner prints its WHOLE log less the self-tests that passed: trim what passed, never what failed (PB1573).
+    echo "leg $name: RED (rc=$rc) in ${secs}s — ${verdict:-no self-test verdict; see TestResults/linux-gate/$name.log}"
+    grep -vE '^self-test .*: GREEN in ' "$out/$name.log" | sed 's/^/    /'
+    bad="$bad $name"
+  fi
+}
+selftests_leg selftests
+built_unit=0; built_conformance=0
 IFS=',' read -r -a wanted <<< "$legs"
 for leg in "${wanted[@]}"; do
   start=$(date +%s)
@@ -150,6 +161,7 @@ for leg in "${wanted[@]}"; do
     grep -E ' error ' "$out/$leg-build.log" | sort -u | head -10 | sed 's/^/    /'
     bad="$bad $leg:build"; continue
   fi
+  case "$leg" in unit) built_unit=1 ;; conformance) built_conformance=1 ;; esac
   bsecs=$(( $(date +%s) - start ))
   # Scrubbed (kb/Work PB1718): a gate-leg handshake or VSTest* variable inherited from the caller would narrow the run
   # to PART of its assembly while it exits 0. The one statement of that rule is test_population.py.
@@ -166,6 +178,14 @@ for leg in "${wanted[@]}"; do
     bad="$bad $leg"
   fi
 done
+if [ $built_unit -eq 1 ] && [ $built_conformance -eq 1 ]; then
+  selftests_leg selftests-built --built
+else
+  # Not run because a needed build is missing: a failed build is already a red leg above, and a `--legs` list without
+  # unit and conformance chose not to build them. Said, never silent.
+  echo "leg selftests-built: NOT RUN (it reads the unit and conformance legs' builds, and this run built" \
+       "unit=$built_unit conformance=$built_conformance)"
+fi
 
 state_after="$(repo_state)"
 if [ "$state_after" != "$state_before" ]; then

@@ -327,7 +327,11 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
             elseif (Test-Stop) { $windDown = 'STOP file present' }
             if (-not $stats.stop_unit_sent -and $windDown) {
                 Say "${windDown}: winding the unit down (STOP-UNIT and the loop's fleet stop $FleetStop; the unit checkpoints and hands off, the loop then ends if STOP is set)"
-                New-Item -ItemType File -Force -Path $StopUnit, $FleetStop | Out-Null
+                # The fleet stop FIRST: the unit acts on STOP-UNIT and then expects the fleet stop to exist (its dispatched
+                # agents must see it); written the other way round, a loaded host showed the unit STOP-UNIT alone
+                # (test_orchestrate_winddown 4f, train 1037t, 2026-10-08).
+                New-Item -ItemType File -Force -Path $FleetStop | Out-Null
+                New-Item -ItemType File -Force -Path $StopUnit | Out-Null
                 $stats.stop_unit_sent = $true
                 $stopAt = Get-Date
             }

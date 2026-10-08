@@ -3153,6 +3153,12 @@ already-derivable coverage; none change the pipeline.
   PB751/PB752 — vstest answers an unmatched filter with a passing run of zero tests); add `--allow-build` when the
   run itself is what builds the project.
   Comprehensive: `bash scripts/battery.sh [outdir]` (§0 Gates).
+- Script self-tests: `python scripts/self_tests.py` runs every self-test under `scripts/` (discovered: a script that
+  handles `--self-test`, or a file named `test_*.py`/`test_*.ps1`), in parallel, each with a private `COBOL_COORD_DIR`
+  and git global config; `--built` runs the ones that read the built test assemblies; `--list` prints what it found.
+  The gate runs it as its `SELF-TESTS` audit, the Linux gate as legs `selftests`/`selftests-built`, and CI in its
+  `audits`, `greenfield-unit` and `windows-build-test` jobs (kb/Work PB2563; `SelfTestDiscoveryDriftTests`). A
+  self-test that cannot run on one platform says so in its header (`# SELF-TEST-PLATFORM: windows — <reason>`).
 - The order plan (kb/Work PB1683, PB1717, PB1721; `docs/rearchitecture/DESIGN-test-build-ci.md` sections 3.13 and
   3.14.2): the gate builds it in-process — `impacted_tests.py`'s tiers of the change against the impact map for the
   cut point, then `gate_plan.py` (`NameKey`, tiers 0a/0u/1–3, the leg-1 budgets and collection cap). By hand:

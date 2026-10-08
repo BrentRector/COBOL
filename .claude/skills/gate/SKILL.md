@@ -36,7 +36,9 @@ pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal *> <log>
 The driver, `scripts/run_gate_legs.py` (DESIGN-test-build-ci.md §3.14; kb/Work PB1721), holds the worktree's GATE
 LOCK (a second gate in the same worktree is refused), runs the audits (FAIL-FAST, before the slot and the build: a red
 audit ends an implementer gate in seconds with `NO LEG RAN`, kb/Work PB2523 — run `python scripts/spec/drift_rules.py`
-and the citation audits yourself before gating to avoid the round trip) and fetches the per-worktree GnuCOBOL corpus
+and the citation audits yourself before gating to avoid the round trip; one audit, `SELF-TESTS`, is every script
+self-test under `scripts/`, discovered and run in parallel by `scripts/self_tests.py`, kb/Work PB2563 — run
+`python scripts/self_tests.py` yourself after editing a script) and fetches the per-worktree GnuCOBOL corpus
 when absent — both BEFORE it queues, because they read only the tree (kb/Work PB2524) — then takes a GATE SLOT
 (`scripts/gate_slot.py`: at most N implementer gates build or test at once, repository-wide — `gate-slot: waiting, k
 ahead` is the cap working), builds the solution and lists every discovered case of Conformance, Unit and

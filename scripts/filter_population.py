@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SELF-TEST-NEEDS: build — its --self-test asks vstest (`dotnet test --no-build --list-tests`) what the BUILT Conformance and Unit assemblies discover
 """filter_population.py — EVERY TERM of a vstest `--filter` must name a real test (kb/Work PB708).
 
 `test_leg_report.py` already refuses a leg that prints no `Passed!`/`Failed!` verdict line — the guard added

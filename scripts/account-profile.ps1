@@ -35,7 +35,7 @@ param(
     # Overwrite the top-level files of `copy` even when the account has its own (directories are only ever completed).
     [switch]$Force,
     [string]$Python = 'python',
-    # Test seams: another model_rules.json and repository (test_orchestrate.ps1 seeds a temp account from a temp source).
+    # Test seams: another model_rules.json and repository (test_orchestrate_account.ps1 seeds a temp account from a temp source).
     [string]$RulesFile = '',
     [string]$RepoDir = (Split-Path $PSScriptRoot -Parent)
 )

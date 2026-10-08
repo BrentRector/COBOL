@@ -2,7 +2,7 @@
 """Self-test for forbidden_commands.py — every rule fires on its shape AND stays silent on the legitimate neighbour.
 
 A guard hook is a gate, and a gate is only trusted once its failure branch has fired (feedback: prove the watchdog
-fails). Run: python scripts/hooks/test_forbidden_commands.py   (CI `audits` job and build-local run it too.)
+fails). Run: python scripts/hooks/test_forbidden_commands.py   (every gate and CI run it through scripts/self_tests.py.)
 """
 import json
 import os

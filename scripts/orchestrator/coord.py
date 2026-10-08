@@ -12,10 +12,16 @@ import json
 import os
 import pathlib
 import re
+import sys
 import time
-from typing import Any, Callable, Iterator, TypeVar
+from typing import Any, Iterator
 
-T = TypeVar("T")
+# scripts/, for the one Windows share-retry rule (sharedfile.py, kb/Work PB2564), which gate_slot.py uses too. Appended,
+# so a module of the importer's own directory is never shadowed.
+_SCRIPTS = str(pathlib.Path(__file__).resolve().parents[1])
+if _SCRIPTS not in sys.path:
+    sys.path.append(_SCRIPTS)
+import sharedfile  # noqa: E402
 
 DEFAULT = r"E:\COBOL-coord"
 ENV = "COBOL_COORD_DIR"
@@ -123,37 +129,17 @@ def locked(cdir: pathlib.Path, name: str) -> Iterator[None]:
     try:
         yield
     finally:
-        with contextlib.suppress(FileNotFoundError):
-            sharing_retry(lambda: os.remove(lock))
+        sharedfile.remove(lock, missing_ok=True)
 
 
-# Windows refuses to replace, remove or open a file another process holds open at that instant (Python opens without
-# FILE_SHARE_DELETE): a reader of a coordination file can make a writer's os.replace fail (WinError 5) and an unlink
-# fail (WinError 32). The refusal lasts milliseconds, so every coordination read and write retries it briefly, and a
-# refusal that outlasts the retries is raised. (scripts/gate_slot.py retries its own settings file for the same reason.)
-_SHARE_RETRIES, _SHARE_PAUSE_S = 100, 0.02
-
-
-def sharing_retry(fn: Callable[[], T]) -> T:
-    for attempt in range(_SHARE_RETRIES):
-        try:
-            return fn()
-        except PermissionError:
-            if attempt == _SHARE_RETRIES - 1:
-                raise
-            time.sleep(_SHARE_PAUSE_S)
-    raise AssertionError("unreachable: the last attempt returns or raises")
-
-
+# Every coordination read and write goes through sharedfile.py: a reader holding a coordination file open on Windows
+# makes a writer's os.replace or unlink fail for milliseconds, and that one refusal is retried there (kb/Work PB2537,
+# PB2564).
 def read_json(path: pathlib.Path, default: Any) -> Any:
-    try:
-        return json.loads(sharing_retry(lambda: path.read_text(encoding="utf-8")))
-    except FileNotFoundError:
-        return default
+    text = sharedfile.read_text(path)
+    return default if text is None else json.loads(text)
 
 
 def write_json(path: pathlib.Path, value: Any) -> None:
     """Write to a sibling temp file and rename over the target, so a crash never leaves a half-written file."""
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(value, indent=1) + "\n", encoding="utf-8")
-    sharing_retry(lambda: os.replace(tmp, path))
+    sharedfile.replace_text(path, json.dumps(value, indent=1) + "\n")

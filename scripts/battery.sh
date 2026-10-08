@@ -52,7 +52,8 @@ note() { echo "$1" | tee -a "$SUMMARY"; }
 # ⛔ PHASE -1: THE STATIC CITATION AUDITS. They take a second, they need no build, and they are the only gate
 # that can see a WRONG CLAUSE NUMBER — the defect CLAUDE.md rule 1 exists for, which no test can ever fail on
 # (`// MOVE (§14.9.24)` compiles perfectly; §14.9.24 is MERGE). Baseline is ZERO findings for ALL THREE; each
-# has a `--self-test` proving its checks still fail on a real defect. The first two need `specs/ISO_COBOL.md`,
+# has a `--self-test` proving its checks still fail on a real defect (every gate runs those through
+# scripts/self_tests.py, kb/Work PB2563). The first two need `specs/ISO_COBOL.md`,
 # which is TRACKED here, and REFUSE when it is absent, so a green is never green-by-absence; the third reads only
 # the tree it checks against and asserts its own population instead. The same four also gate CI's `audits` job
 # on every push (kb/Work PB1574).

@@ -3,7 +3,7 @@
 
 A permission-granting hook is the mirror image of a guard: its FAILURE branch is an allow that should not have been
 given, so every case below that must NOT be allowed is as load-bearing as the ones that must. Run:
-python scripts/hooks/test_worktree_rm_allow.py   (CI `audits` job runs it with the other hook self-tests.)
+python scripts/hooks/test_worktree_rm_allow.py   (every gate and CI run it through scripts/self_tests.py.)
 """
 import json
 import pathlib

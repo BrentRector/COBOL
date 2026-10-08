@@ -243,9 +243,6 @@ jobs:
       - name: Drift-rule index — docs/DRIFT_RULES.md regenerated from every *DriftTests summary (drift_rules.py --check)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/drift_rules.py --check
-      - name: Guard hook self-tests — forbidden_commands.py and readonly_repo.py block each forbidden shape and pass its neighbour; worktree_rm_allow.py grants only its exact shape
-        if: ${{ !cancelled() }}
-        run: python3 scripts/hooks/test_forbidden_commands.py && python3 scripts/hooks/test_readonly_repo.py && python3 scripts/hooks/test_worktree_rm_allow.py
       - name: Witness loss — inventory evidence dropped since the base of this push (audit_witness_loss.py --check)
         if: ${{ !cancelled() }}
         shell: bash
@@ -266,12 +263,14 @@ jobs:
       - name: Spec corrections — every flag, Addendum entry, printed form and page agree (verify_publishable.py)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/verify_publishable.py
-      - name: Citation gate self-test — cite.py refuses an empty quotation and accepts the printed form (cite.py --self-test)
+      # EVERY script self-test, DISCOVERED (kb/Work PB2563): each test_*.py / test_*.ps1 and each script handling
+      # --self-test under scripts/ — the hook self-tests, cite.py, ledger_plan.py, landing_check.py and the orchestrator's,
+      # which until PB2563 were named here one by one while eleven of them ran nowhere. The same runner is an audit of the
+      # local gate (run_gate_legs.py AUDITS) and a leg of linux-gate.sh. A Windows-only self-test is reported NOT RUN here
+      # with its reason and runs in windows-build-test; one that reads the built assemblies runs in greenfield-unit.
+      - name: Script self-tests — every self-test under scripts/, discovered (self_tests.py)
         if: ${{ !cancelled() }}
-        run: python3 scripts/spec/cite.py --self-test
-      - name: Ledger plan self-test — the completion ledger's lanes, phase and gate notes, wave kinds and cluster totals agree with the register (ledger_plan.py --self-test)
-        if: ${{ !cancelled() }}
-        run: python3 scripts/spec/ledger_plan.py --self-test
+        run: python3 scripts/self_tests.py
       - name: Work register — every kb/Work note well-formed (work.py check)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/work.py check
@@ -285,13 +284,6 @@ jobs:
           set -euo pipefail
           git submodule update --init tools/claude-skills
           python3 .claude/skills/workstream/check_practices.py
-          # dispatch_guard.py runs check_practices.py over a brief, which needs this same submodule
-          python3 scripts/hooks/test_dispatch_guard.py
-      # The file-set partition's guarantee (kb/Work PB2118 Draft 9): push-main.sh runs landing_check.py before every
-      # landing; its self-test plants an out-of-set edit and a two-branch overlap in a scratch repository.
-      - name: Landing check self-test (landing_check.py --self-test)
-        if: ${{ !cancelled() }}
-        run: python3 scripts/orchestrator/landing_check.py --self-test
 
   # ── The authoritative NIST gate: the PARALLEL guard. guard-fast.sh runs exactly the checks scripts/guard.sh
   # does (build src/Cobol.Net.Cli + the ~376 NIST CCVS-85 programs) but fans the NIST suite across the
@@ -454,12 +446,19 @@ jobs:
         run: |
           dotnet build tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj
           dotnet build tests/Cobol.Net.Tests.Characterization/Cobol.Net.Tests.Characterization.csproj
+          dotnet build tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj
       - name: Greenfield unit tests
         run: dotnet test tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj --no-build --logger "trx;LogFileName=unit.trx" --results-directory TestResults/${{ runner.os }}-unit
       # Characterization gate (rearch P0): COMPARES the committed diagnostic + emitted-C# snapshots. CI must NEVER set
       # COBOLNET_UPDATE_SNAPSHOTS (that would rewrite them); a real emit/diagnostic change re-seeds locally under review.
       - name: Greenfield characterization snapshots (behavior-neutrality gate)
         run: dotnet test tests/Cobol.Net.Tests.Characterization/Cobol.Net.Tests.Characterization.csproj --no-build --logger "trx;LogFileName=characterization.trx" --results-directory TestResults/${{ runner.os }}-unit
+      # The self-tests that read the BUILT assemblies (`SELF-TEST-NEEDS: build`; filter_population.py lists what the
+      # Conformance and Unit assemblies discover), which the audits job cannot run (kb/Work PB2563). After the test
+      # legs, so a red self-test never hides their results.
+      - name: Post-build script self-tests (self_tests.py --built)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/self_tests.py --built
       - name: Upload test results (TRX)
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
@@ -676,6 +675,20 @@ jobs:
         run: dotnet test tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj --no-build --configuration Release --logger "trx;LogFileName=unit.trx" --results-directory TestResults/${{ runner.os }}-build-test
       - name: Greenfield characterization snapshots (behavior-neutrality gate)
         run: dotnet test tests/Cobol.Net.Tests.Characterization/Cobol.Net.Tests.Characterization.csproj --no-build --configuration Release --logger "trx;LogFileName=characterization.trx" --results-directory TestResults/${{ runner.os }}-build-test
+      # Every script self-test on Windows, the Windows-only ones included (the orchestrator loop's
+      # test_orchestrate_*.ps1 and test_autostart.ps1), which the Linux audits job reports NOT RUN (kb/Work PB2563).
+      # After the test legs, so a red self-test never hides their results.
+      # Windows has no system IANA time-zone database, so Python's zoneinfo (scripts/orchestrator/budget.py) needs the
+      # tzdata package; the local hosts carry it (2026.4) and the runner's Python does not, so every orchestrator
+      # self-test went red here and green locally (train 1037t, run 37748130457). Pinned to the local version.
+      - name: Python time-zone data for the orchestrator self-tests (tzdata, pinned)
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check --no-input tzdata==2026.4
+      - name: Script self-tests on Windows (self_tests.py)
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: python scripts/self_tests.py
       - name: Upload test results (TRX)
         if: ${{ always() }}
         uses: actions/upload-artifact@v7

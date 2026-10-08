@@ -1,4 +1,5 @@
 #Requires -Version 7.0
+# SELF-TEST-PLATFORM: windows — the autostart entry is a .cmd in the Windows Startup folder that opens Windows Terminal (%LOCALAPPDATA%, wt.exe)
 # Self-test for autostart.ps1 and install-autostart.ps1: temp directories only, nothing real is installed or started.
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot

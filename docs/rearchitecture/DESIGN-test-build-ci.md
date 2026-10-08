@@ -990,7 +990,19 @@ so the props file sees the targets' constant).
 --mode …` only set the process priority and call it; their `Leg` functions and their `filter_population.py` call are
 gone (a gate without a vstest filter has no term to prove live; `filter_population.py` stays for CI's shards, the
 generators and `record_verdicts.py`, which still filter), and so are their two copies of the audit list: the driver's
-`AUDITS` is the gate's one list (battery PHASE -1 and CI's `audits` job run the same scripts). One gate:
+`AUDITS` is the gate's one list (battery PHASE -1 and CI's `audits` job run the same scripts). They run CONCURRENTLY
+before the slot, each audit's output printed as one block. One entry, `SELF-TESTS`, is every script self-test under
+`scripts/`: `scripts/self_tests.py` DISCOVERS them (a script that handles `--self-test`, read from its syntax tree, or a
+file named `test_*.py`/`test_*.ps1`), runs them in parallel, each with a private `COBOL_COORD_DIR` and a private git
+global config, and reports a self-test marked `# SELF-TEST-PLATFORM: windows — <reason>` as NOT RUN elsewhere with its
+reason. Its post-build half (`self_tests.py --built`: the self-tests marked `# SELF-TEST-NEEDS: build`,
+`filter_population.py`) runs beside the legs once the build is done. The same runner is CI's (the `audits` job on Linux,
+`windows-build-test` on Windows, `greenfield-unit` for `--built`) and the Linux gate's (`selftests` and
+`selftests-built`), and `SelfTestDiscoveryDriftTests` holds every one of those entry points to it and forbids any of
+them to name a self-test by hand (kb/Work PB2563: eleven orchestrator self-tests had run in no gate, and
+`landing_check.py --self-test` only in CI). Measured 2026-10-08 on a loaded Windows host: the runner takes about 80 s,
+set by the eleven parallel `test_orchestrate_*.ps1` parts, against the old serial audit phase's 42.5 s; on Linux the
+44 self-tests that run there take 5 s. One gate:
 1. **The worktree's gate lock** — an exclusive OS lock on `<worktree git dir>/cobol-gate.lock`, held from before the
    build to the verdict. A second gate in the same worktree REFUSES at once, naming the holder's pid: its build would
    otherwise overwrite the binaries between the first gate's legs.
@@ -1356,7 +1368,11 @@ on Windows and red in CI's Linux unit job. That was a ~30-minute round trip and 
 **`scripts/linux-gate.sh`** runs, from any tree (`wsl -d Ubuntu --cd <tree> -- bash -lc 'bash scripts/linux-gate.sh'`),
 the test projects CI's Linux jobs run, and the scripts they run: leg `guard` runs `bash scripts/guard-fast.sh`, CI's
 `guard` job (the NIST suite through the `cobol` CLI, the manifest audit, the baseline check and the guard's own
-self-tests), with a `TMPDIR` private to the clone because the guard writes fixed file names there.
+self-tests), with a `TMPDIR` private to the clone because the guard writes fixed file names there. Leg `selftests`
+runs first and always: `scripts/self_tests.py` in the clone, as CI's `audits` job runs it; `selftests-built` runs
+`self_tests.py --built` after the unit and conformance legs have built (kb/Work PB2563). Its first Linux run found two
+self-tests that had never run on Linux: an unguarded Windows-only arm in `fleet_active_build.py` and
+`test_autostart.ps1`, which installs a Windows Startup entry and is now marked windows-only.
 `LinuxGateDriftTests` holds both sets equal to the workflow's: every `dotnet test` project and every `run: bash
 scripts/….sh` step of a Linux job is a default leg. The guard leg was added 2026-10-04 (kb/Work PB1955, PB1957 row 40):
 the guard job was the one CI Linux job no local gate ran, so train 1013's guard red on PB322's `TERMINATES` rows

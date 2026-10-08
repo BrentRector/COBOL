@@ -556,7 +556,11 @@ def self_test() -> int:
                 sharing, tree = agents_sharing_tree(got, [t("main1")])
                 check("scope: …and a main-tree fleet then does NOT deny that worktree build", (len(sharing), tree), (0, wt))
         check("scope: a POSIX path that is not a drive is left alone", native_path("/tmp/x"), "/tmp/x")
-        check("scope: a bare drive `/e` maps to the drive root", native_path("/e"), "E:/")
+        # The drive mapping is Windows-only (`native_path`): on Linux `/e` is a real POSIX directory and stays as spelled.
+        if os.name == "nt":
+            check("scope: a bare drive `/e` maps to the drive root", native_path("/e"), "E:/")
+        else:
+            check("scope: `/e` is a POSIX path off Windows, left alone", native_path("/e"), "/e")
 
         # The DENY message must name the agents AND the shared tree (it named `subagents` for every one).
         sharing, tree = agents_sharing_tree(str(fx["main"]), [t("main1"), t("main2")])
