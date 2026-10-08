@@ -241,9 +241,13 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
                             StoreArith(r.Place, num.Combine(ax, "*", bx, RcvFor(r, ise), outermost: true), r.Rounding));
                     return;
                 }
-                NumX v = Snapshot(num.Render(c.Rhs, rcv));
+                // An exact WIDE value (a nested product past the Int128 carrier, kb/Work PB1900) is snapshotted AS ITSELF and
+                // settled per receiver, at that receiver's scale and with its mode — the one initial evaluation keeps
+                // every digit, and each receiver's ROUNDED phrase sees them. Any other value settles to itself.
+                NumX v = Snapshot(num.Render(c.Rhs, rcv, keepWide: true));
                 foreach (var r in c.Targets)
-                    GuardedStore(ise, r.Place, () => StoreArith(r.Place, v, r.Rounding));
+                    GuardedStore(ise, r.Place, () =>
+                        StoreArith(r.Place, num.Settle(v, RcvFor(r, ise), outermost: true), r.Rounding));
                 return;
             }
             foreach (var r in c.Targets)
@@ -305,10 +309,10 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
     /// <remarks>⛔ <c>FloatEdited</c> is carried because <see cref="ScaleOf"/> gives a FLOATING-POINT
     /// numeric-edited receiver its mask's SIGNIFICAND scale — a working-scale hint, not a scale the ROUNDED
     /// transfer rounds at (that resultant normalizes into the mask instead, D21/PB66). Only
-    /// <see cref="ReceiverContext.FloatLanding"/> reads it (kb/Work PB647).</remarks>
+    /// <see cref="ReceiverContext.RoundsAtItsScale"/> and <see cref="ReceiverContext.FloatLanding"/> read it
+    /// (kb/Work PB647, PB1900).</remarks>
     public ReceiverContext RcvFor(Receiver r, bool inSizeError) =>
-        new(ScaleOf(r.Place), r.Place.Item.Pic is { IsFloat: true }, r.Rounding, inSizeError, IntDigitsOf(r.Place),
-            FloatEdited: r.Place.Item.Pic is { IsFloatEdited: true });
+        ReceiverContext.Of(r.Place.Item.Pic, r.Rounding, inSizeError);
 
     /// <summary>The optional <c>blankWhenZero</c> argument text for a numeric-edited store when the receiver
     /// carries BLANK WHEN ZERO (ISO §13.18.8 — zero stores all spaces, MOVE and arithmetic alike).</summary>
@@ -325,7 +329,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
     {
         string t = $"__ie{ctx.Names.NextStoreTmp()}";
         // Total over the carriers (kb/Work PB85): a float sender snapshotted as `Int128 t = double` was CS0266.
-        string cs = v.Dec ? "CobolDec" : v.Real ? "double" : v.U ? "UInt128" : "Int128";
+        string cs = v.Wide ? "CobolWide" : v.Dec ? "CobolDec" : v.Real ? "double" : v.U ? "UInt128" : "Int128";
         ctx.Writer.Line($"{cs} {t} = {v.Expr};");
         return v with { Expr = t };
     }

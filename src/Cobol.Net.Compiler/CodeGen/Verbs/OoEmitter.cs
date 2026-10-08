@@ -1659,7 +1659,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             {
                 var fpF = a.Formal.Pic!;
                 NumX fv = a.Source is { } lsrc ? Num.AsNum(new BoundFieldOperand(lsrc), ReceiverContext.None)
-                    : a.ContentExpr is { } fex ? Num.AsNum(new BoundComputedOperand(fex), ReceiverContext.None)
+                    : a.ContentExpr is { } fex ? FormalValue(fex, fpF)
                     : UnscaledLit(a.NumericLiteral!);
                 string landed = ecState.SizeTruncationChecking
                     ? RuntimeApi.FloatResultantStoreOrRaise(fv, CobolRounding.Truncation, fpF.IsSingle)
@@ -1959,6 +1959,16 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         a.ByContent && !a.Formal.IsGroup && a.Formal.Pic is { Category: PicCategory.Numeric, IsFloat: true } fp
         && !(a.Source?.Item.Pic is { IsFloat: true } sp && sp.Usage == fp.Usage);
 
+    /// <summary>⛔ AN ARITHMETIC-EXPRESSION-1 ARGUMENT EVALUATED FOR THE FORMAL'S DESCRIPTION (kb/Work PB289, the INVOKE twin
+    /// of <c>CallEmitter.ArgText</c>'s computed-operand arm). §14.2.3 GR9 fills the formal's record by "a COMPUTE statement
+    /// without the ROUNDED phrase", so the expression is the sending operand and the formal the resultant: it renders as the
+    /// FINAL TRANSFER into a resultant of the formal's description (<see cref="ReceiverContext.Of"/> — the arithmetic
+    /// statements' own rule), never receiver-less at the 6-digit working scale that dropped the digits the formal could hold.
+    /// Checking is the ambient EC-SIZE state, as for every receiver-less render in this statement.</summary>
+    private NumX FormalValue(BoundExpr expr, PicInfo formalPic) =>
+        Num.Render(expr, ReceiverContext.Of(formalPic, CobolRounding.Truncation, ecState.SizeChecking),
+            outermost: true);
+
     /// <summary>The VALUE a literal-2 or arithmetic-expression-1 argument stores into a fixed-point numeric method formal
     /// (kb/Work PB1064): §14.2.3 GR9 fills the formal's record by "a COMPUTE statement without the ROUNDED phrase", so
     /// it is the ONE numeric store (<see cref="NumericRenderer.StoreExpr"/> — PB84's SDIDI overloads, PB640's raising
@@ -1967,7 +1977,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// image. Null when the argument is neither.</summary>
     private string? MethodNumericContent(BoundInvokeArg a, string qualProfile)
     {
-        NumX? value = a.ContentExpr is { } cex ? Num.AsNum(new BoundComputedOperand(cex), ReceiverContext.None)
+        NumX? value = a.ContentExpr is { } cex ? FormalValue(cex, a.Formal.Pic!)
             : a.NumericLiteral is { } lit ? UnscaledLit(lit)
             : null;
         return value is not { } v ? null

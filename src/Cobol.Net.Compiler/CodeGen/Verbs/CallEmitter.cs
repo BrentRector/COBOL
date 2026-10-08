@@ -815,7 +815,23 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 // An SDIDI intermediate (a STANDARD-DECIMAL expression; a native integer power — kb/Work PB69) lands
                 // through the ONE landing at the receiver-less working scale (kb/Work PB84 — `(long)(CobolDec)` was
                 // a Roslyn error on `CALL … BY VALUE A ** 2`).
-                NumX x = num.Landed(NumericRenderer.DeU(num.Render(expr.Expr, ReceiverContext.None)), ReceiverContext.None);
+                // ⛔ THE EXPRESSION IS EVALUATED FOR THE FORMAL'S DESCRIPTION WHEN THE ACTIVATING ELEMENT KNOWS IT (kb/Work
+                // PB289; PB165's BoundCallArg.Formal is the spine). §14.2.3 GR9's second branch and GR10 make the crossing "a
+                // COMPUTE statement without the ROUNDED phrase" into a record of the formal's description, so the argument is
+                // the COMPUTE's sending operand and the formal its resultant: a quotient or product lands at the formal's
+                // fraction digits, an expression into a floating-point formal evaluates in binary64, and a nested product
+                // past the Int128 carrier is rounded once, at the formal's scale (the final transfer). The receiver-less
+                // working scale (6 fraction digits) silently dropped the digits a PIC S9(5)V9(20) formal could hold —
+                // `CALL … AS NESTED USING BY VALUE 1 / 3` reached it as 0.333333 — BEFORE the callee's own landing ran.
+                // The ONE derivation of "the context of a resultant of this description" is ReceiverContext.Of, which the
+                // arithmetic statements use for their resultants; checking is the ambient EC-SIZE state, as for any
+                // receiver-less render in this statement (NumericRenderer.Checked). GR9's FIRST branch (no formal known)
+                // moves the argument "without conversion", so it keeps the receiver-less render.
+                ReceiverContext rcv = !a.Omitted && a.Mode is CobolPassMode.Content or CobolPassMode.Value
+                                      && a.Formal is { IsGroup: false, Pic: { IsClassNumeric: true } formalPic }
+                    ? ReceiverContext.Of(formalPic, CobolRounding.Truncation, ecState.SizeChecking)
+                    : ReceiverContext.None;
+                NumX x = num.Landed(NumericRenderer.DeU(num.Render(expr.Expr, rcv, outermost: !rcv.Receiverless)), rcv);
                 // ⛔ THE FLOAT LANE CROSSES AS A FLOAT (kb/Work PB238). `Landed` documents its own contract:
                 // "A float under NATIVE arithmetic stays binary64 — the consumer's own float arm applies", and
                 // this consumer had none, so `(Int128)(…)` TRUNCATED the fraction away: `01 F FLOAT-LONG

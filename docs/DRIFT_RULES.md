@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-298 drift tests.
+299 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -118,6 +118,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [EvaluateOperandCombinationsDriftTests](../tests/Cobol.Net.Tests.Unit/EvaluateOperandCombinationsDriftTests.cs) | ⛔ EvaluateOperandCombinations IS ISO Table 15, AND THIS RE-DERIVES IT FROM THE SPEC. | — |
 | [EvaluateSelectionObjectArityDriftTests](../tests/Cobol.Net.Tests.Unit/EvaluateSelectionObjectArityDriftTests.cs) | ⛔ AN EVALUATE WHEN GROUP HOLDS EXACTLY ONE SELECTION OBJECT, AND THE UNLICENSED REPETITION SILENTLY MISCOMPILED LEGAL SOURCE (fix-queue PB45). | — |
 | [ExactCarrierBoundaryDriftTests](../tests/Cobol.Net.Tests.Unit/ExactCarrierBoundaryDriftTests.cs) | kb/Work PB252 — the invariants of the exact Int128 carrier, held STRUCTURALLY rather than by memory. | `src/Cobol.Net.Compiler/CodeGen/Emit/IntrinsicRenderer.cs` |
+| [ExactWideSettlementDriftTests](../tests/Cobol.Net.Tests.Unit/ExactWideSettlementDriftTests.cs) | ⛔ AN EXACT WIDE INTERMEDIATE (NumX.Wide, kb/Work PB1900) NEVER LEAVES NumericRenderer UNSETTLED, AND THE LIST OF CONSUMERS THAT TAKE IT EXACT IS CLOSED. | `src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs`, `src/Cobol.Net.Compiler/CodeGen`, `src/Cobol.Net.Compiler/CodeGen/Verbs/ArithmeticEmitter.cs`, `src/Cobol.Net.Compiler/CodeGen/Emit/ConditionRenderer.cs`, `src/Cobol.Net.Compiler/CodeGen/Emit/EmitCore.cs` |
 | [ExceptionCheckingFlagsDriftTests](../tests/Cobol.Net.Tests.Unit/ExceptionCheckingFlagsDriftTests.cs) | The invariant that keeps §14.9.28.4 GR14's "implicit PUSH ALL followed by TURN OFF ALL" COMPLETE as exception conditions are added. | — |
 | [ExceptionCheckingPerformDirectiveBanDriftTests](../tests/Cobol.Net.Tests.Unit/ExceptionCheckingPerformDirectiveBanDriftTests.cs) | kb/Work PB595 — ONE lexical-containment predicate for the three directive bans, and the warning owner decision D20 (2026-07-19) specified: ISO §7.3.25.3 SR5 — "A TURN directive shall not be specified within an exception processing PERFORM statement." ISO §7.3.22.3 SR4 — "The PUSH directive shall not be specified within an exception checking PERFORM statement." ISO §7.3.20.3 SR4 — "The POP directiv… | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/EcBinder.ExceptionPerform.cs` |
 | [ExceptionRaiseHelperDriftTests](../tests/Cobol.Net.Tests.Unit/ExceptionRaiseHelperDriftTests.cs) | kb/Work PB676 — the invariant that keeps ISO §14.6.13.1.1's raise rule TRUE PER CONDITION as conditions are added: the ambient flag a runtime raise helper READS is the flag the emitter SETS for the exception-name that helper raises. | — |

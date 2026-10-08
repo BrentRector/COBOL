@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Binding.Model;
 using CobolNet.Runtime;
 
 namespace CobolNet.CodeGen;
@@ -55,6 +56,25 @@ internal readonly record struct ReceiverContext(
     /// <summary>The receiver-less context: scale 0, no capacity, not floating, TRUNCATION, no size-error checking.</summary>
     public static readonly ReceiverContext None =
         new(0, false, CobolRounding.Truncation, false, 0, Receiverless: true);
+
+    /// <summary>⛔ THE ONE RULE FOR "THE CONTEXT OF A RESULTANT DESCRIBED BY <paramref name="pic"/>" — its scale
+    /// (<c>PicInfo.ReceiverScale</c>), its floating-point-ness, its INTEGER digit positions (measured from
+    /// <c>DigitPositions</c>, never from the '9' count: over-counting is safe, under-counting is not — see
+    /// <see cref="IntegerDigits"/>) and its floating-point-edited-ness. A null PICTURE (an index, an object) is
+    /// <see cref="None"/>'s scale 0 / no capacity, still bearing a receiver.
+    /// <para>It is what an ARITHMETIC statement builds for each resultant identifier (<c>ArithmeticEmitter.RcvFor</c>)
+    /// and what a CALL or INVOKE argument expression builds for its FORMAL PARAMETER: §14.2.3 GR9/GR10 make the
+    /// crossing "a COMPUTE statement without the ROUNDED phrase" into a record of the formal's description
+    /// (kb/Work PB289), so the expression is evaluated FOR that description — a quotient to the formal's own
+    /// fraction digits, a floating-point formal in binary64 — and never at the receiver-less working scale, which
+    /// silently dropped the digits the formal could hold. Two lanes, one rule: before this factory the arithmetic
+    /// statement and the argument crossing each derived the context, and the crossing derived none.</para></summary>
+    public static ReceiverContext Of(PicInfo? pic, CobolRounding rounding, bool inSizeError)
+    {
+        int scale = pic?.ReceiverScale() ?? 0;
+        return new ReceiverContext(scale, pic is { IsFloat: true }, rounding, inSizeError,
+            pic is null ? 0 : Math.Max(0, pic.DigitPositions - scale), FloatEdited: pic is { IsFloatEdited: true });
+    }
 
     /// <summary>Decimal digits the <c>Int128</c> intermediate carrier holds: <c>Int128.MaxValue</c> ≈ 1.7014×10³⁸,
     /// so any value below 10³⁸ is representable (numeric design D1 — the "Int128 escape boundary").</summary>
@@ -216,8 +236,18 @@ internal readonly record struct ReceiverContext(
     /// </summary>
     public FloatLandingDecision FloatLanding(bool finalTransfer) =>
         !finalTransfer || Real || Receiverless ? FloatLandingDecision.Binary64
-        : FloatEdited ? FloatLandingDecision.At(FloatWorkingScale, CobolRounding.Truncation)
-        : FloatLandingDecision.At(Scale, Rounding);
+        : RoundsAtItsScale ? FloatLandingDecision.At(Scale, Rounding)
+        : FloatLandingDecision.At(FloatWorkingScale, CobolRounding.Truncation);   // the FLOATING-POINT edited resultant
+
+    /// <summary>⛔ THE ONE PREDICATE "A FINAL TRANSFER INTO THIS RESULTANT ROUNDS AT <see cref="Scale"/> WITH
+    /// <see cref="Rounding"/>": a receiver that is neither receiver-less, nor floating-point, nor a FLOATING-POINT
+    /// numeric-edited item (whose <see cref="Scale"/> is only the mask's working-scale hint: the value normalizes into
+    /// the mask, data-model D21 / kb/Work PB66). The exact-product transfer (<c>NumericRenderer.Settle</c>, the
+    /// <c>MulAtScale</c> arm of <c>Multiply</c>), the outermost quotient (<c>Divide</c>), the MAX/MIN selection
+    /// (<c>IntrinsicRenderer</c>) and <see cref="FloatLanding"/> ask it; a floating-point edited receiver otherwise saw
+    /// <c>COMPUTE FE = A * A</c> (A = 10^20) carried at its hint scale and wrapped to 0, and <c>1 / 3000000</c> truncated
+    /// to 3.3E-07 (train 1039b review of kb/Work PB1900; golden 2023/pb1900_float_edited_resultant_scale).</summary>
+    public bool RoundsAtItsScale => !Receiverless && !Real && !FloatEdited;
 }
 
 /// <summary>

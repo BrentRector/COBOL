@@ -565,8 +565,14 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
     {
         bool negative = (a.Sig < 0) ^ (b.Sig < 0);
         var (hi, lo) = Mul128(UAbs(a.Sig), UAbs(b.Sig));
-        return Round34Wide(hi, lo, negative, a.Exp + b.Exp, CobolRounding.Truncation, jam: true);
+        return FromWideToOdd(negative, hi, lo, a.Exp + b.Exp);
     }
+
+    /// <summary>The exact 256-bit magnitude <paramref name="hi"/>:<paramref name="lo"/> × 10^<paramref name="exp"/>
+    /// (sign <paramref name="negative"/>) reduced to 34 significant digits by ROUND-TO-ODD — the one reduction
+    /// <see cref="MulToOdd"/> and <see cref="CobolWide.ToDec"/> share.</summary>
+    internal static CobolDec FromWideToOdd(bool negative, UInt128 hi, UInt128 lo, int exp) =>
+        Round34Wide(hi, lo, negative, exp, CobolRounding.Truncation, jam: true);
 
     /// <summary>⛔ THE EXACT PRODUCT OF TWO SCALED OPERANDS, TRANSFERRED ONCE TO <paramref name="resultScale"/> — the
     /// FINAL TRANSFER of a native multiplication whose scaled operands could leave <c>Int128</c>
@@ -587,9 +593,20 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
                                     bool checkedTransfer)
     {
         if (a == 0 || b == 0) return 0;
-        bool negative = (a < 0) ^ (b < 0);
         var (hi, lo) = Mul128(UAbs(a), UAbs(b));
-        int shift = aScale + bScale - resultScale;     // digits to drop (> 0) or to append (< 0)
+        return TransferWide((a < 0) ^ (b < 0), hi, lo, aScale + bScale - resultScale, mode, checkedTransfer);
+    }
+
+    /// <summary>⛔ THE ONE FINAL TRANSFER OF AN EXACT 256-BIT VALUE INTO THE <c>Int128</c> CARRIER (kb/Work PB1143, PB1900):
+    /// the magnitude <paramref name="hi"/>:<paramref name="lo"/> (sign <paramref name="negative"/>) moves
+    /// <paramref name="shift"/> decimal places down to the receiver's scale (a positive shift drops digits, a negative one
+    /// appends zeros), rounded ONCE with the receiver's mode and landed with the two statement dispositions
+    /// <see cref="MulAtScale"/> documents. <see cref="MulAtScale"/> forms its exact product and calls it; so does
+    /// <see cref="CobolWide.ToUnscaled"/> for an exact nested intermediate — one transfer rule, whichever way the
+    /// exact value was formed.</summary>
+    internal static Int128 TransferWide(bool negative, UInt128 hi, UInt128 lo, int shift, CobolRounding mode,
+                                        bool checkedTransfer)
+    {
         UInt128 limit = (UInt128)Int128.MaxValue;
         if (shift > 0)
         {
@@ -984,7 +1001,7 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
 
     // ── wide scratch primitives (256-bit as UInt128 hi:lo) ──────────────────────────────────────────────────
 
-    private static (UInt128 Hi, UInt128 Lo) Mul128(UInt128 a, UInt128 b)
+    internal static (UInt128 Hi, UInt128 Lo) Mul128(UInt128 a, UInt128 b)
     {
         // Schoolbook over 64-bit limbs via Math.BigMul.
         ulong a0 = (ulong)a, a1 = (ulong)(a >> 64);
@@ -1054,7 +1071,7 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         return (v / den, v % den, den);
     }
 
-    private static UInt128 UAbs(Int128 v) => v < 0 ? (UInt128)(-v) : (UInt128)v;
+    internal static UInt128 UAbs(Int128 v) => v < 0 ? (UInt128)(-v) : (UInt128)v;
 
     private static int DigitCount(Int128 mag)
     {

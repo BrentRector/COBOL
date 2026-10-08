@@ -784,7 +784,9 @@
   "pb1930_content_function_identifier_arguments",
   "pb2078_property_receivers_in_phrases",
   "pb850_edited_refmod_program_name",
-  "pb845_unnamed_usage_entry"
+  "pb845_unnamed_usage_entry",
+  "pb1900_nested_product_cancellation",
+  "pb289_argument_expression_lands_at_formal_scale"
   ],
   "pending": []
 }

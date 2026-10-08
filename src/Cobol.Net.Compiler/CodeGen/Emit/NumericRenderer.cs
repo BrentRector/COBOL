@@ -22,7 +22,11 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// RECEIVER-LESS render (a condition, an argument, a subscript, …) inside a statement that has EC-SIZE-*
     /// checking enabled (<see cref="EcState.SizeChecking"/>): §14.7.5 no-phrase rule 3 makes such an
     /// intermediate overflow EC-SIZE-OVERFLOW, and §14.6.13.1.3 its disposition fatal.</summary>
-    private bool Checked => _rcv.InSizeError || (_rcv.Receiverless && ecState.SizeChecking);
+    private bool Checked => CheckedFor(_rcv);
+
+    /// <summary><see cref="Checked"/> for an explicit receiver context — the final transfer of an exact wide value
+    /// (<see cref="Settle"/>) is checked by the receiver it lands in, which a per-receiver settle names itself.</summary>
+    private bool CheckedFor(in ReceiverContext rcv) => rcv.InSizeError || (rcv.Receiverless && ecState.SizeChecking);
 
     /// <summary>The intrinsic-function render dispatch (ISO §15; IntrinsicRenderer.cs) — created lazily because
     /// the two renderers are mutually recursive (an intrinsic renders its numeric arguments through THIS).</summary>
@@ -88,7 +92,8 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// Save/restore makes every public entry RE-ENTRANT (P7 Step 12): the instance string channel renders an
     /// intrinsic's numeric arguments under <see cref="ReceiverContext.None"/> MID-render, and the outer render
     /// must resume under its own receiver — the H1 staleness class stays closed by construction.</summary>
-    public NumX Render(BoundExpr e, in ReceiverContext rcv, SendingRef sending = SendingRef.Normal, bool outermost = false)
+    public NumX Render(BoundExpr e, in ReceiverContext rcv, SendingRef sending = SendingRef.Normal, bool outermost = false,
+                       bool keepWide = false)
     {
         var saved = _rcv;
         var savedEx = _sending;
@@ -96,8 +101,58 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         _rcv = rcv;
         _sending = sending;
         _outermost = outermost;
-        try { return e.Accept(this); }
+        try
+        {
+            NumX x = e.Accept(this);
+            return keepWide ? x : Settle(x, rcv, outermost);
+        }
         finally { _rcv = saved; _sending = savedEx; _outermost = savedOut; }
+    }
+
+    /// <summary>⛔ SETTLE AN EXACT WIDE INTERMEDIATE (<see cref="NumX.Wide"/>, kb/Work PB1900) — THE ONE PLACE it leaves
+    /// the renderer. Every public entry (<see cref="Render"/>, <see cref="AsNum"/>, <see cref="Fold"/>,
+    /// <see cref="Combine"/>) calls it on its result, so no consumer ever dispatches on a carrier it does not know:
+    /// <list type="bullet">
+    ///   <item><b>The final transfer to ONE fixed-point resultant</b> (<paramref name="outermost"/>, a receiver that is
+    ///         neither receiver-less nor floating-point) — the exact value is rounded ONCE, at that resultant's scale and
+    ///         with its mode (<c>CobolWide.ToUnscaled</c>, the kernel <c>CobolDec.MulAtScale</c> shares): §14.7.7 rule 3 NOTE 1 gives
+    ///         ROUNDED to the final transfer only, and the receiver's own rounding must see every digit.</item>
+    ///   <item><b>Anything else</b> (a receiver-less render, a float receiver, an intermediate with no transfer) — it is
+    ///         lowered to the SDIDI by ROUND-TO-ODD (<see cref="LowerWide"/>), exactly the intermediate a nested product
+    ///         was before the wide form existed, so whatever consumes it next rounds it in any mode as the exact value.</item>
+    /// </list>
+    /// A consumer that CAN use the exact form (a several-receiver COMPUTE's one initial evaluation, a relation) passes
+    /// <c>keepWide</c> and settles it itself.</summary>
+    public NumX Settle(NumX x, in ReceiverContext rcv, bool outermost)
+    {
+        if (!x.Wide) return x;
+        return outermost && rcv.RoundsAtItsScale
+            ? new NumX(RuntimeApi.WideToUnscaled(x.Expr, x.Scale, rcv.Scale, rcv.Rounding, CheckedFor(rcv)), rcv.Scale)
+            : LowerWide(x);
+    }
+
+    /// <summary>An exact wide intermediate as the SDIDI (round-to-odd, 34 digits); every other value passes through.</summary>
+    internal static NumX LowerWide(NumX x) =>
+        x.Wide ? new NumX(RuntimeApi.WideToDec(x.Expr, x.Scale), 0, Dec: true) : x;
+
+    /// <summary>The wide-lane spelling of an exact operand: a wide value as itself, an <c>Int128</c>-lane value lifted.</summary>
+    private static string WideOperand(NumX x) => x.Wide ? x.Expr : RuntimeApi.WideFrom(x.Expr);
+
+    /// <summary>The wide-lane spelling of an exact operand aligned UP to <paramref name="scale"/> (a sum's common scale).</summary>
+    private static string WideAligned(NumX x, int scale) => RuntimeApi.WideUp(WideOperand(x), scale - x.Scale);
+
+    /// <summary>The exact comparison (−1/0/+1 as a C# expression) of two operands of which at least one is an exact wide
+    /// intermediate, or <c>null</c> when the pair has no exact form to compare on (a float, an SDIDI, an unknown bound: the
+    /// caller then lowers both and compares as it always did). A relation (§8.8.4.2.4 — "a comparison is made with respect
+    /// to the algebraic value of the operands") has a defined answer for every legal pair, which only the exact form gives
+    /// for two nested products that differ below the SDIDI's 34th digit. No digit bound is needed: lifting an
+    /// <c>Int128</c> value is exact and the comparison never aligns past the 256-bit range (<c>CobolWide.Compare</c>).</summary>
+    public static string? CompareWide(NumX l, NumX r)
+    {
+        static bool Exact(NumX x) => !x.Real && !x.Dec && !x.U;   // the scaled Int128 lane or the wide form
+        return (l.Wide || r.Wide) && Exact(l) && Exact(r)
+            ? RuntimeApi.WideCompare(WideOperand(l), l.Scale, WideOperand(r), r.Scale)
+            : null;
     }
 
     /// <summary>Render a bound expression that the FORMAT admits only as an OPERAND — PERFORM VARYING's FROM / BY
@@ -113,7 +168,8 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// <summary>Render a bound operand as a scaled native-integer value, computed FOR <paramref name="rcv"/>
     /// (re-entrant — see <see cref="Render"/>). <paramref name="sending"/> names the §14.6.13.2 exempt context,
     /// which suppresses whichever rule's checked read that context exempts.</summary>
-    public NumX AsNum(BoundOperand op, in ReceiverContext rcv, SendingRef sending = SendingRef.Normal, bool outermost = false)
+    public NumX AsNum(BoundOperand op, in ReceiverContext rcv, SendingRef sending = SendingRef.Normal, bool outermost = false,
+                      bool keepWide = false)
     {
         var saved = _rcv;
         var savedEx = _sending;
@@ -121,7 +177,11 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         _rcv = rcv;
         _sending = sending;
         _outermost = outermost;
-        try { return op.Accept(this); }
+        try
+        {
+            NumX x = op.Accept(this);
+            return keepWide ? x : Settle(x, rcv, outermost);
+        }
         finally { _rcv = saved; _sending = savedEx; _outermost = savedOut; }
     }
 
@@ -525,7 +585,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
             if (xs.Count == 0) return new NumX("0L", 0);
             NumX acc = xs[0].Accept(this);
             for (int i = 1; i < xs.Count; i++) acc = CombineCore(acc, "+", xs[i].Accept(this));
-            return acc;
+            return Settle(acc, rcv, outermost: false);
         }
         finally { _rcv = saved; _outermost = savedOut; }
     }
@@ -541,7 +601,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         var saved = _rcv; bool savedOut = _outermost;
         _rcv = rcv;
         _outermost = outermost;
-        try { return CombineCore(a, op, b); }
+        try { return Settle(CombineCore(a, op, b), rcv, outermost); }
         finally { _rcv = saved; _outermost = savedOut; }
     }
 
@@ -609,14 +669,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // ROUNDING (§11.9.11) reaches a native statement carrying a float literal, PROHIBITED included.
         // MOD/REM keep exact integers exact through their own integer fast path.
         if (StandardDecimal || ((a.Dec || b.Dec) && !a.Real && !b.Real && !_rcv.Real))
-            return op switch
-            {
-                "+" => new NumX($"CobolDec.Add({DecOperand(a)}, {DecOperand(b)}, {IntermediateMode})", 0, Dec: true),
-                "-" => new NumX($"CobolDec.Sub({DecOperand(a)}, {DecOperand(b)}, {IntermediateMode})", 0, Dec: true),
-                "*" => new NumX($"CobolDec.Mul({DecOperand(a)}, {DecOperand(b)}, {IntermediateMode})", 0, Dec: true),
-                "/" => new NumX($"CobolDec.Div({DecOperand(a)}, {DecOperand(b)}, {IntermediateMode})", 0, Dec: true),
-                _ => a,
-            };
+            return DecBinary(op, a, b);
         // D16 (NATIVE arithmetic): any expression with ≥1 float operand evaluates ENTIRELY in IEEE binary64 (a
         // single-precision operand widens exactly) — native COBOL float arithmetic is IEEE binary, never decimal
         // (§8.8.1.3 implementor-defined; STANDARD-BINARY is obsolete, 2023 §8.8.1.4.1 NOTE). +,-,*,/ are native
@@ -624,6 +677,20 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         if (a.Real || b.Real || _rcv.Real) return CombineReal(a, op, b);
         return CombineNative(a, op, b);
     }
+
+    /// <summary>One operation on the SDIDI lane at the program's INTERMEDIATE ROUNDING mode — the operands lifted by
+    /// <see cref="DecOperand"/> (a fixed-point value exactly, a float by its shortest round-trip decimal, an exact wide
+    /// intermediate by round-to-odd). The ONE spelling of the four operators for every caller that takes an operation
+    /// there: the standard-decimal engine, an SDIDI-carried native operand (kb/Work PB69) and an exact wide operand whose
+    /// operation has no wide form (kb/Work PB1900).</summary>
+    private NumX DecBinary(string op, NumX a, NumX b) => op switch
+    {
+        "+" => new NumX($"CobolDec.Add({DecOperand(a)}, {DecOperand(b)}, {IntermediateMode})", 0, Dec: true),
+        "-" => new NumX($"CobolDec.Sub({DecOperand(a)}, {DecOperand(b)}, {IntermediateMode})", 0, Dec: true),
+        "*" => new NumX($"CobolDec.Mul({DecOperand(a)}, {DecOperand(b)}, {IntermediateMode})", 0, Dec: true),
+        "/" => new NumX($"CobolDec.Div({DecOperand(a)}, {DecOperand(b)}, {IntermediateMode})", 0, Dec: true),
+        _ => a,
+    };
 
     /// <summary>Does a FLOAT operand own this operation's lane — a floating-point data item or carrier literal
     /// (<c>Real</c> and not <see cref="NumX.Approximate"/>) or a floating-point receiver (kb/Work PB1641)? When none
@@ -683,6 +750,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     {
         { Dec: true } d => d.Expr,
         { Real: true } r => RuntimeApi.DecFromDouble(r.Expr),
+        { Wide: true } w => RuntimeApi.WideToDec(w.Expr, w.Scale),   // the lowering: round-to-odd, 34 digits (kb/Work PB1900)
         var v => $"CobolDec.From({v.Expr}, {v.Scale})",
     };
 
@@ -715,19 +783,22 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     ///         (kb/Work PB1143's review finding N1: <c>E * F</c> of two 20-digit operands into <c>PIC S9(31) COMP-5</c>
     ///         stored …5370000 for …5361999). A product past the Int128 carrier at that scale is the size error
     ///         condition, never a rounding.</item>
-    ///   <item><b>Both bounds known and N+M &gt; 38, NESTED in a larger expression or in a receiver-less one</b> — it MAY NOT fit, so the product
-    ///         is formed on the SDIDI, the carrier that owns its exponent at run time (<c>CobolDec.MulToOdd</c>: the
-    ///         exact 256-bit product reduced to 34 significant digits by ROUND-TO-ODD). The intermediate's rounding is the
-    ///         implementor's (§8.8.1.3) and native arithmetic rounds ONCE, at the final transfer into the resultant
-    ///         (§14.7.4.3's ROUNDED phrase), which has to see whether anything lay beyond the 34th digit: a truncation hid
-    ///         it (ROUNDED AWAY-FROM-ZERO stored 1.000…002 for a product 1 + 2e-30 + 1e-60, a NEAREST-EVEN tie was
-    ///         manufactured, PROHIBITED stored an inexact product silently). Round-to-odd keeps an odd last digit whenever
-    ///         digits were dropped, so a receiver of at most 32 digit positions — every PICTURE-limited one, §13.18.40.3
-    ///         SR14 caps them at 31 — rounds this value, in every mode, exactly as it would round the exact product. The
-    ///         result continues on the decimal lane exactly as a floating-point literal's does (the PB69 / D-B
-    ///         consumers), and the final store is <c>CobolNum.Store(CobolDec, …)</c>. (A nested product is the
-    ///         implementor's intermediate precision, §8.8.1.3 — the 34 digits are stated in A.1 item 123, never a claim of
-    ///         exactness for a 16-byte COMP-5 receiver of a compound expression.)</item>
+    ///   <item><b>Both bounds known and N+M &gt; 38, NESTED in a larger expression or in a receiver-less one</b> — it is not
+    ///         the final transfer, so it keeps EVERY digit: the exact 256-bit product as a <see cref="NumX.Wide"/> value
+    ///         (<c>CobolWide.Mul</c>), whenever the bounds prove it fits <c>CobolWide.MaxDigits</c> (77) digits — kb/Work PB1900.
+    ///         The implementor's intermediate (§8.8.1.3: "Native arithmetic is an implementor-defined method of evaluating an
+    ///         arithmetic expression") follows GnuCOBOL, whose <c>cob_decimal_mul</c> / <c>cob_decimal_add</c> are exact: `A * B - C * D`
+    ///         over PIC 9(21) operands is exactly 1, where the 34-digit SDIDI this arm used to form rounded each 41-digit product
+    ///         and the cancellation kept only the rounding error (stored 10000000). The sums, differences and negations above it
+    ///         stay exact on the same form (<see cref="CombineAdditive"/>, <see cref="Negate"/>), and the value is SETTLED once, at
+    ///         the public entry (<see cref="Settle"/>): into the receiver's scale and mode at the final transfer — §14.7.7 rule 3
+    ///         NOTE 1, ROUNDED sees every digit, for a 16-byte COMP-5 receiver as for a PICTURE-limited one — else into the SDIDI.
+    ///         A product whose bound passes 77 digits, or whose other operand has no bound, is formed on the SDIDI as before
+    ///         (<c>CobolDec.MulToOdd</c>: the exact product reduced to 34 significant digits by ROUND-TO-ODD, which keeps an odd
+    ///         last digit whenever digits were dropped, so a receiver of at most 32 digit positions — every PICTURE-limited one,
+    ///         §13.18.40.3 SR14 caps them at 31 — rounds that value, in every mode, exactly as it would round the exact product).
+    ///         A quotient above a wide value is formed there too (<c>CobolDec.DivToOdd</c>): GnuCOBOL's own divide is inexact
+    ///         (<c>shift_decimal</c> then a truncating <c>mpz_tdiv_q</c>), so the precedence does not demand an exact quotient.</item>
     ///   <item><b>A bound unknown</b> (an intrinsic's value, a windowed view, a counter) — the carrier's own
     ///         behaviour, now NEVER a silent wrap: <c>CobolNum.MulChecked</c> raises the size error condition at the
     ///         Int128 escape boundary (§14.7.5 case 5, A.1 item 179) in every statement, not only under a phrase.</item>
@@ -735,15 +806,25 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     private NumX Multiply(NumX a, NumX b)
     {
         bool known = a.Digits > 0 && b.Digits > 0;
-        if (known && a.Digits + b.Digits > ReceiverContext.IntermediateDigits)
+        if (known && (a.Wide || b.Wide || a.Digits + b.Digits > ReceiverContext.IntermediateDigits))
         {
             // The final transfer to ONE fixed-point resultant: exact, rounded once at ITS scale with ITS mode. A
             // receiver-less or floating-point context has no such transfer (the bound alone cannot tell the value's
             // magnitude), and a nested product is not it either.
-            if (_outermost && !_rcv.Receiverless && !_rcv.Real)
+            if (_outermost && _rcv.RoundsAtItsScale && !a.Wide && !b.Wide)
                 return new NumX(RuntimeApi.DecMulAtScale(a.Expr, a.Scale, b.Expr, b.Scale, _rcv.Scale, _rcv.Rounding, Checked), _rcv.Scale);
+            // ⛔ A NESTED PRODUCT KEEPS EVERY DIGIT (kb/Work PB1900): the exact wide form, whenever the operands' digit
+            // bounds prove the exact product fits it. Rounding it to 34 digits here — as the SDIDI below does — left
+            // `A * B - C * D` over PIC 9(21) operands only the rounding error of two nearly equal 41-digit products.
+            int digits = a.Digits + b.Digits;
+            if (digits <= RuntimeApi.WideMaxDigits)
+                return new NumX(RuntimeApi.WideMul(WideOperand(a), WideOperand(b)), a.Scale + b.Scale, Digits: digits, Wide: true);
             return new NumX(RuntimeApi.DecMulToOdd(DecOperand(a), DecOperand(b)), 0, Dec: true);
         }
+        // A wide operand beside one of unknown bound (an intrinsic's value, a windowed view): the product cannot be proved
+        // to fit the wide form, so it is formed on the SDIDI by round-to-odd like every nested product past the carrier.
+        if (a.Wide || b.Wide)
+            return new NumX(RuntimeApi.DecMulToOdd(DecOperand(a), DecOperand(b)), 0, Dec: true);
         string product = known
             ? $"((Int128)({a.Expr}) * ({b.Expr}))"
             : $"CobolNum.MulChecked({a.Expr}, {b.Expr})";
@@ -768,9 +849,14 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// (§14.7.5 enumerates no native intermediate-inexactness case; only a zero divisor, case 2, still raises).</summary>
     private NumX Divide(NumX a, NumX b)
     {
+        // An exact wide operand has no quotient form of its own (§8.8.1.3 leaves the intermediate to the implementor, and
+        // GnuCOBOL's own divide is inexact: shift_decimal then a truncating mpz_tdiv_q, numeric.c:2259-2261): the quotient
+        // forms on the SDIDI by ROUND-TO-ODD (CobolDec.DivToOdd), so the one rounding at the receiver sees any tail.
+        if (a.Wide || b.Wide)
+            return new NumX(RuntimeApi.DecDivToOdd(DecOperand(a), DecOperand(b)), 0, Dec: true);
         int ds;
         CobolRounding mode;
-        if (_outermost)
+        if (_outermost && _rcv.RoundsAtItsScale)
         {
             // The final transfer: compute at the resultant's scale + ROUNDED mode. DivideOrThrow detects a
             // PROHIBITED-inexact quotient via the exact integer remainder (§14.7.4.3 GR7 — tests the resultant).
@@ -802,6 +888,13 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // both bounds are, and "unknown" (0) once it passes the carrier's own 38.
         int digits = a.Digits > 0 && b.Digits > 0
             ? Math.Max(a.Digits + (s - a.Scale), b.Digits + (s - b.Scale)) + 1 : 0;
+        // ⛔ A SUM OR DIFFERENCE WITH AN EXACT WIDE OPERAND STAYS EXACT (kb/Work PB1900) while its digit bound fits the
+        // wide form — the cancellation of two nested products is the case the form exists for. A bound that does not fit
+        // (or is unknown) lowers both operands to the SDIDI, whose round-to-odd addition keeps the inexact marker.
+        if (a.Wide || b.Wide)
+            return digits is > 0 and <= RuntimeApi.WideMaxDigits
+                ? new NumX(RuntimeApi.WideAdditive(WideAligned(a, s), op == "-", WideAligned(b, s)), s, Digits: digits, Wide: true)
+                : DecBinary(op, a, b);
         if (digits > ReceiverContext.IntermediateDigits) digits = 0;
         // Under an ON SIZE ERROR phrase the sum/difference is overflow-checked at the Int128 ENGINE boundary
         // (AddChecked/SubChecked → OverflowException → the size error condition, §14.7.5 case 5) — the exact
@@ -858,7 +951,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// <c>CobolFloat.ToScaled</c> every other float→fixed transfer uses — the saturation-SAFE one, because it
     /// lands AT the requested scale, so an out-of-range magnitude stays above the caller's capacity check
     /// instead of being rescaled back into range. TRUNCATION matches this helper's existing contract (alignment
-    /// is not a ROUNDED transfer; §14.7 NOTE 1 gives ROUNDED only to the final transfer).</para></summary>
+    /// is not a ROUNDED transfer; §14.7.7 rule 3 NOTE 1 gives ROUNDED only to the final transfer).</para></summary>
     /// <para>⛔ AND THE <c>Dec</c> ARM IS THE ONE IT WAS MISSING (fix-queue PB32/PB14). The paragraph above
     /// declares this helper TOTAL over the carrier kinds; <see cref="NumX"/> has THREE — exact scaled
     /// <see cref="Int128"/>, the <c>CobolDec</c> SDIDI, and binary64 — and only two were written down. Under
@@ -877,7 +970,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// strictly smaller wrong than "does not compile" and it is not the end state — the §15.4.1 r1 answer is a
     /// Dec-carrier body, ledgered as PB38.</para></para></summary>
     /// <param name="mode">The rounding of the narrowing. TRUNCATION is this helper's contract and every
-    /// value-semantics caller takes it (alignment is not a ROUNDED transfer; §14.7 NOTE 1 gives ROUNDED only to
+    /// value-semantics caller takes it (alignment is not a ROUNDED transfer; §14.7.7 rule 3 NOTE 1 gives ROUNDED only to
     /// the final transfer). The ONE caller that passes otherwise is the report SUM accumulation, where the
     /// alignment IS the final transfer: §13.18.54.4 GR3 adds each addend into the counter "consistent with the
     /// general rules of the ADD statement … or, in the case of an arithmetic expression, the COMPUTE statement",
@@ -989,8 +1082,8 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// working scale (a receiver-less context renders at scale 0 — the P7.3 <see cref="ReceiverContext.None"/>).</summary>
     private NumX Power(NumX b, NumX e, bool expIsNonNegativeLiteral = false)
     {
-        b = DeU(b);   // exponentiation is arithmetic — the unsigned-wide Widen funnel applies (kb/Work R10)
-        e = DeU(e);
+        b = LowerWide(DeU(b));   // exponentiation is arithmetic — the unsigned-wide Widen funnel applies (kb/Work R10);
+        e = LowerWide(DeU(e));   // an exact wide base/exponent has no power form: it enters on the SDIDI (kb/Work PB1900)
         // STANDARD / STANDARD-DECIMAL: exponentiation follows §8.8.1.5.4 — an integer exponent evaluates by
         // repeated SDIDI multiplication (r2a–r2d exactly; r2e's implementor-defined form for larger integers,
         // every step per §8.8.1.5.3), r3's reciprocal for a negative exponent, and the EC-SIZE-EXPONENTIATION
@@ -1077,6 +1170,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     private static NumX Negate(NumX x) =>
         x.Real ? new NumX($"(-({Real(x)}))", 0, Real: true, Approximate: x.Approximate)
         : x.Dec ? new NumX($"(new CobolDec(-({x.Expr}).Sig, ({x.Expr}).Exp))", 0, Dec: true)
+        : x.Wide ? new NumX(RuntimeApi.WideNegate(x.Expr), x.Scale, Digits: x.Digits, Wide: true)
         : x.U ? new NumX($"(-{DeU(x).Expr})", x.Scale, Digits: x.Digits)   // negation is arithmetic — the Widen funnel applies
         : new($"(-{x.Expr})", x.Scale, Digits: x.Digits);
 
@@ -1198,11 +1292,13 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// standard-decimal operand only — a float intermediate is already a binary64 the caller narrows once.</summary>
     internal static string ScaledSingle(NumX x) =>
         x.Dec ? $"({x.Expr}).ToSingle()"
+        : x.Wide ? $"({RuntimeApi.WideToDec(x.Expr, x.Scale)}).ToSingle()"
         : RuntimeApi.ScaledToSingle(x.Expr, x.Scale);
 
     internal static string Real(NumX x) =>
         x.Real ? x.Expr                                   // already a double-typed float intermediate (D16)
         : x.Dec ? $"({x.Expr}).ToDouble()"
+        : x.Wide ? RuntimeApi.WideToDouble(x.Expr, x.Scale)
         : x.Scale == 0 ? $"(double)({x.Expr})"
         : RuntimeApi.ScaledToDouble(x.Expr, x.Scale);
 }

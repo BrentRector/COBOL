@@ -173,14 +173,23 @@ internal sealed class EmitContext(CodeWriter writer, DataBinder data, NameAlloca
 /// (a field read: the PICTURE's digit count; a literal: its digit count; the exact additive, multiplicative and
 /// aligned results derived from those); every other producer leaves it 0 and keeps the carrier's checked
 /// behaviour.</param>
+/// <param name="Wide">True when <see cref="Expr"/> is a <c>CobolWide</c>-typed EXACT 256-bit intermediate of the NATIVE
+/// lane (kb/Work PB1900): the unscaled value at the compile-time <see cref="Scale"/>, with <see cref="Digits"/> its
+/// (always known, at most <c>CobolWide.MaxDigits</c>) magnitude bound. ⛔ IT NEVER LEAVES <c>NumericRenderer</c>: the
+/// renderer's public entries settle it — into the receiver's scale and mode at a final transfer, into the SDIDI
+/// otherwise (or the consumer opts in with <c>keepWide</c> and settles it itself) — so it is deliberately NOT a
+/// <see cref="NumXCarrier"/>, and <see cref="Carrier"/> throws on it. Mutually exclusive with <see cref="Dec"/>,
+/// <see cref="Real"/> and <see cref="U"/>.</param>
 internal readonly record struct NumX(string Expr, int Scale, bool Dec = false, bool Real = false, bool U = false,
-    bool Approximate = false, int Digits = 0)
+    bool Approximate = false, int Digits = 0, bool Wide = false)
 {
     /// <summary>WHICH carrier <see cref="Expr"/> is typed as — the one question every total-over-carriers dispatch
     /// (<c>IntrinsicRenderer.IntegerIntake</c>, the landings, the stores) asks, answered once from the mutually
     /// exclusive flags. <see cref="NumXCarrier"/> is the enumeration a drift test walks to prove such a dispatch
     /// accepts every carrier the renderer can produce.</summary>
-    public NumXCarrier Carrier => U ? NumXCarrier.UnsignedWide : Dec ? NumXCarrier.Sdidi : Real ? NumXCarrier.Binary64 : NumXCarrier.Scaled;
+    public NumXCarrier Carrier => Wide ? throw new InvalidOperationException(
+            "an exact wide intermediate (NumX.Wide) is settled inside NumericRenderer and is not a carrier a consumer dispatches on (kb/Work PB1900)")
+        : U ? NumXCarrier.UnsignedWide : Dec ? NumXCarrier.Sdidi : Real ? NumXCarrier.Binary64 : NumXCarrier.Scaled;
 }
 
 /// <summary>The carriers a <see cref="NumX"/> expression can be typed as (see <see cref="NumX.Carrier"/>): the exact

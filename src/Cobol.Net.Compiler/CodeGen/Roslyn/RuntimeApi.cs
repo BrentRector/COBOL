@@ -656,6 +656,51 @@ internal static class RuntimeApi
         $"{nameof(CobolDec)}.{nameof(CobolDec.MulAtScale)}({left}, {leftScale}, {right}, {rightScale}, {resultScale}, "
         + $"{RoundingText(mode)}, {(checkedTransfer ? "true" : "false")})";
 
+    /// <summary>A native quotient formed on the SDIDI — <c>CobolDec.DivToOdd</c>: the quotient reduced to 34 digits by
+    /// round-to-odd, so the receiver's one rounding sees any tail (kb/Work PB1143's sibling, as <see cref="DecMulToOdd"/>).</summary>
+    public static string DecDivToOdd(string leftOperand, string rightOperand) =>
+        $"{nameof(CobolDec)}.{nameof(CobolDec.DivToOdd)}({leftOperand}, {rightOperand})";
+
+    // ── The EXACT WIDE intermediate (CobolWide, kb/Work PB1900) — one spelling per operation, so the renderer never
+    //    writes the runtime type's member names out for itself.
+
+    /// <summary>The widest magnitude, in decimal digits, the exact wide form holds (<c>CobolWide.MaxDigits</c>): the bound the
+    /// renderer's digit analysis selects the form against.</summary>
+    public const int WideMaxDigits = CobolWide.MaxDigits;
+
+    /// <summary>An <c>Int128</c>-lane value lifted into the exact wide form (same unscaled magnitude; the caller tracks the scale).</summary>
+    public static string WideFrom(string int128Expr) => $"{nameof(CobolWide)}.{nameof(CobolWide.From)}({int128Expr})";
+
+    /// <summary>The exact product of two wide values (the caller adds the scales).</summary>
+    public static string WideMul(string left, string right) =>
+        $"{nameof(CobolWide)}.{nameof(CobolWide.Mul)}({left}, {right})";
+
+    /// <summary>A wide value aligned UP by <paramref name="digits"/> decimal places (× 10^digits).</summary>
+    public static string WideUp(string wide, int digits) =>
+        digits == 0 ? wide : $"{nameof(CobolWide)}.{nameof(CobolWide.Up)}({wide}, {digits})";
+
+    /// <summary>The exact sum (<paramref name="subtract"/> false) or difference of two wide values at one scale.</summary>
+    public static string WideAdditive(string left, bool subtract, string right) =>
+        $"{nameof(CobolWide)}.{(subtract ? nameof(CobolWide.Sub) : nameof(CobolWide.Add))}({left}, {right})";
+
+    public static string WideNegate(string wide) => $"{nameof(CobolWide)}.{nameof(CobolWide.Negate)}({wide})";
+
+    /// <summary>The exact comparison (−1/0/+1) of two scaled wide values.</summary>
+    public static string WideCompare(string left, int leftScale, string right, int rightScale) =>
+        $"{nameof(CobolWide)}.{nameof(CobolWide.Compare)}({left}, {leftScale}, {right}, {rightScale})";
+
+    /// <summary>The FINAL TRANSFER of an exact wide value: rounded once from <paramref name="scale"/> to
+    /// <paramref name="toScale"/> with <paramref name="mode"/>, as an unscaled Int128 at <paramref name="toScale"/>
+    /// (<c>CobolWide.ToUnscaled</c>; <paramref name="checkedTransfer"/> as <see cref="DecMulAtScale"/>).</summary>
+    public static string WideToUnscaled(string wide, int scale, int toScale, CobolRounding mode, bool checkedTransfer) =>
+        $"({wide}).{nameof(CobolWide.ToUnscaled)}({scale}, {toScale}, {RoundingText(mode)}, {(checkedTransfer ? "true" : "false")})";
+
+    /// <summary>A wide value lowered to the SDIDI by round-to-odd (<c>CobolWide.ToDec</c>).</summary>
+    public static string WideToDec(string wide, int scale) => $"({wide}).{nameof(CobolWide.ToDec)}({scale})";
+
+    /// <summary>A wide value as binary64 (<c>CobolWide.ToDouble</c>).</summary>
+    public static string WideToDouble(string wide, int scale) => $"({wide}).{nameof(CobolWide.ToDouble)}({scale})";
+
     /// <summary>The exact §15.27.3 r3 FUNCTION E constant under a standard mode — <c>CobolDec.E</c> (kb/Work R18).</summary>
     public static string DecE => $"{nameof(CobolDec)}.{nameof(CobolDec.E)}";
 

@@ -240,8 +240,9 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
                 // the receiver's own §14.9.25.4 GR6 truncation semantics apply, via the store-cap); a
                 // receiverless/float context keeps the common scale and stays LOUD past the escape boundary —
                 // a capped value inside a comparison would silently compare the wrong number (PB13's
-                // receiver-blind-scale lesson, applied in both directions).
-                bool store = !num.Receiver.Receiverless && !num.Receiver.Real;
+                // receiver-blind-scale lesson, applied in both directions). A FLOATING-POINT edited receiver is
+                // the float context too: its Scale is only the mask's hint (ReceiverContext.RoundsAtItsScale).
+                bool store = num.Receiver.RoundsAtItsScale;
                 int to = store ? num.Receiver.Scale : s;
                 return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod is "MaxScaled" ? "MaxAt" : "MinAt",
                     $"{to}, {(store ? "true" : "false")}, {vals}, {scales}"), to);

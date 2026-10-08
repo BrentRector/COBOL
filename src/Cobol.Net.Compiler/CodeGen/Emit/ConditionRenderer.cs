@@ -375,8 +375,15 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
         // floored the exact family at 6 and the relation agreed with a TRUNCATED value no channel should
         // hold. Receiverless STAYS TRUE (the float family keeps its deliberate binary64 compare above);
         // only the working-scale request carries the comparand.
-        NumX l = num.AsNum(r.Left, ReceiverContext.None with { Scale = StaticScaleOf(r.Right) }),
-             rr = num.AsNum(r.Right, ReceiverContext.None with { Scale = StaticScaleOf(r.Left) });
+        // ⛔ KEEP AN EXACT WIDE OPERAND (kb/Work PB1900): `IF A * B = C * D` over operands whose products pass the Int128
+        // carrier compares the EXACT products — §8.8.4.2.4 compares algebraic values, and two products that differ below the
+        // SDIDI's 34th digit are not equal. A pair with no exact form to compare on lowers to the SDIDI as before.
+        NumX l = num.AsNum(r.Left, ReceiverContext.None with { Scale = StaticScaleOf(r.Right) }, keepWide: true),
+             rr = num.AsNum(r.Right, ReceiverContext.None with { Scale = StaticScaleOf(r.Left) }, keepWide: true);
+        if (NumericRenderer.CompareWide(l, rr) is { } wideCompare)
+            return $"{wideCompare} {r.Op} 0";
+        l = NumericRenderer.LowerWide(l);
+        rr = NumericRenderer.LowerWide(rr);
         // A float operand under NATIVE arithmetic (D16): compare the algebraic values natively in IEEE double
         // (§8.8.4.2.4 — "when native arithmetic is in effect, comparison proceeds by the rules of native
         // arithmetic"). IEEE NaN-unordered (every relation but != is false) and +0.0 == -0.0 fall out of C# —

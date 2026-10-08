@@ -1001,11 +1001,23 @@ clause text and fails if a new member is silently exempted.
    MULTIPLY GIVING or product-rooted COMPUTE, which render per receiver like DIVIDE) rounded ONCE at the resultant's scale
    with its mode (`CobolDec.MulAtScale` — exact for EVERY receiver width: a 16-byte COMP-5 item owns a 38-digit
    container, where an SDIDI product keeps 34 and the receiver's ROUNDED phrase would never see the tail, the review
-   finding N1), and (ii) when it is NESTED (a compound expression's operand, a relation operand) formed on the SDIDI
-   (`CobolDec.MulToOdd`: 34 digits by ROUND-TO-ODD — an inexact product keeps an odd last digit, so the receiver's ONE
-   rounding, §14.7.4.3, in any mode, equals rounding the exact product for a receiver of ≤ 32 digit positions, every
-   PICTURE-limited one; a wider receiver of a COMPOUND expression is the implementor's intermediate precision,
-   §8.8.1.3); an unknown bound — `CobolNum.MulChecked` in EVERY statement (a native product never wraps). The old emitter
+   finding N1), and (ii) when it is NESTED (a compound expression's operand, a relation operand) kept EXACT as a `NumX.Wide` value
+   (`CobolWide`: a signed 256-bit integer at the compile-time scale, selected only where the digit bounds prove the exact
+   value fits `CobolWide.MaxDigits` = 77 digits; kb/Work PB1900). The implementor's intermediate (§8.8.1.3) follows
+   GnuCOBOL, whose `cob_decimal_mul` / `_add` / `_sub` are exact, so `A * B - C * D` over PIC 9(21) operands is exactly 1
+   where the 34-digit SDIDI it replaced stored 10000000. The sums, differences and negations above it stay on the wide
+   form, and it is SETTLED once, at the renderer's public entry (`NumericRenderer.Settle`, the only way it leaves): into
+   the receiver's scale and mode at the final transfer (`CobolWide.ToUnscaled`, the `CobolDec.TransferWide` kernel
+   `MulAtScale` shares — ROUNDED sees every digit whatever the receiver's width) when the resultant rounds at its own
+   scale (`ReceiverContext.RoundsAtItsScale`: not receiver-less, not floating-point, and not a FLOATING-POINT
+   numeric-edited item, whose scale is only the mask's hint and whose value normalizes into the mask, §14.6.8.4; the
+   outermost quotient and the MAX/MIN selection ask the same predicate), else lowered to the SDIDI by
+   ROUND-TO-ODD (`CobolWide.ToDec`; an inexact value keeps an odd last digit, so a later rounding in any mode equals
+   rounding the exact value for a receiver of ≤ 32 digit positions). Two consumers take it EXACT through `keepWide`: a
+   several-receiver COMPUTE's one initial evaluation (snapshotted as a `CobolWide`, settled per receiver) and a relation
+   (`CobolWide.Compare`); `ExactWideSettlementDriftTests` closes that list. A bound past 77 digits or unknown, a quotient
+   (GnuCOBOL's own divide is inexact, numeric.c:2259-2261) and an exponentiation take the SDIDI (`CobolDec.MulToOdd` /
+   `DivToOdd`) as before; an unknown bound — `CobolNum.MulChecked` in EVERY statement (a native product never wraps). The old emitter
    multiplied unchecked and `PIC 9V9(30)` × `PIC 9V9(30)` — a legal statement, §14.7.7 r2 a) caps the COMPOSITE — stored a
    wrapped product. The same bound drives `IntrinsicRenderer.AlignmentMayLeaveCarrier`: SUM / RANGE / MEAN / MEDIAN /
    MIDRANGE align every argument to the list's maximum scale, and when the SUM of the magnitudes the function adds (each

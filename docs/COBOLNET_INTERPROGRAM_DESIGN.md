@@ -370,6 +370,17 @@ and cannot satisfy the landing's `struct, INumberBase<T>` constraint). The lande
 argument from that point on — which is exactly what makes the callee-side landing the identity, and what makes an
 image-carried formal see the record's own sign (kb/Work PB873).
 
+**THE ARGUMENT EXPRESSION IS EVALUATED FOR THE FORMAL'S DESCRIPTION (kb/Work PB289).** The same COMPUTE has a
+*sending operand* — the argument — and a *resultant* — the record of the formal's description — so an arithmetic-expression
+argument is rendered as the final transfer into that resultant, not receiver-less. `CallEmitter.ArgText`'s computed-operand
+arm and `OoEmitter.FormalValue` (the INVOKE twin) build the expression's `ReceiverContext` with `ReceiverContext.Of(formal
+PICTURE, …, Truncation, …)` — the one derivation the arithmetic statements use for their resultants — and render with
+`outermost: true`: a quotient lands at the formal's fraction digits (`CALL … AS NESTED USING BY VALUE 1 / 3` into a
+`PIC S9(5)V9(20)` formal is 0.33333333333333333333, not the receiver-less 6-digit working scale's 0.333333), a nested
+product past the `Int128` carrier is rounded once at the formal's scale (kb/Work PB1900), and an expression into a
+floating-point formal evaluates in binary64 as any COMPUTE into one does (D16). Where `BoundCallArg.Formal` is null
+(GR9's first branch) there is no resultant description and the receiver-less render stands.
+
 **When the caller cannot: the activation boundary lands, through the formal's registered carrier (kb/Work
 PB2549).** GR9's FIRST branch — a program with no program-specifier in the activating element's REPOSITORY
 paragraph and no NESTED phrase — allocates a record *"of the same length as the argument"* and moves it *"without
