@@ -287,6 +287,11 @@ jobs:
           python3 .claude/skills/workstream/check_practices.py
           # dispatch_guard.py runs check_practices.py over a brief, which needs this same submodule
           python3 scripts/hooks/test_dispatch_guard.py
+      # The file-set partition's guarantee (kb/Work PB2118 Draft 9): push-main.sh runs landing_check.py before every
+      # landing; its self-test plants an out-of-set edit and a two-branch overlap in a scratch repository.
+      - name: Landing check self-test (landing_check.py --self-test)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/orchestrator/landing_check.py --self-test
 
   # ── The authoritative NIST gate: the PARALLEL guard. guard-fast.sh runs exactly the checks scripts/guard.sh
   # does (build src/Cobol.Net.Cli + the ~376 NIST CCVS-85 programs) but fans the NIST suite across the

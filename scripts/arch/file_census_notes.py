@@ -1,30 +1,70 @@
 #!/usr/bin/env python3
 """file_census_notes.py — files the architecture census's findings as kb/Work notes (kb/Work PB2119, the Delete program).
 
-    python scripts/arch/file_census_notes.py <findings.json> --ids PB2155-PB2214[,PB2215-PB2274] [--dry-run] [--notes-dir DIR]
+    python scripts/arch/file_census_notes.py <findings.json> --ids PB2155-PB2214[,PB2215-PB2274] [--targets T.json]
+                                             [--rerender] [--dry-run] [--notes-dir DIR]
     python scripts/arch/file_census_notes.py --self-test
 
-One note = one mechanism a single Delete / Unify / Move wave can take. The grouping is fixed by kind:
+One note = one mechanism a single Delete / Unify / Move / Extract wave can take. The grouping is fixed by kind:
   dead-artifact       one note per (class, directory)
   unreachable-type /
   unreachable-family  one note per primary src file (families whose members live in the same file merge)
   clone-family        one note per family
   folder-namespace    one note per disagreement
-Never filed: god-class (R1 owns the decomposition targets, kb/Work PB2118) and test-only-family / test-only-type
-("only tests use it" is a judgment, reported as NEEDS-OPUS). Unknown kinds are reported, never guessed.
+  god-class           filed ONLY with --targets, the design record of DESIGN-architecture-review §8.3 (R1, kb/Work
+                      PB2118), kept in the repository at docs/rearchitecture/evidence/arch-census/targets/<sha>.json
+                      beside the census record it refines; a god-class finding with no record there is refused,
+                      never guessed. A record with `steps` is a designed extraction ORDER: the finding's note is
+                      step 1 and every later step is its own note (one note = one wave, because plan_wave.py groups
+                      notes), blocked_by the step before it. A note claims ONLY its own step: the class note's target,
+                      seam and edited files are step 1's (its Sites stay the census finding's, and the finding's whole
+                      target list stays behind its census_ids back-link), and it names the later steps by note id
+                      only, so no extraction is claimed twice.
+                      A record's `removes` (or a step's) names the §8.1 tolerated rows that note removes. A step's
+                      `moves` names what it moves or changes (`Ns.Type.Member`, or a type): the note renders it as
+                      its `**Moves or changes:**` line, from which scripts/arch/member_index.py computes the callers
+                      the wave edits (PB2118 Draft 8, J2); a step without it falls back to every type its Sites
+                      declare. Every path a step's `files` or a designed record's `sites` names must exist (or be
+                      marked `(new)`), or nothing is filed.
+The --targets file also carries `designed` records: waves §8 designs that no census finding names (each tolerated
+row's removal in §8.1's edges file, a grammar regroup, a re-model). Each is one note keyed by its `key`.
 
-Idempotent: a finding whose id already appears in any note's `census_ids:` line is skipped, so the next census
-files only what is new. Every number and site in a note comes from the findings file; nothing is measured here.
+Targets file (schema 2):
+  {"schema": 2, "census": "<sha>", "source": "...",
+   "targets": {"R0-nnnn": {"targets": [...], "seam": "...", "order": "A|B|C|C+B", "order_text": "...",
+                           "blocked_by": [...], "note": "...", "removes": [[from, to, uses], ...],
+                           "steps": [{"target": "...", "seam": "...", "files": [...], "moves": [...], "blocked_by": [...],
+                                      "note": "...", "removes": [...]}, ...]}},
+   "designed": [{"key": "T-...", "wave": "extract|move-rename|grammar|re-model|measure", "what": "...", "sites": [...],
+                 "removes": [[from, to, uses], ...], "targets": [...], "seam": "...", "order": "...",
+                 "order_text": "...", "blocked_by": [...], "note": "...", "model": "...", "claims": [{"file": "...", "kinds": [...]}]}]}
+  A blocked_by entry is a note id (PBnnnn, Rnn), a step reference (`R0-nnnn` = step 1, `R0-nnnn#k`, `R0-nnnn#last`)
+  or a designed key; references resolve to note ids when the notes are rendered. A designed record's `claims` names
+  (file, finding kinds) it already covers (BoundTree.cs's family split claims the §8.2 rule 2-3 findings that kb/Work
+  PB2351 makes the census report); a finding of a claimed kind on a claimed file is skipped (`claimed-by-design`).
+
+Never filed: test-only-family / test-only-type ("only tests use it" is a judgment, reported as NEEDS-OPUS), and
+god-class without --targets. Unknown kinds are reported, never guessed.
+
+Idempotent: a finding whose id already appears in any note's `census_ids:` line, and a step or designed record whose
+key appears in any note's `design_keys:` line, is skipped, so the next run files only what is new. --rerender
+rewrites every OPEN note the targets file renders (god-class steps and designed records) whose text differs from what
+the file renders now, so the notes and the file never disagree (a note is never hand-edited; its record is). Every
+number and site in a note comes from the findings file or the targets file; nothing is measured here.
 """
 import argparse
 import json
 import os
 import re
 import sys
+import pathlib
+import subprocess
 import tempfile
 from collections import OrderedDict
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(REPO, "scripts", "spec"))
+import work  # noqa: E402 — named_missing_paths: the one rule that a path a note names exists
 NOTES_DIR = os.path.join(REPO, "kb", "Work")
 RECORD_DIR = "docs/rearchitecture/evidence/arch-census"
 
@@ -41,23 +81,34 @@ silent: false
 rejects_legal_source: false
 under_rejects: false
 process_only: true
-blocked: false
-blocked_by: []
+blocked: {blocked}
+blocked_by: {blocked_by}
 cluster: ["PB2119"]
 spec_refs: []
 inventory_rows: []
 closes_rows: []
-closes_rows_reason: "behavior-neutral restructuring (Delete program PB2119, owner R69 §3); no inventory row"
+closes_rows_reason: "{reason}"
 tags: [cobolsharp, work, analysis]
 ---
 """
 
-NOT_FILED = {"god-class": "decomposition targets come from R1 (kb/Work PB2118)",
+REASON = {"extract": "behavior-neutral restructuring (an Extract wave of the PB2119 program; owner R69 §2-§3); "
+                      "no inventory row"}
+DEFAULT_REASON = "behavior-neutral restructuring (Delete program PB2119, owner R69 §3); no inventory row"
+NOT_FILED = {"god-class": "decomposition targets come from R1 (kb/Work PB2118): pass --targets",
              "test-only-family": "NEEDS-OPUS: 'only tests use it' is a judgment",
-             "test-only-type": "NEEDS-OPUS: 'only tests use it' is a judgment"}
+             "test-only-type": "NEEDS-OPUS: 'only tests use it' is a judgment",
+             "claimed-by-design": "a designed record of the --targets file already covers this finding's file"}
 WAVE_OF_KIND = {"dead-artifact": "delete", "unreachable-type": "delete", "unreachable-family": "delete",
-                "clone-family": "unify", "folder-namespace": "move-rename"}
-PREFIX = {"delete": "Delete:", "unify": "Unify:", "move-rename": "Move/rename:"}
+                "clone-family": "unify", "folder-namespace": "move-rename", "god-class": "extract"}
+PREFIX = {"delete": "Delete:", "unify": "Unify:", "move-rename": "Move/rename:", "extract": "Extract:",
+          "grammar": "Grammar:", "re-model": "Re-model:", "measure": "Measure:"}
+EXTRACT_MODEL = "Opus (an extract wave: kb/Work R69 §4; `model_rules.json` routes area architecture to Opus)"
+
+
+def frontmatter(title, nid, blocked_by=(), reason=DEFAULT_REASON):
+    return FRONTMATTER.format(title=title, nid=nid, blocked="true" if blocked_by else "false",
+                              blocked_by=json.dumps(list(blocked_by)), reason=reason)
 
 
 def fix_text(s):
@@ -80,16 +131,26 @@ def parse_ranges(spec):
     return ids
 
 
-def filed_census_ids(notes_dir):
-    seen = set()
+def scan_notes(notes_dir):
+    """-> ({census id: note id}, {design key: note id}, {note id: status})."""
+    census, design, status = {}, {}, {}
     for name in os.listdir(notes_dir):
         if not name.endswith(".md"):
             continue
+        nid = name[:-3]
         with open(os.path.join(notes_dir, name), encoding="utf-8") as fh:
             for line in fh:
                 if line.startswith("census_ids:"):
-                    seen.update(x.strip() for x in line[len("census_ids:"):].split(",") if x.strip())
-    return seen
+                    for x in line[len("census_ids:"):].split(","):
+                        if x.strip():
+                            census.setdefault(x.strip(), nid)
+                elif line.startswith("design_keys:"):
+                    for x in line[len("design_keys:"):].split(","):
+                        if x.strip():
+                            design.setdefault(x.strip(), nid)
+                elif line.startswith("status:") and nid not in status:
+                    status[nid] = line[len("status:"):].strip()
+    return census, design, status
 
 
 def member_file(member):
@@ -124,7 +185,82 @@ def group_findings(findings):
     return [{"key": k, "findings": v} for k, v in groups.items()]
 
 
-def render(group, nid, record_path, short_sha):
+def site_files(f):
+    s = f.get("site")
+    if isinstance(s, str):
+        return {s.split(":")[0]}
+    if isinstance(s, dict):
+        return set(s.get("files", [])) | {member_file(m) for m in s.get("members", [])} - {None}
+    if isinstance(s, list):
+        return {x.split(":")[0].split(" ")[0] for x in s}
+    return set()
+
+
+class Design:
+    """The --targets file plus the note ids its references resolve to."""
+
+    def __init__(self, tf, census_ids=None, design_ids=None):
+        self.targets = tf.get("targets", {})
+        self.designed = tf.get("designed", [])
+        self.census_ids = dict(census_ids or {})   # R0 id -> note id (step 1)
+        self.design_ids = dict(design_ids or {})   # design key -> note id
+        self.claims = {(c["file"], k) for d in self.designed for c in d.get("claims", []) for k in c["kinds"]}
+
+    def step_count(self, rid):
+        return max(1, len(self.targets[rid].get("steps", [])))
+
+    def new_keys(self):
+        """Every step (k >= 2) and designed key, in filing order: the targets in census order, then `designed`."""
+        keys = []
+        for rid, t in self.targets.items():
+            keys += ["%s#%d" % (rid, k) for k in range(2, len(t.get("steps", [])) + 1)]
+        keys += [d["key"] for d in self.designed]
+        return keys
+
+    def resolve(self, ref):
+        if re.fullmatch(r"(PB|R)\d+", ref):
+            return ref
+        m = re.fullmatch(r"(R0-\d+)(?:#(\d+|last))?", ref)
+        if m:
+            rid, k = m.group(1), m.group(2) or "1"
+            if rid not in self.targets:
+                raise SystemExit("blocked_by names %s, which has no targets record" % ref)
+            k = self.step_count(rid) if k == "last" else int(k)
+            nid = self.census_ids.get(rid) if k == 1 else self.design_ids.get("%s#%d" % (rid, k))
+        else:
+            nid = self.design_ids.get(ref)
+        if nid is None:
+            raise SystemExit("blocked_by names %s, which resolves to no filed or allocated note" % ref)
+        return nid
+
+    def resolve_all(self, refs):
+        out = []
+        for r in refs:
+            nid = self.resolve(r)
+            if nid not in out:
+                out.append(nid)
+        return out
+
+
+def blocked_sentence(ids):
+    tail = []
+    if "PB2118" in ids:
+        tail.append("PB2118: §8, the target this wave executes, approved by the owner 2026-10-07")
+    if "R69" in ids:
+        tail.append("R69 §1: Cut 3 is the v1.0 cut, a release decision on the public runtime namespaces (PB2349); "
+                    "R69 leaves this list at v1.0")
+    return ", ".join(ids) + (" (" + "; ".join(tail) + ")" if tail else "")
+
+
+def contract(wave):
+    return ("**The wave's contract:** every caller changes in the same change (CLAUDE.md rule 4: no alias, shim or "
+            "forwarder); the drift test that pinned the thing goes with it, or a new boundary gets one; the §4 oracle "
+            "(`python scripts/arch/compare_oracle.py`) proves neutrality; a %s that changes behavior is a "
+            "`kind: defect` lead for the fix lane, never part of the wave (PB2119)." % (
+                "deletion" if wave == "delete" else "change"))
+
+
+def render(group, nid, record_path, short_sha, design=None):
     fs = group["findings"]
     k = fs[0]["kind"]
     key = group["key"]
@@ -132,6 +268,7 @@ def render(group, nid, record_path, short_sha):
     wave = WAVE_OF_KIND[k]
     sites, measured, targets = [], [], []
     needs_opus = [f["id"] for f in fs if "design" in fix_text(f.get("scenario", "")).lower()]
+    t = None
 
     if key[0] == "dead-artifact":
         d = key[2] or "(repository root)"
@@ -142,10 +279,10 @@ def render(group, nid, record_path, short_sha):
         n = sum(f["measure"]["members"] for f in fs)
         types = []
         for f in fs:
-            t = f["site"].get("family") or f["site"].get("type")
-            if t and t not in types:
-                types.append(t)
-        what = "%s — %d unreferenced members of %s" % (key[1], n, ", ".join(short_type(t) for t in types))
+            ty = f["site"].get("family") or f["site"].get("type")
+            if ty and ty not in types:
+                types.append(ty)
+        what = "%s — %d unreferenced members of %s" % (key[1], n, ", ".join(short_type(x) for x in types))
         for f in fs:
             fam = f["site"].get("family") or f["site"].get("type")
             if "members" in f["site"]:
@@ -164,6 +301,20 @@ def render(group, nid, record_path, short_sha):
         mm = f["measure"]
         what = "%s — %d copies, %d tokens" % (" and ".join(names), mm["copies"], mm["tokens"])
         sites.extend("- `%s`" % s for s in f["site"])
+    elif k == "god-class":
+        f = fs[0]
+        t = design.targets.get(f["id"]) if design else None
+        if t is None:
+            raise SystemExit("no --targets record for god-class finding %s (%s): R1 names the targets, never this "
+                             "script" % (f["id"], f["site"]["type"]))
+        mm = f["measure"]
+        what = "%s — %d lines, %d members, %d file(s) into %d target type(s)" % (
+            short_type(f["site"]["type"].replace("+", ".")), mm["lines"], mm["members"], len(f["site"]["files"]),
+            len(t["targets"]))
+        if t.get("steps"):
+            what += "; step 1 of %d: %s" % (len(t["steps"]), t["steps"][0]["target"])
+        sites.append("- type `%s`" % f["site"]["type"])
+        sites.extend("- `%s`" % x for x in f["site"]["files"])
     elif k == "folder-namespace":
         f = fs[0]
         dis = f["measure"]["disagreements"]
@@ -178,13 +329,15 @@ def render(group, nid, record_path, short_sha):
         rule = fix_text(f.get("rule", ""))
         mm = json.dumps(f["measure"], sort_keys=True) if "measure" in f else "none recorded"
         measured.append("%s: rule \"%s\"; measure %s" % (f["id"], rule, mm))
-        t = fix_text(f.get("target", ""))
-        if t not in targets:
-            targets.append(t)
+        tg = fix_text(f.get("target", ""))
+        if tg not in targets:
+            targets.append(tg)
 
     # the model that may take the wave
     claims_design = [f["id"] for f in fs if f["kind"] == "clone-family"]
-    if needs_opus or claims_design:
+    if wave == "extract":
+        who = EXTRACT_MODEL
+    elif needs_opus or claims_design:
         who = ("NEEDS-OPUS: the finding's scenario or target names a design claim (%s); a Sonnet wave may not decide "
                "it" % ", ".join(needs_opus or claims_design))
     else:
@@ -192,7 +345,9 @@ def render(group, nid, record_path, short_sha):
 
     title = "%s — %s %s (census %s at %s)" % (nid, PREFIX[wave], what, ", ".join(ids), short_sha)
     body = []
-    body.append(FRONTMATTER.format(title=title.replace('"', "'"), nid=nid).rstrip("\n"))
+    steps = (t or {}).get("steps") or []
+    bb = design.resolve_all(t["blocked_by"] + steps[0].get("blocked_by", []) if steps else t["blocked_by"]) if t else []
+    body.append(frontmatter(title.replace('"', "'"), nid, bb, REASON.get(wave, DEFAULT_REASON)).rstrip("\n"))
     body.append("")
     body.append("census_ids: " + ", ".join(ids))
     body.append("")
@@ -204,47 +359,216 @@ def render(group, nid, record_path, short_sha):
     body.append("**Measured how:** the R0 census record `%s` (exclusion rules and walkMisses live there). %s"
                 % (record_path, " | ".join(measured)))
     body.append("")
-    body.append("**The wave's contract:** every caller changes in the same change (CLAUDE.md rule 4: no alias, shim or "
-                "forwarder); the drift test that pinned the thing goes with it, or a new boundary gets one; the §4 oracle "
-                "(`python scripts/arch/compare_oracle.py`) proves neutrality; a deletion that changes behavior is a "
-                "`kind: defect` lead for the fix lane, never a deletion (PB2119).")
+    body.append(contract(wave))
     body.append("")
-    body.append("**Target:** " + " | ".join(targets))
-    body.append("")
+    if t:
+        if steps:
+            chain = [nid] + [design.resolve("%s#%d" % (fs[0]["id"], j)) for j in range(2, len(steps) + 1)]
+            body.append("**This note's target (DESIGN-architecture-review §8.3), step 1 of %d:** %s." % (
+                len(steps), steps[0]["target"]))
+            body.append("")
+            if steps[0].get("files"):
+                body.append("**The files this step edits** (the Sites above are the census finding's, the whole "
+                            "class): " + ", ".join("`%s`" % x for x in steps[0]["files"]) + ".")
+                body.append("")
+            body.extend(file_set_lines(steps[0].get("moves")))
+            body.append("**It claims only that step** (one note = one wave; `plan_wave.py` groups notes). Steps 2–%d are "
+                        "their own notes, each blocked by the one before it, and each claims its own target: %s." % (
+                            len(steps), ", ".join("%d %s" % (j + 1, chain[j]) for j in range(1, len(steps)))))
+            body.append("")
+        else:
+            body.append("**Target types (DESIGN-architecture-review §8.3):** " + "; ".join(t["targets"]) + ".")
+            body.append("")
+        if t.get("removes"):
+            body.append(removes_line(t["removes"]))
+            body.append("")
+        body.append("**Seam:** " + (steps[0].get("seam") or t["seam"] if steps else t["seam"]) + ".")
+        body.append("")
+        body.append("**Extraction order:** " + t["order_text"] + (" — " + t["note"] if t.get("note") else "") + ".")
+        body.append("")
+        body.append("**Blocked by:** " + blocked_sentence(bb) + ". The wave proves the §4 contract and adds the drift "
+                    "test that keeps its new boundary true.")
+        body.append("")
+    else:
+        body.append("**Target:** " + " | ".join(targets))
+        body.append("")
     return "\n".join(body), title
 
 
-def file_notes(findings_path, id_pool, notes_dir, dry_run):
+def render_step(rid, k, nid, finding, design, record_path, short_sha):
+    """Step k >= 2 of a designed extraction order: its own note, blocked by step k-1."""
+    t = design.targets[rid]
+    steps = t["steps"]
+    s = steps[k - 1]
+    ty = finding["site"]["type"]
+    files = s.get("files") or finding["site"]["files"]
+    prev = design.resolve("%s#%d" % (rid, k - 1)) if k > 2 else design.resolve(rid)
+    bb = design.resolve_all([prev] + s.get("blocked_by", []))
+    what = "%s step %d of %d — %s" % (short_type(ty.replace("+", ".")), k, len(steps), s["target"])
+    title = "%s — Extract: %s (census %s at %s)" % (nid, what, rid, short_sha)
+    body = [frontmatter(title.replace('"', "'"), nid, bb, REASON["extract"]).rstrip("\n"), "",
+            "design_keys: %s#%d" % (rid, k), "",
+            "**Wave kind:** extract (step %d of %d of `%s`, census %s). **Model:** %s." % (k, len(steps), ty, rid,
+                                                                                          EXTRACT_MODEL), "",
+            "**Sites:**", "- type `%s`" % ty]
+    body += ["- `%s`" % x for x in files]
+    body += ["", "**Measured how:** the R0 census record `%s` (finding %s; its measures are on step 1, %s)."
+             % (record_path, rid, design.resolve(rid)), "", contract("extract"), "",
+             "**This step's target (DESIGN-architecture-review §8.3):** " + s["target"] + ".", ""]
+    body += file_set_lines(s.get("moves"))
+    body += ["**Seam:** " + (s.get("seam") or t["seam"]) + ".", ""]
+    if s.get("removes"):
+        body += [removes_line(s["removes"]), ""]
+    body += ["**Extraction order:** step %d of %d; the step before it is %s%s." % (
+                 k, len(steps), prev, (" — " + s["note"]) if s.get("note") else ""), "",
+             "**Blocked by:** " + blocked_sentence(bb) + ". The wave proves the §4 contract and adds the drift test "
+             "that keeps its new boundary true.", ""]
+    return "\n".join(body), title
+
+
+def file_set_lines(moves):
+    """The note's computed file set (PB2118 Draft 8, J2): its `Moves or changes` names, when the record gives them,
+    and the sentence that says the callers are computed, never listed."""
+    out = []
+    if moves:
+        out += ["**Moves or changes:** " + ", ".join("`%s`" % m for m in moves) + ".", ""]
+    out += ["**Its file set is computed, never listed** (DESIGN-architecture-review §8.7): the files this note names, "
+            "plus every file `scripts/arch/member_index.py` finds using or emitting what it moves or changes (" +
+            ("the names above and every member of their types its target names" if moves
+             else "every type its Sites declare") + "), on the index of the current tree; "
+            "`plan_wave.py --cluster` admits the wave on that set, the landing check (`landing_check.py`, run by "
+            "push-main.sh) stops a landing that changed a file outside it, and `python scripts/arch/member_index.py "
+            "--note <id>` prints it.", ""]
+    return out
+
+
+def missing_design_paths(design, root):
+    """The paths the targets file names (steps' `files`, designed records' `sites`) that do not exist under `root`."""
+    spans = ["`%s`" % f for t in design.targets.values() for s in t.get("steps") or [] for f in s.get("files") or []]
+    spans += [x for d in design.designed for x in d.get("sites") or []]
+    return work.named_missing_paths(" ".join(spans), pathlib.Path(root))
+
+
+def removes_line(removes):
+    return ("**Removes (DESIGN-architecture-review §8.1, `tolerated`, census uses at the R0 record):** " +
+            "; ".join("`%s → %s` %s" % (a, b, u) for a, b, u in removes) +
+            ". The row's `removedBy` names this note; the row is deleted when both observers read zero.")
+
+
+def render_designed(d, nid, design):
+    wave = d["wave"]
+    bb = design.resolve_all(d["blocked_by"])
+    title = "%s — %s %s" % (nid, PREFIX[wave], d["what"])
+    body = [frontmatter(title.replace('"', "'"), nid, bb, d.get("reason") or REASON["extract"]).rstrip("\n"), "",
+            "design_keys: " + d["key"], "",
+            "**Wave kind:** %s. **Model:** %s." % (wave, d.get("model") or EXTRACT_MODEL), "",
+            "**Sites:**"]
+    body += ["- " + x for x in d["sites"]]
+    body.append("")
+    body += file_set_lines(d.get("moves"))
+    if d.get("removes"):
+        body.append(removes_line(d["removes"]))
+        body.append("")
+    body += [contract(wave), "",
+             "**Target (DESIGN-architecture-review §8):** " + "; ".join(d["targets"]) + ".", "",
+             "**Seam:** " + d["seam"] + ".", "",
+             "**Extraction order:** " + d["order_text"] + ((" — " + d["note"]) if d.get("note") else "") + ".", "",
+             "**Blocked by:** " + blocked_sentence(bb) + ".", ""]
+    return "\n".join(body), title
+
+
+def file_notes(findings_path, id_pool, notes_dir, dry_run, targets=None, rerender=False, path_root=REPO):
+    """-> (written, skipped, unused ids, rewritten). `targets` is the --targets file's parsed JSON (or None);
+    `path_root` is where the targets file's paths must exist (the repository)."""
     with open(findings_path, encoding="utf-8") as fh:
         findings = json.load(fh)["findings"]
     base = os.path.basename(findings_path)
     sha = base.split(".")[0]
     record_path = "%s/%s.json" % (RECORD_DIR, sha)
-    already = filed_census_ids(notes_dir)
+    census, dkeys, status = scan_notes(notes_dir)
+    design = Design(targets, census, dkeys) if targets is not None else None
+    if design and (missing := missing_design_paths(design, path_root)):
+        raise SystemExit("the targets file names paths that do not exist: " + ", ".join(missing))
+    by_id = {f["id"]: f for f in findings}
     skipped, todo = {}, []
     for f in findings:
-        if f["kind"] in NOT_FILED:
+        if f["kind"] in NOT_FILED and not (f["kind"] == "god-class" and targets is not None):
             skipped.setdefault(f["kind"], []).append(f["id"])
         elif f["kind"] not in WAVE_OF_KIND:
             skipped.setdefault("UNKNOWN:" + f["kind"], []).append(f["id"])
-        elif f["id"] in already:
+        elif f["id"] in census:
             skipped.setdefault("already-filed", []).append(f["id"])
+        elif design and any((p, f["kind"]) in design.claims for p in site_files(f)):
+            skipped.setdefault("claimed-by-design", []).append(f["id"])
         else:
             todo.append(f)
     groups = group_findings(todo)
-    if len(groups) > len(id_pool):
-        raise SystemExit("need %d ids, only %d allocated" % (len(groups), len(id_pool)))
+    new_keys = [k for k in design.new_keys() if k not in dkeys] if design else []
+    if len(groups) + len(new_keys) > len(id_pool):
+        raise SystemExit("need %d ids, only %d allocated" % (len(groups) + len(new_keys), len(id_pool)))
+    # allocate every id first, so a reference to a note filed later in this run resolves
+    gids = id_pool[:len(groups)]
+    kids = id_pool[len(groups):len(groups) + len(new_keys)]
+    if design:
+        for g, nid in zip(groups, gids):
+            if g["findings"][0]["kind"] == "god-class":
+                design.census_ids[g["findings"][0]["id"]] = nid
+        design.design_ids.update(zip(new_keys, kids))
+    out = []
+    for g, nid in zip(groups, gids):
+        out.append((nid, g["findings"][0]["kind"]) + render(g, nid, record_path, sha[:9], design))
+    designed = {d["key"]: d for d in design.designed} if design else {}
+    for key, nid in zip(new_keys, kids):
+        if key in designed:
+            out.append((nid, "designed") + render_designed(designed[key], nid, design))
+        else:
+            rid, k = key.split("#")
+            out.append((nid, "god-class-step") + render_step(rid, int(k), nid, by_id[rid], design, record_path,
+                                                             sha[:9]))
     written = []
-    for g, nid in zip(groups, id_pool):
-        text, title = render(g, nid, record_path, sha[:9])
+    for nid, kind, text, title in out:
         path = os.path.join(notes_dir, nid + ".md")
         if os.path.exists(path):
             raise SystemExit("refusing to overwrite " + path)
         if not dry_run:
             with open(path, "w", encoding="utf-8", newline="\r\n") as fh:
                 fh.write(text)
-        written.append((nid, g["findings"][0]["kind"], title))
-    return written, skipped, id_pool[len(groups):]
+        written.append((nid, kind, title))
+    rewritten = []
+    if rerender and design:
+        mine = [(nid, "god") for rid, nid in census.items() if rid in design.targets] + \
+               [(nid, key) for key, nid in dkeys.items()]
+        for nid, key in mine:
+            if status.get(nid) != "open":
+                continue
+            if key == "god":
+                rid = next(r for r, n in census.items() if n == nid)
+                text, _ = render({"key": ("god-class", rid), "findings": [by_id[rid]]}, nid, record_path, sha[:9],
+                                 design)
+            elif key in designed:
+                text, _ = render_designed(designed[key], nid, design)
+            elif "#" in key and key.split("#")[0] in design.targets:
+                rid, k = key.split("#")
+                text, _ = render_step(rid, int(k), nid, by_id[rid], design, record_path, sha[:9])
+            else:
+                continue
+            path = os.path.join(notes_dir, nid + ".md")
+            with open(path, encoding="utf-8", newline="") as fh:
+                have = fh.read().replace("\r\n", "\n")
+            if have.rstrip("\n") != text.rstrip("\n"):
+                if not dry_run:
+                    with open(path, "w", encoding="utf-8", newline="\r\n") as fh:
+                        fh.write(text)
+                rewritten.append(nid)
+    return written, skipped, id_pool[len(groups) + len(new_keys):], sorted(rewritten)
+
+
+def stage(root):
+    """The self-test's scratch tree as a git repository with every file staged: `work.named_missing_paths` reads the
+    git index, so a planted file exists for it only once staged."""
+    if not os.path.isdir(os.path.join(root, ".git")):
+        subprocess.run(["git", "-C", root, "init", "-q"], check=True)
+    subprocess.run(["git", "-C", root, "add", "-A"], check=True)
 
 
 def self_test():
@@ -253,48 +577,146 @@ def self_test():
          "scenario": "no live caller names x.txt", "target": "delete it", "id": "R0-9001"},
         {"kind": "folder-namespace", "wave": "move-rename", "site": "src/A/B", "rule": "r", "scenario": "s",
          "measure": {"disagreements": ["N.A != N.A.B"]}, "target": "t", "id": "R0-9002"},
-        {"kind": "god-class", "wave": "extract", "site": {"type": "T", "files": []}, "rule": "r", "scenario": "s",
-         "target": "t", "id": "R0-9003"}]}
+        {"kind": "god-class", "wave": "extract", "site": {"type": "N.T", "files": ["src/T.cs"]}, "rule": "r",
+         "scenario": "s", "measure": {"lines": 900, "members": 40}, "target": "t", "id": "R0-9003"},
+        {"kind": "god-class", "wave": "extract", "site": {"type": "N.U", "files": ["src/U.cs", "src/U.X.cs"]},
+         "rule": "r", "scenario": "s", "measure": {"lines": 800, "members": 30}, "target": "t", "id": "R0-9004"},
+        {"kind": "dead-artifact", "wave": "delete", "class": "src-file", "site": "src/Claimed.cs", "rule": "r",
+         "scenario": "s", "target": "delete it", "id": "R0-9005"}]}
     with tempfile.TemporaryDirectory() as tmp:
         fp = os.path.join(tmp, "abcdef0123456.findings.json")
         with open(fp, "w", encoding="utf-8") as fh:
             json.dump(fixture, fh)
         nd = os.path.join(tmp, "Work")
         os.mkdir(nd)
-        pool = ["PB9001", "PB9002", "PB9003"]
-        w1, s1, tail = file_notes(fp, pool, nd, False)
-        assert len(w1) == 2 and tail == ["PB9003"] and "god-class" in s1, (w1, s1)
-        w2, s2, _ = file_notes(fp, pool[2:], nd, False)
-        assert not w2 and len(s2["already-filed"]) == 2, (w2, s2)
-        assert sorted(os.listdir(nd)) == ["PB9001.md", "PB9002.md"]
+        pool = ["PB9001", "PB9002", "PB9003", "PB9004"]
+        w1, s1, tail, _ = file_notes(fp, pool, nd, False)
+        assert len(w1) == 3 and tail == ["PB9004"] and "god-class" in s1, (w1, s1)
+        w2, s2, _, _ = file_notes(fp, pool[3:], nd, False)
+        assert not w2 and len(s2["already-filed"]) == 3, (w2, s2)
+        assert sorted(os.listdir(nd)) == ["PB9001.md", "PB9002.md", "PB9003.md"]
         with open(os.path.join(nd, "PB9001.md"), encoding="utf-8", newline="") as fh:
             text = fh.read().replace("\r\n", "\n")
-        expect_tail = FRONTMATTER.format(title="PB9001 — Delete: 1 dead root-file artifact(s) in (repository root) "
-                                               "(census R0-9001 at abcdef012)", nid="PB9001")
+        expect_tail = frontmatter("PB9001 — Delete: 1 dead root-file artifact(s) in (repository root) "
+                                  "(census R0-9001 at abcdef012)", "PB9001")
         assert text.startswith(expect_tail), text[:900]
         assert "census_ids: R0-9001" in text and "**Target:** delete it" in text
+
+        # god-class: filed only with --targets, refused without a record, idempotent on census_ids
+        gt = {"schema": 2, "targets": {
+            "R0-9003": {"targets": ["T1", "T2"], "seam": "S", "order": "C+B", "order_text": "C then B",
+                        "blocked_by": ["PB9100", "R69"], "note": ""},
+            "R0-9004": {"targets": ["V1", "V2", "V3"], "seam": "S0", "order": "B", "order_text": "B",
+                        "blocked_by": ["PB9100", "R69"], "note": "", "removes": [["N.C", "N.D", 4]],
+                        "steps": [{"target": "V1", "seam": "S1", "files": ["src/U.cs"]},
+                                  {"target": "V2", "files": ["src/U.X.cs"], "blocked_by": ["T-one"]},
+                                  {"target": "V3", "blocked_by": ["PB9101"], "note": "last",
+                                   "removes": [["N.E", "N.F", 1]]}]}},
+            "designed": [{"key": "T-one", "wave": "move-rename", "what": "move W to the model", "sites": ["`src/W.cs:3`"],
+                          "removes": [["N.A", "N.B", 2]], "targets": ["W in N.Model"], "seam": "W", "order": "B",
+                          "order_text": "B", "blocked_by": ["R0-9003", "R69"], "model": "Sonnet",
+                          "claims": [{"file": "src/Claimed2.cs", "kinds": ["dead-artifact"]}]},
+                         {"key": "T-two", "wave": "grammar", "what": "regroup", "sites": ["`g.g4`"],
+                          "targets": ["G"], "seam": "G", "order": "A", "order_text": "A",
+                          "blocked_by": ["R0-9004#last"]}]}
+        try:
+            file_notes(fp, ["PB9003", "PB9004"], nd, True, {"targets": {}})
+            raise AssertionError("a god-class finding without a targets record was filed")
+        except SystemExit as e:
+            assert "R0-9004" in str(e) or "R0-9003" in str(e), e
+        fixture["findings"].append({"kind": "dead-artifact", "wave": "delete", "class": "src-file",
+                                    "site": "src/Claimed2.cs", "rule": "r", "scenario": "s", "target": "t",
+                                    "id": "R0-9006"})
+        with open(fp, "w", encoding="utf-8") as fh:
+            json.dump(fixture, fh)
+        for rel in ("src/U.cs", "src/U.X.cs", "src/W.cs"):   # the targets file's paths exist, or nothing files
+            os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
+            open(os.path.join(tmp, rel), "w").close()
+        os.remove(os.path.join(tmp, "src/W.cs"))
+        stage(tmp)   # the existence rule reads the committed tree (work.tracked_paths), never the filesystem
+        try:
+            file_notes(fp, ["PB9004"], nd, True, gt, path_root=tmp)
+            raise AssertionError("a targets file naming a missing path filed")
+        except SystemExit as e:
+            assert "src/W.cs" in str(e), e
+        open(os.path.join(tmp, "src/W.cs"), "w").close()
+        stage(tmp)
+        pool3 = ["PB9004", "PB9005", "PB9006", "PB9007", "PB9008", "PB9009", "PB9010"]
+        w3, s3, tail3, r3 = file_notes(fp, pool3, nd, False, gt, path_root=tmp)
+        assert [x[0] for x in w3] == pool3[:6], w3
+        assert [x[1] for x in w3] == ["god-class", "god-class", "god-class-step", "god-class-step", "designed",
+                                      "designed"], w3
+        assert tail3 == ["PB9010"] and s3["claimed-by-design"] == ["R0-9006"] and not r3, (tail3, s3, r3)
+
+        def read(n):
+            with open(os.path.join(nd, n + ".md"), encoding="utf-8", newline="") as fh:
+                return fh.read().replace("\r\n", "\n")
+        g = read("PB9004")
+        assert 'blocked: true\nblocked_by: ["PB9100", "R69"]' in g, g[:900]
+        assert "**Seam:** S." in g and "T1; T2" in g and "census_ids: R0-9003" in g and "Extract:" in g
+        assert "**Blocked by:** PB9100, R69 (" in g          # body and frontmatter come from one list
+        u = read("PB9005")
+        assert "step 1 of 3: V1" in u and "**Seam:** S1." in u and "3 PB9007" in u, u
+        assert "V2" not in u and "V3" not in u, u      # a class note never claims a later step's target (E6)
+        assert "- `src/U.X.cs`" in u and "The files this step edits" in u and "`N.C → N.D` 4" in u, u
+        assert "**Its file set is computed, never listed**" in u and "every type its Sites declare" in u, u
+        assert "**Removes" in read("PB9007") and "`N.E → N.F` 1" in read("PB9007")
+        s2_ = read("PB9006")
+        assert 'blocked_by: ["PB9005", "PB9008"]' in s2_ and "design_keys: R0-9004#2" in s2_, s2_
+        assert "- `src/U.X.cs`" in s2_ and "- `src/U.cs`" not in s2_ and "**Seam:** S0." in s2_, s2_
+        assert 'blocked_by: ["PB9006", "PB9101"]' in read("PB9007")
+        t1 = read("PB9008")
+        assert 'blocked_by: ["PB9004", "R69"]' in t1 and "`N.A → N.B` 2" in t1 and "Move/rename:" in t1, t1
+        assert 'blocked_by: ["PB9007"]' in read("PB9009")   # R0-9004#last
+        # a second run files nothing, and --rerender rewrites only a note whose record changed
+        w4, s4, _, r4 = file_notes(fp, ["PB9011"], nd, False, gt, rerender=True, path_root=tmp)
+        assert not w4 and not r4 and len(s4["already-filed"]) == 5, (w4, s4, r4)
+        gt["designed"][0]["seam"] = "W2"
+        gt["targets"]["R0-9003"]["blocked_by"] = ["PB9100"]
+        _, _, _, r5 = file_notes(fp, ["PB9011"], nd, False, gt, rerender=True, path_root=tmp)
+        assert r5 == ["PB9004", "PB9008"], r5
+        assert "**Seam:** W2." in read("PB9008") and 'blocked_by: ["PB9100"]' in read("PB9004")
+        # a reference that resolves to nothing is refused
+        gt["designed"][1]["blocked_by"] = ["T-missing"]
+        try:
+            file_notes(fp, ["PB9011"], nd, True, gt, rerender=True, path_root=tmp)
+            raise AssertionError("an unresolved reference rendered")
+        except SystemExit as e:
+            assert "T-missing" in str(e), e
     print("self-test OK")
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")   # titles carry §, → and em dashes; a cp1252 console cannot print them
     ap = argparse.ArgumentParser()
     ap.add_argument("findings", nargs="?")
     ap.add_argument("--ids")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--notes-dir", default=NOTES_DIR)
+    ap.add_argument("--targets", help="the design record of DESIGN-architecture-review §8 (schema 2, see the module "
+                                      "doc), docs/rearchitecture/evidence/arch-census/targets/<sha>.json")
+    ap.add_argument("--rerender", action="store_true", help="with --targets: rewrite every open note the targets file "
+                                                            "renders whose text differs from it")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
     if not a.findings or not a.ids:
         ap.error("findings file and --ids are required")
-    written, skipped, tail = file_notes(a.findings, parse_ranges(a.ids), a.notes_dir, a.dry_run)
+    targets = None
+    if a.targets:
+        with open(a.targets, encoding="utf-8") as fh:
+            targets = json.load(fh)
+    written, skipped, tail, rewritten = file_notes(a.findings, parse_ranges(a.ids), a.notes_dir, a.dry_run, targets,
+                                                   a.rerender)
     counts = {}
     for _, kind, _t in written:
         counts[kind] = counts.get(kind, 0) + 1
     for nid, kind, title in written:
         print("%s%s  %s" % ("(dry) " if a.dry_run else "", nid, title))
-    print("notes: %d  by first-finding kind: %s" % (len(written), json.dumps(counts, sort_keys=True)))
+    print("notes: %d  by kind: %s" % (len(written), json.dumps(counts, sort_keys=True)))
+    if a.rerender:
+        print("re-rendered: %d%s" % (len(rewritten), (" (" + ", ".join(rewritten) + ")") if rewritten else ""))
     for k, v in sorted(skipped.items()):
         print("not filed [%s]: %d (%s)" % (k, len(v), NOT_FILED.get(k, "")))
     print("unused ids: %s" % (("%s..%s (%d)" % (tail[0], tail[-1], len(tail))) if tail else "none"))

@@ -78,13 +78,14 @@ R1_DESIGN = REPO / "docs" / "rearchitecture" / "DESIGN-architecture-review.md"
 R1_STATUS = re.compile(r"^## 8\. [^\n]*\n+> \*\*Status: (?P<status>[^*]+?)\*\*", re.M)
 
 #: The gates between the lanes, in order: (label, how it is measured). ("note", id): the note's status.
-#: ("title", regex): the note whose title matches, once one is filed. ("gap", n): passed when GAP <= n; None means
-#: the threshold is the owner's judgement (R69 §2 "near zero" names no number), so the page shows GAP and waits.
+#: ("title", regex): the note whose title matches, once one is filed. ("gap", n): passed when GAP <= n.
+#: GAP near zero is NOT a gate: the owner dropped R69 §2's hold on binding and code-generation restructuring on
+#: 2026-10-07 (kb/Work PB2118 question 5, "Drop it"); the file-set partition, checked by the dispatcher
+#: (plan_wave.py), is the only gate between restructuring waves and fix-lane trains. Zero GAP stays: v1.0's half.
 GATES = (
     ("R1 approved by the owner", ("note", "PB2118")),
     ("The oracle's differences explained", ("note", "PB2152")),
     ("D10's second half", ("note", "PB2151")),
-    ("GAP near zero (R2/R3 over binding and code generation start)", ("gap", None)),
     ("Zero GAP", ("gap", 0)),
     ("v1.0: P15 Cut 3, the runtime namespace flip", ("title", r"\A\S+ — P15 Cut 3\b")),
 )
@@ -205,7 +206,7 @@ def measure(items: list[dict], prefixes: dict[str, str], gap: int, evidence: boo
                           "status": status(hit[0]) if hit else "not filed"})
         else:
             gates.append({"label": label, "id": None, "gap": gap, "threshold": arg,
-                          "status": ("landed" if arg is not None and gap <= arg else "open")})
+                          "status": ("landed" if gap <= arg else "open")})
 
     program = {nid for p in phases for nid, _ in p["notes"]} | {nid for nid, _ in retire["notes"] + review["notes"]}
     landed = sum(1 for nid in program if finished(status(nid)))
@@ -318,14 +319,16 @@ def self_test() -> int:
              p["phases"][0]["notes"], p["phases"][3]["notes"], [s[:3] for s in p["slices"]],
              [x["status"] for x in p["gates"]], p["counts"]["external_landed"], p["counts"]["waiting"])
     want = (1, 1, 1, [("PB9001", "Delete: x", 1)], [("PB9003", "open")], [(REVIEW_PROGRAM, "open")],
-            [(1, "PB9006", "landed"), (2, "PB9007", "open")], ["open", "open", "open", "open", "open", "open"], 1, 1)
+            [(1, "PB9006", "landed"), (2, "PB9007", "open")], ["open", "open", "open", "open", "open"], 1, 1)
     results.append(shape == want)
     print(f"{'✓' if shape == want else '✗'} measured: wave grid, blockers, phases by title and by structure, slices, "
           f"gates, counts: {shape}")
     zero = measure(good, prefixes, 0, evidence=False)["gates"]
-    ok = [x["status"] for x in zero][3:5] == ["open", "landed"]
+    ok = ([x["status"] for x in zero][3], [x["status"] for x in p["gates"]][3]) == ("landed", "open")
+    ok = ok and not any("near zero" in label.lower() for label, _ in GATES)
     results.append(ok)
-    print(f"{'✓' if ok else '✗'} zero GAP passes the zero-GAP gate and leaves 'near zero' to the owner")
+    print(f"{'✓' if ok else '✗'} zero GAP passes the zero-GAP gate at 0 and not at 5; GAP near zero is no gate (owner, "
+          f"PB2118 question 5)")
     case("phase-note-missing", [i for i in good if i["id"] != REVIEW_PROGRAM], "phase-note-missing")
     case("gate-note-missing", [i for i in good if i["id"] != "PB2152"], "gate-note-missing")
     case("wave-kind-unreadable", [*good, {**note("PB9005", "x", [REVIEW_PROGRAM]), "title": "no dash"}],

@@ -36,11 +36,11 @@ neutrality is enforced by a test, not by convention.*
 2. **`ICodeGenBackend` consumes an immutable `BoundCompilation` and produces a `BackendArtifact`** (§2) — the same
    seam `DESIGN-codegen-backend.md §2.2` declares, with the **shared vs per-backend** split made concrete: the
    exhaustive `IBound*Visitor<T>` interfaces, the bound tree, the `NameMangler`, and a new backend-neutral
-   `RuntimeAbi` catalogue are **shared**; the visitor *implementations*, the `Place` rendering, and all
+   `RuntimeMembers` catalogue are **shared**; the visitor *implementations*, the `Place` rendering, and all
    structure→branch lowering are **per-backend**.
 3. **Both backends call the ONE `Cobol.Net.Runtime` through ONE ABI catalogue.** `DESIGN-codegen-backend.md §3`'s
    `RuntimeApi` (a C#-fragment-string façade) is **Roslyn-specific**; it is generalized here into a neutral,
-   `nameof`-anchored `RuntimeAbi` (the typed list of runtime members) with two thin renderers over it —
+   `nameof`-anchored `RuntimeMembers` (the typed list of runtime members) with two thin renderers over it —
    `RoslynRuntimeApi` (→ C# text) and `CilRuntimeApi` (→ Cecil `MethodReference`) — so a runtime rename breaks
    **both** backends at compile time, singular-pattern preserved.
 4. **The second backend is Mono.Cecil, in its own assembly** `Cobol.Net.Backend.Cil` (§3.2) — recommendation with
@@ -86,7 +86,7 @@ droppable in without touching the frontend/binder/bound tree, every fact a backe
   (`Place.cs:45`), no C# statement blocks (`RenamesPlace.Write` `Place.cs:124-138`).
 - **.NET / runtime type names as text** — no `"CobolString.SpliceInto(...)"` (`Place.cs:101`),
   `"CobolNum.FormatDisplay(...)"` (`Place.cs:160`), `"{TablePath}.Capacity"` (`Place.cs:185`). Runtime members are
-  referenced through the `RuntimeAbi` catalogue (§2.3), never spelled in a node.
+  referenced through the `RuntimeMembers` catalogue (§2.3), never spelled in a node.
 - **Pre-mangled C# identifiers** — no C# field/method names baked into a node: `BoundIndexRef.IndexField`
   (`BoundTree.cs:109`), `SetIndexTarget.IndexField` (`BoundTree.cs:471`), `BoundMethod.CsName` (`BoundTree.cs:32`),
   `BoundSetCapacity.TablePath` (`BoundTree.cs:493`), `BoundSearch.IndexField/DependCount/DynTable`
@@ -95,7 +95,7 @@ droppable in without touching the frontend/binder/bound tree, every fact a backe
   **target-naming decision** owned by the shared `NameMangler` (§2.4), resolved from a symbol at render time.
 - **Roslyn `Syntax*` nodes or `using` decisions** — the `using CobolNet.Runtime;` / `using CobolNet.Runtime.IO;`
   choices (`ProgramEmitter.cs`) are a C#-source concern; a CIL backend has no `using`s. These live in
-  the Roslyn backend, keyed off which `RuntimeAbi` members were referenced.
+  the Roslyn backend, keyed off which `RuntimeMembers` members were referenced.
 - **Format literals of the target language** — no C# escape/`SymbolDisplay.FormatLiteral` output stored on a node
   (that is a Roslyn-render step over a decoded value).
 
@@ -108,10 +108,11 @@ droppable in without touching the frontend/binder/bound tree, every fact a backe
 | L3 | **Bound STATEMENT nodes carrying C# access-path strings** — `CapacityRegisterPlace.TablePath` `Place.cs:176`; `BoundSetCapacity.TablePath` `BoundTree.cs:493`; `BoundSearch.IndexField / DependCount / DynTable` `BoundTree.cs:508-511`. | The *bound tree itself* (not just `Place`) presupposes a C# path — the leak `DESIGN-binder-bound-tree.md` does not guard. | Carry the **table `Place`/symbol** (a `CapacityRegisterPlace` holding a `Place Table`, per `DESIGN-codegen-backend.md §2.3`) and an index **symbol**; the backend renders `.Capacity`/the field. `BoundSetCapacity(Place Table, …)`; `BoundSearch(DataItem Index, …, Place? DynTable)`. **(Addition to P6 — §5.)** |
 | L4 | **C#-identifier fields on bound nodes** — `BoundIndexRef.IndexField` `BoundTree.cs:109`; `SetIndexTarget.IndexField` `BoundTree.cs:471`; `BoundMethod.CsName` `BoundTree.cs:32`. | A mangled C# name is a target-naming decision frozen into the neutral tree. | Store the **index `DataItem`** (SSOT §3.5: an index IS its 1-based occurrence field — the symbol suffices) and the **method `OoMethodSymbol`**; the shared `NameMangler` (§2.4) forms the identifier per backend. **(Addition to P6 — §5.)** |
 | L5 | **The backend seam — IN PLACE.** `ICodeGenBackend` (`CodeGen/ICodeGenBackend.cs`) is the ONE seam; `RoslynBackend : ICodeGenBackend` consumes the immutable `BoundCompilation` and performs no binding; `BinderDriver` produces the tree; `CSharpEmitter` is now only the bind-host facade whose `EmitBound` renders C# from the bound tree. | (Resolved — a second backend now has a defined `ICodeGenBackend` to implement against `BoundCompilation`.) | **DONE**: binding is extracted into the Binder phase (`BinderDriver` → `BoundCompilation`); `ICodeGenBackend` is materialized so the driver hands `BoundCompilation` to a selected backend. |
+| L6 | **The backend input carries the binder and the parse tree** — `BoundUnit.Ctx`/`.Data`/`.Refs` (`Binding/Model/BoundUnit.cs:34,48-49`), `BoundCompilation.Tree` and `.InterfaceData` (`Binding/Model/BoundCompilation.cs:34,38`), `EmitContext.Data` (`CodeGen/Emit/EmitCore.cs:19,34`), `UnitEmitters.Refs`; the OO symbols hold parse contexts too (`Oo/OoClassSymbol.cs:29`, `Oo/OoInterfaceSymbol.cs:25`, `Oo/OoMethodSymbol.cs:15`, so §1.1's `OoMethodSymbol` is not yet the pure resolved symbol it lists); emitters call `ReferenceResolver.ResolveItem` (the `Place` builder) 24 times at emit time. | A second backend cannot form a `Place` or read a data fact without driving the binder and the ANTLR tree; §1.1 lists neither. | `PlaceBuilder` to the model layer, run at bind time; an immutable `DataBindResult` in place of `DataBinder` on the backend input; parse-context reads become bound-node facts, and the OO symbols' contexts move to a binder-side map before the symbols move to the model (`DESIGN-architecture-review.md` §8.1 and §8.3 (1), (4); kb/Work PB2293, and the waves PB2375, PB2361, PB2398, PB2401). |
 
 L1/L2 are already scheduled by `DESIGN-codegen-backend.md §2.3` + PHASE-07 Step 11. **L3/L4 are NOT** — they live in
 `BoundTree.cs` records the bound-tree design treats as neutral but which still carry C# path/identifier strings. §5
-adds them to PHASE-06 explicitly. L5 (the P6→P7 seam extraction) is **DONE** — `ICodeGenBackend` is in place and a `BoundCompilation` crosses the backend boundary.
+adds them to PHASE-06 explicitly. L5 (the P6→P7 seam extraction) is **DONE** — `ICodeGenBackend` is in place and a `BoundCompilation` crosses the backend boundary. L6 is OPEN: that `BoundCompilation` still carries the binder and the parse tree, and the architecture review's edges file (DESIGN-architecture-review §8.1) ratchets it to zero.
 
 ---
 
@@ -184,9 +185,14 @@ The **exhaustiveness guarantee is inherited for free**: a new `BoundStatement` l
 (which needs `MethodReference`s). To keep the singular-pattern rule (`feedback_one_mechanism_per_job`) across two backends,
 split it into a **neutral catalogue** + two thin renderers:
 
+> **Amended 2026-10-07 (DESIGN-architecture-review §8.3 (9), R1 Draft 3):** the catalogue is named `RuntimeMembers`, not
+> `RuntimeAbi`. The owner-approved `DESIGN-external-repository.md` (2026-10-05, the later decision) has the RUNTIME
+> declare `RuntimeAbi` (its `Version` and `CallAbi`, read by `ProgramTable.RegisterModule`), and two types of one name
+> would meet in every emitter that has `using CobolNet.Runtime` (CS0104). Nothing else in this section changes.
+
 ```csharp
 // SHARED (Cobol.Net.Compiler) — the ONE typed description of the runtime ABI, nameof-anchored.
-public static class RuntimeAbi
+public static class RuntimeMembers
 {
     // Each member is a typed descriptor: declaring type + method name + arity, anchored to the real symbol so a
     // runtime rename is a COMPILE error here (the single codegen↔runtime contract, for BOTH backends).
@@ -202,15 +208,15 @@ public sealed record RuntimeMember(Type Declaring, string Name /* + arity/overlo
 ```csharp
 // PER-BACKEND renderers over the ONE catalogue:
 internal sealed class RoslynRuntimeApi(EmitContext ctx)   // → C# fragment strings
-{ public string NumStore(string expr, string profile) => Call(RuntimeAbi.NumStore, expr, profile); /* $"CobolNum.Store(…)" */ }
+{ public string NumStore(string expr, string profile) => Call(RuntimeMembers.NumStore, expr, profile); /* $"CobolNum.Store(…)" */ }
 
 internal sealed class CilRuntimeApi(ModuleDefinition mod) // → Cecil MethodReference (resolved once, cached)
-{ public MethodReference NumStore => Import(RuntimeAbi.NumStore); }
+{ public MethodReference NumStore => Import(RuntimeMembers.NumStore); }
 ```
 
-Both derive their target-specific form from the SAME `RuntimeAbi` descriptor, so a runtime member rename breaks the
+Both derive their target-specific form from the SAME `RuntimeMembers` descriptor, so a runtime member rename breaks the
 catalogue's `nameof` at compile time and both renderers with it. This **reconciles** `DESIGN-codegen-backend.md §3`:
-the Roslyn `RuntimeApi` stays (renamed `RoslynRuntimeApi`), now sourced from `RuntimeAbi`; the CIL backend gets its
+the Roslyn `RuntimeApi` stays (renamed `RoslynRuntimeApi`), now sourced from `RuntimeMembers`; the CIL backend gets its
 own resolver for free.
 
 ### 2.4 The shared `NameMangler`
@@ -234,12 +240,12 @@ Unchanged from `DESIGN-codegen-backend.md`: **string emit stays; SyntaxFactory r
 immutable `EmitContext`, renders via `PlaceRenderer`/`ExpressionRenderer`/`ConditionRenderer`/`RoslynRuntimeApi` to a
 `CodeWriter` text sink, compiles with `CSharpCompilation` (cached framework refs), and
 hands packaging to `AssemblyPackager`. It is the **only** owner of C# syntax knowledge. This document changes nothing
-about it except: its runtime-call rendering routes through `RoslynRuntimeApi` **over `RuntimeAbi`** (§2.3).
+about it except: its runtime-call rendering routes through `RoslynRuntimeApi` **over `RuntimeMembers`** (§2.3).
 
 ### 3.2 `CilBackend` (future-additive) — assembly home
 
 `CilBackend : ICodeGenBackend` lives in a **NEW assembly `Cobol.Net.Backend.Cil`** that references
-`Cobol.Net.Compiler` (for `BoundCompilation` + `RuntimeAbi` + the visitor interfaces), `Cobol.Net.Runtime`
+`Cobol.Net.Compiler` (for `BoundCompilation` + `RuntimeMembers` + the visitor interfaces), `Cobol.Net.Runtime`
 (metadata, to import `MethodReference`s), and the `Mono.Cecil` NuGet. **Rationale for a separate assembly** (answers
 topology Open Q4): the whole point of the CIL backend is "*no Roslyn dependency*"; symmetrically, Roslyn-only callers
 should not carry the `Mono.Cecil` dependency. Isolating Cecil in a leaf backend assembly the CLI plugs into
@@ -271,7 +277,7 @@ are genuine.
 
 - **Shared** (`Cobol.Net.Compiler`, consumed by both): the frontend, the binder, `BoundCompilation` + the sealed
   bound hierarchy, the structural `Place`/`AccessSegment`, the source-generated `IBound*Visitor<T>` interfaces + the
-  exhaustive `Accept<T>`, the `RuntimeAbi` catalogue, the `NameMangler`, the ONE `Cobol.Net.Runtime`.
+  exhaustive `Accept<T>`, the `RuntimeMembers` catalogue, the `NameMangler`, the ONE `Cobol.Net.Runtime`.
 - **Backend-specific**: the visitor *implementations* (text vs IL), `PlaceRenderer` vs `CilPlaceLower`, the
   runtime-call renderer (`RoslynRuntimeApi` vs `CilRuntimeApi`), the control-flow lowering (Roslyn preserves;
   Cil branches privately), the assembly writer (`CSharpCompilation` + `AssemblyPackager` vs Cecil `ModuleDefinition`
@@ -289,7 +295,7 @@ what P7 already lists.
 |---|---|---|
 | create | `CodeGen/ICodeGenBackend.cs` (`ICodeGenBackend`, `BackendId`, `BackendOptions`, `BackendArtifact`, `BackendFactory`) | The seam (also in P7 Step 1 / `DESIGN-codegen-backend.md §2.2`). |
 | refactor | `RoslynBackend` → `RoslynBackend : ICodeGenBackend` consuming `BoundCompilation` | The default backend behind the seam; owns all C# syntax. |
-| create | `Model/RuntimeAbi.cs` (neutral catalogue) + `CodeGen/Roslyn/RoslynRuntimeApi.cs` (was `RuntimeApi`) | ONE runtime ABI for BOTH backends (§2.3); generalizes `DESIGN-codegen-backend.md §3`. |
+| create | `Model/RuntimeMembers.cs` (neutral catalogue) + `CodeGen/Roslyn/RoslynRuntimeApi.cs` (was `RuntimeApi`) | ONE runtime ABI for BOTH backends (§2.3); generalizes `DESIGN-codegen-backend.md §3`. |
 | create | `Model/NameMangler.cs` (COBOL-name → target identifier) | ONE naming service; removes L4 baked identifiers (§2.4). |
 | refactor | `Binding/Model/Place.cs` `Read()/Write()` strings → structural `Place` + `AccessSegment` | L1/L2 removal (also P7 Step 11 / `DESIGN-codegen-backend.md §2.3`). |
 | refactor | `BoundTree.cs` C#-string node fields (`BoundSetCapacity.TablePath` :493; `BoundSearch.IndexField/DependCount/DynTable` :508-511; `BoundIndexRef.IndexField` :109; `SetIndexTarget.IndexField` :471; `BoundMethod.CsName` :32; `CapacityRegisterPlace.TablePath` `Place.cs:176`) → symbol/`Place` references | **L3/L4 removal — NEW; not in P7.** (§5, addition to P6.) |
@@ -373,7 +379,7 @@ string field fails the build, exactly the "missing-arm-is-a-compile-error" cultu
    with a P7 render follow-through. Mitigation: prove-then-delete (compute the symbol form alongside, assert the
    rendered path is byte-identical corpus-wide, then delete the string field), exactly as P7 Step 8 does for
    `StoreAsImage`.
-2. **`RuntimeAbi` overload identity (MEDIUM).** ~60 members, several overloaded (`FormatDisplay`/`StoreDisplay`
+2. **`RuntimeMembers` overload identity (MEDIUM).** ~60 members, several overloaded (`FormatDisplay`/`StoreDisplay`
    families). A descriptor must key on the overload the backend needs. Mitigation: `RuntimeMember` carries an arity
    / parameter-shape key; `nameof`-anchor the type + method; the Roslyn compile-step still catches a wrong overload
    in the generated C#, and the CIL resolver throws loudly on an ambiguous import.

@@ -69,8 +69,11 @@ a small committed file, one point per battery or GAP-moving landing (`sha`, `dat
 `label`, `battery`), and a WRITE run appends the current point when the measurement has moved. The same file
 carries a second series, `program` (`sha`, `date`, `open`, `landed`, `total` program notes), appended when those
 counts move: the program is behavior-neutral, so its progress never moves GAP and cannot ride on a GAP point. `--check` never
-writes — it renders against the series plus the current point exactly as a write would, so a moved measurement
-whose point has not been recorded shows up as staleness, which is the correct verdict.
+writes, and it reads the trend file as it is on disk: a measurement that moved with no point recorded in the FILE is stale
+even when the page matches. ⛔ Matching the page alone was self-confirming (kb/Work PB2118 Draft 7, H3): the render
+appends the current point in memory, so a page rendered by a write run whose trend-file append was then reverted (or
+never committed) matched its own re-render, and the check passed with the point missing from the only place it
+survives.
 
 ⭐ THE ONE HAND-WRITTEN PART is `--in-flight` (default
 `docs/rearchitecture/evidence/ledger-in-flight.md`), inserted VERBATIM as the body of the "In flight right now"
@@ -707,7 +710,7 @@ def render_review(plan: dict, series: list[dict]) -> str:
         f'<tr><td class="mono">{e(p["date"])} {e(p["sha"])}</td><td class="r num">{n(p["open"])}</td>'
         f'<td class="r num">{n(p.get("waiting", 0))}</td><td class="r num">{n(p["landed"])}</td>'
         f'<td class="r num">{n(p["total"])}</td></tr>' for p in recent)
-    return f"""<p>The comprehensive architecture review (<span class="mono">DESIGN-architecture-review.md</span> §3), started ahead of zero GAP by kb/Work R69 §2: R0 and R1 now, R3's leaf waves and the Delete program (cluster <span class="mono">{e(ledger_plan.REVIEW_PROGRAM)}</span>) between fix-lane trains, R2 and R3 over binding and code generation once GAP is near zero. Every wave is behavior-neutral by contract, so none of it moves the GAP.</p>
+    return f"""<p>The comprehensive architecture review (<span class="mono">DESIGN-architecture-review.md</span> §3), started ahead of zero GAP by kb/Work R69 §2: R0 and R1 now, then R2 and every R3 wave (the Delete program, cluster <span class="mono">{e(ledger_plan.REVIEW_PROGRAM)}</span>, included) between fix-lane trains under the file-set partition, the only gate between them (owner, kb/Work PB2118 question 5, 2026-10-07). Every wave is behavior-neutral by contract, so none of it moves the GAP.</p>
   <div class="tablecard">
     <table>
       <thead><tr><th>Phase</th><th>Notes in the register</th><th>Evidence</th></tr></thead>
@@ -750,8 +753,7 @@ def render_gates(plan: dict) -> str:
     rows = []
     for i, g in enumerate(plan["gates"], 1):
         if "gap" in g:
-            what = f'GAP <span class="num">{n(g["gap"])}</span>' + (
-                " — the owner judges “near”" if g["threshold"] is None else f' — passes at {n(g["threshold"])}')
+            what = f'GAP <span class="num">{n(g["gap"])}</span> — passes at {n(g["threshold"])}'
         elif g["id"]:
             what = f'<span class="mono">{e(g["id"])}</span>'
         else:
@@ -1173,10 +1175,12 @@ def main() -> int:
             # (feedback_verdict_evidence_invariant).
             print(f"· {a.out} does not exist (gitignored build output) — nothing to check.")
             return 0
-        if a.out.read_text(encoding="utf-8") == text:
-            print(f"✓ {a.out.name} matches the repo exactly ({len(text):,} bytes)")
+        page_ok = a.out.read_text(encoding="utf-8") == text
+        if page_ok and not (is_new or tr["prog_new"]):
+            print(f"✓ {a.out.name} matches the repo exactly ({len(text):,} bytes), and the trend file holds its points")
             return 0
-        print("⛔ THE CONFORMANCE LEDGER IS STALE — it describes a tree the repo has moved past.")
+        print("⛔ THE CONFORMANCE LEDGER IS STALE — " + ("it describes a tree the repo has moved past." if not page_ok
+              else f"the page matches, but {TREND.relative_to(REPO)} lacks the point(s) the page draws."))
         if is_new:
             print(f"      the trend series is missing the current point "
                   f"(GAP {pts[-1]['gap']} at {pts[-1]['sha']})")

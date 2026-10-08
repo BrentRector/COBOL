@@ -45,8 +45,10 @@ internal sealed partial class ReferenceIndex
     private readonly Dictionary<string, HashSet<string>> usedByTests = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> usedFromOutside = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<string>> chains = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, HashSet<string>> usedIn = new(StringComparer.Ordinal);
     private readonly HashSet<string> censusTypes;
     private readonly HashSet<string> emittedSurface;
+    private string? authoredFile;
 
     public ReferenceIndex(IEnumerable<string> censusTypeKeys, IEnumerable<string> emittedSurfaceAssemblies)
     {
@@ -61,6 +63,11 @@ internal sealed partial class ReferenceIndex
     /// <summary>Every identifier written inside a string literal or interpolated-string text of a census project
     /// that is NOT the emitted surface: the names the code generator writes into generated programs.</summary>
     public HashSet<string> EmittedIdentifiers { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Per identifier in <see cref="EmittedIdentifiers"/>, the AUTHORED documents whose string or
+    /// interpolated text writes it: the emitters a change to a runtime name must edit in the same change (kb/Work
+    /// PB2118 Draft 9, the eighth refuter's K1: <c>catch (ProgramReturn)</c> is C# text, never a symbol use).</summary>
+    public Dictionary<string, HashSet<string>> EmittedIn { get; } = new(StringComparer.Ordinal);
 
     /// <summary>Keys of the types that reach <c>System.Text.Json</c> serialization (their properties are read and
     /// written by reflection).</summary>
@@ -86,9 +93,15 @@ internal sealed partial class ReferenceIndex
     public IReadOnlySet<string> OutsideUsersOf(string typeKey) =>
         usedFromOutside.TryGetValue(typeKey, out HashSet<string>? s) ? s : [];
 
+    /// <summary>The member index (kb/Work PB2118 Draft 8, J2): per symbol key, the AUTHORED documents (product and
+    /// test, never generated) whose code uses it; a type's entry also holds every document using any of its members.
+    /// What a restructuring wave that moves or changes a symbol must edit in the same change (CLAUDE.md rule 4).</summary>
+    public IReadOnlyDictionary<string, HashSet<string>> FilesUsing => usedIn;
+
     public void Walk(LoadedProject project, LoadedDocument document, bool userConversionsExist)
     {
         Documents++;
+        authoredFile = document.Generated ? null : document.RepoPath;
         SemanticModel model = project.Compilation.GetSemanticModel(document.Tree);
         Origin origin = !project.IsCensus ? Origin.Test : document.Generated ? Origin.Generated : Origin.Production;
         bool emitter = project.IsCensus && !emittedSurface.Contains(project.Compilation.AssemblyName ?? "");
@@ -112,6 +125,15 @@ internal sealed partial class ReferenceIndex
         if (symbol is null || !symbol.Locations.Any(l => l.IsInSource) || SymbolKeys.Key(symbol) is not { } key)
         {
             return;
+        }
+
+        if (authoredFile is not null)
+        {
+            Add(usedIn, key, authoredFile);
+            if (SymbolKeys.TargetType(symbol) is { } owner && SymbolKeys.Key(owner) is { } ownerKey && ownerKey != key)
+            {
+                Add(usedIn, ownerKey, authoredFile);
+            }
         }
 
         if (key == at.MemberKey)
@@ -347,6 +369,10 @@ internal sealed partial class ReferenceIndex
             foreach (Match m in IdentifierToken().Matches(text))
             {
                 index.EmittedIdentifiers.Add(m.Value);
+                if (index.authoredFile is not null)
+                {
+                    Add(index.EmittedIn, m.Value, index.authoredFile);
+                }
             }
         }
 

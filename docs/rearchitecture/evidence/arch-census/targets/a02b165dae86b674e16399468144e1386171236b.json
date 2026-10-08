@@ -1,0 +1,2238 @@
+{
+ "schema": 2,
+ "census": "a02b165dae86b674e16399468144e1386171236b",
+ "source": "DESIGN-architecture-review.md §8.1 (tolerated rows), §8.3 (decompositions and their step orders), §8.4 (the grammar regroup) and §8.5 (the NumX re-model), R1 Draft 5 (kb/Work PB2118)",
+ "targets": {
+  "R0-0001": {
+   "targets": [
+    "DataBindState (single-producer value slices plus four append-only fact sets) and BindSession's ProcedureBindState (scoped override, drain queues, scope cursors), §8.3 (1)",
+    "one IBindPass class per BindPipeline row (29)",
+    "SpecialNamesBinder",
+    "FileControlBinder",
+    "ReportSectionBinder",
+    "ConstantEntryBinder",
+    "LinkageBinder",
+    "OoDataBinder",
+    "DataBindResult (immutable; what the procedure binders and the backend read)"
+   ],
+   "seam": "IBindPass over the views it declares (IReads<TSlice> for a frozen value slice; IAppends<TFacts>, IReadsEarly<TFacts> and IReads<TFacts> for an append-only fact set), checked by BindPipeline.ValidateDag; DataBindResult replaces DataBinder on BoundUnit.Data, BoundCompilation.InterfaceData and EmitContext.Data",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2098",
+    "PB2099",
+    "PB2103",
+    "PB2104"
+   ],
+   "note": "DataBinder.cs and DataBinder.Linkage.cs wait for external-repository slices 2 and 3; the BindDeclarations REPOSITORY loop and ObjectRefDescriptor.Target (DESIGN-external-repository §12, the slice 7 and slice 8 rows) wait for slices 7 and 8; the last step (DataBindResult) also waits for ReferenceResolver's PlaceBuilder step",
+   "steps": [
+    {
+     "target": "DataBindState: the data-binding fields regrouped into value slices (one producing phase each) and the four append-only fact sets (WholeGroupReferenced, ImageForcedItems, CharacterChannelItems, ActivationSites); the procedure-bind state moves to BindSession's ProcedureBindState in its three shapes (the scoped override Options; the ordered drain queues PendingPreOps and OoPendingPropertyOps; the scope cursors OperandEvaluations and ActiveMethodScope); the configuration seed (BinderDriver.cs:634 -> DataBinder.InheritConfiguration, DataBinder.Switches.cs:449-484: SPECIAL-NAMES, the collating sequences, DEBUGGING MODE, the REPOSITORY specifiers and the OPTIONS baseline copied into a contained unit's own fields before it binds) and OoDriver's class-half configuration and OPTIONS (OoDriver.cs:41, 99-101, 119-120, 176-196: the half's own SPECIAL-NAMES reparented before the class's, read outermost first by DataBinder.EnvDivisions; the half's OPTIONS overlaid on the class's through CallInheritOptions, the second writer of _inheritedOptions) become the configuration slice's one producer per bound unit, ConfigurationStep, whose source is a closed union of three arms: Own (an outermost program, function, class definition or interface, its own CONFIGURATION SECTION), Contained (a contained program, the container's DataBindResult; §12.3.3 SR1, §12.3.4 GR1) and ClassHalf (an OBJECT or FACTORY half, its class definition's ClassConfiguration overlaid by the half's own SPECIAL-NAMES; §12.3.3 SR3, §12.3.4 GR1), with the OPTIONS slice from the same arms (§11.9.4 GR1); a method reads its half's slice (§12.3.3 SR2); MnemonicRegistry.Of's parent walk (MnemonicRegistry.cs:35-60) becomes a reader of the slice; the five unit checking flags (ExternalCheckMask, ArgMismatchChecking, ExternalDescribe, OdoReferenceChecking, AutomaticPropagation), written for EVERY unit and class half (BinderDriver.cs:667-683 and 136-147), become the UnitChecking slice, and each method's three (OoUniversalCheckingHere, ExternalCheckMaskHere, AutomaticPropagationHere; BinderDriver.cs:112-135) the MethodChecking slice, both with one producer, CheckingFold; the GLOBAL merge BinderDriver runs for a contained program between data.Bind and procedure binding (BinderDriver.cs:685-751: the GLOBAL files, container-local files, GLOBAL reports and GLOBAL subtrees; MarkFormals; DropShadowedConstants) becomes BindSession's InheritStep, which writes only InheritedGlobals, at the GlobalsInherited phase; DataBinder holds DataBindState and every reader reads through it; no pass moves yet",
+     "seam": "the slice records, the fact-set interfaces IAppends<TFacts>, IReadsEarly<TFacts>, IReads<TFacts>, and ProcedureBindState's three shapes (Scoped<T>.Push(value) -> a restore scope; DrainQueue<T>.Mark() and DrainFrom(mark); Cursor<T>.Enter(value) -> a restore scope); ConfigurationStep.Produce(ConfigurationSource: Own | Contained(DataBindResult) | ClassHalf(ClassConfiguration, half)) -> the configuration and OPTIONS slices; CheckingFold.Fold(TurnState, the unit's division lines) -> UnitChecking for every unit and class half, MethodChecking for every method; InheritStep.Merge(child, containers as DataBindResult nearest first) -> InheritedGlobals (§8.3 (1))",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/Procedure/BinderContext.cs",
+      "src/Cobol.Net.Compiler/Binding/BinderDriver.cs",
+      "src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.cs",
+      "src/Cobol.Net.Compiler/Binding/Passes/BindPipeline.cs",
+      "src/Cobol.Net.Compiler/Binding/Passes/IBindPass.cs",
+      "src/Cobol.Net.Compiler/Binding/Passes/StorageFormPass.cs",
+      "src/Cobol.Net.Compiler/Binding/Passes/UsageCollectionPass.cs",
+      "src/Cobol.Net.Compiler/Binding/Procedure/MnemonicRegistry.cs",
+      "src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs",
+      "src/Cobol.Net.Compiler/Oo/OoDriver.cs",
+      "src/Cobol.Net.Compiler/Validation/FlagConformancePass.cs"
+     ],
+     "moves": [
+      "CobolNet.Binding.DataBinder.PendingPreOps",
+      "CobolNet.Binding.DataBinder.OoPendingPropertyOps",
+      "CobolNet.Binding.DataBinder.Options",
+      "CobolNet.Binding.DataBinder.OperandEvaluations",
+      "CobolNet.Binding.DataBinder.ActiveMethodScope",
+      "CobolNet.Binding.DataBinder.WholeGroupReferenced",
+      "CobolNet.Binding.DataBinder.ImageForcedItems",
+      "CobolNet.Binding.DataBinder.CharacterChannelItems",
+      "CobolNet.Binding.DataBinder.ActivationSites",
+      "CobolNet.Binding.DataBinder.ExternalCheckMask",
+      "CobolNet.Binding.DataBinder.ArgMismatchChecking",
+      "CobolNet.Binding.DataBinder.ExternalDescribe",
+      "CobolNet.Binding.DataBinder.OdoReferenceChecking",
+      "CobolNet.Binding.DataBinder.AutomaticPropagation",
+      "CobolNet.Binding.DataBinder.InheritConfiguration",
+      "CobolNet.Binding.DataBinder.CallInheritOptions",
+      "CobolNet.Binding.DataBinder.EnvDivisions",
+      "CobolNet.Binding.DataBinder.InheritGlobalReport",
+      "CobolNet.Binding.DataBinder.InheritGlobalSubtree",
+      "CobolNet.Binding.DataBinder.DropShadowedConstants",
+      "CobolNet.Binding.DataBinder.InheritGlobalConstants",
+      "CobolNet.Binding.DataBinder.InheritGlobalTypeDecls",
+      "CobolNet.Binding.DataBinder.ReserveInheritedMemberNames",
+      "CobolNet.Binding.DataBinder.ContainerLocalFiles",
+      "CobolNet.Compiler.Oo.OoMethodSymbol.OoUniversalCheckingHere",
+      "CobolNet.Compiler.Oo.OoMethodSymbol.ExternalCheckMaskHere",
+      "CobolNet.Compiler.Oo.OoMethodSymbol.AutomaticPropagationHere",
+      "CobolNet.Binding.Procedure.EcBinder.MarkFormals",
+      "CobolNet.Binding.Procedure.MnemonicRegistry.Of",
+      "CobolNet.Compiler.Oo.OoRepositoryScope.Build"
+     ]
+    },
+    {
+     "target": "one IBindPass class per pipeline row TypesExpanded through SignResolved (rows 1-11, SynthesizeImpliedPictures to InheritSignClauses), each declaring its views",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/Passes/BindPipeline.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.ImpliedPicture.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Aligned.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.ConditionName.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.PictureRequired.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.ClausePlacement.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.SignClause.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.ConstantRecord.cs"
+     ]
+    },
+    {
+     "target": "one IBindPass class per pipeline row SignResolved through OccursResolved (rows 12-22, CheckCodeSetRecordItems to CheckValueLiteralClasses)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/Passes/BindPipeline.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.CodeSetRecords.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.RedefinesEntry.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.GroupValue.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Odo.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.TableValue.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.ValuePlacement.cs"
+     ]
+    },
+    {
+     "target": "one IBindPass class per FilesResolved row (rows 23-29, ResolveFiles to MarkFileRecordImageLeaves: the storage-tier writers and the two image-fact appenders)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/Passes/BindPipeline.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Ptr.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs"
+     ]
+    },
+    {
+     "target": "SpecialNamesBinder (the Switches and IoControl partials)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.IoControl.cs"
+     ]
+    },
+    {
+     "target": "FileControlBinder",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/DataBinder.cs"
+     ]
+    },
+    {
+     "target": "ReportSectionBinder (the Reports partial)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs"
+     ]
+    },
+    {
+     "target": "ConstantEntryBinder (the Constants and ConstantRecord partials)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs",
+      "src/Cobol.Net.Compiler/Binding/DataBinder.ConstantRecord.cs"
+     ]
+    },
+    {
+     "target": "LinkageBinder (the Linkage partial)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs"
+     ]
+    },
+    {
+     "target": "OoDataBinder (the Oo partial)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs"
+     ]
+    },
+    {
+     "target": "DataBindResult: the immutable record of the frozen slices and fact sets, replacing DataBinder on BoundUnit.Data, BoundCompilation.InterfaceData and EmitContext.Data; DataItem immutable from here",
+     "seam": "DataBindResult (§8.1's largest refusal, codegen → binding, loses its binder half here)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/DataBinder.cs",
+      "src/Cobol.Net.Compiler/Binding/Model/BoundUnit.cs",
+      "src/Cobol.Net.Compiler/Binding/Model/BoundCompilation.cs",
+      "src/Cobol.Net.Compiler/CodeGen/Emit/EmitCore.cs"
+     ],
+     "blocked_by": [
+      "R0-0004#last"
+     ],
+     "removes": [
+      [
+       "CobolNet.Binding.Model",
+       "CobolNet.Binding",
+       "20 (BoundUnit.Data, BoundCompilation.InterfaceData, OoClassUnit)"
+      ],
+      [
+       "CobolNet.CodeGen",
+       "CobolNet.Binding",
+       "93 (EmitContext.Data)"
+      ],
+      [
+       "CobolNet.CodeGen.Emit",
+       "CobolNet.Binding",
+       "33 (EmitContext.Data)"
+      ]
+     ]
+    }
+   ]
+  },
+  "R0-0002": {
+   "targets": [
+    "src/Cobol.Net.Editions/Diagnostics/diagnostics.json (one row per descriptor of both catalogs and EditionCodes)",
+    "scripts/gen-diagnostics.ps1",
+    "DiagnosticCatalog.g.cs (one generated partial per band)",
+    "DiagnosticDescriptors.g.cs",
+    "EditionCodes.g.cs",
+    "docs/DIAGNOSTICS.md (rendered by the same generator)",
+    "the families table (NotImplemented COBOLNET0899, StrongType COBOLNET1533)"
+   ],
+   "seam": "the generated fields under today's names (DiagnosticCatalog.<Name>, DiagnosticDescriptors.<Name>, EditionCodes.<Name>) and the row schema of §8.3 (2) (permissiveInert, twinOf and family columns)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": "",
+   "steps": [
+    {
+     "target": "diagnostics.json with the row schema and the families table, scripts/gen-diagnostics.ps1, and DiagnosticCatalog.g.cs (one generated partial per band)",
+     "files": [
+      "src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs",
+      "tests/Cobol.Net.Tests.Unit/DiagnosticRegistryDriftTests.cs"
+     ]
+    },
+    {
+     "target": "EditionCodes.g.cs from its four rows",
+     "files": [
+      "src/Cobol.Net.Editions/EditionCodes.cs"
+     ]
+    },
+    {
+     "target": "DiagnosticDescriptors.g.cs (the 215 frontend rows; the 11 twinOf rows emit the reference)",
+     "files": [
+      "src/Cobol.Net.Frontend/Diagnostics/DiagnosticDescriptors.cs"
+     ]
+    },
+    {
+     "target": "docs/DIAGNOSTICS.md rendered by the generator; DiagnosticRegistryDriftTests keeps rows, .g.cs and .md agreement and the code-sharing rule",
+     "files": [
+      "docs/DIAGNOSTICS.md",
+      "tests/Cobol.Net.Tests.Unit/DiagnosticRegistryDriftTests.cs"
+     ]
+    }
+   ]
+  },
+  "R0-0003": {
+   "targets": [
+    "NumericFunctions",
+    "TrigonometricFunctions",
+    "SelectionFunctions",
+    "NumvalFunctions",
+    "TextFunctions",
+    "DateTimeFunctions (from CobolDate)",
+    "NumericArguments"
+   ],
+   "seam": "one static entry per intrinsic function on its family type, both numeric arms adjacent behind it, reached by emitted code through a `RuntimeMembers` handle (the compiler-side catalogue of DESIGN-backend-abstraction §2.3, which Draft 3 renames because the runtime's `RuntimeAbi` of DESIGN-external-repository owns the name)",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "R0-0007#2"
+   ],
+   "note": "after RuntimeApi's catalogue exists (RuntimeMembers, the second step of PB2302's chain): each step renames emitted entries",
+   "steps": [
+    {
+     "target": "NumericArguments (the shared argument coercions)",
+     "files": [
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.RealArgs.cs",
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.cs"
+     ]
+    },
+    {
+     "target": "NumericFunctions (the statistical and arithmetic families; both arms of each function adjacent)",
+     "files": [
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.Dec.cs",
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.Float.cs",
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.Exact.cs",
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.cs"
+     ]
+    },
+    {
+     "target": "TrigonometricFunctions (with the TwoPi argument reduction)",
+     "files": [
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.TwoPi.cs",
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.cs"
+     ]
+    },
+    {
+     "target": "SelectionFunctions (MAX, MIN, ORD-*)",
+     "files": [
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.Select.cs"
+     ]
+    },
+    {
+     "target": "NumvalFunctions (the NUMVAL family)",
+     "files": [
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.NumvalLocale.cs"
+     ]
+    },
+    {
+     "target": "TextFunctions",
+     "files": [
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.Text.cs"
+     ]
+    },
+    {
+     "target": "DateTimeFunctions (the date functions out of CobolDate)",
+     "files": [
+      "src/Cobol.Net.Runtime/Intrinsics/CobolDate.cs",
+      "src/Cobol.Net.Runtime/Intrinsics/CobolIntrinsics.cs"
+     ],
+     "blocked_by": [
+      "R0-0051"
+     ]
+    }
+   ]
+  },
+  "R0-0004": {
+   "targets": [
+    "NameResolution",
+    "SubscriptBinder",
+    "RefModBinder",
+    "PlaceBuilder (in compiler.model)",
+    "CounterResolver",
+    "ObjectPropertyResolver"
+   ],
+   "seam": "RefResolution (the closed answer, existing, RefResolutionDriftTests) and PlaceBuilder.Build(DataItem, positions, window) -> Place (the one Place builder, RenamesPlaceBuilderDriftTests), which the backend no longer calls",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": "the SubscriptBinder step waits for PB2151 (D10's second half); the PlaceBuilder step precedes DataBinder's DataBindResult step",
+   "steps": [
+    {
+     "target": "CounterResolver (LINAGE-COUNTER, PAGE-COUNTER, LINE-COUNTER)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs"
+     ]
+    },
+    {
+     "target": "ObjectPropertyResolver (the ObjectProperty partial)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/ReferenceResolver.ObjectProperty.cs"
+     ]
+    },
+    {
+     "target": "NameResolution (§8.4.2.2 over SymbolTable)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs"
+     ]
+    },
+    {
+     "target": "RefModBinder (§8.4.3.3)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs"
+     ]
+    },
+    {
+     "target": "SubscriptBinder (§8.4.2.3 → BoundExpr positions)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs"
+     ],
+     "blocked_by": [
+      "PB2151"
+     ]
+    },
+    {
+     "target": "PlaceBuilder in compiler.model, run at bind time: the 24 emit-time ResolveItem calls become bound-tree Places",
+     "seam": "PlaceBuilder.Build(DataItem, positions, window) -> Place (the one Place builder, RenamesPlaceBuilderDriftTests)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs",
+      "src/Cobol.Net.Compiler/Binding/Model/Place.cs"
+     ],
+     "removes": [
+      [
+       "CobolNet.Binding.Model",
+       "CobolNet.Binding",
+       "20 (OdoModel.SearchDepending's resolver, OdoModel.cs:188)"
+      ],
+      [
+       "CobolNet.CodeGen",
+       "CobolNet.Binding",
+       "93 (UnitEmitters.Refs and the emit-time ResolveItem calls)"
+      ],
+      [
+       "CobolNet.CodeGen.Emit",
+       "CobolNet.Binding",
+       "33 (likewise)"
+      ]
+     ]
+    }
+   ]
+  },
+  "R0-0005": {
+   "targets": [
+    "intrinsics.json -> IntrinsicCatalog.g.cs (arity, domain, codomain, IntroducedIn/RemovedIn, argument schema)",
+    "DateTimeIntrinsicBinder",
+    "NumericIntrinsicBinder",
+    "TextIntrinsicBinder",
+    "NumvalIntrinsicBinder",
+    "LocaleIntrinsicBinder",
+    "ExceptionIntrinsicBinder"
+   ],
+   "seam": "IntrinsicSig (the catalog row, existing) and IIntrinsicFamilyBinder.Bind(IntrinsicSig, arguments) -> BoundIntrinsicCall (existing node)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": "the catalog data-ize (step 1) edits binding files (IntrinsicCatalog, IntrinsicArgumentRules), so it is B like the family split",
+   "steps": [
+    {
+     "target": "intrinsics.json → IntrinsicCatalog.g.cs (arity, domain, codomain, edition windows, argument schema)",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs",
+      "src/Cobol.Net.Compiler/Binding/IntrinsicCatalog.cs"
+     ]
+    },
+    {
+     "target": "DateTimeIntrinsicBinder",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs"
+     ]
+    },
+    {
+     "target": "NumericIntrinsicBinder",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs"
+     ]
+    },
+    {
+     "target": "TextIntrinsicBinder",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs"
+     ]
+    },
+    {
+     "target": "NumvalIntrinsicBinder",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs"
+     ]
+    },
+    {
+     "target": "LocaleIntrinsicBinder",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs"
+     ]
+    },
+    {
+     "target": "ExceptionIntrinsicBinder",
+     "files": [
+      "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs"
+     ]
+    }
+   ]
+  },
+  "R0-0006": {
+   "targets": [
+    "VersionConformancePass (the bound arm only)",
+    "CobolWordGate (the reservedWords / cobolWords checks)"
+   ],
+   "seam": "ConstructRegistry.Check (the one funnel, existing); CobolWordGate.Check(word, ConformanceWalk) behind CobolWordRule — the per-word dedup and the debugging posture are ConformanceWalk's, never a gate's",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "R0-0009#last"
+   ],
+   "note": "after the parse-arm chain (PB2304's last step)"
+  },
+  "R0-0007": {
+   "targets": [
+    "RuntimeMembers (the one catalogue of RuntimeMember descriptors, DESIGN-backend-abstraction §2.3 as amended 2026-10-07)",
+    "RoslynRuntimeApi (the Roslyn renderer over it)",
+    "the compile-time rule calls move to the binder that asks them"
+   ],
+   "seam": "RuntimeMember (backend-abstraction §2.3): the nameof-anchored handle a backend renders (Roslyn text) or imports (a CIL token)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": "RuntimeApi.cs and the 42 binding and code-generation files that call it (797 references) are the fix lane's files, so each wave of the chain is dispatched only when its file set (the files it edits) collides with no in-flight train (the file-set partition, §8.7): the RuntimeApiGuardTests ratchet to zero, then the catalogue, then the renderer",
+   "steps": [
+    {
+     "target": "the RuntimeApiGuardTests ratchet to zero (the 36 bare runtime names in NumericRenderer, ConditionRenderer and OperandText route through the façade)",
+     "files": [
+      "src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs",
+      "src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs",
+      "src/Cobol.Net.Compiler/CodeGen/Emit/ConditionRenderer.cs",
+      "src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs"
+     ]
+    },
+    {
+     "target": "RuntimeMembers, the catalogue of nameof-anchored RuntimeMember descriptors",
+     "files": [
+      "src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs"
+     ]
+    },
+    {
+     "target": "RoslynRuntimeApi: RuntimeApi renamed and sourced from the catalogue, every caller changed",
+     "files": [
+      "src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs"
+     ]
+    },
+    {
+     "target": "the compile-time rule calls (CallEcIsProgramOrExternal and its kind) leave the façade for the binders that ask them",
+     "files": [
+      "src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs"
+     ]
+    }
+   ]
+  },
+  "R0-0008": {
+   "targets": [
+    "InlineInvocationBinder",
+    "ObjectViewBinder",
+    "OoIdentifierBinder",
+    "PropertyObjectBinder"
+   ],
+   "seam": "OoBinder keeps the dispatch over the OO operand forms; each extracted binder exposes its partial's entry Bind(<its context>, BindSession) -> Bound* unchanged",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2104"
+   ],
+   "note": ""
+  },
+  "R0-0009": {
+   "targets": [
+    "ParseArm keeps the ONE tree walk",
+    "CompilationGroupConstructGate",
+    "IdentificationConstructGate",
+    "EnvironmentConstructGate",
+    "DataConstructGate",
+    "ProcedureConstructGate",
+    "ControlFlowConstructGate",
+    "IoConstructGate",
+    "ExpressionConstructGate",
+    "OoConstructGate",
+    "ReportWriterConstructGate",
+    "ScreenConstructGate",
+    "DeclinedConstructGate"
+   ],
+   "seam": "Descent IConstructGate<TContext>.Check(TContext, ConformanceWalk): the ONE walk visits in tree order and hands each context to the gate of the fragment that defines its rule (a total map, pinned by a drift test over the generated parser's context types); the gate returns whether the walk descends, and ConformanceWalk carries the walk state the gates share (created per walk, its gates per-walk instances: the EditionContext, the debugging posture and BeginProgramUnit(), its per-unit reset, the flagged-word and over-long-word sets, Visit(child) for a selective descent), so the unsorted diagnostic stream (DiagnosticBag.cs:14) keeps today's order",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "G-grammar-regroup"
+   ],
+   "note": "after the grammar regroup, so every context has exactly one defining fragment",
+   "steps": [
+    {
+     "target": "the seam alone: ConformanceWalk, Descent, the gate registry and the total-map drift test; ParseArm's Visit methods dispatch through it to ONE gate that holds every check (no check moves)",
+     "files": [
+      "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs"
+     ]
+    },
+    {
+     "target": "IdentificationConstructGate, EnvironmentConstructGate and CompilationGroupConstructGate (the core skeleton's contexts; its ProgramUnitContext check calls walk.BeginProgramUnit(), the per-unit reset of the debugging posture)",
+     "files": [
+      "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs"
+     ]
+    },
+    {
+     "target": "DataConstructGate",
+     "files": [
+      "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs"
+     ]
+    },
+    {
+     "target": "ProcedureConstructGate and ControlFlowConstructGate (the declarative-section descent of DB103M)",
+     "files": [
+      "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs"
+     ]
+    },
+    {
+     "target": "IoConstructGate",
+     "files": [
+      "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs"
+     ]
+    },
+    {
+     "target": "ExpressionConstructGate and OoConstructGate (ClassNameContext: the gate of the fragment that defines className after PB2292)",
+     "files": [
+      "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs"
+     ]
+    },
+    {
+     "target": "ReportWriterConstructGate, ScreenConstructGate and DeclinedConstructGate",
+     "files": [
+      "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs"
+     ]
+    }
+   ]
+  },
+  "R0-0010": {
+   "targets": [
+    "ClassUnitEmitter",
+    "MethodEmitter",
+    "UniversalObjectEmitter",
+    "ObjectCellEmitter"
+   ],
+   "seam": "ClassUnitEmitter.Emit(OoClassUnit, EmitContext) and MethodEmitter.Emit(OoMethodSymbol, EmitContext); the universal object and object-cell renderers are called by both",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2104"
+   ],
+   "note": ""
+  },
+  "R0-0011": {
+   "targets": [
+    "LinageControl",
+    "RecordCodec (fixed, variable, line-sequential)"
+   ],
+   "seam": "RecordCodec, one implementation per record form, chosen at open; LinageControl exposes the LINAGE counters and the page advance; the connector keeps position and the §9.1.13 status",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0012": {
+   "targets": [
+    "one renderer per intrinsic family of R0-0003 / R0-0005"
+   ],
+   "seam": "IIntrinsicFamilyRenderer.Render(BoundIntrinsicCall, EmitContext), mirroring the family binders",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "R0-0005#last"
+   ],
+   "note": ""
+  },
+  "R0-0013": {
+   "targets": [
+    "FileRegistry (the open-file table)",
+    "SharingPolicy (the OPEN Table 19 rows as data)",
+    "the keyed and relative access helpers move to their connector types"
+   ],
+   "seam": "SharingPolicy.Admit(open mode, sharing mode, the file's current opens) -> I-O status",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0014": {
+   "targets": [
+    "ExceptionEngine (raise, dispatch, checking state)",
+    "LastExceptionRecord",
+    "ExceptionPropagation",
+    "IoExceptionMerge",
+    "ArgumentExceptions (with ArgumentSubstitute)"
+   ],
+   "seam": "the engine and its parts reached from the run unit's one captured RunUnit local through RuntimeMembers handles (plan P15 Cut 3 item 4a); no static forwarder",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land, and with P15 Cut 3 at v1.0 (kb/Work R69 §1: Cut 3 is the v1.0 cut, a release decision on the public runtime namespaces, PB2349)",
+   "blocked_by": [
+    "PB2118",
+    "R0-0007#2",
+    "R69"
+   ],
+   "note": "ONE wave with P15 Cut 3 (PB2349): the two notes share their blockers and the ExceptionState.cs site, so plan_wave.py groups them, and the facade deletion (item 4a, PB2349's) and this split change the emitted exception calls once, under Cut 3's one reviewed re-baseline"
+  },
+  "R0-0015": {
+   "targets": [
+    "InspectRules",
+    "InitializeRules",
+    "WriteRules",
+    "OpenRules",
+    "SearchRules (one per verb family)"
+   ],
+   "seam": "each rule type a static Check(<the statement's bound node>, diagnostics) called by the verb binder that applies it",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0016": {
+   "targets": [
+    "CobolNum (the Int128 carrier arithmetic)",
+    "NumericImage (display, binary, checked store)"
+   ],
+   "seam": "NumericImage's static image entries over CobolNum's carrier, reached by emitted code through a `RuntimeMembers` handle (the compiler-side catalogue of DESIGN-backend-abstraction §2.3, which Draft 3 renames because the runtime's `RuntimeAbi` of DESIGN-external-repository owns the name)",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "R0-0007#2",
+    "PB2099"
+   ],
+   "note": "waits for PB2099 (an external-repository slice: this note's site is CobolNum.cs and CobolNum.Image.cs, which DESIGN-external-repository §12 names in the Change column of the HostLanding row (CobolNum.IsNumericImage, the validity decode slice 3's host entry calls), so slice 3 edits it; found by the corrected slice file set, which reads all three §12 columns and every name, PB2118 Draft 7, H4)"
+  },
+  "R0-0017": {
+   "targets": [
+    "EcNameSetBinder",
+    "ExceptionPerformBinder",
+    "OmittedArgumentBinder",
+    "RaisingBinder"
+   ],
+   "seam": "the bound exception-name set (EcNameSetBinder's result) that the other three consume; each Bind(ctx, BindSession)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0018": {
+   "targets": [
+    "RelationConditionBinder",
+    "ClassConditionBinder",
+    "BooleanExpressionBinder",
+    "AbbreviatedConditionBinder"
+   ],
+   "seam": "each returns a BoundCondition leaf (the §8.5 union); ConditionBinder keeps the dispatch",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0019": {
+   "targets": [
+    "one binder per SET format family"
+   ],
+   "seam": "SetFormatSelection (existing) selects the SetFormat; each family binder Bind(SetFormat, ctx) -> BoundStatement",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2104"
+   ],
+   "note": "waits for PB2104 (an external-repository slice: this note's site is SetBinder.cs, which DESIGN-external-repository §12 names in the Callers column of the prototype row (slice 7) and of the ObjectRefDescriptor Target row (slice 8), so slice 8 edits it; found by the corrected slice file set, which reads all three §12 columns and every name, PB2118 Draft 7, H4)"
+  },
+  "R0-0020": {
+   "targets": [
+    "the argument schema rows join intrinsics.json (R0-0005)",
+    "the predicates stay one type"
+   ],
+   "seam": "the generated IntrinsicArgumentSchema row of IntrinsicCatalog.g.cs",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2300"
+   ],
+   "note": "with IntrinsicBinder's data-ize"
+  },
+  "R0-0021": {
+   "targets": [
+    "ReportControlBreaks",
+    "PageAdvance",
+    "ReportGroupPresentation",
+    "SumCounters"
+   ],
+   "seam": "CobolReport keeps the INITIATE / GENERATE / TERMINATE entries the emitted code calls; the four are its owned collaborators (no emitted name changes)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0022": {
+   "targets": [
+    "PrototypeConformance",
+    "ReturnConformance",
+    "InterfaceImplementationConformance"
+   ],
+   "seam": "one Conforms(left, right) -> ConformanceResult per §9.3.8 rule family",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2104"
+   ],
+   "note": ""
+  },
+  "R0-0023": {
+   "targets": [
+    "PictureParser",
+    "EditingPhraseAnalyzer",
+    "the per-edition PICTURE symbol rows as data"
+   ],
+   "seam": "PicInfo (existing, the parse result)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2104"
+   ],
+   "note": "PictureAnalyzer sets ObjectRefDescriptor.Target (DESIGN-external-repository §12, the slice 8 row)"
+  },
+  "R0-0024": {
+   "targets": [
+    "CallArgumentRenderer",
+    "CallSiteEmitter"
+   ],
+   "seam": "CallArgumentRenderer.Render(argument, CallCrossing) (ArgText's successor; CallCrossing exists)",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2099"
+   ],
+   "note": ""
+  },
+  "R0-0025": {
+   "targets": [
+    "CompilationGroupBinder",
+    "ValidationSchedule (both in compiler.pipeline)"
+   ],
+   "seam": "CompilationGroupBinder.Bind(tree, edition, directives) -> BoundCompilation; ValidationSchedule.Run(BoundCompilation)",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "T-binder-driver-calls",
+    "PB2103",
+    "PB2104"
+   ],
+   "note": "after PB2418 (T-binder-driver-calls): BindPipeline.cs:154, OoDriver.cs:151-152 and OoEmitter.cs:257,261 call BinderDriver, and moving it to compiler.pipeline first adds three unlisted rows (Binding.Passes, Compiler.Oo and CodeGen -> CobolNet; the fifth refuter, G1)",
+   "removes": [
+    [
+     "CobolNet.Binding",
+     "CobolNet.Validation",
+     "15 (with PB2404)"
+    ],
+    [
+     "CobolNet.Binding.Passes",
+     "CobolNet.Validation",
+     "1 (BindPipeline's VersionConformancePass row, BindPipeline.cs:163, goes with the driver's pass schedule)"
+    ],
+    [
+     "CobolNet.Binding.Procedure",
+     "CobolNet.Validation",
+     "2 (with PB2404)"
+    ],
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Binding",
+     "93 (CompilationGroupBinder's BinderDriver calls leave code generation)"
+    ]
+   ]
+  },
+  "R0-0026": {
+   "targets": [
+    "NumericCarrierRules (the one place the numeric arm is chosen)",
+    "the visitor stays"
+   ],
+   "seam": "NumericCarrierRules.Choose(...) -> the NumXCarrier case (an enum today; the NumX re-model, its own note, makes it the closed carrier)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": "the NumX re-model (N-numx-carrier) follows this note"
+  },
+  "R0-0027": {
+   "targets": [
+    "OperandContextRules to its own file",
+    "ArithmeticExpressionBinder",
+    "OperandBinder"
+   ],
+   "seam": "OperandBinder.Bind(ctx, operand context) -> BoundOperand (the one operand funnel of DESIGN-binder-bound-tree §3.6)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0028": {
+   "targets": [
+    "DataItem (data only)",
+    "DataItemQueries (category, usage, class)",
+    "DataItemLayout (sizes, offsets)"
+   ],
+   "seam": "DataItem's fields, immutable after binding; the queries and layout as types over it",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2098",
+    "PB2104"
+   ],
+   "note": "waits for PB2104 (an external-repository slice: this note's site is DataItem.cs, which DESIGN-external-repository §12 names in the Today column of the identity row (DynStructure, the structure DEFINITION key of §6.4, slices 7-8), so slice 8 edits it; found by the corrected slice file set, which reads all three §12 columns and every name, PB2118 Draft 7, H4)"
+  },
+  "R0-0029": {
+   "targets": [
+    "CopyTextLocator",
+    "ReplacingMatcher",
+    "CopyProcessor keeps the nesting driver"
+   ],
+   "seam": "CopyTextLocator.Locate(text-name, library-name) -> source text; ReplacingMatcher.Apply(text, REPLACING operands)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0030": {
+   "targets": [
+    "CallArgumentBinder",
+    "CallTargetResolver",
+    "CallBinder"
+   ],
+   "seam": "CallTargetResolver.Resolve(ctx) -> the call target (the slice-7 resolver's result)",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2103"
+   ],
+   "note": ""
+  },
+  "R0-0031": {
+   "targets": [
+    "ReadEmitter",
+    "WriteEmitter",
+    "OpenCloseEmitter",
+    "ReleaseReturnEmitter"
+   ],
+   "seam": "Emit(<the statement's BoundStatement leaf>, EmitContext), one emitter per leaf",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0032": {
+   "targets": [
+    "CobolEdit",
+    "FloatEdit"
+   ],
+   "seam": "CobolEdit keeps the emitted entries; FloatEdit is its owned floating-insertion editor",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0033": {
+   "targets": [
+    "LogicalLineConverter",
+    "LogicalLineBuilder"
+   ],
+   "seam": "LogicalLineConverter.Convert(source text, reference format) -> logical lines (§6.5, one pass)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0034": {
+   "targets": [
+    "CallAbi.cs split one type per file (CobolPassMode, CobolArg, BoundaryClass, BoundaryItem, ICobolProgram)",
+    "ArgumentAdapters, one per boundary class"
+   ],
+   "seam": "BoundaryClass (existing) selects an IArgumentAdapter",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07); owner, PB2118 question 4, YES, 2026-10-07",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2099"
+   ],
+   "note": ""
+  },
+  "R0-0035": {
+   "targets": [
+    "MembershipRenderer",
+    "ClassConditionRenderer"
+   ],
+   "seam": "Render(<BoundCondition leaf>, EmitContext), ConditionRenderer keeping the dispatch",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0036": {
+   "targets": [
+    "CobolDec",
+    "DecUnscaled"
+   ],
+   "seam": "DecUnscaled, the unscaled-Int128 helpers CobolDec owns; emitted names unchanged",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0037": {
+   "targets": [
+    "DirectiveEvaluator",
+    "DisplayDirective"
+   ],
+   "seam": "DirectiveEvaluator.Evaluate(expression, compilation variables) -> value",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0038": {
+   "targets": [
+    "LookaheadPredicates",
+    "LocalePredicates",
+    "the type's namespace becomes its folder's (R0-0222)",
+    "EditionWordPredicates (every member that reads the compile edition, §8.4's pin, moved as one set)"
+   ],
+   "seam": "static predicate types the grammar's predicate actions call directly (no forwarding member on the superclass); a grammar wave, so after the §4 item 3 token and parse-tree differential (kb/Work PB2350) exists, and after PB2291 has decided which edition reads stay",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2350",
+    "PB2291"
+   ],
+   "note": ""
+  },
+  "R0-0039": {
+   "targets": [
+    "EcCheckingEmitter",
+    "DeclarativeDispatchEmitter"
+   ],
+   "seam": "EcCheckingEmitter.Emit(EcStatementInfo, EmitContext); DeclarativeDispatchEmitter.Emit(the unit's declaratives)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0040": {
+   "targets": [
+    "OpenModeMachine (the §9.1.13 transitions)",
+    "RecordArea"
+   ],
+   "seam": "OpenModeMachine.Transition(open mode, operation) -> I-O status",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0041": {
+   "targets": [
+    "one renderer per Place kind family"
+   ],
+   "seam": "one visitor over the Place union (§8.5 step 3); each family renderer Render(<Place kind>, EmitContext)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0042": {
+   "targets": [
+    "GroupImageCodec",
+    "BitImageCodec",
+    "ImageInitializer"
+   ],
+   "seam": "the AsImage / FromImage entries (existing)",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2099"
+   ],
+   "note": ""
+  },
+  "R0-0043": {
+   "targets": [
+    "EvaluateSubjectBinder",
+    "WhenPhraseBinder"
+   ],
+   "seam": "EvaluateOperandCombinations (existing) pairs subjects and objects",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0044": {
+   "targets": [
+    "SortKeyEmitter",
+    "SortProcedureEmitter",
+    "MergeEmitter"
+   ],
+   "seam": "Emit(BoundSort or BoundMerge, EmitContext); SortKeyEmitter.Render(keys)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0045": {
+   "targets": [
+    "FlagConformancePass",
+    "FileStatusFlagRules"
+   ],
+   "seam": "FlagState (existing)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2301"
+   ],
+   "note": "after the VersionConformancePass split (PB2301)"
+  },
+  "R0-0046": {
+   "targets": [
+    "SortBinder",
+    "MergeBinder"
+   ],
+   "seam": "SortKeyAdmission (existing)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0047": {
+   "targets": [
+    "KeyIndex (what PB2129 adds)",
+    "the connector keeps the access modes"
+   ],
+   "seam": "KeyIndex: find, insert, remove and ordered scan by key",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07); owner, PB2118 question 4, YES, 2026-10-07",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2129"
+   ],
+   "note": "the structure follows the fix"
+  },
+  "R0-0048": {
+   "targets": [
+    "ReportGroupEmitter",
+    "ReportControlEmitter"
+   ],
+   "seam": "Emit(ReportGroupModel, EmitContext)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0049": {
+   "targets": [
+    "the INITIALIZE category rows as data",
+    "ReplacingPhraseBinder"
+   ],
+   "seam": "InitializeCategories (existing rows) and ReplacingPhraseBinder.Bind(ctx) -> the REPLACING phrase node",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0050": {
+   "targets": [
+    "ProcedureTableBuilder",
+    "ProcedureScopeRecorder"
+   ],
+   "seam": "the procedure table it returns (pc index -> range), unchanged",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0051": {
+   "targets": [
+    "CobolDate",
+    "DateTimeFormatter",
+    "DateTimeParser"
+   ],
+   "seam": "emitted entries unchanged; the formatter and parser are owned collaborators",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": ""
+  },
+  "R0-0052": {
+   "targets": [
+    "StatementBinder moves to Binding/Procedure",
+    "StatementBindContext (its 31 fields)"
+   ],
+   "seam": "StatementBindContext, passed to the verb binders in place of StatementBinder's fields",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2151"
+   ],
+   "note": "the SubscriptSegments partial dies with PB2151",
+   "removes": [
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Binding",
+     "33 (with PB2405)"
+    ],
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Binding.Procedure",
+     "39 (the walk reads 39 at 669e32aa9: two pairs landed after a02b165da, PlacementRules and UntilExitPlacement)"
+    ],
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Binding.Validation",
+     "1 (landed after a02b165da by the fix lane, StatementBinder -> StatementValidation; walk at 669e32aa9; Draft 7, H1)"
+    ],
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Compiler.Oo",
+     "6 (StatementBinder -> OoClassTable; PB2402 is the rest)"
+    ],
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Frontend.Preprocessor",
+     1
+    ],
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Frontend.Generated",
+     "18 (with PB2398)"
+    ],
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Frontend.Parsing",
+     "1 (with PB2398)"
+    ]
+   ]
+  }
+ },
+ "designed": [
+  {
+   "key": "T-arch-drift-test",
+   "wave": "measure",
+   "what": "the architecture drift test lands, the first wave of the R3 program: ArchitectureEdgesDriftTests (tests/Cobol.Net.Tests.Unit), §8.1's metadata walk over the built product assemblies, and docs/rearchitecture/architecture-edges.json, §8.1's file, MEASURED on this note's own landing tree (a new census record and the walk's seed run), never copied from §8.1's block; every Move/rename and Extract note waits for it, because each is neutral only when this walk shows no row growing",
+   "sites": [
+    "`tests/Cobol.Net.Tests.Unit/ArchitectureEdgesDriftTests.cs` (new)",
+    "`docs/rearchitecture/architecture-edges.json` (new; §8.1's block is the proposal, re-measured on the landing tree)",
+    "`tests/Cobol.Net.Tests.Unit/ArchCensusDriftTests.cs` (the census observer's assertion over the same file)",
+    "`docs/rearchitecture/evidence/arch-census/<landing-sha>.json` (new: the census record of the landing tree, which the file's `uses` column is keyed to)"
+   ],
+   "targets": [
+    "the walk (System.Reflection.Metadata over the authored types of the five product assemblies, the census's population rule read from the portable PDBs; the reference set of §8.1; nested types folded to the outermost; uses = distinct type pairs per namespace pair), of the shape the refuters' prototype measured (21,545 pairs at 669e32aa9; PB2118 Draft 7, H1)",
+    "the checker over the edges file (placement, allowed pairs, the tolerated rows' uses and walkUses ratchets, dead allowances) with the what-if entry point: an optional move map (type -> namespace) and cut list re-key the pairs before they aggregate",
+    "the seed run on the landing tree: writes uses (the new census record) and walkUses (the walk) for every row, and lists EVERY cross-layer type pair the file does not allow, a pair inside an already-tolerated row included (a row-level list let a fix-lane pair added inside a tolerated row before this wave through with no remover; PB2118 Draft 8, J1); the checker's --assign mode replays the planned Move/rename and Extract notes' move maps (the targets file) in blocked_by order and names, for each pair, the first note after which it is allowed or intra-layer; each tolerated row keeps its pairs with their removers (`pairs`: from type, to type, removedBy), the row's removedBy is their union, and that note's Removes line gains the row in the same change; a pair no note removes blocks this wave until a note is filed, and after it lands a pair the file does not list fails the drift test even when its row's count does not grow",
+    "the self-test: a planted edge, a planted growth and a planted pair with no remover each fail it"
+   ],
+   "seam": "the edges file (one rule, one file) and the checker's what-if, which every Move/rename and Extract wave's brief runs on its map",
+   "order": "A",
+   "order_text": "A: a test and a data file, no product code; the first wave after the owner approves §8, before every Move/rename and Extract wave of the program",
+   "note": "the file is keyed to this note's landing tree, not to a02b165da: the fix lane lands between the census and this wave (at 669e32aa9 the walk already holds Binding.Bound -> Binding.Validation, 1, and two more Binding.Bound -> Binding.Procedure pairs; PB2347 removes both), and from this wave on a landing that adds a cross-layer pair fails the drift test in its own gate; a rename wave (a folder-equals-namespace move or a root flip) re-keys the file in the same change: it places the new namespace in its folder's layer, so no layer pair changes, and splits each tolerated row by the walk's measure, the parts summing to the row; a type move re-keys the pairs by its move map",
+   "blocked_by": [
+    "PB2118"
+   ],
+   "model": "Opus (new test code with a self-test, kb/Work R69 §4)",
+   "reason": "behavior-neutral restructuring (the R3 program's measurement, PB2119; owner R69 §2-§3); no inventory row"
+  },
+  {
+   "key": "T-bound-binders-out",
+   "wave": "move-rename",
+   "what": "BoundStores (the StoreKindVisitor's class, read only by OoBinder and ReportWriterBinder) out of Binding/Bound/ into Binding/Procedure; MoveClassifier and MoveOverlap STAY in compiler.bound, the bound-tree computations §8.1 names: BoundMove sets its Stores from MoveClassifier.Classify (BoundTree.cs:1153) and MoveEmitter reads it (BoundTree.cs step 2)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/Bound/BoundStores.cs`"
+   ],
+   "targets": [
+    "BoundStores in Binding/Procedure; MoveClassifier and MoveOverlap in Binding/Bound, where the node that calls them and the emitter that reads them can both reach them"
+   ],
+   "seam": "BoundStores' members (unchanged)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "note": "Draft 4 moved MoveClassifier and MoveOverlap too, which grows the rows it claimed to remove (CobolNet.Binding.Bound -> CobolNet.Binding.Procedure 0 -> 1, CobolNet.CodeGen -> CobolNet.Binding.Procedure 4 -> 5: the walk); BoundStores' move changes no tolerated row, so this note removes none and those rows are StatementBinder's (PB2347); neutral when the walk shows no row growing: §8.1's what-if, the drift test's own metadata walk over the built assemblies (PB2118 Draft 5, F1) re-keyed by this wave's move map, is recorded per row in kb/Work PB2118; the wave's brief re-runs it on its final map, and a row that grows, or a pair on a row the edges file neither allows nor tolerates, is a blocker found before dispatch",
+   "blocked_by": [
+    "R0-0052"
+   ],
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)"
+  },
+  {
+   "key": "B-bound-rule-tables",
+   "wave": "move-rename",
+   "what": "the rule tables in BoundTree.cs (ImplicitMovePhrase, IntoPhraseRules, EcFeatures) to compiler.model (BoundTree.cs step 3)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs`"
+   ],
+   "targets": [
+    "ImplicitMovePhrase, IntoPhraseRules and EcFeatures in CobolNet.Binding.Model"
+   ],
+   "seam": "the tables' existing members",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "T-bound-binders-out"
+   ],
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)"
+  },
+  {
+   "key": "B-bound-family-files",
+   "wave": "move-rename",
+   "what": "BoundTree.cs's six small node families into one family file per root (BoundExpr, BoundOperand, BoundBoolExpr, BoundCondition, BoundPerformControl, BoundSetTarget) (BoundTree.cs step 4)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs`"
+   ],
+   "targets": [
+    "BoundExpr.cs, BoundOperand.cs, BoundBoolExpr.cs, BoundCondition.cs, BoundPerformControl.cs, BoundSetTarget.cs"
+   ],
+   "seam": "the node families themselves (the unit §8.5 converts)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "B-bound-rule-tables"
+   ],
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)",
+   "claims": [
+    {
+     "file": "src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs",
+     "kinds": [
+      "multi-type-file",
+      "misnamed-file"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "B-bound-statement-leaves",
+   "wave": "move-rename",
+   "what": "BoundStatement's 97 leaves out of BoundTree.cs into the verb-family files (BoundCall.cs, BoundSort.cs and the arithmetic, MOVE, control-flow, pointer and program-shell files they need) (BoundTree.cs step 5)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs`"
+   ],
+   "targets": [
+    "BoundStatement.cs (the root) and one verb-family file per leaf family"
+   ],
+   "seam": "the node families themselves",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "B-bound-family-files"
+   ],
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)"
+  },
+  {
+   "key": "T-figurative-constants",
+   "wave": "extract",
+   "what": "the value facts the binders read from code generation leave it for compiler.model: the figurative-constant classification and FillChar (CodeGen/Roslyn/FigurativeConstants.cs) and the §13.18.63 numeric-edited VALUE image compose ValueInitializer.EditedImageOfNumericValue, which the level-88 FALSE check calls (DataBinder.cs:4792) and which reaches the runtime's CobolEdit directly from the model (compiler.model -> runtime is allowed) (§8.1 tolerated rows)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/CodeGen/Roslyn/FigurativeConstants.cs`",
+    "`src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs` (EditedImageOfNumericValue)",
+    "`src/Cobol.Net.Compiler/Binding/DataBinder.cs:2435,2470,2850,4792,4855`",
+    "`src/Cobol.Net.Compiler/Binding/DataBinder.ImpliedPicture.cs:212`",
+    "`src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InitializeBinder.cs:869`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding",
+     "CobolNet.CodeGen",
+     3
+    ],
+    [
+     "CobolNet.Binding.Procedure",
+     "CobolNet.CodeGen",
+     2
+    ]
+   ],
+   "targets": [
+    "a figurative-constant model type and the numeric-edited VALUE image compose in CobolNet.Binding.Model; FigurativeConstants keeps the C# rendering, ValueInitializer calls the model compose"
+   ],
+   "seam": "the classification the binders read (the model type) and the renderer the emitters call",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "T-model-rule-types"
+   ],
+   "note": "after PB2399 (T-model-rule-types), which moves AlphabetDef and NationalAlphabetDef to the model: FillChar names both (FigurativeConstants.cs:97-98), so landing first grows CobolNet.Binding.Model -> CobolNet.Binding 21 -> 23 on the walk (the fifth refuter, G1); neutral when the walk shows no row growing (PB2118 Draft 6, the what-if over every member-moving note)"
+  },
+  {
+   "key": "T-repeat-to-width",
+   "wave": "move-rename",
+   "what": "EmitText.RepeatToWidth to frontend.common (§8.1 tolerated row)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/CodeGen/Emit/EmitCore.cs`",
+    "`src/Cobol.Net.Compiler/Binding/DataBinder.cs:2970`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding",
+     "CobolNet.CodeGen.Emit",
+     1
+    ]
+   ],
+   "targets": [
+    "RepeatToWidth in a CobolNet.Frontend.Common text type"
+   ],
+   "seam": "RepeatToWidth (unchanged signature)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2104"
+   ],
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)",
+   "note": "waits for PB2104 (external-repository slices): its sites name DataBinder.cs, files of DESIGN-external-repository §12's in-flight set (R1 §8.6), and the last slice that edits each, in §21's order, is PB2104 (found by work.py check's slice rule, PB2118 Draft 6)"
+  },
+  {
+   "key": "T-outer-chain",
+   "wave": "extract",
+   "what": "the C# member chain leaves the model: BoundUnit answers the nesting depth and the emitter renders RuntimeApi.OuterChain (§8.1 tolerated row)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/Model/BoundUnit.cs:67`",
+    "`src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding.Model",
+     "CobolNet.CodeGen",
+     1
+    ]
+   ],
+   "targets": [
+    "BoundUnit exposes the static-member fact and the depth; the emitter composes the chain"
+   ],
+   "seam": "the depth and static-member facts on BoundUnit",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ]
+  },
+  {
+   "key": "T-parse-contexts",
+   "wave": "extract",
+   "what": "parse contexts leave the backend's input and the bound tree: BoundCompilation.Tree, BoundUnit.Ctx, the two code-generation reads and BoundOo.cs's become bound-node facts (§8.1 tolerated rows; kb/Work PB2293)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/Model/BoundCompilation.cs:34`",
+    "`src/Cobol.Net.Compiler/Binding/Model/BoundUnit.cs:34`",
+    "`src/Cobol.Net.Compiler/CodeGen/CSharpEmitter.cs:31`",
+    "`src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs`",
+    "`src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs:49`",
+    "`src/Cobol.Net.Compiler/Binding/Bound/BoundOo.cs`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding.Model",
+     "CobolNet.Frontend.Generated",
+     4
+    ],
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Frontend.Generated",
+     2
+    ],
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Frontend.Generated",
+     "18 (the BoundOo.cs half; StatementBinder's half is PB2347)"
+    ],
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Frontend.Parsing",
+     "1 (with PB2347)"
+    ]
+   ],
+   "targets": [
+    "each parse-context read becomes the bound-node fact it computes (DESIGN-backend-abstraction §1.1 lists no parse context)"
+   ],
+   "seam": "the bound-node facts that replace each read",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2100"
+   ],
+   "note": "waits for PB2100 (external-repository slices): its sites name ProgramEmitter.cs, files of DESIGN-external-repository §12's in-flight set (R1 §8.6), and the last slice that edits each, in §21's order, is PB2100 (found by work.py check's slice rule, PB2118 Draft 6)"
+  },
+  {
+   "key": "T-model-rule-types",
+   "wave": "extract",
+   "what": "the model's remaining binder reads end: SymbolTable indexes the item forest, not the DataBinder (SymbolTable.cs:47-49); DataBinder.WrittenQualified (OdoModel.cs:16, OccursKey), ReferenceResolver.HasVariableLengthSubordinate (RecordLayout.cs:302, VariableLengthCompatibility.cs:52,117, DataItem.cs:956, FileModel.cs:566,627) and IntrinsicArgumentRules.ClassOfItem (RecordLayout.cs:428) move into compiler.model as item queries; BoundCompilation.Turn (BoundCompilation.cs:40; TurnState names the preprocessor's DirectiveTimeline) becomes the turn facts as a model record built at bind time; LinkageFormal, Table16Operand and the alphabet family (AlphabetDef, CodedCharacterSet, CodeSetMedium, CollatingTable, ImplementorCodeName, LocaleCollatingSpec) move to compiler.model (§8.1 tolerated row) NationalAlphabetDef moves with AlphabetDef (the alphabet family; FigurativeConstants and SortCollation name both).",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/Model/SymbolTable.cs:47-49`",
+    "`src/Cobol.Net.Compiler/Binding/Model/OdoModel.cs:16`",
+    "`src/Cobol.Net.Compiler/Binding/Model/RecordLayout.cs:302,428`",
+    "`src/Cobol.Net.Compiler/Binding/Model/VariableLengthCompatibility.cs:52,117`",
+    "`src/Cobol.Net.Compiler/Binding/Model/BoundCompilation.cs:40`",
+    "`src/Cobol.Net.Compiler/Binding/TurnState.cs`",
+    "`src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs` (LinkageFormal)",
+    "`src/Cobol.Net.Compiler/Binding/MoveTable16.cs` (Table16Operand)",
+    "`src/Cobol.Net.Compiler/Binding/CollatingModel.cs` (AlphabetDef)",
+    "`src/Cobol.Net.Compiler/Binding/Model/DataItem.cs:956`",
+    "`src/Cobol.Net.Compiler/Binding/Model/FileModel.cs:566,627`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding.Model",
+     "CobolNet.Binding",
+     "20 (the model readers the other notes leave)"
+    ],
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Binding",
+     "93 (the alphabet and linkage reads)"
+    ],
+    [
+     "CobolNet.CodeGen.Emit",
+     "CobolNet.Binding",
+     "33 (likewise)"
+    ]
+   ],
+   "targets": [
+    "the item queries in compiler.model (DataItemQueries, R0-0028's target type); the turn-facts record; the moved types in CobolNet.Binding.Model"
+   ],
+   "seam": "the item queries and the turn-facts record; the moved types' members (unchanged)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "R0-0001#last",
+    "R0-0004#last"
+   ],
+   "note": "Draft 3 moved a flat list of rule types instead, and the what-if shows it could not land: the list names the binder types it calls (CobolNet.Binding.Model -> CobolNet.Binding 18 -> 47 in the text scan), IntrinsicArgumentRules, IntrinsicResultType and MoveTable16 name bound nodes, PrototypeSignatures names OoConformance, and TurnState names the preprocessor; neutral when the walk shows no row growing: §8.1's what-if, the drift test's own metadata walk over the built assemblies (PB2118 Draft 5, F1) re-keyed by this wave's move map, is recorded per row in kb/Work PB2118; the wave's brief re-runs it on its final map, and a row that grows, or a pair on a row the edges file neither allows nor tolerates, is a blocker found before dispatch"
+  },
+  {
+   "key": "T-bound-unit",
+   "wave": "move-rename",
+   "what": "BoundUnit, OoClassUnit and BoundCompilation (Binding/Model) move to compiler.bound once they hold no binder, no C# chain, no parse context and no OO-layer answer: OoClassUnit -> BoundProgram is the row's second pair and BoundCompilation holds both units (§8.1 tolerated row)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/Model/BoundUnit.cs`",
+    "`src/Cobol.Net.Compiler/Binding/Model/OoClassUnit.cs`",
+    "`src/Cobol.Net.Compiler/Binding/Model/BoundCompilation.cs`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding.Model",
+     "CobolNet.Binding.Bound",
+     2
+    ]
+   ],
+   "targets": [
+    "BoundUnit, OoClassUnit and BoundCompilation in CobolNet.Binding.Bound"
+   ],
+   "seam": "BoundUnit (unchanged members)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "R0-0001#last",
+    "T-parse-contexts",
+    "T-outer-chain",
+    "T-model-rule-types",
+    "T-oo-answers",
+    "T-emit-model-types"
+   ],
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)",
+   "note": "neutral when the walk shows no row growing: §8.1's what-if, the drift test's own metadata walk over the built assemblies (PB2118 Draft 5, F1) re-keyed by this wave's move map, is recorded per row in kb/Work PB2118; the wave's brief re-runs it on its final map, and a row that grows, or a pair on a row the edges file neither allows nor tolerates, is a blocker found before dispatch"
+  },
+  {
+   "key": "T-oo-symbol-contexts",
+   "wave": "extract",
+   "what": "the OO symbols and the OO signature record stop naming what compiler.model may not: OoClassSymbol.Ctx, OoInterfaceSymbol.Ctx and OoMethodSymbol.Ctx (after slice 8, Origin's source case) move to a binder-side OoSourceMap; OoMethodBinding.Declaratives (BoundDeclarative, a bound node) leaves the signature record for the class unit's bound program; OptionsModel's two parse-context factories (Endianness, Encoding) move to the binder that builds the OPTIONS model (§8.1; the prerequisite of PB2402)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Oo/OoClassSymbol.cs:8,13`",
+    "`src/Cobol.Net.Compiler/Oo/OoInterfaceSymbol.cs:8,13`",
+    "`src/Cobol.Net.Compiler/Oo/OoMethodSymbol.cs:7`",
+    "`src/Cobol.Net.Compiler/Oo/OoMethodBinding.cs` (Declaratives)",
+    "`src/Cobol.Net.Compiler/Binding/OptionsModel.cs:222,227`"
+   ],
+   "targets": [
+    "OoSourceMap (symbol -> its CLASS-ID, INTERFACE-ID or METHOD-ID context) owned by the OO binders; the four OoSymbolOrigin kinds of DESIGN-external-repository stay, and the source kind carries a key, not a parse context",
+    "the method's declaratives on the class unit's bound program beside its statements; OoMethodBinding keeps the signature, the formals and the pc range",
+    "OptionsModel's factories over parse contexts in the binder that reads the OPTIONS paragraph"
+   ],
+   "seam": "OoSourceMap.Of(symbol) -> the definition context, read only by the binders; OoMethodBinding without bound nodes",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "note": "without it the move of PB2402 grows CobolNet.Binding.Model -> CobolNet.Frontend.Generated (the three Ctx) and CobolNet.Binding.Model -> CobolNet.Binding.Bound (OoMethodBinding -> BoundDeclarative) and fails its own ratchet",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2104"
+   ]
+  },
+  {
+   "key": "T-oo-symbols-to-model",
+   "wave": "move-rename",
+   "what": "the OO symbols move to compiler.model with the closure they name: OoClassSymbol, OoInterfaceSymbol, OoMethodSymbol, NamingConvention, StandardMethod (out of OoStandardClasses.cs), OoMethodBinding, OoFormal, OoMethodDataScope (out of DataBinder.Oo.cs) and the types of OptionsModel.cs (OptionsModel, ArithmeticModes, ArithmeticMode, FloatEndianness, FloatEncoding and the OPTIONS enums) (§8.1 tolerated rows)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Oo/OoClassSymbol.cs`",
+    "`src/Cobol.Net.Compiler/Oo/OoInterfaceSymbol.cs`",
+    "`src/Cobol.Net.Compiler/Oo/OoMethodSymbol.cs`",
+    "`src/Cobol.Net.Compiler/Oo/NamingConvention.cs`",
+    "`src/Cobol.Net.Compiler/Oo/OoStandardClasses.cs` (StandardMethod)",
+    "`src/Cobol.Net.Compiler/Oo/OoMethodBinding.cs`",
+    "`src/Cobol.Net.Compiler/Oo/OoFormal.cs`",
+    "`src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs:20` (OoMethodDataScope)",
+    "`src/Cobol.Net.Compiler/Binding/OptionsModel.cs`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding.Model",
+     "CobolNet.Compiler.Oo",
+     "5 -> 2 (BoundCompilation -> AdapterPair and OoClassTable remain, PB2403)"
+    ],
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Compiler.Oo",
+     "6 -> 1 (StatementBinder -> OoClassTable remains, PB2347)"
+    ],
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Compiler.Oo",
+     "19 (the symbol half; PB2403 is the other)"
+    ],
+    [
+     "CobolNet.Binding.Model",
+     "CobolNet.Binding",
+     "20 (Scope -> OoMethodDataScope, PicInfo -> FloatEndianness)"
+    ],
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Binding",
+     "93 (the OPTIONS-model reads)"
+    ],
+    [
+     "CobolNet.CodeGen.Emit",
+     "CobolNet.Binding",
+     "33 (likewise)"
+    ]
+   ],
+   "targets": [
+    "the listed types in CobolNet.Binding.Model, one type per file"
+   ],
+   "seam": "the symbols (unchanged members)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "T-oo-symbol-contexts"
+   ],
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)",
+   "note": "the closure is what the symbols name: OoClassSymbol -> NamingConvention; OoMethodSymbol -> StandardMethod, OoMethodBinding, OoMethodDataScope, OptionsModel; OoMethodBinding -> OoFormal; OptionsModel -> the OPTIONS enums. Moved alone, the symbols would grow CobolNet.Binding.Model -> CobolNet.Compiler.Oo 5 -> 6 and CobolNet.Binding.Model -> CobolNet.Binding 20 -> 22 (refute 3, E1); moved with the closure, no row grows and every row it touches shrinks; neutral when the walk shows no row growing: §8.1's what-if, the drift test's own metadata walk over the built assemblies (PB2118 Draft 5, F1) re-keyed by this wave's move map, is recorded per row in kb/Work PB2118; the wave's brief re-runs it on its final map, and a row that grows, or a pair on a row the edges file neither allows nor tolerates, is a blocker found before dispatch"
+  },
+  {
+   "key": "T-oo-answers",
+   "wave": "extract",
+   "what": "the OO answers an emitter or BoundCompilation reads leave CobolNet.Compiler.Oo: AdapterPair moves to compiler.model (it names only the symbols, after PB2402), and the OoClassTable, ActivationDescriptions and OoStandardClasses answers reach the backend as BoundCompilation data (§8.1 tolerated rows)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs`",
+    "`src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs` (its OoClassTable read)",
+    "`src/Cobol.Net.Compiler/Oo/OoClassTable.cs`",
+    "`src/Cobol.Net.Compiler/Oo/OoConformance.cs:15` (AdapterPair)",
+    "`src/Cobol.Net.Compiler/Oo/ActivationDescriptions.cs`",
+    "`src/Cobol.Net.Compiler/Binding/Model/BoundCompilation.cs:37,39`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding.Model",
+     "CobolNet.Compiler.Oo",
+     "5 (the last 2: BoundCompilation -> AdapterPair, OoClassTable)"
+    ],
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Compiler.Oo",
+     "19 (the answer half: OoClassTable, ActivationDescriptions, OoStandardClasses, AdapterPair)"
+    ]
+   ],
+   "targets": [
+    "AdapterPair in CobolNet.Binding.Model; the class-table, activation and standard-class facts on BoundCompilation"
+   ],
+   "seam": "BoundCompilation's OO facts",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "T-oo-symbols-to-model",
+    "PB2104"
+   ],
+   "note": "neutral when the walk shows no row growing: §8.1's what-if, the drift test's own metadata walk over the built assemblies (PB2118 Draft 5, F1) re-keyed by this wave's move map, is recorded per row in kb/Work PB2118; the wave's brief re-runs it on its final map, and a row that grows, or a pair on a row the edges file neither allows nor tolerates, is a blocker found before dispatch"
+  },
+  {
+   "key": "T-integer-operand-rules",
+   "wave": "move-rename",
+   "what": "IntegerOperandRules with the IntegerSlot and IntegerSlotKind it returns (Validation/IntegerOperandPass.cs:14-89) move to compiler.binding (CobolNet.Binding), which may read the parse contexts its classifier table is keyed on and which the validation pass may read (§8.1 tolerated rows)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Validation/IntegerOperandPass.cs:89`",
+    "`src/Cobol.Net.Compiler/Binding/DataBinder.Constants.cs:858`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding",
+     "CobolNet.Validation",
+     "15 (the rule half; BinderDriver's move, PB2320, is the other)"
+    ],
+    [
+     "CobolNet.Binding.Procedure",
+     "CobolNet.Validation",
+     2
+    ]
+   ],
+   "targets": [
+    "IntegerOperandRules, IntegerSlot and IntegerSlotKind in CobolNet.Binding"
+   ],
+   "seam": "IntegerOperandRules.Classify and IntegerSlot (unchanged members)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2104"
+   ],
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)",
+   "note": "waits for PB2104 (external-repository slices): its sites name DataBinder.Constants.cs, files of DESIGN-external-repository §12's in-flight set (R1 §8.6), and the last slice that edits each, in §21's order, is PB2104 (found by work.py check's slice rule, PB2118 Draft 6); Draft 4 sent it to compiler.model, which adds CobolNet.Binding.Model -> CobolNet.Validation (IntegerSlot) and grows CobolNet.Binding.Model -> CobolNet.Frontend.Generated (its context-keyed table); the walk's rows across this wave: CobolNet.Binding -> CobolNet.Validation 14 -> 11, CobolNet.Binding.Procedure -> CobolNet.Validation 2 -> 0, none grows; neutral when the walk shows no row growing: §8.1's what-if, the drift test's own metadata walk over the built assemblies (PB2118 Draft 5, F1) re-keyed by this wave's move map, is recorded per row in kb/Work PB2118; the wave's brief re-runs it on its final map, and a row that grows, or a pair on a row the edges file neither allows nor tolerates, is a blocker found before dispatch"
+  },
+  {
+   "key": "T-emit-model-types",
+   "wave": "move-rename",
+   "what": "the rule families an emitter reads move to compiler.bound, which code generation may read and whose nodes they name: the report-model family (ReportModel, ReportGroupModel, ReportLineModel, ReportFieldModel, ReportSumFamily and the 16 Report* types they name), the intrinsic rule family (IntrinsicResultType, IntrinsicArgumentRules, IntrinsicSig, IntrinsicType, IntrinsicResultRule, IntrinsicDomain, IntrinsicCodomain, IntrinsicArity, IntrinsicBind, ArgSchema, ArgRule, ArgPredicate, ArgPredicateKind, CrossArgRule), the class rules (ClassConditionModel, ClassAlternative, ClassOperandRule, CollatingSelection, CollatingClass, AlgebraicRanges, AlgebraicRange) and the MOVE rules (MoveTable16, MoveRule, MoveRefusal) ; CobolClass, an enum the model's RecordLayout names, goes to compiler.model instead (§8.1 tolerated rows)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/CodeGen/Emit/ConditionRenderer.cs:830`",
+    "`src/Cobol.Net.Compiler/CodeGen/Emit/EmitCore.cs`"
+   ],
+   "removes": [
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Binding",
+     "93 (the rule-family reads)"
+    ],
+    [
+     "CobolNet.CodeGen.Emit",
+     "CobolNet.Binding",
+     "33 (likewise)"
+    ],
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Binding",
+     "33 (the bound nodes that read those rules)"
+    ]
+   ],
+   "targets": [
+    "the four families in CobolNet.Binding.Bound, one type per file; CobolClass in CobolNet.Binding.Model"
+   ],
+   "seam": "the moved types' members (unchanged)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "R0-0001#last",
+    "R0-0004#last",
+    "T-report-model-contexts"
+   ],
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)",
+   "note": "Draft 3 sent ClassConditionModel, CollatingSelection, MoveTable16, IntrinsicResultType and AlgebraicRanges to compiler.model, which they cannot reach: each names bound nodes, and the Report*Model family holds parse contexts (PB2416 cuts them first); Draft 4 sent CobolClass to compiler.bound, which grows CobolNet.Binding.Model -> CobolNet.Binding.Bound 2 -> 3 (RecordLayout names it), so it goes to the model; the walk's rows across this wave: CobolNet.Binding.Bound -> CobolNet.Binding 21 -> 9, CobolNet.CodeGen -> CobolNet.Binding 85 -> 48, CobolNet.CodeGen.Emit -> CobolNet.Binding 21 -> 9, CobolNet.Binding.Model -> CobolNet.Binding 3 -> 2, none grows; neutral when the walk shows no row growing: §8.1's what-if, the drift test's own metadata walk over the built assemblies (PB2118 Draft 5, F1) re-keyed by this wave's move map, is recorded per row in kb/Work PB2118; the wave's brief re-runs it on its final map, and a row that grows, or a pair on a row the edges file neither allows nor tolerates, is a blocker found before dispatch"
+  },
+  {
+   "key": "T-report-model-contexts",
+   "wave": "extract",
+   "what": "the cuts PB2405's move needs: the report-model family stops holding parse contexts (ReportModel, ReportCodeModel, ReportGroupModel, ReportLineModel, ReportFieldModel, ReportItemOccurrence, ReportSumModel, ReportSumAddend and ReportVaryingModel each name CobolParserCore contexts, DataBinder.Reports.cs:95,165 for the first two) and each read becomes the fact it computes; ClassConditionModel's ReferenceResolver read becomes a PlaceBuilder call; and the two PICs AlgebraicRanges reads from the procedure binder (SendingValueTemp.IntegerFunctionValuePic and FunctionValuePic, AlgebraicRange.cs:234) move to PicInfo in compiler.model, where SendingValueTemp reads them too (the prerequisite of PB2405) The report field sources FieldReferenceSource.Ref and FieldComputeSource.Ctx (DataBinder.Reports.cs:599,617) stop holding parse contexts the same way, so PB2420 can move the source family to compiler.bound.",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs`",
+    "`src/Cobol.Net.Compiler/Binding/ClassConditionModel.cs`",
+    "`src/Cobol.Net.Compiler/Binding/AlgebraicRange.cs:234`",
+    "`src/Cobol.Net.Compiler/Binding/Procedure/SendingValueTemp.cs`"
+   ],
+   "targets": [
+    "the report-model records with facts, not contexts (DESIGN-backend-abstraction §1.1 lists no parse context)"
+   ],
+   "seam": "the report-model records (their facts unchanged)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "note": "without it PB2405's move grows CobolNet.Binding.Bound -> CobolNet.Frontend.Generated 0 -> 2 and CobolNet.Binding.Bound -> CobolNet.Binding.Procedure 0 -> 1 (the walk); neutral when the walk shows no row growing: §8.1's what-if, the drift test's own metadata walk over the built assemblies (PB2118 Draft 5, F1) re-keyed by this wave's move map, is recorded per row in kb/Work PB2118; the wave's brief re-runs it on its final map, and a row that grows, or a pair on a row the edges file neither allows nor tolerates, is a blocker found before dispatch",
+   "blocked_by": [
+    "R0-0001#7",
+    "R0-0004#last"
+   ]
+  },
+  {
+   "key": "T-place-cursor",
+   "wave": "extract",
+   "what": "the four cursor records of Binding/Procedure/PlaceCursor.cs (PlaceCursor, MemberCursor, DynElementCursor, ViewCursor, which name each other) move beside Place in compiler.model, ReferenceResolver.BuildCellPath (a static over model types, ReferenceResolver.cs:1606, read at PlaceCursor.cs:76,194) moving with them to AccessPath; and the two procedure-binder answers an emitter reads become model or bound facts: EcBinder.ExternalNames (EcEmitter.cs:558) moves to compiler.model with EcFeatures, and IntrinsicBinder.CompileClock (ProgramEmitter.cs:53) is read once at bind time into BoundCompilation (§8.1 tolerated row)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/Procedure/PlaceCursor.cs`",
+    "`src/Cobol.Net.Compiler/Binding/ReferenceResolver.cs:1606`",
+    "`src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs:464-510`",
+    "`src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs:558`",
+    "`src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs:53`"
+   ],
+   "removes": [
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Binding.Procedure",
+     4
+    ]
+   ],
+   "targets": [
+    "the four cursor records and the cell-path builder in CobolNet.Binding.Model; EcBinder.ExternalNames in the model; the compile clock's reading on BoundCompilation"
+   ],
+   "seam": "PlaceCursor.Over(Place) (unchanged)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "R0-0004#last",
+    "PB2100"
+   ],
+   "note": "waits for PB2100 (external-repository slices): its sites name ProgramEmitter.cs, files of DESIGN-external-repository §12's in-flight set (R1 §8.6), and the last slice that edits each, in §21's order, is PB2100 (found by work.py check's slice rule, PB2118 Draft 6); Draft 4 moved PlaceCursor and ViewCursor alone, which adds CobolNet.Binding.Model -> CobolNet.Binding.Procedure (MemberCursor, DynElementCursor) and grows CobolNet.Binding.Model -> CobolNet.Binding (ViewCursor's BuildCellPath read); the walk's row across this wave: CobolNet.CodeGen -> CobolNet.Binding.Procedure 4 -> 0, none grows; neutral when the walk shows no row growing: §8.1's what-if, the drift test's own metadata walk over the built assemblies (PB2118 Draft 5, F1) re-keyed by this wave's move map, is recorded per row in kb/Work PB2118; the wave's brief re-runs it on its final map, and a row that grows, or a pair on a row the edges file neither allows nor tolerates, is a blocker found before dispatch"
+  },
+  {
+   "key": "T-compilation-inputs",
+   "wave": "move-rename",
+   "what": "CompilationInputs with the InputProbe and EnvironmentRead it names (Frontend/Pipeline/CompilationInputs.cs:20-21) moves to frontend.common (§8.1 tolerated rows)",
+   "sites": [
+    "`src/Cobol.Net.Frontend/Pipeline/CompilationInputs.cs`",
+    "`src/Cobol.Net.Compiler/CodeGen/CSharpEmitter.cs`",
+    "`src/Cobol.Net.Compiler/CodeGen/ProgramEmitter.cs`",
+    "`src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs`"
+   ],
+   "removes": [
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Frontend",
+     3
+    ],
+    [
+     "CobolNet.Frontend.Preprocessor",
+     "CobolNet.Frontend",
+     3
+    ]
+   ],
+   "targets": [
+    "CompilationInputs, InputProbe and EnvironmentRead in CobolNet.Frontend.Common"
+   ],
+   "seam": "CompilationInputs (unchanged members)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "note": "waits for PB2100 (external-repository slices): its sites name ProgramEmitter.cs, files of DESIGN-external-repository §12's in-flight set (R1 §8.6), and the last slice that edits each, in §21's order, is PB2100 (found by work.py check's slice rule, PB2118 Draft 6); B because three of its callers are code-generation files; Draft 4 moved CompilationInputs alone, which adds CobolNet.Frontend.Common -> CobolNet.Frontend (InputProbe, EnvironmentRead), a pair the edges file does not allow; the walk's rows across this wave: CobolNet.CodeGen -> CobolNet.Frontend 3 -> 0, CobolNet.Frontend.Preprocessor -> CobolNet.Frontend 2 -> 0, none grows; neutral when the walk shows no row growing: §8.1's what-if, the drift test's own metadata walk over the built assemblies (PB2118 Draft 5, F1) re-keyed by this wave's move map, is recorded per row in kb/Work PB2118; the wave's brief re-runs it on its final map, and a row that grows, or a pair on a row the edges file neither allows nor tolerates, is a blocker found before dispatch",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2100"
+   ],
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)"
+  },
+  {
+   "key": "T-directive-results",
+   "wave": "extract",
+   "what": "the DirectiveResults read in CSharpEmitter moves to bind time, so code generation reads the bound compilation only (§8.1 tolerated row)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/CodeGen/CSharpEmitter.cs:32`"
+   ],
+   "removes": [
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Frontend.Preprocessor",
+     1
+    ]
+   ],
+   "targets": [
+    "the directive facts on BoundCompilation, set by CompilationGroupBinder"
+   ],
+   "seam": "BoundCompilation's directive facts",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "R0-0025"
+   ]
+  },
+  {
+   "key": "T-debug-line-carrier",
+   "wave": "move-rename",
+   "what": "ReferenceFormatProcessor.DebugLineCarrier moves to frontend.common (§8.1 tolerated row)",
+   "sites": [
+    "`src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.cs:30`",
+    "`src/Cobol.Net.Frontend/Parsing/DebuggingLineRewriter.cs:95`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Frontend.Parsing",
+     "CobolNet.Frontend.Preprocessor",
+     1
+    ]
+   ],
+   "targets": [
+    "DebugLineCarrier in a CobolNet.Frontend.Common type"
+   ],
+   "seam": "the carrier string (unchanged)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)"
+  },
+  {
+   "key": "G-grammar-regroup",
+   "wave": "grammar",
+   "what": "the parser grammar regroup of DESIGN-architecture-review §8.4: CobolIdentification, CobolEnvironment (CobolSpecialNames folds in) and CobolProcedure split out of CobolParserCore.g4, the core reduced to the §10 compilation-group skeleton, and the grammar drift assertion that no rule name is defined in two fragments",
+   "sites": [
+    "`src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4`",
+    "`src/Cobol.Net.Frontend/Grammar/Core/CobolSpecialNames.g4`",
+    "`src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4`",
+    "`src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4`"
+   ],
+   "targets": [
+    "CobolIdentification.g4 (§11)",
+    "CobolEnvironment.g4 (§12, with SPECIAL-NAMES)",
+    "CobolProcedure.g4 (§14's header, declaratives, sentences, the statement dispatcher, the shared arithmetic rules and the nucleus verbs)",
+    "the core: the §10 skeleton and the import list",
+    "the drift assertion: no rule name in two fragments"
+   ],
+   "seam": "the fragment file of each rule (clause → rule → fragment), which §8.3 (6)'s gates dispatch by",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "note": "a grammar wave: the token-stream and parse-tree differential (PB2350) is its oracle, and the duplicate className (PB2292) is removed first because the import list decides a duplicate",
+   "blocked_by": [
+    "PB2118",
+    "PB2350",
+    "PB2292"
+   ],
+   "model": "Opus (a grammar wave)",
+   "reason": "behavior-neutral restructuring (a grammar wave of the PB2119 program; owner R69 §2); no inventory row"
+  },
+  {
+   "key": "N-numx-carrier",
+   "wave": "re-model",
+   "what": "NumX's exclusive Dec, Real and U flags become a closed carrier of four cases (scaled, unsigned-wide, standard-decimal, binary64; Approximate only on binary64), re-typing every renderer's numeric path (DESIGN-architecture-review §8.5)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/CodeGen/Emit/EmitCore.cs:178-188`",
+    "`src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs`",
+    "`src/Cobol.Net.Compiler/CodeGen/Emit/IntrinsicRenderer.cs`",
+    "`src/Cobol.Net.Compiler/CodeGen/Emit/ConditionRenderer.cs`",
+    "`src/Cobol.Net.Compiler/CodeGen/Emit/OperandText.cs`",
+    "`src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs`",
+    "the NumX consumers under `src/Cobol.Net.Compiler/CodeGen/Verbs/` (ArithmeticEmitter, MoveEmitter, CallEmitter and ten more), `src/Cobol.Net.Compiler/CodeGen/StatementEmitter.cs`, `src/Cobol.Net.Compiler/Binding/IntrinsicCatalog.cs`, `Binding/Model/PicInfo.cs`"
+   ],
+   "targets": [
+    "NumX as a sealed record family of four carrier cases with a total switch (a union once the SDK lands, §8.5 step 1's mechanics)"
+   ],
+   "seam": "the carrier case NumericCarrierRules chooses (PB2321); IntrinsicCarrierAgreementDriftTests keeps the arm totality",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "note": "the defect class of PB2, PB13, PB14, PB28, PB32 and PB33 (one rule corrected in one arm) lives in the flag record; done before the SDK",
+   "blocked_by": [
+    "R0-0026"
+   ]
+  },
+  {
+   "key": "N-root-editions",
+   "wave": "move-rename",
+   "what": "the namespace root CobolNet.Editions becomes Cobol.Net.Editions (owner, PB2118 question 1, 2026-10-07)",
+   "sites": [
+    "`src/Cobol.Net.Editions/Cobol.Net.Editions.csproj:20` (`RootNamespace`)",
+    "every namespace line under `src/Cobol.Net.Editions/`",
+    "the `using` lines of 117 binding, code-generation, validation and OO files and 48 test files (*text scan, provisional*)"
+   ],
+   "targets": [
+    "`Cobol.Net.Editions` and `Cobol.Net.Editions.Diagnostics`; §8.1's edges file renamed in the same change"
+   ],
+   "seam": "the types' simple names (unchanged); only the namespace spelling changes",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "note": "the owner's answer to PB2118 question 1 (2026-10-07): the namespace roots become the project names, reversing COBOLNET_PROJECT_ORG_DESIGN.md §1.1; the oracle is IDENTICAL (no emitted .g.cs and no diagnostic stream names a compiler namespace); B because the using lines are binding and code-generation files",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "model": "Sonnet (a Roslyn-rewriter-driven rename, kb/Work R69 §4)"
+  },
+  {
+   "key": "N-root-frontend",
+   "wave": "move-rename",
+   "what": "the namespace root CobolNet.Frontend becomes Cobol.Net.Frontend, the generated parser's with it (owner, PB2118 question 1, 2026-10-07)",
+   "sites": [
+    "`src/Cobol.Net.Frontend/Cobol.Net.Frontend.csproj:9` (`RootNamespace`) and `:13` (`AntlrNamespace`, single-sourced into `GenerateIfNewer.ps1`)",
+    "every namespace line under `src/Cobol.Net.Frontend/`",
+    "the `using` lines of 113 binding, code-generation, validation and OO files and 152 test files (*text scan, provisional*)"
+   ],
+   "targets": [
+    "`Cobol.Net.Frontend.*` (with `Cobol.Net.Frontend.Generated`); §8.1's edges file renamed in the same change"
+   ],
+   "seam": "the types' simple names (unchanged)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "note": "the owner's answer to PB2118 question 1 (2026-10-07): the namespace roots become the project names, reversing COBOLNET_PROJECT_ORG_DESIGN.md §1.1; the oracle is IDENTICAL (no emitted .g.cs and no diagnostic stream names a compiler namespace); after the editions flip, so two rewriter waves never edit one using block at once",
+   "blocked_by": [
+    "N-root-editions"
+   ],
+   "model": "Sonnet (a Roslyn-rewriter-driven rename, kb/Work R69 §4)"
+  },
+  {
+   "key": "N-root-cli",
+   "wave": "move-rename",
+   "what": "the namespace root CobolNet.Cli becomes Cobol.Net.Cli (owner, PB2118 question 1, 2026-10-07)",
+   "sites": [
+    "`src/Cobol.Net.Cli/Cobol.Net.Cli.csproj:12` (`RootNamespace`)",
+    "every namespace line under `src/Cobol.Net.Cli/`"
+   ],
+   "targets": [
+    "`Cobol.Net.Cli`; §8.1's edges file renamed in the same change"
+   ],
+   "seam": "the types' simple names (unchanged)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "note": "the owner's answer to PB2118 question 1 (2026-10-07): the namespace roots become the project names, reversing COBOLNET_PROJECT_ORG_DESIGN.md §1.1; the oracle is IDENTICAL (no emitted .g.cs and no diagnostic stream names a compiler namespace)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "model": "Sonnet (a Roslyn-rewriter-driven rename, kb/Work R69 §4)"
+  },
+  {
+   "key": "N-root-compiler",
+   "wave": "move-rename",
+   "what": "the namespace root CobolNet becomes Cobol.Net.Compiler, every compiler namespace under it (owner, PB2118 question 1, 2026-10-07)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Cobol.Net.Compiler.csproj:9,16` (`RootNamespace` and its banner)",
+    "every namespace line under `src/Cobol.Net.Compiler/` (288 files) and the `using` lines of about 650 test files (*text scan, provisional*)",
+    "`kb/Work/PB2243.md` (R0-0220: `Oo/` declaring `CobolNet.Compiler.Oo` under the root `CobolNet`), which this flip resolves"
+   ],
+   "targets": [
+    "`Cobol.Net.Compiler.*` (`Cobol.Net.Compiler.Binding`, `.CodeGen`, `.Validation`, `.Oo` …); §8.1's edges file renamed in the same change"
+   ],
+   "seam": "the types' simple names (unchanged)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "note": "the owner's answer to PB2118 question 1 (2026-10-07): the namespace roots become the project names, reversing COBOLNET_PROJECT_ORG_DESIGN.md §1.1; the oracle is IDENTICAL (no emitted .g.cs and no diagnostic stream names a compiler namespace); last of the four, after the front-end flip",
+   "blocked_by": [
+    "N-root-frontend"
+   ],
+   "model": "Sonnet (a Roslyn-rewriter-driven rename, kb/Work R69 §4)"
+  },
+  {
+   "key": "T-binder-driver-calls",
+   "wave": "extract",
+   "what": "the members other layers call leave BinderDriver before PB2320 moves it to compiler.pipeline: ExternalItemIdentity becomes a DataItem member in compiler.model (OoEmitter.cs:257,261; BinderDriver.cs:317-350); UserFunctionsOf and ProgramPrototypesOf move to a compiler.binding type, UnitSignatureTables (OoDriver.cs:151-152; BinderDriver.cs:807,825,1094); BindProcedures with BindUnitProcedure and the BinderDriver members it calls move to a compiler.binding pass, ProcedureBindPass, which BindPipeline's group tail names (BindPipeline.cs:154)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/BinderDriver.cs:317-367,776-779,807,825,1094`",
+    "`src/Cobol.Net.Compiler/Binding/Passes/BindPipeline.cs:154`",
+    "`src/Cobol.Net.Compiler/Oo/OoDriver.cs:151-152`",
+    "`src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs:257,261`",
+    "`src/Cobol.Net.Compiler/Binding/Model/DataItem.cs`"
+   ],
+   "removes": [
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Binding",
+     "93 (OoEmitter -> BinderDriver)"
+    ]
+   ],
+   "targets": [
+    "DataItem.ExternalIdentity (compiler.model); UnitSignatureTables and ProcedureBindPass (compiler.binding)"
+   ],
+   "seam": "DataItem.ExternalIdentity; UnitSignatureTables.UserFunctionsOf / ProgramPrototypesOf (signatures unchanged); ProcedureBindPass as the ProcedureBinding row of the group tail",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2103"
+   ],
+   "note": "PB2103 because ProgramPrototypesOf is a row of DESIGN-external-repository §12 that slice 7 rewrites; neutral when the walk shows no row growing: §8.1's what-if over the built assemblies, re-keyed by this wave's move map and cut list, is recorded in kb/Work PB2118 Draft 6 (no row grows at any step of the 26-step sequence; no tolerated pair is left without a remover); the wave's brief re-runs it on its final map",
+   "model": "Opus (an extract wave: kb/Work R69 §4)"
+  },
+  {
+   "key": "T-concat-all-literal",
+   "wave": "extract",
+   "what": "the bound tree's one factory that names a binding type leaves it: BoundAllLiteral.Of(ConcatFolder.Folded) (BoundTree.cs:592) becomes a ConcatFolder member, so CobolNet.Binding.Bound -> CobolNet.Binding loses BoundAllLiteral -> ConcatFolder (compiler.binding -> compiler.bound is allowed)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs:577-592`",
+    "`src/Cobol.Net.Compiler/Binding/ConcatFolder.cs`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Binding",
+     "33 (BoundAllLiteral -> ConcatFolder)"
+    ]
+   ],
+   "targets": [
+    "ConcatFolder.AllLiteral(Folded) -> BoundAllLiteral in compiler.binding"
+   ],
+   "seam": "the factory's signature, on ConcatFolder",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test"
+   ],
+   "note": "neutral when the walk shows no row growing: §8.1's what-if over the built assemblies, re-keyed by this wave's move map and cut list, is recorded in kb/Work PB2118 Draft 6 (no row grows at any step of the 26-step sequence; no tolerated pair is left without a remover); the wave's brief re-runs it on its final map",
+   "model": "Sonnet (a rewriter-driven member move, kb/Work R69 §4)"
+  },
+  {
+   "key": "T-value-types-down",
+   "wave": "move-rename",
+   "what": "the binding value types bound nodes and the backend hold move to the layer of what they hold: to compiler.model SortCollation (CollatingModel.cs:589; BoundSort.cs:47,72,111), IeeeSpecial and IeeeSpecials (IeeeSpecials.cs; BoundTree.cs:1675, SetEmitter), CallExternalBacking, ProgramSpecifier (DataBinder.Linkage.cs:125), RangeCollationCarrier, CellLifetime and EditionContext (EditionContext.cs; BoundTree.cs:286-302,613-629,706, CSharpEmitter, ConditionRenderer, EmitContext, the I-O emitters); to compiler.bound the report field sources ReportFieldSource, FieldReferenceSource, FieldComputeSource, FieldSumSource and FieldValueSource (DataBinder.Reports.cs:581-640; they hold BoundExpr and BoundOperand) and RelationPair with RelationPairShape (ConditionRenderer)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Binding/CollatingModel.cs:589`",
+    "`src/Cobol.Net.Compiler/Binding/IeeeSpecials.cs`",
+    "`src/Cobol.Net.Compiler/Binding/EditionContext.cs`",
+    "`src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs:125`",
+    "`src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs:581-640`",
+    "`src/Cobol.Net.Compiler/Binding/Bound/BoundSort.cs:47,72,111`",
+    "`src/Cobol.Net.Compiler/Binding/Bound/BoundTree.cs:286-302,613-629,706,1675`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding.Bound",
+     "CobolNet.Binding",
+     "33 (EditionContext x4, SortCollation x2, IeeeSpecial)"
+    ],
+    [
+     "CobolNet.CodeGen",
+     "CobolNet.Binding",
+     "93 (the value types: EditionContext, NationalAlphabetDef's readers after PB2399, CallExternalBacking, ProgramSpecifier, RangeCollationCarrier, CellLifetime, the field sources, IeeeSpecials)"
+    ],
+    [
+     "CobolNet.CodeGen.Emit",
+     "CobolNet.Binding",
+     "33 (EditionContext, RangeCollationCarrier, RelationPair)"
+    ]
+   ],
+   "targets": [
+    "the listed types in CobolNet.Binding.Model and CobolNet.Binding.Bound, members unchanged"
+   ],
+   "seam": "the moved types' members (unchanged)",
+   "order": "C",
+   "order_text": "C: after the named prerequisite note(s) land; then between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "T-model-rule-types",
+    "T-emit-model-types",
+    "T-report-model-contexts"
+   ],
+   "note": "after PB2399 (the alphabet family SortCollation names), PB2405 (ReportFieldSource's family follows the rule families to compiler.bound) and PB2416 (the field sources' parse contexts cut); landing earlier grows CobolNet.Binding.Model -> CobolNet.Binding and CobolNet.Binding.Model -> CobolNet.Frontend.Generated on the walk; neutral when the walk shows no row growing: §8.1's what-if over the built assemblies, re-keyed by this wave's move map and cut list, is recorded in kb/Work PB2118 Draft 6 (no row grows at any step of the 26-step sequence; no tolerated pair is left without a remover); the wave's brief re-runs it on its final map",
+   "model": "Sonnet (a rewriter-driven move, kb/Work R69 §4)"
+  },
+  {
+   "key": "T-picture-construct-id",
+   "wave": "extract",
+   "what": "the last binding read of the validation layer leaves it: VersionConformancePass.PictureConstructId (a PicInfo -> construct-id table read) becomes a PicInfo member in compiler.model, which DataBinder.Reports.cs:3777 and VersionConformancePass both call (compiler.model -> editions is allowed)",
+   "sites": [
+    "`src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs:487`",
+    "`src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs:3777`",
+    "`src/Cobol.Net.Compiler/Binding/Model/PicInfo.cs`"
+   ],
+   "removes": [
+    [
+     "CobolNet.Binding",
+     "CobolNet.Validation",
+     "15 (DataBinder -> VersionConformancePass, the pair PB2320 leaves)"
+    ]
+   ],
+   "targets": [
+    "PicInfo.ConstructId in compiler.model"
+   ],
+   "seam": "PicInfo.ConstructId (the same answer)",
+   "order": "A",
+   "order_text": "A: a wave between fix-lane trains (the file-set partition, §8.7: dispatched only when its file set collides with no in-flight train and no open external-repository slice; owner, PB2118 question 5, 2026-10-07)",
+   "blocked_by": [
+    "PB2118",
+    "T-arch-drift-test",
+    "PB2104"
+   ],
+   "note": "waits for PB2104 (external-repository slices): its sites name DataBinder.Reports.cs, PicInfo.cs, files of DESIGN-external-repository §12's in-flight set (R1 §8.6), and the last slice that edits each, in §21's order, is PB2104 (found by work.py check's slice rule, PB2118 Draft 6); neutral when the walk shows no row growing: §8.1's what-if over the built assemblies, re-keyed by this wave's move map and cut list, is recorded in kb/Work PB2118 Draft 6 (no row grows at any step of the 26-step sequence; no tolerated pair is left without a remover); the wave's brief re-runs it on its final map",
+   "model": "Opus (an extract wave: kb/Work R69 §4)"
+  }
+ ]
+}

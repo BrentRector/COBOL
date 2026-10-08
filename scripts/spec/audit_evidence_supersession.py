@@ -88,6 +88,7 @@ import re
 import sys
 
 import citation_corpus  # noqa: E402  (same directory; the ONE definition of "frozen")
+import work  # noqa: E402  (work.tracked_paths: a path exists when the COMMITTED tree has it; PB1957 2026-10-07)
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
@@ -202,6 +203,7 @@ def scan(files: list[pathlib.Path], rules: dict[str, list[tuple[str, int, int]]]
     findings: list[Finding] = []
     drift: list[Finding] = []
     stats = {"files": 0, "citations": 0, "ruleclaims": 0, "markers": 0}
+    tracked = work.tracked_paths(root)   # never the filesystem: a build output exists only in a built checkout
 
     for f in sorted(files):
         rel = f.relative_to(root).as_posix()
@@ -249,7 +251,7 @@ def scan(files: list[pathlib.Path], rules: dict[str, list[tuple[str, int, int]]]
             for path, lo, hi, rule in cites:
                 if not rule:
                     stats["citations"] += 1
-                    if not (root / path).exists():
+                    if path not in tracked:
                         if not exempt:
                             findings.append(Finding("path", rel, _line_of(raw, f"{path}:{lo}"), where,
                                                     f"cites {path}:{lo} — that file no longer exists"))
@@ -321,6 +323,7 @@ def self_test() -> int:
     a check. Each arm below is run twice — once on a document built to break it, once on the same document with
     the marker in place — because either half alone is compatible with a checker that always says the same thing.
     """
+    import subprocess
     import tempfile
     rules = {"realRule": [("Fake.g4", 10, 12)]}
     banner = f"FROZEN — a refuted claim carries {MARKER_KEY}."
@@ -337,6 +340,7 @@ def self_test() -> int:
     ok = True
     with tempfile.TemporaryDirectory() as d:
         root = pathlib.Path(d)
+        subprocess.run(["git", "-C", d, "init", "-q"], check=True)   # the path arm reads the git index
         p = root / "case.json"
         for kind, doc, silencer in cases:
             p.write_text(json.dumps(doc, indent=1), encoding="utf-8")
@@ -354,6 +358,7 @@ def self_test() -> int:
         # or the `path` arm fires first and "gates nothing" would pass for the wrong reason.
         (root / "src" / "Cobol.Net.Frontend" / "Grammar" / "Core").mkdir(parents=True, exist_ok=True)
         (root / "src" / "Cobol.Net.Frontend" / "Grammar" / "Core" / "Fake.g4").write_text("", encoding="utf-8")
+        subprocess.run(["git", "-C", d, "add", "-A"], check=True)
         p.write_text(json.dumps({BANNER_KEY: banner,
                                  "e": ["src/Cobol.Net.Frontend/Grammar/Core/Fake.g4:900 — realRule"]}, indent=1),
                      encoding="utf-8")

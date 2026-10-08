@@ -9,6 +9,7 @@ waits (blockers in two chains, the owner, a frontier model), and work.py check's
 Run: python scripts/orchestrator/test_plan_wave.py   (no build, no git; the campaign section needs the
 tools/claude-skills submodule, and its absence is a FAIL)."""
 import pathlib
+import subprocess
 import sys
 import tempfile
 
@@ -313,6 +314,156 @@ fp_ = pw.plan(notes, [cl(F_BIND, "PB5"), cl(F_EMIT, "PB3"), dep12], [], [r3], la
               budget_points=100, deps={"PB12": ["PB5"]})
 check("a finisher keeps its own notes and runs", [(g.kind, g.notes) for g in fp_["groups"]][:1], [("finisher", ["PB3"])])
 
+# 9c. the file-set partition (owner, kb/Work PB2118 question 5, 2026-10-07): a campaign group whose files meet an
+#     in-flight train's file set waits, with the collision named, and so does every group that follows it; a group
+#     that meets nothing runs. Planted collision first: without `busy` the same groups all run.
+free = pw.plan(notes, [cl(F_BIND, "PB5"), cl("src/X/Misc.cs", "PB9"), after5], [], [], lambda b: "ABSENT", {}, RULES,
+               budget_points=100, deps={"PB13": ["PB5"]})
+check("with nothing in flight all three run", [g.notes for g in free["groups"]], [["PB5"], ["PB9"], ["PB13"]])
+bp = pw.plan(notes, [cl(F_BIND, "PB5"), cl("src/X/Misc.cs", "PB9"), after5], [], [], lambda b: "ABSENT", {}, RULES,
+             budget_points=100, deps={"PB13": ["PB5"]}, busy={"worktree-train-a": {F_BIND, "src/Other.cs"}})
+check("a colliding group waits, the collision named",
+      "file-set collision with worktree-train-a (" + F_BIND + ")" in bp["waiting"].get("PB5", ""), True)
+check("its successor waits for it", "PB5 is not planned" in bp["waiting"].get("PB13", ""), True)
+check("a group that meets nothing runs", [g.notes for g in bp["groups"]], [["PB9"]])
+check("the one collision rule, path separators folded",
+      pw.file_set_collisions(["src" + chr(92) + "A.cs"], {"t": {"src/A.cs"}, "u": {"src/B.cs"}}), ["t (src/A.cs)"])
+
+# 9d. the in-flight set reads sources a branch CLASSIFICATION cannot drop (PB2118 Draft 7, the sixth refuter's
+#     partition lead): a dispatched worktree with no commit (classifies MERGED) whose agent has edited a file, an
+#     unlanded branch that only edits existing files (classifies LANDED), and a dispatched group with no worktree yet
+#     are all in flight; a branch landed by content and a dispatched group whose notes are all landed are not.
+#     A fake git (prune_worktrees.git's shape) stands in for the repository, so no git runs.
+NL = chr(10)
+
+
+class _R:
+    def __init__(self, out="", rc=0):
+        self.stdout, self.returncode = out, rc
+
+
+def fake_git(*args, cwd=None):
+    key = (str(cwd).replace(chr(92), "/"), args)
+    table = {
+        ("/r", ("worktree", "list", "--porcelain")): _R(NL.join([
+            "worktree /r", "HEAD aaa", "branch refs/heads/main", "",
+            "worktree /w/fresh", "HEAD aaa", "branch refs/heads/worktree-fresh", "",
+            "worktree /w/edits", "HEAD bbb", "branch refs/heads/worktree-edits", ""])),
+        ("/w/fresh", ("diff", "--name-only", "--no-renames", "origin/main...HEAD")): _R(""),
+        ("/w/fresh", ("diff", "--name-only", "--no-renames", "HEAD")): _R("src/Fresh.cs" + NL),
+        ("/w/fresh", ("ls-files", "--others", "--exclude-standard")): _R("STATUS.md" + NL),
+        ("/w/edits", ("diff", "--name-only", "--no-renames", "origin/main...HEAD")): _R("src/Existing.cs" + NL),
+        ("/w/edits", ("diff", "--name-only", "--no-renames", "origin/main", "HEAD")): _R("src/Existing.cs" + NL),
+        ("/w/edits", ("diff", "--name-only", "--no-renames", "HEAD")): _R(""),
+        ("/w/edits", ("ls-files", "--others", "--exclude-standard")): _R(""),
+        ("/r", ("branch", "--format=%(refname:short)")): _R(NL.join(
+            ["main", "worktree-fresh", "worktree-edits", "squashed", "merged"])),
+        ("/r", ("merge-base", "--is-ancestor", "squashed", "origin/main")): _R("", 1),
+        ("/r", ("merge-base", "--is-ancestor", "merged", "origin/main")): _R("", 0),
+        ("/r", ("diff", "--name-only", "--no-renames", "origin/main...squashed")): _R("src/Landed.cs" + NL),
+        ("/r", ("diff", "--name-only", "--no-renames", "origin/main", "squashed")): _R(""),
+    }
+    if key not in table:
+        raise AssertionError(f"unexpected git call {key}")
+    return table[key]
+
+
+LEDGER = TMP / "coord"
+LEDGER.mkdir()
+coord.write_json(LEDGER / pw.DISPATCH_LEDGER, {"groups": [
+    {"wave": "1040", "letter": "a", "notes": ["PB70"], "files": ["src/Dispatched.cs"]},
+    {"wave": "1039", "letter": "b", "notes": ["PB71"], "files": ["src/Done.cs"]}]})
+fly = pw.inflight_file_sets(git=fake_git, repo=pathlib.Path("/r"), coord_dir=LEDGER,
+                            terminal=lambda i: i == "PB71")
+flat = {f for fs in fly.values() for f in fs}
+check("a dispatched worktree with no commit is in flight (its uncommitted edit)", "src/Fresh.cs" in flat, True)
+check("an unlanded branch that only edits existing files is in flight", "src/Existing.cs" in flat, True)
+check("a dispatched group with no worktree yet is in flight", "src/Dispatched.cs" in flat, True)
+check("a branch landed by content is not", "src/Landed.cs" in flat, False)
+check("a dispatched group whose notes all landed is not", "src/Done.cs" in flat, False)
+check("STATUS.md is never a product file", "STATUS.md" in flat, False)
+check("the planner's own checkout is not in flight", any("main" in k for k in fly), False)
+check("the collision names the dispatched owner", pw.file_set_collisions(["src/Dispatched.cs"], fly),
+      ["dispatched w1040a (PB70) (src/Dispatched.cs)"])
+
+# 9e. the group's file set (PB2118 Draft 8, the seventh refuter's J2 and J3): every site a note names WHATEVER its
+#     score (Draft 7 kept fix_clusters' >= 2 and dropped a bare type name: "GammaState's" never added GammaState.cs),
+#     plus the callers the member index computes for the note (an injected function here; member_index.py's own
+#     self-test drives the computation); and a HAND dispatch is in flight from the moment the guard admits it, not
+#     from its first edit (record_hand_dispatch), until its notes land or its entry expires.
+if fc:
+    C2 = TMP / "campaign2"
+    for rel in ("src/Lib/Alpha.cs", "src/Lib/GammaState.cs", "src/Lib/Beta.cs", "src/Lib/Caller.cs"):
+        (C2 / rel).parent.mkdir(parents=True, exist_ok=True)
+        (C2 / rel).write_text("// fixture" + NL, encoding="utf-8")
+    W2 = C2 / "kb" / "Work"
+    W2.mkdir(parents=True)
+    for nid, body in (("PB950", "Fold GammaState's flags into `src/Lib/Alpha.cs`."),
+                      ("PB951", "Move `src/Lib/Beta.cs`'s members (callers computed).")):
+        (W2 / f"{nid}.md").write_text(
+            f'---{NL}title: "{nid} — step"{NL}id: {nid}{NL}kind: analysis{NL}status: open{NL}area: architecture{NL}'
+            f"wrong_answer: false{NL}process_only: true{NL}blocked: false{NL}blocked_by: []{NL}cluster: [PB950]{NL}---"
+            f"{NL}{NL}# {nid}{NL}{NL}{body}{NL}", encoding="utf-8")
+    items2 = [dict(work.parse_frontmatter(q.read_text(encoding="utf-8")), _file=q.name) for q in sorted(W2.glob("*.md"))]
+    view2 = work.cluster_order(items2, "PB950")
+    notes2 = pw.load_notes(W2, {"wrong_answer": 8})
+    texts2 = {i: (W2 / f"{i}.md").read_text(encoding="utf-8") for i in notes2}
+    o2, _, _, _ = pw.campaign_clusters(view2, notes2, texts2, RULES, fc, C2,
+                                       callers=lambda text: {"src/Lib/Caller.cs"} if "PB951" in text else set())
+    files2 = {n["id"]: c["files"] for c in o2 for n in c["notes"]}
+    check("a bare type name (score 1) is in its group's file set", "src/Lib/GammaState.cs" in files2["PB950"], True)
+    check("a note's computed callers are in its group's file set", "src/Lib/Caller.cs" in files2["PB951"], True)
+    check("callers never steer the clustering (the primary file is a named site)",
+          sorted(c["file"] for c in o2), ["src/Lib/Alpha.cs", "src/Lib/Beta.cs"])
+    check("the collision check sees a caller", pw.file_set_collisions(files2["PB951"], {"train t": {"src/Lib/Caller.cs"}}),
+          ["train t (src/Lib/Caller.cs)"])
+HL = TMP / "coord-hand"
+HL.mkdir()
+pw.record_hand_dispatch(HL, "general-purpose: R1 author", ["PB960"], {"src/Hand.cs"}, terminal=lambda i: False, now=1000.0)
+hand = pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False, now=1000.0 + 60)
+check("a hand dispatch is in flight before its agent edits a file", {f for fs in hand.values() for f in fs},
+      {"src/Hand.cs"})
+check("a hand entry expires after HAND_TTL_SECONDS",
+      pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False,
+                            now=1000.0 + pw.HAND_TTL_SECONDS + 1), {})
+check("a hand entry whose notes landed is not in flight",
+      pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: True, with_git=False, now=1000.0 + 60), {})
+# 9f. (PB2118 Draft 9) the landing check orders two branches by dispatch time: the in-flight enumeration reports each
+#     dispatch entry's notes and time through `meta`; and the planner never plans on a stale member index
+META: dict = {}
+pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False, now=1000.0 + 60, meta=META)
+check("meta carries a dispatch entry's notes and time", [(m["notes"], m["at"]) for m in META.values()],
+      [(["PB960"], 1000.0)])
+STALE = TMP / "stale-repo"
+(STALE / "src").mkdir(parents=True)
+(STALE / "src" / "A.cs").write_text("// a" + NL, encoding="utf-8")
+for args in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"]):
+    subprocess.run(["git", *args], cwd=STALE, check=True, capture_output=True)
+try:
+    pw.member_callers(STALE, TMP / "no-cache", regenerate=False)
+    check("the planner refuses a tree no member index describes", "planned", "refused")
+except SystemExit:
+    check("the planner refuses a tree no member index describes", "refused", "refused")
+
+# 9g. (PB2118 Draft 10, the ninth refuter) every changed-file read passes --no-renames (the fake git above refuses a
+#     diff without it, so 9d already holds the enumeration to it); one wave's groups are recorded strictly apart in
+#     letter order, so no two tie (N4); and an aborted dispatch is released by wave, group or note, never by a clock (N5)
+RL = TMP / "release"
+RL.mkdir()
+pw.record_dispatch(RL, "1050", [pw.Group(kind="cluster", notes=["PB80"], file="", files=["src/X.cs"], letter="a"),
+                                pw.Group(kind="cluster", notes=["PB81"], file="", files=["src/Y.cs"], letter="b"),
+                                pw.Group(kind="cluster", notes=["PB82"], file="", files=["src/Z.cs"], letter="c")],
+                   terminal=lambda i: False)
+ATS = [g["at"] for g in coord.read_json(RL / pw.DISPATCH_LEDGER, {})["groups"]]
+check("one wave's groups never tie and keep letter order", ATS == sorted(ATS) and len(set(ATS)) == 3, True)
+check("release by group", [g["letter"] for g in pw.release_dispatch(RL, "1050b")], ["b"])
+check("release by note", [g["letter"] for g in pw.release_dispatch(RL, "PB82")], ["c"])
+check("release by wave", [g["letter"] for g in pw.release_dispatch(RL, "1050")], ["a"])
+check("nothing left to release", pw.release_dispatch(RL, "1050"), [])
+check("changed_files passes --no-renames",
+      pw.changed_files(lambda *a, **k: _R(NL.join(a) + NL) if "--no-renames" in a else _R(""), "x...y"),
+      {"diff", "--name-only", "--no-renames", "x...y"})
+
 # 10. work.py check holds blocked to blocked_by: a stale flag, an unknown blocker, a cycle
 TOPO = [{"_file": "T1.md", "id": "T1", "status": "open", "blocked": True, "blocked_by": ["T9"], "cluster": []},
         {"_file": "T9.md", "id": "T9", "status": "landed", "blocked": False, "blocked_by": [], "cluster": []},
@@ -334,6 +485,85 @@ check("a cycle never reads as ready", [(r["id"], r["depth"], r["ready"]) for r i
       [("T6", None, False), ("T7", None, False)])
 check("a scalar cluster is no member (no substring match)", [r["id"] for r in work.cluster_order(TOPO, "T3")["notes"]],
       ["T3"])
+
+# 11. the slices' file set reads ALL of DESIGN-external-repository §12 (PB2118 Draft 7, the sixth refuter's H4): the
+#     Callers column, every name in a span (`X.Y : Z`), a member mapped to the file that declares it, tests/ and docs/
+#     paths; a parameter list and a one-word name are not sites. A synthetic repository first, then the refuter's
+#     four plants against the real register, each of which must FAIL the register's slice rule.
+SR = TMP / "slicerepo"
+(SR / "docs" / "rearchitecture").mkdir(parents=True)
+(SR / "src" / "B").mkdir(parents=True)
+(SR / "tests" / "T").mkdir(parents=True)
+(SR / "docs" / "rearchitecture" / "DESIGN-external-repository.md").write_text(NL.join([
+    "## 12. Changes", "", "| Today | Change | Callers updated in the same change |", "|---|---|---|",
+    "| `Session.Repo : GroupRepo` | `: Resolver` | `DriverX.Bind`, `CheckPairs` |",
+    "| `Rec(Kind, Name)` | `+ Target` | `Target` |",
+    "| `OldThing` | **landed (kb/Work PB1):** done | `LandedCaller` |",
+    "| tests (`tests/T/HostTests.cs`) | rewritten | `docs/NOTES.md` |",
+    "", "## 13. Next", ""]), encoding="utf-8")
+for rel, text in {"src/B/Session.cs": "public sealed class Session { public GroupRepo Repo { get; } }",
+                  "src/B/GroupRepo.cs": "internal sealed class GroupRepo { }",
+                  "src/B/DriverX.cs": "public static class DriverX { public static void Bind() { } }",
+                  "src/B/Checks.cs": NL.join(["static class Checks", "{", "    private static void CheckPairs(int a) { }", "}"]),
+                  "src/B/Rec.cs": "public sealed record Rec(int K);",
+                  "src/B/Kind.cs": "public enum Kind { A }",
+                  "src/B/Target.cs": NL.join(["class Holder", "{", "    public int Target { get; set; }", "}"]),
+                  "src/B/LandedCaller.cs": "class LandedCaller { }",
+                  "tests/T/HostTests.cs": "public class HostTests { }",
+                  "docs/NOTES.md": "notes"}.items():
+    (SR / rel).write_text(text, encoding="utf-8")
+# a build output and a stray file name the same type: the slice set reads the COMMITTED tree (PB1957, 2026-10-07)
+(SR / "src" / "B" / "Generated").mkdir(parents=True)
+(SR / "src" / "B" / "Generated" / "SessionParser.cs").write_text("class Session { }", encoding="utf-8")
+subprocess.run(["git", "-C", str(SR), "init", "-q"], check=True)
+subprocess.run(["git", "-C", str(SR), "add", "-A", "--", ":!src/B/Generated"], check=True)
+(SR / "src" / "B" / "Stray.cs").write_text("class GroupRepo { }", encoding="utf-8")
+um = []
+sset = work.slice_file_set(SR, unmapped=um)
+check("an untracked file declaring a slice name is not in the slice set", "src/B/Stray.cs" in sset, False)
+check("a build output declaring a slice name is not in the slice set", "src/B/Generated/SessionParser.cs" in sset, False)
+check("the Today column's first name", "src/B/Session.cs" in sset, True)
+check("the second name of a `X.Y : Z` span", "src/B/GroupRepo.cs" in sset, True)
+check("the Callers column (a type)", "src/B/DriverX.cs" in sset, True)
+check("the Callers column (a member, mapped to its declaring file)", "src/B/Checks.cs" in sset, True)
+check("a tests/ path and a docs/ path", {"tests/T/HostTests.cs", "docs/NOTES.md"} <= sset, True)
+check("a parameter list names no site", "src/B/Kind.cs" in sset, False)
+check("a one-word member name is prose, reported", ("src/B/Target.cs" in sset, any(u.startswith("Target") for u in um)),
+      (False, True))
+check("a landed row is history", "src/B/LandedCaller.cs" in sset, False)
+
+REAL = work.load()
+REAL_SET = work.slice_file_set()
+
+
+def r3_plant(pid, site):
+    body = (NL + "**Wave kind:** extract. **Model:** Opus." + NL + NL + "**Sites:**" + NL + "- `" + site + "`" + NL + NL
+            + "**Blocked by:** PB2118, PB2417." + NL)
+    return {"_file": pid + ".md", "id": pid, "title": pid + " — Extract: planted", "status": "open", "blocked": True,
+            "blocked_by": ["PB2118", "PB2417"], "cluster": ["PB2119"], "_body": body}
+
+
+for pid, site in (("PB9991", "src/Cobol.Net.Compiler/Binding/BindSession.cs"),
+                  ("PB9992", "src/Cobol.Net.Compiler/Binding/GroupRepository.cs"),
+                  ("PB9993", "src/Cobol.Net.Compiler/Oo/OoConformance.cs"),
+                  ("PB9994", "tests/Cobol.Net.Tests.Conformance/NonCobolActivatorReturnTests.cs")):
+    hit = [m for m in work.r3_program_problems(REAL + [r3_plant(pid, site)], REAL_SET) if m.startswith(pid)]
+    check(f"a planted R3 note on {site.rsplit('/', 1)[-1]} must wait for an open slice", bool(hit), True)
+
+# PB2197 (the R1 landing's CI red): the existence rule reads the COMMITTED tree, so a build output that exists in a built
+# checkout and not in CI's never decides it; a note naming a generated parser file must name the grammar it comes from.
+GEN = "src/Cobol.Net.Frontend/Generated/CobolParserCore.cs"
+G4 = "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4"
+gen_only = [m for m in work.r3_program_problems(REAL + [r3_plant("PB9995", GEN)], REAL_SET) if m.startswith("PB9995")]
+check("a planted R3 note naming only a generated file is refused (build output, no grammar)",
+      any("build output" in m for m in gen_only), True)
+check("a generated file is never reported missing, built checkout or not", any("does not exist" in m for m in gen_only), False)
+with_g4 = r3_plant("PB9996", GEN)
+with_g4["_body"] += "- `" + G4 + "`" + NL
+check("a planted R3 note naming the generated file AND its grammar passes the build-output rule",
+      any("build output" in m for m in work.r3_program_problems(REAL + [with_g4], REAL_SET) if m.startswith("PB9996")), False)
+check("an untracked path is missing even if a local file has that name",
+      work.named_missing_paths("`src/Cobol.Net.Frontend/obj/project.assets.json`"), ["src/Cobol.Net.Frontend/obj/project.assets.json"])
 
 for f in fails:
     print("FAIL:", f)

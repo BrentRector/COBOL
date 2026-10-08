@@ -27,6 +27,11 @@
 | T1 | **`Cobol.Net.Tests.Unit`** | xUnit | `CobolNet.Tests.Unit` | — | Unit tests for the new compiler + runtime. |
 | T2 | **`Cobol.Net.Tests.Conformance`** | xUnit | `CobolNet.Tests.Conformance` | — | NIST + post-85 conformance corpus + the differential harness + the VERSION TEST MATRIX (`VersionMatrixTests` — the compiler exercised as four per-edition compilers per `docs/VERSION_TEST_MATRIX_DESIGN.md`), run against the new compiler. |
 
+> **Reversed 2026-10-07 (owner, kb/Work PB2118 question 1):** the namespace roots become the project names —
+> `CobolNet` → `Cobol.Net.Compiler`, `CobolNet.Frontend` → `Cobol.Net.Frontend`, `CobolNet.Editions` →
+> `Cobol.Net.Editions`, `CobolNet.Cli` → `Cobol.Net.Cli` (the runtime's is P15 Cut 3). The flips are the architecture
+> review's waves PB2412–PB2415 (`DESIGN-architecture-review.md` §8.2); until each lands, the code keeps the root below.
+
 **Decision — name form.** Assembly/package/folder names use the dotted product brand **`Cobol.Net.*`** (reads as the product "WiseOwl COBOL"); **root namespaces stay the single token `CobolNet`** (e.g. `CobolNet.Frontend`, `CobolNet.CodeGen`). Rationale: dotted `Cobol.Net.*` is the marketing/NuGet identity; `CobolNet` as the namespace root avoids a clash with the `.Net`/`System.Net` reading and keeps `using CobolNet.CodeGen;` clean. One rule, applied consistently. (Owner may prefer `Cobol.Net` namespaces too — trivially flippable since it is just the `<RootNamespace>` value; not load-bearing.)
 
 **Decision — CLI split (P2/P3).** Today `Program.cs` lives *inside* the exe project, so tests cannot reference the compiler without referencing an exe. Split it: `Cobol.Net.Compiler` (library, everything except the CLI shell) + `Cobol.Net.Cli` (exe, `<AssemblyName>cobol</AssemblyName>`, ~120-line driver). This lets the test projects reference a library.

@@ -1280,7 +1280,8 @@ the rule it cited, §13.18.63.4 GR16, is a FORMAT 2 general rule and never reach
 its code is never reallocated.
 
 **Implemented (the CORE increments):** (1)
-grammar (`CAPACITY` token + the `OCCURS DYNAMIC occursDynamicPhrase* …` alt, `{is2014()}?`-gated) + `OccursSpec`
+grammar (`CAPACITY` token + the `OCCURS DYNAMIC occursDynamicPhrase* …` alt, superset-parsed and introduction-gated
+by `VersionConformancePass`, no parse-time predicate) + `OccursSpec`
 dynamic fields + `DataItem.IsDynamicTable`/`IsTable`/`FieldType` (+ image-capable exclusions) + `CobolDynTable<T>` +
 `FieldInit` dynamic branch + `OdoBindOccursSpec` Format-4 branch + `EditionGateHints` gate + the matrix row
 (`occurs-dynamic-2014`, active) — the ONLY grammar/legacy-guard slice → golden `dyn_declare` (a group-element table,

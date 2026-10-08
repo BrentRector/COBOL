@@ -64,6 +64,7 @@ import argparse
 import json
 import pathlib
 import re
+import subprocess
 import sys
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -431,6 +432,7 @@ def check() -> int:
                        f'genuinely does nothing to a user\'s program.')
         bad += closes_rows_shape(it)
     bad += topology_problems(items)
+    bad += r3_program_problems(items)
     ids = [it.get("id") for it in items]
     for i in set(ids):
         if ids.count(i) > 1:
@@ -587,6 +589,274 @@ def topology_problems(items: list[dict]) -> list[str]:
     for nid in sorted(live, key=id_order):
         if nid not in state:
             visit(nid, [nid])
+    return bad
+
+
+# ── the R3 program's two prerequisites, checked (kb/Work PB2118 Draft 5, F1 and F5; Draft 6, owner question 5) ──────
+# ⛔ A WAVE THE PLANNER CAN DISPATCH IS ONE `blocked_by` LETS IT DISPATCH. Draft 4 left four binding and code-generation
+# renames with `blocked_by: []`, so the planner offered them between fix-lane trains before anything measured them.
+# On 2026-10-07 the owner made the FILE-SET PARTITION the only gate between restructuring waves and fix-lane trains
+# (PB2118 question 5, "Drop it"; R69 §2): the folder hold Draft 5 checked here is gone, and the collision check lives
+# where the dispatcher decides (scripts/orchestrator/plan_wave.py, `file_set_collisions`). The register keeps only
+# what it can verify alone:
+#   1. the slices (DESIGN-external-repository §12, R1 §8.6): an open R3 note whose sites name a file of the §12
+#      in-flight file set must reach an open external-repository slice note through `blocked_by`, so the note itself
+#      says which slice it waits for (the planner then never sees it until that slice lands);
+#   2. the measurement (DESIGN-architecture-review §8.1): an open Move/rename or Extract note of the program must
+#      reach the note that lands the architecture drift test through `blocked_by`.
+R3_PROGRAM, R3_DRIFT_TEST = "PB2119", "PB2417"
+R3_MEASURED_WAVES = ("move", "move-rename", "extract", "re-model")
+_WAVE_KIND = re.compile(r"\*\*Wave kind:\*\*\s*([\w-]+)", re.I)
+_SITES = re.compile(r"\*\*Sites[^*]*\*\*(.*?)(?:\n\s*\n\*\*|\Z)", re.S)
+#: A path anywhere in the Sites block: a bare `src/...`, `tests/...` or `docs/...` site, or a census member's
+#: "`M:... @ src/...:n`" (Delete notes). tests/ and docs/ count: the slices' set names files there (§12 rows 21-23).
+_SITE_PATH = re.compile(r"(?<![\w/.])((?:src|tests|docs)/[^`:\s)]+)")
+#: The external-repository slices are the notes whose title says so (kb/Work PB2097-PB2104).
+EXTERNAL_SLICE_TITLE = re.compile(r"\A\S+ — external repository slice \d+\b")
+EXTERNAL_DESIGN = REPO / "docs" / "rearchitecture" / "DESIGN-external-repository.md"
+_S12 = re.compile(r"^## 12\. .*?$(.*?)^## 13\. ", re.M | re.S)
+_DECL = re.compile(r"\b(?:class|record|struct|interface|enum)\s+(?:class\s+|struct\s+)?([A-Z]\w*)")
+#: A member declaration's name: modifiers, an optional return type, the name, then a parameter list, a generic list,
+#: an accessor block, an expression body or an initializer. Approximate by design: it only maps a §12 name that is not
+#: a type to the file that declares it, and a name declared in more than SLICE_MEMBER_FANOUT files is too generic to
+#: be a site (`Main`, `Equals`) and is reported, never guessed.
+_MEMBER = re.compile(r"^[ \t]*(?:\[[^\]\n]*\][ \t]*)*(?:(?:public|private|internal|protected|static|readonly|override|"
+                     r"virtual|sealed|async|partial|new|abstract|required|unsafe|extern|const)\s+)+"
+                     r"(?:(?:\([^)\n]*\)|[\w.]+(?:<[^\n]*?>)?)(?:\[\])*\??\s+)?"
+                     r"([A-Za-z_]\w*)\s*(?:\(|<[^>\n]*>\s*\(|\{|=>|=|;)", re.M)
+SLICE_MEMBER_FANOUT = 3
+_ONE_WORD = re.compile(r"_?[A-Za-z][a-z0-9]*")
+_SLICE_ROOTS = ("src", "tests")
+_CS_KEYWORDS = frozenset("""abstract as base bool break byte case catch char checked class const continue decimal default
+delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface
+internal is lock long namespace new null object operator out override params private protected public readonly ref return
+sbyte sealed short sizeof stackalloc static string struct switch this throw true try typeof uint ulong unchecked unsafe
+ushort using virtual void volatile while global record var dynamic""".split())
+
+
+def note_sites(it: dict) -> list[str]:
+    """The `src/` files an R3 note's **Sites** block names (paths, line suffixes dropped): the declared file set the
+    register can read. The planner adds the files its clustering resolves (plan_wave.py)."""
+    return sorted({p for s in _SITES.findall(it.get("_body", ""))[:1] for p in _SITE_PATH.findall(s)})
+
+
+def _slice_rows(repo: pathlib.Path) -> list[list[str]]:
+    """DESIGN-external-repository §12's rows whose change has not landed (a row whose "Change" cell opens with
+    "landed" is history), each as its three cells: Today, Change, Callers updated in the same change."""
+    doc = (repo / EXTERNAL_DESIGN.relative_to(REPO)).read_text(encoding="utf-8")
+    m = _S12.search(doc)
+    if not m:
+        raise SystemExit("⛔ DESIGN-external-repository.md has no §12 table: the slice file set cannot be read")
+    rows = []
+    for line in m.group(1).splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split(" | ")]
+        if not line.startswith("| ") or len(cells) < 3 or cells[0] == "Today" or line.startswith("|---"):
+            continue
+        if cells[1].lstrip("*").lower().startswith("landed"):
+            continue
+        rows.append(cells)
+    return rows
+
+
+def _slice_spans(cell: str) -> list[str]:
+    """The code spans of one §12 cell with their parenthesized and angle-bracketed parts removed: a parameter or
+    argument list (`ObjectRefDescriptor(Kind, Name, Factory, Only)`, `RegisterModule(registrar, …)`) and a generic
+    or placeholder (`Cobol.<S>`, `<Version>`) name parameters, never sites."""
+    out = []
+    for span in re.findall(r"`([^`]+)`", cell):
+        prev = None
+        while prev != span:
+            prev, span = span, re.sub(r"\([^()]*\)|<[^<>]*>", " ", span)
+        out.append(span)
+    return out
+
+
+def slice_file_set(repo: pathlib.Path = REPO, unmapped: list[str] | None = None) -> set[str]:
+    """DESIGN-external-repository §12's in-flight file set (R1 §8.6): every file a slice still to land edits. All three
+    columns of every unlanded row are read (the "Callers updated in the same change" column names files the Today
+    column does not: PB2118 Draft 7, the sixth refuter's H4), and every name in a code span counts, not only the
+    first. A span that is a path (`docs/CONFORMANCE.md`, a `tests/.../char_*.g.cs.txt` glob) or a build file
+    (`Directory.Build.props`, `*.csproj`) maps to itself. Otherwise each dotted chain is read: every TYPE in it maps
+    to every file under src/ or tests/ that declares it (each partial), and a member after a type is that type's
+    (`BindSession.Repository : GroupRepository` is BindSession's and GroupRepository's files); a lone name that is
+    not a type is a MEMBER, in the Today and Callers columns only (a Change cell's lone names are the new shape),
+    mapped to the row's own types' files when one of them declares it and otherwise to the files declaring a member
+    of that name when at most SLICE_MEMBER_FANOUT do and the name is more than one word (`CheckPrototypeSignaturePairs`
+    is a site; `Version`, `Target` and `Main` are prose). A name more generic than that, and a Today-column name declared
+    nowhere (the table is stale: the code moved), is appended to `unmapped`, never guessed.
+    Repo-relative POSIX paths. One implementation: plan_wave.py's collision check and r3_program_problems read it."""
+    rows = _slice_rows(repo)
+    words: set[str] = set()
+    for cells in rows:
+        for span in (s for c in cells for s in _slice_spans(c)):
+            words.update(re.findall(r"[A-Za-z_]\w*", span))
+    types: dict[str, set[str]] = {}
+    members: dict[str, set[str]] = {}
+    tracked = tracked_paths(repo)   # the committed tree, never a build output or a stray file (PB1957, 2026-10-07)
+    for root in _SLICE_ROOTS:
+        for f in (repo / root).rglob("*.cs"):
+            rel = f.relative_to(repo).as_posix()
+            if rel not in tracked:
+                continue
+            text = f.read_text(encoding="utf-8", errors="replace")
+            for n in set(_DECL.findall(text)) & words:
+                types.setdefault(n, set()).add(rel)
+            for n in set(_MEMBER.findall(text)) & words:
+                members.setdefault(n, set()).add(rel)
+    out: set[str] = set()
+    for cells in rows:
+        row_types: set[str] = set()
+        lone: list[tuple[int, str]] = []
+        for col, cell in enumerate(cells):
+            for span in _slice_spans(cell):
+                s = span.strip()
+                if "/" in s or re.fullmatch(r"[\w.*-]+\.(?:props|csproj|targets|md|json)", s):
+                    found = repo.glob(s) if "/" in s else [*repo.glob(s), *(repo / "src").rglob(s)]
+                    out |= {r for g in found if (r := g.relative_to(repo).as_posix()) in tracked and g.is_file()}
+                    continue
+                for chain in re.findall(r"[A-Za-z_][\w.]*", s):
+                    segs = [x for x in chain.split(".") if x and x not in _CS_KEYWORDS]
+                    # the first type in a chain is the site; what follows it is that type's member
+                    if first := next((x for x in segs if x in types), None):
+                        row_types.add(first)
+                    elif len(segs) == 1:
+                        lone.append((col, segs[0]))
+        for n in row_types:
+            out |= types[n]
+        for col, n in lone:
+            if col == 1:
+                continue
+            mine = {f for t_ in row_types for f in types[t_]} & members.get(n, set())
+            if mine:
+                out |= mine
+            elif n in members and len(members[n]) <= SLICE_MEMBER_FANOUT and not _ONE_WORD.fullmatch(n):
+                out |= members[n]
+            elif unmapped is not None and n in members:
+                unmapped.append(f"{n} ({len(members[n])} declaring files)")
+            elif unmapped is not None and col == 0 and n[:1].isupper():
+                unmapped.append(f"{n} (declared nowhere: a planned name, or §12's Today column is stale)")
+    if unmapped is not None:
+        unmapped[:] = sorted(set(unmapped))
+    return out
+
+
+_NAMED_PATH = re.compile(r"`((?:src|tests|scripts|docs|tools)/[^`\s:#]+\.[A-Za-z0-9]+)(?:[:#][^`]*)?`(\s*\(new)?")
+# the same path written WITHOUT a code span (the eighth refuter's K1, plant 4): a source file named in prose
+_BARE_PATH = re.compile(r"(?<![`\w/.-])((?:src|tests)/[\w./-]+\.(?:cs|g4|py))(?![\w`])(\s*\(new)?")
+
+
+#: The ANTLR output folder (never committed; the build regenerates it from `Grammar/*.g4`). A path under it is a BUILD
+#: OUTPUT: no wave edits it, so it is neither "missing" nor a member of a file set; the note names the grammar.
+_GENERATED_DIR = re.compile(r"(?:^|/)Generated/")
+
+
+def tracked_paths(repo: pathlib.Path) -> frozenset[str]:
+    """Every file git tracks in `repo`, and every folder above one. The existence rule reads the COMMITTED tree, never
+    the filesystem: a build output (the ANTLR parser under `Generated/`) exists in a built checkout and not in CI's,
+    so a filesystem test passed locally and failed CI on PB2197 (CLAUDE.md, the CI invariant). The index is the
+    git index of `repo`: a caller that checks many notes reads it once and passes it on."""
+    out = subprocess.run(["git", "-C", str(repo), "ls-files", "-z"], capture_output=True, check=True).stdout
+    files = [f for f in out.decode("utf-8").split("\0") if f]
+    dirs = {"/".join(parts[:k]) for f in files for parts in [f.split("/")] for k in range(1, len(parts))}
+    return frozenset(files) | frozenset(dirs)
+
+
+def is_build_output(path: str) -> bool:
+    return bool(_GENERATED_DIR.search(path))
+
+
+def named_paths(body: str) -> list[tuple[str, bool]]:
+    """(path, is new) for every repository path a note names, in code spans or bare in prose (a path followed by
+    "(new" is a file the wave creates); placeholders (`<sha>`) and globs are not paths."""
+    found = _NAMED_PATH.findall(body) + _BARE_PATH.findall(body)
+    return [(p, bool(new)) for p, new in found if "<" not in p and "*" not in p]
+
+
+def named_missing_paths(body: str, repo: pathlib.Path = REPO, tracked: frozenset[str] | None = None) -> list[str]:
+    """The repository paths a note names that the committed tree does not have: a wave's file set is computed from
+    what its note names, so a wrong path is a hole in the partition (PB2118 Draft 8, J2: PB2296 named
+    `Binding/BinderContext.cs`, which is `Binding/Procedure/`; Draft 9: a bare path was never checked). A build
+    output is not missing; `build_output_problems` holds the note to its source instead."""
+    tracked = tracked_paths(repo) if tracked is None else tracked
+    return sorted({p for p, new in named_paths(body) if not new and not is_build_output(p) and p not in tracked})
+
+
+def build_output_problems(body: str) -> list[str]:
+    """A note that names a generated parser file must also name a grammar file (`*.g4`): the wave edits the grammar,
+    and the planner's file set is only as good as the source paths the note names (kb/Work PB2197)."""
+    paths = [p for p, _ in named_paths(body)]
+    outputs = sorted({p for p in paths if is_build_output(p)})
+    if outputs and not any(p.endswith(".g4") and not is_build_output(p) for p in paths):
+        return [f"names the build output `{outputs[0]}` but no grammar file: no wave edits a generated file — name "
+                f"the `.g4` it is generated from"]
+    return []
+
+
+def load_member_index():
+    """scripts/arch/member_index.py as a module (the one computation of a note's callers; PB2118 Draft 8, J2)."""
+    sys.path.insert(0, str(REPO / "scripts" / "arch"))
+    import member_index  # noqa: PLC0415
+    return member_index
+
+
+def r3_program_problems(items: list[dict], slice_files: set[str] | None = None,
+                        unknown_names: dict[str, list[str]] | None = None) -> list[str]:
+    """The register's own checks of the R3 program (cluster PB2119): every path an open note names exists; every
+    name it moves or changes is one the member index knows (so the planner can compute its callers); a note whose
+    declared Sites meet the external repository's in-flight set waits for an open slice; and every measured wave
+    waits for the drift test. The CALLERS' collision with the slices is the planner's, recomputed at every plan
+    (plan_wave.campaign_clusters; DESIGN-architecture-review §8.7): callers change with every landing, so a
+    blocked_by written from them would be a hand list that drifts. `unknown_names` is {note id: unknown names}
+    (computed here when None)."""
+    by_id = {i.get("id"): i for i in items}
+    open_slices = {i.get("id") for i in items if EXTERNAL_SLICE_TITLE.match(i.get("title") or "")
+                   and i.get("status") not in TERMINAL_STATUSES}
+    if slice_files is None:
+        slice_files = slice_file_set() if open_slices else set()
+
+    def reaches(it: dict, target: str) -> bool:
+        seen, todo = set(), list(it.get("blocked_by") or [])
+        while todo:
+            b = todo.pop()
+            if b == target:
+                return True
+            if b in seen or b not in by_id:
+                continue
+            seen.add(b)
+            todo.extend(by_id[b].get("blocked_by") or [])
+        return False
+
+    r3 = [it for it in items if R3_PROGRAM in (it.get("cluster") or []) and it.get("status") not in TERMINAL_STATUSES]
+    if unknown_names is None:
+        mi = load_member_index()
+        index = mi.load()
+        unknown_names = {it["id"]: mi.resolve(index, mi.note_names(it.get("_body", ""), index)[0])[1] for it in r3}
+    bad = []
+    tracked = tracked_paths(REPO) if r3 else frozenset()
+    for it in r3:
+        body = it.get("_body", "")
+        for p in named_missing_paths(body, tracked=tracked):
+            bad.append(f"{it['_file']}: names `{p}`, which does not exist — fix the path (a file the wave creates is "
+                       f"marked `(new)`); the planner computes the wave's file set from what the note names")
+        bad += [f"{it['_file']}: {msg}" for msg in build_output_problems(body)]
+        if unknown := unknown_names.get(it["id"]):
+            bad.append(f"{it['_file']}: moves or changes {', '.join(unknown)}, which the member index "
+                       f"(scripts/arch/member_index.py) does not know — a typo, or a member renamed since; the "
+                       f"wave's callers cannot be computed")
+        if it.get("id") == R3_DRIFT_TEST:
+            continue
+        wave = (m.group(1).lower() if (m := _WAVE_KIND.search(body)) else "")
+        hit = sorted(set(note_sites(it)) & slice_files)
+        if hit and not any(reaches(it, s) for s in open_slices):
+            bad.append(f"{it['_file']}: an R3 {wave or '?'} wave whose sites name {hit[0]}"
+                       f"{f' (+{len(hit) - 1} more)' if len(hit) > 1 else ''}, a file of the external repository's "
+                       f"in-flight set (DESIGN-external-repository §12; R1 §8.6), and that waits for no open slice — "
+                       f"add the slice note that changes it ({', '.join(sorted(open_slices, key=id_order))}) to "
+                       f"blocked_by")
+        if wave in R3_MEASURED_WAVES and not reaches(it, R3_DRIFT_TEST):
+            bad.append(f"{it['_file']}: an R3 {wave} wave that does not wait for {R3_DRIFT_TEST}, the architecture "
+                       f"drift test — its neutrality is 'the walk shows no row growing' (DESIGN-architecture-review "
+                       f"§8.1), which needs the walk landed first; add {R3_DRIFT_TEST} to blocked_by")
     return bad
 
 

@@ -12,8 +12,9 @@ namespace CobolNet.Tools.ArchCensus;
 /// The architecture census's Roslyn host (kb/Work PB2115; DESIGN-architecture-review.md §3 R0). It loads a solution
 /// through MSBuildWorkspace, measures it, and writes the facts as one JSON document for <c>scripts/arch/census.py</c>.
 /// <para>Usage: <c>ArchCensus --solution &lt;sln&gt; --scope &lt;scope.json&gt; --out &lt;raw.json&gt;
-/// [--min-tokens N]</c>. Exit 0 with the file written, 2 with a refusal on stderr (a partial solution is never
-/// measured).</para>
+/// [--min-tokens N]</c>, or <c>ArchCensus --solution &lt;sln&gt; --scope &lt;scope.json&gt; --member-index &lt;out.json&gt;</c>
+/// for the member index alone (<see cref="MemberIndex"/>; the same load and walk, no reachability or clones). Exit 0
+/// with the file written, 2 with a refusal on stderr (a partial solution is never measured).</para>
 /// </summary>
 internal static class Program
 {
@@ -25,6 +26,12 @@ internal static class Program
         try
         {
             Options options = Options.Parse(args);
+            if (options.MemberIndex is { } indexPath)
+            {
+                await WriteMemberIndexAsync(options, indexPath);
+                return 0;
+            }
+
             RawCensus census = await MeasureAsync(options);
             await using FileStream output = File.Create(options.Out);
             await JsonSerializer.SerializeAsync(output, census, CensusJson.Default.RawCensus);
@@ -37,15 +44,21 @@ internal static class Program
         }
     }
 
-    private static async Task<RawCensus> MeasureAsync(Options options)
+    private static async Task WriteMemberIndexAsync(Options options, string indexPath)
     {
-        var clock = Stopwatch.StartNew();
         CensusScope scope = JsonSerializer.Deserialize(await File.ReadAllTextAsync(options.Scope), CensusJson.Default.CensusScope)
                             ?? throw new CensusRefusal($"unreadable scope file {options.Scope}");
         using LoadedSolution solution = await LoadedSolution.OpenAsync(options.Solution, scope, Console.Out);
-
         var inventory = new TypeInventory(solution);
-        var surface = scope.EmittedSurface.ToHashSet(StringComparer.Ordinal);
+        ReferenceIndex index = Walk(solution, inventory, scope.EmittedSurface);
+
+        MemberIndex.Write(indexPath, index, inventory, scope.EmittedSurface.ToHashSet(StringComparer.Ordinal));
+        Console.WriteLine($"member index: walked {index.Documents} documents, {index.Recorded} uses -> {indexPath}");
+    }
+
+    /// <summary>The ONE semantic walk both modes share: every document of every census and reader project.</summary>
+    private static ReferenceIndex Walk(LoadedSolution solution, TypeInventory inventory, IEnumerable<string> surface)
+    {
         var index = new ReferenceIndex(inventory.Types.Select(t => t.Key), surface);
         bool userConversions = solution.Projects.SelectMany(p => p.Documents)
             .Any(d => d.Tree.GetRoot().DescendantNodes().Any(n => n.IsKind(SyntaxKind.ConversionOperatorDeclaration)));
@@ -56,6 +69,20 @@ internal static class Program
                 index.Walk(project, document, userConversions);
             }
         }
+
+        return index;
+    }
+
+    private static async Task<RawCensus> MeasureAsync(Options options)
+    {
+        var clock = Stopwatch.StartNew();
+        CensusScope scope = JsonSerializer.Deserialize(await File.ReadAllTextAsync(options.Scope), CensusJson.Default.CensusScope)
+                            ?? throw new CensusRefusal($"unreadable scope file {options.Scope}");
+        using LoadedSolution solution = await LoadedSolution.OpenAsync(options.Solution, scope, Console.Out);
+
+        var inventory = new TypeInventory(solution);
+        var surface = scope.EmittedSurface.ToHashSet(StringComparer.Ordinal);
+        ReferenceIndex index = Walk(solution, inventory, surface);
 
         Console.WriteLine($"walked {index.Documents} documents, {index.Recorded} uses, {clock.Elapsed.TotalSeconds:F0}s");
         var reachability = new Reachability(solution, inventory, index, surface);
@@ -179,11 +206,11 @@ internal static class Program
             .OrderBy(e => e.From, StringComparer.Ordinal).ThenBy(e => e.To, StringComparer.Ordinal)];
     }
 
-    private sealed record Options(string Solution, string Scope, string Out, int MinTokens)
+    private sealed record Options(string Solution, string Scope, string Out, int MinTokens, string? MemberIndex)
     {
         public static Options Parse(string[] args)
         {
-            string? solution = null, scope = null, output = null;
+            string? solution = null, scope = null, output = null, memberIndex = null;
             int minTokens = 75;
             for (int i = 0; i < args.Length; i++)
             {
@@ -193,6 +220,7 @@ internal static class Program
                     case "--solution": solution = Next(); break;
                     case "--scope": scope = Next(); break;
                     case "--out": output = Next(); break;
+                    case "--member-index": memberIndex = Next(); break;
                     case "--min-tokens": minTokens = int.Parse(Next(), System.Globalization.CultureInfo.InvariantCulture); break;
                     default: throw new CensusRefusal($"unknown argument {args[i]}");
                 }
@@ -201,8 +229,9 @@ internal static class Program
             return new Options(
                 solution ?? throw new CensusRefusal("--solution is required"),
                 scope ?? throw new CensusRefusal("--scope is required"),
-                output ?? throw new CensusRefusal("--out is required"),
-                minTokens);
+                output ?? (memberIndex is null ? throw new CensusRefusal("--out or --member-index is required") : ""),
+                minTokens,
+                memberIndex);
         }
     }
 }

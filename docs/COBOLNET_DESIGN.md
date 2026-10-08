@@ -68,7 +68,9 @@ internal detail. Where a deep-dive conflicts with §1/§14/§18, the SSOT wins.
 ```
 source.cob
   → Frontend  (REUSED ANTLR, SUPERSET grammar: Preprocess[reference-format, >>directives, COPY, NIST placeholders]
-               → Lex → Parse; edition {isXXXX()}? gates REMOVED so all constructs parse at every --std; each
+               → Lex → Parse; construct introduction is gated post-bind, so the constructs parse at every --std
+               except where a parse-time edition read decides (word-status reads, and the one construct gate
+               validationClause; defined by rule in DESIGN-architecture-review §8.4, adjudicated in kb/Work PB2291); each
                version-gated rule stamps its construct-id — DESIGN-version-conformance-pipeline.md)
        → parse tree
   → Bind      (edition-AGNOSTIC (save the documented exception ledger, DESIGN-version-conformance-pipeline §1.1): resolve symbols + build a typed/categorized BOUND TREE that PRESERVES COBOL structure;
@@ -87,8 +89,20 @@ source.cob
 Edition gating is ONE mechanism: the grammar declares construct *identity* (a committed-match annotation local to each
 version-gated rule; version *numbers* live only in `constructs.json`), the binder is edition-agnostic (save the documented exception ledger, DESIGN-version-conformance-pipeline §1.1), and the
 `VersionConformancePass` over the bound tree is the sole gate — rejecting strict / accepting-inert permissive, and
-HALTING before emit so codegen never runs on an errored tree. There is no parse-time `{isXXXX()}?` edition predicate,
-no post-hoc reverse-signature recognizer, and no edition checks scattered through the binder.
+HALTING before emit so codegen never runs on an errored tree. Construct introduction is gated there, post-bind, but parser-grammar
+predicates still read the compile edition, under several names: most decide whether a word that is a user-defined word
+in an earlier edition is reserved here (`reservedHere`, `facilityWord`, `screenPositionAhead`, the `gatedDeclaration` action
+and the `NoteGatedOffender` listener, the 71 `keywordContinuesHere` alternatives of the
+generated `CobolWords.g4`, and four of the five `{isXXXX()}?` spellings: LOCATION, VALID, APPLY/COMMIT, RETRY); the
+fifth spelling gates a construct at parse time (`validationClause`), and SET LOCALE's `LC_` escape reads it too (word
+status as well: LOCALE and USER-DEFAULT are 1985 user words). The lexer and the retype stage read it too, as word status:
+the Annex C spelling a word has at the edition (`ApplyEditionSpelling`) and whether the edition reserves a subscript
+trigger (`PreviousTokenCouldBeDataName`, primed by `TokenRetypes.ReservedNonDataNames`).
+DESIGN-architecture-review §8.4 defines them by a rule (a parser-superclass, lexer or retype-stage member whose body
+reaches edition state — the parser's `Edition`, an `EditionInfo`, or a lexer field primed from one — and every
+predicate, action, lexer override, listener or retype-stage member that calls one), its drift test applies that rule,
+and kb/Work PB2291
+adjudicates each against this rule. There is no post-hoc reverse-signature recognizer, and no edition checks scattered through the binder.
 
 **Backend-neutral bound tree + a selectable codegen backend (owner-confirmed 2026-06-08).** The bound semantic tree
 is the single model that both backends consume; codegen is behind an **`ICodeGenBackend`** abstraction with two

@@ -29,6 +29,8 @@
 #                    already an ancestor of origin/main (the drift check kb/Work/PB950 asks for).
 #         PUSH_MAIN_TIMEOUT_MIN=45  — how long to wait for the landing run (default 45)
 # Exit:   0 = the commit is on main and its CI was green · 1 = CI red or the push refused · 2 = usage/state error
+#         3 = the landing check STOPPED the landing (scripts/orchestrator/landing_check.py: a file outside an R3
+#             wave's declared set, or one shared with earlier-dispatched in-flight work): re-plan, never retry as is
 
 set -uo pipefail
 
@@ -41,7 +43,7 @@ while [ $# -gt 0 ]; do
     --branch-prefix) PREFIX="${2:?--branch-prefix needs a value}"; shift 2 ;;
     --no-delete)     DELETE_BRANCH=0; shift ;;
     --audit)         AUDIT=1; shift ;;
-    -h|--help)       sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help)       sed -n '2,33p' "$0"; exit 0 ;;
     *) echo "push-main.sh: unknown argument '$1'" >&2; exit 2 ;;
   esac
 done
@@ -181,6 +183,18 @@ if ! git merge-base --is-ancestor "$BASE" "$SHA"; then
   die "HEAD ($SHORT) is not a descendant of origin/main ($(git rev-parse --short=12 "$BASE")).
      Rebase first:  git fetch origin && git rebase origin/main
      A landing is a pure fast-forward; this script never force-pushes."
+fi
+
+# ── THE FILE-SET PARTITION'S GUARANTEE (kb/Work PB2118 Drafts 9-10; DESIGN-architecture-review §8.7). The planner admits
+# an R3 restructuring wave on its COMPUTED file set, an estimate three refuter rounds each found a hole in; this is
+# where a miss is caught instead of landed. landing_check.py compares what this landing ACTUALLY changed with its
+# declared set (R3 work) and with every in-flight branch (when either side is R3 work): a file outside the set, or
+# one shared with an earlier-dispatched branch, STOPS the landing before a run is spent, and the later branch
+# re-plans and rebases. Every landing passes here, so it is the ONE place the check runs. ──
+. scripts/python-resolve.sh
+if ! "$PY" scripts/orchestrator/landing_check.py --rev "$SHA" --base "$BASE"; then
+  echo "⛔ push-main: the landing check STOPPED this landing (above): re-plan the named work and rebase — main NOT touched." >&2
+  exit 3   # its own code (the header's Exit list): a STOP is a re-plan, never a usage error to retry
 fi
 
 green_ci_gate() {   # 1 = this sha already carries a successful `ci-gate` check run
