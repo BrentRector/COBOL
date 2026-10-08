@@ -179,7 +179,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
                 // EDITED item, a group, an index item and a reference-modified reference are all refused.
                 if (place is RefModPlace || place.Item.IsGroup
                     || pic is not { Category: PicCategory.Numeric } || pic.Usage is Usage.Index
-                    || AlgebraicRanges.Of(pic, ctx.Data.DecimalPointIsComma) is not { } range)
+                    || AlgebraicRanges.Of(pic) is not { } range)
                 {
                     return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.SetContentNotNumeric,
                         $"SET CONTENT OF '{name}' TO {(farthest ? "FARTHEST-FROM-ZERO" : "NEAREST-TO-ZERO")}: "

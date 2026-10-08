@@ -487,7 +487,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         }
         if (target.Item.Pic is { Category: PicCategory.NumericEdited, EditMask: { } mask })
         {
-            int ms = RuntimeApi.MaskScale(target.Item.Pic!, mask, '$', ctx.Data.DecimalPointIsComma);
+            int ms = RuntimeApi.MaskScale(target.Item.Pic!, mask, '$');
             // The narrowing rescale: under ON SIZE ERROR / EC-SIZE, a PROHIBITED-inexact transfer to an edited
             // receiver is a size error (ISO §14.7.4.3 r7 — the receiver stays UNCHANGED). The Dec path's
             // .ToUnscaled and the numeric path's TryStore already throw/flag on that; the Int128 edited path used
@@ -610,7 +610,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
     private int ScaleOf(Place p) =>
         // The ONE receiver-scale rule (PicInfo.ReceiverScale; PB64 T6 — this copy and MoveEmitter's
         // SenderContext were the same rule written twice, and both fell to pic.Scale = 0 for a LOCALE item).
-        p.Item.Pic is { } pic ? pic.ReceiverScale(ctx.Data.DecimalPointIsComma) : 0;
+        p.Item.Pic is { } pic ? pic.ReceiverScale() : 0;
 
     /// <summary>The receiver's INTEGER digit positions — <see cref="ReceiverContext.IntegerDigits"/>, which caps
     /// the float quantization working scale (PB13). Measured from <c>DigitPositions</c> (ISO §13.18.40.3 SR14 —

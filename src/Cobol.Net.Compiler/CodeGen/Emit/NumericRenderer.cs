@@ -367,7 +367,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
             // COBOL-85 de-editing move; the runtime walks the image against the mask's digit positions).
             && p.Item.Pic is { Category: PicCategory.NumericEdited, EditMask: { } dem }
         ? new NumX($"CobolEdit.DeEdit({PlaceRenderer.Read(p)}, {EmitText.CsLiteral(dem)}{ctx.EditCfg(p.Item.Pic)}{(p.Item.BlankWhenZero ? ", blankWhenZero: true" : "")})",
-            RuntimeApi.MaskScale(p.Item.Pic!, dem, '$', ctx.Data.DecimalPointIsComma))
+            RuntimeApi.MaskScale(p.Item.Pic!, dem, '$'))
         : FieldNumCore(p, _sending);
 
     /// <summary>⛔ THE ONE RENDERING OF AN ALPHANUMERIC OR NATIONAL OPERAND READ IN A NUMERIC CONTEXT (ISO

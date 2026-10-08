@@ -660,7 +660,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 // not a double (D16 review: the numeric-edited path was missed by the Real integration → CS1503).
                 // NB the receiver scale is the ONE PicInfo.ReceiverScale rule, NOT pic.Scale (a masked item's Scale is 0 —
                 // the point is in the mask; a format-2 LOCALE item's IS pic.Scale — kb/Work PB64 T6).
-                int ems = pic.ReceiverScale(ctx.Data.DecimalPointIsComma);
+                int ems = pic.ReceiverScale();
                 // A STANDARD-DECIMAL intermediate lands at the receiver's scale (the §14.7 final transfer — the same
                 // form ArithmeticEmitter's edited path uses; fix-queue PB65: MOVE FUNCTION E under the mode handed
                 // the CobolDec to the Int128 edit path, CS1503 on conforming source).
@@ -791,7 +791,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         if (target.Pic is not { } pic) return ReceiverContext.None;
         // The ONE receiver-scale rule (RuntimeApi.ReceiverScaleOf — PB64 T6: this copy and ArithmeticEmitter's
         // both fell to pic.Scale = 0 for a format-2 LOCALE item, silently truncating a fractional sender).
-        int scale = pic.ReceiverScale(ctx.Data.DecimalPointIsComma);
+        int scale = pic.ReceiverScale();
         return ReceiverContext.None with { Scale = scale, IntegerDigits = Math.Max(0, pic.DigitPositions - scale), MoveSender = true };
     }
 }

@@ -114,14 +114,16 @@ public sealed class ConditionValueRecipeDriftTests
 
     /// <summary>⛔ AND THE COMPOSER TAKES NO EMIT CONTEXT (kb/Work PB920). SR6 is asked during BINDING as
     /// well as during emission, so an <c>EmitContext</c> parameter would have made the binder unable to call it
-    /// — which is exactly how a second copy of the rule gets written. The signature carries the two facts the
-    /// rule needs instead.</summary>
+    /// — which is exactly how a second copy of the rule gets written. The signature carries the facts the rule
+    /// needs instead: the dialect level and the item, whose PICTURE carries its own decimal-point mode
+    /// (<c>PicInfo.DecimalPointIsComma</c>, kb/Work PB2554 — the mode belongs to the item, not to the unit that
+    /// emits it).</summary>
     [Fact]
     public void TheNumericEditedValueImage_IsPhaseNeutral()
     {
         string values = CompilerSources()
             .Single(s => s.Rel.EndsWith("ValueInitializer.cs", StringComparison.Ordinal)).Text;
-        Assert.Contains("EditedImageOfNumericValue(int dialectLevel, bool decimalPointIsComma",
+        Assert.Contains("EditedImageOfNumericValue(int dialectLevel, DataItem item, PicInfo pic, string raw)",
             values, StringComparison.Ordinal);
     }
 

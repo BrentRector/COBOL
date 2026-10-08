@@ -122,10 +122,14 @@ Positive conformance tests live in `tests/conformance/2002/oo_*.cob`; the reject
 **The standard class BASE (§16; kb/Work PB1548 / PB1506 / PB1524).** §16.1: "A standard class BASE shall be provided
 by the implementation. It may be used as the root of a class hierarchy to provide standard object life-cycle
 function. This use is not required". Its implementation is the runtime pair `CobolNet.Runtime.BASE` (object half —
-BaseInterface's `FactoryObject`, §16.2.2.2 GR1, a virtual `FACTORYOBJECT()` returning the abstract
+BaseInterface's `FactoryObject`, §16.2.2.2 GR1, a virtual `FACTORYOBJECT()` returning the virtual
 `__FactoryOfClass` every BASE-derived class overrides with its own singleton) and `BASE__FACTORY` (factory half —
-BaseFactoryInterface's `New`: the VIRTUAL body `CobolObject? __New()` wrapping the covariant abstract `__Create()` every
-BASE-derived factory overrides with `new C()`. Virtual because §16.2 does not declare New FINAL (kb/Work PB1582): a
+BaseFactoryInterface's `New`: the VIRTUAL body `CobolObject? __New()` wrapping the covariant virtual `__Create()` every
+BASE-derived factory overrides with `new C()`. ⛔ BOTH ARE CONCRETE, and `BASE__FACTORY` declares the same
+`__Instance` run-unit singleton every generated factory has (kb/Work PB2489): §16.2.1.2 GR1 makes New on BASE's own
+factory create an object, so `INVOKE BASE "NEW"` and `SET f TO BASE` are legal source and render as
+`BASE__FACTORY.__Instance.__New()` / `.__Instance` exactly like any class — one shape for every factory, no BASE arm
+at an emit site; a generated factory with any superclass hides the accessor with `new`. Virtual because §16.2 does not declare New FINAL (kb/Work PB1582): a
 BASE subclass's `METHOD-ID. NEW OVERRIDE.` adopts `__New` as a C# `override` (§11.7.3 SR3; its result type is the
 universal one because §16.2's `object reference active-class` returning item crosses the ABI as the universal type),
 `INVOKE C "NEW"` then dispatches to it, `INVOKE SUPER "NEW"` inside it renders `base.__New()` (`InvokeForm.NewSuper`,

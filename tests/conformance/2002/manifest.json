@@ -1,6 +1,9 @@
 {
   "_comment": "The 2002 positive-corpus DISCOVERY MANIFEST (roadmap Phase-1 runner shells): CorpusRunnerTests compiles (and, given a sibling .out, runs+compares) every ENABLED program at --std 2002 strict. Programs exercising not-yet-implemented features stay PENDING (the ISO-validation critics' mass-red guard) and are enabled by the wave that lands their feature. The integrity fact asserts every .cob here is listed (enabled or pending) - nothing is silently undiscovered.",
   "enabled": [
+  "pb2554_class_comma_driver_period",
+  "pb2554_class_period_driver_comma",
+  "pb2489_invoke_base_new",
   "pb2466_renames_half_national_byte",
   "pb1045_global_constant_beside_class",
   "pb2093_member_names_like_generated_members",

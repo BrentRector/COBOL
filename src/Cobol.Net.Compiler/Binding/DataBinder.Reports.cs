@@ -3805,7 +3805,7 @@ public sealed partial class DataBinder
         // characters, and a NUMERIC-EDITED PicInfo carries Scale 0 (its fraction lives in the mask), so `PIC 99.99 SUM
         // WS-F` registered a scale-0 counter and truncated every addend to an integer (2.75 twice printed 04.00 for the
         // 05.50 owed). The one rule every store already asks (PicInfo.ReceiverScale) answers it.
-        int sumScale = pic?.ReceiverScale(DecimalPointIsComma) ?? 0;
+        int sumScale = pic?.ReceiverScale() ?? 0;
         int baseId = model.SumFamilies.Count == 0 ? 0 : model.SumFamilies[^1].BaseId + model.SumFamilies[^1].Count;
         // The synthetic OCCURS chain: one ancestor per enclosing repetition (outermost first), each an implicit
         // table level of the counter — never storage, never in ByName, reachable only through the register.

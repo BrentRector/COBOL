@@ -756,7 +756,7 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
         if (pic.IsFloat)
             return FloatTest(f, farthest ? CobolNet.Runtime.FloatClassTest.FarthestFromZero
                                               : CobolNet.Runtime.FloatClassTest.NearestToZero);
-        if (AlgebraicRanges.Of(pic, ctx.Data.DecimalPointIsComma) is not { } range)
+        if (AlgebraicRanges.Of(pic) is not { } range)
             return EmitText.LoudValue("bool", $"{(farthest ? "FARTHEST-FROM-ZERO" : "NEAREST-TO-ZERO")} over a description with no numeric capacity");
         // The negative extreme exists only where the description can hold a sign (AlgebraicRange.FarthestNegative
         // null otherwise) — and it is NOT always the mirror of the positive one (a two's-complement container).
@@ -785,7 +785,7 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
     private string RenderInArithmeticRange(BoundFieldOperand f, string numericTest)
     {
         var pic = f.Place.Item.OperandPic!;
-        if (AlgebraicRanges.Of(pic, ctx.Data.DecimalPointIsComma) is not { } range)
+        if (AlgebraicRanges.Of(pic) is not { } range)
             return EmitText.LoudValue("bool", "IN-ARITHMETIC-RANGE over a description with no numeric capacity");
         var (modeFarthest, modeNearest) = ArithmeticModes.IntermediateExtremes(ctx.Data.Options.Arithmetic);
         bool contained = AlgebraicRanges.CompareMagnitude(range.Farthest, modeFarthest) <= 0
@@ -857,8 +857,7 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
     {
         AlgebraicRange? described = AlgebraicRanges.OfCounterRegister(op.Expr)
             ?? (op.Expr is BoundIntrinsicCall
-                ? AlgebraicRanges.OfFunctionReturnedValue(IntrinsicResultType.IsIntegerOperand(op), v.Dec,
-                    ctx.Data.DecimalPointIsComma)
+                ? AlgebraicRanges.OfFunctionReturnedValue(IntrinsicResultType.IsIntegerOperand(op), v.Dec)
                 : null);
         if (described is not { } range || range.Nearest is null)
             return EmitText.LoudValue("bool", $"{(farthest ? "FARTHEST-FROM-ZERO" : "NEAREST-TO-ZERO")} over a computed operand with no described capacity");
@@ -1045,7 +1044,7 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
             return new(RuntimeApi.LocaleEditCompose(lpic, uv, sc, parent.BlankWhenZero), IsFigSeed: false);
         if (parent.OperandPic is { Category: PicCategory.NumericEdited } npic
             && ValueInitializer.EditedImageOfNumericValue(ctx.Data.Edition.DialectLevel,
-                    ctx.Data.DecimalPointIsComma, parent, npic, raw) is { } edited)
+                    parent, npic, raw) is { } edited)
             return new(EmitText.CsLiteral(edited), IsFigSeed: false);
         // ⛔ THE ONE §8.3.3.6.2 OPERAND CLASSIFIER (kb/Work PB461). §14.9.39.4 GR6 stores this same operand
         // "according to the rules for the VALUE clause" and §8.8.4.5.3 GR3 makes the test true exactly when the

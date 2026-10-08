@@ -265,7 +265,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             if (pic.Category is PicCategory.NumericEdited && !raw.StartsWith('"')
                 && ValueInitializer.TryParseNumeric(raw, out var uv, out int sc))
                 return EmitText.CsLiteral(RuntimeApi.EditCompose(uv, sc, pic.EditMask!,
-                    item.BlankWhenZero, pic.CurrencyString, ctx.Data.DecimalPointIsComma, pic.EditingRules));
+                    item.BlankWhenZero, pic.CurrencyString, pic.DecimalPointIsComma, pic.EditingRules));
             if (pic.Category is PicCategory.Alphanumeric or PicCategory.NumericEdited)
                 return RuntimeApi.StrStore(EmitText.CsLiteral(CobolLiteral.Decode(raw)), $"{pic.Length}");
             if (pic.Category is PicCategory.National)

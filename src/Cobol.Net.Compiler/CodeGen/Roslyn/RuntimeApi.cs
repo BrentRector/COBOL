@@ -2338,8 +2338,8 @@ internal static class RuntimeApi
     /// rather than the bare mask so the item's PICTURE EDITING rules always ride along: a FLOATING extended
     /// editing sign control symbol's repetitions are digit positions (§13.18.40.5 rule 6) and the mask alone
     /// cannot say so (kb/Work PB491).</summary>
-    public static int MaskScale(PicInfo pic, string mask, char currency, bool commaMode) =>
-        CobolEdit.MaskScale(mask, currency, commaMode, pic.EditingRules as CobolEdit.EditRule[]);
+    public static int MaskScale(PicInfo pic, string mask, char currency) =>
+        CobolEdit.MaskScale(mask, currency, pic.DecimalPointIsComma, pic.EditingRules as CobolEdit.EditRule[]);
 
     /// <summary>ISO §13.18.8.4 GR3's content test over an operand's image — <c>CobolEdit.IsBlanked</c>.</summary>
     public static string EditIsBlanked(string read) => $"{nameof(CobolEdit)}.{nameof(CobolEdit.IsBlanked)}({read})";

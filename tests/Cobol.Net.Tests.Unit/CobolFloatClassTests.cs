@@ -50,7 +50,7 @@ public sealed class CobolFloatClassTests
     public void AlgebraicRangeExtremes_AreTheBitPatternsGr3gAndMTest(Usage usage)
     {
         var pic = new PicInfo(PicCategory.Numeric, usage, Length: 0, Digits: 0, Scale: 0, Signed: true);
-        var range = AlgebraicRanges.Of(pic, decimalPointIsComma: false)!.Value;
+        var range = AlgebraicRanges.Of(pic)!.Value;
         bool single = usage is Usage.FloatBinary32;
         foreach (string text in new[] { range.Farthest, range.FarthestNegative! })
             Assert.True(Classify(text, single, FloatClassTest.FarthestFromZero), $"{usage} farthest {text}");

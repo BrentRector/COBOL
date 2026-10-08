@@ -416,9 +416,10 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // The factory object (§9.3.14.2: "created before it is first referenced by a run unit" and "deleted
             // after it is last referenced by a run unit") is the CURRENT RUN UNIT's, created on first reference
             // (RunUnit.FactoryObject) — never a process-lifetime static, which outlived the run unit with all its
-            // factory data (kb/Work PB1069). A factory whose superclass is a COBOL class needs `new` to shadow
-            // that class's accessor; the runtime BASE__FACTORY declares none, so there is nothing to hide.
-            $"public {(cls.Symbol.Base is { IsStandard: false } ? "new " : "")}static {cls.Symbol.FactoryCsName} "
+            // factory data (kb/Work PB1069). A factory with ANY superclass hides that superclass's accessor — a COBOL
+            // class's, or the runtime BASE__FACTORY's, which declares the same singleton so that BASE's own factory is
+            // reached as every other is (kb/Work PB2489).
+            $"public {(cls.Symbol.Base is not null ? "new " : "")}static {cls.Symbol.FactoryCsName} "
                 + $"{NamingConvention.FactoryInstanceField} => {RuntimeApi.FactoryObject(cls.Symbol.FactoryCsName)};",
             $"protected override System.Type? __InstanceClassType => typeof({cls.CsName});",
         };

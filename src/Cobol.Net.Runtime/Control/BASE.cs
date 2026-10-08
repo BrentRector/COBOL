@@ -11,6 +11,12 @@ namespace CobolNet.Runtime;
 // special case in the emitter. Emitted code lives in the global namespace and imports CobolNet.Runtime, so a
 // compilation group that DEFINES its own class BASE shadows these (a global-namespace type wins over a using-
 // imported one) — the same precedence OoClassTable.Find gives a group definition over the standard class.
+//
+// ⛔ BASE AND BASE__FACTORY ARE CONCRETE, AND BASE__FACTORY HAS THE SAME __Instance SINGLETON EVERY GENERATED
+// FACTORY HAS (kb/Work PB2489). §16.2.1.2 GR1 makes New on BASE's own factory create "an object" — an instance of
+// BASE itself — so `INVOKE BASE "NEW"` and `SET f TO FACTORY OF BASE` are legal source, and the emitter reaches them
+// as `BASE__FACTORY.__Instance`, exactly as it reaches `CLS__FACTORY.__Instance` for any class: one shape for every
+// factory, so no emit site has a BASE arm. A generated factory that inherits this one hides the accessor with `new`.
 #pragma warning disable CA1707 // the underscore is the emitted factory-type convention, not a style choice
 
 /// <summary>
@@ -21,12 +27,16 @@ namespace CobolNet.Runtime;
 /// <see cref="CobolObject"/> directly, and has neither New nor FactoryObject (§16.1: "This use is not required").
 /// §16.2's NOTE — "The standard class BASE need not be implemented in COBOL" — is what this class is.
 /// </summary>
-public abstract class BASE : CobolObject
+public class BASE : CobolObject
 {
     /// <summary>The factory object of THIS object's runtime class (§16.2.2.2 GR1: FactoryObject "determines the
     /// class of the object"). Every emitted BASE-derived class overrides it with its own factory singleton, so the
-    /// most-derived override IS the runtime class's factory.</summary>
-    protected abstract BASE__FACTORY __FactoryOfClass { get; }
+    /// most-derived override IS the runtime class's factory; a plain BASE object (created by New on BASE's own
+    /// factory) is of class BASE.</summary>
+    protected virtual BASE__FACTORY __FactoryOfClass => BASE__FACTORY.__Instance;
+
+    /// <summary>§9.3.6 match rule 3 d) 5.: the FACTORY type of a plain BASE object's class.</summary>
+    protected internal override Type? __FactoryClassType => typeof(BASE__FACTORY);
 
     /// <summary>FactoryObject (§16.2.2.2 GR1): "When invoked on an instance object, the FactoryObject method
     /// determines the class of the object and returns a reference to the factory object associated with that
@@ -54,14 +64,23 @@ public abstract class BASE : CobolObject
 /// that provides a standard mechanism for creating instance objects of a class" (§16.2.1.1). §9.3.14.3: "An
 /// instance object is created as the result of the NEW method being invoked on a factory object."
 /// </summary>
-public abstract class BASE__FACTORY : CobolObject
+public class BASE__FACTORY : CobolObject
 {
+    /// <summary>The factory object of the standard class BASE in the CURRENT run unit, created on first reference
+    /// (§9.3.14.2: "A factory object is created before it is first referenced by a run unit") — the same accessor,
+    /// by the same name and through the same <see cref="RunUnit.FactoryObject{T}"/>, every generated factory
+    /// emits for its own class.</summary>
+    public static BASE__FACTORY __Instance => RunUnit.Current.FactoryObject<BASE__FACTORY>();
+
+    /// <summary>§9.3.6 match rule 3 d) 4.: the INSTANCE type of the class this factory belongs to — BASE itself.</summary>
+    protected internal override Type? __InstanceClassType => typeof(BASE);
+
     /// <summary>Allocate and initialize one instance of this factory's class — §16.2.1.2 GR1's "allocates storage
     /// for an object, initializes its instance data in accordance with 14.6.2.4". Every emitted BASE-derived factory
     /// overrides it covariantly with <c>new C()</c> (the generated constructor IS the initialization, OO deep-dive
     /// D4), so New invoked on a subclass's factory — or through SELF in an inherited factory method — creates the
-    /// runtime factory's class.</summary>
-    protected abstract BASE __Create();
+    /// runtime factory's class. BASE's own factory creates a plain BASE.</summary>
+    protected virtual BASE __Create() => new BASE();
 
     /// <summary>New (§16.2.1.2): create an object through <see cref="__Create"/>, or — GR2 — "If resources needed to
     /// create a new object are not available, the returned object reference is set to NULL, and the EC-OO-RESOURCE

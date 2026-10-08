@@ -192,7 +192,7 @@ internal sealed class ValueInitializer(EmitContext ctx)
         if (pic.LocaleEdit is not null) return RuntimeApi.LocaleEditCompose(pic, Int128.Zero, 0, item.BlankWhenZero);
         // A figurative ZERO moved to a numeric-edited item is the numeric value zero (§14.9.25.4), at every
         // edition — hence the literal "0" at the 2023 level, where the VALUE rule treats the two identically.
-        return EditedImageOfNumericValue(2023, ctx.Data.DecimalPointIsComma, item, pic, "0") is { } z
+        return EditedImageOfNumericValue(2023, item, pic, "0") is { } z
             ? EmitText.CsLiteral(z) : null;
     }
 
@@ -302,7 +302,7 @@ internal sealed class ValueInitializer(EmitContext ctx)
         // image — the ONE compose (EditedImageOfNumericValue) the level-88 membership test shares. Below 2023 a
         // figurative ZERO falls through to the FigurativeInitializer zero-fill (the pre-2023 behavior, VCR 35).
         if (pic.Category is PicCategory.NumericEdited
-            && EditedImageOfNumericValue(ctx.Data.Edition.DialectLevel, ctx.Data.DecimalPointIsComma,
+            && EditedImageOfNumericValue(ctx.Data.Edition.DialectLevel,
                     item, pic, raw) is { } editedImage)
             return EmitText.CsLiteral(editedImage);
 
@@ -364,9 +364,9 @@ internal sealed class ValueInitializer(EmitContext ctx)
     /// <c>EmitContext</c> exists. An emit-context parameter would have forced a second copy of SR6 into the
     /// binder, which is the defect this method was extracted to end
     /// (<c>ConditionValueRecipeDriftTests</c> names every reader).</remarks>
-    internal static string? EditedImageOfNumericValue(int dialectLevel, bool decimalPointIsComma,
-        DataItem item, PicInfo pic, string raw)
+    internal static string? EditedImageOfNumericValue(int dialectLevel, DataItem item, PicInfo pic, string raw)
     {
+        bool decimalPointIsComma = pic.DecimalPointIsComma;   // the DESCRIBING unit's mode (§12.3.7.4 GR14 b; kb/Work PB2554)
         // A format-2 (LOCALE) item has NO compile-time image (the locale is runtime data) — the callers carry
         // their own runtime arm (RuntimeApi.LocaleEditCompose); returning null here keeps the EditMask derefs
         // below unreachable for it (PB64 T6).

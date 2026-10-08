@@ -516,6 +516,17 @@ public sealed record PicInfo(
     /// <see cref="IsRecovery"/> profile. The one input every "the same PICTURE clause" rule reads.</summary>
     public PictureClauseIdentity? Clause { get; init; }
 
+    /// <summary>⛔ THE DECIMAL-POINT MODE BELONGS TO THE ITEM, NOT TO THE UNIT THAT HAPPENS TO EMIT IT
+    /// (kb/Work PB2554). ISO §12.3.7.4 GR14 b) makes the comma the decimal separator in a PICTURE character-string
+    /// and in an edited item "for the basic format of the PICTURE clause" — a property of the source element
+    /// that DESCRIBES the item (§12.3.4 GR1 hands it to a CONTAINED unit only), so a separately compiled
+    /// class under DECIMAL-POINT IS COMMA keeps it for its formals no matter which unit INVOKEs them. Every editing,
+    /// de-editing, receiver-scale and edited-image consumer reads THIS, never <c>ctx.Data.DecimalPointIsComma</c>
+    /// (<c>DecimalPointModeDriftTests</c>). Read off <see cref="Clause"/>, the one record of the declaring unit's
+    /// state: it is <see langword="false"/> for a profile with no analyzed PICTURE and for one with neither a
+    /// period nor a comma symbol, where the mode cannot change a single edited character.</summary>
+    public bool DecimalPointIsComma => Clause?.DecimalPointIsComma ?? false;
+
     /// <summary>For a numeric-edited (or alphanumeric-edited) item carrying one or more PICTURE EDITING phrases
     /// (ISO §13.18.40.2 Format 1, COBOL-2023): the resolved single-character render rules keyed on character-1's
     /// position in <see cref="EditMask"/> — the simple-insertion (IS) form and the single-occurrence sign-control
@@ -684,10 +695,10 @@ public sealed record PicInfo(
     /// numeric-edited receiver's is the MASK's (<c>CobolEdit.MaskScale</c> — an edited PicInfo's own
     /// <see cref="Scale"/> is 0); everything else <see cref="Scale"/>. A float-edited receiver rides the mask arm
     /// too — its significand scale drives the working scale of an intermediate landing.</summary>
-    public int ReceiverScale(bool commaMode) =>
+    public int ReceiverScale() =>
         LocaleEdit is not null ? Scale
         : this is { Category: PicCategory.NumericEdited, EditMask: { } mask }
-            ? CobolNet.Runtime.CobolEdit.MaskScale(mask, '$', commaMode, EditingRules as CobolNet.Runtime.CobolEdit.EditRule[])
+            ? CobolNet.Runtime.CobolEdit.MaskScale(mask, '$', DecimalPointIsComma, EditingRules as CobolNet.Runtime.CobolEdit.EditRule[])
         : Scale;
 
     /// <summary>For a <see cref="PicCategory.ObjectReference"/> item: the FULL §13.18.60.2 description —

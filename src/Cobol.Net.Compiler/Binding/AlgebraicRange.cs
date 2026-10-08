@@ -53,11 +53,12 @@ internal static class AlgebraicRanges
     /// <summary>The extremes of <paramref name="pic"/>. The caller has already established that the item is an
     /// admissible operand for its own rule; this reads the description's capacity discipline and nothing else.
     /// Returns <c>null</c> only for a description with no numeric capacity at all (a group, an index, a
-    /// non-numeric category) — a shape every caller screens out first.</summary>
-    /// <param name="decimalPointIsComma">The §12.3.7 SPECIAL-NAMES DECIMAL-POINT IS COMMA clause — read only to parse an
-    /// EDITED item's own picture, never to render the result (the returned text is C#-facing, '.' radix always).</param>
-    internal static AlgebraicRange? Of(PicInfo pic, bool decimalPointIsComma)
+    /// non-numeric category) — a shape every caller screens out first. The DECIMAL-POINT IS COMMA mode it parses an
+    /// EDITED item's own picture under is the item's (<see cref="PicInfo.DecimalPointIsComma"/>), never the
+    /// result's: the returned text is C#-facing, '.' radix always.</summary>
+    internal static AlgebraicRange? Of(PicInfo pic)
     {
+        bool decimalPointIsComma = pic.DecimalPointIsComma;
         if (pic.Usage is Usage.Index) return null;                 // class index — not category numeric (§13.18.60)
         bool edited = pic.Category is PicCategory.NumericEdited;
         if (pic.Category is not PicCategory.Numeric && !edited) return null;
@@ -224,15 +225,14 @@ internal static class AlgebraicRanges
     /// (§15.2 item 5 — "no digits to the right of the decimal point", so its nearest nonzero value is 1), and
     /// S9(21)V9(9) for a NUMERIC function.</item>
     /// </list></summary>
-    internal static AlgebraicRange OfFunctionReturnedValue(bool integer, bool standardDecimal, bool decimalPointIsComma)
+    internal static AlgebraicRange OfFunctionReturnedValue(bool integer, bool standardDecimal)
     {
         if (standardDecimal)
         {
             var (far, near) = ArithmeticModes.IntermediateExtremes(ArithmeticMode.StandardDecimal);
             return new AlgebraicRange(far, "-" + far, near, Zero: "0");
         }
-        return Of(integer ? Procedure.SendingValueTemp.IntegerFunctionValuePic : Procedure.SendingValueTemp.FunctionValuePic,
-            decimalPointIsComma)!.Value;
+        return Of(integer ? Procedure.SendingValueTemp.IntegerFunctionValuePic : Procedure.SendingValueTemp.FunctionValuePic)!.Value;
     }
 
     private static BigInteger Pow10(int n) => BigInteger.Pow(10, Math.Max(0, n));

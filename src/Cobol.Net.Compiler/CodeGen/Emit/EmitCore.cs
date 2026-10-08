@@ -133,7 +133,7 @@ internal sealed class EmitContext(CodeWriter writer, DataBinder data, NameAlloca
         pic?.LocaleEdit is not null ? ""
         : (pic?.CurrencyString is { } cur
             ? $", currencyString: {SymbolDisplay.FormatLiteral(cur, quote: true)}" : "")
-        + (Data.DecimalPointIsComma ? ", commaMode: true" : "")
+        + (pic?.DecimalPointIsComma == true ? ", commaMode: true" : "")
         + RuntimeApi.EditsArg(pic?.EditingRules);
 
     // FigFill lives in FigurativeConstants since P7 Step 4 (the ONE figurative service).

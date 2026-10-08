@@ -2712,7 +2712,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             // minimum, and r4's implementor latitude it leaned on covers only NATIVE arithmetic anyway).
             // The constants themselves are AlgebraicRanges' (kb/Work PB452) — SET format 15 needs the same
             // three values and a second table would be the same rule written twice.
-            return FoldFrom(sig, pic, AlgebraicRanges.Of(pic, ctx.Data.DecimalPointIsComma));
+            return FoldFrom(sig, pic, AlgebraicRanges.Of(pic));
         }
 
         // (SMALLEST needs no early return of its own any more: §15.83.3 r1 admits category numeric ONLY, so the
@@ -2725,7 +2725,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // arithmetic mode in effect (§8.8.4.4.4 GR3 l): binary64 under NATIVE, decimal128 under STANDARD-DECIMAL.
         if (edited && pic.IsFloatEdited)
         {
-            var fm = CobolNet.Runtime.CobolEdit.FloatMask.Parse(pic.EditMask!, ctx.Data.DecimalPointIsComma);
+            var fm = CobolNet.Runtime.CobolEdit.FloatMask.Parse(pic.EditMask!, pic.DecimalPointIsComma);
             int intDigits = fm.SigDigits - fm.SigScale;
             // farthest = (10^d − 1) × 10^(−f) × 10^maxExp  ≈ 10^(intDigits + maxExp); closest nonzero = 10^(intDigits − 1 − maxExp)
             int farthestExp = intDigits + fm.MaxExp;             // the decimal exponent of the extreme's magnitude
@@ -2742,7 +2742,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                 return BoundExprError.Refused(ctx.Edition, $"FUNCTION {sig.Name} floating-point edited argument");
             }
         }
-        return FoldFrom(sig, pic, AlgebraicRanges.Of(pic, ctx.Data.DecimalPointIsComma));
+        return FoldFrom(sig, pic, AlgebraicRanges.Of(pic));
     }
 
     /// <summary>Pick the §15.43.4 / §15.58.4 / §15.83.4 r2 value this FUNCTION names out of the description's

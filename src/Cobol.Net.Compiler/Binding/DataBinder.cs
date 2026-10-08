@@ -3209,7 +3209,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // leading '+' into an unsigned item is the common harmless idiom (+5 == 5, no data loss) and is not rejected.
         // (a floating-point edited mask's exponent '+' is NOT a representation of the value's sign — only the
         // significand's own sign symbol is, CobolEdit.FloatMask.SigSign.)
-        bool signBearing = pic.IsFloatEdited ? CobolEdit.FloatMask.Parse(mask, DecimalPointIsComma).SigSign != '\0'
+        bool signBearing = pic.IsFloatEdited ? CobolEdit.FloatMask.Parse(mask, pic.DecimalPointIsComma).SigSign != '\0'
             // A format-2 (LOCALE) item has no mask: its sign representation is the picture's '+' (§13.18.40.4
             // GR18 — Signed carries it; PB64 T6). Reading the empty mask here falsely rejected a legal negative
             // VALUE on a '+'-bearing format-2 picture.
@@ -3239,7 +3239,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // E = highLitExp + 1 − (integer significand digits).
         if (pic.IsFloatEdited)
         {
-            var fm = CobolEdit.FloatMask.Parse(mask, DecimalPointIsComma);
+            var fm = CobolEdit.FloatMask.Parse(mask, pic.DecimalPointIsComma);
             int run = lastNonZero - firstNonZero + 1;
             int normExp = highLitExp + 1 - (fm.SigDigits - fm.SigScale);
             if (run > fm.SigDigits || normExp > fm.MaxExp || normExp < -fm.MaxExp)
@@ -3282,7 +3282,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         string mask = pic.EditMask ?? "";
         return (edited ? pic.DigitPositions - mask.Count(c => c == 'P') : pic.Digits,
                 pic.LocaleEdit is not null ? pic.Scale
-                    : edited ? CobolEdit.MaskScale(mask, '$', DecimalPointIsComma,
+                    : edited ? CobolEdit.MaskScale(mask, '$', pic.DecimalPointIsComma,
                         pic.EditingRules as CobolEdit.EditRule[]) : pic.Scale);
     }
 
@@ -4869,7 +4869,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         if (parent.OperandPic is { Category: PicCategory.NumericEdited } npic
             && CobolNet.CodeGen.ValueInitializer.EditedImageOfNumericValue(
-                   Edition.DialectLevel, DecimalPointIsComma, parent, npic, raw) is { } edited)
+                   Edition.DialectLevel, parent, npic, raw) is { } edited)
             return (null, edited);
         return (NumericLiteralValue(raw), StringValue(raw));
     }

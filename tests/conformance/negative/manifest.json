@@ -983,6 +983,8 @@
   "bit-usage-numeric-pic",
   "boolean-ordering-relation",
   "boolean_conv_below_2002",
+  "pb2489_invoke_base_new_below_2002",
+  "pb2554_decimal_point_class_below_2002",
   "boolean_operators_below_2002",
   "by-value-formal-class",
   "byte_length_below_2002",
