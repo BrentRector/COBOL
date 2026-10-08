@@ -176,12 +176,12 @@ rows (98, 100–113) are directive-driven, not edition gates, so they carry `<!-
    `flag-02-directive-2014` / `flag-14-directive-2023` gate through their `directiveWords`. Wired by
    `Frontend.LeftDirectives` (which answers only WHICH STAGE OWNS THE LINE; FLAG-02/14 are catalog rows either
    way, so legacy callers still consume them) and a new stage call in `Frontend.Preprocess` after the
-   REF-MOD-ZERO-LENGTH stage, exposing `Frontend.FlagEvents`. The frontend-only b/c flags are emitted here-adjacent
+   REF-MOD-ZERO-LENGTH stage, exposing `Frontend.Directives.FlagEvents`. The frontend-only b/c flags are emitted here-adjacent
    inside `ConditionalCompilationProcessor` from its own in-scan `FlagScanState`.
 2. **THREAD + FOLD** — `FlagState` (`Cobol.Net.Compiler/Binding`): `Build(events)` + `IsOnAt(int siteLine,
    FlagOption)` folding "last toggle strictly before the site wins, default OFF" per option, with ALL fan-out
-   and `ALL OFF` reset. Threaded `frontend.FlagEvents` → `CompilerDriver:114`
-   (`emitter.Bind(tree, edition, TurnEvents, RefModZeroLengthEvents, FlagEvents)`) → `CSharpEmitter.Bind` →
+   and `ALL OFF` reset. Threaded `frontend.Directives` (the ONE `DirectiveResults` record, kb/Work PB65) →
+   `CompilerDriver` (`emitter.Bind(tree, edition, frontend.Directives)`) → `CSharpEmitter.Bind` →
    `BinderDriver` (`FlagState.Build(flagEvents)`), carried on `BindSession` alongside `RefModZeroLength`.
 3. **EMIT** — `FlagConformancePass.Run(group, flagState, sink)` invoked right after `VersionConformancePass.Run`
    in `BinderDriver`, per-option detector methods emitting

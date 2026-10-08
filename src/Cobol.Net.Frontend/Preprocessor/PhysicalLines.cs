@@ -110,14 +110,9 @@ public readonly record struct PhysicalLine(int Number, string Text, TabMap? Tabs
 /// <summary>The lines of one file, in order — what EVERY reference-format consumer reads instead of the raw text.</summary>
 public sealed class PhysicalLineSet(PhysicalLine[] lines)
 {
-    public int Count => lines.Length;
-
     public PhysicalLine this[int index] => lines[index];
 
     public ReadOnlySpan<PhysicalLine> Lines => lines;
-
-    /// <summary>The lines from <paramref name="start"/> up to, not including, <paramref name="end"/> (0-based).</summary>
-    public ReadOnlySpan<PhysicalLine> Range(int start, int end) => lines.AsSpan(start, end - start);
 }
 
 /// <summary>The correspondence between the positions of an expanded line and the characters of the physical line it was

@@ -120,7 +120,7 @@ catch). Runtime: `Runtime/Exceptions/` — `ExceptionCatalog` (Table 13 + `Direc
 GR2/GR3/GR4 expansion), `EcCheckingProfile` (an activating statement's checking state, folded at run time for a
 run-time name — §14.9.18.4 GR1 b)), `ExceptionState` (last-exception register +
 propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.28/30/32/33), `CobolFatalException`,
-`ResumeSignal`. `CompilerDriver` hands `Frontend.TurnEvents` to `CSharpEmitter.Bind`; `EmitBound` renders the bound tree via `ProgramEmitter`.
+`ResumeSignal`. `CompilerDriver` hands `Frontend.Directives` (whose `TurnEvents` build the TurnState) to `CSharpEmitter.Bind`; `EmitBound` renders the bound tree via `ProgramEmitter`.
 
 **EC engine specifics:**
 - **The declarative dispatch-result protocol.** Declaratives are pc

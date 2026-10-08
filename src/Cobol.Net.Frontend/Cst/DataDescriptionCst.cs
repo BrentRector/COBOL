@@ -16,8 +16,6 @@ using Core = CobolParserCore;
 /// </summary>
 public readonly struct DataDescriptionCst(Core.DataDescriptionEntryContext ctx)
 {
-    public Core.DataDescriptionEntryContext Context => ctx;
-
     /// <summary>The level number as an <see cref="int"/>, or <see langword="null"/> when it does not parse
     /// (the caller returns early on null — byte-identical to the <c>int.TryParse</c> guard).</summary>
     public int? Level => int.TryParse(ctx.levelNumber().GetText(), out int n) ? n : null;
@@ -67,8 +65,6 @@ public readonly struct DataDescriptionCst(Core.DataDescriptionEntryContext ctx)
             return set;
         }
     }
-
-    public SourceSpan Span => SourceSpan.Of(ctx);
 
     public static implicit operator DataDescriptionCst(Core.DataDescriptionEntryContext c) => new(c);
 }
@@ -142,10 +138,4 @@ public readonly struct DataDescriptionClauseCst(Core.DataDescriptionClauseContex
             return names;
         }
     }
-
-    /// <summary>The first VALUE operand's RAW source text (literal or figurative constant), or null. Numeric-literal
-    /// normalization stays binder-side (it is binder logic, not a text read).</summary>
-    public string? FirstValueText => ctx.valueClause()?.valueItem().FirstOrDefault()?.GetText();
-
-    public static implicit operator DataDescriptionClauseCst(Core.DataDescriptionClauseContext c) => new(c);
 }

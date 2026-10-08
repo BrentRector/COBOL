@@ -1059,7 +1059,6 @@ public readonly struct DataDescriptionCst(CobolParserCore.DataDescriptionEntryCo
     public PictureCst? Picture => ctx.pictureClause() is {} p ? new(p) : null;
     public UsageCst? Usage    => …;
     public bool IsTypedef     => ctx.typedefClause() is not null;
-    public SourceSpan Span    => SourceSpan.Of(ctx);                    // line/col for diagnostics
     …
 }
 ```

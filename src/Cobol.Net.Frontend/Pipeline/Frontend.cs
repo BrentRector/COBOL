@@ -72,32 +72,11 @@ public sealed class Frontend
     /// resultant lines — the &gt;&gt;TURN / &gt;&gt;FLAG anchors — stay directly comparable to token lines.</summary>
     public SourceLineMap LineMap { get; private set; } = SourceLineMap.Identity("<source>", 0);
 
-    /// <summary>The <c>&gt;&gt;TURN</c> directive events of the LAST parsed source (ISO §7.3.25), anchored to
-    /// 1-based lines of the final preprocessed text (so token <c>Start.Line</c> is directly comparable — the
-    /// compile-time TurnState's basis, deep-dive D10). Empty when the source has no TURN directives.</summary>
-    public DirectiveTimeline<TurnEvent> TurnEvents => Directives.TurnEvents;
-
-    /// <summary>The frontend's <c>&gt;&gt;REF-MOD-ZERO-LENGTH</c> directive events (ISO §7.3.23) — they build the
-    /// group's compile-time <see cref="Binding.RefModZeroLengthState"/> (the per-line zero-length allowance fold).</summary>
-    public DirectiveTimeline<RefModZeroLengthEvent> RefModZeroLengthEvents => Directives.RefModZeroLengthEvents;
-
-    /// <summary>The frontend's <c>&gt;&gt;FLAG-02</c> / <c>&gt;&gt;FLAG-14</c> directive events (ISO §7.3.14 /
-    /// §7.3.15) — they build the group's compile-time <see cref="Binding.FlagState"/> (the per-line per-option
-    /// migration-flag fold that <c>FlagConformancePass</c> queries). Empty when the source has no FLAG directives.</summary>
-    public DirectiveTimeline<FlagEvent> FlagEvents => Directives.FlagEvents;
-
     /// <summary>The frontend's <c>&gt;&gt;COBOL-WORDS</c> override layer (ISO §7.3.10) — the per-group
     /// reserved/context-sensitive/intrinsic word-table modification the lexer's <c>CobolWordsRewriter.Plan</c>
     /// applies to the token stream and the compiler's composed <c>ReservedWordSet</c> / intrinsic resolution
     /// consult. <see cref="CobolWordsMap.Empty"/> when the source has no COBOL-WORDS directive.</summary>
     public CobolWordsMap CobolWordsMap => Directives.CobolWordsMap;
-
-    /// <summary>The POSITION-RULED directive sites of the LAST parsed source (ISO §7.3.20.3 SR4, §7.3.22.3 SR4,
-    /// §7.3.25.3 SR5): WHERE each <c>&gt;&gt;TURN</c> / <c>&gt;&gt;PUSH</c> / <c>&gt;&gt;POP</c> was written, in
-    /// the final line frame, for the ONE lexical-containment predicate that decides all three bans (owner
-    /// decision D20; kb/Work PB595) — and the sites of every directive whose row carries a placement rule
-    /// (<c>DirectivePlacementPass</c>, kb/Work PB1377/PB1378/PB1065).</summary>
-    public IReadOnlyList<DirectiveSite> DirectiveSites => Directives.DirectiveSites;
 
     /// <summary>EVERY directive-derived fact the binder consumes, as ONE record (kb/Work PB65 — the fifth
     /// positional parameter on <c>Bind</c> was the growing-list shape). Reflects the LAST parsed source, with

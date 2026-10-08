@@ -40,7 +40,4 @@ public readonly struct SourceLocation : IEquatable<SourceLocation>
 
     public override bool Equals(object? obj) => obj is SourceLocation other && Equals(other);
     public override int GetHashCode() => HashCode.Combine(FileName, Position);
-
-    public static bool operator ==(SourceLocation left, SourceLocation right) => left.Equals(right);
-    public static bool operator !=(SourceLocation left, SourceLocation right) => !left.Equals(right);
 }
