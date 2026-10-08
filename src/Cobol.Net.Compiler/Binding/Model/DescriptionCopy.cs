@@ -43,7 +43,7 @@ public enum DescriptionCopyKind
     MemberOnly = 4,
 
     /// <summary>Not a verbatim copy — a copier WRITES it as the PROVENANCE of a copied clause
-    /// (<see cref="DataItem.ValueIsCopied"/>, <see cref="DataItem.ExternalFromType"/>). The drift test
+    /// (<see cref="DataItem.ValueCopiedFrom"/>, <see cref="DataItem.ExternalFromType"/>). The drift test
     /// therefore neither requires it to equal the source's value nor requires it to stay default.</summary>
     CopyWritten = 8,
 

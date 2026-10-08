@@ -54,12 +54,14 @@ public sealed partial class DataBinder
     /// clause is used for the initial value associated with the subject of the entry"), and its NOTE points at
     /// the VALUE clause's own syntax rules for exactly this composition.</para>
     ///
-    /// <para><b>Once per WRITTEN VALUE clause.</b> The subject test reads <see cref="DataItem.ValueIsCopied"/>:
+    /// <para><b>Once per WRITTEN VALUE clause.</b> The subject test reads <see cref="DataItem.ValueCopiedFrom"/>:
     /// a template's VALUE assumed by a reference site (§13.18.57.4 GR1) or a SAME AS subject (§13.18.49 GR1)
     /// names the SAME source entry the template already answered for. Measured: `01 A VALUE "ABCD".
     /// 05 X PIC 9(4) COMP. 01 B SAME AS A.` reported COBOLNET1702 twice, both anchored at X's one declaration.
     /// (A SAME AS entry can never carry its OWN VALUE — §13.16.3 SR12, enforced as COBOLNET1555 — so the SAME AS
-    /// population is covered entirely by its target.)</para>
+    /// population is covered entirely by its target.) That holds for SR13 and SR14 — properties of the entry that
+    /// wrote the clause — and NOT for SR1, a property of what the subject IS, which a TYPE reference can compose
+    /// out of a template that conforms alone (<see cref="ScreenAssumedGroupValueSubject"/>, kb/Work PB2517).</para>
     ///
     /// <para><b>SR1, both SR14 conjuncts, and SR13's second sentence.</b> SR14 is a single sentence carrying TWO
     /// independent restrictions and this repo's most reproducible defect shape is a two-arm rule with one arm
@@ -75,8 +77,17 @@ public sealed partial class DataBinder
             // format 2 (TableValues). A level-88 entry is a condition-name, not a node in the forest
             // (DataBinder's level stack attaches it to its conditional variable), so every descendant
             // reached below is a real data item — SR13/SR14's "data items subordinate to" exactly.
-            if (!IsGroupValueSubject(item)) continue;
+            if (!HasGroupValue(item)) continue;
             string subject = item.CobolName ?? item.CsName;
+
+            // ⛔ A VALUE THE ENTRY ONLY ASSUMED (§13.18.57.4 GR1 / §13.18.49 GR1) is screened where it was
+            // WRITTEN for every predicate its source could already answer — but SR1 is not such a predicate when
+            // the composition is what creates its shape (kb/Work PB2517). See ScreenAssumedGroupValueSubject.
+            if (item.ValueCopiedFrom is { } assumedFrom)
+            {
+                ScreenAssumedGroupValueSubject(item, assumedFrom, subject);
+                continue;
+            }
 
             // SR1 — the subject shall not be a strongly-typed group item or a variable-length group. Reported
             // at the subject and the subtree walk is SKIPPED: the entry itself has to change, and SR14's usage
@@ -242,12 +253,47 @@ public sealed partial class DataBinder
         _ => "an alphanumeric",
     };
 
-    /// <summary>The subject of §13.18.63.3 SR1/SR13/SR14: a GROUP entry that WROTE a VALUE clause — format 1
-    /// (<see cref="DataItem.RawValue"/>) or, per SR16, format 2 (<see cref="DataItem.TableValues"/>). A VALUE
-    /// this entry only ASSUMED from a type declaration or a SAME AS target belongs to the entry that wrote it
-    /// (see <see cref="DataItem.ValueIsCopied"/>), which is screened where it is declared.</summary>
-    private static bool IsGroupValueSubject(DataItem item) =>
-        item.IsGroup && !item.ValueIsCopied && (item.RawValue is not null || item.TableValues is not null);
+    /// <summary>A GROUP entry carrying a VALUE clause — format 1 (<see cref="DataItem.RawValue"/>) or, per SR16,
+    /// format 2 (<see cref="DataItem.TableValues"/>) — WRITTEN or ASSUMED.</summary>
+    private static bool HasGroupValue(DataItem item) =>
+        item.IsGroup && (item.RawValue is not null || item.TableValues is not null);
+
+    /// <summary>The subject of §13.18.63.3 SR13/SR14 (and of SR1 as written): a GROUP entry that WROTE a VALUE
+    /// clause. A VALUE this entry only ASSUMED from a type declaration or a SAME AS target belongs to the entry
+    /// that wrote it (see <see cref="DataItem.ValueCopiedFrom"/>), which is screened where it is declared.</summary>
+    private static bool IsGroupValueSubject(DataItem item) => HasGroupValue(item) && item.ValueCopiedFrom is null;
+
+    /// <summary>SR1 for a group whose VALUE clause was ASSUMED from <paramref name="source"/> — the TYPE template's
+    /// group, the cloned member it reproduces, or the SAME AS target (§13.18.57.4 GR1, §13.18.58.4 GR1,
+    /// §13.18.49.4 GR1).
+    ///
+    /// <para>⛔ <b>Suppress only a predicate the source could already answer</b> (kb/Work PB2517; PB2071's same
+    /// hazard). SR13 and SR14 are properties of the entry that wrote the clause and the entries under it, and the
+    /// source answered for them. SR1 is a property of what the subject IS, and §8.5.3.1 makes a group strongly
+    /// typed only when it is described with, or subordinate to an item described with, a TYPE clause naming a
+    /// STRONG declaration — so the group inside <c>01 U IS TYPEDEF STRONG. 05 G VALUE "AB".</c> conforms (a
+    /// template is not a typed item) and <c>01 V TYPE U.</c> is what composes the violation: V.G is a
+    /// strongly-typed group item (§8.5.3.1 second case) that carries the VALUE (§13.18.58.4 GR3). The screen
+    /// therefore asks the composed entry, and stays silent only when the source was already in the same shape —
+    /// a chained declaration (<c>01 S2 TYPEDEF TYPE S</c>) or a SAME AS target already reported where the
+    /// strength was first composed.</para>
+    ///
+    /// <para>Anchored at the entry whose TYPE clause composed the shape — the outermost strongly-typed entry
+    /// (<see cref="StrongTypeModel.StrongRoot"/>), which for a nested reference is NOT the nearest TYPE clause
+    /// (<c>01 Q IS TYPEDEF STRONG. 05 H2 TYPE S. 01 R TYPE Q.</c> is strong through R's clause, not H2's). The
+    /// declaration is legal on its own, exactly as the SR14 arm's clone anchoring reasons, and the message names
+    /// the subject because one reference site can compose several VALUE-carrying groups.</para></summary>
+    private void ScreenAssumedGroupValueSubject(DataItem item, DataItem source, string subject)
+    {
+        if (Sr1SubjectShape(item) is not { } shape || Sr1SubjectShape(source) is not null) return;
+        var anchor = StrongTypeModel.StrongRoot(item) ?? StrongTypeModel.TypeAnchor(item) ?? item;
+        using var _ = Edition.At(anchor);
+        Edition.Error(DiagnosticCatalog.GroupValueSubjectShape, $"data item '{subject}' carries a group-level "
+            + $"VALUE clause assumed from the description of '{source.CobolName ?? source.CsName}' and is {shape}, "
+            + $"composed by the TYPE clause of '{anchor.CobolName ?? anchor.CsName}' "
+            + "— the subject of the entry shall not be a strongly-typed group item or a variable-length group "
+            + "(ISO §13.18.63.3 SR1; §13.18.58.4 GR3)");
+    }
 
     /// <summary>Whether any ancestor of <paramref name="item"/> is itself a group-level VALUE subject — the
     /// SR13-sentence-2 shape, already rejected once at the outer subject, whose subtree walk covers this one.</summary>

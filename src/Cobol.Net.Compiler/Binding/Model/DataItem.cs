@@ -276,20 +276,28 @@ public sealed class DataItem
     /// and §13.18.63.4 GR5 initializes the AREA — so <c>GroupValueSlicer.AreaOf</c> reads this too.</summary>
     public string? ValueAt(Subscripts subs) => TableValuePlan is { } plan ? plan.LiteralAt(subs) : RawValue;
 
-    /// <summary>True when this entry's <see cref="RawValue"/> was TRANSPLANTED from another entry's data
-    /// description rather than written in this entry's own — a TYPE template's VALUE assumed by its reference
-    /// site (ISO §13.18.57.4 GR1; GR3 gives the subject's OWN VALUE precedence, hence <c>??=</c>), a SAME AS
-    /// target's assumed by its subject (§13.18.49 GR1), or a cloned template subtree's member VALUE.
+    /// <summary>The entry this entry's VALUE clause (<see cref="RawValue"/> or <see cref="TableValues"/>) was
+    /// TRANSPLANTED from, or null when the entry wrote its own or has none — a TYPE template's VALUE assumed by its
+    /// reference site (ISO §13.18.57.4 GR1; GR3 gives the subject's OWN VALUE precedence, hence <c>??=</c>), a
+    /// SAME AS target's assumed by its subject (§13.18.49 GR1), or a cloned template subtree's member VALUE.
+    /// Non-null IS "this entry's VALUE is copied".
     ///
     /// <para>⛔ THE PROVENANCE THE SYNTAX-RULE SCREENS NEED. A rule whose subject is "an entry that specifies a
     /// VALUE clause" (§13.18.63.3 SR13/SR14) speaks about the entry the PROGRAMMER WROTE: the template is
     /// screened once where it is declared, and re-screening each composed copy reports the identical source
     /// entry once per reference site. Measured: `01 A VALUE "ABCD". 05 X PIC 9(4) COMP. 01 B SAME AS A.` emitted
-    /// COBOLNET1702 TWICE, both anchored at X's one declaration. Without this flag the fact is unrecoverable at
-    /// screen time — the merge has already happened and the text is indistinguishable.</para></summary>
+    /// COBOLNET1702 TWICE, both anchored at X's one declaration. Without this fact it is unrecoverable at
+    /// screen time — the merge has already happened and the text is indistinguishable.</para>
+    ///
+    /// <para>⛔ AN ENTRY, NOT A FLAG (kb/Work PB2517). "The source already answered for it" is a statement about
+    /// one PREDICATE, and only the source can say whether that predicate held there: §13.18.63.3 SR1 ("shall not
+    /// be a strongly-typed group item") is false of a TYPEDEF STRONG template's group — a template is not a typed
+    /// item (§8.5.3.1) — and becomes true only when a TYPE reference composes it. A flag could only suppress the
+    /// screen for every copy; the source lets the screen suppress exactly the copies whose source was already in
+    /// violation (<c>DataBinder.CheckGroupValueDeclarations</c>).</para></summary>
     [DescriptionCopy(DescriptionCopyKind.CopyWritten,
         "the copy itself WRITES it — the ISO §13.18.63.3 SR13/SR14 screens' subject is the entry that WROTE the VALUE, never a composed copy")]
-    public bool ValueIsCopied { get; set; }
+    public DataItem? ValueCopiedFrom { get; set; }
 
     /// <summary>True when this entry carries a TYPEDEF clause — it is a TYPE DECLARATION (a named template; ISO
     /// §13.18.58, data-model D17), allocating NO storage. Registered in <c>DataBinder.TypeDecls</c>, kept OFF

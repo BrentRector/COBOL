@@ -3731,10 +3731,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // §13.18.63.3 literal screen against the COMPOSED description — the template's PICTURE, written or
         // SR9-implied (kb/Work PB1300). BindEntry could not ask it: the entry had no PICTURE until this copy, so
         // `01 W TYPE U VALUE "QRSTUV".` over a two-character U, and `01 M TYPE N VALUE 12345.` over a PIC 9(3)
-        // N, compiled clean and stored a truncated value. A COPIED value (ValueIsCopied) is the template's, which
+        // N, compiled clean and stored a truncated value. A COPIED value (ValueCopiedFrom) is the template's, which
         // its own entry already answered for; a GROUP subject's own VALUE is the group-value screen's
         // (CheckGroupValueDeclarations), which reads the composed forest already.
-        if (!item.ValueIsCopied && item.Pic is { } composedPic && !composedPic.IsRecovery)
+        if (item.ValueCopiedFrom is null && item.Pic is { } composedPic && !composedPic.IsRecovery)
         {
             string valueWhere = $"data item '{subject}'";
             if (item.RawValue is { } ownValue)
@@ -3896,7 +3896,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // silently re-categorized a whole subtree (kb/Work PB522).
         if (to.GroupUsage is GroupUsage.None) to.GroupUsage = from.GroupUsage;
         if (to.Pending is PicPending.None) to.Pending = from.Pending;
-        // The provenance of the VALUE travels with it (DataItem.ValueIsCopied): the §13.18.63.3 SR13/SR14
+        // The provenance of the VALUE travels with it (DataItem.ValueCopiedFrom): the §13.18.63.3 SR13/SR14
         // screen's subject is the entry that WROTE the VALUE clause, so a copied one must not re-report the
         // template's / target's already-screened entry once per reference site.
         // ⛔ BOTH VALUE CARRIERS, not just the Format-1 one (kb/Work PB505's sibling sweep). RawValue and
@@ -3908,7 +3908,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         if (entryCopy)
         {
             if (to.RawValue is null && to.TableValues is null && (from.RawValue is not null || from.TableValues is not null))
-                to.ValueIsCopied = true;
+                to.ValueCopiedFrom = from;
             if (to.RawValue is null && to.TableValues is null) to.TableValues = from.TableValues;
             to.RawValue ??= from.RawValue;
         }
@@ -8078,7 +8078,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// §13.18.63.3 SR14 violation out of a VALUE clause the reference site wrote and a usage the template wrote,
     /// and NEITHER entry carries it alone. Measured on the first landing of the SR13/SR14 screen: that program
     /// compiled clean while its byte-identical inline spelling was rejected — the whole TYPE population escaped.
-    /// Use this forest for such a rule, and keep the item's OWN provenance (see <see cref="DataItem.ValueIsCopied"/>)
+    /// Use this forest for such a rule, and keep the item's OWN provenance (see <see cref="DataItem.ValueCopiedFrom"/>)
     /// to avoid re-reporting a clause the template already answered for.</para>
     /// </summary>
     public IEnumerable<DataItem> CompositionForest() => DeclaredForest();

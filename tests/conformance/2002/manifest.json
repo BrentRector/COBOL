@@ -179,6 +179,7 @@
   "pb665_restricted_pointer_conforming",
   "pb1408_address_of_restricted_pointer",
   "pb1408_universal_address_of_subordinate_group",
+  "pb2517_group_value_in_weak_type_ok",
   "pb1282_redefines_in_weak_typedef_ok",
   "pb609_call_restricted_program_pointer",
   "pb606_call_not_on_propagated",

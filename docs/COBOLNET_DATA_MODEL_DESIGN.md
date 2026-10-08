@@ -1655,7 +1655,7 @@ digit-capacity gates (18 at COBOL-85) do not reach it — it is not a PICTURE th
 lives in the SPINE both forests share, so it is absent from `CompositionForest` too — see
 `COBOLNET_DESIGN.md`'s group-VALUE bullets for why there are two: `ConformanceForest` is the WRITTEN-ENTRY set
 for per-entry attribute gates, `CompositionForest` adds the TYPE / SAME AS clone subtrees back for rules whose
-subject is the COMPOSED entry, with `DataItem.ValueIsCopied` carrying the provenance that keeps such a rule
+subject is the COMPOSED entry, with `DataItem.ValueCopiedFrom` carrying the provenance that keeps such a rule
 answering once per WRITTEN clause.)
 
 **⛔ AND THE INTEGRALITY RULE IS ONE READ SHARED WITH ORDINARY SCALED SUBSCRIPTS (fix-queue PB41).** Asking what a

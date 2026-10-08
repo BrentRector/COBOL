@@ -597,7 +597,7 @@ ALIGNED (§13.18.1), ANY LENGTH (§13.18.2) and DYNAMIC LENGTH (§13.18.19) were
    a composed BASED is placement-screened at the copy site by `ScreenComposedBased`, COBOLNET2510, kb/Work
    PB1300) · `MemberOnly` (a reproduced subordinate
    only — the name, OCCURS, REDEFINES, a nested TYPE/SAME AS reference, the declaration cursor) · `CopyWritten`
-   (the copy derives it: `ValueIsCopied`, `ExternalFromType`) · `None` (excluded by a named rule, or owned by a
+   (the copy derives it: `ValueCopiedFrom`, `ExternalFromType`) · `None` (excluded by a named rule, or owned by a
    post-build pass). Adding a field to `DataItem` is therefore a CHOICE made where the field is declared.
 3. **The classification is behaviourally true.** `DescriptionCopyCompletenessDriftTests` (Unit) fails when a
    stored property has no classification, when a `Clause`/`Alignment` field is not transferred by the copy, when

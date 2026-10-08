@@ -444,8 +444,12 @@ The grammar gives `dataReference : cobolWord dataReferenceSuffix*`, and subscrip
   has no counterpart on the template: `01 R TYPE T VALUE "ABCD".` composes an SR14 violation out of a VALUE the
   reference site wrote and a usage the template wrote, and neither entry carries it alone — that program compiled
   clean on the screen's first landing while its byte-identical inline spelling was rejected. Provenance keeps the
-  verdict count honest: `DataItem.ValueIsCopied` marks a VALUE this entry only ASSUMED (§13.18.57.4 GR1 /
-  §13.18.49 GR1), so the screen answers once per WRITTEN VALUE clause rather than once per reference site.
+  verdict count honest: `DataItem.ValueCopiedFrom` names the entry a VALUE this entry only ASSUMED was copied from
+  (§13.18.57.4 GR1 / §13.18.49 GR1), so SR13/SR14 answer once per WRITTEN VALUE clause rather than once per reference
+  site. SR1 is the exception that proves why it names the entry and not a flag (kb/Work PB2517): a TYPEDEF STRONG
+  template's group is not a typed item (§8.5.3.1), so SR1 is false there and becomes true only when a TYPE reference
+  composes it; `ScreenAssumedGroupValueSubject` asks SR1 of every assumed group VALUE and stays silent only when the
+  source entry was already in the same shape (a chained declaration, a SAME AS of an already-reported entry).
 - **A staged loud beats a silent wrong answer, and a crash is neither — and a refusal is retired the moment the
   rule is expressible.** The bit-packed group VALUE was the standing example: before it was refused, the
   multi-member shape raised an unhandled `ArgumentOutOfRangeException` out of `GroupValueSlicer.SliceInit` and
