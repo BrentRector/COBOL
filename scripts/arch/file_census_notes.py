@@ -6,8 +6,10 @@
     python scripts/arch/file_census_notes.py --r2 <batch dir>/collected.json [--ids PBa-PBb] [--dry-run]
     python scripts/arch/file_census_notes.py --self-test
 
-R2 (kb/Work PB2560; DESIGN-architecture-review §3 R2): `--r2` files each UPHELD finding of a review batch (decided by
-scripts/arch/r2_collect.py from the fleet's JSON lines) as one note of cluster PB1754 — `kind: analysis` for a
+R2 (kb/Work PB2560; DESIGN-architecture-review §3 R2): `--r2` files each upheld MECHANISM of a COMPLETE review batch
+(decided by scripts/arch/r2_collect.py from the fleet's JSON lines; findings of one wave kind on overlapping members or
+sites are one mechanism, whichever finder found them, and a mechanism an earlier batch filed takes the new ids on its
+existing note — the w1034 refuter's C3) as one note of cluster PB1754 — `kind: analysis` for a
 restructuring finding, `kind: defect` for a defect the fleet hands the fix lane — with its sites as backticked paths
 (so `work.py note_sites`, `fix_clusters.py` and the planner resolve them), its members as the `**Moves or changes:**`
 line (the member index computes the wave's callers from it), its census findings as `census_refs:` (never
@@ -580,6 +582,8 @@ R2_MODEL = {"extract": EXTRACT_MODEL, "unify": EXTRACT_MODEL, "data-ize": EXTRAC
             "delete": "Sonnet (a measured deletion, R69 §4); a judgment it meets returns NEEDS-OPUS",
             "modernize": "Sonnet (one analyzer rule with its code fix, §5.5; R69 §4)",
             "defect-for-fix-lane": "the fix lane's routing (`model_rules.json`)"}
+# Critical stays MAJOR: the register reserves BLOCKER for an adjudicated severe wrong answer (4 notes of 2,137),
+# and the fix lane ranks a defect by its harm flags first; the landing adjudication re-ranks it.
 R2_SEVERITY = {"Critical": "MAJOR", "Warning": "MINOR"}
 R2_HARM = {"wrong-answer": "wrong_answer", "crashes": "crashes", "silent": "silent",
            "rejects-legal-source": "rejects_legal_source", "under-rejects": "under_rejects"}
@@ -599,7 +603,7 @@ process_only: {process_only}
 blocked: false
 blocked_by: []
 cluster: ["PB1754"]
-spec_refs: []
+spec_refs: {spec_refs}
 inventory_rows: []
 closes_rows: []
 closes_rows_reason: "{reason}"
@@ -609,17 +613,51 @@ tags: [cobolsharp, work, {kind}, r2]
 
 
 def scan_r2(notes_dir):
-    """-> {R2 finding id: note id} from every note's `r2_ids:` line (the idempotence key of an R2 filing)."""
+    """-> {note id: what an R2 note says of its mechanism} — its `r2_ids:` (the idempotence key), `r2_members:`, the
+    wave kind and the sites, read back from the text `render_r2` writes (the self-test round-trips it), and its status.
+    One mechanism, one note across batches too (the w1034 refuter's C3)."""
     out = {}
-    for name in os.listdir(notes_dir):
-        if name.endswith(".md"):
-            with open(os.path.join(notes_dir, name), encoding="utf-8") as fh:
-                for line in fh:
-                    if line.startswith("r2_ids:"):
-                        for x in line[len("r2_ids:"):].split(","):
-                            if x.strip():
-                                out.setdefault(x.strip(), name[:-3])
+    for name in sorted(os.listdir(notes_dir)):
+        if not name.endswith(".md"):
+            continue
+        with open(os.path.join(notes_dir, name), encoding="utf-8") as fh:
+            text = fh.read()
+        if "\nr2_ids:" not in text.replace("\r\n", "\n"):
+            continue
+        note = {"ids": [], "members": [], "sites": [], "wave_kind": None, "status": None}
+        for line in text.splitlines():
+            if line.startswith("r2_ids:"):
+                note["ids"] = [x.strip() for x in line[len("r2_ids:"):].split(",") if x.strip()]
+            elif line.startswith("r2_members:"):
+                note["members"] = [x.strip() for x in line[len("r2_members:"):].split(",") if x.strip()]
+            elif line.startswith("status:") and note["status"] is None:
+                note["status"] = line[len("status:"):].strip()
+            elif line.startswith("**Wave kind:** "):
+                note["wave_kind"] = line[len("**Wave kind:** "):].split(".")[0].strip()
+            elif line.startswith("- `") and "`" in line[3:]:
+                note["sites"].append(line[3:line.index("`", 3)])
+        out[name[:-3]] = note
     return out
+
+
+def r2_merge(group):
+    """One mechanism's upheld records (the primary first) -> the record its ONE note renders: the primary's prose,
+    and every id, file, site, member, census row, harm and checked clause of the group (the w1034 refuter's C3)."""
+    m = dict(group[0])
+
+    def union(key):
+        seen = []
+        for r in group:
+            for x in r.get(key) or []:
+                if x not in seen:
+                    seen.append(x)
+        return seen
+    for k in ("files", "sites", "members", "census_ids", "harm", "spec_refs"):
+        m[k] = union(k)
+    m["severity"] = min((r["severity"] for r in group), key=["Critical", "Warning", "Suggestion"].index)
+    m["ids"] = [r["id"] for r in group]
+    m["also"] = group[1:]
+    return m
 
 
 def render_r2(rec, nid, pin, areas):
@@ -627,16 +665,19 @@ def render_r2(rec, nid, pin, areas):
     defect = wave == "defect-for-fix-lane" or rec["kind"] == "defect"
     harm = {v: "true" if k in (rec.get("harm") or []) else "false" for k, v in R2_HARM.items()}
     title = "%s — %s %s (R2 %s at %s)" % (nid, R2_PREFIX[wave], rec["title"].rstrip("."), rec["pair"], pin[:9])
+    clauses = sorted({str(r["clause"]) for r in rec.get("spec_refs") or []})
     fm = R2_FRONTMATTER.format(
         title=title.replace('"', "'"), nid=nid, kind="defect" if defect else "analysis",
         severity=R2_SEVERITY.get(rec["severity"], "MINOR"),
         area=areas.get(re.sub(r"-[0-9]+$", "", rec["shard"]), "architecture") if defect else "architecture",
-        process_only="false" if defect else "true",
+        process_only="false" if defect else "true", spec_refs=json.dumps(clauses),
         reason=("open; an R2 review finding for the fix lane (PB1754): the inventory row it touches is decided when it "
                 "is fixed") if defect else
                ("behavior-neutral restructuring (an R2 finding of the PB1754 review, DESIGN-architecture-review §3 R2); "
                 "no inventory row"), **harm)
-    body = [fm.rstrip("\n"), "", "r2_ids: " + rec["id"]]
+    body = [fm.rstrip("\n"), "", "r2_ids: " + ", ".join(rec.get("ids") or [rec["id"]])]
+    if rec.get("members"):
+        body.append("r2_members: " + ", ".join(rec["members"]))
     if rec.get("census_ids"):
         body.append("census_refs: " + ", ".join(rec["census_ids"]))
     body += ["", "**Wave kind:** %s. **Model:** %s." % (wave, R2_MODEL[wave]), "", "**Sites:**"]
@@ -658,14 +699,46 @@ def render_r2(rec, nid, pin, areas):
     if rec.get("analyzer_rule"):
         measured += " Analyzer rule: `%s`." % rec["analyzer_rule"]
     body += ["**Measured how:** " + measured, ""]
-    if rec.get("corrections"):
-        body += ["**Skeptics' corrections:** " + " | ".join(json.dumps(c, ensure_ascii=False) for c in rec["corrections"]), ""]
+    if clauses:
+        body += ["**Spec:** " + "; ".join("§%s \"%s\" (`cite.py --check` passed at collection)" % (r["clause"], r["text"])
+                                          for r in rec["spec_refs"]), ""]
+    if rec.get("corrections_applied"):
+        body += ["**Skeptics' corrections applied:** " + " | ".join(
+            "%s lens: %s %s -> %s" % (c["lens"], c["field"], json.dumps(c["was"], ensure_ascii=False),
+                                      json.dumps(c["now"], ensure_ascii=False)) for c in rec["corrections_applied"]), ""]
     body += ["**Target:** " + rec["target"], "", "**Design reference:** " + rec["design_ref"] + ".", ""]
     if rec.get("owner_question"):
         body += ["**Owner question:** " + rec["owner_question"], ""]
+    if rec.get("also"):
+        body += ["**Also found as** (the same mechanism, merged before filing; every provenance kept):"]
+        body += ["- `%s` (pair %s; skeptics %s): %s" % (
+            a["id"], a["pair"], ", ".join("%s %s" % (k, v) for k, v in sorted(a.get("votes", {}).items())),
+            a["title"].rstrip(".")) for a in rec["also"]]
+        body.append("")
     if not defect:
         body += [contract("delete" if wave == "delete" else "extract"), ""]
     return "\n".join(body), title
+
+
+def merge_into_note(path, rec, new_ids, pin, dry_run):
+    """Add a later batch's finding of an already-filed mechanism to its note: its ids on `r2_ids:` and one
+    `Also found as` line per new record, so one mechanism keeps one note and every provenance."""
+    with open(path, encoding="utf-8", newline="") as fh:
+        text = fh.read().replace("\r\n", "\n")
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if line.startswith("r2_ids:"):
+            have = [x.strip() for x in line[len("r2_ids:"):].split(",") if x.strip()]
+            lines[i] = "r2_ids: " + ", ".join(have + [x for x in new_ids if x not in have])
+            break
+    adds = [r for r in [rec] + list(rec.get("also") or []) if r["id"] in new_ids]
+    text = "\n".join(lines).rstrip("\n") + "\n\n" + "\n".join(
+        "**Also found as** `%s` (pair %s, R2 at %s; skeptics %s): %s" % (
+            r["id"], r["pair"], pin[:9], ", ".join("%s %s" % (k, v) for k, v in sorted(r.get("votes", {}).items())),
+            r["title"].rstrip(".")) for r in adds) + "\n"
+    if not dry_run:
+        with open(path, "w", encoding="utf-8", newline="\r\n") as fh:
+            fh.write(text)
 
 
 def alloc_ids(n):
@@ -684,30 +757,49 @@ def alloc_ids(n):
 
 
 def file_r2(collected_path, id_pool, notes_dir, dry_run, path_root=REPO, areas=None):
-    """-> (written, skipped {reason: [finding ids]}, unused ids). Only UPHELD findings are filed; a finding already
-    filed (its id on an `r2_ids:` line) is skipped; a note naming a path the committed tree lacks is refused."""
+    """-> (written, skipped {reason: [finding ids]}, unused ids). One note per MECHANISM of the batch's upheld
+    findings (r2_collect.py's `mechanisms`, the w1034 refuter's C3), carrying every id; a mechanism an earlier batch
+    already filed gets its new ids added to that note instead of a second note; a batch that is not COMPLETE is
+    refused (an unverified duplicate upheld later would otherwise become a second note); a note naming a path the
+    committed tree lacks is refused."""
     with open(collected_path, encoding="utf-8") as fh:
         rep = json.load(fh)
+    if not rep.get("complete"):
+        raise SystemExit("the batch is not COMPLETE (%s): run `r2_collect.py --out <batch dir> --launch` and launch "
+                         "again until it is" % "; ".join(rep.get("relaunch") or ["no verdict: re-run r2_collect.py"]))
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import r2_collect
     if areas is None:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import r2_subsystems
         areas = {s["key"]: s["area"] for s in r2_subsystems.TABLE}
-    done = scan_r2(notes_dir)
+    notes = scan_r2(notes_dir)
+    filed = {i: nid for nid, n in notes.items() for i in n["ids"]}
     skipped = {}
     for b in ("refuted", "unverified", "leads", "invalid", "already_tracked"):
         if rep.get(b):
             skipped["not upheld: " + b] = [r["id"] for r in rep[b]]
     tracked = work.tracked_paths(pathlib.Path(path_root))
+    upheld = {r["id"]: r for r in rep.get("upheld", [])}
     todo = []
-    for r in rep.get("upheld", []):
-        named = set(r["files"]) | {x.strip().split(" ")[0].split(":")[0] for x in r["sites"]}
+    for mech in rep["mechanisms"]:
+        rec = r2_merge([upheld[mech["primary"]]] + [upheld[i] for i in mech["ids"] if i != mech["primary"]])
+        new_ids = [i for i in mech["ids"] if i not in filed]
+        into = next((filed[i] for i in mech["ids"] if i in filed), None) or next(
+            (nid for nid, n in notes.items() if n["wave_kind"] and r2_collect.same_mechanism(rec, n)), None)
+        named = set(rec["files"]) | {x.strip().split(" ")[0].split(":")[0] for x in rec["sites"]}
         missing = sorted(p for p in named if p not in tracked and not work.is_build_output(p))
-        if r["id"] in done:
-            skipped.setdefault("already-filed", []).append(r["id"])
+        if not new_ids:
+            skipped.setdefault("already-filed", []).extend(mech["ids"])
+        elif into:
+            if notes[into]["status"] in work.TERMINAL_STATUSES:
+                skipped.setdefault("already-filed (its note is %s)" % notes[into]["status"], []).extend(new_ids)
+            else:
+                merge_into_note(os.path.join(notes_dir, into + ".md"), rec, new_ids, rep["pin"], dry_run)
+                skipped.setdefault("merged into an existing note", []).extend("%s -> %s" % (i, into) for i in new_ids)
         elif missing:   # the pin's path is gone from the committed tree: a stale finding, re-reviewed, never filed
-            skipped.setdefault("stale-path", []).append("%s (%s)" % (r["id"], ", ".join(missing)))
+            skipped.setdefault("stale-path", []).append("%s (%s)" % (rec["id"], ", ".join(missing)))
         else:
-            todo.append(r)
+            todo.append(rec)
     if id_pool is None:   # ids go only to the notes written: a stale or filed finding takes none
         id_pool = ["PB(new%d)" % (i + 1) for i in range(len(todo))] if dry_run else alloc_ids(len(todo))
     if len(todo) > len(id_pool):
@@ -732,41 +824,71 @@ def self_test_r2():
              "target": "T and U", "files": ["src/T.cs"], "sites": ["src/T.cs:10-90 (N.T.F)"], "members": ["N.T.F"],
              "census_ids": ["R0-0001"], "design_ref": "§8.3", "wave_kind": "extract", "severity": "Warning",
              "existing_note": "", "owner_question": "", "votes": {"rule": "upheld", "scenario": "upheld", "site": "refuted"},
-             "corrections": []}
+             "corrections_applied": []}
         r.update(kw)
         return r
+
+    def mech(*ids):
+        return {"primary": ids[0], "ids": sorted(ids), "why": []}
+    clause = {"clause": "14.9.8.4", "text": "Otherwise, arithmetic-expression-1 is evaluated to produce an algebraic value"}
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, "src"))
-        for f in ("T.cs", "D.cs"):
+        for f in ("T.cs", "D.cs", "U.cs"):
             open(os.path.join(tmp, "src", f), "w").close()
         stage(tmp)
         nd = os.path.join(tmp, "Work")
         os.mkdir(nd)
         cp = os.path.join(tmp, "collected.json")
+        dup = rec(1, id="s1--architecture--f2#1", files=["src/T.cs", "src/U.cs"], sites=["src/T.cs:80-120 (N.T.F)", "src/U.cs:1-9"],
+                  title="the same split, seen from the far end", severity="Critical")
+        d = rec(2, wave_kind="defect-for-fix-lane", kind="defect", harm=["wrong-answer"], files=["src/D.cs"],
+                sites=["src/D.cs:3"], severity="Critical", spec_refs=[clause], members=[])
+        upheld = [rec(1), dup, d, rec(3, files=["src/Gone.cs"], sites=["src/Gone.cs:1"], members=["N.G.H"])]
+        batch = {"pin": "abcdef0123456789", "complete": True, "relaunch": [], "upheld": upheld,
+                 "mechanisms": [mech(rec(1)["id"], dup["id"]), mech(d["id"]), mech(rec(3)["id"])],
+                 "refuted": [rec(9)], "leads": [rec(8)]}
         with open(cp, "w", encoding="utf-8") as fh:
-            json.dump({"pin": "abcdef0123456789", "upheld": [
-                rec(1), rec(2, wave_kind="defect-for-fix-lane", kind="defect", harm=["wrong-answer"], files=["src/D.cs"],
-                           sites=["src/D.cs:3"], severity="Critical"),
-                rec(3, files=["src/Gone.cs"], sites=["src/Gone.cs:1"])],
-                "refuted": [rec(9)], "leads": [rec(8)]}, fh)
+            json.dump(dict(batch, complete=False, relaunch=["1 finding(s) unverified"]), fh)
+        try:
+            file_r2(cp, ["PB9100"], nd, False, tmp, {"s1": "binding"})
+            raise AssertionError("an incomplete batch was filed")
+        except SystemExit as e:
+            assert "not COMPLETE" in str(e) and "unverified" in str(e), e
+        with open(cp, "w", encoding="utf-8") as fh:
+            json.dump(batch, fh)
         areas = {"s1": "binding"}
         w, s, tail = file_r2(cp, ["PB9101", "PB9102", "PB9103"], nd, False, tmp, areas)
         assert [x[0] for x in w] == ["PB9101", "PB9102"] and tail == ["PB9103"], (w, tail)
         assert s["stale-path"][0].startswith("s1--architecture--f1#3") and s["not upheld: refuted"] and s["not upheld: leads"], s
         with open(os.path.join(nd, "PB9101.md"), encoding="utf-8") as fh:
             a = fh.read()
-        assert "kind: analysis" in a and 'cluster: ["PB1754"]' in a and "r2_ids: s1--architecture--f1#1" in a, a
+        # C3: two finders' findings of one mechanism are ONE note carrying both ids, every file and the higher severity
+        assert "r2_ids: s1--architecture--f1#1, s1--architecture--f2#1" in a and "- `src/U.cs:1-9`" in a, a
+        assert "**Also found as**" in a and "the same split, seen from the far end" in a and "severity: MAJOR" in a, a
+        assert "kind: analysis" in a and 'cluster: ["PB1754"]' in a and "r2_members: N.T.F" in a, a
         assert "census_refs: R0-0001" in a and "census_ids:" not in a, a   # never claims a census finding's filing key
         assert "- `src/T.cs:10-90` (N.T.F)" in a and "**Moves or changes:** `N.T.F`." in a and "Extract:" in a, a
-        assert "severity: MINOR" in a and "area: architecture" in a and "skeptics rule upheld, scenario upheld, site refuted" in a
+        assert "area: architecture" in a and "skeptics rule upheld, scenario upheld, site refuted" in a and "spec_refs: []" in a
         with open(os.path.join(nd, "PB9102.md"), encoding="utf-8") as fh:
-            d = fh.read()
-        assert "kind: defect" in d and "wrong_answer: true" in d and "area: binding" in d and "severity: MAJOR" in d, d
-        assert "process_only: false" in d and "**Moves or changes" not in d, d
+            dn = fh.read()
+        assert "kind: defect" in dn and "wrong_answer: true" in dn and "area: binding" in dn and "severity: MAJOR" in dn, dn
+        assert "process_only: false" in dn and "**Moves or changes" not in dn and 'spec_refs: ["14.9.8.4"]' in dn, dn
         parsed = work.parse_frontmatter(a)
         assert parsed and parsed["kind"] == "analysis" and parsed["status"] == "open", parsed
+        back = scan_r2(nd)["PB9101"]
+        assert back["wave_kind"] == "extract" and back["members"] == ["N.T.F"] and "src/T.cs:10-90" in back["sites"], back
         w2, s2, _ = file_r2(cp, ["PB9104", "PB9105"], nd, False, tmp, areas)
-        assert not w2 and s2["already-filed"] == ["s1--architecture--f1#1", "s1--architecture--f1#2"], (w2, s2)
+        assert not w2 and sorted(s2["already-filed"]) == sorted([rec(1)["id"], dup["id"], d["id"]]), (w2, s2)
+        # a LATER batch finds the same mechanism: its id joins the existing note, no second note
+        later = rec(7, id="s9--duplication--f1#7", pair="s9--duplication", sites=["src/T.cs:50-60 (N.T.F)"])
+        with open(cp, "w", encoding="utf-8") as fh:
+            json.dump(dict(batch, upheld=[later], mechanisms=[mech(later["id"])], refuted=[], leads=[]), fh)
+        w3, s3, tail3 = file_r2(cp, ["PB9106"], nd, False, tmp, areas)
+        with open(os.path.join(nd, "PB9101.md"), encoding="utf-8") as fh:
+            a2 = fh.read()
+        assert not w3 and tail3 == ["PB9106"] and s3["merged into an existing note"] == ["s9--duplication--f1#7 -> PB9101"], s3
+        assert "r2_ids: s1--architecture--f1#1, s1--architecture--f2#1, s9--duplication--f1#7" in a2 and \
+            "**Also found as** `s9--duplication--f1#7`" in a2, a2
     print("self-test R2 OK")
 
 

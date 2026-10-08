@@ -134,7 +134,7 @@ is tracked tooling with a self-test, so the next batch is a command, never a bri
   it is written; this block is rendered from it (`--write-design`), and `--check` fails when the block differs or
   when the sets do not PARTITION the reviewed code (a file in no subsystem is a hole, a file in two an overlap). The
   drift test `ArchReviewFleetDriftTests` runs the check on the committed tree, so a new folder no subsystem owns is
-  red until the table owns it. At 8be230068: 1,503 files, 0 holes, 0 overlaps. The runtime's collation, Unicode and
+  red until the table owns it. At 8be230068: 1,511 files (the root scripts and the agent role files included), 0 holes, 0 overlaps. The runtime's collation, Unicode and
   globalization code is a seventeenth subsystem, and the source generator belongs to the bound tree it generates for.
 <!-- r2-subsystems:begin -->
 | Subsystem (`key`) | Files: include | except |
@@ -155,15 +155,16 @@ is tracked tooling with a self-test, so the next batch is a command, never a bri
 | runtime control and exceptions (`runtime-control`) | `src/Cobol.Net.Runtime/{Control,Exceptions}/**` | — |
 | editions and diagnostics (`editions-diagnostics`) | `src/Cobol.Net.Editions/**` `src/Cobol.Net.Frontend/Diagnostics/**` | — |
 | CLI (`cli`) | `src/Cobol.Net.Cli/**` | — |
-| tests, scripts and CI (`tests-scripts-ci`) | `tests/**` `scripts/**` `tools/**` `.github/**` `.claude/**` `Directory.*.props` `Cobol.Net.sln` | — |
+| tests, scripts and CI (`tests-scripts-ci`) | `tests/**` `scripts/**` `tools/**` `.github/**` `.claude/**` `*.ps1` `Directory.*.props` `Cobol.Net.sln` | — |
 
-Under review: `src/**/*.{cs,g4,ps1,csproj}`, `tests/**/*.{cs,csproj,props,py,ps1,sh}`, `scripts/**/*.{py,ps1,sh,js,mjs,cs,yml}`, `tools/**/*.{cs,csproj,targets,sh,py,ps1}`, `.github/**/*.yml`, `.claude/**/*.{py,js,ps1}`, `Directory.*.props`, `Cobol.Net.sln`. Left out: `**/*.{g.cs,g.i.cs,Designer.cs}` (generated, by the census rule `generated`; reviewed through its generator); `**/Generated/**` (a build output, the ANTLR parser, never committed); `**/obj/**` (a build output); `tools/claude-skills/**` (the pinned public-skills submodule, BrentRector/claude-skills, reviewed in its own repository).
+Under review: `src/**/*.{cs,g4,ps1,csproj}`, `tests/**/*.{cs,csproj,props,py,ps1,sh}`, `scripts/**/*.{py,ps1,sh,js,mjs,cs,yml}`, `tools/**/*.{cs,csproj,targets,sh,py,ps1}`, `.github/**/*.yml`, `.claude/**/*.{py,js,ps1}`, `.claude/agents/*.md`, `*.ps1`, `Directory.*.props`, `Cobol.Net.sln`. Left out: `**/*.{g.cs,g.i.cs,Designer.cs}` (generated, by the census rule `generated`; reviewed through its generator); `**/Generated/**` (a build output, the ANTLR parser, never committed); `**/obj/**` (a build output); `tools/claude-skills/**` (the pinned public-skills submodule, BrentRector/claude-skills, reviewed in its own repository).
 <!-- r2-subsystems:end -->
 - **Shards a reviewer can read whole** (B2). Each subsystem is cut by path into balanced shards of at most 6,000
   physical lines at the pin (the census `lines` column is per type, and a partial type's files fall in different
   shards, so only a file-level size adds up); a single larger file is its own shard. At 8be230068 the binding family
-  is 9 + 5 + 1 shards, code generation 5, the runtime 10, the CLI 1. A shard over 4,000 lines gets two finders that
-  start from opposite ends (base `review` Scale: audit). Every finder appends a `read` line for each file it read
+  is 9 + 5 + 1 shards, code generation 5, the runtime 10, the CLI 1. A shard (or a resumed pair's unread remainder)
+  over 4,000 lines gets two finders that start from opposite ends (base `review` Scale: audit) and meet in the middle:
+  each skips a file any finder of its pair has marked read. Every finder records a `read` line for each file it read
   WHOLE; the workflow diffs the union against the shard's files and sends a finisher to exactly the remainder (twice
   at most), and a pair still missing a file is reported INCOMPLETE.
 - **The census and member index of the pin** (B7). The fleet reads one pinned commit, and its census record and
@@ -174,46 +175,79 @@ Under review: `src/**/*.{cs,g4,ps1,csproj}`, `tests/**/*.{cs,csproj,props,py,ps1
   each cached; `--projects` measures some now, and a shard's input is written once the projects holding its files
   are measured, because csc on `Cobol.Net.Compiler` with every rule on ran past 2,000 CPU-seconds and 28 GB while
   the leaf projects took under a minute), the drift-rule query
-  per file and the open-notes scan ONCE, caches each step, and writes one self-contained input per shard: its files
+  per file and the open-notes scan ONCE, caches each step under the KEY it was made for (the pin, the step's version,
+  the rule table; a step cached under another key is recomputed, never reused), and writes one self-contained input
+  per shard: its files
   and lines, those facts filtered to its files, the census rows for it (god classes, unreachable and test-only
   families, folder/namespace disagreements, clone families touching it) and the measured namespace edges of its
   namespaces. **Duplication** is ONE whole-codebase pass over the census clone report (every family, each copy
   mapped to its shard, a cross-shard family one finding), plus each shard's "two mechanisms, one rule in two places"
   lens. **Performance** gets the R0 baseline record and `perf_baseline.py --against`; a claim without a measurement
-  on the pin is a lead (N3). **Modern C#** is analyzer-first: a finding is one analyzer rule (`wave_kind: modernize`,
-  `analyzer_rule`), and a point without a rule id is a lead (N2).
+  on the pin (a row of the baseline, or a count at a stated input size read from the pinned code; a reviewer builds
+  nothing) is a lead (N3). **Modern C#** is analyzer-first: a finding is one analyzer rule (`wave_kind: modernize`,
+  `analyzer_rule`), and a point without a rule id is a lead (N2). `AnalysisLevel=latest-all` turns on the CA rules
+  only, so the analyzer tree's `.globalconfig` raises the IDE and SYSLIB rules of §5.5's features to warning; the
+  feature-to-rule table (`MODERN_RULES` in `r2_inputs.py`, carried in every shard input) is the one place that mapping
+  is written, and a feature with no rule (extension members, `params` spans, frozen collections, `required`) is a lead.
+  Without it batch 1's inputs held 284 CA warnings and no IDE or SYSLIB rule (the w1034 claim refuter's C4); with it
+  the runtime alone reports IDE0305, IDE0032, IDE0028, IDE0300, IDE0290, IDE0078, IDE0306, IDE0330 and IDE0066, and
+  the frontend SYSLIB1045 sixteen times. The rules cost nothing measurable (Cobol.Net.Editions built in 4 s with and
+  without them); the analyzer steps of batch 1's projects took 7 s (CLI), 10 s (Editions), 24 s (Frontend) and 23 s
+  (Runtime).
 - **The workflow** is `.claude/skills/workstream/templates/wf_r2_review.js` (`check_practices.py` holds its required
   parts; `scripts/arch/test_wf_r2_review.mjs` dry-runs every arm with stubbed agents). Every agent is the read-only
-  role `cobol-reviewer` (Opus, effort high, 120 turns, the read-only hook, the bar; N1). It APPENDS one JSON line
-  per decision to its own checkpoint file the moment it decides (B3): `review-<shard>--<dimension>--f<k>.jsonl`,
-  `null-<pair>.jsonl`, `refute-<pair>--c<j>--<lens>.jsonl`; on start it skips what its file holds, so a relaunch
-  with the same args resumes across the operator's restarts (Workflow resume is same-session only). Width: eight
-  agents at once across every stage; a stop file (the owner's `scratch\STOP` or the fleet's `scratch\STOP-r2`) ends
-  the batch after the agent that saw it.
+  role `cobol-reviewer` (Opus, effort high, 120 turns, the read-only hook, the bar; N1). It records one JSON line
+  per decision the moment it decides (B3), through ONE tool that owns the format: `r2_collect.py --append <file>
+  '<json>'` validates the record as the collector will (and refuses it with the reason, so the agent fixes it in
+  context), into its own checkpoint file `review-<shard>--<dimension>--f<k>.jsonl`, `null-<pair>.jsonl` or
+  `refute-<pair>--c<j>--<lens>.jsonl`; `r2_collect.py --status <batch dir> <pair>` tells it what its PAIR has decided
+  (the files any finder read, every finding on disk, the decisions per lens, the next finding number), and it skips
+  that. **Resume is from disk, per pair** (the w1034 claim refuter's C2: a workflow that planned from what agents
+  RETURNED re-read a finisher's files on a relaunch, never ran the finisher again, left its findings unverified and
+  re-decided findings whose skeptic chunks had moved; a finder that wrote findings and returned nothing orphaned
+  them). Every launch, the first included, is made from `launch-args.json`, which `r2_collect.py --out <batch dir>
+  --launch` writes: the batch args plus each pair's on-disk state. The workflow refuses args without it and plans
+  each pair from it: finders only for the unread remainder, each new agent under a new finder number, a finisher
+  after any agent that returned nothing (only an agent can read the disk), skeptics only for findings their lens has
+  not decided; a decided pair starts no agent. Width: eight agents at once across every stage; a stop file (the
+  owner's `scratch\STOP` or the fleet's `scratch\STOP-r2`) ends the batch after the agent that saw it.
 - **Verification** (B6). Every finding is attacked by three skeptics with distinct lenses — the site (real, current,
   not already a note), the rule (it applies, the target agrees with §8, the wave kind and severity), the scenario (it
   occurs; the measurement; a defect is a spec defect) — in chunks of four findings per transcript. A finding stands
-  when two of the three fail to refute it. A pair that found NOTHING is examined by an agent that tries to find what
+  when two of the three fail to refute it, and takes the corrections of the skeptics that upheld it, each only for
+  the fields its lens judged (site: files, sites, members, the existing note; rule: design reference, wave kind,
+  severity; scenario: measurement, harm, clauses), validated again after. A pair that found NOTHING is examined by an agent that tries to find what
   the finders missed, and a null result is accepted only when the pair is complete and examined.
 - **Every finding carries** (B5) its id, kind (finding · lead · defect), title, the rule it breaks, a concrete
   scenario, the target, the repository-relative `files` (each must exist in the pin), the exact `sites`, the
   `members` a wave would move or change, the `census_ids` it rests on, its `design_ref` (§8.x, or the PBnnnn that
   already plans it), its wave kind (extract · unify · move-and-rename · data-ize · delete · modernize · a
-  defect for the fix lane, with its harm), calibrated severity (Critical · Warning · Suggestion; long-lived, high
-  consequence), `existing_note` and `owner_question`.
+  defect for the fix lane, with its harm and its `spec_refs` — the clause and its words, each run through
+  `cite.py`'s check at collection, so a defect note's `spec_refs:` holds only checked clauses), calibrated severity
+  (Critical · Warning · Suggestion; long-lived, high consequence; Critical files as MAJOR, the register reserving
+  BLOCKER for an adjudicated severe wrong answer), `existing_note` and `owner_question`.
 - **Deciding and filing.** `scripts/arch/r2_collect.py --out <batch dir>` reads the JSON lines FROM DISK (never the
-  workflow's return) and decides each finding (upheld · refuted · unverified · lead · invalid · already tracked),
-  each pair's completeness and each null. `python scripts/arch/file_census_notes.py --r2 <batch dir>/collected.json`
-  files every UPHELD finding as one note in the **`PB1754` cluster** (N6; the planner's `--cluster PB1754` reads it):
+  workflow's return) and decides each finding (upheld · refuted · unverified · lead · invalid · already tracked;
+  two records under one id are invalid, never last-wins), each pair's completeness and each null, and says COMPLETE
+  or LAUNCH NEEDED. **One mechanism, one note** (the w1034 claim refuter's C3: on 15 of batch 1's 35 pairs two
+  finders read the whole shard, and five dimensions read each shard, so one mechanism can be found several times):
+  upheld findings of the same wave kind whose members overlap or whose sites overlap are one mechanism, whichever
+  finder, pair or dimension found them, and the most specific record is its primary.
+  `python scripts/arch/file_census_notes.py --r2 <batch dir>/collected.json` refuses a batch that is not COMPLETE
+  (an unverified duplicate upheld later would become a second note) and files every upheld MECHANISM as one note in
+  the **`PB1754` cluster** (N6; the planner's `--cluster PB1754` reads it), carrying every id and an "Also found as"
+  line per merged provenance; a mechanism an earlier batch filed takes the new ids on that note instead:
   `kind: analysis` for a restructuring finding, `kind: defect` for a defect the fleet hands the fix lane, its sites as
   backticked paths and its members as the `**Moves or changes:**` line, so `fix_clusters.py`, the member index and
   `plan_wave.py` compute the wave's file set (§8.7) rather than anyone listing it. Ids come from `alloc.py`; the
-  finding id on the note's `r2_ids:` line makes a re-run file only what is new; a path the committed tree no longer
-  has is refused as stale.
+  finding ids on the note's `r2_ids:` line (and its `r2_members:`) make a re-run file only what is new; a path the
+  committed tree no longer has is refused as stale.
 - **Running a batch** (MANDATORY-PRACTICES O8, N7): read `scripts/orchestrator/budget.py` before each batch; write
   its args with `r2_inputs.py --out <dir> --batch <label> --shards <ids>` (the SMALL shards first, so the shape is
-  measured before binding's 76,000 lines); launch the workflow with that `batch-args.json`; start
-  `tools/claude-skills/skills/agent-fleet/references/stall_watch.py <its transcript dir>` beside it; collect; file.
+  measured before binding's 76,000 lines); `r2_collect.py --out <batch dir> --launch`, then launch the workflow with
+  the `launch-args.json` it wrote; start `tools/claude-skills/skills/agent-fleet/references/stall_watch.py <its
+  transcript dir>` beside it; after it ends (or stops), `r2_collect.py --out <batch dir> --launch` again, and launch
+  again while it says LAUNCH NEEDED; file once it says COMPLETE.
 - **Dimensions:** the four of `PROMPT.md` §4 (architecture · full code · performance · duplication and efficiency),
   plus modern-C# conformance (§5.5). Their criteria are written once, in `.claude/skills/review/SKILL.md`, the base
   skill's `references/dimensions.md` and §5; the workflow adds only each batch's inputs (N4).

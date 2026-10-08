@@ -60,6 +60,13 @@ public sealed class ArchReviewFleetDriftTests
                      "a pair that found nothing is examined, and only it",
                      "skeptics: chunks of four, three lenses each",
                      "after an agent reports a stop, no new agent starts",
+                     // the w1034 claim refuter's C2: the launch state is the pair's, from disk
+                     "resume after a stop: every file was read exactly once across all launches",
+                     "resume after a stop: no finding is decided twice under a lens",
+                     "resume after a stop: every finding — the finisher's included — is verified",
+                     "a decided pair starts no agent on a relaunch",
+                     "a silent finder whose files another finder saw read still has its findings verified",
+                     "args without the on-disk launch state are refused",
                  })
         {
             Assert.True(r.Stdout.Contains("PASS  " + arm, StringComparison.Ordinal),

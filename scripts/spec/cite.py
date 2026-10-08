@@ -181,11 +181,12 @@ def main() -> int:
                     help="assert TEXT appears inside CLAUSE's own region; exit 1 if not")
     ap.add_argument("--find", metavar="TEXT", help="which clause(s) contain this text")
     ap.add_argument("--self-test", action="store_true", help="prove each guard fires and stays silent")
-    args = ap.parse_args()
+    # before parse_args: `--help` prints the module docstring, whose characters a cp1252 console cannot encode
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:  # noqa: BLE001
         pass
+    args = ap.parse_args()
     if args.self_test:
         return self_test()
     if not (args.find or args.check):

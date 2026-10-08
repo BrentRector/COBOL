@@ -59,6 +59,8 @@ DOMAIN = [
     "tools/**/*.{cs,csproj,targets,sh,py,ps1}",
     ".github/**/*.yml",
     ".claude/**/*.{py,js,ps1}",
+    ".claude/agents/*.md",   # the role definitions: model, turn cap, hooks and the bar each agent runs under
+    "*.ps1",                 # root scripts (the w1034 refuter: create-agents.ps1, create-auditartifacts.ps1)
     "Directory.*.props",
     "Cobol.Net.sln",
 ]
@@ -103,7 +105,7 @@ TABLE = [
      "include": ["src/Cobol.Net.Editions/**", F + "/Diagnostics/**"]},
     {"key": "cli", "area": "cli", "name": "CLI", "include": ["src/Cobol.Net.Cli/**"]},
     {"key": "tests-scripts-ci", "area": "process/tooling", "name": "tests, scripts and CI",
-     "include": ["tests/**", "scripts/**", "tools/**", ".github/**", ".claude/**", "Directory.*.props", "Cobol.Net.sln"]},
+     "include": ["tests/**", "scripts/**", "tools/**", ".github/**", ".claude/**", "*.ps1", "Directory.*.props", "Cobol.Net.sln"]},
 ]
 
 

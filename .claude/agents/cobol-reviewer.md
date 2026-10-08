@@ -32,10 +32,14 @@ section it would amend.
   (scale = long-lived, consequence = high). A defect against the ISO spec is `defect-for-fix-lane` with its harm and
   repro, never a refactor. A performance claim without a measurement on the pin is a `lead`; a modern-C# point
   without an analyzer rule id is a `lead`. Three strong findings beat fifteen weak ones.
-- **Checkpoint per decision:** on start read your checkpoint file if it exists and skip every file and finding it
-  already holds; append a `read` line for each file the moment you have read it WHOLE, a `finding` line the moment a
-  finding is decided, and `done` when your files are finished. A kill can come at any moment; the file is what
-  survives, and a file you did not mark read is reviewed again by someone else.
+- **Checkpoint per decision, through one tool:** `python scripts/arch/r2_collect.py --status <batch dir> <pair>` says
+  what your PAIR has decided (files any of its finders read, every finding on disk, the decisions per lens, the next
+  finding number); ask it first and before each new file or finding, and skip what it shows. Record each decision
+  with `python scripts/arch/r2_collect.py --append <your checkpoint file> '<one JSON object>'` the moment you make it:
+  a `read` line for each file read WHOLE, a `finding` line per finding, `done` when your files are finished. It
+  refuses a record the collector would reject and says why; fix it and append again. Never write the file yourself
+  and never through a heredoc. A kill can come at any moment; the disk is what survives, and a file nobody marked
+  read is reviewed again by someone else.
 - **Stop** at the turn cap or when a stop file your prompt names exists (the owner's global `<coord>\scratch\STOP` or
   the fleet's `STOP-r2`; no other session's): make sure the file holds every decision and return.
 

@@ -10,10 +10,12 @@ spanning two subsystems would have been reported twice under two wave kinds, or 
 on the pin, every reviewer gets ITS facts in one input file (agent-fleet §2: one agent, one self-contained input), and
 duplication's whole-codebase clone report is one input for one pass.
 
-WHAT, in `<out>/` (each step cached in `<out>/mech/<step>.json` and skipped when present, so a re-run resumes):
+WHAT, in `<out>/` (each step cached in `<out>/mech/<step>.json` with the KEY it was made for — the pin, the step's
+STEP_VERSION and what else it depends on — and reused only for the same key, so a re-run resumes):
   mech/semgrep.json     `scripts/semgrep/invariants.yml` over the pin's src/ (the six §1.2 invariants), hits by file;
   mech/analyzers-<project>.json   `dotnet build <project> -p:AnalysisLevel=latest-all` per C# project, in dependency
-                        order, in one detached worktree of the pin (`mech/tree`), every analyzer warning by file (the
+                        order, in one detached worktree of the pin (`mech/tree`) whose `.globalconfig` raises the
+                        §5.5 IDE/SYSLIB rules (MODERN_RULES) to warning, every analyzer warning by file (the
                         modern-C# dimension's ONLY evidence: a modern-C# finding without an analyzer rule id is a
                         suggestion, N2);
   mech/drift.json       `scripts/spec/drift_rules.py <files>`: the specific drift rules that govern each file;
@@ -48,6 +50,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -75,16 +78,33 @@ def rel(path: str, root: Path) -> str | None:
         return None
 
 
-def cached(out: Path, step: str, fn):
+def cached(out: Path, step: str, key: dict, fn):
+    """A mechanical step's result, recomputed unless `mech/<step>.json` was made for the same KEY (the pin, the step's
+    version, and what else its result depends on). Keyed by the step name alone, a step cached before its code
+    changed was silently reused (the w1034 refuter: semgrep.json predated the fleet's final code)."""
     f = out / "mech" / (step + ".json")
     if f.exists():
-        print("r2_inputs: %s cached (%s)" % (step, f))
-        return json.loads(f.read_text(encoding="utf-8"))
+        have = json.loads(f.read_text(encoding="utf-8"))
+        if isinstance(have, dict) and have.get("key") == key:
+            print("r2_inputs: %s cached (%s)" % (step, f))
+            return have["data"]
+        print("r2_inputs: %s cached for another key — recomputing" % step)
     print("r2_inputs: %s ..." % step, flush=True)
+    t0 = time.monotonic()
     data = fn()
     f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text(json.dumps(data, indent=1), encoding="utf-8")
+    f.write_text(json.dumps({"key": key, "seconds": round(time.monotonic() - t0, 1), "data": data}, indent=1),
+                 encoding="utf-8")
     return data
+
+
+def cached_data(out: Path, step: str, key: dict):
+    """A step's cached result when it was made for KEY, else None (a shard waits for its projects' steps)."""
+    f = out / "mech" / (step + ".json")
+    if not f.exists():
+        return None
+    have = json.loads(f.read_text(encoding="utf-8"))
+    return have["data"] if isinstance(have, dict) and have.get("key") == key else None
 
 
 # ── the mechanical steps ─────────────────────────────────────────────────────────────────────────────────────────
@@ -124,6 +144,41 @@ def parse_warnings(text: str, root: Path):
 # 2,000 CPU-seconds and 28 GB while the leaf projects took under a minute, so a whole-solution step held EVERY shard's
 # input hostage to the slowest project. Per project, a shard's input is written as soon as the projects holding its
 # files are measured, and the batch that needs only the leaves need not wait for the compiler.
+#
+# ⛔ THE MODERN-C# DIMENSION NEEDS THE IDE AND SYSLIB RULES (the w1034 refuter's C4). `AnalysisLevel=latest-all` turns
+# on every CA rule, but the code-style (IDE) rules keep their default severity (hidden or suggestion) and are never
+# printed as warnings, so batch 1's inputs held 284 CA warnings and ZERO IDE/SYSLIB ones while design §5.5's features
+# are exactly those rules. The analyzer tree therefore gets a `.globalconfig` (the SDK reads one at the tree root)
+# raising the rules below to warning, written AFTER the plain build (SYSLIB1045 is a generator analyzer, and the
+# pin's TreatWarningsAsErrors would fail that build). Measured on the pin 2026-10-07 (w1037s): Cobol.Net.Editions 4 s
+# and Cobol.Net.Runtime 6 s with the rules on, the same as without; Runtime then reports IDE0305, IDE0032, IDE0028,
+# IDE0300, IDE0290, IDE0078, IDE0306, IDE0330 and IDE0066. A §5.5 feature with no rule here has no analyzer: a point
+# about it is a lead (N2). This table is the ONE place the mapping is written; each shard input carries it.
+MODERN_RULES = {
+    "primary constructors": ["IDE0290"],
+    "collection expressions": ["IDE0028", "IDE0300", "IDE0301", "IDE0302", "IDE0303", "IDE0304", "IDE0305", "IDE0306"],
+    "the field keyword (auto properties)": ["IDE0032"],
+    "System.Threading.Lock": ["IDE0330"],
+    "[GeneratedRegex]": ["SYSLIB1045"],
+    "pattern matching over type tests": ["IDE0019", "IDE0020", "IDE0038", "IDE0066", "IDE0078", "IDE0083", "IDE0260"],
+    "span-based parsing on hot paths": ["CA1845", "CA1846"],   # CA rules: already on at latest-all
+    "extension members (C# 14)": [], "params spans": [], "frozen collections for static tables": [],
+    "required members": [],
+}
+# a step's version: bump it when the step's code or its rule set changes, and every cached result of it is recomputed
+STEP_VERSION = {"semgrep": 2, "drift": 2, "notes": 2, "analyzers": 3}
+
+
+def modern_globalconfig() -> str:
+    rules = sorted({r for ids in MODERN_RULES.values() for r in ids if not r.startswith("CA")})
+    return ("is_global = true\n# r2_inputs.py MODERN_RULES (design §5.5): the modern-C# rules raised to warning for the "
+            "analyzer step\n" + "".join("dotnet_diagnostic.%s.severity = warning\n" % r for r in rules))
+
+
+def analyzer_key(commit: str) -> dict:
+    return {"pin": commit, "version": STEP_VERSION["analyzers"], "modern_rules": MODERN_RULES}
+
+
 PROJECT_ORDER = ["Cobol.Net.Editions", "Cobol.Net.Runtime", "Cobol.Net.Frontend", "Cobol.Net.Cli",
                  "Cobol.Net.Compiler.SourceGen", "Cobol.Net.Compiler", "Cobol.Net.Benchmarks",
                  "Cobol.Net.Tests.Characterization", "Cobol.Net.Tests.Conformance", "Cobol.Net.Tests.Unit",
@@ -152,13 +207,24 @@ def analyzer_worktree(commit: str, out: Path) -> Path:
     return wt
 
 
-def run_analyzers(wt: Path, project: str):
-    """Build one project of the pin's worktree with every analyzer rule on; its own MSBuild nodes and compiler
-    (`-nodeReuse:false`, `UseSharedCompilation=false`): attached to the fleet gates' shared nodes the first run sat an
-    hour with the machine 40 % idle. Only the warnings inside the project's own folder are kept."""
+def write_modern_config(wt: Path, commit: str):
+    """The analyzer tree's `.globalconfig` (MODERN_RULES), never over one the pin itself tracks."""
+    tracked = subprocess.run(["git", "-C", str(REPO), "ls-tree", "--name-only", commit, ".globalconfig"],
+                             capture_output=True, text=True, check=True).stdout.strip()
+    if tracked:
+        raise SystemExit("the pin tracks its own .globalconfig: merge MODERN_RULES into it here before measuring")
+    (wt / ".globalconfig").write_text(modern_globalconfig(), encoding="utf-8")
+
+
+def run_analyzers(wt: Path, project: str, commit: str):
+    """Build one project of the pin's worktree with every analyzer rule on (CA at latest-all, the MODERN_RULES IDE and
+    SYSLIB rules through the tree's `.globalconfig`); its own MSBuild nodes and compiler (`-nodeReuse:false`,
+    `UseSharedCompilation=false`): attached to the fleet gates' shared nodes the first run sat an hour with the
+    machine 40 % idle. Only the warnings inside the project's own folder are kept."""
     proj = next(wt.glob("*/%s/%s.csproj" % (project, project)), None)
     if proj is None:
         raise SystemExit("no project %s in the pin's tree" % project)
+    write_modern_config(wt, commit)
     r = subprocess.run(["dotnet", "build", str(proj), "-c", "Debug", "--no-incremental", "-nologo",
                         "-p:AnalysisLevel=latest-all", "-p:TreatWarningsAsErrors=false", "-p:WarningsAsErrors=",
                         "-p:EnforceCodeStyleInBuild=true", "-nodeReuse:false", "-p:UseSharedCompilation=false",
@@ -255,6 +321,7 @@ def shard_input(sh, m, mech, census, record, ns_of=None):
         "files": sh["files"],
         "semgrep": {p: mech["semgrep"][p] for p in files if p in mech["semgrep"]},
         "analyzers": {p: mech["analyzers"][p] for p in files if p in mech["analyzers"]},
+        "modern_rules": MODERN_RULES,   # the §5.5 feature -> analyzer rule ids map the modern-C# dimension counts by
         "drift_rules": {p: mech["drift"][p] for p in files if p in mech["drift"]},
         "open_notes": {p: mech["notes"][p] for p in files if p in mech["notes"]},
         "census": {k: v for k, v in rows.items()},
@@ -286,10 +353,12 @@ def perf_input():
     if not recs:
         raise SystemExit("no performance baseline record under " + str(PERF_DIR))
     r = recs[-1].relative_to(REPO).as_posix()
-    return {"baseline": r, "measure": "python scripts/arch/perf_baseline.py --against " + r,
-            "rule": "a performance claim needs a measurement on the pin (a benchmark row, a profile, a count at a stated "
-                    "input size); without one it is a LEAD (`kind: lead` in the finding), never a finding (§4 item 5, "
-                    "§5.4)"}
+    # No re-measuring command: a reviewer is read-only and builds nothing (the fleet's build hook refuses it while
+    # the fleet runs), and `perf_baseline.py --against` measures the checkout, not the pin (the w1034 refuter's C4).
+    return {"baseline": r,
+            "rule": "a performance claim needs a measurement ON THE PIN: a row of this baseline record, or a count at a "
+                    "stated input size read from the pinned code (allocations per call, passes over a collection); "
+                    "without one it is a LEAD (`kind: lead` in the finding), never a finding (§4 item 5, §5.4)"}
 
 
 def build(pin: Path, out: Path, max_lines: int, projects=None):
@@ -305,18 +374,25 @@ def build(pin: Path, out: Path, max_lines: int, projects=None):
     out.mkdir(parents=True, exist_ok=True)
     (out / "shards.json").write_text(json.dumps(m, indent=1), encoding="utf-8")
     files = [p for s in m["shards"] for p, _ in s["files"]]
-    mech = {"semgrep": cached(out, "semgrep", lambda: run_semgrep(pin)),
-            "drift": cached(out, "drift", lambda: run_drift(pin, files)),
-            "notes": cached(out, "notes", lambda: open_notes(files)), "analyzers": {}}
+    head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True,
+                          check=True).stdout.strip()
+    pin_key = lambda step: {"pin": commit, "version": STEP_VERSION[step]}  # noqa: E731
+    mech = {"semgrep": cached(out, "semgrep", pin_key("semgrep"), lambda: run_semgrep(pin)),
+            "drift": cached(out, "drift", pin_key("drift"), lambda: run_drift(pin, files)),
+            # the open notes are this checkout's register, not the pin's: keyed by the checkout's HEAD
+            "notes": cached(out, "notes", dict(pin_key("notes"), register=head), lambda: open_notes(files)),
+            "analyzers": {}}
     measured = set()
     wanted = [p for p in PROJECT_ORDER if projects is None or p in projects]
+    akey = analyzer_key(commit)
     for proj in PROJECT_ORDER:
-        f = out / "mech" / ("analyzers-%s.json" % proj)
-        if proj in wanted and not f.exists():
+        step = "analyzers-" + proj
+        if proj in wanted and cached_data(out, step, akey) is None:
             wt = analyzer_worktree(commit, out)
-            cached(out, "analyzers-" + proj, lambda: run_analyzers(wt, proj))
-        if f.exists():
-            mech["analyzers"].update(json.loads(f.read_text(encoding="utf-8")))
+            cached(out, step, akey, lambda: run_analyzers(wt, proj, commit))
+        data = cached_data(out, step, akey)
+        if data is not None:
+            mech["analyzers"].update(data)
             measured.add(proj)
     if measured == set(PROJECT_ORDER) and (out / "mech" / "tree").exists():   # every project measured: drop the tree
         subprocess.run(["git", "-C", str(REPO), "worktree", "remove", "--force", str(out / "mech" / "tree")],
@@ -365,7 +441,9 @@ def batch_args(out: Path, shards, dims, pin: str, duplication: bool, width: int,
             "globalStopFile": global_stop, "width": width, "dimensions": dims, "duplicationPass": duplication,
             "shards": [{"id": s, "name": by_id[s]["name"], "lines": by_id[s]["lines"],
                         "input": str(out / "inputs" / ("in-%s.json" % s)),
-                        "files": [p for p, _ in by_id[s]["files"]]} for s in shards]}
+                        "files": [p for p, _ in by_id[s]["files"]],
+                        # per file, so a RESUMED pair sizes its unread remainder (two finders over 4,000 lines)
+                        "fileLines": [n for _, n in by_id[s]["files"]]} for s in shards]}
 
 
 # ── self-test ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -437,6 +515,21 @@ def self_test():
             arm("batch args refuse an unknown dimension", False)
         except SystemExit:
             arm("batch args refuse an unknown dimension", True)
+        arm("batch args carry each file's lines, so a resumed pair can size its remainder", a["shards"][0]["fileLines"] == [3])
+        runs = []
+        k1, k2 = {"pin": "c", "version": 1}, {"pin": "c", "version": 2}
+        cached(out, "s", k1, lambda: runs.append(1) or {"x": 1})
+        v = cached(out, "s", k1, lambda: runs.append(2) or {"x": 2})
+        arm("a cached step is reused for the same key", runs == [1] and v == {"x": 1})
+        v = cached(out, "s", k2, lambda: runs.append(3) or {"x": 3})
+        arm("a cached step made for another key (pin, version, rules) is recomputed, never reused",
+            runs == [1, 3] and v == {"x": 3} and cached_data(out, "s", k1) is None and cached_data(out, "s", k2) == {"x": 3})
+    gc = modern_globalconfig()
+    arm("the analyzer tree's globalconfig raises every §5.5 IDE/SYSLIB rule to warning, and no CA rule",
+        gc.startswith("is_global = true") and "dotnet_diagnostic.IDE0290.severity = warning" in gc and
+        "dotnet_diagnostic.SYSLIB1045.severity = warning" in gc and "IDE0330" in gc and "CA1845" not in gc)
+    arm("the analyzer cache key moves with the rule table", analyzer_key("c")["modern_rules"] is MODERN_RULES)
+    arm("a shard input carries the feature -> rule map the modern-C# dimension counts by", ia["modern_rules"] is MODERN_RULES)
     print("=== R2 INPUTS SELF-TEST: %s ===" % ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
