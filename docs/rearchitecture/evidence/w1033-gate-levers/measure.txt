@@ -1,0 +1,9 @@
+before Conformance      wall   171.9 s  Passed! failed 0 passed 10914 total 10914  load mean  32.9 % (n=15)
+after  Conformance      wall    95.7 s  Passed! failed 0 passed 10917 total 10917  load mean  71.6 % (n=9)
+before Unit             wall    76.0 s  Failed! failed 2 passed 32537 total 32539  load mean  32.7 % (n=7)  fails: CobolNet.Tests.Unit.ExternalCorpusPopulationDriftTests.TheCensus_NamesEveryPopul, CobolNet.Tests.Unit.ExternalCorpusPopulationDriftTests.SweepExternalPopulation_E
+after  Unit             wall    49.0 s  Passed! failed 0 passed 32540 total 32540  load mean  42.6 % (n=5)
+after  Conformance      wall    68.0 s  Passed! failed 0 passed 10917 total 10917  load mean  72.2 % (n=6)
+before Conformance      wall   196.5 s  Passed! failed 0 passed 10914 total 10914  load mean  57.5 % (n=17)
+after  Unit             wall    65.8 s  Passed! failed 0 passed 32540 total 32540  load mean  53.2 % (n=6)
+before Unit             wall    92.8 s  Failed! failed 2 passed 32537 total 32539  load mean  74.2 % (n=8)  fails: CobolNet.Tests.Unit.ExternalCorpusPopulationDriftTests.TheCensus_NamesEveryPopul, CobolNet.Tests.Unit.ExternalCorpusPopulationDriftTests.SweepExternalPopulation_E
+MEASURE DONE

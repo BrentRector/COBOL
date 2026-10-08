@@ -34,14 +34,17 @@ pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal *> <log>
 ```
 
 The driver, `scripts/run_gate_legs.py` (DESIGN-test-build-ci.md §3.14; kb/Work PB1721), holds the worktree's GATE
-LOCK (a second gate in the same worktree is refused), takes a GATE SLOT (`scripts/gate_slot.py`: at most N implementer
-gates build or test at once, repository-wide — `gate-slot: waiting, k ahead` is the cap working), runs the audits
-(FAIL-FAST, before the build: a red audit ends an implementer gate in seconds with `NO LEG RAN`, kb/Work PB2523 —
-run `python scripts/spec/drift_rules.py` and the citation audits yourself before gating to avoid the round trip),
-fetches the per-worktree GnuCOBOL corpus when absent, builds the solution and lists every discovered case of
-Conformance, Unit and Characterization. The ORDER PLAN (`scripts/gate_plan.py`) puts in leg 1 the tests the change
-ADDS, the previous gate's reds and the cheapest cases the change can reach — the tiers `impacted_tests.py` derives from
-an impact map, when one exists — and everything else in leg 2. Both legs run the three assemblies concurrently. It is
+LOCK (a second gate in the same worktree is refused), runs the audits (FAIL-FAST, before the slot and the build: a red
+audit ends an implementer gate in seconds with `NO LEG RAN`, kb/Work PB2523 — run `python scripts/spec/drift_rules.py`
+and the citation audits yourself before gating to avoid the round trip) and fetches the per-worktree GnuCOBOL corpus
+when absent — both BEFORE it queues, because they read only the tree (kb/Work PB2524) — then takes a GATE SLOT
+(`scripts/gate_slot.py`: at most N implementer gates build or test at once, repository-wide — `gate-slot: waiting, k
+ahead` is the cap working), builds the solution and lists every discovered case of Conformance, Unit and
+Characterization. The ORDER PLAN (`scripts/gate_plan.py`) puts in leg 1 the tests the change ADDS, the previous gate's
+reds and the cheapest cases the change can reach — the tiers `impacted_tests.py` derives from an impact map, when one
+exists — and everything else in leg 2, its collections LONGEST FIRST, timed from the shared timings store every gate
+publishes to after its legs, so a fresh worktree is timed too (kb/Work PB2527). The test hosts run Server GC (kb/Work
+PB2526). Both legs run the three assemblies concurrently. It is
 FAIL-FAST: a red in leg 1 stops the gate `RED/INCOMPLETE` and names the remainder
 (`TestResults/build-local/<run>/not-run-*.txt`). It is GREEN only when every leg ran, every assembly's population
 equals its `--list-tests` (`scripts/test_population.py`) and every leg host ran this plan on these binaries.

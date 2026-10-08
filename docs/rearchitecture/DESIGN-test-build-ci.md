@@ -569,7 +569,8 @@ why that direction cannot reach the audit at all).
 |---|---|---|---|
 | `VersionMatrixTests_P0 … _P11` | 12 | 2127 rows, **720.5 s SERIAL** — the whole 721 s leg | 12 × (175…179 rows), 552–601 s each, all spanning the run together |
 | `NistDifferentialTests_P0 … _P5` | 6 | 349 rows, 237.9 s SERIAL | 6 × (58–59 rows), 329–354 s each |
-| `CorpusRunnerTests_P0 … _P2` | 3 | 1005 rows, 83.9 s SERIAL | 3 × (332–334 rows), 117–145 s each |
+| `CorpusRunnerTests_P0 … _P23` | 24 | at 3 partitions (2026-10-07, about 4,635 rows): 3 × about 1,546 cases, 246–282 s each, the Conformance leg's 95–220 s tail at 1–4 threads | 24 × about 193 rows (kb/Work PB2527); `CorpusPartitioningDriftTests` bounds a partition at 250 rows |
+| `OptionalWordSubsetDriftTests_P0 … _P7` | 8 | one 23-row class, 131–152 s span (one row 59 s) | 8 × about 3 formats (kb/Work PB2527), bounded at 3 |
 | `StorageFormNistEquivalenceTests_P0 … _P7` | 8 | one `[Fact]` looping the corpus, **171.5 s** — *was* the Unit leg's wall clock | 8 slice-`[Fact]`s, 81–138 s each |
 
 Whole-corpus assertions stay OFF the partitioned base and run ONCE (`VersionMatrixTests`' two catalogue facts,
@@ -865,7 +866,11 @@ because the raw name is not stable (`b7`):
 - **Order inside a leg.** Collections by their best-ranked case (tier, then cost), and inside a collection its cases
   by the same key — the assembly-level `TestCollectionOrderer` / `TestCaseOrderer` of §3.14.3. In leg 2 the
   collections go LONGEST FIRST (largest recorded sum first), so a surviving long pole starts at once instead of
-  capping the wall; with no timings, xunit's own order.
+  capping the wall; with no timings, xunit's own order. **The timings come from the shared timings store** every
+  gate publishes to (section 3.14.3 step 6; kb/Work PB2527), so a FRESH worktree's plan is timed too — before it,
+  every implementer gate ran in a fresh worktree and printed `timings none`, and its leg 2 ran in declaration order;
+  the worktree's own previous run times the plan only while no gate on the machine has published. Reds always come
+  from the worktree's own previous run.
 
 **The plan file** (`plan.json` in the gate's run directory) holds, per assembly, the leg-1 KEYS, the leg-2 KEYS, the
 per-key rank, and the plan's SHA-256. Its format (schema 1), written by `gate_plan.py --out` as canonical JSON (UTF-8,
@@ -989,18 +994,24 @@ generators and `record_verdicts.py`, which still filter), and so are their two c
 1. **The worktree's gate lock** — an exclusive OS lock on `<worktree git dir>/cobol-gate.lock`, held from before the
    build to the verdict. A second gate in the same worktree REFUSES at once, naming the holder's pid: its build would
    otherwise overwrite the binaries between the first gate's legs.
-2. The gate slot (`-Mode implementer` only, §3.14.6) — taken BEFORE the build, so the cap bounds the builds too. The
-   lock order is always worktree lock, then slot, so no two gates can wait on each other in a cycle.
-3. The audits — FIRST, since none needs a build or a test result, and in implementer mode FAIL-FAST: a red audit ends
-   the gate `RED — <audit> RED — fail-fast: the audits run before the build and NO LEG RAN` in seconds (kb/Work
-   PB2523: four of wave 1034's eight first-run implementer reds were audit-only, each reported after a whole ~6-min
-   population); a lander's gate goes on, so its one run shows every red of the train — then the per-worktree GnuCOBOL
-   corpus fetch (absent in a fresh worktree; a failed fetch makes the gate RED, attributed to it), the solution build, then the binaries' SHA-256 record — per assembly, the test assembly and
-   every product assembly beside it, the set each identity record names.
-4. A fresh RUN DIRECTORY `TestResults/build-local/<UTC stamp>-<nonce>/`: the plan, every trx, every identity record
+2. A fresh RUN DIRECTORY `TestResults/build-local/<UTC stamp>-<nonce>/`: the plan, every trx, every identity record
    and the verdict file. Nothing is written to a fixed name, so no earlier gate's file can be read as this one's. The
-   next gate's timings and reds come from the newest run directory holding a verdict file; the driver keeps the last
-   five.
+   next gate's reds come from the newest run directory holding a verdict file (its timings from the shared timings
+   store, step 6); the driver keeps the last five.
+3. The audits — FIRST, since none needs a build or a test result, and in implementer mode FAIL-FAST: a red audit ends
+   the gate `RED — <audit> RED — fail-fast: the audits run before the slot and the build and NO LEG RAN` in seconds
+   (kb/Work PB2523: four of wave 1034's eight first-run implementer reds were audit-only, each reported after a whole
+   ~6-min population); a lander's gate goes on, so its one run shows every red of the train — then the per-worktree
+   GnuCOBOL corpus fetch (absent in a fresh worktree; a failed fetch makes the gate RED, attributed to it). **Both run
+   BEFORE the gate slot is taken** (kb/Work PB2524): they read only the tree, nothing the slot rations, and inside the
+   slot they were 35-45 % of its hold (about 230 s of serial Python per gate while every other implementer gate
+   queued; `verdict.json` of 22 gates, 2026-10-07). `audit_doc_citations.py`, the costliest, rules on every quotation
+   IN-PROCESS over one loaded standard (kb/Work PB2525: one `cite.py` process per citation was 75 of its 79 s).
+4. The gate slot (`-Mode implementer` only, section 3.14.6), timed as `slot_wait_s` — taken BEFORE the build, so the
+   cap bounds the builds too. The lock order is always worktree lock, then slot, so no two gates can wait on each
+   other in a cycle. Shared gate settings that turn malformed while a gate queues stop it `NOT RUN`, with the reason.
+   Then the solution build and the binaries' SHA-256 record — per assembly, the test assembly and every product
+   assembly beside it, the set each identity record names.
 5. `--list-tests` per assembly (the three concurrently), the plan — any planning failure, like no plan input, gives
    ONE leg in the plain order, named on the verdict line — then per leg the three assemblies CONCURRENTLY (the
    battery's `Conformance ∥ Unit ∥ Characterization` shape), each `dotnet test --no-build --logger trx` with the
@@ -1008,7 +1019,11 @@ generators and `record_verdicts.py`, which still filter), and so are their two c
    is refused in the driver itself), each printed through `test_leg_report.py`; an assembly the plan gives no case in
    a leg is not invoked for it. A red leg 1 stops an implementer gate there: the population check names every case
    of the uninvoked legs `NOT RUN` (all of them in `not-run-<assembly>.txt`, the counts on the verdict line).
-6. The population check (§3.14.4), the identity check (each leg host's record names the digest the driver handed it,
+6. The population check (§3.14.4); the publish of every measured duration of this run to the SHARED TIMINGS STORE,
+   `<git common dir>/cobol-gate-timings/timings.json` (kb/Work PB2527; `gate_plan.publish_timings`, lander included,
+   a stopped or leg-1-only gate too: a case it did not run keeps its earlier duration, a case no longer discovered is
+   dropped by name key; a failed write is reported and recorded in `verdict.json` as `timings_store`, never in the
+   verdict, because timings change only the order); the identity check (each leg host's record names the digest the driver handed it,
    the plan's content digest, the binaries step 3 hashed, the whole discovered population as `received`, and only
    its own leg's keys in `runs`), then the verdict line and `verdict.json` (the mode, the slot, the plan, every
    leg's per-assembly wall time and exit code, the time to the first red, and each population).
@@ -1160,12 +1175,17 @@ token of every compilation recomputes the closure over all default-mode rules an
 - **Server GC** bought 3–9 % while the lexer lock bound the process: not adopted then. After M6 it is the next
   in-process serialization — `b2` over the whole green set spends 3.1–4.0 s of each ~5 s round paused in
   workstation GC at 8–24 threads, and reaches 6.1× at 87 % CPU on 12 threads under server GC
-  (`b2-scaling/b2-after-m6.txt`) — so it is re-decided as its own mechanism, not inside M6.
+  (`b2-scaling/b2-after-m6.txt`) — so it is re-decided as its own mechanism, not inside M6. **Adopted (kb/Work
+  PB2526, 2026-10-07):** `tests/Directory.Build.props` sets `ServerGarbageCollection` for every test host after the
+  w1033 diagnosis measured 69 % of a 32-thread compile probe's wall in workstation-GC pauses, and the whole
+  Conformance leg 318 s to 255 s and Unit 74 s to 56 s with identical pass sets; each gated assembly's
+  `GateLegDriftTests` asserts its host's runtimeconfig carries `System.GC.Server`.
 - **The compiled-program cache** (§3.12) already stores check-only results, so a TEST-ONLY re-gate hits every
   continuity cell; a gate after a product change misses by design. No change.
 - **§3.11's "the class-split lever is exhausted"** was measured under this lock. After M6, the partition counts
-  (one `Partitions` constant per family, audited by `TestPartitionAudit`) are re-measured, starting with
-  `CorpusRunnerTests` (3), whose `_P1` bounds leg 1.
+  (one `Partitions` constant per family, audited by `TestPartitionAudit`) are re-measured; the first re-measure
+  (w1033, kb/Work PB2527) took `CorpusRunnerTests` from 3 partitions to 24 and split `OptionalWordSubsetDriftTests` 8
+  ways (section 3.11.1).
 
 **M7 — the long poles.** `pb505-table-value-dynamic-span-levels` (266 s in the battery; **29.6 s alone through the
 `cobol` CLI** for a 26-line program) and `DynamicWithoutTo_HigherSubscriptsShallBeEqual_1946` (116 s) are one
@@ -1185,6 +1205,29 @@ pb505 now rejects in 0.49 s through the CLI (was 25.3 s on the same build). The 
 `special-names-85` 41 s, `St101A` 30 s, continuity rows of IX113A/NC177A/NC253A/RL101A at 40–49 s) are compile-bound
 and are re-measured after M6 before any is touched. The battery summary prints the five slowest tests (a REPORT,
 never a wall-clock assertion — MANDATORY-PRACTICES forbids those), so the next pole is seen when it appears.
+
+**The w1033 gate-cost levers (kb/Work PB2524–PB2527), measured 2026-10-07.** The diagnosis
+(`E:\COBOL-coord\scratch\reports\w1033-perf-gate-report.md`) found a typical implementer gate holding its slot
+430–940 s, 35–45 % of it the twelve serial audits, and the Conformance leg ending in a 1–4-thread tail of three corpus
+partitions. Four levers landed together; each was measured on the same 32-core host, the arms alternated, the
+compiled-program cache off:
+
+| lever | before | after |
+|---|---|---|
+| audits run before the slot (PB2524) | about 230 s of each slot hold (94–358 s, 22 gates) | 0 s in the slot: gate 2 `audits_s` 28.8 s before `gate-slot: took slot`, `slot_wait_s` 0.1 s |
+| `audit_doc_citations.py --check` in-process (PB2525) | 78.2 s (843 `cite.py` processes) | 2.5 s, byte-identical `--all` output over the corpus (949 citations) |
+| the twelve audits, serial | 113.7 s (diagnosis, 25 % host load) | 28.3 s (`CITATIONS` 18.5 s is now the largest) |
+| whole Conformance assembly, xunit order (PB2526 + PB2527) | 171.9 s, 196.5 s | 95.7 s, 68.0 s (10,917/10,917 passed) |
+| whole Unit assembly (PB2526) | 76.0 s, 92.8 s | 49.0 s, 65.8 s |
+
+The host was otherwise near idle (about 10 % load before the runs); the load sampled during each run is mostly the
+run's own and is recorded with the evidence in `docs/rearchitecture/evidence/w1033-gate-levers/` (`measure.txt` and
+the script that took it, `audits-after.txt`, and the doc-citation audit's `--all` output before and after). The
+implementer gate
+on the branch: gate 1 (fresh worktree, cold, `timings none`) 381 s wall, 333 s of it in the slot; gate 2 (a re-gate,
+warm compile cache, timed from the shared store) 161 s wall, 123 s in the slot, Conformance leg 2 88.7 s. Not
+adopted, left to the owner as the diagnosis' levers 4 and 5: a shared location-independent compile store, and a
+ReadyToRun runtime for the programs the tests run.
 
 #### 3.14.6 The gate cap (M2)
 
@@ -1207,7 +1250,8 @@ never a wall-clock assertion — MANDATORY-PRACTICES forbids those), so the next
 - **What holds it.** A Python caller holds a slot with `GateSlots.for_repo().acquire(label)` (a `Slot`, released by
   its `with` block or by the holder's death); a shell caller wraps a command with `gate_slot.py run [--label TEXT] --
   <command>`, which exits with the command's code. `run_gate_legs.py` takes the slot after the worktree's gate lock
-  and BEFORE the build (§3.14.3), and holds it through the population check, so the cap bounds the concurrent solution
+  and its audits (kb/Work PB2524: the audits read only the tree, so they never hold a slot) and BEFORE the build
+  (§3.14.3), and holds it through the population check, so the cap bounds the concurrent solution
   builds as well as the test legs. The slot is held by the gate's whole PROCESS TREE. On Windows, acquisition puts the
   holder ITSELF into a Job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` before it spawns anything, so every
   descendant is in the job from birth, with no window in which a grandchild can escape, and if the driver dies the OS

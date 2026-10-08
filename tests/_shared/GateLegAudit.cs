@@ -36,6 +36,24 @@ internal static class GateLegAudit
             $"{assembly.GetName().Name} does not compile tests/_shared/GateLegs.cs");
     }
 
+    /// <summary>The test host that runs <paramref name="assembly"/> is configured for SERVER garbage collection
+    /// (kb/Work PB2526): <c>tests/Directory.Build.props</c> sets <c>ServerGarbageCollection</c>, which writes
+    /// <c>System.GC.Server: true</c> into the assembly's runtimeconfig.json, and the host loads it as an AppContext
+    /// property. Under the default workstation GC, 32 threads compiling COBOL spent 69 % of a probe's wall in GC
+    /// pauses and stopped scaling past about 8 threads; Server GC took the whole Conformance leg from 318 s to 255 s.
+    /// The CONFIGURED value is asserted, not <see cref="System.Runtime.GCSettings.IsServerGC"/>: the runtime runs
+    /// workstation GC on a one-core machine whatever the configuration says, and that is not a regression.</summary>
+    public static void AssertTestHostConfiguredForServerGc(Assembly assembly)
+    {
+        object? configured = AppContext.GetData("System.GC.Server");
+        Assert.True(configured is true || (configured is string s && bool.TryParse(s, out bool b) && b),
+            $"the test host running {assembly.GetName().Name} is not configured for Server GC (System.GC.Server is "
+            + $"{configured ?? "absent"} in its runtimeconfig.json). tests/Directory.Build.props sets "
+            + "<ServerGarbageCollection>true</ServerGarbageCollection> for every test project; a project that sets it "
+            + "false, or a props change that drops it, puts every compiling thread of the gate's legs behind one "
+            + "workstation-GC heap again (kb/Work PB2526).");
+    }
+
     /// <summary>Arm (5): no discovered case of <paramref name="assembly"/> carries the repository root in its
     /// display name or in a string argument. A worktree path in a name makes the name differ between the worktree
     /// the impact map was recorded in and the one a gate runs in, so no plan could ever key on it (evidence

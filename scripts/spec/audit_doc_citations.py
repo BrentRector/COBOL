@@ -60,7 +60,6 @@ from __future__ import annotations
 import argparse
 import pathlib
 import re
-import subprocess
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -68,7 +67,6 @@ import citation_corpus  # noqa: E402
 import cite as cite_mod  # noqa: E402
 
 REPO = citation_corpus.REPO
-CITE = REPO / "scripts" / "spec" / "cite.py"
 
 #: A quoted fragment that could be spec prose: lower-case opening (so a sentence-initial capital, which a doc
 #: would have had to re-case, is not read as a verbatim quotation) and long enough to be prose rather than a
@@ -125,16 +123,30 @@ MARKER = "audit-doc-citations: names-misfilings"
 #: a coincidence rather than a quotation, and that floor is what keeps an ordinary phrase out.
 ELIDE_SLACK, ELIDE_FLOOR = 1.5, 5
 
+_SPEC = None
 _WORDS = None
+
+
+def _spec() -> tuple[list[str], list]:
+    """`specs/ISO_COBOL.md` as `cite.py` reads it — its lines and clause regions — loaded ONCE per process.
+
+    ⛔ ONE CHECKER, CALLED IN-PROCESS (kb/Work PB2525). Every pairing used to be checked by spawning `cite.py
+    --check` (and `--find`) as a fresh Python process that reloaded the standard: 843 processes, 75 of the audit's
+    79 s under cProfile, about 89 ms each, while the audit's own logic cost about 3 s. `cite.check` and
+    `cite.find` are the very functions the `cite.py` CLI calls, so the ruling is the same code either way."""
+    global _SPEC
+    if _SPEC is None:
+        _SPEC = cite_mod.load()
+    return _SPEC
 
 
 def _clause_words() -> dict[str, list[str]]:
     """clause -> its own region as a WORD LIST, normalized the way `cite.py` compares. Built once."""
     global _WORDS
     if _WORDS is None:
-        lines = (REPO / "specs" / "ISO_COBOL.md").read_text(encoding="utf-8").splitlines()
+        lines, regions = _spec()
         out: dict[str, list[str]] = {}
-        for n, _t, s, e in cite_mod.clauses(lines):
+        for n, _t, s, e in regions:
             out.setdefault(n, []).extend(cite_mod.norm(" ".join(lines[s:e])).split())
         _WORDS = out
     return _WORDS
@@ -176,21 +188,16 @@ def verdict_of(clause: str, quote: str) -> tuple[str, str | int | None]:
     self-test re-implemented the MISFILED half beside it in four lines of its own — which is how the ELIDED arm
     could be added to `scan` and be invisible to `--self-test`: a gate arm nothing had ever seen fire
     (`feedback_green_gates_arent_evidence`). One ruling, two callers."""
-    if cite("--check", clause, quote)[0] == 0:
+    lines, regions = _spec()
+    if cite_mod.check(lines, regions, clause, quote)[0] == 0:
         return "ok", None
-    code, out = cite("--find", quote)
-    head = out.splitlines()[0].strip() if out else ""
+    code, out = cite_mod.find(lines, regions, quote)
+    head = out[0].splitlines()[0].strip() if out else ""
     if code == 0 and head.startswith("§"):
         return "misfiled", head
     if (w := elided_window(clause, quote)) is not None:
         return "elided", w
     return "absent", None
-
-
-def cite(*args: str) -> tuple[int, str]:
-    r = subprocess.run([sys.executable, str(CITE), *args],
-                       capture_output=True, text=True, encoding="utf-8", errors="replace")
-    return r.returncode, (r.stdout or r.stderr).strip()
 
 
 def citations(line: str):
@@ -219,8 +226,8 @@ def scan(paths, elided_out: list | None = None):
     ⛔ ONE VERDICT PER PAIRING, ONE REPORT PER SITE, and the two were conflated until PB379. Deduplicating the
     REPORT hid siblings: the `§15.38.1 "depends on the type of argument-1"` pairing lives in three files, and a
     reader of the one reported line had no way to know the other two existed — precisely the sweep CLAUDE.md
-    rule 4 demands, defeated by the tool. The cite.py call is still made once per pairing, which is the part
-    that costs anything."""
+    rule 4 demands, defeated by the tool. The ruling (`verdict_of`) is still made once per pairing, which is the
+    part that costs anything."""
     verdict: dict[tuple[str, str], tuple[str, str | int | None]] = {}
     misfiled: list[tuple[str, int, str, str, str, str]] = []
     absent: list[tuple[str, int, str, str, str]] = []
@@ -324,6 +331,28 @@ def self_test() -> int:
     print(f"  {'ok  ' if fires else 'FAIL'} fires   on a file WITHOUT the {MARKER!r} marker")
     print(f"  {'ok  ' if silent else 'FAIL'} silent  on the same file WITH it")
     ok &= fires and silent
+    # ⛔ THE RULING IS IN-PROCESS (kb/Work PB2525): a process spawned per pairing was 75 of the audit's 79 s. With
+    # process creation made to fail, every ruling must still come back — from the one standard loaded once.
+    import subprocess
+    spawned: list[str] = []
+
+    def refuse(*args, **kwargs):
+        spawned.append(str(args[0] if args else kwargs.get("args"))[:80])
+        raise RuntimeError("the audit spawned a process to check a citation")
+
+    real_popen, subprocess.Popen = subprocess.Popen, refuse
+    try:
+        try:
+            rulings = [verdict_of(c, q)[0] for _n, _w, line in SELF_TEST for _col, c, q, _f in citations(line)]
+        except RuntimeError:
+            rulings = []
+    finally:
+        subprocess.Popen = real_popen
+    loaded_once = _spec() is _spec()
+    inproc = not spawned and len(rulings) >= len(SELF_TEST) and loaded_once
+    print(f"  {'ok  ' if inproc else 'FAIL'} in-process: every ruling made with no process spawned, the standard "
+          f"loaded once" + ("" if inproc else f"  (spawned {spawned[:1]}, {len(rulings)} rulings)"))
+    ok &= inproc
     print("SELF-TEST:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 

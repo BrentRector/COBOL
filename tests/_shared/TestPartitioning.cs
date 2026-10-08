@@ -86,7 +86,8 @@ public interface ITestPartitionSlot
     static abstract int Index { get; }
 }
 
-// The ladder: 16 identical one-line declarations, kept honest by TestPartitionAudit.AuditSlotLadder.
+// The ladder: 24 identical one-line declarations, kept honest by TestPartitionAudit.AuditSlotLadder. Its top is set
+// by the widest family, CorpusRunnerTests (24 partitions, kb/Work PB2527).
 public readonly struct Slot0 : ITestPartitionSlot { public static int Index => 0; }
 public readonly struct Slot1 : ITestPartitionSlot { public static int Index => 1; }
 public readonly struct Slot2 : ITestPartitionSlot { public static int Index => 2; }
@@ -103,6 +104,14 @@ public readonly struct Slot12 : ITestPartitionSlot { public static int Index => 
 public readonly struct Slot13 : ITestPartitionSlot { public static int Index => 13; }
 public readonly struct Slot14 : ITestPartitionSlot { public static int Index => 14; }
 public readonly struct Slot15 : ITestPartitionSlot { public static int Index => 15; }
+public readonly struct Slot16 : ITestPartitionSlot { public static int Index => 16; }
+public readonly struct Slot17 : ITestPartitionSlot { public static int Index => 17; }
+public readonly struct Slot18 : ITestPartitionSlot { public static int Index => 18; }
+public readonly struct Slot19 : ITestPartitionSlot { public static int Index => 19; }
+public readonly struct Slot20 : ITestPartitionSlot { public static int Index => 20; }
+public readonly struct Slot21 : ITestPartitionSlot { public static int Index => 21; }
+public readonly struct Slot22 : ITestPartitionSlot { public static int Index => 22; }
+public readonly struct Slot23 : ITestPartitionSlot { public static int Index => 23; }
 
 /// <summary>
 /// Marks the UNPARTITIONED row source of a partitioned family, naming the sliced member the family's theories

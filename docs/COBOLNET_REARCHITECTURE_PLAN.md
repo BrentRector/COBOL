@@ -1850,7 +1850,8 @@ result. Run the long legs ONE AT A TIME.
 - **PER COMMIT — the ORDERED whole-population gate (kb/Work PB1708, PB1721; `DESIGN-test-build-ci.md` §3.14):**
   `pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal` (bash: `scripts/build-local.sh --mode
   implementer`). ORDER, DON'T SKIP (owner, 2026-09-28): its driver `scripts/run_gate_legs.py` holds the worktree's
-  gate lock, takes a gate slot (`scripts/gate_slot.py`, at most N implementer gates at once), runs the audits, builds
+  gate lock, runs the audits (before it queues, kb/Work PB2524), takes a gate slot (`scripts/gate_slot.py`, at most N
+  implementer gates at once), builds
   the SOLUTION, lists every discovered case of Conformance, Unit and Characterization and runs them ALL in two legs —
   the tests the change adds, the previous gate's reds and the cheapest cases the change reaches (the impact map's
   tiers) first — FAIL-FAST, then checks each assembly's population against `--list-tests` and each leg host's identity

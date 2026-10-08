@@ -34,6 +34,7 @@ same clause, and the rule path reported for a quotation of the printed form is t
 from __future__ import annotations
 
 import argparse
+import functools
 import pathlib
 import re
 import sys
@@ -61,8 +62,13 @@ CORRECTION_NOTE = re.compile(r"^>\s*⚠\s*\*\*CORRECTED")
 EMPTY_NEEDLE = "quotation carries no word characters (letters, digits, underscore); nothing to match"
 
 
+@functools.lru_cache(maxsize=1 << 17)  # > the transcription's ~47,500 lines
 def norm(s: str) -> str:
-    """Compare on words only — dashes, quotes and spacing are typography, not content."""
+    """Compare on words only — dashes, quotes and spacing are typography, not content.
+
+    Memoized, because an in-process caller checks many quotations against ONE loaded standard: `find` normalizes
+    every line of the spec per call, and `audit_doc_citations.py` (kb/Work PB2525) spent 25 of its 33 s re-running
+    these two regular expressions over the same ~47,500 lines for 59 `find` calls."""
     return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", s)).strip().lower()
 
 

@@ -11,7 +11,9 @@ Inputs, each optional except the listings:
   * the change: the diff against `--base` (the worktree's, or `--head`'s for a replay), analysed by
     `scripts/spec/impacted_tests.py` against the impact map for the base (any age; `--map`/`--store`);
   * TIMINGS: the per-case durations in the trx files of the worktree's previous gate (`--previous-run <dir>`),
-    else the map's recorded durations; and that gate's REDS (trx outcome `Failed`).
+    else the map's recorded durations; and that gate's REDS (trx outcome `Failed`). The gate driver times its plan
+    from the SHARED TIMINGS STORE instead (`publish_timings`/`read_shared_timings`, kb/Work PB2527): every gate
+    publishes there, so a fresh worktree's plan is timed too.
 
 THE NAME KEY. Every lookup keys on `name_key(display name)`: the display name with the partition suffix `_P<k>`
 removed from its CLASS segment. A partitioned family (`TestPartitioning.Slice`) puts row i in class
@@ -53,6 +55,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import statistics
 import sys
@@ -144,21 +147,104 @@ def trx_secs(duration: str) -> float:
     return int(h) * 3600 + int(m) * 60 + float(s)
 
 
-def read_previous_run(run: Path) -> tuple[Timings, set[str]]:
-    """The previous gate's timings and REDS (by name key), from every trx file in its run directory."""
-    timings, reds = Timings(f"previous run {run}"), set()
+def trx_results(run: Path):
+    """(display name, seconds or None, outcome) of every result in every trx file of a gate run directory."""
     files = sorted(run.glob("*.trx"))
     if not files:
         raise SystemExit(f"{run}: no trx file — not a gate run directory")
     for trx in files:
         for r in ET.parse(trx).getroot().iter(TRX_NS + "UnitTestResult"):
-            name = r.get("testName") or ""
-            if r.get("duration"):
-                timings.add(name, trx_secs(r.get("duration")))
-            if r.get("outcome") == "Failed":
-                reds.add(name_key(name))
-                reds.add(name_key(name).partition("(")[0])  # the listed key of an unserializable theory
+            d = r.get("duration")
+            yield r.get("testName") or "", (trx_secs(d) if d else None), r.get("outcome")
+
+
+def read_previous_run(run: Path) -> tuple[Timings, set[str]]:
+    """The previous gate's timings and REDS (by name key), from every trx file in its run directory."""
+    timings, reds = Timings(f"previous run {run}"), set()
+    for name, seconds, outcome in trx_results(run):
+        if seconds is not None:
+            timings.add(name, seconds)
+        if outcome == "Failed":
+            reds.add(name_key(name))
+            reds.add(name_key(name).partition("(")[0])  # the listed key of an unserializable theory
     return timings, reds
+
+
+# ── THE SHARED TIMINGS STORE (kb/Work PB2527) ──────────────────────────────────────────────────────────────────────
+#: ⛔ WHY A STORE SHARED BY EVERY WORKTREE. Leg 2 runs its collections LONGEST FIRST, and a plan with no timings runs
+#: them in declaration order — and every implementer gate runs in a FRESH worktree with no previous run, so every one
+#: of them reported `timings none` (w1033 gate diagnosis: a long serial collection that starts late sets the leg's
+#: wall; longest first modeled the Conformance leg 212 s -> 162 s at 24 corpus partitions). So every gate, lander
+#: included, PUBLISHES its measured durations here after its legs, and every implementer plan reads them: a fresh
+#: worktree plans from the newest durations any gate on this machine measured. Its own REDS still come only from its
+#: own previous run. Timings are hints: they change the ORDER and the leg-1 share, never WHETHER a case runs.
+#: It lives in `<git common dir>/cobol-gate-timings/` beside the gate slots; a write replaces the file atomically, and
+#: two gates publishing at once lose at most one gate's merge (the next gate's publish carries the newest durations).
+TIMINGS_STORE_SCHEMA = 1
+TIMINGS_STORE_DIR = "cobol-gate-timings"
+TIMINGS_STORE_FILE = "timings.json"
+
+
+def timings_store(common_dir: Path) -> Path:
+    """The shared store's file under a repository's git common dir."""
+    return common_dir / TIMINGS_STORE_DIR / TIMINGS_STORE_FILE
+
+
+def _read_store(store: Path) -> dict:
+    """The store's content (an empty store when the file does not exist); a malformed file raises ValueError."""
+    if not store.exists():
+        return {"schema": TIMINGS_STORE_SCHEMA, "updated": None, "by": None, "durations": {}}
+    try:
+        data = json.loads(store.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise ValueError(f"{store}: unreadable shared timings store ({type(e).__name__}: {e})") from None
+    if (not isinstance(data, dict) or data.get("schema") != TIMINGS_STORE_SCHEMA
+            or not isinstance(data.get("durations"), dict)):
+        raise ValueError(f"{store}: not a schema-{TIMINGS_STORE_SCHEMA} shared timings store")
+    return data
+
+
+def read_shared_timings(store: Path) -> Timings:
+    """The shared store as Timings (empty — falsy — when no gate has published yet)."""
+    data = _read_store(store)
+    t = Timings(f"shared store, {len(data['durations'])} cases, updated {data['updated']} by {data['by']}"
+                if data["durations"] else "none")
+    for display, seconds in data["durations"].items():
+        for s in seconds:
+            t.add(display, float(s))
+    return t
+
+
+def publish_timings(store: Path, run: Path, discovered: set[str], by: str, now: str) -> tuple[int, str]:
+    """Merge one gate run's measured durations into the shared store; return (cases published, a note).
+
+    A case this run measured replaces its entry; a case it did not run (a stopped or leg-1-only gate) keeps the
+    duration an earlier gate measured; a case no longer DISCOVERED (by name key, so a partition renumbering or an
+    unserializable theory's rows survive) is dropped, which bounds the store to the live population. A malformed
+    store is replaced rather than merged, and the note says so."""
+    keys = {name_key(d) for d in discovered}
+
+    def live(display: str) -> bool:
+        k = name_key(display)
+        return k in keys or k.partition("(")[0] in keys
+
+    note = ""
+    try:
+        old = _read_store(store)["durations"]
+    except ValueError as e:
+        old, note = {}, f"replaced a malformed store: {e}"
+    measured: dict[str, list[float]] = defaultdict(list)
+    for display, seconds, _outcome in trx_results(run):
+        if seconds is not None and live(display):
+            measured[display].append(round(seconds, 4))
+    merged = {d: s for d, s in old.items() if live(d)}
+    merged.update(measured)
+    store.parent.mkdir(parents=True, exist_ok=True)
+    tmp = store.with_name(f"{store.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps({"schema": TIMINGS_STORE_SCHEMA, "updated": now, "by": by, "durations": merged},
+                              ensure_ascii=False, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+    os.replace(tmp, store)
+    return len(measured), note
 
 
 def map_timings(m: dict | None) -> Timings:
@@ -467,6 +553,48 @@ def self_test() -> int:
     check("leg_of is total: leg 1, leg 2, and leg 1 for a key the plan never heard of",
           (leg_of(plan, "Conformance", f"{ns}A.M"), leg_of(plan, "Conformance", f"{ns}B.M"),
            leg_of(plan, "Conformance", f"{ns}Z.M"), leg_of(plan, "Unit", f"{ns}B.M")) == (1, 2, 1, 1))
+    # the shared timings store (kb/Work PB2527): every gate publishes, a fresh worktree's plan reads it.
+    def trx_with(run_dir: Path, rows: list[tuple[str, str]]) -> None:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        body = "".join(f'<UnitTestResult testName="{n}" duration="{d}" outcome="Passed" />' for n, d in rows)
+        (run_dir / "leg-1-Conformance.trx").write_text(
+            '<?xml version="1.0" encoding="utf-8"?><TestRun xmlns="http://microsoft.com/schemas/VisualStudio/'
+            f'TeamTest/2010"><Results>{body}</Results></TestRun>', encoding="utf-8")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        store = timings_store(Path(tmp) / "common")
+        empty = read_shared_timings(store)
+        long_c, short_c, gone = f"{ns}Long_P3.M", f"{ns}Short.M", f"{ns}Gone.M"
+        trx_with(Path(tmp) / "run1", [(long_c, "00:01:40.0"), (short_c, "00:00:01.0"), (gone, "00:00:02.0")])
+        n1, _ = publish_timings(store, Path(tmp) / "run1", {long_c, short_c, gone}, "gate one", "t1")
+        # a later, partial gate (leg 1 only): it measured only Short, and Gone is no longer discovered;
+        # the long partition was renumbered (_P3 -> _P17) by a partition-count change.
+        trx_with(Path(tmp) / "run2", [(short_c, "00:00:03.0")])
+        renumbered = f"{ns}Long_P17.M"
+        n2, _ = publish_timings(store, Path(tmp) / "run2", {renumbered, short_c}, "gate two", "t2")
+        shared = read_shared_timings(store)
+        check("the shared timings store: empty before any gate publishes (a plan then has no timings)",
+              not empty and empty.source == "none", empty.source)
+        check("a published gate's durations time a fresh worktree's plan; a partial gate replaces only what it "
+              "measured, keeps the rest by name key across a partition renumbering, and drops what is no longer "
+              "discovered",
+              n1 == 3 and n2 == 1 and shared.seconds(name_key(renumbered)) == 100.0
+              and shared.seconds(short_c) == 3.0 and shared.seconds(gone) is None
+              and "gate two" in shared.source, (n1, n2, shared.source))
+        p = plan_assembly([short_c, renumbered], ctx(previous=shared, map_known=set(), every_tier1=True))
+        check("timed from the store, leg 2 starts with the longest collection",
+              p["stats"]["timed"] and (p["leg2"] or p["leg1"])[0] == name_key(renumbered), p)
+        store.write_text("{ not json", encoding="utf-8")
+        try:
+            read_shared_timings(store)
+            malformed_read_refused = False
+        except ValueError:
+            malformed_read_refused = True
+        _, note = publish_timings(store, Path(tmp) / "run2", {renumbered, short_c}, "gate three", "t3")
+        check("a malformed store is refused on read and REPLACED (named) on publish",
+              malformed_read_refused and "replaced a malformed store" in note
+              and read_shared_timings(store).seconds(short_c) == 3.0, note)
+
     # the file: canonical, digested, readable back.
     listing = f"Test run for x.dll\n{LISTED_MARK}\n" + "\n".join("    " + d for d in cheap[:3]) + "\n"
     with tempfile.TemporaryDirectory() as tmp:

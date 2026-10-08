@@ -196,15 +196,20 @@ def drop_git_local_env() -> None:
         os.environ.pop(name, None)
 
 
-def slot_dir(repo: Path = REPO) -> Path:
-    """`<git common dir>/cobol-gate-slots` of the repository `repo` is a checkout of — one directory shared by the main
-    checkout and every linked worktree."""
+def git_common_dir(repo: Path = REPO) -> Path:
+    """The git common dir of the repository `repo` is a checkout of — one directory shared by the main checkout and
+    every linked worktree, where the gate's shared state lives (the slots, the timings store)."""
     out = subprocess.run(["git", "rev-parse", "--git-common-dir"], cwd=repo, check=True, capture_output=True,
                          text=True, encoding="utf-8").stdout.strip()
     common = Path(out)
     if not common.is_absolute():
         common = Path(repo) / common
-    return common.resolve() / SLOT_DIR_NAME
+    return common.resolve()
+
+
+def slot_dir(repo: Path = REPO) -> Path:
+    """`<git common dir>/cobol-gate-slots` of the repository `repo` is a checkout of."""
+    return git_common_dir(repo) / SLOT_DIR_NAME
 
 
 # ── the shared settings (kb/Work PB2514, PB2515) ─────────────────────────────────────────────────────────────────

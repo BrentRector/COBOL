@@ -1,0 +1,13 @@
+CITATIONS                            18.5 s  rc=0
+DOC CITATIONS                         2.4 s  rc=0
+EVIDENCE SUPERSESSION                 0.2 s  rc=0
+DRIFT RULES INDEX                     0.1 s  rc=0
+GUARD HOOK SELF-TEST                  3.6 s  rc=0
+READ-ONLY HOOK SELF-TEST              0.4 s  rc=0
+WORKTREE RM-ALLOW HOOK SELF-TEST      1.9 s  rc=0
+WITNESS LOSS                          0.2 s  rc=0
+RULE CATALOG                          0.4 s  rc=0
+SPEC CORRECTIONS                      0.2 s  rc=0
+CITE SELF-TEST                        0.1 s  rc=0
+LEDGER PLAN SELF-TEST                 0.2 s  rc=0
+TOTAL                                28.3 s

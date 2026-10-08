@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-289 drift tests.
+290 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -15,6 +15,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [BitRunImageDriftTests](../tests/Cobol.Net.Tests.Conformance/BitRunImageDriftTests.cs) | ⛔ ONE GROUP, TWO COMPOSERS, ONE ANSWER — the drift net under kb/Work PB584's mechanism. | `src`, `src/Cobol.Net.Compiler/Binding/Model/BitLayout.cs`, `src/Cobol.Net.Compiler/Binding/DataBinder.cs` |
 | [ByteWindowResidueDriftTests](../tests/Cobol.Net.Tests.Conformance/ByteWindowResidueDriftTests.cs) | ⛔ THE DRIFT PIN FOR THE ONE BYTE-WINDOW CARRIAGE GATE (DataBinder.ByteWindowResidueOf; kb/Work PB231). | — |
 | [CompiledProgramCacheDriftTests](../tests/Cobol.Net.Tests.Conformance/CompiledProgramCacheDriftTests.cs) | ⛔ THE KEY OF CompiledProgramCache IS COMPLETE (kb/Work PB985 obligation 2; DESIGN-test-build-ci.md §3.12). | `tests/Cobol.Net.Tests.Conformance`, `src`, `src/prog.cob`, `src/PB985CPY.cpy` |
+| [CorpusPartitioningDriftTests](../tests/Cobol.Net.Tests.Conformance/CorpusPartitioningDriftTests.cs) | ⛔ NO SERIAL COLLECTION OF THE CONFORMANCE LEG MAY GROW BACK INTO ITS WALL (kb/Work PB2527): the corpus runner keeps at least 24 partitions and the optional-word subset sweep at least 8, and no partition of either holds more rows than its bound, so a corpus that grows past the bound turns this red instead of quietly lengthening the leg. | — |
 | [DifferentialGoldenDriftTests](../tests/Cobol.Net.Tests.Conformance/DifferentialGoldenDriftTests.cs) | The differential-golden drift guard (rearchitecture P0 step 11) — the "nothing silently orphaned" backstop for the committed differential goldens, mirroring CorpusManifestTests/ConstructRegistryDriftTests. | `tests/Cobol.Net.Tests.Conformance`, `tests/differential` |
 | [EditionGateArmDriftTests](../tests/Cobol.Net.Tests.Conformance/EditionGateArmDriftTests.cs) | ⛔ AN EDITION GATE KEYED ON A BOUND NODE'S SHAPE IS SILENTLY UN-GATED ON EVERY PATH THAT BAILS OUT BEFORE THE NODE IS BUILT (kb/Work PB353). | — |
 | [EvaluateOperandClassifierDriftTests](../tests/Cobol.Net.Tests.Conformance/EvaluateOperandClassifierDriftTests.cs) | ⛔ THE EVALUATE OPERAND CLASSIFIER IS SYMMETRIC, AND THIS IS WHAT MEASURES IT. | — |

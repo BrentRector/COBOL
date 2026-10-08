@@ -98,7 +98,9 @@ public sealed class GateLegDriftTests
     /// mismatches, the empty leg, the no-plan fallback, the scrubbed all-or-none handshake, the lander's single leg,
     /// the refused second gate (kb/Work PB1721; DESIGN-test-build-ci.md section 3.14.4), and the implementer scope
     /// <c>leg1</c> of the batched-gating trial (kb/Work PB2515): leg 1 only, its verdict never a plain GREEN; and the
-    /// audits' fail-fast (kb/Work PB2523): a red audit stops an implementer gate before the build, never a lander's.
+    /// audits' fail-fast (kb/Work PB2523): a red audit stops an implementer gate before the build, never a lander's;
+    /// and the audits run before the implementer's gate slot is taken (kb/Work PB2524); and every gate publishes its
+    /// measured durations to the shared timings store a fresh worktree's plan reads (kb/Work PB2527).
     /// </summary>
     [Fact]
     public void Arm3_TheGateDriver_FiresEveryArmOnPlantedInputs()
@@ -131,6 +133,10 @@ public sealed class GateLegDriftTests
                      "malformed shared gate settings: the implementer gate is NOT RUN",
                      "a red audit (a stale drift-rules index) STOPS the implementer gate before the build",
                      "a red audit in -Mode lander is RED and the legs still run",
+                     "the audits and the corpus fetch run BEFORE the gate slot is taken",
+                     "shared gate settings that turn malformed while the gate queues: NOT RUN",
+                     "every gate that ran a leg publishes its measured durations to the shared timings store",
+                     "a failed publish to the timings store is reported and recorded, and the verdict is unaffected",
                      "-Mode lander: ONE leg, every assembly, no plan, no handshake, no slot, and no fail-fast",
                      "a second gate in the same worktree is REFUSED",
                      "a defect in the driver still ends in ONE verdict line",
@@ -510,6 +516,12 @@ public sealed class GateLegDriftTests
     [Fact]
     public void Arm5_NoDiscoveredCase_CarriesTheRepositoryRoot() =>
         GateLegAudit.AssertNoCaseCarriesTheRoot(typeof(GateLegDriftTests).Assembly);
+
+    /// <summary>This assembly's test host is configured for Server GC (kb/Work PB2526); the Conformance and
+    /// Characterization assemblies' own GateLegDriftTests assert the same of theirs.</summary>
+    [Fact]
+    public void ThisTestHost_IsConfiguredForServerGc() =>
+        GateLegAudit.AssertTestHostConfiguredForServerGc(typeof(GateLegDriftTests).Assembly);
 
     /// <summary>The audit's witness, on EVERY host for EVERY root shape (kb/Work PB1719): a Windows root and a POSIX
     /// root, both matched as text on either OS, and <c>host</c>, this run's own <see cref="TestRepo.Root"/> — the

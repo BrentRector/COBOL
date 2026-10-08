@@ -19,4 +19,9 @@ public sealed class GateLegDriftTests
     [Fact]
     public void Arm5_NoDiscoveredCase_CarriesTheRepositoryRoot() =>
         GateLegAudit.AssertNoCaseCarriesTheRoot(typeof(GateLegDriftTests).Assembly);
+
+    /// <summary>This assembly's test host is configured for Server GC (kb/Work PB2526).</summary>
+    [Fact]
+    public void ThisTestHost_IsConfiguredForServerGc() =>
+        GateLegAudit.AssertTestHostConfiguredForServerGc(typeof(GateLegDriftTests).Assembly);
 }

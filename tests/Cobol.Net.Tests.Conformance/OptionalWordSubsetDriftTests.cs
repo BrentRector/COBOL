@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Xunit;
 using CobolNet.Frontend.Preprocessor;
+using CobolNet.Tests.Shared;
 
 namespace CobolNet.Tests.Conformance;
 
@@ -23,9 +24,21 @@ namespace CobolNet.Tests.Conformance;
 /// Adding a format is one row in <see cref="Formats"/>. The optional-word list is measured from the printed page
 /// (<c>scripts/spec/figure_extract.py</c>), never from the transcription and never from the corpus, and
 /// <c>scripts/spec/audit_grammar_optional_words.py</c> is the tool that finds the ones still missing.
+///
+/// ⛔ THIS FAMILY IS PARTITIONED (<see cref="TestPartitioning"/>, kb/Work PB2527). Every row compiles and runs the
+/// whole power set of its format serially, and as ONE class (one xUnit collection) the 23 rows were a 131-152 s pole
+/// of the Conformance leg, one row alone 59 s. The partitions keep <c>OptionalWordSubsetDriftTests</c> in their names,
+/// so a <c>FullyQualifiedName~OptionalWordSubsetDriftTests</c> filter still selects them all.
 /// </remarks>
-public sealed class OptionalWordSubsetDriftTests
+/// <typeparam name="TSlot">This partition's slot.</typeparam>
+public abstract class OptionalWordSubsetDriftTestsBase<TSlot>
+    where TSlot : ITestPartitionSlot
 {
+    /// <summary>Partition count: 8 collections of about 3 rows each, so no partition holds more than the 59 s row
+    /// and a neighbour (w1033 gate diagnosis; modeled with the 24 corpus partitions and longest-first order: the
+    /// Conformance leg 162 s to 118 s, against a floor of 117 s). <c>CorpusPartitioningDriftTests</c> pins it.</summary>
+    public const int Partitions = 8;
+
     /// <param name="Name">Test identity, and the PROGRAM-ID stem.</param>
     /// <param name="Clause">The general format whose underlining was measured.</param>
     /// <param name="Edition">The ISO edition to compile as — the earliest at which the format exists.</param>
@@ -860,37 +873,65 @@ public sealed class OptionalWordSubsetDriftTests
             ObjectReferenceFactoryOf),
     ];
 
-    public static IEnumerable<object[]> Cases() => Formats.Select(f => new object[] { f.Name });
+    [PartitionedRowSource(nameof(Cases))]
+    public static IEnumerable<object[]> AllCases() => Formats.Select(f => new object[] { f.Name });
+
+    /// <summary>This partition's share of the formats.</summary>
+    public static IEnumerable<object[]> Cases() => TestPartitioning.SliceRows<TSlot>(AllCases(), Partitions);
+
+    /// <summary>One spelling of a format: its PROGRAM-ID (and assembly name), the optional words it writes, and its
+    /// source.</summary>
+    internal sealed record Spelling(string Unit, string Words, string Source);
+
+    /// <summary>The edition a format compiles at.</summary>
+    internal static int EditionOf(string name) => Formats.Single(c => c.Name == name).Edition;
+
+    /// <summary>Every subset of a format's optional words, as the source that writes it — THE generator the theory
+    /// and the architecture oracle (<see cref="ArchOracle"/>) both compile, so they compile the same programs.</summary>
+    internal static IEnumerable<Spelling> Spellings(string name)
+    {
+        FormatCase f = Formats.Single(c => c.Name == name);
+        int slots = f.OptionalWords.Length;
+        for (int mask = 0; mask < (1 << slots); mask++)
+        {
+            // Slot i is written when its bit is set; the all-bits-set spelling is the fully-written form.
+            object[] words = [.. Enumerable.Range(0, slots).Select(i => (mask & (1 << i)) != 0 ? f.OptionalWords[i] : "")];
+            string spelling = string.Join(" ", words.Cast<string>().Where(w => w.Length > 0));
+            // ⛔ A UNIQUE PROGRAM-ID AND ASSEMBLY NAME PER SPELLING. Every subset compiles inside ONE test
+            // process, and a same-named assembly is served from the load context that already holds it — the
+            // run would then compare a spelling against ITSELF and pass whatever the grammar did.
+            string unit = f.ProgramId + mask.ToString("00");
+            string source = string.Format(f.Template, words).Replace(f.ProgramId + ".", unit + ".", StringComparison.Ordinal);
+            yield return new(unit, spelling.Length == 0 ? "none written" : spelling, source);
+        }
+    }
+
+    /// <summary>The compile the theory performs for one spelling, its outputs in <paramref name="dir"/>.</summary>
+    internal static CompilerDriver.Result Compile(string dir, Spelling s, int edition)
+    {
+        string src = CompiledProgramCache.StageSource(Path.Combine(dir, s.Unit + ".cob"), s.Source);
+        return CompiledProgramCache.Compile(new CompilerDriver.Options(src, Path.Combine(dir, s.Unit + ".dll"),
+            DialectLevel: edition, SourceFormat: InitialReferenceFormat.Auto));
+    }
 
     [Theory]
     [MemberData(nameof(Cases))]
     public void EveryOptionalWordSubset_CompilesAndRunsIdentically(string name)
     {
         FormatCase f = Formats.Single(c => c.Name == name);
-        int slots = f.OptionalWords.Length;
         string? baseline = null;
         string baselineSpelling = "";
 
-        for (int mask = 0; mask < (1 << slots); mask++)
+        foreach (Spelling s in Spellings(name))
         {
-            // Slot i is written when its bit is set; the all-bits-set spelling is the fully-written form.
-            object[] words = [.. Enumerable.Range(0, slots).Select(i => (mask & (1 << i)) != 0 ? f.OptionalWords[i] : "")];
-            string spelling = string.Join(" ", words.Cast<string>().Where(w => w.Length > 0));
-            if (spelling.Length == 0) spelling = "none written";
-            // ⛔ A UNIQUE PROGRAM-ID AND ASSEMBLY NAME PER SPELLING. Every subset compiles inside ONE test
-            // process, and a same-named assembly is served from the load context that already holds it — the
-            // run would then compare a spelling against ITSELF and pass whatever the grammar did.
-            string unit = f.ProgramId + mask.ToString("00");
-            string source = string.Format(f.Template, words).Replace(f.ProgramId + ".", unit + ".", StringComparison.Ordinal);
-            Assert.Contains("PROGRAM-ID. " + unit + ".", source, StringComparison.Ordinal);
+            string unit = s.Unit, spelling = s.Words;
+            Assert.Contains("PROGRAM-ID. " + unit + ".", s.Source, StringComparison.Ordinal);
 
             string dir = CutRunner.NewTempDir("optword");
             try
             {
-                string src = Path.Combine(dir, unit + ".cob");
-                src = CompiledProgramCache.StageSource(src, source);
                 string dll = Path.Combine(dir, unit + ".dll");
-                var r = CompiledProgramCache.Compile(new CompilerDriver.Options(src, dll, DialectLevel: f.Edition, SourceFormat: InitialReferenceFormat.Auto));
+                var r = Compile(dir, s, f.Edition);
                 Assert.True(r.Success,
                     $"ISO §{f.Clause}: the optional words [{spelling}] must compile at --std {f.Edition} " +
                     $"(§5.2.3 — they are printed WITHOUT an underline): {string.Join("\n", r.Errors)}");
@@ -915,3 +956,29 @@ public sealed class OptionalWordSubsetDriftTests
         Assert.NotNull(baseline);
     }
 }
+
+// ⛔ THE 8 PARTITIONS — each its own xUnit collection; TestPartitionAudit proves they cover the formats exactly once.
+
+/// <summary>Optional-word subset partition 0 of <see cref="OptionalWordSubsetDriftTestsBase{TSlot}.Partitions"/>.</summary>
+public sealed class OptionalWordSubsetDriftTests_P0 : OptionalWordSubsetDriftTestsBase<Slot0>;
+
+/// <summary>Optional-word subset partition 1.</summary>
+public sealed class OptionalWordSubsetDriftTests_P1 : OptionalWordSubsetDriftTestsBase<Slot1>;
+
+/// <summary>Optional-word subset partition 2.</summary>
+public sealed class OptionalWordSubsetDriftTests_P2 : OptionalWordSubsetDriftTestsBase<Slot2>;
+
+/// <summary>Optional-word subset partition 3.</summary>
+public sealed class OptionalWordSubsetDriftTests_P3 : OptionalWordSubsetDriftTestsBase<Slot3>;
+
+/// <summary>Optional-word subset partition 4.</summary>
+public sealed class OptionalWordSubsetDriftTests_P4 : OptionalWordSubsetDriftTestsBase<Slot4>;
+
+/// <summary>Optional-word subset partition 5.</summary>
+public sealed class OptionalWordSubsetDriftTests_P5 : OptionalWordSubsetDriftTestsBase<Slot5>;
+
+/// <summary>Optional-word subset partition 6.</summary>
+public sealed class OptionalWordSubsetDriftTests_P6 : OptionalWordSubsetDriftTestsBase<Slot6>;
+
+/// <summary>Optional-word subset partition 7.</summary>
+public sealed class OptionalWordSubsetDriftTests_P7 : OptionalWordSubsetDriftTestsBase<Slot7>;

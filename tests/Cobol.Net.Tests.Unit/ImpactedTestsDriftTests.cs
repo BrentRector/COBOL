@@ -61,7 +61,12 @@ public sealed class ImpactedTestsDriftTests
             "an empty leg 1 makes the assembly one leg", "an assembly whose whole recorded time fits the collection cap",
             "leg 2 runs collections longest first", "cases sharing a truncated name share one key",
             "a theory listed as one case", "leg_of is total", "a --list-tests output reads back as its display names",
-            "the plan carries the SHA-256 of its content");
+            "the plan carries the SHA-256 of its content",
+            // kb/Work PB2527: the shared timings store, so a fresh worktree's plan runs leg 2 longest first
+            "the shared timings store: empty before any gate publishes",
+            "a published gate's durations time a fresh worktree's plan",
+            "timed from the store, leg 2 starts with the longest collection",
+            "a malformed store is refused on read and REPLACED (named) on publish");
     }
 
     [Fact]

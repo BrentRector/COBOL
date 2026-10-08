@@ -86,6 +86,8 @@ public sealed class CitationAuditSelfTestDriftTests
                      "absent   on paraphrase, not an elision", // what makes ELIDED gateable
                      "fires   on a file WITHOUT",              // the whole-file opt-out suppresses something
                      "silent  on the same file WITH it",
+                     // kb/Work PB2525: one process per citation was 75 of the audit's 79 s
+                     "ok   in-process: every ruling made with no process spawned",
                  })
         {
             Assert.True(r.Stdout.Contains(mustDrive, StringComparison.Ordinal),

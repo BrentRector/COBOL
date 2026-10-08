@@ -192,9 +192,12 @@ internal static class ConformanceCorpus
 public abstract class CorpusRunnerTestsBase<TSlot>
     where TSlot : ITestPartitionSlot
 {
-    /// <summary>Partition count, chosen from the MEASURED serial cost: 83.9 s ÷ 3 ≈ 28 s per collection, which
-    /// keeps it below the split version matrix (~60 s) rather than becoming the leg's new pole.</summary>
-    public const int Partitions = 3;
+    /// <summary>Partition count, chosen from the MEASURED serial cost (kb/Work PB2527, the w1033 gate diagnosis):
+    /// at 3 partitions of about 1,546 cases each, each partition ran 246-282 s on one thread and the Conformance leg
+    /// spent 95-220 s of its wall at 1-4 threads after its 32-wide phase. 24 partitions (about 190 cases, about 35 s
+    /// each) end that tail; replayed onto 32 workers, the measured durations model the leg 247 s to 162 s, longest
+    /// first. <c>CorpusPartitioningDriftTests</c> pins the count.</summary>
+    public const int Partitions = 24;
 
     [PartitionedRowSource(nameof(EnabledPositive))]
     public static IEnumerable<object[]> AllEnabledPositive() => ConformanceCorpus.EnabledPositive();
@@ -255,8 +258,8 @@ public abstract class CorpusRunnerTestsBase<TSlot>
     }
 }
 
-// ⛔ THE THREE PARTITIONS — each its own xUnit collection. TestPartitionAudit proves they cover both corpora
-// exactly once.
+// ⛔ THE 24 PARTITIONS — each its own xUnit collection. TestPartitionAudit proves they cover both corpora
+// exactly once; CorpusPartitioningDriftTests pins the count (kb/Work PB2527).
 
 /// <summary>Conformance-corpus partition 0 of <see cref="CorpusRunnerTestsBase{TSlot}.Partitions"/>.</summary>
 public sealed class CorpusRunnerTests_P0 : CorpusRunnerTestsBase<Slot0>;
@@ -267,10 +270,73 @@ public sealed class CorpusRunnerTests_P1 : CorpusRunnerTestsBase<Slot1>;
 /// <summary>Conformance-corpus partition 2.</summary>
 public sealed class CorpusRunnerTests_P2 : CorpusRunnerTestsBase<Slot2>;
 
+/// <summary>Conformance-corpus partition 3.</summary>
+public sealed class CorpusRunnerTests_P3 : CorpusRunnerTestsBase<Slot3>;
+
+/// <summary>Conformance-corpus partition 4.</summary>
+public sealed class CorpusRunnerTests_P4 : CorpusRunnerTestsBase<Slot4>;
+
+/// <summary>Conformance-corpus partition 5.</summary>
+public sealed class CorpusRunnerTests_P5 : CorpusRunnerTestsBase<Slot5>;
+
+/// <summary>Conformance-corpus partition 6.</summary>
+public sealed class CorpusRunnerTests_P6 : CorpusRunnerTestsBase<Slot6>;
+
+/// <summary>Conformance-corpus partition 7.</summary>
+public sealed class CorpusRunnerTests_P7 : CorpusRunnerTestsBase<Slot7>;
+
+/// <summary>Conformance-corpus partition 8.</summary>
+public sealed class CorpusRunnerTests_P8 : CorpusRunnerTestsBase<Slot8>;
+
+/// <summary>Conformance-corpus partition 9.</summary>
+public sealed class CorpusRunnerTests_P9 : CorpusRunnerTestsBase<Slot9>;
+
+/// <summary>Conformance-corpus partition 10.</summary>
+public sealed class CorpusRunnerTests_P10 : CorpusRunnerTestsBase<Slot10>;
+
+/// <summary>Conformance-corpus partition 11.</summary>
+public sealed class CorpusRunnerTests_P11 : CorpusRunnerTestsBase<Slot11>;
+
+/// <summary>Conformance-corpus partition 12.</summary>
+public sealed class CorpusRunnerTests_P12 : CorpusRunnerTestsBase<Slot12>;
+
+/// <summary>Conformance-corpus partition 13.</summary>
+public sealed class CorpusRunnerTests_P13 : CorpusRunnerTestsBase<Slot13>;
+
+/// <summary>Conformance-corpus partition 14.</summary>
+public sealed class CorpusRunnerTests_P14 : CorpusRunnerTestsBase<Slot14>;
+
+/// <summary>Conformance-corpus partition 15.</summary>
+public sealed class CorpusRunnerTests_P15 : CorpusRunnerTestsBase<Slot15>;
+
+/// <summary>Conformance-corpus partition 16.</summary>
+public sealed class CorpusRunnerTests_P16 : CorpusRunnerTestsBase<Slot16>;
+
+/// <summary>Conformance-corpus partition 17.</summary>
+public sealed class CorpusRunnerTests_P17 : CorpusRunnerTestsBase<Slot17>;
+
+/// <summary>Conformance-corpus partition 18.</summary>
+public sealed class CorpusRunnerTests_P18 : CorpusRunnerTestsBase<Slot18>;
+
+/// <summary>Conformance-corpus partition 19.</summary>
+public sealed class CorpusRunnerTests_P19 : CorpusRunnerTestsBase<Slot19>;
+
+/// <summary>Conformance-corpus partition 20.</summary>
+public sealed class CorpusRunnerTests_P20 : CorpusRunnerTestsBase<Slot20>;
+
+/// <summary>Conformance-corpus partition 21.</summary>
+public sealed class CorpusRunnerTests_P21 : CorpusRunnerTestsBase<Slot21>;
+
+/// <summary>Conformance-corpus partition 22.</summary>
+public sealed class CorpusRunnerTests_P22 : CorpusRunnerTestsBase<Slot22>;
+
+/// <summary>Conformance-corpus partition 23.</summary>
+public sealed class CorpusRunnerTests_P23 : CorpusRunnerTestsBase<Slot23>;
+
 /// <summary>
 /// The corpus INTEGRITY facts — whole-directory assertions that make silent non-discovery impossible: every
 /// on-disk program must be listed. They are about a manifest as a WHOLE, so they run ONCE and are deliberately not
-/// on the partitioned base (an inherited theory would run three times and assert the same thing thrice).
+/// on the partitioned base (an inherited theory would run once per partition and assert the same thing each time).
 /// </summary>
 public sealed class CorpusRunnerTests
 {

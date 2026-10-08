@@ -11,8 +11,8 @@ namespace CobolNet.Tests.Conformance;
 /// ⛔ THE ARCHITECTURE REVIEW'S BEHAVIOR-NEUTRALITY ORACLE (kb/Work PB2116; docs/rearchitecture/
 /// DESIGN-architecture-review.md §4 items 1 and 2). A refactor can change what the compiler emits through
 /// registration order, static initialization or a shared cache while every test stays green; this records, for
-/// every compile this assembly's partitioned theory families perform (the conformance corpus, NIST and the version
-/// matrix), the emitted C# and the diagnostic stream, so a restructuring wave can prove case by case that it changed
+/// every compile this assembly's partitioned theory families perform (the conformance corpus, NIST, the version
+/// matrix and the optional-word subset sweep), the emitted C# and the diagnostic stream, so a restructuring wave can prove case by case that it changed
 /// neither.
 /// <para><b>The population is the suites' own.</b> Every case is enumerated from a <see cref="RowSource"/> — the
 /// <c>[PartitionedRowSource]</c> member a partitioned theory family consumes — and compiled through the SAME option
@@ -74,6 +74,9 @@ public static class ArchOracle
             VersionMatrixTestsBase<Slot0>.AllObsoleteMatrix, row => MatrixCell(row, permissive: false)),
         new(typeof(VersionMatrixTestsBase<>), nameof(VersionMatrixTestsBase<Slot0>.AllContinuityCells),
             VersionMatrixTestsBase<Slot0>.AllContinuityCells, ContinuityCell),
+        // Partitioned since kb/Work PB2527: every subset spelling of a format's optional words, one case per format.
+        new(typeof(OptionalWordSubsetDriftTestsBase<>), nameof(OptionalWordSubsetDriftTestsBase<Slot0>.AllCases),
+            OptionalWordSubsetDriftTestsBase<Slot0>.AllCases, OptionalWordFormat),
     ];
 
     /// <summary>The whole population: every enrolled source's cases, one per identity, in ordinal id order. An id
@@ -140,6 +143,17 @@ public static class ArchOracle
             from permissive in new[] { true, false }
             select (permissive ? "permissive" : "strict",
                 EditionHarness.CompileNistObserved(name, edition, permissive, checkOnly: true, Observe))));
+    }
+
+    /// <summary>An optional-word format: every subset spelling, compiled as the drift theory compiles it, each section
+    /// headed by the words it writes.</summary>
+    private static IEnumerable<OracleCase> OptionalWordFormat(object[] row)
+    {
+        string name = (string)row[0];
+        int edition = OptionalWordSubsetDriftTestsBase<Slot0>.EditionOf(name);
+        yield return new($"optword/{name}", $"optword/{edition}", () => Fold(
+            OptionalWordSubsetDriftTestsBase<Slot0>.Spellings(name).Select(s => (s.Words, InScratch(dir =>
+                OptionalWordSubsetDriftTestsBase<Slot0>.Compile(dir, s, edition))))));
     }
 
     private static IEnumerable<OracleCase> MatrixCell(object[] row, bool permissive)
