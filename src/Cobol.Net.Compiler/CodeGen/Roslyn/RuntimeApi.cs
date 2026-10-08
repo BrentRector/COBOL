@@ -92,12 +92,25 @@ internal static class RuntimeApi
     /// The literal form, so a folded intrinsic and a computed one are indistinguishable (DA2).</summary>
     /// <paramref name="deSign"/> carries §14.9.25.4 GR6a (the operational sign is not moved to an alphanumeric
     /// receiver / text comparison) — the same flag <c>FieldAsString</c> honours for a signed FIELD operand.
-    public static string NumFormatFunctionText(string value, int scale, bool deSign = false) =>
-        $"{nameof(CobolNum)}.{nameof(CobolNum.FormatFunctionText)}({value}, {scale}{(deSign ? ", true" : "")})";
+    /// <paramref name="commaMode"/> is the decimal separator the image is written with (kb/Work PB2507): the
+    /// referencing unit's DECIMAL-POINT IS COMMA mode for a call, the materialized temporary's own for a place —
+    /// REQUIRED, so no emit site can forget it.
+    public static string NumFormatFunctionText(string value, int scale, bool deSign, bool commaMode) =>
+        $"{nameof(CobolNum)}.{nameof(CobolNum.FormatFunctionText)}({value}, {scale}{FunctionTextFlags(deSign, commaMode, ", ")})";
 
     /// <summary>The same text image for a STANDARD-DECIMAL intermediate — <c>CobolDec.ToFunctionText</c>.</summary>
-    public static string DecFunctionText(string value, bool deSign = false) =>
-        $"({value}).{nameof(CobolDec.ToFunctionText)}({(deSign ? "true" : "")})";
+    public static string DecFunctionText(string value, bool deSign, bool commaMode) =>
+        $"({value}).{nameof(CobolDec.ToFunctionText)}({FunctionTextFlags(deSign, commaMode, "")})";
+
+    /// <summary>The trailing <c>deSign</c> / <c>commaMode</c> arguments of a function-text call, each written only when
+    /// set (an unflagged call keeps its byte-stable emission); <paramref name="lead"/> precedes a non-empty list.</summary>
+    private static string FunctionTextFlags(bool deSign, bool commaMode, string lead) => (deSign, commaMode) switch
+    {
+        (false, false) => "",
+        (true, false) => lead + "true",
+        (false, true) => lead + "commaMode: true",
+        (true, true) => lead + "true, commaMode: true",
+    };
 
     /// <summary>The numeric MOVE-rules store (decimal alignment, truncation/zero-fill) — <c>CobolNum.Store</c>,
     /// or <c>CobolNum.StoreU</c> when the VALUE expression is on the unsigned-wide lane (<c>NumX.U</c> — a

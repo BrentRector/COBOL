@@ -40,6 +40,12 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     internal AlphabetDef? Collating => ctx.Data.Collating;
     internal NationalAlphabetDef? NationalCollating => ctx.Data.NationalCollating;
 
+    /// <summary>The EMITTING unit's own DECIMAL-POINT IS COMMA mode (§12.3.7.4 GR14 a; a contained program inherits it,
+    /// §12.3.4 GR1) — for what the unit ITSELF evaluates and spells, never for an item's PICTURE (that is
+    /// <c>PicInfo.DecimalPointIsComma</c>, kb/Work PB2554, and <c>DecimalPointModeDriftTests</c> holds the line): the
+    /// literal-form text image of a numeric function's returned value (kb/Work PB2507).</summary>
+    internal bool UnitDecimalPointIsComma => ctx.Data.DecimalPointIsComma;
+
     // Render/AsNum dispatch through the generated exhaustive visitors (PHASE-07 Step 6d): every BoundExpr / BoundOperand
     // leaf has a Visit below, so a new leaf is a COMPILE error here — the former loud `_ =>` defaults are gone.
 

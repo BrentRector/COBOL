@@ -843,11 +843,19 @@ public static partial class CobolNum
     /// MAGNITUDE travels, never the sign. This is a GENERAL rule with no implementor latitude — the §15.4.1 /
     /// §14.9.11.4 GR1 latitude this determination rests on covers the FORM of the text, not whether the sign
     /// travels. False for DISPLAY, where the sign IS part of the value being shown.</param>
-    public static string FormatFunctionText(Int128 unscaled, int scale, bool deSign = false)
+    /// <param name="commaMode">⛔ The decimal separator is the PROGRAM'S (kb/Work PB2507): under DECIMAL-POINT IS COMMA
+    /// "the character written in numeric literals to represent the decimal separator shall be the comma" (§12.3.7.4
+    /// GR14 a), and this text IS the literal form of the value — the same image <c>DISPLAY 1,5</c> gives the literal
+    /// (kb/Work PB1643, DOC-A.1-56), which is why <c>DISPLAY FUNCTION NUMVAL("1,5")</c> must agree with it, as it does
+    /// in GnuCOBOL 3.2. The emitter passes the referencing unit's mode (a returned value is a temporary of the unit
+    /// that evaluates it); false is the C#-facing '.' radix of a compile-time fold's canonical text
+    /// (<c>AlgebraicRanges.Decimalize</c>), which never reaches COBOL source.</param>
+    public static string FormatFunctionText(Int128 unscaled, int scale, bool deSign = false, bool commaMode = false)
     {
-        if (deSign && unscaled < 0) unscaled = -unscaled;
-        bool neg = unscaled < 0;
-        string digits = (neg ? -unscaled : unscaled).ToString(CultureInfo.InvariantCulture);
+        // The magnitude is the UNSIGNED one: negating the signed value leaves Int128.MinValue (-2^127) NEGATIVE
+        // (kb/Work PB2641), which printed as "--170141…" here.
+        bool neg = unscaled < 0 && !deSign;
+        string digits = CobolDec.UAbs(unscaled).ToString(CultureInfo.InvariantCulture);
         string body;
         if (scale <= 0)
         {
@@ -860,7 +868,7 @@ public static partial class CobolNum
             // Left-pad so a value smaller than one full unit still shows the leading "0." (1 unscaled at
             // scale 2 is 0.01, never .01).
             digits = digits.PadLeft(scale + 1, '0');
-            body = digits[..^scale] + "." + digits[^scale..];
+            body = digits[..^scale] + (commaMode ? ',' : '.') + digits[^scale..];
         }
         return neg ? "-" + body : body;
     }
@@ -1094,6 +1102,9 @@ public static partial class CobolNum
                     .ToUnscaledIntermediate(resultScale, mode);
         Int128 num = a, den = b;
         if (exp >= 0) num *= Pow10Wide(exp); else den *= Pow10Wide(-exp);
+        // Int128.MinValue has no signed negation (-MinValue is MinValue), so the sign-normalising step below would leave
+        // a negative divisor or a wrong-signed dividend: both go through the magnitudes (kb/Work PB2640's sweep).
+        if (num == Int128.MinValue || den == Int128.MinValue) return DivideByMagnitude(num, den, mode);
         if (den < 0) { num = -num; den = -den; }     // RoundDiv requires a positive divisor
         return RoundDiv(num, den, mode);
     }
@@ -1112,20 +1123,70 @@ public static partial class CobolNum
         T q = value / divisor, rem = value % divisor;
         if (rem == T.Zero) return q;
         bool neg = value < T.Zero;
-        T step = neg ? -T.One : T.One;                       // the away-from-zero unit (never negated for unsigned)
-        T two = T.One + T.One;
-        T twiceRem = T.Abs(rem) * two;
+        // The away-from-zero unit is ±1 (the subtraction keeps the unsigned carrier from ever negating a UInt128).
+        return BumpsMagnitude(neg, q % (T.One + T.One) != T.Zero, T.Abs(rem), divisor, mode)
+            ? (neg ? q - T.One : q + T.One)
+            : q;
+    }
+
+    /// <summary>⛔ THE ONE ROUNDING DECISION (§14.7.4.3 GR2–GR8): does a NONZERO remainder move the truncated quotient's
+    /// MAGNITUDE one unit away from zero? Every divide kernel asks it — <see cref="RoundDiv{T}"/> over any signed or
+    /// unsigned carrier, and <see cref="LandQuotient"/> over the unsigned magnitudes of the two kernels that must
+    /// hold <c>Int128.MinValue</c>'s magnitude 2^127 — so the mode table is written once.
+    /// <para>The NEAREST arms compare <paramref name="absRem"/> with its COMPLEMENT <c>divisor − |rem|</c>, never
+    /// <c>2·|rem|</c> with the divisor (kb/Work PB2640): <c>|rem| &lt; divisor</c>, so the complement is positive and cannot
+    /// overflow on any carrier, where doubling the remainder wrapped NEGATIVE on <see cref="Int128"/> once the divisor
+    /// passed 2^126 (a 16-byte COMP-5 quotient: 9.025e37 ÷ 9.409e37 stored 0 under ROUNDED). <c>|rem| ≷ complement ⇔
+    /// 2·|rem| ≷ divisor</c>, so above-half and tie are the same tests (§14.7.4.3 GR4/GR5/GR6: "the nearest value that
+    /// can be represented", a tie being two values equally near).</para></summary>
+    /// <param name="negative">The quotient's sign: it decides the direction of the TOWARD-GREATER / TOWARD-LESSER arms.</param>
+    /// <param name="quotientIsOdd">Whether the TRUNCATED quotient is odd — NEAREST-EVEN's tie-break.</param>
+    /// <param name="absRem">The remainder's magnitude, in <c>(0, divisor)</c>.</param>
+    /// <param name="divisor">The divisor's magnitude, positive.</param>
+    internal static bool BumpsMagnitude<T>(bool negative, bool quotientIsOdd, T absRem, T divisor, CobolRounding mode)
+        where T : System.Numerics.INumber<T>
+    {
+        T rest = divisor - absRem;
+        bool above = absRem > rest, tie = absRem == rest;
         return mode switch
         {
-            CobolRounding.Truncation or CobolRounding.Prohibited => q,                 // toward zero
-            CobolRounding.AwayFromZero => q + step,
-            CobolRounding.TowardGreater => !neg ? q + T.One : q,                        // ceiling
-            CobolRounding.TowardLesser => neg ? q - T.One : q,                          // floor
-            CobolRounding.NearestAwayFromZero => twiceRem >= divisor ? q + step : q,
-            CobolRounding.NearestTowardZero => twiceRem > divisor ? q + step : q,
-            CobolRounding.NearestEven => twiceRem > divisor || (twiceRem == divisor && q % two != T.Zero) ? q + step : q,
-            _ => q,
+            CobolRounding.AwayFromZero => true,
+            CobolRounding.TowardGreater => !negative,                        // ceiling
+            CobolRounding.TowardLesser => negative,                          // floor
+            CobolRounding.NearestAwayFromZero => above || tie,
+            CobolRounding.NearestTowardZero => above,
+            CobolRounding.NearestEven => above || (tie && quotientIsOdd),
+            _ => false,                                                      // TRUNCATION, PROHIBITED (the unchecked landing truncates)
         };
+    }
+
+    /// <summary>⛔ THE LANDING OF A QUOTIENT FORMED ON UNSIGNED MAGNITUDES (kb/Work PB2640's sibling sweep): rounds the
+    /// truncated magnitude <paramref name="q"/> once by its true remainder (<see cref="BumpsMagnitude"/>) and returns it
+    /// as an <see cref="Int128"/> with the sign applied. Signs are applied AFTER the magnitude arithmetic because the
+    /// magnitude of <c>Int128.MinValue</c> is 2^127, which no <see cref="Int128"/> holds: negating the signed value left
+    /// it NEGATIVE, so <c>Int128.MinValue ÷ −3</c> came out negative and <c>Int128.MinValue ÷ −1</c> came out
+    /// <c>Int128.MinValue</c>. The one value only a NEGATIVE quotient can hold is that 2^127; any other quotient past
+    /// <c>Int128.MaxValue</c> is the §14.7.5 case-5 size error (EC-SIZE-OVERFLOW), never a wrapped digit string.
+    /// PROHIBITED truncates here — this is <see cref="Divide"/>'s UNCHECKED landing (DOC-A.1-70; the checked statement
+    /// asks <c>DivideOrThrow</c> first).</summary>
+    internal static Int128 LandQuotient(UInt128 q, UInt128 rem, UInt128 divisor, bool negative, CobolRounding mode)
+    {
+        if (rem != 0 && BumpsMagnitude(negative, !UInt128.IsEvenInteger(q), rem, divisor, mode))
+        {
+            if (q == UInt128.MaxValue) throw CobolDec.QuotientOverflow();
+            q++;
+        }
+        UInt128 limit = negative ? (UInt128)1 << 127 : (UInt128)Int128.MaxValue;
+        if (q > limit) throw CobolDec.QuotientOverflow();
+        return negative ? unchecked((Int128)(UInt128.Zero - q)) : (Int128)q;
+    }
+
+    /// <summary><see cref="Divide"/>'s aligned division when either operand is <c>Int128.MinValue</c> — the one signed
+    /// value whose magnitude has no signed twin, so the sign-normalising negation <c>RoundDiv</c> needs is not total.</summary>
+    private static Int128 DivideByMagnitude(Int128 num, Int128 den, CobolRounding mode)
+    {
+        UInt128 n = CobolDec.UAbs(num), d = CobolDec.UAbs(den);
+        return LandQuotient(n / d, n % d, d, (num < 0) ^ (den < 0), mode);
     }
 
     /// <summary>10^n as an <see cref="Int128"/> (n in 0..38 — the wide intermediate range, COBOLNET_DESIGN §18 #4)

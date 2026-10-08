@@ -315,6 +315,7 @@ public sealed class DescriptionCopyCompletenessDriftTests
         if (Nullable.GetUnderlyingType(t) is { } inner) return Distinct(inner, current);
         if (t == typeof(bool)) return current is not true;
         if (t == typeof(string)) return Equals(current, "PB522") ? "PB522-2" : "PB522";
+        if (t == typeof(char)) return Equals(current, 'X') ? 'Y' : 'X';   // DataItem.FunctionValueSeparator (kb/Work PB2507)
         if (t.IsEnum)
             return Enum.GetValues(t).Cast<object>().FirstOrDefault(v => !Equals(v, current)) ?? current;
         if (t == typeof(int) || t == typeof(long) || t == typeof(short))

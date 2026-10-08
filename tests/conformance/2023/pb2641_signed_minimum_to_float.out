@@ -1,0 +1,6 @@
+T1 binary64 scaled operand ok
+T2 binary32 scaled operand ok
+T3 binary32 integer operand ok
+T4 atan -1.570796
+T5 MOVE to binary32 ok
+T6 MOVE scaled to binary32 ok

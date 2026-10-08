@@ -669,21 +669,20 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         bool negative = (a < 0) ^ (b < 0);
         UInt128 den = UAbs(b);
         var (hi, lo) = Mul128(UAbs(a), (UInt128)Pow10.AsWide(exp));
-        CobolSizeError Overflow() => new("the quotient exceeds the native Int128 carrier at the result scale "
-            + "(ISO §14.7.5 case 5 — the implementor-defined intermediate range is checked, A.1 item 179: EC-SIZE-OVERFLOW)",
-            "EC-SIZE-OVERFLOW");
-        if (hi >= den) throw Overflow();                     // the quotient would be 2^128 or more
+        if (hi >= den) throw QuotientOverflow();             // the quotient would be 2^128 or more
         var (q, rem) = DivRem256(hi, lo, den);
-        if (q > (UInt128)Int128.MaxValue || den > (UInt128)Int128.MaxValue) throw Overflow();
-        Int128 sq = negative ? -(Int128)q : (Int128)q;
-        if (rem == 0) return sq;
-        // PROHIBITED: this is CobolNum.Divide's UNCHECKED landing, which truncates (DOC-A.1-70, kb/Work PB1196);
-        // CobolNum.DivideOrThrow asks QuotientHasRemainder and raises for a checked statement.
-        Int128 rounded = RoundFromRemainder(sq, negative ? -(Int128)rem : (Int128)rem, (Int128)den, sticky: false,
-            mode == CobolRounding.Prohibited ? CobolRounding.Truncation : mode);
-        if (negative ? rounded > 0 : rounded < 0) throw Overflow();   // rounding up from the very top of the carrier wrapped
-        return rounded;
+        // The rounding and the landing in Int128 are CobolNum.LandQuotient's: on MAGNITUDES, so a divisor of exactly
+        // Int128.MinValue (magnitude 2^127, kb/Work PB2641's family) is a divisor like any other, and the PROHIBITED
+        // arm of the UNCHECKED landing truncates (DOC-A.1-70, kb/Work PB1196; CobolNum.DivideOrThrow asks
+        // QuotientHasRemainder and raises for a checked statement).
+        return CobolNum.LandQuotient(q, rem, den, negative, mode);
     }
+
+    /// <summary>The §14.7.5 case-5 size error of a quotient the native <see cref="Int128"/> carrier cannot hold at the
+    /// result scale — the one error value of <see cref="QuotientAtScale"/> and <see cref="CobolNum.LandQuotient"/>.</summary>
+    internal static CobolSizeError QuotientOverflow() => new("the quotient exceeds the native Int128 carrier at the result scale "
+        + "(ISO §14.7.5 case 5 — the implementor-defined intermediate range is checked, A.1 item 179: EC-SIZE-OVERFLOW)",
+        "EC-SIZE-OVERFLOW");
 
     /// <summary>Does <c>a × 10^exp / b</c> leave a remainder — the exact test <see cref="CobolNum.DivideOrThrow"/>'s
     /// PROHIBITED check needs when the aligned dividend does not fit <c>Int128</c>.</summary>
@@ -872,7 +871,8 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
     /// string context (DA2). An SDIDI carries its own exponent, so the fixed-point scale is <c>-Exp</c>; routing
     /// through <see cref="CobolNum.FormatFunctionText"/> rather than formatting here keeps ONE rendering rule for
     /// a function result, whichever arithmetic mode produced it (§8.8.1.5 vs native, ISO §15.4.1).</summary>
-    public string ToFunctionText(bool deSign = false) => CobolNum.FormatFunctionText(Sig, -Exp, deSign);
+    public string ToFunctionText(bool deSign = false, bool commaMode = false) =>
+        CobolNum.FormatFunctionText(Sig, -Exp, deSign, commaMode);
 
     // ── 34-digit rounding core ───────────────────────────────────────────────────────────────────────────────
 
@@ -1071,6 +1071,10 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         return (v / den, v % den, den);
     }
 
+    /// <summary>The magnitude of a signed carrier value as an UNSIGNED one — total over <see cref="Int128"/>:
+    /// <c>-Int128.MinValue</c> wraps to itself and its bit pattern IS 2^127 as a <see cref="UInt128"/>, where
+    /// <c>Int128.Abs</c> throws and a negated-ternary stays negative (kb/Work PB2641). The ONE magnitude every
+    /// test over a carrier value that can be a signed 16-byte COMP-5 minimum asks.</summary>
     internal static UInt128 UAbs(Int128 v) => v < 0 ? (UInt128)(-v) : (UInt128)v;
 
     private static int DigitCount(Int128 mag)

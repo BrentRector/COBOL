@@ -866,10 +866,15 @@ public sealed class DataItem
     /// is the LITERAL form of its value (§15.4.1 leaves the representation to the implementor), so the temporary's
     /// character image is that literal form — never the zero-padded digits of the implementor's wide description,
     /// which made <c>MOVE FUNCTION INTEGER(N) TO A B</c> store <c>0000</c> where <c>MOVE FUNCTION INTEGER(N) TO A</c>
-    /// stores <c>3</c> (kb/Work PB1007). Read by <c>OperandText</c>'s field image, the ONE text reader.</summary>
+    /// stores <c>3</c> (kb/Work PB1007). Read by <c>OperandText</c>'s field image, the ONE text reader.
+    /// <para>The value is the DECIMAL SEPARATOR that literal form is written with — the materializing unit's, the
+    /// comma under DECIMAL-POINT IS COMMA (§12.3.7.4 GR14 a: "the character written in numeric literals to represent
+    /// the decimal separator shall be the comma"), else the period — and <see langword="null"/> for every item that
+    /// is not such a temporary (kb/Work PB2507). One field, not a flag plus a mode, so the temporary cannot say
+    /// "function value" without saying how to spell it.</para></summary>
     [DescriptionCopy(DescriptionCopyKind.None,
-        "a synthesized-temp discrimination (kb/Work PB1007), set on the materialized temp, not a data description clause")]
-    public bool IsFunctionReturnedValue { get; internal set; }
+        "a synthesized-temp discrimination (kb/Work PB1007, PB2507), set on the materialized temp, not a data description clause")]
+    public char? FunctionValueSeparator { get; internal set; }
 
     /// <summary>True for a group item (has children, no PICTURE).</summary>
     public bool IsGroup => Pic is null && Children.Count > 0;

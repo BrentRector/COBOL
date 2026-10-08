@@ -1032,7 +1032,12 @@ clause text and fails if a new member is silently exempted.
    same reason: a dividend that scales up past the carrier is the exact 256-bit numerator, divided by the 128-bit divisor
    with its true remainder and rounded once at the result scale (`CobolDec.QuotientAtScale` — a 38-digit quotient reaches a
    16-byte COMP-5 receiver whole); only a divisor scaled past the carrier takes the SDIDI (`CobolDec.DivToOdd`,
-   round-to-odd); a quotient past the carrier is EC-SIZE-OVERFLOW.
+   round-to-odd); a quotient past the carrier is EC-SIZE-OVERFLOW. The rounding decision is ONE function
+   (`CobolNum.BumpsMagnitude`: sign and parity of the truncated quotient in, "move the magnitude one unit?" out), asked by the
+   generic `RoundDiv` and by `CobolNum.LandQuotient`, which rounds a quotient formed on UNSIGNED magnitudes and signs it afterwards
+   — so a signed 16-byte minimum `Int128.MinValue` (magnitude 2^127, no signed twin) divides like any other operand. Its NEAREST arms
+   compare `|rem|` with the complement `divisor − |rem|`, never `2·|rem|` with the divisor (the doubling wrapped negative past
+   2^126; kb/Work PB2640).
 2. *Does a float operand own this lane?* D16 evaluates an expression in binary64 when an operand is "described with usage
    float-…" (§14.9.2.4 GR4 and §14.9.44.4 GR4 — ADD and SUBTRACT, the other statements' native rule being the implementor's,
    §8.8.1.3; §14.7.7 r2 lists an intrinsic function and the float / binary usages in separate bullets). A floating-math function's returned value and a non-integer native power are engine-produced approximations,

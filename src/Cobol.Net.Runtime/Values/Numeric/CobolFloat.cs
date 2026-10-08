@@ -37,8 +37,10 @@ public static class CobolFloat
     public static double ScaledToDouble(Int128 unscaled, int scale)
     {
         if (scale == 0) return (double)unscaled;
-        Int128 mag = unscaled < 0 ? -unscaled : unscaled;
-        if (mag <= (Int128)(1L << 53) && scale is >= -22 and <= 22)
+        // ⛔ The magnitude test is on the UNSIGNED magnitude (kb/Work PB2641): negating the signed value leaves
+        // Int128.MinValue (-2^127, a legal signed 16-byte COMP-5 value) unchanged and NEGATIVE, so it passed
+        // "≤ 2^53" and (long)unscaled kept its low 64 bits — zero. CobolDec.UAbs is the MinValue-safe magnitude.
+        if (CobolDec.UAbs(unscaled) <= (1UL << 53) && scale is >= -22 and <= 22)
         {
             double v = (double)(long)unscaled;                 // exact: |value| ≤ 2^53
             return scale > 0 ? v / ExactPow10[scale] : v * ExactPow10[-scale];
@@ -61,8 +63,7 @@ public static class CobolFloat
     public static float ScaledToSingle(Int128 unscaled, int scale)
     {
         if (unscaled == 0) return 0f;
-        Int128 mag = unscaled < 0 ? -unscaled : unscaled;
-        if (mag <= (Int128)(1 << 24) && scale is >= -10 and <= 10)
+        if (CobolDec.UAbs(unscaled) <= (1UL << 24) && scale is >= -10 and <= 10)   // unsigned magnitude: MinValue-safe (PB2641)
         {
             float v = (float)(int)unscaled;                    // exact: |value| ≤ 2^24
             return scale > 0 ? v / ExactPow10Single[scale] : v * ExactPow10Single[-scale];

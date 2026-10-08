@@ -1,0 +1,9 @@
+T1 nearest away  1
+T2 nearest even  1
+T3 nearest toward zero  1
+T4 truncation  0
+T5 away from zero  1
+T6 negative nearest away -1
+T7 negative nearest even -1
+T8 negative nearest toward zero -1
+T9 below half  0

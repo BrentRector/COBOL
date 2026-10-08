@@ -28,8 +28,15 @@ public sealed class DecimalPointModeDriftTests
         ("CodeGen/Emit/IntrinsicRenderer.cs", 1,
             "CommaFlag: NUMVAL / NUMVAL-C / NUMVAL-F parse a STRING at run time under the mode of the unit that "
             + "references the function (§15 NUMVAL), not an item's picture"),
-        ("Binding/Procedure/Verbs/IntrinsicBinder.cs", 2,
-            "DateTimeFormatGrammar.Describe/Classify: a date-time format literal the referencing unit wrote"),
+        ("CodeGen/Emit/NumericRenderer.cs", 1,
+            "UnitDecimalPointIsComma: the literal-form text image of a numeric function's returned value is spelled with "
+            + "the separator of the unit that evaluates it (kb/Work PB2507), as a literal's image is"),
+        ("Binding/Procedure/Verbs/IntrinsicBinder.cs", 3,
+            "DateTimeFormatGrammar.Describe/Classify: a date-time format literal the referencing unit wrote; and the "
+            + "folded numeric function result, whose character image is the literal form in the unit's separator (kb/Work PB2507)"),
+        ("Binding/Procedure/SendingValueTemp.cs", 1,
+            "the §15.4 returned-value temporary carries the separator its literal-form text is written with "
+            + "(DataItem.FunctionValueSeparator, kb/Work PB2507)"),
         ("Binding/Procedure/ExpressionBinder.cs", 2,
             "the two numeric-literal producers: the literal keeps the separator its writer used (PB1643, "
             + "NumericLiteralImageDriftTests)"),

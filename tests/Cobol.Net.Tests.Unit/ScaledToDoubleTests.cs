@@ -85,6 +85,27 @@ public sealed class ScaledToDoubleTests
         Assert.True(examined >= 600, $"only {examined} pairs examined");
     }
 
+    /// <summary>⛔ kb/Work PB2641: <c>-Int128.MinValue</c> is <c>Int128.MinValue</c> (the unary minus is unchecked), so a
+    /// negated-ternary magnitude test took the "exact small value" path for -2^127 and <c>(long)unscaled</c> kept the
+    /// low 64 bits — 0. -2^127 is a legal signed 16-byte COMP-5 value (<c>LOWEST-ALGEBRAIC</c> of one), so the
+    /// conversion owes the oracle's answer at EVERY scale, the exact-path scales (±22) and the parse path alike.
+    /// §14.6.8.3 GR2: the algebraic value is converted "in a manner consistent with ... ISO/IEC 60559".</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(22)]
+    [InlineData(23)]
+    [InlineData(-1)]
+    [InlineData(-22)]
+    [InlineData(-23)]
+    public void TheSignedMinimum_ConvertsToItsOwnMagnitude_NeverZero(int scale)
+    {
+        double actual = CobolFloat.ScaledToDouble(Int128.MinValue, scale);
+        Assert.Equal(Oracle(Int128.MinValue, scale), actual);
+        Assert.True(actual < 0, $"scale {scale}: {actual:R}");
+    }
+
     [Fact]
     public void CobolDecToDouble_RidesTheSameConversion()
     {

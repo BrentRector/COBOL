@@ -131,9 +131,13 @@ internal static class OperandText
     private static string NumericExprText(NumericRenderer num, BoundExpr expr, bool deSign)
     {
         NumX x = num.Render(expr, ReceiverContext.None);
+        // ⛔ The image is the LITERAL form of the value, so its decimal separator is the evaluating unit's (§12.3.7.4
+        // GR14 a — kb/Work PB2507), exactly as the literal operand's image is (BoundNumericLiteral.Image, PB1643).
+        // A float result keeps CobolFloat.Display's '.' in both compilers (a PICTURE-less float has no separator rule).
+        bool comma = num.UnitDecimalPointIsComma;
         return x.Real ? RuntimeApi.FloatDisplay(x.Expr)
-             : x.Dec ? RuntimeApi.DecFunctionText(x.Expr, deSign)
-             : RuntimeApi.NumFormatFunctionText(x.Expr, x.Scale, deSign);
+             : x.Dec ? RuntimeApi.DecFunctionText(x.Expr, deSign, comma)
+             : RuntimeApi.NumFormatFunctionText(x.Expr, x.Scale, deSign, comma);
     }
 
     /// <summary>A data item's character image directly from its <see cref="Place"/> — the num-free entry for
@@ -520,8 +524,10 @@ internal static class OperandText
         // literal form, exactly as NumericIntrinsicText renders the un-materialized call, so a materialized function
         // (the MOVE multi-receiver hoist, an EVALUATE subject, an INVOKE argument) and the call it froze produce the
         // same characters in a character receiver (kb/Work PB1007 — the wide description's zero-padded digits did not).
-        if (p.Item is { IsFunctionReturnedValue: true, Pic: { Category: PicCategory.Numeric, IsFloat: false } fvp })
-            return RuntimeApi.NumFormatFunctionText(PlaceRenderer.Read(p), fvp.Scale, deSign);
+        // The separator is the TEMPORARY's own (the materializing unit's, kb/Work PB2507), so a text image of the frozen
+        // value spells its radix exactly as the un-materialized call does.
+        if (p.Item is { FunctionValueSeparator: { } fvSeparator, Pic: { Category: PicCategory.Numeric, IsFloat: false } fvp })
+            return RuntimeApi.NumFormatFunctionText(PlaceRenderer.Read(p), fvp.Scale, deSign, fvSeparator == ',');
         // A numeric-DISPLAY leaf stored as its character image is already a string holding the (sign-aware) image; when
         // it is the de-signed source of an alphanumeric move/compare, decode and re-emit the magnitude digits (GR6a).
         if (p.Item.StoreAsImage)

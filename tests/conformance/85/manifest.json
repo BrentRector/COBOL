@@ -221,6 +221,7 @@
   "pb979_unstring_receiver_size",
   "pb970_image_carried_binary_packed_argument",
   "pb1007_function_temporary_character_receivers",
+  "pb2507_function_result_decimal_comma",
   "pb1018_occurs_key_qualified",
   "pb362_declaratives_reference_boundary",
   "pb363_before_reporting_legal_store",

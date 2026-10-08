@@ -546,7 +546,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // argument's function activation would otherwise overtake (ArgumentOrder).
         using var window = host.ArgOrder.Open();
         var result = window.Settle(BindFunctionResult(word, argCtxs));
-        return result is BoundNumLiteral folded ? folded with { FunctionValue = true } : result;
+        // A folded result's CHARACTER image is the literal form of the value, spelled with the unit's decimal separator
+        // (§12.3.7.4 GR14 a; kb/Work PB2507): HIGHEST-ALGEBRAIC of a PIC 9V99 item displays 9,99 under DECIMAL-POINT IS COMMA.
+        return result is BoundNumLiteral folded
+            ? folded with { FunctionValue = true, DecimalSeparator = ctx.Data.DecimalSeparator }
+            : result;
     }
 
     private BoundExpr BindFunctionResult(FunctionWord word, IReadOnlyList<Core.FunctionArgumentContext> argCtxs)

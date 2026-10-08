@@ -104,6 +104,26 @@ public sealed class ScaledToSingleTests
         Assert.Equal(oracle, CobolFloat.ScaledToSingle(Int128.Parse(unscaled, CultureInfo.InvariantCulture), scale));
     }
 
+    /// <summary>⛔ kb/Work PB2641, the binary32 twin: the signed 16-byte minimum -2^127 negated to itself and passed the
+    /// "magnitude ≤ 2^24" test, so <c>(float)(int)unscaled</c> returned 0 at every scale in [-10, 10] — scale 0
+    /// included (§14.6.8.3 GR2: one conversion consistent with ISO/IEC 60559).</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(10)]
+    [InlineData(11)]
+    [InlineData(-1)]
+    [InlineData(-10)]
+    [InlineData(-11)]
+    public void TheSignedMinimum_ConvertsToItsOwnMagnitude_NeverZero(int scale)
+    {
+        float actual = CobolFloat.ScaledToSingle(Int128.MinValue, scale);
+        float oracle = float.Parse(Int128.MinValue.ToString(CultureInfo.InvariantCulture) + "E" + (-scale),
+            NumberStyles.Float, CultureInfo.InvariantCulture);
+        Assert.Equal(oracle, actual);
+        Assert.True(actual < 0, $"scale {scale}: {actual:R}");
+    }
+
     [Fact]
     public void OverflowIsInfinity_AndUnderflowIsZeroOrSubnormal()
     {

@@ -79,6 +79,42 @@ public sealed class FunctionTextImageTests
         Assert.Equal(expected, new CobolDec(unscaled, -scale).ToFunctionText(deSign: true));
     }
 
+    /// <summary>⛔ kb/Work PB2507 — the image is the LITERAL FORM, so under DECIMAL-POINT IS COMMA its decimal separator is
+    /// the comma (§12.3.7.4 GR14 a: "the character written in numeric literals to represent the decimal separator shall
+    /// be the comma"), on BOTH value lanes. The default stays the C#-facing period a compile-time fold's canonical text
+    /// needs; a value with no fraction digits has no separator to spell.</summary>
+    [Theory]
+    [InlineData(15, 1, "1,5")]
+    [InlineData(225, 2, "2,25")]
+    [InlineData(-150, 2, "-1,50")]
+    [InlineData(1, 2, "0,01")]
+    [InlineData(0, 2, "0,00")]
+    [InlineData(7, 0, "7")]
+    [InlineData(12, -2, "1200")]
+    public void CommaMode_SpellsTheDecimalSeparatorAsTheComma(long unscaled, int scale, string expected)
+    {
+        Assert.Equal(expected, CobolNum.FormatFunctionText(unscaled, scale, commaMode: true));
+        Assert.Equal(expected, new CobolDec(unscaled, -scale).ToFunctionText(commaMode: true));
+    }
+
+    [Fact]
+    public void CommaMode_ComposesWithDeSign_AndTheDefaultIsThePeriod()
+    {
+        Assert.Equal("1,5", CobolNum.FormatFunctionText(-15, 1, deSign: true, commaMode: true));
+        Assert.Equal("1,5", new CobolDec(-15, -1).ToFunctionText(deSign: true, commaMode: true));
+        Assert.Equal("-1.5", CobolNum.FormatFunctionText(-15, 1));
+    }
+
+    /// <summary>The magnitude is the UNSIGNED one (kb/Work PB2641): negating <c>Int128.MinValue</c> leaves it negative,
+    /// which printed "--170141183460469231731687303715884105728".</summary>
+    [Fact]
+    public void TheSignedMinimum_PrintsOneMinusSign()
+    {
+        Assert.Equal("-170141183460469231731687303715884105728", CobolNum.FormatFunctionText(Int128.MinValue, 0));
+        Assert.Equal("-1701411834604692317316873037158841057,28", CobolNum.FormatFunctionText(Int128.MinValue, 2, commaMode: true));
+        Assert.Equal("170141183460469231731687303715884105728", CobolNum.FormatFunctionText(Int128.MinValue, 0, deSign: true));
+    }
+
     /// <summary>DISPLAY is NOT a de-signing context — §14.9.11.4 GR1 transfers the operand's content, and the sign
     /// is part of the value being shown. The default must therefore keep it, or the two contexts collapse.</summary>
     [Theory]
