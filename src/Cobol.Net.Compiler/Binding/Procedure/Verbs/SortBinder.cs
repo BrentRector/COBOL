@@ -466,11 +466,9 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         // §14.9.32.3 SR2 (the function-identifier class), SR3 (valid as a MOVE sending operand with
         // record-name-1 as the receiver) and SR4 (no zero-length literal-1) are applied HERE, at bind time,
         // together with the storage facts StorageFormPass consumes.
-        // RELEASE ... FROM literal-1: ANSI X3.23-1985 admits only identifier-1 in the FROM phrase; the literal
-        // operand is a later-standard extension of the format (present in ISO/IEC 1989:2023 §14.9.32.2;
-        // VERSION_CHANGE_REFERENCE ledger instructs gating pending verification against the 2002/2014 texts).
-        // release-from-literal-2002: the pass owns the edition gate (Exec Step E).
-        BoundMove? from = rel.releaseFrom() is { } rf
+        // The literal-1 arm's edition edge (post-1985) is the one FROM-phrase gate WRITE and REWRITE share,
+        // VersionConformancePass.ParseArm.VisitRecordFromPhrase (construct from-literal-2002, kb/Work PB2650).
+        BoundMove? from = rel.recordFromPhrase() is { } rf
             ? host.Move.BindFromPhrase(FromPhraseRules.Release, record, rf.sendingOperand())
             : null;
         // ⛔ THE SIZE OF A FIXED-LENGTH SD'S RECORD IS THE LARGEST RECORD DESCRIPTION'S (kb/Work PB322 determination F;

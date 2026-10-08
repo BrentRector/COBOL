@@ -1853,12 +1853,17 @@ internal sealed class VersionConformancePass
             return base.VisitChildren(ctx);
         }
 
-        /// <summary>RELEASE … FROM literal-1 (ISO §14.9.32.2) — X3.23-1985 allows only an identifier as the
-        /// FROM operand; the literal form is 2002+.</summary>
-        public override object? VisitReleaseFrom(CobolParserCore.ReleaseFromContext ctx)
+        /// <summary>The <c>FROM { identifier-1 | literal-1 }</c> phrase of WRITE, REWRITE and RELEASE (ISO §14.9.51.2,
+        /// §14.9.35.2, §14.9.32.2) — X3.23-1985 allows only an identifier as the FROM operand of all three; the
+        /// literal form (a figurative constant included) is 2002+. ONE grammar rule carries the phrase for every
+        /// statement that takes it, so this one gate covers each of them by construction (kb/Work PB2650: it used to
+        /// be RELEASE's alone, and WRITE / REWRITE … FROM literal-1 compiled clean at --std 85). The statement is
+        /// named from the phrase's parent, whose first token is its verb.</summary>
+        public override object? VisitRecordFromPhrase(CobolParserCore.RecordFromPhraseContext ctx)
         {
             if (ctx.sendingOperand()?.literal() is not null)
-                _p.Check(Constructs.ReleaseFromLiteral2002, "RELEASE … FROM literal-1");
+                _p.Check(Constructs.FromLiteral2002,
+                    $"{((Antlr4.Runtime.ParserRuleContext)ctx.Parent).Start.Text.ToUpperInvariant()} … FROM literal-1");
             return base.VisitChildren(ctx);
         }
 

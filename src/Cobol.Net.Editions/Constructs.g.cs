@@ -238,7 +238,7 @@ public static class Constructs
     public const string InitializeCategory2002 = "initialize-category-2002";
     public const string InitializeCategory2014 = "initialize-category-2014";
     public const string InitializeCategory2023 = "initialize-category-2023";
-    public const string ReleaseFromLiteral2002 = "release-from-literal-2002";
+    public const string FromLiteral2002 = "from-literal-2002";
     public const string SortCollatingNational2002 = "sort-collating-national-2002";
     public const string TableSort2002 = "table-sort-2002";
     public const string RaiseStatement2002 = "raise-statement-2002";

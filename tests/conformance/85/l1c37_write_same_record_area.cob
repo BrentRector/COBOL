@@ -31,8 +31,10 @@
       *>   GR4: the released record remains available as R1 (the file
       *>   of record-name-1)                    -> "R1 ABCDEFGH"
       *>   and as F2's record R2, split 4|4     -> "R2 ABCD|EFGH"
-      *>   A second WRITE R1 FROM "XY": GR5 a) pads to "XY      "; the
-      *>   peer shows it too                    -> "R2 XY  |    "
+      *>   A second WRITE R1 FROM WS-XY ("XY"): GR5 a) pads to
+      *>   "XY      "; the peer shows it too     -> "R2 XY  |    "
+      *>   (an identifier: FROM literal-1 is a COBOL-2002 addition,
+      *>   refused at 85 - kb/Work PB2650)
       *> The "no longer available" half of GR4 (a file WITHOUT the
       *> clause) leaves the area's content undefined and is not pinned.
        IDENTIFICATION DIVISION.
@@ -55,6 +57,7 @@
            05 R2-B PIC X(4).
        WORKING-STORAGE SECTION.
        01 WS-SRC PIC X(8) VALUE "ABCDEFGH".
+       01 WS-XY  PIC X(2) VALUE "XY".
        PROCEDURE DIVISION.
        M1.
            OPEN OUTPUT F1 F2
@@ -62,7 +65,7 @@
            DISPLAY "SRC " WS-SRC
            DISPLAY "R1 " R1-X
            DISPLAY "R2 " R2-A "|" R2-B
-           WRITE R1 FROM "XY"
+           WRITE R1 FROM WS-XY
            DISPLAY "R2 " R2-A "|" R2-B
            CLOSE F1 F2
            STOP RUN.

@@ -15,9 +15,8 @@
       *>   MANUAL default also sets no lock on a plain READ (14.9.30.4
       *>   GR11 d)). The discriminating pin, READ ... WITH LOCK through
       *>   a clause-less connector observed by another connector, is
-      *>   blocked on kb/Work PB322 (the implementor default sharing
-      *>   mode decides the observer's OPEN), so this program is
-      *>   evidence for a) and b) 1. only and does not close GR1.)
+      *>   2002/gn1_lock_mode_omitted_implementor_default; this program
+      *>   is the evidence for a) and b) 1., and the two close GR1.)
       *> SHAPE. Three legs, each: connector X opens INPUT with the READ
       *>   ONLY sharing mode, the OBSERVER FE opens INPUT, X reads
       *>   record 1 WITH LOCK, then FE reads record 1. The legs differ

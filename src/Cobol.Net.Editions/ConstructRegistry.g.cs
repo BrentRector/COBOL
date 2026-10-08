@@ -240,7 +240,7 @@ public static partial class ConstructRegistry
         new("initialize-category-2002", "INITIALIZE ... category-name (2002 words)", 2002, null, null, "COBOLNET0900", "ISO §14.9.20.2 (category-name) / §8.9 (reserved from 2002)"),
         new("initialize-category-2014", "INITIALIZE ... FUNCTION-POINTER", 2014, null, null, "COBOLNET0900", "ISO §14.9.20.2 (category-name) / §8.9 (reserved from 2014)"),
         new("initialize-category-2023", "INITIALIZE ... MESSAGE-TAG", 2023, null, null, "COBOLNET0900", "ISO §14.9.20.2 (category-name) / §8.9 (reserved from 2023)"),
-        new("release-from-literal-2002", "RELEASE ... FROM literal-1", 2002, null, null, "COBOLNET0871", "ISO §14.9.32.2 (X3.23-1985 allows only an identifier as the FROM operand)"),
+        new("from-literal-2002", "FROM literal-1", 2002, null, null, "COBOLNET0871", "ISO §14.9.51.2, §14.9.35.2, §14.9.32.2 (X3.23-1985 allows only an identifier as the FROM operand)"),
         new("sort-collating-national-2002", "COLLATING SEQUENCE alphabet-name-2 / FOR forms", 2002, null, null, "COBOLNET0872", "ISO §14.9.40.3 SR2 (alphabet-name-2 orders NATIONAL keys; the national class is 2002+); parse-arm gate (VisitSortCollatingPhrase)"),
         new("table-sort-2002", "SORT of a table (Format 2)", 2002, null, null, "COBOLNET0870", "ISO §14.9.40 (Format 2 - the in-place table sort; COBOL-85 SORT operates on sort-merge files only)"),
         new("raise-statement-2002", "the RAISE statement", 2002, null, null, "COBOLNET0876", "ISO §14.9.29 (the exception-condition statement; the EC model is 2002+)"),

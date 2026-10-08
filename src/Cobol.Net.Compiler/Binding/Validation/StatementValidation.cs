@@ -1253,8 +1253,7 @@ internal sealed class StatementValidation(DataBinder data)
             for (int i = 0; i < node.ChildCount; i++)
                 switch (node.GetChild(i))
                 {
-                    case Core.StatementBlockContext or Core.WriteFromContext or Core.RewriteFromContext
-                        or Core.ReadIntoContext:
+                    case Core.StatementBlockContext or Core.RecordFromPhraseContext or Core.ReadIntoContext:
                         continue;   // SR4's FROM / INTO exception, and the nested statements screened on their own
                     case Core.DataReferenceContext dref:
                         if (dref.Parent is not (Core.RecordNameContext or Core.OpenFileSpecContext))

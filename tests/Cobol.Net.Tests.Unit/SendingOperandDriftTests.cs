@@ -133,7 +133,7 @@ public sealed class SendingOperandDriftTests
     /// <summary>The detector, on the shapes it must catch: an inline group in any order, a top-level list, and a
     /// guarded alternative — and not on a set that lacks one of the four (an identifier-only position).</summary>
     [Theory]
-    [InlineData("writeFrom\n    : FROM (functionCall | inlineMethodInvocation | dataReference | literal)\n    ;", true)]
+    [InlineData("recordFromPhrase\n    : FROM (functionCall | inlineMethodInvocation | dataReference | literal)\n    ;", true)]
     [InlineData("x\n    : literal\n    | functionCall\n    | inlineMethodInvocation\n    | dataReference\n    ;", true)]
     [InlineData("x\n    : DISPLAY ({!p()}? (inlineMethodInvocation | dataReference | literal | functionCall))*\n    ;", true)]
     [InlineData("x\n    : INSPECT (functionCall | inlineMethodInvocation | dataReference) TALLYING\n    ;", false)]

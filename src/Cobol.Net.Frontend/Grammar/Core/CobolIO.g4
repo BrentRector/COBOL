@@ -597,7 +597,7 @@ readInvalidKey
 
 writeStatement
     : WRITE (recordName | FILE fileName)
-      writeFrom?
+      recordFromPhrase?
       writeBeforeAfter?
       (retryPhrase)?   // COBOL-2002 (§14.7.9); superset-parsed, introduction-gated at BIND (GateRetryIntro → Check(RetryPhrase2002)) — residue migration #4. The file is already named before RETRY here, so no name-list ambiguity (unlike OPEN).
       (recordLockPhrase)?   // introduction-gated in the VersionConformancePass parse arm (VisitRecordLockPhrase → Check(RecordLockPhrase2002))
@@ -607,9 +607,14 @@ writeStatement
 
     ;
 
-// §14.9.51.4 GR5a makes this phrase `MOVE identifier-1 TO record-name-1`, so its operand is MOVE's sending
-// operand, function-identifier included (fix-queue PB10; the one rule, kb/Work PB2114).
-writeFrom
+// ⛔ THE `FROM { identifier-1 | literal-1 }` PHRASE OF WRITE, REWRITE AND RELEASE IS ONE RULE (kb/Work PB2650).
+// §14.9.51.2, §14.9.35.2 and §14.9.32.2 print the same phrase, and each statement's general rules make it the same
+// implicit MOVE to record-name-1 (§14.9.51.4 GR5 a), §14.9.35.4 GR7 a), §14.9.32.4 GR4 a)), so its operand is MOVE's
+// sending operand, function-identifier included (fix-queue PB10; kb/Work PB2114). One rule is what lets the phrase's
+// edition edge (literal-1 is post-1985: VersionConformancePass.ParseArm.VisitRecordFromPhrase) be asked once: it was
+// three copies, and the gate sat on RELEASE's alone while WRITE and REWRITE took a literal at --std 85.
+// Each verb's OWN syntax rules for the phrase are its row in FromPhraseRules (MoveBinder.BindFromPhrase).
+recordFromPhrase
     : FROM sendingOperand
     ;
 
@@ -697,18 +702,12 @@ recordName
 
 rewriteStatement
     : REWRITE (recordName | FILE fileName) RECORD?
-      rewriteFrom?
+      recordFromPhrase?
       (retryPhrase)?   // COBOL-2002 (§14.7.9); superset-parsed, introduction-gated at BIND (GateRetryIntro → Check(RetryPhrase2002)) — residue migration #4. The file is already named before RETRY here, so no name-list ambiguity (unlike OPEN).
       (recordLockPhrase)?   // introduction-gated in the VersionConformancePass parse arm (VisitRecordLockPhrase → Check(RecordLockPhrase2002))
       rewriteInvalidKeyPhrase?
       END_REWRITE?
 
-    ;
-
-// §14.9.35.4 makes this phrase the same implicit MOVE as WRITE's FROM, so its operand is MOVE's sending operand,
-// function-identifier included (fix-queue PB10; the one rule, kb/Work PB2114).
-rewriteFrom
-    : FROM sendingOperand
     ;
 
 // ISO 5.2.6.4: the positive and negative phrases are enclosed in CHOICE INDICATORS (| bars inside the
@@ -994,14 +993,8 @@ returnAtEndPhrase
 
 releaseStatement
     : RELEASE dataReference
-      releaseFrom?
+      recordFromPhrase?   // the one FROM phrase rule, defined beside writeStatement (kb/Work PB2650)
 
-    ;
-
-// §14.9.32.4 makes this phrase the same implicit MOVE as WRITE's FROM, so its operand is MOVE's sending operand,
-// function-identifier included (fix-queue PB10; the one rule, kb/Work PB2114).
-releaseFrom
-    : FROM sendingOperand
     ;
 
 // ==========================================

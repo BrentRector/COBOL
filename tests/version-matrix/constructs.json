@@ -3005,16 +3005,16 @@
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. RWICAT23.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MT PIC X(4).\n01 G.\n  05 A1 PIC X(3) VALUE \"xyz\".\nPROCEDURE DIVISION.\nMAIN.\n    INITIALIZE G REPLACING MESSAGE-TAG DATA BY MT.\n    STOP RUN.\n"
   },
   {
-   "id": "release-from-literal-2002",
-   "description": "RELEASE FROM a literal operand - a post-85 extension of the FROM phrase. Folded from the inline SortBinder gate (Exec Step E).",
-   "display": "RELEASE ... FROM literal-1",
+   "id": "from-literal-2002",
+   "description": "The FROM phrase of WRITE, REWRITE and RELEASE with a literal operand (a figurative constant included) - a post-85 extension of the phrase. ONE grammar rule (recordFromPhrase) carries the phrase for all three statements and ONE parse-arm gate (VisitRecordFromPhrase) asks its edge (kb/Work PB2650: the gate used to be RELEASE's alone).",
+   "display": "FROM literal-1",
    "diagnosticCode": "COBOLNET0871",
-   "citation": "ISO §14.9.32.2 (X3.23-1985 allows only an identifier as the FROM operand)",
+   "citation": "ISO §14.9.51.2, §14.9.35.2, §14.9.32.2 (X3.23-1985 allows only an identifier as the FROM operand)",
    "introducedIn": 2002,
    "removedIn": null,
    "expectDiagnostic": "COBOLNET0871",
-   "vcr": "2002 introduction (VERSION_CHANGE_REFERENCE ledger; present in the 2023 §14.9.32.2 format)",
-   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. RWRFL.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\n    SELECT S-F ASSIGN TO \"rwrfl.tmp\".\nDATA DIVISION.\nFILE SECTION.\nSD S-F.\n01 S-REC PIC X(5).\nWORKING-STORAGE SECTION.\n01 W-REC PIC X(5).\nPROCEDURE DIVISION.\nMAIN.\n    SORT S-F ON ASCENDING KEY S-REC\n        INPUT PROCEDURE IS IP\n        OUTPUT PROCEDURE IS OP.\n    STOP RUN.\nIP.\n    RELEASE S-REC FROM \"HELLO\".\nOP.\n    RETURN S-F INTO W-REC AT END CONTINUE END-RETURN.\n"
+   "vcr": "VCR row 7.34 (2002 introduction, derived; present in the 2023 §14.9.51.2 / §14.9.35.2 / §14.9.32.2 formats)",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. RWRFL.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\n    SELECT F ASSIGN TO \"rwrfl.dat\"\n        ORGANIZATION IS SEQUENTIAL.\n    SELECT S-F ASSIGN TO \"rwrfl.tmp\".\nDATA DIVISION.\nFILE SECTION.\nFD F.\n01 F-REC PIC X(5).\nSD S-F.\n01 S-REC PIC X(5).\nWORKING-STORAGE SECTION.\n01 W-REC PIC X(5).\nPROCEDURE DIVISION.\nMAIN.\n    OPEN OUTPUT F.\n    WRITE F-REC FROM \"HELLO\".\n    CLOSE F.\n    OPEN I-O F.\n    READ F.\n    REWRITE F-REC FROM SPACE.\n    CLOSE F.\n    SORT S-F ON ASCENDING KEY S-REC\n        INPUT PROCEDURE IS IP\n        OUTPUT PROCEDURE IS OP.\n    STOP RUN.\nIP.\n    RELEASE S-REC FROM \"HELLO\".\nOP.\n    RETURN S-F INTO W-REC AT END CONTINUE END-RETURN.\n"
   },
   {
    "id": "sort-collating-national-2002",

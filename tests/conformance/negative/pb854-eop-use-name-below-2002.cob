@@ -20,6 +20,8 @@
        FILE SECTION.
        FD  PRTF LINAGE IS 3 LINES WITH FOOTING AT 2.
        01  PREC     PIC X(8).
+       WORKING-STORAGE SECTION.
+       01  W-LINE   PIC X(4) VALUE "LINE".
        PROCEDURE DIVISION.
        DECLARATIVES.
        DEOP SECTION.
@@ -30,6 +32,6 @@
        MAIN SECTION.
        MAIN-P.
            OPEN OUTPUT PRTF.
-           WRITE PREC FROM "LINE".
+           WRITE PREC FROM W-LINE.
            CLOSE PRTF.
            STOP RUN.

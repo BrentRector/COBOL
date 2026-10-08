@@ -1637,6 +1637,13 @@ the programmer actually wrote (`the implicit MOVE of RELEASE … FROM to SRT-REC
   alphanumeric" column would have REJECTED LEGAL SOURCE on the REWRITE arm. The FILE-phrase readings
   (§14.9.51.3 SR10, §14.9.35.3 SR8) are unreachable — the FILE arm is Annex A.4.13 item 2, declined
   COBOLNET1706 earlier. Diagnostics: COBOLNET1914, COBOLNET1915.
+- **The phrase is ONE grammar rule, and its edition edge is ONE gate** (kb/Work PB2650). §14.9.51.2, §14.9.35.2
+  and §14.9.32.2 print the same `FROM { identifier-1 | literal-1 }`, so the three statements share
+  `recordFromPhrase : FROM sendingOperand`, and `VersionConformancePass.ParseArm.VisitRecordFromPhrase` refuses
+  literal-1 (a figurative constant included) below COBOL-2002 (construct `from-literal-2002`, COBOLNET0871;
+  VERSION_CHANGE_REFERENCE row 7.34 derives the 1985 edge). It used to be three copies of the rule with the gate
+  on RELEASE's alone, so WRITE and REWRITE took a literal at `--std 85`. The per-verb rules above stay rows of
+  `FromPhraseRules`; the edition edge is the same for all three, so it is not a column.
 - **The function's class is read off the BOUND operand, through the Table-16 sender position.**
   `MoveBinder.SenderPosition` is a named reader rather than an inline switch precisely because the phrase rules
   ask the same question of the same operand: `FUNCTION LENGTH` constant-folds to a plain numeric literal, and a

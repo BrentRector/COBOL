@@ -156,7 +156,7 @@ internal sealed class KeyedIoBinder(BinderContext ctx, StatementBinder host, Fil
         KeyedInvalidKey? invalid =
             w.writeInvalidKey() is { } ik ? KeyedInvalidPhrase(ik.statementBlock(), PhraseBlocks.StartsWithNot(ik)) : null;
         return new BoundKeyedWrite(file, record,
-            host.Move.BindFromPhrase(FromPhraseRules.Write, record, w.writeFrom()?.sendingOperand()), invalid)
+            host.Move.BindFromPhrase(FromPhraseRules.Write, record, w.recordFromPhrase()?.sendingOperand()), invalid)
         { Lock = lock_, Retry = retry };
     }
 
@@ -182,7 +182,7 @@ internal sealed class KeyedIoBinder(BinderContext ctx, StatementBinder host, Fil
             invalid = KeyedInvalidPhrase(ik.statementBlock(), PhraseBlocks.StartsWithNot(ik));
         }
         return new BoundKeyedRewrite(file, record,
-            host.Move.BindFromPhrase(FromPhraseRules.Rewrite, record, rw.rewriteFrom()?.sendingOperand()), invalid)
+            host.Move.BindFromPhrase(FromPhraseRules.Rewrite, record, rw.recordFromPhrase()?.sendingOperand()), invalid)
         { Lock = lock_, Retry = retry };
     }
 

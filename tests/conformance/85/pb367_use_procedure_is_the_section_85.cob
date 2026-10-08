@@ -33,6 +33,7 @@
        01 F1-REC PIC X(3).
        WORKING-STORAGE SECTION.
        01 FS1 PIC XX VALUE "00".
+       01 W-AAA PIC X(3) VALUE "AAA".
        PROCEDURE DIVISION.
        DECLARATIVES.
        D1 SECTION.
@@ -50,7 +51,7 @@
        MAIN SECTION.
        MAIN-P.
            OPEN OUTPUT F1.
-           WRITE F1-REC FROM "AAA".
+           WRITE F1-REC FROM W-AAA.
            CLOSE F1.
            OPEN INPUT F1.
            READ F1.
