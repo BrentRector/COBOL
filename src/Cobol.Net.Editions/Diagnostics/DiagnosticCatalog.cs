@@ -255,15 +255,18 @@ public static class DiagnosticCatalog
     //    bound ahead of the reference that needs the constant (kb/Work PB1231, PB1226)
     /// <summary>A constant entry's length phrase may name a data item described after it (§13.10.3 SR4 forbids only a
     /// length that depends on the constant). The binder serves that by binding the operand's RECORD out of source
-    /// order when the value is first needed. Two shapes it cannot bind ahead are recognized-not-implemented debt,
-    /// never a misreported undefined name: part of a record whose earlier entries are being bound
-    /// (<c>01 R. 05 A PIC X(K). 05 W PIC X(7).</c> with <c>01 K CONSTANT AS LENGTH OF W.</c>), and an elementary
-    /// report item of a report group the report binder has not reached (§13.10.3 SR11's operand).</summary>
+    /// order when the value is first needed, or, inside a record whose earlier entries are being bound, the operand's
+    /// own entry and subordinates (kb/Work PB1941). Two shapes it cannot bind ahead are recognized-not-implemented
+    /// debt, never a misreported undefined name: an operand SUBORDINATE to the very entry whose description
+    /// references the constant (<c>05 A OCCURS K. 10 W PIC X(7).</c> with <c>01 K CONSTANT AS LENGTH OF W.</c> — A's
+    /// item does not exist yet to link W to), and an elementary report item of a report group the report binder has
+    /// not reached (§13.10.3 SR11's operand).</summary>
     public static readonly DiagnosticDescriptor ConstantLengthOperandBoundLater = new(
         NotImplemented, "constant-length-operand-bound-later", EditionSeverity.Error,
         "A constant entry's LENGTH OF / BYTE-LENGTH OF operand is described later, and the constant is referenced "
-        + "before that description can be bound (inside a record that is still being bound, or in a report group the "
-        + "REPORT SECTION has not reached): measuring it out of source order is recognized but not yet implemented.",
+        + "before that description can be bound (subordinate to the entry whose description references the constant, "
+        + "or in a report group the REPORT SECTION has not reached): measuring it out of source order is recognized "
+        + "but not yet implemented.",
         "ISO §13.10.3 SR4 / §13.10.4 GR5-GR6", RecognizedNotImplemented);
 
     // ⛔ The two 0899-staged constant-entry legs are GONE. ConstantFromCompilationVariable (kb/Work PB1368): the

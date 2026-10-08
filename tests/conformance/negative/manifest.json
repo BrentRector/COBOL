@@ -166,6 +166,8 @@
   "pb1231-constant-direct-cycle",
   "pb1231-constant-indirect-cycle",
   "pb1231-constant-length-cycle",
+  "pb1941-constant-length-cycle-open-record",
+  "pb1942-currency-numeric-constant",
   "pb1225-constant-without-as-at-85",
   "pb1271-sum-counter-occurrence-not-subscripted",
   "pb1402-extended-letter-85",

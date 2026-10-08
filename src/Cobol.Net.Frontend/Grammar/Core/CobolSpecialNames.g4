@@ -96,7 +96,22 @@ localeClause
 // Recognizing the clause at every --std is what lets the version pass answer below 2002 with the explanatory
 // `order-table-2002` introduction gate rather than a parse error.
 orderTableClause
-    : ORDER TABLE cobolWord IS? literal
+    : ORDER TABLE cobolWord IS? specialNamesLiteral
+    ;
+
+// ⛔ A SPECIAL-NAMES LITERAL POSITION WHOSE ONLY WORD IS A CONSTANT-NAME (kb/Work PB1942): literal-5 / literal-6 of the
+// CLASS clause, literal-7 / literal-8 of the CURRENCY SIGN clause and literal-9 of the ORDER TABLE clause.
+// §13.10.3 SR2 — "Except in a compiler directive, constant-name-1 may be used anywhere that a format specifies a
+// literal of the class and category of constant-name-1" — puts a constant-name in each of them, and the constant
+// entry stands LATER, in the DATA DIVISION, so the parser cannot tell a constant-name from any other word: the word
+// is admitted here and DataBinder.SpecialNamesConstant decides it (it binds the constant entry on demand,
+// kb/Work PB1231), refusing a word that names no constant. ONE rule, so the next literal position joins by naming it.
+// The positions whose word alternative has a meaning of its own — the ALPHABET clause's literal-phrase operands (a
+// code-name, a figurative synonym) and the LOCALE clause's literal-4 (external-locale-name-1) — keep their own
+// `cobolWord | literal` shape, and their binders ask the same constant question of the word.
+specialNamesLiteral
+    : literal
+    | cobolWord
     ;
 
 // dynamic-length-structure-clause (ISO §12.3.7.2; kb/Work PB829 — it had NO rule, so the clause was COBOL0001
@@ -189,8 +204,9 @@ switchOffClause
 // Semantic validation ensures PIC_STRING == "SYMBOL".
 // ⛔ WITH IS AN OPTIONAL WORD (kb/Work PB695): folio 290 prints `[ WITH PICTURE SYMBOL literal-8 ]` with rules
 // under PICTURE and SYMBOL only — `CURRENCY SIGN IS "$" PICTURE SYMBOL "#"` is conforming and was rejected.
+// literal-7 and literal-8 are specialNamesLiteral positions: either may be a constant-name (kb/Work PB1942).
 currencySignClause
-    : CURRENCY SIGN? IS? literal (WITH? PIC PIC_STRING literal)?
+    : CURRENCY SIGN? IS? specialNamesLiteral (WITH? PIC PIC_STRING specialNamesLiteral)?
     ;
 
 // [ DECIMAL-POINT IS COMMA ] — folio 290 underlines DECIMAL-POINT and COMMA, never the IS (kb/Work PB695).
@@ -218,12 +234,18 @@ classDefinitionClause
 // groups and rejected `CLASS HEXDIG IS "0" THRU "9" "A" THRU "F"` — legal COBOL at every edition (kb/Work PB60's
 // configuration-inheritance golden surfaced it, 2026-08-17; the OO in-line invocation's argumentList had the
 // same shape and was swept in the same change).
+// ⛔ A LATER OPERAND IS ADMITTED BY classOperandAhead (kb/Work PB1942): an operand may be a constant-name WORD
+// (specialNamesLiteral), and a switch / device entry written after the clause without a separator period begins with
+// words too (`CLASS C IS "A" CONSOLE MYCON`), as does the paragraph's last alternative, the unrecognized word run. A
+// word continues the list only when the compilation unit declares it a constant-name, so every program that parsed
+// before a word could be an operand keeps its reading. The predicate sits at the LEFT EDGE of the loop body, where
+// it steers the loop decision.
 classValueSet
-    : classValueItem (COMMA? classValueItem)*
+    : classValueItem ({classOperandAhead()}? COMMA? classValueItem)*
     ;
 
 classValueItem
-    : literal ((THRU | THROUGH) literal)?
+    : specialNamesLiteral ((THRU | THROUGH) specialNamesLiteral)?
     ;
 
 // SYMBOLIC CHARACTERS [FOR {ALPHANUMERIC|NATIONAL}]

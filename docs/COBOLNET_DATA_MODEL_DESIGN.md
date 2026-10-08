@@ -246,9 +246,15 @@ whole record (its 01/77 entry up to the next 01/77/constant entry, 66 and 88 ent
 the same `BindEntries` walk with `outOfOrder: true` and parked, and the section's own walk places the parked roots at
 their source position (`DataBinder.EntryOrder.cs`), so `Roots`, a file's record list and every post-build pass see
 source order. The SR4 cycle is an item whose own description, or an ancestor group's, is open where the constant is
-referenced (`IsBeingDescribed`, `IsDescriptionOpen`); an operand described later INSIDE a record that is still open is
-recognized-not-implemented COBOLNET0899 `constant-length-operand-bound-later` (binding part of an open record
-detached from its ancestors would read the wrong USAGE/SIGN inheritance and parent-chain screens).
+referenced (`IsBeingDescribed`, `IsDescriptionOpen`). An operand described later INSIDE the record that is still open
+binds ahead at the granularity of its own ENTRY (kb/Work PB1941, `BindLaterEntriesOfOpenRecord`): the entry with its
+subordinate run, and each group entry between it and its nearest already-bound ancestor ALONE, each LINKED to its
+parent at once (so qualification, the OCCURS depth and the ancestor screens see the real chain) but joined to the
+parent's members only when the walk reaches it (`TakePreboundEntry` → the walk's one `AttachToHierarchy` tail), so
+member order stays source order; a group bound alone is completed — its remaining subordinates bound under it — before
+anything measures it (`CompletePreboundGroup`). An operand SUBORDINATE to the very entry whose description references
+the constant has no bound ancestor to link to (that entry's item does not exist yet) and stays recognized-not-implemented
+COBOLNET0899 `constant-length-operand-bound-later`.
 
 **⛔ EVERY `integer-n` POSITION IS A LITERAL POSITION A CONSTANT-NAME STANDS IN, AND THE GRAMMAR SAYS SO ONCE** (kb/Work
 PB1947 report writer, PB1948 the rest). §5.5 1) calls each `integer-n` "a fixed-point integer literal" and §13.10.3 SR2
@@ -272,6 +278,22 @@ whether the unit defines it as a constant, because only the constant table tells
 integers (a refused constant is the program's error whether or not the clause changes the I-O). Goldens
 `2002/pb1948_integer_n_constants`, `2002/pb1948_locale_size_constant`, `2014/pb1948_dynamic_length_limit_constant`
 and `negative/pb1948-*`.
+
+**⛔ THE SPECIAL-NAMES LITERAL POSITIONS ADMIT A CONSTANT-NAME THROUGH ONE RULE AND ONE READER** (kb/Work PB1942). The
+paragraph's literal-1 … literal-9 (§12.3.7.2) are literal positions too, and the constant entry stands LATER, in the DATA
+DIVISION. CLASS literal-5/-6, CURRENCY SIGN literal-7/-8 and ORDER TABLE literal-9 are `specialNamesLiteral : literal |
+cobolWord` (`CobolSpecialNames.g4`); the ALPHABET literal phrase and the LOCALE clause already admitted a word with a
+meaning of its own (code-name, figurative synonym, external-locale-name-1) and keep their shape. The CLASS value list's
+LATER operands are steered by `classOperandAhead()` (`CobolParserCoreBase`): a word continues the list only when the unit
+declares it a constant-name, read off the token stream (`{1|01} word CONSTANT`, never `CONSTANT RECORD`), so a switch or
+device entry written after the clause without a period keeps its reading. In the binder `DataBinder.SpecialNamesConstant`
+is the one constant reading of such a word (it binds the later entry on demand through `FindConstant`, kb/Work PB1231),
+and each clause holds the constant's literal-1 to the rules of the literal it stands for (§13.10.4 GR1): `CurrencyOperandOf`
+(SR18/SR26/SR19 from the specification as written, SR28's class from the category), `TryClauseTextLiteral` (SR10/SR11)
+and `LiteralPhraseOperand` (an integer constant is an ORDINAL, SR14 b1 / SR17 b2). A word the unit declares as a
+constant-name is that constant, never an ALPHABET code-name or an external-locale-name of the same spelling
+(docs/CONFORMANCE.md §7 items 181, 184). Goldens `2002/pb1942_special_names_constant_literals`,
+`negative/pb1942-currency-numeric-constant`.
 
 **⛔ A CONDITION-NAME IS A THIRD KIND OF VALUE-CLAUSE SUBJECT, and it indicates NO SIZE** (kb/Work PB598). `DataBinder.BindCondition` screens a Format-3 VALUE literal through the ONE screen the item VALUE uses (`ValidateValueCategory` — §13.18.63.3 SR4/SR5 are ALL FORMATS rules and SR24, "Syntax rules 10 and 17 above apply", carries SR10 in whole), and the screen takes the subject as a `ValueSubject` descriptor (`Binding/ValueSubject.cs`) rather than a bare size, because WHICH SUBJECT it is decides which SENTENCES of those rules bind. Each of SR4/SR5/SR10 is a sentence pair: a CLASS sentence over "the item" / "the subject of the entry", which reaches a condition-name; and a SIZE sentence naming only "an elementary item" (bounded by "the size indicated by an **explicit** PICTURE clause") and a group item. A Format-3 entry is `88 condition-name-1 value-clause .` (§13.16.2), which admits no PICTURE clause; SR33 makes that level-88 entry the subject of the entry; §8.5.1.3.2 item 3 gives a condition-name entry "no true concept of level", so it is neither of §8.5.1.3.1's record subdivisions; and §13.18.63.4 GR19 gives it its conditional variable's characteristics only **implicitly** — which is what "explicit" excludes. So `ValueSubject.ForConditionName()` carries no size, and the three level-88 call sites (the THROUGH-range pair and the singleton leg) pass it; passing the conditional variable's size instead made `01 XV PIC X. 88 XC VALUE "cd".` COBOLNET1740, a rejection of legal source and a GnuCOBOL differential flip. The standard defines what the oversize literal MEANS, which a size rule would make dead text: §8.8.4.5.3 item 2 sends the comparison to the relation-condition rules, so it never compares equal (a permanently-false condition), and §14.9.39.4 GR6 → §13.18.63.4 GR7 → §14.6.8.5 places it "with space fill or truncation to the right". Goldens `85/pb598_condition_name_value_size`, `2002/pb598_condition_name_value_size_national_bit`, and `ConditionNameValueSizeTests` for the edition axis and the drift proof that the two subjects the sentences DO name are still measured.
 

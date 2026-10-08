@@ -848,12 +848,19 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// section the run belongs to — consumed by the section-scoped placement rules (CONSTANT RECORD §13.18.15.3 SR1).
     /// <paramref name="outOfOrder"/> marks ONE record bound ahead of its section's walk because a constant's value
     /// needed its length (<see cref="BindLaterRecords"/>, kb/Work PB1231): its roots are returned but not yet added
-    /// to the forest — the section walk places them at their source position (<see cref="TakePreboundRecord"/>).</summary>
+    /// to the forest — the section walk places them at their source position (<see cref="TakePreboundRecord"/>).
+    /// <paramref name="aheadOfWalkParent"/> marks the run as ONE entry and its subordinates, of a record whose walk is
+    /// in progress, bound ahead of that walk (<see cref="BindLaterEntriesOfOpenRecord"/>, kb/Work PB1941): the run's
+    /// first item links to that parent and the walk attaches it at its source position (<see cref="TakePreboundEntry"/>).
+    /// <paramref name="openGroup"/> marks the run as the remaining subordinate entries of a group bound ahead alone,
+    /// attached under it (<see cref="CompletePreboundGroup"/>).</summary>
     private List<DataItem> BindEntries(IEnumerable<Core.DataDescriptionEntryContext> entries, CsNameScope rootNames,
-        EntrySection section = EntrySection.WorkingStorage, bool outOfOrder = false)
+        EntrySection section = EntrySection.WorkingStorage, bool outOfOrder = false, DataItem? aheadOfWalkParent = null,
+        DataItem? openGroup = null)
     {
         var newRoots = new List<DataItem>();
         var stack = new Stack<DataItem>();
+        if (openGroup is not null) stack.Push(openGroup);
         bool rootIsTemplate = false;   // true while the current level-1 subtree is a TYPEDEF template (D17)
         DataItem? templateRoot = null; // that template's level-1 entry: its level-66 entries ride IT (ISO §13.18.58.4 GR1)
         // ⛔ THE ENTRY A LEVEL-88 ENTRY IMMEDIATELY FOLLOWS — ISO §13.16.3 SR24's own subject, and NOT
@@ -863,7 +870,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // item, so `66 R1 RENAMES A THRU B.` / `88 COND-R VALUE "CD".` silently bound COND-R to the preceding
         // `05 B` and answered about it (kb/Work PB488 — a wrong answer, not a permissiveness). Null = the 88
         // follows no entry describing a data item; the screen reports that instead of the old silent drop.
-        DataItem? lastDescribed = null;
+        DataItem? lastDescribed = openGroup;   // a completed group's own level-88 entries follow it in the run
         bool renamesBegun = false;   // the current record's level-66 entries have begun: §13.18.45.3 SR2 (kb/Work PB1283)
         // The record description this walk is INSIDE — the record a level-66 entry belongs to (§13.18.45.3 SR2) —
         // or null once nothing is open: before the first record, and after a constant entry closed one.
@@ -885,6 +892,19 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         }
         foreach (var entry in entries)
         {
+            // An entry of the record being walked that a constant's value needed ahead of its position (kb/Work
+            // PB1941): its item was bound then, its Parent already linked, and it ATTACHES here, at its source
+            // position, through the same nesting tail as an entry bound now. An entry inside a parked subtree was
+            // bound with its subtree and is skipped.
+            if (TakePreboundEntry(entry, out var preboundItem) && preboundItem is null) continue;
+            if (preboundItem is { } early)
+            {
+                using var __ = Edition.At(entry);
+                AttachToHierarchy(early);
+                stack.Push(early);
+                lastDescribed = early;
+                continue;
+            }
             // A record a constant's value already needed was bound ahead of this walk (kb/Work PB1231): its roots
             // take their place HERE, in source order, and its entries are not bound twice. Its whole extent (its
             // level-66 entries included) was bound with it, so the walk resumes with nothing on the level stack and
@@ -992,9 +1012,45 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 _openDescriptions.Remove(description);
             }
             if (bound is not { } item) { lastDescribed = null; continue; }
+            _entryItems[entry] = item;
             item.Uid = _uidCounter++;
             if (item.Level is 1 or 77) item.RootSection = section;   // DataItem.Section — a subordinate reads its root's
+            // The root of a run bound AHEAD of its record's walk (kb/Work PB1941) links to the parent the walk will
+            // attach it to — so qualification, the OCCURS depth and every ancestor screen below see its real chain —
+            // and joins that parent's members only when the walk reaches it (TakePreboundEntry, above).
+            if (aheadOfWalkParent is not null && stack.Count == 0) item.Parent = aheadOfWalkParent;
+            else AttachToHierarchy(item);
+            // CONSTANT RECORD placement (P10 Step 15). §13.18.15.3 SR1: the clause may be specified only in the
+            // local-storage or working-storage sections. (The same-entry SR13/SR3/SR6 conflicts are checked in
+            // BindEntry, where the flags are local — the IsBased discipline.)
+            if (item.IsConstantRecord && section is not (EntrySection.WorkingStorage or EntrySection.LocalStorage))
+                Edition.Error(DiagnosticCatalog.ConstantRecordRule, $"'{item.CobolName ?? "FILLER"}': the "
+                    + "CONSTANT RECORD clause may be specified only in the local-storage or working-storage "
+                    + "sections (ISO §13.18.15.3 SR1)");
+            // (The subordinate halves — §13.16.3 SR13's excluded clauses, §13.18.40.3 SR32 and §13.18.38.3 SR19/SR23/SR33
+            // — are asked of the COMPOSED forest by CheckConstantRecordSubtrees, so a TYPE or SAME AS clone is asked too.)
+            // §13.18.63.3 SR12/SR16 — the VALUE clause's PLACEMENT, asked here because the ancestor chain exists
+            // only once the entry is attached (DataBinder.ValuePlacement;
+            // its format-3 twin, SR25, is asked by BindCondition).
+            ScreenItemValuePlacement(item);
+            stack.Push(item);
+            lastDescribed = item;   // ISO §13.16.3 SR24's "the entry describing the item", for a following 88
+            // A TYPEDEF template's items (root + subordinates) are NOT globally referenceable (ISO §13.18.58.4 GR1) —
+            // keep them off ByName; the clones ExpandTypes produces ARE registered.
+            if (!rootIsTemplate) RegisterName(item);
+            // Every named entry is DECLARED here (§8.3.2.2; kb/Work PB1083) — a template's subordinate data-names
+            // too, although they stay off ByName; the template root's type-name is declared by RegisterTypeDecl, and
+            // the clones ExpandTypes registers are the same words, already declared here.
+            if (item.CobolName is { } declared && !item.IsTypedef)
+                DeclareUserWord(declared, section == EntrySection.File && item.Level == 1
+                    ? UserWordKind.RecordName : UserWordKind.DataName);
+        }
+        return newRoots;
 
+        // Place a bound item in the level hierarchy: pop the stack to the nearest open item of a lower level, then
+        // root the item there or join it to that item's members, with the hierarchy rules each placement asks.
+        void AttachToHierarchy(DataItem item)
+        {
             // Level 77 is an INDEPENDENT elementary item (ISO §13.18.38): always top-level, like 01, regardless of its
             // numeric value. Treat it as level 1 for the nesting pop so it attaches as a ROOT — never nested under an
             // open subordinate item just because 77 > that item's level (which would mis-qualify every later reference).
@@ -1066,32 +1122,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 item.Parent = parent;
                 parent.AddMember(item);
             }
-            // CONSTANT RECORD placement (P10 Step 15). §13.18.15.3 SR1: the clause may be specified only in the
-            // local-storage or working-storage sections. (The same-entry SR13/SR3/SR6 conflicts are checked in
-            // BindEntry, where the flags are local — the IsBased discipline.)
-            if (item.IsConstantRecord && section is not (EntrySection.WorkingStorage or EntrySection.LocalStorage))
-                Edition.Error(DiagnosticCatalog.ConstantRecordRule, $"'{item.CobolName ?? "FILLER"}': the "
-                    + "CONSTANT RECORD clause may be specified only in the local-storage or working-storage "
-                    + "sections (ISO §13.18.15.3 SR1)");
-            // (The subordinate halves — §13.16.3 SR13's excluded clauses, §13.18.40.3 SR32 and §13.18.38.3 SR19/SR23/SR33
-            // — are asked of the COMPOSED forest by CheckConstantRecordSubtrees, so a TYPE or SAME AS clone is asked too.)
-            // §13.18.63.3 SR12/SR16 — the VALUE clause's PLACEMENT, asked here because the ancestor chain exists
-            // only once the entry is attached (DataBinder.ValuePlacement;
-            // its format-3 twin, SR25, is asked by BindCondition).
-            ScreenItemValuePlacement(item);
-            stack.Push(item);
-            lastDescribed = item;   // ISO §13.16.3 SR24's "the entry describing the item", for a following 88
-            // A TYPEDEF template's items (root + subordinates) are NOT globally referenceable (ISO §13.18.58.4 GR1) —
-            // keep them off ByName; the clones ExpandTypes produces ARE registered.
-            if (!rootIsTemplate) RegisterName(item);
-            // Every named entry is DECLARED here (§8.3.2.2; kb/Work PB1083) — a template's subordinate data-names
-            // too, although they stay off ByName; the template root's type-name is declared by RegisterTypeDecl, and
-            // the clones ExpandTypes registers are the same words, already declared here.
-            if (item.CobolName is { } declared && !item.IsTypedef)
-                DeclareUserWord(declared, section == EntrySection.File && item.Level == 1
-                    ? UserWordKind.RecordName : UserWordKind.DataName);
         }
-        return newRoots;
     }
 
     /// <summary>⛔ ISO §8.5.1.3.2's EQUAL-SIBLING RULE, stated once for both walks that build a level-number hierarchy:

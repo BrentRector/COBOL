@@ -523,37 +523,78 @@ public sealed partial class DataBinder
             RefusesHexadecimal: true);
     }
 
-    /// <summary>The characters of a CURRENCY SIGN clause literal, or null when it is not a literal the operand's
-    /// rule admits (<see cref="CurrencyOperand"/>): a NUMERIC literal (⛔ silently ACCEPTED until kb/Work PB770 — the
-    /// clause called the CLASS clause's ordinal helper, so <c>CURRENCY SIGN IS 65</c> became the currency symbol 'A'),
-    /// a BOOLEAN one, a FIGURATIVE constant (SR18 for literal-7 and SR26 for literal-8 — ⛔ accepted until kb/Work
-    /// PB791 because the screen was class-only and <c>LiteralCharsOf</c> decoded a figurative constant as its own
-    /// SPELLING: <c>CURRENCY SIGN IS SPACE PICTURE SYMBOL "#"</c> bound the currency string "SPACE"), the predefined
-    /// NULL (an identifier, §8.4.3.10.3 SR1 — never a literal), and, for literal-8, a hexadecimal literal (SR26, whatever
-    /// it decodes to). The decision is made from the TOKEN as written, never from the decoded characters.</summary>
-    private string? CurrencyTextLiteral(Core.LiteralContext lit, CurrencyOperand op)
+    /// <summary>One CURRENCY SIGN clause operand as the rules read it: its characters, whether it is WRITTEN in
+    /// hexadecimal format (§12.3.7.3 SR19 / SR26 and NOTE 1 ask the form, never the decoded characters) and its class
+    /// (SR28's input — alphanumeric or national; every other class was refused).</summary>
+    private readonly record struct CurrencyLiteral(string Text, bool Hexadecimal, LiteralClass Class);
+
+    /// <summary>A CURRENCY SIGN clause operand, or null when it is not a literal the operand's rule admits
+    /// (<see cref="CurrencyOperand"/>): a NUMERIC literal (⛔ silently ACCEPTED until kb/Work PB770 — the clause called
+    /// the CLASS clause's ordinal helper, so <c>CURRENCY SIGN IS 65</c> became the currency symbol 'A'), a BOOLEAN one, a
+    /// FIGURATIVE constant (SR18 for literal-7 and SR26 for literal-8 — ⛔ accepted until kb/Work PB791 because the
+    /// screen was class-only and <c>LiteralCharsOf</c> decoded a figurative constant as its own SPELLING:
+    /// <c>CURRENCY SIGN IS SPACE PICTURE SYMBOL "#"</c> bound the currency string "SPACE"), the predefined NULL (an
+    /// identifier, §8.4.3.10.3 SR1 — never a literal), and, for literal-8, a hexadecimal literal (SR26, whatever it
+    /// decodes to). The decision is made from the operand as WRITTEN, never from the decoded characters — for a
+    /// constant-name (kb/Work PB1942), from literal-1 of its entry, which §13.10.4 GR1 substitutes "as if literal-1 …
+    /// were written where constant-name-1 is written" (<see cref="SpecialNamesConstant"/>).</summary>
+    private CurrencyLiteral? CurrencyOperandOf(Core.SpecialNamesLiteralContext operand, CurrencyOperand op)
     {
-        var nn = lit.nonNumericLiteral();
-        if (nn?.predefinedNull() is not null)
+        string? what;
+        string spelling;
+        CurrencyLiteral? value = null;
+        if (operand.literal() is { } lit)
         {
-            PredefinedNullRule.Report(Edition, $"the {op.Name} of a CURRENCY SIGN clause — {op.Requirement} "
-                + $"(ISO §12.3.7.3 {op.Rule})");
-            return null;
+            var nn = lit.nonNumericLiteral();
+            if (nn?.predefinedNull() is not null)
+            {
+                PredefinedNullRule.Report(Edition, $"the {op.Name} of a CURRENCY SIGN clause — {op.Requirement} "
+                    + $"(ISO §12.3.7.3 {op.Rule})");
+                return null;
+            }
+            // The literal's CLASS is the grammar's answer (§8.3.3.3.1: "Numeric literals are of the class and category
+            // numeric" — the lexer's numeric-literal rule decides it), never a C# parse of its text (kb/Work PB1579):
+            // `int.TryParse || decimal.TryParse` answered "not numeric" for a 30- or 31-digit numeric literal (beyond
+            // decimal's range), which then fell into the alphanumeric path and was refused under the wrong rule. A
+            // §8.8.3 concatenation expression is "equivalent to a literal" (§8.8.3.3 GR3), never one in hexadecimal format.
+            bool hex = nn?.concatenationExpression() is null && CobolLiteral.IsHexadecimalFormat(lit.GetText());
+            var cls = OperandLiteralClass(lit);
+            what = nn?.figurativeConstant() is not null ? "a figurative constant"
+                : lit.numericLiteral() is not null ? "a numeric literal"
+                : op.RefusesHexadecimal && hex ? "a hexadecimal literal"
+                : cls is LiteralClass.Boolean ? "a boolean literal"
+                : null;
+            spelling = ConcatFolder.Spelling(lit);
+            // CURRENCY: no NATIONAL phrase; SR11 names no literal-7/-8.
+            if (what is null)
+                value = new(LiteralCharsOf(lit, sr11: false), hex,
+                    cls is LiteralClass.National ? LiteralClass.National : LiteralClass.Alphanumeric);
         }
-        // The literal's CLASS is the grammar's answer (§8.3.3.3.1: "Numeric literals are of the class and category
-        // numeric" — the lexer's numeric-literal rule decides it), never a C# parse of its text (kb/Work PB1579):
-        // `int.TryParse || decimal.TryParse` answered "not numeric" for a 30- or 31-digit numeric literal (beyond
-        // decimal's range), which then fell into the alphanumeric path and was refused under the wrong rule.
-        string? what = nn?.figurativeConstant() is not null ? "a figurative constant"
-            : lit.numericLiteral() is not null ? "a numeric literal"
-            : op.RefusesHexadecimal && nn?.concatenationExpression() is null && CobolLiteral.IsHexadecimalFormat(lit.GetText())
-                ? "a hexadecimal literal"
-            : OperandLiteralClass(lit) is LiteralClass.Boolean ? "a boolean literal"
-            : null;
-        if (what is null) return LiteralCharsOf(lit, sr11: false);   // CURRENCY: no NATIONAL phrase; SR11 names no literal-7/-8
-        Edition.Error("COBOLNET0892", $"CURRENCY SIGN {ConcatFolder.Spelling(lit)}: {op.Name} shall be {op.Requirement} — "
-            + $"this is {what} (ISO §12.3.7.3 {op.Rule})");
+        else
+        {
+            var word = operand.cobolWord();
+            if (SpecialNamesConstant(word, Report, $"CURRENCY SIGN {word.GetText()}", op.Name) is not { } k)
+                return null;
+            // A constant's literal-1 is never a figurative constant (§13.10.3 SR6), so its class and its form remain;
+            // the form is literal-1 as written, the entry's specification (§13.10.3 SR9's subject).
+            bool hex = CobolLiteral.IsHexadecimalFormat(k.Specification);
+            what = k.Category switch
+            {
+                PicCategory.Numeric => "a numeric literal",
+                PicCategory.Boolean => "a boolean literal",
+                _ when op.RefusesHexadecimal && hex => "a hexadecimal literal",
+                _ => null,
+            };
+            spelling = $"{word.GetText()} (the constant-name for {k.Specification})";
+            if (what is null)
+                value = new(k.Text, hex, k.Category is PicCategory.National ? LiteralClass.National : LiteralClass.Alphanumeric);
+        }
+        if (value is not null) return value;
+        Report($"CURRENCY SIGN {spelling}: {op.Name} shall be {op.Requirement} — this is {what} (ISO §12.3.7.3 {op.Rule})");
         return null;
+
+        // The clause's one report: the pre-catalog COBOLNET0892 band of CURRENCY SIGN operand rules.
+        void Report(string message) => Edition.Error("COBOLNET0892", message);
     }
 
     /// <summary>Bind <c>CURRENCY [SIGN] [IS] literal-7 [WITH PICTURE SYMBOL literal-8]</c> (ISO §12.3.7.3
@@ -565,15 +606,14 @@ public sealed partial class DataBinder
     /// different strings. r25's implied '$' is added by <see cref="FinalizeCurrencySigns"/>.</summary>
     private void SwitchBindCurrency(Core.CurrencySignClauseContext cur)
     {
-        var lits = cur.literal();
-        if (lits.Length == 0) return;
-        if (CurrencyTextLiteral(lits[0], CurrencyOperand.Literal7) is not { } literal7) return;
+        var operands = cur.specialNamesLiteral();
+        if (operands.Length == 0) return;
+        if (CurrencyOperandOf(operands[0], CurrencyOperand.Literal7) is not { } operand7) return;
+        string literal7 = operand7.Text;
         // SR19: a hexadecimal literal-7 (X"…" / NX"…") requires the PICTURE SYMBOL phrase — and NOTE 1 exempts its
-        // content from the compile-time currency-string limitations (SR23 b). Detected on the TOKEN's form (the
-        // literal's decoded characters cannot tell the forms apart), by the ONE hexadecimal-format question; a
-        // concatenation expression is "equivalent to a literal" (§8.8.3.3 GR3), not a literal in hexadecimal format.
-        bool literal7Hex = lits[0].nonNumericLiteral()?.concatenationExpression() is null
-            && CobolLiteral.IsHexadecimalFormat(lits[0].GetText());
+        // content from the compile-time currency-string limitations (SR23 b). Detected on the operand's WRITTEN form
+        // (the decoded characters cannot tell the forms apart), by CurrencyOperandOf.
+        bool literal7Hex = operand7.Hexadecimal;
 
         char symbol;
         string currencyString;
@@ -584,7 +624,7 @@ public sealed partial class DataBinder
             // the keyword SYMBOL (the grammar cannot distinguish; semantic check per the grammar's own note).
             if (cur.PIC_STRING()?.GetText() is { } sym && !CobolNames.Same(sym, "SYMBOL"))
                 Edition.Error("COBOLNET0892", $"CURRENCY SIGN: expected 'WITH PICTURE SYMBOL', found 'PICTURE {sym}' (ISO §12.3.7)");
-            string? literal8 = lits.Length > 1 ? CurrencyTextLiteral(lits[1], CurrencyOperand.Literal8) : "";
+            string? literal8 = operands.Length > 1 ? CurrencyOperandOf(operands[1], CurrencyOperand.Literal8)?.Text : "";
             if (literal8 is null) return;
             if (literal8.Length != 1)
             {
@@ -631,9 +671,9 @@ public sealed partial class DataBinder
 
         char key = char.ToUpperInvariant(symbol);
         // §12.3.7.3 SR28's input: the CLASS of literal-7 — alphanumeric (a plain or X"…" literal) or national (N"…" /
-        // NX"…", a §8.8.3.3 concatenation folding to national). Boolean and every other shape were refused above.
-        var definition = new CurrencyDefinition(currencyString,
-            OperandLiteralClass(lits[0]) is LiteralClass.National ? LiteralClass.National : LiteralClass.Alphanumeric);
+        // NX"…", a §8.8.3.3 concatenation folding to national, or a constant-name of either). Boolean and every other
+        // shape were refused by CurrencyOperandOf.
+        var definition = new CurrencyDefinition(currencyString, operand7.Class);
         // r21: no two clauses may bind equivalent symbols to different strings — and a string of the other CLASS is
         // not the identical string (SR28 would then confine the one symbol to display AND to national items).
         if (_currencySigns.TryGetValue(key, out var bound) && bound != definition)
@@ -1029,11 +1069,19 @@ public sealed partial class DataBinder
         string name = words[0].GetText();
         DeclareUserWord(name, UserWordKind.LocaleName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
         string external;
-        bool fromLiteral = loc.literal() is not null;
-        if (fromLiteral)
+        // literal-4 is written as a literal, or as a constant-name standing for one (§13.10.3 SR2; kb/Work PB1942). The
+        // word branch is ALSO external-locale-name-1, a system-name: ⚠ DETERMINATION — a word this unit declares as a
+        // constant-name takes the constant reading (the program's own declaration of the word), any other word is
+        // external-locale-name-1.
+        Antlr4.Runtime.Tree.IParseTree? written4 = loc.literal() is { } lit4 ? lit4
+            : words.Length > 1 && NamesConstant(words[1].GetText()) ? words[1]
+            : null;
+        bool fromLiteral = written4 is not null;
+        if (written4 is not null)
         {
+            string spelling = loc.literal() is { } l ? ConcatFolder.Spelling(l) : written4.GetText();
             // SR10 / SR11 for literal-4 — the ONE text-literal rule the ORDER TABLE clause's literal-9 shares.
-            if (!TryClauseTextLiteral(loc.literal()!, $"LOCALE {name} IS {ConcatFolder.Spelling(loc.literal()!)}", "literal-4", out external)) return;
+            if (!TryClauseTextLiteral(written4, $"LOCALE {name} IS {spelling}", "literal-4", out external)) return;
         }
         else external = words[1].GetText();
         var symbol = new LocaleSymbol(name, external, fromLiteral);
@@ -1066,10 +1114,26 @@ public sealed partial class DataBinder
     /// SPACE then names an ordering table / a locale this implementation does not provide, which is the RUN-TIME
     /// answer (the COBOLNET1662 advice and EC-ORDER-NOT-SUPPORTED / EC-LOCALE-MISSING), not a syntax error. This screen
     /// used to refuse every figurative constant under a rule that quotes only the symbolic-character one (kb/Work
-    /// PB1537), and the NULL it also refused was not a figurative constant at all (§8.4.3.10.3 SR1).</para></summary>
-    private bool TryClauseTextLiteral(Core.LiteralContext lit, string what, string operand, out string text)
+    /// PB1537), and the NULL it also refused was not a figurative constant at all (§8.4.3.10.3 SR1).</para>
+    /// <para>A WORD at the position is a constant-name (§13.10.3 SR2, kb/Work PB1942 — <see cref="SpecialNamesConstant"/>):
+    /// its literal-1 meets the same two rules.</para></summary>
+    private bool TryClauseTextLiteral(Antlr4.Runtime.Tree.IParseTree written, string what, string operand, out string text)
     {
         text = "";
+        if (written is Core.CobolWordContext word)
+        {
+            if (SpecialNamesConstant(word, Report, what, operand) is not { } constant) return false;
+            if (constant.Category is not (PicCategory.Alphanumeric or PicCategory.National))
+            {
+                Report($"{what}: {operand} shall be an alphanumeric or national literal (ISO "
+                    + $"§12.3.7.3 SR10); the constant-name '{word.GetText()}' stands for {constant.Specification}, of "
+                    + $"class {constant.Category} (§13.10.4 GR1/GR2)");
+                return false;
+            }
+            text = constant.Text;
+            return SecondHalfOfSr11(text);
+        }
+        var lit = (Core.LiteralContext)written;
         string raw = lit.GetText();
         var nn = lit.nonNumericLiteral();
         if (nn?.predefinedNull() is not null)
@@ -1080,7 +1144,7 @@ public sealed partial class DataBinder
         }
         if (nn?.figurativeConstant() is { } fig)
         {
-            var slot = new FigurativeSlot(what, message => Edition.Error("COBOLNET0898", message),
+            var slot = new FigurativeSlot(what, Report,
                 $"{operand} shall be an alphanumeric or national literal", "SR10",
                 category => category is PicCategory.Alphanumeric or PicCategory.National,
                 $"{operand} shall specify neither a symbolic-character figurative constant nor a zero-length literal");
@@ -1099,7 +1163,7 @@ public sealed partial class DataBinder
                 refusesSymbolicCharacters: true));
             if (folded.Category is not (PicCategory.Alphanumeric or PicCategory.National))
             {
-                Edition.Error("COBOLNET0898", $"{what}: {operand} shall be an alphanumeric "
+                Report($"{what}: {operand} shall be an alphanumeric "
                     + "or national literal (ISO §12.3.7.3 SR10); this concatenation expression is class "
                     + $"{folded.Category} (§8.8.3.3 GR1/GR3)");
                 return false;
@@ -1113,20 +1177,25 @@ public sealed partial class DataBinder
             // §8.3.3.2) and refuses a boolean one; a NUMERIC literal is not a quoted literal and lands here too.
             if (CobolLiteral.ClassOf(raw) is not (LiteralClass.Alphanumeric or LiteralClass.National))
             {
-                Edition.Error("COBOLNET0898", $"{what}: {operand} shall be an alphanumeric or "
+                Report($"{what}: {operand} shall be an alphanumeric or "
                     + "national literal (ISO §12.3.7.3 SR10)");
                 return false;
             }
             text = CobolLiteral.Decode(raw);
         }
+        return SecondHalfOfSr11(text);
+
         // SR11's SECOND half.
-        if (text.Length == 0)
+        bool SecondHalfOfSr11(string decoded)
         {
-            Edition.Error("COBOLNET0898", $"{what}: {operand} shall specify neither a "
+            if (decoded.Length > 0) return true;
+            Report($"{what}: {operand} shall specify neither a "
                 + "symbolic-character figurative constant nor a zero-length literal (ISO §12.3.7.3 SR11)");
             return false;
         }
-        return true;
+
+        // The clause's one report: the pre-catalog COBOLNET0898 band of SPECIAL-NAMES literal rules.
+        void Report(string message) => Edition.Error("COBOLNET0898", message);
     }
 
     /// <summary>Declare one <c>DYNAMIC LENGTH [STRUCTURE] name [IS] {…}</c> clause (ISO §12.3.7.2; kb/Work PB829):
@@ -1184,12 +1253,14 @@ public sealed partial class DataBinder
         // ONE cobolWord: ordering-name-1. The clause's own keywords ORDER and TABLE are both lexer tokens since
         // kb/Work PB704 — ORDER used to ride cobolWord as slot [0], which is exactly the shape the §8.9 funnel
         // mistook for a user-defined word.
-        if (ot.cobolWord() is not { } name1 || ot.literal() is not { } lit) return;   // a malformed shape already drew a parse error
+        if (ot.cobolWord() is not { } name1 || ot.specialNamesLiteral() is not { } operand9) return;   // a malformed shape already drew a parse error
         string name = name1.GetText();
         DeclareUserWord(name, UserWordKind.OrderingName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB1083)
-        string raw = ConcatFolder.Spelling(lit);
+        // literal-9, or a constant-name standing for it (§13.10.3 SR2; kb/Work PB1942).
+        Antlr4.Runtime.Tree.IParseTree written9 = (Antlr4.Runtime.Tree.IParseTree?)operand9.literal() ?? operand9.cobolWord();
+        string raw = operand9.literal() is { } lit ? ConcatFolder.Spelling(lit) : operand9.GetText();
         // SR10 / SR11 for literal-9 — the ONE text-literal rule the LOCALE clause's literal-4 shares.
-        if (!TryClauseTextLiteral(lit, $"ORDER TABLE {name} IS {raw}", "literal-9", out string text)) return;
+        if (!TryClauseTextLiteral(written9, $"ORDER TABLE {name} IS {raw}", "literal-9", out string text)) return;
         // ⚠ ONE CLAUSE PER PARAGRAPH, measured off the PRINTED general format rather than inferred from GR17's
         // singular wording: §12.3.7.2 brackets `ORDER TABLE ordering-name-1 IS literal-9` with NO trailing
         // ellipsis, where the repeatable clauses beside it (CLASS, CURRENCY, LOCALE, the switch entry, SYMBOLIC
@@ -1338,8 +1409,11 @@ public sealed partial class DataBinder
         out ImplementorCodeName? row)
     {
         row = null;
+        // A word the unit declares as a constant-name is literal-1 of a literal phrase (§13.10.3 SR2; kb/Work PB1942) —
+        // ⚠ DETERMINATION: the program's own declaration of the word wins over the implementor's code-name of the same
+        // spelling, as it does for the LOCALE clause's external-locale-name-1 (LocaleBind).
         if (def.alphabetEntry() is not [{ ChildCount: 1 } only] || only.GetChild(0) is not Core.CobolWordContext cw
-            || IsAlphabetFigurativeWord(cw.GetText()))
+            || IsAlphabetFigurativeWord(cw.GetText()) || NamesConstant(cw.GetText()))
             return CodeNameOutcome.NotACodeName;
         if (ImplementorCodeNames.Find(cw.GetText(), national) is { } hit) { row = hit; return CodeNameOutcome.Bound; }
         Edition.Error(DiagnosticCatalog.AlphabetCodeNameUnsupported, $"ALPHABET {name}{(national ? " FOR NATIONAL" : "")} "
@@ -1549,12 +1623,11 @@ public sealed partial class DataBinder
     /// <param name="Members">How many CHARACTERS of a coded set the operand names — more than one only for a numeric
     /// ordinal under a CLASS clause's IN phrase that lands on an ALSO group (§12.3.7.4 GR7 k6; kb/Work PB1095). It is a
     /// count of characters, never of code units, so a supplementary character (two code units) is still one member.</param>
-    private readonly record struct PhraseOperand(Antlr4.Runtime.Tree.IParseTree Node, string Characters, int Members = 1)
+    /// <param name="IsOrdinal">True when the operand is an ORDINAL: written as a numeric literal that is an integer, or a
+    /// constant-name standing for an integer (§13.10.3 SR2; kb/Work PB1942) — decided where the operand is decoded.</param>
+    private readonly record struct PhraseOperand(
+        Antlr4.Runtime.Tree.IParseTree Node, string Characters, int Members = 1, bool IsOrdinal = false)
     {
-        /// <summary>True when the operand is written as a numeric literal that is an integer — an ORDINAL.</summary>
-        public bool IsOrdinal => Node is Core.LiteralContext { } lit && lit.numericLiteral() is { } numeric
-            && IntegerLiteralDigits(numeric) is not null;
-
         /// <summary>The operand as the source spelled it, for a diagnostic.</summary>
         public string Spelling => Node.GetText();
     }
@@ -1610,8 +1683,8 @@ public sealed partial class DataBinder
     /// operand carries how many, because a THROUGH phrase needs exactly one (<see cref="OneCharacterOperands"/>).</para></remarks>
     private PhraseOperand? LiteralPhraseOperand(Antlr4.Runtime.Tree.IParseTree operand, LiteralPhraseRules r)
     {
-        PhraseOperand? Of(string? characters, int members = 1) =>
-            characters is null ? null : new PhraseOperand(operand, characters, members);
+        PhraseOperand? Of(string? characters, int members = 1, bool ordinal = false) =>
+            characters is null ? null : new PhraseOperand(operand, characters, members, ordinal);
         switch (operand)
         {
             // ⛔ A FIGURATIVE CONSTANT IS A LITERAL, not a word: `nonNumericLiteral : figurativeConstant | …`, so
@@ -1640,47 +1713,45 @@ public sealed partial class DataBinder
                         + "(ISO §12.3.7.3 SR11)");
                     return null;
                 }
+                // ⛔ WHICH RULE is decided by the literal's FORM — an integer literal is held to the ordinal rule
+                // whatever its value — never by whether its text fits an `int` (kb/Work PB1557's sibling):
+                // `int.TryParse` failed on an 11-digit ordinal and sent it to the CLASS rule below, which reported
+                // "each noninteger literal shall be an alphanumeric literal" for a literal that is an integer. A
+                // NONINTEGER numeric literal (1.5) is not an integer, so it is the class rule's noninteger literal and
+                // falls through to it (kb/Work PB770).
                 if (lit.numericLiteral() is { } numeric && IntegerLiteralDigits(numeric) is ({ } digits, var signed))
-                {
-                    // The ordinal rule, BOTH halves of one sentence: "shall be an UNSIGNED INTEGER **and** shall
-                    // have a value within the range …". ⛔ WHICH RULE is decided by the literal's FORM — an integer
-                    // literal is held to the ordinal rule whatever its value — never by whether its text fits an
-                    // `int` (kb/Work PB1557's sibling): `int.TryParse` failed on an 11-digit ordinal and sent it to
-                    // the CLASS rule below, which reported "each noninteger literal shall be an alphanumeric
-                    // literal" for a literal that is an integer. A NONINTEGER numeric literal (1.5) is not an
-                    // integer, so it is the class rule's noninteger literal and falls through to it (kb/Work PB770).
-                    if (signed)
-                    {
-                        Edition.Error(r.Code, $"{r.What}: {text} — each numeric literal shall be an UNSIGNED integer "
-                            + $"(ISO §12.3.7.3 {r.Rule(r.OrdinalItem)})");
-                        return null;
-                    }
-                    int ordinal = CobolNet.Validation.IntegerOperandRules.HostValue(digits);
-                    if (r.InSet is { } inSet)
-                    {
-                        // GR12 a — the ordinal names every character at that position of the IN set (an ALSO group's
-                        // members, GR7 k6); the SYMBOLIC CHARACTERS clause alone takes literal-1 (SwitchBindSymbolic).
-                        if (inSet.CharactersAt(ordinal) is { } named) return Of(string.Concat(named), named.Count);
-                        Edition.Error(r.Code, $"{r.What}: the ordinal {text} does not exist in the character set "
-                            + $"referenced by the IN alphabet ({inSet.Phrase}, {inSet.OrdinalCount} characters) — ISO "
-                            + $"§12.3.7.3 {r.Rule(r.OrdinalItem)}");
-                        return null;
-                    }
-                    if (ordinal is >= 1 and <= CollatingTable.Repertoire) return Of(((char)(ordinal - 1)).ToString());
-                    Edition.Error(r.Code, $"{r.What}: the ordinal {text} does not exist in the native "
-                        + $"{(r.National ? "national" : "alphanumeric")} character set ({CollatingTable.Repertoire} "
-                        + "characters) — each numeric literal shall be an unsigned integer with a value from one "
-                        + $"through the maximum number of characters in that set (ISO §12.3.7.3 {r.Rule(r.OrdinalItem)})");
-                    return null;
-                }
+                    return Ordinal(digits, signed, text);
                 if (OperandLiteralClass(lit) == r.LiteralClass)
                     return Of(LiteralCharsOf(lit, sr11: true));
                 // The class rule. A noninteger literal of the wrong class: name the rule, then RECOVER with the
                 // literal's characters when it is a string at all, so one bad operand does not cascade.
-                Edition.Error(r.Code, $"{r.What}: {text} — each noninteger literal shall be "
-                    + $"{(r.National ? "a NATIONAL literal (N\"…\")" : "an alphanumeric literal")} "
-                    + $"(ISO §12.3.7.3 {r.Rule(r.ClassItem)})");
+                ClassRule(text);
                 return Of(CobolLiteral.IsStringLiteral(text) ? CobolLiteral.Decode(text) : null);
+            case Core.CobolWordContext w when NamesConstant(w.GetText()):
+                // A CONSTANT-NAME (§13.10.3 SR2, kb/Work PB1942): "as if literal-1 … were written where constant-name-1
+                // is written" (§13.10.4 GR1), so its literal-1 meets every rule above — the ordinal rule for an integer
+                // (GR3's integer forms included), the class rule otherwise, SR11's zero-length half. Its literal-1 is
+                // never a figurative constant (§13.10.3 SR6).
+                if (SpecialNamesConstant(w, m => Edition.Error(r.Code, m), r.What, "a literal-phrase operand") is not { } k) return null;
+                string spec = $"{w.GetText()} (the constant-name for {k.Specification})";
+                if (k.Category is PicCategory.Numeric && k.IntegerText is { } integer)
+                    return Ordinal(integer.TrimStart('-'), k.Text.StartsWith('+') || k.Text.StartsWith('-'), spec);
+                if (k.Category is not PicCategory.Numeric && k.Text.Length == 0)
+                {
+                    Edition.Error(r.Code, $"{r.What}: {spec} — an operand shall not be a zero-length literal "
+                        + "(ISO §12.3.7.3 SR11)");
+                    return null;
+                }
+                LiteralClass? constantClass = k.Category switch
+                {
+                    PicCategory.Alphanumeric => LiteralClass.Alphanumeric,
+                    PicCategory.National => LiteralClass.National,
+                    PicCategory.Boolean => LiteralClass.Boolean,
+                    _ => null,   // a noninteger numeric literal
+                };
+                if (constantClass == r.LiteralClass) return Of(k.Text);
+                ClassRule(spec);
+                return Of(constantClass is null ? null : k.Text);
             case Core.CobolWordContext w:
                 // GR10: the NATIVE extremes/values of the clause's class. ⛔ There is NO `_ => t` fallback: an
                 // unrecognized word is code-name-1/-2, which AlphabetCodeName has already resolved or refused for
@@ -1697,11 +1768,47 @@ public sealed partial class DataBinder
                     return null;
                 }
                 Edition.Error(r.Code, $"{r.What}: {w.GetText()} is not a literal — each operand shall be a numeric "
-                    + $"literal, {(r.National ? "a NATIONAL" : "an alphanumeric")} literal or a figurative constant "
-                    + $"(ISO §12.3.7.3 {r.Rule(r.ClassItem)}; §12.3.7.4 GR10)");
+                    + $"literal, {(r.National ? "a NATIONAL" : "an alphanumeric")} literal, a figurative constant or a "
+                    + $"constant-name standing for a literal (ISO §12.3.7.3 {r.Rule(r.ClassItem)}; §12.3.7.4 GR10; "
+                    + "§13.10.3 SR2)");
                 return null;
         }
         return null;
+
+        // The ordinal rule, BOTH halves of one sentence: "shall be an UNSIGNED INTEGER **and** shall have a value
+        // within the range …" — of an integer literal as written, or of the integer a constant-name stands for.
+        PhraseOperand? Ordinal(string digits, bool signed, string spelling)
+        {
+            if (signed)
+            {
+                Edition.Error(r.Code, $"{r.What}: {spelling} — each numeric literal shall be an UNSIGNED integer "
+                    + $"(ISO §12.3.7.3 {r.Rule(r.OrdinalItem)})");
+                return null;
+            }
+            int ordinal = CobolNet.Validation.IntegerOperandRules.HostValue(digits);
+            if (r.InSet is { } inSet)
+            {
+                // GR12 a — the ordinal names every character at that position of the IN set (an ALSO group's
+                // members, GR7 k6); the SYMBOLIC CHARACTERS clause alone takes literal-1 (SwitchBindSymbolic).
+                if (inSet.CharactersAt(ordinal) is { } named) return Of(string.Concat(named), named.Count, ordinal: true);
+                Edition.Error(r.Code, $"{r.What}: the ordinal {spelling} does not exist in the character set "
+                    + $"referenced by the IN alphabet ({inSet.Phrase}, {inSet.OrdinalCount} characters) — ISO "
+                    + $"§12.3.7.3 {r.Rule(r.OrdinalItem)}");
+                return null;
+            }
+            if (ordinal is >= 1 and <= CollatingTable.Repertoire) return Of(((char)(ordinal - 1)).ToString(), ordinal: true);
+            Edition.Error(r.Code, $"{r.What}: the ordinal {spelling} does not exist in the native "
+                + $"{(r.National ? "national" : "alphanumeric")} character set ({CollatingTable.Repertoire} "
+                + "characters) — each numeric literal shall be an unsigned integer with a value from one "
+                + $"through the maximum number of characters in that set (ISO §12.3.7.3 {r.Rule(r.OrdinalItem)})");
+            return null;
+        }
+
+        // The class rule, for a noninteger literal of the wrong class.
+        void ClassRule(string spelling) =>
+            Edition.Error(r.Code, $"{r.What}: {spelling} — each noninteger literal shall be "
+                + $"{(r.National ? "a NATIONAL literal (N\"…\")" : "an alphanumeric literal")} "
+                + $"(ISO §12.3.7.3 {r.Rule(r.ClassItem)})");
     }
 
     /// <summary>The digits and sign of a numeric literal that is an INTEGER — a fixed-point integer core with an
@@ -1845,6 +1952,34 @@ public sealed partial class DataBinder
     /// <summary>The literal environment of a position OUTSIDE the SPECIAL-NAMES paragraph (kb/Work PB1406).</summary>
     internal LiteralEnvironment LiteralEnv => LiteralEnvironment.Program(this);
 
+    /// <summary>Does <paramref name="word"/> name a constant here — one of this unit's constant entries (bound, bindable
+    /// or refused) or an inherited GLOBAL one? The question a position whose word alternative has a meaning of its own
+    /// (an ALPHABET code-name, an external-locale-name) asks before taking that meaning.</summary>
+    private bool NamesConstant(string word) => _declaredConstants.ContainsKey(word) || FindConstant(word) is not null;
+
+    /// <summary>⛔ THE ONE CONSTANT-NAME READING OF A WORD AT A SPECIAL-NAMES LITERAL POSITION (kb/Work PB1942): literal-1
+    /// … literal-9 of §12.3.7.2. ISO §13.10.3 SR2 — "Except in a compiler directive, constant-name-1 may be used anywhere
+    /// that a format specifies a literal of the class and category of constant-name-1" — and §13.10.4 GR1 — "the
+    /// effect of specifying constant-name-1 in other than this entry is as if literal-1 … were written where
+    /// constant-name-1 is written". The constant entry stands later, in the DATA DIVISION; it was declared before this
+    /// paragraph binds (DeclareDataEntries), so <see cref="FindConstant"/> binds it now, on demand. The caller holds the
+    /// returned literal-1 to its own operand's rules (class, form, length), exactly as it holds a written literal.
+    /// Null, reported through the caller's <paramref name="report"/>, when the word names no constant entry; null
+    /// silently when it names one whose own entry was refused (that entry was reported).</summary>
+    /// <param name="report">The caller's clause diagnostic, for the no-constant report.</param>
+    /// <param name="what">The clause as the caller names it, for the diagnostic.</param>
+    /// <param name="operand">The standard's name for the operand ("literal-7").</param>
+    private ConstantDef? SpecialNamesConstant(Core.CobolWordContext word, Action<string> report, string what, string operand)
+    {
+        string name = word.GetText();
+        if (FindConstant(name) is { } constant) return constant;
+        if (!IsFailedConstant(name))
+            report($"{what}: {operand} is a literal, and '{name}' names no constant entry — a word "
+                + "stands there only as a constant-name (ISO §13.10.3 SR2: \"constant-name-1 may be used anywhere that "
+                + "a format specifies a literal of the class and category of constant-name-1\")");
+        return null;
+    }
+
     /// <summary>The characters of an alphabet-entry string literal: a §8.8.3.3 GR3 concatenation folded first — in
     /// the SPECIAL-NAMES environment (§12.3.7.4 GR10's native extremes), with §12.3.7.3 SR11's
     /// symbolic-character prohibition when <paramref name="sr11"/> —, the §8.3.3.2 hexadecimal format decoded
@@ -1915,7 +2050,9 @@ public sealed partial class DataBinder
         var members = new System.Text.StringBuilder();
         foreach (var item in cd.classValueSet().classValueItem())
         {
-            var lits = item.literal();
+            // literal-5 and literal-6, each written as a literal or as a constant-name (§13.10.3 SR2; kb/Work PB1942).
+            var lits = item.specialNamesLiteral()
+                .Select(o => (Antlr4.Runtime.Tree.IParseTree)o.literal() ?? o.cobolWord()).ToArray();
             if (LiteralPhraseOperand(lits[0], rules) is not { } lo) continue;
             if (lits.Length < 2) { members.Append(lo.Characters); continue; }
             // SR17 b4/c4 — "Each alphanumeric / national literal, when a THROUGH phrase is specified, shall be one

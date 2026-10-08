@@ -22,9 +22,11 @@ using Core = CobolParserCore;
 /// next one, its 66 and 88 entries included — is bound then, through the same <see cref="BindEntries"/> walk, and
 /// parked (<see cref="_preboundRecordRoots"/>). The section's own walk, on reaching it, places the parked roots
 /// exactly where it would have placed them and skips the entries, so the forest, the file's record list and every
-/// later pass see source order. A record that is still being described cannot be split this way: measuring an item
-/// later in an OPEN record is <see cref="DiagnosticCatalog.ConstantLengthOperandBoundLater"/>, and measuring an item
-/// whose own description is open — the description that referenced the constant — is the SR4 cycle.</para>
+/// later pass see source order. An item later in a record that is still being described is bound the same way at the
+/// granularity of its own entry (<see cref="BindLaterEntriesOfOpenRecord"/>, kb/Work PB1941): the entry, its
+/// subordinates and each group entry between it and its nearest bound ancestor bind now, and the walk attaches them
+/// where they stand. Measuring an item whose own description is open — the description that referenced the constant —
+/// is the SR4 cycle; an item subordinate to that open entry is <see cref="DiagnosticCatalog.ConstantLengthOperandBoundLater"/>.</para>
 /// </summary>
 public sealed partial class DataBinder
 {
@@ -54,6 +56,15 @@ public sealed partial class DataBinder
 
     /// <summary>Every entry of a record bound out of source order — the section walk skips them.</summary>
     private readonly HashSet<Core.DataDescriptionEntryContext> _preboundEntries = [];
+
+    /// <summary>The item each data description entry bound to, by its entry — how an entry bound ahead of its
+    /// record's walk finds the already-bound item it is subordinate to (<see cref="BindLaterEntriesOfOpenRecord"/>).</summary>
+    private readonly Dictionary<Core.DataDescriptionEntryContext, DataItem> _entryItems = [];
+
+    /// <summary>The entries of an OPEN record bound ahead of its walk (kb/Work PB1941), by entry: the item the walk
+    /// attaches when it reaches the entry (an operand's own entry, or a group entry it is subordinate to), or null
+    /// for an entry bound as part of an operand's subordinate run, which the walk skips.</summary>
+    private readonly Dictionary<Core.DataDescriptionEntryContext, DataItem?> _preboundEntryItems = [];
 
     /// <summary>Record where every data description entry under <paramref name="scope"/> stands, BEFORE any of it binds:
     /// the section runs exactly as <see cref="BindFileSection"/>, the WORKING-STORAGE / LOCAL-STORAGE walks and
@@ -137,6 +148,112 @@ public sealed partial class DataBinder
         }
         return any;
     }
+
+    /// <summary>⛔ PART OF AN OPEN RECORD, BOUND AHEAD OF ITS WALK (kb/Work PB1941). <c>01 R. 05 A PIC X(K). 05 W PIC
+    /// X(7). 01 K CONSTANT AS LENGTH OF W.</c> — A's PICTURE demands K while R is being described, and W is a later
+    /// entry of R. §13.10.3 SR4 ("The length of data-name-1 or data-name-2 shall not be dependent, directly or
+    /// indirectly, upon the value of constant-name-1") is not violated: W's length does not depend on K, so W can be
+    /// measured before the walk reaches it.
+    /// <para>For every entry declaring <paramref name="name"/> whose bind has not begun inside a record whose walk HAS
+    /// begun: the entry and its subordinate entries are bound now, through the same <see cref="BindEntries"/> walk,
+    /// and so is each group entry between it and its nearest already-bound ancestor (that entry alone — its other
+    /// subordinates are the walk's). Each item links to its parent at once, so qualification, the OCCURS depth and the
+    /// ancestor screens see the real chain, and the walk ATTACHES it when it reaches the entry
+    /// (<see cref="TakePreboundEntry"/>), so the parent's members keep source order. A description that does depend
+    /// on the constant meets the constant's own cycle check while it binds here — the SR4 violation, reported as such.</para>
+    /// <para>An entry subordinate to the entry whose description is being bound right now has no bound ancestor to
+    /// link to (that entry's item does not exist yet) and is left for
+    /// <see cref="DiagnosticCatalog.ConstantLengthOperandBoundLater"/>.</para></summary>
+    /// <returns>True when at least one entry was bound.</returns>
+    private bool BindLaterEntriesOfOpenRecord(string name)
+    {
+        if (!_dataEntryLocations.TryGetValue(name, out var locs)) return false;
+        bool any = false;
+        foreach (var (run, index, section) in locs.ToList())
+        {
+            if (_entriesBound.Contains(run[index])) continue;
+            int start = index;
+            while (start > 0 && !EndsRecord(run[start])) start--;
+            if (!OpensRecord(run[start]) || !_entriesBound.Contains(run[start])) continue;   // not begun: BindLaterRecords
+            if (UnboundAncestry(run, start, index) is not ({ } parent, var chain)) continue;
+            foreach (int j in chain)
+            {
+                // The operand's own entry carries its subordinate run; an ancestor group entry binds alone.
+                int end = j == index ? SubordinateRunEnd(run, j) : j + 1;
+                var entries = run.Skip(j).Take(end - j).ToList();
+                BindEntries(entries, _rootNames, section, aheadOfWalkParent: parent);
+                if (!_entryItems.TryGetValue(run[j], out var bound)) break;   // the entry described no item (reported)
+                _preboundEntryItems[run[j]] = bound;
+                foreach (var subordinate in entries.Skip(1)) _preboundEntryItems[subordinate] = null;
+                if (j != index) _preboundGroups[bound] = new DataEntryLocation(run, j, section);
+                parent = bound;
+                any = true;
+            }
+        }
+        return any;
+    }
+
+    /// <summary>The group entries bound ALONE ahead of the walk (<see cref="BindLaterEntriesOfOpenRecord"/>) whose
+    /// other subordinates are not bound yet, so whose description is not complete.</summary>
+    private readonly Dictionary<DataItem, DataEntryLocation> _preboundGroups = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>Complete a group bound alone ahead of the walk before it is measured: bind its subordinate entries now,
+    /// under it and in source order (an entry already bound ahead attaches at its position), so its description is
+    /// whole. The walk then skips those entries and attaches the group itself where it stands. A subordinate whose
+    /// description depends on the constant being evaluated meets that constant's cycle check — §13.10.3 SR4, since the
+    /// group's length then depends on it.</summary>
+    private void CompletePreboundGroup(DataItem group)
+    {
+        if (!_preboundGroups.Remove(group, out var at)) return;
+        int end = SubordinateRunEnd(at.Run, at.Index);
+        var entries = at.Run.Skip(at.Index + 1).Take(end - at.Index - 1).ToList();
+        BindEntries(entries, _rootNames, at.Section, openGroup: group);
+        foreach (var subordinate in entries)
+        {
+            _preboundEntryItems[subordinate] = null;
+            if (_entryItems.TryGetValue(subordinate, out var nested)) _preboundGroups.Remove(nested);
+        }
+    }
+
+    /// <summary>The nearest already-bound item the entry at <paramref name="index"/> is subordinate to, and the indices
+    /// of the entries from the outermost unbound ancestor down to the entry itself; null when an ancestor's bind has
+    /// begun but produced no item yet — the entry being described right now — or produced none at all.</summary>
+    private (DataItem Parent, List<int> Chain)? UnboundAncestry(
+        IReadOnlyList<Core.DataDescriptionEntryContext> run, int start, int index)
+    {
+        var chain = new List<int> { index };
+        int level = EntryLevel(run[index]);
+        for (int j = index - 1; j >= start; j--)
+        {
+            int l = EntryLevel(run[j]);
+            if (l is < 1 or 66 or 88 || run[j].dataDescriptionBody()?.constantEntryBody() is not null) continue;
+            int nest = l == 77 ? 1 : l;
+            if (nest >= level) continue;
+            if (_entryItems.TryGetValue(run[j], out var bound)) return (bound, chain);
+            if (_entriesBound.Contains(run[j])) return null;
+            chain.Insert(0, j);
+            level = nest;
+        }
+        return null;
+    }
+
+    /// <summary>One past the last entry subordinate to the entry at <paramref name="index"/>: the next entry at its
+    /// level or a lower one, a level-66 entry (which follows the record's last data description entry, §13.18.45.3
+    /// SR2) or the next record. Its level-88 entries are inside the run.</summary>
+    private static int SubordinateRunEnd(IReadOnlyList<Core.DataDescriptionEntryContext> run, int index)
+    {
+        int level = EntryLevel(run[index]);
+        int end = index + 1;
+        while (end < run.Count && !EndsRecord(run[end]) && EntryLevel(run[end]) is var l && l != 66 && (l == 88 || l > level))
+            end++;
+        return end;
+    }
+
+    /// <summary>For the section walk: whether <paramref name="entry"/> was bound ahead of the walk as part of an open
+    /// record (<see cref="BindLaterEntriesOfOpenRecord"/>) — with the item to attach at its source position, or null
+    /// for an entry bound inside an earlier entry's subordinate run.</summary>
+    private bool TakePreboundEntry(Core.DataDescriptionEntryContext entry, out DataItem? item) =>
+        _preboundEntryItems.Remove(entry, out item);
 
     // ── The REPORT SECTION's entries (kb/Work PB1226, §13.10.3 SR11) ─────────────────────────────────────────────
 

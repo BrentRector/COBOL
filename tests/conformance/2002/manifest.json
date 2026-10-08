@@ -61,6 +61,8 @@
  "pb1116_strong_group_object_leaf",
  "pb1226_constant_length_report_item",
  "pb1231_constant_forward_references",
+ "pb1941_constant_length_inside_open_record",
+ "pb1942_special_names_constant_literals",
  "pb1225_constant_optional_words",
  "pb1904_bit_group_view_storage_image",
  "pb1271_report_sum_counter_occurrences",

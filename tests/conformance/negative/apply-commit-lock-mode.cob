@@ -7,8 +7,8 @@
 *> APPLY COMMIT clause for which there is an implicit LOCK MODE IS AUTOMATIC WITH LOCK ON MULTIPLE RECORDS
 *> applied automatically, including for sequential files."
 *> THE ANTECEDENT is the APPLY COMMIT clause, Annex A.4.3 item 2, which COBOLNET1709 refuses at every site
-*> (docs/CONFORMANCE.md section 5, row A.4.3 - Not claimed). So no compilable program can pair a LOCK MODE
-*> clause with a file subject to APPLY COMMIT, the rule cannot be violated, and it holds.
+*> in the strict lane (A.4.3 Not claimed); under --permissive it is only a warning, so the rule is enforced
+*> in its own right there (COBOLNET2974, kb/Work PB666/PB667). This fixture pins the strict lane.
 *> ⛔ WHY THIS FIXTURE EXISTS RATHER THAN A SHARED ONE. It writes the rule's OWN forbidden pairing - a LOCK
 *> MODE clause AND an APPLY COMMIT clause naming the same file - so the day A.4.3 is claimed, this file stops
 *> failing and the row's CONFORMS is forced back to a real adjudication. A witness that only wrote APPLY

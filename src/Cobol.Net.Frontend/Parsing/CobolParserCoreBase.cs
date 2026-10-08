@@ -469,6 +469,47 @@ public abstract class CobolParserCoreBase : Parser
 
     private HashSet<string>? _declaredNames;
 
+    /// <summary>⛔ IS THE LOOKAHEAD THE NEXT OPERAND OF A SPECIAL-NAMES CLASS CLAUSE'S VALUE LIST (kb/Work PB1942)? The
+    /// LEFT-EDGE predicate of the list's loop body. An operand may be a constant-name (§13.10.3 SR2 — "constant-name-1
+    /// may be used anywhere that a format specifies a literal of the class and category of constant-name-1"), so the
+    /// list admits a WORD; but a switch or device entry written after the clause with no separator period begins with
+    /// words too, and an unrecognized word run is the paragraph's last alternative — so a word continues the list only
+    /// when the compilation unit DECLARES it a constant-name, and every other token is left to the grammar. The
+    /// declaration stands LATER, in the DATA DIVISION, which the parser has not reached: it is read off the token
+    /// stream (<see cref="ConstantEntryNames"/>). The binder still decides what the word names
+    /// (<c>DataBinder.SpecialNamesConstant</c>); this only keeps a word that names no constant out of the list.</summary>
+    protected bool classOperandAhead()
+    {
+        var t = TokenStream.LT(TokenStream.LA(1) == CobolLexer.COMMA ? 2 : 1);
+        return t is null || t.Type != CobolLexer.IDENTIFIER || ConstantEntryNames.Contains(t.Text);
+    }
+
+    private HashSet<string>? _constantEntryNames;
+
+    /// <summary>The constant-names the compilation unit's constant entries declare, read off the whole token stream once:
+    /// the word between a level-number 1 or 01 and the keyword CONSTANT (§13.10.2: <c>{1 | 01} constant-name-1
+    /// CONSTANT …</c>), excluding the CONSTANT RECORD clause of a data description entry (§13.18.15), whose CONSTANT
+    /// is followed by RECORD. Default-channel tokens only, so a comment never contributes.</summary>
+    private HashSet<string> ConstantEntryNames
+    {
+        get
+        {
+            if (_constantEntryNames is not null) return _constantEntryNames;
+            var names = new HashSet<string>(CobolNames.Comparer);
+            if (TokenStream is BufferedTokenStream buffered)
+            {
+                buffered.Fill();
+                var tokens = buffered.GetTokens().Where(t => t.Channel == TokenConstants.DefaultChannel).ToList();
+                for (int i = 2; i < tokens.Count; i++)
+                    if (tokens[i].Type == CobolLexer.CONSTANT
+                        && (i + 1 >= tokens.Count || tokens[i + 1].Type != CobolLexer.RECORD)
+                        && tokens[i - 2] is { Type: CobolLexer.INTEGERLIT, Text: "1" or "01" })
+                        names.Add(tokens[i - 1].Text);
+            }
+            return _constantEntryNames = names;
+        }
+    }
+
     /// <summary>Records a user-defined word the program DECLARES (a data-name, a file-name) — called by grammar
     /// actions, which never run during prediction. Read by <see cref="IsKeywordReadingHere"/>.</summary>
     protected void declareName(IToken? name)

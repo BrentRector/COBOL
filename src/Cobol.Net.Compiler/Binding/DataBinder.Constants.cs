@@ -744,7 +744,9 @@ public sealed partial class DataBinder
     /// referenced this constant: the SR4 cycle.</item>
     /// <item>described later, entry reached in order → <paramref name="waits"/>: nothing needs the value yet.</item>
     /// <item>described later, value demanded now → its record is bound now, out of source order
-    /// (<see cref="BindLaterRecords"/>; the records keep their source order in the forest), then measured.</item>
+    /// (<see cref="BindLaterRecords"/>; the records keep their source order in the forest), then measured; or, when
+    /// its record is the one being described, its own entry and subordinates are
+    /// (<see cref="BindLaterEntriesOfOpenRecord"/>, kb/Work PB1941; the walk attaches them at their position).</item>
     /// <item>being described by the entry whose own description demanded the constant → the SR4 cycle.</item>
     /// </list></summary>
     private DataItem? LengthOperandItem(
@@ -758,8 +760,13 @@ public sealed partial class DataBinder
         if (item is null && IsDescribedLater(baseName))
         {
             if (!demanded) { waits = true; return null; }
-            if (BindLaterRecords(baseName)) item = resolver.FindItem(baseName, qualifiers);
+            // Both orders are asked (`|`, not `||`): the name may be declared in a record not yet begun AND later in
+            // the record being described, and qualification picks among them once all are bound.
+            if (BindLaterRecords(baseName) | BindLaterEntriesOfOpenRecord(baseName))
+                item = resolver.FindItem(baseName, qualifiers);
         }
+        // A group an earlier constant bound ahead ALONE is completed before it is measured (kb/Work PB1941).
+        if (item is not null) CompletePreboundGroup(item);
         if ((item is not null && IsDescriptionOpen(item)) || (item is null && IsBeingDescribed(baseName)))
         {
             Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {phrase} '{written}' — the description of "
@@ -771,9 +778,9 @@ public sealed partial class DataBinder
         if (item is null && IsDescribedLater(baseName))
         {
             Edition.Error(DiagnosticCatalog.ConstantLengthOperandBoundLater, $"{where}: {phrase} '{written}' — "
-                + $"'{baseName}' is described later in a record whose description is still being bound where "
-                + $"'{constantName}' is referenced; measuring part of an open record out of source order is recognized "
-                + "but not yet implemented");
+                + $"'{baseName}' is described later, subordinate to the entry whose description references "
+                + $"'{constantName}'; measuring an item subordinate to that open entry out of source order is "
+                + "recognized but not yet implemented");
             return null;
         }
         if (item is null)
