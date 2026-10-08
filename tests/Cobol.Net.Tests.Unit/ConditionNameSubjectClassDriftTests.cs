@@ -33,12 +33,14 @@ public sealed class ConditionNameSubjectClassDriftTests
     /// <summary>Two DIFFERENT collating sequences, deliberately, so neither leg can pass for the wrong reason: an
     /// alphanumeric alphabet in which 'A' and 'B' share one position (ALSO) and a national alphabet in which they
     /// do not. A test that renders the wrong sequence therefore renders a DIFFERENT argument, not merely a
-    /// different name for the same order.</summary>
+    /// different name for the same order. The OBJECT-COMPUTER paragraph precedes SPECIAL-NAMES, the §12.3.2 printed
+    /// sequence (kb/Work PB1508).</summary>
     private const string Alphabets = """
-                   ALPHABET AN-EQ IS "A" ALSO "B"
-                   ALPHABET NAT-D FOR NATIONAL IS N"A" N"B".
                OBJECT-COMPUTER. DRIFT-COMPUTER
                    PROGRAM COLLATING SEQUENCE IS AN-EQ NAT-D.
+               SPECIAL-NAMES.
+                   ALPHABET AN-EQ IS "A" ALSO "B"
+                   ALPHABET NAT-D FOR NATIONAL IS N"A" N"B".
         """;
 
     private static string Program(string decls, string tests) => $"""
@@ -46,7 +48,6 @@ public sealed class ConditionNameSubjectClassDriftTests
                PROGRAM-ID. CNDRIFT.
                ENVIRONMENT DIVISION.
                CONFIGURATION SECTION.
-               SPECIAL-NAMES.
         {Alphabets}
                DATA DIVISION.
                WORKING-STORAGE SECTION.

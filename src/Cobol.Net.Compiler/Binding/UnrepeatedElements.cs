@@ -30,12 +30,17 @@ internal static class UnrepeatedElements
     /// <param name="where">The construct as the user wrote it ("RD 'R-1'").</param>
     /// <param name="element">The element as the figure names it ("the CONTROL clause").</param>
     /// <param name="clause">The clause whose general format this is ("13.14.2").</param>
-    public static void AtMostOnce(EditionContext edition, int count, string where, string element, string clause)
+    /// <param name="orderFree">Whether a rule of the format lets its elements be written in any order (§13.14.3 SR2);
+    /// false where the figure's printed sequence binds (§5.2.1 — the OPTIONS paragraph, the CONFIGURATION SECTION),
+    /// so the message never grants an order licence the format does not (kb/Work PB1508).</param>
+    public static void AtMostOnce(EditionContext edition, int count, string where, string element, string clause,
+        bool orderFree = true)
     {
         if (count > 1)
             edition.Error(DiagnosticCatalog.FormatElementRepeated,
                 $"{where}: {element} is written {count} times; ISO §{clause}'s general format encloses it in its "
-                + "own bracket with no ellipsis, so it may be written at most once (§5.2.6.2, §5.2.7) — the "
-                + "elements may be written in any order, but each once");
+                + "own bracket with no ellipsis, so it may be written at most once (§5.2.6.2, §5.2.7)"
+                + (orderFree ? " — the elements may be written in any order, but each once"
+                             : " — once, in the sequence the format prints (§5.2.1)"));
     }
 }

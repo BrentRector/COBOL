@@ -27,16 +27,15 @@ using Core = CobolParserCore;
 public sealed class ClauseCardinalityDriftTests : CobolNetTestBase
 {
     /// <summary>The closed formats whose figure was read and does NOT print every element once: SPECIAL-NAMES,
-    /// I-O-CONTROL and OBJECT-COMPUTER repeat most of their elements; SOURCE-COMPUTER holds a single element; the
-    /// configuration section and the identification division list PARAGRAPHS, not clauses.</summary>
+    /// I-O-CONTROL and OBJECT-COMPUTER repeat most of their elements; SOURCE-COMPUTER holds a single element. (The
+    /// configuration section and the identification division list paragraphs, each bracketed once, and are rows —
+    /// kb/Work PB1508.)</summary>
     private static readonly IReadOnlySet<Type> ReviewedExemptions = new HashSet<Type>
     {
         typeof(Core.SpecialNameEntryContext),
         typeof(Core.IoControlClauseContext),
         typeof(Core.SourceComputerParagraphContext),
         typeof(Core.ObjectComputerClauseContext),
-        typeof(Core.ConfigurationParagraphContext),
-        typeof(Core.IdentificationParagraphContext),
     };
 
     private static IReadOnlyList<Type> AlternativesOf(Type listContext) =>
@@ -78,6 +77,48 @@ public sealed class ClauseCardinalityDriftTests : CobolNetTestBase
             Assert.True(dead.Count == 0,
                 $"{list.Name}'s Repeatable set names {string.Join(", ", dead)}, which the grammar no longer offers there");
         }
+    }
+
+    /// <summary>⛔ A FIXED SEQUENCE RANKS EXACTLY THE LIST'S ONCE-ONLY ALTERNATIVES (kb/Work PB1508; ISO §5.2.1). A row
+    /// whose figure binds the order (<see cref="ClauseList.Sequence"/>) is read by <c>ClosedFormatPass</c> as a rank per
+    /// element; an alternative the sequence does not name would be written anywhere unchecked, and one it names that
+    /// the grammar no longer offers is a dead rank. Both are read from the GENERATED parser, so a clause added to the
+    /// OPTIONS paragraph or the CONFIGURATION SECTION cannot arrive unranked.</summary>
+    [Fact]
+    public void EveryFixedSequence_RanksExactlyTheOnceOnlyAlternatives()
+    {
+        var ordered = ClauseCardinalities.ByClauseContext.Where(r => r.Value.Sequence is not null).ToList();
+        Assert.True(ordered.Count >= 3,
+            "the OPTIONS paragraph, CONFIGURATION SECTION and identification division rows must carry a Sequence");
+        foreach (var (list, row) in ordered)
+        {
+            var onceOnly = AlternativesOf(list).Where(t => !row.Repeatable.Contains(t)).ToHashSet();
+            var ranked = row.Sequence!.ToHashSet();
+            Assert.True(ranked.Count == row.Sequence!.Count, $"{list.Name}'s Sequence names an element twice");
+            var unranked = onceOnly.Except(ranked).Select(t => t.Name).ToList();
+            Assert.True(unranked.Count == 0, $"{list.Name}'s Sequence does not rank {string.Join(", ", unranked)}: read "
+                + "the printed figure (scripts/render-spec-page.py) and place it where the figure prints it");
+            var dead = ranked.Except(onceOnly).Select(t => t.Name).ToList();
+            Assert.True(dead.Count == 0, $"{list.Name}'s Sequence ranks {string.Join(", ", dead)}, which is not a "
+                + "once-only alternative of the list");
+        }
+    }
+
+    /// <summary>The OPTIONS paragraph's clause list (§11.9.2) has no error production, so the closed-format obligation
+    /// cannot see it: pin that it is a row, that nothing in it repeats, and that its sequence is the figure's.</summary>
+    [Fact]
+    public void TheOptionsClauseRow_RanksTheSevenClausesInTheFiguresSequence()
+    {
+        Assert.True(ClauseCardinalities.ByClauseContext.TryGetValue(typeof(Core.OptionsClauseContext), out var row));
+        Assert.Empty(row!.Repeatable);
+        Assert.Equal(
+            [
+                typeof(Core.ArithmeticClauseContext), typeof(Core.DefaultRoundedClauseContext),
+                typeof(Core.EntryConventionClauseContext), typeof(Core.FloatBinaryClauseContext),
+                typeof(Core.FloatDecimalClauseContext), typeof(Core.OptionsInitializeClauseContext),
+                typeof(Core.IntermediateRoundingClauseContext),
+            ],
+            row.Sequence!);
     }
 
     /// <summary>The report group description entry is the one row that is NOT a closed format with an error

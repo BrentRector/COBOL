@@ -1197,8 +1197,21 @@ joined the table the same way, which is the table doing its job: a tenth format 
   error production, the declined validation clauses); `ClosedFormatPass.VisitChildren` counts every clause list's
   elements against it and reports COBOLNET2423 through the one `UnrepeatedElements` reader the RD entry already uses.
   `ClauseCardinalityDriftTests` makes the table total: every closed format is a row or a reviewed exemption
-  (SPECIAL-NAMES, I-O-CONTROL, OBJECT-COMPUTER, SOURCE-COMPUTER and the paragraph lists repeat or are not clause
-  lists), so a new closed format cannot arrive without its figure being read for ellipses.
+  (SPECIAL-NAMES, I-O-CONTROL, OBJECT-COMPUTER and SOURCE-COMPUTER repeat their elements or hold one), so a new
+  closed format cannot arrive without its figure being read for ellipses.
+- **And the ORDER half (kb/Work PB1508).** §5.2.1: the elements of a general format "shall be written in the
+  compilation group in the sequence given in the general format, unless otherwise specified by the rules of that
+  format". Every row DECIDES its order through `ClauseList.Sequence`: null where a syntax rule frees it (§13.16.3 SR4,
+  §13.15.3 SR2, §13.4.5.3 SR2, §12.4.5.2 SR1), else the once-only elements in printed sequence — the §11.9.2 OPTIONS
+  paragraph's seven clauses (its rule was an order-free `optionsClause+` folded last-wins, so a reordered or repeated
+  clause compiled clean), the §12.3.2 CONFIGURATION SECTION's four paragraphs and the §11.2.1 identification
+  division's OPTIONS paragraph (a second one was never read). `ClosedFormatPass` reports an element written after one
+  the figure prints later as COBOLNET2987, at the misplaced element; a repeat stays COBOLNET2423, whose message no
+  longer grants an order licence to a fixed-sequence list. The grammar keeps the order-free superset (a named
+  diagnostic, never a raw COBOL0307 at the second clause), and `ClauseCardinalityDriftTests` requires a sequence to rank
+  exactly its list's once-only alternatives, so a clause added to such a list cannot arrive unranked. The OPTIONS
+  paragraph's independent `[.]` is its own grammar alternative: `OPTIONS DOT (optionsClause+ DOT | DOT)?` is §11.9.2's
+  bracket plus §11.9.3 SR1 (a period is required once a clause is written), so `OPTIONS. .` is accepted.
 - **Its second error production — a KNOWN phrase in the WRONG position.** `misplacedSpecialNamesForPhrase`
   (kb/Work PB977) parses a SPECIAL-NAMES `FOR {ALPHANUMERIC | NATIONAL}` phrase written AFTER the definition of an
   ALPHABET, CLASS or SYMBOLIC CHARACTERS clause — a position §12.3.7.2 never prints and no dialect owns — so

@@ -76,10 +76,13 @@ internal sealed class ClosedFormatPass(EditionContext edition) : CursorFollowing
 
     /// <summary>Count the elements <paramref name="container"/>'s clause children fill and diagnose each that is
     /// written more than once (ISO §5.2.6.2, §5.2.7), through the ONE <see cref="UnrepeatedElements"/> reader the
-    /// RD entry already uses. Reported at the SECOND occurrence — the one that makes the entry non-conforming.</summary>
+    /// RD entry already uses. Reported at the SECOND occurrence — the one that makes the entry non-conforming. Where
+    /// the list's figure fixes the order (<see cref="ClauseList.Sequence"/>), an element written after one the figure
+    /// prints LATER is refused too (§5.2.1; kb/Work PB1508), at the element written out of place.</summary>
     private void ScreenClauseRepetition(ParserRuleContext container)
     {
         Dictionary<(string Clause, object Element), (ClauseList List, int Count, ParserRuleContext First, ParserRuleContext Second)>? seen = null;
+        (int Rank, ParserRuleContext Clause)? latest = null;   // the element the figure prints LAST among those written so far
         for (int i = 0; i < container.ChildCount; i++)
         {
             if (container.GetChild(i) is not ParserRuleContext clause
@@ -90,17 +93,41 @@ internal sealed class ClosedFormatPass(EditionContext edition) : CursorFollowing
             seen[key] = seen.TryGetValue(key, out var prior)
                 ? (list, prior.Count + 1, prior.First, prior.Count == 1 ? clause : prior.Second)
                 : (list, 1, clause, clause);
+            if (list.RankOf(element) is not { } rank) continue;
+            // An EQUAL rank is a repeat, which the count below reports; only a strictly lower rank is out of order.
+            if (latest is { } last && rank < last.Rank) ReportOutOfOrder(container, list, clause, last.Clause);
+            else latest = (rank, clause);
         }
         if (seen is null) return;
         foreach (var (list, count, first, second) in seen.Values)
         {
             if (count < 2) continue;
             using var at = _edition.At(second);
-            string owner = OwnerName(container) is { Length: > 0 } n ? $" '{n}'" : "";
-            UnrepeatedElements.AtMostOnce(_edition, count, $"{list.Subject}{owner}",
-                $"the clause '{WrittenOpening(first)}'", list.Clause);
+            // A paragraph list (the identification division, the CONFIGURATION SECTION) names its elements
+            // "paragraph"s, as the closed-format refusal does; every other list holds clauses.
+            string noun = ClosedFormats.Of(first.GetType())?.Noun ?? "clause";
+            UnrepeatedElements.AtMostOnce(_edition, count, $"{list.Subject}{OwnerSuffix(container)}",
+                $"the {noun} '{WrittenOpening(first)}'", list.Clause, orderFree: list.Sequence is null);
         }
     }
+
+    /// <summary>ISO §5.2.1 — "The words, phrases, clauses, punctuation, and operands in each general format shall be
+    /// written in the compilation group in the sequence given in the general format, unless otherwise specified by
+    /// the rules of that format." Reported at <paramref name="clause"/>, the element written after
+    /// <paramref name="printedLater"/> although the figure prints it first (COBOLNET2987).</summary>
+    private void ReportOutOfOrder(ParserRuleContext container, ClauseList list, ParserRuleContext clause,
+        ParserRuleContext printedLater)
+    {
+        using var at = _edition.At(clause);
+        _edition.Error(DiagnosticCatalog.FormatElementOutOfOrder,
+            $"{list.Subject}{OwnerSuffix(container)}: '{WrittenOpening(clause)}' is written after "
+            + $"'{WrittenOpening(printedLater)}', but ISO §{list.Clause}'s general format prints it before — no rule "
+            + "of that format frees the order, so the elements shall be written in the sequence the format gives "
+            + "(§5.2.1)");
+    }
+
+    private static string OwnerSuffix(ParserRuleContext container)
+        => OwnerName(container) is { Length: > 0 } n ? $" '{n}'" : "";
 
     /// <summary>The first words of a clause as the programmer wrote them (at most 32 characters), to name it in the message.</summary>
     private static string WrittenOpening(ParserRuleContext clause)

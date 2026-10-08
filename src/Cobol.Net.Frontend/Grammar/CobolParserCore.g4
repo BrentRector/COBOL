@@ -213,7 +213,9 @@ commonProgramAttribute
 // REMARKS is the COBOL-74 one. ⚠ Their `~DOT+` / `(IDENTIFIER|STRINGLIT)+` bodies are ALSO unbounded token runs
 // and are CORRECT: what those removed paragraphs took was a COMMENT-ENTRY — arbitrary text by definition, which
 // is why ISO/IEC 1989:2023 defines no syntax for one anywhere. A sink over a COMMENT-ENTRY is right; a sink over
-// a CLAUSE or PARAGRAPH LIST is what this last alternative closes.
+// a CLAUSE or PARAGRAPH LIST is what this last alternative closes. `identificationParagraph*` lets the OPTIONS
+// paragraph be written twice where the figure brackets it once: ClosedFormatPass refuses the repeat from the
+// ClauseCardinalities row (COBOLNET2423; kb/Work PB1508 — OptionsBinder read only the first, in silence).
 identificationParagraph
     : optionsParagraph
     | authorParagraph
@@ -226,12 +228,19 @@ identificationParagraph
     ;
 
 // OPTIONS paragraph (COBOL-2002, ISO §11.9) — fully parsed into a structured clause tree (the model is consumed
-// program-wide; see CobolNet.Binding.OptionsModel / OptionsBinder). Each of the seven clauses begins with a
-// distinct keyword token, so `optionsClause+` is LL(1)-clean and order-independent (a superset of the spec's
-// fixed clause order). Per §11.9.3 the terminating separator period is present iff at least one clause is given;
-// no clause body contains a period, so the loop ends cleanly at the period.
+// program-wide; see CobolNet.Binding.OptionsModel / OptionsBinder). §11.9.2 (RENDERED, PDF p302 / folio 272) prints
+// `OPTIONS.`, seven SEPARATE brackets in a fixed sequence, and an independent `[.]` (kb/Work PB1508):
+// - ORDER AND REPETITION. Each clause begins with a distinct keyword token, so `optionsClause+` is LL(1)-clean, but it
+//   is a SUPERSET: §5.2.1 binds the printed sequence (no §11.9.3 rule frees it) and a bracket admits its clause once.
+//   Both halves are read from ONE table row (ClauseCardinalities, OptionsClauseContext → ClosedFormatPass:
+//   COBOLNET2987 out of order, COBOLNET2423 repeated) — a superset parse with a named diagnostic, never a raw
+//   COBOL0307 at the second clause.
+// - THE PERIOD. `[.]` is its own bracket, so with no clause it may still be written (`OPTIONS. .`); §11.9.3 SR1
+//   ("If any of the clauses are specified, then there shall be a terminating separator period") makes it required
+//   once a clause is written. The two alternatives below are exactly those two cases. No clause body contains a
+//   period, so the loop ends cleanly at it.
 optionsParagraph
-    : OPTIONS DOT (optionsClause+ DOT)?
+    : OPTIONS DOT (optionsClause+ DOT | DOT)?
     ;
 
 optionsClause
@@ -448,6 +457,9 @@ configurationSection
 // special-names-paragraph and repository-paragraph — four bracketed paragraphs, and nothing else. The last
 // alternative is the error production, NOT a vendor hook (see Core/CobolExpressions.g4#unrecognizedClause); the
 // DOT is written HERE because a PARAGRAPH is period-terminated and the shared production is not.
+// `configurationParagraph*` is order-free and repeatable, a SUPERSET of the figure's fixed sequence of once-only
+// brackets (§5.2.1, §5.2.6.2): ClosedFormatPass narrows it from the ClauseCardinalities row (COBOLNET2987 out of
+// order, COBOLNET2423 repeated; kb/Work PB1508), as it does the OPTIONS paragraph's clauses.
 configurationParagraph
     : sourceComputerParagraph
     | objectComputerParagraph

@@ -6314,6 +6314,21 @@ public static class DiagnosticCatalog
         + "the repeated clause or phrase.",
         "ISO §5.2.6.2 · §5.2.7");
 
+    /// <summary>COBOLNET2987 — an element of a general format whose printed sequence binds is written after one the
+    /// figure prints later (§5.2.1; kb/Work PB1508). The OPTIONS paragraph (§11.9.2) and the CONFIGURATION SECTION
+    /// (§12.3.2) print a fixed sequence of separate brackets and no rule of either frees the order; the grammar parses
+    /// them order-free and <c>ClosedFormatPass</c> reads the sequence from <c>ClauseCardinalities</c>.</summary>
+    public static readonly DiagnosticDescriptor FormatElementOutOfOrder = new(
+        "COBOLNET2987", "format-element-out-of-order", EditionSeverity.Error,
+        "A clause or paragraph is written ahead of one its general format prints before it. ISO §5.2.1: \"The words, "
+        + "phrases, clauses, punctuation, and operands in each general format shall be written in the compilation "
+        + "group in the sequence given in the general format, unless otherwise specified by the rules of that "
+        + "format.\" Where no rule of the format licenses any order — the OPTIONS paragraph (§11.9.2: ARITHMETIC, "
+        + "DEFAULT ROUNDED, ENTRY-CONVENTION, FLOAT-BINARY, FLOAT-DECIMAL, INITIALIZE, INTERMEDIATE ROUNDING) and the "
+        + "CONFIGURATION SECTION (§12.3.2: SOURCE-COMPUTER, OBJECT-COMPUTER, SPECIAL-NAMES, REPOSITORY) — write the "
+        + "elements in the printed sequence.",
+        "ISO §5.2.1");
+
     /// <summary>COBOLNET2424 — the OPTIONS paragraph's FLOAT-DECIMAL clause (§11.9.9), the §4.2.6 ¶3 warning a
     /// declined processor-dependent element owes. Annex A.3 item 13 makes the clause dependent "both on the
     /// capabilities of the processor and on support for the standard decimal floating-point usages", and neither

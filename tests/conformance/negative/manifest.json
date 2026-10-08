@@ -2482,7 +2482,13 @@
   "pb2079-baseconvert-alphanumeric-base",
   "pb2079-baseconvert-pointer-base",
   "pb2079-baseconvert-address-of-base",
-  "pb2079-baseconvert-function-base"
+  "pb2079-baseconvert-function-base",
+  "pb1508-options-clause-out-of-order",
+  "pb1508-options-clause-repeated",
+  "pb1508-options-initialize-section-repeated",
+  "pb1508-options-paragraph-repeated",
+  "pb1508-configuration-paragraph-out-of-order",
+  "pb1508-configuration-paragraph-repeated"
  ],
  "pending": []
 }

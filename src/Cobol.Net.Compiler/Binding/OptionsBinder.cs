@@ -50,6 +50,9 @@ internal static class OptionsBinder
         if (edition is { DialectLevel: < 2002 })
             return start;
 
+        // The clauses fold in written order; a clause written twice or out of the §11.9.2 sequence is refused by
+        // ClosedFormatPass from the ClauseCardinalities row (kb/Work PB1508), so a compile that reaches the model
+        // has each clause at most once.
         var model = start;
         foreach (var clause in options.optionsClause())
             model = Apply(model, clause, edition);
@@ -184,9 +187,7 @@ internal static class OptionsBinder
     private static OptionsInitialize InitializeOf(Core.OptionsInitializeClauseContext init, EditionContext? edition)
     {
         var target = init.optionsInitializeTarget();
-        OptionsSections sections = target.ALL() is not null
-            ? OptionsSections.All
-            : target.optionsInitializeSection().Aggregate(OptionsSections.None, (acc, s) => acc | SectionOf(s, edition));
+        OptionsSections sections = target.ALL() is not null ? OptionsSections.All : SectionsOf(target, edition);
 
         var fill = init.optionsInitializeFill();
         // §8.8.3.3 GR3: a concatenation-expression fill literal folds to its equivalent literal's raw text
@@ -242,6 +243,34 @@ internal static class OptionsBinder
         return int.TryParse(raw.AsSpan(2, 2), System.Globalization.NumberStyles.HexNumber,
                             System.Globalization.CultureInfo.InvariantCulture, out int b) ? (char)b : null;
     }
+
+    /// <summary>The storage-section targets of the INITIALIZE clause. ISO §11.9.10.2 encloses
+    /// <c>LOCAL-STORAGE | SCREEN | WORKING-STORAGE</c> in CHOICE INDICATORS inside braces, so §5.2.6.4 admits "any
+    /// single alternative … only once" (in any order): the grammar's <c>optionsInitializeSection+</c> is the
+    /// any-order half and each alternative's once-only half is read by the ONE reader,
+    /// <see cref="ChoiceIndicators.AtMostOnce{T}"/> (COBOLNET2104; kb/Work PB1508 — a bitwise OR folded
+    /// <c>WORKING-STORAGE WORKING-STORAGE</c> into one target in silence). The first occurrence of each is bound.</summary>
+    private static OptionsSections SectionsOf(Core.OptionsInitializeTargetContext target, EditionContext? edition)
+    {
+        var sections = OptionsSections.None;
+        foreach (var alternative in target.optionsInitializeSection().GroupBy(SectionWord))
+        {
+            var occurrences = alternative.ToArray();
+            Core.OptionsInitializeSectionContext first = occurrences[0];
+            if (edition is not null)
+            {
+                using var _ = edition.At(occurrences.Length > 1 ? occurrences[1] : first);   // the repeat, as ClosedFormatPass reports
+                first = ChoiceIndicators.AtMostOnce(edition, occurrences, "the INITIALIZE clause of the OPTIONS paragraph",
+                    alternative.Key, "11.9.10.2")!;
+            }
+            sections |= SectionOf(first, edition);
+        }
+        return sections;
+    }
+
+    /// <summary>The alternative a storage-section target is, as the figure spells it.</summary>
+    private static string SectionWord(Core.OptionsInitializeSectionContext s)
+        => s.LOCAL_STORAGE() is not null ? "LOCAL-STORAGE" : s.SCREEN() is not null ? "SCREEN" : "WORKING-STORAGE";
 
     /// <summary>One target of the OPTIONS INITIALIZE clause (ISO §11.9.10.2).
     /// <para>⛔ THE EXPLICIT <c>SCREEN</c> LEG IS REFUSED; THE <c>ALL</c> LEG IS NOT — and the standard itself
