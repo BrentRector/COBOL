@@ -17,16 +17,15 @@ public enum SpecialRegister { None, LinageCounter, LineCounter, PageCounter }
 /// 1:1 with the <c>dataReference</c> grammar rule: it holds the context and names the accessors, it computes NO
 /// semantic state (that belongs to the binder). A grammar-rule rename now breaks THIS file (a compile error)
 /// instead of drifting silently across the ~336 raw <c>GetText()</c> sites (P7 migrates the rest).
-/// <para>The subscript list (<see cref="Core.SubscriptPartContext"/>) and the reference modifier
-/// (<see cref="Core.RefModPartContext"/>) are reached through <see cref="Context"/>: both are parse nodes since D10
-/// removed the SUBSCRIPT lexer mode (kb/Work PB2113), read by the binder's <c>ReferenceResolver.ReadWritten</c>.</para>
+/// <para>The suffixes (qualification, the subscript list <see cref="Core.SubscriptPartContext"/> and the reference
+/// modifier <see cref="Core.RefModPartContext"/>) are not on the façade: they are parse nodes since D10 removed the
+/// SUBSCRIPT lexer mode (kb/Work PB2113), and the binder's <c>ReferenceResolver.ReadWritten</c> reads them off the
+/// raw context as the reference AS WRITTEN. The façade's former "has no suffix" test was deleted (kb/Work PB2193):
+/// <c>dataReferenceSuffix</c> carries qualification as well as subscripts, so that test could not tell a legal
+/// qualified reference from a subscripted one (kb/Work PB457).</para>
 /// </summary>
 public readonly struct DataReferenceCst(Core.DataReferenceContext ctx)
 {
-    /// <summary>The wrapped raw context — the escape hatch for reads not yet lifted onto the façade (the suffix
-    /// classify walk; P7).</summary>
-    public Core.DataReferenceContext Context => ctx;
-
     /// <summary>The special-register kind this reference names, else <see cref="SpecialRegister.None"/>.</summary>
     public SpecialRegister Register =>
           ctx.LINAGE_COUNTER() is not null ? SpecialRegister.LinageCounter
@@ -37,12 +36,6 @@ public readonly struct DataReferenceCst(Core.DataReferenceContext ctx)
     /// <summary>The base data-name text (the leading <c>cobolWord</c>), or <see langword="null"/> for a bare
     /// special register (whose <c>cobolWord</c>, if present, is a qualifier — see the register early-returns).</summary>
     public string? BaseName => ctx.cobolWord()?.GetText();
-
-    /// <summary>True when the reference carries NO suffix (no subscript / ref-mod / qualification) — the
-    /// no-side-effect OCCURS-DYNAMIC CAPACITY-register peek relies on this exact shape (data-model D9).</summary>
-    public bool HasNoSuffix => ctx.dataReferenceSuffix().Length == 0;
-
-    public SourceSpan Span => SourceSpan.Of(ctx);
 
     /// <summary>Non-invasive adoption: an existing call site passes the raw context unchanged.</summary>
     public static implicit operator DataReferenceCst(Core.DataReferenceContext c) => new(c);

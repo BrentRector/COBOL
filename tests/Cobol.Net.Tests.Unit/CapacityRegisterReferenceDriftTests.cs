@@ -12,8 +12,9 @@ namespace CobolNet.Tests.Unit;
 /// capacity, never storage — so whatever <c>ReferenceResolver.CapacityRegisterFor</c> refuses is not handed to a
 /// slower path: it is the END of resolution, and the general resolver then said COBOLNET1639 "is not defined"
 /// about a name ISO §13.18.38.3 SR30 declares. The old hook refused on two PARSE-shape conjuncts —
-/// <c>DataReferenceCst.HasNoSuffix</c> (which <c>dataReferenceSuffix</c> makes false for QUALIFICATION as well as
-/// for subscripts, so the legal <c>SET WS-CAP OF WS-TABLE TO 7</c> failed it) and the zero-index
+/// <c>DataReferenceCst.HasNoSuffix</c> (since deleted, kb/Work PB2193; <c>dataReferenceSuffix</c> made it false
+/// for QUALIFICATION as well as for subscripts, so the legal <c>SET WS-CAP OF WS-TABLE TO 7</c> failed it) and the
+/// zero-index
 /// <c>BuildTablePath</c> (null for every table with a table ancestor).
 ///
 /// <para><b>Why a source scan.</b> The properties these tests pin are not observable from behaviour: a second
@@ -64,13 +65,15 @@ public sealed class CapacityRegisterReferenceDriftTests
         Assert.Single(sites, s => s.StartsWith("ReferenceResolver.cs", StringComparison.Ordinal));
     }
 
-    /// <summary>⛔ The hook judges the WRITTEN reference, never the parse shape. <c>HasNoSuffix</c> back in
-    /// <c>CapacityRegisterFor</c> is the exact regression that deleted the qualified form: it cannot tell a
-    /// subscript (§13.18.38.3 SR31, refused) from a qualification (§8.4.2.2.3 SR2, legal).</summary>
+    /// <summary>⛔ The hook judges the WRITTEN reference, never the parse shape. A read of
+    /// <c>dataReferenceSuffix()</c> back in <c>CapacityRegisterFor</c> (the old façade <c>HasNoSuffix</c> test,
+    /// deleted by kb/Work PB2193, was exactly that read) is the regression that deleted the qualified form: it
+    /// cannot tell a subscript (§13.18.38.3 SR31, refused) from a qualification (§8.4.2.2.3 SR2, legal).</summary>
     [Fact]
     public void TheCapacityRegisterHook_ReadsTheWrittenReference_NotTheParseShape()
     {
         string body = MethodBody(File.ReadAllText(ReferenceResolverPath), "CapacityRegisterFor");
+        Assert.DoesNotContain("dataReferenceSuffix(", body, StringComparison.Ordinal);
         Assert.DoesNotContain("HasNoSuffix", body, StringComparison.Ordinal);
         Assert.Contains("ReadWritten(", body, StringComparison.Ordinal);
         // The §8.4.2.2 qualifier rule is the binder's ONE matcher, not a copy (kb/Work PB489).
