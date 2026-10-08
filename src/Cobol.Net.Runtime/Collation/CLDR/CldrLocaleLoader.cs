@@ -9,11 +9,7 @@ namespace CobolNet.Runtime.Collation.Cldr;
 /// The exception <see cref="CldrLocaleLoader.Load"/> throws when no CLDR collation file exists for a locale or any of
 /// its parents.
 /// </summary>
-public sealed class CldrLocaleNotFoundException(string localeName, string message) : Exception(message)
-{
-    /// <summary>The locale that was asked for.</summary>
-    public string LocaleName { get; } = localeName;
-}
+public sealed class CldrLocaleNotFoundException(string message) : Exception(message);
 
 /// <summary>
 /// The CLDR LOCALE LOADER: finds and parses the CLDR collation data of a locale — from a site directory
@@ -89,14 +85,7 @@ public static class CldrLocaleLoader
         {
             if (LoadExact(candidate) is { } data) return data;
         }
-        throw new CldrLocaleNotFoundException(localeName, $"no CLDR collation data for '{localeName}' or its parents ({DescribeSearch()})");
-    }
-
-    /// <summary>Try-form of <see cref="Load"/>.</summary>
-    public static bool TryLoad(string localeName, out CldrLocaleData? data)
-    {
-        try { data = Load(localeName); return true; }
-        catch (CldrLocaleNotFoundException) { data = null; return false; }
+        throw new CldrLocaleNotFoundException($"no CLDR collation data for '{localeName}' or its parents ({DescribeSearch()})");
     }
 
     /// <summary>The root file's data.</summary>
