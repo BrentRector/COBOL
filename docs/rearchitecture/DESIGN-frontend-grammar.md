@@ -1079,7 +1079,7 @@ generated visitor. The façade is for the *binder*.
 
 The frontend already has the good pieces: `Diagnostics/DiagnosticDescriptor` (a typed
 `{Code, Severity, MessageTemplate}` record) and `DiagnosticDescriptors` (a registry:
-`CBL0901`, `COBOL0303`, `COBOLNET0900`, …) — `Diagnostics/DiagnosticDescriptors.cs`. This is exactly the
+`COBOL0303`, `COBOLNET2072`, `CBL3620`, …) — `Diagnostics/DiagnosticDescriptors.cs`. This is exactly the
 model the *compiler* side lacks (its 163 codes are bare strings — the understandability-critique HIGH). The
 target:
 

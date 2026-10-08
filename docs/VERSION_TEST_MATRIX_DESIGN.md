@@ -154,8 +154,9 @@ the design (do not re-invent — `feedback_one_mechanism_per_job`):
 - **A `ConstructDialectStatus` registry** (survey recommendation): one table mapping each construct → per-edition
   severity {ERROR | WARNING | SILENT}. The registry is the code-side twin of the construct catalogue (§4) and is
   generated/checked against `VERSION_CHANGE_REFERENCE.md` so the doc and the compiler cannot drift.
-- **Version diagnostics:** wire the already-defined-but-unused `CBL3501/3502` (greenfield) + add "feature requires
-  COBOL-YYYY" / "removed in COBOL-YYYY" codes, mirroring legacy `CBL3601/3602/3607/3611…3618`.
+- **Version diagnostics:** the edition-gating band `COBOLNET0900–0999` (`CobolNet.Editions.EditionCodes`):
+  0900 "feature requires COBOL-YYYY", 0901 reserved word, 0902 "removed in COBOL-YYYY", 0903 obsolete/archaic flag,
+  reported through `ConstructRegistry.Check` — the greenfield successors of legacy `CBL3601/3602/3607/3611…3618`.
 
 **6.3 The matrix test (the payoff).** A parameterized xUnit `[Theory]` over the catalogue × editions:
 ```

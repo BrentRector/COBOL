@@ -1081,7 +1081,7 @@ fields beside four string constants (`NotImplemented`, `StrongType`, `Recognized
 `DeclinedOptionalElement`); the census's own data-ize rule fires (its measures are on the note). And its twin: `CobolNet.Frontend.Diagnostics.DiagnosticDescriptors` holds descriptors (`CBLnnnn`, `COBOLnnnn`, and twins
 whose code is another constant) of a second `DiagnosticDescriptor` record, `(Code,
 DefaultSeverity, MessageTemplate)`; and `CobolNet.Editions.EditionCodes` holds the four edition-band codes that
-`ConstructRegistry`, `CobolWordRule`, `VersionConformancePass` and the frontend catalog all read.
+`ConstructRegistry`, `CobolWordRule`, `VersionConformancePass` and the frontend's `CobolErrorListener` all read.
 *Target: data plus a generator, keeping every identity.* One data file,
 `src/Cobol.Net.Editions/Diagnostics/diagnostics.json`, holds every row of the three. The row schema is the union of the
 records, so nothing a descriptor carries is lost: `catalog` (`DiagnosticCatalog`, `DiagnosticDescriptors` or
@@ -1091,7 +1091,7 @@ records, so nothing a descriptor carries is lost: `catalog` (`DiagnosticCatalog`
 `DiagnosticCatalog.cs:3333,3344,3355`, and `EditionContext.cs:310` reads it to keep those declined optional elements
 inert under `--permissive`, so a schema without it would silently change behaviour the default-mode oracle never
 exercises), `annex`, `doc` (the XML summary), and **`twinOf`**: the frontend rows that are parse-layer twins of a
-catalog row or of `EditionCodes.Introduction` (`DiagnosticDescriptors.cs:510` and the ten after it) carry no `code` of
+catalog row (the eight `COBOLNETnnnn` fields of `DiagnosticDescriptors`) carry no `code` of
 their own but `twinOf: "<catalog>.<name>"`, and the generator emits the reference (`Code =
 DiagnosticCatalog.GoToFormatShape.Code`), so the code is written once and a twin round-trips exactly as the source
 spells it today. And **`family`**: catalog rows take their code from the private constant `NotImplemented`
