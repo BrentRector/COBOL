@@ -757,7 +757,8 @@
   "pb2095_bit_item_by_reference_area",
   "pb2096_global_formal_forward_area",
   "pb1940_strong_objref_group_content_returning",
-  "pb1508_options_period_bracket"
+  "pb1508_options_period_bracket",
+  "pb1430_operator_separator_spaces"
   ],
   "pending": []
 }

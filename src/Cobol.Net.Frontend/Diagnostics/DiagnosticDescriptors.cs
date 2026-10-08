@@ -548,8 +548,9 @@ public static partial class DiagnosticDescriptors
         DiagnosticSeverity.Error, "{0}");
 
     // ══════════════════════════════════════
-    // COBOLNET2631–2633: the §8.3.5 separator-context rules (kb/Work PB1394), decided post-lex by SeparatorRule over
-    // the source characters around each token and reported through the syntax-error listener beside 2419.
+    // COBOLNET2631–2633: the §8.3.5 separator-context rules (kb/Work PB1394), and COBOLNET2993: the §8.7.3 / §8.7.4
+    // operator spacing (kb/Work PB1430) — decided post-lex by SeparatorRule over the source characters around each
+    // token and reported through the syntax-error listener beside 2419.
     // ══════════════════════════════════════
     public static readonly DiagnosticDescriptor COBOLNET2631 = new(
         CobolNet.Editions.Diagnostics.DiagnosticCatalog.SeparatorCommaWithoutSpace.Code,
@@ -559,6 +560,15 @@ public static partial class DiagnosticDescriptors
         DiagnosticSeverity.Error, "{0}");
     public static readonly DiagnosticDescriptor COBOLNET2633 = new(
         CobolNet.Editions.Diagnostics.DiagnosticCatalog.SeparatorLiteralDelimiter.Code,
+        DiagnosticSeverity.Error, "{0}");
+    public static readonly DiagnosticDescriptor COBOLNET2993 = new(
+        CobolNet.Editions.Diagnostics.DiagnosticCatalog.SeparatorOperatorSpacing.Code,
+        DiagnosticSeverity.Error, "{0}");
+
+    // COBOLNET2994: an inline method invocation's empty parenthesis pair (kb/Work PB1430) — the grammar requires the
+    // argument list inside the optional parentheses, and CobolErrorStrategy names the refused shape.
+    public static readonly DiagnosticDescriptor COBOLNET2994 = new(
+        CobolNet.Editions.Diagnostics.DiagnosticCatalog.InlineInvocationEmptyArguments.Code,
         DiagnosticSeverity.Error, "{0}");
 
     // ══════════════════════════════════════

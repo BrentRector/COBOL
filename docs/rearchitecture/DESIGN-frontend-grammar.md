@@ -119,7 +119,9 @@ was mis-named: 90% dead-non-ISO and 10% live-OO. That surviving rule turned out 
 wrong: it matched `dataReference ( argumentList )` as a STATEMENT, a shape ISO defines nowhere, while the
 real §8.4.3.4 construct — the §8.4.3.1.2 Format 4 IDENTIFIER, led by the §8.7.4 `::` invocation operator
 — had no surface at all. It is now `inlineMethodInvocation` in `Core/CobolOO.g4`, an OPERAND alternative
-wherever `functionCall` is one (kb/Work PB428).
+wherever `functionCall` is one (kb/Work PB428). Its parenthesis pair, when written, holds at least one argument
+(the §8.4.3.4.2 brace repeats inside the one pair, unlike §8.4.3.2.2's bracketed function arguments), so
+`O :: "M" ( )` is refused by the grammar and named COBOLNET2994 by `CobolErrorStrategy` (kb/Work PB1430).
 
 ### 1.3 The context-sensitive word set is triplicated and hand-synced
 The set of tokens that are keywords in context but legal user-defined words elsewhere is maintained in
@@ -1388,7 +1390,11 @@ rules own; rule 3 — a DOT not followed by a space → COBOLNET2632 (a period i
 string is part of that token); rule 5 — every literal token of either mode (`LiteralTokens.Types`, the one set
 `LiteralScreenPass` also reads) whose opening delimiter is not preceded by a space, '(' or '==' or whose closing
 delimiter is not followed by a space, ',', ';', '.', ')' or '==' → COBOLNET2633, touching literals reported once.
-"Separator space" is the lexer's own `WS` set plus the start and end of the text. The parse-recovery hints that
+The operator clauses that state their own separator context are decided at the same site (kb/Work PB1430): §8.7.3's
+concatenation operator '&' and §8.7.4's invocation operator '::' "shall be immediately preceded and followed by a
+separator space" → COBOLNET2993, naming the side that touches; when that neighbour is a literal the operator owns the
+boundary and the literal's COBOLNET2633 stands down, so one missing space is one report. §8.7.1's arithmetic operators
+(with the unary-operator exception) are the next case here (kb/Work PB2017). "Separator space" is the lexer's own `WS` set plus the start and end of the text. The parse-recovery hints that
 guessed at rule 5 on a parse error (COBOL0301/0302) are gone: the rule has one home. It applies to the main
 compilation-group lex; the D2 keyword-omitted re-parse needs no second screen because every one of its tokens was
 already a SUBSCRIPT-mode token of the main lex.

@@ -5826,13 +5826,13 @@
   "ordinal": 5,
   "subject": "Identifier",
   "rule-digest": "0bccc2e21727",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineMethodInvocation; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineInvocationSegment",
-  "test-ref": "conformance:2002/pb428_inline_method_invocation",
+  "test-ref": "conformance:2002/pb428_inline_method_invocation; conformance:negative/pb428-inline-method-invocation-below-2002; conformance:negative/pb1430-inline-invocation-empty-arguments",
   "derivation": "",
-  "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1430 (registrar 15b). SR5 (cite.py --check 8.4.3.1.3 5) OK): Format 4 is the 8.4.3.4 inline invocation; the rule `objectReference inlineInvocationSegment+ refModPart*` exists and the spec-derived golden pb428 exercises nine positions (kb/Work PB428 landed); the below-2002 negative is conformance:negative/pb428-inline-method-invocation-below-2002. Probes under out/probe/ident with the pinned cobol.exe. || REFUTED: PARTIAL — The rule imports the 8.4.3.4.2 format, whose own verdict is DIVERGES. The format's argument brace group repeats inside ONE parenthesis pair, so at least one argument is required. inlineInvocationSegment is `(LPAREN argumentList? RPAREN)?`, so an empty pair is accepted and runs (an under-reject of the Format 4 shape). The pb428 golden covers the legal positions only.",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1430 landed (wave 1032 F). SR5 (cite.py --check 8.4.3.1.3 'Inline-invocation-1 is defined by 8.4.3.4, Inline method invocation.' OK): Format 4 imports the 8.4.3.4.2 format, and the refuter's PARTIAL was that format's DIVERGES (an empty parenthesis pair accepted). With FMT-8.4.3.4.2 now CONFORMS (argumentList required inside the optional parentheses; COBOLNET2994 for `O :: \"M\" ( )`), the imported shape is exact: golden pb428 exercises the legal positions, negative pb1430-inline-invocation-empty-arguments the refused one, and pb428-inline-method-invocation-below-2002 the 2002 introduction.",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.1.3-6",
@@ -57516,13 +57516,13 @@
   "ordinal": 0,
   "subject": "Inline method invocation",
   "rule-digest": "50be7393cb29",
-  "verdict": "DIVERGES",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineMethodInvocation; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineInvocationSegment; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#argument; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.InlineInvocation.cs#OoBindInlineInvocation",
-  "test-ref": "conformance:2002/pb428_inline_method_invocation",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineMethodInvocation; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#inlineInvocationSegment; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#argument; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.InlineInvocation.cs#OoBindInlineInvocation; src/Cobol.Net.Frontend/Parsing/CobolErrorStrategy.cs#IsEmptyInlineArgumentList; src/Cobol.Net.Frontend/Parsing/SeparatorRule.cs#Violations",
+  "test-ref": "conformance:2002/pb428_inline_method_invocation; conformance:2002/pb1430_operator_separator_spaces; conformance:negative/pb1430-inline-invocation-empty-arguments; conformance:negative/pb1430-invocation-operator-spacing; unit:InlineMethodInvocationOperandDriftTests.TheRuleMatchesThePrintedGeneralFormat",
   "derivation": "",
-  "editions": "2002, 2014, 2023, 85",
-  "notes": "kb/Work PB1430 (registrar 15b). Format: {object-class-name-1 | identifier-1} :: literal-1 [ ( {arith-expr-1|bool-expr-1|identifier-2|literal-2|OMITTED} ... ) ]. cite.py --check 8.4.3.4.2 'the inner braces select exactly one argument form, and the' OK (figure notes: '...' repeats the brace group inside ONE paren pair, so at least one argument). Both receiver arms, chaining, ref-mod tail and all five argument forms are present (golden pb428 + MethodOmittedArgumentTests OMITTED; probes p11 comma list N=0007, p13 arithmetic arg N=0006). DEFECT: inlineInvocationSegment is `COLONCOLON literal (LPAREN argumentList? RPAREN)?`, so an EMPTY list `A1 :: \"GETNAME\" ()` is accepted and runs (probe p2_emptyparens: W=ACCOUNT) - the format admits no empty parenthesis pair; expected a compile-time rejection. The drift test TheRuleMatchesThePrintedGeneralFormat only asserts 'argumentList' is present, not its cardinality. Sibling (not this row, §8.7.4): cite.py --check 8.7.4 'shall be immediately preceded and followed by a separator space' OK, yet conformance-test MethodOmittedArgumentTests.InlineInvocation_Omitted_ConditionTrueInMethod pins spaceless `O::\"CHK\"(OMITTED)` as accepted. || editions as written by the adjudicator: 2002, 2014, 2023 (OO facility; §8.4.3.4 absent from 85)",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1430 landed (wave 1032 F). Format rendered from the canonical PDF page 163 (printed folio 133): {object-class-name-1 | identifier-1} :: literal-1 [ ( {arithmetic-expression-1 | boolean-expression-1 | identifier-2 | literal-2 | OMITTED} ... ) ]. The bracket makes the parenthesised group optional, but the argument forms are a BRACE whose ellipsis repeats inside the one pair (cite.py --check 5.2.6.3 'one of the alternatives contained within the braces shall be explicitly specified' OK; 5.2.7 OK), so a written pair holds at least one argument. inlineInvocationSegment is now `COLONCOLON literal (LPAREN argumentList RPAREN)?`; `A1 :: \"GETNAME\" ( )` (which compiled and ran, W=ACCOUNT) is refused with COBOLNET2994 named by CobolErrorStrategy. The drift test pins the required list. The format's '::' punctuation carries the 8.7.4 separator-space rule (cite.py --check 8.7.4 'shall be immediately preceded and followed by a separator space' OK), now decided by SeparatorRule as COBOLNET2993 (with its 8.7.3 '&' twin); positive golden pb1430_operator_separator_spaces pins line-end separators and both argument separators.",
+  "state": "OK"
  },
  {
   "rule-id": "FMT-8.4.3.5.2",

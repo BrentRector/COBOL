@@ -20,7 +20,13 @@ namespace CobolNet.Frontend.Parsing;
 /// <item>rule 5 — "The opening delimiter shall be immediately preceded by a space, left parenthesis, or opening
 /// pseudo-text delimiter. The closing delimiter shall be immediately followed by one of the separators space, comma,
 /// semicolon, period, right parenthesis, or closing pseudo-text delimiter": <c>DISPLAY "AB"N</c>, <c>MOVE"AB" TO A</c>
-/// and <c>W"AB"</c> beside a data item W (<c>COBOLNET2633</c>).</item>
+/// and <c>W"AB"</c> beside a data item W (<c>COBOLNET2633</c>);</item>
+/// <item>the two operator clauses that state their OWN separator context — §8.7.3 "The concatenation operator is the
+/// COBOL character '&amp;', which shall be immediately preceded and followed by a separator space" and §8.7.4 "The
+/// invocation operator is the two contiguous COBOL characters '::', which shall be immediately preceded and followed by
+/// a separator space": <c>SPACE&amp;SPACE</c>, <c>O:: "M"</c> and <c>O ::"M"</c> (<c>COBOLNET2993</c>; kb/Work
+/// PB1430). §8.7.1's arithmetic operators state the same rule with a unary-operator exception and are not yet asked
+/// here (kb/Work PB2017).</item>
 /// </list>
 /// </summary>
 /// <remarks>
@@ -41,7 +47,13 @@ namespace CobolNet.Frontend.Parsing;
 /// DOT / COMMA / SEMICOLON token, so rules 2 and 3 cannot misfire on one ("except when appearing in a literal", and
 /// the PICMODE lexer owns the picture's own separators). A <c>;</c> with no space after it is a HIDDEN-channel token
 /// (<c>SEMICOLON</c>) precisely so this rule can see it; the parser never does.</para>
-/// <para>Edition-invariant: §8.3.5's text, and COBOL-85's, carry no edition qualifier.</para>
+/// <para>⚠ ONE REPORT PER BOUNDARY. An operator touching a literal breaks two rules at one boundary — §8.3.5 5) for the
+/// literal's delimiter and §8.7.3 / §8.7.4 for the operator. The operator's clause is the specific one (it names the
+/// very character that touches), so the operator reports the boundary and the literal's delimiter check stands down
+/// for it: <c>O ::"M"</c> is one COBOLNET2993, never a COBOLNET2633 beside it.</para>
+/// <para>Edition-invariant: §8.3.5's text, and COBOL-85's, carry no edition qualifier; §8.7.3 and §8.7.4 qualify no
+/// edition either (the operators themselves are 2002 introductions, which <c>VersionConformancePass</c> gates on
+/// recognition).</para>
 /// </remarks>
 public static class SeparatorRule
 {
@@ -53,11 +65,16 @@ public static class SeparatorRule
     public static IEnumerable<Violation> Violations(string text, IList<IToken> tokens)
     {
         int reportedCloseStop = -2;   // a literal's closing-delimiter violation already covers the boundary after it
-        foreach (var t in tokens)
+        for (int i = 0; i < tokens.Count; i++)
         {
+            var t = tokens[i];
             if (t.Channel == CobolLexer.ABSENT_DEBUG_LINE) continue;   // a debugging line that is a comment (kb/Work PB1705)
             switch (t.Type)
             {
+                case CobolLexer.AMPERSAND or CobolLexer.COLONCOLON:
+                    if (OperatorSpacingMessage(text, t) is { } message)
+                        yield return new(t, DiagnosticCatalog.SeparatorOperatorSpacing, message);
+                    break;
                 case CobolLexer.COMMA or CobolLexer.SEMICOLON:
                     if (!IsSeparatorSpace(CharAt(text, t.StopIndex + 1)) && !IsDecimalComma(text, t))
                         yield return new(t, DiagnosticCatalog.SeparatorCommaWithoutSpace,
@@ -73,12 +90,13 @@ public static class SeparatorRule
                     break;
                 default:
                     if (!LiteralTokens.Types.Contains(t.Type)) break;
-                    if (!OpeningDelimiterSeparated(text, t.StartIndex) && t.StartIndex - 1 != reportedCloseStop)
+                    if (!OpeningDelimiterSeparated(text, t.StartIndex) && t.StartIndex - 1 != reportedCloseStop
+                        && !IsOperatorTouching(tokens, i - 1, t.StartIndex - 1))
                         yield return new(t, DiagnosticCatalog.SeparatorLiteralDelimiter,
                             $"the literal {Abbreviated(t.Text)} begins immediately after '{(char)CharAt(text, t.StartIndex - 1)}' — "
                             + "ISO §8.3.5 rule 5 requires an opening delimiter to be immediately preceded by a space, a "
                             + "left parenthesis or an opening pseudo-text delimiter");
-                    if (!ClosingDelimiterSeparated(text, t.StopIndex))
+                    if (!ClosingDelimiterSeparated(text, t.StopIndex) && !IsOperatorTouching(tokens, i + 1, t.StopIndex + 1))
                     {
                         reportedCloseStop = t.StopIndex;
                         yield return new(t, DiagnosticCatalog.SeparatorLiteralDelimiter,
@@ -90,6 +108,33 @@ public static class SeparatorRule
             }
         }
     }
+
+    /// <summary>The §8.7.3 / §8.7.4 verdict on a concatenation or invocation operator: null when a separator space
+    /// immediately precedes AND follows it, otherwise the message naming the side (or sides) that touch.</summary>
+    private static string? OperatorSpacingMessage(string text, IToken op)
+    {
+        bool before = IsSeparatorSpace(CharAt(text, op.StartIndex - 1));
+        bool after = IsSeparatorSpace(CharAt(text, op.StopIndex + 1));
+        if (before && after) return null;
+        var (name, clause) = op.Type == CobolLexer.COLONCOLON
+            ? ("invocation operator", "§8.7.4")
+            : ("concatenation operator", "§8.7.3");
+        var (missing, fix) = (before, after) switch
+        {
+            (false, false) => ("preceded or followed", "on both sides of it"),
+            (false, true) => ("preceded", "before it"),
+            _ => ("followed", "after it"),
+        };
+        return $"the {name} '{op.Text}' is not immediately {missing} by a separator space — ISO {clause} requires it to be "
+            + $"immediately preceded and followed by a separator space; write a space {fix}";
+    }
+
+    /// <summary>Whether <paramref name="tokens"/>[<paramref name="at"/>] is a §8.7.3 / §8.7.4 operator whose own
+    /// characters include <paramref name="boundary"/> — a boundary that operator's report already covers.</summary>
+    private static bool IsOperatorTouching(IList<IToken> tokens, int at, int boundary) =>
+        (uint)at < (uint)tokens.Count
+        && tokens[at] is { Type: CobolLexer.AMPERSAND or CobolLexer.COLONCOLON } op
+        && boundary >= op.StartIndex && boundary <= op.StopIndex;
 
     /// <summary>The source character at <paramref name="index"/>, or -1 before the first or after the last.</summary>
     public static int CharAt(string text, int index) => (uint)index < (uint)text.Length ? text[index] : -1;

@@ -2489,7 +2489,10 @@
   "pb1508-options-initialize-section-repeated",
   "pb1508-options-paragraph-repeated",
   "pb1508-configuration-paragraph-out-of-order",
-  "pb1508-configuration-paragraph-repeated"
+  "pb1508-configuration-paragraph-repeated",
+  "pb1430-inline-invocation-empty-arguments",
+  "pb1430-invocation-operator-spacing",
+  "pb1430-concatenation-operator-spacing"
  ],
  "pending": []
 }

@@ -6521,6 +6521,30 @@ public static class DiagnosticCatalog
         + "period, right parenthesis or closing pseudo-text delimiter.",
         "ISO §8.3.5 5)");
 
+    /// <summary>COBOLNET2993 — a concatenation operator or invocation operator not immediately preceded and followed by
+    /// a separator space (kb/Work PB1430). §8.7.3: "The concatenation operator is the COBOL character '&amp;', which shall
+    /// be immediately preceded and followed by a separator space"; §8.7.4 says the same of the invocation operator
+    /// '::'. The lexer skips the separator space, so the parser sees <c>O::"M"</c> and <c>O :: "M"</c> as one token
+    /// run; decided post-lex by <c>SeparatorRule</c> from the characters beside the operator, which also owns the
+    /// boundary when the touching neighbour is a literal (one report, not a COBOLNET2633 beside it).</summary>
+    public static readonly DiagnosticDescriptor SeparatorOperatorSpacing = new(
+        "COBOLNET2993", "separator-operator-spacing", EditionSeverity.Error,
+        "A concatenation operator (&) or invocation operator (::) is not immediately preceded and followed by a "
+        + "separator space.",
+        "ISO §8.7.3 · §8.7.4");
+
+    /// <summary>COBOLNET2994 — an inline method invocation written with an empty parenthesis pair, <c>O :: "M" ( )</c>
+    /// (kb/Work PB1430). §8.4.3.4.2 brackets the whole parenthesised group (so it may be omitted) but encloses the five
+    /// argument forms in braces repeated by the ellipsis INSIDE the one pair, and §5.2.6.3 requires one alternative
+    /// of a brace group to be explicitly specified — so a written pair holds at least one argument. No edition admits
+    /// the shape, so the grammar refuses it (<c>inlineInvocationSegment</c>) and <c>CobolErrorStrategy</c> names it.
+    /// Contrast the function-identifier, whose argument group is bracketed inside its parentheses (§8.4.3.2.2).</summary>
+    public static readonly DiagnosticDescriptor InlineInvocationEmptyArguments = new(
+        "COBOLNET2994", "inline-invocation-empty-arguments", EditionSeverity.Error,
+        "An inline method invocation is written with an empty parenthesis pair; the parentheses, when written, "
+        + "hold at least one argument. Omit them to invoke the method without arguments.",
+        "ISO §8.4.3.4.2 / §5.2.6.3");
+
     /// <summary>COBOLNET2634 — a file-name is specified in a second SELECT clause of the same factory, function, object
     /// or program (ISO §12.4.5.2 SR2; kb/Work PB1077). The second entry used to replace the first in the binder's name
     /// map, so the program ran against whichever ASSIGN target came last. Reported by

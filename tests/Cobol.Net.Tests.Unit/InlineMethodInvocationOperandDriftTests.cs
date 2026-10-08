@@ -163,7 +163,8 @@ public sealed class InlineMethodInvocationOperandDriftTests
     /// <summary>The construct's own shape, pinned to the §8.4.3.4.2 general format rendered from the
     /// canonical PDF (page 163 / printed folio 133): the receiver is INVOKE's own <c>objectReference</c> (one
     /// activation mechanism — §8.4.3.4.4 GR1 defines the inline form AS that INVOKE), the operator is the
-    /// §8.7.4 <c>::</c> token, literal-1 is required, and the parenthesised argument list is optional.</summary>
+    /// §8.7.4 <c>::</c> token, literal-1 is required, and the parenthesised argument list is optional — but a written
+    /// parenthesis pair holds at least one argument.</summary>
     [Fact]
     public void TheRuleMatchesThePrintedGeneralFormat()
     {
@@ -176,7 +177,9 @@ public sealed class InlineMethodInvocationOperandDriftTests
         Assert.True(rules.TryGetValue("inlineInvocationSegment", out string? seg));
         Assert.Contains("COLONCOLON", seg);
         Assert.Contains("literal", seg);
-        Assert.Contains("argumentList", seg);
+        // kb/Work PB1430: the argument BRACE repeats INSIDE the one parenthesis pair (§5.2.6.3, §5.2.7), so a written
+        // pair holds at least one argument — the list is required inside the optional group, never `argumentList?`.
+        Assert.Matches(@"\(\s*LPAREN\s+argumentList\s+RPAREN\s*\)\s*\?", seg);
 
         // The §8.7.4 invocation operator is a LEXER token of its own — without it the construct is
         // punctuation, which is precisely the state PB428 measured.

@@ -326,12 +326,19 @@ objectReferenceUsage
 // ref-mod of a ref-mod). The two parenthesised tails stay disjoint on the COLON exactly as they do for
 // functionCall, so no predicate is needed.
 // ⚠ THE SEGMENT IS ITS OWN RULE so each `::` carries ITS OWN argument list: with the group written inline the
-// generated context would expose FLAT `literal()` and `argumentList()` lists, and `A::"M"::"N"(X)` could not
+// generated context would expose FLAT `literal()` and `argumentList()` lists, and `A :: "M" :: "N" (X)` could not
 // say which method the one argument belongs to.
+// ⛔ A WRITTEN PARENTHESIS PAIR HOLDS AT LEAST ONE ARGUMENT, so `argumentList` is REQUIRED inside it (kb/Work
+// PB1430). The figure brackets the WHOLE `( … )` group but puts a BRACE, not a bracket, round the argument
+// forms, and the `…` repeats that brace inside the one pair (§5.2.7): §5.2.6.3 braces select exactly one alternative, so
+// the list is one or more arguments and `O :: "M" ( )` is no spelling the format prints (no edition admits it, so
+// it leaves the grammar rather than reaching a binder screen). Contrast the function-identifier (§8.4.3.2.2),
+// whose argument group is BRACKETED inside its parentheses — `FUNCTION RANDOM ()` is printed there, which is why
+// `functionCall` keeps `functionArgList?` and this rule does not.
 inlineMethodInvocation
     : objectReferenceAtom inlineInvocationSegment+ refModPart*
     ;
 
 inlineInvocationSegment
-    : COLONCOLON literal (LPAREN argumentList? RPAREN)?
+    : COLONCOLON literal (LPAREN argumentList RPAREN)?
     ;

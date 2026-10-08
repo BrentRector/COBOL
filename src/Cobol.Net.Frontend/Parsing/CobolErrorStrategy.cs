@@ -243,6 +243,15 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
         // STATE (the half-built or just-completed SEARCH context), never from a scan for a keyword.
         if (SearchFormatShapeMessage(recognizer, token, stream) is { } searchMsg)
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOLNET2269, searchMsg, 0));
+        // ⛔ 0f. AN INLINE METHOD INVOCATION'S EMPTY PARENTHESIS PAIR (kb/Work PB1430). `inlineInvocationSegment`
+        // requires its argumentList inside the optional parentheses, so `O :: "M" ( )` arrives here, at the '(' or
+        // the ')'. Outranks 0a for the same reason 0d does: the empty pair is the cause wherever the parse gives up.
+        if (IsEmptyInlineArgumentList(stream, token))
+            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOLNET2994,
+                "An inline method invocation's parenthesis pair holds at least one argument: ISO §8.4.3.4.2 brackets "
+                + "the whole parenthesised group but encloses the argument forms in BRACES repeated by the ellipsis "
+                + "inside the one pair, and one alternative of a brace group shall be explicitly specified "
+                + "(ISO §5.2.6.3). Omit the parentheses when the method is invoked without arguments.", -1));
 
         if (token.Type is CobolLexer.CORRESPONDING or CobolLexer.CORR && IsInRule(ruleStack, "moveStatement"))
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOLNET2173,
@@ -372,6 +381,23 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
         var prev = GetToken(stream, token.TokenIndex - 1);
         if (prev?.Type == CobolLexer.TO) prev = GetToken(stream, token.TokenIndex - 2);
         return prev?.Type == CobolLexer.GO ? GoToFormats.DiagnoseWrittenShape(0, hasDepending: true) : null;
+    }
+
+    /// <summary>Whether the failure is at the empty parenthesis pair of an inline method invocation segment —
+    /// <c>:: literal-1 ( )</c> (§8.4.3.4.2), with <paramref name="token"/> its '(' or its ')'. The §8.7.4 operator has
+    /// no other role (§8.3.5 rule 7 makes '::' one lexical unit), so the four default-channel tokens are this format and
+    /// nothing else. GROUPING-PAREN-ONLY: a '(' after literal-1 is always the plain token — the lexer retypes a '(' to
+    /// FNARG_LPAREN only after <c>FUNCTION</c> function-name (§8.4.3.2.3 SR6) and to REF_LPAREN only after a word that
+    /// could name a data item (<c>OnDefaultLParen</c>), and a literal is neither (the same reasoning as <c>InvocationSite.OfInlineSegment</c>).</summary>
+    private static bool IsEmptyInlineArgumentList(ITokenStream stream, IToken token)
+    {
+        var open = token.Type == CobolLexer.LPAREN ? token
+            : token.Type == CobolLexer.RPAREN ? PreviousDefault(stream, token.TokenIndex) : null;
+        if (open?.Type != CobolLexer.LPAREN || NextDefault(stream, open.TokenIndex)?.Type != CobolLexer.RPAREN)
+            return false;
+        var name = PreviousDefault(stream, open.TokenIndex);
+        return name is not null && LiteralTokens.Types.Contains(name.Type)
+            && PreviousDefault(stream, name.TokenIndex)?.Type == CobolLexer.COLONCOLON;
     }
 
     // ── The SEARCH general-format complement (kb/Work PB446) ──

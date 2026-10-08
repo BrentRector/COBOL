@@ -15,7 +15,9 @@ namespace CobolNet.Tests.Unit;
 /// followed by a space"; 3) a period only "when followed by a space"; 5) "The opening delimiter shall be immediately
 /// preceded by a space, left parenthesis, or opening pseudo-text delimiter. The closing delimiter shall be immediately
 /// followed by one of the separators space, comma, semicolon, period, right parenthesis, or closing pseudo-text
-/// delimiter"; §8.3.3.2.3 SR5 / §8.3.3.5.3 SR4 / §8.3.3.4.3 SR3 hexadecimal digits, §8.3.3.4.3 SR2 '0' or '1'.
+/// delimiter"; §8.3.3.2.3 SR5 / §8.3.3.5.3 SR4 / §8.3.3.4.3 SR3 hexadecimal digits, §8.3.3.4.3 SR2 '0' or '1'; and
+/// §8.7.3 / §8.7.4 (kb/Work PB1430): the concatenation operator '&amp;' and the invocation operator '::' "shall be
+/// immediately preceded and followed by a separator space".
 /// </summary>
 public sealed class SeparatorRuleTests
 {
@@ -59,9 +61,38 @@ public sealed class SeparatorRuleTests
     [InlineData("MOVE\"AB\" TO A.\n", "COBOLNET2633")]          // opening delimiter
     [InlineData("IF \"AB\"=A DISPLAY \"Y\" END-IF.\n", "COBOLNET2633")]
     [InlineData("DISPLAY W\"AB\".\n", "COBOLNET2633")]          // a prefix-looking word: IDENTIFIER W + literal
-    [InlineData("MOVE O::\"M\" TO A.\n", "COBOLNET2633")]
     [InlineData("DISPLAY \"AB\"(1:1).\n", "COBOLNET2633")]      // '(' is no closing separator
+    // §8.7.3 / §8.7.4 — the operator owns its boundary, so a touching literal adds no COBOLNET2633 beside it.
+    [InlineData("MOVE O::\"M\" TO A.\n", "COBOLNET2993")]
+    [InlineData("MOVE O:: \"M\" TO A.\n", "COBOLNET2993")]     // no literal involved: only §8.7.4 can see it
+    [InlineData("MOVE O ::\"M\" TO A.\n", "COBOLNET2993")]
+    [InlineData("MOVE SPACE&SPACE TO W.\n", "COBOLNET2993")]   // figurative operands (§8.8.3.2 SR1): no delimiter
+    [InlineData("MOVE K1 &K2 TO W.\n", "COBOLNET2993")]        // constant-names (§13.10.3 SR2)
+    [InlineData("MOVE \"AB\"&\"CD\" TO W.\n", "COBOLNET2993")]  // both sides touch literals: still one report
+    [InlineData("MOVE \"AB\" &\"CD\" TO W.\n", "COBOLNET2993")]
     public void NonconformingSeparator_IsReportedOnce(string text, string code) => Assert.Equal([code], Codes(text));
+
+    [Theory] // §8.7.3 / §8.7.4: a separator space on each side — a line end is one, and so is the end of the text
+    [InlineData("MOVE O :: \"M\" TO A.\n")]
+    [InlineData("MOVE O :: \"M\" (1) :: \"N\" TO A.\n")]
+    [InlineData("MOVE O\n:: \"M\" TO A.\n")]
+    [InlineData("MOVE O ::\n\"M\" TO A.\n")]
+    [InlineData("MOVE \"AB\" & \"CD\" & SPACE TO W.\n")]
+    [InlineData("MOVE \"AB\"\n&\n\"CD\" TO W.\n")]
+    public void SpacedOperators_AreNotReported(string text) => Assert.Empty(Codes(text));
+
+    [Theory] // the message names the side that touches, and the clause of the operator it is
+    [InlineData("MOVE O:: \"M\" TO A.\n", "§8.7.4", "write a space before it")]
+    [InlineData("MOVE O ::\"M\" TO A.\n", "§8.7.4", "write a space after it")]
+    [InlineData("MOVE SPACE&SPACE TO W.\n", "§8.7.3", "write a space on both sides of it")]
+    public void OperatorSpacing_NamesTheClauseAndTheSide(string text, string clause, string fix)
+    {
+        var tokens = new CommonTokenStream(new CobolLexer(new AntlrInputStream(text)));
+        tokens.Fill();
+        var v = Assert.Single(SeparatorRule.Violations(text, tokens.GetTokens()));
+        Assert.Contains(clause, v.Message);
+        Assert.EndsWith(fix, v.Message);
+    }
 
     [Fact] // two literals that touch: the closing delimiter's report covers the boundary — one diagnostic, not two
     public void AdjacentLiterals_ReportTheBoundaryOnce() => Assert.Equal(["COBOLNET2633"], Codes("DISPLAY \"A\"'B'.\n"));

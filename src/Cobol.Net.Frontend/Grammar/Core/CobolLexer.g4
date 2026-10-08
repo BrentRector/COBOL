@@ -1216,16 +1216,16 @@ SLASH       : '/' ;
 // colons. With no rule here the whole of §8.4.3.1.2 Format 4 was unwritable in EVERY identifier position: the
 // lexer stopped at the first ':' and the parser reported punctuation. MUST precede COLON in source order for
 // readability — ANTLR's longest-match already decides it, and CobolLexerModeDriftTests pins the token dump.
-// ⚠ §8.7.4's "shall be immediately preceded and followed by a separator space" is NOT enforced at the token
-// level, exactly as §8.7.3's identical sentence about '&' is not (see AMPERSAND below): the parser sees the
-// skipped-WS stream, and '::' has no other lexical role, so `O::"M"` and `O :: "M"` are the same token run.
+// ⚠ §8.7.4's "shall be immediately preceded and followed by a separator space" is not a TOKEN-level rule: the
+// parser sees the skipped-WS stream, and '::' has no other lexical role, so `O::"M"` and `O :: "M"` are the same
+// token run here. The rule is decided post-lex, from the characters beside the token, by SeparatorRule
+// (COBOLNET2993, kb/Work PB1430) — the one site for every separator-context rule, and AMPERSAND's too.
 COLONCOLON  : '::' ;
 COLON       : ':' ;
 // The concatenation operator (ISO §8.7.3): the COBOL character '&', joining literals into one literal
-// (§8.8.3). The §8.7.3 separator-space requirement ("immediately preceded and followed by a separator
-// space") is not enforced at the token level — the parser sees the skipped-WS stream, the same leniency
-// every other separator-adjacent operator (e.g. '::' §8.7.4) already has. '&' has no other lexical role,
-// so the token is unambiguous with or without the spaces.
+// (§8.8.3). '&' has no other lexical role, so the token is unambiguous with or without spaces; the §8.7.3
+// requirement that it be "immediately preceded and followed by a separator space" is decided post-lex by
+// SeparatorRule (COBOLNET2993, kb/Work PB1430), exactly as '::''s §8.7.4 twin is.
 AMPERSAND   : '&' ;
 // A ';' with no space after it (the §8.3.5 separator `; ` is FNARG_SEPARATOR above). It is no separator (§8.3.5 rule
 // 2), and SeparatorRule reports it (COBOLNET2631) — so it rides the HIDDEN channel, where that post-lex rule sees it and
