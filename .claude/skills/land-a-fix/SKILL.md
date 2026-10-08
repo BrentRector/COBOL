@@ -65,7 +65,9 @@ Use the `gate` skill. Read the verdict line, then commit as a separate call.
 
 ## 7. DEVLOG, commit, push
 
-- `DEVLOG.md`: insert a new entry directly beneath the ordering note (DESCENDING, newest first). Header
+- `DEVLOG.md`: insert a new entry directly beneath the ordering note (DESCENDING, newest first) with
+  `python scripts/prepend-devlog.py <entry.md>`, the one inserter: the file is CRLF, so it splices bytes and prints
+  the expected and actual diffstat (additions only). Header
   `## Entry NNN — YYYY-MM-DD HH:MM TZ — Title`, stamped from `date "+%Y-%m-%d %H:%M %Z"`. Write narratively —
   what changed, why, what broke, what was learned. Log the failures too. One entry per LANDING ON MAIN, not per
   commit (owner 2026-10-08, kb/Work PB2605): `push-main.sh` refuses a landing whose range adds no new, stamped,

@@ -50,6 +50,8 @@ public sealed class ArchCensusDriftTests
                      "a census type the assembly lacks FAILS the run",
                      "an EMPTY built assembly FAILS the run",
                      "a script no file but itself names is unreferenced",
+                     "a census record is a generated reader, never a live caller, on every OS",
+                     "a frozen evidence record is never judged by a caller query",
                      "a drift literal naming a missing path or file is dangling",
                  })
         {

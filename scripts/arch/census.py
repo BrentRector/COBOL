@@ -57,6 +57,12 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 SCHEMA = 1
 RECORD_DIR = Path("docs/rearchitecture/evidence/arch-census")
+# The frozen evidence tree (owner decision kb/Work/PB785; its own README states the directory rule): a record there
+# is written once, when its experiment or measurement ends, and kept as that evidence; a later result supersedes it
+# with a `superseded_by` marker, never a deletion. Its reader is the decision or report it serves, never a caller, so
+# the caller query cannot measure a record dead and the census does not judge one (kb/Work PB2231, PB2232). The census
+# records themselves live inside it.
+EVIDENCE_DIR = Path("docs/rearchitecture/evidence")
 HOST = Path("tools/ArchCensus")
 # The record lives in the frozen evidence directory and keeps its convention (docs/DOC_INDEX.md; kb/Work/PB785).
 FROZEN_BANNER = (
@@ -87,7 +93,10 @@ RESPONSIBILITY_MIN_METHODS = 3  # a method-name subject names a responsibility w
 # ── THE DEAD-ARTIFACT POLICY ───────────────────────────────────────────────────────────────────────────────────
 # A reader is any tracked text file but the artifact itself. Two kinds of mention are NOT a caller or a reader:
 HISTORY = {"DEVLOG.md"}                        # the history narrative (CLAUDE.md rule 6)
-GENERATED_READERS = (str(RECORD_DIR) + "/",)   # census records list every artifact they measure
+# Census records list every artifact they measure. A tracked path is always `/`-separated, so the prefix is the POSIX
+# form: `str(RECORD_DIR)` is backslashed on Windows, matched nothing, and counted a record as a LIVE reader of every
+# artifact it found dead (kb/Work PB2234's sweep).
+GENERATED_READERS = (RECORD_DIR.as_posix() + "/",)
 REGISTER = "kb/"                               # a kb/Work mention counts only while its note is open
 CLOSED_STATUSES = {"landed", "retired", "discharged", "closed", "superseded", "duplicate"}
 # Files read by a tool or a person BY CONVENTION, never by name (git, MSBuild, dotnet, GitHub, the harness):
@@ -319,7 +328,7 @@ def artifact_class(rel: str, projects: set[str]) -> str | None:
         return None
     if "/" not in rel:
         return "root-file"
-    if rel.startswith(str(RECORD_DIR) + "/"):
+    if rel.startswith(EVIDENCE_DIR.as_posix() + "/"):
         return None
     for cls, prefixes in ARTIFACT_CLASSES.items():
         if rel.startswith(prefixes):
@@ -540,7 +549,8 @@ def build_record(sha: str, date: str, scope: dict, raw: dict, population: list[d
             "reach": {**REACH_RULES_EXTRA, **raw["reachRules"]},
             "deadArtifacts": {
                 "classes": "script: tracked files under scripts/ and tools/ (submodules excluded); doc: tracked "
-                           "docs/**/*.md (census records excluded); root-file: tracked repository-root files; "
+                           "docs/**/*.md (the frozen evidence tree docs/rearchitecture/evidence/ excluded: its "
+                           "records are kept as evidence, kb/Work/PB785); root-file: tracked repository-root files; "
                            "test-scaffold: a test type with no test method and no user; drift-literal: a drift-test "
                            "string naming a path or file that exists nowhere",
                 "query": "a caller is a mention of the basename (the parent-qualified name when two tracked files "
@@ -761,6 +771,15 @@ def self_test() -> int:
             artifact_reach("README.md", corpus, ambiguous) == "conventional"
             and got["scripts/rr/rr-README.txt"] == "conventional"
             and got["scripts/rr/LICENSE/NOTES.txt"] == "conventional", str(got))
+
+    # The tracked-path prefixes are `/`-separated on every OS (a backslashed prefix matched nothing on Windows).
+    record = RECORD_DIR.as_posix() + "/a02b.findings.json"
+    arm("a census record is a generated reader, never a live caller, on every OS",
+        classify_reader(record, build_corpus(Path("."), [])) == "generated", record)
+    evidence = EVIDENCE_DIR.as_posix() + "/fleet-optimization/2026-10-03-spike.md"
+    arm("a frozen evidence record is never judged by a caller query; any other doc is",
+        artifact_class(evidence, set()) is None and artifact_class(RECORD_DIR.as_posix() + "/x.md", set()) is None
+        and artifact_class("docs/rearchitecture/plan.md", set()) == "doc", evidence)
 
     def lit(line: int, text: str, kind: str) -> dict:
         return {"file": "t/XDriftTests.cs", "line": line, "text": text, "kind": kind}

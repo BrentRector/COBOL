@@ -77,7 +77,9 @@ Every finding is a `kb/Work` note (CLAUDE.md rule 8), never a list in this docum
   - clone families (`roslyn-analysis`'s type-2 detector);
   - unreachable members, measured, never deduced (`engineering-standards`);
   - dead artifacts beyond code: scripts, configuration, docs, test scaffolds and drift-test literals with no caller
-    or reader, measured by a caller query (the Delete program PB2119's input).
+    or reader, measured by a caller query (the Delete program PB2119's input). The frozen evidence tree
+    (`docs/rearchitecture/evidence/`, kb/Work/PB785) is not judged: a record there is kept as evidence and a later
+    result supersedes it with a `superseded_by` marker, never a deletion (kb/Work PB2231, PB2232).
   R0's instruments are kb/Work PB2115 (census), PB2116 (oracle capture) and PB2117 (performance baseline, which is
   also kb/Work A6's instrument: one mechanism, one place).
 - **God-class candidates.** Any type over ~800 lines across its partials, or with more than one reason to change.

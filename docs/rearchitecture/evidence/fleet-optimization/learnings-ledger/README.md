@@ -19,7 +19,11 @@ parent directory.
   The next run reads DEVLOG entries with numbers ABOVE the latest `consolidated_through_entry`.
 - **`candidates.jsonl`**, one line per candidate:
   `{"id": "C<n>", "run", "theme", "title", "text", "source_entries": [DEVLOG entry numbers], "sources": [...]}`.
-  The ids are stable and never reused.
+  The ids are stable and never reused. Run `consolidation-1` wrote its lines without `text`: its candidates' bodies
+  (problem, root cause, fix, evidence) are in `consolidation-1-candidates.md`, matched by title. Steps 3 and 6 below
+  read them there.
+- **`consolidation-1-candidates.md`**, the full text of run `consolidation-1`'s 145 candidates, as drafted (the
+  withdrawn LEARNINGS.md that `watermark.json` names). It is the only copy of those bodies, so it is kept.
 - **`verdicts.jsonl`**, one line per decision:
   `{"id", "run", "date", "verdict": "VETTED|UNPROVEN|REFUTED", "validator": {...}, "refuter": {...}, "evidence",
   "missing", "contradiction", "correction"}`.
