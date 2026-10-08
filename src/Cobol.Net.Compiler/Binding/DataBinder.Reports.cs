@@ -72,9 +72,10 @@ public sealed class ReportModel
     /// <summary>§13.18.39.4 GR5's assumed page width.</summary>
     public const int DefaultPageWidth = 999;
 
-    /// <summary>The report line width: the FD's fixed RECORD CONTAINS when present, else the widest field extent
+    /// <summary>The report line width: the record size the FD's RECORD clause establishes in any of its three formats
+    /// (<see cref="FileModel.RecordClause"/>, upper operand) less the CODE characters, else the widest field extent
     /// (column + image width − 1) over the report (the §13.18.39.4 GR5 page-width default 999 is a MAXIMUM, not
-    /// a record length). Computed post-build.</summary>
+    /// a record length). A line wider than this is cut when recorded. Computed post-build.</summary>
     public int LineWidth { get; set; } = 1;
 
     /// <summary>The RD's CODE clause (ISO §13.18.12), or null — the characters every logical record this report
@@ -1726,10 +1727,13 @@ public sealed partial class DataBinder
     /// GR12c/GR12d STEP line → its anchor + its displacement, the anchors seeded as the engine seeds them. Null
     /// when every line can be absent. <paramref name="present"/> names the lines to walk instead — the §13.18.35.3 SR6 d)
     /// screen asks it for a presentation in which a chosen set of conditional lines is present (null: the
-    /// unconditional lines, the floor no presentation can lift).</summary>
-    private static int? MinimumLastLine(ReportGroupModel g, ReportModel model, Func<ReportLineModel, bool>? present = null)
+    /// unconditional lines, the floor no presentation can lift). <paramref name="seed"/> is the last line of the group
+    /// printed BEFORE this one in the same run of groups, when there is one (a control heading below an OR PAGE heading
+    /// follows it, §13.18.57.4 GR7 d) 2.): the walk starts from that line, so a relative first line is placed after it
+    /// instead of at FIRST DETAIL, and with no walked line the seed is the answer.</summary>
+    private static int? MinimumLastLine(ReportGroupModel g, ReportModel model, Func<ReportLineModel, bool>? present = null, int? seed = null)
     {
-        int? pos = null;
+        int? pos = seed;
         var anchors = new Dictionary<int, int>();
         foreach (var l in g.Lines)
         {
@@ -1778,12 +1782,23 @@ public sealed partial class DataBinder
     /// heading REACHES — "the line after the last line of" an OR PAGE control heading or the page footing — is taken
     /// at that group's MINIMUM reach (<see cref="MinimumLastLine"/>: its unconditional lines, placed as the engine
     /// places them), the widest region the group's own PRESENT WHEN clauses leave open. The screen is a syntax-rule
-    /// screen: a line outside the widest region is outside every presentation's.</para></summary>
+    /// screen: a line outside the widest region is outside every presentation's. A heading's last line is walked
+    /// from the last line of the nearest OR PAGE heading ABOVE it (every page advance prints those first, GR6 c)),
+    /// so the d) 2./3./4. limits of a group below two OR PAGE headings sit below both of them (kb/Work PB2513).</para></summary>
     private static (int Upper, int Lower) GroupLimits(ReportGroupModel g, ReportModel model)
     {
-        int AfterHeading(ReportGroupModel h) => MinimumLastLine(h, model) is { } last ? last + 1 : model.FirstDetail;
         var controlHeadings = model.Groups.Where(x => x.Kind == ReportGroupKindModel.ControlHeading && x.ControlLevel >= 0).ToList();
         var orPage = controlHeadings.Where(x => x.OrPage).ToList();
+        // The last line of a control heading at its UPPERMOST: every OR PAGE heading above it is printed before it on
+        // every page advance (§13.18.57.4 GR6 c)), so its first line follows the nearest such heading's last line
+        // instead of standing at FIRST DETAIL (§13.18.35.4 GR5 b) 3. — the first body group on a page), and so on up the
+        // chain (the d) 2./d) 3. limits "the line following the last line of" a heading below another one).
+        int? HeadingReach(ReportGroupModel h)
+        {
+            var above = orPage.Where(x => x.ControlLevel < h.ControlLevel).OrderByDescending(x => x.ControlLevel).FirstOrDefault();
+            return MinimumLastLine(h, model, null, above is null ? null : HeadingReach(above));
+        }
+        int AfterHeading(ReportGroupModel h) => HeadingReach(h) is { } last ? last + 1 : model.FirstDetail;
         // GR7 d) 1.–4.: the OR PAGE headings push the body groups below them down; absent any, GR7 c) is FIRST DETAIL.
         int BodyUpper()
         {
@@ -4336,8 +4351,13 @@ public sealed partial class DataBinder
                     ScreenReportColumnArrangement(model, ln, arrangementReported);
                 }
             // §13.18.12.4 GR2 — the CODE characters "are not included in the descriptions of the lines in the report,
-            // but are included in the logical record size": a fixed RECORD CONTAINS is the code PLUS the line.
-            model.LineWidth = model.File?.RecordContains is { } record
+            // but are included in the logical record size": the record is the code PLUS the line. The record's size is
+            // the maximum the RECORD clause establishes (§14.9.30.4 GR6) in ANY of its three formats (§13.18.43.4 GR6
+            // integer-1, GR7 integer-3, GR18 integer-5; kb/Work PB2519), the one reading FileModel.RecordClause gives
+            // every consumer.
+            // A column past it is cut from the record (the Annex A.1 159) latitude, docs/CONFORMANCE.md DOC-A.1-159) —
+            // the occupancy GR4 reads is NOT cut with it (ReportLineImage), kb/Work PB1934.
+            model.LineWidth = model.File?.RecordClause?.Upper is { } record
                 ? Math.Max(1, record - (model.Code?.Length ?? 0)) : widest;
         }
         // SR4 e) is asked of the references of EVERY report at once: a chain may leave one report description and

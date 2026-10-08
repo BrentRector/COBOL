@@ -1,0 +1,18 @@
+LINE 01 [PG        ]
+LINE 02 [Y=1       ]
+LINE 03 [M=1       ]
+LINE 04 [D 1       ]
+LINE 05 [D 2       ]
+LINE 06 [D 3       ]
+LINE 07 [D 4       ]
+LINE 08 [TM1       ]
+(page)
+LINE 01 [PG        ]
+LINE 02 [     TY1  ]
+LINE 03 [Y=2       ]
+LINE 04 [M=1       ]
+LINE 05 [D 5       ]
+LINE 06 [TM1       ]
+(page)
+LINE 01 [PG        ]
+LINE 02 [     TY2  ]

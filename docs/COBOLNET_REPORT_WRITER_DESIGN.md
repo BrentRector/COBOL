@@ -368,7 +368,13 @@ off-by-one through every later counter check.
   a SUM entry's printable face now goes through the same place (which is what GR4's "moved, according to the
   general rules of the MOVE statement" asks for). An ambiguous or mis-qualified reference is **COBOLNET2145**;
   the counter's own profile (§13.18.54.4 GR1 — signed, digits from the entry's PICTURE) is
-  `PicInfo.SumCounterItem`, emitted beside the printable items' `NumProfile`s.
+  `PicInfo.SumCounterItem`, emitted beside the printable items' `NumProfile`s. **Its usage is DISPLAY** (kb/Work
+  PB1943, PB2520; the implementor's choice, GR1 states none — CONFORMANCE.md A.4.11): a signed `S9(n)V9(m)` DISPLAY
+  item, trailing overpunch, so §8.4.3.3.3 SR1 admits a reference modifier (`CF-T (1:2)`, after the subscripts of a
+  repeating counter — `ReferenceResolver.SumCounterFor` runs the same `ReadScreenedRefMod` / `RefModView` tail every
+  identifier does, and the view is the counter's `NumericImagePlace` character image) and every size consumer
+  (FUNCTION LENGTH) reads the digit count. A view over engine state answers `Place.OwnsStorageCell` false, so no
+  image-backing fact (`MarkImageForced`) is ever recorded for its register item.
 - **A REPEATING ENTRY'S SUM COUNTER IS A TABLE, ONE COUNTER PER OCCURRENCE** (kb/Work PB1271). §13.18.54.4 GR8 a)
   adds each occurrence of a repeating addend "into the corresponding occurrence of the sum counter", GR10 speaks of
   "the corresponding sum counter" of an absent occurrence, and all three §13.15.4 GR3 repetition vehicles are OCCURS
@@ -436,10 +442,13 @@ off-by-one through every later counter check.
   so such an addition's closure is a BLOCK that declares the same counter locals for the occurrence it adds, by the
   one `EmitVaryingCounters` the compose uses (`ReportItemOccurrence.VaryingDependent`).
 - **The FD side**: `FileModel.ReportNames` (the §13.18.46 REPORT clause, captured in `BindFileSection`);
-  a report file is an FD with a non-empty list — legally record-less (§9.1.22). `FileModel.RecordContains`
-  captures the fixed Format-1 RECORD CONTAINS for the line width; otherwise the width is the widest field
+  a report file is an FD with a non-empty list — legally record-less (§9.1.22). `FileModel.RecordClause.Upper`
+  is the record's size in ANY of the three RECORD formats (integer-1, integer-3, integer-5; §13.18.43.4 GR6, GR7,
+  GR18, kb/Work PB2519) and gives the line width (less the CODE); otherwise the width is the widest field
   extent (column + image width − 1) — the §13.18.39.4 GR5 page-width default 999 is a maximum, not a record
-  length, and the legacy's hardcoded 132 was arbitrary.
+  length, and the legacy's hardcoded 132 was arbitrary. A column past the record is cut from the record (Annex
+  A.1 159 latitude, CONFORMANCE.md DOC-A.1-159), but `ReportLineImage` keeps the column occupancy EC-REPORT-COLUMN-OVERLAP
+  reads up to the PAGE width, so the cut never decides whether the exception is raised (kb/Work PB1934).
 - **Counters** (§8.4.3.15; kb/Work PB1049, PB1456): `ReportWriterBinder.CounterExpr` intercepts LINE-/PAGE-COUNTER in
   `FieldOperand`/`RefExpr` ahead of name resolution (the LINAGE-COUNTER idiom); the OF/IN `cobolWord` is the report-name
   qualifier. ONE resolution, `CounterReportOf`, answers which report a counter names, for both directions and both
@@ -589,8 +598,8 @@ identifier-1 as the WRITTEN reference, kept the way the SOURCE clause keeps its 
 reference-modified identifier is live, its value bound in the procedure phase through the one sending-operand
 resolution, kb/Work PB1292; a reference-modified one needs integer-literal bounds, CONFORMANCE.md §3) is registered on the engine with
 `CobolReport.SetCode(Func<string>)`, and the engine prefixes every line it writes with the characters in force (GR1; the
-compose returns the line alone, GR2, so `RECORD CONTAINS` is the code PLUS the line — `ReportModel.LineWidth` gives the
-code's length up). The one evaluation is `CobolReport.EvaluateCode` (GR3 — "at the start of the processing for each body
+compose returns the line alone, GR2, so the RECORD clause's size is the code PLUS the line — `ReportModel.LineWidth` gives the
+code's length up, and a line wider than that is cut at it). The one evaluation is `CobolReport.EvaluateCode` (GR3 — "at the start of the processing for each body
 group, either during page advance processing … or whenever page advance processing is not performed"): from
 `AdvancePage` at §14.9.16.4 GR6 c) — after the page footing, which is therefore written with the OLD value — from
 `PresentBody` for a body group that took no advance, and from the first GENERATE (whose report and page headings precede
@@ -653,8 +662,12 @@ without integer-1) is COBOLNET2709. The TYPE clause's control rows are `{CONTROL
 §13.18.57.2): `ReportGroupModel.OrPage` → the engine's `ReportGroup.OrPage`, and `CobolReport.AdvancePage(causing)` ends
 with `PresentOrPageHeadings` (§13.18.57.4 GR6 c): every OR PAGE heading, major → minor, as the first body group of the
 new page via `PresentBody(reprint: true)` — no page-fit test, NEXT GROUP or SUM reset; the page advance of a control
-heading reprints only the headings above it, and the proviso for a control footing is applied as written). The GR7 d)
-upper limits are realised by placement, not modelled as limits. **The COLUMN LEFT/CENTER/RIGHT alignment
+heading reprints only the headings above it, and that of a control footing at level j the headings at level j and
+above, not those below it: the proviso's "lower control level" is the HEADING's level, the reading GR7 d) 4. and
+IBM's Report Writer agree on, kb/Work PB1927). The GR7 d) upper limits are modelled as limits
+(`DataBinder.GroupLimits`, the §13.18.35.3 SR6 c) screen): a control heading below an OR PAGE heading, a detail and a
+control footing sit after the last line of that heading, which `HeadingReach` walks from the last line of the nearest
+OR PAGE heading above it instead of from FIRST DETAIL (kb/Work PB2513). **The COLUMN LEFT/CENTER/RIGHT alignment
 phrase (§13.18.14 F1, kb/Work PB1220)** is `reportColumnAlignment : LEFT | CENTER | RIGHT`, written optional in
 `reportColumnClause` although the printed diagram shows a brace, because SR9 licenses its omission ("LEFT is
 assumed") — with CENTER a context-sensitive token (§8.10; cobol-words.json). **The keyword prefixes of the LINE,

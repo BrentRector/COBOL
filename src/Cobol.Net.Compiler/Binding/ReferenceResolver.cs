@@ -649,7 +649,9 @@ public sealed partial class ReferenceResolver(DataBinder data)
             if (item.Pic is not { IsCharacterFormNumeric: true }) return null;   // THE ONE character-form predicate
             // P5.7: the bind-time wrap decision reads the COLLECTED early facts (same mid-bind timing the
             // deleted flag had — MarkRefModStoreImage records the SAME item during this statement's bind).
-            if (!data.IsImageBackedEarly(item) && inner is not RedefViewPlace) inner = new NumericImagePlace(inner);
+            // (A view over engine state has no cell to be image-backed: Place.OwnsStorageCell, kb/Work PB1943.)
+            if ((!inner.OwnsStorageCell || !data.IsImageBackedEarly(item)) && inner is not RedefViewPlace)
+                inner = new NumericImagePlace(inner);
         }
         // National/boolean items reference-modify in their OWN character positions (§8.4.3.3 GR1/GR5a — a
         // national position is one UTF-16 char, a bit position one '0'/'1' char, under D-N1/D-B1); alphanumeric,
@@ -1967,8 +1969,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// <see cref="DataBinder.QualifierWalk"/> a data item's own ancestors go through, over
     /// <see cref="ReportSumModel.Qualification"/>. (The model it replaced — "a level-01-free item whose only
     /// available qualifier is its report" — was false, so `TOT OF CF1` was refused and two same-named counters
-    /// of one report could not be told apart.) A reference with a reference modification is not a counter
-    /// reference here: the name falls through to ordinary resolution, which names the rule it breaks.</para>
+    /// of one report could not be told apart.) A reference-modified counter is a counter reference like any other
+    /// and takes the ordinary reference-modification tail after its subscripts (kb/Work PB1943).</para>
     /// <para>⛔ A REPEATING ENTRY'S COUNTER IS A TABLE (kb/Work PB1271). Its occurrences are a
     /// <see cref="ReportSumFamily"/> whose register carries one OCCURS level per repetition vehicle, so the written
     /// subscripts go through the ONE <see cref="ReadSubscripts"/> — §8.4.2.3.3 SR3's count, SR5's "Each table
@@ -1982,11 +1984,24 @@ public sealed partial class ReferenceResolver(DataBinder data)
     {
         if (!data.SumCounters.ContainsKey(name)) return null;
         var written = ReadWritten(dref);
-        if (written.RefModCount > 0) return null;   // reference-modified
         if (SumCounterFamilyFor(dref, name, written.Qualifiers, report) is not ({ } rep, { } family)) return null;
+        // §8.4.3.3.3 SR3 — the count screen every identifier entry runs (ScreenRefModCount), asked of the counter too.
+        if (!ScreenRefModCount(dref, written, name)) return RefResolution.Refused(DataBinder.WrittenText(dref));
         if (ReadSubscripts(dref, family.Register, written.SubscriptGroup, out var indexExprs) is { } refusal)
             return refusal;
-        return RefResolution.Resolved(SumCounterPlace(rep, family, indexExprs), "");
+        var counter = SumCounterPlace(rep, family, indexExprs);
+        if (written.RefModCount == 0) return RefResolution.Resolved(counter, "");
+        // ⛔ A REFERENCE-MODIFIED COUNTER TAKES THE ONE REFERENCE-MODIFICATION TAIL (kb/Work PB1943), after its
+        // subscripts like every item: §8.4.3.3.3 SR1 admits "a numeric data item of usage display or national", and the
+        // counter's register IS one (PicInfo.SumCounterItem — GR1 states no usage, so DISPLAY is the implementor's
+        // determination, docs/CONFORMANCE.md A.4.11). The same admission (ReadScreenedRefMod) and the same view
+        // (RefModView: the counter's DISPLAY character image, GR1's digits) as every other numeric item. This used
+        // to return null here, which sent the reference to ordinary resolution, where a sum counter is not in
+        // ByName: COBOLNET1639 "'CF-T(1:2)' is not defined", naming a rule the program had not broken.
+        if (ReadScreenedRefMod(dref, written, counter.Item, out var refModRefusal) is not { } spec) return refModRefusal;
+        return RefModView(counter.Item, counter, spec) is { } view
+            ? RefResolution.Resolved(view, "")
+            : RefResolution.Deferred(DeferredShape.NumericRefModSubstrate, DataBinder.WrittenText(dref));
     }
 
     /// <summary>The place of one counter occurrence of <paramref name="family"/>: its rendered one-based subscripts

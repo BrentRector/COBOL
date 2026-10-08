@@ -2131,7 +2131,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // integer-5, or format 2's integer-3. A format-2 clause with no TO phrase establishes none — §13.18.43.4
         // GR10 defers to "the greatest number of bytes described for a record in that file" and this file
         // describes none — and neither does an absent clause, which §13.4.5.3 SR3 a) / §13.18.43.3 SR1 forbid.
-        int? max = file.Varying?.Max ?? file.RecordContains;
+        int? max = file.RecordClause?.Upper;   // the one reading of the clause's upper operand, in all three formats (PB2519)
         if (max is not > 0)
         {
             Edition.Error(DiagnosticCatalog.RecordLessFdNoRecordSize, $"file description entry '{fdName}': it "

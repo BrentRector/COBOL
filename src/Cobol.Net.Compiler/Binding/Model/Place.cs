@@ -103,6 +103,16 @@ public abstract record Place
     /// fixed half asks <see cref="ImageCapable"/> (the OPERAND), the variable-length half the entry's own
     /// current-extent composer.</summary>
     public bool BoundaryImageCapable => ImageCapable || Item.CurrentExtentImageCapable;
+
+    /// <summary>True when this place is a cell of PROGRAM STORAGE, which can be promoted to keep its character
+    /// image (<c>DataBinder.MarkImageForced</c>); false for a VIEW over engine state — a report's sum counter, its
+    /// PAGE-COUNTER, the CAPACITY register and the other implicitly-defined registers — whose value the engine owns
+    /// and whose <see cref="Item"/> is a synthetic register profile, not a declared item. The image-backing facts are
+    /// keyed by that item, so a fact recorded for a view's register item would describe storage that does not exist
+    /// and then steer the reference-modification view away from the numeric-image wrap the view needs
+    /// (kb/Work PB1943: <c>MOVE "00" TO CF-T (1:2)</c> followed by <c>CF-T (3:)</c> sliced the counter's number as
+    /// though it were a string). Decorators forward.</summary>
+    public virtual bool OwnsStorageCell => true;
 }
 
 /// <summary>
@@ -127,6 +137,9 @@ public abstract record PlaceDecorator(Place Inner) : Place
 
     /// <inheritdoc/>
     public override bool TransferImageCapable => Inner.TransferImageCapable;
+
+    /// <inheritdoc/>
+    public override bool OwnsStorageCell => Inner.OwnsStorageCell;
 }
 
 /// <summary>
@@ -847,6 +860,9 @@ public sealed record NatImagePlace(Place Inner) : PlaceDecorator(Inner);
 public sealed record CapacityRegisterPlace(AccessPath Table, DataItem RegisterItem) : Place
 {
     /// <inheritdoc/>
+    public override bool OwnsStorageCell => false;
+
+    /// <inheritdoc/>
     public override PicInfo? Pic => RegisterItem.Pic;
 
     /// <inheritdoc/>
@@ -873,6 +889,9 @@ public sealed record CapacityRegisterPlace(AccessPath Table, DataItem RegisterIt
 public sealed record ReportSumCounterPlace(
     int ReportIndex, int CounterId, DataItem RegisterItem, int Depth = 0, IReadOnlyList<Position>? Subscripts = null) : Place
 {
+    /// <inheritdoc/>
+    public override bool OwnsStorageCell => false;
+
     /// <inheritdoc/>
     public override PicInfo? Pic => RegisterItem.Pic;
 
@@ -901,6 +920,9 @@ public sealed record ReportSumCounterPlace(
 public sealed record ReportPageCounterPlace(int ReportIndex, DataItem RegisterItem, int Depth = 0) : Place
 {
     /// <inheritdoc/>
+    public override bool OwnsStorageCell => false;
+
+    /// <inheritdoc/>
     public override PicInfo? Pic => RegisterItem.Pic;
 
     /// <inheritdoc/>
@@ -927,6 +949,9 @@ public enum DebugRegisterMember { Item, Line, Name, Sub1, Sub2, Sub3, Contents }
 /// </summary>
 public sealed record DebugRegisterPlace(DataItem RegisterItem, DebugRegisterMember Member) : Place
 {
+    /// <inheritdoc/>
+    public override bool OwnsStorageCell => false;
+
     /// <inheritdoc/>
     public override PicInfo? Pic => RegisterItem.Pic;
 
@@ -958,6 +983,9 @@ public sealed record DebugRegisterPlace(DataItem RegisterItem, DebugRegisterMemb
 /// </summary>
 public sealed record ExceptionObjectPlace(DataItem RegisterItem) : Place
 {
+    /// <inheritdoc/>
+    public override bool OwnsStorageCell => false;
+
     /// <inheritdoc/>
     public override PicInfo? Pic => RegisterItem.Pic;
 

@@ -1361,11 +1361,13 @@ public sealed class CobolReport(
     /// <list type="bullet">
     /// <item>causing a CONTROL HEADING at level j: that heading prints itself on the new page, as does every
     /// heading below it in the same break, so only the headings ABOVE j (more major) are the "in addition" ones.</item>
-    /// <item>causing a CONTROL FOOTING at level j: the proviso — a heading that is more major than the footing's
-    /// level is skipped (the footing is at a LOWER control level than the heading), so only a heading at the
-    /// footing's level or below it (more minor) is reprinted. ⚠ The proviso is applied as written; §13.18.57.4 GR7 d) 4.
-    /// gives such a footing an upper limit after the headings at its own level or higher, a rule about line
-    /// placement that this engine does not model (docs/CONFORMANCE.md A.4.11).</item>
+    /// <item>causing a CONTROL FOOTING at level j: the headings at level j and every HIGHER level (more major) are
+    /// reprinted, the headings BELOW j (more minor) are skipped. ⚠ The proviso's "lower control level" is elliptical
+    /// and its referent is the HEADING's level: "not before a control footing at a lower control level" read with
+    /// the footing as the referent would skip the headings of the groups the break leaves OPEN, which §13.18.57.4
+    /// GR7 d) 4. contradicts by giving such a footing an upper limit after "the lowest-level control heading with
+    /// an OR PAGE phrase at the same level as the control footing, or higher" (docs/CONFORMANCE.md A.4.11, kb/Work
+    /// PB1927).</item>
     /// <item>causing a detail (or any other body group): every OR PAGE heading.</item>
     /// </list></summary>
     private void PresentOrPageHeadings(ReportGroup causing)
@@ -1376,7 +1378,7 @@ public sealed class CobolReport(
             bool skip = causing.Kind switch
             {
                 ReportGroupKind.ControlHeading => ch.ControlLevel >= causing.ControlLevel,
-                ReportGroupKind.ControlFooting => ch.ControlLevel < causing.ControlLevel,
+                ReportGroupKind.ControlFooting => ch.ControlLevel > causing.ControlLevel,
                 _ => false,
             };
             if (!skip) PresentBody(ch, reprint: true);
@@ -1704,7 +1706,7 @@ public sealed class CobolReport(
 public sealed class ReportLineImage
 {
     private readonly char[] _chars;
-    private readonly bool[] _used;
+    private bool[] _used;
 
     internal ReportLineImage(int width)
     {
@@ -1714,7 +1716,9 @@ public sealed class ReportLineImage
     }
 
     /// <summary>Does any column in [<paramref name="start"/>, <paramref name="start"/> + <paramref name="length"/>)
-    /// already belong to a printable item? Columns past the line's width hold nothing to overlap.</summary>
+    /// already belong to a printable item? The occupancy reaches as far as the page width lets an item go
+    /// (<see cref="Write"/>), not as far as the record: GR4 is stated over the report line's column positions, so two
+    /// items overlapping past the record's cut overlap all the same (kb/Work PB1934).</summary>
     internal bool Overlaps(int start, int length)
     {
         int end = Math.Min(start + length, _used.Length);
@@ -1723,14 +1727,18 @@ public sealed class ReportLineImage
         return false;
     }
 
-    /// <summary>Write <paramref name="image"/> from column index <paramref name="start"/>, cut at the line's width
-    /// and at <paramref name="limit"/> columns (the page width, §13.18.14.4 GR5), marking each column used.</summary>
+    /// <summary>Write <paramref name="image"/> from column index <paramref name="start"/>. Each column up to
+    /// <paramref name="limit"/> (the page width, §13.18.14.4 GR5) is marked used, because the line a printable item
+    /// belongs to is bounded by the page width and not by the record (GR4's occupancy); only the TEXT is cut at the
+    /// line's width, the record the report writes (§13.18.43.4 GR6/GR7/GR18; Annex A.1 159), docs/CONFORMANCE.md).</summary>
     internal void Write(int start, string image, int limit)
     {
-        int end = Math.Min(Math.Min(start + image.Length, _chars.Length), limit);
-        for (int i = start; i < end; i++)
+        int reach = Math.Min(start + image.Length, limit);
+        if (reach > _used.Length) Array.Resize(ref _used, reach);
+        int cut = Math.Min(reach, _chars.Length);
+        for (int i = start; i < reach; i++)
         {
-            _chars[i] = image[i - start];
+            if (i < cut) _chars[i] = image[i - start];
             _used[i] = true;
         }
     }

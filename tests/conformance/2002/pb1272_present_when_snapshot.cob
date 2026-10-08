@@ -37,6 +37,10 @@
       *> resets, +1 -> 1. Fails with "CNT=07" if a control footing whose
       *> every line is absent skips its end-of-group processing.
       *> Only non-blank lines are displayed, with their page line.
+      *> A sum counter is a signed USAGE DISPLAY item (docs/CONFORMANCE.md A.4.11, kb/Work PB1943: 13.18.54.4 GR1
+      *> gives it no usage and a sign), so DISPLAY CNT shows the digits with the operational sign on the last one,
+      *> as for any signed DISPLAY item: positive 1, 3, 4 are "0A", "0C", "0D" in the default IBM overpunch
+      *> convention (--sign-encoding ibm); the values are the derivation's 1, 3, 4, 1.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1272T.
        ENVIRONMENT DIVISION.

@@ -459,7 +459,7 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
             // receiver has to be able to hold one whichever way the test goes).
             if (move.Stores[i].Kind is not MoveKind.FigurativeToNumericImage
                 && MoveClassifier.ZeroLengthItemRoute(move.Stores[i].Sender, t) is null) continue;
-            if (t is not (RedefViewPlace or NumericImagePlace) && t.Item.Class is null
+            if (t is not (RedefViewPlace or NumericImagePlace) && t.OwnsStorageCell && t.Item.Class is null
                 && t.Item.Pic is { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display })   // CARRIAGE, not image form (kb/Work PB646)
                 ctx.Data.MarkImageForced(t.Item);   // the collected image fact
         }
@@ -552,7 +552,7 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     private void MarkRefModStoreImage(IReadOnlyList<Place> targets)
     {
         foreach (var t in targets)
-            if (t is RefModPlace rm
+            if (t is RefModPlace { OwnsStorageCell: true } rm
                 && rm.Item is { Class: null, Pic: { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display } } item)   // CARRIAGE, not image form (kb/Work PB646)
                 ctx.Data.MarkImageForced(item);   // the collected image fact
     }

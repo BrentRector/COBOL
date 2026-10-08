@@ -775,12 +775,20 @@ public sealed record PicInfo(
     /// decimal digits in the sum counter, both integral and fractional, is derived from the corresponding number
     /// of digits, excluding insertion editing characters, in the PICTURE clause of the entry containing the SUM
     /// clause. The sum counter is signed, whether or not the corresponding PICTURE clause has an operational
-    /// sign." The counter is engine state, never storage, so the realization is the native two's-complement
-    /// integer the engine accumulates in — <paramref name="digits"/>/<paramref name="scale"/> taken from the
-    /// entry's own analyzed PICTURE, and SIGNED unconditionally per GR1's last sentence.
-    /// <para>USAGE BINARY, not a fixed-width binary usage: GR1 derives the counter's capacity from the digit
-    /// COUNT, which is <see cref="NumericTruncation.DigitCount"/>, while COMP-5 and the BINARY-* family hold
-    /// their container's native range instead.</para>
+    /// sign." The counter is engine state, never storage, so its VALUE is the native integer the engine
+    /// accumulates in — <paramref name="digits"/>/<paramref name="scale"/> taken from the entry's own analyzed
+    /// PICTURE, and SIGNED unconditionally per GR1's last sentence.
+    /// <para>⛔ ITS USAGE IS DISPLAY — implementor latitude, recorded in docs/CONFORMANCE.md A.4.11 (kb/Work PB1943,
+    /// PB2520). GR1 gives the counter a category (numeric), a digit count and a sign, and NO usage; the standard
+    /// states a usage wherever it makes a conceptual item one (§14.9.1.4 GR7: DATE "behaves as if it had been
+    /// described as an unsigned elementary integer data item of usage display"), so the choice is the implementor's. DISPLAY is the one the neighbours
+    /// make (Micro Focus sizes the counter "by the PICTURE clause" in character positions) and the only one under
+    /// which the counter has CHARACTER positions at all: §8.4.3.3.3 SR1 admits reference modification of "a numeric
+    /// data item of usage display or national", and FUNCTION LENGTH, LENGTH OF and every other size consumer then
+    /// read the digit count GR1 derives (a PIC 9999 counter is 4 positions, never the binary size 2). It is the
+    /// profile of <c>PIC S9(digits)V9(scale)</c> USAGE DISPLAY with the default operational sign — trailing, not
+    /// separate, so the last digit carries the sign in the processor's overpunch convention — and the capacity is
+    /// the PICTURE's digit count (<see cref="NumericTruncation.DigitCount"/>), as it was under BINARY.</para>
     /// <para>⛔ THE DIGIT COUNT IS THE PICTURE'S, NOT A CARRIER'S (kb/Work PB1666). The engine accumulates in an
     /// <c>Int128</c> (<c>CobolReport.SumEntry</c>), the carrier <see cref="ClrType"/> gives any 19–38-digit
     /// numeric item, so every counter a numeric or numeric-edited PICTURE can describe (≤ 31 digit positions,
@@ -791,8 +799,8 @@ public sealed record PicInfo(
     public static PicInfo SumCounterItem(int digits, int scale)
     {
         int d = System.Math.Clamp(digits, 1, 38);
-        return new PicInfo(PicCategory.Numeric, Usage.Binary, Length: d, Digits: d, Scale: scale, Signed: true)
-            { SignKind = SignKindFor(Usage.Binary, signed: true, sign: null) };
+        return new PicInfo(PicCategory.Numeric, Usage.Display, Length: d, Digits: d, Scale: scale, Signed: true)
+            { SignKind = SignKindFor(Usage.Display, signed: true, sign: null) };
     }
 
     /// <summary>The C# type used to store this item's value.</summary>

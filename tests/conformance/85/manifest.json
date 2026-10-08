@@ -395,6 +395,7 @@
   "pb2087_by_reference_group_aliasing",
   "pb2089_native_argument_area_formal",
   "pb2113_subscript_list_separators",
+  "pb1943_sum_counter_ref_mod",
   "pb397_sequence_placement_legal",
   "pb1954_report_level_hierarchy_legal",
   "pb2518_redefines_only_redefinitions_between"

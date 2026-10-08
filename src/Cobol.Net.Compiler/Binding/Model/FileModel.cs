@@ -380,8 +380,9 @@ public sealed class FileModel
     /// <summary>integer-1 of a Format 1 <c>RECORD CONTAINS integer-1</c> clause (ISO §13.18.43.2) — a count of
     /// BYTES (§13.18.43.4 GR1: "Each integer in a RECORD clause specifies a record size in terms of bytes") — or
     /// null when the clause is absent or variable-length. It SIZES THE FILE: <see cref="RecordWidth"/> reads it
-    /// (§13.18.43.4 GR6: "Integer-1 specifies the number of bytes contained in each record in the file"), and a
-    /// report file's line width prefers it over the computed field extent (COBOLNET_REPORT_WRITER_DESIGN §4).</summary>
+    /// (§13.18.43.4 GR6: "Integer-1 specifies the number of bytes contained in each record in the file"). A report
+    /// file's line width reads the clause's upper operand in every format through <see cref="RecordClause"/>
+    /// (COBOLNET_REPORT_WRITER_DESIGN §4).</summary>
     public int? RecordContains { get; set; }
 
     /// <summary>How a diagnostic NAMES the entry that describes this file: a sort-merge file description

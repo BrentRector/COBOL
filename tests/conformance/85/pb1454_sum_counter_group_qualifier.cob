@@ -15,6 +15,10 @@
       *> above a counter a qualifier, so TOT1 OF CF1 and TOT1 OF RF1 name DIFFERENT counters of one report (the bare
       *> TOT1 would be ambiguous), TOT2 OF CF1 OF R1 uses the group and the report together, and TOT1 IN R2 still
       *> reaches the only counter of that name in R2. Before the fix, every form with a group qualifier was refused.
+      *> A sum counter is a signed USAGE DISPLAY item (docs/CONFORMANCE.md A.4.11, kb/Work PB1943: 13.18.54.4 GR1
+      *> gives it no usage and a sign), so DISPLAY shows the digits with the operational sign on the last one, as
+      *> for any signed DISPLAY item: positive 14 is "1D", 014 is "01D" and 07 is "0G" in the default IBM
+      *> overpunch convention (--sign-encoding ibm); the values are the derivation's 14, 014 and 07.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1454Q.
        ENVIRONMENT DIVISION.

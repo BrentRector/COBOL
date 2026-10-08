@@ -47440,6 +47440,25 @@ wrong in direction for PREVIOUS (which e)2. governs). It reads as a fragment of 
 what was intended is not certain, and it does no harm beside the corrected e)1. and e)2. — so it is transcribed as
 printed.
 
+### D5 · pages 497 and 498 · 13.18.57.4 TYPE clause, general rules 6) c) and 7) d) 4. · "a control footing at a lower control level"
+
+General rule 6 c) prints that an OR PAGE control heading is printed after each page advance, "provided that the page
+advance did not take place just before the printing of a control footing at a lower control level" (page 497).
+Read with the footing as the referent of "lower" (a footing at a lower level than the heading), that proviso skips
+exactly the headings that general rule 7 d) 4. (page 498) puts ABOVE such a footing: 7 d) 4. gives a control footing
+the upper limit "the line following the last line of the lowest-level control heading with an OR PAGE phrase at
+the same level as the control footing, or higher", which presumes those headings are printed. The two sentences
+cannot both hold for a footing at a level below an OR PAGE heading. The printed text was compared with the
+transcription on both pages (word for word, so this is not a transcription slip).
+
+What was intended is not certain, so the text is transcribed as printed. WiseOwl COBOL reads the proviso's "lower"
+as the level of the HEADING ("not before a control footing, when the heading is at a lower level than that
+footing"), the only reading under which 6 c) and 7 d) 1. to 4. agree: the headings at the footing's level and above,
+which the footing stands below, are repeated, and those below the footing's level are not, because the footing's
+own break prints them in their turn. IBM's Report Writer states the same outcome (SC26-4301, section
+3.24.4, rule 1.c: no control headings below the level of the control footing are printed). The decision is recorded in
+`docs/CONFORMANCE.md` A.4.11 (kb/Work PB1927).
+
 ## Method
 
 Underlining, and the bracket / brace / choice-indicator delimiters, were read from the source PDF by

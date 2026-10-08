@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-291 drift tests.
+292 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -210,6 +210,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [PictureTable10DriftTests](../tests/Cobol.Net.Tests.Unit/PictureTable10DriftTests.cs) | ⛔ THE GATE THAT HOLDS PictureComposition's COPY OF TABLE 10 EQUAL TO THE STANDARD. | `specs/ISO_COBOL.md` |
 | [PicturelessUsageSetDriftTests](../tests/Cobol.Net.Tests.Unit/PicturelessUsageSetDriftTests.cs) | ⛔ IsPictureless AGAINST ITS OWN SOURCE — ISO §13.16.3 SR8, re-read out of specs/ISO_COBOL.md on every run (kb/Work PB495). | `specs/ISO_COBOL.md` |
 | [PlaceDenotedItemDriftTests](../tests/Cobol.Net.Tests.Unit/PlaceDenotedItemDriftTests.cs) | ⛔ EVERY Place KIND HAS AN ADJUDICATED ANSWER TO "WHICH DATA ITEM DOES THIS REFERENCE DENOTE?" (kb/Work PB602). | `src` |
+| [PlaceStorageCellDriftTests](../tests/Cobol.Net.Tests.Unit/PlaceStorageCellDriftTests.cs) | ⛔ A Place THAT IS A VIEW OVER ENGINE STATE SAYS SO, AND NO IMAGE-BACKING FACT IS EVER RECORDED FOR IT (kb/Work PB1943). | — |
 | [PlaceStorageFormSwitchDriftTests](../tests/Cobol.Net.Tests.Unit/PlaceStorageFormSwitchDriftTests.cs) | ⛔ A SWITCH OVER A Place's STORAGE FORM MUST NOT MEET A PlaceDecorator IN ITS DEFAULT ARM (kb/Work PB393). | `src` |
 | [PointerUsageOperandDriftTests](../tests/Cobol.Net.Tests.Unit/PointerUsageOperandDriftTests.cs) | ⛔ THE DRIFT GUARD FOR THE TO-LESS POINTER OPERAND (kb/Work PB848). | — |
 | [PositionCarrierDriftTests](../tests/Cobol.Net.Tests.Unit/PositionCarrierDriftTests.cs) | ⛔ NO POSITION TRAVELS BETWEEN THE BINDER AND THE CODE GENERATOR AS C# TEXT (kb/Work PB2151, D10's second half; docs/rearchitecture/DESIGN-binder-bound-tree.md §3.9). | `src/Cobol.Net.Compiler/Binding`, `src` |
