@@ -36,9 +36,6 @@ public sealed class SourceLineMap
         return new SourceLineMap(o);
     }
 
-    /// <summary>The number of resultant lines mapped.</summary>
-    public int Count => _origins.Length;
-
     /// <summary>The origin of RESULTANT line <paramref name="line"/> (1-based, the ANTLR token line), or null when the
     /// line is outside the mapped text (a synthetic position).</summary>
     public SourceOrigin? Origin(int line) =>
