@@ -14,9 +14,8 @@ public enum AccessDir { Sending, Receiving }
 /// A structural access path to a storage location (P7 Step 11 — structural <see cref="Place"/>): an ordered chain of
 /// <see cref="AccessSegment"/>s the BACKEND renders to a C# lvalue expression (a field chain, table accessors), so a
 /// <see cref="MemberPlace"/>/<see cref="RedefViewPlace"/>/<see cref="CapacityRegisterPlace"/> carries STRUCTURE, not
-/// C# text. A table segment's subscript INDEX is the D10 TRANSITIONAL string carrier (a rendered index expression) —
-/// it becomes a <c>BoundExpr</c> when PHASE 15 removes the SUBSCRIPT lexer mode (see the PHASE-07 Step 11 plan +
-/// <c>project_d10_subscript_removal</c>). The rendering lives in <c>CodeGen.PlaceRenderer.RenderPath</c>.
+/// C# text. A table segment's subscript INDEX is a typed <see cref="Position"/> (kb/Work PB2151;
+/// DESIGN-binder-bound-tree.md §3.9). The rendering lives in <c>CodeGen.PlaceRenderer.RenderPath</c>.
 /// </summary>
 public sealed record AccessPath(IReadOnlyList<AccessSegment> Segments)
 {
@@ -57,10 +56,10 @@ public sealed record RootFieldSegment(string CsField, OmittedFormalGuard? Guard 
 public sealed record MemberSegment(string CsMember) : AccessSegment;
 
 /// <summary>A FIXED OCCURS subscript — the accumulated path is wrapped in <c>CobolTable.At(path, index)</c>
-/// (ISO §8.4.2.3.4 GR2, benign out-of-range). <paramref name="OneBasedIndex"/> is the D10 transitional index string.
+/// (ISO §8.4.2.3.4 GR2, benign out-of-range). <paramref name="OneBasedIndex"/> is the typed occurrence number.
 /// <paramref name="Odo"/>, when present, is the level's OCCURS DEPENDING bound that the reference itself must test
 /// (<see cref="OdoReferenceCheck"/>).</summary>
-public sealed record FixedTableSegment(string OneBasedIndex, OdoReferenceCheck? Odo = null) : AccessSegment;
+public sealed record FixedTableSegment(Position OneBasedIndex, OdoReferenceCheck? Odo = null) : AccessSegment;
 
 /// <summary>⛔ §13.18.38.4 GR7 AT AN ELEMENT REFERENCE (kb/Work PB1268): "At the time the subject of entry is
 /// referenced or any data item subordinate or superordinate to the subject of entry is referenced, the value of the
@@ -76,20 +75,20 @@ public sealed record OdoReferenceCheck(Place Depending, int MinOccurs, int MaxOc
 
 /// <summary>An OCCURS DYNAMIC subscript (§8.5.1.9.2/.9.3, D9) — the accessor is direction-specific
 /// (<c>RefSending</c> on a read, <c>RefReceiving</c> on a write), chosen at RENDER time from the operation.
-/// <paramref name="OneBasedIndex"/> is the D10 transitional index string.</summary>
-public sealed record DynTableSegment(string OneBasedIndex) : AccessSegment;
+/// <paramref name="OneBasedIndex"/> is the typed occurrence number.</summary>
+public sealed record DynTableSegment(Position OneBasedIndex) : AccessSegment;
 
 /// <summary>A CELL-BACKED area's dynamic-capacity table (kb/Work PB1042; <see cref="CellComponents"/>): the
 /// accumulated path is the area's <c>StorageCell</c> (or an element cell of an enclosing such table) and this step
 /// reaches its component <paramref name="Ordinal"/> — <c>StorageCell.DynTableAt</c>, a <c>CobolDynTable</c> whose
-/// occurrences are element cells. <paramref name="Ordinal"/> is the D10 transitional ordinal expression (it carries
-/// a subscript term for each enclosing fixed table level). <paramref name="Min"/> and <paramref name="ElementWidth"/>
+/// occurrences are element cells. <paramref name="Ordinal"/> is the typed component ordinal (a
+/// <see cref="PositionOffset"/> carrying a subscript term for each enclosing fixed table level). <paramref name="Min"/> and <paramref name="ElementWidth"/>
 /// are the REFERENCING description's OCCURS facts — its FROM minimum and its element's storage width — which the
 /// runtime asks the shared table to agree with (ISO §14.6.13.2 rule 6).</summary>
-public sealed record CellTableSegment(string Ordinal, int Min, int ElementWidth) : AccessSegment
+public sealed record CellTableSegment(Position Ordinal, int Min, int ElementWidth) : AccessSegment
 {
     /// <summary>The step to <paramref name="table"/>'s component at <paramref name="ordinal"/>, carrying the table's
     /// own description.</summary>
-    public static CellTableSegment Of(DataItem table, string ordinal) =>
+    public static CellTableSegment Of(DataItem table, Position ordinal) =>
         new(ordinal, table.OccursSpec?.InitialCap ?? 0, table.ByteWidth);
 }

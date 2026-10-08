@@ -18,9 +18,9 @@ public enum CorrVerb { Move, Add, Subtract }
 /// identification for the pairs (including any subscript on the group operands) is done at the START of the
 /// statement, never per implied statement. Exactly one field is set: <paramref name="RefGroup"/> is a member-path
 /// group anchored by a <c>ref var</c> local (its table subscripts evaluate exactly once — the backend renders the
-/// group place), or <paramref name="LongInit"/> is a Tier-B REDEFINES view group's computed window offset pinned by a
-/// <c>long</c> local.</summary>
-public sealed record CorrespondingHoist(string Local, Place? RefGroup, string? LongInit);
+/// group place), or <paramref name="ViewOffset"/> is a Tier-B REDEFINES view group's computed window offset (a typed
+/// position) pinned by a <c>long</c> local.</summary>
+public sealed record CorrespondingHoist(string Local, Place? RefGroup, Position? ViewOffset);
 
 /// <summary>One corresponding pair (§14.7.6): the resolved sending and receiving <see cref="Place"/>s of an
 /// implied per-pair statement. Both are anchored on the statement's hoisted group locals where applicable.</summary>

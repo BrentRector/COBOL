@@ -144,7 +144,7 @@ internal sealed class StrongGroupComparison(BinderContext ctx)
                 var exists = new BoundRelational(new BoundFieldOperand(count!), ">=", new BoundNumericLiteral(k.ToString()));
                 here = present is null ? exists : new BoundLogical("&&", [present, exists]);
             }
-            PlaceCursor occurrence = cur.Indexed(k.ToString());
+            PlaceCursor occurrence = cur.Indexed(new PositionConstant(k));
             bool ok = table.IsGroup ? Walk(occurrence, root, here, leaves, ref unbuilt)
                 : Add(leaves, occurrence.ToPlace(), here);
             if (!ok) return false;

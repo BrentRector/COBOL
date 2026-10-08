@@ -1142,8 +1142,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 if (byReference)
                 {
                     // Strict identity needs a PROVABLE window length equal to the formal's.
-                    if (!int.TryParse(rmp.Start, out _) || rmp.Length is null
-                        || !int.TryParse(rmp.Length, out int rlen))
+                    if (rmp.Start.Int32Literal is null || rmp.Length?.Int32Literal is not { } rlen)
                     {
                         Err($"BY REFERENCE reference-modified argument '{argText}' needs a "
                             + "compile-time (start:length) to prove §14.8.2.3.2 conformance — pass it "

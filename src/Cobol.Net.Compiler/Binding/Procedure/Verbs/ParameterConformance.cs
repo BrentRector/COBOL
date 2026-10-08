@@ -450,7 +450,7 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
         {
             if (core is RefModPlace rm)
             {
-                if (ConstIndex(rm.Start) is not { } s0) return new BitStart(null, BitStartFault.NonLiteralRefMod);
+                if (rm.Start.ConstantValue is not { } s0) return new BitStart(null, BitStartFault.NonLiteralRefMod);
                 extra += s0 - 1;
             }
             core = dec.Inner;
@@ -463,11 +463,11 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
         // for the subject of the entry starts at the first bit of the data item referenced by data-name-2" —
         // puts every redefinition at the redefined item's own first bit, so the class canonical's start within its
         // record (the SAME §8.5.1.6.3 walk, over its own parent chain) plus the member's class-relative bit
-        // offset (BitWindow.ClassRelativeExpr — its in-class offset and each in-class subscript's stride) IS the
+        // offset (BitWindow.ClassRelative — its in-class offset and each in-class subscript's stride) IS the
         // occurrence's start. A BASED class's runtime displacement is whole bytes and cannot move the answer.
         if (core is RedefViewPlace { Bit: { } bw, ViewItem.Class: { } viewCls })
         {
-            if (ConstIndex(bw.ClassRelativeExpr) is not { } rel) return new BitStart(null, BitStartFault.NonLiteralSubscript);
+            if (bw.ClassRelative.ConstantValue is not { } rel) return new BitStart(null, BitStartFault.NonLiteralSubscript);
             return RecordBitOffset(viewCls.Canonical) is not { } canon
                 ? new BitStart(null, BitStartFault.None)   // an unmodelled chain — never reject
                 : new BitStart(canon + rel + extra, BitStartFault.None);
@@ -476,7 +476,7 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
         if (path is null) return new BitStart(null, BitStartFault.None);
         var chain = new List<DataItem>();
         for (var d = core.Item; d is not null; d = d.Parent) chain.Insert(0, d);
-        var subs = new Queue<string>();
+        var subs = new Queue<Position>();
         foreach (var seg in path.Segments)
         {
             if (seg is FixedTableSegment ft) subs.Enqueue(ft.OneBasedIndex);
@@ -494,7 +494,7 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
             bool tabled = chain[i].Occurs is not null || chain[i].IsDynamicTable || chain[i].OccursSpec is not null;
             if (tabled && subs.Count > 0)
             {
-                if (ConstIndex(subs.Dequeue()) is not { } k) return new BitStart(null, BitStartFault.NonLiteralSubscript);
+                if (subs.Dequeue().ConstantValue is not { } k) return new BitStart(null, BitStartFault.NonLiteralSubscript);
                 bit += (k - 1) * (long)BitLayout.StrideBits(chain[i]);   // a SUBSCRIPT stride — ALIGNED strides whole bytes (§13.18.1.4 GR2)
             }
         }
@@ -516,64 +516,5 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
             bit += within;
         }
         return bit;
-    }
-
-    /// <summary>Evaluate a rendered subscript/ref-mod index that the bit-alignment rules permit — an integer
-    /// literal or an all-literal + - * / ( ) expression (no exponentiation; identifiers make it non-constant →
-    /// null).</summary>
-    private static long? ConstIndex(string rendered)
-    {
-        string s = rendered.Trim();
-        if (long.TryParse(s, out long direct)) return direct;
-        foreach (char ch in s)
-            if (!(char.IsDigit(ch) || ch is '+' or '-' or '*' or '/' or '(' or ')' or ' ')) return null;
-        int i = 0;
-        long? r = AddSub(s, ref i);
-        return r is not null && SkipWs(s, ref i) == s.Length ? r : null;
-
-        static int SkipWs(string t, ref int j) { while (j < t.Length && t[j] == ' ') j++; return j; }
-        static long? AddSub(string t, ref int j)
-        {
-            long? v = MulDiv(t, ref j);
-            while (v is not null && SkipWs(t, ref j) < t.Length && t[j] is '+' or '-')
-            {
-                char op = t[j++];
-                long? w = MulDiv(t, ref j);
-                v = w is null ? null : op == '+' ? v + w : v - w;
-            }
-            return v;
-        }
-        static long? MulDiv(string t, ref int j)
-        {
-            long? v = Primary(t, ref j);
-            while (v is not null && SkipWs(t, ref j) < t.Length && t[j] is '*' or '/')
-            {
-                char op = t[j++];
-                long? w = Primary(t, ref j);
-                v = w is null or 0 && op == '/' ? null : op == '*' ? v * w : v / w;
-            }
-            return v;
-        }
-        static long? Primary(string t, ref int j)
-        {
-            if (SkipWs(t, ref j) >= t.Length) return null;
-            if (t[j] == '(')
-            {
-                j++;
-                long? v = AddSub(t, ref j);
-                if (SkipWs(t, ref j) >= t.Length || t[j] != ')') return null;
-                j++;
-                return v;
-            }
-            if (t[j] is '+' or '-')
-            {
-                char sign = t[j++];
-                long? v = Primary(t, ref j);
-                return sign == '-' ? -v : v;
-            }
-            int start = j;
-            while (j < t.Length && char.IsDigit(t[j])) j++;
-            return j > start && long.TryParse(t[start..j], out long n) ? n : null;
-        }
     }
 }

@@ -274,7 +274,7 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     /// table's element through its direction-specific accessor (data-model D9 — a read is RefSending, a store
     /// RefReceiving, which within the current capacity never grows it), any other table through its OCCURS index.</summary>
     private static Place ElementPlace(PlaceCursor tableCursor, DataItem table, string v) =>
-        (table.IsDynamicTable ? tableCursor.DynamicElement(v) : null)?.ToPlace() ?? tableCursor.Indexed(v).ToPlace();
+        (table.IsDynamicTable ? tableCursor.DynamicElement(new PositionLocal(v)) : null)?.ToPlace() ?? tableCursor.Indexed(new PositionLocal(v)).ToPlace();
 
     /// <summary>
     /// ⛔ THE ONE BINDING OF A <c>{identifier | literal}</c> SENDING OPERAND (kb/Work PB2114) — the grammar's one

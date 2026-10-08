@@ -44,9 +44,8 @@ namespace CobolNet.Validation;
 /// arm.</para>
 /// <para>⚠ A SUBSCRIPT LIST AND A KEYWORD-OMITTED ARGUMENT LIST ARE PART OF THIS TREE. Since kb/Work PB2113 the tokens
 /// between a reference's parentheses are the ordinary literal tokens, parsed in place, so they are screened here like
-/// any other. A subscript the binder materializes is re-parsed from its TEXT (<c>SubscriptExpressionFragment</c>);
-/// that fragment tree is never walked here, and does not need to be, because each of its literals is already a token
-/// of this tree. <c>LiteralScreenDriftTests</c> derives <see cref="LiteralTokens.Types"/> from the lexer grammar
+/// any other — and a subscript the binder materializes into a temporary is bound from this same tree's node (kb/Work
+/// PB2151), so no second tree of it exists. <c>LiteralScreenDriftTests</c> derives <see cref="LiteralTokens.Types"/> from the lexer grammar
 /// (every token whose body is a literal fragment), so a new literal token cannot escape the screen.</para>
 /// <para>The syntax rules are edition-invariant: they carry no edition qualifier in the text the repository holds, and
 /// the checks they replace ran at every <c>--std</c>. The one edition question asked here is which literal FORMATS the

@@ -591,7 +591,7 @@ public sealed partial class DataBinder
     ///   <item>a user-defined function activation (<c>UdfBinder</c>, ISO §8.4.3.2.4 GR1 — the caller-side
     ///         <c>BoundCallProgram</c> into the result temp), and an inline method invocation (§8.4.3.4.4 GR1);</item>
     ///   <item>a D18 function-bearing subscript / ref-mod segment's §15.4 temporary store
-    ///         (<c>StatementBinder.MaterializeSubscriptSegment</c>, fix-queue PB17);</item>
+    ///         (<c>StatementBinder.BindPositionTemporary</c>, fix-queue PB17);</item>
     ///   <item>a function argument's held value and its object-property GETs, placed at the argument's position by
     ///         <c>ArgumentOrder</c> (§8.4.3.2.4 GR2; kb/Work PB1423, PB1932).</item>
     /// </list>

@@ -759,6 +759,142 @@ integer-1, SR34 for Format 16's integer-2) beside a GENERAL rule on the expressi
 EVALUATE — and compares it against a `SetAmountBound` the call site declares, so each format names its own
 operand and its own rule (`COBOLNET2113`) and the next amount-taking format is a bound, not a fourth `if`.
 
+### 3.9 The typed position carrier — subscripts and reference-modification positions (D10's second half, kb/Work PB2151)
+
+**The rule: a position is a typed node from the parse to the code generator.** A subscript (ISO §8.4.2.3.2
+`arithmetic-expression-1`), a reference-modifier leftmost position or length (§8.4.3.3.3 SR4), and every offset and
+ordinal the place model computes from them is a `Position` (`Binding/Model/Position.cs`). The binder builds STRUCTURE;
+`CodeGen/Roslyn/PositionRenderer.Render` is the one place a position becomes C# (the §3.3 rule "Place stays the lvalue
+abstraction but stops being a string", applied to the positions inside a place). No position travels between the binder
+and codegen as text, and `PositionCarrierDriftTests` keeps it so.
+
+**Why (DEVLOG, PB2151).** Until PB2151 the binder rendered each position to a C# string at bind time, re-parsed the
+positions it could not render through a second, isolated grammar entry, and spliced the strings into seven string
+carriers of the place model that codegen re-read as text: byte offsets were computed as string arithmetic
+(`0 + (Occ(I) + 1 - 1) * 3 + 1`), the evaluate-once identification decided "is this a constant" by scanning characters,
+and the bit-alignment proof of §14.9.4.3 SR6 re-parsed the text with a hand-written evaluator.
+
+#### 3.9.1 The node shapes (`Binding/Model/Position.cs`)
+
+```csharp
+public abstract record Position;                                    // an integer-valued run-time address term
+public sealed record PositionConstant(long Value) : Position;       // an integer literal, an integer constant-name
+public sealed record PositionIndexCell(string Cell) : Position;     // an index-name: its occurrence cell (IndexDeclaration.Cell)
+public sealed record PositionItemRead(AccessPath Path, DataItem Item, PositionReadForm Form) : Position;
+        // a data item read as an ordinal position through its own profile (CobolTable.Occ / CobolString.RefModPosition)
+public sealed record PositionLocal(string CsName, bool AsLong = false) : Position;   // a statement local: a hoisted
+        // identification, a report VARYING counter, an INITIALIZE loop variable, a CORRESPONDING view anchor
+public sealed record LocalVector(string CsName);                    // a table(ALL) enumeration's index vector (ISO §15.3)
+public sealed record PositionLocalElement(LocalVector Vector, int Index) : Position;   // one ALL level's occurrence
+public sealed record PositionBinary(Position Left, PositionOperator Op, Position Right) : Position;   // + - *
+public sealed record PositionNegate(Position Operand) : Position;
+public sealed record PositionGroup(Position Inner) : Position;     // a WRITTEN parenthesis, kept so the order is the source's
+public sealed record PositionPointerOffset(string PointerField) : Position;   // CobolPtr.OffsetOf(pointer), a BASED displacement
+public sealed record PositionPointerDynBase(string PointerField) : Position;   // CobolPtr.DynBaseOf(pointer), its ordinal twin
+public sealed record PositionOffset(Position Origin, IReadOnlyList<OffsetTerm> Terms) : Position;
+public readonly record struct OffsetTerm(Position Index, long Stride);   // + (Index - 1) * Stride
+```
+
+`PositionOffset` is the ONE structured form of every address the place model computes from subscripts: an origin plus
+Σ (index − 1) × stride, outermost level first. A Tier-B view's byte offset (`ClassOffset + Σ (index − 1) × level
+width`, ISO §13.18.44), its bit twin (`8 × (displacement) + ClassBitOffset + Σ (index − 1) × stride bits`), a cell
+component ordinal (`ClassDynOrdinal + Σ (index − 1) × components per occurrence`) and the ADDRESS OF displacement are all
+this node. The ORIGIN is any position: the static in-class offset or ordinal (a `PositionConstant`), that constant
+displaced by a BASED pointer (`PositionPointerOffset + c`), or an enclosing window's own offset — so a member window a
+cursor builds from a group window is the group's offset displaced again, `PositionOffset(group offset [+ delta], terms)`.
+A component ordinal in a class laid over storage through its data-address pointer (a BASED item, an AREA formal, kb/Work
+PB2094) has the origin `c + PositionPointerDynBase` (`ReferenceResolver.OrdinalOrigin` over `CellOrdinalBase`), carried
+by the window walk's scope and by a whole-table cursor until a dynamic-capacity table's element cell opens its own scope.
+(The first design wrote the origin as a fixed `Displacement` plus a `long Constant`; the cursors' and CORRESPONDING's
+origins — `k + (o) − e`, `L − e + c` — are not of that shape, and a general origin renders every one of them exactly.)
+
+| carrier | field(s) | type |
+|---|---|---|
+| `AccessPath` table segments | `FixedTableSegment.OneBasedIndex`, `DynTableSegment.OneBasedIndex` | `Position` (a subscript) |
+| | `CellTableSegment.Ordinal` | `Position` (a `PositionOffset` component ordinal) |
+| `RedefViewPlace` | `Offset`, `DynOrdinal` | `Position` (a `PositionOffset`, or a hoisted `PositionLocal`) |
+| `BitWindow` | `Offset`, `ClassRelative` | `Position` (`PositionOffset` in bits) |
+| `DynSlotWindow` / `VarGroupWindow` | `Ordinal` / `DynBase` | `Position` |
+| `TableAllPlace` | `Indices` | `LocalVector` (its elements are the ALL subscripts) |
+| `RefModSpec` / `RefModPlace` | `Start`, `Length` | `Position` |
+| bound nodes | `BoundAddressOf.OccursDisplacement`; `CorrespondingHoist.ViewOffset`; `InitializeOccurrenceSelect.Occurrences` | `OffsetTerm` list; `Position`; `Position` list |
+
+**What a position MAY be is not decided by the node set.** ISO §8.4.2.3.2 makes a subscript `ALL`,
+`arithmetic-expression-1` or `index-name-1 [{+|-} integer-1]`, and §8.4.3.3.3 SR4 makes both reference-modifier
+positions arithmetic expressions. The node set is the set of shapes that RENDER DIRECTLY as an ordinal; every other
+arithmetic expression (a function-identifier, `/`, `**`, a decimal literal, a scaled operand inside a compound, a
+floating-point or group operand, the figurative ZERO) is bound by the ONE `ExpressionBinder.BindExpr` into the §15.4
+position temporary (`BoundPositionValue`, kb/Work PB1890) and is then a `PositionItemRead` of that temporary. The
+integrality rule of §8.4.2.3.4 GR1 b) is therefore asked once, of the result.
+
+Two structural questions are answered by the node, never by text: `Position.ConstantValue` (the compile-time value of
+a position built only from constants, an offset included — what the §14.9.4.3 SR6 / SR8 bit-alignment proof asks of
+`BitWindow.ClassRelative`) and `Position.IsSelfEvaluating` (a non-negative constant, or an offset with no term over
+one — what the evaluate-once identification asks before it hoists).
+
+#### 3.9.2 The binder: the position walk
+
+`ReferenceResolver.BindPosition(node, kind, indexNames)` walks the `functionArgument` PARSE NODE — never its tokens
+— through the arithmetic grammar (`additiveExpression` → `multiplicativeExpression` → `powerExpression` →
+`unaryExpression` → `primaryExpression`):
+
+- an integer literal → `PositionConstant`; a written parenthesis → `PositionGroup`; `+ - *` → `PositionBinary`;
+  a unary sign → `PositionNegate`;
+- a bare (possibly qualified) name → the existing resolution: an index-name → `PositionIndexCell` (§8.4.2.3.3 SR4's
+  collector, §13.18.38.3 r7's ref-mod screen); an integer constant-name → `PositionConstant`; a report VARYING counter
+  → `PositionLocal(AsLong)`; a data item with a position overload → `PositionItemRead`, with the §8.8.1.1 class screen
+  queued to the commit point exactly as PB220 required;
+- anything else, at any depth, routes the WHOLE position to the D18 temporary: the `MaterializeSegment` hook
+  (`StatementBinder.BindPositionTemporary`) takes the position's own `arithmeticExpression` node and binds it through
+  the expression binder. A `functionArgument` that is not an `arithmeticExpression` (a nonnumeric literal, a boolean
+  expression, `OMITTED`, an address identifier, a phrase word) and the word ALL outside §8.4.2.3.3 SR6's two contexts
+  never reach the hook: the resolver refuses them by name — COBOLNET2363 (kb/Work PB1030).
+
+The PB136 declaration-informed cut (Annex D.3.5.3 `DOG (XCOUNTER (- YCOUNTER))`: a name that cannot be subscripted
+gives its paren to a NEW subscript) is applied to the tree (`CollectCuts`): the resolver records the cut
+`dataReference` nodes, reads a cut reference without its subscript list, and the cut list's items become the
+following subscripts, each a `PositionGroup` of its item. A cut list that does not close its subscript item
+(`T (A + X (- Y) + 1)`, where the tree joins `+ 1` to `X (- Y)`) has no subscript reading the tree can give; it is
+refused by name (COBOLNET2363).
+
+The place model's producers build the offsets as nodes: `ReferenceResolver.WindowScopeOf` (the ONE walk of a Tier-B
+reference's levels, its byte, bit and ordinal terms side by side), the ADDRESS OF displacement, the `ViewCursor` that
+INITIALIZE and the strongly-typed group comparison walk (`Base`, `OccursTerms`, `OccursBitTerms`, `EntryOrdinal`,
+`OrdinalTerms`), the CORRESPONDING view access, and the cell walk of `IntrinsicBinder`'s length composer. Every view
+window is built by `RedefViewPlace.For` from a byte `Position`, a runtime displacement `Position?` and the bit terms.
+
+#### 3.9.3 The code generator renders positions; identification hoists nodes
+
+`CodeGen/Roslyn/PositionRenderer.Render(Position)` is the ONE renderer: a constant renders its value, an index cell
+its cell, an item read `CobolTable.Occ(path, profile)` / `CobolString.RefModPosition(path, profile)` /
+`CobolTable.Occ(path)` (the path through `PlaceRenderer.RenderPath`), a binary node `l op r`, a group `(x)`, a pointer
+offset `CobolPtr.OffsetOf(p)` (`RuntimeApi.PtrOffsetOf`), an offset `origin + (i - 1) * s …` term by term. A term over a
+constant index is rendered as written, not folded, so the emitted C# of a behaviour-neutral restructuring stays
+identical. `PlaceRenderer`, `RuntimeApi.RefModStart` / `RefModLength`, `CallEmitter`'s argument area, `PtrEmitter`,
+`CorrespondingEmitter` and `InitializeEmitter` call it wherever they read a position field. A formal's *-ARG-OMITTED
+root guard renders in `PlaceRenderer.GuardedRoot`, beside the one path renderer that emits a root.
+
+`PlaceIdentification.Freeze` hoists NODES: `Hoist(p) => p.IsSelfEvaluating ? p : new PositionLocal(hoist(Render(p)))`,
+over every position of the place model's own walk (`FreezePath`, `FreezeView`, `FreezeCoding`, `FreezeRefMod`): the
+table indices, the cell ordinals, the view offset and ordinal, the ref-mod bounds. A `BitWindow`'s offset is not
+hoisted, because no verb that identifies its operands there can receive a USAGE BIT item with a run-time subscript: a
+BY REFERENCE bit argument's subscripts are numeric literals or all-literal expressions (§14.9.4.3 SR6, §14.9.23.3
+SR12), and INSPECT, STRING and UNSTRING take only usage display or national operands (§14.9.22.3 SR1, §14.9.43.3 SR1,
+§14.9.48.3 SR4).
+
+#### 3.9.4 How it landed — one carrier per commit, the oracle after each
+
+Each step kept the emitted C# and the diagnostic stream identical (`scripts/arch/compare_oracle.py`) or explained every
+difference by class: (1) the position source — `Position` and the position walk replaced the bind-time text renderer
+and the D18 text re-parse (two explained classes: an integer subscript written `+N` or with leading zeros renders as its
+value; a D18 temporary is named for its real source line); (2) `RefModSpec` / `RefModPlace`; (3) the `AccessPath` table
+indices; (4) the component ordinals; (5) the window offsets and the ADDRESS OF displacement; (6) the table(ALL) index
+vector and INITIALIZE's occurrence keys; (7) the close — the binder's last render call deleted, the text evaluator of
+the bit-alignment proof and the string hoist deleted, and `PositionCarrierDriftTests`: every `string` property of a
+`Place`, `AccessSegment`, `WindowCoding` or `Position` record is an adjudicated C# NAME, no binder source references
+`PositionRenderer`, and none of the deleted text machinery is named anywhere under `src/`. Steps 3 to 7: IDENTICAL.
+
+
 ---
 
 ## 4. Current → target module changes
@@ -784,7 +920,7 @@ operand and its own rule (`COBOLNET2113`) and the next amount-taking format is a
 | rename | `StatementBinder.Accept.cs`, `CSharpEmitter.Accept.cs` (the ACCEPT *verb*) | `Binding/Procedure/Verbs/AcceptDisplayBinder.cs` + `CodeGen/Verbs/AcceptDisplayEmitter.cs` (the AcceptDisplay* names) | End the Visitor-term collision once a real visitor exists |
 | rename | `BoundStores` | `BoundStoreAnalysis` | It is an analysis, not storage |
 | create | — | `Common/CobolLiteral.cs` (Decode), `Binding/RecordLayout.cs`, `Binding/PhraseBlocks.cs`, `DataItem.Root` | One canonical helper per job (dedup) |
-| move | `ReferenceResolver` subscript readers (`SegmentsOf`/`InterpretSubscripts`/`RenderSegment` — the hand-rolled token splitter is gone, kb/Work PB2113) | `NameResolver` collaborator; subscripts as `BoundExpr` (D10's second half) | Thin the resolver; it becomes an orchestrator over SymbolTable |
+| move | `ReferenceResolver` subscript readers (`SegmentsOf`/`BindPosition`/`WindowScopeOf` — the hand-rolled token splitter is gone, kb/Work PB2113, and positions are the typed `Position` carrier, §3.9, kb/Work PB2151) | `NameResolver` collaborator | Thin the resolver; it becomes an orchestrator over SymbolTable |
 | retire (G8) | `using Core = CobolParserCore; using legacy-root.Generated;` (`StatementBinder.cs:6,11`) | `CobolNet.Frontend.Generated` | Decouple from the legacy generated namespace at cut-over (driver/frontend sibling) |
 
 ---

@@ -1695,13 +1695,16 @@ regression bisects to one step.
 
 ## 9. D10 — SUBSCRIPT-mode removal (owner override): design + the one open decision
 
-> **Status: FIRST HALF LANDED (kb/Work PB2113, PHASE 15 §"CUT 2.5").** §9.4 is resolved (Option A, from the spec), the
-> SUBSCRIPT lexer mode and every `SUB_*` token are deleted, subscripts / reference modifiers / keyword-omitted argument
-> lists are parse nodes, and the binder's hand-rolled splitter and captured-group readers are gone (§9.5 records what each
-> stage became). The SECOND half remains (kb/Work PB2151): subscript and reference-modifier positions still reach the code generator as
-> the D10 TRANSITIONAL string carrier (`ReferenceResolver.RenderSegment`, and the D18 materializer's text re-parse
-> through `subscriptExpressionFragment`); moving them onto `BoundExpr` deletes both. §9.3's entanglement cleared when
-> PB2110 deleted the legacy tree.
+> **Status: BOTH HALVES LANDED (PHASE 15 §"CUT 2.5").** The FIRST half (kb/Work PB2113): §9.4 is resolved (Option A,
+> from the spec), the SUBSCRIPT lexer mode and every `SUB_*` token are deleted, subscripts / reference modifiers /
+> keyword-omitted argument lists are parse nodes, and the binder's hand-rolled splitter and captured-group readers are
+> gone (§9.5 records what each stage became). The SECOND half (kb/Work PB2151, DESIGN-binder-bound-tree.md §3.9): a
+> position is a typed `Position` node from the parse to the code generator. The binder reads each position's PARSE NODE
+> (`ReferenceResolver.BindPosition`); a position it cannot read term by term binds that same node through the
+> expression binder into the §15.4 temporary (`StatementBinder.BindPositionTemporary`); the `subscriptExpressionFragment`
+> grammar entry and its text re-parse are deleted; every offset and ordinal of the place model is a `PositionOffset`;
+> and only `CodeGen.PositionRenderer` turns a position into C#. `PositionCarrierDriftTests` keeps it so. §9.3's
+> entanglement cleared when PB2110 deleted the legacy tree.
 
 ### 9.1 Goal
 Replace the lexer **SUBSCRIPT mode** (`CobolLexer.g4` — entered via `LPAREN` after a data-name token, emits the
@@ -1816,8 +1819,8 @@ all-or-nothing):**
   COMMA)? subscriptItem)*`, `subscriptItem : ALL | functionArgument` (the superset: the same paren carries a keyword-omitted
   argument list; a bare COMMA parses so SeparatorRule names it, COBOLNET2631). `ReferenceResolver.SegmentsOf` takes one
   token segment per item and applies PB136's declaration-informed cut on the TREE (a dataReference at the item's own
-  level whose name cannot be subscripted gives its paren to a new subscript). `RenderSegment` now renders those segments;
-  as a TOKEN renderer it is the transitional carrier the second half replaces.
+  level whose name cannot be subscripted gives its paren to a new subscript). Each segment carries its parse node, which
+  the second half's position walk reads (kb/Work PB2151).
 - **D10.4** — the keyword-omitted channel binds the parsed `functionArgument` items (`IntrinsicBinder.ArgumentsOf`);
   `FunctionArgFragment`, `functionArgListFragment` and the lexer's `PrimeFunctionArgs` are deleted. The
   `functionArgList` / `argumentList` reunification is kb/Work PB2114's.

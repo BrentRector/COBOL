@@ -759,7 +759,7 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
             w.Line($"System.Comparison<int> __tc{id} = (__a, __b) =>");
             EmitKeyComparer(ts, weightsArg,
                 (key, v) => PlaceRenderer.Read(
-                    refs.ResolveItemAt(key.Key, [.. outer, $"({v} + 1)"])
+                    refs.ResolveItemAt(key.Key, [.. outer, PositionRenderer.OneBased(v)])
                     ?? throw new InvalidOperationException(
                         $"SORT table '{ts.Table.CobolName}': no window for '{key.Key.CobolName}' — the binder checked it (kb/Work PB599)")),
                 shared: true);
@@ -788,7 +788,7 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
         var w = ctx.Writer;
         // One window per element or key: the item at a 1-based occurrence, an index expression for each enclosing
         // table and then the element's own — through the ONE place builder, so the offset law is the class's.
-        Place At(DataItem item, string occurrence) =>
+        Place At(DataItem item, Position occurrence) =>
             refs.ResolveItemAt(item, [.. shared.OuterIndexExprs, occurrence])
                 ?? throw new InvalidOperationException(
                     $"SORT table '{ts.Table.CobolName}': no window for '{item.CobolName}' — the binder checked it (kb/Work PB1175)");
@@ -798,10 +798,10 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
         w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {ix}[{at}] = {at};");
         w.Line($"System.Comparison<int> __tc{id} = (__a, __b) =>");
         EmitKeyComparer(ts, weightsArg,
-            (key, v) => PlaceRenderer.Read(At(key.Key, $"({v} + 1)")), shared: true);
+            (key, v) => PlaceRenderer.Read(At(key.Key, PositionRenderer.OneBased(v))), shared: true);
         w.Line($"{RuntimeApi.TableSortInPlace($"System.MemoryExtensions.AsSpan({ix})", $"__tc{id}")};   // GR19 — the element order; stable (GR3c)");
         w.Line($"var {im} = new string[{n}];");
-        w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {im}[{at}] = {PlaceRenderer.Read(At(ts.Table, $"({at} + 1)"))};");
+        w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {im}[{at}] = {PlaceRenderer.Read(At(ts.Table, PositionRenderer.OneBased(at)))};");
         // An element's pointer-class members ride the area's managed SLOTS, not its bytes (§14.9.3.4 GR9; kb/Work PB231,
         // PB1922): the image holds only their reserved placeholder positions, so each such member's value is read with
         // its element BEFORE the first write and written back by the same permutation AFTER the images, which
@@ -812,11 +812,11 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
         {
             string sv = $"__sl{id}_{j}";
             slots.Add(sv);
-            w.Line($"var {sv} = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, {n}), __k => {PlaceRenderer.Read(At(slotMembers[j], "(__k + 1)"))}));");
+            w.Line($"var {sv} = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, {n}), __k => {PlaceRenderer.Read(At(slotMembers[j], PositionRenderer.OneBased("__k")))}));");
         }
-        w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {PlaceRenderer.Write(At(ts.Table, $"({at} + 1)"), $"{im}[{ix}[{at}]]")}   // GR24 — placed back in data-name-2");
+        w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {PlaceRenderer.Write(At(ts.Table, PositionRenderer.OneBased(at)), $"{im}[{ix}[{at}]]")}   // GR24 — placed back in data-name-2");
         for (int j = 0; j < slotMembers.Count; j++)
-            w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {PlaceRenderer.Write(At(slotMembers[j], $"({at} + 1)"), $"{slots[j]}[{ix}[{at}]]")}   // GR24 — the element's managed slot travels with its image");
+            w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {PlaceRenderer.Write(At(slotMembers[j], PositionRenderer.OneBased(at)), $"{slots[j]}[{ix}[{at}]]")}   // GR24 — the element's managed slot travels with its image");
     }
 
     /// <summary>The table sort's key comparer BODY — the lambda's block, one compare per key in significance order

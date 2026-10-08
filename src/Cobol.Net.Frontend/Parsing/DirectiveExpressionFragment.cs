@@ -13,7 +13,7 @@ namespace CobolNet.Frontend.Parsing;
 /// cce) and re-lexes it here with the lexer primed as a directive-expression region
 /// (<see cref="CobolLexer.PrimeDirectiveExpr"/>: DEFINED is a token and every '(' groups), then parses it through
 /// the isolated fragment entry rules — the SAME expression grammar the main parse uses, so there is no hand-rolled
-/// tokenizer / condition parser (the <see cref="SubscriptExpressionFragment"/> precedent). The tree is evaluated by the ONE
+/// tokenizer / condition parser. The tree is evaluated by the ONE
 /// shared <see cref="T:CobolNet.Frontend.Expressions.CompileTimeExpressionEvaluator"/>.
 ///
 /// The DEFAULT lexer mode is used (no list region) — §7.3.6 has no argument juxtaposition, so <c>1 - 2</c>

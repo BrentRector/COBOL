@@ -84,13 +84,13 @@ public abstract record TableSortStorage
     /// EVERY key is read through its window at an occurrence number (<c>ReferenceResolver.ResolveItemAt</c>, the
     /// <see cref="SharedArea"/> law), the element order is sorted, and the elements are placed back by that
     /// permutation.</para></summary>
-    public sealed record TypedArray(AccessPath Array, IReadOnlyList<string>? KeyWindowOuter = null) : TableSortStorage;
+    public sealed record TypedArray(AccessPath Array, IReadOnlyList<Position>? KeyWindowOuter = null) : TableSortStorage;
 
     /// <summary>A table whose storage is a shared byte area — a REDEFINES class, a record area shared by several
     /// 01s, a BASED or EXTERNAL record. It has no element array: each element and each key is a window the class's
     /// own offset law places (<c>ReferenceResolver.ResolveItemAt</c>), one rendered index expression per OCCURS
     /// level — <paramref name="OuterIndexExprs"/> for the enclosing tables, then the element's own.</summary>
-    public sealed record SharedArea(IReadOnlyList<string> OuterIndexExprs) : TableSortStorage;
+    public sealed record SharedArea(IReadOnlyList<Position> OuterIndexExprs) : TableSortStorage;
 }
 
 /// <summary>One Format-2 table-sort key: the C# member path RELATIVE to an element variable of a

@@ -76,14 +76,15 @@ public sealed record InitializeLoop(string Var, AllCount Count, IReadOnlyList<In
 /// <see cref="InitializeLoop"/> body carries cannot express it — and the occurrences it does NOT key are not
 /// receiving-operands under the VALUE phrase at all, which is why <paramref name="Otherwise"/> exists and is
 /// nullable: those occurrences fall through GR5c to the REPLACING/DEFAULT arms, or to nothing.
-/// <paramref name="IndexVars"/> are the enclosing <see cref="InitializeLoop"/> variables of the subject's OCCURS
-/// chain, MOST INCLUSIVE FIRST — exactly the order §13.18.63.3 SR20 keys the plan's subscript tuples by, so an
+/// <paramref name="Occurrences"/> are the run-time occurrence numbers of the subject's OCCURS chain that the
+/// expansion does not pin at bind time — each an enclosing <see cref="InitializeLoop"/> variable, or a subscript
+/// identifier-1 itself wrote as an expression (a typed position) — MOST INCLUSIVE FIRST — exactly the order §13.18.63.3 SR20 keys the plan's subscript tuples by, so an
 /// arm's <see cref="InitializeOccurrenceArm.When"/> tuples index straight into them. Arms are TESTED IN ORDER and
 /// are mutually exclusive by construction (one arm per distinct literal, the occurrences sharing it coalesced —
 /// the same folding <c>ValueInitializer.OccurrenceSwitch</c> does, so a literal spanning a thousand occurrences is one
 /// branch and not a thousand).</para></summary>
 public sealed record InitializeOccurrenceSelect(
-    IReadOnlyList<string> IndexVars,
+    IReadOnlyList<Position> Occurrences,
     IReadOnlyList<InitializeOccurrenceArm> Arms,
     InitializeAction? Otherwise) : InitializeAction;
 

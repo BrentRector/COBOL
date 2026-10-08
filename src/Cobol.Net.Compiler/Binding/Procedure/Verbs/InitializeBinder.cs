@@ -75,7 +75,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
     /// GR5c1c test becomes an emitted branch); a dimension identifier-1 pinned with its own INTEGER-LITERAL
     /// subscript is known as that number and is resolved entirely at bind time. Both null = an occurrence identifier-1
     /// supplied as a run-time expression, which no bind-time lookup can key.</summary>
-    private readonly record struct OccurrenceDim(string? Var, int? Fixed);
+    private readonly record struct OccurrenceDim(Position? Var, int? Fixed);
 
     /// <summary>Bind INITIALIZE (ISO §14.9.20). The COBOL-85 surface — identifier-1‥n (full data references:
     /// qualification AND subscripts) and the REPLACING phrase — binds completely; the 2002+ phrases (WITH FILLER,
@@ -207,9 +207,9 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
             // identifier-1 carries no subscript on this arm (the guard above), so the ONE dimension the expansion
             // enters is the whole occurrence key a Format-2 VALUE on the element is looked up by. A cell-backed
             // table's occurrence is an element cell (kb/Work PB1042), a record's a typed element.
-            PlaceCursor element = ViewCursor.AtCellTable(dtbl)?.DynamicElement(v)
-                ?? new DynElementCursor(tblPath.Add(new DynTableSegment(v)), dtbl);
-            ExpandInitialize(element, spec, body, dtbl, [new OccurrenceDim(v, null)], identifier1: true);
+            PlaceCursor element = ViewCursor.AtCellTable(dtbl)?.DynamicElement(new PositionLocal(v))
+                ?? new DynElementCursor(tblPath.Add(new DynTableSegment(new PositionLocal(v))), dtbl);
+            ExpandInitialize(element, spec, body, dtbl, [new OccurrenceDim(new PositionLocal(v), null)], identifier1: true);
             if (body.Count > 0 && OccurrenceCounts.Capacity(dtbl, tblPath) is { } cap) actions.Add(new InitializeLoop(v, cap, body));
             else if (body.Count > 0) actions.Add(new InitializeErrorAction(
                 $"INITIALIZE of the dynamic-capacity table '{dtbl.CobolName ?? "FILLER"}' (no capacity register)"));
@@ -298,8 +298,8 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
     /// <see cref="TableValuePlan"/> is looked up by.
     /// <para>An integer-literal subscript resolves at bind time and needs no emitted test; ANY OTHER subscript
     /// expression is carried as the dimension's run-time index and is tested exactly like a loop variable — it is
-    /// the same one-based occurrence number, written in the same scope, and it is already the text the resolved
-    /// place splices into its own subscript position. A storage form with no access path (the Tier-B window
+    /// the same one-based occurrence number, written in the same scope, and it is the very position the resolved
+    /// place carries in its own subscript. A storage form with no access path (the Tier-B window
     /// cursor) yields the empty key, which is a length mismatch against any non-empty plan and is the ONE shape
     /// <see cref="ExpandTableValue"/> has to fail loud on.</para></summary>
     private static IReadOnlyList<OccurrenceDim> SeedOccurrenceKey(Place place)
@@ -318,14 +318,14 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
         var key = new List<OccurrenceDim>();
         foreach (var seg in path.Segments)
         {
-            string? ix = seg switch
+            Position? ix = seg switch
             {
                 FixedTableSegment f => f.OneBasedIndex,
                 DynTableSegment d => d.OneBasedIndex,
                 _ => null,
             };
             if (ix is null) continue;
-            key.Add(int.TryParse(ix.Trim(), out int n) ? new OccurrenceDim(null, n) : new OccurrenceDim(ix, null));
+            key.Add(ix.Int32Literal is { } n ? new OccurrenceDim(null, n) : new OccurrenceDim(ix, null));
         }
         return key;
     }
@@ -402,9 +402,9 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
             {
                 string dv = $"__ini{_initializeLoopVar++}";
                 var dbody = new List<InitializeAction>();
-                if (childCur.StoragePath is { } dtp && childCur.DynamicElement(dv) is { } elementCur)
+                if (childCur.StoragePath is { } dtp && childCur.DynamicElement(new PositionLocal(dv)) is { } elementCur)
                 {
-                    ExpandInitialize(elementCur, spec, dbody, identifier1Item, [.. key, new OccurrenceDim(dv, null)]);
+                    ExpandInitialize(elementCur, spec, dbody, identifier1Item, [.. key, new OccurrenceDim(new PositionLocal(dv), null)]);
                     if (dbody.Count > 0 && TableCount(child, identifier1Item, dtp) is { } dcount)
                         actions.Add(new InitializeLoop(dv, dcount, dbody));
                     else if (dbody.Count > 0)
@@ -421,8 +421,8 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
             {
                 string v = $"__ini{_initializeLoopVar++}";
                 var body = new List<InitializeAction>();
-                ExpandInitialize(childCur.Indexed(v), spec, body, identifier1Item,
-                    [.. key, new OccurrenceDim(v, null)]);
+                ExpandInitialize(childCur.Indexed(new PositionLocal(v)), spec, body, identifier1Item,
+                    [.. key, new OccurrenceDim(new PositionLocal(v), null)]);
                 // GR5b2 over the GR8 count — fixed (GR4), current (GR8a) or maximum (GR8b).
                 if (body.Count > 0 && TableCount(child, identifier1Item, childCur.StoragePath) is { } count)
                     actions.Add(new InitializeLoop(v, count, body));
@@ -634,7 +634,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
 
         // The dimensions identifier-1 PINNED select a bind-time slice of the plan; the ones the expansion loops
         // over stay as run-time tests, in the same most-inclusive-first order the arms' tuples are written in.
-        var vars = new List<string>();
+        var vars = new List<Position>();
         var varAt = new List<int>();
         for (int i = 0; i < key.Count; i++)
             if (key[i].Var is { } v) { vars.Add(v); varAt.Add(i); }

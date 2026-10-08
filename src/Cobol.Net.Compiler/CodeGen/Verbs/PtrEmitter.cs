@@ -32,7 +32,7 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
             return LoudValue("ManagedPointer", $"ADDRESS OF '{item.CobolName}' without cell storage");
         // A SUBSCRIPTED operand addresses the OCCURRENCE (§8.4.3.11 GR1): the class offset plus the binder's
         // occurrence displacement — the occurrences lie end-to-end in the ONE cell image.
-        string off = a.OccursDisplacement is { } disp ? $"{item.ClassOffset} + {disp}" : $"{item.ClassOffset}";
+        string off = PositionRenderer.Render(new PositionOffset(new PositionConstant(item.ClassOffset), a.OccursDisplacement ?? []));
         // A REFERENCE-MODIFIED operand's address is its leftmost position's (§8.4.3.11.4 GR1 over §8.4.3.3.4 GR5): the
         // checked zero-based position, times the storage width of a position (RefModPlace.PositionBits — a bit
         // position is a bit, so a bit item's byte displacement divides by eight; its SR4 b) alignment proof makes

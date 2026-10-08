@@ -1504,15 +1504,14 @@ public sealed record BoundSetPointer(
 /// <summary><c>ADDRESS OF identifier</c> as a pointer VALUE (ISO §8.4.3.11 GR1; Phase-4b increment 2): for a
 /// BASED item the value IS its implicit data-address pointer (§8.6.5 :8791); for a cell-backed record the
 /// emitter renders <c>ManagedPointer.At(cell, classOffset)</c> over the item's forced/EXTERNAL storage cell.
-/// <paramref name="OccursDisplacement"/> carries a SUBSCRIPTED operand's occurrence displacement —
-/// <c>(idx − 1) × width [+ …]</c> character positions added to the item's class offset (the occurrences lie
-/// end-to-end in the ONE cell image, §8.4.3.11 GR1 — the address OF THE OCCURRENCE); null for an
-/// unsubscripted operand. It is the D10 transitional rendered-index carrier (see
-/// <c>AccessPath</c>/<c>FixedTableSegment</c>) — a <c>BoundExpr</c> when PHASE 15 removes SUBSCRIPT mode.
+/// <paramref name="OccursDisplacement"/> carries a SUBSCRIPTED operand's occurrence displacement — the typed
+/// <c>(idx − 1) × width</c> terms (<see cref="OffsetTerm"/>) of character positions added to the item's class offset
+/// (the occurrences lie end-to-end in the ONE cell image, §8.4.3.11 GR1 — the address OF THE OCCURRENCE); null for an
+/// unsubscripted operand.
 /// <paramref name="RefMod"/> carries a REFERENCE-MODIFIED operand's leftmost position (kb/Work PB1407; null when none
 /// is written): the address is then the one of the unique data item reference modification creates, which §8.4.3.3.4
 /// GR5 makes a subset of identifier-1 starting at that position.</summary>
-public sealed record BoundAddressOf(DataItem Item, string? OccursDisplacement = null, AddressRefMod? RefMod = null);
+public sealed record BoundAddressOf(DataItem Item, IReadOnlyList<OffsetTerm>? OccursDisplacement = null, AddressRefMod? RefMod = null);
 
 /// <summary>The reference modifier of an <c>ADDRESS OF identifier-1(leftmost:length)</c> operand — everything the emitter
 /// needs to turn the written leftmost position into a byte displacement and to range-check it exactly as a read of

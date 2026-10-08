@@ -222,9 +222,10 @@ consolidation:
    - a level-66 view → `RenamesPlace`
 3. **`CapacityRegisterPlace`** becomes a proper read-only view type (it already throws on `Write`); mark it
    `IReadOnlyPlace` so the store-polarity analysis can reject a write at bind time structurally rather than by comment.
-4. **Longer-term (owner-gated, see open Q3):** replace the raw-string `Path`/`OffsetExpr` fields with structured
-   segments (`item + subscript BoundExpr[]`) so the binder stops assembling emit-time C# (`Initialize.cs:327-385`,
-   `TryExpandAll`). This restores the §2 bind/emit boundary. **Phase-gated** — not required to land StorageForm.
+4. **DONE — structured places.** The raw-string `Path`/`OffsetExpr` fields are structured: an `AccessPath` of typed
+   segments, and every subscript, reference-modifier position, view offset and component ordinal a typed `Position`
+   (`PositionOffset` for the offsets and ordinals), rendered only by the code generator (kb/Work PB2151;
+   DESIGN-binder-bound-tree.md §3.9). The binder no longer assembles emit-time C# for a place.
 
 ### 2.3 The REDEFINES tier model (unchanged semantics, owned representation)
 
@@ -883,10 +884,8 @@ before a reader is flipped. Each later phase is a self-contained commit with the
    real REDEFINES type-punning gap).
 2. **Retire the runtime overload bridge (D5)?** Keeping `Occ`/`StoreDisplay`/`FormatDisplay` polymorphic overloads is
    harmless and reduces churn; removing them makes storage-form selection fully explicit at the emitter. Preference?
-3. **Structured `Place` segments (§2.2 item 4)?** Converting `Place.Path`/`OffsetExpr` from raw C# strings to
-   structured `item + BoundExpr[]` segments is the clean fix for binder-assembles-emit-C# (`Initialize`/`TryExpandAll`),
-   but it is a large, separable change touching every verb. Land it in this wave, or defer to the emitter-decomposition
-   wave?
+3. **Structured `Place` segments (§2.2 item 4)?** RESOLVED and landed: typed `AccessPath` segments and the typed
+   `Position` carrier (kb/Work PB2151; DESIGN-binder-bound-tree.md §3.9).
 4. **`BindModel` boundary strictness.** Should `Bind()` return a fully read-only `BindModel` (passes mutate only via
    explicit methods), or is init-only-fields-on-DataItem + a thin accessor object sufficient? The former is cleaner
    but a wider refactor of the ~30 public collections.

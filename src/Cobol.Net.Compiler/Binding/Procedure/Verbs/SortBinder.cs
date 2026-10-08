@@ -206,13 +206,13 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         {
             // A subject whose class backing is not reachable from the statement (a class inside an OCCURS) is a
             // shape the ONE place builder has not built — the resolver's own deferral, never a second answer here.
-            if (ctx.Refs.ResolveItemAt(table, [.. outer, "1"]) is null)
+            if (ctx.Refs.ResolveItemAt(table, [.. outer, new PositionConstant(1)]) is null)
                 return new BoundUnsupported($"SORT of table '{name}': "
                     + DeferredShapes.Describe(DeferredShape.NestedClassBacking));
             // A pointer-class member's VALUE rides the area's managed slot, not its bytes (§14.9.3.4 GR9; kb/Work
             // PB231), and the elements move as byte images: the emitter carries each element's slots with its image
             // (kb/Work PB1922), so every such member needs a window of its own here, placed by the ONE place builder.
-            if (SlotWindow.MembersOf(table).Any(m => ctx.Refs.ResolveItemAt(m, [.. outer, "1"]) is null))
+            if (SlotWindow.MembersOf(table).Any(m => ctx.Refs.ResolveItemAt(m, [.. outer, new PositionConstant(1)]) is null))
                 return new BoundUnsupported($"SORT of table '{name}': "
                     + DeferredShapes.Describe(DeferredShape.UnbuiltAccessPath));
             storage = new TableSortStorage.SharedArea(outer);
@@ -334,7 +334,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                 _ => null,
             } is { } windowOuter)
             foreach (var k in keys)
-                if (ctx.Refs.ResolveItemAt(k.Key, [.. windowOuter, "1"]) is null)
+                if (ctx.Refs.ResolveItemAt(k.Key, [.. windowOuter, new PositionConstant(1)]) is null)
                     return new BoundUnsupported($"SORT table key '{k.Key.CobolName}': "
                         + DeferredShapes.Describe(DeferredShape.UnbuiltAccessPath));
 
@@ -912,7 +912,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     /// on the struct), a key with a NULL member path that the statement reads through its window at an occurrence number
     /// (<see cref="TableSortStorage.TypedArray.KeyWindowOuter"/>; kb/Work PB599). <see langword="null"/> only for a key
     /// no window can be placed for (see <see cref="TableSortKeyUnsupported"/>).</summary>
-    private BoundTableSortKey? TableSortKey(DataItem table, TableSortStorage storage, IReadOnlyList<string> outer,
+    private BoundTableSortKey? TableSortKey(DataItem table, TableSortStorage storage, IReadOnlyList<Position> outer,
         bool descending, DataItem key)
     {
         if (storage is TableSortStorage.SharedArea)
@@ -921,7 +921,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         // No stored field: a REDEFINES-view key (§13.18.44.4 GR1 — every view of the class is the one backing). A key
         // under an inner OCCURS is not a view problem and has no window either (§14.9.40.3 SR14 e / §13.18.38.3 SR6).
         return key.Class is not null && !KeyUnderInnerOccurs(table, key)
-            && ctx.Refs.ResolveItemAt(key, [.. outer, "1"]) is not null
+            && ctx.Refs.ResolveItemAt(key, [.. outer, new PositionConstant(1)]) is not null
             ? new BoundTableSortKey(descending, null, key) : null;
     }
 

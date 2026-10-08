@@ -66,12 +66,13 @@ internal readonly record struct RefModSuffixes(
 
 public sealed partial class ReferenceResolver(DataBinder data)
 {
-    /// <summary>The D18 hook that MATERIALIZES a subscript / ref-mod segment the token renderer cannot render
-    /// (fix-queue PB17): given the segment's verbatim source text and its line, it re-parses the text through
-    /// <c>SubscriptExpressionFragment</c>, binds it through the ONE <c>ExpressionBinder.BindExpr</c>, synthesizes
-    /// the §15.4 temporary via <c>DataBinder.CreateCompilerTemp</c>, registers the store as a statement-scoped
-    /// pending PRE-op on <see cref="DataBinder.PendingPreOps"/>, and returns the temp — which this resolver then
-    /// renders as an ordinary data-name read.
+    /// <summary>The D18 hook that MATERIALIZES a subscript / ref-mod position the direct walk cannot read
+    /// (fix-queue PB17): given the position's PARSED arithmetic expression (null when the written position is not
+    /// one — the hook refuses it by name, COBOLNET2363), its written text for that message and its line, it binds the
+    /// expression through the ONE <c>ExpressionBinder.BindExpr</c>, synthesizes the §15.4 temporary via
+    /// <c>DataBinder.CreateCompilerTemp</c>, registers the store as a statement-scoped pending PRE-op on
+    /// <see cref="DataBinder.PendingPreOps"/>, and returns the temp — which this resolver then reads as an ordinary
+    /// position (<see cref="PositionRead"/>).
     /// <para>⛔ IT IS A HOOK, NOT A COLLABORATOR REFERENCE, because the binder dependency is ONE-WAY:
     /// <c>StatementBinder(DataBinder, ReferenceResolver)</c>. StatementBinder installs it in its constructor (the
     /// <c>ConditionRenderer.Calls</c> property-wire precedent). Null on the DATA-division resolution paths
@@ -87,7 +88,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// but §13.18.38.3 r7's five contexts list "as a subscript" and do NOT list a reference-modification
     /// position, so an index-name in a ref-mod bound was wrongly admitted. One hook, two positions, one context
     /// was the defect; the position is now part of the hook's question.</remarks>
-    internal Func<string, SegmentPosition, int, DataItem?>? MaterializeSegment { get; set; }
+    internal Func<Core.ArithmeticExpressionContext, SegmentPosition, int, DataItem?>? MaterializeSegment { get; set; }
 
     /// <summary>⛔ THE ODO LENGTH IS EVALUATED BEFORE THE REFERENCE MODIFIER (ISO §14.6.4 steps 6 then 7 — "length
     /// evaluation for an occurs-depending group item", then "reference modification", each done in full before the
@@ -484,7 +485,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
             return Refused();
         }
 
-        List<string> indexExprs = [];   // a property temp has no OCCURS: the written subscripts were identifier-3's
+        List<Position> indexExprs = [];   // a property temp has no OCCURS: the written subscripts were identifier-3's
         if (!objectProperty)
         {
             if (report) ScreenLinkageReference(dref, item);
@@ -669,7 +670,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// described by data-name-2 (§13.18.45.4 GR1), never by its own entry (kb/Work PB1380).</para></summary>
     public Place? ResolveItemRefMod(DataItem item, int start, int? length, bool allowZeroLength = false) =>
         PlaceForItem(item, []) is { } inner && RefModExclusion(inner.Item) is null
-            ? RefModView(inner.Item, inner, new RefModSpec(start.ToString(), length?.ToString(), allowZeroLength))
+            ? RefModView(inner.Item, inner, new RefModSpec(new PositionConstant(start), length is { } l ? new PositionConstant(l) : null, allowZeroLength))
             : null;
 
     /// <summary>ISO §8.4.3.3.3 SR1, read as an EXCLUSION test: the reason <paramref name="item"/> may NOT be
@@ -751,8 +752,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
 
     /// <summary>The decimal-integer LITERAL a rendered position is, or null when it is anything else (a data-name
     /// read, an expression, a narrowing call) — the screen's "is this position known at compile time".</summary>
-    private static System.Numerics.BigInteger? LiteralPosition(string? rendered) =>
-        rendered is { Length: > 0 } r && r.All(char.IsAsciiDigit) ? System.Numerics.BigInteger.Parse(r) : null;
+    private static System.Numerics.BigInteger? LiteralPosition(Position? position) =>
+        position is PositionConstant { Value: >= 0 } c ? new System.Numerics.BigInteger(c.Value) : null;
 
     /// <summary>The hook that answers "is checking for EC-BOUND-REF-MOD enabled at this source line?" — installed by
     /// <c>StatementBinder</c> (which owns the statement-level TURN fold, overlays included) exactly as
@@ -816,11 +817,13 @@ public sealed partial class ReferenceResolver(DataBinder data)
                     + "the leftmost position explicitly, for example (1:2).");
             return null;
         }
-        if (RenderSegment(LeafTokens(spec.leftmost), SegmentPosition.RefMod) is not { } rmStart) return null;
-        string? rmLen = null;
+        if (BindPosition(new PositionSegment(LeafTokens(spec.leftmost), spec.leftmost), SegmentPosition.RefMod)
+            is not { } rmStart) return null;
+        Position? rmLen = null;
         if (spec.length is { } lengthExpr)
         {
-            if (RenderSegment(LeafTokens(lengthExpr), SegmentPosition.RefMod) is not { } l) return null;
+            if (BindPosition(new PositionSegment(LeafTokens(lengthExpr), lengthExpr), SegmentPosition.RefMod)
+                is not { } l) return null;
             rmLen = l;
         }
         // §7.3.23 / §8.4.3.3.4 item 5c: the ref-mod allows a zero-length result iff REF-MOD-ZERO-LENGTH is ON at
@@ -895,12 +898,12 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// <see cref="ResolveItem"/> path go through it, so EVERY consumer (verb operands, level-88 / SET conditional
     /// variables, FD record areas) sees identical view resolution.
     /// </summary>
-    private Place? PlaceForItem(DataItem item, IReadOnlyList<string> indexExprs) => PlaceForItem(item, indexExprs, out _);
+    private Place? PlaceForItem(DataItem item, IReadOnlyList<Position> indexExprs) => PlaceForItem(item, indexExprs, out _);
 
     /// <param name="gap">On a null return, the <see cref="DeferredShape"/> this builder has not built — or none,
     /// with the entry whose declaration was refused: a REJECTED (Tier D) REDEFINES view (kb/Work PB1030), or a
     /// level-66 RENAMES entry or the refused entry behind it (kb/Work PB1380).</param>
-    private Place? PlaceForItem(DataItem item, IReadOnlyList<string> indexExprs, out PlaceGap gap)
+    private Place? PlaceForItem(DataItem item, IReadOnlyList<Position> indexExprs, out PlaceGap gap)
     {
         gap = new(null, item);
         // A level-66 RENAMES entry (ISO §13.18.45) is a data item of its own that owns no storage — its place is
@@ -936,24 +939,25 @@ public sealed partial class ReferenceResolver(DataBinder data)
             indexExprs = [.. indexExprs.Skip(outerCount)];
             if (WindowScopeOf(classBacking, BuildCellPath(sc), levels, indexExprs, CellOrdinalBase(sc)) is not { } scope) { gap = new(DeferredShape.UnbuiltAccessPath, item); return null; }
             // A dynamic-capacity table referenced by its subscript IS its element, at offset zero of the element cell.
-            string offset = (item.IsDynamicTable ? 0 : item.ClassOffset) + scope.Terms;
+            Position origin = new PositionConstant(item.IsDynamicTable ? 0 : item.ClassOffset);
             // A BASED class's window is displaced by the data-address pointer's runtime offset (ISO §13.18.5
             // — the view addresses wherever the pointer currently points; Phase-4b increment 2). The backing
             // property renders FIRST in both Read and Write, so the Deref null/bounds traps (GR3/GR4) fire
             // before the null-lenient OffsetOf. Only the record SCOPE is displaced: a dynamic-capacity table's element
             // cell (an area formal may hold one — kb/Work PB2094) has offsets of its own; its component ordinals are
             // displaced the same way (CellOrdinalBase, inside the scope walk).
-            string? based = null;
+            Position? based = null;
             if (sc.BasedPointerField is { } addr && !scope.Nested)
             {
-                based = $"CobolPtr.OffsetOf({addr})";
-                offset = $"{based} + {offset}";
+                based = new PositionPointerOffset(addr);
+                origin = new PositionBinary(based, PositionOperator.Add, origin);
             }
+            var offset = new PositionOffset(origin, scope.Terms);
             // (whole-group image analysis moved OUT of resolve to the post-bind UsageCollectionPass, PHASE-05 Step 5)
             // A class-tier GROUP holding an occurs-depending table is an ODO operand exactly like a struct group
             // (kb/Work PB80: a BASED record — string-canonical — sent its MAXIMUM image; §13.18.38.4 GR8 does not
             // care how the group is stored). ONE wrap rule for both storage shapes.
-            string? dynOrdinal = scope.Cell is null ? null : $"{(item.IsDynamicTable ? 0 : item.ClassDynOrdinal)}{scope.OrdinalTerms}";
+            Position? dynOrdinal = scope.Cell is null ? null : scope.OrdinalAt(item.IsDynamicTable ? 0 : item.ClassDynOrdinal);
             return WrapIfOdoGroup(RedefViewPlace.For(scope.Backing, item, offset, based, scope.BitTerms, scope.Cell, dynOrdinal), item);
         }
         // A Tier-A view forwards to the canonical (a numeric view reinterprets the shared unscaled value via its own
@@ -984,7 +988,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// item that owns no storage of its own. The no-THROUGH form forwards to data-name-2's place (GR1); the
     /// THROUGH form composes a <see cref="RenamesPlace"/> over the spanned storage parts (GR2): string-valued leaves
     /// as they are and every numeric leaf through its storage image (<see cref="SpanLeafPlace"/>).</summary>
-    private Place? PlaceForRenames(DataItem alias, RenamesInfo ren, IReadOnlyList<string> indexExprs, out PlaceGap gap)
+    private Place? PlaceForRenames(DataItem alias, RenamesInfo ren, IReadOnlyList<Position> indexExprs, out PlaceGap gap)
     {
         gap = new(null, alias);
         // A level-66 entry is never a table element, so a written subscript was refused by §8.4.2.3.3 SR2 before
@@ -1021,7 +1025,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 // national character is as addressable as any other (kb/Work PB2466).
                 if (SpanLeafPlace(leaf, part.SubscriptsFor(leaf.Occurs is null ? null : occIdx), out gap) is not { } cell)
                     return null;
-                if (part.IsPartial) cell = new RefModPlace(cell, part.StartByte.ToString(), part.LengthBytes.ToString());
+                if (part.IsPartial) cell = new RefModPlace(cell, new PositionConstant(part.StartByte), new PositionConstant(part.LengthBytes));
                 leafPlaces.Add(cell);
                 widths.Add(part.LengthBytes);   // STORAGE bytes — the unit the alias's image is in (kb/Work PB1665)
                 continue;
@@ -1059,7 +1063,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// <see cref="NationalBytesPlace"/> — after the numeric image, for a usage-national numeric leaf whose image is
     /// national characters. The image is then in the unit every <see cref="RenamesSpanPart"/> is kept in, and a part
     /// that splits a national character is a byte slice of it like any other.</para></summary>
-    private Place? SpanLeafPlace(DataItem leaf, IReadOnlyList<string> indexExprs, out PlaceGap gap)
+    private Place? SpanLeafPlace(DataItem leaf, IReadOnlyList<Position> indexExprs, out PlaceGap gap)
     {
         if (PlaceForItem(leaf, indexExprs, out gap) is not { } place) return null;
         bool stringValued = data.IsImageBackedEarly(leaf) || place is RedefViewPlace
@@ -1086,13 +1090,13 @@ public sealed partial class ReferenceResolver(DataBinder data)
     public Place? ResolveItem(DataItem item) => PlaceForItem(item, []);
 
     /// <summary>The <see cref="Place"/> of ONE OCCURRENCE of an already-resolved <paramref name="item"/> — one
-    /// rendered index expression per OCCURS level of its path, outermost first (the D10 transitional carrier) —
+    /// typed occurrence position per OCCURS level of its path, outermost first —
     /// through the same view-aware builder every verb operand uses. The caller states the occurrence; nothing is
     /// read from source. The Format-2 table SORT of a table in a shared-storage (REDEFINES) class sorts through
     /// these (kb/Work PB1175): each element and each key is a window the class's own offset law positions.
     /// <see langword="null"/> when the count does not match the item's <see cref="DataItem.SubscriptArity"/> or the
     /// item has no built place.</summary>
-    internal Place? ResolveItemAt(DataItem item, IReadOnlyList<string> indexExprs) => PlaceForItem(item, indexExprs);
+    internal Place? ResolveItemAt(DataItem item, IReadOnlyList<Position> indexExprs) => PlaceForItem(item, indexExprs);
 
     /// <summary>⛔ THE ONE RESOLUTION OF AN FD/SD's RECORD AREA (kb/Work PB355). ISO §13.18.33.4 GR3 — "Multiple
     /// level 1 entries subordinate to a FD or SD entry represent implicit redefinitions of the same area" — so
@@ -1137,7 +1141,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// tables only — <see cref="ScreenTableSubjectArity"/> — and §8.4.2.3.3 SR6's rightmost ALL, "equivalent to
     /// omitting the rightmost or only subscript in this context", is admitted and dropped.</param>
     private RefResolution? ReadSubscripts(Core.DataReferenceContext dref, DataItem item,
-        Core.SubscriptPartContext? subCtx, out List<string> indexExprs, bool tableSubject = false)
+        Core.SubscriptPartContext? subCtx, out List<Position> indexExprs, bool tableSubject = false)
     {
         indexExprs = [];
         if (subCtx is null)
@@ -1186,7 +1190,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// refusal. ISO §14.9.40.3 SR13: "Subscripting shall be specified in accordance with 8.4.2.3"; the rule that
     /// shape takes for a table subject is <see cref="ScreenTableSubjectArity"/>.</summary>
     internal RefResolution? ReadTableSubjectSubscripts(Core.DataReferenceContext dref, DataItem table,
-        out List<string> outerIndexExprs) =>
+        out List<Position> outerIndexExprs) =>
         ReadSubscripts(dref, table, SubscriptGroupOf(dref), out outerIndexExprs, tableSubject: true);
 
     /// <summary>⛔ A DATA REFERENCE FOLLOWED BY EMPTY PARENTHESES — <c>WS-X()</c> or <c>WS-X( )</c> — is neither
@@ -1375,7 +1379,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// with identifier-1 … The index-name subscript shall not be followed by a '+' or a '–'" — and the C# index
     /// expression <see cref="InterpretSubscripts"/> produces has already erased both facts: an index-name and an
     /// integer data item of the same value render identically, and <c>IX + 1</c> folds into the arithmetic.</para></summary>
-    internal List<List<IToken>>? SubscriptSegments(Core.DataReferenceContext dref) =>
+    internal List<PositionSegment>? SubscriptSegments(Core.DataReferenceContext dref) =>
         SubscriptSegmentsOf(ReadWritten(dref).SubscriptGroup);
 
     /// <summary>True when any subscript of <paramref name="dref"/>, AS WRITTEN, names the index-name
@@ -1391,7 +1395,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     internal bool SubscriptNamesIndex(Core.DataReferenceContext dref, IndexDeclaration index)
     {
         if (SubscriptSegments(dref) is not { } segs) return false;
-        foreach (var seg in segs)
+        foreach (var seg in segs.Select(s => s.Tokens))
             for (int i = 0; i < seg.Count; i++)
             {
                 var t = seg[i];
@@ -1405,7 +1409,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
 
     /// <summary>The <see cref="SubscriptSegments"/> split over an ALREADY-READ subscript group (the caller has
     /// the <see cref="WrittenReference"/> in hand and need not walk the suffix tail a second time).</summary>
-    private List<List<IToken>>? SubscriptSegmentsOf(Core.SubscriptPartContext? group) =>
+    private List<PositionSegment>? SubscriptSegmentsOf(Core.SubscriptPartContext? group) =>
         group is null ? null : SegmentsOf(group, CannotBeSubscripted);
 
     /// <summary>⛔ THE ONE DECLARATION-INFORMED <c>'('</c> PREDICATE (kb/Work PB136, corrected by PB877) — the
@@ -1431,7 +1435,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     // ── Intrinsic-argument entries (ISO §15.3; consumed by IntrinsicBinder) ─────────────────────────────────
     // The table(ALL) argument resolves its name and renders its non-ALL subscripts itself (it builds an enumeration,
     // not one place) — these thin internal entries expose the SAME private resolution (ResolveUnqualified /
-    // ResolveQualified → PlaceForItem → RenderSegment) so argument references see identical view/qualification/
+    // ResolveQualified → PlaceForItem → BindPosition) so argument references see identical view/qualification/
     // subscript semantics as every verb operand (singular-pattern rule).
 
     /// <summary>Resolve a (possibly OF/IN-qualified) data-name to its <see cref="DataItem"/>, or null. Used by
@@ -1489,26 +1493,25 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// (one per OCCURS level, outermost first). A level-66 RENAMES entry is built by the same
     /// <see cref="PlaceForItem"/> as every other item (kb/Work PB1380); it is never a table element, so a written
     /// subscript on one builds no place.</summary>
-    internal Place? ResolveByName(string name, IReadOnlyList<string> qualifiers, IReadOnlyList<string> indexExprs) =>
+    internal Place? ResolveByName(string name, IReadOnlyList<string> qualifiers, IReadOnlyList<Position> indexExprs) =>
         FindItem(name, qualifiers) is { } item ? PlaceForItem(item, indexExprs) : null;
 
-    /// <summary>Render one subscript token segment to a C# index expression (the private
-    /// <see cref="RenderSegment"/>), or null when the segment uses an unhandled form (caller fails loud).
+    /// <summary>Bind one written subscript to its typed <see cref="Position"/> (the private
+    /// <see cref="BindPosition"/>), or null when it cannot be bound (caller fails loud).
     /// <para>⛔ <paramref name="indexNames"/> IS NOT OPTIONAL (kb/Work PB1472): a caller that renders a subscript
     /// owes §8.4.2.3.3 SR4's association screen (<see cref="ScreenIndexNameAssociation"/>) for the index-names it
     /// wrote, and the collector is how the screen sees them. The only caller outside the resolver, the table(ALL)
     /// intrinsic argument, passed none, so `FUNCTION SUM(E2(IXA, ALL))` with IXA declared on another table compiled
     /// clean while `E2(IXA, 1)` was refused — the second arm of one subscript reading.</para></summary>
-    internal string? RenderIndexSegment(List<IToken> tokens, List<IndexUse> indexNames) =>
-        RenderSegment(tokens, SegmentPosition.Subscript, indexNames);
+    internal Position? BindIndexSegment(PositionSegment segment, List<IndexUse> indexNames) =>
+        BindPosition(segment, SegmentPosition.Subscript, indexNames);
 
     /// <summary>Resolve an <c>ADDRESS OF</c> operand (ISO §8.4.3.11) to its item plus the OCCURS displacement
-    /// of its subscripts — <c>(idx − 1) × width [+ …]</c> character positions within the item's storage class,
-    /// or a null displacement for an unsubscripted (possibly OF/IN-qualified) reference. The address of
-    /// occurrence k is the class cell displaced by the SAME in-class occurrence arithmetic the Tier-B view
+    /// of its subscripts — the <c>(idx − 1) × width</c> character-position terms (<see cref="OffsetTerm"/>) within
+    /// the item's storage class, or a null displacement for an unsubscripted (possibly OF/IN-qualified) reference. The
+    /// address of occurrence k is the class cell displaced by the SAME in-class occurrence law the Tier-B view
     /// window uses (<see cref="PlaceForItem"/> — a table lays its occurrences end-to-end in the ONE cell
-    /// image), so the two share one formula; the displacement string is the D10 transitional index carrier
-    /// (a rendered expression, like <see cref="FixedTableSegment.OneBasedIndex"/>).
+    /// image), so the two share one formula, <see cref="PositionOffset"/>.
     /// <para>⛔ A REFERENCE-MODIFIED OPERAND IS LEGAL (kb/Work PB1407): §8.4.3.11.3 SR4 a) itself speaks of
     /// "subscripting and reference modification in identifier-1", and identifier-1 is a general identifier. It goes
     /// through the ONE ref-mod admission <see cref="ReadScreenedRefMod"/> that <see cref="Resolve"/> uses (SR3
@@ -1562,7 +1565,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         if (occursLevels.Count != exprs.Count) return null;   // wrong subscript count → loud
         // ByteWidth, for the same reason as the PlaceForItem twin above: the class backing is byte-addressed
         // and a NATIONAL element strides two bytes per position (kb/Work PB231; §13.18.60.4 GR8 / D-N1).
-        string disp = string.Join(" + ", occursLevels.Select((lv, k) => $"({exprs[k]} - 1) * {lv.ByteWidth}"));
+        var disp = occursLevels.Select((lv, k) => new OffsetTerm(exprs[k], lv.ByteWidth)).ToList();
         return new AddressOfOperand(item, disp, refMod, bitPlace, extent);
     }
 
@@ -1573,7 +1576,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// modifier (§8.4.3.3.4 5) — "a position outside the area of identifier-1", the area being the group's current
     /// size under §13.18.38.4 GR8); null for every operand whose size is a compile-time fact.</param>
     /// <param name="Item">The data item the reference names (the table ELEMENT's item for a subscripted one).</param>
-    /// <param name="OccursDisplacement"><c>(idx − 1) × width [+ …]</c> bytes within the item's storage class, or null
+    /// <param name="OccursDisplacement">The <c>(idx − 1) × width</c> byte terms within the item's storage class, or null
     /// for an unsubscripted reference — and for an item at or under a dynamic-capacity table, which §8.4.3.11.3 SR6
     /// refuses before any address is formed (no occurrence of one has a fixed stride).</param>
     /// <param name="RefMod">The screened reference modifier, or null when none is written. §8.4.3.11.4 GR1's
@@ -1583,7 +1586,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// built only for a bit item (SR4's proof is a walk over a place); null for any other item and for a shape the
     /// place builder cannot model, which the proof then accepts rather than reject what it cannot prove.</param>
     internal readonly record struct AddressOfOperand(
-        DataItem Item, string? OccursDisplacement, RefModSpec? RefMod, Place? SubscriptedPlace, OdoGroupPlace? CurrentExtent);
+        DataItem Item, IReadOnlyList<OffsetTerm>? OccursDisplacement, RefModSpec? RefMod, Place? SubscriptedPlace,
+        OdoGroupPlace? CurrentExtent);
 
     /// <summary>The STRUCTURAL access path to a Tier-B/Tier-C class's single stored backing field (the
     /// <see cref="RedefViewPlace"/> twin of the old string <c>BackingPath</c>). The backing is emitted in the
@@ -1595,7 +1599,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// DYNAMIC table is reached the same way (kb/Work PB1933): the path's <see cref="DynTableSegment"/> renders its
     /// accessor from the direction <c>PlaceRenderer</c> renders the backing in — <c>RefSending</c> on a read,
     /// <c>RefReceiving</c> (grow-and-seed, §8.5.1.9.3) on a store into the window.</summary>
-    private AccessPath? BuildBackingPath(RedefinesClass cls, IReadOnlyList<string> outerIndexExprs)
+    private AccessPath? BuildBackingPath(RedefinesClass cls, IReadOnlyList<Position> outerIndexExprs)
     {
         if (cls.Canonical.Parent is not { } parent)
             return new AccessPath([new RootFieldSegment(cls.BackingCsName, OmittedFormalGuard.Of(cls.Canonical))]);
@@ -1625,8 +1629,14 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// (§14.2.3 GR8) — numbers its components from the pointer's <c>CellPointer.DynBase</c>, the ordinal twin of the
     /// <c>CobolPtr.OffsetOf</c> its character window is displaced by (an area formal over a subordinate variable-length
     /// group begins at that group's first component). Empty for a class that owns its cell.</summary>
-    internal static string CellOrdinalBase(RedefinesClass cls) =>
-        cls.BasedPointerField is { } addr ? $" + CobolPtr.DynBaseOf({addr})" : "";
+    internal static Position? CellOrdinalBase(RedefinesClass cls) =>
+        cls.BasedPointerField is { } addr ? new PositionPointerDynBase(addr) : null;
+
+    /// <summary>The origin of a component ordinal: the item's static ordinal <paramref name="staticOrdinal"/> in its
+    /// scope, displaced by the scope's run-time ordinal base (<see cref="CellOrdinalBase"/>) when it has one.</summary>
+    internal static Position OrdinalOrigin(int staticOrdinal, Position? ordinalBase) =>
+        ordinalBase is null ? new PositionConstant(staticOrdinal)
+                            : new PositionBinary(new PositionConstant(staticOrdinal), PositionOperator.Add, ordinalBase);
 
     /// <summary>The subscript levels of a reference to <paramref name="item"/> WITHIN its Tier-B class
     /// <paramref name="cls"/>, outermost first: every fixed OCCURS level and every dynamic-capacity table level on
@@ -1643,12 +1653,18 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// <summary>Where a Tier-B class reference's window lives, and its displacements there.</summary>
     /// <param name="Cell">The scope's <c>StorageCell</c> path (null for a REDEFINES class, which has none).</param>
     /// <param name="Backing">The scope's character backing — the class backing, or an element cell's <c>Ref</c>.</param>
-    /// <param name="Terms">The byte displacement of the fixed levels crossed in the scope.</param>
+    /// <param name="Terms">The byte displacement terms of the fixed levels crossed in the scope.</param>
     /// <param name="BitTerms">The same displacement in bits, for a USAGE BIT member.</param>
     /// <param name="OrdinalTerms">The component-ordinal displacement of the same levels (cell only).</param>
     /// <param name="Nested">True when a dynamic-capacity table level opened an element cell's scope.</param>
-    private readonly record struct WindowScope(AccessPath? Cell, AccessPath Backing, string Terms, string BitTerms,
-                                               string OrdinalTerms, bool Nested);
+    private readonly record struct WindowScope(AccessPath? Cell, AccessPath Backing, IReadOnlyList<OffsetTerm> Terms,
+                                               IReadOnlyList<OffsetTerm> BitTerms, Position? OrdinalBase,
+                                               IReadOnlyList<OffsetTerm> OrdinalTerms, bool Nested)
+    {
+        /// <summary>The component ordinal of an item whose static ordinal in the scope is <paramref name="staticOrdinal"/>,
+        /// displaced by the scope's run-time ordinal base and its levels.</summary>
+        public PositionOffset OrdinalAt(int staticOrdinal) => new(OrdinalOrigin(staticOrdinal, OrdinalBase), OrdinalTerms);
+    }
 
     /// <summary>⛔ THE ONE WALK OF A TIER-B REFERENCE'S SUBSCRIPT LEVELS (kb/Work PB1042), outermost first. A fixed
     /// level displaces the window by <c>(index − 1) ×</c> its per-occurrence STORAGE extent — never its
@@ -1662,9 +1678,9 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// <c>Ref</c> is the backing and whose own offsets and ordinals start again at zero. Null when such a level lies in
     /// a class with no cell.</summary>
     private static WindowScope? WindowScopeOf(AccessPath backing, AccessPath? cell, IReadOnlyList<DataItem> levels,
-                                              IReadOnlyList<string> indexExprs, string ordinalBase)
+                                              IReadOnlyList<Position> indexExprs, Position? ordinalBase)
     {
-        string terms = "", bitTerms = "", ordinalTerms = ordinalBase;
+        List<OffsetTerm> terms = [], bitTerms = [], ordinalTerms = [];
         bool nested = false;
         for (int k = 0; k < levels.Count; k++)
         {
@@ -1672,17 +1688,17 @@ public sealed partial class ReferenceResolver(DataBinder data)
             if (level.IsDynamicTable)
             {
                 if (cell is null) return null;
-                cell = cell.Add(CellTableSegment.Of(level, $"{level.ClassDynOrdinal}{ordinalTerms}"))
+                cell = cell.Add(CellTableSegment.Of(level, new PositionOffset(OrdinalOrigin(level.ClassDynOrdinal, ordinalBase), [.. ordinalTerms])))
                            .Add(new DynTableSegment(indexExprs[k]));
                 backing = cell.Add(new MemberSegment(nameof(CobolNet.Runtime.StorageCell.Ref)));
-                (terms, bitTerms, ordinalTerms, nested) = ("", "", "", true);
+                (terms, bitTerms, ordinalBase, ordinalTerms, nested) = ([], [], null, [], true);
                 continue;
             }
-            terms += $" + ({indexExprs[k]} - 1) * {level.ByteWidth}";
-            bitTerms += $" + ({indexExprs[k]} - 1) * {BitLayout.StrideBits(level)}";
-            if (cell is not null) ordinalTerms += $" + ({indexExprs[k]} - 1) * {CellComponents.PerOccurrence(level)}";
+            terms.Add(new OffsetTerm(indexExprs[k], level.ByteWidth));
+            bitTerms.Add(new OffsetTerm(indexExprs[k], BitLayout.StrideBits(level)));
+            if (cell is not null) ordinalTerms.Add(new OffsetTerm(indexExprs[k], CellComponents.PerOccurrence(level)));
         }
-        return new WindowScope(cell, backing, terms, bitTerms, ordinalTerms, nested);
+        return new WindowScope(cell, backing, terms, bitTerms, ordinalBase, ordinalTerms, nested);
     }
 
     /// <summary>⛔ THE ONE ROOT SEGMENT OF AN ITEM'S ACCESS PATH (kb/Work PB971): the item's field, carrying the
@@ -1775,11 +1791,6 @@ public sealed partial class ReferenceResolver(DataBinder data)
     }
 
     // ── Access-path construction (subscripts attach to OCCURS levels, outer→inner) ───────────────────────
-
-    /// <summary>The D10 transitional STRING twin of <see cref="RootOf"/>: the root item's field text, through the
-    /// guard's one rendering when the item is a formal parameter (kb/Work PB971).</summary>
-    private static string RootText(DataItem root) =>
-        OmittedFormalGuard.Of(root) is { } g ? g.Render(root.CsName) : root.CsName;
 
     /// <summary>Why a written reference that NAMES a CAPACITY register still has no place (kb/Work PB457). Each arm
     /// is a syntax rule, not a hole: the register's name identifies it outright (§13.18.38.3 SR30 first sentence),
@@ -1982,7 +1993,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// (outermost first; empty for a non-repeating entry, whose one counter is <see cref="ReportSumFamily.BaseId"/>).
     /// The ONE construction of a procedure-division sum counter place — the ordinary reference and the table(ALL)
     /// intrinsic argument (§15.3) both build through it.</summary>
-    internal ReportSumCounterPlace SumCounterPlace(ReportModel report, ReportSumFamily family, IReadOnlyList<string> indexExprs) =>
+    internal ReportSumCounterPlace SumCounterPlace(ReportModel report, ReportSumFamily family, IReadOnlyList<Position> indexExprs) =>
         new(report.CsIndex, family.BaseId, family.Register, data.ReportDepth(report), indexExprs);
 
     /// <summary>The CURRENT range of level <paramref name="level"/> (outermost first) of a repeating sum counter, for
@@ -2044,8 +2055,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
 
     /// <summary>The STRUCTURAL access path for an item — the <see cref="MemberPlace"/>/<see cref="DynTablePlace"/>
     /// twin of the string <see cref="AccessPath"/>: each chain node is a field segment, each OCCURS level a fixed or
-    /// dynamic table segment carrying its (D10 transitional) index string. Null on a subscript-count mismatch.</summary>
-    private static AccessPath? BuildAccessPath(DataItem item, IReadOnlyList<string> indexExprs,
+    /// dynamic table segment carrying its typed index position. Null on a subscript-count mismatch.</summary>
+    private static AccessPath? BuildAccessPath(DataItem item, IReadOnlyList<Position> indexExprs,
         Func<DataItem, OdoReferenceCheck?>? odo = null)
     {
         var chain = new List<DataItem>();
@@ -2089,7 +2100,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// <para>The three-way switch itself is <see cref="Procedure.OccurrenceCounts.Current"/> — the ONE reading INITIALIZE and the
     /// §14.6.9.2 element moves also take; this entry only supplies the whole-table path a dynamic level's capacity
     /// register needs (the two used to be two copies of the switch, each documented as the one).</para></summary>
-    internal AllCount? CurrentOccurrenceCount(DataItem table, IReadOnlyList<string> outerIndexExprs) =>
+    internal AllCount? CurrentOccurrenceCount(DataItem table, IReadOnlyList<Position> outerIndexExprs) =>
         Procedure.OccurrenceCounts.Current(table, table.IsDynamicTable ? BuildTablePath(table, outerIndexExprs) : null, this);
 
     /// <summary>The §13.18.38.4 GR7 check a subscripted reference through <paramref name="level"/> carries
@@ -2102,12 +2113,12 @@ public sealed partial class ReferenceResolver(DataBinder data)
             ? new OdoReferenceCheck(o.Depending, o.MinOccurs, o.MaxOccurs) : null;
 
     /// <summary>The STRUCTURAL whole-table path to a table that may itself lie under OTHER tables — one index
-    /// expression per enclosing table level, outermost first (the D10 transitional string carrier): the
+    /// position per enclosing table level, outermost first: the
     /// <see cref="CapacityRegisterPlace"/> of a NESTED dynamic-capacity table for a table(ALL) enumeration (ISO §15.3
     /// — each outer occurrence has its own capacity; kb/Work PB62). Null when fewer indices are supplied than there
     /// are enclosing tables — the zero-index form is exactly the whole-table ambiguity the one-argument overload
     /// reports.</summary>
-    internal static AccessPath? BuildTablePath(DataItem table, IReadOnlyList<string> outerIndexExprs)
+    internal static AccessPath? BuildTablePath(DataItem table, IReadOnlyList<Position> outerIndexExprs)
     {
         // A dynamic-capacity table of a CELL-BACKED class is a component of its scope's cell (kb/Work PB1042): the
         // enclosing levels are walked by THE ONE scope walk, and the table is that cell's component.
@@ -2117,7 +2128,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
             outer.RemoveAt(outer.Count - 1);   // the table itself
             if (outerIndexExprs.Count < outer.Count) return null;   // an enclosing table with no index — ambiguous
             return WindowScopeOf(rootCell, rootCell, outer, outerIndexExprs, CellOrdinalBase(cc)) is { Cell: { } scopeCell } s
-                ? scopeCell.Add(CellTableSegment.Of(table, $"{table.ClassDynOrdinal}{s.OrdinalTerms}"))
+                ? scopeCell.Add(CellTableSegment.Of(table, s.OrdinalAt(table.ClassDynOrdinal)))
                 : null;
         }
         var chain = new List<DataItem>();
@@ -2140,59 +2151,23 @@ public sealed partial class ReferenceResolver(DataBinder data)
         return new AccessPath(segs);
     }
 
-    /// <summary>
-    /// The C# member-access path for an item: a static field at the root, else <c>Parent.Child</c> chained, with
-    /// each <paramref name="indexExprs"/> entry inserted at its OCCURS level (outermost first).
-    /// Returns <see langword="null"/> if the subscript count does not match the table's OCCURS dimension.
-    /// </summary>
-    private static string? AccessPath(DataItem item, IReadOnlyList<string> indexExprs,
-        AccessDir dir = AccessDir.Sending)
-    {
-        var chain = new List<DataItem>();
-        for (DataItem? n = item; n is not null; n = n.Parent) chain.Add(n);
-        chain.Reverse();   // root-first
-
-        // §8.4.2.3.3 SR3's count, from THE one place it is written down (DataItem.SubscriptArity, kb/Work PB877):
-        // ANY table level, fixed OR dynamic — a dynamic table IS an OCCURS dimension though its Occurs is null.
-        if (item.SubscriptArity != indexExprs.Count) return null;   // wrong number of subscripts
-
-        string path = "";
-        int si = 0;
-        foreach (var seg in chain)
-        {
-            // The root through THE one guarded-root rendering (kb/Work PB971): a subscript or reference-
-            // modification position that names an omitted formal is a reference to it, like any other.
-            path += path.Length == 0 ? RootText(seg) : "." + seg.CsName;
-            // A FIXED OCCURS routes through the ref-returning CobolTable.At (ISO §8.4.2.3.4 GR2): an out-of-range
-            // occurrence continues benignly with subscript checking off (COBOL-85 semantics — conditions and FAIL
-            // paths legally evaluate one-past-the-end references), instead of a raw CLR IndexOutOfRangeException.
-            if (seg.Occurs is not null) path = $"CobolTable.At({path}, {indexExprs[si++]})";
-            // A DYNAMIC OCCURS (§8.5.1.9.2/.9.3, D9) has direction-specific accessors: RefSending on a read (benign
-            // scratch on OOB), RefReceiving on a write (grows-and-seeds past the current capacity). The direction is
-            // fixed at build time and carried by the DynTablePlace's two paths.
-            else if (seg.IsDynamicTable)
-                path = $"{path}.{(dir == AccessDir.Sending ? "RefSending" : "RefReceiving")}({indexExprs[si++]})";
-        }
-        return path;
-    }
-
     // ── Subscript interpretation (the parsed subscript list, kb/Work PB2113) ───────────────────────────────
 
     /// <summary>True when one subscript segment is the bare word <c>ALL</c> (§8.4.2.3.3 SR6) — the ONE test, asked by
     /// the reference reader and the table(ALL) intrinsic argument alike.</summary>
-    internal static bool IsAllSegment(List<IToken> segment) => segment is [{ Type: Core.ALL }];
+    internal static bool IsAllSegment(PositionSegment segment) => segment.Tokens is [{ Type: Core.ALL }];
 
     /// <param name="indexNames">§8.4.2.3.3 SR4's collector — the index-names used as subscripts, for
     /// <see cref="ScreenIndexNameAssociation"/> at the caller, which knows the table being referenced.</param>
     /// <param name="admitRightmostAll">True only for a Format-2 SORT table subject (§8.4.2.3.3 SR6): a rightmost
     /// <c>ALL</c> is "equivalent to omitting the rightmost or only subscript", so the segment is dropped from the
-    /// result rather than rendered (<see cref="ReadSubscripts"/>).</param>
-    /// <summary>Render each subscript of the written list to a C# <c>long</c> index expression, outermost first; a
-    /// segment that cannot be rendered yields null (→ the caller fails loud).</summary>
-    private List<string>? InterpretSubscripts(
+    /// result rather than bound (<see cref="ReadSubscripts"/>).</param>
+    /// <summary>Bind each subscript of the written list to its typed <see cref="Position"/>, outermost first; a
+    /// segment that cannot be bound yields null (→ the caller fails loud).</summary>
+    private List<Position>? InterpretSubscripts(
         Core.SubscriptPartContext ctx, List<IndexUse>? indexNames = null, bool admitRightmostAll = false)
     {
-        var exprs = new List<string>();
+        var positions = new List<Position>();
         // kb/Work PB136 — declaration-informed '(' splitting, through the ONE predicate (kb/Work PB877): an
         // inline `IsTable` lambda stood here and answered only §8.4.2.3.3 SR2's FIRST half, so a name SUBORDINATE
         // to an OCCURS — legally subscripted, and a legal arithmetic-expression-1 subscript under §8.4.2.3.2 +
@@ -2201,10 +2176,10 @@ public sealed partial class ReferenceResolver(DataBinder data)
         if (admitRightmostAll && segments.Count > 0 && IsAllSegment(segments[^1])) segments.RemoveAt(segments.Count - 1);
         foreach (var seg in segments)
         {
-            if (RenderSegment(seg, SegmentPosition.Subscript, indexNames) is not { } e) return null;
-            exprs.Add(e);
+            if (BindPosition(seg, SegmentPosition.Subscript, indexNames) is not { } p) return null;
+            positions.Add(p);
         }
-        return exprs;
+        return positions;
     }
 
     /// <summary>The parse tree's terminals under <paramref name="node"/>, in source order.</summary>
@@ -2221,7 +2196,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         return tokens;
     }
 
-    /// <summary>A name as the subscript renderer reads one: a word that can name a data item, an index-name or a
+    /// <summary>A name as the subscript reader reads one: a word that can name a data item, an index-name or a
     /// constant (the lexer's own data-name word set, <c>CobolLexer.SubscriptTriggerTokens</c> — IDENTIFIER plus every
     /// context-sensitive word that can be user-defined). Whether it names one HERE is the resolver's question.</summary>
     internal static bool IsNameToken(IToken t) => CobolLexer.SubscriptTriggerTokens.Contains(t.Type);
@@ -2240,45 +2215,70 @@ public sealed partial class ReferenceResolver(DataBinder data)
         return qualifiers;
     }
 
-    /// <summary>⛔ THE WRITTEN SUBSCRIPT LIST AS TOKEN SEGMENTS, ONE PER SUBSCRIPT, read off the PARSE (kb/Work PB2113).
+    /// <summary>ONE written position — a subscript of a subscript list, or a reference modifier's leftmost position or
+    /// length — as the PARSE gives it (kb/Work PB2151). <paramref name="Tokens"/> are its terminals, for the readers
+    /// whose syntax rules are about the written text (§14.9.37.3 SR8/SR9's index-name subscript, §13.10.3 SR3's
+    /// literal subscripts). <paramref name="Operand"/> is the node the position binds from: the subscript item's or
+    /// the modifier's <c>functionArgument</c>; null for <c>ALL</c> and for a piece of a written item the tree cannot
+    /// give a subscript reading (<see cref="SegmentsOf"/>), which the binder refuses by name.
+    /// <paramref name="Cut"/> is the reference inside <paramref name="Operand"/> whose subscript list the
+    /// declarations gave to the NEXT subscript (kb/Work PB136): it is read without that list.
+    /// <paramref name="FromCutList"/> marks that next subscript — the list's single item, written in its own
+    /// parentheses.</summary>
+    internal sealed record PositionSegment(
+        List<IToken> Tokens, Core.FunctionArgumentContext? Operand,
+        Core.DataReferenceContext? Cut = null, bool FromCutList = false);
+
+    /// <summary>⛔ THE WRITTEN SUBSCRIPT LIST AS SEGMENTS, ONE PER SUBSCRIPT, read off the PARSE (kb/Work PB2113).
     /// The grammar already split the list — each <c>subscriptItem</c> is one operand, separated by §8.3.5's space or
-    /// comma/semicolon-plus-space — so a segment is an item's own tokens. Before PB2113 this was a hand-written
-    /// splitter over the SUBSCRIPT lexer mode's flat token run (spaces, commas and depth counting); the one decision
-    /// the grammar cannot make is kept, and it is asked of the tree:
+    /// comma/semicolon-plus-space — so a segment is an item. The one decision the grammar cannot make is kept, and it
+    /// is asked of the tree:
     /// <para>⛔ kb/Work PB136 — the '(' after a name, at an item's own level, is the name's subscript list when the
     /// name can carry one and the start of a NEW subscript when it cannot (§8.4.2.3.3 SR2): Annex D.3.5.3's
     /// <c>DOG (XCOUNTER (- YCOUNTER))</c> is two subscripts, <c>DOG (BAKER (I) 3)</c> two with BAKER(I) the first. The
     /// parser always reads the first way (the lexer typed the paren REF_LPAREN after the name), so a name that
-    /// <paramref name="parenSplitsAfterName"/> says cannot be subscripted has its item cut at that paren — the cut
-    /// the declarations decide, which §8.4.2.3.2 leaves to them. With no predicate (none is known) nothing is cut.</para></summary>
-    internal static List<List<IToken>> SegmentsOf(Core.SubscriptPartContext group,
+    /// <paramref name="parenSplitsAfterName"/> says cannot be subscripted gives its list to a new subscript — the cut
+    /// the declarations decide, which §8.4.2.3.2 leaves to them. With no predicate (none is known) nothing is cut.</para>
+    /// <para>⚠ A cut has a subscript reading only when its list CLOSES the item: the item without the list is the
+    /// first subscript and the list's single item the second. A list followed by more of the item
+    /// (<c>T (A + X (- Y) + 1)</c>, where the tree joins <c>+ 1</c> to <c>X (- Y)</c>), or a second cut in one item,
+    /// has none the tree can give; its pieces carry no operand and the binder refuses them by name (COBOLNET2363)
+    /// rather than re-cut the expression out of its tokens (DESIGN-binder-bound-tree.md §3.9.2).</para></summary>
+    internal static List<PositionSegment> SegmentsOf(Core.SubscriptPartContext group,
         Func<string, List<string>, bool>? parenSplitsAfterName)
     {
-        var segments = new List<List<IToken>>();
+        var segments = new List<PositionSegment>();
         if (group.subscriptList() is not { } list) return segments;
         foreach (var item in list.subscriptItem())
         {
             var tokens = LeafTokens(item);
-            if (parenSplitsAfterName is null) { segments.Add(tokens); continue; }
-            var cuts = new HashSet<IToken>();
-            CollectCuts(item, parenSplitsAfterName, cuts);
-            var current = new List<IToken>();
-            foreach (var t in tokens)
+            var cuts = new List<(Core.DataReferenceContext Ref, Core.SubscriptPartContext List)>();
+            if (parenSplitsAfterName is not null) CollectCuts(item, parenSplitsAfterName, cuts);
+            if (cuts.Count == 0) { segments.Add(new PositionSegment(tokens, item.functionArgument())); continue; }
+            int at = tokens.IndexOf(cuts[0].List.Start);
+            var head = tokens.GetRange(0, at);
+            var tail = tokens.GetRange(at, tokens.Count - at);
+            var cutList = cuts[0].List;
+            bool closes = cuts.Count == 1 && ReferenceEquals(tokens[^1], cutList.Stop);
+            if (!closes)
             {
-                if (cuts.Contains(t) && current.Count > 0) { segments.Add(current); current = []; }
-                current.Add(t);
+                segments.Add(new PositionSegment(head, null));
+                segments.Add(new PositionSegment(tail, null));
+                continue;
             }
-            segments.Add(current);
+            segments.Add(new PositionSegment(head, item.functionArgument(), Cut: cuts[0].Ref));
+            var only = cutList.subscriptList()?.subscriptItem() is [{ } single] ? single.functionArgument() : null;
+            segments.Add(new PositionSegment(tail, only, FromCutList: true));
         }
         return segments;
     }
 
-    /// <summary>The cut points of one subscript item (see <see cref="SegmentsOf"/>): the opening paren of every
-    /// subscript list hung on a name that cannot be subscripted, at the item's OWN level — inside a nested paren
-    /// (another reference's subscripts or reference modifier, a function's arguments, a parenthesized expression)
-    /// the split question belongs to that paren's owner, so the walk does not descend there.</summary>
+    /// <summary>The cut points of one subscript item (see <see cref="SegmentsOf"/>): every subscript list hung on a
+    /// name that cannot be subscripted, at the item's OWN level — inside a nested paren (another reference's
+    /// subscripts or reference modifier, a function's arguments, a parenthesized expression) the split question
+    /// belongs to that paren's owner, so the walk does not descend there.</summary>
     private static void CollectCuts(IParseTree node, Func<string, List<string>, bool> cannotBeSubscripted,
-        HashSet<IToken> cuts)
+        List<(Core.DataReferenceContext Ref, Core.SubscriptPartContext List)> cuts)
     {
         switch (node)
         {
@@ -2295,7 +2295,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
                     }
                     if (sp is null) continue;
                     // §8.4.2.3.2 hangs the list off the whole qualified name (kb/Work PB1455's sweep)
-                    if (cannotBeSubscripted(head.GetText(), qualifiers)) cuts.Add(sp.Start);
+                    if (cannotBeSubscripted(head.GetText(), qualifiers)) cuts.Add((dref, sp));
                     return;   // the first list decides; what follows it is that list's own reading
                 }
                 return;
@@ -2307,128 +2307,142 @@ public sealed partial class ReferenceResolver(DataBinder data)
         for (int i = 0; i < node.ChildCount; i++) CollectCuts(node.GetChild(i), cannotBeSubscripted, cuts);
     }
 
-    /// <summary>Render one subscript / ref-mod segment to a C# <c>long</c> position expression, or
-    /// <see langword="null"/> if it uses a form neither the token renderer nor the D18 materialization route
-    /// handles (so the caller fails loud). The renderer proper is a fast path for the shapes that map to C# text
-    /// one token at a time — integer literals, data-name / index-name references, <c>+ - * /</c> and parentheses,
-    /// i.e. the relative-subscript and simple-index forms. <b>EVERYTHING ELSE routes through
-    /// <see cref="MaterializeViaFragment"/></b>, which re-parses and binds it properly; the renderer is an
-    /// optimization over that route, never the arbiter of what is legal in the position (fix-queue PB42).
-    /// <para>⚠ THAT INVARIANT WAS A CLAIM, NOT A FACT, until kb/Work PB170. A name the renderer CAN render never
-    /// reached the binder, so nothing ever applied §8.8.1.1 to it and <c>T(XE)</c> with <c>XE PIC X(4)</c>
-    /// compiled clean under STRICT — the renderer WAS deciding the position's legality, by omission. It holds now
-    /// because <see cref="ScreenPositionOperandClass"/> asks the same classifier the binder would have asked, so
-    /// the fast path and the D18 route reach the same verdict rather than two different ones.</para>
-    /// <para>⛔ THE FAST PATH'S SCREENS ARE DEFERRED TO ITS COMMIT POINT (kb/Work PB220). They used to fire
-    /// INSIDE the token loop, and the loop's five exits to D18 are ORDER-DEPENDENT — a later token with no case
-    /// arm (<c>**</c>), an unresolvable name, or a scaled operand in a compound abandons the whole fast path
-    /// AFTER an earlier name was already screened, and the D18 route then screens the same operand again through
-    /// the expression binder. Measured: <c>MOVE E(XE ** 2) TO R</c> with <c>XE PIC X(4)</c> emitted COBOLNET0844
-    /// TWICE (and Error+Warning under <c>--permissive</c>, which is worse than either lane alone). A
-    /// <c>_diagnosed</c>-style dedupe cannot fix it — the second diagnostic comes from a different class over a
-    /// different bound operand — so the screens are QUEUED here and flushed only when this method actually
-    /// returns a rendered segment. Every D18 reroute discards the queue, which makes the deduplication a
-    /// property of the control flow rather than of a set, and makes the NEXT late exit automatic.</para></summary>
+    /// <summary>Bind one subscript / ref-mod position to its typed <see cref="Position"/> (kb/Work PB2151), or
+    /// <see langword="null"/> if neither the direct walk nor the D18 materialization route can bind it (so the
+    /// caller fails loud). The direct walk reads the PARSE NODE through the arithmetic grammar and keeps the shapes
+    /// that map to an ordinal term by term — integer literals, data-name / index-name references, <c>+ - *</c>,
+    /// unary minus and written parentheses, i.e. the relative-subscript and simple-index forms. <b>EVERYTHING ELSE
+    /// routes through <see cref="MaterializePosition"/></b>, which binds the same node through the ONE expression
+    /// binder; the walk is an optimization over that route, never the arbiter of what is legal in the position
+    /// (fix-queue PB42).
+    /// <para>⚠ THAT INVARIANT WAS A CLAIM, NOT A FACT, until kb/Work PB170. A name the walk CAN read never reached
+    /// the binder, so nothing ever applied §8.8.1.1 to it and <c>T(XE)</c> with <c>XE PIC X(4)</c> compiled clean
+    /// under STRICT — the walk WAS deciding the position's legality, by omission. It holds now because
+    /// <see cref="ScreenPositionOperandClass"/> asks the same classifier the binder would have asked, so the direct
+    /// walk and the D18 route reach the same verdict rather than two different ones.</para>
+    /// <para>⛔ THE WALK'S SCREENS ARE DEFERRED TO ITS COMMIT POINT (kb/Work PB220). Its exits to D18 are
+    /// ORDER-DEPENDENT — a later operand with no direct form (<c>**</c>), an unresolvable name, or a scaled operand in
+    /// a compound abandons the walk AFTER an earlier name was already screened, and the D18 route then screens the
+    /// same operand again through the expression binder. Measured: <c>MOVE E(XE ** 2) TO R</c> with <c>XE PIC X(4)</c>
+    /// emitted COBOLNET0844 TWICE. So the screens are QUEUED and flushed only when the walk returns a position; every
+    /// D18 reroute discards the queue, which makes the deduplication a property of the control flow.</para></summary>
     /// <param name="indexNames">§8.4.2.3.3 SR4's collector — see
     /// <see cref="ResolveSubscriptName(string,List{string},SegmentPosition,ref List{PendingScreen},out bool,ValueTuple{IToken,List{IndexUse}})"/>.</param>
-    private string? RenderSegment(List<IToken> tokens, SegmentPosition position, List<IndexUse>? indexNames = null)
+    private Position? BindPosition(PositionSegment seg, SegmentPosition position, List<IndexUse>? indexNames = null)
     {
-        var sb = new System.Text.StringBuilder();
-        List<PendingScreen>? pending = null;
-        // ⛔ A COMPOUND segment (one carrying an arithmetic operator) whose operands include a SCALED item cannot
-        // be rendered operand-by-operand, because §8.4.2.3.4 GR1b tests the integrality of THE RESULT of the whole
-        // expression, not of each operand: `W-E(W-P + W-Q)` with W-P = W-Q = 1.5 has the integral result 3.0 and
-        // is a legal subscript, while de-scaling each operand first yields 1 + 1 = 2 AND raises the condition
-        // twice on source that never violated it. Such a segment routes to the D18 materializer, which evaluates
-        // the expression at full precision into the §15.4 temp and applies the integrality rule exactly once — to
-        // the result, where the standard applies it. A SINGLE scaled operand needs no such detour: it IS the
-        // result, so the direct read below is equivalent and cheaper.
+        var tokens = seg.Tokens;
+        // A cut list's position is written in its OWN parentheses, the reference's: it is never a direct term.
+        if (seg.FromCutList || seg.Operand?.arithmeticExpression() is not { } expr)
+            return MaterializePosition(seg, position);
+        // kb/Work PB136: a QUOTIENT-bearing position routes to D18 UNCONDITIONALLY — the direct form would be C#
+        // integer division over long reads, truncating where §8.4.2.3.4 GR1b evaluates the exact result of the whole
+        // expression and requires EC-BOUND-SUBSCRIPT on a non-integer (`E((W-A + W-B) / 2)` with the sum 7 silently
+        // selected occurrence 3).
+        if (tokens.Any(t => t.Type is Core.SLASH)) return MaterializePosition(seg, position);
+        // ⛔ A COMPOUND position (one carrying an arithmetic operator) whose operands include a SCALED item cannot be
+        // read operand by operand, because §8.4.2.3.4 GR1b tests the integrality of THE RESULT of the whole
+        // expression, not of each operand: `W-E(W-P + W-Q)` with W-P = W-Q = 1.5 has the integral result 3.0 and is
+        // a legal subscript, while de-scaling each operand first yields 1 + 1 = 2 AND raises the condition twice on
+        // source that never violated it. Such a position routes to D18, which evaluates the expression at full
+        // precision into the §15.4 temp and applies the integrality rule exactly once — to the result. A SINGLE
+        // scaled operand needs no such detour: it IS the result, so the direct read is equivalent and cheaper.
         bool compound = tokens.Any(t => t.Type is Core.PLUS or Core.MINUS or Core.STAR or Core.SLASH or Core.POWER);
-        // kb/Work PB136: a QUOTIENT-bearing segment routes to D18 UNCONDITIONALLY — the token splice would be
-        // C# integer division over long reads, truncating where §8.4.2.3.4 GR1b evaluates the exact result of
-        // the whole expression and requires EC-BOUND-SUBSCRIPT on a non-integer (`E((W-A + W-B) / 2)` with the
-        // sum 7 silently selected occurrence 3). The scaled-operand routing above (PB41) caught only segments
-        // whose OPERANDS are scaled; an all-integer quotient is exactly the case it could not see.
-        if (tokens.Any(t => t.Type is Core.SLASH))
-            return MaterializeViaFragment(tokens, position);
-        for (int i = 0; i < tokens.Count; i++)
-        {
-            var t = tokens[i];
-            switch (t.Type)
-            {
-                case Core.SIGNED_INTEGERLIT or Core.INTEGERLIT: sb.Append(t.Text); break;
-                case Core.PLUS: sb.Append(" + "); break;
-                case Core.MINUS: sb.Append(" - "); break;
-                case Core.STAR: sb.Append(" * "); break;
-                // GROUPING-PAREN-ONLY (fix-queue PB48): the argument-list twins FNARG_LPAREN/FNARG_RPAREN and the
-                // reference twins REF_LPAREN/REF_RPAREN (kb/Work PB2113) are deliberately absent. A segment carrying
-                // them holds a function call or a nested subscripted / reference-modified name, and the `default:`
-                // arm below routes ANY unrenderable token to D18 — which is where such a segment belongs anyway — so
-                // adding them here would render a call's or a nested reference's parens into a token-by-token string
-                // the rest of this switch cannot complete. PB42's rule ("can the renderer render it") is what makes
-                // the omission safe rather than lucky.
-                case Core.LPAREN: sb.Append('('); break;
-                case Core.RPAREN: sb.Append(')'); break;
-                case var _ when IsNameToken(t):
-                {
-                    // Gather `name (OF|IN qualifier)*` — a QUALIFIED data-name subscript (ISO §8.4.2.3.2).
-                    string name = t.Text;
-                    var qualifiers = QualifiersAfter(tokens, i, out i);
-                    // A FUNCTION-BEARING segment cannot be rendered token-by-token (the head word is a function
-                    // name, not a data-name), so the WHOLE segment routes to D18 rather than this arm failing.
-                    if (IsFunctionBearing(tokens)) return MaterializeViaFragment(tokens, position);
-                    // ⛔ AN UNRESOLVABLE NAME ROUTES TO D18 — IT IS NOT A VERDICT (fix-queue PB50). This arm used
-                    // to `return null`, which is the caller's LOUD posture, and that made it the one place in
-                    // this renderer that decided a segment was unrenderable without asking D18 — contradicting
-                    // the rule stated ten lines below it ("EVERY token the renderer cannot render ROUTES TO
-                    // D18"). The figurative used to arrive here as a plain word (the retired SUBSCRIPT lexer mode
-                    // had no ZERO token), resolve to no data item, and `E(ZERO + 1)` ABORTED AT RUN TIME —
-                    // §8.8.1.1 admits "the figurative constant ZERO" as an arithmetic operand and §8.4.2.3.2
-                    // makes a subscript an arithmetic expression, so that is legal source.
-                    // ⚠ A GENUINELY undefined name keeps the SAME posture, verified rather than assumed:
-                    // `E(NOSUCHNAME + 1)` aborted at run time before this change and aborts at run time after
-                    // it. Only the message improved — it now names `NOSUCHNAME` instead of the whole reference
-                    // text, because the fragment binder reaches the individual operand. (That an undefined
-                    // subscript name is a RUN-TIME abort at all is a separate, pre-existing wrong-stage
-                    // defect; it is recorded in PB50's note, not fixed here.)
-                    if (ResolveSubscriptName(name, qualifiers, position, ref pending, out bool scaled, (t, indexNames)) is not { } readExpr)
-                        return MaterializeViaFragment(tokens, position);
-                    // A scaled operand inside a compound segment — evaluate the whole expression instead (above).
-                    if (scaled && compound) return MaterializeViaFragment(tokens, position);
-                    sb.Append(readExpr);
-                    break;
-                }
-                // ⛔ EVERY token the renderer cannot render ROUTES TO D18 — the gate asks "can this be rendered",
-                // never "is this one of a listed set" (fix-queue PB42). The listed-set version shipped for one
-                // commit and dropped two shapes of plain legal arithmetic on the floor: `W-E(W-I ** 2)` and
-                // `W-E(2.0)` each compiled clean and threw at RUN TIME, because `**` had no case arm and a
-                // decimal literal had none either — while §8.8.1.1 admits "a numeric literal … separated by
-                // arithmetic operators" and §8.3.2.4.2 lists `**` as one, so both are arithmetic-expression-1
-                // under §8.4.2.3.2 and legal in the position.
-                // ⚠ THIS IS NOT THE UNAUDITED-TABLE MISTAKE PB1 TAUGHT, and the reason is structural: the
-                // materializer re-parses the segment through `subscriptExpressionFragment : arithmeticExpression
-                // EOF`, so THE ARITHMETIC-EXPRESSION GRAMMAR IS THE ADJUDICATOR. A shape §8.8.1.1 does not admit
-                // — an alphanumeric literal, an ALL figurative constant (legal only in the §8.4.2.3.3 r6
-                // positions) — cannot parse as an arithmetic expression, so the fragment returns null and the
-                // caller keeps the exact loud posture it had. Nothing is admitted by assertion; it is admitted by
-                // parsing, which is why the NEXT arithmetic token needs no edit here at all.
-                default: return MaterializeViaFragment(tokens, position);
-            }
-        }
-        string expr = sb.ToString().Trim();
-        if (expr.Length == 0) return null;   // the caller's loud posture — nothing was rendered, so nothing is screened
+        List<PendingScreen>? pending = null;
+        bool functionChecked = false;
+        if (Additive(expr.additiveExpression()) is not { } bound) return MaterializePosition(seg, position);
         if (pending is not null && !_probing)   // R30 purity: a probe never diagnoses (kb/Work PB157)
             foreach (var ps in pending)
                 if (ps.Item is { } it) ScreenPositionOperandClass(it, ps.Name, position);
                 else IndexNameInPositionError(ps.Name, position);
-        return expr;
+        return bound;
+
+        Position? Additive(Core.AdditiveExpressionContext a)
+        {
+            var mults = a.multiplicativeExpression();
+            var ops = a.addOp();
+            if (Multiplicative(mults[0]) is not { } acc) return null;
+            for (int i = 0; i < ops.Length; i++)
+            {
+                if (Multiplicative(mults[i + 1]) is not { } right) return null;
+                acc = new PositionBinary(acc, ops[i].MINUS() is null ? PositionOperator.Add : PositionOperator.Subtract, right);
+            }
+            return acc;
+        }
+
+        Position? Multiplicative(Core.MultiplicativeExpressionContext m)
+        {
+            var powers = m.powerExpression();
+            if (Power(powers[0]) is not { } acc) return null;
+            for (int i = 1; i < powers.Length; i++)
+            {
+                if (Power(powers[i]) is not { } right) return null;   // `/` never reaches here (above)
+                acc = new PositionBinary(acc, PositionOperator.Multiply, right);
+            }
+            return acc;
+        }
+
+        // `**` has no direct form (fix-queue PB42): the first operand is read, then the operator abandons the walk.
+        Position? Power(Core.PowerExpressionContext p) =>
+            Unary(p.unaryExpression(0)) is { } first && p.POWER().Length == 0 ? first : null;
+
+        Position? Unary(Core.UnaryExpressionContext u)
+        {
+            if (u.addOp() is { } sign)
+                return Unary(u.unaryExpression()) is { } operand
+                    ? sign.MINUS() is null ? operand : new PositionNegate(operand) : null;
+            return Primary(u.primaryExpression());
+        }
+
+        Position? Primary(Core.PrimaryExpressionContext p)
+        {
+            // GROUPING-PAREN-ONLY: primaryExpression's LPAREN is a written grouping parenthesis; a subscript list's
+            // REF_ parens and a function's FNARG_ parens belong to dataReference / functionCall, which route to D18.
+            if (p.LPAREN() is not null)
+                return Additive(p.arithmeticExpression().additiveExpression()) is { } inner ? new PositionGroup(inner) : null;
+            if (p.numericLiteral() is { } lit) return IntegerLiteral(lit);
+            if (p.dataReference() is not { } dref || !IsNameToken(dref.Start)) return null;
+            // A FUNCTION-BEARING position cannot be read term by term (the head word is a function name, not a
+            // data-name), so the WHOLE position routes to D18. Asked once, at the first name, over the whole position.
+            if (!functionChecked)
+            {
+                functionChecked = true;
+                if (IsFunctionBearing(tokens)) return null;
+            }
+            // A reference carrying its own subscripts, reference modifier or object qualifier is not a bare name —
+            // unless its list is the one the declarations gave to the next subscript (kb/Work PB136).
+            var written = ReadWritten(dref);
+            if (!ReferenceEquals(dref, seg.Cut) && (written.SubscriptGroup is not null || written.IsReferenceModified))
+                return null;
+            if (written.PropertyObject is not null) return null;
+            // ⛔ AN UNRESOLVABLE NAME ROUTES TO D18 — IT IS NOT A VERDICT (fix-queue PB50): the expression binder
+            // reports a genuinely undefined name at the operand itself.
+            if (ResolveSubscriptName(dref.cobolWord().GetText(), written.Qualifiers, position, ref pending,
+                    out bool scaled, (dref.Start, indexNames)) is not { } read) return null;
+            // A scaled operand inside a compound position — evaluate the whole expression instead (above).
+            return scaled && compound ? null : read;
+        }
+    }
+
+    /// <summary>An integer literal (a sign before it is a unary operator of the expression, ISO §8.3.3.3.2) as a
+    /// <see cref="PositionConstant"/>; null for any other numeric literal (a decimal or floating-point literal — the
+    /// D18 route applies §8.4.2.3.4 GR1 b)'s integrality rule to it) and for one beyond the host's <c>long</c>.</summary>
+    private static Position? IntegerLiteral(Core.NumericLiteralContext lit)
+    {
+        var signed = lit.signedNumericLiteral();
+        var core = signed.numericLiteralCore();
+        if (core.ChildCount != 1 || core.Start.Type is not (Core.INTEGERLIT or Core.SIGNED_INTEGERLIT)) return null;
+        // THE ONE integer-literal reader (kb/Work PB1058 / PB1579), at the position intakes' long width: a literal past
+        // it saturates and stays out of every range.
+        if (!CobolNet.Validation.IntegerOperandRules.TryHostPosition(core.Start.Text, out long value, out _)) return null;
+        Position constant = new PositionConstant(value);
+        return signed.MINUS() is null ? constant : new PositionNegate(constant);
     }
 
     /// <summary>A screen the fast path OWES once it commits to rendering the segment — either the §8.8.1.1 class
     /// screen over a resolved item (<see cref="ScreenPositionOperandClass"/>) or the §13.18.38.3 r7 index-name
     /// screen (<see cref="IndexNameInPositionError"/>, <c>Item</c> null). Queued rather than emitted so an exit
     /// to D18 later in the token loop cannot leave a diagnostic behind for the D18 route to duplicate — see
-    /// <see cref="RenderSegment"/>.</summary>
+    /// <see cref="BindPosition"/>.</summary>
     private readonly record struct PendingScreen(DataItem? Item, string Name);
 
     /// <summary>⛔ §8.4.2.3.3 SR4 — THE ONE CONSUMER OF THE INDEX→TABLE ASSOCIATION on the reference side:
@@ -2501,7 +2515,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     private readonly HashSet<object> _indexRefsReported = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>⛔ THE ONE RESOLUTION OF A WRITTEN INDEX-NAME REFERENCE — <c>index-name-1 [OF|IN qualifier] …</c>
-    /// (ISO §8.4.2.2.2 Format 3) — for EVERY position that admits one: a subscript (the token renderer) and the
+    /// (ISO §8.4.2.2.2 Format 3) — for EVERY position that admits one: a subscript (the position walk) and the
     /// identifier positions of SET, PERFORM / SEARCH VARYING and the relation condition (through
     /// <c>ExpressionBinder.IndexFieldOf</c>). kb/Work PB919: both used to look the bare spelling up in a
     /// <c>name → cell</c> map, so a qualified reference was "not defined" and a duplicated one silently read the
@@ -2551,7 +2565,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     }
 
     /// <summary>True when this segment contains a FUNCTION-IDENTIFIER (ISO §8.4.3.1.2 Format 1) and therefore
-    /// belongs to the D18 materialization route rather than the token renderer: either the explicit
+    /// belongs to the D18 materialization route rather than the direct position walk: either the explicit
     /// <c>FUNCTION</c> keyword, or the §8.4.3.2.3 SR2 keyword-omitted form — a REPOSITORY-declared intrinsic or a
     /// user-function name, immediately followed by its parenthesis, that is NOT shadowed by a declared data item (a declared item always wins, exactly as in
     /// <c>IntrinsicBinder.KeywordOmittedFunction</c>; the two must not drift apart, which is why both ask the
@@ -2588,33 +2602,59 @@ public sealed partial class ReferenceResolver(DataBinder data)
         }
     }
 
-    /// <summary>The D18 route (fix-queue PB17, widened by PB42): materialize ANY segment the token renderer
-    /// cannot render into the §15.4 temporary, and render the segment as that temp's ordinary position read. The
-    /// segment's VERBATIM source text is recovered from the char stream (the <c>IntrinsicBinder.ReparseArgs</c>
-    /// idiom — spacing is significant, e.g. <c>A - 4</c> vs <c>A -4</c>) and handed to the
-    /// <see cref="MaterializeSegment"/> hook.
-    /// <para>⛔ IT IS DELIBERATELY NOT GATED ON A TOKEN LIST. The hook re-parses the text through
-    /// <c>subscriptExpressionFragment : arithmeticExpression EOF</c>, so the ARITHMETIC-EXPRESSION GRAMMAR decides
-    /// admissibility: a shape §8.8.1.1 does not admit cannot parse, the hook returns null, and the caller keeps
-    /// its loud posture unchanged. That is what lets a function-identifier, <c>**</c>, a decimal literal and every
-    /// future arithmetic form share ONE route with no per-token edit — and why widening the gate cannot repeat
-    /// PB1's unaudited-table mistake.</para>
+    /// <summary>The D18 route (fix-queue PB17, widened by PB42): materialize ANY position the direct walk cannot
+    /// read into the §15.4 temporary, and read the position as that temp's ordinary position read. The position's
+    /// PARSE NODE — its <c>arithmeticExpression</c> — is handed to the <see cref="MaterializeSegment"/> hook, which
+    /// binds it through the ONE expression binder (kb/Work PB2151: the node is bound where the grammar parsed it; the
+    /// verbatim-text re-parse through an isolated fragment rule is gone).
+    /// <para>⛔ IT IS DELIBERATELY NOT GATED ON A TOKEN LIST. The ARITHMETIC-EXPRESSION GRAMMAR decides
+    /// admissibility: a position that did not parse as an arithmetic expression — the word ALL outside §8.4.2.3.3
+    /// SR6's two contexts, a nonnumeric literal, a piece of an item the declarations cut that has no subscript
+    /// reading (<see cref="SegmentsOf"/>) — is refused here by name (COBOLNET2363, kb/Work PB1030) and never reaches
+    /// the hook. That is what lets a function-identifier, <c>**</c>, a decimal literal and every
+    /// future arithmetic form share ONE route with no per-token edit.</para>
     /// <para>Null when the hook is absent (a data-division resolver builds a throwaway resolver with no procedure
-    /// binder) or the fragment fails to parse or bind — in every such case the caller's loud posture is exactly
-    /// what it was before D18.</para></summary>
-    private string? MaterializeViaFragment(List<IToken> tokens, SegmentPosition position)
+    /// binder) or the hook refuses or defers the position — in every such case the caller's loud posture stands.</para></summary>
+    private Position? MaterializePosition(PositionSegment seg, SegmentPosition position)
     {
-        // R30 PURITY (kb/Work PB157): a probe must not BIND the segment — the hook registers a §15.4 pre-op
-        // and a function-bearing segment would activate TWICE (once per probe+commit). The probe's Place is
-        // discarded after its Item is read, so a dummy occurrence expression is never emitted.
-        if (_probing) return "1";
+        // R30 PURITY (kb/Work PB157): a probe must not BIND the position — the hook registers a §15.4 pre-op and a
+        // function-bearing position would activate TWICE (once per probe+commit). The probe's Place is discarded
+        // after its Item is read, so the dummy occurrence is never emitted.
+        if (_probing) return new PositionConstant(1);
+        var tokens = seg.Tokens;
         if (MaterializeSegment is null || tokens.Count == 0) return null;
-        var first = tokens[0];
-        if (first.InputStream is not { } stream) return null;
-        string text = stream.GetText(
-            new Antlr4.Runtime.Misc.Interval(first.StartIndex, tokens[^1].StopIndex));
-        return MaterializeSegment(text, position, first.Line) is { } temp ? PositionRead(temp, position) : null;
+        // A reference the declarations cut (kb/Work PB136) is read without its list only by the direct walk; inside an
+        // expression the walk cannot read, the tree has no reading of the cut, so the position is refused by name.
+        if ((seg.Cut is null ? seg.Operand?.arithmeticExpression() : null) is not { } expr)
+        {
+            // ⛔ A POSITION THAT IS NOT AN ARITHMETIC EXPRESSION IS NOT A SUBSCRIPT (kb/Work PB1030). §8.4.2.3.2 writes a
+            // subscript as ALL, arithmetic-expression-1, or index-name-1 [{+|-} integer-1] (the last is read directly
+            // and never arrives here), and §8.4.3.3.3 SR4 makes both reference-modifier bounds arithmetic expressions.
+            // What did not parse as one is the word ALL outside the two places §8.4.2.3.3 SR6 admits it (an
+            // intrinsic-function argument or a SORT table's rightmost subscript, neither of which resolves through
+            // here), or not a subscript at all (`E("A")`). It used to be returned unreported, and the caller bound a
+            // run-time NotImplemented that aborted the run unit.
+            string text = tokens[0].InputStream is { } stream
+                ? stream.GetText(new Antlr4.Runtime.Misc.Interval(tokens[0].StartIndex, tokens[^1].StopIndex))
+                : string.Join(" ", tokens.Select(t => t.Text));
+            data.Edition.Error(DiagnosticCatalog.NotASubscript, IllegalPositionMessage(text.Trim(), position));
+            return null;
+        }
+        return MaterializeSegment(expr, position, tokens[0].Line) is { } temp ? PositionRead(temp, position) : null;
     }
+
+    /// <summary>The COBOLNET2363 text for a position that is not an arithmetic expression (kb/Work PB1030) — the
+    /// word ALL in a subscript names §8.4.2.3.3 SR6's two contexts; anything else names the position's own rule.</summary>
+    private static string IllegalPositionMessage(string segment, SegmentPosition position) =>
+        position == SegmentPosition.RefMod
+            ? $"'{segment}' is written as a reference-modification bound, but a leftmost-position and a length shall "
+              + "be arithmetic expressions (ISO §8.4.3.3.3 SR4)."
+        : CobolNames.Same(segment, "ALL")
+            ? "the subscript ALL is written where it is not permitted: ISO §8.4.2.3.3 SR6 — \"The subscript ALL may "
+              + "be used only\" when the subscripted identifier is an intrinsic function argument, or as the rightmost "
+              + "or only subscript of a table in the table format of a SORT statement. Write the occurrence you mean."
+        : $"'{segment}' is written as a subscript, but a subscript is ALL, an arithmetic expression, or an index-name "
+          + "optionally followed by + or - and an integer (ISO §8.4.2.3.2).";
 
     /// <summary>A subscript data-name → its C# read expression: an INDEXED BY index-name (a <c>long</c> field), or
     /// a (possibly OF/IN-qualified, ISO §8.4.2.3.2) numeric data item read; <see langword="null"/> if unresolvable.
@@ -2628,7 +2668,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// referenced, so §8.4.2.3.3 SR4 is applied there (<see cref="ScreenIndexNameAssociation"/>). Threaded rather
     /// than kept on the resolver because the D18 materializer can re-enter this resolver for a nested
     /// reference (kb/Work PB459).</param>
-    private string? ResolveSubscriptName(string name, List<string> qualifiers, SegmentPosition position,
+    private Position? ResolveSubscriptName(string name, List<string> qualifiers, SegmentPosition position,
         ref List<PendingScreen>? pending, out bool scaled, (IToken Token, List<IndexUse>? Into) nameToken)
     {
         scaled = false;
@@ -2646,21 +2686,21 @@ public sealed partial class ReferenceResolver(DataBinder data)
             {
                 // §8.4.2.3.3 SR4 — screened by the caller, which has the table
                 if (ix.Decl is { } decl) nameToken.Into?.Add(new IndexUse(nameToken.Token, decl));
-                return ix.Cell;
+                return IndexCellOf(ix);
             }
             (pending ??= []).Add(new PendingScreen(null, name));
-            return ix.Cell;   // keep rendering: a null here would re-route to D18 and screen the operand twice
+            return IndexCellOf(ix);   // keep reading: a null here would re-route to D18 and screen the operand twice
         }
         // An INTEGER constant-name in a subscript position substitutes its integer literal (ISO §13.10.3 SR2 /
-        // §13.10.4 GR1/GR3 — a subscript is a literal position, §8.4.2.3.2) — its canonical integer text IS the C#
-        // read (IntegerText, not the literal as written: `+5` is a COBOL integer literal, not a C# operand spelling).
+        // §13.10.4 GR1/GR3 — a subscript is a literal position, §8.4.2.3.2) — its VALUE is the position, read by THE ONE
+        // integer-literal reader (kb/Work PB1579).
         if (qualifiers.Count == 0
             && data.FindConstant(name) is { Category: PicCategory.Numeric, IntegerText: { } integer })
-            return integer;
+            return CobolNet.Validation.IntegerOperandRules.TryHostPosition(integer, out long value, out _) ? new PositionConstant(value) : null;
         // A report VARYING counter in scope (§13.18.64.4 GR4's NOTE: "data-name-1 [may] be used … as a subscript to a source
         // data item") is the compose-local integer the placement declares; it is no data item and has no scale.
         if (qualifiers.Count == 0 && VaryingScope is { } counters && counters.TryGetValue(name, out var counter))
-            return $"(long){counter.CsName}";
+            return new PositionLocal(counter.CsName, AsLong: true);
         DataItem? item = qualifiers.Count == 0 ? ResolveUnqualified(name) : ResolveQualified(name, qualifiers);
         if (item is null) return null;
         if (!IntrinsicArgumentRules.IsArithmeticOperandClass(item)) (pending ??= []).Add(new PendingScreen(item, name));
@@ -2685,7 +2725,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// </list>
     /// Before this, the ref-mod fast path carried the R16 posture while its OWN D18 route carried R29's, so
     /// under <c>--permissive</c> <c>W(IX:2)</c> was a hard error and <c>W(IX / 1:2)</c> — the same rule, the same
-    /// position — warned and compiled, keyed on nothing but whether the token renderer could render the
+    /// position — warned and compiled, keyed on nothing but whether the direct walk could read the
     /// bound.</summary>
     private void IndexNameInPositionError(string name, SegmentPosition position)
     {
@@ -2723,14 +2763,14 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// temp and a PendingPreOp for every permissive alphanumeric subscript, changing permissive-lane emitted text
     /// and adding an integrality check where <c>CobolTable.Occ(string)</c> has none. Screening in place keeps the
     /// emit floor byte-identical.</para>
-    /// <para>⚠ AND THE RENDERER'S OWN INVARIANT IS RESTORED, not abandoned: <see cref="RenderSegment"/> documents
+    /// <para>⚠ AND THE RENDERER'S OWN INVARIANT IS RESTORED, not abandoned: <see cref="BindPosition"/> documents
     /// itself as "an optimization over that route, never the arbiter of what is legal in the position", and this
     /// defect falsified it. Asking the ONE classifier the question the binder would have asked is what makes the
     /// sentence true again — the fast path now reaches the same verdict, not a different one.</para>
     /// <para>⚠ PRECONDITION: the class question is asked in <see cref="ResolveSubscriptName"/>
     /// (<c>IntrinsicArgumentRules.IsArithmeticOperandClass</c>) and only a REJECTED item is queued, so this
     /// method composes the message and nothing else. The <c>_probing</c> purity guard lives at the queue's flush
-    /// in <see cref="RenderSegment"/> — ONE place, since that is also where the ordering fix lives
+    /// in <see cref="BindPosition"/> — ONE place, since that is also where the ordering fix lives
     /// (kb/Work PB220).</para></summary>
     private void ScreenPositionOperandClass(DataItem item, string name, SegmentPosition position)
     {
@@ -2785,21 +2825,25 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// profile-less form this replaced decoded that image through a tolerant digit scan: EC-DATA-INCOMPATIBLE was
     /// unreachable and a signed image's sign was dropped. Only a NON-numeric operand — the two <c>--permissive</c>
     /// carriers COBOLNET0844 admits — keeps the bare <c>CobolTable.Occ(path)</c> digit decode.</para>
-    /// <para>⚠ The runtime call is spelled out rather than routed through <c>RuntimeApi</c>: this text is produced
-    /// at BIND time (the D10 transitional string carrier) and the binder cannot reference the CodeGen assembly.
-    /// PHASE 15 CUT 2.5 removed the SUBSCRIPT lexer mode (kb/Work PB2113), so every subscript is now a parse node;
-    /// when the carrier becomes <c>BoundExpr</c>, this rendering moves to the renderer with the rest of it.</para></summary>
-    private string? PositionRead(DataItem item, SegmentPosition position)
+    /// <para>The read is a typed <see cref="PositionItemRead"/> (kb/Work PB2151): the item, its structural path
+    /// and the overload form; <c>CodeGen.PositionRenderer</c> renders it through <c>RuntimeApi</c>.</para></summary>
+    private PositionItemRead? PositionRead(DataItem item, SegmentPosition position)
     {
         bool numeric = item.Pic is { Category: PicCategory.Numeric };
         // ⛔ THE BET ON OVERLOAD RESOLUTION IS ONLY GOOD FOR THE CARRIERS THAT HAVE AN OVERLOAD (kb/Work PB201).
         if (!HasPositionOverload(item, numeric)) return null;
-        if (AccessPath(item, []) is not { } path) return null;
-        if (!numeric) return $"CobolTable.Occ({path})";
-        return position == SegmentPosition.Subscript
-            ? $"CobolTable.Occ({path}, {item.ProfileName})"
-            : $"CobolString.RefModPosition({path}, {item.ProfileName})";
+        // An unsubscripted read: an item inside a table has no path without its subscripts (§8.4.2.3.3 SR3's count).
+        if (BuildAccessPath(item, []) is not { } path) return null;
+        return new PositionItemRead(path, item,
+            !numeric ? PositionReadForm.Digits
+            : position == SegmentPosition.Subscript ? PositionReadForm.Occurrence
+            : PositionReadForm.RefModPosition);
     }
+
+    /// <summary>An index-name reference as a position: its declaration's cell, or — for a failed reference whose
+    /// error already fails the compile — an inert occurrence number, so the bind continues without a cascade.</summary>
+    private static Position IndexCellOf(IndexRef ix) =>
+        ix.Decl is { } decl ? new PositionIndexCell(decl.Cell) : new PositionConstant(1);
 
     /// <summary>⛔ THE FAST PATH'S ADMISSION TEST (kb/Work PB201): can the C# text <see cref="PositionRead"/> is
     /// about to emit actually BIND against the operand's generated field? The bind-time renderer names the field
@@ -2829,9 +2873,9 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// which renders the OCCURS DEPENDING current count at CODEGEN time and has no route to fall back to). But
     /// overloads alone can never close this: a group's carrier can never have a runtime overload, being a
     /// per-program generated type, and a pointer has no numeric value to convert at all. The
-    /// route already exists and is the documented posture: <see cref="RenderSegment"/> is "an optimization over
+    /// route already exists and is the documented posture: <see cref="BindPosition"/> is "an optimization over
     /// that route, never the arbiter of what is legal in the position", so an operand it cannot render is
-    /// <see cref="MaterializeViaFragment"/>'s, where <c>ExpressionBinder</c> screens it under §8.8.1.1 and
+    /// <see cref="MaterializePosition"/>'s, where <c>ExpressionBinder</c> screens it under §8.8.1.1 and
     /// <c>NumericRenderer.FieldNum</c> — THE ONE numeric read — supplies the carrier-correct decode (the float
     /// sending check, the wide tier, and a group's §8.5.2.1 alphanumeric IMAGE, which is exactly the digit decode
     /// the <c>--permissive</c> message promises and the fast path never performed).</para>
@@ -2859,7 +2903,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// reflection. Adding an overload without widening this list leaves the fast path routing a carrier it could
     /// now render; widening this list without the overload puts the CS1503 back. The test fails on either.
     /// <c>Int128</c> must be here for a second reason: the D18 segment temp is a 19-digit integer position item —
-    /// the wide tier — and <see cref="MaterializeViaFragment"/> reads it back through <see cref="PositionRead"/>.</summary>
+    /// the wide tier — and <see cref="MaterializePosition"/> reads it back through <see cref="PositionRead"/>.</summary>
     internal static readonly string[] NumericPositionCarriers =
         ["long", "string", "Int128", "ulong", "UInt128"];
 

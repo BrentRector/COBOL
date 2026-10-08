@@ -329,6 +329,31 @@ internal static class IntegerOperandRules
     /// <param name="saturated">True when the literal's value lies outside the host range and
     /// <paramref name="value"/> is the saturated bound — the fact a site that substitutes a CONSTANT for an
     /// <c>integer-n</c> needs to raise the <see cref="HostLimit"/> diagnostic the literal itself would get.</param>
+    /// <summary>The <c>long</c> twin of <see cref="TryHostValue(string, out int, out bool)"/> for an integer literal
+    /// used as a run-time POSITION (a subscript or a reference-modifier position, kb/Work PB2151): the position
+    /// intakes take a <c>long</c> (<c>CobolNum.Position</c> saturates there), so the literal is read at that width and
+    /// saturates at <see cref="long.MaxValue"/> / <see cref="long.MinValue"/> — still out of every table's and item's
+    /// range, so the range rules downstream find it so.</summary>
+    internal static bool TryHostPosition(string text, out long value, out bool saturated)
+    {
+        value = 0;
+        saturated = false;
+        int digitsFrom = text.Length > 0 && text[0] is '+' or '-' ? 1 : 0;
+        if (digitsFrom == text.Length) return false;
+        for (int i = digitsFrom; i < text.Length; i++)
+            if (!char.IsAsciiDigit(text[i])) return false;
+        if (long.TryParse(text, System.Globalization.NumberStyles.AllowLeadingSign,
+                System.Globalization.CultureInfo.InvariantCulture, out long v))
+            value = v;
+        else
+        {
+            saturated = true;
+            value = text[0] == '-' ? long.MinValue : long.MaxValue;
+        }
+        return true;
+    }
+
+    /// <inheritdoc cref="TryHostValue(string, out int)"/>
     internal static bool TryHostValue(string text, out int value, out bool saturated)
     {
         value = 0;

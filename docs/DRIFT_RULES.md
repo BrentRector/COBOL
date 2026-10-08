@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-288 drift tests.
+289 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -211,6 +211,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [PlaceDenotedItemDriftTests](../tests/Cobol.Net.Tests.Unit/PlaceDenotedItemDriftTests.cs) | ⛔ EVERY Place KIND HAS AN ADJUDICATED ANSWER TO "WHICH DATA ITEM DOES THIS REFERENCE DENOTE?" (kb/Work PB602). | `src` |
 | [PlaceStorageFormSwitchDriftTests](../tests/Cobol.Net.Tests.Unit/PlaceStorageFormSwitchDriftTests.cs) | ⛔ A SWITCH OVER A Place's STORAGE FORM MUST NOT MEET A PlaceDecorator IN ITS DEFAULT ARM (kb/Work PB393). | `src` |
 | [PointerUsageOperandDriftTests](../tests/Cobol.Net.Tests.Unit/PointerUsageOperandDriftTests.cs) | ⛔ THE DRIFT GUARD FOR THE TO-LESS POINTER OPERAND (kb/Work PB848). | — |
+| [PositionCarrierDriftTests](../tests/Cobol.Net.Tests.Unit/PositionCarrierDriftTests.cs) | ⛔ NO POSITION TRAVELS BETWEEN THE BINDER AND THE CODE GENERATOR AS C# TEXT (kb/Work PB2151, D10's second half; docs/rearchitecture/DESIGN-binder-bound-tree.md §3.9). | `src/Cobol.Net.Compiler/Binding`, `src` |
 | [PositionCarrierOverloadDriftTests](../tests/Cobol.Net.Tests.Unit/PositionCarrierOverloadDriftTests.cs) | ⛔ THE BIND-TIME RENDERER NAMES A FIELD AND LETS C# OVERLOAD RESOLUTION SUPPLY THE CONVERSION — SO THE SET OF CARRIERS IT MAY NAME IS THE RUNTIME METHOD'S OVERLOAD SET, AND NOTHING ELSE (kb/Work PB201, PB1117). | — |
 | [PredefinedNullContextDriftTests](../tests/Cobol.Net.Tests.Unit/PredefinedNullContextDriftTests.cs) | ⛔ THE PREDEFINED NULL HAS ONE OPERAND MODEL, AND ONLY A §8.4.3.10.3 SR1 CONTEXT MAY PRODUCE IT (kb/Work PB1427). | `src/Cobol.Net.Compiler`, `src/Cobol.Net.Frontend/Grammar` |
 | [PrintedFormatAlternativeDriftTests](../tests/Cobol.Net.Tests.Unit/PrintedFormatAlternativeDriftTests.cs) | ⛔ THE GRAMMAR SHAPE THAT MAKES THE NEXT FORMAT AUTOMATIC, HELD TRUE (kb/Work PB412, PB421). | `src/Cobol.Net.Frontend/Grammar`, `specs/ISO_COBOL.md` |

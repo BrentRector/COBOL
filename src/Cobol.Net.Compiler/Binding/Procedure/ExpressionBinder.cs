@@ -90,7 +90,7 @@ internal enum OperandContext
 /// <see cref="ExpressionBinder.BindExpr"/> — rather than by declaring that §8.8.1.1 governs it, and the two
 /// questions it actually has to answer were recorded in four different places: an enum member at ten sites, a
 /// call-site comment at two, a private category switch at three, and NOWHERE AT ALL in
-/// <c>ReferenceResolver</c>'s token renderer. All four defects of the cluster are one site answering one axis
+/// <c>ReferenceResolver</c>'s subscript reader. All four defects of the cluster are one site answering one axis
 /// wrongly or not at all.
 /// <list type="number">
 ///   <item><b>NumericClassScreen</b> — does §8.8.1.1's class-numeric screen govern this position, or does the

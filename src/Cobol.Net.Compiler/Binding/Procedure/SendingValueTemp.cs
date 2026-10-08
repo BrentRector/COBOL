@@ -76,7 +76,7 @@ namespace CobolNet.Binding.Procedure;
 internal sealed class SendingValueTemp(BinderContext ctx)
 {
     /// <summary>The §15.4 temporary's description for a NUMERIC function-identifier value — THE SAME shape
-    /// <c>StatementBinder.MaterializeSubscriptSegment</c> gives the §15.4 temporary of a function-bearing
+    /// <c>StatementBinder.BindPositionTemporary</c> gives the §15.4 temporary of a function-bearing
     /// subscript, written once here so the two cannot drift. §15.4.1: "When native arithmetic is in effect, the
     /// characteristics and representation of the returned value are defined by the implementor."
     /// <para>21 integer digits × 9 fraction digits — 30 total, so the item takes the <c>Int128</c> wide tier

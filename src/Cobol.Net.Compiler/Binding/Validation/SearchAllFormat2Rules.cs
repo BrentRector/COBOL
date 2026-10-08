@@ -410,7 +410,7 @@ internal readonly struct SearchAllFormat2Rules(DataBinder data, ReferenceResolve
     {
         int pos = OdoModel.SubscriptPositionOf(item, table);
         var segs = refs.SubscriptSegments(dref);
-        List<IToken> toks = pos >= 0 && segs is not null && pos < segs.Count ? segs[pos] : [];
+        List<IToken> toks = pos >= 0 && segs is not null && pos < segs.Count ? segs[pos].Tokens : [];
         if (toks.Count == 0)
             return Key(table, $"'{DataBinder.WrittenText(dref)}' is not subscripted by '{firstIndex}': it \"shall be "
                 + "subscripted by the first index-name associated with identifier-1 along with any subscripts "

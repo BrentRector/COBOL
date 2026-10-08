@@ -615,21 +615,9 @@ fnArgPhraseWord
     | NATIONAL
     ;
 
-// The D18 SUBSCRIPT-EXPRESSION re-parse entry (binder-invoked only; ISO §8.4.2.3.2 admits `arithmetic-expression-1`
-// as a subscript and §8.4.3.3.3 SR4 as a reference-modifier position). A subscript / ref-mod SEGMENT that the
-// token renderer (ReferenceResolver.RenderSegment) cannot render — today a function-identifier,
-// fix-queue PB17 — is re-lexed from its VERBATIM source text and parsed through the ONE arithmeticExpression rule,
-// so it binds through ExpressionBinder.BindExpr exactly as every other arithmetic expression does. That is what
-// keeps the token renderer a token renderer instead of growing a THIRD hand-written expression compiler beside
-// ExpressionBinder and IntrinsicRenderer.
-// Referenced by nothing in compilationUnit, so ZERO blast radius on the main parse. The main parse already delimited
-// the segment (kb/Work PB2113 — subscriptList's items), so the DEFAULT lexer mode is right here: no list region is
-// open in one subscript. (The whole route goes when subscripts bind as BoundExpr, D10's second half.)
-subscriptExpressionFragment : arithmeticExpression EOF ;
-
 // ── COMPILE-TIME DIRECTIVE-EXPRESSION fragments (ISO §7.3.6 arithmetic / §7.3.7 boolean / §7.3.8 constant-
 // conditional-expression). Isolated fragment entry rules — reachable ONLY from the frontend's directive-expression
-// re-parse (the subscriptExpressionFragment precedent: referenced by nothing in compilationUnit, so ZERO blast radius
+// re-parse (referenced by nothing in compilationUnit, so ZERO blast radius
 // on the main parse). They reuse the existing operand sub-rules (arithmeticExpression / booleanExpression /
 // nonNumericLiteral / comparisonOperator / cobolWord) — no duplicated expression grammar. The lexer is primed with
 // PrimeDirectiveExpr() so DEFINED is a token and every '(' groups. Evaluated by the ONE shared

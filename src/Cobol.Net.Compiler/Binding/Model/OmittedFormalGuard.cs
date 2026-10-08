@@ -36,28 +36,4 @@ public sealed record OmittedFormalGuard(string Presence, ActivatedElementKind Ki
     /// Tier-A/Tier-B view of a REDEFINES class whose canonical is the formal — the canonical's (a redefinition
     /// of the formal names the formal's storage).</summary>
     public static OmittedFormalGuard? Of(DataItem root) => root.OmittedGuard ?? root.Class?.Canonical.OmittedGuard;
-
-    /// <summary>⛔ THE ONE RENDERING of a guarded root (kb/Work PB971): <paramref name="rootText"/> — the root's
-    /// field text, possibly <c>__outer.</c>-prefixed — wrapped in the runtime guard, which raises the kind's
-    /// condition when the argument was omitted and yields the SAME storage (by <c>ref</c>, or the carrier passed
-    /// through), so the wrapped text is still an lvalue for a store, a member access or a table accessor.
-    /// <para>It lives on the model rather than in <c>PlaceRenderer</c> because TWO renderers emit root text: the
-    /// structural <c>PlaceRenderer.RenderPath</c> and the resolver's D10 transitional string paths (subscript /
-    /// ref-mod positions, whole-table paths) — the same bind-time C# text the resolver already spells for
-    /// <c>CobolTable.Occ</c>. One method, so the two cannot drift; it moves to the renderer with the rest of the
-    /// string carrier at PHASE 15.</para></summary>
-    public string Render(string rootText)
-    {
-        string tail = $"{Presence}, {nameof(ActivatedElementKind)}.{Kind}, \"{FormalName}\")";
-        if (CarrierPrefix is not { } carrier)
-            return $"{nameof(OmittedFormal)}.{nameof(OmittedFormal.Ref)}(ref {rootText}, {tail}";
-        // The carrier is the leading reference-type part of the root text ("__lnk7" of "__lnk7.Value", after
-        // any "__outer." re-anchoring); the rest ("…Value") applies to what the guard hands back.
-        int at = rootText.IndexOf(carrier, System.StringComparison.Ordinal);
-        if (at < 0)
-            throw new System.InvalidOperationException(
-                $"OmittedFormalGuard: root text '{rootText}' does not contain its carrier '{carrier}' (kb/Work PB971)");
-        int end = at + carrier.Length;
-        return $"{nameof(OmittedFormal)}.{nameof(OmittedFormal.Carrier)}({rootText[..end]}, {tail}{rootText[end..]}";
-    }
 }

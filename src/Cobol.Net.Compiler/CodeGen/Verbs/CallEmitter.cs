@@ -521,7 +521,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         if (p is RefModPlace rm)
         {
             if (rm.Inner is not RedefViewPlace) return null;
-            start = rm.Start;
+            start = PositionRenderer.Render(rm.Start);
             p = rm.Inner;
         }
         // A bit item's positions are bits and a national one's two bytes each, so only an identity-coded view's start is
@@ -529,11 +529,13 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         if (FullAllocation(p) is not RedefViewPlace { Cell: { } cell } view
             || start is not null && view.Coding is not null) return null;
         // ⛔ A BIT ITEM HAS AN AREA TOO (kb/Work PB2095): its window is stated in BIT positions of the cell
-        // (BitWindow.OffsetExpr, absolute in the cell), and §14.9.4.3 SR6 — "identifier-2 shall be described such that
+        // (BitWindow.Offset, absolute in the cell), and §14.9.4.3 SR6 — "identifier-2 shall be described such that
         // it is aligned on a byte boundary" — makes a BY REFERENCE bit item's first bit a whole number of characters
         // into the cell, so its area begins at that bit offset over the bits a character holds. The activated element's
         // bit-group area formal windows its bits at BitsPerCharacter × the area's offset (PlaceRenderer), the same unit.
-        string at = view.Bit is { } bit ? $"({bit.OffsetExpr}) / {BitLayout.BitsPerCharacter}" : view.OffsetExpr;
+        string at = view.Bit is { } bit
+            ? $"({PositionRenderer.Render(bit.Offset)}) / {BitLayout.BitsPerCharacter}"
+            : PositionRenderer.Render(view.Offset);
         string offset = start is null ? at : $"({at}) + ({start}) - 1";
         // ⛔ A VARIABLE-LENGTH GROUP'S AREA ALSO BEGINS AT A COMPONENT (kb/Work PB2094): its dynamic-length items and
         // dynamic-capacity tables are slots of the cell numbered from the group's first component ordinal
@@ -543,7 +545,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         // to share its storage, so the formal holds a copy.
         if (view.Coding is VarGroupWindow g)
             return view.DenotedItem is { } group && VariableLengthCompatibility.GroupAtoms(group) is { } atoms
-                ? RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset, g.DynBase, RuntimeApi.GroupAtomsNew(atoms))
+                ? RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset, PositionRenderer.Render(g.DynBase), RuntimeApi.GroupAtomsNew(atoms))
                 : null;
         return RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset);
     }

@@ -1,7 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Model;
-using CobolNet.Editions.Diagnostics;
 using CobolNet.Runtime;
 
 namespace CobolNet.Binding.Bound;
@@ -25,27 +24,22 @@ namespace CobolNet.Binding.Bound;
 /// required one syntactically (SR14 confirms it from the other side, having to impose that restriction
 /// <i>specially</i> for a BY REFERENCE bit item).</para>
 ///
-/// <para><b>The decision.</b> Materialize what §15.4 already describes, rather than teaching
-/// <c>ReferenceResolver.RenderSegment</c> — a hand-rolled token renderer that emits C# text at BIND time — to
-/// render function calls, which would make it a THIRD expression compiler beside <c>ExpressionBinder</c> and
-/// <c>IntrinsicRenderer</c>. The segment's verbatim text re-parses through the isolated
-/// <c>subscriptExpressionFragment</c> rule and binds through the ONE <c>ExpressionBinder.BindExpr</c> (already
-/// documented as the entry "for COMPUTE, the arithmetic verbs, subscripts, reference-modifier offsets"), so a
-/// USER-defined function, a nested function, and a keyword-omitted reference all fall out of the same change.
-/// The value lands in a compiler temp via <c>DataBinder.CreateCompilerTemp</c> — "THE ONE synthesized-
-/// compiler-temp constructor" — whose store registers as a statement-scoped pending PRE-op on the shared
-/// <c>DataBinder.PendingPreOps</c>, drained at the <c>BindStatement</c> chokepoint by the mark-on-entry /
+/// <para><b>The decision.</b> Materialize what §15.4 already describes, rather than teaching the resolver's direct
+/// position walk to read function calls, which would make it a THIRD expression compiler beside
+/// <c>ExpressionBinder</c> and <c>IntrinsicRenderer</c>. The position's PARSE NODE — its
+/// <c>arithmeticExpression</c>, where the grammar parsed it — binds through the ONE
+/// <c>ExpressionBinder.BindExpr</c> (documented as the entry "for COMPUTE, the arithmetic verbs, subscripts,
+/// reference-modifier offsets"), so a USER-defined function, a nested function, and a keyword-omitted reference
+/// all fall out of the same route. The value lands in a compiler temp via <c>DataBinder.CreateCompilerTemp</c> —
+/// "THE ONE synthesized-compiler-temp constructor" — whose store registers as a statement-scoped pending PRE-op on
+/// the shared <c>DataBinder.PendingPreOps</c>, drained at the <c>BindStatement</c> chokepoint by the mark-on-entry /
 /// drain-own-suffix protocol that already served the UDF and object-property clients.</para>
 ///
-/// <para>⛔ <b>The alternative that is FORBIDDEN, not merely worse:</b> migrating
-/// <c>RefModPlace.Start</c>/<c>Length</c> to <c>BoundExpr</c>. They are the documented <b>D10 TRANSITIONAL
-/// carrier</b>, deliberately the same shape as <c>RefModSpec</c> "so PHASE 15 migrates both in one move rather
-/// than leaving a second, differently-shaped ref-mod behind", and D10 is an owner ruling executed as PHASE 15
-/// §"CUT 2.5". Its first half landed with kb/Work PB2113 — the SUBSCRIPT lexer mode, the <c>SUB_*</c> tokens and the
-/// hand-rolled splitter are gone and every subscript is a parse node — and its second half moves these positions
-/// onto <c>BoundExpr</c>. The string carrier is deliberate sequencing, not decay — and when that half lands, THIS
-/// temp path is deleted with it. It is a mechanism designed to be deleted, which is precisely why it must not grow a second carrier
-/// in the meantime.</para>
+/// <para>⛔ <b>One parse, one tree (kb/Work PB2151, D10's second half).</b> Until PB2151 the route recovered the
+/// segment's verbatim TEXT and re-parsed it through a second, isolated grammar entry, so one position was parsed
+/// twice and its temporary was named for the fragment's line 1. The node is now bound where it was parsed, and the resolver reads the temporary back as a typed <c>PositionItemRead</c>
+/// (DESIGN-binder-bound-tree.md §3.9): the route is the general arm of the typed position carrier, not a
+/// transitional one.</para>
 /// </summary>
 public sealed partial class StatementBinder
 {
@@ -67,22 +61,12 @@ public sealed partial class StatementBinder
     private static readonly PicInfo SegmentTempPic =
         new(PicCategory.Numeric, Usage.Display, Length: 19, Digits: 19, Scale: 0, Signed: true);
 
-    /// <summary>The COBOLNET2363 text for a segment that is not an arithmetic expression (kb/Work PB1030) — the
-    /// word ALL in a subscript names §8.4.2.3.3 SR6's two contexts; anything else names the position's own rule.</summary>
-    private static string IllegalSegmentMessage(string segment, SegmentPosition position) =>
-        position == SegmentPosition.RefMod
-            ? $"'{segment}' is written as a reference-modification bound, but a leftmost-position and a length shall "
-              + "be arithmetic expressions (ISO §8.4.3.3.3 SR4)."
-        : CobolNames.Same(segment, "ALL")
-            ? "the subscript ALL is written where it is not permitted: ISO §8.4.2.3.3 SR6 — \"The subscript ALL may "
-              + "be used only\" when the subscripted identifier is an intrinsic function argument, or as the rightmost "
-              + "or only subscript of a table in the table format of a SORT statement. Write the occurrence you mean."
-        : $"'{segment}' is written as a subscript, but a subscript is ALL, an arithmetic expression, or an index-name "
-          + "optionally followed by + or - and an integer (ISO §8.4.2.3.2).";
-
-    /// <summary>Materialize one function-bearing subscript / ref-mod segment (the D18 route; the
-    /// <c>ReferenceResolver.MaterializeSegment</c> hook). Returns the §15.4 temporary the segment's value lands
-    /// in, or <see langword="null"/> to leave the caller's loud posture untouched.
+    /// <summary>Materialize one position the resolver's direct walk cannot read — a function-bearing subscript or
+    /// ref-mod bound, a division, an exponentiation, a decimal literal (the D18 route; the
+    /// <c>ReferenceResolver.MaterializeSegment</c> hook), given the position's own <c>arithmeticExpression</c> parse
+    /// node (kb/Work PB2151: the node is bound where the grammar parsed it). Returns the §15.4 temporary the value
+    /// lands in, or <see langword="null"/> to leave the caller's loud posture untouched. A position that is not an
+    /// arithmetic expression never arrives: the resolver refuses it by name (COBOLNET2363, kb/Work PB1030).
     ///
     /// <para><b>Ordering is why this binds HERE and not at the drain.</b> A nested segment
     /// (<c>W-E(FUNCTION INTEGER(W-F(FUNCTION INTEGER(2))))</c>) resolves its inner reference while THIS bind
@@ -94,38 +78,9 @@ public sealed partial class StatementBinder
     /// numeric renderer and the ONE arithmetic store path, but the integrality question is asked of the value on
     /// its own carrier BEFORE the store, which a <c>BoundCompute</c> into a fixed-scale temp could not do (kb/Work
     /// PB1890). The temp is the saturated integer position, so a size error at the store is unreachable.</para></summary>
-    /// <summary>⛔ THE ODO LENGTH BEFORE THE REFERENCE MODIFIER (ISO §14.6.4 steps 6 and 7; the
-    /// <c>ReferenceResolver.FreezeOdoExtent</c> hook; kb/Work PB1123). The reference modifier's position was
-    /// materialized above as pre-ops from <paramref name="preOpMark"/> on, and a pre-op that activates a function can
-    /// change the DEPENDING ON object, so the object's value is copied into a compiler temp as a pre-op INSERTED at
-    /// <paramref name="preOpMark"/> — ahead of every one of them — and the group's extent reads the temp. The copy
-    /// is a plain MOVE of the object into a temp of its own description, so the length it pins is exactly the value
-    /// the operand site would have read had no pre-op run first.</summary>
-    private Place FreezeOdoExtentBeforeRefMod(OdoGroupPlace odo, int preOpMark, int line)
+    private DataItem? BindPositionTemporary(Frontend.Generated.CobolParserCore.ArithmeticExpressionContext expr,
+        SegmentPosition position, int line)
     {
-        var temp = data.CreateCompilerTemp(odo.Depending.Item, "__REFODO-", "__refodo", $"L{line}");
-        if (Ctx.Refs.ResolveItem(temp) is not { } frozen) return odo;
-        data.PendingPreOps.Insert(preOpMark, new BoundMove(new BoundFieldOperand(odo.Depending), [frozen]));
-        return odo with { Depending = frozen };
-    }
-
-    private DataItem? MaterializeSubscriptSegment(string text, SegmentPosition position, int line)
-    {
-        if (Frontend.Parsing.SubscriptExpressionFragment.Parse(text, Ctx.Edition.Edition, Ctx.Retypes) is not { } frag)
-        {
-            // ⛔ A SEGMENT THAT IS NOT AN ARITHMETIC EXPRESSION IS NOT A SUBSCRIPT (kb/Work PB1030). The renderer
-            // routes here every token it cannot render itself, and this parse is the adjudicator: §8.4.2.3.2 writes
-            // a subscript as ALL, arithmetic-expression-1, or index-name-1 [{+|-} integer-1] (the last renders on
-            // the fast path and never arrives here), and §8.4.3.3.3 SR4 makes both reference-modifier bounds
-            // arithmetic expressions. What fails the parse is therefore the word ALL outside the two places
-            // §8.4.2.3.3 SR6 admits it — an intrinsic-function argument or a SORT table's rightmost subscript,
-            // neither of which resolves through here — or not a subscript at all (`E("A")`). This used to return
-            // null UNREPORTED, and the resolver's caller bound a run-time NotImplemented: `DISPLAY E("A")`
-            // compiled with a "not implemented" warning and aborted the run unit.
-            Ctx.Edition.Error(DiagnosticCatalog.NotASubscript, IllegalSegmentMessage(text.Trim(), position));
-            return null;
-        }
-
         // ⛔ THE POSITION DECIDES THE CONTEXT (kb/Work PB170/PB172). ISO §13.18.38.3 r7 lists five contexts in
         // which an index-name may be referenced — "as a subscript; in the VARYING phrase of a PERFORM statement;
         // in the VARYING phrase of a SEARCH statement; in the SET statement; as an operand in a relation
@@ -135,8 +90,8 @@ public sealed partial class StatementBinder
         // SR4 makes both ref-mod bounds plain arithmetic expressions, so they bind under Arithmetic, where the
         // r7 screen fires.
         var value = position == SegmentPosition.Subscript
-            ? Expr.BindIndexNameWindowExpr(frag.arithmeticExpression())   // a SUBSCRIPT: r7 yes, SR10 no (kb/Work R29, PB215)
-            : Expr.BindExpr(frag.arithmeticExpression());             // a ref-mod bound is NOT (§8.4.3.3.3 SR4)
+            ? Expr.BindIndexNameWindowExpr(expr)   // a SUBSCRIPT: r7 yes, SR10 no (kb/Work R29, PB215)
+            : Expr.BindExpr(expr);             // a ref-mod bound is NOT (§8.4.3.3.3 SR4)
         if (value is BoundExprError err)
         {
             // Refused: the expression binder reported it. Unbuilt: an operand of the segment is a deferred shape, so
@@ -154,5 +109,20 @@ public sealed partial class StatementBinder
 
         data.PendingPreOps.Add(new BoundPositionValue(value, place, RefMod: position == SegmentPosition.RefMod));
         return temp;
+    }
+
+    /// <summary>⛔ THE ODO LENGTH BEFORE THE REFERENCE MODIFIER (ISO §14.6.4 steps 6 and 7; the
+    /// <c>ReferenceResolver.FreezeOdoExtent</c> hook; kb/Work PB1123). The reference modifier's position was
+    /// materialized above as pre-ops from <paramref name="preOpMark"/> on, and a pre-op that activates a function can
+    /// change the DEPENDING ON object, so the object's value is copied into a compiler temp as a pre-op INSERTED at
+    /// <paramref name="preOpMark"/> — ahead of every one of them — and the group's extent reads the temp. The copy
+    /// is a plain MOVE of the object into a temp of its own description, so the length it pins is exactly the value
+    /// the operand site would have read had no pre-op run first.</summary>
+    private Place FreezeOdoExtentBeforeRefMod(OdoGroupPlace odo, int preOpMark, int line)
+    {
+        var temp = data.CreateCompilerTemp(odo.Depending.Item, "__REFODO-", "__refodo", $"L{line}");
+        if (Ctx.Refs.ResolveItem(temp) is not { } frozen) return odo;
+        data.PendingPreOps.Insert(preOpMark, new BoundMove(new BoundFieldOperand(odo.Depending), [frozen]));
+        return odo with { Depending = frozen };
     }
 }

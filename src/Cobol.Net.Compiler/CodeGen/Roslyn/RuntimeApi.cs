@@ -988,27 +988,26 @@ internal static class RuntimeApi
     public static string HostInt64Literal(string literal) =>
         CobolNum.Position(CobolNum.IntegerLiteralValue(literal)).ToString(System.Globalization.CultureInfo.InvariantCulture) + "L";
 
-    // The rendered ref-mod positions are integer-valued COBOL expressions and the runtime takes `int`, so each is
+    // The ref-mod positions are integer-valued COBOL expressions and the runtime takes `int`, so each is
     // narrowed at the call site through HostInt32; an omitted length renders the distinct sentinel above rather
     // than −1. Both rules live HERE and nowhere else: a ref-mod attaches to a storage PLACE (PlaceRenderer,
     // readable and writable), to a ref-modified FUNCTION RESULT (IntrinsicRenderer, read-only — §8.4.3.3.3 SR2)
     // and to a ref-modified ACCEPT receiver's transfer width (AcceptDisplayEmitter), and they must agree.
 
-    /// <summary>The runtime <c>int</c> leftmost-position from a rendered start expression (§8.4.3.3.4 item 5b).
+    /// <summary>The runtime <c>int</c> leftmost-position from the typed start position (§8.4.3.3.4 item 5b).
     /// A value past the carrier saturates, so it stays out of range and raises EC-BOUND-REF-MOD (item 5c) rather
     /// than wrapping onto a position inside the item (kb/Work PB1033).</summary>
-    public static string RefModStart(string renderedStart) => HostInt32(renderedStart);
+    public static string RefModStart(Position start) => HostInt32(PositionRenderer.Render(start));
 
-    /// <summary>The runtime <c>int</c> length from a rendered length expression, or the OMITTED sentinel when the
+    /// <summary>The runtime <c>int</c> length from the typed length position, or the OMITTED sentinel when the
     /// "to the end" form was written (§8.4.3.3.4 item 5c). A specified length narrows through
     /// <see cref="CobolString.SpecifiedRefModLength"/>, which saturates like <see cref="HostInt32"/> but can never
     /// land on the omitted sentinel.</summary>
-    public static string RefModLength(string? renderedLength) =>
-        renderedLength is null ? OmittedRefModLength
-        : int.TryParse(renderedLength, System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture, out _)
-            ? renderedLength
-            : $"{nameof(CobolString)}.{nameof(CobolString.SpecifiedRefModLength)}({renderedLength})";
+    public static string RefModLength(Position? length) =>
+        length is null ? OmittedRefModLength
+        : length.Int32Literal is >= 0
+            ? PositionRenderer.Render(length)
+            : $"{nameof(CobolString)}.{nameof(CobolString.SpecifiedRefModLength)}({PositionRenderer.Render(length)})";
 
     /// <summary>A reference-modification slice over an already-rendered VALUE, from the model's
     /// <see cref="RefModSpec"/>. The value form has no splice counterpart: §8.4.3.2.3 SR1 makes a
@@ -1061,11 +1060,17 @@ internal static class RuntimeApi
         $"{nameof(CobolString)}.{nameof(CobolString.CompareFig)}({a}, {b}, "
         + $"figIsLeft: {(figIsLeft ? "true" : "false")}{weightsArg})";
 
-    /// <summary>An integer count read — <c>CobolTable.Occ</c>, through the item's profile when it is numeric
-    /// (the checked §14.6.13.2 rule 2 read; <c>PlaceRenderer.CountRead</c> is the one caller).</summary>
+    /// <summary>An integer count or occurrence-number read — <c>CobolTable.Occ</c>, through the item's profile when
+    /// it is numeric (the checked §14.6.13.2 rule 2 read): <c>PlaceRenderer.CountRead</c>'s OCCURS DEPENDING count
+    /// and <c>PositionRenderer</c>'s subscript read.</summary>
     public static string TableOcc(string expr, string? profile) => profile is null
         ? $"{nameof(CobolTable)}.{nameof(CobolTable.Occ)}({expr})"
         : $"{nameof(CobolTable)}.{nameof(CobolTable.Occ)}({expr}, {profile})";
+
+    /// <summary>A numeric item read as a reference-modifier position through its own profile —
+    /// <c>CobolString.RefModPosition(x, profile)</c> (kb/Work PB41: the item's value, never its unscaled storage).</summary>
+    public static string StrRefModPosition(string expr, string profile) =>
+        $"{nameof(CobolString)}.{nameof(CobolString.RefModPosition)}({expr}, {profile})";
 
     /// <summary>A FIXED OCCURS element access — the ref-returning <c>CobolTable.At(path, oneBasedIndex)</c>
     /// (ISO §8.4.2.3.4 GR2 — a benign out-of-range occurrence, subscript-checking off in COBOL-85).</summary>
@@ -1991,6 +1996,15 @@ internal static class RuntimeApi
     /// <summary>Dereference a data-address pointer to its storage cell (GR3/GR4 loud) — <c>CobolPtr.Deref</c>.</summary>
     public static string PtrDeref(string ptr, string classWidth) =>
         $"{nameof(CobolPtr)}.{nameof(CobolPtr.Deref)}({ptr}, {classWidth})";
+
+    /// <summary>The character offset a data-address pointer currently points at in its storage cell — the run-time
+    /// displacement of a BASED item's window (<c>CobolPtr.OffsetOf</c>; <c>Binding.Model.PositionPointerOffset</c>).</summary>
+    public static string PtrOffsetOf(string ptr) => $"{nameof(CobolPtr)}.{nameof(CobolPtr.OffsetOf)}({ptr})";
+
+    /// <summary>The first cell component a data-address pointer currently addresses — the run-time base of a BASED or
+    /// area-formal class's component ordinals (<c>CobolPtr.DynBaseOf</c>; <c>Binding.Model.PositionPointerDynBase</c>,
+    /// kb/Work PB2094).</summary>
+    public static string PtrDynBaseOf(string ptr) => $"{nameof(CobolPtr)}.{nameof(CobolPtr.DynBaseOf)}({ptr})";
 
     /// <summary>Read a pointer-class member's MANAGED SLOT of a shared storage area — <c>CobolPtr.SlotRead</c>
     /// (kb/Work PB231 — the pointer third). A class-pointer / class-object member holds a managed reference and

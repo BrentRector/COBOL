@@ -183,11 +183,11 @@ public sealed record DynTablePlace(AccessPath Path, DataItem ElementItem) : Plac
 /// so its category/scale/profile drive interpretation: a numeric-DISPLAY view is flagged
 /// <see cref="DataItem.StoreAsImage"/>, so the numeric pipeline decodes/encodes the window exactly as for a
 /// whole-group numeric leaf. <paramref name="Backing"/> is the structural path to the class's stored backing field;
-/// <paramref name="OffsetExpr"/> is the 0-based window offset — the D10 transitional string (a constant, or the
-/// <c>classOffset + Σ (idx − 1) × stride</c> arithmetic for a view inside an OCCURS, ISO §13.18.44). Rendered by
-/// <c>CodeGen.PlaceRenderer</c>.
+/// <paramref name="Offset"/> is the 0-based window offset — a typed position (a constant, or the
+/// <see cref="PositionOffset"/> <c>classOffset + Σ (idx − 1) × stride</c> for a view inside an OCCURS, ISO §13.18.44).
+/// Rendered by <c>CodeGen.PlaceRenderer</c>.
 /// </summary>
-public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int Width, DataItem ViewItem) : Place
+public sealed record RedefViewPlace(AccessPath Backing, Position Offset, int Width, DataItem ViewItem) : Place
 {
     /// <summary>A cell window over a dynamic-capacity table IS one occurrence — the element at offset zero of its element
     /// cell (<c>ReferenceResolver</c>; the table has no window of its own) — so its capability is the element shape's,
@@ -223,10 +223,10 @@ public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int W
     /// for a REDEFINES class. What a cursor over the window's members re-anchors on.</summary>
     public AccessPath? Cell { get; init; }
 
-    /// <summary>The D10 transitional expression of the item's first component ordinal in <see cref="Cell"/> (kb/Work
+    /// <summary>The item's first component ordinal, typed (a <see cref="PositionOffset"/>), in <see cref="Cell"/> (kb/Work
     /// PB1042) — its <see cref="DataItem.ClassDynOrdinal"/> displaced by the subscripts of the reference; null for a
     /// REDEFINES class. A cursor over the window's members displaces each member's ordinal by the same amount.</summary>
-    public string? DynOrdinal { get; init; }
+    public Position? DynOrdinal { get; init; }
 
     /// <summary>⛔ TRUE WHEN THIS VIEW'S <c>Read()</c> IS A CHARACTER STRING — the ONE test for the assumption
     /// the wrapping consumers make about a Tier-B view ("its read is already the value image, use it
@@ -240,30 +240,30 @@ public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int W
     /// (<c>ReferenceResolver.PlaceForItem</c>), the INITIALIZE receiver cursor and the MOVE CORRESPONDING leaf
     /// cursor — and before this factory each carried its own copy of the offset law, which is exactly how the BIT
     /// unit came to be missing from all three at once.
-    /// <para>The law: a member's window starts at <paramref name="byteOffsetExpr"/> characters into the class
+    /// <para>The law: a member's window starts at <paramref name="byteOffset"/> characters into the class
     /// backing, or — when the member is a bit item, whose positions §13.18.44.4 GR1 and §8.5.1.6.3 both count in
     /// BITS — at <c>8 × (the caller's RUNTIME byte displacement) + <see cref="DataItem.ClassBitOffset"/> +
     /// Σ (index − 1) × the per-occurrence bit extent</c>. The displacement is passed separately from the byte
     /// expression because the item's own in-class position is already carried in bits by
     /// <see cref="DataItem.ClassBitOffset"/> — re-deriving it from the byte expression would round a sub-byte
     /// member down to its containing byte.</para></summary>
-    /// <param name="runtimeByteDisplacement">The part of <paramref name="byteOffsetExpr"/> that is NOT the item's
+    /// <param name="runtimeByteDisplacement">The part of <paramref name="byteOffset"/> that is NOT the item's
     /// own static in-class offset — a BASED class's pointer displacement, or an enclosing cursor's hoisted
-    /// offset. Null/empty/"0" when the window is at a compile-time-known position.</param>
-    /// <param name="occursBitTerms">The <c> + (index − 1) * bits</c> terms for each OCCURS level crossed WITHIN
-    /// the class, already in bit units (<see cref="BitLayout.WidthBits"/> per level). Empty when none.</param>
+    /// offset. Null when the window is at a compile-time-known position.</param>
+    /// <param name="occursBitTerms">The <c>(index − 1) × bits</c> terms for each OCCURS level crossed WITHIN
+    /// the class, already in bit units (<see cref="BitLayout.StrideBits"/> per level). Null or empty when none.</param>
     /// <param name="cell">The structural path to the class's backing <c>StorageCell</c> — supplied only by the
     /// three CELL-BACKED surfaces (BASED, EXTERNAL, ADDRESS OF; <c>RedefinesClass.BackingCellCsName</c>) and
     /// null for a REDEFINES class, whose backing is a plain stored string field. It is what a
     /// <see cref="SlotWindow"/> member needs (kb/Work PB231); see <see cref="SlotWindow.CarriedBySlot"/> for
     /// why a REDEFINES class can never hold one.</param>
-    /// <param name="dynOrdinal">The D10 transitional expression of the member's first component ordinal in its
+    /// <param name="dynOrdinal">The member's first component ordinal, typed (a <see cref="PositionOffset"/>), in its
     /// scope's cell (<see cref="CellComponents"/>; kb/Work PB1042) — what a dynamic-length member's slot and a
     /// variable-length group's first component are numbered by. Null when no table level displaces it: the
     /// item's own <see cref="DataItem.ClassDynOrdinal"/>.</param>
-    public static RedefViewPlace For(AccessPath backing, DataItem item, string byteOffsetExpr,
-                                     string? runtimeByteDisplacement = null, string occursBitTerms = "",
-                                     AccessPath? cell = null, string? dynOrdinal = null)
+    public static RedefViewPlace For(AccessPath backing, DataItem item, Position byteOffset,
+                                     Position? runtimeByteDisplacement = null, IReadOnlyList<OffsetTerm>? occursBitTerms = null,
+                                     AccessPath? cell = null, Position? dynOrdinal = null)
     {
         // ⛔ THE WINDOW IS THE MEMBER'S STORAGE EXTENT, NOT ITS CHARACTER-POSITION COUNT (kb/Work PB231).
         // §13.18.44.4 GR1 states the association over "an area sufficient to contain the number of BITS
@@ -272,8 +272,8 @@ public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int W
         // units. ByteWidth IS ImageWidth for every leaf kind but NATIONAL, whose §13.18.60.4 GR8 size this
         // implementation pins at two bytes per position (D-N1), so this read is byte-identical everywhere
         // else and is the whole of RESIDUE-11's geometry here.
-        dynOrdinal ??= $"{item.ClassDynOrdinal}";
-        var window = new RedefViewPlace(backing, byteOffsetExpr, item.ByteWidth, item)
+        dynOrdinal ??= new PositionConstant(item.ClassDynOrdinal);
+        var window = new RedefViewPlace(backing, byteOffset, item.ByteWidth, item)
             { Cell = cell, DynOrdinal = cell is null ? null : dynOrdinal };
         // ⛔ A POINTER-CLASS MEMBER'S VALUE IS NOT IN THE BYTES (kb/Work PB231 — the pointer third): it is the
         // managed slot of the SAME area at the SAME byte offset, so its bytes stay reserved (§14.9.3.4 GR3's
@@ -308,14 +308,20 @@ public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int W
         if (NationalWindow.WindowPositionsOf(item) is { } positions)
             return window with { Coding = new NationalWindow(positions) };
         if (!BitLayout.IsBitItem(item)) return window;
-        string at = runtimeByteDisplacement is null or "" or "0"
-            ? $"{item.ClassBitOffset}"
-            : $"{BitLayout.BitsPerCharacter} * ({runtimeByteDisplacement}) + {item.ClassBitOffset}";
+        // 8 × (the runtime byte displacement) + the member's static in-class bit offset, then the in-class levels.
+        Position classBit = new PositionConstant(item.ClassBitOffset);
+        Position at = runtimeByteDisplacement is null
+            ? classBit
+            : new PositionBinary(
+                new PositionBinary(new PositionConstant(BitLayout.BitsPerCharacter), PositionOperator.Multiply,
+                                   new PositionGroup(runtimeByteDisplacement)),
+                PositionOperator.Add, classBit);
+        occursBitTerms ??= [];
         return window with
         {
-            Coding = new BitWindow(at + occursBitTerms, BitLayout.WidthBits(item))
+            Coding = new BitWindow(new PositionOffset(at, occursBitTerms), BitLayout.WidthBits(item))
             {
-                ClassRelativeExpr = $"{item.ClassBitOffset}{occursBitTerms}",
+                ClassRelative = new PositionOffset(classBit, occursBitTerms),
             },
         };
     }
@@ -330,23 +336,24 @@ public sealed record RedefViewPlace(AccessPath Backing, string OffsetExpr, int W
 /// <summary>The CODING of a <see cref="RedefViewPlace"/> window over the class's one byte backing — the relation
 /// between the member's VALUE CARRIER and the bytes it occupies. The absence of a coding (a null
 /// <see cref="RedefViewPlace.Coding"/>) is the identity: an alphanumeric, edited or byte-form-numeric member's
-/// carrier IS its bytes. Every coding keeps the window's byte geometry (<see cref="RedefViewPlace.OffsetExpr"/>
+/// carrier IS its bytes. Every coding keeps the window's byte geometry (<see cref="RedefViewPlace.Offset"/>
 /// and <see cref="RedefViewPlace.Width"/>, in bytes); a coding that also re-expresses the geometry in a finer
 /// unit carries it itself, as <see cref="BitWindow"/> does.</summary>
 public abstract record WindowCoding;
 
 /// <summary>A <see cref="RedefViewPlace"/>'s BIT window: the 0-based ABSOLUTE bit offset within the class's one
-/// byte backing (the D10 transitional expression string) and the member's boolean-position count
+/// byte backing (a typed position) and the member's boolean-position count
 /// (§13.18.29.4 GR1b's <c>m</c> for a bit group, the PICTURE 1(n) length for a bit leaf).</summary>
-public sealed record BitWindow(string OffsetExpr, int Bits) : WindowCoding
+public sealed record BitWindow(Position Offset, int Bits) : WindowCoding
 {
-    /// <summary>The CLASS-RELATIVE part of <see cref="OffsetExpr"/> — the member's static in-class bit offset plus
+    /// <summary>The CLASS-RELATIVE part of <see cref="Offset"/> — the member's static in-class bit offset plus
     /// each in-class OCCURS level's <c>(index − 1) × stride</c> term, WITHOUT the runtime byte displacement a
     /// BASED class adds (kb/Work PB240). §14.9.4.3 SR6/SR8 ask whether a BY REFERENCE bit operand "is aligned on
     /// a byte boundary", and that displacement is a whole number of BYTES by construction (a pointer addresses
-    /// characters), so this is the part that can move the answer — and, being all-literal exactly when every
-    /// subscript is, the part whose static provability the rules' second clause demands.</summary>
-    public string ClassRelativeExpr { get; init; } = OffsetExpr;
+    /// characters), so this is the part that can move the answer — and, being constant exactly when every
+    /// subscript is (<see cref="Position.ConstantValue"/>), the part whose static provability the rules' second clause
+    /// demands.</summary>
+    public Position ClassRelative { get; init; } = Offset;
 }
 
 /// <summary>A <see cref="RedefViewPlace"/>'s NATIONAL window (kb/Work PB231 — RESIDUE-11): the member occupies
@@ -478,12 +485,12 @@ public sealed record SlotWindow(AccessPath Cell) : CellWindowCoding(Cell)
 /// memory" — and this implementation locates it in a managed slot of the cell <paramref name="Cell"/> (its scope's
 /// cell: the record's, or the element cell of the dynamic-capacity table it lies in — <see cref="CellComponents"/>),
 /// so every description sharing the cell (§13.18.22.4 GR1 / GR4 b)) shares its content. <paramref name="Ordinal"/> is
-/// the D10 transitional expression of its component ordinal: <see cref="DataItem.ClassDynOrdinal"/> plus, for each
+/// its typed component ordinal (a <see cref="PositionOffset"/>): <see cref="DataItem.ClassDynOrdinal"/> plus, for each
 /// fixed table level crossed within the scope, <c>(index − 1) ×</c> that level's components per occurrence (kb/Work
 /// PB1042 — one slot per OCCURRENCE). It occupies ZERO bytes of the backing (its <see cref="DataItem.ByteWidth"/>),
 /// which is §8.5.1.12.3's own accounting of the fixed run. Its read IS its content string, so
 /// <see cref="RedefViewPlace.ReadsCharacterImage"/> holds.</summary>
-public sealed record DynSlotWindow(AccessPath Cell, string Ordinal) : CellWindowCoding(Cell)
+public sealed record DynSlotWindow(AccessPath Cell, Position Ordinal) : CellWindowCoding(Cell)
 {
     /// <summary>⛔ THE ONE test for "does this member ride a dynamic-length slot?" — an elementary dynamic-length
     /// item. The cell forcer (<c>DataBinder.ForceStringCanonical</c>), the REDEFINES classifier's carrier question and
@@ -543,7 +550,7 @@ public static class CellComponents
 /// <see cref="RedefViewPlace.Width"/> bytes of its scope's backing from the window's offset, in which each component
 /// sits at <paramref name="DynFixedAt"/> (relative to the group): a dynamic-length item occupying nothing, a
 /// dynamic-capacity table reserving its one-element extent <paramref name="DynTable"/> (0 for a dynamic-length item).
-/// The components are the cell's slots <paramref name="DynBase"/> onward (the D10 transitional expression of the
+/// The components are the cell's slots <paramref name="DynBase"/> onward (a typed position, the
 /// first ordinal), with maximum sizes <paramref name="DynMax"/> (a table's in occurrences), each laid out in a record
 /// image by its <paramref name="DynStructure"/> (<c>CobolDynStructure.Code</c>, 0 for none — ISO §12.3.7.4
 /// GR18/GR19; kb/Work PB1094). ISO §8.5.1.11.2 — "a variable-length data item behaves in all respects as though it
@@ -554,7 +561,7 @@ public static class CellComponents
 /// §13.18.38.3 SR22) - its element width and maximum count, <c>(0, 0)</c> for a group without one. The window
 /// reserves the table at its maximum in the fixed run; the cell helpers (<c>CellOdoTail</c>) make it the layout's last
 /// component and cut the run to the operand's current count (§13.18.38.4 GR8).</para></summary>
-public sealed record VarGroupWindow(AccessPath Cell, string DynBase, IReadOnlyList<int> DynFixedAt,
+public sealed record VarGroupWindow(AccessPath Cell, Position DynBase, IReadOnlyList<int> DynFixedAt,
                                     IReadOnlyList<int> DynMax, IReadOnlyList<int> DynStructure,
                                     IReadOnlyList<int> DynTable, CellOdoTail Odo,
                                     IReadOnlyList<CellGroupShape?> DynElem) : CellWindowCoding(Cell)
@@ -562,7 +569,7 @@ public sealed record VarGroupWindow(AccessPath Cell, string DynBase, IReadOnlyLi
     /// <summary>The coding for <paramref name="group"/> when it has components under it, else null. The layout is
     /// read off the class walk (<see cref="CellComponents.Of"/> over <see cref="DataItem.ClassOffset"/>), never
     /// recomputed, so the group and its members cannot disagree about where a component sits.</summary>
-    public static VarGroupWindow? Of(DataItem group, AccessPath cell, string dynBase)
+    public static VarGroupWindow? Of(DataItem group, AccessPath cell, Position dynBase)
     {
         if (!group.IsGroup) return null;
         var parts = CellComponents.Of(group).ToList();
@@ -678,9 +685,9 @@ public sealed record OdoGroupPlace(
 /// immediately by subscripting where one or more of the subscripts is the word ALL"; kb/Work PB62): ONE operand that
 /// stands for EVERY element the ALL subscripts range over — "the effect is as if each table element associated with
 /// that subscript position were specified", left to right, the rightmost ALL varying fastest.
-/// <para>The <see cref="Element"/> is the element's own place with each ALL level's subscript written as the index
-/// variable <c>{IndexVar}[k]</c> (k = the ALL level's ordinal, outermost first) and every fixed subscript already
-/// rendered; <see cref="Counts"/> gives each ALL level's RANGE, outermost first — a fixed OCCURS count, an OCCURS
+/// <para>The <see cref="Element"/> is the element's own place with each ALL level's subscript the element
+/// <c>k</c> of the index vector <see cref="Indices"/> (a <see cref="PositionLocalElement"/>, k = the ALL level's
+/// ordinal, outermost first) and every fixed subscript its own typed position; <see cref="Counts"/> gives each ALL level's RANGE, outermost first — a fixed OCCURS count, an OCCURS
 /// DEPENDING table's data-name-1 value ("the range of values is determined by the object of the OCCURS DEPENDING ON
 /// clause") or a dynamic-capacity table's current capacity ("from 1 to the current capacity of the table"). The two
 /// runtime ranges are why this is a PLACE the backend ENUMERATES (<c>CobolTable.AllArgs</c>) rather than a
@@ -691,7 +698,7 @@ public sealed record OdoGroupPlace(
 /// only the intrinsic argument-list renderers expand it, and a single-value read (<c>PlaceRenderer.Read</c>) is an
 /// internal error by construction — a table(ALL) is never a value.</para>
 /// </summary>
-public sealed record TableAllPlace(Place Element, string IndexVar, IReadOnlyList<AllCount> Counts) : PlaceDecorator(Element)
+public sealed record TableAllPlace(Place Element, LocalVector Indices, IReadOnlyList<AllCount> Counts) : PlaceDecorator(Element)
 {
     /// <summary>The number of elements when EVERY ALL level has a fixed range — the product of the OCCURS counts;
     /// null when any level's range is a runtime value (an OCCURS DEPENDING or dynamic-capacity table).</summary>
@@ -855,7 +862,7 @@ public sealed record CapacityRegisterPlace(AccessPath Table, DataItem RegisterIt
 /// (GR1 — the identity is the entry, never GR5's data-name, which two entries may legally share);
 /// <paramref name="RegisterItem"/> carries the GR1 profile (<see cref="PicInfo.SumCounterItem"/>) so the numeric
 /// pipeline reads and writes it at the counter's own scale. Backend-neutral, like
-/// <see cref="CapacityRegisterPlace"/>: no C# text lives here beyond the subscripts' D10 transitional index strings.
+/// <see cref="CapacityRegisterPlace"/>: no C# text lives here (the subscripts are typed positions).
 /// <para>⛔ A REPEATING ENTRY'S COUNTER IS AN OCCURRENCE OF A TABLE (kb/Work PB1271): with
 /// <paramref name="Subscripts"/> written, <paramref name="CounterId"/> is the FAMILY's first id
 /// (<c>ReportSumFamily.BaseId</c>) and the occurrence is selected at run time from the one-based subscripts against
@@ -864,7 +871,7 @@ public sealed record CapacityRegisterPlace(AccessPath Table, DataItem RegisterIt
 /// non-repeating entry's, or one occurrence the report engine's own compose names directly.</para>
 /// </summary>
 public sealed record ReportSumCounterPlace(
-    int ReportIndex, int CounterId, DataItem RegisterItem, int Depth = 0, IReadOnlyList<string>? Subscripts = null) : Place
+    int ReportIndex, int CounterId, DataItem RegisterItem, int Depth = 0, IReadOnlyList<Position>? Subscripts = null) : Place
 {
     /// <inheritdoc/>
     public override PicInfo? Pic => RegisterItem.Pic;
@@ -959,37 +966,34 @@ public sealed record ExceptionObjectPlace(DataItem RegisterItem) : Place
 }
 
 /// <summary>
-/// One source reference-modification <c>(start : [length])</c>, reduced to its RENDERED index expressions — the
-/// ISO §8.4.3.3.2 general format read off the source, independent of WHAT is being modified. Produced by the ONE
-/// reader (<c>ReferenceResolver.ReadRefMod</c>, which accepts both source carriers: the DEFAULT-mode parsed
-/// <c>refModPart</c> and the SUBSCRIPT-mode captured token group) and consumed by the two things a ref-mod can
-/// attach to:
+/// One source reference-modification <c>(start : [length])</c>, reduced to its typed positions — the ISO §8.4.3.3.2
+/// general format read off the source, independent of WHAT is being modified. Produced by the ONE reader
+/// (<c>ReferenceResolver.ReadRefMod</c>, over the parsed <c>refModPart</c>) and consumed by the two things a ref-mod
+/// can attach to:
 /// <list type="bullet">
 ///   <item>a storage <b>place</b> — <see cref="RefModPlace"/>, readable AND writable (the splice);</item>
 ///   <item>a <b>value</b> with no place — the result of a function-identifier (ISO §8.4.3.3.3 SR2), carried on
 ///         <c>BoundIntrinsicCall.RefMod</c>. §8.4.3.2.3 SR1 makes a function-identifier a non-receiving operand,
 ///         so the value form is read-only by construction and needs no splice counterpart.</item>
 /// </list>
-/// <paramref name="Start"/>/<paramref name="Length"/> are rendered index strings — the D10 TRANSITIONAL carrier,
-/// deliberately the SAME one <see cref="RefModPlace"/> uses so PHASE 15 migrates both to <c>BoundExpr</c> in one
-/// move rather than leaving a second, differently-shaped ref-mod behind.
+/// <paramref name="Start"/>/<paramref name="Length"/> are typed <see cref="Position"/>s (kb/Work PB2151), the SAME
+/// carrier <see cref="RefModPlace"/> holds, rendered only by the code generator.
 /// </summary>
-/// <param name="Start">The rendered leftmost-position expression (§8.4.3.3.4 item 5b).</param>
-/// <param name="Length">The rendered length expression, or <see langword="null"/> for the omitted
-/// "to the end" form (§8.4.3.3.4 item 5c).</param>
+/// <param name="Start">The leftmost position (§8.4.3.3.4 item 5b).</param>
+/// <param name="Length">The length, or <see langword="null"/> for the omitted "to the end" form (§8.4.3.3.4 item
+/// 5c).</param>
 /// <param name="AllowZeroLength">The REF-MOD-ZERO-LENGTH directive (ISO §7.3.23) is ON at this ref-mod's source
 /// line, so a zero-length result is allowed instead of raising EC-BOUND-REF-MOD.</param>
-public readonly record struct RefModSpec(string Start, string? Length, bool AllowZeroLength);
+public readonly record struct RefModSpec(Position Start, Position? Length, bool AllowZeroLength);
 
 /// <summary>
 /// A reference-modified place <c>inner(start:length)</c> (COBOLNET_DESIGN §3.3 / §7.2): reading is a substring
 /// (<c>CobolString.RefMod</c>); writing splices the new slice back into the inner field (<c>CobolString.SpliceInto</c>),
 /// preserving the inner's width. <paramref name="Length"/> is <see langword="null"/> for the "to the end" form.
-/// <paramref name="Start"/>/<paramref name="Length"/> stay the rendered index string (the D10 TRANSITIONAL carrier —
-/// they become <c>BoundExpr</c> when PHASE 15 removes the SUBSCRIPT lexer mode). Rendered by
-/// <c>CodeGen.PlaceRenderer</c>.
+/// <paramref name="Start"/>/<paramref name="Length"/> are typed <see cref="Position"/>s (kb/Work PB2151), rendered by
+/// <c>CodeGen.PlaceRenderer</c> through <c>CodeGen.PositionRenderer</c>.
 /// </summary>
-public sealed record RefModPlace(Place Inner, string Start, string? Length) : PlaceDecorator(Inner)
+public sealed record RefModPlace(Place Inner, Position Start, Position? Length) : PlaceDecorator(Inner)
 {
     /// <summary>The REF-MOD-ZERO-LENGTH directive (ISO §7.3.23) is ON at this ref-mod's source line — a zero-length
     /// result is ALLOWED (no EC-BOUND-REF-MOD raise, §8.4.3.3.4 item 5c). The directive's GR default is OFF, so this
@@ -1005,8 +1009,9 @@ public sealed record RefModPlace(Place Inner, string Start, string? Length) : Pl
     /// inner item's full length for an unknown slice over-states it (kb/Work PB589).</summary>
     /// <param name="innerLength">identifier-1's length in the same positions, or null when it is not static.</param>
     public int? StaticLength(int? innerLength) =>
-        Length is { } len ? (int.TryParse(len, out int n) ? n : null)
-        : innerLength is { } size && int.TryParse(Start, out int left) ? size - left + 1 : null;
+        Length is { } len ? (len is PositionConstant { Value: >= int.MinValue and <= int.MaxValue } n ? (int)n.Value : null)
+        : innerLength is { } size && Start is PositionConstant { Value: >= int.MinValue and <= int.MaxValue } left
+            ? size - (int)left.Value + 1 : null;
 
     /// <summary>⛔ NOTHING A DATA DESCRIPTION ENTRY DECLARES — ISO §8.4.3.3.4 GR5: "Reference modification creates
     /// a unique data item that is a subset of the data item referenced by identifier-1." The slice IS a data item,

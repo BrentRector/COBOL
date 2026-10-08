@@ -465,8 +465,9 @@ varying fastest — and the range of an ALL is a fixed OCCURS count, "the object
 or "from 1 to the current capacity of the table" for a dynamic-capacity table. Two of the three ranges are RUNTIME
 values, so the former bind-time expansion (N `BoundFieldOperand`s by the OCCURS count; an ODO table staged loud, a
 dynamic table not even a level) was the wrong model. **`IntrinsicBinder.TryBindAllArgument` binds the argument as
-one `BoundFieldOperand` whose place is a `TableAllPlace(Element, IndexVar, Counts)`** — a `PlaceDecorator` over
-the ELEMENT place (its ALL subscripts written as `__allN[k]`, its fixed subscripts rendered) carrying one
+one `BoundFieldOperand` whose place is a `TableAllPlace(Element, Indices, Counts)`** — a `PlaceDecorator` over
+the ELEMENT place (its ALL subscripts the elements `__allN[k]` of the index vector `Indices`, a `LocalVector`; its fixed
+subscripts their own typed positions) carrying one
 `AllCount` per ALL level (`Fixed(occurs)` / `Odo(depending, min, max)` / `Capacity(register)` — a nested dynamic
 table's register path carries the outer index variables, so each outer occurrence's own capacity is read). Being a
 decorator, every static classifier (class, category, usage, width, the §15.3 screen, MAX/MIN's type resolution)

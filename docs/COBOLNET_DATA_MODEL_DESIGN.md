@@ -38,7 +38,7 @@ Algorithm (port legacy ResolveQualifiedName): resolve the rightmost qualifier Z 
 
 == 4. SUBSCRIPTING / INDEXING, ISO §8.4.2.3 ==
 OCCURS dimensions are collected by walking item→ancestors (legacy LocationResolver does exactly this). COBOL subscripts are 1-BASED and listed OUTER→INNER (`T(outer, inner)`); C# arrays are 0-based — so each subscript emits as `[expr - 1]`. Multi-dim: COBOL-85 caps a table at 7 dimensions (the 3-dim cap was ANSI-74, out of scope); 2002+ removes the fixed cap — store dims as a list, no fixed cap; >7 dims at `--std 85` ⇒ diagnostic (G1, per-edition gating section). Each dimension is a SEPARATE C# array index because a 2-D OCCURS is an array-of-structs-containing-array (`Rows[i-1].Cols[j-1]`), NOT a flattened 1-D — this is the natural .NET shape and removes all the legacy multiplier/stepSize offset arithmetic.
-  • Subscript forms: ISO §8.4.2.3.2's general format has exactly THREE alternatives — `ALL`, **arithmetic-expression-1**, and `index-name-1 [ {+|-} integer-1 ]` → `idx ± lit - 1`. The middle one is the wide one and it is NOT a closed list of shapes: §8.8.1.1 admits "an identifier referencing a numeric data item, a numeric literal, the figurative constant ZERO …, such identifiers, figurative constants, and literals separated by arithmetic operators", and §8.4.3.1.2 Format 2 makes that identifier a qualified-data-name-WITH-SUBSCRIPTS — so an integer literal, a plain or qualified data-name, `I + 1`, `(A + B) / 2`, `FUNCTION INTEGER(X)` and **a subscripted identifier such as `X(1)`** are all one alternative. `RenderSegment` is a fast path over the shapes that map to C# text token-by-token and is never the arbiter of what is legal: anything it cannot render routes to the D18 materializer, where the `arithmeticExpression` grammar decides admissibility (D18 below).
+  • Subscript forms: ISO §8.4.2.3.2's general format has exactly THREE alternatives — `ALL`, **arithmetic-expression-1**, and `index-name-1 [ {+|-} integer-1 ]` → `idx ± lit - 1`. The middle one is the wide one and it is NOT a closed list of shapes: §8.8.1.1 admits "an identifier referencing a numeric data item, a numeric literal, the figurative constant ZERO …, such identifiers, figurative constants, and literals separated by arithmetic operators", and §8.4.3.1.2 Format 2 makes that identifier a qualified-data-name-WITH-SUBSCRIPTS — so an integer literal, a plain or qualified data-name, `I + 1`, `(A + B) / 2`, `FUNCTION INTEGER(X)` and **a subscripted identifier such as `X(1)`** are all one alternative. The resolver's direct position walk (`ReferenceResolver.BindPosition`, kb/Work PB2151) reads the parse node into a typed `Position` for the shapes that map to an ordinal term by term and is never the arbiter of what is legal: anything else routes to the D18 materializer, which binds the same node through the expression binder; what did not parse as an `arithmeticExpression` is refused by name (D18 below; DESIGN-binder-bound-tree.md §3.9).
   • **Which names may carry a subscript, and how many — ISO §8.4.2.3.3 SR2 and SR3, and they are ONE predicate each, in `DataItem`.** SR2: the entry "shall contain an OCCURS clause **or shall be subordinate to** a data description entry that contains an OCCURS clause" = `DataItem.IsTableElement`. SR3: "the number of subscripts shall equal the number of OCCURS clauses in the description of the table element being referenced" = `DataItem.SubscriptArity`, with `SubscriptLevels()` the same walk as a list, outermost first (SR3's "order of successively less inclusive dimensions"). `ReferenceResolver.ScreenSubscriptArity` reports both by name (COBOLNET2096 / COBOLNET2097) at the ONE resolution site, so the rule reaches the SENDING and RECEIVING sides of a statement identically. It fires only on a reference that WRITES subscripts: SR5's seven exceptions all admit an OMITTED list (a SEARCH subject, a REDEFINES clause, an OCCURS KEY IS phrase, a SORT key or table subject, a screen entry's FROM/TO/USING phrase, a report SUM addend) and belong to the owning binders. ⛔ `DataItem.IsTable` is the answer to a DIFFERENT question — "does THIS entry carry an OCCURS clause", a table-RECOGNITION test — and using it where SR2 belongs is what made `Y (X(1))` a two-subscript reference (kb/Work PB877); `SubscriptAdmissionDriftTests` pins both the predicate and its single call site.
   • INDEX-NAMEs (INDEXED BY): an index-name is a DISTINCT entity, NOT a data item (ISO §8.4.2.3 / §13.18.38). DECISION: an index-name → a C# `long` field holding a 1-BASED OCCURRENCE NUMBER (not a byte displacement; the legacy byte-displacement model is rejected as it leaks layout). SET idx TO n → `idx = n`; SET idx UP/DOWN BY k → `idx ±= k`; using idx as a subscript → `[idx - 1]`. (Rationale: occurrence-number semantics are layout-free and make SEARCH/SEARCH ALL emit as plain integer loops; the only observable difference — idx surviving a redefine of the table element width — is implementor-defined and not in the conformance corpus.) Index-name lives in the same static/instance scope as its table.
 
@@ -1601,7 +1601,7 @@ GR2 d) (a group-typed subject "is aligned as though it were a level 1 item") is 
 only level-1 placement WiseOwl COBOL has, since it inserts no word-boundary slack at any level (§8.5.1.6.4; kb/Work
 PB1569).
 
-### D18. A FUNCTION-IDENTIFIER in a subscript or reference-modification position materializes into a COMPILER TEMP hoisted as a statement pre-op — never a new arm on `RenderSegment`, and never an early `BoundExpr` carrier migration.
+### D18. A FUNCTION-IDENTIFIER in a subscript or reference-modification position materializes into a COMPILER TEMP hoisted as a statement pre-op — never a new arm on the direct position walk.
 
 **The problem (fix-queue PB17).** `MOVE W-E(FUNCTION INTEGER(3)) TO W-R` and
 `MOVE W-A(FUNCTION INTEGER(3):2) TO W-R` are **legal source** that compiles clean and throws
@@ -1616,19 +1616,17 @@ required, and a subscript is neither: **GR1b sets EC-BOUND-SUBSCRIPT when the ex
 integer**, a runtime condition that would be pointless if the position required one syntactically (SR14 confirms
 it from the other side, having to impose that restriction *specially* for a BY REFERENCE bit item).
 
-**Root cause.** `ReferenceResolver.RenderSegment` is a hand-rolled expression compiler over a subscript's tokens
-(a flat SUBSCRIPT-mode run until kb/Work PB2113; one parsed item's tokens since) that emits C# text at BIND time; its `default:` arm literally lists `FUNCTION` among the token types it
-cannot render.
+**Root cause.** The subscript reader was a hand-rolled renderer over a subscript's tokens that emitted C# text at
+BIND time (`RenderSegment`, deleted by kb/Work PB2151 for the typed position walk); a function-identifier is not a
+shape it could read term by term.
 
 **Two tempting fixes, both REJECTED.**
-· *Add a FUNCTION arm to `RenderSegment`* — that hand-writes intrinsic rendering into a `StringBuilder`, i.e. a
-  THIRD expression compiler beside `ExpressionBinder` and `IntrinsicRenderer`.
-· *Migrate `RefModPlace.Start`/`Length` to `BoundExpr`* — **forbidden here**: they are the documented **D10
-  TRANSITIONAL carrier**, deliberately the same shape as `RefModSpec` "so PHASE 15 migrates both in one move
-  rather than leaving a second, differently-shaped ref-mod behind", and **D10 is an owner ruling relocated to
-  PHASE 15 §"CUT 2.5"**, whose first half (the lexer mode and the hand-rolled splitter, kb/Work PB2113) has landed
-  and whose second half moves these positions onto `BoundExpr`. The string carrier is deliberate sequencing, not
-  decay.
+· *Add a FUNCTION arm to the subscript reader* — that hand-writes intrinsic rendering, i.e. a THIRD expression
+  compiler beside `ExpressionBinder` and `IntrinsicRenderer`.
+· *Bind every position as a `BoundExpr` rendered by the numeric renderer* — that would lose the direct
+  occurrence-number forms (an index-name's cell, a profile-checked item read) the place model renders today. D10's
+  second half (kb/Work PB2151) instead made the position a TYPED carrier, `Position`, whose general arm is this
+  temporary (DESIGN-binder-bound-tree.md §3.9).
 
 **The decision.** Materialize what §15.4 already describes. Bind the function through the ONE function pipeline
 (`IntrinsicBinder.BindIntrinsicCore` — shared by the FUNCTION-keyword form, the keyword-omitted re-parse and every
@@ -1701,15 +1699,14 @@ SEARCH WHEN / EVALUATE object must not be lifted to a statement pre-op. `UdfBind
 used to carry for the windows it did not reach, COBOLNET1509, is DELETED: its last two callers — an EVALUATE
 condition subject and a partial-expression object's subject splice — now bind the subject once, kb/Work PB912.)
 
-**On the "do NOT re-grammar this" guidance below:** this adds an ISOLATED
-`subscriptExpressionFragment : arithmeticExpression EOF ;` entry rule reachable ONLY from the binder re-parse and
-referenced by nothing in `compilationUnit` — the `functionArgListFragment` / `compileTimeOperandFragment`
-precedent, whose own comment records "ZERO blast radius on the main parse". The main subscript grammar is
-untouched.
+**One parse, one tree (kb/Work PB2151).** The route binds the position's `arithmeticExpression` NODE of the main
+tree, where the grammar parsed it. Until PB2151 it recovered the segment's verbatim text and re-parsed it through an
+isolated `subscriptExpressionFragment` rule; that rule and its re-parse are deleted.
 
-**Deleted by D10.** When PHASE 15 §"CUT 2.5" removes the SUBSCRIPT lexer mode and the string carrier becomes
-`BoundExpr`, the temp path goes with it — this is a decision that is *designed to be deleted*, which is why it
-must not grow a second carrier in the meantime.
+**Kept by D10's second half (a correction of the earlier plan to delete it).** The temporary is the general arm of
+the typed position carrier: a position the direct walk cannot read — a function, `/`, `**`, a decimal literal, a
+scaled operand in a compound — is this temporary's `PositionItemRead`, so GR1b's integrality rule is asked once, of
+the result.
 ⚠ **The PB41 half is NOT deleted with it.** The integrality rule belongs to the two clauses, not to the carrier:
 after CUT 2.5 the position read moves into the expression renderer with the rest of the carrier, still naming the
 position's own Table 13 condition. Only the *materialization* is transitional; `HasFraction`/`PositionOf` and the
@@ -2171,7 +2168,7 @@ CONCRETE COBOL→C# MAPPINGS:
 
 Port the legacy ExpressionBinder's SUB_* token interpreter verbatim (it is proven over 364 NIST tests): for each `(...)` suffix group, scan tokens — if it contains SUB_COLON it is a ref-mod (split into start/length sub-expressions at the colon), else it is a subscript list (split on SUB_WS / SUB_COMMA into N subscript expressions, each itself possibly a relative `idx ± lit`). Phase-A flatten produces a clean {qualifiers[], subscriptGroups[][], refMod?} that Phase-B resolves. Do NOT try to re-grammar this — the SUBSCRIPT-mode design is intentional and reusing the interpreter avoids re-deriving COBOL subscript edge cases.
 
-⚠ **The interpreter is a token renderer, not an expression compiler, and the difference is where it ends (D18).** `RenderSegment` renders integer literals, data-names, index-names, `+ - * /` and parentheses one token at a time; **everything else is re-parsed through the isolated `subscriptExpressionFragment` rule and bound by the real pipeline** — never grown a new hand-written arm, which is how a token renderer turns into a third expression compiler. **The renderer is an OPTIMIZATION over that route, never the arbiter of what is legal in the position, and stating it the other way round cost a defect: PB42.** For one commit the D18 gate asked "is this segment FUNCTION-bearing?" instead of "can the renderer render it", so `W-E(W-I ** 2)` and `W-E(2.0)` — plain arithmetic under §8.8.1.1 ("a numeric literal … separated by arithmetic operators") with §8.3.2.4.2 listing `**` as an arithmetic operator — kept compiling clean and throwing at run time. ⛔ **Routing everything is NOT the unaudited-table mistake PB1 taught, and the reason is structural: the fragment rule is `arithmeticExpression EOF`, so THE GRAMMAR ADJUDICATES.** A shape §8.8.1.1 does not admit — an alphanumeric literal, an `ALL` figurative constant (legal only in the §8.4.2.3.3 r6 positions) — cannot parse as an arithmetic expression, the fragment returns null, and the caller keeps its exact loud posture. Admission is by parsing, not by assertion, which is why the next arithmetic form needs no edit here. ⚠ Those two remain **run-time** throws where they should be bind-time diagnostics — right position, wrong stage; that is PB42's recorded residue.
+⚠ **The position walk is a reader, not an expression compiler, and the difference is where it ends (D18).** `ReferenceResolver.BindPosition` reads integer literals, data-names, index-names, `+ - *`, unary minus and parentheses off the parse node into a typed `Position` (kb/Work PB2151); **everything else binds the same node through the real pipeline into the §15.4 temporary** — never grown a new hand-written arm, which is how a reader turns into a third expression compiler. **The walk is an OPTIMIZATION over that route, never the arbiter of what is legal in the position, and stating it the other way round cost a defect: PB42.** For one commit the D18 gate asked "is this segment FUNCTION-bearing?" instead of "can the renderer render it", so `W-E(W-I ** 2)` and `W-E(2.0)` — plain arithmetic under §8.8.1.1 ("a numeric literal … separated by arithmetic operators") with §8.3.2.4.2 listing `**` as an arithmetic operator — kept compiling clean and throwing at run time. ⛔ **Routing everything is NOT the unaudited-table mistake PB1 taught, and the reason is structural: THE GRAMMAR ADJUDICATES.** A shape §8.8.1.1 does not admit — an alphanumeric literal, an `ALL` figurative constant (legal only in the §8.4.2.3.3 r6 positions) — does not parse as an `arithmeticExpression`, and the D18 hook refuses it by name (COBOLNET2363). Admission is by parsing, not by assertion, which is why the next arithmetic form needs no edit here. ⚠ Those two remain **run-time** throws where they should be bind-time diagnostics — right position, wrong stage; that is PB42's recorded residue.
 
 ### REDEFINES is a byte-level storage overlay with no clean typed-native equivalent: two differently-typed C# fields cannot share memory, so a write through one view is invisible to the other.
 

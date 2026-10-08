@@ -52,7 +52,7 @@ public sealed class SubscriptAdmissionDriftTests
         {
             string text = File.ReadAllText(file);
             foreach (Match m in Regex.Matches(text,
-                         @"(?<!internal static List<List<IToken>> )(?<![A-Za-z])SegmentsOf\((?<args>[^;]*?)\)\s*[;),]",
+                         @"(?<!internal static List<PositionSegment> )(?<![A-Za-z])SegmentsOf\((?<args>[^;]*?)\)\s*[;),]",
                          RegexOptions.Singleline))
                 sites.Add((Path.GetFileName(file), m.Groups["args"].Value));
         }

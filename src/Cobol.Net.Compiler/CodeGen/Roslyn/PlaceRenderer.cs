@@ -4,6 +4,7 @@ using System.Linq;
 using CobolNet.Binding.Model;
 using CobolNet.Binding.Procedure;
 using CobolNet.CodeGen.Emit;
+using CobolNet.Runtime;
 
 namespace CobolNet.CodeGen;
 
@@ -103,7 +104,7 @@ internal static class PlaceRenderer
         // the member's positions are bit positions and its VALUE is the boolean carrier they hold — never the
         // characters of the byte that happens to contain them.
         RedefViewPlace { Coding: BitWindow b } v => RuntimeApi.BitsReadWindow(
-            RenderPath(v.Backing, AccessDir.Sending), $"(int)({b.OffsetExpr})", b.Bits.ToString()),
+            RenderPath(v.Backing, AccessDir.Sending), $"(int)({PositionRenderer.Render(b.Offset)})", b.Bits.ToString()),
         // A NATIONAL member of the class (kb/Work PB231 — RESIDUE-11): its window is still the byte window
         // above, but a national character position occupies TWO of those bytes (ISO §13.18.60.4 GR8 leaves the
         // size to the implementor; D-N1 pins two), so the read TRANSCODES the UTF-16BE pair back to the
@@ -111,7 +112,7 @@ internal static class PlaceRenderer
         // the byte that holds it. The offset is 0-based here (the runtime window helpers count from zero,
         // unlike the 1-based CobolString ref-mod the identity arm below uses).
         RedefViewPlace { Coding: NationalWindow n } v => RuntimeApi.NatReadWindow(
-            RenderPath(v.Backing, AccessDir.Sending), $"(int)({v.OffsetExpr})", n.Positions.ToString()),
+            RenderPath(v.Backing, AccessDir.Sending), $"(int)({PositionRenderer.Render(v.Offset)})", n.Positions.ToString()),
         // A POINTER-CLASS member of the class (kb/Work PB231 — the pointer third): its value is a MANAGED
         // REFERENCE, not bytes, so it rides the same storage area's SLOT at the same byte offset its reserved
         // bytes occupy. The null state is the item's own DefaultInitializer, which is how §14.9.3.4 GR9's
@@ -120,7 +121,7 @@ internal static class PlaceRenderer
         // backing string) is what makes the two halves provably one area — and it goes through the SAME cell
         // property whose GR3/GR4 deref guard the byte half already fires.
         RedefViewPlace { Coding: SlotWindow s } v => RuntimeApi.PtrSlotRead(
-            RenderPath(s.Cell, AccessDir.Sending), $"(int)({v.OffsetExpr})",
+            RenderPath(s.Cell, AccessDir.Sending), $"(int)({PositionRenderer.Render(v.Offset)})",
             v.ViewItem.ElementType, v.ViewItem.Pic!.DefaultInitializer),
         // A DYNAMIC-LENGTH member of a cell-backed class (kb/Work PB1026): its content rides the cell's dynamic
         // slot (§8.5.1.10.3 — "located elsewhere"), so every description sharing the cell reads the same content —
@@ -128,7 +129,7 @@ internal static class PlaceRenderer
         // DYNAMIC LENGTH clause (kb/Work PB1118: an EXTERNAL record described LIMIT 20 in one program and LIMIT 5 in
         // another).
         RedefViewPlace { Coding: DynSlotWindow d } v => RuntimeApi.DynAgree(
-            RuntimeApi.CellDynRead(RenderPath(d.Cell, AccessDir.Sending), d.Ordinal), v.ViewItem.DynMaxSize),
+            RuntimeApi.CellDynRead(RenderPath(d.Cell, AccessDir.Sending), PositionRenderer.Render(d.Ordinal)), v.ViewItem.DynMaxSize),
         // A VARIABLE-LENGTH GROUP of a cell-backed class (kb/Work PB1026): read as its contiguous image at its
         // current extent — §8.5.1.11.2, the same composition a declared group's CurrentImage() performs.
         // (A plain read is the group's MAXIMUM image: the OCCURS DEPENDING count is an operand decision, made by
@@ -242,29 +243,29 @@ internal static class PlaceRenderer
         // either would silently clobber the other. The value is first stored to exactly the member's boolean
         // position count with §14.6.8.6's boolean-ZERO fill.
         RedefViewPlace { Coding: BitWindow b } v => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
-            $"{RuntimeApi.BitsWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({b.OffsetExpr})", RuntimeApi.StrStoreBoolean(rhs, b.Bits.ToString(), justifiedRight: false))};",
+            $"{RuntimeApi.BitsWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({PositionRenderer.Render(b.Offset)})", RuntimeApi.StrStoreBoolean(rhs, b.Bits.ToString(), justifiedRight: false))};",
         // Splice the member's NATIONAL positions back into the class's ONE backing as UTF-16BE byte pairs,
         // leaving every other byte untouched (kb/Work PB231; §13.18.44.4 GR1 — one storage area, so a write
         // through one view must not disturb another's bytes). The receiving twin of the national read arm; the
         // fit to exactly the member's position count happens in POSITIONS inside the runtime helper, because
         // padding the BYTES would manufacture U+2020 characters instead of national spaces.
         RedefViewPlace { Coding: NationalWindow n } v => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
-            $"{RuntimeApi.NatWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({v.OffsetExpr})", n.Positions.ToString(), rhs)};",
+            $"{RuntimeApi.NatWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({PositionRenderer.Render(v.Offset)})", n.Positions.ToString(), rhs)};",
         // Store a POINTER-CLASS member into the area's MANAGED SLOT (kb/Work PB231) — the receiving twin of the
         // slot read. The member's own 8 positions get the pointer IMAGE of the stored value (kb/Work PB1071, the
         // DOC-A.1-216 image, written by the runtime's one store beside the slot) and no other member's positions are
         // touched (§13.18.44.4 GR1 — one storage area, and every other member's positions are its own).
         RedefViewPlace { Coding: SlotWindow s } v =>
-            $"{RuntimeApi.PtrSlotWrite(RenderPath(s.Cell, AccessDir.Receiving), $"(int)({v.OffsetExpr})", v.ViewItem.ElementType, rhs)};",
+            $"{RuntimeApi.PtrSlotWrite(RenderPath(s.Cell, AccessDir.Receiving), $"(int)({PositionRenderer.Render(v.Offset)})", v.ViewItem.ElementType, rhs)};",
         // Store a DYNAMIC-LENGTH member's new content into the cell's dynamic slot (kb/Work PB1026) — the receiving
         // twin of the slot read. rhs already carries §8.5.1.10.4's receiving rule (CobolDynString.Store).
         // The cell is reached RECEIVING: inside a dynamic-capacity table's element cell (kb/Work PB1042) the store
         // is a receiving reference to that occurrence, which grows the table to it (§8.5.1.9.3).
-        RedefViewPlace { Coding: DynSlotWindow d } => $"{RuntimeApi.CellDynWrite(RenderPath(d.Cell, AccessDir.Receiving), d.Ordinal, rhs)};",
+        RedefViewPlace { Coding: DynSlotWindow d } => $"{RuntimeApi.CellDynWrite(RenderPath(d.Cell, AccessDir.Receiving), PositionRenderer.Render(d.Ordinal), rhs)};",
         // A VARIABLE-LENGTH GROUP of a cell-backed class receiving a character value (kb/Work PB1026): the value is
         // a contiguous image (§8.5.1.11.2), decomposed by the ONE take step determination D-FRA states.
         RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Receiving),
-            $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, g.DynFixedAt.Select(_ => 0), g.DynTable, g.Odo, rhs)};",
+            $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynMax, g.DynFixedAt.Select(_ => 0), g.DynTable, g.Odo, rhs)};",
         // Splice the new image back into the class's ONE backing, preserving its full width (§13.18.44).
         RedefViewPlace v => ByteWindowWrite(v, rhs),
         // Unreachable: SET Format 14 routes to BoundSetCapacity, and any other store into the CAPACITY register is
@@ -304,13 +305,14 @@ internal static class PlaceRenderer
     /// or — for an occurrence of a REPEATING entry's counter — the family's first id, the extent of each OCCURS level
     /// of its register (§8.4.2.3.3 SR3's order, outermost first) and the written subscripts.</summary>
     private static string SumAddress(ReportSumCounterPlace s) => s.Subscripts is { Count: > 0 } subscripts
-        ? RuntimeApi.ReportSumAddress(s.CounterId, [.. s.RegisterItem.SubscriptLevels().Select(l => l.Occurs!.Value)], subscripts)
+        ? RuntimeApi.ReportSumAddress(s.CounterId, [.. s.RegisterItem.SubscriptLevels().Select(l => l.Occurs!.Value)],
+            [.. subscripts.Select(PositionRenderer.Render)])
         : RuntimeApi.ReportSumAddress(s.CounterId, [], []);
 
     /// <summary>Render an <see cref="AccessPath"/> to a C# lvalue expression — a static/instance root field, then
     /// <c>.Member</c> access, <c>CobolTable.At(path, index)</c> for a fixed OCCURS, and <c>RefSending</c>/
     /// <c>RefReceiving</c> for an OCCURS DYNAMIC level (the accessor chosen from <paramref name="dir"/>: a read
-    /// sends, a write receives). A subscript INDEX is the D10 transitional string carried on the table segment.</summary>
+    /// sends, a write receives). A subscript INDEX is the typed <see cref="Position"/> on the table segment.</summary>
     public static string RenderPath(AccessPath ap, AccessDir dir)
     {
         string path = "";
@@ -318,22 +320,44 @@ internal static class PlaceRenderer
             path = seg switch
             {
                 // A formal parameter's root renders through its *-ARG-OMITTED guard (kb/Work PB971).
-                RootFieldSegment r => r.Guard is { } g ? g.Render(r.CsField) : r.CsField,
+                RootFieldSegment r => r.Guard is { } g ? GuardedRoot(g, r.CsField) : r.CsField,
                 MemberSegment m => path + "." + m.CsMember,
                 // An OCCURS DEPENDING level carries §13.18.38.4 GR7's reference-time bound check when the
                 // compilation group can enable EC-BOUND-ODO (kb/Work PB1268).
-                FixedTableSegment { Odo: { } o } f => RuntimeApi.TableAtOdo(path, f.OneBasedIndex,
+                FixedTableSegment { Odo: { } o } f => RuntimeApi.TableAtOdo(path, PositionRenderer.Render(f.OneBasedIndex),
                     CountRead(o.Depending), o.MinOccurs, o.MaxOccurs),
-                FixedTableSegment f => RuntimeApi.TableAt(path, f.OneBasedIndex),
-                DynTableSegment d => $"{path}.{(dir == AccessDir.Sending ? "RefSending" : "RefReceiving")}({d.OneBasedIndex})",
-                CellTableSegment c => RuntimeApi.CellDynTable(path, c.Ordinal, c.Min, c.ElementWidth),   // kb/Work PB1042
+                FixedTableSegment f => RuntimeApi.TableAt(path, PositionRenderer.Render(f.OneBasedIndex)),
+                DynTableSegment d => $"{path}.{(dir == AccessDir.Sending ? "RefSending" : "RefReceiving")}({PositionRenderer.Render(d.OneBasedIndex)})",
+                CellTableSegment c => RuntimeApi.CellDynTable(path, PositionRenderer.Render(c.Ordinal), c.Min, c.ElementWidth),   // kb/Work PB1042
                 _ => path,
             };
         return path;
     }
 
-    // A Tier-B view's 1-based window start = the 0-based offset expression + 1 (OffsetExpr is the D10 transitional string).
-    private static string RvOffset(RedefViewPlace v) => $"(int)({v.OffsetExpr} + 1)";
+    /// <summary>⛔ THE ONE RENDERING of a guarded root (kb/Work PB971): <paramref name="rootText"/> — the root's
+    /// field text, possibly <c>__outer.</c>-prefixed — wrapped in the runtime guard, which raises the kind's
+    /// condition when the argument was omitted and yields the SAME storage (by <c>ref</c>, or the carrier passed
+    /// through), so the wrapped text is still an lvalue for a store, a member access or a table accessor.
+    /// <para>It lived on the model while the reference resolver also spelled root text (the subscript strings of the
+    /// D10 string carrier); with every position typed (kb/Work PB2151) <see cref="RenderPath"/> is the only
+    /// renderer of a root, so the guard's rendering is here with it.</para></summary>
+    private static string GuardedRoot(OmittedFormalGuard g, string rootText)
+    {
+        string tail = $"{g.Presence}, {nameof(ActivatedElementKind)}.{g.Kind}, \"{g.FormalName}\")";
+        if (g.CarrierPrefix is not { } carrier)
+            return $"{nameof(OmittedFormal)}.{nameof(OmittedFormal.Ref)}(ref {rootText}, {tail}";
+        // The carrier is the leading reference-type part of the root text ("__lnk7" of "__lnk7.Value", after
+        // any "__outer." re-anchoring); the rest ("…Value") applies to what the guard hands back.
+        int at = rootText.IndexOf(carrier, System.StringComparison.Ordinal);
+        if (at < 0)
+            throw new System.InvalidOperationException(
+                $"OmittedFormalGuard: root text '{rootText}' does not contain its carrier '{carrier}' (kb/Work PB971)");
+        int end = at + carrier.Length;
+        return $"{nameof(OmittedFormal)}.{nameof(OmittedFormal.Carrier)}({rootText[..end]}, {tail}{rootText[end..]}";
+    }
+
+    // A Tier-B view's 1-based window start = the 0-based typed offset + 1.
+    private static string RvOffset(RedefViewPlace v) => $"(int)({PositionRenderer.Render(v.Offset)} + 1)";
 
     /// <summary>The BYTE window of a Tier-B view — its storage as one character per byte of the class's one backing,
     /// whatever the coding of its VALUE (§13.18.44.4 GR1: the same storage area, seen as bytes). The identity-coded
@@ -360,13 +384,12 @@ internal static class PlaceRenderer
     /// the element cell's fixed run does not carry, so it is the named loud, never a shortened image.</summary>
     private static string CellVarContiguous(RedefViewPlace v, VarGroupWindow g, string count, CurrentExtentUse use) =>
         v.Item.CanCompose(use)
-            ? RuntimeApi.CellVarContiguous(RenderPath(g.Cell, AccessDir.Sending), $"(int)({v.OffsetExpr})", v.Width,
-                g.DynBase, g.DynFixedAt, g.DynTable, g.Odo, count, g.DynElem)
+            ? RuntimeApi.CellVarContiguous(RenderPath(g.Cell, AccessDir.Sending), $"(int)({PositionRenderer.Render(v.Offset)})", v.Width,
+                PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynTable, g.Odo, count, g.DynElem)
             : EmitText.LoudValue("string", TierCIsland.Reason(v.Item, "variable-length group image of"));
 
     // The reference-modification start/length are `long`-valued expressions but the runtime takes `int` positions —
-    // cast at the call site. Start/Length are the P5.11/D10 TRANSITIONAL string carrier (a rendered index expression);
-    // they become BoundExpr when D10 removes the SUBSCRIPT lexer mode (PHASE 15) — see the PHASE-07 Step 11 plan.
+    // narrowed at the call site. Start/Length are typed Positions (kb/Work PB2151), rendered by PositionRenderer.
     // The cast and the OMITTED-length sentinel are RuntimeApi's (the ONE definition, shared with the ref-modified
     // FUNCTION RESULT channel in IntrinsicRenderer — the two must render identical positions).
     private static string RmStart(RefModPlace r) => RuntimeApi.RefModStart(r.Start);
@@ -490,8 +513,8 @@ internal static class PlaceRenderer
             if (c.Occurs is int n)
             {
                 string k = $"__lk{depth}";
-                string elem = c.IsGroup ? $"(object?){CellLeaves(at.Indexed(k), depth + 1)}"
-                    : $"({c.ElementType})({LeafCarrierRead(at.Indexed(k).ToPlace())})";
+                string elem = c.IsGroup ? $"(object?){CellLeaves(at.Indexed(new PositionLocal(k)), depth + 1)}"
+                    : $"({c.ElementType})({LeafCarrierRead(at.Indexed(new PositionLocal(k)).ToPlace())})";
                 parts.Add($"System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(1, {n}), {k} => {elem}))");
             }
             else parts.Add(c.IsGroup ? CellLeaves(at, depth + 1) : $"(object?)({LeafCarrierRead(at.ToPlace())})");
@@ -512,8 +535,8 @@ internal static class PlaceRenderer
             string slot = $"{v}[{i++}]";
             if (c.Occurs is int n)
                 stmts.Add(c.IsGroup
-                    ? $"for (int {k} = 1; {k} <= {n}; {k}++) {{ {CellLeavesStore(at.Indexed(k), $"((object?[]){slot}!)[{k} - 1]", depth + 1)} }}"
-                    : $"for (int {k} = 1; {k} <= {n}; {k}++) {{ {LeafCarrierWrite(at.Indexed(k).ToPlace(), $"(({c.ElementType}[]){slot}!)[{k} - 1]")} }}");
+                    ? $"for (int {k} = 1; {k} <= {n}; {k}++) {{ {CellLeavesStore(at.Indexed(new PositionLocal(k)), $"((object?[]){slot}!)[{k} - 1]", depth + 1)} }}"
+                    : $"for (int {k} = 1; {k} <= {n}; {k}++) {{ {LeafCarrierWrite(at.Indexed(new PositionLocal(k)).ToPlace(), $"(({c.ElementType}[]){slot}!)[{k} - 1]")} }}");
             else
                 stmts.Add(c.IsGroup
                     ? $"{{ {CellLeavesStore(at, slot, depth + 1)} }}"
@@ -638,7 +661,7 @@ internal static class PlaceRenderer
             // (SR22); the operand's count cuts the carrier's fixed run to the current extent (kb/Work PB244).
             RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo, CurrentExtentUse.Carrier) =>
                 RuntimeApi.CellVarCarrier(RenderPath(g.Cell, AccessDir.Sending),
-                    $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynTable, g.Odo, CellOdoCount(odo)),   // kb/Work PB1026, PB1042
+                    $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynTable, g.Odo, CellOdoCount(odo)),   // kb/Work PB1026, PB1042
             _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.CurrentExtentImageCapable =>
                 EmitText.LoudValue(RuntimeApi.VarGroupType, TierCIsland.Reason(inner.Item, context)),
             // A STATEMENT's read asks a LINKAGE dynamic-length member to agree with its clause (§14.6.13.2 rule 5,
@@ -707,7 +730,7 @@ internal static class PlaceRenderer
         // A formal's copy-in keeps each dynamic-length member's whole content here too (kb/Work PB1937, PB2094: a
         // variable-length group formal's fresh area is a cell): no member LIMIT applies to that store.
         RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreCarrier(RenderPath(g.Cell, AccessDir.Receiving),
-            $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt,
+            $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt,
             formalStorage ? g.DynMax.Select(_ => int.MaxValue) : g.DynMax, g.DynTable, g.Odo,
             odoCount ?? g.Odo.Max.ToString(), value)};",   // kb/Work PB1026, PB1042, PB244
         _ when !group.Item.CurrentExtentImageCapable => EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),
@@ -783,7 +806,7 @@ internal static class PlaceRenderer
         return inner.Undecorated switch
         {
             RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo, CurrentExtentUse.Record) => RuntimeApi.CellVarContiguousExtents(
-                RenderPath(g.Cell, AccessDir.Sending), v.Width, g.DynBase, g.DynFixedAt, g.DynMax, g.DynStructure, g.DynTable,
+                RenderPath(g.Cell, AccessDir.Sending), v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynMax, g.DynStructure, g.DynTable,
                 g.Odo, CellOdoCount(odo)),
             _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.RecordImageCapable => "null",
             _ => $"{Read(inner)}.CurrentExtents({odo})",
@@ -804,7 +827,7 @@ internal static class PlaceRenderer
         // (a window holding an OCCURS DEPENDING table takes it as the layout's last component — kb/Work PB244)
         RedefViewPlace { Coding: VarGroupWindow g } v when v.Item.RecordImageCapable =>
             $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Receiving),
-            $"(int)({v.OffsetExpr})", v.Width, g.DynBase, g.DynFixedAt, g.DynMax, g.DynStructure, g.DynTable, g.Odo, record, extents, fixedForm)};",
+            $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynMax, g.DynStructure, g.DynTable, g.Odo, record, extents, fixedForm)};",
         _ when group is RedefViewPlace { Coding: VarGroupWindow } || !group.Item.RecordImageCapable =>
             EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),
         _ => $"{GroupTarget(group)}.FromContiguousImage({record}, {extents}{(fixedForm ? ", true" : "")});",

@@ -79,7 +79,7 @@ internal sealed class InitializeEmitter(EmitContext ctx, MoveEmitter move)
                 bool first = true;
                 foreach (var arm in sel.Arms)
                 {
-                    using (w.Block($"{(first ? "if" : "else if")} ({OccurrenceTest(sel.IndexVars, arm.When)})"))
+                    using (w.Block($"{(first ? "if" : "else if")} ({OccurrenceTest(sel.Occurrences, arm.When)})"))
                         EmitAction(arm.Do);
                     first = false;
                 }
@@ -99,10 +99,10 @@ internal sealed class InitializeEmitter(EmitContext ctx, MoveEmitter move)
     /// subject's OCCURS chain (most inclusive first, ISO §13.18.63.3 SR20's order) matched against each occurrence
     /// tuple the arm covers — a conjunction per tuple, disjoined over the tuples. The tuples are bind-time
     /// constants, so nothing but the loop variables is read at run time.</summary>
-    private static string OccurrenceTest(IReadOnlyList<string> vars, IReadOnlyList<Subscripts> tuples) =>
+    private static string OccurrenceTest(IReadOnlyList<Position> occurrences, IReadOnlyList<Subscripts> tuples) =>
         string.Join(" || ", tuples.Select(t =>
         {
-            string conj = string.Join(" && ", vars.Select((v, i) => $"{v} == {t[i]}"));
-            return vars.Count > 1 && tuples.Count > 1 ? $"({conj})" : conj;
+            string conj = string.Join(" && ", occurrences.Select((o, i) => $"{PositionRenderer.Render(o)} == {t[i]}"));
+            return occurrences.Count > 1 && tuples.Count > 1 ? $"({conj})" : conj;
         }));
 }

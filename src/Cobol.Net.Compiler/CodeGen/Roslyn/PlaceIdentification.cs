@@ -81,10 +81,10 @@ internal static class PlaceIdentification
         var frozen = v with
         {
             Backing = FreezePath(v.Backing, hoist),
-            OffsetExpr = HoistFragment(v.OffsetExpr, hoist),
+            Offset = Hoist(v.Offset, hoist),
             Coding = FreezeCoding(v.Coding, hoist),
             Cell = v.Cell is { } cell ? FreezePath(cell, hoist) : null,
-            DynOrdinal = v.DynOrdinal is { } ordinal ? HoistFragment(ordinal, hoist) : null,
+            DynOrdinal = v.DynOrdinal is { } ordinal ? Hoist(ordinal, hoist) : null,
         };
         if (v.Cell is not { Segments: [RootFieldSegment root] }) return frozen;
         string local = hoist(root.CsField);
@@ -101,19 +101,25 @@ internal static class PlaceIdentification
     private static RefModPlace FreezeRefMod(RefModPlace r, Func<string, string> hoist)
     {
         var inner = Freeze(r.Inner, hoist);
-        string start = HoistFragment(r.Start, hoist);
-        string? length = r.Length is null ? null : HoistFragment(r.Length, hoist);
+        var start = Hoist(r.Start, hoist);
+        var length = r.Length is null ? null : Hoist(r.Length, hoist);
         return r with { Inner = inner, Start = start, Length = length };
     }
 
     /// <summary>A cell window's own address fragments (kb/Work PB1042): the cell path — which, inside a
     /// dynamic-capacity table's element, carries that table's subscript — and the component ordinal, which carries a
-    /// subscript term per enclosing fixed table.</summary>
+    /// subscript term per enclosing fixed table.
+    /// <para>A <see cref="BitWindow"/>'s offset is not hoisted, because no verb that identifies its operands here can
+    /// receive a USAGE BIT item with a run-time subscript: a BY REFERENCE bit argument's subscripts "consist of only
+    /// fixed-point numeric literals or arithmetic expressions … in which all operands are numeric literals" (ISO
+    /// §14.9.4.3 SR6, COBOLNET1683; INVOKE's twin is §14.9.23.3 SR12), and INSPECT, STRING and UNSTRING take only
+    /// usage display or national operands (§14.9.22.3 SR1, §14.9.43.3 SR1, §14.9.48.3 SR4). The view's byte <see cref="RedefViewPlace.Offset"/>, which every other coding reads, is
+    /// hoisted above.</para></summary>
     private static WindowCoding? FreezeCoding(WindowCoding? coding, Func<string, string> hoist) => coding switch
     {
         SlotWindow s => s with { Cell = FreezePath(s.Cell, hoist) },
-        DynSlotWindow d => d with { Cell = FreezePath(d.Cell, hoist), Ordinal = HoistFragment(d.Ordinal, hoist) },
-        VarGroupWindow g => g with { Cell = FreezePath(g.Cell, hoist), DynBase = HoistFragment(g.DynBase, hoist) },
+        DynSlotWindow d => d with { Cell = FreezePath(d.Cell, hoist), Ordinal = Hoist(d.Ordinal, hoist) },
+        VarGroupWindow g => g with { Cell = FreezePath(g.Cell, hoist), DynBase = Hoist(g.DynBase, hoist) },
         _ => coding,
     };
 
@@ -124,15 +130,17 @@ internal static class PlaceIdentification
         foreach (var s in path.Segments)
             segments.Add(s switch
             {
-                FixedTableSegment f => f with { OneBasedIndex = HoistFragment(f.OneBasedIndex, hoist) },
-                DynTableSegment d => d with { OneBasedIndex = HoistFragment(d.OneBasedIndex, hoist) },
-                CellTableSegment c => c with { Ordinal = HoistFragment(c.Ordinal, hoist) },   // kb/Work PB1042
+                FixedTableSegment f => f with { OneBasedIndex = Hoist(f.OneBasedIndex, hoist) },
+                DynTableSegment d => d with { OneBasedIndex = Hoist(d.OneBasedIndex, hoist) },
+                CellTableSegment c => c with { Ordinal = Hoist(c.Ordinal, hoist) },   // kb/Work PB1042
                 _ => s,
             });
         return new AccessPath(segments);
     }
 
-    /// <summary>A bare integer literal evaluates to itself at any time; everything else is a run-time read.</summary>
-    private static string HoistFragment(string fragment, Func<string, string> hoist) =>
-        fragment.Length > 0 && fragment.All(char.IsAsciiDigit) ? fragment : hoist(fragment);
+    /// <summary>A self-evaluating position (<see cref="Position.IsSelfEvaluating"/>) is the same at any time; everything
+    /// else is a run-time read, hoisted into a statement local (kb/Work PB2151: the constancy test is structural, never
+    /// a scan of text).</summary>
+    private static Position Hoist(Position position, Func<string, string> hoist) =>
+        position.IsSelfEvaluating ? position : new PositionLocal(hoist(PositionRenderer.Render(position)));
 }

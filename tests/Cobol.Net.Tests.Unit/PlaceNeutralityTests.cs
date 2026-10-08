@@ -29,7 +29,7 @@ public sealed class PlaceNeutralityTests
             .SelectMany(t => t
                 .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly)
                 .Where(m => m.ReturnType == typeof(string)
-                    && !m.IsSpecialName                  // property getters (get_Start, get_OffsetExpr, …) are structural data, allowed
+                    && !m.IsSpecialName                  // property getters (get_Start, get_Offset, …) are structural data, allowed
                     && m.Name != nameof(ToString)        // record/object ToString
                     && m.Name != "PrintMembers")         // record-generated
                 .Select(m => $"{t.Name}.{m.Name}()"))

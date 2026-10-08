@@ -2410,8 +2410,9 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // its place among the group's components — the difference of the two static ordinals (a group that is
         // itself a table element numbers its members from zero), plus `shift`, the displacement of the fixed-table
         // occurrence the per-occurrence walk below has entered (CellComponents.PerOccurrence per occurrence).
-        string CellOrdinal(VarGroupWindow vg, DataItem c, int shift) =>
-            $"{vg.DynBase} + {c.ClassDynOrdinal - (group.IsDynamicTable ? 0 : group.ClassDynOrdinal) + shift}";
+        Position CellOrdinal(VarGroupWindow vg, DataItem c, int shift) =>
+            new PositionBinary(vg.DynBase, PositionOperator.Add,
+                new PositionConstant(c.ClassDynOrdinal - (group.IsDynamicTable ? 0 : group.ClassDynOrdinal) + shift));
 
         void Walk(DataItem g, AccessPath? path, int shift = 0)
         {
@@ -2465,7 +2466,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     if (perOccurrence)
                     {
                         for (int i = 1; i <= times && failure is null; i++)
-                            Walk(c, cPath?.Add(new FixedTableSegment(i.ToString())), shift + (i - 1) * CellComponents.PerOccurrence(c));
+                            Walk(c, cPath?.Add(new FixedTableSegment(new PositionConstant(i))), shift + (i - 1) * CellComponents.PerOccurrence(c));
                     }
                     else if (HasRuntimeLength(c) || c.IsDynamicLength)
                     { failure = ImageOrStage($"the table '{c.CobolName ?? c.CsName}' has a runtime-length element — a per-occurrence sum"); return; }
@@ -2480,7 +2481,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     // its ordinal relative to the group's own first component (kb/Work PB1042).
                     Place? cPlace = cPath is not null ? new MemberPlace(cPath, c)
                         : inner is RedefViewPlace { Coding: VarGroupWindow vg } rv
-                            ? RedefViewPlace.For(rv.Backing, c, rv.OffsetExpr, cell: vg.Cell, dynOrdinal: CellOrdinal(vg, c, shift))
+                            ? RedefViewPlace.For(rv.Backing, c, rv.Offset, cell: vg.Cell, dynOrdinal: CellOrdinal(vg, c, shift))
                             : null;
                     if (cPlace is null) { failure = Stage($"the dynamic-length subordinate '{c.CobolName ?? c.CsName}' could not be addressed"); return; }
                     Add(new BoundIntrinsicCall(sig, [new BoundFieldOperand(cPlace)], PicCategory.Numeric)
@@ -3018,17 +3019,17 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             return true;
         }
 
-        string indexVar = $"__all{_allSerial++}";
-        var exprs = new string[innerSegs.Count];
+        var indices = new LocalVector($"__all{_allSerial++}");
+        var exprs = new Position[innerSegs.Count];
         var counts = new List<AllCount>();
-        var outerExprs = new List<string>();   // the rendered index of every level ABOVE the current one
+        var outerExprs = new List<Position>();   // the index of every level ABOVE the current one
         List<ReferenceResolver.IndexUse> indexNames = [];   // §8.4.2.3.3 SR4's collector — see below the loop
         for (int i = 0; i < innerSegs.Count; i++)
         {
             DataItem level = levels[i];
             if (ReferenceResolver.IsAllSegment(innerSegs[i]))
             {
-                exprs[i] = $"{indexVar}[{counts.Count}]";
+                exprs[i] = new PositionLocalElement(indices, counts.Count);
                 // The level's range is the ONE current-occurrence-count model (fixed / ODO / dynamic capacity) — or,
                 // for a repeating sum counter, its report-writer twin (a DEPENDING level counts by §13.18.38.4 GR13).
                 if ((counter is (_, { } countedFamily)
@@ -3042,8 +3043,8 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                 }
                 counts.Add(count);
             }
-            else if (ctx.Refs.RenderIndexSegment(innerSegs[i], indexNames) is { } rendered)
-                exprs[i] = rendered;
+            else if (ctx.Refs.BindIndexSegment(innerSegs[i], indexNames) is { } bound)
+                exprs[i] = bound;
             else
             {
                 args.Add(BoundOperandError.Unbuilt(ctx.Edition, $"table(ALL) subscript of '{name}'"));
@@ -3063,7 +3064,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             args.Add(BoundOperandError.Unbuilt(ctx.Edition, $"table(ALL) occurrence of '{name}'"));
             return true;
         }
-        args.Add(new BoundFieldOperand(new TableAllPlace(element, indexVar, counts)));
+        args.Add(new BoundFieldOperand(new TableAllPlace(element, indices, counts)));
         return true;
     }
 

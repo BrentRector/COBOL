@@ -22,8 +22,8 @@ internal abstract record PlaceCursor(DataItem Item)
     public abstract PlaceCursor? Child(DataItem child);
 
     /// <summary>The cursor at one occurrence of <see cref="Item"/> (an OCCURS table), <paramref name="oneBasedIndex"/>
-    /// being the D10 transitional index text — a loop variable or an integer literal.</summary>
-    public abstract PlaceCursor Indexed(string oneBasedIndex);
+    /// being the typed occurrence number — a loop variable or an integer literal.</summary>
+    public abstract PlaceCursor Indexed(Position oneBasedIndex);
 
     /// <summary>The <see cref="Place"/> the cursor denotes.</summary>
     public abstract Place ToPlace();
@@ -40,7 +40,7 @@ internal abstract record PlaceCursor(DataItem Item)
     /// direction-specific accessor (§8.5.1.9.2 / §8.5.1.9.3) — a typed element of the table's
     /// <c>CobolDynTable</c> on its <see cref="StoragePath"/>, or, in a cell-backed area, the occurrence's element cell
     /// (<see cref="ViewCursor"/>; kb/Work PB1042). Null when the position has no table path.</summary>
-    public virtual PlaceCursor? DynamicElement(string oneBasedIndex) =>
+    public virtual PlaceCursor? DynamicElement(Position oneBasedIndex) =>
         StoragePath is { } table ? new DynElementCursor(table.Add(new DynTableSegment(oneBasedIndex)), Item) : null;
 
     /// <summary>The cursor over a resolved group place, or null for a storage form no cursor is built over.
@@ -72,15 +72,14 @@ internal sealed record MemberCursor(AccessPath Path, DataItem Item) : PlaceCurso
         {
             if (cls.Tier == RedefinesTier.StringCanonical && child.IsCanonical)
                 return new ViewCursor(Path.Add(new MemberSegment(cls.BackingCsName)),
-                    child.ClassOffset.ToString(), child.ClassOffset, child, "",
-                    Cell: ReferenceResolver.BuildCellPath(cls));
+                    new PositionConstant(child.ClassOffset), child.ClassOffset, child, ReferenceResolver.BuildCellPath(cls));
             if (cls.Tier != RedefinesTier.Alias || !child.IsCanonical) return null;
         }
         return new MemberCursor(Path.Add(new MemberSegment(child.CsName)), child);
     }
 
     /// <inheritdoc/>
-    public override PlaceCursor Indexed(string oneBasedIndex) =>
+    public override PlaceCursor Indexed(Position oneBasedIndex) =>
         this with { Path = Path.Add(new FixedTableSegment(oneBasedIndex)) };
 
     /// <inheritdoc/>
@@ -104,7 +103,7 @@ internal sealed record DynElementCursor(AccessPath Path, DataItem Item) : PlaceC
             : null;
 
     /// <inheritdoc/>
-    public override PlaceCursor Indexed(string oneBasedIndex) =>
+    public override PlaceCursor Indexed(Position oneBasedIndex) =>
         this with { Path = Path.Add(new FixedTableSegment(oneBasedIndex)) };
 
     /// <inheritdoc/>
@@ -115,22 +114,36 @@ internal sealed record DynElementCursor(AccessPath Path, DataItem Item) : PlaceC
 }
 
 /// <summary>A cursor inside a Tier-B REDEFINES class: every member is a (offset, width) character window over
-/// the class's ONE string backing. The window offset = the entry place's offset expression + (this item's
-/// in-class offset − the entry item's) + Σ (index − 1) × per-occurrence storage width for each OCCURS level crossed
-/// (ISO §13.18.44 — a redefined table lays its occurrences end-to-end in the one backing; the same arithmetic
-/// as <c>ReferenceResolver.WindowScopeOf</c>).</summary>
+/// the class's ONE string backing. The window offset = the entry place's offset (<paramref name="Base"/>) + (this
+/// item's in-class offset − the entry item's, <paramref name="BaseOffset"/>) + Σ (index − 1) × per-occurrence storage
+/// width for each OCCURS level crossed (ISO §13.18.44 — a redefined table lays its occurrences end-to-end in the one
+/// backing; the same <see cref="PositionOffset"/> law as <c>ReferenceResolver.WindowScopeOf</c>).</summary>
 /// <param name="Cell">The backing <c>StorageCell</c> path of the cursor's SCOPE, for the three cell-backed surfaces
 /// — what a pointer-class member's managed slot and a variable-length component's slot address (kb/Work PB231,
 /// PB1042; <see cref="SlotWindow"/>, <see cref="CellComponents"/>). Null for a plain REDEFINES class, which cannot
 /// hold such a member.</param>
 internal sealed record ViewCursor(
-    AccessPath Backing, string BaseExpr, int BaseOffset, DataItem Item, string OccursTerms,
-    string OccursBitTerms = "", AccessPath? Cell = null) : PlaceCursor(Item)
+    AccessPath Backing, Position Base, int BaseOffset, DataItem Item, AccessPath? Cell = null) : PlaceCursor(Item)
 {
-    /// <summary>The component-ordinal displacement of the cursor's position (kb/Work PB1042): the entry place's
-    /// run-time ordinal less its item's static one, plus <c>(index − 1) ×</c> the components per occurrence of each
-    /// fixed level crossed since — the ordinal twin of <see cref="OccursTerms"/>.</summary>
-    public string OrdinalTerms { get; init; } = "";
+    /// <summary>The byte displacement terms of the OCCURS levels crossed since the entry.</summary>
+    public IReadOnlyList<OffsetTerm> OccursTerms { get; init; } = [];
+
+    /// <summary>The same displacement in bits (§13.18.1.4 GR2's stride), for a USAGE BIT member.</summary>
+    public IReadOnlyList<OffsetTerm> OccursBitTerms { get; init; } = [];
+
+    /// <summary>The entry place's run-time component ordinal and its item's static one (kb/Work PB1042) — the cursor's
+    /// ordinal displacement at entry is their difference; null when the cursor entered no cell-backed window, or once a
+    /// dynamic-capacity table's element cell opened a scope of its own.</summary>
+    public OrdinalEntry? EntryOrdinal { get; init; }
+
+    /// <summary>The component-ordinal displacement of each fixed level crossed since the entry: <c>(index − 1) ×</c>
+    /// the level's components per occurrence — the ordinal twin of <see cref="OccursTerms"/>.</summary>
+    public IReadOnlyList<OffsetTerm> OrdinalTerms { get; init; } = [];
+
+    /// <summary>The run-time component-ordinal base of the cursor's class scope (<c>ReferenceResolver.CellOrdinalBase</c>,
+    /// kb/Work PB2094) when the cursor entered it whole rather than through a resolved window — null otherwise, and once
+    /// a dynamic-capacity table's element cell opened a scope of its own.</summary>
+    public Position? OrdinalBase { get; init; }
 
     /// <summary>The dynamic-capacity table whose ELEMENT CELL is the cursor's scope (kb/Work PB1042), or null for
     /// the class cell's. The table item itself, positioned at one occurrence, is its element at offset zero.</summary>
@@ -142,10 +155,10 @@ internal sealed record ViewCursor(
     {
         var item = rv.ViewItem;
         bool element = item.IsDynamicTable;
-        return new ViewCursor(rv.Backing, rv.OffsetExpr, element ? 0 : item.ClassOffset, item, "", Cell: rv.Cell)
+        return new ViewCursor(rv.Backing, rv.Offset, element ? 0 : item.ClassOffset, item, rv.Cell)
         {
             ScopeTable = element ? item : null,
-            OrdinalTerms = rv.DynOrdinal is { } o ? $" + ({o}) - {(element ? 0 : item.ClassDynOrdinal)}" : "",
+            EntryOrdinal = rv.DynOrdinal is { } o ? new OrdinalEntry(o, element ? 0 : item.ClassDynOrdinal) : null,
         };
     }
 
@@ -158,7 +171,7 @@ internal sealed record ViewCursor(
     // level's STORAGE extent (ByteWidth), never its character-position count: a NATIONAL element occupies two bytes
     // per position (§13.18.60.4 GR8 / D-N1, kb/Work PB231), the stride the resolver's window walk uses.
     /// <inheritdoc/>
-    public override PlaceCursor Indexed(string oneBasedIndex) =>
+    public override PlaceCursor Indexed(Position oneBasedIndex) =>
         Item.IsDynamicTable && Cell is { } cell
             // ONE OCCURRENCE OF A CELL-BACKED dynamic-capacity table (kb/Work PB1042): its element cell is a scope
             // of its own — its members' offsets and ordinals start at zero there.
@@ -166,15 +179,15 @@ internal sealed record ViewCursor(
             {
                 Backing = ElementCell(cell, oneBasedIndex).Add(new MemberSegment(nameof(CobolNet.Runtime.StorageCell.Ref))),
                 Cell = ElementCell(cell, oneBasedIndex),
-                BaseExpr = "0", BaseOffset = 0, OccursTerms = "", OccursBitTerms = "", OrdinalTerms = "",
+                Base = new PositionConstant(0), BaseOffset = 0, OccursTerms = [], OccursBitTerms = [], EntryOrdinal = null,
+                OrdinalBase = null, OrdinalTerms = [],
                 ScopeTable = Item,
             }
             : this with
             {
-                OccursTerms = $"{OccursTerms} + ({oneBasedIndex} - 1) * {Item.ByteWidth}",
-                OccursBitTerms = $"{OccursBitTerms} + ({oneBasedIndex} - 1) * {BitLayout.StrideBits(Item)}",   // §13.18.1.4 GR2
-                OrdinalTerms = Cell is null ? OrdinalTerms
-                    : $"{OrdinalTerms} + ({oneBasedIndex} - 1) * {CellComponents.PerOccurrence(Item)}",
+                OccursTerms = [.. OccursTerms, new OffsetTerm(oneBasedIndex, Item.ByteWidth)],
+                OccursBitTerms = [.. OccursBitTerms, new OffsetTerm(oneBasedIndex, BitLayout.StrideBits(Item))],   // §13.18.1.4 GR2
+                OrdinalTerms = Cell is null ? OrdinalTerms : [.. OrdinalTerms, new OffsetTerm(oneBasedIndex, CellComponents.PerOccurrence(Item))],
             };
 
     /// <summary>The cell-backed dynamic-capacity table at the cursor (kb/Work PB1042) — what its CAPACITY register,
@@ -185,34 +198,48 @@ internal sealed record ViewCursor(
             : null;
 
     /// <inheritdoc/>
-    public override PlaceCursor? DynamicElement(string oneBasedIndex) => StoragePath is null ? null : Indexed(oneBasedIndex);
+    public override PlaceCursor? DynamicElement(Position oneBasedIndex) => StoragePath is null ? null : Indexed(oneBasedIndex);
 
     /// <summary>The cursor at the cell-backed dynamic-capacity table <paramref name="table"/> referenced whole (kb/Work
     /// PB1042) — a level the whole-table INITIALIZE enters only through <see cref="DynamicElement"/>, so the class
     /// backing it starts from is never read. Null outside a cell-backed class.</summary>
     public static ViewCursor? AtCellTable(DataItem table) =>
         ReferenceResolver.BuildCellPath(table.Class) is { } cell
-            ? new ViewCursor(cell, "0", 0, table, "", Cell: cell) { OrdinalTerms = ReferenceResolver.CellOrdinalBase(table.Class!) }
+            ? new ViewCursor(cell, new PositionConstant(0), 0, table, cell) { OrdinalBase = ReferenceResolver.CellOrdinalBase(table.Class!) }
             : null;
 
-    private AccessPath ElementCell(AccessPath cell, string oneBasedIndex) =>
+    private AccessPath ElementCell(AccessPath cell, Position oneBasedIndex) =>
         cell.Add(CellTableSegment.Of(Item, Ordinal(Item))).Add(new DynTableSegment(oneBasedIndex));
 
     /// <summary>The component ordinal of <paramref name="item"/> at the cursor's position.</summary>
-    private string Ordinal(DataItem item) =>
-        $"{(ReferenceEquals(item, ScopeTable) ? 0 : item.ClassDynOrdinal)}{OrdinalTerms}";
+    private PositionOffset Ordinal(DataItem item)
+    {
+        Position origin = ReferenceResolver.OrdinalOrigin(ReferenceEquals(item, ScopeTable) ? 0 : item.ClassDynOrdinal, OrdinalBase);
+        if (EntryOrdinal is { } entry)   // origin + (the entry's run-time ordinal) − its static one
+            origin = new PositionBinary(new PositionBinary(origin, PositionOperator.Add, new PositionGroup(entry.RunTime)),
+                                        PositionOperator.Subtract, new PositionConstant(entry.Static));
+        return new PositionOffset(origin, OrdinalTerms);
+    }
 
     /// <inheritdoc/>
     public override Place ToPlace()
     {
         int delta = (ReferenceEquals(Item, ScopeTable) ? 0 : Item.ClassOffset) - BaseOffset;
-        // ⛔ THROUGH THE ONE WINDOW BUILDER (kb/Work PB203). `BaseExpr - BaseOffset` is the entry place's
+        // ⛔ THROUGH THE ONE WINDOW BUILDER (kb/Work PB203). `Base - BaseOffset` is the entry place's
         // RUNTIME displacement with its static in-class offset removed — exactly what the builder needs,
         // because a bit member's own position is already carried in BITS by DataItem.ClassBitOffset and
         // re-deriving it from a byte expression would round a sub-byte member down to its containing byte.
-        return RedefViewPlace.For(Backing, Item,
-            $"{BaseExpr}{(delta != 0 ? $" + {delta}" : "")}{OccursTerms}",
-            BaseExpr == BaseOffset.ToString() ? null : $"{BaseExpr} - {BaseOffset}", OccursBitTerms, Cell,
-            Cell is null ? null : Ordinal(Item));
+        // An entry at its own static offset (a self-evaluating base equal to it) has no runtime displacement.
+        Position origin = delta != 0 ? new PositionBinary(Base, PositionOperator.Add, new PositionConstant(delta)) : Base;
+        Position? displacement = Base.IsSelfEvaluating && Base.ConstantValue == BaseOffset
+            ? null
+            : new PositionBinary(Base, PositionOperator.Subtract, new PositionConstant(BaseOffset));
+        return RedefViewPlace.For(Backing, Item, new PositionOffset(origin, OccursTerms), displacement, OccursBitTerms,
+            Cell, Cell is null ? null : Ordinal(Item));
     }
 }
+
+/// <summary>The component ordinal a <see cref="ViewCursor"/> entered a cell-backed window at (kb/Work PB1042): the
+/// window's run-time ordinal and its item's static <see cref="DataItem.ClassDynOrdinal"/>, whose difference displaces
+/// every member's ordinal the cursor reaches.</summary>
+internal readonly record struct OrdinalEntry(Position RunTime, int Static);

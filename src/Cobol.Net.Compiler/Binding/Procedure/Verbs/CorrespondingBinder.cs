@@ -354,7 +354,7 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
         private readonly List<CorrespondingHoist> _hoists;
         private readonly string _local;
         private readonly Place? _group;        // the member group's anchor Place (the `ref var` hoist target)
-        private readonly string _offsetInit;   // the view group's window-offset expression (the `long` hoist init)
+        private readonly Position? _viewOffset; // the view group's window offset (the `long` hoist init); null for any other group
         private readonly bool _isMember;       // MemberPlace group vs Tier-B RedefViewPlace group
         private readonly bool _subscripted;    // the member path evaluates a subscript (a table access)
         private readonly AccessPath? _backing; // the view group's backing path
@@ -363,12 +363,12 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
         private bool _hoisted;
         private bool _isAlias;                 // a level-66 THROUGH alias: each member resolves on its own
         private AccessPath? _cell;             // the view group's scope cell (kb/Work PB1042)
-        private string? _dynOrdinal;           // the view group's component ordinal expression (kb/Work PB1042)
+        private Position? _dynOrdinal;         // the view group's component ordinal (kb/Work PB1042)
 
-        private CorrAccess(List<CorrespondingHoist> hoists, string local, Place? group, string offsetInit,
+        private CorrAccess(List<CorrespondingHoist> hoists, string local, Place? group, Position? viewOffset,
             bool isMember, bool subscripted, AccessPath? backing, DataItem groupItem, ReferenceResolver refs)
         {
-            _hoists = hoists; _local = local; _group = group; _offsetInit = offsetInit; _isMember = isMember;
+            _hoists = hoists; _local = local; _group = group; _viewOffset = viewOffset; _isMember = isMember;
             _subscripted = subscripted; _backing = backing; _groupItem = groupItem; _refs = refs;
         }
 
@@ -388,15 +388,15 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
         public static CorrAccess? Create(Place group, string local, List<CorrespondingHoist> hoists, ReferenceResolver refs)
             => group.Undecorated switch
             {
-                MemberPlace m => new CorrAccess(hoists, local, group: m, offsetInit: "", isMember: true,
+                MemberPlace m => new CorrAccess(hoists, local, group: m, viewOffset: null, isMember: true,
                     subscripted: m.Path.HasIndex, backing: null, m.Item, refs),
-                RedefViewPlace v => new CorrAccess(hoists, local, group: null, offsetInit: v.OffsetExpr, isMember: false,
+                RedefViewPlace v => new CorrAccess(hoists, local, group: null, viewOffset: v.Offset, isMember: false,
                     subscripted: false, v.Backing, v.Item, refs) { _cell = v.Cell, _dynOrdinal = v.DynOrdinal },
                 // A level-66 THROUGH alias (kb/Work PB966): its members are the elementary items §13.18.45.4 GR2
                 // says it includes, none subject to an OCCURS clause (§13.18.45.3 SR3 keeps both endpoints out of
                 // one, and CorrMembers excludes an item under an OCCURS inside the window), so each is identified
                 // by its own unsubscripted reference — there is nothing to anchor at statement start.
-                RenamesPlace n => new CorrAccess(hoists, local, group: null, offsetInit: "", isMember: false,
+                RenamesPlace n => new CorrAccess(hoists, local, group: null, viewOffset: null, isMember: false,
                     subscripted: false, backing: null, n.Item, refs) { _isAlias = true },
                 _ => null,
             };
@@ -433,11 +433,17 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
             // when the group is one occurrence of a dynamic-capacity table, at whose offset zero it then lies — and
             // its component ordinal, by which a dynamic-length pair member's slot is displaced like its window.
             bool element = _groupItem.IsDynamicTable;
-            string displacement = $"{Hoist(isRef: false)} - {(element ? 0 : _groupItem.ClassOffset)}";
+            Position displacement = new PositionBinary(new PositionLocal(Hoist(isRef: false)), PositionOperator.Subtract,
+                                                       new PositionConstant(element ? 0 : _groupItem.ClassOffset));
             return RedefViewPlace.For(_backing!, leaf,
-                $"{displacement} + {leaf.ClassOffset}", displacement, cell: _cell,
-                dynOrdinal: _dynOrdinal is { } o
-                    ? $"({o}) - {(element ? 0 : _groupItem.ClassDynOrdinal)} + {leaf.ClassDynOrdinal}" : null);
+                new PositionBinary(displacement, PositionOperator.Add, new PositionConstant(leaf.ClassOffset)), displacement,
+                cell: _cell,
+                dynOrdinal: _dynOrdinal is { } o   // (the group's run-time ordinal) − its static one + the leaf's
+                    ? new PositionBinary(
+                        new PositionBinary(new PositionGroup(o), PositionOperator.Subtract,
+                                           new PositionConstant(element ? 0 : _groupItem.ClassDynOrdinal)),
+                        PositionOperator.Add, new PositionConstant(leaf.ClassDynOrdinal))
+                    : null);
         }
 
         /// <summary>Record the anchor hoist on first use and return its local name.</summary>
@@ -446,8 +452,8 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
             if (!_hoisted)
             {
                 _hoists.Add(isRef
-                    ? new CorrespondingHoist(_local, RefGroup: _group, LongInit: null)
-                    : new CorrespondingHoist(_local, RefGroup: null, LongInit: $"(long)({_offsetInit})"));
+                    ? new CorrespondingHoist(_local, RefGroup: _group, ViewOffset: null)
+                    : new CorrespondingHoist(_local, RefGroup: null, ViewOffset: _viewOffset));
                 _hoisted = true;
             }
             return _local;

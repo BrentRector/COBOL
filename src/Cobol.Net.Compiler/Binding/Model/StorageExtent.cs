@@ -42,7 +42,7 @@ public readonly record struct StorageExtent(DataItem Area, int Start, int Length
     {
         // Positions are CHARACTER positions (§8.4.3.3.4 GR5a); they are bytes only for a DISPLAY-usage operand,
         // which is the only kind whose extent this answers (USAGE NATIONAL / BIT operands answer null above).
-        if (Of(r.Inner) is not { } inner || !int.TryParse(r.Start, out int start) || start < 1) return null;
+        if (Of(r.Inner) is not { } inner || r.Start.Int32Literal is not { } start || start < 1) return null;
         if (r.StaticLength(inner.Length) is not { } len || len < 1 || start - 1 + len > inner.Length) return null;
         return new StorageExtent(inner.Area, inner.Start + start - 1, len);
     }

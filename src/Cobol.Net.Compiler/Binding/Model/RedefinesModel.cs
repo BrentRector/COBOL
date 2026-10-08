@@ -25,8 +25,8 @@ public sealed record RenamesSpanPart(DataItem Leaf, int? Occurrence, int StartBy
     /// <summary>The subscript of each OCCURS level on the leaf's path, outermost first — the table groups' occurrences
     /// (<see cref="Outer"/>) and then <paramref name="own"/> for the leaf's own OCCURS when it has one: the index list
     /// <c>ReferenceResolver.PlaceForItem</c> takes for one cell of the leaf.</summary>
-    public IReadOnlyList<string> SubscriptsFor(int? own) =>
-        [.. Outer.Select(o => o.ToString()), .. own is { } k ? new[] { k.ToString() } : Array.Empty<string>()];
+    public IReadOnlyList<Position> SubscriptsFor(int? own) =>
+        [.. Outer.Select(o => new PositionConstant(o)), .. own is { } k ? new Position[] { new PositionConstant(k) } : []];
 
     /// <summary>The whole leaf — every occurrence, every byte (the composed accessor's fast path).</summary>
     public bool IsWhole => Occurrence is null;

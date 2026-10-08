@@ -7,11 +7,11 @@ using CobolNet.Frontend.Generated;
 namespace CobolNet.Frontend.Parsing;
 
 /// <summary>
-/// ⭐ THE ONE FRAGMENT RE-PARSE. Several places isolate a run of SOURCE TEXT and re-parse it through an isolated
-/// fragment entry rule rather than growing a second expression compiler: the D18 subscript / reference-modifier
-/// segment (<see cref="SubscriptExpressionFragment"/>) and the compile-time directive expression
-/// (<see cref="DirectiveExpressionFragment"/>). (The D2 keyword-omitted argument list was the third until kb/Work
-/// PB2113 made it a parse node of the main tree.) Each needs the SAME five steps — lex the text, prime the lexer
+/// ⭐ THE ONE FRAGMENT RE-PARSE. A place that must isolate a run of SOURCE TEXT re-parses it through an isolated
+/// fragment entry rule rather than growing a second expression compiler: today the compile-time directive expression
+/// (<see cref="DirectiveExpressionFragment"/>). (The D2 keyword-omitted argument list and the D18 subscript /
+/// reference-modifier segment were the others until kb/Work PB2113 and PB2151 made them parse nodes of the main tree,
+/// bound where they were parsed.) Each needs the SAME five steps — lex the text, prime the lexer
 /// for its region, normalize the token stream, parse at an edition, and return null on any syntax error — and
 /// each had its own copy.
 /// </summary>
@@ -25,7 +25,7 @@ namespace CobolNet.Frontend.Parsing;
 /// <list type="bullet">
 /// <item><b>Subscript / ref-mod</b> — <c>E(ZERO + 1)</c> could not parse, so the D18 route returned null and the
 /// reference ABORTED AT RUN TIME on legal source (PB50). The queue entry blamed a missing arm in
-/// <c>RenderSegment</c>'s token switch; PB42 had already widened that switch's <c>default:</c> to route
+/// the subscript token renderer's switch; PB42 had already widened that switch's <c>default:</c> to route
 /// everything unrenderable here, so the arm was not the cause — this omission was.</item>
 /// <item><b>Keyword-omitted arguments</b> — <c>MIN(ZERO + 5, 2)</c> returned <b>0</b> while
 /// <c>FUNCTION MIN(ZERO + 5, 2)</c> returned 2, because the un-rewritten <c>ZERO</c> ended one argument and
