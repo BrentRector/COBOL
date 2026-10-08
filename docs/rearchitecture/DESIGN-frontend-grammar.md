@@ -868,7 +868,12 @@ reference formats, and the only place source comments are recognized. Its model:
   2014 — COBOLNET0902; the NIST S / Y letters are the CCVS dialect, never gated, and excluded as comment lines). A `D`
   line is NOT decided here (kb/Work PB1705, owner decision R56): the clause that makes it source is further down the text
   than the line, so the converter CARRIES it — `ReferenceFormatProcessor.DebugLineCarrier` + its program text — and the
-  lexer reads the carrier as the hidden `DEBUG_LINE` marker and the text as ordinary tokens;
+  lexer reads the carrier as the hidden `DEBUG_LINE` marker and the text as ordinary tokens. The builder reads the line
+  like any source line (`LogicalLineBuilder.EmitDebugging`: the literal state it ends in is tracked, a blank one is a
+  blank line, kb/Work PB1914) and, so that both readings agree on every other line, a `D` line written while the latest
+  logical line is inside a literal that needs its continuation is passed over like a comment — the continuation line
+  after it continues the literal (§6.3.5 2)) — and keeps a logical line of its own after the joined one
+  (docs/CONFORMANCE.md D-DEBUG);
   `Parsing/DebuggingLineRewriter` (first in `Frontend.LexAndParse`) keeps those tokens when the line's source unit, or a
   unit containing it (§12.3.5.4 GR1), declares SOURCE-COMPUTER … WITH DEBUGGING MODE and moves them to the
   `ABSENT_DEBUG_LINE` channel otherwise, so the parser, `SeparatorRule` and `PictureSeparatorPeriodRule` never read an
@@ -886,6 +891,12 @@ reference formats, and the only place source comments are recognized. Its model:
   `HideAll` is exactly right for them.
 - **The program-text area is always positions 8–72**, a shorter record read as space-filled to margin R
   (DOC-A.1-157), so a continued literal carries every position to margin R (§6.3.5).
+- **A column is a CHARACTER POSITION — one code point — and never a string index** (DOC-A.1-157, kb/Work PB1966): a
+  supplementary-plane character is two UTF-16 units and one position. `CharacterPositions` (count, index of a position,
+  position of an index) is the one definition, `FixedFormLine` the one reader of a fixed-form line's columns (sequence
+  area, indicator, program-text area, margin R), `PhysicalLines` expands tabs by position, and the builder's diagnostic
+  columns are positions; `PhysicalLinesDriftTests.NoPipelineStage_ReadsAColumnAsAStringIndex` refuses a column read as
+  `line[6]`, `line[7..72]` or `line.Length > 72`.
 - **ONE literal-aware scan** (`ScanProgramText`) serves every line kind, with the literal state CARRIED IN — so §6.5
   3) removes an inline comment on a continuation line too, a quotation symbol ends a literal only when it is the one
   that opened it, and it stops at the floating literal continuation indicator and at a directive after program text.

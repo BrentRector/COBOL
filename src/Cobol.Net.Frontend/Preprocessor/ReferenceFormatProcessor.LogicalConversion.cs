@@ -58,7 +58,7 @@ public static partial class ReferenceFormatProcessor
         /// §6.2.2 does not list — are a dialect, honored only under <c>--nist</c> (kb/Work PB1494).</summary>
         private enum LineKind { Source, Comment, Continuation, Debugging, CcvsExcluded, NotAnIndicator }
 
-        private LineKind KindOf(char indicator) => indicator switch
+        private LineKind KindOf(int indicator) => indicator switch
         {
             ' ' => LineKind.Source,
             '*' or '/' => LineKind.Comment,
@@ -71,9 +71,10 @@ public static partial class ReferenceFormatProcessor
 
         private void ConvertLine(string line, int lineNo)
         {
-            char indicator = line.Length > IndicatorColumn ? line[IndicatorColumn] : ' ';
-            string area = ProgramTextArea(line);
-            var kind = KindOf(indicator);
+            var fixedLine = new FixedFormLine(line);
+            var indicator = fixedLine.Indicator;
+            string area = fixedLine.ProgramText;
+            var kind = KindOf(indicator.Value);
             switch (CommentEntryOf(kind, area))
             {
                 case CommentEntryText.Header:
@@ -103,7 +104,7 @@ public static partial class ReferenceFormatProcessor
                     // per source unit after lexing (kb/Work PB1705, owner decision R56). Its tokens stay matchable by COPY
                     // REPLACING / REPLACE as if the D were absent (TextWordScanner skips the carrier).
                     gates?.OnDebuggingLine(file, lineNo);
-                    _builder.Emit(DebugLineCarrier + area.TrimEnd(' '), lineNo);
+                    _builder.EmitDebugging(DebugLineCarrier, area, lineNo, FixedFormLine.SourceAreaStart);
                     break;
 
                 // 'S' and 'Y' (the CCVS debug-suite letters, §6.2.2 lists neither) are excluded the same way: they are the
@@ -138,16 +139,16 @@ public static partial class ReferenceFormatProcessor
                     break;
 
                 case LineKind.Continuation:
-                    _builder.Add(area, lineNo, SourceAreaStart, fixedContinuation: true);
+                    _builder.Add(area, lineNo, FixedFormLine.SourceAreaStart, fixedContinuation: true);
                     break;
 
                 case LineKind.NotAnIndicator:
                     gates?.OnInvalidIndicator(file, lineNo, indicator);   // COBOLNET2616, then read as a source line
-                    _builder.Add(area, lineNo, SourceAreaStart, fixedContinuation: false);
+                    _builder.Add(area, lineNo, FixedFormLine.SourceAreaStart, fixedContinuation: false);
                     break;
 
                 default:
-                    _builder.Add(area, lineNo, SourceAreaStart, fixedContinuation: false);
+                    _builder.Add(area, lineNo, FixedFormLine.SourceAreaStart, fixedContinuation: false);
                     break;
             }
         }
@@ -206,7 +207,8 @@ public static partial class ReferenceFormatProcessor
         var builder = new LogicalLineBuilder(file, gates, fixedForm: false);
         foreach (var line in physicalLines)
         {
-            if (line.Text.Length > FreeFormMaxPositions) gates?.OnFreeFormLineTooLong(file, line.Number, line.Text.Length);
+            int positions = CharacterPositions.Count(line.Text);
+            if (positions > FreeFormMaxPositions) gates?.OnFreeFormLineTooLong(file, line.Number, positions);
             builder.Add(line.Text, line.Number, column: 0, fixedContinuation: false);
         }
         return builder.Result;
@@ -216,13 +218,6 @@ public static partial class ReferenceFormatProcessor
     /// maximum of 255") — positions as DOC-A.1-157 counts them, so on the expanded line. Asked in the free-form arm
     /// because a fixed-form line may run past margin R and only its program-text area counts.</summary>
     internal const int FreeFormMaxPositions = 255;
-
-    /// <summary>The program-text area of a fixed-form line — character positions 8 through 72 (margin R, Annex A
-    /// item 158), a shorter line read as if space-filled to margin R (DOC-A.1-157).</summary>
-    private static string ProgramTextArea(string line)
-        => line.Length >= MarginR ? line[SourceAreaStart..MarginR]
-            : line.Length > SourceAreaStart ? line[SourceAreaStart..].PadRight(SourceAreaWidth)
-            : new string(' ', SourceAreaWidth);
 
     /// <summary>
     /// If the source area begins with a word in Area A (its first non-space character falls within

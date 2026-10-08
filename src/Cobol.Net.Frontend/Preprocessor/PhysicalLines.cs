@@ -17,7 +17,8 @@ namespace CobolNet.Frontend.Preprocessor;
 /// GnuCOBOL reader's rule, <c>ppinput</c>; rule-1 precedence). The end of the text ends its last line, so a text with
 /// <c>n</c> LINE FEEDs has <c>n</c> + 1 lines.</item>
 /// <item><b>Tabs</b> (DOC-A.1-157; §6.1 1) c) "The implementor shall specify the meaning of lines and character
-/// positions"): a horizontal tab U+0009 advances to the next tab stop — positions 1, 9, 17, 25, … — and is replaced by
+/// positions"): a horizontal tab U+0009 advances to the next tab stop — positions 1, 9, 17, 25, …, a position being one
+/// CHARACTER and not one UTF-16 unit (<see cref="CharacterPositions"/>, kb/Work PB1966) — and is replaced by
 /// the one to eight spaces that fill the gap, EVERYWHERE, an alphanumeric literal included (owner decision, kb/Work
 /// R55: the tab is an input-medium positioning control, not a character of the literal; <c>X"09"</c> is how a
 /// program puts a TAB in data). No tab survives this stage, so no later stage has a tab rule.</item>
@@ -64,13 +65,21 @@ public static class PhysicalLines
 
         var text = new StringBuilder(raw.Length + TabWidth);
         var toExpanded = new int[raw.Length + 1];
+        int position = 0;   // the 0-based character position the next character lands on (CharacterPositions: not text.Length)
         for (int i = 0; i < raw.Length; i++)
         {
             toExpanded[i] = text.Length;
-            if (raw[i] != '\t') { text.Append(raw[i]); continue; }
+            if (raw[i] != '\t')
+            {
+                text.Append(raw[i]);
+                // The low half of a valid surrogate pair is the same character as its high half.
+                if (!(char.IsLowSurrogate(raw[i]) && i > 0 && char.IsHighSurrogate(raw[i - 1]))) position++;
+                continue;
+            }
             // The next tab stop strictly after the tab's own position: positions 1, 9, 17, … (0-based 0, 8, 16, …).
             text.Append(' ');
-            while (text.Length % TabWidth != 0) text.Append(' ');
+            position++;
+            while (position % TabWidth != 0) { text.Append(' '); position++; }
         }
         toExpanded[raw.Length] = text.Length;
         var toPhysical = new int[text.Length + 1];

@@ -29,18 +29,6 @@ public static partial class ReferenceFormatProcessor
     /// <c>*&gt; DEBUG: …</c> comment take part in matching).</summary>
     public static readonly string DebugLineCarrier = "*>" + (char)0xFDD0 + "DEBUG ";
 
-    /// <summary>Length of the sequence number area (columns 1-6).</summary>
-    private const int SequenceAreaLength = 6;
-
-    /// <summary>Column index of the indicator area (column 7, zero-based index 6).</summary>
-    internal const int IndicatorColumn = 6;
-
-    /// <summary>Column index where the source area begins (column 8, zero-based index 7).</summary>
-    private const int SourceAreaStart = 7;
-
-    /// <summary>Maximum width of the source area (columns 8-72 = 65 characters).</summary>
-    private const int SourceAreaWidth = 65;
-
     /// <summary>Minimum percentage of lines that must match fixed-form pattern for detection.</summary>
     private const int FixedFormThresholdPercent = 60;
 
@@ -320,7 +308,8 @@ public static partial class ReferenceFormatProcessor
     private static string? DirectiveText(string line, bool fixedForm)
     {
         if (!fixedForm) return line;
-        return line.Length > SourceAreaStart && line[IndicatorColumn] == ' ' ? ProgramTextArea(line) : null;
+        var fixedLine = new FixedFormLine(line);
+        return fixedLine.HasProgramText && fixedLine.Indicator.Value == ' ' ? fixedLine.ProgramText : null;
     }
 
     /// <summary>For the <see cref="InitialReferenceFormat.Auto"/> detector only: the index of the first line that is a
@@ -343,10 +332,6 @@ public static partial class ReferenceFormatProcessor
         for (int i = 0; i < origins.Length; i++) origins[i] = new SourceOrigin(file, i < outOrigins.Count ? outOrigins[i] : 1);
         return new MappedText(string.Join('\n', outLines), origins);
     }
-
-    /// <summary>Our documented margin R (Annex A item 158 / CONFORMANCE.md §7): the program-text area is columns
-    /// 8–72, so column position <see cref="SourceAreaStart"/>+<see cref="SourceAreaWidth"/> = 72.</summary>
-    private const int MarginR = SourceAreaStart + SourceAreaWidth;
 
     /// <summary>
     /// The <see cref="InitialReferenceFormat.Auto"/> extension's detector — NEVER the default (kb/Work PB1362: it reads
@@ -386,19 +371,19 @@ public static partial class ReferenceFormatProcessor
             // source we would TRUNCATE if we treated it as fixed, so — absent a numeric sequence area proving
             // card-image origin — it is far likelier to be free-form. NIST/CCVS fills 73-80 with its member tag
             // ("IX2164.2") and IS fixed-form, which is why a numeric sequence area overrides this signal.
-            if (line.Length > SourceAreaStart + SourceAreaWidth
-                && !CobolSpace.IsBlank(line.AsSpan(SourceAreaStart + SourceAreaWidth)))
+            var fixedLine = new FixedFormLine(line);
+            if (!CobolSpace.IsBlank(fixedLine.BeyondMarginR))
                 hasContentPastSourceArea = true;
 
-            if (line.Length > IndicatorColumn)
+            if (fixedLine.HasIndicator)
             {
-                char indicator = line[IndicatorColumn];
+                int indicator = fixedLine.Indicator.Value;
                 if (indicator is ' ' or '*' or '/' or 'D' or 'd' or '-')
                 {
                     bool seqOk = true;
-                    for (int i = 0; i < SequenceAreaLength && i < line.Length; i++)
+                    foreach (var c in fixedLine.SequenceArea.EnumerateRunes())
                     {
-                        if (!char.IsDigit(line[i]) && line[i] != ' ')
+                        if (!Rune.IsDigit(c) && c.Value != ' ')
                         {
                             seqOk = false;
                             break;
@@ -407,9 +392,9 @@ public static partial class ReferenceFormatProcessor
                     if (seqOk)
                     {
                         fixedIndicators++;
-                        for (int i = 0; i < SequenceAreaLength && i < line.Length; i++)
+                        foreach (var c in fixedLine.SequenceArea.EnumerateRunes())
                         {
-                            if (char.IsDigit(line[i]))
+                            if (Rune.IsDigit(c))
                             {
                                 hasNumericSequence = true;
                                 break;

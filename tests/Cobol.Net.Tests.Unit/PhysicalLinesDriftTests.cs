@@ -14,6 +14,10 @@ namespace CobolNet.Tests.Unit;
 /// stage that spells <c>'\t'</c> or <c>'\r'</c> is dead code that looks like a rule, and a raw-text consumer that
 /// splits on its own is the next place a determination is forgotten. Source-form guards, because no behavioral test
 /// can see either: the code compiles and every golden passes.
+/// <para><b>A column is a character position, never a string index (kb/Work PB1966).</b> A supplementary-plane character
+/// is two UTF-16 units and one position (DOC-A.1-157), so <c>line[6]</c>, <c>line[7..72]</c> or <c>line.Length &gt; 72</c>
+/// puts margin R, the indicator area and the free-form 255 limit early on a line that holds one. Every column read goes
+/// through <c>FixedFormLine</c> and <c>CharacterPositions</c>.</para>
 /// </summary>
 public sealed class PhysicalLinesDriftTests
 {
@@ -80,5 +84,26 @@ public sealed class PhysicalLinesDriftTests
         Assert.True(callers.Count == 1 && callers[0].Contains("ReferenceFormatProcessor.cs", StringComparison.Ordinal),
             "PhysicalLines.Read has one production caller, the reference-format walker's entry "
             + "(NormalizeToFreeFormMapped). Callers found:\n  " + string.Join("\n  ", callers));
+    }
+
+    private static readonly Regex ColumnAsIndex = new(
+        @"\[\s*(FixedFormLine\.)?(IndicatorColumn|SourceAreaStart|SourceAreaWidth|MarginR|SequenceAreaLength)\b"
+        + @"|\.Length\s*[<>]=?\s*(FixedFormLine\.)?(IndicatorColumn|SourceAreaStart|MarginR|FreeFormMaxPositions|72|255)\b"
+        + @"|AsSpan\(\s*(FixedFormLine\.)?(MarginR|SourceAreaStart)\b|\[(6|7)\]\s+(is|==|!=)",
+        RegexOptions.Compiled);
+
+    [Fact] // A column is a CHARACTER POSITION: no stage indexes a line, or compares its length, by a column number.
+    public void NoPipelineStage_ReadsAColumnAsAStringIndex()
+    {
+        var files = PipelineFiles().Append(TestRepo.Src("Cobol.Net.Frontend", "Pipeline", "Frontend.cs"))
+            .Where(f => Path.GetFileName(f) is not ("FixedFormLine.cs" or "CharacterPositions.cs"));
+        var offenders = files.SelectMany(CodeLines).Where(l => ColumnAsIndex.IsMatch(l.Text))
+            .Select(l => $"{l.File}:{l.Line}: {l.Text.Trim()}").ToList();
+        Assert.True(offenders.Count == 0,
+            "A stage reads a fixed-form column, or the free-form 255-position limit, as a UTF-16 index. A position is one "
+            + "CHARACTER (DOC-A.1-157, kb/Work PB1966): a supplementary-plane letter is two units and one position, so the "
+            + "read lands early on any line holding one. Read the columns through FixedFormLine (sequence area, indicator, "
+            + "program-text area, margin R) and count positions with CharacterPositions. Offending sites:\n  "
+            + string.Join("\n  ", offenders));
     }
 }

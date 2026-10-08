@@ -1,5 +1,7 @@
 {
  "enabled": [
+  "pb1914_debugging_line_continued_under_clause",
+  "pb1914_debugging_line_between_literal_parts",
   "pb643_reserve_areas_all_organizations",
   "pb1291_sd_record_from_into_85",
   "pb756_alternate_record_key_spellings",

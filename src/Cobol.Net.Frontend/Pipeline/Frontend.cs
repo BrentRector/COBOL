@@ -236,7 +236,7 @@ public sealed class Frontend
         {
             string line = physical[n - 1];
             if (nested.Contains(n) || line.TrimSpacesStart().StartsWith("*>", StringComparison.Ordinal)
-                || (line.Length > 6 && line[6] is '*' or '/') || !EndPerformWord.IsMatch(line))
+                || new FixedFormLine(line).Indicator.Value is '*' or '/' || !EndPerformWord.IsMatch(line))
                 continue;
             for (int r = 0; r < origins.Length; r++)
                 if (origins[r].File == at.File && origins[r].Line >= n) return r + 1;

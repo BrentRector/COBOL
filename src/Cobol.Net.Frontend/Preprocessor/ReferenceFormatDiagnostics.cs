@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Text;
 using CobolNet.Editions;
 using CobolNet.Frontend.Common;
 using CobolNet.Frontend.Diagnostics;
@@ -44,7 +45,7 @@ public sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive
     /// facility is obsolete at 2002 and removed at 2014 (owner decision kb/Work R61; row
     /// <c>debugging-line-removed-2014</c>). Gated once per compilation, at its first use.</summary>
     public void OnDebuggingLine(string file, int line)
-        => GateOnce(ref _debuggingLineFlagged, Constructs.DebuggingLineRemoved2014, file, line, ReferenceFormatProcessor.IndicatorColumn);
+        => GateOnce(ref _debuggingLineFlagged, Constructs.DebuggingLineRemoved2014, file, line, FixedFormLine.IndicatorColumn);
 
     private void GateOnce(ref bool flagged, string constructId, string file, int line, int column)
     {
@@ -68,7 +69,7 @@ public sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive
         => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FloatingIndicatorSplit.Code,
             $"the floating indicator {indicator} is split across a continued line and its continuation line; all the "
             + "characters of a multiple-character floating indicator shall be on the same line (ISO §6.2.3.2 SR3)",
-            At(file, line, ReferenceFormatProcessor.IndicatorColumn), default);
+            At(file, line, FixedFormLine.IndicatorColumn), default);
 
     /// <summary>§6.3.5 2) — COBOLNET2688: a continuation line completes a multiple-character separator or invocation
     /// operator (<c>==</c>, <c>::</c>) begun at the end of the latest logical line.</summary>
@@ -76,7 +77,7 @@ public sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive
         => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.MultipleCharacterTokenSplit.Code,
             $"{token} is split across a continued line and its continuation line; all the characters of a "
             + "multiple-character separator or operator shall be on the same line (ISO §6.3.5 2))",
-            At(file, line, ReferenceFormatProcessor.IndicatorColumn), default);
+            At(file, line, FixedFormLine.IndicatorColumn), default);
 
     /// <summary>§6.2.3.2 SR6 / §6.3.5 2) / §6.4.2 — COBOLNET2684: the first nonblank character of a literal's
     /// continuation line is not the quotation symbol of its opening delimiter.</summary>
@@ -89,7 +90,7 @@ public sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive
     public void OnNationalFixedContinuation(string file, int line)
         => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.NationalLiteralFixedContinuation.Code,
             "a national literal may be continued only with a floating literal continuation indicator, not the fixed "
-            + "continuation indicator (ISO §6.3.5 2))", At(file, line, ReferenceFormatProcessor.IndicatorColumn), default);
+            + "continuation indicator (ISO §6.3.5 2))", At(file, line, FixedFormLine.IndicatorColumn), default);
 
     /// <summary>§6.2.3.2 SR5 — COBOLNET2686: a floating literal continuation indicator on a line that holds the fixed
     /// continuation indicator.</summary>
@@ -142,11 +143,11 @@ public sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive
 
     /// <summary>§6.3.3 / §6.2.2 — COBOLNET2616: the indicator area holds a character that is not a fixed indicator
     /// (kb/Work PB1494). Every such line is reported; it is then read as a source line.</summary>
-    public void OnInvalidIndicator(string file, int line, char indicator)
+    public void OnInvalidIndicator(string file, int line, Rune indicator)
         => diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.FixedIndicatorInvalid.Code,
             $"the indicator area (column 7) holds '{indicator}', which is not a fixed indicator: ISO §6.2.2 lists "
             + "*, / (comment line), - (continuation line) and space (source line); a NIST CCVS program's column-7 "
-            + "conventions are honored under --nist", At(file, line, ReferenceFormatProcessor.IndicatorColumn), default);
+            + "conventions are honored under --nist", At(file, line, FixedFormLine.IndicatorColumn), default);
 
     /// <summary>Any col-7 '-' continuation — OBSOLETE at 2023 (Annex F.2 item 4; VCR row 94).</summary>
     public void OnContinuation(string file, int line)
@@ -157,7 +158,7 @@ public sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive
         Emit(severity, EditionCodes.ObsoleteFlag,
             "the fixed continuation indicator (hyphen in column 7) is obsolete as of COBOL-2023 "
             + "(Annex F.2 item 4; use the floating continuation indicator) — first use at line " + line,
-            At(file, line, ReferenceFormatProcessor.IndicatorColumn));
+            At(file, line, FixedFormLine.IndicatorColumn));
     }
 
     /// <summary>A continuation that SPLICES a COBOL word across lines — REMOVED at 2023
@@ -169,7 +170,7 @@ public sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive
         const string msg = "continuation of a COBOL word in fixed-form reference format was removed in "
             + "COBOL-2023 (Annex E.2 item 1 bullet 2) — first use at line ";
         var severity = EditionSeverityPolicy.For(ConstructAvailability.Removed, Edition);
-        Emit(severity, EditionCodes.RemovedConstruct, msg + line, At(file, line, ReferenceFormatProcessor.IndicatorColumn));
+        Emit(severity, EditionCodes.RemovedConstruct, msg + line, At(file, line, FixedFormLine.IndicatorColumn));
     }
 
     /// <summary>

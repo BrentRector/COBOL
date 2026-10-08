@@ -316,4 +316,76 @@ public sealed class LogicalLineBuilderTests
         Assert.Equal("book.cpy", unseparated.Location.FileName);
         Assert.Equal(2, unseparated.Location.Line);                              // 0-based: physical line 3 of the copybook
     }
+
+    // ── kb/Work PB1914: a fixed-form debugging line (indicator D) and the continuation of a literal ──────────────
+    // The line is CARRIED (DebuggingLineRewriter keeps or hides it per source unit, after this walk), so the walk reads it
+    // so that both readings agree on every other line: docs/CONFORMANCE.md D-DEBUG.
+
+    private static readonly string Carrier = ReferenceFormatProcessor.DebugLineCarrier;
+
+    /// <summary>A fixed-form line whose program text <paramref name="prefix"/> ends inside an open literal that runs to
+    /// margin R (position 72), filled with <paramref name="fill"/> — the shape that REQUIRES a continuation line.</summary>
+    private static string ToMarginR(string sequence, string indicator, string prefix, char fill)
+        => sequence + indicator + prefix + new string(fill, 65 - prefix.Length);
+
+    [Fact] // §6.3.5 2) "Comment lines and blank lines may be interspersed among lines containing the parts of a literal": a
+           // debugging line is a comment line unless the program says WITH DEBUGGING MODE, so the continuation line after it
+           // continues the literal the line BEFORE it left open (GnuCOBOL: the same, without -fdebugging-line).
+    public void DebuggingLine_BetweenTheParts_OfAContinuedLiteral_LeavesTheContinuationToTheLiteral()
+    {
+        const string prefix = "    MOVE \"";
+        string src = ToMarginR("000100", " ", prefix, 'A') + "\n000200D    DISPLAY \"X\".\n000300-    \"TAIL\" TO V.\n000400     STOP RUN.\n";
+        var (m, bag) = Normalize(src, InitialReferenceFormat.Fixed, 85);
+        string[] lines = m.Text.Split('\n');
+        Assert.Equal(prefix + new string('A', 65 - prefix.Length) + "TAIL\" TO V.", lines[0]);   // the literal, whole
+        Assert.Equal(Carrier + "    DISPLAY \"X\".", lines[1]);    // the debugging line keeps a line of its own, after the one it interrupted
+        Assert.Equal("    STOP RUN.", lines[2]);
+        Assert.Equal([1, 2, 4], m.Lines.Select(o => o.Line).Take(3).ToArray());
+        Assert.DoesNotContain(bag.Diagnostics, d => d.IsError);
+    }
+
+    [Fact] // the same when the literal was continued by a FLOATING indicator (§6.5 8): the next line that is not a comment
+           // or blank line is its continuation, and a comment-like debugging line is not it
+    public void DebuggingLine_AfterAFloatingContinuationIndicator_LeavesTheContinuationToTheLiteral()
+    {
+        string src = "000100     DISPLAY \"AB\"-\n000200D    DISPLAY \"X\".\n000300     \"CD\".\n";
+        var (m, bag) = Normalize(src, InitialReferenceFormat.Fixed, 2002);
+        string[] lines = m.Text.Split('\n');
+        Assert.Equal("    DISPLAY \"ABCD\".", lines[0]);
+        Assert.Equal(Carrier + "    DISPLAY \"X\".", lines[1]);
+        Assert.DoesNotContain(bag.Diagnostics, d => d.IsError);
+    }
+
+    [Fact] // a literal left open BY the debugging line itself is that line's: its continuation line continues it ("continuation
+           // of debugging lines is permitted"), and the open literal is tracked like any source line's
+    public void DebuggingLine_ContinuedLiteral_ContinuesTheDebuggingLine()
+    {
+        const string prefix = "    DISPLAY \"";
+        string src = ToMarginR("000100", "D", prefix, 'C') + "\n000200-    \"DD\".\n000300     STOP RUN.\n";
+        var (m, bag) = Normalize(src, InitialReferenceFormat.Fixed, 85);
+        string[] lines = m.Text.Split('\n');
+        Assert.Equal(Carrier + prefix + new string('C', 65 - prefix.Length) + "DD\".", lines[0]);
+        Assert.Equal("    STOP RUN.", lines[1]);
+        Assert.DoesNotContain(bag.Diagnostics, d => d.IsError);
+    }
+
+    [Fact] // a debugging line after a line that needs no continuation is the latest logical line: its continuation is its own
+    public void DebuggingLine_ThenAContinuationLine_ContinuesTheDebuggingLine()
+    {
+        string src = "000100     MOVE A TO\n000200D    B\n000300-    C.\n";
+        var (m, _) = Normalize(src, InitialReferenceFormat.Fixed, 85);
+        string[] lines = m.Text.Split('\n');
+        Assert.Equal("    MOVE A TO", lines[0]);
+        Assert.Equal(Carrier + "    BC.", lines[1]);
+    }
+
+    [Fact] // a debugging line of spaces is a blank line (§6.5 2)): discarded, so it is never the join target either
+    public void DebuggingLine_OfSpaces_IsABlankLine()
+    {
+        string src = "000100     MOVE A TO X\n000200D\n000300-    Y.\n";
+        var (m, _) = Normalize(src, InitialReferenceFormat.Fixed, 85);
+        string[] lines = m.Text.Split('\n');
+        Assert.Equal("    MOVE A TO XY.", lines[0]);
+        Assert.Equal("", lines[1]);
+    }
 }

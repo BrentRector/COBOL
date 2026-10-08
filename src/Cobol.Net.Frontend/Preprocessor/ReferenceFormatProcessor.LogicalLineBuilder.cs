@@ -58,9 +58,50 @@ public static partial class ReferenceFormatProcessor
             _origins.Add(lineNo);
         }
 
-        /// <summary>A new logical line the classifier built itself (a fixed-form debugging line's carrier): the §6.5 6)
-        /// join target from now on, outside any literal.</summary>
+        /// <summary>A new logical line the classifier built itself (a comment-entry paragraph header): the §6.5 6) join
+        /// target from now on, outside any literal.</summary>
         public void Emit(string text, int lineNo) => Emit(text, lineNo, LiteralState.Outside, isDirective: false);
+
+        /// <summary>A fixed-form DEBUGGING line (indicator <c>D</c>), carried as <paramref name="carrier"/> (the
+        /// <see cref="DebugLineCarrier"/> and the line's program text) for <c>DebuggingLineRewriter</c> to keep or hide
+        /// per source unit (docs/CONFORMANCE.md D-DEBUG; kb/Work PB1705). Which of the two it is is decided after this
+        /// walk, so the walk must read the line so that BOTH readings agree on every OTHER line:
+        /// <list type="bullet">
+        /// <item>a line of spaces is a blank line (§6.5 2)): discarded, never a join target;</item>
+        /// <item>a line written while the latest logical line is inside a literal that needs its continuation (an open
+        /// literal, or one a floating indicator continues) is passed over like a comment line — "Comment lines and blank
+        /// lines may be interspersed among lines containing the parts of a literal" (§6.3.5 2)) — so the continuation line
+        /// after it still continues the literal (kb/Work PB1914; GnuCOBOL reads the line as a comment unless
+        /// <c>-fdebugging-line</c>). It stays in the output as a logical line of its own, after the line it interrupts;</item>
+        /// <item>any other debugging line is a new logical line and the join target from now on, so a continuation line
+        /// after it continues the debugging line ("continuation of debugging lines is permitted").</item>
+        /// </list></summary>
+        public void EmitDebugging(string carrier, string programText, int lineNo, int column)
+        {
+            // The line is read like any source line (§6.5 3) and 4): an inline comment is removed, a floating literal
+            // continuation indicator ends it, and the literal state it ends in is tracked), so a continuation line after
+            // it finds the literal it left open.
+            var state = LiteralState.Outside;
+            string kept = Scan(programText, 0, ref state, lineNo, column, fixedContinuation: false);
+            if (CobolSpace.IsBlank(kept))
+            {
+                Discard(lineNo);
+                return;
+            }
+            string text = carrier + (state.InLiteral ? kept : kept.TrimSpacesEnd());
+            if (_latest >= 0 && (_literal.AwaitsFloating || _literal.InLiteral && !_literal.PendingClose))
+            {
+                _lines.Add(text);
+                _origins.Add(lineNo);
+                return;
+            }
+            Emit(text, lineNo, state, isDirective: false);
+        }
+
+        /// <summary>The 0-based physical column, in character positions (<see cref="CharacterPositions"/>), of the
+        /// character at <paramref name="index"/> of <paramref name="text"/>, whose first character stands at
+        /// <paramref name="column"/> — the column a diagnostic names.</summary>
+        private static int Col(string text, int column, int index) => column + CharacterPositions.PositionAt(text, index);
 
         /// <summary>One line of program text. <paramref name="text"/> is the program-text area — characters 8 through
         /// margin R of a fixed-form line, space-filled to margin R (DOC-A.1-157), or a whole free-form line — and
@@ -84,7 +125,7 @@ public static partial class ReferenceFormatProcessor
                 return;
             }
             if (_latest >= 0 && _latestIsDirective && (fixedContinuation || _literal.AwaitsFloating))
-                DropDirectiveContinuation(lineNo, column + first);
+                DropDirectiveContinuation(lineNo, Col(text, column, first));
             else if (_latest >= 0 && _literal.AwaitsFloating) ContinueFloating(text, first, lineNo, column, fixedContinuation);
             else if (_latest >= 0 && fixedContinuation) ContinueFixed(text, first, lineNo, column);
             else NewLine(text, lineNo, column);
@@ -129,12 +170,12 @@ public static partial class ReferenceFormatProcessor
             var state = _literal with { AwaitsFloating = false };
             // A hyphen in column 7 on the continuation line of a floating-continued literal is the SECOND form of
             // continuation of that literal (§6.2.3.2 SR4).
-            if (fixedContinuation) gates?.OnTwoContinuationForms(file, lineNo, IndicatorColumn);
+            if (fixedContinuation) gates?.OnTwoContinuationForms(file, lineNo, FixedFormLine.IndicatorColumn);
             int contentAt = AfterOpeningQuote(text, first, state.Quote, lineNo, column);
             string content = text[contentAt..];
             if (!fixedForm && PartIsEmpty(content, state.Quote))
-                gates?.OnEmptyLiteralPart(file, lineNo, column + contentAt);
-            Join(_lines[_latest], content, 0, state, lineNo, column + contentAt, fixedContinuation);
+                gates?.OnEmptyLiteralPart(file, lineNo, Col(text, column, contentAt));
+            Join(_lines[_latest], content, 0, state, lineNo, Col(text, column, contentAt), fixedContinuation);
         }
 
         /// <summary>§6.5 6): a fixed-form continuation line identified by the fixed continuation indicator.</summary>
@@ -166,14 +207,14 @@ public static partial class ReferenceFormatProcessor
                         if (prev == token[0] && area.AsSpan(first).StartsWith(token.AsSpan(1), StringComparison.Ordinal))
                             gates.OnSplitSeparator(file, lineNo, token);
                 }
-                Join(head.TrimSpacesEnd(), area[first..], 0, LiteralState.Outside, lineNo, column + first, fixedContinuation: true);
+                Join(head.TrimSpacesEnd(), area[first..], 0, LiteralState.Outside, lineNo, Col(area, column, first), fixedContinuation: true);
                 return;
             }
 
             // A continued literal. §6.3.5 2): "National literals may be continued only with a floating literal
             // continuation indicator"; §6.2.3.2 SR4: one form of continuation per literal.
             if (state.Kind == LiteralKind.National) gates?.OnNationalFixedContinuation(file, lineNo);
-            if (state.Form == ContinuationForm.Floating) gates?.OnTwoContinuationForms(file, lineNo, IndicatorColumn);
+            if (state.Form == ContinuationForm.Floating) gates?.OnTwoContinuationForms(file, lineNo, FixedFormLine.IndicatorColumn);
             state = state with { Form = ContinuationForm.Fixed };
 
             if (state.PendingClose)
@@ -184,11 +225,11 @@ public static partial class ReferenceFormatProcessor
                 string content = first + 1 < area.Length && area[first + 1] == state.Quote
                     ? area[first] + area[(first + 2)..]
                     : area[first..];
-                Join(head, content, 1, state with { PendingClose = false }, lineNo, column + first, fixedContinuation: true);
+                Join(head, content, 1, state with { PendingClose = false }, lineNo, Col(area, column, first), fixedContinuation: true);
                 return;
             }
             int contentAt = AfterOpeningQuote(area, first, state.Quote, lineNo, column);
-            Join(head, area[contentAt..], 0, state, lineNo, column + contentAt, fixedContinuation: true);
+            Join(head, area[contentAt..], 0, state, lineNo, Col(area, column, contentAt), fixedContinuation: true);
         }
 
         /// <summary>The index in <paramref name="text"/> of the first character of a literal's continuation: the one after
@@ -199,7 +240,7 @@ public static partial class ReferenceFormatProcessor
         {
             char c = text[first];
             if (c == quote) return first + 1;
-            gates?.OnContinuationQuote(file, lineNo, column + first, quote);
+            gates?.OnContinuationQuote(file, lineNo, Col(text, column, first), quote);
             return c is '"' or '\'' ? first + 1 : first;
         }
 
@@ -231,23 +272,23 @@ public static partial class ReferenceFormatProcessor
                 case ScanStopKind.FloatingContinuation:
                     // The introduction gate is asked in FIXED form only, as the floating comment indicator's is (see
                     // ReportComment): free form is itself a 2002 introduction and this is its only continuation.
-                    if (fixedForm) gates?.OnFloatingLiteralContinuation(file, lineNo, column + at);
-                    if (stop.CommentFollows) gates?.OnCommentAfterFloatingContinuation(file, lineNo, column + at);
+                    if (fixedForm) gates?.OnFloatingLiteralContinuation(file, lineNo, Col(text, column, at));
+                    if (stop.CommentFollows) gates?.OnCommentAfterFloatingContinuation(file, lineNo, Col(text, column, at));
                     // Never on a fixed continuation line (§6.2.3.2 SR5). A literal continued BOTH ways (SR4) is found where
                     // the second form is written: by ContinueFloating (a hyphen in column 7 after a floating indicator) and
                     // by ContinueFixed (a hyphen after a literal a floating indicator continued before).
-                    if (fixedContinuation) gates?.OnFloatingOnFixedContinuation(file, lineNo, column + at);
+                    if (fixedContinuation) gates?.OnFloatingOnFixedContinuation(file, lineNo, Col(text, column, at));
                     // A literal opened in THIS text with no content before the indicator (a carried-in literal's part is
                     // ContinueFloating's PartIsEmpty).
                     if (!fixedForm && stop.LiteralStart >= 0 && scanFrom + stop.LiteralStart == at)
-                        gates?.OnEmptyLiteralPart(file, lineNo, column + at);
+                        gates?.OnEmptyLiteralPart(file, lineNo, Col(text, column, at));
                     state = state with { AwaitsFloating = true, Form = ContinuationForm.Floating };
                     return text[..at];
                 case ScanStopKind.Directive:
                     // §7.3.3 SR2: a compiler directive is preceded only by spaces. The directive and the rest of the line
                     // are not program text — they are what the author meant as a directive — so they are cut, and the
                     // parser does not add a second, nameless error for the stray indicator (kb/Work PB1690).
-                    gates?.OnDirectiveAfterProgramText(file, lineNo, column + at);
+                    gates?.OnDirectiveAfterProgramText(file, lineNo, Col(text, column, at));
                     return text[..at];
                 default:
                     return text;
@@ -269,8 +310,8 @@ public static partial class ReferenceFormatProcessor
         private void ReportComment(string text, int at, int lineNo, int column)
         {
             if (gates is null) return;
-            if (fixedForm) gates.OnFloatingComment(file, lineNo, column + at);
-            if (at > 0 && text[at - 1] != ' ') gates.OnUnseparatedFloatingComment(file, lineNo, column + at);
+            if (fixedForm) gates.OnFloatingComment(file, lineNo, Col(text, column, at));
+            if (at > 0 && text[at - 1] != ' ') gates.OnUnseparatedFloatingComment(file, lineNo, Col(text, column, at));
         }
 
         /// <summary>A new logical line: the §6.5 6) / 8) join target from now on.</summary>
