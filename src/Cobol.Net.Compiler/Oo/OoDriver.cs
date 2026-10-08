@@ -85,7 +85,8 @@ internal sealed class OoDriver(BindSession session)
         OoEnvironmentRules.Screen(OoDefinition.Instance, $"class '{cls.Name}' OBJECT paragraph",
             classCtx.objectParagraph()?.environmentDivision(), edition);
         // The DATA-division twin: a factory or instance definition carries no LINKAGE or LOCAL-STORAGE SECTION
-        // (§13.7.3 SR1, §13.6.3 SR1; kb/Work PB1251). Its methods' own data divisions are asked in OoBindMethodData.
+        // (§13.7.3 SR1, §13.6.3 SR1; kb/Work PB1251) and no GLOBAL clause in any entry (§13.18.27.3 SR4; kb/Work
+        // PB1045). Its methods' own data divisions are asked in OoBindMethodData.
         OoDefinitionRules.Screen(OoDefinition.Factory, $"class '{cls.Name}' FACTORY paragraph",
             classCtx.factoryParagraph()?.dataDivision(), edition);
         OoDefinitionRules.Screen(OoDefinition.Instance, $"class '{cls.Name}' OBJECT paragraph",
@@ -107,7 +108,6 @@ internal sealed class OoDriver(BindSession session)
             data.OoBindMethodData(m);
         data.OoBindPropertyClauses(cls.Symbol, factory: false);
         data.BindResolve(synthetic);
-        OoGateClassGlobal(data, cls.Name, "OBJECT", edition);
         cls.Data = data;
         cls.Refs = new ReferenceResolver(data);
 
@@ -126,7 +126,6 @@ internal sealed class OoDriver(BindSession session)
             fdata.OoBindMethodData(m);
         fdata.OoBindPropertyClauses(cls.Symbol, factory: true);
         fdata.BindResolve(fsynthetic);
-        OoGateClassGlobal(fdata, cls.Name, "FACTORY", edition);
         cls.FactoryData = fdata;
         cls.FactoryRefs = new ReferenceResolver(fdata);
     }
@@ -199,24 +198,4 @@ internal sealed class OoDriver(BindSession session)
         return unit;
     }
 
-    /// <summary>Enforce ISO §13.18.27.3 SR4 for an OBJECT/FACTORY definition: the GLOBAL clause shall not be
-    /// specified in a factory, instance, or method definition — on an FD (SR1 file-description entry) OR a level-01
-    /// data-description entry (SR1 file/WS/local-storage/linkage). GLOBAL is a nested-PROGRAM containment mechanism
-    /// (a class contains no programs); program↔class file sharing is EXTERNAL only (§9.1.5). Both → COBOLNET1520.</summary>
-    private static void OoGateClassGlobal(DataBinder data, string clsName, string half, EditionContext edition)
-    {
-        // The three entry kinds §13.18.27.3 SR1 lets carry GLOBAL, judged by ONE rule with ONE message.
-        var globals = data.Files.Where(f => f.IsGlobal).Select(f => ("file", (string?)f.CobolName))
-            // A GLOBAL report description entry (§13.18.27.3 SR1 e)) — the third entry kind SR4 bars here; it used
-            // to be covered only by the RD GLOBAL staging, which kb/Work PB369 lifted.
-            .Concat(data.Reports.Where(r => r.IsGlobal).Select(r => ("report", (string?)r.Name)))
-            // A GLOBAL level-01 DATA item (§13.18.27 SR1) — CallBindExternalAndGlobal collected it into
-            // CallGlobalRoots (meaningless in a class, which contains no programs). An FD-record GLOBAL is already
-            // covered by the file arm.
-            .Concat(data.CallGlobalRoots.Where(g => !data.Files.Any(f => f.Records.Contains(g)))
-                .Select(g => ("data item", g.CobolName)));
-        foreach (var (kind, name) in globals)
-            edition.Error("COBOLNET1520", $"class '{clsName}': {half} {kind} '{name}' specifies the GLOBAL clause — "
-                + "GLOBAL shall not be specified in a factory, instance, or method definition (ISO §13.18.27.3 SR4)");
-    }
 }

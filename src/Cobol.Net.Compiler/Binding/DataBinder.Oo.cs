@@ -276,8 +276,10 @@ public sealed partial class DataBinder
     /// Bind one METHOD's data sections into the class forest and its own name scope, and resolve the method's
     /// PROCEDURE DIVISION USING/RETURNING formals (positional, §14.9.23.4 GR3). Runs between
     /// <see cref="BindDeclarations"/> and <see cref="BindResolve"/> so the post-build passes cover method items.
-    /// Part-2-of-slice-2 boundaries stage LOUD (never silently drop): REDEFINES / OCCURS INDEXED BY / OCCURS
-    /// DEPENDING / EXTERNAL / GLOBAL / level-66 inside method data, and a FILE or REPORT section in a method.
+    /// REDEFINES, OCCURS INDEXED BY, OCCURS DEPENDING and level-66 entries in method data are carried (M2-OO-1h).
+    /// The sections a method may not carry and every GLOBAL clause written in it are refused by
+    /// <see cref="OoDefinitionRules.Screen"/>; an EXTERNAL clause by the clause-placement screen (§13.18.22.3 SR1
+    /// admits it only in file description entries, level 1 working-storage entries and level 1 type declarations).
     /// </summary>
     internal void OoBindMethodData(OoMethodSymbol m)
     {
@@ -304,19 +306,9 @@ public sealed partial class DataBinder
             // The sections a method definition may not carry — FILE, WORKING-STORAGE, REPORT, SCREEN (§13.4.3,
             // §13.5.3, §13.8.3, §13.9.3 SR1) — are judged once, at EVERY edition, by the one DATA-division placement
             // table (kb/Work PB1251, PB1308 decision R62). A method's own data division is LOCAL-STORAGE (§13.6.3) and
-            // LINKAGE (§13.7.3), both bound below.
+            // LINKAGE (§13.7.3), both bound below. The same screen refuses every GLOBAL clause written in the method
+            // (§13.18.27.3 SR4, COBOLNET1520 — a method prototype of an interface included; kb/Work PB1045).
             OoDefinitionRules.Screen(OoDefinition.Method, where, dd, Edition);
-            // §13.18.27.3 SR4: the GLOBAL clause is barred in a method definition — on a level-01 item of ANY
-            // section a method may own (LOCAL-STORAGE / LINKAGE). Spec-FORBIDDEN (COBOLNET1520), not merely
-            // unimplemented.
-            void GateMethodGlobal(IEnumerable<Core.DataDescriptionEntryContext> entries)
-            {
-                foreach (var e in entries)
-                    if (e.dataDescriptionBody()?.dataDescriptionClauses()?.dataDescriptionClause()
-                            ?.Any(cl => cl.globalClause() is not null) == true)
-                        Edition.Error("COBOLNET1520", $"{where}: a data item specifies the GLOBAL clause — GLOBAL "
-                            + "shall not be specified in a factory, instance, or method definition (ISO §13.18.27.3 SR4)");
-            }
             if (dd.workingStorageSection() is { } ws)
             {
                 // §13.5.3 SR1 refused this section above (OoDefinitionRules, at EVERY edition — 2002, 2014 and 2023
@@ -328,16 +320,9 @@ public sealed partial class DataBinder
                 m.Binding!.LocalRoots.AddRange(BindEntries(ws.dataDescriptionEntry(), _rootNames));
             }
             if (dd.localStorageSection() is { } ls)
-            {
-                GateMethodGlobal(ls.dataDescriptionEntry());
                 m.Binding!.LocalRoots.AddRange(BindEntries(ls.dataDescriptionEntry(), _rootNames, EntrySection.LocalStorage));
-            }
             if (dd.linkageSection() is { } lk)
-            {
-                var lkEntries = lk.dataDescriptionEntry();
-                GateMethodGlobal(lkEntries);
-                m.Binding!.LinkageRoots.AddRange(BindEntries(lkEntries, _rootNames, EntrySection.Linkage));
-            }
+                m.Binding!.LinkageRoots.AddRange(BindEntries(lk.dataDescriptionEntry(), _rootNames, EntrySection.Linkage));
             BindRemainingConstants();
         }
         _bindingMethodScope = null;
@@ -346,7 +331,6 @@ public sealed partial class DataBinder
         {
             OoMethodScopedRoots.Add(root);
             OoRootOwner[root] = m;   // M2-OO-1h: the post-build passes resolve names through the owning method
-            OoGateUnsupportedShapes(root, where);
             OoScopeSubtree(root, m.DataScope);
         }
         // M2-OO-1h step 4: a method table's index cell is a per-activation method local (emitted in OoEmitMethod).
@@ -872,27 +856,6 @@ public sealed partial class DataBinder
                 foreach (var d in Flatten(c))
                     yield return d;
         }
-    }
-
-    /// <summary>Stage the method-data shapes slice 2 does not carry yet — LOUD, naming the owning wave.</summary>
-    private void OoGateUnsupportedShapes(DataItem item, string where)
-    {
-        // REDEFINES in method data is LIVE (M2-OO-1h step 3, DEVLOG 639): ResolveRedefines scopes a top-level
-        // method redefiner's target to the owning method's own roots (§13.18.44.3 SR / §11.7.4); the Tier-B
-        // string backing is routed static (method-WS) or method-local (LOCAL/LINKAGE) by OoRouteMethodRedefinesBackings.
-        // OCCURS … INDEXED BY in method data is LIVE (M2-OO-1h step 4, DEVLOG 640): index-names register into the
-        // method's own scope with a FRESH cell (§11.7.4 GR5 privacy — no cross-method sharing), resolved via
-        // Symbols.IndexCandidates (kb/Work PB919) and emitted static (method-WS) or per-activation local (LOCAL/LINKAGE).
-        // OCCURS DEPENDING ON in method data is LIVE (M2-OO-1h step 2, DEVLOG 638): OdoResolve resolves
-        // data-name-1 through Symbols.TryResolve(…, ScopeOf(RootOf(item))) — the method's own scope first
-        // (§11.7.4 GR5), then a visible object item — instead of the raw global ByName.
-        // level-66 RENAMES in method data is LIVE (M2-OO-1h step 1, DEVLOG 637): ResolveRedefines resolves the
-        // alias FROM/THRU structurally via SubtreeCandidates over the owning record (kb/Work PB978 — counted),
-        // so it is correct regardless of OoScopeSubtree's name re-homing — no gate needed.
-        foreach (var child in item.Children) OoGateUnsupportedShapes(child, where);
-        // Level-66s live OFF the children (Renames66) — without this walk the gate above is dead code and a
-        // 66 in method data slips through unstaged (the 3a/3b review's dead-gate finding).
-        foreach (var ren in item.Renames66) OoGateUnsupportedShapes(ren, where);
     }
 
     /// <summary>Route a method-scoped Tier-B REDEFINES class's ONE string backing to its method LOCAL (M2-OO-1h

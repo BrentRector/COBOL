@@ -550,6 +550,84 @@ public sealed class OoSpineTests
             END METHOD M.
             """)), "COBOLNET1520");
 
+    /// <summary>kb/Work PB1045 — a CONSTANT entry is an entry §13.18.27.3 SR1 a) lets carry the GLOBAL clause, so SR4
+    /// bars it in every factory, instance and method definition, a method prototype included (§10.6.1 NOTE: "A
+    /// method-definition in an interface-definition defines a method prototype"). Each constant here compiled
+    /// clean: the class arm asked only the bound files, reports and level-1 data items, and the method arm only its
+    /// data description entries. Each refusal names its entry and sits on its clause's line.</summary>
+    [Fact]
+    public void GlobalConstant_InEveryOoDefinition_1520()
+    {
+        var errors = ErrorsOf(("""
+            IDENTIFICATION DIVISION.
+            INTERFACE-ID. GKIF.
+            PROCEDURE DIVISION.
+            METHOD-ID. PM.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 KP CONSTANT GLOBAL AS 3.
+            01 LP PIC X.
+            PROCEDURE DIVISION USING LP.
+            END METHOD PM.
+            END INTERFACE GKIF.
+
+            IDENTIFICATION DIVISION.
+            CLASS-ID. GKCLS.
+            IDENTIFICATION DIVISION.
+            FACTORY.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 KF CONSTANT IS GLOBAL AS 5.
+            PROCEDURE DIVISION.
+            END FACTORY.
+            IDENTIFICATION DIVISION.
+            OBJECT.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 KO CONSTANT GLOBAL AS 6.
+            PROCEDURE DIVISION.
+            METHOD-ID. M.
+            DATA DIVISION.
+            LOCAL-STORAGE SECTION.
+            01 KM CONSTANT GLOBAL AS 7.
+            PROCEDURE DIVISION.
+                DISPLAY KO KM.
+            END METHOD M.
+            END OBJECT.
+            END CLASS GKCLS.
+            """).Replace("\r\n", "\n"));
+        foreach (var (name, line) in new[] { ("KP", 7), ("KF", 19), ("KO", 26), ("KM", 31) })
+            Assert.Contains(errors, e => e.Contains("COBOLNET1520") && e.Contains($"constant entry '{name}'")
+                                         && e.Contains($"({line},"));
+        Assert.Equal(4, errors.Count(e => e.Contains("COBOLNET1520")));
+    }
+
+    /// <summary>kb/Work PB1045 — SR4 is asked of the clause as WRITTEN, once per clause: a GLOBAL FD and a GLOBAL
+    /// record under it are two clauses (SR1 d) and b)), and the refusal names the entry kind of each.</summary>
+    [Fact]
+    public void GlobalFileAndItsRecord_EachRefused_1520()
+    {
+        var errors = ErrorsOf(("""
+            IDENTIFICATION DIVISION.
+            CLASS-ID. GFRCLS.
+            IDENTIFICATION DIVISION.
+            OBJECT.
+            ENVIRONMENT DIVISION.
+            INPUT-OUTPUT SECTION.
+            FILE-CONTROL.
+                SELECT GFR ASSIGN TO "g.dat".
+            DATA DIVISION.
+            FILE SECTION.
+            FD GFR IS GLOBAL.
+            01 GFR-REC PIC X(4) GLOBAL.
+            PROCEDURE DIVISION.
+            END OBJECT.
+            END CLASS GFRCLS.
+            """).Replace("\r\n", "\n"));
+        Assert.Contains(errors, e => e.Contains("COBOLNET1520") && e.Contains("file description entry 'GFR'"));
+        Assert.Contains(errors, e => e.Contains("COBOLNET1520") && e.Contains("data description entry 'GFR-REC'"));
+    }
+
     /// <summary>The staged boundaries stay LOUD (never a silent drop): INVOKE SELF (slice 3b) reaches the
     /// runtime not-implemented guard; an arity mismatch (slice 2 — trap #3: a dropped/extra argument would
     /// shift every following slot, the legacy DEVLOG-449 blocker) is a compile-time 0828.</summary>

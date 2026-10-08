@@ -538,6 +538,19 @@ public static class DiagnosticCatalog
         + "not in a factory or instance definition (§13.7.3 SR1).",
         "ISO §13.4.3 SR1, §13.5.3 SR1, §13.6.3 SR1, §13.7.3 SR1, §13.8.3 SR1, §13.9.3 SR1");
 
+    /// <summary>COBOLNET1520 — a GLOBAL clause written in a factory, instance or method definition (kb/Work PB1045).
+    /// Its only reporter is <c>OoDefinitionRules.Screen</c>, which walks each such definition's data division for
+    /// every entry §13.18.27.3 SR1 lets carry the clause (constant, data description, file description and report
+    /// description entries): "The GLOBAL clause shall not be specified in a factory definition, an instance
+    /// definition, or a method definition." (ISO §13.18.27.3 SR4). A class contains no programs, so a global name
+    /// declared in one would have nothing to be global to; program-to-class sharing is EXTERNAL only.</summary>
+    public static readonly DiagnosticDescriptor GlobalInOoDefinition = new(
+        "COBOLNET1520", "global-in-oo-definition", EditionSeverity.Error,
+        "A constant entry, data description entry, file description entry or report description entry of a factory, "
+        + "instance or method definition (a method prototype included) specifies the GLOBAL clause: \"The GLOBAL "
+        + "clause shall not be specified in a factory definition, an instance definition, or a method definition.\"",
+        "ISO §13.18.27.3 SR4");
+
     /// <summary>COBOLNET2643 — an AS literal of spaces only forms the zero-length externalized name (kb/Work
     /// PB1539). Refused wherever the clause itself refuses a zero-length literal — every AS clause but CLASS-ID.</summary>
     public static readonly DiagnosticDescriptor ExternalizedNameAllSpaces = new(
