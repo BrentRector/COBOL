@@ -508,7 +508,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         carry.PartialSubject = null;   // SR5 elides the LEFTMOST portion only
         bool not = pc.NOT() is not null;
         if (subject is not { } subj) return Refused("partial-expression with no selection subject");
-        if (pc.className() is { } cls) return BindClassConditionOn(cls, not, () => subj.Content, carry);
+        if (pc.classConditionName() is { } cls) return BindClassConditionOn(cls, not, () => subj.Content, carry);
         if (pc.POSITIVE() is not null || pc.NEGATIVE() is not null || pc.ZERO() is not null)
         {
             char kind = pc.POSITIVE() is not null ? 'P' : pc.NEGATIVE() is not null ? 'N' : 'Z';
@@ -719,10 +719,10 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// <para><paramref name="operand"/> is a thunk so the operand is bound only on the arms that reach it: the
     /// LOCALE refusal reports a rule about the CLASS-NAME and must not also drag the operand's own diagnostics
     /// into the same statement.</para></summary>
-    public BoundCondition BindClassCondition(Core.ClassNameContext cls, bool not, System.Func<BoundOperand> operand) =>
+    public BoundCondition BindClassCondition(Core.ClassConditionNameContext cls, bool not, System.Func<BoundOperand> operand) =>
         BindClassConditionOn(cls, not, operand, new AbbrevCarry());
 
-    private BoundCondition BindClassConditionOn(Core.ClassNameContext cls, bool not,
+    private BoundCondition BindClassConditionOn(Core.ClassConditionNameContext cls, bool not,
         System.Func<BoundOperand> operand, AbbrevCarry carry)
     {
         carry.Reset();   // a class condition is a complete simple condition — terminates the abbreviation
@@ -770,7 +770,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
 
     /// <summary>§14.9.13.3 SR5's "class condition without the identifier" written as a BARE user-defined word
     /// (<c>EVALUATE WS-X WHEN MY-CLASS</c>) — the spelling the grammar cannot tell from identifier-2, because
-    /// <c>evaluateWhenItem</c>'s <c>valueOperand</c> and <c>partialComparison</c>'s <c>className</c> both match
+    /// <c>evaluateWhenItem</c>'s <c>valueOperand</c> and <c>partialComparison</c>'s <c>classConditionName</c> both match
     /// one word. <see cref="AnalyzeBareOperand"/> has already resolved the word to a class-name or alphabet-name
     /// (<see cref="BareOperandForm.ClassName"/>); SR8 then splices the selection subject in, exactly as for the
     /// <c>IS</c>-led spelling, and the ONE user-word class body binds it (kb/Work PB843).</summary>
@@ -778,7 +778,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         BindUserWordClassCondition(word, not: false, () => subject.Content);
 
     /// <summary>The §8.8.4.4.2 alternatives that are USER-DEFINED WORDS — alphabet-name-1 and class-name-1 — over
-    /// an operand the caller names. One body for the written <c>className</c> spelling and the bare EVALUATE
+    /// an operand the caller names. One body for the written <c>classConditionName</c> spelling and the bare EVALUATE
     /// object (kb/Work PB843), so the LOCALE refusal, the operand screens and the undeclared-name diagnostic
     /// cannot drift between them.</summary>
     private BoundCondition BindUserWordClassCondition(string word, bool not, System.Func<BoundOperand> operand)
@@ -862,7 +862,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         var operands = cmp.comparisonOperand();
         bool not = cmp.NOT() is not null;
 
-        if (cmp.className() is { } cls)
+        if (cmp.classConditionName() is { } cls)
             return BindClassConditionOn(cls, not, () => ComparisonOperand(operands[0]), carry);
 
         if (cmp.OMITTED() is not null)
@@ -965,7 +965,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     {
         // §14.9.13.3 SR5/SR8 — under a partial-expression rewrite the LEFTMOST leaf may be the bare class-name /
         // alphabet-name of "a class condition without the identifier" (LeadingBareClassWord); the selection
-        // subject is spliced in as its identifier, exactly as partialComparison's `IS? NOT? className` does.
+        // subject is spliced in as its identifier, exactly as partialComparison's `IS? NOT? classConditionName` does.
         if (carry.PartialSubject is { } ps && BareClassWord(vo) is { } classWord)
         {
             carry.PartialSubject = null;

@@ -130,8 +130,8 @@ foreach ($e in $reserved.words) { $rwMap[$e.word] = $e }
 #     (a) the subscriptTrigger-only words (DISPLAY/MERGE/RANDOM/SIGN/SORT/SUM) are RESERVED keywords at every
 #         edition — they are in the trigger set only because they COLLIDE with functionName ('(' opens the
 #         argument list), NOT because they are user words; and
-#     (b) two nameSlot words (COLUMN, LENGTH) are §8.9-reserved at all four editions yet appear in cobolWord —
-#         syntactically admitted in a name slot, with the §8.9 funnel making the semantic rejection.
+#     (b) nameSlot words such as COLUMN and LENGTH are §8.9-reserved at all four editions yet are name-slot rows —
+#         admitted in a DEFINITION slot through reservedGatedWord (step 4b), so the §8.9 funnel can name the word.
 #   So the sound, valuable cross-checks that DO hold are:
 #     RW-1 (fail-hard): every subscriptTrigger-ONLY word (nameSlot=false) is a genuine reserved keyword — it maps
 #           to a reserved-words entry reserved at 2023. This catches a NON-reserved stray word wrongly kept out of
@@ -163,32 +163,19 @@ $nameSlotReservedAll4 = @($nameSlotTokens | Where-Object {
 #          from the SAME reserved-words.json the funnel and reservedHere() read makes the next word automatic
 #          and leaves nothing to forget. IDENTIFIER is excluded structurally (it is the base user word, never
 #          a keyword token).
-#          ⛔ ONE EXCLUSION, AND IT IS DERIVED TOO: the §15 INTRINSIC FUNCTION NAMES that collide with a reserved
-#          word (the `functionName` rule in Grammar/Core/CobolExpressions.g4 — LENGTH, NATIONAL, BIT are the ones
-#          that are also nameSlot rows). A cobolWord occurrence of one of these is the KEYWORD-OMITTED function
-#          reference §15 permits (`COMPUTE N = LENGTH(A)` parses the name through cobolWord, not through a
-#          FUNCTION-led rule), i.e. a use OF the reserved word rather than a user-defined-word use — the same
-#          distinction VersionConformancePass.IsBareFunctionArgumentWord draws for §15 phrase words. Gating them
-#          made five conforming 2023 goldens COBOL0001. They also carry NO swallow risk: a function name leads no
-#          statement and no clause, so no operand list can absorb a construct through it.
-$functionNameG4 = Join-Path $repo 'src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4'
-if (-not (Test-Path $functionNameG4)) { throw "missing input: $functionNameG4 (the functionName rule is the gate's exclusion source)" }
-$fnLines = Get-Content -LiteralPath $functionNameG4
-$fnStart = [Array]::FindIndex([string[]]$fnLines, [Predicate[string]]{ param($l) $l.Trim() -eq 'functionName' })
-if ($fnStart -lt 0) { throw "no 'functionName' rule in $functionNameG4 — the gate's exclusion source moved" }
-$functionNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-for ($i = $fnStart + 1; $i -lt $fnLines.Count; $i++) {
-    $l = $fnLines[$i].Trim()
-    if ($l -eq ';') { break }
-    if ($l -match '^[:|]\s*([A-Z][A-Z0-9_]*)\s*$') { [void]$functionNames.Add($Matches[1]) }
-}
-if ($functionNames.Count -lt 2) { throw "the functionName rule yielded $($functionNames.Count) tokens — the parse broke" }
+#          ⛔ NO EXCLUSIONS (kb/Work PB845). LENGTH, NATIONAL and BIT used to be exempt as "intrinsic function
+#          names" (read off the functionName rule), on the ground that a cobolWord occurrence of one was the
+#          KEYWORD-OMITTED function reference. The premise was false twice: NATIONAL and BIT are not ISO 8.11 names
+#          at all, and 8.3.2.1 rule 5 names LENGTH among the intrinsic function names that may NOT be user-defined
+#          words. The exemption made the three words names in EVERY slot at every edition (`INDEXED BY LENGTH` and
+#          `CLASS NATIONAL IS "A" THRU "C"` compiled), and its entry-name reading refused `05 NATIONAL PIC N(3).`,
+#          a conforming unnamed USAGE NATIONAL item. The keyword-omitted `LENGTH (A)` parses through
+#          reservedIntrinsicArgFn beside SIGN and SUM, outside cobolWord, so this gate knows no function names.
 
 $gatedTokenSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 $lowConfidence = @()
 foreach ($t in $nameSlotTokens) {
     if ($t -eq 'IDENTIFIER') { continue }
-    if ($functionNames.Contains($t)) { continue }                    # a §15 function name: a keyword use, see above
     $e = $rwMap[(To-Word $t)]
     if ($null -eq $e) { continue }                                   # a §8.10 context-sensitive word: never reserved
     if (-not ($e.r85 -or $e.r2002 -or $e.r2014 -or $e.r2023)) { continue }
@@ -309,7 +296,6 @@ $stats = [ordered]@{
     subscriptTrigOnly = $subTrigOnly.Count        # functionName collisions
     nameSlotReservedAll4 = $nameSlotReservedAll4.Count   # RW-2: §8.9-funnel-gated name-slot admissions
     reservationGated = $gatedTokens.Count                # 4b: DERIVED — nameSlot words §8.9 reserves at >=1 edition
-    functionNameExempt = @($nameSlotTokens | Where-Object { $functionNames.Contains($_) }).Count   # 4b exclusion
     namespace        = $antlrNamespace
 }
 Write-Output ("cobol-words generated: " + (($stats.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ' '))

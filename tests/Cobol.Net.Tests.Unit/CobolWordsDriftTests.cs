@@ -50,40 +50,19 @@ public sealed class CobolWordsDriftTests
     /// ungated admission lets an operand list absorb the word at the editions that reserve it.
     /// <para>Recomputed from <c>reserved-words.json</c> rather than read off a flag ON PURPOSE: the gate used to
     /// be a hand-set <c>reservationGated</c> row property and fifty-one §8.9-straddling words never got one, so
-    /// this test would have been asserting the mistake against itself.</para></summary>
+    /// this test would have been asserting the mistake against itself.</para>
+    /// <para>⛔ WITH NO EXCLUSION (kb/Work PB845). LENGTH, NATIONAL and BIT were exempt as "function names" and so
+    /// were names in every slot at every edition; ISO §8.3.2.1 5) names LENGTH among the intrinsic function names that
+    /// may not be user-defined words, and NATIONAL and BIT are no §8.11 names. The keyword-omitted <c>LENGTH (A)</c>
+    /// parses through <c>reservedIntrinsicArgFn</c>, never through <c>cobolWord</c>.</para></summary>
     internal static HashSet<string> DerivedGateSet()
     {
         var reserved = LoadReservedIntervals();
-        var functionNames = FunctionNameTokens();
         return LoadJsonWords()
-            .Where(w => w.NameSlot && w.Token != "IDENTIFIER" && !functionNames.Contains(w.Token))
+            .Where(w => w.NameSlot && w.Token != "IDENTIFIER")
             .Where(w => reserved.TryGetValue(ToWord(w.Token), out var f) && f.Contains(true))
             .Select(w => w.Token)
             .ToHashSet(StringComparer.Ordinal);
-    }
-
-    /// <summary>The single-token alternatives of the grammar's <c>functionName</c> rule — the §15 intrinsic
-    /// function names that collide with a reserved word. They are the gate's ONE exclusion (kb/Work PB693): a
-    /// <c>cobolWord</c> occurrence of one is the KEYWORD-OMITTED function reference §15 permits
-    /// (<c>COMPUTE N = LENGTH(A)</c>), a use OF the reserved word rather than a user-defined-word use, and gating
-    /// them turned five conforming 2023 goldens into COBOL0001. Read from the grammar, not listed here, so the
-    /// exclusion cannot drift from the rule it is about.</summary>
-    private static HashSet<string> FunctionNameTokens()
-    {
-        string path = TestRepo.Src("Cobol.Net.Frontend", "Grammar", "Core", "CobolExpressions.g4");
-        Assert.True(File.Exists(path), $"grammar missing: {path}");
-        var alts = new HashSet<string>(StringComparer.Ordinal);
-        bool inRule = false;
-        foreach (var raw in File.ReadAllLines(path))
-        {
-            string line = raw.Trim();
-            if (line == "functionName") { inRule = true; continue; }
-            if (!inRule) continue;
-            if (line == ";") break;
-            if (Regex.Match(line, @"^[:|]\s*([A-Z][A-Z0-9_]*)\s*$") is { Success: true } m) alts.Add(m.Groups[1].Value);
-        }
-        Assert.True(alts.Count >= 2, $"the functionName rule yielded {alts.Count} tokens — the parse broke");
-        return alts;
     }
 
     /// <summary>The JSON <c>nameSlot=true</c> tokens are exactly the generated <c>cobolWord</c> alternatives plus the

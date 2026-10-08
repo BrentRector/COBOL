@@ -783,7 +783,8 @@
   "pb1643_display_literal_comma_constant_invoke",
   "pb1930_content_function_identifier_arguments",
   "pb2078_property_receivers_in_phrases",
-  "pb850_edited_refmod_program_name"
+  "pb850_edited_refmod_program_name",
+  "pb845_unnamed_usage_entry"
   ],
   "pending": []
 }

@@ -14,11 +14,11 @@ namespace CobolNet.Tests.Unit;
 /// <summary>
 /// ⛔ THE CLASS CONDITION'S ALTERNATIVES ARE ONE LIST, AND THIS TEST IS WHY "ONE" STAYS TRUE.
 /// ISO §8.8.4.4.2 prints fourteen alternatives in a single brace group. Before kb/Work PB571 + PB590 they were
-/// written down FOUR times — the <c>className</c> grammar rule, a second grammar rule <c>classCondition</c>
+/// written down FOUR times — the <c>classConditionName</c> grammar rule, a second grammar rule <c>classCondition</c>
 /// serving <c>evaluateSubject</c> (which offered ALPHANUMERIC, not one of the fourteen, and omitted BOOLEAN,
 /// class-name-1 and alphabet-name-1), and a kind decode in each of two binders — and the lists DISAGREED, so
 /// the same class test meant different things in an IF and as an EVALUATE selection subject.
-/// <para>The alternatives now live in <c>className</c>; their §8.8.4.4.3 operand rules live in
+/// <para>The alternatives now live in <c>classConditionName</c>; their §8.8.4.4.3 operand rules live in
 /// <c>ClassConditionModel</c>; their truth values live in <c>ConditionRenderer.RenderClass</c>. Adding an
 /// alternative to any ONE of the three and not the others is exactly the drift that produced a
 /// <c>NotImplementedCobolFeatureException</c> at run time for a class condition the grammar accepted, so the
@@ -38,7 +38,7 @@ public sealed class ClassConditionTableDriftTests
             + "is DECLINED as a whole (Core/CobolDeclined.g4), so its operand arms are never bound.",
     };
 
-    /// <summary>The <c>className</c> rule body, comments stripped.</summary>
+    /// <summary>The <c>classConditionName</c> rule body, comments stripped.</summary>
     private static string ClassNameRuleBody()
     {
         string path = TestRepo.Src(Path.Combine(
@@ -46,14 +46,14 @@ public sealed class ClassConditionTableDriftTests
         string text = Regex.Replace(File.ReadAllText(path), @"//[^\r\n]*", "");
         foreach (string chunk in text.Split(';'))
         {
-            var m = Regex.Match(chunk, @"\A\s*className\s*:(?<body>.*)\z", RegexOptions.Singleline);
+            var m = Regex.Match(chunk, @"\A\s*classConditionName\s*:(?<body>.*)\z", RegexOptions.Singleline);
             if (m.Success) return m.Groups["body"].Value;
         }
         throw new Xunit.Sdk.XunitException(
-            "the className rule was not found in Core/CobolExpressions.g4 — the scan is broken, not the grammar");
+            "the classConditionName rule was not found in Core/CobolExpressions.g4 — the scan is broken, not the grammar");
     }
 
-    /// <summary>The KEYWORD alternatives of <c>className</c> (an all-caps token reference on its own
+    /// <summary>The KEYWORD alternatives of <c>classConditionName</c> (an all-caps token reference on its own
     /// alternative), which are §8.8.4.4.2's underlined words. <c>cobolWord</c> is the two user-defined-word
     /// alternatives, alphabet-name-1 and class-name-1, told apart at bind.</summary>
     private static List<string> KeywordAlternatives() =>
@@ -73,14 +73,14 @@ public sealed class ClassConditionTableDriftTests
         // The scan must FIND the alternatives — an empty result would make every assertion below vacuous
         // (feedback_verdict_evidence_invariant: a run must assert its population).
         Assert.True(keywords.Count >= 5,
-            $"the grammar scan found only {keywords.Count} keyword alternative(s) of className "
+            $"the grammar scan found only {keywords.Count} keyword alternative(s) of classConditionName "
             + $"({string.Join(", ", keywords)}) — the scan itself is broken, not the grammar");
 
         string binder = File.ReadAllText(TestRepo.Src(Path.Combine(
             "Cobol.Net.Compiler", "Binding", "Procedure", "Verbs", "ConditionBinder.cs")));
         var missing = keywords.Where(k => !binder.Contains($"cls.{k}() is not null", StringComparison.Ordinal)).ToList();
         Assert.True(missing.Count == 0,
-            $"className offers keyword alternative(s) the class-condition binder never decodes: "
+            $"classConditionName offers keyword alternative(s) the class-condition binder never decodes: "
             + $"{string.Join(", ", missing)}.{Environment.NewLine}The parser accepts them and "
             + $"BindClassConditionOn falls through, which is the silent-compile / loud-runtime staging PB590 "
             + $"closed. Add the arm in ConditionBinder.BindClassConditionOn, a row in ClassConditionModel with "
@@ -124,7 +124,7 @@ public sealed class ClassConditionTableDriftTests
 
     /// <summary>⛔ THE SECOND LIST STAYS DELETED. <c>classCondition</c> was a private copy of these alternatives
     /// that served <c>evaluateSubject</c> alone; reintroducing any rule that enumerates NUMERIC/ALPHABETIC
-    /// beside <c>className</c> is the defect, not a convenience.</summary>
+    /// beside <c>classConditionName</c> is the defect, not a convenience.</summary>
     [Fact]
     public void NoSecondAlternativeList_ExistsInTheGrammar()
     {
@@ -138,7 +138,7 @@ public sealed class ClassConditionTableDriftTests
             foreach (string chunk in text.Split(';'))
             {
                 var m = Regex.Match(chunk, @"\A\s*(?<name>[a-z]\w*)\s*:(?<body>.*)\z", RegexOptions.Singleline);
-                if (!m.Success || m.Groups["name"].Value == "className") continue;
+                if (!m.Success || m.Groups["name"].Value == "classConditionName") continue;
                 string body = m.Groups["body"].Value;
                 // A rule that alternates NUMERIC with an ALPHABETIC form is a class-condition list, whatever it
                 // is called. The PICTURE/REPLACING category words (CobolData.g4) name ALPHANUMERIC-EDITED and
@@ -160,6 +160,6 @@ public sealed class ClassConditionTableDriftTests
             $"a SECOND class-condition alternative list appeared in the grammar: {string.Join(", ", offenders)}."
             + $"{Environment.NewLine}ISO §8.8.4.4.2 prints ONE list; the deleted `classCondition` rule is why "
             + $"`EVALUATE X IS <user-class>` did not parse while `IF X IS <user-class>` did (kb/Work PB590). "
-            + $"Point the new site at `className` instead.");
+            + $"Point the new site at `classConditionName` instead.");
     }
 }

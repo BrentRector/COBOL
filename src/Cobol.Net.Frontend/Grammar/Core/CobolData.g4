@@ -237,8 +237,15 @@ linkageSection
 // DATA DESCRIPTION ENTRIES
 // ==========================================
 
+// ⛔ THE ENTRY-NAME IS REFUSED A WORD §8.9 RESERVES WHEN THE ENTRY PARSES WITHOUT IT (kb/Work PB845, PB2501). A
+// reservation-gated word reaches dataName through reservedGatedWord, so `05 NATIONAL PIC N(3).` parsed BOTH ways and
+// ANTLR took the name (the optional block's first alternative) — a COBOLNET0901 on a conforming unnamed USAGE NATIONAL
+// item (§13.16.3 SR4: no entry-name clause is the filler format; §13.18.60.2: `[ USAGE IS ]` is optional).
+// entryNameHere() refuses the name reading only where the targeted edition reserves the word AND the clause reading
+// parses, so `05 DEFAULT PIC X.` still names DEFAULT and draws the funnel's 0901, and a word an edition leaves free
+// (NATIONAL at COBOL-85) is still a name.
 dataDescriptionEntry
-    : levelNumber dataName? dataDescriptionBody DOT
+    : levelNumber ({entryNameHere()}? dataName)? dataDescriptionBody DOT
     ;
 
 levelNumber
@@ -576,10 +583,11 @@ editingLiteral
 // FUNCTION-POINTER, so `PIC 1(3) BIT` was a parse error). The optional binarySign applies to the COBOL-2002
 // BINARY-CHAR/SHORT/LONG/DOUBLE usages; it is grammatically tolerated after any usageKeyword and rejected by the
 // binder for non-binary ones, as is noSignPhrase off PACKED-DECIMAL (§13.18.60.4 GR11, 2023). A 2002 usage word
-// that is a USER word at 85 (BIT, NATIONAL, PROGRAM-POINTER, FUNCTION-POINTER — all cobolWord) needs no predicate
-// here: in `05 BIT.` the entry-NAME alternative is tried first and wins (an '85 item named BIT), and `05 X BIT.`
-// reads as the usage, which the binder / VersionConformancePass then names as the 2002 introduction — the
-// superset-parse / bind-narrow direction of DESIGN-version-conformance-pipeline.
+// that is a USER word at 85 (BIT, NATIONAL, PROGRAM-POINTER, FUNCTION-POINTER — all reservation-gated) needs no
+// predicate here: at 85 `05 BIT.` is an item named BIT (the word is free, so the entry-name reading stands), from 2002
+// `05 BIT.` is an unnamed USAGE BIT item (dataDescriptionEntry's entryNameHere(), kb/Work PB845), and `05 X BIT.`
+// reads as the usage at every edition, which the binder / VersionConformancePass names as the 2002 introduction at
+// 85 — the superset-parse / bind-narrow direction of DESIGN-version-conformance-pipeline.
 usageClause
     : (USAGE IS?)? usageKeyword binarySign? noSignPhrase? floatFormatPhrase*
     ;

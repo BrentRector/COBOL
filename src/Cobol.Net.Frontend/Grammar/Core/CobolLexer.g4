@@ -1082,6 +1082,12 @@ fragment BOOL_BODY : 'B' STR_BODY                                               
                    | 'BX' STR_BODY ;                                                 // §8.3.3.4.2 Format 2
 fragment INT_BODY  : [0-9]+ ;                                                        // INTEGERLIT
 fragment DEC_BODY  : [0-9]+ '.' [0-9]+ | '.' [0-9]+ ;                                // DECIMALLIT
+// The DECIMAL-POINT IS COMMA fixed-point shape (ISO §12.3.7.4 GR14 a)). Its UNSIGNED form has no token of its own: a
+// comma is a token, so numericLiteralCore assembles the contiguous INTEGERLIT COMMA INTEGERLIT / COMMA INTEGERLIT.
+// The SIGNED form cannot be assembled there: inside a list region the sign and the digits before the comma are already
+// one SIGNED_INTEGERLIT, so `MIN(-1,5 2)` was MIN(-1, 0.5, 2) and `ABS(-1,5)` two arguments (kb/Work PB2506). It is a
+// body so that its sign-adjacent twin exists and SignedLiteralShapeDriftTests holds both halves of the shape.
+fragment DEC_COMMA_BODY : [0-9]+ ',' [0-9]+ | ',' [0-9]+ ;                           // FN_SIGNED_COMMA_DECIMALLIT
 // ⛔ THE UNDERSCORE IS A COBOL WORD CHARACTER AND HAS BEEN SINCE COBOL-2002 (fix-queue R02). §8.3.2.1: "Each
 // character of a COBOL word … shall be selected from the set of basic letters, basic digits, extended letters,
 // and the basic special characters HYPHEN AND UNDERSCORE. The hyphen or underscore shall not appear as the first
@@ -1134,6 +1140,7 @@ fragment NAME_BODY                                                              
 FN_SIGNED_FLOATLIT   : [+-] FLOAT_BODY { OnSignedLiteral(FLOATLIT); } ;
 FN_SIGNED_COMMA_FLOATLIT : [+-] FLOAT_COMMA_BODY { OnSignedLiteral(COMMA_FLOATLIT); } ;   // kb/Work PB98
 FN_SIGNED_DECIMALLIT : [+-] DEC_BODY { OnSignedLiteral(SIGNED_DECIMALLIT); } ;
+FN_SIGNED_COMMA_DECIMALLIT : [+-] DEC_COMMA_BODY { OnSignedLiteral(SIGNED_DECIMALLIT); } ;   // kb/Work PB2506
 FN_SIGNED_INTEGERLIT : [+-] INT_BODY { OnSignedLiteral(SIGNED_INTEGERLIT); } ;
 
 DECIMALLIT  : DEC_BODY ;

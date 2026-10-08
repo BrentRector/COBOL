@@ -7,8 +7,9 @@ using Xunit;
 namespace CobolNet.Tests.Unit;
 
 /// <summary>
-/// ⛔ THE SIGNED-LITERAL SHAPE SYMMETRY (kb/Work R17 — ledger F12). The lexer has three numeric literal
-/// BODIES (integer, decimal, float), and a sign-adjacent form must exist for each — the <c>FN_SIGNED_*</c> twins, whose
+/// ⛔ THE SIGNED-LITERAL SHAPE SYMMETRY (kb/Work R17 — ledger F12; kb/Work PB2506). The lexer has a numeric literal
+/// BODY per shape (integer, decimal, comma decimal, float, comma float), every shape the parser assembles from
+/// contiguous tokens has one too, and a sign-adjacent form must exist for each — the <c>FN_SIGNED_*</c> twins, whose
 /// <c>OnSignedLiteral</c> action keeps the signed literal only inside a list region (an argument list or, since kb/Work
 /// PB2113 removed the SUBSCRIPT lexer mode, a reference's subscript list) where §8.3.3.3.2 makes the sign part of it,
 /// and otherwise splits the sign off as the operator.
@@ -38,6 +39,42 @@ public sealed class SignedLiteralShapeDriftTests
                 $"{body} has no FN_SIGNED twin — a sign-adjacent literal of this shape in a FUNCTION argument "
                 + "region will be split by maximal munch into a shorter signed literal plus an orphan (the F12 "
                 + "false-arity failure). Add the twin, with its OnSignedLiteral action, beside FN_SIGNED_DECIMALLIT.");
+    }
+
+    /// <summary>⛔ THE SHAPES THE PARSER ASSEMBLES HAVE A LEXER BODY TOO (kb/Work PB2506). The DECIMAL-POINT IS COMMA
+    /// fixed-point literal has no unsigned token: <c>numericLiteralCore</c> assembles it from contiguous
+    /// <c>INTEGERLIT COMMA INTEGERLIT</c> / <c>COMMA INTEGERLIT</c>. Its signed form cannot be assembled the same way,
+    /// because in a list region the sign and the integer part are already a <c>SIGNED_INTEGERLIT</c> — and with no
+    /// body fragment the twin assertion above could not see that the shape had no twin, so <c>FUNCTION MIN(-1,5 2)</c>
+    /// computed MIN(-1, 0.5, 2). Each contiguous assembly alternative is translated token by token into the lexer's
+    /// spelling and must be an alternative of some numeric body fragment, which the twin assertion then covers.</summary>
+    [Fact]
+    public void EveryParserAssembledNumericShape_HasALexerBody()
+    {
+        string lexer = LexerSource();
+        string grammar = System.IO.File.ReadAllText(
+            TestRepo.Src("Cobol.Net.Frontend", "Grammar", "Core", "CobolExpressions.g4"));
+        var rule = Regex.Match(grammar, @"^numericLiteralCore\s*:(?<body>.*?)^\s*;", RegexOptions.Multiline | RegexOptions.Singleline);
+        Assert.True(rule.Success, "numericLiteralCore not found in CobolExpressions.g4");
+        var assembled = Regex.Matches(rule.Groups["body"].Value, @"\{tokensAreContiguous\(\d+\)\}\?\s*(?<toks>[A-Z_ ]+?)\s*//")
+            .Select(m => m.Groups["toks"].Value.Trim()).ToArray();
+        Assert.NotEmpty(assembled);
+
+        var lexerSpelling = new Dictionary<string, string> { ["INTEGERLIT"] = "[0-9]+", ["COMMA"] = "','" };
+        var bodyAlternatives = Regex.Matches(lexer, @"fragment\s+(?:INT|DEC|FLOAT)\w*_BODY\s*:(?<alts>[^;]*);")
+            .SelectMany(m => m.Groups["alts"].Value.Split('|'))
+            .Select(a => Regex.Replace(a.Trim(), @"\s+", " "))
+            .ToHashSet();
+        foreach (string shape in assembled)
+        {
+            string[] tokens = shape.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            Assert.All(tokens, t => Assert.True(lexerSpelling.ContainsKey(t),
+                $"numericLiteralCore assembles `{shape}` from {t}, which this test cannot spell as a lexer pattern"));
+            string spelled = string.Join(' ', tokens.Select(t => lexerSpelling[t]));
+            Assert.True(bodyAlternatives.Contains(spelled),
+                $"numericLiteralCore assembles `{shape}` but no numeric *_BODY fragment of CobolLexer.g4 has the "
+                + $"alternative `{spelled}`, so its sign-adjacent form has no FN_SIGNED twin (the PB2506 split).");
+        }
     }
 
     [Fact]

@@ -40,7 +40,8 @@ namespace CobolNet.Frontend.Parsing;
 /// question at a PICTURE string's right edge the same way, and it is reported through the same listener.</para>
 /// <para>⚠ THE SPACE-LESS COMMA OF A NUMERIC LITERAL IS NOT THIS RULE'S. Under DECIMAL-POINT IS COMMA the comma is a
 /// numeric literal's decimal point (§12.3.7.4 GR14 a)), and the lexer delivers <c>1,5</c> as INTEGERLIT COMMA
-/// INTEGERLIT for the parser to assemble; whether that literal is legal is the numeric-literal rules' question (the
+/// INTEGERLIT for the parser to assemble (a list region's signed <c>-1,5</c> is one SIGNED_DECIMALLIT token, kb/Work
+/// PB2506, so no COMMA token reaches this rule for it); whether that literal is legal is the numeric-literal rules' question (the
 /// binder's one normalizer reports a comma decimal point without the clause). So a comma touching a following digit,
 /// with a digit or a separator before it, is left alone here. A semicolon is never a decimal point.</para>
 /// <para>⚠ A PERIOD, COMMA OR SEMICOLON INSIDE A LITERAL OR A PICTURE CHARACTER-STRING IS PART OF THAT TOKEN, never a

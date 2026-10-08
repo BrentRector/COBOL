@@ -110,8 +110,8 @@ public sealed class PartialExpressionSpineDriftTests
         string written = RuleBody("CobolExpressions.g4", "comparisonExpression");
 
         // SR5 shape 1 — "a class condition without the identifier".
-        Assert.Contains("IS? NOT? className", partial, StringComparison.Ordinal);
-        Assert.Contains("comparisonOperand IS? NOT? className", written, StringComparison.Ordinal);
+        Assert.Contains("IS? NOT? classConditionName", partial, StringComparison.Ordinal);
+        Assert.Contains("comparisonOperand IS? NOT? classConditionName", written, StringComparison.Ordinal);
         // SR5 shapes 3 and 4 — "a sign condition without the identifier, or a sign condition without the
         // arithmetic expression": §8.8.4.7.2's two operand forms occupy ONE elided position, so one alternative.
         Assert.Contains("IS? NOT? (POSITIVE | NEGATIVE | ZERO)", partial, StringComparison.Ordinal);
@@ -122,7 +122,7 @@ public sealed class PartialExpressionSpineDriftTests
         Assert.Equal("comparisonOperator comparisonOperand", RuleBody("CobolExpressions.g4", "abbreviatedRelation"));
     }
 
-    /// <summary>⛔ <c>partialExpression</c> comes LAST among <c>evaluateWhenItem</c>'s shapes. <c>className</c>'s
+    /// <summary>⛔ <c>partialExpression</c> comes LAST among <c>evaluateWhenItem</c>'s shapes. <c>classConditionName</c>'s
     /// user-word alternative matches ONE bare word, so an earlier position would claim every bare identifier-2 —
     /// the mirror image of the ordering hazard <c>EvaluateSelectionObjectArityDriftTests</c> pins on the
     /// <c>valueOperand</c>/<c>condition</c> pair, and unanswerable in the grammar for the same reason: Table 15
@@ -141,7 +141,7 @@ public sealed class PartialExpressionSpineDriftTests
             + $"got [{string.Join(" | ", alts)}]");
         Assert.True(partial > value && partial > range && partial > cond,
             "evaluateWhenItem's partialExpression alternative moved ahead of valueOperand / valueRange / condition. "
-            + "className's cobolWord alternative matches a bare word, so it would claim every bare identifier-2 "
+            + "classConditionName's cobolWord alternative matches a bare word, so it would claim every bare identifier-2 "
             + $"object. Order: [{string.Join(" | ", alts)}]");
     }
 

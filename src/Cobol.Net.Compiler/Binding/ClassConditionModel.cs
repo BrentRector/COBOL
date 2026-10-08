@@ -62,10 +62,10 @@ internal readonly record struct ClassAlternative(char Kind, string Spelling, Cla
 /// <para>The general format prints FOURTEEN alternatives in one brace group (the printed page was rendered:
 /// PDF page 224 / printed 194 — every keyword alternative underlined, alphabet-name-1 and class-name-1 not,
 /// no choice indicator, so exactly one is selected). Which of them this compiler OFFERS is a grammar question
-/// (<c>className</c> in <c>Core/CobolExpressions.g4</c>); which OPERAND each admits is this table, and adding
+/// (<c>classConditionName</c> in <c>Core/CobolExpressions.g4</c>); which OPERAND each admits is this table, and adding
 /// an alternative is a row here plus a grammar alternative plus a renderer arm — never a new screen.</para>
 /// <para>⛔ IT REPLACED THREE PARTIAL COPIES (kb/Work PB571 + PB590). The alternatives were enumerated in the
-/// <c>className</c> grammar rule AND in a second grammar rule <c>classCondition</c> (whose list carried
+/// <c>classConditionName</c> grammar rule AND in a second grammar rule <c>classCondition</c> (whose list carried
 /// ALPHANUMERIC — which §8.8.4.4.2 does not offer at all — and omitted BOOLEAN, class-name-1 and
 /// alphabet-name-1), and the kind was decoded in <c>ConditionBinder.BindClassConditionOn</c> AND again in
 /// <c>EvaluateBinder.SubjectAsCondition</c>. The operand SCREEN was a third partial: it returned early unless

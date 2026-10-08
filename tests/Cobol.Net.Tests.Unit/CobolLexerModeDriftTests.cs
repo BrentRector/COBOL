@@ -114,6 +114,24 @@ public sealed class CobolLexerModeDriftTests
         if (expected is "MINUS" or "PLUS") Assert.DoesNotContain(names, n => n.StartsWith("SIGNED_", StringComparison.Ordinal));
     }
 
+    /// <summary>The DECIMAL-POINT IS COMMA fixed-point literal in a list region (kb/Work PB2506): §8.3.3.3.2 2) puts the
+    /// sign inside the literal and §8.3.5 2) makes a comma a separator only when a space follows it, so `-1,5`, `+1,5`
+    /// and `-,5` are each ONE SIGNED_DECIMALLIT token — never SIGNED_INTEGERLIT(-1) plus a contiguous `,5` that the
+    /// parser assembles into a second argument. Outside every list region the sign is cut off as the operator and the
+    /// unsigned literal assembles in numericLiteralCore as it always has (no SIGNED_* token).</summary>
+    [Theory]
+    [InlineData("COMPUTE N = FUNCTION MIN(-1,5 2)", "FNARG_LPAREN SIGNED_DECIMALLIT INTEGERLIT FNARG_RPAREN")]
+    [InlineData("COMPUTE N = FUNCTION MAX(+1,5)", "FNARG_LPAREN SIGNED_DECIMALLIT FNARG_RPAREN")]
+    [InlineData("COMPUTE N = FUNCTION MIN(-,5 1)", "FNARG_LPAREN SIGNED_DECIMALLIT INTEGERLIT FNARG_RPAREN")]
+    [InlineData("COMPUTE N = FUNCTION MIN(3, -1,5)", "FNARG_LPAREN INTEGERLIT FNARG_SEPARATOR SIGNED_DECIMALLIT FNARG_RPAREN")]
+    [InlineData("COMPUTE N = 2 -1,5", "INTEGERLIT MINUS INTEGERLIT COMMA INTEGERLIT")]
+    public void SignedCommaDecimal_IsOneTokenInAListRegionOnly(string src, string expectedTail)
+    {
+        string[] names = TokenNames(src);
+        string tail = string.Join(' ', names.SkipWhile(n => n is not ("FNARG_LPAREN" or "INTEGERLIT")));
+        Assert.Equal(expectedTail, tail);
+    }
+
     /// <summary>A '(' after a ')' is never a reference paren, inside a list region or out — `MAX(T (1) (A + B))` is
     /// two arguments, and `T (1) (2:3)` a subscript list then a reference modifier written with a plain LPAREN. The
     /// parser's subscriptPart takes only REF_LPAREN, so this is what keeps a grouping paren from becoming a second

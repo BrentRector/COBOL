@@ -196,7 +196,7 @@ abbreviatedRelation
 // subscripted comparisons at 2002+) is the recorded cost of widening it. Partial expressions are EVALUATE's rule,
 // so they get EVALUATE's own entry, reached only from evaluateWhenItem.
 // A user-defined class-name / alphabet-name written BARE (`WHEN MY-CLASS`) is indistinguishable from identifier-2
-// here — `className`'s cobolWord alternative and `valueOperand` both match one word — so evaluateWhenItem keeps
+// here — `classConditionName`'s cobolWord alternative and `valueOperand` both match one word — so evaluateWhenItem keeps
 // valueOperand FIRST and EvaluateBinder resolves that spelling by SYMBOL (the same doctrine that makes a bare
 // level-88 object condition-2): ConditionBinder.BareClassWord names it, the classifier makes it Table 15's
 // partial-expression row, and the SR8 rewrite binds it. The same word LEADING a longer object (`WHEN MY-CLASS AND
@@ -219,7 +219,7 @@ partialAndExpression
 // without the identifier, and a sign condition without its identifier / arithmetic expression (one alternative —
 // §8.8.4.7.2's two operand forms occupy the same position).
 partialComparison
-    : IS? NOT? className                                       // class condition without the identifier
+    : IS? NOT? classConditionName                              // class condition without the identifier
     | IS? NOT? (POSITIVE | NEGATIVE | ZERO)                    // sign condition without its operand (ZERO the keyword, §8.8.4.7.2 — not ZEROS/ZEROES, PB510)
     | abbreviatedRelation                                      // leftmost portion is a relational operator
     ;
@@ -301,7 +301,7 @@ booleanFactor     : B_NOT booleanFactor
 
 comparisonExpression
     : comparisonOperand IS? NOT? OMITTED                           // omitted-argument condition (§8.8.4.8; 2002+ - kb/Work PB133)
-    | comparisonOperand IS? NOT? className                         // class condition
+    | comparisonOperand IS? NOT? classConditionName                // class condition
     | comparisonOperand IS? NOT? (POSITIVE | NEGATIVE | ZERO)      // sign condition (merged from signCondition); §8.8.4.7.2 prints the keyword ZERO only — PB510
     | comparisonOperand ( comparisonOperator comparisonOperand )?  // existing relational + bare operand
     ;
@@ -333,7 +333,11 @@ comparisonExpression
 // edition is an UNDECLARED class-name-1, and ConditionBinder reads it as one (→ COBOLNET1639) instead of as the
 // §8.8.4.4.4 GR3 alternative. (Until PB655 the gate was a cobolWord predicate and the ORDER of these alternatives
 // was the edition gate; a predicate past the left edge of an enclosing decision cannot be one.)
-className
+//   ⛔ ITS OWN NAME, NOT `className` (kb/Work PB2292). The rule used to be called className, as is the OO class-name
+// rule of CobolOO.g4; ANTLR keeps the FIRST imported definition of a duplicated rule, so CLASS-ID, END CLASS, INHERITS
+// and OBJECT REFERENCE took this keyword set and `CLASS-ID. NUMERIC.` parsed. GrammarRuleUniquenessDriftTests holds
+// every rule name to one definition.
+classConditionName
     : NUMERIC
     | ALPHABETIC
     | ALPHABETIC_LOWER
@@ -516,15 +520,15 @@ primaryExpression
 // ⛔ THAT ARGUMENT DOES NOT APPLY TO A RESERVED WORD, and that is the whole basis for this alternative: a
 // reserved word can NEVER be a user-defined data name (§8.3.2.4.1), so `SUM(1 2 3)` cannot be a subscripted
 // data reference and there is nothing to be ambiguous with. §8.9 ∩ §8.11 is exactly four words — LENGTH,
-// RANDOM, SIGN, SUM. LENGTH already reaches the binder through the cobolWord name slot (it needs to be there
-// for `START WITH LENGTH` anyway) and keeps that route; the other three arrive here.
-// ⚠ WHY NOT JUST ADD THEM TO cobolWord LIKE LENGTH — this was tried and NIST NC116A caught it. A word in the
+// RANDOM, SIGN, SUM — the four §8.3.2.1 5) bars from user-defined words, and all four arrive here. (LENGTH used to
+// reach the binder through the cobolWord name slot, which made it a legal NAME in every slot at every edition:
+// `INDEXED BY LENGTH` compiled. kb/Work PB845 took it out of cobolWord.)
+// ⚠ WHY NOT JUST ADD THEM TO cobolWord — this was tried and NIST NC116A caught it. A word in the
 // name slot is admissible as a VALUE-clause literal (a constant-name), so the greedy literal list swallows a
 // FOLLOWING data-description clause keyword:
 //     01 W PICTURE S99999 VALUE ZERO
 //            SIGN LEADING SEPARATE.        ->  COBOLNET1585 "takes exactly one literal"
-// LENGTH is safe there only because LENGTH does not BEGIN a data-description clause; SIGN and SUM both do
-// (§13.18.52 SIGN, §13.18.54 report-writer SUM). This alternative is confined to expression/operand positions and
+// SIGN and SUM both BEGIN a data-description clause (§13.18.52 SIGN, §13.18.54 report-writer SUM). This alternative is confined to expression/operand positions and
 // cannot reach a data description at all, so that whole class is structurally out of reach.
 // ⚠ THE ARGUMENT LIST IS A `subscriptPart`, NOT `FNARG_LPAREN functionArgList FNARG_RPAREN`, and a token dump is what
 // says so: these words carry subscriptTrigger=true, so with no FUNCTION keyword before them the lexer types the '('
@@ -533,10 +537,11 @@ primaryExpression
 // which is exactly the D2 carrier the keyword-omitted form already uses, and whose items are functionArguments. The
 // binder therefore binds it through the SAME IntrinsicBinder.ArgumentsOf as every other keyword-omitted reference,
 // rather than growing a second argument grammar. (Pinned by CobolLexerModeDriftTests.)
-// ⛔ THE ARGUMENT GROUP IS REQUIRED FOR SIGN AND SUM, AND THAT IS WHAT KEEPS THIS SAFE — it is derived from the
-// functions' own general formats, not an ad-hoc guard. §15.81.2 writes `FUNCTION SIGN ( argument-1 )` and
-// §15.88.2 `FUNCTION SUM ( { argument-1 } … )`: neither has a no-argument form, so a BARE `SIGN` or `SUM` is
-// never a function reference. Requiring the group is what stops the collision NIST NC116A found:
+// ⛔ THE ARGUMENT GROUP IS REQUIRED FOR LENGTH, SIGN AND SUM, AND THAT IS WHAT KEEPS THIS SAFE — it is derived from
+// the functions' own general formats, not an ad-hoc guard. `FUNCTION LENGTH ( argument-1 [ PHYSICAL ] )`,
+// `FUNCTION SIGN ( argument-1 )` and `FUNCTION SUM ( { argument-1 } … )`: none has a no-argument form, so a BARE
+// `LENGTH`, `SIGN` or `SUM` is never a function reference (and the constant entry's `LENGTH OF data-name` keeps its
+// own alternative: OF is no argument group). Requiring the group is what stops the collision NIST NC116A found:
 //     01 W PICTURE S99999 VALUE ZERO
 //            SIGN LEADING SEPARATE.
 // A VALUE clause operand is a `unaryExpression`, which reaches functionCall, and the operand loop is greedy —
@@ -562,13 +567,13 @@ functionCall
     | RANDOM subscriptPart? refModPart*
     ;
 
-// The §8.9-reserved words that are also §8.11 intrinsic function names AND require arguments. LENGTH is the
-// fourth member of §8.9 ∩ §8.11 and is absent deliberately: it already reaches the binder through the cobolWord
-// name slot (where it must be anyway, for `START WITH LENGTH`), and adding it here would make `LENGTH OF x`
-// ambiguous. Legal only when the REPOSITORY declares the function — a question the grammar cannot answer, so
-// IntrinsicBinder enforces §8.4.3.2.3 SR2.
+// The §8.9-reserved words that are also §8.11 intrinsic function names AND require arguments (RANDOM, the fourth
+// member of §8.9 ∩ §8.11, takes its own arm above because its arguments are optional). Legal only when the
+// REPOSITORY declares the function — a question the grammar cannot answer, so IntrinsicBinder enforces
+// §8.4.3.2.3 SR2.
 reservedIntrinsicArgFn
-    : SIGN
+    : LENGTH
+    | SIGN
     | SUM
     ;
 
@@ -818,7 +823,10 @@ signedNumericLiteral
 // Numeric literal assembly.
 // DOT-based decimals use DECIMALLIT from the lexer (maximal munch resolves
 // DOT-as-decimal vs DOT-as-sentence-terminator unambiguously).
-// COMMA-based decimals for DECIMAL-POINT IS COMMA are assembled here in the parser.
+// COMMA-based decimals for DECIMAL-POINT IS COMMA are assembled here in the parser — the UNSIGNED ones. A list region's
+// sign-adjacent comma decimal (`-1,5`, `+,5`) is ONE lexer token, SIGNED_DECIMALLIT, because the sign and the integer
+// part would otherwise already be a SIGNED_INTEGERLIT that no alternative here can extend (kb/Work PB2506); each
+// contiguous shape below has a lexer body (DEC_COMMA_BODY), which SignedLiteralShapeDriftTests holds.
 // ⛔ A COMMA LITERAL IS ONE CHARACTER-STRING (§8.3.3.3.2 / §8.3.5), so its tokens are CONTIGUOUS — a space before the
 // comma ends the previous literal (kb/Work PB1446: `1 ,5` fused into the interior-point literal 1,5 = 1.5, the value
 // of characters OUTSIDE the literal, where `,5` is 0.5). The left-edge predicate sees the hidden-channel gap.
@@ -826,7 +834,7 @@ numericLiteralCore
     : FLOATLIT                             // 1.5E3, 2.5E-2 (floating-point literal, ISO §8.3.3.3.3 — D16)
     | COMMA_FLOATLIT                       // 1,5E3 (the DECIMAL-POINT IS COMMA floating-point literal — kb/Work PB98)
     | DECIMALLIT                           // 123.45 or .45 (dot decimal from lexer)
-    | SIGNED_DECIMALLIT                    // -15.6 (sign-adjacent literal — FUNCTION-argument regions only, P7 Step 12)
+    | SIGNED_DECIMALLIT                    // -15.6, -1,5 (sign-adjacent literal — list regions only, P7 Step 12)
     | SIGNED_INTEGERLIT                    // -4 (sign-adjacent literal — FUNCTION-argument regions only)
     | {tokensAreContiguous(3)}? INTEGERLIT COMMA INTEGERLIT  // 123,45 (comma decimal — DECIMAL-POINT IS COMMA)
     | {tokensAreContiguous(2)}? COMMA INTEGERLIT             // ,45 (leading comma decimal)

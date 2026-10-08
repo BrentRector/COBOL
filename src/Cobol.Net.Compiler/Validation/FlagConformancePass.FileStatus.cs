@@ -117,7 +117,7 @@ internal sealed partial class FlagConformancePass
             FileStatusRelation(right, left, comparison);
             subject.Operand = left;
         }
-        else if (comparison.comparisonOperator() is null && comparison.className() is null
+        else if (comparison.comparisonOperator() is null && comparison.classConditionName() is null
                  && comparison.POSITIVE() is null && comparison.NEGATIVE() is null && comparison.ZERO() is null
                  && comparison.OMITTED() is null && operands.Length == 1)
         {

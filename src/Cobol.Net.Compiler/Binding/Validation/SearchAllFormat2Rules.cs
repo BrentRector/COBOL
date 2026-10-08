@@ -183,7 +183,7 @@ internal readonly struct SearchAllFormat2Rules(DataBinder data, ReferenceResolve
     private static string? ShapeViolation(Core.ComparisonExpressionContext ce)
     {
         if (ce.OMITTED() is not null) return "an omitted-argument condition";
-        if (ce.className() is not null) return "a class condition";
+        if (ce.classConditionName() is not null) return "a class condition";
         if (ce.POSITIVE() is not null || ce.NEGATIVE() is not null || ce.ZERO() is not null)
             return "a sign condition";
         if (ce.comparisonOperand().Length < 2) return null;         // the bare condition-name arm

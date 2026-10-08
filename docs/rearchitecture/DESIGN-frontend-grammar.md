@@ -402,9 +402,9 @@ COBOL-2002"), and the migration mode admits a word the edition ADDED while that 
 keyword. Retyping every free word unconditionally (GnuCOBOL's per-standard reserved list) would turn `GOBACK.` on
 its own line at COBOL-85 into a PARAGRAPH named GOBACK — silently. So a free word is a user word exactly when the
 program uses it as one. A keyword alternative whose word is free at the compile edition and that the program did
-not declare is an undeclared user-word reference where §8.9 gives it no keyword reading: `className`'s BOOLEAN
+not declare is an undeclared user-word reference where §8.9 gives it no keyword reading: `classConditionName`'s BOOLEAN
 and the seven 2014 numeric-content words are read as class-name-1 by `ConditionBinder` there (→ COBOLNET1639),
-which the ORDER of the `className` alternatives used to do while the gate was a predicate.
+which the ORDER of the `classConditionName` alternatives used to do while the gate was a predicate.
 
 **The same decision reaches every re-parse of the text (`Parsing/TokenRetypes`).** The binder RE-LEXES source
 text for the D18 subscript / reference-modifier segment and the D2 keyword-omitted argument list
@@ -447,13 +447,24 @@ form to a repeating entry) — so the operand list is greedy by design and the r
 `reservedHere` keeps its own meaning ("is this token the reserved keyword here") for `facilityWord`
 and the SPECIAL-NAMES CRT/CURSOR clause guards, which must keep recognizing their clauses under `--permissive`.
 
-**The gate has exactly ONE exclusion, and it is derived too: the §15 intrinsic function names that collide with a
-reserved word** (the `functionName` rule in `Grammar/Core/CobolExpressions.g4` — of the name-slot rows, LENGTH,
-NATIONAL and BIT). A `cobolWord` occurrence of one of these is the KEYWORD-OMITTED function reference §15 permits
-(`COMPUTE N = LENGTH(A)` reaches the name through `cobolWord`, not through a FUNCTION-led rule) — a use OF the
-reserved word, the same distinction `IsBareFunctionArgumentWord` draws for §15 phrase words. Gating them turned
-five conforming 2023 goldens into COBOL0001. They also carry no swallow risk: a function name leads no statement
-and no clause.
+**The gate has NO exclusions (kb/Work PB845).** It once exempted the name-slot rows that the `functionName` rule
+also lists (LENGTH, NATIONAL, BIT) as "intrinsic function names" whose `cobolWord` occurrence was the
+KEYWORD-OMITTED function reference. The premise was false twice — NATIONAL and BIT are no §8.11 names, and
+§8.3.2.1 5) names LENGTH among the intrinsic function names that may NOT be user-defined words — and the exemption
+made all three NAMES in every slot at every edition (`INDEXED BY LENGTH`, `CLASS NATIONAL IS "A" THRU "C"` and
+`SYSOUT IS BIT` compiled at 2023). The keyword-omitted `LENGTH (A)` now parses through `reservedIntrinsicArgFn`
+beside SIGN and SUM (the argument group is required, so a bare LENGTH is never a function reference), which is what
+let the exemption go without the five conforming 2023 goldens that gating LENGTH once broke.
+
+**The entry-name slot yields to the clause a reserved word begins (kb/Work PB845, PB2501).** A gated word reaches
+the data description entry's optional `dataName` through `reservedGatedWord`, so `05 NATIONAL PIC N(3).` parsed
+both as an item NAMED NATIONAL and as an unnamed USAGE NATIONAL item (§13.16.3 SR4; `[ USAGE IS ]` is optional,
+§13.18.60.2), and ANTLR took the name. `entryNameHere()` refuses the name reading exactly when the targeted edition
+reserves the word (migration-blind: `--permissive` never changes the meaning of conforming source) AND the rest of
+the entry parses as its clauses — asked of the grammar by a speculative `ParserInterpreter` parse of
+`dataDescriptionBody`, so every gated clause-leading word (each USAGE keyword, ALIGNED, BASED, GROUP-USAGE) is
+covered by construction. Where the clause reading fails (`05 DEFAULT PIC X.`) the name stands and the funnel's
+COBOLNET0901 names the word.
 
 ⛔ **A KEYWORD SLOT MAY NOT BORROW `cobolWord` (kb/Work PB693).** The gate gives `cobolWord` one meaning —
 *user-defined word* — so a rule that used it to match a reserved KEYWORD that happens to carry a lexer token is
@@ -642,7 +653,10 @@ decides what the match is:
   `>>COBOL-WORDS` word → token map) and `CobolWordsDriftTests` — a token-context keyword must never publish one;
 - `FNARG_SEPARATOR` matches the §8.3.5 2) comma/semicolon-space separator everywhere and `Skip()`s it outside a
   function-argument region (the unpredicated `COMMA_SEP` twin it needed is deleted);
-- the four `FN_SIGNED_*` twins match `[+-]` + a numeric body, and `OnSignedLiteral` keeps the signed literal where
+- the `FN_SIGNED_*` twins match `[+-]` + a numeric body, one twin per body (integer, decimal, comma decimal, float,
+  comma float; the comma-decimal body exists only for its twin, because the UNSIGNED comma decimal assembles in
+  `numericLiteralCore` from contiguous tokens — kb/Work PB2506; `SignedLiteralShapeDriftTests` holds every body and
+  every parser-assembled shape to a twin), and `OnSignedLiteral` keeps the signed literal where
   `SignedLiteralCanStart` holds (§8.3.3.3.2 2) / §8.7.1); elsewhere it cuts the token back to its one-character
   sign (`PLUS`/`MINUS`, the column restored) and the lexer resumes at the digits — exactly the two tokens the
   predicate-false path lexed.

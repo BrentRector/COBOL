@@ -18,7 +18,6 @@ cobolWord
     | {!keywordContinuesHere()}? BACKWARD
     | {!keywordContinuesHere()}? BELL
     | {!keywordContinuesHere()}? BINARY_ENCODING
-    | {!keywordContinuesHere()}? BIT
     | {!keywordContinuesHere()}? BLINK
     | {!keywordContinuesHere()}? BYTES
     | {!keywordContinuesHere()}? CAPACITY
@@ -45,10 +44,8 @@ cobolWord
     | {!keywordContinuesHere()}? INITIALIZED
     | {!keywordContinuesHere()}? INTERMEDIATE
     | {!keywordContinuesHere()}? INTRINSIC
-    | {!keywordContinuesHere()}? LENGTH
     | {!keywordContinuesHere()}? LOWLIGHT
     | {!keywordContinuesHere()}? MANUAL
-    | {!keywordContinuesHere()}? NATIONAL
     | {!keywordContinuesHere()}? NEAREST_AWAY_FROM_ZERO
     | {!keywordContinuesHere()}? NEAREST_EVEN
     | {!keywordContinuesHere()}? NEAREST_TOWARD_ZERO
@@ -100,6 +97,7 @@ reservedGatedWord
       | BINARY_DOUBLE
       | BINARY_LONG
       | BINARY_SHORT
+      | BIT
       | BOOLEAN
       | B_AND
       | B_NOT
@@ -165,6 +163,7 @@ reservedGatedWord
       | INVOKE
       | IN_ARITHMETIC_RANGE
       | LABEL
+      | LENGTH
       | LOCAL_STORAGE
       | LOCATION
       | MESSAGE
@@ -172,6 +171,7 @@ reservedGatedWord
       | METHOD
       | METHOD_ID
       | MULTIPLE
+      | NATIONAL
       | NATIONAL_EDITED
       | NEAREST_TO_ZERO
       | NULL_

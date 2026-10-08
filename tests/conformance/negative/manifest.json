@@ -2540,7 +2540,13 @@
   "pb850-assign-using-alphanumeric-edited",
   "pb850-set-program-address-alphanumeric-edited",
   "pb850-invoke-identifier-2-national-edited",
-  "pb850-start-operand-alphanumeric-edited"
+  "pb850-start-operand-alphanumeric-edited",
+  "pb2506-signed-comma-decimal-argument-without-comma-mode",
+  "pb845-reserved-national-index-name",
+  "pb845-reserved-length-class-name",
+  "pb845-reserved-bit-mnemonic-name",
+  "pb845-unnamed-usage-national-alphanumeric-picture",
+  "pb2292-class-id-class-condition-keyword"
  ],
  "pending": []
 }

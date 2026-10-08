@@ -1209,12 +1209,13 @@ compilation group never inherits the first one's WITH DEBUGGING MODE. The walk's
 test over the generated parser's context types (the chain's first step adds it), so a new grammar rule without a gate
 fails the build's tests instead of passing unchecked; and `ConstructRegistry.Check` (existing, the one funnel) sits
 underneath. **Which gate owns a context:** the gate of the fragment that DEFINES its rule. ANTLR generates one context
-type per rule name, so a rule defined in two fragments makes the map ambiguous: `className` is defined in
-`CobolExpressions.g4:336` and in `CobolOO.g4:56` today, and the Expressions definition wins (kb/Work PB2292). The map
-therefore needs one definition per rule name (the OO class-name and the class-condition class-name are two rules, and
-`ClassNameContext`'s gate is whichever fragment then defines `className`, by the same rule) and the identification,
-environment and procedure fragments the core-defined contexts belong to, with the assertion that no rule name is
-defined in two fragments (§8.4's regroup); the notes' `blocked_by` carry the order. Why
+type per rule name, so a rule defined in two fragments makes the map ambiguous: `className` was defined in
+`CobolExpressions.g4` and in `CobolOO.g4`, and ANTLR kept the first imported definition, so the OO class-name took the
+class-condition keyword set (kb/Work PB2292). The two are now two rules — the class-condition operand
+`classConditionName` (Expressions) and the OO class-name `className` (OO) — and `GrammarRuleUniquenessDriftTests`
+asserts that no rule name is defined in two grammar files, which this map relies on. The map also needs the
+identification, environment and procedure fragments the core-defined contexts belong to (§8.4's regroup); the notes'
+`blocked_by` carry the order. Why
 this partition: a construct's grammar rule (§8.4), its gate and its `constructs.json` row then share one name, so a
 §14.9 GAP fix lands in the procedure gate's file only — the shape that makes the next case automatic. *Steps:*
 PB2304, PB2385–PB2390, then PB2301 (the bound arm and `CobolWordGate`).
@@ -1413,11 +1414,11 @@ dispatches by the same fragments; the regroup is kb/Work PB2410. What ANTLR's im
 grammar may import parser grammars, their rules merge, the importing grammar's rule wins over an imported one of the
 same name, and imported fragments may reference each other's rules — that is how the ten fragments already work. When
 two IMPORTED grammars define the same rule, ANTLR keeps the first one it finds, depth-first in import order, so the
-import list is load-bearing for a duplicate: `className` is defined in `CobolExpressions.g4:336` (the class-condition
-keywords and `cobolWord`) and in `CobolOO.g4:56` (`cobolWord`), and today the Expressions definition wins, so CLASS-ID,
-END CLASS, INHERITS and OBJECT REFERENCE accept the class-condition keyword set (kb/Work PB2292, a defect for the fix
-lane). Regrouping changes the import list, so the regroup (PB2410) runs only after PB2292 removes the duplicate, and the
-grammar drift tests gain the assertion that no rule name is defined in two fragments — so the next duplicate fails at the gate
+import list is load-bearing for a duplicate: `className` was defined in `CobolExpressions.g4` (the class-condition
+keywords and `cobolWord`) and in `CobolOO.g4` (`cobolWord`), and the Expressions definition won, so CLASS-ID, END CLASS,
+INHERITS and OBJECT REFERENCE accepted the class-condition keyword set (kb/Work PB2292, landed: the class-condition
+operand is now `classConditionName`). Regrouping changes the import list, so the regroup (PB2410) runs after PB2292, and
+`GrammarRuleUniquenessDriftTests` asserts that no rule name is defined in two grammar files — so the next duplicate fails at the gate
 instead of being decided by file order. A lexer grammar's import appends the imported rules after the importing
 grammar's own, and the lexer's precedence among equal-length matches follows rule order, so a split lexer would move
 token precedence with the import order; **the lexer stays one grammar**, its modes' DFA start states pinned by
@@ -1440,7 +1441,7 @@ and PB2146's do); PB2144
 one argument rule; PB2146 (the identifier-only sending shape written three times) is one rule in `CobolExpressions`;
 PB2147 (a removed spelling never swept against the corpus) becomes a step of the grammar-wave template, whose input
 population is the differential's; PB2151 (D10's second half) is a binding wave, the prerequisite of §8.3 (4), not a
-grammar change; PB2292 (the duplicate `className`) precedes the regroup.
+grammar change; PB2292 (the duplicate `className`, landed) precedes the regroup.
 
 ### 8.5 Closed hierarchies → C# 15 unions
 

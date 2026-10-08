@@ -403,11 +403,66 @@ public abstract class CobolParserCoreBase : Parser
         if (offending is not null && CobolLexer.IsReservationGated(offending.Type)) gatedDeclaration(offending);
     }
 
+    /// <summary>⛔ THE ENTRY-NAME SLOT YIELDS TO THE CLAUSE A RESERVED WORD BEGINS (kb/Work PB845, PB2501) — the
+    /// predicate on the optional entry-name of <c>dataDescriptionEntry</c>. ISO §13.16.3 SR4: "If no entry-name clause
+    /// is specified, it is as though the filler format of the entry-name clause were specified"; §13.18.60.2 prints
+    /// <c>[ USAGE IS ]</c> as optional, so <c>05 NATIONAL PIC N(3).</c> is a conforming unnamed USAGE NATIONAL item
+    /// wherever §8.9 reserves NATIONAL — and there §8.3.2.1 1) ("Reserved words shall not be used as user-defined
+    /// words") leaves the entry-name reading illegal. So the name reading is refused exactly when the lookahead is a
+    /// reservation-gated word §8.9 reserves at this edition AND the rest of the entry parses as its clauses; when it
+    /// does not (`05 DEFAULT PIC X.`), the name reading stands and the funnel's COBOLNET0901 names the word.
+    /// <para>The test is <see cref="ReservedGatedWord"/>, never <see cref="userWordHere"/>: the migration mode admits a
+    /// word an edition ADDED as a user word, but a source conforming to the TARGETED edition has one reading, and
+    /// <c>--permissive</c> never changes the meaning of conforming source (`05 BIT PIC 1(8).` under --permissive at
+    /// 2023 used to become an 8-byte item named BIT).</para>
+    /// <para>The clause reading is asked of the grammar itself (<see cref="ClauseReadingParses"/>), never of a list,
+    /// so every gated word that begins a clause — every USAGE keyword (BINARY-LONG, FLOAT-LONG, PROGRAM-POINTER …),
+    /// ALIGNED, BASED, GROUP-USAGE — is covered by construction. It runs only for a gated word §8.9 reserves here
+    /// at the head of an entry, which conforming source writes only as an unnamed clause.</para></summary>
+    protected bool entryNameHere()
+    {
+        if (TokenStream.LT(1) is not { } word || ReservedGatedWord(word) is null) return true;
+        if (_entryClauseProbe is { } p && p.Index == word.TokenIndex) return !p.Parses;
+        bool parses = ClauseReadingParses();
+        _entryClauseProbe = (word.TokenIndex, parses);
+        return !parses;
+    }
+
+    private (int Index, bool Parses)? _entryClauseProbe;
+
+    /// <summary>Whether the entry's tokens from the lookahead up to its separator period parse as
+    /// <c>dataDescriptionBody</c> — the no-entry-name reading of <see cref="entryNameHere"/>. A speculative parse by an
+    /// <see cref="ParserInterpreter"/> over THIS grammar's ATN on a copy of those tokens, so the outer parse's stream,
+    /// prediction and actions are untouched. The interpreter evaluates every semantic predicate as true, which only
+    /// ever widens the clause reading — the authoritative parse that follows still applies them. Read-only.</summary>
+    private bool ClauseReadingParses()
+    {
+        var tokens = new List<IToken>();
+        for (int i = 1; TokenStream.LT(i) is { } t && t.Type != TokenConstants.EOF && t.Type != CobolLexer.DOT; i++)
+            tokens.Add(new CommonToken(t));
+        var stream = new CommonTokenStream(new ListTokenSource(tokens));
+        var probe = new ParserInterpreter(GrammarFileName, Vocabulary, RuleNames, Atn, stream)
+        {
+            ErrorHandler = new BailErrorStrategy(),
+        };
+        probe.RemoveErrorListeners();
+        try
+        {
+            probe.Parse(CobolParserCore.RULE_dataDescriptionBody);
+            return stream.LA(1) == TokenConstants.EOF;
+        }
+        catch (Antlr4.Runtime.Misc.ParseCanceledException)
+        {
+            return false;
+        }
+    }
+
     public override void Reset()
     {
         base.Reset();
         _freeGatedDeclarations = null;
         _declaredNames = null;
+        _entryClauseProbe = null;
     }
 
     /// <summary>⛔ WHICH READING WINS WHEN A WORD COULD BE EITHER (kb/Work PB805 + PB655) — true when the lookahead
@@ -584,14 +639,21 @@ public abstract class CobolParserCoreBase : Parser
     /// <see cref="ReservedWordSet.AdmitsAsUserWord"/>); for a word an edition merely ADDED the gate still stands
     /// down and this is unreachable.</para></summary>
     internal string? ReservedUserWordViolation(IToken? offendingSymbol)
+        => ReservedGatedWord(offendingSymbol) is { } w ? ReservedWordSet.UserWordViolationMessage(w, Edition.Year) : null;
+
+    /// <summary>The canonical upper-case word of <paramref name="token"/> when it is a reservation-gated word that §8.9
+    /// RESERVES at this edition (the funnel's high-confidence <see cref="ReservedWordSet.RejectsAt"/>), else null — the
+    /// one question <see cref="ReservedUserWordViolation"/> and <see cref="entryNameHere"/> both ask. Migration-blind on
+    /// purpose: it asks what the targeted edition reserves, not what <c>--permissive</c> admits.</summary>
+    private string? ReservedGatedWord(IToken? token)
     {
-        if (offendingSymbol is null || !CobolLexer.IsReservationGated(offendingSymbol.Type)) return null;
-        string? w = Canonical(offendingSymbol.Text);
+        if (token is null || !CobolLexer.IsReservationGated(token.Type)) return null;
         // ReservedWordSet.Default is the generated §8.9 table with no >>COBOL-WORDS overlay — the right set here:
         // Canonical() has ALREADY applied this group's directive (an UNDEFINE'd word returns null, an EQUATEd
-        // synonym its canonical spelling), so composing the overlay twice would double-count it.
-        return w is not null && ReservedWordSet.Default.RejectsAt(w, Edition.Year)
-            ? ReservedWordSet.UserWordViolationMessage(w, Edition.Year)
+        // synonym its canonical spelling), so composing the overlay twice would double-count it. The table is keyed
+        // upper-case and the token keeps the source's spelling, so the word is upper-cased here.
+        return Canonical(token.Text)?.ToUpperInvariant() is { } w && ReservedWordSet.Default.RejectsAt(w, Edition.Year)
+            ? w
             : null;
     }
 
@@ -694,9 +756,9 @@ public abstract class CobolParserCoreBase : Parser
     /// POINTER / FUNCTION-POINTER / PROGRAM-POINTER is the type-name or prototype-name — UNLESS it is a word that
     /// may legitimately FOLLOW the usage without any operand: a USAGE-clause tail phrase (HIGH-ORDER-RIGHT, the
     /// SIGN phrases — the ones a following semantic check rejects by name) or the next data-description clause.
-    /// <c>cobolWord</c>'s reservation gate does not settle that on its own: it exempts the §15 function names
-    /// (BIT and NATIONAL are also bare USAGE keywords) and admits a keyword wherever it is not reserved (an older
-    /// edition, <c>--permissive</c>). Both failures were MEASURED — <c>USAGE POINTER BIT</c> and
+    /// <c>cobolWord</c>'s reservation gate does not settle that on its own: it admits a keyword wherever it is not
+    /// reserved (an older edition, <c>--permissive</c>; BIT and NATIONAL are also bare USAGE keywords). Both failures
+    /// were MEASURED — <c>USAGE POINTER BIT</c> and
     /// <c>USAGE POINTER HIGH-ORDER-RIGHT</c> each bound the word as a type-name. A plain IDENTIFIER is always
     /// the operand (the only thing it could otherwise begin is the unrecognizedClause error production).</summary>
     protected bool pointerOperandHere()
