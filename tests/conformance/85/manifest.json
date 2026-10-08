@@ -1,5 +1,6 @@
 {
  "enabled": [
+  "pb1027_plain_write_is_after_advancing_85",
   "pb1914_debugging_line_continued_under_clause",
   "pb1914_debugging_line_between_literal_parts",
   "pb643_reserve_areas_all_organizations",

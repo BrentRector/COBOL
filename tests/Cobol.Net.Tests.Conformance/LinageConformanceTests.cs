@@ -70,19 +70,22 @@ public sealed class LinageConformanceTests
     private static readonly CobolNetCompiler CobolNet2023 = new(2023);
 
     /// <summary>Compile-and-run, then assert the EXACT bytes the program left on the medium. The expected string
-    /// is written with explicit <c>\r\n</c> for every line end: a record sequential PRINT stream ends its lines
-    /// with CR LF on every host, so a margin line, a page-fill line and an ADVANCING line are the same two bytes
-    /// everywhere. On a LINE SEQUENTIAL file (<paramref name="org"/> names the organization) every one of those
-    /// line ends is the line delimiter instead, which Annex A.1 item 114 makes the HOST newline
-    /// (docs/CONFORMANCE.md DOC-A.1-114; kb/Work PB1540) — the same line structure, host bytes.</summary>
+    /// is written with explicit <c>\r\n</c> for every LINE END (a margin line, a page-fill line, an ADVANCING
+    /// line, a record's delimiter), which this helper maps to the bytes the file's SHAPE ends its lines with — the
+    /// three-way mapping of docs/CONFORMANCE.md DOC-A.1-146 (c′) (kb/Work PB1664): a LINE SEQUENTIAL file and a
+    /// file with a LINAGE clause end them with the HOST newline (DOC-A.1-114; kb/Work PB1540), and any other
+    /// record sequential print stream — one written with an ADVANCING phrase — ends them with a line feed on
+    /// every host. A lone <c>\r</c> (ADVANCING 0's overprint) and <c>\f</c> (ADVANCING PAGE) are controls, not
+    /// line ends, and are asserted as written.</summary>
     private static void AssertBytes(string source, string fileName, string expected, int edition = 85, string org = "")
     {
         var (ok, _, detail, bytes) =
             (edition == 85 ? CobolNet : CobolNet2023).CompileRunAndReadFile(source, fileName);
         Assert.True(ok, $"WiseOwl COBOL failed: {detail}");
         Assert.NotNull(bytes);
-        if (org.Contains("LINE SEQUENTIAL", StringComparison.Ordinal))
-            expected = expected.Replace("\r\n", Environment.NewLine, StringComparison.Ordinal);
+        bool hostNewline = org.Contains("LINE SEQUENTIAL", StringComparison.Ordinal)
+            || source.Contains("LINAGE IS", StringComparison.Ordinal);
+        expected = expected.Replace("\r\n", hostNewline ? Environment.NewLine : "\n", StringComparison.Ordinal);
         Assert.Equal(expected, System.Text.Encoding.Latin1.GetString(bytes!));
     }
 
@@ -256,7 +259,9 @@ public sealed class LinageConformanceTests
     // Before PB964 the print arm presented first (a BEFORE placement) and the line sequential arm never advanced,
     // so both welded the two records onto one physical line — invisible to a same-width COBOL read-back, which
     // is why these pin BYTES. One case per write arm: print stream, LINAGE page, line sequential, line sequential
-    // with LINAGE, and PAGE (a form feed, GR25 h)) as the AFTER write.
+    // with LINAGE, and PAGE (a form feed, GR25 h)) as the AFTER write. Since PB1027 the plain WRITE takes the
+    // explicit AFTER path in EVERY state of the device, not only after an AFTER write, and
+    // PlainWriteEqualsAfterOneDriftTests holds the two spellings byte-equal over every placement mix.
 
     [Theory]
     [InlineData("LNGBY9", "lngby9.prt", "", "RECORD CONTAINS 4 CHARACTERS", 85)]
@@ -290,17 +295,21 @@ public sealed class LinageConformanceTests
             "\fAAAA\r\nBBBB\r\n", edition, org);
 
     [Theory]
-    // The OTHER placements keep their own answers — the plain WRITE's placement is the only thing PB964 moved.
-    // A BEFORE write after an AFTER write presents on the line the device stands on (GR25 e): "the line is
-    // presented before the representation of the printed page is advanced") — the same line, appended to it
-    // (GnuCOBOL's behaviour, kb/Work PB1840 holds the overprint question); AFTER ADVANCING 0 LINES is an OVERPRINT
-    // (GR25 c): "no repositioning of the representation of the printed page is performed"), written as a bare
-    // carriage return (docs/CONFORMANCE.md "ADVANCING 0", owner decision kb/Work R54), so BBBB returns to the
-    // start of AAAA's line; a BEFORE write followed by an AFTER write is two advances, so one blank
-    // line; and a plain WRITE after a BEFORE write, whose advance already ended the line, adds no blank line.
-    [InlineData("LNGBYF", "lngbyf.prt", "AFTER ADVANCING 1 LINE", "BEFORE ADVANCING 1 LINE", "\r\nAAAABBBB\r\nCCCC\r\n")]
+    // The OTHER placements keep their own answers. A BEFORE write after an AFTER write presents on the line the
+    // device stands on (GR25 e): "the line is presented before the representation of the printed page is
+    // advanced") — the same line, appended to it (GnuCOBOL's behaviour, kb/Work PB1840 holds the overprint
+    // question); AFTER ADVANCING 0 LINES is an OVERPRINT (GR25 c): "no repositioning of the representation of the
+    // printed page is performed"), written as a bare carriage return (docs/CONFORMANCE.md "ADVANCING 0", owner
+    // decision kb/Work R54), so BBBB returns to the start of AAAA's line; a BEFORE write followed by an AFTER
+    // write is two advances, so one blank line.
+    // ⛔ AND THE LAST WRITE, WITH NO ADVANCING PHRASE, IS AN EXPLICIT AFTER ADVANCING 1 LINE (kb/Work PB1027;
+    // GR25: "automatic advancing shall be provided by the implementor to act as if the user has specified AFTER
+    // ADVANCING 1 LINE"): after a BEFORE write, whose own advance already ended the line, it advances AGAIN, so
+    // CCCC follows a blank line exactly as LNGBYG's explicit AFTER does. (Before PB1027 it took BEFORE's
+    // placement whenever no line was open, which left no blank line here.)
+    [InlineData("LNGBYF", "lngbyf.prt", "AFTER ADVANCING 1 LINE", "BEFORE ADVANCING 1 LINE", "\r\nAAAABBBB\r\n\r\nCCCC\r\n")]
     [InlineData("LNGBYG", "lngbyg.prt", "BEFORE ADVANCING 1 LINE", "AFTER ADVANCING 1 LINE", "AAAA\r\n\r\nBBBB\r\nCCCC\r\n")]
-    [InlineData("LNGBYH", "lngbyh.prt", "BEFORE ADVANCING 1 LINE", "", "AAAA\r\nBBBB\r\nCCCC\r\n")]
+    [InlineData("LNGBYH", "lngbyh.prt", "BEFORE ADVANCING 1 LINE", "", "AAAA\r\n\r\nBBBB\r\nCCCC\r\n")]
     [InlineData("LNGBYI", "lngbyi.prt", "AFTER ADVANCING 1 LINE", "AFTER ADVANCING 0 LINES", "\r\nAAAA\rBBBB\r\nCCCC\r\n")]
     public void Bytes_LineSequential_EveryPlacementMix(string programId, string file, string first, string second, string expected)
         => AssertBytes(BytesProgram(programId, file, LineSequentialOrg, "", $"""
@@ -319,9 +328,13 @@ public sealed class LinageConformanceTests
     // an omitted ADVANCING phrase a one-line advance and §13.18.34.4 GR7 c) 3 adds one to the counter, so that
     // newline IS the device travelling one line on the logical page.
     // FD: LINAGE IS 2 LINES LINES AT TOP 3 LINES AT BOTTOM 2 (page 1 = physical 1-7, page 2 starts at 8).
-    // A plain WRITE presents on the line the device is standing on and then advances (§14.9.51.4 GR25 e)), so
-    // AAAA lands on page-1 body line 1 = physical 4, BBBB on body line 2 = physical 5, its advance overflows
-    // (GR26 a)) to page-2 body line 1 = physical 11, and CCCC lands there.
+    // A plain WRITE is an AFTER ADVANCING 1 LINE (§14.9.51.4 GR25: "automatic advancing shall be provided by the
+    // implementor to act as if the user has specified AFTER ADVANCING 1 LINE"; kb/Work PB1027), so the file is
+    // BYTE FOR BYTE the one Bytes_TopAndBottomMarginsAreLinesOfTheLogicalPage derives for the same FD with the
+    // phrase spelled out: AAAA lands on page-1 body line 2 = physical 5 (GR25 f): the counter was 1 at OPEN,
+    // §13.18.34.4 GR7 d), and the advance makes it 2, GR7 c) 3), BBBB's advance would reach body line 3, past the
+    // page size, so GR26 a) repositions to page-2 body line 1 = physical 11 and presents it there, and CCCC lands
+    // on body line 2 = physical 12.
     public void Bytes_LineSequentialLinageFile_GetsTheSameMargins()
         => AssertBytes(BytesProgram("LNGBY5", "lngby5.prt", LineSequentialOrg,
             "LINAGE IS 2 LINES LINES AT TOP 3 LINES AT BOTTOM 2", """
@@ -332,7 +345,7 @@ public sealed class LinageConformanceTests
                 MOVE "CCCC" TO P-REC.
                 WRITE P-REC.
             """), "lngby5.prt",
-            "\r\n\r\n\r\nAAAA\r\nBBBB\r\n\r\n\r\n\r\n\r\n\r\nCCCC\r\n", edition: 2023, org: LineSequentialOrg);
+            "\r\n\r\n\r\n\r\nAAAA\r\n\r\n\r\n\r\n\r\n\r\nBBBB\r\nCCCC\r\n", edition: 2023, org: LineSequentialOrg);
 
     // ── GR7 counter rules (§13.18.34 GR7c1–c4 / GR7d) ─────────────────────────────────────────────────────
 

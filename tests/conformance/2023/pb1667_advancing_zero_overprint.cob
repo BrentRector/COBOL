@@ -20,20 +20,28 @@
       *> line with no return between the two records.
       *> The bytes are read back through a one-character record
       *> sequential FD over the same file. CR shows as "<" and LF as
-      *> "/" (the print stream's line end is CR LF on every host).
-      *>   A  AFTER 1 "ABC"            CRLF, ABC             line open
+      *> "/". A plain record sequential print stream (A-C) ends its
+      *> lines with a line feed on every host, so its bytes are read
+      *> as they are; the line end of a LINAGE file (D) is the HOST
+      *> newline (CR LF on Windows, LF on Linux and macOS --
+      *> docs/CONFORMANCE.md DOC-A.1-146 (c'), kb/Work PB1664), so D is
+      *> read with WS-FOLD = "Y", which folds a CR that is followed by
+      *> LF into the one "/" and makes the golden read the same on
+      *> every host. (A BEFORE 0 CR followed by the next line's LF is a
+      *> CR LF pair in B, which is why A-C must not fold.)
+      *>   A  AFTER 1 "ABC"            LF, ABC               line open
       *>      AFTER 0 "XYZ"            CR, XYZ
       *>      AFTER ZN (ZN = 0) "PQR"  CR, PQR  (identifier-2)
-      *>      AFTER 2 "END"            CRLF CRLF, END; CLOSE ends the line
-      *>      => </ABC<XYZ<PQR</</END</
+      *>      AFTER 2 "END"            LF LF, END; CLOSE ends the line
+      *>      => /ABC<XYZ<PQR//END/
       *>   B  BEFORE 0 "GHI"           GHI, CR  (record, then the zero)
-      *>      AFTER 1 "JKL"            CRLF, JKL; CLOSE ends the line
-      *>      => GHI<</JKL</
+      *>      AFTER 1 "JKL"            LF, JKL; CLOSE ends the line
+      *>      => GHI</JKL/
       *>   C  AFTER 0 "AAA" first      no line open: nothing written
-      *>      => AAA</
+      *>      => AAA/
       *>   D  LINAGE 5: OPEN sets LINAGE-COUNTER to 1 (§13.18.34.4 GR7)
       *>      AFTER 1 "AAA" -> counter 2; AFTER 0 "BBB" -> counter 2,
-      *>      and the two records overprint: </AAA<BBB</
+      *>      and the two records overprint: /AAA<BBB/
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1667ADV.
        ENVIRONMENT DIVISION.
@@ -67,6 +75,8 @@
        01 WS-LINE  PIC X(40).
        01 WS-PTR   PIC 99.
        01 WS-CH    PIC X.
+       01 WS-CR    PIC X.
+       01 WS-FOLD  PIC X VALUE "N".
        01 ZN       PIC 9 VALUE 0.
        PROCEDURE DIVISION.
        MAIN-PARA.
@@ -108,6 +118,7 @@
            DISPLAY "D2=" LINAGE-COUNTER OF PD
            CLOSE PD
            MOVE "pb1667d.dat" TO WS-NAME
+           MOVE "Y" TO WS-FOLD
            PERFORM SHOW-FILE
            DISPLAY "D=" WS-LINE
            STOP RUN.
@@ -115,6 +126,7 @@
            MOVE SPACES TO WS-LINE
            MOVE 1 TO WS-PTR
            MOVE "N" TO WS-EOF
+           MOVE "N" TO WS-CR
            OPEN INPUT BY-IN
            PERFORM UNTIL WS-EOF = "Y"
                READ BY-IN
@@ -122,13 +134,33 @@
                    NOT AT END PERFORM SHOW-BYTE
                END-READ
            END-PERFORM
+           IF WS-CR = "Y"
+               MOVE "<" TO WS-CH
+               PERFORM PUT-CH
+           END-IF
            CLOSE BY-IN.
        SHOW-BYTE.
+           IF WS-CR = "Y"
+               MOVE "N" TO WS-CR
+               IF BY-REC NOT = X"0A"
+                   MOVE "<" TO WS-CH
+                   PERFORM PUT-CH
+               END-IF
+           END-IF
            EVALUATE BY-REC
-               WHEN X"0D" MOVE "<" TO WS-CH
+               WHEN X"0D"
+                   IF WS-FOLD = "Y"
+                       MOVE "Y" TO WS-CR
+                   ELSE
+                       MOVE "<" TO WS-CH
+                       PERFORM PUT-CH
+                   END-IF
                WHEN X"0A" MOVE "/" TO WS-CH
+                          PERFORM PUT-CH
                WHEN OTHER MOVE BY-REC TO WS-CH
-           END-EVALUATE
+                          PERFORM PUT-CH
+           END-EVALUATE.
+       PUT-CH.
            STRING WS-CH DELIMITED BY SIZE INTO WS-LINE
                WITH POINTER WS-PTR
            END-STRING.

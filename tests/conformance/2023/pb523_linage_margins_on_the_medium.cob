@@ -57,12 +57,19 @@
       *> on the medium writes ONE line there and fails at A06.
       *>
       *> FILE B — the LINE SEQUENTIAL arm, plain WRITE, three times. The
-      *> page geometry is the same; what differs is GR25 e) — the line is
-      *> presented and the advance follows — so the records sit one line
-      *> earlier than file A's: AAAA on page-1 body line 1 = B04, BBBB on
-      *> body line 2 = B05, and BBBB's own advance overflows (GR26 a)) to
-      *> page-2 body line 1, where CCCC lands = B11. This file exists
-      *> because the two WRITE arms are a two-arm dispatch and only the
+      *> page geometry is the same, and so is the file: a WRITE without
+      *> the ADVANCING phrase acts "as if the user has specified AFTER
+      *> ADVANCING 1 LINE" (§14.9.51.4 GR25; kb/Work PB1027)
+      *>   python scripts/spec/cite.py --check 14.9.51.4 "If the ADVANCING
+      *>   phrase is not used, automatic advancing shall be provided by
+      *>   the implementor to act as if the user has specified AFTER
+      *>   ADVANCING 1 LINE"   -> OK  §14.9.51.4 25)
+      *> so file B is file A byte for byte: AAAA on page-1 body line 2 =
+      *> B05, BBBB on page-2 body line 1 = B11 (GR26 a) overflow), CCCC on
+      *> page-2 body line 2 = B12. (Before PB1027 a plain WRITE presented
+      *> where the device stood and advanced after, which put the three
+      *> records one line early: B04, B05, B11.) This file exists because
+      *> the two WRITE arms are a two-arm dispatch and only the
       *> record-sequential one had been fixed: a line sequential LINAGE
       *> file emitted its record and a bare newline, so no margin ever
       *> reached its medium.

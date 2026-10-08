@@ -7,15 +7,17 @@
       *> twin (tests/conformance/2023/pb523_linage_margins_on_the_medium
       *> .cob) bracket the supported range.
       *>
-      *> ⛔ WHY THIS TWIN READS BYTES WHERE THE 2023 ONE READS LINES. The
+      *> ⛔ WHY THIS TWIN READS CHARACTERS WHERE THE 2023 ONE READS LINES. The
       *> 2023 fixture reads its print files back with ORGANIZATION IS LINE
       *> SEQUENTIAL, so each DISPLAYed index IS a physical line number.
       *> LINE SEQUENTIAL does not exist at COBOL-85 (it is the 2023
       *> ORGANIZATION phrase; this compiler rejects it with COBOLNET0900
       *> at --std 85), so the medium is read here one CHARACTER at a time
       *> through a record sequential file with a PIC X record — which
-      *> observes the same bytes one level lower: the file's LENGTH and
-      *> the OFFSET of each written record within it.
+      *> observes the same bytes one level lower, counting the line feeds
+      *> that end the physical lines (the line end of a LINAGE file is the
+      *> host newline, CR LF or LF, so a byte offset would differ by host;
+      *> a line number does not).
       *>
       *> THE RULES.
       *>   python scripts/spec/cite.py --check 13.18.34.4 "The logical
@@ -58,20 +60,14 @@
       *>       GR7 c) 4 resets the counter to one.
       *>   W3: counter 1 -> 2, CCCC on page-2 body line 2 = line 12.
       *>
-      *> THE BYTES THAT FOLLOWS FROM. Every line the device travels is a
-      *> physical newline (CR LF on this implementation's print medium, 2
-      *> characters), and a written record contributes its 4 characters:
-      *>   lines 1-4 travelled blank          8 characters   (offsets 1-8)
-      *>   AAAA                               4               (9-12)
-      *>   lines 5-10 travelled blank        12              (13-24)
-      *>   BBBB                               4              (25-28)
-      *>   line 11 travelled blank            2              (29-30)
-      *>   CCCC                               4              (31-34)
-      *>   line 12 terminated at CLOSE        2              (35-36)
-      *> so LEN=0036, A@=0009, B@=0025, C@=0031. A compiler that keeps the
+      *> THE LINES THAT FOLLOW FROM. Every physical line ends in a line
+      *> feed, the last one (line 12) at CLOSE, so the reader sees 12 line
+      *> feeds; the first A is on the line after the 4 that ended blank,
+      *> the first B after 10 and the first C after 11:
+      *> LINES=0012, A@=0005, B@=0011, C@=0012. A compiler that keeps the
       *> margins in the LINAGE-COUNTER but not on the medium writes the 5
-      *> margin lines between AAAA and BBBB as ONE, and produces LEN=0020,
-      *> A@=0003, B@=0009, C@=0015 — every one of the four values differs,
+      *> margin lines between AAAA and BBBB as ONE, and produces LINES=0004,
+      *> A@=0002, B@=0003, C@=0004 — every one of the four values differs,
       *> so no single arithmetic accident can make this fixture pass.
       *>
       *> ⛔ WHY EACH WRITE IS PRECEDED BY ITS OWN MOVE. §14.9.51.4 GR4 —
@@ -86,6 +82,9 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB523L.
        ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           SYMBOLIC CHARACTERS SYM-X0A ARE 11.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
            SELECT PRTA ASSIGN TO "pb523l-a.prt".
@@ -117,20 +116,22 @@
                READ RDA
                    AT END MOVE 1 TO EOF-SW
                    NOT AT END
-                       ADD 1 TO POSN
+                       IF R-CHAR = SYM-X0A
+                           ADD 1 TO POSN
+                       END-IF
                        IF R-CHAR = "A" AND AT-A = 0
-                           MOVE POSN TO AT-A
+                           COMPUTE AT-A = POSN + 1
                        END-IF
                        IF R-CHAR = "B" AND AT-B = 0
-                           MOVE POSN TO AT-B
+                           COMPUTE AT-B = POSN + 1
                        END-IF
                        IF R-CHAR = "C" AND AT-C = 0
-                           MOVE POSN TO AT-C
+                           COMPUTE AT-C = POSN + 1
                        END-IF
                END-READ
            END-PERFORM.
            CLOSE RDA.
-           DISPLAY "LEN=" POSN.
+           DISPLAY "LINES=" POSN.
            DISPLAY "A@=" AT-A.
            DISPLAY "B@=" AT-B.
            DISPLAY "C@=" AT-C.

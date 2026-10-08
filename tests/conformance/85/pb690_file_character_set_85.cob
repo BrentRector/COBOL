@@ -37,6 +37,14 @@
       *>             is the same file coded character set: '91' for
       *>             U+20AC; U+00E9 is written as its OWN byte 0xE9 —
       *>             never '?' — and the file holds that line alone.
+      *>             The file is six bytes: the second WRITE is AFTER
+      *>             ADVANCING 1 LINE (§14.9.51.4 GR25 — kb/Work
+      *>             PB1027), so a line end (LF: the line end of a
+      *>             record sequential print stream with no LINAGE
+      *>             clause, DOC-A.1-146 (c'), kb/Work PB1664) comes
+      *>             first, then P 0xE9 0 1 at bytes 2-5, and CLOSE
+      *>             ends the open line (byte 6). The refused write
+      *>             travelled nowhere (§14.9.51.4 GR15).
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
        SPECIAL-NAMES.

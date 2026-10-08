@@ -43,7 +43,7 @@
       *> Under that defect PRTQ has page size 5, footing 4, top margin 1
       *> and bottom margin 4, so BOTH observables below diverge: the
       *> end-of-page branches change (a 5-line body is not reached by
-      *> three single-line advances) and so do the byte offsets.
+      *> three single-line advances) and so do the line numbers.
       *>
       *> OBSERVABLE 1 — THE END-OF-PAGE BRANCH PER WRITE, which is what
       *> makes the FOOTING operand visible at all (§13.18.34.4 GR1: the
@@ -57,15 +57,17 @@
       *> raise the end-of-page condition. All six branches are therefore
       *> EOP, on both files.
       *>
-      *> OBSERVABLE 2 — THE BYTES ON THE MEDIUM, which is what makes the
+      *> OBSERVABLE 2 — THE LINES ON THE MEDIUM, which is what makes the
       *> TOP and BOTTOM operands visible (a margin has no effect on the
-      *> counter). The derivation of the three offsets for exactly this
-      *> geometry is the one already recorded in
+      *> counter). The derivation of the three line numbers for exactly
+      *> this geometry is the one already recorded in
       *> tests/conformance/85/pb523_linage_margins_on_the_medium_85.cob —
-      *> LINAGE 2 / TOP 3 / BOTTOM 2, three WRITEs AFTER ADVANCING 1 LINE,
-      *> every travelled line a 2-character newline and every record 4
-      *> characters: lines 1-4 blank (offsets 1-8), AAAA at 9, lines 5-10
-      *> blank (13-24), BBBB at 25, line 11 blank (29-30), CCCC at 31.
+      *> LINAGE 2 / TOP 3 / BOTTOM 2, three WRITEs AFTER ADVANCING 1 LINE:
+      *> lines 1-4 blank, AAAA on line 5, lines 6-10 blank, BBBB on line
+      *> 11, CCCC on line 12. The reader counts line feeds, because the
+      *> line end of a LINAGE file is the host newline (CR LF or LF:
+      *> docs/CONFORMANCE.md A.1 item 146 (c'), kb/Work PB1664), so a
+      *> byte offset would differ by host and a line number does not.
       *> The FOOTING phrase does not move them: GR1 — "The logical page
       *> size is the sum of the values referenced by each phrase except
       *> the FOOTING phrase."
@@ -101,6 +103,9 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB489Q.
        ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           SYMBOLIC CHARACTERS SYM-X0A ARE 11.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
            SELECT PRTL ASSIGN TO "pb489q-l.prt".
@@ -179,15 +184,17 @@
                READ RDF
                    AT END MOVE 1 TO EOF-SW
                    NOT AT END
-                       ADD 1 TO POSN
+                       IF F-CHAR = SYM-X0A
+                           ADD 1 TO POSN
+                       END-IF
                        IF F-CHAR = "A" AND AT-A = 0
-                           MOVE POSN TO AT-A
+                           COMPUTE AT-A = POSN + 1
                        END-IF
                        IF F-CHAR = "B" AND AT-B = 0
-                           MOVE POSN TO AT-B
+                           COMPUTE AT-B = POSN + 1
                        END-IF
                        IF F-CHAR = "C" AND AT-C = 0
-                           MOVE POSN TO AT-C
+                           COMPUTE AT-C = POSN + 1
                        END-IF
                END-READ
            END-PERFORM.
@@ -200,15 +207,17 @@
                READ RDG
                    AT END MOVE 1 TO EOF-SW
                    NOT AT END
-                       ADD 1 TO POSN
+                       IF G-CHAR = SYM-X0A
+                           ADD 1 TO POSN
+                       END-IF
                        IF G-CHAR = "A" AND AT-A = 0
-                           MOVE POSN TO AT-A
+                           COMPUTE AT-A = POSN + 1
                        END-IF
                        IF G-CHAR = "B" AND AT-B = 0
-                           MOVE POSN TO AT-B
+                           COMPUTE AT-B = POSN + 1
                        END-IF
                        IF G-CHAR = "C" AND AT-C = 0
-                           MOVE POSN TO AT-C
+                           COMPUTE AT-C = POSN + 1
                        END-IF
                END-READ
            END-PERFORM.

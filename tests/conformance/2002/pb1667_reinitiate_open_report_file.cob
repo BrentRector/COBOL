@@ -25,12 +25,16 @@
       *> of the run before (§14.9.51.4 25) c): a zero advance is an
       *> overprint), which the engine did by reading INITIATE's empty
       *> page model as an empty DEVICE. The file is read back through a
-      *> one-character record sequential FD (CR "<", LF "/"; the report
-      *> stream's line end is CR LF on every host) with no CLOSE of the
-      *> report file between the two runs:
+      *> one-character record sequential FD with no CLOSE of the report
+      *> file between the two runs. A lone CR shows as "<" (an overprint:
+      *> the defect) and a line end as "/": the line end of a report file
+      *> is the host newline (CR LF on Windows, LF on Linux and macOS:
+      *> docs/CONFORMANCE.md A.1 item 159, kb/Work PB1664), so a CR that
+      *> is followed by LF is folded into the one "/" and the golden reads
+      *> the same on every host:
       *>   run 1   60, S=60
       *>   run 2   05, S=05   (WS-N reset)
-      *> => 60</S=60</05</S=05</
+      *> => 60/S=60/05/S=05/
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1667REP.
        ENVIRONMENT DIVISION.
@@ -49,6 +53,7 @@
        01  WS-CH   PIC X.
        01  WS-LINE PIC X(60) VALUE SPACES.
        01  WS-PTR  PIC 99    VALUE 1.
+       01  WS-CR   PIC X     VALUE "N".
        REPORT SECTION.
        RD  R-S CONTROL IS FINAL.
        01  DET-S TYPE DE LINE PLUS 1.
@@ -74,15 +79,29 @@
                    NOT AT END PERFORM SHOW-BYTE
                END-READ
            END-PERFORM.
+           IF WS-CR = "Y"
+               MOVE "<" TO WS-CH
+               PERFORM PUT-CH
+           END-IF
            CLOSE CHS.
            DISPLAY "BYTES=" WS-LINE.
            STOP RUN.
        SHOW-BYTE.
+           IF WS-CR = "Y"
+               MOVE "N" TO WS-CR
+               IF CHS-REC NOT = X"0A"
+                   MOVE "<" TO WS-CH
+                   PERFORM PUT-CH
+               END-IF
+           END-IF
            EVALUATE CHS-REC
-               WHEN X"0D" MOVE "<" TO WS-CH
+               WHEN X"0D" MOVE "Y" TO WS-CR
                WHEN X"0A" MOVE "/" TO WS-CH
+                          PERFORM PUT-CH
                WHEN OTHER MOVE CHS-REC TO WS-CH
-           END-EVALUATE
+                          PERFORM PUT-CH
+           END-EVALUATE.
+       PUT-CH.
            STRING WS-CH DELIMITED BY SIZE INTO WS-LINE
                WITH POINTER WS-PTR
            END-STRING.

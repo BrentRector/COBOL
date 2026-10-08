@@ -772,7 +772,7 @@ deep-dive table points here.
 - **⛔ EVERY corpus golden and unit fact below that observes report CONTENT lives at `--std 2023`, and the reason
   is not the Report Writer** (an 85 subsystem): the only way to read a report file back is a second SELECT with
   `ORGANIZATION LINE SEQUENTIAL`, a COBOL-2023 introduction (§12.4.5.10.3 GR2; kb/Work PB688), and a WiseOwl COBOL
-  report file is CRLF-delimited text whatever its own ORGANIZATION, so a record-sequential read-back of it is
+  report file is host-newline-delimited text (CR LF on Windows, LF on Linux and macOS: DOC-A.1-159, kb/Work PB1664) whatever its own ORGANIZATION, so a record-sequential read-back of it is
   misaligned. `ReportWriterConformanceTests` compiles whole at 2023 for that reason, and the nine 2002 goldens
   moved to `tests/conformance/2023/`. The ONE golden that stays at 85 —
   `85/pb326_flow_report_unconditional`, whose subject IS the oldest edition — dropped its read-back instead:

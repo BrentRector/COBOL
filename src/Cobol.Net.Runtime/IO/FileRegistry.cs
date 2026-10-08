@@ -1021,7 +1021,14 @@ public sealed class FileRegistry
         // The REVERSED phrase reaches the connector BEFORE its OPEN body runs, because the position it asks for
         // needs a record count, and nothing after a successful open may read the physical file (the PB713 rule
         // below, in SharedOpenAttempt; kb/Work PB1512). Set on every open, so it describes THIS statement only.
-        if (Require(name) is SequentialConnector sequential) sequential.ReversedRequested = tape == OpenTapePhrase.Reversed;
+        if (Require(name) is SequentialConnector sequential)
+        {
+            sequential.ReversedRequested = tape == OpenTapePhrase.Reversed;
+            // The executing element's LINAGE operands are null exactly when its FD has no LINAGE clause
+            // (LinageArg), and a LINAGE file's line end is the host newline, not the record sequential print
+            // stream's line feed (SequentialConnector.SelectLineEnd, kb/Work PB1664).
+            sequential.HasLinageClause = page is not null;
+        }
         // SharedOpenAttempt sets the connector status on the terminal attempt, and RetryLoop lands an exhausted
         // retry on the CONFLICT'S OWN status (§14.7.9.3 closing paragraph → §9.1.13.9 item 1 = '61'), so there is
         // nothing left to override afterwards — the former `if (status == Deadlock) SetStatusOf(…)` line existed

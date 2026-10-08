@@ -398,9 +398,8 @@ public sealed class SequentialConnector : FileConnector
     /// an OPEN OUTPUT that established it (§13.18.34.4 GR6 b) 1 and GR7 d) name that mode and no other) and the
     /// CLOSE that ends it (<see cref="EndLinagePage"/>), and GR6's value rules make the page size positive, so a
     /// zero body IS the absence of a page. Every arm that has to choose between the logical page and the plain
-    /// print stream asks HERE — <see cref="Position"/>, <see cref="Present"/> and
-    /// <see cref="EmitLineSequentialRecord"/> — rather than each spelling the test its own way, because three
-    /// spellings of one predicate is how one of them ends up disagreeing.</summary>
+    /// print stream asks HERE — <see cref="Position"/> and <see cref="Present"/> — rather than each spelling the
+    /// test its own way, because two spellings of one predicate is how one of them ends up disagreeing.</summary>
     private bool HasLogicalPage => _pageBody > 0;
 
     /// <summary>The current logical page's top margin (§13.18.34.4 GR4) has not yet reached the medium: the
@@ -693,8 +692,8 @@ public sealed class SequentialConnector : FileConnector
 
     /// <summary>Present one line on the current logical page — the record, preceded by the page's top margin
     /// when this is the first thing written on the page (§13.18.34.4 GR4). ⛔ EVERY record that reaches a
-    /// LINAGE file's medium goes through here or through <see cref="EmitLineSequentialRecord"/>, so a page's
-    /// margin cannot be skipped by adding a write arm.</summary>
+    /// LINAGE file's medium goes through here (a line sequential one too: its write is the same
+    /// <see cref="WriteAdvancingRecord"/>), so a page's margin cannot be skipped by adding a write arm.</summary>
     private void Present(string text, LinagePage? page, bool national)
     {
         if (page is not null && HasLogicalPage) EmitTopMarginIfPending();
@@ -709,8 +708,8 @@ public sealed class SequentialConnector : FileConnector
         : base(hostPath, recordWidth, varyMin, varyMax)
     {
         _lineSequential = lineSequential;
-        _lineEnd = lineSequential ? LineSequentialDelimiter : PrintLineEnd;
         _recordDescribed = recordDescribed;
+        _lineEnd = SelectLineEnd();
     }
 
     /// <summary>⛔ DOES THIS CONNECTOR'S FILE HAVE A RECORD DESCRIPTION THAT A READ WILL CONSUME (kb/Work PB677)? A
@@ -735,17 +734,37 @@ public sealed class SequentialConnector : FileConnector
     /// <inheritdoc/>
     protected override bool LineSequential => _lineSequential;
 
-    /// <summary>The PRINT STREAM's line control — the line end of a record sequential file written with an
-    /// ADVANCING phrase or a LINAGE clause (the one on-disk shape a record sequential print file has; the
-    /// report writer's lines are the same stream). CR LF on every host. It is not a line sequential file, so
-    /// item 114 does not govern it; kb/Work PB1540 changed the line sequential delimiter only.</summary>
-    private const string PrintLineEnd = "\r\n";
+    /// <summary>The line end of a RECORD SEQUENTIAL print stream that has neither a LINAGE clause nor a report
+    /// description: a record sequential file written with an ADVANCING phrase. A line feed on every host
+    /// (<see cref="SelectLineEnd"/> carries the determination).</summary>
+    private const string RecordPrintLineEnd = "\n";
 
-    /// <summary>This connector's ONE line end — <see cref="LineSequentialDelimiter"/> on a line sequential file,
-    /// <see cref="PrintLineEnd"/> on a record sequential print stream. Every line this connector ends — a
-    /// record's delimiter, an ADVANCING or LINAGE line, the CLOSE of an open line — writes exactly this, so a
-    /// margin line, a page-fill line and a record's delimiter are the same bytes on one file.</summary>
-    private readonly string _lineEnd;
+    /// <summary>Does the file description this connector was last opened under carry a LINAGE clause? Told by
+    /// the registry at every OPEN (<see cref="FileRegistry"/>'s OpenCore) from the executing element's LINAGE
+    /// operands — the same <c>page</c> argument that carries the operand values — because a LINAGE clause is a
+    /// property of the file description and an EXTERNAL file is described by every element that declares it.</summary>
+    internal bool HasLinageClause { private get; set; }
+
+    /// <summary>⛔ THE LINE END OF THIS CONNECTOR'S MEDIUM, selected ONCE per OPEN and written down as the
+    /// three-way mapping it is (kb/Work PB1664; <c>docs/CONFORMANCE.md</c> DOC-A.1-146 (c′), DOC-A.1-159).
+    /// <list type="bullet">
+    /// <item>A LINE SEQUENTIAL file: <see cref="LineSequentialDelimiter"/> (item 114).</item>
+    /// <item>A file with a LINAGE clause, and every REPORT file (a line sequential one included): the host
+    /// newline too. ISO leaves a record's on-medium form to the implementor (§9.1.7.2; §13.4.5.4 GR4 for the
+    /// report writer's logical record), so CLAUDE.md rule 1's precedence decides, and GnuCOBOL 3.2 reclassifies
+    /// both as LINE SEQUENTIAL (<c>parser.y</c>) and writes them in the C library's text mode.</item>
+    /// <item>Any other RECORD SEQUENTIAL print stream — a file written with an ADVANCING phrase: a line feed on
+    /// every host (<see cref="RecordPrintLineEnd"/>). GnuCOBOL keeps it a binary sequential file and writes
+    /// <c>\n</c>. Its bare carriage return for ADVANCING 0 and its form feed for ADVANCING PAGE are controls, not
+    /// line ends, and stay as they were (§14.9.51.4 GR25 c) and h)).</item>
+    /// </list>
+    /// Every line this connector ends — a record's delimiter, an ADVANCING or LINAGE line, a margin or page-fill
+    /// line, the CLOSE of an open line — writes exactly this, so they are the same bytes on one file.</summary>
+    private string SelectLineEnd() =>
+        _lineSequential || !_recordDescribed || HasLinageClause ? LineSequentialDelimiter : RecordPrintLineEnd;
+
+    /// <summary>This connector's ONE line end for the current open (<see cref="SelectLineEnd"/>).</summary>
+    private string _lineEnd;
 
     /// <inheritdoc/>
     /// <remarks>Both §9.1.7.2 types of sequential file — record sequential and line sequential — record this
@@ -817,6 +836,7 @@ public sealed class SequentialConnector : FileConnector
     {
         _printControl = false;
         _lineOpen = false;
+        _lineEnd = SelectLineEnd();   // the registry told HasLinageClause before this OPEN's body ran
         _lastReadBlockStart = -1;
         _lastReadTableCount = -1;
         _readOffset = 0;
@@ -1062,19 +1082,21 @@ public sealed class SequentialConnector : FileConnector
         // §13.18.34.4 GR6 b) 2 — "all subsequent WRITE statements referencing the file cause the EC-I-O-LINAGE
         // exception condition to continue to exist until the file is closed". Ahead of everything, because the
         // statement is not executed at all: nothing reaches the medium, nothing is released (GR12), the counter
-        // stays 0. Both WRITE entries carry it because a plain WRITE on a LINE SEQUENTIAL LINAGE file does not
-        // route through WriteAdvancing (the two-arm dispatch this connector has been bitten by twice).
+        // stays 0. Both WRITE entries carry it; since kb/Work PB1027 every plain WRITE on a LINAGE file (line
+        // sequential too) is rerouted below to WriteAdvancingRecord, which asks it again, so this one only keeps
+        // the latch ahead of the reroute's own bookkeeping.
         if (_linagePageBroken) return LinageViolationStatus();
-        // On a PRINT file (this connector has seen print-control advancing) — or a LINAGE file, which is
-        // line-oriented from its FIRST write (the FILES deep-dive rule; its plain WRITE acts as AFTER
-        // ADVANCING 1, ISO §14.9.51 GR25, and the counter advances by one, §13.18.34 GR7c3) — an omitted
-        // ADVANCING phrase still line-advances (a raw fixed-width block would weld onto the previous line). In
-        // the pending-advance stream model (each AFTER-write leads with its newline; CLOSE supplies the final
-        // one), the write-then-advance shape reproduces the print stream the golden corpus encodes — on a line
-        // nothing left OPEN. Where a line IS open (an AFTER write's record, presented after its advance), the one
-        // implicit advance is placed FIRST, as GR25 f) places AFTER's: see ImplicitAdvanceIsBefore (kb/Work PB964).
-        if ((_printControl || page is not null) && !_lineSequential)
-            return WriteAdvancingRecord(image, length, 1, before: ImplicitAdvanceIsBefore, page, national);
+        // ⛔ A WRITE WITHOUT AN ADVANCING PHRASE ON A FILE THAT SUPPORTS VERTICAL POSITIONING IS AN EXPLICIT
+        // `AFTER ADVANCING 1 LINE`, IN EVERY STATE OF THE DEVICE (kb/Work PB1027). §14.9.51.4 GR25: "If the
+        // ADVANCING phrase is not used, automatic advancing shall be provided by the implementor to act as if the
+        // user has specified AFTER ADVANCING 1 LINE" — the placement is AFTER's (GR25 f), the counter step is
+        // one (§13.18.34.4 GR7 c) 3), and no implementor choice exists, so the statement takes the SAME path the
+        // spelled-out phrase takes. It used to take BEFORE's placement whenever no line was open (the record
+        // first, its line end after), which put the record on the wrong line of a LINAGE page, welded a plain
+        // WRITE after a BEFORE write onto no blank line, and travelled twice around a line sequential file's
+        // AFTER write. A line sequential file takes the same path (it used to have a third, hand-placed arm).
+        if (SupportsVerticalPositioning(page))
+            return WriteAdvancingRecord(image, length, 1, before: false, page, national);
         // §14.9.51.4 GR23: "For a line sequential file, if the record area contains one or more characters that
         // are not in the implementor-defined character set defined for a line sequential file, the execution of
         // the WRITE statement is unsuccessful and the I-O status in the write file connector is set to '71'."
@@ -1092,7 +1114,7 @@ public sealed class SequentialConnector : FileConnector
         if (OutsideVaryingBounds(len)) return Status = FileStatusCode.RecordSizeViolation;   // '44' §14.9.51.4 GR14
         if (IsVarying)
         {
-            if (_lineSequential) { if (!EmitLineSequentialRecord(TrimRecordEnd(FitRecord(image, len, national), national), page, national)) return LinageViolationStatus(); }
+            if (_lineSequential) EmitRecordLine(TrimRecordEnd(FitRecord(image, len, national), national), national);
             else
             {
                 // The table describes the image the group composed; a record sent at another length (GR13 a) is
@@ -1102,11 +1124,25 @@ public sealed class SequentialConnector : FileConnector
                 EmitRecord(record, national);
             }
         }
-        else if (_lineSequential) { if (!EmitLineSequentialRecord(TrimRecordEnd(image, national), page, national)) return LinageViolationStatus(); }
+        else if (_lineSequential) EmitRecordLine(TrimRecordEnd(image, national), national);
         else EmitRecord(Fit(image), national);
         ReleaseRecord();   // §14.9.51.4 GR12 — released to the operating environment, and numbered there
-        return WriteSucceeded();   // a LINE SEQUENTIAL LINAGE write travels the page too (EmitLineSequentialRecord)
+        return WriteSucceeded();
     }
+
+    /// <summary>⛔ DOES THIS FILE SUPPORT VERTICAL POSITIONING — the question §14.9.51.4 GR25 asks before it says
+    /// what an omitted ADVANCING phrase does: <i>"If the physical file does not support vertical positioning,
+    /// the ADVANCING and END-OF-PAGE phrases are ignored"</i>. Whether a physical file supports it is
+    /// processor-dependent (Annex A.3 item 37), so this is a DETERMINATION of the implementor
+    /// (<c>docs/CONFORMANCE.md</c> §4 "DETERMINATION — which files support vertical positioning"): a file does
+    /// when its description carries a LINAGE clause (<paramref name="page"/> is the executing element's LINAGE
+    /// operands, null = none), and from the first WRITE that carries an ADVANCING phrase (<see cref="_printControl"/>,
+    /// set by <see cref="WriteAdvancingRecord"/>); a report file reaches the medium only through that WRITE. A file
+    /// of which neither is true has had no positioning asked of it, so its plain WRITE is the record and its line
+    /// end (a line sequential record's delimiter, a record sequential file's raw block) — the shape GnuCOBOL
+    /// writes by default and every ordinary text-file program relies on. It is one predicate so that a write
+    /// arm cannot decide the question its own way.</summary>
+    private bool SupportsVerticalPositioning(LinagePage? page) => _printControl || page is not null;
 
     /// <summary>⛔ THE ONE LENGTH DECISION OF A WRITE, asked by BOTH write arms — the plain record
     /// (<see cref="WriteRecord"/>) and the print-control line (<see cref="WriteAdvancingRecord"/>), which a
@@ -1129,51 +1165,6 @@ public sealed class SequentialConnector : FileConnector
     /// connector is set to '44'"</i> (§9.1.13.7 item 4 a); §13.18.43.4 GR14 a)). GR15 then says the write does
     /// not take place, so every write arm asks it before anything reaches the medium.</summary>
     private bool OutsideVaryingBounds(int len) => IsVarying && (len < VaryMin || len > VaryMax);
-
-    /// <summary>A line sequential record and its delimiter (ISO §9.1.13.2 — a line sequential record is
-    /// delimited, not fixed-width).
-    /// <para>⛔ ON A LINAGE FILE THE DELIMITER IS THE WRITE'S OWN ONE-LINE ADVANCE, not a delimiter that happens
-    /// to look like one. §14.9.51.4 GR25 makes an omitted ADVANCING phrase a one-line advance and §13.18.34.4
-    /// GR7 c) 3 advances the counter by one for it, so the "newline" this write emits is the device travelling
-    /// one line on the logical page — which means it may instead be a page transition, and it may be preceded by
-    /// the page's top margin. Emitting it as a bare <c>WriteLine</c> is what let a LINE SEQUENTIAL LINAGE file
-    /// ignore its margins while the record-sequential twin (rerouted to <see cref="WriteAdvancing"/>) was fixed:
-    /// the two-arm dispatch with one arm fixed (kb/Work PB523).</para>
-    /// <para>The travel happens BEFORE <see cref="ReleaseRecord"/> flushes, so the record reaches the medium
-    /// delimited — §14.9.51.4 GR12's release is of a whole record, and a sharing sibling shall not meet a line
-    /// with no terminator.</para></summary>
-    /// <returns><see langword="false"/> when the one-line travel's page transition broke the LINAGE page model
-    /// (§13.18.34.4 GR6 b) — see <see cref="Position"/>).</returns>
-    private bool EmitLineSequentialRecord(string data, LinagePage? page, bool national)
-    {
-        if (page is null || !HasLogicalPage)
-        {
-            // The one implicit advance, placed by the same question the print arm asks: on an open line it is
-            // the travel that ENDS that line (§14.9.51.4 GR25 f)'s AFTER placement — kb/Work PB964, where the
-            // record used to weld onto the AFTER write's line); otherwise it is the record's own delimiter.
-            if (!ImplicitAdvanceIsBefore) AdvanceLines(1);
-            EmitRecordLine(data, national);
-            return true;
-        }
-        if (ImplicitAdvanceIsBefore) { Present(data, page, national); return Position(1, page); }
-        if (!Position(1, page)) return false;
-        Present(data, page, national);
-        return true;
-    }
-
-    /// <summary>⛔ THE ONE PLACEMENT QUESTION OF A WRITE THAT HAS NO ADVANCING PHRASE, asked by every arm that
-    /// performs one (the print/LINAGE arm through <see cref="WriteAdvancing"/>, and both line sequential arms of
-    /// <see cref="EmitLineSequentialRecord"/>). §14.9.51.4 GR25: <i>"If the ADVANCING phrase is not used,
-    /// automatic advancing shall be provided by the implementor to act as if the user has specified AFTER
-    /// ADVANCING 1 LINE."</i> The advance is ONE line — §13.18.34.4 GR7 counts it once — and its placement
-    /// follows the device's LINE STATE (<see cref="_lineOpen"/>): when an AFTER-placed record still stands on an
-    /// unterminated line, the advance comes first (GR25 f), "the line is presented after the representation of
-    /// the printed page is advanced") and ends that line, so the record lands on the next one; when no line is
-    /// open, the stream's established write-then-advance shape (a record followed by its line terminator — the
-    /// shape a line sequential record and the NIST print corpus both carry) already puts it on a fresh line.
-    /// Before kb/Work PB964 the print arm always placed it second and the line sequential arm never advanced at
-    /// all, so a plain WRITE after an AFTER write welded two records onto one physical line.</summary>
-    private bool ImplicitAdvanceIsBefore => !_lineOpen;
 
     /// <summary>Print-control <c>WRITE record [BEFORE] [AFTER] ADVANCING {n LINES | PAGE}</c> (ISO §14.9.51.4
     /// GR25): for
