@@ -54,7 +54,10 @@ CASES = [
 
 COORD = TMP / "coord"   # rule 3 writes the dispatch ledger: never the real coordination directory from a test
 COORD.mkdir()
-ENV = dict(os.environ, COBOL_COORD_DIR=str(COORD))
+# The cases choose the session kind themselves (UNIT_ENV adds COBOL_LOOP_UNIT), so the caller's own kind never leaks in:
+# a gate run inside a loop unit (a land unit's lander has COBOL_LOOP_UNIT=land) made the "attended session" case a loop
+# unit and turned this self-test red on a correct hook (kb/Work PB2702).
+ENV = {k: v for k, v in os.environ.items() if k != "COBOL_LOOP_UNIT"} | {"COBOL_COORD_DIR": str(COORD)}
 
 
 def blocked(payload: dict) -> bool:
