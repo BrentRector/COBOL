@@ -14,9 +14,6 @@ public static class CobolModule
     /// the ambient reads, not the list bookkeeping (fix-queue PB36).</summary>
     public static ModuleStack Stack => RunUnit.Current.Modules;
 
-    /// <inheritdoc cref="ModuleStack.PushMain"/>
-    public static void PushMain(string name) => RunUnit.Current.Modules.PushMain(name);
-
     /// <inheritdoc cref="ModuleStack.Push"/>
     public static void Push(string name, string outermost, bool isNested)
         => RunUnit.Current.Modules.Push(name, outermost, isNested);
