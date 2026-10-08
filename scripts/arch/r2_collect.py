@@ -86,9 +86,18 @@ KINDS = ("finding", "lead", "defect")
 WAVES = ("extract", "unify", "move-and-rename", "data-ize", "delete", "modernize", "defect-for-fix-lane")
 SEVERITIES = ("Critical", "Warning", "Suggestion")
 HARMS = ("wrong-answer", "crashes", "silent", "rejects-legal-source", "under-rejects")
+sys.path.insert(0, str(REPO / "scripts" / "spec"))
+from work import HARM_FLAGS  # noqa: E402  (the register's ONE definition of a harm `work.py next` ranks)
+# `silent` qualifies a harm and is never one by itself: a defect filed with only `silent` sets no flag in HARM_FLAGS and
+# is invisible to `work.py next` (batch 1 of 8be230068 filed one, PB2647, and `work.py check` refused it).
+RANKED_HARMS = tuple(h for h in HARMS if h.replace("-", "_") in HARM_FLAGS)
 REQUIRED = ("id", "kind", "title", "rule", "scenario", "target", "files", "sites", "members", "census_ids",
             "design_ref", "wave_kind", "severity", "existing_note", "owner_question")
-DESIGN_REF = re.compile(r"^(§8(\.\d+)*( \(\d+\))?|PB\d+)$")
+# The reference is the LEADING token — a section of the approved §8 or the open note that plans the change; whatever
+# follows a non-word character is the finder's qualifier (`§8.3(2)`, `§8.4 (PB2291, PB2333)`, `§8.7 (R4 step 4); …`).
+# Batch 1 of 8be230068 lost ten upheld findings to the earlier exact-match form. A non-§8 section (`§5.1 (…)`) or prose
+# (`later`) is still INVALID: the finding names no target the approved design or the register holds.
+DESIGN_REF = re.compile(r"^(§8(\.\d+)*|PB\d+)(\W.*)?$")
 # the fields each lens judges, so a skeptic's correction lands only where its lens looked
 LENS_FIELDS = {"site": ("files", "sites", "members", "existing_note"),
                "rule": ("design_ref", "wave_kind", "severity"),
@@ -160,8 +169,8 @@ def problems(rec: dict, tracked: set[str]) -> list[str]:
     if not DESIGN_REF.match(rec["design_ref"] or ""):
         bad.append("design_ref %r is neither §8.x nor PBnnnn" % rec["design_ref"])
     if rec["kind"] == "defect" or rec["wave_kind"] == "defect-for-fix-lane":
-        if not set(rec.get("harm") or []) <= set(HARMS) or not rec.get("harm"):
-            bad.append("a defect names its harm from %s" % (HARMS,))
+        if not set(rec.get("harm") or []) <= set(HARMS) or not set(rec.get("harm") or []) & set(RANKED_HARMS):
+            bad.append("a defect names its harm from %s, at least one of %s" % (HARMS, RANKED_HARMS))
         bad += spec_ref_problems(rec.get("spec_refs"))
     return bad
 
@@ -304,13 +313,19 @@ def mechanisms(upheld: list[dict]) -> list[dict]:
 
 
 def corrected(rec: dict, stand: dict) -> tuple[dict, list]:
-    """Apply the corrections of the skeptics that UPHELD the finding, each only to the fields its lens judged."""
+    """Apply the corrections of the skeptics that UPHELD the finding, each only to the fields its lens judged.
+
+    A field a skeptic returns as null is one it did NOT correct (batch 1 of 8be230068: a site-lens skeptic corrected
+    `files` and returned `"sites": null`, which overwrote the finding's sites and crashed `mechanisms`), so null never
+    replaces a value."""
     rec, applied = dict(rec), []
     for lens, v in sorted(stand.items()):
         c = v.get("corrected")
         if not isinstance(c, dict):
             continue
         for k, val in c.items():
+            if val is None:
+                continue
             if k in LENS_FIELDS[lens] and rec.get(k) != val:
                 applied.append({"lens": lens, "field": k, "was": rec.get(k), "now": val})
                 rec[k] = val
@@ -526,7 +541,8 @@ def self_test():
         f2 = "s1--architecture--f2#1"
         write(out / "refute-s1--architecture--c1--site.jsonl", [
             vote(f % 1, "site", False), vote(f % 2, "site", True), vote(f % 3, "site", False),
-            vote(f % 8, "site", False, {"sites": ["src/A.cs:5-50 (A.G)"], "files": ["src/A.cs", "src/B.cs"], "severity": "Critical"}),
+            vote(f % 8, "site", False, {"sites": ["src/A.cs:5-50 (A.G)"], "files": ["src/A.cs", "src/B.cs"], "severity": "Critical",
+                                       "members": None}),
             vote(f2, "site", False)])
         write(out / "refute-s1--architecture--c1--rule.jsonl", [vote(f % 1, "rule", False), vote(f % 2, "rule", True),
                                                                 vote(f % 8, "rule", False), vote(f2, "rule", False)])
@@ -541,6 +557,15 @@ def self_test():
         inv = {r["id"]: r["problems"] for r in rep["invalid"]}
         arm("a file not in the pin's tree and a bad design_ref are INVALID",
             "file not in the pin's tree: src/Nope.cs" in inv.get(f % 4, []) and f % 7 in inv)
+        arm("a design_ref is its leading §8.x / PBnnnn token; a qualifier after it is commentary",
+            all(DESIGN_REF.match(s) for s in ("§8.3", "§8.3 (2)", "§8.3(2)", "§8.4 (PB2291, PB2333)", "§8.7 (b)",
+                                              "§8.7 (R4 step 4); escalating CA1305", "PB948", "PB948 (code half)"))
+            and not any(DESIGN_REF.match(s) for s in ("later", "§5.1 (consistent with §8)", "§80", "PB", "8.3")))
+        silent_only = rec(11, wave_kind="defect-for-fix-lane", kind="defect", harm=["silent"],
+                          spec_refs=[{"clause": "14.9.27.4", "text": "Otherwise, arithmetic-expression-1 is evaluated to produce an algebraic value"}])
+        arm("a defect whose only harm is `silent` is INVALID: work.py next ranks only HARM_FLAGS",
+            any("at least one of" in p for p in problems(silent_only, tracked))
+            and not any("at least one of" in p for p in problems(dict(silent_only, harm=["wrong-answer", "silent"]), tracked)))
         arm("a defect whose clause does not hold its text is INVALID (cite.py's check)",
             any("cite.py --check" in p for p in inv.get(f % 9, [])))
         arm("a defect whose clause holds its text passes the check", spec_ref_problems([{
