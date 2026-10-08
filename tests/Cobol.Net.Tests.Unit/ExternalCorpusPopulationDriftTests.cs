@@ -107,7 +107,7 @@ public sealed class ExternalCorpusPopulationDriftTests
 
         Assert.True(state != "absent",
             "the external GnuCOBOL corpus is not present, so this gate could not measure the population it "
-            + "exists to measure. Run scripts/fetch-gnucobol-tests.ps1 (GPL, never committed). A missing "
+            + "exists to measure. Run python scripts/external_corpus.py ensure (GPL, never committed). A missing "
             + $"population is not an empty one, and it is not a pass.\n{r.Stdout}{r.Stderr}");
 
         int external = j.GetProperty("external").GetInt32();

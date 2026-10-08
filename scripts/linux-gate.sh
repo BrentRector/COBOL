@@ -89,16 +89,20 @@ if ! git -c safe.directory='*' clone --quiet --shared --no-checkout "$common" "$
   echo "=== LINUX GATE: NOT RUN (could not clone HEAD ${head:0:9} into $snap; see TestResults/linux-gate/clone.log) ==="; exit 2
 fi
 # The GPL GnuCOBOL corpus is git-ignored, so a clone never has it; ExternalCorpusPopulationDriftTests is RED without
-# it by design (PB209). Copy the tree's, or fetch it exactly as CI's Linux jobs do.
+# it by design (PB209). Copy the tree's (no network), then apply THE one corpus rule the Windows gate and the battery
+# apply (scripts/external_corpus.py, kb/Work PB2611): fetch when still absent, and a failed fetch is a named red.
+corpus_red=""
 if [ -d tests/external/gnucobol ]; then
   mkdir -p "$snap/tests/external" && cp -r tests/external/gnucobol "$snap/tests/external/"
-elif ! ( cd "$snap" && pwsh -NoProfile -File scripts/fetch-gnucobol-tests.ps1 ) > "$out/corpus-fetch.log" 2>&1; then
-  echo "linux-gate: NOTE — the GnuCOBOL corpus fetch FAILED (TestResults/linux-gate/corpus-fetch.log); the two ExternalCorpusPopulationDriftTests reds in the unit leg are attributable to it"
+fi
+if ! "$py" "$snap/scripts/external_corpus.py" ensure --repo "$snap" > "$out/corpus-fetch.log" 2>&1; then
+  echo "linux-gate: EXTERNAL CORPUS FETCH FAILED, POPULATION UNMEASURED (TestResults/linux-gate/corpus-fetch.log); the two ExternalCorpusPopulationDriftTests reds in the unit leg are attributable to it"
+  corpus_red=" corpus-fetch"
 fi
 echo "linux-gate: Linux clone of HEAD ${head:0:9} at $snap"
 [ "$dirty" -gt 0 ] && echo "linux-gate: NOTE — $dirty uncommitted tracked change(s) are NOT tested (the clone is HEAD)"
 
-bad=""; ran=""
+bad="$corpus_red"; ran=""
 # Every script self-test, on Linux, through the ONE runner CI runs (kb/Work PB2563): CI's audits job runs
 # `python3 scripts/self_tests.py`, and greenfield-unit runs `python3 scripts/self_tests.py --built` after its build.
 # The runner DISCOVERS the self-tests, so this gate never names one (a hand list here went stale: it ran three guard-hook

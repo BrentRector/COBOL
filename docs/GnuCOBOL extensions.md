@@ -56,7 +56,7 @@ out and fixed.
 Regenerate the evidence with:
 
 ```
-pwsh scripts/fetch-gnucobol-tests.ps1        # GPL corpus -> git-ignored tree
+python3 scripts/external_corpus.py ensure    # GPL corpus -> git-ignored tree (fetched when absent)
 python3 scripts/gnucobol_differential.py     # -> report + the PER-CASE diff vs the committed baseline
 ```
 

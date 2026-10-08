@@ -9,7 +9,10 @@
 # at all). Two `--no-build` test assemblies cannot do that to each other.
 #
 # So the legs are grouped by what they WRITE, not by how long they take:
-#   PHASE 0  build the solution ONCE          — every --no-build leg below depends on it (a stale test-bin
+#   PHASE -½ the external GnuCOBOL corpus     — fetched when absent by the gate driver's own rule
+#                                               (scripts/external_corpus.py, kb/Work PB2611): phase 1's Unit and
+#                                               phase 3 both measure it
+#   PHASE 0  build the solution ONCE         — every --no-build leg below depends on it (a stale test-bin
 #                                               compiler DLL hides regressions: plan §0 "Mechanics")
 #   PHASE 1  Conformance ∥ Unit ∥ Characterization — three independent --no-build assemblies, fully concurrent.
 #            Wall-clock becomes the POLE (Conformance), not the SUM. Each is population-checked afterwards:
@@ -91,6 +94,20 @@ note "$(printf '%-16s %s' 'evidence:' "$(grep -E '^⛔ [0-9]+ UNMARKED' "$OUT/ci
 WLOSS=$?
 note "$(printf '%-16s %s' 'witnesses:' "$(grep -E '^=== WITNESS LOSS' "$OUT/citations.log" | tail -1)")"
 [ "$WLOSS" -eq 0 ] || { note "witnesses:       ⛔ inventory evidence lost — see $OUT/citations.log"; RC=1; }
+
+# ⛔ THE EXTERNAL CORPUS, BY THE GATE'S OWN RULE (kb/Work PB2611). The GPL GnuCOBOL corpus is git-ignored and per
+# worktree, and two legs below measure it: phase 1's Unit (ExternalCorpusPopulationDriftTests) and phase 3 (the
+# differential). Battery #89 ran in a fresh worktree with no fetch here, so both were red for a reason that was not the
+# tree's. scripts/external_corpus.py is THE rule the gate driver applies too: fetch when absent, and a failed fetch is
+# the one named red, `EXTERNAL CORPUS FETCH FAILED, POPULATION UNMEASURED`. The battery goes on running every leg, so
+# the reds the missing corpus causes are seen and attributed to it.
+if [ "${SKIP_TESTS:-0}" != "1" ] || [ "${SKIP_DIFF:-0}" != "1" ]; then
+    el "=== PHASE -½: the external GnuCOBOL corpus (fetched when absent) ==="
+    "$PY" scripts/external_corpus.py ensure > "$OUT/fetch.log" 2>&1
+    CORP=$?
+    note "$(printf '%-16s %s' 'corpus:' "$(grep -E '^=== EXTERNAL CORPUS: |^EXTERNAL CORPUS FETCH FAILED' "$OUT/fetch.log" | tail -1)")"
+    [ "$CORP" -eq 0 ] || { note "corpus:          ⛔ EXTERNAL CORPUS FETCH FAILED, POPULATION UNMEASURED — see $OUT/fetch.log"; RC=1; }
+fi
 
 el "=== PHASE 0: build the solution (once) ==="
 if ! dotnet build Cobol.Net.sln -v quiet > "$OUT/build.log" 2>&1; then

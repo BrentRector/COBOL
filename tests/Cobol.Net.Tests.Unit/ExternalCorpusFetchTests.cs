@@ -96,6 +96,72 @@ public sealed class ExternalCorpusFetchTests
         Assert.Equal(0, r.ExitCode);
     }
 
+    /// <summary>⛔ THE ONE CORPUS RULE FIRES EVERY ARM (kb/Work PB2611): <c>scripts/external_corpus.py --self-test</c>
+    /// drives a present corpus (no fetch), an absent one fetched, and the three ways a fetch fails — non-zero exit,
+    /// exit 0 with no corpus, and no <c>pwsh</c> at all — each the one named red, never a green and never a crash.</summary>
+    [Fact]
+    public void TheCorpusRule_SelfTest_FiresEveryArm()
+    {
+        string path = TestRepo.Scripts("external_corpus.py");
+        Assert.True(File.Exists(path), $"the corpus rule is missing: {path}");
+
+        ProcessObservation r = PythonInstrument.Run(path, "--self-test");
+
+        Assert.True(r.ExitCode == 0 && r.Stdout.Contains("external_corpus SELF-TEST: PASS", StringComparison.Ordinal),
+            $"`external_corpus.py --self-test` failed (exit {r.ExitCode}):\n{r.Stdout}{r.Stderr}");
+        foreach (string arm in new[]
+                 {
+                     "a present corpus runs NO fetch and is not red",
+                     "an absent corpus runs the fetch script once, in that tree, and is not red when it lands",
+                     "a fetch that exits non-zero is the named FETCH FAILED red",
+                     "a fetch that exits 0 but leaves no marker is the named FETCH FAILED red, never a green",
+                     "a fetch that cannot start (no pwsh) is the named FETCH FAILED red, never a crash",
+                 })
+        {
+            Assert.True(r.Stdout.Contains("PASS  " + arm, StringComparison.Ordinal),
+                $"`external_corpus.py --self-test` no longer drives '{arm}' — a check that has never been seen to "
+                + $"fail is not evidence.\n{r.Stdout}");
+        }
+    }
+
+    /// <summary>
+    /// ⛔ ONE FETCH RULE IN ONE PLACE (kb/Work PB2611): no script under <c>scripts/</c> names the fetch script outside a
+    /// comment except the rule itself (<c>scripts/external_corpus.py</c>) and the fetch script, so every gate, the
+    /// battery, the impact-map recorder, the Linux gate and the cloud session hook obtain the corpus the same way.
+    /// Battery #89 read NOT GREEN at a green tree because <c>battery.sh</c> had no fetch while the gate driver had one,
+    /// and three more scripts each carried their own spelling of the rule. CI's two fetch steps are the one recorded
+    /// exception: a fresh checkout never holds the corpus, and the step's exit status is the red.
+    /// </summary>
+    [Fact]
+    public void OnlyTheCorpusRule_InvokesTheFetchScript()
+    {
+        const string Fetch = "fetch-gnucobol-tests.ps1";
+        string[] owners = ["scripts/external_corpus.py", "scripts/" + Fetch];
+        var seen = new List<string>();
+        var strays = new List<string>();
+        foreach (string file in Directory.EnumerateFiles(TestRepo.Scripts(), "*", SearchOption.AllDirectories)
+                     .Where(f => f.EndsWith(".py", StringComparison.Ordinal) || f.EndsWith(".sh", StringComparison.Ordinal)
+                                 || f.EndsWith(".ps1", StringComparison.Ordinal) || f.EndsWith(".psm1", StringComparison.Ordinal)))
+        {
+            string rel = Path.GetRelativePath(TestRepo.Root, file).Replace('\\', '/');
+            foreach (string line in File.ReadLines(file))
+            {
+                if (!line.Contains(Fetch, StringComparison.Ordinal) || line.TrimStart().StartsWith('#')) continue;
+                if (owners.Contains(rel)) seen.Add(rel);
+                else strays.Add($"{rel}: {line.Trim()}");
+            }
+        }
+
+        Assert.True(seen.Contains("scripts/external_corpus.py"),
+            "the scan no longer sees the rule's own reference to the fetch script — it is reading for a shape that no "
+            + "longer exists, so it asserts nothing (feedback_a_dead_lookup_is_also_unverified).");
+        Assert.True(strays.Count == 0,
+            "a script names the corpus fetch directly instead of applying THE one rule (kb/Work PB2611): import "
+            + "`external_corpus.ensure` (python) or run `python scripts/external_corpus.py ensure` (shell), which "
+            + "fetches when absent and names a failed fetch `EXTERNAL CORPUS FETCH FAILED, POPULATION UNMEASURED`.\n"
+            + string.Join("\n", strays));
+    }
+
     /// <summary>⛔ THE REPAIR THAT MUST NOT BE MADE. <c>--force-local</c> fixes GNU tar's <c>host:path</c>
     /// misreading and is rejected outright by Windows' bsdtar (<c>Option --force-local is not supported</c>,
     /// exit 1), so it converts a failure on one machine into a failure on the other. The fix is a BARE archive

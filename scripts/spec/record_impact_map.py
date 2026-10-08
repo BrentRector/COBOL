@@ -61,6 +61,7 @@ from test_population import GATED_ASSEMBLIES as ASSEMBLIES, PopulationError, lis
 # (DESIGN-test-build-ci.md §3.14.6): held from before the worktree is made to the map's write, and every child is
 # spawned with `**slot.spawn_kwargs()`, or a Linux child runs outside the cap and a build server outlives the slot.
 from gate_slot import GateSlots, Slot  # noqa: E402
+import external_corpus  # noqa: E402
 
 SCHEMA = 2
 # The assemblies whose execution the map records — keep in step with tools/impact/ImpactRecording.targets.
@@ -222,6 +223,10 @@ def check(m: dict) -> list[str]:
 
 
 def main() -> int:
+    # The docstring and the progress lines carry '⛔' and '⚠': a cp1252 console made `--help` itself crash.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--commit", default="HEAD")
     ap.add_argument("--assemblies", default=",".join(ASSEMBLIES), help="comma-separated: " + ",".join(ASSEMBLIES))
@@ -277,13 +282,14 @@ def record(args: argparse.Namespace, sha: str, store: Path, wt: Path, raw: Path,
         if not targets.exists():
             return fail(f"{targets} does not exist at {sha[:12]} — pass --overlay for a tree older than the tooling")
 
-        # The git-ignored GPL corpus some Unit tests measure (build-local fetches it the same way): without it those
-        # tests are red for a reason that is not the tree's, and the recording would say so for the wrong cause.
-        if not (wt / "tests/external/gnucobol/tests/testsuite.src").exists():
-            if run(["pwsh", "-NoProfile", "-File", "scripts/fetch-gnucobol-tests.ps1"], logs / "fetch-corpus.log",
-                   wt, slot, priority=args.priority) != 0:
-                print("  ⚠ the GnuCOBOL corpus fetch failed — ExternalCorpusPopulationDriftTests will be red in the "
-                      "Unit leg for that reason (their hits are still recorded)")
+        # The git-ignored GPL corpus some Unit tests measure, by THE one rule the gate and the battery apply
+        # (scripts/external_corpus.py, kb/Work PB2611): without it those tests are red for a reason that is not the
+        # tree's. A failed fetch is reported and the recording goes on: their hits are still recorded.
+        if external_corpus.ensure(wt, lambda s: print(f"  {s}"),
+                                  lambda cmd, cwd: run(cmd, logs / "fetch-corpus.log", cwd, slot,
+                                                       priority=args.priority)):
+            print(f"  ⚠ ExternalCorpusPopulationDriftTests will be red in the Unit leg for that reason (see "
+                  f"{logs / 'fetch-corpus.log'})")
         rc = run(["dotnet", "build", "Cobol.Net.sln", "-c", "Debug", "-v", "quiet",
                   f"-p:CustomAfterMicrosoftCommonTargets={targets}"], logs / "build.log", wt, slot,
                  priority=args.priority)

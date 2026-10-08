@@ -109,7 +109,7 @@ def verify_population(src: str, baseline: str) -> tuple[bool, str, dict]:
         cases = gx.differential_cases(src)
     except FileNotFoundError:
         return False, (f'EXTERNAL POPULATION ABSENT - no corpus at {src}. This sweep CANNOT answer a '
-                       f'reachability question about the external corpus; run scripts/fetch-gnucobol-tests.ps1 '
+                       f'reachability question about the external corpus; run python scripts/external_corpus.py ensure '
                        f'(GPL, never committed). A missing population is not an empty one.'), \
                {'state': 'absent', 'external': 0, 'baseline': baseline_case_count(baseline) or 0}
     n, b = len(cases), baseline_case_count(baseline)

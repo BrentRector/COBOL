@@ -296,7 +296,7 @@ def main() -> int:
 
     if not os.path.isdir(a.src):
         print(f'!! corpus not present: {a.src}\n'
-              f'   run scripts/fetch-gnucobol-tests.ps1 first (the corpus is GPL and is never committed).',
+              f'   run python scripts/external_corpus.py ensure first (the corpus is GPL and is never committed).',
               file=sys.stderr)
         return 2
 

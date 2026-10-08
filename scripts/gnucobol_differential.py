@@ -225,7 +225,8 @@ BASELINE_HEADER = """\
 # ⛔ REGENERATING IS A DELIBERATE ACT, NEVER A FIX FOR A RED. `--write-baseline` rewrites it; the commit that
 # does so must ATTRIBUTE every changed row. A flip is either a fix (we now accept ISO source we rejected), a
 # regression, or a corpus refresh — and only the first two are visible here. Rewriting to make a red go away
-# destroys the only record that the behaviour moved.
+# destroys the only record that the behaviour moved. `--write-baseline` therefore REQUIRES `--record "<which battery,
+# which adjudication>"`, and writes it as the `# Last recorded:` line below.
 #
 # Tab-separated, sorted by id; a leading # is a comment. Columns: id<TAB>tier<TAB>verdict
 """
@@ -248,10 +249,13 @@ def read_baseline(path: str) -> dict[str, tuple[str, str]] | None:
     return out
 
 
-def write_baseline(path: str, results: list[dict]) -> None:
+def write_baseline(path: str, results: list[dict], record: str) -> None:
+    """Rewrite the manifest. `record` is the attribution — which battery, which adjudication licensed the moved rows —
+    and is written into the file as its `# Last recorded:` line, so the manifest itself names why it last moved."""
     os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
     with open(path, 'w', encoding='utf-8', newline='\n') as fh:
         fh.write(BASELINE_HEADER)
+        fh.write(f"# Last recorded: {' '.join(record.split())}\n")
         for r in sorted(results, key=lambda x: x['id']):
             fh.write(f"{r['id']}\t{r['tier']}\t{r['verdict']}\n")
 
@@ -294,7 +298,12 @@ def main() -> int:
     ap.add_argument('--write-baseline', action='store_true',
                     help='REWRITE --baseline from this run instead of diffing against it. Deliberate only: '
                          'every accepted flip must be attributed in the commit message that rewrites it.')
+    ap.add_argument('--record', default='',
+                    help='with --write-baseline (required there): the attribution written into the manifest as its '
+                         '"# Last recorded:" line - which battery, and the adjudication that licensed the moved rows')
     a = ap.parse_args()
+    if a.write_baseline and not a.record.strip():
+        ap.error('--write-baseline needs --record "<which battery, which adjudication licensed the moved rows>"')
 
     if not os.path.exists(a.exe):
         print(f'!! compiler not found: {a.exe}', file=sys.stderr); return 2
@@ -314,7 +323,7 @@ def main() -> int:
     print('evidence control: accept and reject are distinguishable on this build.')
 
     if not os.path.isdir(a.src):
-        print(f'!! corpus absent: {a.src}\n   run scripts/fetch-gnucobol-tests.ps1 (GPL, never committed).',
+        print(f'!! corpus absent: {a.src}\n   run python scripts/external_corpus.py ensure (GPL, never committed).',
               file=sys.stderr)
         return 2
 
@@ -379,7 +388,11 @@ def main() -> int:
 
     # ── PER-CASE FLIP DETECTION (the claim the four totals above cannot make) ────────────────────────────
     if a.write_baseline:
-        write_baseline(a.baseline, results)
+        # The rows this rewrite moves are printed first, so the attribution can be checked against them.
+        old = read_baseline(a.baseline)
+        if old is not None:
+            diff_baseline(old, results, a.baseline)
+        write_baseline(a.baseline, results, a.record)
         print(f'baseline REWRITTEN -> {a.baseline}  ({len(results)} cases). '
               'Attribute every changed row in the commit that does this.')
         return 0

@@ -32,7 +32,8 @@ ONE GATE, in this order (§3.14.3):
      this one's; the newest earlier run holding a verdict gives the plan its timings and reds; five are kept;
   3. the audits (the one list below, run CONCURRENTLY; one of them is every script self-test, found by
      scripts/self_tests.py — kb/Work PB2563) — in implementer mode FAIL-FAST: a red audit ends the gate RED right there, with
-     no leg run (kb/Work PB2523) — then the GnuCOBOL corpus fetch. Both run BEFORE the slot (kb/Work PB2524): they
+     no leg run (kb/Work PB2523) — then the GnuCOBOL corpus, by the ONE rule scripts/external_corpus.py (kb/Work
+     PB2611). Both run BEFORE the slot (kb/Work PB2524): they
      read only the tree, and inside the slot they were 35-45 % of its hold while every other implementer gate queued;
   4. the gate slot (implementer only), always after the lock, so no two gates can wait on each other in a cycle; then
      the solution build and the SHA-256 of every binary the legs will run;
@@ -77,6 +78,7 @@ from typing import Callable
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 sys.path.insert(0, str(REPO / "scripts" / "spec"))
+import external_corpus  # noqa: E402
 import gate_plan  # noqa: E402
 import impacted_tests  # noqa: E402
 from gate_slot import (DEFAULT_SCOPE, ExclusiveLock, GateSettings, GateSlots, Setting, Slot,  # noqa: E402
@@ -120,9 +122,6 @@ AUDITS = (
 )
 #: The post-build half of the self-tests: the ones declaring `SELF-TEST-NEEDS: build` (scripts/self_tests.py).
 BUILT_SELF_TESTS = ["scripts/self_tests.py", "--built"]
-#: The git-ignored GPL corpus ExternalCorpusPopulationDriftTests measure (kb/Work PB209, PB897): absent in a fresh
-#: worktree, so the gate fetches it; a failed fetch makes the gate RED, attributed to the fetch.
-CORPUS_MARKER = Path("tests/external/gnucobol/tests/testsuite.src")
 
 Spawn = Callable[..., dict]
 
@@ -190,18 +189,10 @@ class Host:
         return ([] if rc == 0 else ["POST-BUILD SELF-TESTS RED"]), lines
 
     def fetch_corpus(self, spawn: Spawn, say: Callable[[str], None]) -> list[str]:
-        """The GnuCOBOL corpus fetch when the worktree lacks it. Returns the RED reason, if any."""
-        reds = []
-        if not (self.repo / CORPUS_MARKER).exists():
-            say("=== EXTERNAL CORPUS: absent in this worktree — fetching (GPL, git-ignored, never committed) ===")
-            rc = subprocess.run(["pwsh", "-NoProfile", "-File", "scripts/fetch-gnucobol-tests.ps1"], cwd=self.repo,
-                                **spawn()).returncode
-            if rc != 0 or not (self.repo / CORPUS_MARKER).exists():
-                say(f"=== EXTERNAL CORPUS: FETCH FAILED (exit {rc}; the FETCH FAILED line above names the cause) — "
-                    "the ExternalCorpusPopulationDriftTests reds in the Unit leg are ATTRIBUTABLE TO IT, and this gate "
-                    "is RED because it could not measure that population ===")
-                reds.append("EXTERNAL CORPUS FETCH FAILED, POPULATION UNMEASURED")
-        return reds
+        """The GnuCOBOL corpus when the worktree lacks it — THE one rule, scripts/external_corpus.py (kb/Work
+        PB2611), which battery.sh and every other caller apply too. Returns the RED reason, if any."""
+        return external_corpus.ensure(self.repo, say,
+                                      lambda cmd, cwd: subprocess.run(cmd, cwd=cwd, **spawn()).returncode)
 
     def build(self, spawn: Spawn) -> bool:
         return subprocess.run(["dotnet", "build", "Cobol.Net.sln", "-v", "quiet"], cwd=self.repo,

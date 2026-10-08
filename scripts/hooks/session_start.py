@@ -66,22 +66,34 @@ def local_skills_hint() -> str:
 def fetch_cloud_corpus() -> str:
     """The git-ignored GnuCOBOL corpus (tests/external/) is per CLONE, so a cloud session starts without it and the
     population drift gate (ExternalCorpusPopulationDriftTests) is red by design (PB209/PB277) — cloud smoke #2,
-    2026-09-24. setup-env.sh pre-caches the pinned tarball; copying it in first makes the fetch skip the download."""
+    2026-09-24. setup-env.sh pre-caches the pinned tarball; copying it in first makes the fetch skip the download.
+    The rule (fetch when absent, a failed fetch named) is scripts/external_corpus.py's, the one every gate applies
+    (kb/Work PB2611)."""
     import shutil
+    sys.path.insert(0, str(REPO / "scripts"))
+    import external_corpus
     cached = pathlib.Path("/opt/cobolsharp-cache/gnucobol-3.2.tar.xz")
     target = REPO / "tests" / "external" / cached.name
+    out: list[str] = []
+
+    def captured(cmd: list[str], cwd: pathlib.Path) -> int:
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180,
+                           cwd=str(cwd))
+        out.append((r.stdout or "") + (r.stderr or ""))
+        return r.returncode
+
     try:
         if cached.exists() and not target.exists():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(cached, target)
-        r = subprocess.run(
-            ["pwsh", "-NoProfile", "-File", str(REPO / "scripts" / "fetch-gnucobol-tests.ps1")],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180, cwd=str(REPO),
-        )
-        out = (r.stdout or "") + (r.stderr or "")
-        status = "ok" if r.returncode == 0 else (
-            f"FAILED (exit {r.returncode}): "
-            + next((l for l in out.splitlines() if l.startswith("FETCH FAILED")), out.strip()[-400:]))
+        if external_corpus.present(REPO):
+            status = "present"
+        elif not external_corpus.ensure(REPO, lambda _: None, captured):
+            status = "ok"
+        else:
+            text = "".join(out)
+            status = (f"{external_corpus.FETCH_FAILED}: "
+                      + next((l for l in text.splitlines() if l.startswith("FETCH FAILED")), text.strip()[-400:]))
     except Exception as exc:  # noqa: BLE001 - a hook must never break the session
         status = f"FAILED: {exc}"
     return f"cloud session: GnuCOBOL corpus fetch → {status}\n"
