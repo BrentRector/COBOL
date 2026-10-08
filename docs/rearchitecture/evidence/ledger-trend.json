@@ -1513,6 +1513,33 @@
       "dns": 457,
       "label": "PB1470+PB1544: two-literal r",
       "battery": null
+    },
+    {
+      "sha": "8f332a13",
+      "date": "2026-10-08",
+      "gap": 142,
+      "closed": 4205,
+      "dns": 457,
+      "label": "PB2650: one FROM-phrase rule",
+      "battery": null
+    },
+    {
+      "sha": "3077c142",
+      "date": "2026-10-08",
+      "gap": 141,
+      "closed": 4206,
+      "dns": 457,
+      "label": "PB2659+PB2660: run-unit stac",
+      "battery": null
+    },
+    {
+      "sha": "14dab530",
+      "date": "2026-10-08",
+      "gap": 136,
+      "closed": 4211,
+      "dns": 457,
+      "label": "PB2671: unbound and omitted",
+      "battery": null
     }
   ],
   "program": [
@@ -1546,6 +1573,18 @@
       "total": 249,
       "landed": 18,
       "open": 231,
+      "waiting": 153,
+      "retire_landed": 10,
+      "retire_total": 10,
+      "external_landed": 2,
+      "external_total": 8
+    },
+    {
+      "sha": "7fb5cab7",
+      "date": "2026-10-08",
+      "total": 250,
+      "landed": 24,
+      "open": 226,
       "waiting": 153,
       "retire_landed": 10,
       "retire_total": 10,
