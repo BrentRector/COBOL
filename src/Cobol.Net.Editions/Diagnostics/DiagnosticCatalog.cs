@@ -6708,19 +6708,22 @@ public static class DiagnosticCatalog
     /// cannot take (kb/Work PB1246): it opens a record at a level other than 1 (§13.11.1, §13.18.33.4 GR1) — a
     /// section or FD whose first entry is level 2-49, or a level 2-49 entry written after a level-77 item, which is
     /// not itself subdivided (§8.5.1.3.2) — or it joins a group whose other immediate members carry a different
-    /// level-number (§8.5.1.3.2: "numerically equal level-numbers"). The set of level-numbers a SECTION admits is
+    /// level-number (§8.5.1.3.2: "numerically equal level-numbers"), which a report group description entry obeys too
+    /// (kb/Work PB1954; §13.18.33.1). The set of level-numbers a SECTION admits is
     /// COBOLNET1746, the FORMAT axis is COBOLNET1747; this is the POSITION axis, which only the binder's nesting
     /// walk can decide. One code for the family; the message names the rule.</summary>
     public static readonly DiagnosticDescriptor LevelNumberHierarchy = new(
         "COBOLNET2771", "level-number-hierarchy", EditionSeverity.Error,
-        "A level-number is out of position in the record hierarchy. A record description entry \"consists of a set of "
+        "A level-number is out of position in the record or report group hierarchy. A record description entry \"consists of a set of "
         + "data description entries, the first of which shall have level-number 1\" (§13.11.1; §13.18.33.4 GR1: \"The "
         + "level-number 1 identifies the first entry in each record description, type declaration, or report group\"), "
         + "and a level-77 item is neither a subdivision of another item nor itself subdivided (§8.5.1.3.2), so a "
         + "level 2 through 49 entry has to follow an entry it is subordinate to. \"All items that are immediately "
         + "subordinate to a given group item shall be described using numerically equal level-numbers greater than "
-        + "the level-number used to describe that group item\" (§8.5.1.3.2).",
-        "ISO §13.11.1 / §13.18.33.4 GR1 / §8.5.1.3.2");
+        + "the level-number used to describe that group item\" (§8.5.1.3.2), in a record description and in a report "
+        + "group description alike (§13.18.33.1: level-numbers 1 through 49 indicate position in the hierarchy of "
+        + "a data description entry or a report group description entry).",
+        "ISO §13.11.1 / §13.18.33.4 GR1 / §8.5.1.3.2 / §13.18.33.1");
 
     /// <summary>COBOLNET2770 — a SOURCE clause identifier-1 violates one of its operand syntax rules (kb/Work PB1293):
     /// the implicit MOVE of §13.18.53.4 GR1 from identifier-1 to the printable item is not a valid MOVE (§13.18.53.3

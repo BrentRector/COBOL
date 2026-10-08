@@ -1419,14 +1419,78 @@ public sealed partial class DataBinder
     private void BindReportGroups(Core.ReportDescriptionEntryContext rd, ReportModel model)
     {
         var entries = rd.reportGroupEntry();
+        var runs = ReportEntryRuns(rd);
         ScreenReportDescriptionHasGroup(entries, model);
-        ScreenReportLineNesting(entries, model);
-        ScreenReportLineClauses(entries, model);
-        ScreenReportColumnClauses(entries, model);
-        ScreenReportEntryClausePresence(entries, model);
-        ScreenReportVaryingClauses(entries, model);
-        BindReportSectionEntries(rd, entries, model);
+        // The flat screens read the level hierarchy of the WRITTEN entries, so each runs over one run between constant
+        // entries: a constant ends the report group before it (kb/Work PB1954, see ReportEntryRuns), and an entry
+        // after it is subordinate to nothing before it.
+        foreach (var (start, end, _) in runs)
+        {
+            var run = entries[start..end];
+            ScreenReportLevelNumbers(run, model);
+            ScreenReportLineNesting(run, model);
+            ScreenReportLineClauses(run, model);
+            ScreenReportColumnClauses(run, model);
+            ScreenReportEntryClausePresence(run, model);
+            ScreenReportVaryingClauses(run, model);
+        }
+        BindReportSectionEntries(entries, runs, model);
         BindNextGroupClauses(entries, model);
+    }
+
+    /// <summary>⛔ THE REPORT SECTION'S ENTRIES FOR ONE RD, CUT INTO RUNS AT ITS CONSTANT ENTRIES — the one place the
+    /// cut is made, for the flat screens and for <see cref="BindReportSectionEntries"/> alike. ISO §13.8.2 prints the
+    /// entries after a report description entry as <c>{ constant-entry | report-group-description-entry } …</c>, and a
+    /// constant is a level-01 entry (§13.10.2), so it ends the report group before it. Each run is the index range
+    /// [Start, End) of <c>rd.reportGroupEntry()</c> and the constant entry that ends it (null for the last run).
+    /// Before the cut the screens read across a constant: `03 LINE PLUS 1. 01 K CONSTANT AS 3. 05 LINE PLUS 1.` drew a
+    /// spurious §13.18.35.3 SR4 diagnostic, as if the second LINE entry were subordinate to the first.</summary>
+    private static List<(int Start, int End, Core.ConstantEntryContext? Constant)> ReportEntryRuns(
+        Core.ReportDescriptionEntryContext rd)
+    {
+        var runs = new List<(int Start, int End, Core.ConstantEntryContext? Constant)>();
+        int start = 0, seen = 0;
+        foreach (var child in rd.children)
+        {
+            if (child is Core.ReportGroupEntryContext) { seen++; continue; }
+            if (child is not Core.ConstantEntryContext constant) continue;
+            runs.Add((start, seen, constant));
+            start = seen;
+        }
+        runs.Add((start, seen, null));
+        return runs;
+    }
+
+    /// <summary>ISO §8.5.1.3.2's equal-sibling rule for report group description entries (kb/Work PB1954): "All
+    /// items that are immediately subordinate to a given group item shall be described using numerically equal
+    /// level-numbers greater than the level-number used to describe that group item." §13.18.33.1 gives level-numbers
+    /// 1 through 49 one meaning in a data description entry and a report group description entry, so the rule the
+    /// data arm asks in <see cref="BindEntries"/> is asked here too, through the same
+    /// <see cref="ScreenImmediateMemberLevel"/>. Screened ONCE per WRITTEN entry over one run of the flat entry array
+    /// (the <see cref="ScreenReportLineNesting"/> shape): a §13.18.38 Format 3 subtree replay in
+    /// <c>BindReportEntry</c> would report it once per repetition (kb/Work PB884, PB1306). A first entry that is not
+    /// level 1 is <see cref="DiagnosticCatalog.ReportGroupBefore01"/>'s, reported by the walk. An entry whose
+    /// level-number is outside 1 through 49 (an 88, 66 or 77 written in an RD) is no report group description entry
+    /// (§13.18.33.3 SR4, COBOLNET1746 from <c>LevelNumberPass</c>), so it takes no place in the hierarchy: counting it
+    /// made `01 DT TYPE DETAIL. 88 D-ON VALUE "X". 05 LINE 1.` report the 05 as unequal to the 88.</summary>
+    private void ScreenReportLevelNumbers(Core.ReportGroupEntryContext[] run, ReportModel model)
+    {
+        var open = new List<(int Level, string Name, int? MemberLevel)>();
+        foreach (var ge in run)
+        {
+            if (!int.TryParse(ge.levelNumber().GetText(), out int level) || level is < 1 or > 49) continue;
+            while (open.Count > 0 && open[^1].Level >= level) open.RemoveAt(open.Count - 1);
+            string name = ge.dataName().NameOrNull() ?? "FILLER";
+            if (open.Count > 0)
+            {
+                var group = open[^1];
+                if (group.MemberLevel is null) open[^1] = group with { MemberLevel = level };
+                using var _ = Edition.At(ge);
+                ScreenImmediateMemberLevel(group.MemberLevel, level, $"RD '{model.Name}' entry '{name}'",
+                    $"the report group entry '{group.Name}'");
+            }
+            open.Add((level, name, null));
+        }
     }
 
     /// <summary>⛔ THE VARYING CLAUSE'S SYNTAX RULES, asked ONCE per WRITTEN entry over the flat entry array (kb/Work
@@ -1508,26 +1572,23 @@ public sealed partial class DataBinder
     /// report-group-description-entry } …</c>; kb/Work PB1226). A constant entry binds into the compile-time
     /// constant table at the point it stands, unless a reference bound it earlier on demand (a reference may precede
     /// the entry it names, kb/Work PB1231, <see cref="FindConstant"/>); the report group entries between two constants bind as
-    /// one run through <see cref="BindReportEntries"/>, which takes an index range for exactly this. A constant is a
-    /// level-01 entry (§13.10.2), so it ends the group before it: the entries after it have no 01 entry to belong
-    /// to, and the builder's group is dropped so <see cref="DiagnosticCatalog.ReportGroupBefore01"/> says so
-    /// instead of attaching them to the group the constant interrupted.</summary>
-    private void BindReportSectionEntries(
-        Core.ReportDescriptionEntryContext rd, Core.ReportGroupEntryContext[] entries, ReportModel model)
+    /// one run (<see cref="ReportEntryRuns"/>) through <see cref="BindReportEntries"/>, which takes an index range for
+    /// exactly this. A constant is a level-01 entry (§13.10.2), so it ends the group before it: the entries after it
+    /// have no 01 entry to belong to, and the builder's group is dropped so
+    /// <see cref="DiagnosticCatalog.ReportGroupBefore01"/> says so instead of attaching them to the group the constant
+    /// interrupted.</summary>
+    private void BindReportSectionEntries(Core.ReportGroupEntryContext[] entries,
+        List<(int Start, int End, Core.ConstantEntryContext? Constant)> runs, ReportModel model)
     {
         var st = new ReportGroupBuild();
-        int runStart = 0, seen = 0;
-        foreach (var child in rd.children)
+        foreach (var (start, end, constant) in runs)
         {
-            if (child is Core.ReportGroupEntryContext) { seen++; continue; }
-            if (child is not Core.ConstantEntryContext constant) continue;
-            BindReportEntries(entries, runStart, seen, model, st);
-            runStart = seen;
+            BindReportEntries(entries, start, end, model, st);
+            if (constant is null) continue;
             using var _ = Edition.At(constant);
             BindConstantEntry(constant, constant.levelNumber(), constant.dataName(), constant.constantEntryBody());
             st.Group = null;
         }
-        BindReportEntries(entries, runStart, entries.Length, model, st);
         SealSumCounters(model);
     }
 

@@ -630,7 +630,15 @@ COBOLNET2197 beside it.
 **The REPORT SECTION entry grammar and the PAGE clause are the printed ones** (kb/Work PB1226, PB1059):
 `reportDescriptionEntry` is `RD … { constantEntry | reportGroupEntry } …` (§13.8.2; the constant entry rides the
 data description entry's own `constantEntryBody` and `DataBinder.BindConstantEntry`, reached in source order by
-`BindReportSectionEntries` and bound earlier on demand when a reference needs it (kb/Work PB1231). A constant's
+`BindReportSectionEntries` and bound earlier on demand when a reference needs it (kb/Work PB1231). A constant is a
+level-01 entry and so ends the report group before it: `ReportEntryRuns` is the one place the RD's entries are cut into
+runs at their constant entries, and both `BindReportSectionEntries` and every flat screen (`ScreenReportLevelNumbers`,
+`ScreenReportLineNesting`, `ScreenReportLineClauses`, `ScreenReportColumnClauses`, `ScreenReportEntryClausePresence`,
+`ScreenReportVaryingClauses`) run per run, so no screen reads a hierarchy across a constant (kb/Work PB1954).
+**§8.5.1.3.2's equal-sibling rule** ("numerically equal level-numbers" for every item immediately subordinate to one
+group; §13.18.33.1 gives report group entries the data hierarchy) is `ScreenReportLevelNumbers`, once per written
+entry, asking the data arm's own `ScreenImmediateMemberLevel` — COBOLNET2771, the code `BindEntries` reports for a
+record (kb/Work PB1246, PB1954). A constant's
 `LENGTH OF` / `BYTE-LENGTH OF` may name a report entry: `DeclareReportEntries` records every named entry before
 binding, `ReportLengthOperand` refuses a report group (§13.10.3 SR11 — elementary report items only, kb/Work PB1226)
 and measures an elementary one as its printable item; and `ScreenReportDescriptionHasGroup` reports an RD with no group entry, COBOLNET2708,

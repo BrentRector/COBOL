@@ -102,10 +102,11 @@ public sealed class OccursOperandCaptureDriftTests
         // Population: the VALUE-operand construction this guard polices is still in this file.
         Assert.Contains("new FieldValueSource(r)", src, StringComparison.Ordinal);
         Assert.DoesNotMatch(new Regex(@"new\s+FieldValueSource\(\s*""", RegexOptions.None), src);
-        int screen = src.IndexOf("ScreenReportEntryClausePresence(entries, model);", StringComparison.Ordinal);
-        // The walk is one call per RD (BindReportSectionEntries binds the report group runs between the RD's constant
-        // entries, §13.8.2): the screens above it run once, before the first run and every replay inside it.
-        int walk = src.IndexOf("BindReportSectionEntries(rd, entries, model);", StringComparison.Ordinal);
+        // The screens run over each run of WRITTEN entries between the RD's constant entries (ReportEntryRuns, §13.8.2;
+        // kb/Work PB1954), so each written entry is screened once; the walk is one call per RD (BindReportSectionEntries
+        // binds the same runs), after every screen and so before the first run and every replay inside it.
+        int screen = src.IndexOf("ScreenReportEntryClausePresence(run, model);", StringComparison.Ordinal);
+        int walk = src.IndexOf("BindReportSectionEntries(entries, runs, model);", StringComparison.Ordinal);
         Assert.True(screen > 0 && walk > screen, "the §13.15.3 clause-presence screen must run once per RD, "
             + "before the entry walk and its replays");
     }

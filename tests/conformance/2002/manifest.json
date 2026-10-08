@@ -759,7 +759,9 @@
   "pb2096_global_formal_forward_area",
   "pb1940_strong_objref_group_content_returning",
   "pb1508_options_period_bracket",
-  "pb1430_operator_separator_spaces"
+  "pb1430_operator_separator_spaces",
+  "pb2516_constant_between_records",
+  "pb2071_unused_template_redefines_conforms"
   ],
   "pending": []
 }

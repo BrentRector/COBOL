@@ -2495,7 +2495,22 @@
   "pb1508-configuration-paragraph-repeated",
   "pb1430-inline-invocation-empty-arguments",
   "pb1430-invocation-operator-spacing",
-  "pb1430-concatenation-operator-spacing"
+  "pb1430-concatenation-operator-spacing",
+  "pb2516-constant-ends-record",
+  "pb2516-renames-after-constant",
+  "pb1954-report-unequal-sibling-levels",
+  "pb1954-report-unequal-line-levels",
+  "pb2071-template-redefines-strong-typed-group",
+  "pb2071-template-redefines-pointer",
+  "pb2071-template-pointer-redefines",
+  "pb2071-template-redefines-table",
+  "pb2071-template-redefines-larger",
+  "pb2071-template-redefines-unresolved",
+  "pb2071-template-redefines-chain",
+  "pb2071-template-redefines-dynamic-length",
+  "pb2071-template-redefines-typed-table",
+  "pb2071-template-redefines-outside-group",
+  "pb2071-template-redefines-in-nested-strong"
  ],
  "pending": []
 }

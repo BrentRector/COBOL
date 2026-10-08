@@ -90,15 +90,17 @@ public sealed partial class DataBinder
 
     /// <summary>§13.18.45.3 SR2 — "All RENAMES entries referring to data items within a given record shall immediately
     /// follow the last data description entry of the associated record description entry." Asked by <c>BindEntries</c>,
-    /// the only place the entry ORDER exists. A level-66 entry needs an associated record in this section (a level-77
-    /// item is no record description entry), and once a record's RENAMES entries have begun no level 02-49 entry may
-    /// follow before the next record.</summary>
+    /// the only place the entry ORDER exists. A level-66 entry needs an open associated record in this section (a
+    /// level-77 item is no record description entry, and a constant entry ends the record before it — kb/Work PB2516),
+    /// and once a record's RENAMES entries have begun no level 02-49 entry may follow before the next record.</summary>
     private void ScreenRenamesPlacement(DataItem? associatedRecord, string aliasName)
     {
         if (associatedRecord is { Level: not 77 }) return;
         Edition.Error(DiagnosticCatalog.RenamesEntryRule,
             $"'{aliasName}': the RENAMES entry follows "
-            + (associatedRecord is null ? "no record description entry in this section" : "a level-77 item, which is not a record description entry")
+            + (associatedRecord is null
+                ? "no record description entry it can belong to (none precedes it in this section, or a constant entry ended it)"
+                : "a level-77 item, which is not a record description entry")
             + " (ISO §13.18.45.3 SR2: \"All RENAMES entries referring to data items within a given record shall "
             + "immediately follow the last data description entry of the associated record description entry.\")");
     }

@@ -865,10 +865,30 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // follows no entry describing a data item; the screen reports that instead of the old silent drop.
         DataItem? lastDescribed = null;
         bool renamesBegun = false;   // the current record's level-66 entries have begun: §13.18.45.3 SR2 (kb/Work PB1283)
+        // The record description this walk is INSIDE — the record a level-66 entry belongs to (§13.18.45.3 SR2) —
+        // or null once nothing is open: before the first record, and after a constant entry closed one.
+        DataItem? openRecord = null;
+        // ⛔ ONE PLACE A RECORD DESCRIPTION ENDS SHORT OF THE NEXT LEVEL-1 DATA ENTRY (kb/Work PB2516). A constant entry
+        // is a separate alternative of the section's entry list (ISO §13.5.2: constant-entry beside
+        // record-description-entry), not a data description entry, so it ENDS the record before it; the entry after it
+        // begins a new record description, whose first entry "shall have level-number 1" (§13.11.1). Leaving the level
+        // stack open made `01 D. 05 A. 01 K CONSTANT AS 3. 05 B.` bind B into D's storage. The out-of-order binder
+        // draws the same boundary (DataBinder.EntryOrder.cs#EndsRecord), and the prebound arm below closes here too.
+        void CloseRecord(DataItem? stillOpen)
+        {
+            stack.Clear();
+            lastDescribed = null;
+            renamesBegun = false;
+            rootIsTemplate = false;
+            templateRoot = null;
+            openRecord = stillOpen;
+        }
         foreach (var entry in entries)
         {
             // A record a constant's value already needed was bound ahead of this walk (kb/Work PB1231): its roots
-            // take their place HERE, in source order, and its entries are not bound twice.
+            // take their place HERE, in source order, and its entries are not bound twice. Its whole extent (its
+            // level-66 entries included) was bound with it, so the walk resumes with nothing on the level stack and
+            // the prebound root as the open record.
             if (TakePreboundRecord(entry, out var parked))
             {
                 foreach (var root in parked ?? [])
@@ -877,9 +897,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     newRoots.Add(root);
                     _lastRoot = root;
                 }
-                stack.Clear();
-                lastDescribed = null;
-                renamesBegun = false;
+                CloseRecord(newRoots.Count > 0 ? newRoots[^1] : null);
                 continue;
             }
             _entriesBound.Add(entry);
@@ -892,8 +910,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             {
                 BindConstantEntry(entry, entry.levelNumber(), entry.dataName(), constBody);
                 // A constant entry describes NO data item, so a level-88 entry written after one has no
-                // conditional variable to associate with (ISO §13.16.3 SR24 — "the entry describing the item").
-                lastDescribed = null;
+                // conditional variable to associate with (ISO §13.16.3 SR24 — "the entry describing the item"); and
+                // it ends the record description before it, so nothing stays open for a 02-49 or 66 entry to join.
+                CloseRecord(null);
                 continue;
             }
             // The level-number arrives PRE-SCREENED: LevelNumberPass ran over the whole parse tree before any
@@ -949,7 +968,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // ISO §13.16.3 SR24 b) then excludes it. Recording it here is what replaces the silent steal.
                 // The record it belongs to is the one this walk last opened (never `_lastRoot`, which outlives the walk and
                 // would hand a section's first 66 the previous section's record) — §13.18.45.3 SR2 (kb/Work PB1283).
-                var renamesOwner = rootIsTemplate ? templateRoot : newRoots.Count > 0 ? newRoots[^1] : null;
+                var renamesOwner = rootIsTemplate ? templateRoot : openRecord;
                 ScreenRenamesPlacement(renamesOwner, entry.dataName()?.GetText() ?? "FILLER");
                 renamesBegun = true;
                 lastDescribed = BindRenames(entry, renamesOwner);
@@ -1017,6 +1036,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     item.CsName = CsNames.Allocate(item.CsName, rootNames);
                     if (!outOfOrder) _roots.Add(item);   // an out-of-order record joins the forest at its source position
                     newRoots.Add(item);
+                    openRecord = item;
                     _lastRoot = item;
                 }
             }
@@ -1026,17 +1046,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     Edition.Error(DiagnosticCatalog.TypeDeclarationShape, $"TYPEDEF on '{item.CobolName ?? "FILLER"}': the TYPEDEF clause "
                         + "shall be specified only in a level-01 record-description entry (ISO §13.18.58)");
                 var parent = stack.Peek();
-                // ⛔ ONE LEVEL-NUMBER FOR ALL OF A GROUP'S IMMEDIATE MEMBERS (kb/Work PB1246). ISO §8.5.1.3.2: "All items
-                // that are immediately subordinate to a given group item shall be described using numerically equal
-                // level-numbers greater than the level-number used to describe that group item." The pop loop above
-                // already guarantees "greater than"; this is the "numerically equal" half — `01 G. 05 A. 03 B.` bound B
-                // under G beside A, two members of one group at two levels. The first member sets the group's level.
-                if (parent.Children.Count > 0 && parent.Children[0].Level != item.Level)
-                    Edition.Error(DiagnosticCatalog.LevelNumberHierarchy, $"'{item.CobolName ?? "FILLER"}': level-number "
-                        + $"{item.Level} is not the level-number {parent.Children[0].Level} of the other items immediately "
-                        + $"subordinate to the group '{parent.CobolName ?? "FILLER"}' — all items immediately subordinate "
-                        + "to a given group item shall be described using numerically equal level-numbers "
-                        + "(ISO §8.5.1.3.2)");
+                // ⛔ ONE LEVEL-NUMBER FOR ALL OF A GROUP'S IMMEDIATE MEMBERS (kb/Work PB1246). The pop loop above
+                // already guarantees §8.5.1.3.2's "greater than"; this is the "numerically equal" half — `01 G. 05 A.
+                // 03 B.` bound B under G beside A, two members of one group at two levels. The first member sets the
+                // group's level. The report arm asks the same rule (ScreenReportLevelNumbers, kb/Work PB1954).
+                ScreenImmediateMemberLevel(parent.Children.Count > 0 ? parent.Children[0].Level : null, item.Level,
+                    $"'{item.CobolName ?? "FILLER"}'", $"the group '{parent.CobolName ?? "FILLER"}'");
                 if (renamesBegun) ScreenEntryAfterRenames(item.CobolName);   // §13.18.45.3 SR2 (kb/Work PB1283)
                 // §13.18.57.3 SR2 (review DEVLOG 664 fix #2): a TYPE-clause entry shall not be followed immediately by
                 // a subordinate entry — the entry IS the whole type (§13.18.57.4 GR1). Without this the explicit
@@ -1077,6 +1092,22 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     ? UserWordKind.RecordName : UserWordKind.DataName);
         }
         return newRoots;
+    }
+
+    /// <summary>⛔ ISO §8.5.1.3.2's EQUAL-SIBLING RULE, stated once for both walks that build a level-number hierarchy:
+    /// "All items that are immediately subordinate to a given group item shall be described using numerically equal
+    /// level-numbers greater than the level-number used to describe that group item." <see cref="BindEntries"/> asks
+    /// it of a data description entry (kb/Work PB1246) and <c>ScreenReportLevelNumbers</c> of a report group
+    /// description entry (kb/Work PB1954; §13.18.33.1 gives level-numbers 1 through 49 the same meaning in both).
+    /// <paramref name="memberLevel"/> is the level-number of the group's FIRST immediate member, or null when
+    /// <paramref name="level"/> belongs to the first; <paramref name="subject"/> and <paramref name="group"/> name the
+    /// entry and its group for the message.</summary>
+    private void ScreenImmediateMemberLevel(int? memberLevel, int level, string subject, string group)
+    {
+        if (memberLevel is not { } first || first == level) return;
+        Edition.Error(DiagnosticCatalog.LevelNumberHierarchy, $"{subject}: level-number {level} is not the level-number "
+            + $"{first} of the other items immediately subordinate to {group} — all items immediately subordinate to a "
+            + "given group item shall be described using numerically equal level-numbers (ISO §8.5.1.3.2)");
     }
 
     /// <summary>Register a TYPEDEF type declaration (ISO §13.18.58; data-model D17): a named level-01 template.
@@ -3694,12 +3725,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 + $"not contain a GROUP-USAGE, SIGN, or USAGE clause — '{tp.CobolName ?? "FILLER"}' does "
                 + "(ISO §13.18.57.3 SR5)");
 
-        // §13.18.57.3 SR6: a STRONG type may be referenced only at level 1 or by an item subordinate to another
-        // strongly-typed group — strong typing always covers a WHOLE record, never a lone field in an ordinary group.
+        // §13.18.57.3 SR6: a STRONG type may be referenced only at level 1 or by an item subordinate to a type
+        // declaration that includes the STRONG phrase (a strongly-typed group copies one) — strong typing always covers a WHOLE record, never a lone field in an ordinary group.
         if (strong && !StrongPlacementAdmitted(item))
             Edition.Error("COBOLNET1532", $"'{subject}' references STRONG type '{typeName}': a strongly-typed "
-                + "item shall be specified only at level 1 or subordinate to a strongly-typed group "
-                + "(ISO §13.18.57.3 SR6)");
+                + "item shall be specified only with level-number 1 or be subordinate to a type declaration that includes the "
+                + "STRONG phrase (ISO §13.18.57.3 SR6)");
 
         // §13.18.57.3 SR8: "When the TYPE clause is specified in the file section, the description of type-name-1,
         // including its subordinate data items, shall not contain a data item described with a USAGE OBJECT
@@ -4280,12 +4311,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             else
                 item.ExternalFromType = true;
         }
-        // A copied STRONG type identity re-checks placement (§13.18.57.3 SR6 — level 1 or subordinate to a
-        // strongly-typed group; the ExpandType twin, through the ONE placement predicate).
+        // A copied STRONG type identity re-checks placement (§13.18.57.3 SR6 — level 1 or subordinate to a type
+        // declaration that includes the STRONG phrase; the ExpandType twin, through the ONE placement predicate).
         if (item.StrongType && !StrongPlacementAdmitted(item))
             Edition.Error("COBOLNET1532", $"'{subject}' copies strongly-typed '{targetName}' (type "
                 + $"'{item.TypeName}'): a strongly-typed item shall be specified only at level 1 or "
-                + "subordinate to a strongly-typed group (ISO §13.18.57.3 SR6)");
+                + "subordinate to a type declaration that includes the STRONG phrase (ISO §13.18.57.3 SR6)");
         return true;
     }
 
@@ -4362,7 +4393,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                             + "part (ISO §13.18.57.3 SR4)");
                     }
 
-        foreach (var item in AllItems())
+        // A REDEFINES written in a TYPEDEF template is asked too (kb/Work PB2071): `05 G TYPE T2. 05 H REDEFINES G.`
+        // in an unused template redefines the strongly-typed G from outside its strong subtree exactly as it would in
+        // a record.
+        foreach (var item in AllItems().Concat(TemplateItems()))
             if (item.RedefinesKind is RedefinitionKind.Clause && item.RedefinesTarget is { } tgt
                 && StrongTypeModel.IsStronglyTyped(tgt)
                 && !ReferenceEquals(StrongTypeModel.StrongRoot(item), StrongTypeModel.StrongRoot(tgt)))
@@ -7083,10 +7117,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <summary>Resolve each item's REDEFINES target name to its <see cref="DataItem"/>, and each level-66 RENAMES
     /// FROM/THRU operand to its item. A REDEFINES target is an unqualified prior entry in the same scope (SR1/SR6); a
     /// RENAMES range names items within the owning record (SR3). Target resolution does not chase chains — the
-    /// classification pass walks <see cref="DataItem.RedefinesTarget"/> transitively to the anchor (SR11).</summary>
+    /// classification pass walks <see cref="DataItem.RedefinesTarget"/> transitively to the anchor (SR11).
+    /// <para>⛔ A REDEFINES clause written in a TYPEDEF template is resolved and screened TOO (kb/Work PB2071): the
+    /// §13.18.44.3 syntax rules hold of the source as written (§4.3), and a type declaration nothing instantiates is
+    /// still source. Walking <see cref="Roots"/> alone, an unused template's `REDEFINES NOSUCH`, its oversized
+    /// redefinition (SR8) or its redefinition of a table (SR5) compiled clean, and a used one was reported only through
+    /// the copies its TYPE subjects hold. <see cref="TemplateItems"/> adds the template members; a template gets no storage class
+    /// (<see cref="ClassifyRedefinesClasses"/> asks it only the clause rules).</para></summary>
     internal void ResolveRedefines()
     {
-        foreach (var item in AllItems())
+        foreach (var item in AllItems().Concat(TemplateItems()))
             if (item.RedefinesTargetName is { } tname)
             {
                 using var _ = Edition.At(item);
@@ -7383,9 +7423,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// FUNCTION-POINTER).</para></summary>
     private static string? RenamesRangeFault(DataItem record, DataItem from, DataItem? thru)
     {
-        var ordered = new List<DataItem>();
-        void PreOrder(DataItem n) { ordered.Add(n); foreach (var c in n.Children) PreOrder(c); }
-        PreOrder(record);
+        var ordered = PreOrder(record).ToList();
         int first = ordered.IndexOf(from);
         var last = thru ?? from;
         int lastAt = ordered.IndexOf(last);
@@ -7416,6 +7454,68 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         return null;
     }
 
+    /// <summary>⛔ THE CLAUSE SCREENS SCREEN THE CLAUSE (kb/Work PB836) — §13.18.44.3 SR5 (sentence 1), SR12, SR14 and
+    /// SR17, asked once per WRITTEN REDEFINES clause over its subject <paramref name="item"/> and its DIRECT
+    /// data-name-2 <paramref name="target"/>, never the chained anchor. An FD/SD's later level-1 records (§13.18.33.4
+    /// GR3) and a SAME RECORD AREA file's record (§12.4.6.4.4 GR2) share the area IMPLICITLY: no clause, no operand,
+    /// and none of these rules. Asked of a storage item by <see cref="ClassifyRedefinesClasses"/> before it builds the
+    /// item's class, and of a TYPEDEF template member, which has no class (kb/Work PB2071).</summary>
+    private void ScreenRedefinesClause(DataItem item, DataItem target)
+    {
+        // §13.18.44.3 SR12/SR14 (kb/Work PB179; the skeptic round moved this screen HERE, per WRITTEN
+        // ENTRY and BEFORE dissolution — ClassifyRedefinesClasses' dissolve loop removes nested classes, so a per-class
+        // screen let an inner entry's violation escape the diagnostic and fall to the outer class's
+        // staged-loud arm: same verdict, wrong posture): SR12 bars the SUBJECT being of class
+        // object/message-tag/pointer or a strongly-typed group; SR14 bars data-name-2 (the DIRECT
+        // target as written) likewise, plus "subordinate to a strongly-typed group item". These are the
+        // rules' LETTER — the drafting contrast with SR9's "nor any entry subordinate to it" shows they
+        // name the entry-level items only; a NESTED pointer leaf is §13.18.60.3 SR14's territory — now
+        // screened at its own declaration by CheckUsageDeclarations (kb/Work PB183, COBOLNET1724), with
+        // ComputeTier's backstop arm kept as the recovery-path guard behind it.
+        if (Sr12Sr14Violation(item, target) is { } srv)
+            Edition.Error(DiagnosticCatalog.RedefinesPointerObject, srv);
+        // §13.18.44.3 SR17, the SAME per-written-entry posture and for the same reason (kb/Work PB177 arm C):
+        // "Neither data-name-2 nor the subject of the entry shall be a variable-length group or a
+        // dynamic-length elementary item." A SYMMETRIC rule, so BOTH sides are tested — the two-arm
+        // discipline applied to the screen itself. It must run HERE, before the dissolve loop, or a nested
+        // entry's violation escapes into the outer class's staged-loud arm (the PB179 skeptic round's
+        // finding, which is why SR12/SR14 sit here).
+        // ⛔ AND IT CLOSES A SILENT MIS-MODEL, not just an under-rejection: StorageFormPass.Classify returns
+        // DynamicString for an IsDynamicLength item BEFORE reaching its Tier-B view arm, so such a view got
+        // its OWN disjoint native string — two storages for one shared area (§13.18.44.4 GR1 says one), with
+        // no diagnostic. Rejecting the entry makes that path unreachable.
+        foreach (var (side, sideItem) in new[]
+                 { ("the subject of the REDEFINES entry", item), ("data-name-2 of a REDEFINES entry", target) })
+            if (VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup(sideItem) is { } shape)
+                Edition.Error(DiagnosticCatalog.RedefinesVariableLength,
+                    $"'{sideItem.CobolName ?? sideItem.CsName}' is {side} but is {shape}: neither "
+                    + "data-name-2 nor the subject of the entry shall be a variable-length group or a "
+                    + "dynamic-length elementary item (ISO §13.18.44.3 SR17)");
+        // §13.18.44.3 SR5 SENTENCE 1 — the OBJECT side, per written entry like its two neighbours above.
+        // "The data description entry for data-name-2 shall not contain an OCCURS clause." ANY format: the
+        // fixed OCCURS of Format 1, Format 2's occurs-depending table, and Format 4's dynamic-capacity table
+        // are all THE OCCURS CLAUSE (§13.18.38), so the predicate is `IsTable` — the union. ⛔ NEITHER half
+        // alone works, and each is a live trap this repo has already sprung once: `Occurs is not null` is
+        // the FIXED physical capacity and is NULL for a Format-4 table (the CONTROL SR3 arm's defect), while
+        // `OccursSpec is not null` is NULL for a plain keyless fixed table, which OdoBindOccursSpec
+        // deliberately leaves allocation-free (measured: with that spelling `05 T PIC X(3) OCCURS 4. 05 R
+        // REDEFINES T PIC X(12).` still compiled clean — the very shape this screen exists for).
+        // ⛔ SENTENCE 2 IS THE LIMIT OF THIS ARM: "However, data-name-2 may be subordinate to an item whose
+        // data description entry contains an OCCURS clause." So the test is on data-name-2's OWN entry —
+        // an ancestor walk here would reject legal source.
+        // ⛔ AND THE DEPENDING SHAPE IS DELIBERATELY EXCLUDED, so one entry never draws two diagnostics from
+        // one rule: SENTENCE 4 ("Neither the original definition nor the redefinition shall include an
+        // occurs-depending table") is COBOLNET0855's, whose population is WIDER (an ODO table anywhere in
+        // either definition, not merely on data-name-2's own entry) and which already rejects every entry
+        // this arm would also match. One rule, four sentences, two disjoint screens.
+        if (target.IsTable && target.OccursSpec?.DependingName is null)
+            Edition.Error(DiagnosticCatalog.RedefinesTargetOccurs,
+                $"'{item.CobolName ?? item.CsName}' REDEFINES '{target.CobolName ?? target.CsName}', "
+                + "whose data description entry contains an OCCURS clause: the data description entry for "
+                + "data-name-2 shall not contain an OCCURS clause (ISO §13.18.44.3 SR5) — data-name-2 may be "
+                + "SUBORDINATE to an item that has one, but shall not carry one itself");
+    }
+
     /// <summary>Group every redefining entry with the non-redefining anchor it ultimately overlays (SR7/SR11) into a
     /// <see cref="RedefinesClass"/>, mark the anchor canonical and every other member a view, then assign the class a
     /// tier (D &gt; C &gt; B &gt; A) and its class-max width, and propagate view-suppression to each view's
@@ -7427,66 +7527,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         {
             if (item.RedefinesTarget is null) continue;
             using var _ = Edition.At(item);
-            // ⛔ THE CLAUSE SCREENS SCREEN THE CLAUSE (kb/Work PB836). SR5, SR12, SR14 and SR17 below are rules about
-            // a written REDEFINES clause — its subject and its data-name-2 operand. An FD/SD's later level-1 records
-            // (§13.18.33.4 GR3) and a SAME RECORD AREA file's record (§12.4.6.4.4 GR2) share the area IMPLICITLY:
-            // no clause, no operand, and none of these rules. Their own screens are the implicit-area arm in the
-            // class loop below and §13.18.57.3 SR4's implicit arm in CheckStrongTypeDeclarations.
-            if (item.RedefinesKind is RedefinitionKind.Clause)
-            {
-                // §13.18.44.3 SR12/SR14 (kb/Work PB179; the skeptic round moved this screen HERE, per WRITTEN
-                // ENTRY and BEFORE dissolution — the dissolve loop below removes nested classes, so a per-class
-                // screen let an inner entry's violation escape the diagnostic and fall to the outer class's
-                // staged-loud arm: same verdict, wrong posture): SR12 bars the SUBJECT being of class
-                // object/message-tag/pointer or a strongly-typed group; SR14 bars data-name-2 (the DIRECT
-                // target as written) likewise, plus "subordinate to a strongly-typed group item". These are the
-                // rules' LETTER — the drafting contrast with SR9's "nor any entry subordinate to it" shows they
-                // name the entry-level items only; a NESTED pointer leaf is §13.18.60.3 SR14's territory — now
-                // screened at its own declaration by CheckUsageDeclarations (kb/Work PB183, COBOLNET1724), with
-                // ComputeTier's backstop arm kept as the recovery-path guard behind it.
-                if (Sr12Sr14Violation(item, item.RedefinesTarget) is { } srv)
-                    Edition.Error(DiagnosticCatalog.RedefinesPointerObject, srv);
-                // §13.18.44.3 SR17, the SAME per-written-entry posture and for the same reason (kb/Work PB177 arm C):
-                // "Neither data-name-2 nor the subject of the entry shall be a variable-length group or a
-                // dynamic-length elementary item." A SYMMETRIC rule, so BOTH sides are tested — the two-arm
-                // discipline applied to the screen itself. It must run HERE, before the dissolve loop, or a nested
-                // entry's violation escapes into the outer class's staged-loud arm (the PB179 skeptic round's
-                // finding, which is why SR12/SR14 sit here).
-                // ⛔ AND IT CLOSES A SILENT MIS-MODEL, not just an under-rejection: StorageFormPass.Classify returns
-                // DynamicString for an IsDynamicLength item BEFORE reaching its Tier-B view arm, so such a view got
-                // its OWN disjoint native string — two storages for one shared area (§13.18.44.4 GR1 says one), with
-                // no diagnostic. Rejecting the entry makes that path unreachable.
-                foreach (var (side, sideItem) in new[]
-                         { ("the subject of the REDEFINES entry", item), ("data-name-2 of a REDEFINES entry", item.RedefinesTarget) })
-                    if (VariableLengthCompatibility.DynamicLengthOrVariableLengthGroup(sideItem) is { } shape)
-                        Edition.Error(DiagnosticCatalog.RedefinesVariableLength,
-                            $"'{sideItem.CobolName ?? sideItem.CsName}' is {side} but is {shape}: neither "
-                            + "data-name-2 nor the subject of the entry shall be a variable-length group or a "
-                            + "dynamic-length elementary item (ISO §13.18.44.3 SR17)");
-                // §13.18.44.3 SR5 SENTENCE 1 — the OBJECT side, per written entry like its two neighbours above.
-                // "The data description entry for data-name-2 shall not contain an OCCURS clause." ANY format: the
-                // fixed OCCURS of Format 1, Format 2's occurs-depending table, and Format 4's dynamic-capacity table
-                // are all THE OCCURS CLAUSE (§13.18.38), so the predicate is `IsTable` — the union. ⛔ NEITHER half
-                // alone works, and each is a live trap this repo has already sprung once: `Occurs is not null` is
-                // the FIXED physical capacity and is NULL for a Format-4 table (the CONTROL SR3 arm's defect), while
-                // `OccursSpec is not null` is NULL for a plain keyless fixed table, which OdoBindOccursSpec
-                // deliberately leaves allocation-free (measured: with that spelling `05 T PIC X(3) OCCURS 4. 05 R
-                // REDEFINES T PIC X(12).` still compiled clean — the very shape this screen exists for).
-                // ⛔ SENTENCE 2 IS THE LIMIT OF THIS ARM: "However, data-name-2 may be subordinate to an item whose
-                // data description entry contains an OCCURS clause." So the test is on data-name-2's OWN entry —
-                // an ancestor walk here would reject legal source.
-                // ⛔ AND THE DEPENDING SHAPE IS DELIBERATELY EXCLUDED, so one entry never draws two diagnostics from
-                // one rule: SENTENCE 4 ("Neither the original definition nor the redefinition shall include an
-                // occurs-depending table") is COBOLNET0855's, whose population is WIDER (an ODO table anywhere in
-                // either definition, not merely on data-name-2's own entry) and which already rejects every entry
-                // this arm would also match. One rule, four sentences, two disjoint screens.
-                if (item.RedefinesTarget.IsTable && item.RedefinesTarget.OccursSpec?.DependingName is null)
-                    Edition.Error(DiagnosticCatalog.RedefinesTargetOccurs,
-                        $"'{item.CobolName ?? item.CsName}' REDEFINES '{item.RedefinesTarget.CobolName ?? item.RedefinesTarget.CsName}', "
-                        + "whose data description entry contains an OCCURS clause: the data description entry for "
-                        + "data-name-2 shall not contain an OCCURS clause (ISO §13.18.44.3 SR5) — data-name-2 may be "
-                        + "SUBORDINATE to an item that has one, but shall not carry one itself");
-            }
+            if (item.RedefinesKind is RedefinitionKind.Clause) ScreenRedefinesClause(item, item.RedefinesTarget);
             DataItem anchor = item;
             // Chase data-name-2 to the non-redefining anchor. A CHAIN (X REDEFINES Y, Y REDEFINES Z) is
             // SR7-ILLEGAL (the skeptic round corrected this comment's SR11 miscitation — SR11 is the
@@ -7504,6 +7545,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             item.Class = cls;
             item.IsCanonical = false;
         }
+        // A TYPEDEF template member's REDEFINES clause answers the same clause rules (kb/Work PB2071) and builds NO
+        // class: a type declaration has no storage associated with it (ISO §13.18.58.4 GR2).
+        foreach (var item in TemplateItems())
+            if (item.RedefinesKind is RedefinitionKind.Clause && item.RedefinesTarget is { } target)
+            {
+                using var _ = Edition.At(item);
+                ScreenRedefinesClause(item, target);
+            }
 
         // ONE shared area per overlay nest (ISO §13.18.44 — a REDEFINES nested under another class's member
         // shares THAT storage): a class whose ANCHOR lies inside another class's subtree — its ancestor chain
@@ -7831,23 +7880,6 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         };
     }
 
-    /// <summary>ONE §13.18.44.3 SR12/SR14 verdict per WRITTEN entry — <paramref name="subject"/> is the item
-    /// carrying the REDEFINES clause, <paramref name="target"/> its DIRECT data-name-2 (never the chained
-    /// anchor). Returns the violation text (the diagnostic message AND the class RejectReason), or null.
-    /// Each arm's message names the arm that actually fired (the skeptic round: a subordinate-to-strong
-    /// violation was described as "is a strongly-typed group" — false of the item named).
-    /// <para>⛔ The SR14 "subordinate to a strongly-typed group item" arm has NO same-root exemption (kb/Work
-    /// PB1282). It once fired only when the subject sat OUTSIDE the target's strong subtree, which no entry can
-    /// do — a subject and its data-name-2 are siblings, so they share one parent and therefore one strong root —
-    /// so the disjunct was vacuous. The one way to meet it is a REDEFINES written inside a STRONG typedef
-    /// template: §13.18.58.4 GR3 makes every subordinate description of the type "assumed by data defined using
-    /// the type-name", so in each TYPE subject the clause is written and its data-name-2 is "an item subordinate to
-    /// a strongly-typed group item" (Annex D.8.3: such items are "subordinate to a type declaration with the STRONG
-    /// phrase", and "any explicit or implicit redefinitions of such data items with less restrictive data
-    /// descriptions are prohibited"). PB183's companion derivation answered §13.18.57.3 SR4 — the subject of the
-    /// TYPE entry — which is a different rule from this one; <c>CheckStrongTypeDeclarations</c> still leaves the
-    /// internal case to this screen so it is reported once.</para></summary>
-
     /// <summary>The outermost strongly-typed item in <paramref name="record"/>'s subtree (the record itself when it
     /// is a TYPE subject naming a STRONG type), or null — the "in whole or in part" population of §13.18.57.3 SR4
     /// for a record that is implicitly redefined as a whole (kb/Work PB836).</summary>
@@ -7859,6 +7891,23 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         return null;
     }
 
+    /// <summary>ONE §13.18.44.3 SR12/SR14 verdict per WRITTEN entry — <paramref name="subject"/> is the item
+    /// carrying the REDEFINES clause, <paramref name="target"/> its DIRECT data-name-2 (never the chained
+    /// anchor). Returns the violation text (the diagnostic message AND the class RejectReason), or null.
+    /// Each arm's message names the arm that actually fired (the skeptic round: a subordinate-to-strong
+    /// violation was described as "is a strongly-typed group" — false of the item named).
+    /// <para>⛔ The SR14 "subordinate to a strongly-typed group item" arm has NO same-root exemption (kb/Work
+    /// PB1282). It once fired only when the subject sat OUTSIDE the target's strong subtree, which no entry can
+    /// do — a subject and its data-name-2 are siblings, so they share one parent and therefore one strong root —
+    /// so the disjunct was vacuous. The way to meet it is a REDEFINES written inside a STRONG typedef template:
+    /// §13.18.58.4 GR3 makes every subordinate description of the type "assumed by data defined using the
+    /// type-name" (and §13.18.57.4 GR1 codes it "as though" in the TYPE subject), and §8.5.3.1 makes that subject
+    /// strongly typed ("described with a TYPE clause that references a type declaration specifying the STRONG
+    /// phrase"), so in each TYPE subject data-name-2 is "an item subordinate to a strongly-typed group item".
+    /// In the template itself it is not: the template root carries TYPEDEF, not a TYPE clause, so an unused STRONG
+    /// template holding such a REDEFINES conforms (kb/Work PB2071). PB183's companion derivation answered
+    /// §13.18.57.3 SR4 — the subject of the TYPE entry — which is a different rule from this one;
+    /// <c>CheckStrongTypeDeclarations</c> still leaves the internal case to this screen so it is reported once.</para></summary>
     private static string? Sr12Sr14Violation(DataItem subject, DataItem target)
     {
         if (PointerObjectClass(subject))
@@ -8032,15 +8081,22 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     private List<DataItem> RenamesOwners() => AllItems().Where(i => i.Renames66.Count > 0).ToList();
 
     /// <summary>Every item in the WORKING-STORAGE forest, in declaration (pre-order DFS) order.</summary>
-    private IEnumerable<DataItem> AllItems()
+    private IEnumerable<DataItem> AllItems() => Roots.SelectMany(PreOrder);
+
+    /// <summary>The SUBORDINATE items of this source element's own TYPEDEF templates (<see cref="TypeDecls"/>, kept
+    /// off <see cref="Roots"/>), pre-order in declaration order: the members the programmer wrote and the clones
+    /// <c>ExpandTypes</c> composed inside a template for a member's TYPE clause (kb/Work PB1302). A type declaration
+    /// has no storage (ISO §13.18.58.4 GR2), so no storage pass walks it, but the syntax rules of a clause written in
+    /// it hold of the declaration as written (§4.3): the REDEFINES passes ask them here (kb/Work PB2071). A template's
+    /// level-1 entry is not included: it is the type declaration itself, and an inherited GLOBAL template is its
+    /// container's.</summary>
+    private IEnumerable<DataItem> TemplateItems() => TypeDecls.Values.SelectMany(t => t.Children).SelectMany(PreOrder);
+
+    private static IEnumerable<DataItem> PreOrder(DataItem d)
     {
-        static IEnumerable<DataItem> Walk(DataItem d)
-        {
-            yield return d;
-            foreach (var c in d.Children)
-                foreach (var x in Walk(c)) yield return x;
-        }
-        return Roots.SelectMany(Walk);
+        yield return d;
+        foreach (var c in d.Children)
+            foreach (var x in PreOrder(c)) yield return x;
     }
 
     /// <summary>
