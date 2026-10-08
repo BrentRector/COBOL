@@ -606,7 +606,7 @@ internal static class IntrinsicArgumentRules
     /// display or national usage</b>"); r5's NOTE ("distinct from simply requiring the string to be of class
     /// alphanumeric") cuts by representation, not class — a numeric or edited DISPLAY item holds alphanumeric
     /// characters and qualifies, a COMP item's storage is not characters at all and does not; r7's exclusion
-    /// list is six usages. §15.12.3 r1 (BASECONVERT, display-or-national) waits on the same axis. A literal
+    /// list is six usages. §15.12.3 r1 (BASECONVERT argument-1, display-or-national) rides the same axis. A literal
     /// answers the usage its category implies (§8.3.3.5 / §8.3.3.2 — an N"…" literal is national characters, any other
     /// string literal display characters), as does a nested intrinsic's STRING result; null = no statically
     /// fixed representation (a group, a figurative, an ALL literal, a numeric value) — every caller reads null
@@ -683,6 +683,13 @@ internal static class IntrinsicArgumentRules
         string crossClause = "", string? noZeroLen = null) =>
         new([], new ArgRule(kind, clause, noZeroLen), cross, crossClause);
 
+    /// <summary>The kind of a DECLARED position whose §15.x.3 rule is not a class rule — it constrains an axis a
+    /// class set cannot carry (BASECONVERT argument-1's USAGE, §15.12.3 r1) — so the schema keeps the ordinal
+    /// (the positions after it need their index) while <see cref="Admissible"/> answers null: no class screen
+    /// there, and the function's own binder arm owns the position. Unlike an ABSENT position it is declared, so
+    /// <c>IntrinsicArgumentClassDriftTests</c> can hold every such position to the bespoke screen that owns it.</summary>
+    internal const char UnscreenedKind = '-';
+
     /// <summary>Per-POSITION kinds, for a rule that constrains its ordinals differently — FIND-STRING's two
     /// string operands plus an integer, the FORMATTED-* family's format literal plus its numeric values.
     /// <paramref name="tail"/> is the kind for positions past the declared ones (a variadic tail), or
@@ -754,6 +761,17 @@ internal static class IntrinsicArgumentRules
             ["ANNUITY"] = Schema("§15.9.3 r1/r3", ['n', 'i']),
             ["CHAR"] = Uniform('i', "§15.15.3 r1"),                          // shall be an integer
             ["CHAR-NATIONAL"] = Uniform('i', "§15.16.3 r1"),                 // shall be an integer
+            // §15.12.3 r1 — TWO sentences, two axes. Argument-1 "shall be a usage display or national data item or
+            // literal" (+ the sub-11 unsigned-integer half) constrains USAGE, which no class kind expresses: its
+            // position is UnscreenedKind and IntrinsicBinder.CheckBaseConvertArgs owns it over StaticUsageOf.
+            // "Argument-2 and argument-3 shall be positive nonzero numeric integer literals or data items" is an
+            // ordinary class rule (§15.3 type 6 — Table 21 prints Int2, Int3), so both positions ride the ONE
+            // screen: class numeric + the §15.3 integer test, and "literals or data items" bars an arithmetic
+            // expression or nested function as it does FIND-STRING's integer (kb/Work PB2079). The value halves
+            // (positive, range 2 to 16, unequal) stay in CheckBaseConvertArgs and the runtime twins.
+            ["BASECONVERT"] = Schema("§15.12.3 r1", [UnscreenedKind, 'i', 'i'])
+                .WithPredicate(1, ArgPredicate.DataItemOrLiteralOnly("§15.12.3 r1"))
+                .WithPredicate(2, ArgPredicate.DataItemOrLiteralOnly("§15.12.3 r1")),
             ["BOOLEAN-OF-INTEGER"] = Uniform('i', "§15.13.3 r1/r2"),         // both arguments positive integers
             // §15.17.3 r1/r2 — argument-1 "in integer date form", argument-2 "in standard numeric time form".
             // Table 21 types them Int1 and Num2 (§15.3 type 6 and type 10): an integer date, and a time that may
@@ -975,18 +993,12 @@ internal static class IntrinsicArgumentRules
     /// with the reason. Not an oversight, and recorded so it cannot be mistaken for one.
     /// </summary>
     /// <remarks>
-    /// A class screen can only express "the argument shall be of class X". These four rules are something else,
+    /// A class screen can only express "the argument shall be of class X". These two rules are something else,
     /// and forcing them into the table would reject legal COBOL — which is exactly how the first attempt at PB1
     /// failed its gate on twelve corpus programs.
     /// <list type="bullet">
     ///   <item><b>BYTE-LENGTH</b> §15.14.3 r1 — "a data item of any class or category". There is nothing to
     ///   screen; the catalog's <c>"s"</c> hint is simply wrong, and screening from it rejected legal source.</item>
-    ///   <item><b>BASECONVERT</b> §15.12.3 r1 — constrains USAGE ("a usage display or national data item or
-    ///   literal"), not class. A usage screen is a different mechanism and does not exist here yet.</item>
-    ///   <item><b>CONCAT</b> §15.18.3 r1 — admits "class alphabetic, alphanumeric, boolean, numeric or
-    ///   national", i.e. everything except index/object/pointer. Expressible in principle, but its r2/r3 add
-    ///   cross-argument USAGE agreement and an unsigned-integer condition, so a class-only screen would give a
-    ///   false sense that the rule is enforced.</item>
     ///   <item><b>CONVERT</b> §15.19.3 — the admissible argument depends on the source-format KEYWORD (HEX /
     ///   ANUM / NAT / ANY), so there is no single class for argument-1. Its own arm in the binder owns it.</item>
     /// </list>
@@ -995,16 +1007,6 @@ internal static class IntrinsicArgumentRules
         new Dictionary<string, string>(CobolNames.Comparer)
         {
             ["BYTE-LENGTH"] = "§15.14.3 r1 admits an argument of ANY class or category",
-            ["BASECONVERT"] = "§15.12.3 r1 constrains USAGE (display or national), not class — an axis this "
-                + "ordinal table cannot express; enforced at bind by CheckBaseConvertArgs over StaticUsageOf "
-                + "(the usage half, the sub-11 unsigned-integer half, and every static-literal base violation "
-                + "per §4.2.2 — range, integer-ness, equality), with the runtime twins (the r2 digit screen, "
-                + "dynamic base range/equality) in CobolIntrinsics.BaseConvert. The RENDERER admits a numeric "
-                + "LITERAL argument-1 (IntrinsicRenderer.StrNum, PB59)",
-            ["CONCAT"] = "§15.18.3 r1 admits all classes but index/object/pointer; r2/r3 are cross-argument "
-                + "USAGE rules. The RENDERER admits numeric literals (r1 lists class numeric — the admitting "
-                + "StrArgList, PB59); STILL unscreened at bind: r1's exclusions and r3's usage-display + "
-                + "unsigned-integer conditions (a signed/fractional literal renders verbatim today)",
             ["CONVERT"] = "§15.19.3 keys the admissible argument-1 on the source-format KEYWORD, an axis this "
                 + "ordinal table cannot express; enforced IN FULL at bind by BindConvert's own positional walk "
                 + "plus its r4/r5/r6/r7 screens over StaticUsageOf. The value halves (r4's digit validity, "
@@ -1211,6 +1213,8 @@ internal static class IntrinsicArgumentRules
         // IntrinsicBinder.CheckConcatArgs' — a class kind cannot carry them). Alphabetic joined when the class
         // gained its member (PB124 wave 5) — the rule always named it; the fold made it unreachable.
         'c' => ClassConcat,
+        // UnscreenedKind — a DECLARED position whose rule is not a class (BASECONVERT argument-1's usage): no set.
+        UnscreenedKind => null,
         // 'p' — MAX/MIN/ORD-MAX/ORD-MIN, whose rule (§15.71.3 r1 and siblings) is a NEGATIVE list. An
         // admissible-set cannot express it without also excluding classes the rule permits.
         _ => null,

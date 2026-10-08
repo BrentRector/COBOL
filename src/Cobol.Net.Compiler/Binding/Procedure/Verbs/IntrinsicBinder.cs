@@ -1590,7 +1590,10 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// (follow-GnuCOBOL-on-split-latitude). Argument-2/-3 "shall be positive nonzero numeric integer literals
     /// or data items with unequal values in the range 2 to 16" — every STATIC-literal violation is flagged at
     /// compile time per §4.2.2 ¶3 (a non-integer literal base, a literal base outside 2..16, two EQUAL literal
-    /// bases); data-item bases stay the runtime guards' territory.</summary>
+    /// bases). The CLASS half of that sentence — numeric, integer, "literals or data items" — is the row's
+    /// <c>Verified</c> schema (<see cref="IntrinsicArgumentRules.Verified"/>, kb/Work PB2079), screened by
+    /// <see cref="CheckArgumentClasses"/> before this method runs; a data-item base's VALUE (range, equality)
+    /// stays the runtime guards' territory.</summary>
     private void CheckBaseConvertArgs(List<BoundOperand> args)
     {
         if (args.Count > 0 && IntrinsicArgumentRules.StaticUsageOf(args[0]) is { } u
@@ -1611,8 +1614,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         if (s2 is { Beyond: false } e2 && s3 is { Beyond: false } e3 && e2.Value == e3.Value)
             ctx.Edition.Error("COBOLNET1642", "FUNCTION BASECONVERT: argument-2 and argument-3 shall have "
                 + $"unequal values — both are {e2.Value} (ISO §15.12.3 rule 1)");
+        // An INTEGER literal has no decimal point (§8.3.3.3.2), so '2.0' is not one although its VALUE is integral
+        // — the one half of "integer literal" the schema's value test (IntegerViolation, COBOLNET1627) cannot see.
         for (int i = 1; i <= 2 && i < args.Count; i++)
-            if (args[i] is BoundNumericLiteral bl && (bl.Text.Contains('.') || bl.Text.Contains(',')))
+            if (args[i] is BoundNumericLiteral bl && !IntrinsicResultType.IsIntegerOperand(bl)
+                && IntrinsicArgumentRules.IntegerViolation(bl) is null)
                 ctx.Edition.Error("COBOLNET1642", $"FUNCTION BASECONVERT: argument-{i + 1} shall be a positive "
                     + $"nonzero numeric INTEGER literal or data item, not '{bl.Text}' (ISO §15.12.3 rule 1)");
 
@@ -1904,7 +1910,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                 if (IntrinsicArgumentRules.PredicateViolation(p, args[i], KnownWidth(args[i])) is { } pWhy)
                     Report($"FUNCTION {sig.Name} argument-{i + 1} {pWhy}");
             if (IntrinsicArgumentRules.Violation(rule, args[i]) is not { } why) continue;
-            Report($"FUNCTION {sig.Name} argument-{i + 1} {why} ({rule.Clause})");
+            ReportClass($"FUNCTION {sig.Name} argument-{i + 1} {why} ({rule.Clause})", args[i]);
         }
 
         // CROSS-ARGUMENT (fix-queue PB31) — §15.59.3 r2 and its siblings, which no per-position check can see.
@@ -1916,11 +1922,23 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // argument-2 is numeric, it shall be usage display or national and shall be an unsigned integer" — the
         // StaticUsageOf axis (the same shared reader the BASECONVERT/CONVERT screens ride), which a class kind
         // structurally cannot carry. Static shapes only; a runtime-shaped operand (a group, a figurative) fails open.
-        if (sig.Name == "CONCAT") CheckConcatArgs(args, Report);
+        if (sig.Name == "CONCAT") CheckConcatArgs(args, ReportClass);
 
-        void Report(string where)
+        // ⛔ The --permissive coercion exists only for an operand that HOLDS CHARACTERS to coerce: an item of class
+        // pointer or object holds a reference (§8.5.2.1 Table 2), so there is nothing to render or decode and the
+        // class violation stays an error — the same IsDigitDecodable question the §8.8.1.1 operand screen asks
+        // (ExpressionBinder). Before, `BASECONVERT("1A" P 10)` / `ABS(P)` under --permissive warned, then died in
+        // Roslyn (CS1503: ManagedPointer to Int128) (kb/Work PB2079).
+        void ReportClass(string where, BoundOperand operand) =>
+            Emit(where, IntrinsicArgumentRules.IsDigitDecodable(operand));
+
+        void Report(string where) => Emit(where, coercible: true);
+
+        void Emit(string where, bool coercible)
         {
-            if (ctx.Edition.Permissive)
+            if (!coercible)
+                ctx.Edition.Error(DiagnosticCatalog.IntrinsicArgumentClass, where);
+            else if (ctx.Edition.Permissive)
                 ctx.Edition.Warning(DiagnosticCatalog.IntrinsicArgumentClass,
                     $"{where}; accepted under --permissive with the existing coercion");
             else
@@ -1933,8 +1951,10 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// r2: one usage family for the whole list (national, else display) — a COMP/PACKED/BINARY argument is neither,
     /// and a display+national mixture is the disagreement. r3: a NUMERIC argument (class numeric — a numeric item
     /// or numeric literal) shall be usage display or national AND an unsigned integer: a signed or scaled numeric
-    /// item, and a signed or fractional numeric literal, are rejected.</summary>
-    private void CheckConcatArgs(IReadOnlyList<BoundOperand> args, Action<string> report)
+    /// item, and a signed or fractional numeric literal, are rejected. Each violation is reported with its operand, so
+    /// the --permissive coercion is offered only for an operand that holds characters (a pointer or object argument
+    /// stays an error whose text does not advertise --permissive; <c>ReportClass</c>, kb/Work PB2079).</summary>
+    private void CheckConcatArgs(IReadOnlyList<BoundOperand> args, Action<string, BoundOperand> report)
     {
         bool anyNational = args.Any(a => IntrinsicArgumentRules.StaticUsageOf(a) is Usage.National);
         for (int i = 0; i < args.Count; i++)
@@ -1948,7 +1968,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             {
                 if (IntrinsicArgumentRules.UnsignedIntegerViolation(a) is { } fnWhy)
                     report($"FUNCTION CONCAT argument-{i + 1} {fnWhy}; ISO §15.18.3 r3 requires a numeric argument "
-                        + "to be an unsigned integer");
+                        + "to be an unsigned integer", a);
                 continue;
             }
             // r3 first: a numeric argument's own usage/sign/scale conditions.
@@ -1956,27 +1976,27 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             {
                 if (np.Usage is not (Usage.Display or Usage.National))
                     report($"FUNCTION CONCAT argument-{i + 1} is a numeric item of usage {np.Usage}; ISO §15.18.3 r3 "
-                        + "requires a numeric argument to be usage display or national");
+                        + "requires a numeric argument to be usage display or national", a);
                 else if (np.Signed || np.Scale != 0)
                     report($"FUNCTION CONCAT argument-{i + 1} is a {(np.Signed ? "signed" : "non-integer")} numeric item; "
-                        + "ISO §15.18.3 r3 requires a numeric argument to be an unsigned integer");
+                        + "ISO §15.18.3 r3 requires a numeric argument to be an unsigned integer", a);
                 continue;   // a numeric DISPLAY item is display-usage for r2 below by construction
             }
             if (a is BoundNumericLiteral nl)
             {
                 if (nl.Text.StartsWith('-') || nl.Text.StartsWith('+') || nl.Text.IndexOfAny(['.', ',']) >= 0)
                     report($"FUNCTION CONCAT argument-{i + 1} is the numeric literal {nl.Text}; ISO §15.18.3 r3 "
-                        + "requires a numeric argument to be an unsigned integer");
+                        + "requires a numeric argument to be an unsigned integer", a);
                 continue;
             }
             // r2: the usage family.
             if (IntrinsicArgumentRules.StaticUsageOf(a) is not { } u) continue;   // fail open
             if (u is not (Usage.Display or Usage.National))
                 report($"FUNCTION CONCAT argument-{i + 1} is of usage {u}; ISO §15.18.3 r2 requires every argument "
-                    + "to be usage national or every argument to be usage display");
+                    + "to be usage national or every argument to be usage display", a);
             else if (anyNational && u is Usage.Display)
                 report($"FUNCTION CONCAT argument-{i + 1} is usage display while another argument is usage national; "
-                    + "ISO §15.18.3 r2 — if any argument is usage national, all arguments shall be usage national");
+                    + "ISO §15.18.3 r2 — if any argument is usage national, all arguments shall be usage national", a);
         }
     }
 

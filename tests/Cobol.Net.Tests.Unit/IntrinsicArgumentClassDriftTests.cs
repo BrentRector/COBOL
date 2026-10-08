@@ -369,6 +369,54 @@ public sealed class IntrinsicArgumentClassDriftTests
             + "read the function's §15.x.3 argument rule, cite it, and add its row (or its reason).");
     }
 
+    /// <summary>kb/Work PB2079 — a function with a <c>Verified</c> schema is NOT also listed as deliberately
+    /// unscreened. BASECONVERT and CONCAT were in both: the second table kept saying "an axis this ordinal table
+    /// cannot express" about positions the first one screened, so argument-2/-3 of BASECONVERT lost their class
+    /// screen to a sentence that was only true of argument-1. A position a class cannot carry is DECLARED with
+    /// <c>IntrinsicArgumentRules.UnscreenedKind</c> inside the schema instead.</summary>
+    [Fact]
+    public void NoFunction_IsBothVerified_AndDeliberatelyUnscreened()
+    {
+        var both = IntrinsicArgumentRules.Verified.Keys
+            .Where(IntrinsicArgumentRules.DeliberatelyUnscreened.ContainsKey)
+            .Order()
+            .ToList();
+        Assert.True(both.Count == 0,
+            $"function(s) in BOTH Verified and DeliberatelyUnscreened: [{string.Join(", ", both)}] — a function with "
+            + "any class-ruled position belongs in Verified (declare its non-class positions with "
+            + "IntrinsicArgumentRules.UnscreenedKind); DeliberatelyUnscreened is for a function with NO class rule.");
+    }
+
+    /// <summary>kb/Work PB2079 — every declared position kind in <c>Verified</c> is a kind with a disposition:
+    /// an <c>Admissible</c> class set, the negative-list kind <c>'p'</c>, the no-argument marker <c>' '</c>, or
+    /// <c>UnscreenedKind</c>. A typo'd kind would otherwise screen NOTHING and look declared.</summary>
+    [Fact]
+    public void EveryVerifiedPositionKind_HasADisposition_AndUnscreenedOnesAreOnlyBaseConvertArgument1()
+    {
+        var schemas = IntrinsicArgumentRules.Verified;
+        var undispositioned = schemas
+            .SelectMany(kv => kv.Value.Positions.Select((r, i) => (Fn: kv.Key, Ordinal: i + 1, r.Kind))
+                .Concat(kv.Value.Tail is { } t ? [(kv.Key, kv.Value.Positions.Length + 1, t.Kind)] : []))
+            .Where(x => x.Kind is not ('p' or ' ' or IntrinsicArgumentRules.UnscreenedKind)
+                        && IntrinsicArgumentRules.Admissible(x.Kind) is null)
+            .Select(x => $"FUNCTION {x.Fn} argument-{x.Ordinal} kind '{x.Kind}'")
+            .Order()
+            .ToList();
+        Assert.True(undispositioned.Count == 0,
+            $"Verified position(s) whose kind screens nothing: [{string.Join("; ", undispositioned)}]");
+
+        // An UnscreenedKind position is owned by a bespoke binder arm; the one that exists is BASECONVERT's
+        // argument-1 (usage, CheckBaseConvertArgs). A second one must name its owner here, not appear silently.
+        var unscreened = schemas
+            .SelectMany(kv => kv.Value.Positions.Select((r, i) => (Fn: kv.Key, Ordinal: i + 1, r.Kind)))
+            .Where(x => x.Kind == IntrinsicArgumentRules.UnscreenedKind)
+            .Select(x => $"{x.Fn}:{x.Ordinal}")
+            .Order()
+            .ToList();
+        Assert.Equal(["BASECONVERT:1"], unscreened);
+        Assert.Contains("CheckBaseConvertArgs(args)", BinderSource(), StringComparison.Ordinal);
+    }
+
     /// <summary>A bare reference to an elementary item of <paramref name="usage"/> — the operand shape the
     /// §15.3 type-6 screen sees for <c>FUNCTION CHAR(WS-F)</c>.</summary>
     private static BoundFieldOperand ItemOperand(Usage usage, PicInfo pic) =>
@@ -687,8 +735,9 @@ public sealed class IntrinsicArgumentClassDriftTests
     /// A position whose alternatives are all <c>Int…</c> is integer-typed; one that also lists <c>Num</c> (ABS, RANGE,
     /// SUM) admits numeric operands and is not asked. A <c>Key</c>, <c>Ord</c> or <c>Loc</c> item is a NAME, not an
     /// operand, and does not occupy a position (the convention the Verified rows already use); <c>Key4 and Int4</c>
-    /// (FIND-STRING) is an integer operand with its keyword. BASECONVERT is in
-    /// <c>DeliberatelyUnscreened</c> with the reason (its bases are screened by <c>CheckBaseConvertArgs</c>).
+    /// (FIND-STRING) is an integer operand with its keyword. BASECONVERT's argument-2 and argument-3 are
+    /// <c>Int</c> positions and <c>'i'</c> in its schema (argument-1 is <c>UnscreenedKind</c>, owned by
+    /// <c>CheckBaseConvertArgs</c>); only <c>DeliberatelyUnscreened</c> functions are skipped.
     /// </remarks>
     [Fact]
     public void EveryTable21IntegerPosition_IsTypedInteger_InTheVerifiedTable()

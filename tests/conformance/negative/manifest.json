@@ -2470,7 +2470,11 @@
   "pb989-function-definition-follows-the-specifier",
   "pb989-call-previous-definition-argument-count",
   "pb1939-dyn-numeric-element-spaces-2002",
-  "pb2004-dyn-element-inspect-sign-2002"
+  "pb2004-dyn-element-inspect-sign-2002",
+  "pb2079-baseconvert-alphanumeric-base",
+  "pb2079-baseconvert-pointer-base",
+  "pb2079-baseconvert-address-of-base",
+  "pb2079-baseconvert-function-base"
  ],
  "pending": []
 }

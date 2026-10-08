@@ -747,6 +747,7 @@
   "pb2087_by_reference_area_formals",
   "pb2087_invoke_by_reference_aliasing",
   "pb2087_invoke_area_strong_recursion",
+  "pb1931_address_of_by_reference_formal",
   "pb2113_subscript_expressions_and_arguments",
   "pb311_date_day_windowing_r6_bounds",
   "pb2095_bit_item_by_reference_area",
