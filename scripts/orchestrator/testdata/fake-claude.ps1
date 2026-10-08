@@ -48,6 +48,14 @@ function WaitEof {
     Set-Content -Path (Join-Path $coord 'eof.txt') -Value 'stdin closed by the supervisor'
 }
 function Hand($o) { Set-Content -Path $handoff -Value ($o | ConvertTo-Json -Depth 10) -Encoding utf8 }
+# The ONE wait for the supervisor's STOP-UNIT, shared by every mode that waits for it. A hang guard, never a speed bound:
+# the supervisor writes STOP-UNIT within seconds, but the self-test runner runs this beside 59 others on a shared host,
+# where a 60 s guard expired (train 1037t, 2026-10-08; and again in the softcap mode, which had kept its own 60 s copy,
+# at wave 1043's gate: the guard ran before STOP-UNIT existed and allowed the second launch).
+function WaitStopUnit {
+    $deadline = (Get-Date).AddSeconds(600)
+    while (-not (Test-Path (Join-Path $coord 'STOP-UNIT')) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+}
 
 Emit @{ type = 'system'; subtype = 'init'; session_id = $sid }
 switch ($env:FAKE_CLAUDE_MODE) {
@@ -55,10 +63,7 @@ switch ($env:FAKE_CLAUDE_MODE) {
     'nohandoff' { Call 'msg_1' 5000; exit 0 }
     'bigcontext' {
         Call 'msg_1' 900000
-        # A hang guard, never a speed bound: the supervisor writes STOP-UNIT within seconds, but the self-test runner runs
-        # this beside 59 others on a shared host, where a 60 s guard expired (train 1037t, 2026-10-08).
-        $deadline = (Get-Date).AddSeconds(600)
-        while (-not (Test-Path (Join-Path $coord 'STOP-UNIT')) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+        WaitStopUnit
         Hand @{ schema_version = 1; unit = 'wave'; outcome = 'split'; summary = 'stopped at STOP-UNIT'; next_unit = 'resume' }
         exit 0
     }
@@ -86,10 +91,7 @@ switch ($env:FAKE_CLAUDE_MODE) {
         # The owner creates STOP while this unit runs; the supervisor must wind the unit down (STOP-UNIT and the fleet STOP).
         Call 'msg_1' 5000
         Set-Content -Path (Join-Path $coord 'STOP') -Value 'owner'
-        # A hang guard, never a speed bound: the supervisor writes STOP-UNIT within seconds, but the self-test runner runs
-        # this beside 59 others on a shared host, where a 60 s guard expired (train 1037t, 2026-10-08).
-        $deadline = (Get-Date).AddSeconds(600)
-        while (-not (Test-Path (Join-Path $coord 'STOP-UNIT')) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+        WaitStopUnit
         Set-Content -Path (Join-Path $coord 'fleet-stop-seen.txt') -Value (Test-Path (Join-Path $coord 'scratch/STOP-loop'))
         # The wind-down must never create the owner's GLOBAL stop: other sessions' agents obey it (kb/Work PB2483).
         Set-Content -Path (Join-Path $coord 'global-stop-seen.txt') -Value (Test-Path (Join-Path $coord 'scratch/STOP'))
@@ -103,8 +105,7 @@ switch ($env:FAKE_CLAUDE_MODE) {
         Emit @{ type = 'system'; subtype = 'background_tasks_changed'; tasks = @(@{ task_id = 'wf1'; task_type = 'local_workflow' }); session_id = $sid }
         Start-Sleep -Milliseconds 300
         Call 'msg_1' 5000
-        $deadline = (Get-Date).AddSeconds(60)
-        while (-not (Test-Path (Join-Path $coord 'STOP-UNIT')) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+        WaitStopUnit
         Start-Sleep -Milliseconds 500   # a fleet stop, if the supervisor (wrongly) sent one, lands with STOP-UNIT
         Set-Content -Path (Join-Path $coord 'soft-fleet-stop-seen.txt') -Value (Test-Path (Join-Path $coord 'scratch/STOP-loop'))
         Set-Content -Path (Join-Path $coord 'loop-unit-env.txt') -Value $env:COBOL_LOOP_UNIT
