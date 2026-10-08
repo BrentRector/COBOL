@@ -14,7 +14,7 @@
   "than a boolean is the point: two evaluators that reject one row for two different reasons look identical",
   "under 'it was refused', which is the shape PB315 hid behind for months.",
   "",
-  "⚙ THE WORLD IS FABRICATED ON PURPOSE. Every one of the eight live determinations is correct, so the arms",
+  "⚙ THE WORLD IS FABRICATED ON PURPOSE. Every live determination is correct, so the arms",
   "cannot be falsified against the real document — a fixture built from it would pass for the wrong reason",
   "(feedback_probe_the_shape_the_subject_hides).",
   "",
@@ -32,6 +32,8 @@
     "argument": "an A.2 item that does not exist", "signature": "owner: 2026-09-03"},
    {"key": "DRV-GR-14.9.5.4-14", "arm": "undefined-A.2", "names": "A.2 item 4",
     "argument": "the right ground, the wrong signer", "signature": "owner: 1999-01-01"},
+   {"key": "DRV-GR-14.9.5.4-16", "arm": "undefined-A.2", "names": "A.2 item 4",
+    "argument": "a later owner decision signs under its own date (kb/Work PB1636)", "signature": "owner: 2026-10-08"},
    {"key": "DRV-GR-14.9.5.4-15", "arm": "made-it-up", "names": "A.2 item 4",
     "argument": "an arm the schema does not declare", "signature": "owner: 2026-09-03"},
    {"key": "DRV-GR-14.9.11.4-11", "arm": "unpopulatable-antecedent",
@@ -51,7 +53,7 @@
   "register-items": ["DOC-A.1-19"],
   "undefined": {
    "$note": "GR-14.9.5.4-14 is covered so that the bad-signature case fails for the SIGNATURE alone — a case with two causes cannot show which check fired.",
-   "4": ["GR-14.9.5.4-11", "GR-14.9.5.4-14"],
+   "4": ["GR-14.9.5.4-11", "GR-14.9.5.4-14", "GR-14.9.5.4-16"],
    "41": ["GR-14.9.30.4-3"]
   },
   "catalog-rule-ids": ["GR-14.9.5.4-7", "GR-14.9.5.4-11", "GR-14.9.30.4-3", "RV-15.50.4-5", "DOC-A.1-19"]
@@ -85,6 +87,13 @@
            "code-location": "src/Cobol.Net.Runtime/Control/ProgramTable.cs#CallPointer",
            "derivation": "docs/CONFORMANCE.md#DRV-GR-14.9.5.4-14"},
    "state": "GAP", "refusals": ["bad-signature"]},
+
+  {"name": "a determination signed by a LATER owner decision the schema lists is accepted (the signature is a set)",
+   "row": {"rule-id": "GR-14.9.5.4-16", "section": "14.9.5.4", "kind": "GR", "ordinal": 16,
+           "subject": "CANCEL statement", "verdict": "CONFORMS",
+           "code-location": "src/Cobol.Net.Runtime/Control/ProgramTable.cs#CallPointer",
+           "derivation": "docs/CONFORMANCE.md#DRV-GR-14.9.5.4-16"},
+   "state": "OK", "refusals": []},
 
   {"name": "an arm the schema does not declare is refused",
    "row": {"rule-id": "GR-14.9.5.4-15", "section": "14.9.5.4", "kind": "GR", "ordinal": 15,

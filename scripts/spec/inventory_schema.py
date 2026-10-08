@@ -212,7 +212,7 @@ class DerivationRow(NamedTuple):
     arm: str        #: which of the three §1.1 grounds this determination stands on
     names: str      #: the arm's OBJECT — `A.2 item <n>` / the closed set / the indistinguishable rule-id
     argument: str   #: the derivation itself, written for a reader
-    signature: str  #: the owner's signature, matched against `derivation.signature` in the schema
+    signature: str  #: the owner's signature, one of the keys of `derivation.signatures` in the schema
 
 
 def register_cells(line: str) -> list[str]:
@@ -493,7 +493,8 @@ class Derivation:
         self.anchor_template: str = raw["anchor-template"]
         self.heading: str = raw["register-heading"]
         self.header_cell: str = raw.get("register-header-cell", "Rule")
-        self.signature: str = raw["signature"]
+        #: Every signature the owner has given — one dated decision each, mapped to where it is recorded.
+        self.signatures: dict[str, str] = {k: v for k, v in raw["signatures"].items() if not k.startswith("$")}
         self.undefined_list: str = raw["undefined-list"]
         self.arms: dict[str, dict[str, Any]] = {
             name: {"names": re.compile(arm["names-pattern"]), "check": arm["check"]}
@@ -581,10 +582,11 @@ class Derivation:
                                f"docs/CONFORMANCE.md {self.heading.strip('# ')} carries no row keyed "
                                f"'{self.key_for(row)}'"))
             return out
-        if entry.signature != self.signature:
+        if entry.signature not in self.signatures:
             out.append(Refusal("bad-signature",
-                               f"determination '{entry.key}' is signed '{entry.signature}', not "
-                               f"'{self.signature}' — a derivation is the OWNER's, and the signature records it"))
+                               f"determination '{entry.key}' is signed '{entry.signature}', not one of "
+                               f"{sorted(self.signatures)} — a derivation is the OWNER's, and the signature "
+                               f"records which owner decision read it"))
         arm = self.arms.get(entry.arm)
         if arm is None:
             out.append(Refusal("unknown-arm",

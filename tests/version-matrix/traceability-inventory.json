@@ -759,10 +759,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#ResolveOneCopy",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-7.2.3.4-4",
   "editions": "85, 2002, 2014, 2023",
   "notes": "GR4: 'If the SUPPRESS phrase is specified, library text incorporated as a result of COPY statement processing is not listed. If a listing is being produced, the COPY statement itself is listed.' cite.py --check 7.2.3.4 'If the SUPPRESS phrase is specified, library text incorporated as a result of COPY statement processing is not listed' -> OK §7.2.3.4 4). COBOL.NET produces no source listing (docs/CONFORMANCE.md: '>>LISTING / >>PAGE ... no source listing is produced'; A.1 item 200 is conditioned on the implementor producing listings), so both halves hold vacuously; SUPPRESS [PRINTING] is accepted (ResolveOneCopy scans past it to the period) — probe p2c (COPY p2book SUPPRESS.) incorporated the text. ⚠ The SUPPRESS phrase is NOT harmless: because it is skipped by the scan-to-period rather than parsed, a REPLACING phrase that follows it (the general-format order) is silently discarded — filed against GR8/GR6 (finding 'COPY phrase parse is positional'). The legacy integration test SourceTextSpecTests.CopySuppressPrinting_IsBenignAndStillCopies exercises CobolSharp.Compiler, not Cobol.Net, so it does not close this row. probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/copy-p2/ || editions (adjudicator): 85, 2002, 2014, 2023 (COPY statement present in every edition; Annex E.2 item 1 bullet 4 touches only non-pseudo-text REPLACING operands at 2023)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-5",
@@ -774,10 +774,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#ListingDirective2002",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-7.2.3.4-5",
   "editions": "2002, 2014, 2023",
   "notes": "GR5: 'At the completion of copying the library text into the compilation group, the LISTING directive that is in effect for the COPY statement itself is considered to be in effect, regardless of any LISTING directives in the library text.' No source listing is produced (docs/CONFORMANCE.md §5 prose: '>>LISTING / >>PAGE (§7.3.18 / §7.3.19) — no source listing is produced, so listing on/off and page ejects are inert'); the LISTING directive is recognized and consumed, carrying no state that could leak out of a copybook. Vacuously satisfied; no observable behaviour to test. || editions (adjudicator): 2002, 2014, 2023 (the LISTING directive is a §7.3 compiler directive; the rule is moot at 85, which has no directives)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.2.3.4-6",
@@ -1584,10 +1584,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#Find",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-7.3.4-4",
   "editions": "2002, 2014, 2023",
   "notes": "§7.3.4 GR4 'If the implementor defines the IMP directive, the general rules for that directive shall be implementor-defined.' (cite.py --check 7.3.4 OK). Conditional on an implementor IMP directive, which COBOL.NET does not define (no catalog row claims IMP; I1/I3 '>>IMP ...' rejected). The rule is vacuous for this implementation and Annex A.1 item 30 is owed only 'upon support for an IMP directive'. Nothing to test beyond SR-7.3.3-9's rejection. || editions (adjudicator): 2002, 2014, 2023 (the >> compiler-directive facility is absent from X3.23-1985; per-directive introducing editions are the §7.3.x rows' own, e.g. PUSH/POP added in 2023 per Annex E.3.3 item 38 and E.2 item 5)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.4-5",
@@ -1869,10 +1869,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#Entries",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-7.3.9.3-3",
   "editions": "2002, 2014, 2023",
   "notes": "Rule: 'The CALL-CONVENTION directive may also be used by the implementor to determine other details needed to interact with a function, method, or program.' (cite.py OK §7.3.9.3 3)). Permissive ('may'): it grants the implementor latitude and imposes no obligation. COBOL.NET uses no call-convention to select linkage details (single .NET managed calling convention, docs/CONFORMANCE.md recognized-and-ignored directives entry; DirectiveStateRegistry 'NONE HELD'). Declining an optional latitude conforms. Nothing observable to test.",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.10.3-1",
@@ -3279,10 +3279,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Process; src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#ListingDirective2002; src/Cobol.Net.Editions/ConstructRegistry.g.cs#listing-directive-2002",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-7.3.18.3-2",
   "editions": "2002, 2014, 2023",
   "notes": "Rule: 'The default LISTING directive is '>>LISTING ON'.' cite.py --check 7.3.18.3 -> OK §7.3.18.3 2). The CLI (cobol --help) has no listing option and a case-insensitive search of src/Cobol.Net.* for a listing producer finds none; DirectiveStateRegistry records 'NONE HELD: ... this compiler produces none' and docs/CONFORMANCE.md (recognized-and-ignored directives paragraph) says 'no source listing is produced, so listing on/off and page ejects are inert'. GR1 ('If the compiler does not produce a source listing, the LISTING directive shall be ignored. Otherwise, the following general rules apply.') makes this rule apply only to a compiler that produces a listing, so it is satisfied vacuously; it becomes live the day a listing is added. Probe out/probe/listing-directive/lst{2002,2014,2023}.cob: >>LISTING OFF (twice), >>LISTING ON, bare >>LISTING, >>LISTING OFF interleaved with DATA/PROCEDURE lines; --std 2002/2014/2023 --run each prints A=1 / B=2 with no diagnostic, i.e. every line after OFF is still compiled and the directive has no effect. No test can observe a listing that does not exist, so test-ref is empty; the vacuous conformance rests on GR-7.3.18.3-1. || editions (adjudicator): 2002, 2014, 2023 (the 2023 Annex E does not list the LISTING directive as a change, so it predates 2023; the 2002 introduction of the Clause-7 directive facility is the project VCR's derivation and was not re-derived here from a 2002 annex) || code-location detail: src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Process (directive consume + CompilerDirectiveCatalog.CheckOperand); src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#ListingDirective2002 row; src/Cobol.Net.Editions/ConstructRegistry.g.cs#listing-directive-2002",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.18.3-3",
@@ -3294,10 +3294,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Process; src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#ListingDirective2002; src/Cobol.Net.Editions/ConstructRegistry.g.cs#listing-directive-2002",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-7.3.18.3-3",
   "editions": "2002, 2014, 2023",
   "notes": "Rule: 'Each LISTING directive shall be listed, even if the listing is being suppressed by a LISTING directive.' cite.py --check 7.3.18.3 -> OK §7.3.18.3 3). The CLI (cobol --help) has no listing option and a case-insensitive search of src/Cobol.Net.* for a listing producer finds none; DirectiveStateRegistry records 'NONE HELD: ... this compiler produces none' and docs/CONFORMANCE.md (recognized-and-ignored directives paragraph) says 'no source listing is produced, so listing on/off and page ejects are inert'. GR1 ('If the compiler does not produce a source listing, the LISTING directive shall be ignored. Otherwise, the following general rules apply.') makes this rule apply only to a compiler that produces a listing, so it is satisfied vacuously; it becomes live the day a listing is added. Probe out/probe/listing-directive/lst{2002,2014,2023}.cob: >>LISTING OFF (twice), >>LISTING ON, bare >>LISTING, >>LISTING OFF interleaved with DATA/PROCEDURE lines; --std 2002/2014/2023 --run each prints A=1 / B=2 with no diagnostic, i.e. every line after OFF is still compiled and the directive has no effect. No test can observe a listing that does not exist, so test-ref is empty; the vacuous conformance rests on GR-7.3.18.3-1. || editions (adjudicator): 2002, 2014, 2023 (the 2023 Annex E does not list the LISTING directive as a change, so it predates 2023; the 2002 introduction of the Clause-7 directive facility is the project VCR's derivation and was not re-derived here from a 2002 annex) || code-location detail: src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Process (directive consume + CompilerDirectiveCatalog.CheckOperand); src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#ListingDirective2002 row; src/Cobol.Net.Editions/ConstructRegistry.g.cs#listing-directive-2002",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.18.3-4",
@@ -3309,10 +3309,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Process; src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#ListingDirective2002; src/Cobol.Net.Editions/ConstructRegistry.g.cs#listing-directive-2002",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-7.3.18.3-4",
   "editions": "2002, 2014, 2023",
   "notes": "Rule: 'If OFF is specified, source lines shall not be listed until a LISTING directive specifying or implying the ON phrase is encountered, with the exception that another LISTING OFF directive shall be listed.' cite.py --check 7.3.18.3 -> OK §7.3.18.3 4). The CLI (cobol --help) has no listing option and a case-insensitive search of src/Cobol.Net.* for a listing producer finds none; DirectiveStateRegistry records 'NONE HELD: ... this compiler produces none' and docs/CONFORMANCE.md (recognized-and-ignored directives paragraph) says 'no source listing is produced, so listing on/off and page ejects are inert'. GR1 ('If the compiler does not produce a source listing, the LISTING directive shall be ignored. Otherwise, the following general rules apply.') makes this rule apply only to a compiler that produces a listing, so it is satisfied vacuously; it becomes live the day a listing is added. Probe out/probe/listing-directive/lst{2002,2014,2023}.cob: >>LISTING OFF (twice), >>LISTING ON, bare >>LISTING, >>LISTING OFF interleaved with DATA/PROCEDURE lines; --std 2002/2014/2023 --run each prints A=1 / B=2 with no diagnostic, i.e. every line after OFF is still compiled and the directive has no effect. No test can observe a listing that does not exist, so test-ref is empty; the vacuous conformance rests on GR-7.3.18.3-1. The bare >>LISTING (ON implied, per the un-underlined ON of §7.3.18.2) is accepted — the open analysis note PB808 owns the spec-transcription figure note that wrongly calls ON required; it does not affect this compiler. || editions (adjudicator): 2002, 2014, 2023 (the 2023 Annex E does not list the LISTING directive as a change, so it predates 2023; the 2002 introduction of the Clause-7 directive facility is the project VCR's derivation and was not re-derived here from a 2002 annex) || code-location detail: src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Process (directive consume + CompilerDirectiveCatalog.CheckOperand); src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#ListingDirective2002 row; src/Cobol.Net.Editions/ConstructRegistry.g.cs#listing-directive-2002",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.18.3-5",
@@ -3324,10 +3324,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Process; src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#ListingDirective2002; src/Cobol.Net.Editions/ConstructRegistry.g.cs#listing-directive-2002",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-7.3.18.3-5",
   "editions": "2002, 2014, 2023",
   "notes": "Rule: 'If ON is specified or implied, source lines shall be listed until either a LISTING OFF directive is encountered or the end of the compilation group is reached.' cite.py --check 7.3.18.3 -> OK §7.3.18.3 5). The CLI (cobol --help) has no listing option and a case-insensitive search of src/Cobol.Net.* for a listing producer finds none; DirectiveStateRegistry records 'NONE HELD: ... this compiler produces none' and docs/CONFORMANCE.md (recognized-and-ignored directives paragraph) says 'no source listing is produced, so listing on/off and page ejects are inert'. GR1 ('If the compiler does not produce a source listing, the LISTING directive shall be ignored. Otherwise, the following general rules apply.') makes this rule apply only to a compiler that produces a listing, so it is satisfied vacuously; it becomes live the day a listing is added. Probe out/probe/listing-directive/lst{2002,2014,2023}.cob: >>LISTING OFF (twice), >>LISTING ON, bare >>LISTING, >>LISTING OFF interleaved with DATA/PROCEDURE lines; --std 2002/2014/2023 --run each prints A=1 / B=2 with no diagnostic, i.e. every line after OFF is still compiled and the directive has no effect. No test can observe a listing that does not exist, so test-ref is empty; the vacuous conformance rests on GR-7.3.18.3-1. The bare >>LISTING (ON implied, per the un-underlined ON of §7.3.18.2) is accepted — the open analysis note PB808 owns the spec-transcription figure note that wrongly calls ON required; it does not affect this compiler. || editions (adjudicator): 2002, 2014, 2023 (the 2023 Annex E does not list the LISTING directive as a change, so it predates 2023; the 2002 introduction of the Clause-7 directive facility is the project VCR's derivation and was not re-derived here from a 2002 annex) || code-location detail: src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Process (directive consume + CompilerDirectiveCatalog.CheckOperand); src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs#ListingDirective2002 row; src/Cobol.Net.Editions/ConstructRegistry.g.cs#listing-directive-2002",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "SR-7.3.19.3-1",
@@ -3384,10 +3384,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#Render",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-7.3.19.4-2",
   "editions": "2002, 2014, 2023",
   "notes": "Rule: 'If a source listing is being produced, a PAGE directive shall cause page ejection followed by listing of the PAGE directive.' (cite.py --check 7.3.19.4 -> OK §7.3.19.4 2)). COBOL.NET produces no source listing at all: cobol --help offers no listing option and no listing writer exists in src/Cobol.Net.* (grep 'listing' finds only directive-state/catalog mentions); docs/CONFORMANCE.md (recognized-and-ignored directives, ~line 525) records '>>LISTING / >>PAGE (§7.3.18 / §7.3.19) — no source listing is produced, so listing on/off and page ejects are inert'. The rule's condition is never true, so it imposes no obligation — vacuously conforming. Reopens if a listing facility is ever added (page eject, then the directive line listed). The conditional arm is untestable today. || editions (adjudicator): 2002, 2014, 2023 (the §7.3 directive facility is post-85; Annex E lists no 2014->2023 change to §7.3.19; COBOL-85 has no >> lines — derived edge, VCR Table 7 row 7.21)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-7.3.19.4-3",
@@ -4089,10 +4089,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Pipeline/CompilationInputs.cs#ReadAllText",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-8.1.3.2-5",
   "editions": "85, 2002, 2014, 2023",
   "notes": "Rule: 'When an implementation does not provide a graphic representation of all characters of the COBOL character repertoire, substitute graphics may be specified by the implementor to replace the characters not represented.' (cite.py --check 8.1.3.2 -> OK 8.1.3.2 5)). A permission conditioned on a missing graphic. The source is decoded to UTF-16, which represents every Table 1 basic letter, digit and special character (all in ISO/IEC 646 IRV) and every Annex B character, so the antecedent is false and no substitute graphic is used or needed -- verified by reading ReadAllText and by the probes (rcase/rcase2 exercise the basic set incl. hyphen, quote, parentheses, period). No latitude exercised. Documenting 'substitute graphics: none' belongs to A.1 item 25 = DOC-A.1-25, the same missing CONFORMANCE.md row noted on GR-8.1.3.2-1; it does not make this permissive rule defective. CONFORMS-but-untested. || editions as written by the adjudicator: 85, 2002, 2014, 2023 (no Annex E change)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.2.1-1",
@@ -5709,10 +5709,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#TryBindAllArgument; src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.SubscriptSegments.cs#BindPositionTemporary",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-SR-8.4.2.3.3-7",
   "editions": "85, 2002, 2014, 2023",
   "notes": "Rule (cite.py --check 8.4.2.3.3 'ALL shall not be specified if qualified-condition-name-1 is specified.' -> OK §8.4.2.3.3 7)). No path admits ALL on a condition-name: the only two ALL-admitting contexts (§8.4.2.3.3 SR6) take a data item (intrinsic argument / SORT data-name-2), and everywhere else the ALL segment fails the subscript parse. Probes scratchpad/adj-d2/out/probe/subscripts/sr7a-d.cob over `05 E1 PIC 9 OCCURS 3. 88 C1 VALUE 1.`: `IF C1(ALL)`, `SET C1(ALL) TO TRUE`, `EVALUATE TRUE WHEN C1(ALL)` -> COBOLNET2363; `FUNCTION MAX(C1(ALL))` -> COBOLNET1639 (a condition-name identifies no data item); legal `IF C1(2)` / `IF C1 OF E1 (3)` run (sr7e). Every illegal spelling is refused at compile time; the COBOLNET2363 text names SR6 rather than SR7 (diagnostic wording only - SR6 independently forbids each of these). No test targets the condition-name spelling - CONFORMS-untested. retired-witness: src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.SubscriptSegments.cs#MaterializeSubscriptSegment (renamed: kb/Work PB2151 - the D18 hook binds the position's parse node only (BindPositionTemporary))",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.2.3.3-8",
@@ -8019,10 +8019,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Values/Text/CobolDynString.cs#CobolDynString; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#CobolDynTable",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-8.5.1.11.3-1",
   "editions": "2014, 2023",
   "notes": "PERMISSIVE rule: §8.5.1.11.3 says the resources 'MAY be freed automatically when' the listed event occurs, and 'The actual time when the resources used by a variable-length data item are freed is implementor-defined' (Annex A item 220: required, need not be documented). The only binding content is that freeing is unobservable ('this has no effect on the results of the execution of the program') and persistence equals a fixed-length item's. COBOL.NET's variable-length items are managed .NET objects: a dynamic-length item IS a System.String field (CobolDynString), a dynamic-capacity table IS a CobolDynTable<T> (T[] + count); reclamation is by the CLR GC once unreachable, so every listed event is honoured at a GC-determined time, which the implementor-defined timing admits. cite.py --check 8.5.1.11.3 \"The resources used by a variable-length data item may be freed automatically when\" -> OK; --check 8.5.1.11.3 \"The actual time when the resources used by a variable-length data item are freed is implementor-defined\" -> OK; --check 8.5.1.11.1 \"The term variable-length data item refers to either a dynamic-capacity table or a dynamic-length elementary item\" -> OK. Editions: the facility is ISO 2014+ (Annex E item 17 of 2023 records only the SET SIZE enhancement as new, so the items pre-exist in 2014). Event 1 (object finalized): OBJECT working-storage variable-length items are per-instance managed fields; they become unreachable with the instance and are collected with it. Probe probe/vldi/p2.cob (CLASS-ID CDYN, OBJECT WS with OCCURS DYNAMIC + DYNAMIC LENGTH; two instances, FILL on O1, SHOW both, SET O1 TO NULL): output 'CAP=0000000006 D=[HELLO]' / 'CAP=0000000001 D=[]' -- per-instance storage, no sharing, released with the instance. No spec-derived test pins OO-instance variable-length data (none exists; the freeing itself is unobservable).",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.11.3-2",
@@ -8049,10 +8049,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Values/Text/CobolDynString.cs#CobolDynString; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#CobolDynTable",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-8.5.1.11.3-3",
   "editions": "2014, 2023",
   "notes": "PERMISSIVE rule: §8.5.1.11.3 says the resources 'MAY be freed automatically when' the listed event occurs, and 'The actual time when the resources used by a variable-length data item are freed is implementor-defined' (Annex A item 220: required, need not be documented). The only binding content is that freeing is unobservable ('this has no effect on the results of the execution of the program') and persistence equals a fixed-length item's. COBOL.NET's variable-length items are managed .NET objects: a dynamic-length item IS a System.String field (CobolDynString), a dynamic-capacity table IS a CobolDynTable<T> (T[] + count); reclamation is by the CLR GC once unreachable, so every listed event is honoured at a GC-determined time, which the implementor-defined timing admits. cite.py --check 8.5.1.11.3 \"The resources used by a variable-length data item may be freed automatically when\" -> OK; --check 8.5.1.11.3 \"The actual time when the resources used by a variable-length data item are freed is implementor-defined\" -> OK; --check 8.5.1.11.1 \"The term variable-length data item refers to either a dynamic-capacity table or a dynamic-length elementary item\" -> OK. Editions: the facility is ISO 2014+ (Annex E item 17 of 2023 records only the SET SIZE enhancement as new, so the items pre-exist in 2014). Event 3 (main program GOBACK/STOP): the run unit ends and every managed object of the run unit is reclaimed (process exit or RunUnit teardown). Nothing to observe; no dedicated mechanism is needed or permitted to be observable.",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.1.11.3-4",
@@ -10584,10 +10584,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/IO/FileStatus.cs#FileStatusCode",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-9.1.13.3-1",
   "editions": "85,2002,2014,2023",
   "notes": "Rule (cite.py --check 9.1.13.3 \"This condition shall not duplicate any condition specified by another I-O status value\" -> OK §9.1.13.3 1)); the value is Annex A.1 item 106, OPTIONAL (cite.py --check A.1 \"I-O status 0x (value of x). This item is optional\" -> OK §A.1 106)). COBOL.NET provides NO '0x' letter status: FileStatusCode defines none and a search of src/Cobol.Net.Runtime for a \"0[A-Ma-m]\" status literal finds nothing, so the non-duplication constraint is met vacuously and the optional documentation obligation does not arise (docs/CONFORMANCE.md line ~294 records the E.2 item 17 note that only digit '0x' values are reported). Case-equivalence (the NOTE) is moot with no letter value produced. No test: nothing to observe beyond absence. || Editions (adjudicator, verbatim): 85,2002,2014,2023 (E.2 item 17: from 2023 upper/lower-case equivalence is implementor dependent)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.1.13.4-1",
@@ -11484,10 +11484,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Preprocessor/DirectiveStateRegistry.cs; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-9.3.6-L3.2",
   "editions": "2002,2014,2023",
   "notes": "Rule (cite.py --check 9.3.6 'The same calling convention shall be in effect for the invocation as is in effect for the invoked method' -> OK §9.3.6 2)). COBOL.NET provides exactly one convention: ENTRY-CONVENTION accepts only COBOL (non-COBOL names refused COBOLNET2385, adjudicated in the entry-convention-clause subject), and >>CALL-CONVENTION is recognized-and-ignored with a documented single-convention disposition (docs/CONFORMANCE.md, 'Recognized-and-ignored compiler directives (§7.3)': 'CALL uses the single .NET managed calling convention'). The invocation's and the method's conventions are therefore always the same one, and the condition is satisfied by construction. Probe out/probe/objects-p1/cc.cob: >>CALL-CONVENTION XYZ before INVOKE R \"M\" compiled and ran M-OK — consistent with the documented disposition (§7.3.9.3 GR2 b) leaves call-convention-name-1's meaning to the implementor). Vacuous today; it becomes a live check the day a second convention is provided. Test-needed (nothing observable to golden beyond the documented disposition). || Editions (adjudicator, verbatim): 2002, 2014, 2023 (OO is an ISO/IEC 1989:2002 introduction; absent from 1985 — probe p1.cob at --std 85 is refused COBOLNET0900)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-9.3.6-L3.3",
@@ -13059,10 +13059,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/OptionsModel.cs#EntryConvention; src/Cobol.Net.Compiler/Binding/OptionsBinder.cs#EntryConventionOf",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-11.9.7.4-4",
   "editions": "2014,2023",
   "notes": "Rule (cite.py --check 11.9.7.4 a) \"If a class definition includes the INHERITS clause, the entry convention is inherited from the first class specified\", b) \"If an interface definition includes the INHERITS clause, the entry convention is inherited from the first interface\", c) \"In all other cases, the entry convention is COBOL\" -> all OK GR4). Every class/interface an INHERITS clause can name must be defined in the compilation group (COBOLNET0821 otherwise, measured with INHERITS FROM BASE) and every such element's convention is COBOL (other names refused COBOLNET2385), so the inherited convention in a) and b) is COBOL by construction; c) absent clause -> COBOL (OptionsModel null = COBOL). Verified: p4 (ECDER INHERITS FROM ECBASE, no clause) invokes the inherited method; p6 (interface ECIB INHERITS FROM ECIA) compiles/runs; consistent with §11.9.4 GR1 (cite OK). The golden pb232_entry_convention_cobol exercises only arm c) (contained W56ECIN with no clause); arms a)/b) untested -> test-ref empty. Correct vacuously while only COBOL exists; if an entry-convention-name is ever provided, the producer-only OptionsModel.EntryConvention (open PB298) must gain INHERITS inheritance. || Editions (adjudicator, verbatim): 2014, 2023 (the 2023 Annex E lists no introduction or change of the clause, so it predates 2023; whether ISO 1989:2002 carried it is not derivable from specs/ISO_COBOL.md -- the code gates it 2014 as a recorded conservative choice, constructs.json options-entry-convention-2014)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "SR-11.9.8.3-1",
@@ -13644,10 +13644,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#sourceComputerParagraph; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindDeclarations",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-12.3.5.4-2",
   "editions": "2002,2014,2023",
   "notes": "Rule: 'When the SOURCE-COMPUTER paragraph is not specified and the source unit is not contained within a source unit including a SOURCE-COMPUTER paragraph, the computer on which the source unit is being compiled is the source computer.' (cite.py --check 12.3.5.4 -> OK §12.3.5.4 2)). The paragraph is optional in the grammar and the compiler has no source-computer-dependent behavior: no code consumes a source-computer identity (grep of src for computerName() finds only the OBJECT-COMPUTER gate at VersionConformancePass.cs:1468), so the source computer is always the compiling host — exactly the rule. The only paragraph-derived state (DebuggingModeDeclared) defaults to false when the paragraph is absent, which is the no-clause behavior. No dedicated spec-derived test; every golden omitting the paragraph exercises it implicitly. [registrar 14a — editions as adjudicated: 1985, 2002, 2014, 2023]",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.3.5.4-3",
@@ -13659,10 +13659,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#sourceComputerParagraph",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-12.3.5.4-3",
   "editions": "2002,2014,2023",
   "notes": "Rule: 'When the SOURCE-COMPUTER paragraph is specified, but computer-name-1 is not specified, the computer upon which the source unit is being compiled is the source computer.' (cite.py --check 12.3.5.4 -> OK §12.3.5.4 3)). Grammar: SOURCE_COMPUTER DOT ((computerName debuggingModeClause? unrecognizedClause?)? DOT)? — computer-name-1 optional, second period optional. Since computer-name-1 is never consumed, a name-less paragraph yields the compiling host as source computer, same as a named one. conformance:2023/pb78_object_computer_optional_name compiles a name-less 'SOURCE-COMPUTER.' but is a test of OBJECT-COMPUTER, so it is not cited as closing this row. Whether a name-less SOURCE-COMPUTER is correctly gated/accepted at 1985 was not verified here (outside this GR's content). [registrar 14a — editions as adjudicated: 1985, 2002, 2014, 2023 (name-less paragraph form per the 2023 format; the '85 format required computer-name, see the grammar comment)]",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.3.6.3-1",
@@ -16269,10 +16269,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ResolveFileCollating; src/Cobol.Net.Compiler/Binding/DataBinder.cs#DeclineRecordKeySource",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-SR-12.4.5.7.3-5",
   "editions": "2002,2014,2023",
   "notes": "cite.py --check 12.4.5.7.3 \"Record-key-name-1 shall be a name specified as a record-key-name\" OK. ResolveFileCollating builds keyNames from RecordKeyName + AlternateKeyNames and refuses any Format-2 name outside it (COBOLNET1582, 'SR4/SR5'). record-key-name-1 can only be defined by the `record-key-name-1 SOURCE IS` key form, which CONFORMANCE.md row 40 declares Not claimed and DataBinder.DeclineRecordKeySource refuses by name (COBOLNET1954) at every edition — so no accepted program can hold a record-key-name, and every Format-2 name that is not a declared key's data-name is refused. The SR5 arm is therefore enforced (vacuously) for all accepted source; no open note needed (row 40's witnesses are PB358, landed). FileCollatingSequenceSpecTests.KeyLevel_NameThatIsNotAKey_Diagnosed covers SR4's data-name arm, not SR5 — test-ref left empty. [registrar 14a — editions as adjudicated: 2002, 2014, 2023 (absent from COBOL-85: the file-control COLLATING SEQUENCE clause is a 2002 introduction; Annex E lists no 2014->2023 delta for it)]",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "SR-12.4.5.7.3-6",
@@ -20079,10 +20079,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#blockContainsClause",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-13.18.10.4-3",
   "editions": "2002, 2014, 2023",
   "notes": "cite.py --check 13.18.10.4 \"regardless of the types of characters used to represent the items within the physical record\" -> OK GR3. Defines the unit of a CHARACTERS size (bytes). The physical-record size has no effect in this implementation, which A.3 item 5 sanctions and CONFORMANCE.md documents (§4.2.6 documentation duty met by row 5). Nothing observable to diverge. docs/CONFORMANCE.md A.3 row 5 = Claimed (inert): 'Accepted; no effect on the managed I-O model'. cite.py --check A.3 \"The BLOCK CONTAINS clause has no effect if the operating environment does not support the required features\" -> OK §A.3 5). No binder/emitter/runtime site reads blockContainsClause (grep of src: only CobolData.g4 and IntegerOperandPass.Slots reference it); the managed I-O model does no blocking. || Editions (adjudicator): 1985, 2002, 2014, 2023 (clause present unchanged in every edition; Annex E records no change to 13.18.10)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.10.4-4",
@@ -20094,10 +20094,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#blockContainsClause",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-13.18.10.4-4",
   "editions": "2002, 2014, 2023",
   "notes": "cite.py --check 13.18.10.4 \"If integer-1 is not specified, integer-2 represents the exact size of the physical record.\" -> OK GR4. Exact vs min/max physical record size has no runtime effect under the documented inert claim (A.3 item 5). The one compile-time consequence of the min/max reading - their ordering - is SR1 (DIVERGES, separate row); §13.4.5.4 GR2a's EXTERNAL agreement on min/max is a different rule, not adjudicated here. docs/CONFORMANCE.md A.3 row 5 = Claimed (inert): 'Accepted; no effect on the managed I-O model'. cite.py --check A.3 \"The BLOCK CONTAINS clause has no effect if the operating environment does not support the required features\" -> OK §A.3 5). No binder/emitter/runtime site reads blockContainsClause (grep of src: only CobolData.g4 and IntegerOperandPass.Slots reference it); the managed I-O model does no blocking. || Editions (adjudicator): 1985, 2002, 2014, 2023 (clause present unchanged in every edition; Annex E records no change to 13.18.10)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.11.3-1",
@@ -21129,10 +21129,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Reports.cs#ControlOperandShapeViolation",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-13.18.16.4-6",
   "editions": "85, 2002, 2014, 2023",
   "notes": "cite.py --check 13.18.16.4 \"Data-name-1 shall not reference a zero-length group item\" -> OK 6). Zero-length group per §8.5.4 (cite.py --check 8.5.4 \"A group data item containing only an occurs-depending table in which the number of occurrences is zero\" -> OK 1)): item 1 (group of only an ODO table) and item 2 (group of only a zero-length subordinate, recursively ODO or DYNAMIC LENGTH) are always rejected at bind by ControlOperandShapeViolation's SR5 arm (OdoModel.TableUnder, cite OK §13.18.16.3 5)) and SR7 arm (HasVariableLengthSubordinate, cite OK §13.18.16.3 7)); items 3/4 are elementary, not groups; item 5 (a variable-length logical record whose runtime length is zero) is a run-time state the GR constrains the PROGRAM against with no exception condition or specified outcome, so no implementation action is required. Existing negatives pb177-control-occurs-depending / pb177-control-variable-length-group are SR5/SR7 witnesses whose groups have nonzero minimum length, so they do not witness GR6 as such; test-ref empty. || Editions (adjudicator): 85, 2002, 2014, 2023 (text as in 2023; Annex E carries no edition note for it)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "SR-13.18.17.3-1",
@@ -27309,10 +27309,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.cs#ExpandSameAs; src/Cobol.Net.Compiler/Binding/DataBinder.cs#CopyEntryDescription",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-13.18.49.4-4",
   "editions": "2002,2014,2023",
   "notes": "GR4 \"If a group item to which data-name-1 is subordinate contains a GROUP-USAGE clause and the subject of the entry is a group item, the effect is as if that GROUP-USAGE clause had been specified for the subject of the entry.\" (--check 13.18.49.4 -> OK 4)). PREMISE CHECK: the antecedent cannot be satisfied. SR7 limits data-name-1 to an elementary item or a LEVEL-1 group; a level-1 group has no superordinate group, and an elementary data-name-1 gives an elementary subject (GR1/GR2 - the subject is a group only when data-name-1 is), so 'data-name-1 subordinate to a group' and 'subject is a group' never hold together. Probe r02_gr4 (the only shape that could satisfy it - a level-05 group inside a GROUP-USAGE NATIONAL record) is refused by the SR7 guard (COBOLNET1556). The compiler has no GR4 transfer code and needs none; data-name-1's OWN GROUP-USAGE travels via CopyEntryDescription (pb522 golden). Vacuous-conforming; nothing to test. || Editions (adjudicator's statement, normalized to 2002,2014,2023 by registrar 14e): 2002, 2014, 2023 (the SAME AS clause is absent from COBOL-85 and is not in Annex E's 2014->2023 substantive-changes list, so the rule stands unchanged in 2014 and 2023)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-13.18.49.4-5",
@@ -31569,10 +31569,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.Linkage.cs#CallBindLinkage",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-14.2.3-7",
   "editions": "2002, 2014, 2023",
   "notes": "§14.2.3 GR7 (cite.py --check 14.2.3 \"The initial value of the returning item, data-name-2, is undefined\" -> OK §14.2.3 7)). Undefined behaviour imposes no requirement; the returning item binds as an ordinary LINKAGE item without a VALUE-driven initial state, and nothing observable can contradict it. No test can be spec-derived for an undefined value.",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.2.3-8",
@@ -40044,10 +40044,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitMerge",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-14.9.24.4-10",
   "editions": "85, 2002, 2014, 2023",
   "notes": "Rule: 'During the execution of the output procedure, no statement may be executed manipulating the file referenced by or accessing the record area associated with file-name-2 or file-name-3.' (cite.py --check 14.9.24.4 -> OK §14.9.24.4 10)). This is a constraint on the PROGRAM with no exception condition and no prescribed consequence, so it asks nothing of the implementation beyond not depending on such access; the rule names no diagnostic and the range is dynamic, so a compile-time refusal would reject legal source whose violating path never executes. Code: EmitMerge completes every USING transfer (implicit OPEN/READ/CLOSE) and the k-way merge BEFORE entering the output procedure, so a violating statement meets a closed connector (deterministic, within 'undefined'); nothing in the implementation relies on file-name-2/-3 being untouched during the procedure. No finding. (The early CLOSE is GR7 c)'s timing question - part 1, not this rule.)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.24.4-11",
@@ -40059,10 +40059,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitTransferUse; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitInputFile; src/Cobol.Net.Compiler/CodeGen/Verbs/SortEmitter.cs#EmitGivingFile",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-14.9.24.4-11",
   "editions": "2002, 2014, 2023",
   "notes": "Rule: 'During the execution of any USE procedure implicitly invoked while executing the MERGE statement, no statement may be executed manipulating the file referenced by or accessing the record area associated with file-name-2, file-name-3, or file-name-4.' (cite.py --check 14.9.24.4 -> OK §14.9.24.4 11)). A constraint on the program with no exception condition and no prescribed consequence - nothing for the implementation to enforce or detect (GR12's closing paragraph restates it for file-name-4 with 'shall not'). Code: the as-if statements' USE procedures are invoked via EmitTransferUse (seqIo.EmitUseHook); the transfer's own state (READ/WRITE loops, CobolSort store) does not depend on the USE procedure leaving the connectors alone beyond the loop's own unsuccessful-status exit, so a violating program gets deterministic results within 'undefined'. No finding. || editions as adjudicated: 2002, 2014, 2023 in substance (USE procedures invoked from the implicit transfers belong to the 2002 exception model)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.24.4-12",
@@ -43494,10 +43494,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/SequentialIoEmitter.cs#EmitRewrite; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/MoveBinder.cs",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-14.9.35.4-8",
   "editions": "85,2002,2014,2023",
   "notes": "Rule: 'The figurative constant SPACE when specified in the REWRITE statement references one alphanumeric space character.' cite.py --check 14.9.35.4 -> OK 8). With record-name-1, GR7 makes the FROM a MOVE, and MOVE of a one-character alphanumeric space to the record space-fills it, which is what the bound implicit MOVE of the figurative produces. Probe probe/rewrite-statement-p2/p2.cob: `REWRITE F1-REC FROM SPACE` -> FROMSP=00 F1=[      ], read back [      ]. The FILE-phrase context where the one-character length would matter is barred by SR10 b) (no figurative with FILE) and A.4.13 is declined (PB282, landed). No spec-derived golden -> test-needed. [editions as adjudicated: every edition whose REWRITE general format admits literal-1 (2002, 2014, 2023)]",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.35.4-9",
@@ -46284,10 +46284,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/IO/CobolSort.cs#Sort; src/Cobol.Net.Runtime/Values/Tables/CobolTable.cs#SortInPlace",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-14.9.40.4-4",
   "editions": "85,2002,2014,2023",
   "notes": "Rule: 'If the DUPLICATES phrase is not specified and the contents of all the key data items ... are equal ..., the order of return of these records or the relative order of the contents of these table elements is undefined.' (cite.py --check 14.9.40.4 OK, GR4; also listed as undefined item 52 in Annex B). CobolSort.Sort breaks ties by release index (stable) and CobolTable.Sorted uses stable OrderBy regardless of the phrase; any order satisfies 'undefined', so the stable refinement conforms. Nothing observable to pin with a spec-derived expected value (the rule defines no result), hence no test-ref. [editions as adjudicated: 1985, 2002, 2014, 2023 (records); 2002, 2014, 2023 (table elements)] retired-witness: src/Cobol.Net.Runtime/Values/Tables/CobolTable.cs#Sorted (w70c (kb/Work PB1174): CobolTable.Sorted (a copy of the whole physical array) was replaced by CobolTable.SortInPlace over the table's current occurrences; the comparer-exception unwrap this row witnesses moved with it unchanged)",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.40.4-5",
@@ -47514,10 +47514,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/CodeGen/Verbs/StringEmitter.cs#EmitString",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-14.9.43.4-10",
   "editions": "2002,2014,2023",
   "notes": "GR10: overlap of identifier-1/-2 with identifier-3/-4, or of identifier-3 with identifier-4, makes the result undefined (cite.py --check 14.9.43.4 'the result of the execution of this statement is undefined' -> OK §14.9.43.4 10); also listed as Annex A undefined item 60). Any behavior conforms; the emitter reads the pointer by value once at initiation and each sender image at its own transfer, writes the receiver image and then the pointer back - deterministic, no crash. No test required for an undefined result. [editions as adjudicated: 2023 text (ISO/IEC 1989:2023 §14.9.43); Annex E lists no STRING change 2014->2023; the earlier-edition edge is not derivable in-repo (no 2002/2014 text)]",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "SR-14.9.44.3-1",
@@ -49674,10 +49674,10 @@
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/IO/FileRegistry.cs#WriteShared",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-GR-14.9.51.4-16",
   "editions": "2002, 2014, 2023",
   "notes": "GR16: 'The RETRY phrase is used to control the behavior of the WRITE statement for files opened for file sharing for the case where resources needed to write a record are locked by another run unit. The I-O status is set in accordance with the rules in 14.7.9, RETRY phrase.' (cite.py --check 14.9.51.4 -> OK rule 16). The antecedent is unpopulatable in this implementation: COBOLNET_FILES_DESIGN §14.7.9 GR2 determination (CONFORMANCE A.1 items 165/166) — every file and record lock is held by a connector of the executing run unit, and WRITE defines no record operation conflict. WriteShared therefore binds the RETRY phrase (grammar retryPhrase, GateRetryIntro 2002) and makes the first attempt decide. The one resource denial WriteShared CAN return, the §12.4.5.9 GR7 lock ceiling '53'/'54' from PreflightNewLock, bypasses RetryLoop — kb/Work PB707 (open) owns that as a where-the-rule-is-written defect, behaviour-identical today (no re-attempt within one run unit can clear the ceiling). No verdict-changing edge found.",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.51.4-17",
@@ -64404,10 +64404,10 @@
   "verdict": "CONFORMS",
   "code-location": "docs/CONFORMANCE.md#DOC-A.1-169; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindIoControl; src/Cobol.Net.Compiler/Binding/DataBinder.IoControl.cs#BindIoControl",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-DOC-A.1-169",
   "editions": "85,2002,2014,2023",
   "notes": "Voluntary row (A.1 169: internal procedure need not be documented). cite.py --check 12.4.6.4.4 'The extent of such allocation shall be specified by the implementor' -> OK §12.4.6.4.4 4) b). Code: DataBinder.BindIoControl line ~1801 'if (clause.sameClause() is not { } same || same.RECORD() is null) continue;' — only SAME RECORD AREA binds; sort-merge-area format has no storage effect. Probe probe/p169/s2.cob (SAME SORT AREA FOR SF1 SF2 PLF, two SORTs USING/GIVING PLF) -> CCC BBB AAA at --std 85 and 2023. No spec-derived test pins it (NIST ST13x corroborate only). Adjacent open SR under-rejection kb/Work/PB1087 is a different rule set. Owning note: kb/Work/PB1535.",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-170",
@@ -65169,10 +65169,10 @@
   "verdict": "CONFORMS",
   "code-location": "docs/CONFORMANCE.md#DOC-A.1-220; src/Cobol.Net.Runtime/Values/Tables/CobolDynTable.cs#SetCapacity; src/Cobol.Net.Compiler/CodeGen/DataDivision/ValueInitializer.cs",
   "test-ref": "",
-  "derivation": "",
+  "derivation": "docs/CONFORMANCE.md#DRV-DOC-A.1-220",
   "editions": "2014,2023",
   "notes": "Voluntary row (A.1 220 need not be documented). cite.py --check 8.5.1.11.3 'The actual time when the resources used by a variable-length data item are freed is implementor-defined' -> OK §8.5.1.11.3 7). Read CobolDynTable: GrowTo only Array.Resize upward (doubling, capped at MaxOccurrences), re-seeds occurrences _count..target with _seedAt; SetCapacity shrink sets _count only (no array shrink); ValueInitializer.cs:139 'the field is a native string' for DYNAMIC LENGTH. Probe probe/p220/vl.cob --std 2023: D=XY L=002; C(5)=7, SET CAP TO 2, SET CAP TO 5 -> C5=0 CAP=5; --std 2002 -> COBOLNET0900 for both. Collection timing is nondeterministic, so no test can pin it. Resource exhaustion is item 61 / kb/Work/PB1410, not this item. Owning note: kb/Work/PB1535.",
-  "state": "GAP"
+  "state": "OK"
  },
  {
   "rule-id": "DOC-A.1-221",

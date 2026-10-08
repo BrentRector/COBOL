@@ -1332,7 +1332,16 @@
     "anchor-template": "docs/CONFORMANCE.md#DRV-{rule-id}",
     "register-heading": "## 8. Rules with no observable obligation",
     "register-header-cell": "Rule",
-    "signature": "owner: 2026-09-03",
+    "signatures": {
+      "$comment": [
+        "⛔ EVERY SIGNATURE IS ONE DATED OWNER DECISION, and a §8 row's `Signed` cell must be one of these keys.",
+        "A row is signed by the decision that READ its argument, so the cell records WHEN it was read and the",
+        "value names WHERE the decision is recorded. A new batch signing adds a key here in the same change that",
+        "writes its rows; it never re-uses an older date for an argument drafted after it (kb/Work PB1636)."
+      ],
+      "owner: 2026-09-03": "kb/Work PB386 — the owner opened the derivation door; also the rows signed under it through 2026-09-25 (Q25-Q27, wave 40, kb/Work R43 item 4)",
+      "owner: 2026-10-08": "kb/Work PB1636 — the owner signed the 32 drafted derivations as one batch (answer 'Sign all 32')"
+    },
     "undefined-list": "tests/version-matrix/annex-a2-undefined.json",
     "$refusals": [
       "The bounds the owner set, encoded rather than described (record_verdicts.validate reports each by name):",
@@ -1342,7 +1351,7 @@
       "3) a derivation on a row of a kind that obliges a register determination docs/CONFORMANCE.md does not",
       "   carry — the documentation obligation is not yet STATED, so there is nothing to derive about;",
       "4) an `undefined-A.2` arm naming an item that does not resolve to this row;",
-      "5) a missing or wrong owner signature;",
+      "5) a missing owner signature, or one that is not a key of `signatures`;",
       "6) a `derivation` value that is not the COMPUTED anchor, or one docs/CONFORMANCE.md §8 has no row for."
     ],
     "arms": {

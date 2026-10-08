@@ -113,7 +113,7 @@ internal static class ConformanceRegister
     /// <param name="Arm">which of the three §1.1 grounds this determination stands on</param>
     /// <param name="Names">the arm's OBJECT — an A.2 item, the closed set, or the indistinguishable rule-id</param>
     /// <param name="Argument">the derivation itself, written for a reader</param>
-    /// <param name="Signature">the owner's signature, matched against the schema's <c>derivation.signature</c></param>
+    /// <param name="Signature">the owner's signature, one of the keys of the schema's <c>derivation.signatures</c></param>
     internal sealed record DerivationRow(string Key, string Arm, string Names, string Argument, string Signature);
 
     /// <summary>

@@ -95,12 +95,12 @@ public sealed class SpecTraceabilityInventoryDriftTests
     /// <param name="Field">the inventory field carrying the claim</param>
     /// <param name="AnchorTemplate">the §8 anchor, COMPUTED from the row's own rule-id</param>
     /// <param name="Heading">the §8 register heading, so the section can be renamed in one place</param>
-    /// <param name="Signature">the literal owner signature a determination must carry</param>
+    /// <param name="Signatures">every owner signature a determination may carry — one per dated owner decision</param>
     /// <param name="Arms">the three grounds the owner accepted</param>
     /// <param name="Register">docs/CONFORMANCE.md §8, parsed — injectable so the self-test is hermetic</param>
     /// <param name="Undefined">Annex A.2 item → the rule-ids it covers, from the generated artifact</param>
     private sealed record DerivationRule(
-        string Field, string AnchorTemplate, string Heading, string Signature,
+        string Field, string AnchorTemplate, string Heading, IReadOnlySet<string> Signatures,
         IReadOnlyDictionary<string, DerivationArm> Arms,
         IReadOnlyDictionary<string, ConformanceRegister.DerivationRow> Register,
         IReadOnlyDictionary<int, IReadOnlySet<string>> Undefined);
@@ -240,8 +240,11 @@ public sealed class SpecTraceabilityInventoryDriftTests
             }
         }
 
+        var signatures = d.GetProperty("signatures").EnumerateObject()
+            .Where(p => !p.Name.StartsWith('$')).Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+
         return new DerivationRule(
-            Str(d, "field"), Str(d, "anchor-template"), heading, Str(d, "signature"), arms,
+            Str(d, "field"), Str(d, "anchor-template"), heading, signatures, arms,
             ConformanceRegister.Derivations(heading, Str(d, "register-header-cell")), undefined);
     }
 
@@ -385,11 +388,12 @@ public sealed class SpecTraceabilityInventoryDriftTests
                 $"{r.RuleId}: docs/CONFORMANCE.md {d.Heading.Trim('#', ' ')} carries no row keyed '{key}'"));
             return bad;
         }
-        if (!string.Equals(entry.Signature, d.Signature, StringComparison.Ordinal))
+        if (!d.Signatures.Contains(entry.Signature))
         {
             bad.Add(new("bad-signature",
-                $"{r.RuleId}: determination '{key}' is signed '{entry.Signature}', not '{d.Signature}' — a "
-                + "derivation is the OWNER's, and the signature records it"));
+                $"{r.RuleId}: determination '{key}' is signed '{entry.Signature}', not one of "
+                + $"[{string.Join(", ", d.Signatures.Order(StringComparer.Ordinal))}] — a derivation is the "
+                + "OWNER's, and the signature records which owner decision read it"));
         }
         if (!d.Arms.TryGetValue(entry.Arm, out var arm))
         {
@@ -950,6 +954,26 @@ public sealed class SpecTraceabilityInventoryDriftTests
             // they contain no "shall", and every obligation they allude to is its own inventory row. They are the
             // only such rows in the catalog (§4.3, the conforming compilation group, has none).
             "GR-4.4-1", "GR-4.4-2",
+            // ⚙ The SIXTEENTH to FORTY-SEVENTH, added deliberately as ONE batch (owner decision kb/Work PB1636,
+            // 2026-10-08, answer "Sign all 32", signature `owner: 2026-10-08`): the golden-lane-2 rows no test can
+            // close, each drafted and re-probed (w1040) before the signing. By arm — undefined-A.2 (Annex A.2
+            // items 39, 52, 60):
+            "GR-14.2.3-7", "GR-14.9.40.4-4", "GR-14.9.43.4-10",
+            // indistinguishable-consequent (each names the rule whose consequent it cannot be told from):
+            "GR-14.9.35.4-8", "GR-8.5.1.11.3-3", "DOC-A.1-220",
+            // definitional, R43's arm EXTENDED by this signing to a user-program constraint no rule gives a
+            // consequence (§4.4 2) leaves a violation undefined) and to a term definition no other rule reads:
+            "GR-13.18.16.4-6", "GR-14.9.24.4-10", "GR-14.9.24.4-11", "GR-12.3.5.4-2", "GR-12.3.5.4-3",
+            // unpopulatable-antecedent — listing-only rules under §7.3.18.3 GR1's "Otherwise" (no listing is
+            // produced, A.1 item 117):
+            "GR-7.2.3.4-4", "GR-7.2.3.4-5", "GR-7.3.18.3-2", "GR-7.3.18.3-3", "GR-7.3.18.3-4", "GR-7.3.18.3-5",
+            "GR-7.3.19.4-2",
+            // …the single-convention rows (>>CALL-CONVENTION and ENTRY-CONVENTION admit only COBOL):
+            "GR-7.3.9.3-3", "GR-11.9.7.4-4", "GR-9.3.6-L3.2",
+            // …and the rest, each stating its own closed set in its §8 Names cell:
+            "GR-13.18.10.4-3", "GR-13.18.10.4-4", "GR-7.3.4-4", "GR-8.1.3.2-5", "SR-12.4.5.7.3-5",
+            "GR-9.1.13.3-1", "GR-13.18.49.4-4", "DOC-A.1-169", "SR-8.4.2.3.3-7", "GR-8.5.1.11.3-1",
+            "GR-14.9.51.4-16",
         ];
 
         var s = LoadSchema();
@@ -1319,24 +1343,25 @@ public sealed class SpecTraceabilityInventoryDriftTests
 
         // ── the DERIVATION: §1.1's owner-signed alternative to a test, and every bound the owner set ──
         //
-        // ⛔ THE ARMS CANNOT BE FALSIFIED AGAINST TODAY'S DOCUMENT, where all eight determinations are correct.
+        // ⛔ THE ARMS CANNOT BE FALSIFIED AGAINST TODAY'S DOCUMENT, where every determination is correct.
         // So the register and the Annex A.2 list are FABRICATED here, and every refusal is driven with a
         // positive control beside it — a checker that rejected everything would satisfy the negatives alone.
         var d = s.Derivation!;
+        string signed = d.Signatures.Order(StringComparer.Ordinal).First();
         var fakeRegister = new Dictionary<string, ConformanceRegister.DerivationRow>(StringComparer.Ordinal)
         {
-            ["DRV-GR-14.9.5.4-11"] = new("DRV-GR-14.9.5.4-11", "undefined-A.2", "A.2 item 4", "…", d.Signature),
-            ["DRV-GR-14.9.5.4-12"] = new("DRV-GR-14.9.5.4-12", "undefined-A.2", "A.2 item 41", "…", d.Signature),
-            ["DRV-GR-14.9.5.4-13"] = new("DRV-GR-14.9.5.4-13", "undefined-A.2", "A.2 item 999", "…", d.Signature),
+            ["DRV-GR-14.9.5.4-11"] = new("DRV-GR-14.9.5.4-11", "undefined-A.2", "A.2 item 4", "…", signed),
+            ["DRV-GR-14.9.5.4-12"] = new("DRV-GR-14.9.5.4-12", "undefined-A.2", "A.2 item 41", "…", signed),
+            ["DRV-GR-14.9.5.4-13"] = new("DRV-GR-14.9.5.4-13", "undefined-A.2", "A.2 item 999", "…", signed),
             ["DRV-GR-14.9.5.4-14"] = new("DRV-GR-14.9.5.4-14", "unpopulatable-antecedent",
-                                         "the two-valued DISPLAY device set", "…", d.Signature),
-            ["DRV-GR-14.9.5.4-15"] = new("DRV-GR-14.9.5.4-15", "unpopulatable-antecedent", "—", "…", d.Signature),
+                                         "the two-valued DISPLAY device set", "…", signed),
+            ["DRV-GR-14.9.5.4-15"] = new("DRV-GR-14.9.5.4-15", "unpopulatable-antecedent", "—", "…", signed),
             ["DRV-GR-14.9.5.4-16"] = new("DRV-GR-14.9.5.4-16", "indistinguishable-consequent",
-                                         "GR-14.9.5.4-7", "…", d.Signature),
+                                         "GR-14.9.5.4-7", "…", signed),
             ["DRV-GR-14.9.5.4-17"] = new("DRV-GR-14.9.5.4-17", "indistinguishable-consequent",
-                                         "GR-99.99.99.4-1", "…", d.Signature),
+                                         "GR-99.99.99.4-1", "…", signed),
             ["DRV-GR-14.9.5.4-18"] = new("DRV-GR-14.9.5.4-18", "undefined-A.2", "A.2 item 4", "…", "owner: 1999"),
-            ["DRV-GR-14.9.5.4-19"] = new("DRV-GR-14.9.5.4-19", "made-it-up", "A.2 item 4", "…", d.Signature),
+            ["DRV-GR-14.9.5.4-19"] = new("DRV-GR-14.9.5.4-19", "made-it-up", "A.2 item 4", "…", signed),
         };
         var fakeA2 = new Dictionary<int, IReadOnlySet<string>>
         {
@@ -1388,6 +1413,24 @@ public sealed class SpecTraceabilityInventoryDriftTests
         Assert.Equal(["not-computed-anchor"], Codes(DerivationRefusals(
             Derived("GR-14.9.5.4-11") with { Derivation = "docs/CONFORMANCE.md#DRV-GR-14.9.5.4-14" }, ds)));
         Assert.Equal(["bad-signature"], Codes(DerivationRefusals(Derived("GR-14.9.5.4-18"), ds)));
+        // ✔ …and EVERY signature the schema lists is accepted (kb/Work PB1636: one dated owner decision each), so
+        // a check that compared against one literal would fail here on the later batch's rows.
+        foreach (string signature in d.Signatures)
+        {
+            var oneSigned = ds with
+            {
+                Derivation = ds.Derivation! with
+                {
+                    Register = new Dictionary<string, ConformanceRegister.DerivationRow>(StringComparer.Ordinal)
+                    {
+                        ["DRV-GR-14.9.5.4-11"] = new("DRV-GR-14.9.5.4-11", "undefined-A.2", "A.2 item 4", "…",
+                                                     signature),
+                    },
+                },
+            };
+            Assert.Empty(DerivationRefusals(Derived("GR-14.9.5.4-11"), oneSigned));
+        }
+        Assert.True(d.Signatures.Count >= 2, "the schema lists every owner decision that signed a §8 row");
         Assert.Equal(["unknown-arm"], Codes(DerivationRefusals(Derived("GR-14.9.5.4-19"), ds)));
         Assert.Equal(["names-shape"], Codes(DerivationRefusals(Derived("GR-14.9.5.4-15"), ds)));
         Assert.Equal(["unknown-rule"], Codes(DerivationRefusals(Derived("GR-14.9.5.4-17"), ds)));
@@ -1399,7 +1442,7 @@ public sealed class SpecTraceabilityInventoryDriftTests
         var docReg = new Dictionary<string, ConformanceRegister.DerivationRow>(StringComparer.Ordinal)
         {
             ["DRV-DOC-A.1-19"] = new("DRV-DOC-A.1-19", "indistinguishable-consequent", "GR-14.9.5.4-7", "…",
-                                     d.Signature),
+                                     signed),
         };
         var docS = s with
         {
