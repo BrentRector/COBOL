@@ -444,6 +444,18 @@ public sealed class CobolReport(
         /// a <c>long</c> — 18 digits — wrapped a 20-digit total modulo 2^64 or reported a false size error.</summary>
         public Int128 Value;
 
+        /// <summary>⛔ THE COUNTER'S CHARACTER CELL, held only while it is not its value's own image (kb/Work PB2553).
+        /// The counter is a signed USAGE DISPLAY item (docs/CONFORMANCE.md A.4.11), so a procedure-division store of
+        /// characters — through a reference modifier (§8.4.3.3.4 GR5: "a subset of the data item referenced by
+        /// identifier-1"), or a pre-2023 figurative fill — puts THOSE characters in it, a non-digit included, exactly
+        /// as it would in a stored item. <see cref="Value"/> alone cannot hold them, so they are kept here, with
+        /// <see cref="Value"/> the image's lenient decode, until a numeric store replaces the content. A reference to
+        /// the content while they are not a valid numeric image is §14.6.13.2 rule 2's incompatible data (<see cref="Current"/>).</summary>
+        public string? Image;
+
+        /// <summary>The counter's GR1 profile <see cref="Image"/> was stored under (the decode it is read back with).</summary>
+        public NumProfile ImageProfile;
+
         /// <summary>⛔ ISO §13.18.54.4 GR1 — "Each entry containing a SUM clause establishes an independent sum
         /// counter AND SIZE ERROR INDICATOR" (kb/Work PB1130). Set by an addition that is a size error (GR3);
         /// unset with the counter's reset — at INITIATE (§14.9.21.4 GR1 a)) and at the end of the group that
@@ -464,16 +476,39 @@ public sealed class CobolReport(
         public bool Add(Func<Int128, Int128> apply)
         {
             Int128 next;
-            try { next = apply(Value); }
+            try { next = apply(Current()); }
             catch (Exception e) when (e is CobolSizeError or OverflowException) { SizeError = true; return false; }
             Value = next;
+            Image = null;
             return true;
+        }
+
+        /// <summary>The counter's content as the addition's first operand (GR3: "consistent with the general rules of
+        /// the ADD statement"): its value, or — when a store left characters that are not a numeric image — their
+        /// decode through the ONE checked sending read, which sets EC-DATA-INCOMPATIBLE (§14.6.13.2 rule 2: "the
+        /// content of a numeric sending item … would evaluate to false in a numeric class condition").</summary>
+        private Int128 Current() => Image is null ? Value : CobolNum.ParseImageSending(Image, ImageProfile);
+
+        /// <summary>The counter's character image under its GR1 <paramref name="profile"/>: the characters a store left
+        /// (<see cref="Image"/>), else its value's DISPLAY image.</summary>
+        public string ImageOf(in NumProfile profile) => Image ?? CobolNum.FormatImage(Value, profile);
+
+        /// <summary>A procedure-division store of the counter's character image (GR12): a valid numeric image becomes the
+        /// counter's value; the characters are kept as they were stored (<see cref="Image"/>) unless they ARE the value's
+        /// own image, so a valid but non-canonical image (a plain digit in the sign position, a negative zero) reads
+        /// back character for character (§8.4.3.3.4 GR5; train 1045 review).</summary>
+        public void Store(string image, in NumProfile profile)
+        {
+            Value = CobolNum.ParseImage(image, profile);
+            Image = image == CobolNum.FormatImage(Value, profile) ? null : image;
+            ImageProfile = profile;
         }
 
         /// <summary>GR2 / §14.9.21.4 GR1 a) — the counter set to zero and its size error indicator unset.</summary>
         public void Reset()
         {
             Value = 0;
+            Image = null;
             SizeError = false;
         }
 
@@ -600,30 +635,33 @@ public sealed class CobolReport(
                 r.Target.Accumulate(r.SumId, r.Apply);
     }
 
-    /// <summary>A SUM counter's current value (unscaled, at the counter's scale) — read by the generated compose
-    /// of the printable item the counter is the source of (ISO §13.18.54.4 GR4), and by a procedure division
-    /// statement that names the counter (GR5 + GR12). The compiler's read narrows it to the counter's own CLR
-    /// carrier (<c>RuntimeApi.ReportSumRead</c>), which holds every value the counter's digits admit.</summary>
-    public Int128 SumValue(int id) => _sums[id].Value;
+    /// <summary>A SUM counter's content as its CHARACTER IMAGE under its GR1 <paramref name="profile"/> — the counter is
+    /// a signed USAGE DISPLAY item carried as its image (docs/CONFORMANCE.md A.4.11; kb/Work PB2553), read by the
+    /// generated compose of the printable item the counter is the source of (ISO §13.18.54.4 GR4), by a rolled total,
+    /// and by a procedure division statement that names the counter (GR5 + GR12), each through the ordinary
+    /// image-carried numeric read (§14.6.13.2 rule 2's checked decode included).</summary>
+    public string SumImage(int id, in NumProfile profile) => _sums[id].ImageOf(profile);
 
-    /// <summary>The value of one OCCURRENCE of a repeating SUM entry's counter, selected by a procedure division
+    /// <summary>The image of one OCCURRENCE of a repeating SUM entry's counter, selected by a procedure division
     /// subscript (kb/Work PB1271 — see <see cref="SumOccurrence"/>). An out-of-range subscript reads zero once the
     /// EC-BOUND-SUBSCRIPT condition has been raised, the counter twin of an ordinary table's scratch occurrence
     /// (<c>CobolTable.At</c>).</summary>
-    public Int128 SumValue(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<long> subscripts) =>
-        SumOccurrence(baseId, extents, subscripts) is int id and >= 0 ? _sums[id].Value : Int128.Zero;
+    public string SumImage(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<long> subscripts, in NumProfile profile) =>
+        SumOccurrence(baseId, extents, subscripts) is int id and >= 0
+            ? _sums[id].ImageOf(profile)
+            : CobolNum.FormatImage(Int128.Zero, profile);
 
     /// <summary>Alter a SUM counter's content from the procedure division (ISO §13.18.54.4 GR12 — "It is
-    /// permissible for procedure division statements to alter the content of sum counters"). The value is
-    /// unscaled, at the counter's own scale (GR1 — derived from the entry's PICTURE), and already stored through
-    /// the counter's GR1 profile by the writing statement.</summary>
-    public void SetSumValue(int id, Int128 value) => _sums[id].Value = value;
+    /// permissible for procedure division statements to alter the content of sum counters"): the image the writing
+    /// statement stored through the counter's GR1 profile, kept as stored (<see cref="SumEntry.Store"/>).</summary>
+    public void SetSumImage(int id, string image, in NumProfile profile) => _sums[id].Store(image, profile);
 
     /// <summary>Alter one OCCURRENCE of a repeating SUM entry's counter (GR12 over <see cref="SumOccurrence"/>); a
     /// store through an out-of-range subscript is discarded once EC-BOUND-SUBSCRIPT has been raised.</summary>
-    public void SetSumValue(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<long> subscripts, Int128 value)
+    public void SetSumImage(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<long> subscripts, string image,
+                            in NumProfile profile)
     {
-        if (SumOccurrence(baseId, extents, subscripts) is int id and >= 0) _sums[id].Value = value;
+        if (SumOccurrence(baseId, extents, subscripts) is int id and >= 0) _sums[id].Store(image, profile);
     }
 
     /// <summary>The repetition count of a report writer OCCURS … DEPENDING entry (ISO §13.18.38.4 GR13): "If the

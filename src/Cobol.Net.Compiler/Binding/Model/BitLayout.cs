@@ -129,6 +129,31 @@ internal static class BitLayout
         m.Occurs is not { } n || n <= 1 ? WidthBits(m)
         : StrideBits(m) * (n - 1) + WidthBits(m);
 
+    /// <summary>⛔ THE CHARACTER POSITIONS A §8.5.1.6.3 RUN OCCUPIES in its group's image — its members' bits packed
+    /// back to back and rounded up to a byte, because whatever follows the run is "at the first bit position of the
+    /// first available byte" (§8.5.1.6.3; a non-bit item or a bit item of another level never shares the run's last
+    /// byte). The ONE spelling, read by the physical-field walk (<c>PhysicalModel</c>: the run leader's slice width)
+    /// and the §8.5.1.12 atom builder (<c>VariableLengthCompatibility</c>: the run's place in the group's byte
+    /// accounting), so the carrier and the atoms that position things inside it cannot disagree (kb/Work PB2691).</summary>
+    public static int RunCharacters(IReadOnlyList<DataItem> run)
+    {
+        int bits = 0;
+        foreach (var m in run) bits += RunBits(m);
+        return Characters(bits);
+    }
+
+    /// <summary>True when every member of a §8.5.1.6.3 run spans a whole number of bytes per occurrence, so no two
+    /// members SHARE a byte and each one starts on a byte boundary — the run is then laid out exactly as the plain
+    /// per-item byte sum lays it out (a bit leaf's <see cref="DataItem.ByteWidth"/> is <c>ceil(n / 8)</c>, which is
+    /// exact when <c>n</c> is a multiple of 8), and every member keeps a relative byte position of its own. A run that
+    /// is not byte-granular has members that start inside a byte, which no byte position names (kb/Work PB2691).</summary>
+    public static bool IsByteGranular(IReadOnlyList<DataItem> run)
+    {
+        foreach (var m in run)
+            if (WidthBits(m) % BitsPerCharacter != 0) return false;
+        return true;
+    }
+
     /// <summary>The bit extent of one item PER OCCURRENCE — a bit leaf's declared boolean-position count, else the
     /// item's byte extent expressed in bits. A group defers to <see cref="ExtentBits"/> so a nested bit run is laid
     /// out by the same rules (§8.5.1.6.3 applies "within that group" at every level).

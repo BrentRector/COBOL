@@ -1236,8 +1236,10 @@ a dynamic table's occurrences into the receiver's dynamic-length item when the s
 `CobolVarGroup.Compare` walks the corresponding pairs — fixed material and component pairs in order, each a §8.8.4.2.7
 comparison with space extension (a dynamic-length item at its current length, a table element-wise with the larger
 table's remainder against spaces, §14.6.9.3), the material after the last pair as it lies in the contiguous images.
-Two variable-length groups whose shapes cannot be stated (a USAGE BIT leaf) share one layout and compare at its
-component offsets (`CobolVarGroup.CompareInLayout`). The relation is screened at bind by §8.5.1.12.1 through the MOVE's own reader
+A USAGE BIT member takes its place in both shapes by the §8.5.1.6.3 bit runs (`BitLayout.RunsOf`): a run that is not
+byte-granular is ONE fixed atom of `BitLayout.RunCharacters` bytes, the slice the carrier gives it, so a group holding
+bit items is reshaped and compared by the same walk (kb/Work PB2691); a dynamic-capacity table packed into such a run
+occupies no relative byte positions of its own and is compatible with no group. The relation is screened at bind by §8.5.1.12.1 through the MOVE's own reader
 (`VariableLengthCompatibility.PairRefusal`) → **COBOLNET2492**. Only the operations that genuinely need a FIXED record
 window (WRITE/RELEASE) and the shapes the composer cannot reach (CONFORMANCE.md A.1 item 57) stay staged LOUD.
 

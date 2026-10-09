@@ -440,7 +440,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // A REPORT SECTION SUM COUNTER (ISO §13.18.54.4 GR5 — the data-name after the level number names the
         // COUNTER, not the printable item; GR12 permits procedure division statements to read and alter it): an
         // IMPLICITLY-defined VIEW over the report engine's counter, not in ByName, so it is resolved HERE — the
-        // CAPACITY-register pattern — to a ReportSumCounterPlace whose read/write are SumValue/SetSumValue
+        // CAPACITY-register pattern — to a ReportSumCounterPlace whose read/write are SumImage/SetSumImage
         // (kb/Work PB840). Its qualifiers are the report group entries above it and, outermost, its REPORT-NAME
         // (§8.4.2.2.3 SR4; §8.4.2.2.2 Format 1's file-report-qualifier — kb/Work PB1454). A REPEATING entry's
         // counter is a table and takes the ordinary subscripts (kb/Work PB1271).

@@ -230,6 +230,16 @@ internal static class StorageFormPass
                 foreach (var line in group.Lines)
                     foreach (var field in line.Fields)
                     Walk(field.PrintItem, visited, promoted);
+        // ⛔ A REPORT SUM COUNTER'S REGISTER IS IMAGE-CARRIED BY DETERMINATION, never by promotion (kb/Work PB2553).
+        // §13.18.54.4 GR1 makes the counter a numeric data item, docs/CONFORMANCE.md A.4.11 makes it signed USAGE
+        // DISPLAY, and §8.4.3.3.4 GR5 makes a reference-modified store "a subset of the data item referenced by
+        // identifier-1": a character it receives is IN the counter, a non-digit included, as in any stored item. The
+        // engine's integer register cannot hold one, so the procedure division sees the counter as its character
+        // image (CobolReport.SumImage / SetSumImage) and every consumer reads it as any image-carried numeric item —
+        // §14.6.13.2 rule 2's checked decode, the class condition's image test, a figurative fill's plain store.
+        foreach (var report in data.Reports)
+            foreach (var family in report.SumFamilies)
+                family.Register.Storage = new StorageForm.CharImage(family.Register.ImageWidth, PicCategory.Numeric);
     }
 
     private static void Walk(DataItem item, HashSet<DataItem> visited, HashSet<DataItem> promoted)

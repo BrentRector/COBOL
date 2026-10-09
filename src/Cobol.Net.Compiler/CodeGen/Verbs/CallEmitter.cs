@@ -692,8 +692,8 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         // dynamic-capacity tables are slots of the cell numbered from the group's first component ordinal
         // (VarGroupWindow.DynBase), so the area states that ordinal and the group's §8.5.1.12 atoms, and a formal of the
         // same storage numbers its own components from there (CobolArgAdapt.Area). A group whose atoms cannot be stated
-        // (a USAGE BIT leaf makes a character position non-positional) states no area: no description could be shown
-        // to share its storage, so the formal holds a copy.
+        // (one the binder already refused; a USAGE BIT run is one fixed atom since kb/Work PB2691) states no area: no
+        // description could be shown to share its storage, so the formal holds a copy.
         if (view.Coding is VarGroupWindow g)
             return view.DenotedItem is { } group && VariableLengthCompatibility.GroupAtoms(group) is { } atoms
                 ? RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset, PositionRenderer.Render(g.DynBase), RuntimeApi.GroupAtomsNew(atoms))

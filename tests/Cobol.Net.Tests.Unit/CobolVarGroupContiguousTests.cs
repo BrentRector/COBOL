@@ -133,7 +133,6 @@ public sealed class CobolVarGroupContiguousTests
         var sent = new CobolVarGroup("Hxy", ["abc"]);                // the carrier AsVarImage(2) composes
         var extents = layout.ExtentsOf(sent);
         Assert.Equal([3, 2], extents.Lengths);                        // D "abc", T "xy"
-        Assert.Equal([1], layout.ComponentOffsets);                  // the carrier has ONE component: D
         var back = layout.Decompose("Habcxy", extents);
         Assert.Equal("Hxy", back.Fixed);
         Assert.Equal(["abc"], back.Dynamic);
@@ -287,7 +286,6 @@ public sealed class CobolVarGroupContiguousTests
         var extents = layout.ExtentsOf(sent);
         Assert.Equal([2, 3], extents.Lengths);
         Assert.Equal([1, 2], extents.FixedAt);
-        Assert.Equal([1, 2, 3], layout.ComponentOffsets);   // the components at the maximum, for compare and the boundary
         var back = layout.Decompose("2abxcdey", extents, count: 1);   // the record states 2: the count passed is ignored
         Assert.Equal("2xy", back.Fixed);
         Assert.Equal(["ab", "cde"], back.Dynamic);

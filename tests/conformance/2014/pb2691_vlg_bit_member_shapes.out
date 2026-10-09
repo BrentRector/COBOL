@@ -1,0 +1,10 @@
+SB=[xa dd]
+G2=[xa dd]
+G1=[xpqzz] C1=0000000002
+G1 EQ G2
+G3 LT G4
+A4=01 D4=[abc] Y4=[y ]
+G3 EQ G4
+C6=0000000002 A6=0001 E6=pq Y6=y
+G5 EQ G6
+A5=0 B5=001 E5=rq Y5=y

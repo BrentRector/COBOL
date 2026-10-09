@@ -776,30 +776,6 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
         return CompareRun(ga.Contiguous(a, prevA), gb.Contiguous(b, prevB), collation);
     }
 
-    /// <summary><see cref="Compare"/> between two variable-length groups whose §8.5.1.12 shapes cannot be stated (a
-    /// USAGE BIT leaf, whose shared-byte runs make a character position non-positional) and which therefore share ONE
-    /// layout: component k of each sits at <paramref name="fixedAt"/>[k] of its fixed run, so the positional shape those
-    /// offsets describe pairs the components one for one.</summary>
-    public static int CompareInLayout(CobolVarGroup a, CobolVarGroup b, IReadOnlyList<int> fixedAt,
-        CobolCollation? collation = null) =>
-        Compare(a, Positional(fixedAt, a.Fixed.Length), b, Positional(fixedAt, b.Fixed.Length), collation);
-
-    /// <summary>The shape of a carrier known only by its components' offsets in its fixed run of
-    /// <paramref name="fixedChars"/> characters: the material between them, each component as a dynamic-length item.</summary>
-    private static GroupAtom[] Positional(IReadOnlyList<int> fixedAt, int fixedChars)
-    {
-        var atoms = new List<GroupAtom>(2 * fixedAt.Count + 1);
-        int at = 0;
-        foreach (int off in fixedAt)
-        {
-            if (off > at) atoms.Add(new GroupAtom(GroupAtomKind.Fixed, off - at, off - at));
-            atoms.Add(new GroupAtom(GroupAtomKind.DynamicLength, 0, 0));
-            at = Math.Max(at, off);
-        }
-        if (fixedChars > at) atoms.Add(new GroupAtom(GroupAtomKind.Fixed, fixedChars - at, fixedChars - at));
-        return [.. atoms];
-    }
-
     /// <summary>§14.6.9.3 over two tables of which at least one holds VARIABLE-LENGTH elements: correspondingly
     /// numbered elements compared as two compatible groups (<see cref="Compare"/>), then each remaining element of the
     /// larger table against spaces — an element compared with the empty carrier, every part of which is spaces.</summary>

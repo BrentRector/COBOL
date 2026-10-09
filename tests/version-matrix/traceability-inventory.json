@@ -28192,11 +28192,11 @@
   "subject": "SUM clause",
   "rule-digest": "1ff1d7420de4",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs; src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs; src/Cobol.Net.Runtime/IO/ReportWriter.cs#SetSumValue",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs; src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs; src/Cobol.Net.Runtime/IO/ReportWriter.cs#SetSumImage",
   "test-ref": "conformance:85/pb882_report_sum_counter_identity",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "GR12 'It is permissible for procedure division statements to alter the content of sum counters' (cite.py --check OK). The counter is a Place with a receiving side; golden MOVE 500 TO CF-U then one GENERATE of 11 prints 0511. kb/Work PB840 landed. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs (sum counter receiver ~L235) | src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs (SetSumValue ~L1325)",
+  "notes": "GR12 'It is permissible for procedure division statements to alter the content of sum counters' (cite.py --check OK). The counter is a Place with a receiving side; golden MOVE 500 TO CF-U then one GENERATE of 11 prints 0511. kb/Work PB840 landed. || Editions (adjudicator's statement, normalized to 85,2002,2014,2023 by registrar 14e): 85, 2002, 2014, 2023 (Report Writer optional module, A.4.11 item 17; Annex E records no 2014->2023 change to 13.18.54) || Code-location detail (moved from the field by registrar 14e): src/Cobol.Net.Compiler/CodeGen/Roslyn/PlaceRenderer.cs (sum counter receiver ~L235) | src/Cobol.Net.Compiler/CodeGen/Roslyn/RuntimeApi.cs (SetSumValue ~L1325) || kb/Work PB2553 (train 1045): a sum counter is image-carried, so the store into it is ReportWriter.SetSumImage (the counter's character cell), which replaced SetSumValue. retired-witness: src/Cobol.Net.Runtime/IO/ReportWriter.cs#SetSumValue (kb/Work PB2553 deleted SetSumValue: the sum counter is image-carried and stored through SetSumImage)",
   "state": "OK"
  },
  {

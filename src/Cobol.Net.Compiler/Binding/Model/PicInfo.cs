@@ -786,9 +786,10 @@ public sealed record PicInfo(
     /// decimal digits in the sum counter, both integral and fractional, is derived from the corresponding number
     /// of digits, excluding insertion editing characters, in the PICTURE clause of the entry containing the SUM
     /// clause. The sum counter is signed, whether or not the corresponding PICTURE clause has an operational
-    /// sign." The counter is engine state, never storage, so its VALUE is the native integer the engine
-    /// accumulates in — <paramref name="digits"/>/<paramref name="scale"/> taken from the entry's own analyzed
-    /// PICTURE, and SIGNED unconditionally per GR1's last sentence.
+    /// sign." The counter is engine state, never storage: the engine accumulates in a native integer, and the
+    /// procedure division sees the counter as its character image (the register is image-carried,
+    /// <c>StorageFormPass</c>; kb/Work PB2553) — <paramref name="digits"/>/<paramref name="scale"/> taken from the
+    /// entry's own analyzed PICTURE, and SIGNED unconditionally per GR1's last sentence.
     /// <para>⛔ ITS USAGE IS DISPLAY — implementor latitude, recorded in docs/CONFORMANCE.md A.4.11 (kb/Work PB1943,
     /// PB2520). GR1 gives the counter a category (numeric), a digit count and a sign, and NO usage; the standard
     /// states a usage wherever it makes a conceptual item one (§14.9.1.4 GR7: DATE "behaves as if it had been

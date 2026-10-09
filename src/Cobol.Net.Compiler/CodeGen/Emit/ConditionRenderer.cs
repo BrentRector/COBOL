@@ -294,8 +294,8 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
     /// is its ONE §8.5.1.12 carrier in its own shape (<see cref="PlaceRenderer.VarGroupOperand"/> — the MOVE's GR9
     /// reader), and <c>CobolVarGroup.Compare</c> walks the PAIR's correspondence over the two shapes (kb/Work PB2496: a
     /// fixed table opposite a dynamic-capacity one, a table of variable-length elements compared element by element),
-    /// under the alphanumeric program collating sequence §8.8.4.2.7 names. Two variable-length groups whose shapes
-    /// cannot be stated (a USAGE BIT leaf) compare in their one layout, at the component offsets.</summary>
+    /// under the alphanumeric program collating sequence §8.8.4.2.7 names. A USAGE BIT member is laid by §8.5.1.6.3's
+    /// bit runs in both shapes (kb/Work PB2691), so a group holding one is compared by the same walk.</summary>
     private string RenderVariableLengthGroupRelational(BoundRelational r)
     {
         if (r.Left is not BoundFieldOperand { Place: var lp } || r.Right is not BoundFieldOperand { Place: var rp })
@@ -304,17 +304,14 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
                        "a fixed-length group compared with a variable-length group");
         var right = PlaceRenderer.VarGroupOperand(rp, "a compared variable-length group",
                         "a fixed-length group compared with a variable-length group");
-        bool bothVariable = VariableLengthCompatibility.IsVariableLength(lp.Item) && VariableLengthCompatibility.IsVariableLength(rp.Item);
-        if (left is not var (lc, ls) || right is not var (rc, rs) || (ls is null || rs is null) && !bothVariable)
+        if (left is not var (lc, ls) || right is not var (rc, rs))
             return EmitText.LoudValue("bool", TierCIsland.Reason((left is null ? lp : rp).Item,
                 "the §8.8.4.2.17 comparison of"));
         // The sequence is the PAIR's, from the ONE pair reader (kb/Work PB649/PB741) — for two groups, the
         // alphanumeric program collating sequence §8.8.4.2.7 names.
         var (leftCat, rightCat) = RelationCategories(r.Left, r.Right);
         string collate = ctx.CollateArgFor(leftCat, rightCat);
-        return (ls is not null && rs is not null
-            ? RuntimeApi.VarGroupCompare(lc, ls, rc, rs, collate)
-            : RuntimeApi.VarGroupCompareInLayout(lc, rc, PlaceRenderer.VarGroupComponentOffsets(lp), collate)) + $" {r.Op} 0";
+        return $"{RuntimeApi.VarGroupCompare(lc, ls, rc, rs, collate)} {r.Op} 0";
     }
 
     /// <summary>GR3's content test for whichever operand is the subject of a BLANK WHEN ZERO entry and has a

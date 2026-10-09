@@ -141,7 +141,7 @@ internal static class PlaceRenderer
         // A REPORT SECTION sum counter (§13.18.54.4 GR1/GR4/GR12): RWCS engine state, read at the counter's own
         // scale and landed in the counter's own CLR carrier (kb/Work PB1666). The identity is the ENTRY's
         // ordinal, never GR5's data-name (kb/Work PB882).
-        ReportSumCounterPlace s => RuntimeApi.ReportSumRead(s.ReportIndex, s.Depth, SumAddress(s), s.RegisterItem.Pic!.ClrType),
+        ReportSumCounterPlace s => RuntimeApi.ReportSumImage(s.ReportIndex, s.Depth, SumAddress(s), s.RegisterItem.ProfileName),
         // A report's PAGE-COUNTER (ISO §8.4.3.15.4 GR1 — a temporary unsigned integer maintained per report):
         // RWCS engine state, scale 0. Reachable on the SENDING side only through a receiving place that is then
         // read back (a rounded/size-error resultant); the plain sending reference is BoundReportCounterRef, and
@@ -276,7 +276,7 @@ internal static class PlaceRenderer
         // A REPORT SECTION sum counter as a RECEIVER — ISO §13.18.54.4 GR12: "It is permissible for procedure
         // division statements to alter the content of sum counters." The store goes to the RWCS engine, at the
         // counter's own scale (GR1); there is no storage to write (kb/Work PB840).
-        ReportSumCounterPlace s => RuntimeApi.ReportSumWrite(s.ReportIndex, s.Depth, SumAddress(s), rhs),
+        ReportSumCounterPlace s => RuntimeApi.ReportSumStoreImage(s.ReportIndex, s.Depth, SumAddress(s), rhs, s.RegisterItem.ProfileName),
         // A report's PAGE-COUNTER as a RECEIVER — ISO §8.4.3.15.3 SR1 admits it wherever an integer data item
         // may appear, and SR3 bars only LINE-COUNTER from the receiving side. The store goes to the RWCS engine;
         // there is no storage to write (kb/Work PB429).
@@ -764,43 +764,28 @@ internal static class PlaceRenderer
     /// operand and both operands of the §8.8.4.2.17 comparison (kb/Work PB1467 moved it here from the MOVE emitter so
     /// the two cannot decompose a group differently). A variable-length group is its own composer; a FIXED-length group
     /// is its record image with no components. <c>Shape</c> is the operand's own §8.5.1.12 atoms
-    /// (<c>VariableLengthCompatibility.GroupAtoms</c>; null for a group with a USAGE BIT leaf): the pair's
+    /// (<c>VariableLengthCompatibility.GroupAtoms</c>, a USAGE BIT member laid by §8.5.1.6.3's runs — kb/Work PB2691): the pair's
     /// correspondence is decided over the TWO shapes (<c>CobolVarGroup.Reshape</c> for a MOVE, <c>CobolVarGroup.Compare</c>
     /// for a relation), the same walk that decided the pair compatible, so a fixed table opposite a dynamic-capacity
     /// table (§8.5.1.12.3 sentence 3) and a table of variable-length elements (§14.6.9.2, kb/Work PB2496) are paired
     /// where the walk pairs them. Null when this implementation cannot compose the operand (the caller emits its named
     /// loud): a variable-length group whose current extent does not compose, a fixed-length group with no character
-    /// image or no atoms. <paramref name="variableContext"/> / <paramref name="fixedContext"/> name the operand in a
-    /// run-time reason, as <see cref="GroupImage"/>'s <c>context</c> does.</summary>
-    public static (string Carrier, GroupAtom[]? Shape)? VarGroupOperand(Place g, string variableContext, string fixedContext)
+    /// image, or a group with no atoms (a dynamic-capacity table packed into a §8.5.1.6.3 bit run, which §8.5.1.12.1
+    /// makes compatible with no group, so the binder has already refused the statement).
+    /// <paramref name="variableContext"/> / <paramref name="fixedContext"/> name the operand in a run-time reason, as
+    /// <see cref="GroupImage"/>'s <c>context</c> does.</summary>
+    public static (string Carrier, GroupAtom[] Shape)? VarGroupOperand(Place g, string variableContext, string fixedContext)
     {
-        var shape = VariableLengthCompatibility.GroupAtoms(g.Item);
+        if (VariableLengthCompatibility.GroupAtoms(g.Item) is not { } shape) return null;
         if (VariableLengthCompatibility.IsVariableLength(g.Item))
             return g.Item.CurrentExtentImageCapable ? (VarGroupImage(g, variableContext), shape) : null;
-        return shape is not null && g.ImageCapable
-            ? (RuntimeApi.VarGroupOfImage(SendingGroupImage(g, fixedContext)), shape)
-            : null;
+        return g.ImageCapable ? (RuntimeApi.VarGroupOfImage(SendingGroupImage(g, fixedContext)), shape) : null;
     }
 
     /// <summary>A §8.5.1.12 carrier of shape <paramref name="from"/> seen in shape <paramref name="to"/>: the carrier
-    /// itself when the shapes are the same, else <c>CobolVarGroup.Reshape</c> (kb/Work PB480, PB2496). A shape that
-    /// cannot be stated (null: a USAGE BIT leaf) leaves the carrier as it is, which is exact only between two groups of
-    /// one layout.</summary>
-    public static string VarGroupInShape(string carrier, GroupAtom[]? from, GroupAtom[]? to) =>
-        from is not null && to is not null && !GroupCompatibility.SameShape(from, to)
-            ? RuntimeApi.VarGroupReshape(carrier, from, to)
-            : carrier;
-
-    /// <summary>Each variable-length component's offset in a variable-length group's FIXED run — where
-    /// <c>CobolVarGroup.Compare</c> interleaves the components with the fixed material (§8.8.4.2.17; kb/Work
-    /// PB1467). Arm for arm the twin of <see cref="VarGroupImage"/>: the cell-backed window's layout is known at
-    /// compile time, a record struct's is its generated contiguous layout.</summary>
-    public static string VarGroupComponentOffsets(Place group) => group switch
-    {
-        OdoGroupPlace o => VarGroupComponentOffsets(o.Inner),
-        RedefViewPlace { Coding: VarGroupWindow g } => $"new int[] {{ {string.Join(", ", g.RunFixedAt())} }}",
-        _ => RuntimeApi.VarGroupComponentOffsets(Read(group)),
-    };
+    /// itself when the shapes are the same, else <c>CobolVarGroup.Reshape</c> (kb/Work PB480, PB2496, PB2691).</summary>
+    public static string VarGroupInShape(string carrier, GroupAtom[] from, GroupAtom[] to) =>
+        GroupCompatibility.SameShape(from, to) ? carrier : RuntimeApi.VarGroupReshape(carrier, from, to);
 
     /// <summary>The EXTENT TABLE that travels beside <see cref="VarGroupCurrentImage"/> (determination D-FRA (v);
     /// kb/Work PB1053): where each variable-length component of the group ends in that image — the generated

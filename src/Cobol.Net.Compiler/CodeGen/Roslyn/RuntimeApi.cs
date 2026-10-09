@@ -1746,8 +1746,8 @@ internal static class RuntimeApi
     public static string ReportPageCounterWrite(int reportIndex, int depth, string valueExpr) =>
         $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SetPageCounter)}((long)({valueExpr}));";
 
-    /// <summary>The argument list that ADDRESSES one SUM counter for <c>CobolReport.SumValue</c> /
-    /// <c>SetSumValue</c> — THE ONE SPELLING, so a read and a write of the same reference cannot select different
+    /// <summary>The argument list that ADDRESSES one SUM counter for <c>CobolReport.SumImage</c> /
+    /// <c>SetSumImage</c> — THE ONE SPELLING, so a read and a write of the same reference cannot select different
     /// counters. With no <paramref name="subscripts"/> it is the counter's id (GR1's identity: an entry occurrence,
     /// kb/Work PB882). With subscripts it is a REPEATING entry's family (kb/Work PB1271): the first id of the family's
     /// block, the extent of each OCCURS level (outermost first) and the one-based subscript values, which the engine
@@ -1759,19 +1759,12 @@ internal static class RuntimeApi
             : $"{counterId}, [{string.Join(", ", extents.Select(e => e.ToString(System.Globalization.CultureInfo.InvariantCulture)))}], "
               + $"[{string.Join(", ", subscripts.Select(s => $"(long)({s})"))}]";
 
-    /// <summary>Read a SUM counter's content, unscaled at the counter's own scale (ISO §13.18.54.4 GR1/GR4) —
-    /// <c>CobolReport.SumValue</c>. <paramref name="counterAddress"/> is <see cref="ReportSumAddress"/>'s.
-    /// <para>The engine carries every counter in an <see cref="Int128"/> (kb/Work PB1509/PB1560/PB1666); the read
-    /// lands it in <paramref name="clrType"/>, the counter's OWN carrier (<c>PicInfo.ClrType</c> of its GR1
-    /// profile — <c>long</c> up to 18 digits, <c>Int128</c> beyond), so every consumer sees the type any other
-    /// numeric item of that profile has. The narrowing is exact: the engine never holds a value past the
-    /// counter's digits (its GR3 size-error test), and a procedure-division write arrives stored through the
-    /// same profile.</para></summary>
-    public static string ReportSumRead(int reportIndex, int depth, string counterAddress, string clrType)
-    {
-        string read = $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SumValue)}({counterAddress})";
-        return clrType == "Int128" ? read : $"(({clrType}){read})";
-    }
+    /// <summary>Read a SUM counter's content as its character image under its GR1 profile <paramref name="profile"/>
+    /// (ISO §13.18.54.4 GR1/GR4) — <c>CobolReport.SumImage</c>. <paramref name="counterAddress"/> is
+    /// <see cref="ReportSumAddress"/>'s. The counter's register is an image-carried numeric item
+    /// (<c>DataItem.StoreAsImage</c>; kb/Work PB2553), so every consumer reads it as it reads any such item.</summary>
+    public static string ReportSumImage(int reportIndex, int depth, string counterAddress, string profile) =>
+        $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SumImage)}({counterAddress}, {profile})";
 
     /// <summary>A report writer OCCURS … DEPENDING repetition count (ISO §13.18.38.4 GR13) —
     /// <c>CobolReport.DependingCount</c> over data-name-1's integer value, evaluated once.</summary>
@@ -1801,10 +1794,11 @@ internal static class RuntimeApi
         $"{nameof(CobolReport)}.{nameof(CobolReport.VaryingInteger)}({args})";
 
     /// <summary>Alter a SUM counter's content from the procedure division (ISO §13.18.54.4 GR12) —
-    /// <c>CobolReport.SetSumValue</c>, at the counter's own scale, widened to the engine's Int128 carrier.
-    /// <paramref name="counterAddress"/> is <see cref="ReportSumAddress"/>'s.</summary>
-    public static string ReportSumWrite(int reportIndex, int depth, string counterAddress, string valueExpr) =>
-        $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SetSumValue)}({counterAddress}, (Int128)({valueExpr}));";
+    /// <c>CobolReport.SetSumImage</c>: the character image the writing statement stored through the counter's GR1
+    /// profile <paramref name="profile"/>, kept as stored (kb/Work PB2553). <paramref name="counterAddress"/> is
+    /// <see cref="ReportSumAddress"/>'s.</summary>
+    public static string ReportSumStoreImage(int reportIndex, int depth, string counterAddress, string image, string profile) =>
+        $"{ReportEngine(reportIndex, depth)}.{nameof(CobolReport.SetSumImage)}({counterAddress}, {image}, {profile});";
 
     /// <summary>Decode a DISPLAY image back into a native numeric leaf, preserving unset positions from the
     /// current value — <c>CobolNum.StoreDisplay</c>.</summary>
@@ -1923,16 +1917,6 @@ internal static class RuntimeApi
                                          string collateArg) =>
         $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Compare)}({left}, {GroupAtomsNew(leftShape)}, {right}, "
         + $"{GroupAtomsNew(rightShape)}{collateArg})";
-
-    /// <summary>The same comparison between two variable-length groups whose shapes cannot be stated (a USAGE BIT leaf)
-    /// and so share one layout — <c>CobolVarGroup.CompareInLayout</c> at the variable-length side's component offsets.</summary>
-    public static string VarGroupCompareInLayout(string left, string right, string componentOffsets, string collateArg) =>
-        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.CompareInLayout)}({left}, {right}, {componentOffsets}{collateArg})";
-
-    /// <summary>A variable-length record type's component offsets in its fixed run —
-    /// <c>{group}.__Contiguous.ComponentOffsets</c>.</summary>
-    public static string VarGroupComponentOffsets(string groupRead) =>
-        $"{groupRead}.{ContiguousLayoutProperty}.{nameof(CobolContiguousLayout.ComponentOffsets)}";
 
     /// <summary>The inverse of <see cref="VarGroupFromFixedImage"/> — rebuild the fixed group's record image.</summary>
     public static string VarGroupToFixedImage(string carrier, int totalWidth, string spans) =>

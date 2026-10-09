@@ -797,7 +797,8 @@
   "pb845_unnamed_usage_entry",
   "pb1900_nested_product_cancellation",
   "pb289_argument_expression_lands_at_formal_scale",
-  "pb2078_property_receivers_identified"
+  "pb2078_property_receivers_identified",
+  "pb2553_sum_counter_incompatible"
   ],
   "pending": []
 }

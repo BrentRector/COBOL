@@ -30,7 +30,7 @@ public sealed class PlaceStorageCellDriftTests
     /// <summary>The views over engine state, with what the engine owns for each.</summary>
     private static readonly Dictionary<string, string> Views = new(StringComparer.Ordinal)
     {
-        ["ReportSumCounterPlace"] = "The report engine's sum counter (ISO §13.18.54.4 GR1), read and written by SumValue / SetSumValue.",
+        ["ReportSumCounterPlace"] = "The report engine's sum counter (ISO §13.18.54.4 GR1), read and written as its character image by SumImage / SetSumImage.",
         ["ReportPageCounterPlace"] = "The report engine's PAGE-COUNTER (ISO §8.4.3.15.4 GR1).",
         ["CapacityRegisterPlace"] = "The OCCURS DYNAMIC table's current capacity (ISO §13.18.38 GR15).",
         ["DebugRegisterPlace"] = "The X3.23-1985 DEBUG-ITEM register family, populated by the debug trigger.",

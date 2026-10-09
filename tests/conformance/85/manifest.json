@@ -410,7 +410,8 @@
   "pb850_edited_subordinate_key_group",
   "pb2506_signed_comma_decimal_argument",
   "pb845_national_bit_user_words",
-  "pb2610_go_to_before_conditional"
+  "pb2610_go_to_before_conditional",
+  "pb2553_sum_counter_character_cell"
  ],
  "pending": []
 }

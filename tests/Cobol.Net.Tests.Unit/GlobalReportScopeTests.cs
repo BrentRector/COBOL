@@ -108,10 +108,10 @@ public sealed class GlobalReportScopeTests
     {
         string visible = Emit(Group(true, true, "", "", "           MOVE TOT-N TO WS-T."));
         Assert.Contains("__outer.__RPT_", Inner(visible));
-        Assert.Contains(".SumValue(", Inner(visible));
+        Assert.Contains(".SumImage(", Inner(visible));
 
         string hidden = Emit(Group(true, true, "", "", "           MOVE TOT-N TO WS-T.", "       01 TOT-N PIC 99 VALUE 7.\n"));
-        Assert.DoesNotContain(".SumValue(", Inner(hidden));
+        Assert.DoesNotContain(".SumImage(", Inner(hidden));
     }
 
     /// <summary>§8.4.6.2.1 rule 3 a) — "If the name is declared in source element B, the item in source element B

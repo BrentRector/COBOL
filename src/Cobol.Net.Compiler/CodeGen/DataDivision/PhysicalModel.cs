@@ -196,10 +196,9 @@ internal sealed class PhysicalModel(EmitContext ctx)
             if (runs.IsInRun(c))
             {
                 var run = runs.RunLedBy(c);
-                int runBits = run?.Sum(m => BitLayout.RunBits(m)) ?? 0;
                 // A bit GROUP member keeps its record-struct type (IsGroupStruct) — its own AsImage/FromImage still exist
                 // for the standalone (record) case — but inside the run its slice is the run's (D20/PB79).
-                yield return new Physical(c.CsName, c.FieldType, run is null ? 0 : BitLayout.Characters(runBits),
+                yield return new Physical(c.CsName, c.FieldType, run is null ? 0 : BitLayout.RunCharacters(run),
                     c.IsGroup, Values.FieldInit(c, subs, recipe), comment, occurs, null, run);
                 continue;
             }

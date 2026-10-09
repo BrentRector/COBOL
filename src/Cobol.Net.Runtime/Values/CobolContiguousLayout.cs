@@ -42,8 +42,7 @@ namespace CobolNet.Runtime;
 /// <item>ELEMENTS OF A FIXED IMAGE (<c>Comps</c> zero): the table is the LAST component, one element per unit up to
 /// its maximum, so the record's own length says how many occurrences it holds. The group's activation-boundary
 /// carrier (<c>AsVarImage</c>) holds that table in its FIXED run, so this layout converts at its two doors —
-/// <see cref="ExtentsOf"/> and <see cref="Decompose"/> — and its <see cref="ComponentOffsets"/> list only the
-/// components the carrier has.</item>
+/// <see cref="ExtentsOf"/> and <see cref="Decompose"/>.</item>
 /// <item>VARIABLE-LENGTH ELEMENTS (<c>Comps</c> above zero): the components are listed at the table's MAXIMUM (where
 /// a comparison and the activation boundary look for them) and <paramref name="FixedTotal"/> holds every occurrence's
 /// fixed run. A record holding N occurrences is laid out by the first <c>Comps</c> × N of the table's components and
@@ -136,10 +135,6 @@ public sealed class CobolContiguousLayout(int FixedTotal, int[] FixedAt, int[] U
         for (int k = 0; k < lengths.Length; k++) lengths[k] = extents.Lengths[k] + (_structure[k]?.Overhead ?? 0);
         return new RecordExtents([.. extents.FixedAt], lengths, this);
     }
-
-    /// <summary>Each variable-length component's offset in the FIXED run, in the carrier's flattened order — where
-    /// <see cref="CobolVarGroup.Compare"/> interleaves the components with the fixed material (ISO §8.8.4.2.17).</summary>
-    public IReadOnlyList<int> ComponentOffsets => TableIsLastComponent ? FixedAt[..^1] : FixedAt;
 
     /// <summary>The EXTENT TABLE of a record of this type (D-FRA (v); kb/Work PB1053): each variable-length
     /// component's fixed-run offset and the length, in characters, of its content in <paramref name="current"/> —

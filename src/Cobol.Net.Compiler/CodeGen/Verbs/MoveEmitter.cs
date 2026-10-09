@@ -476,15 +476,15 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     /// the one the INVOKE boundary already reshapes (<c>OoEmitter</c>); handing the sender's carrier over ordinally put
     /// a dynamic table's occurrences into the receiver's dynamic-length item. A fixed-length receiver takes the reshaped
     /// carrier's fixed run, which is its whole record image. Null when the shape cannot be distributed.</summary>
-    private static string? VarCarrierWrite(Place g, string carrier, GroupAtom[]? sendShape)
+    private static string? VarCarrierWrite(Place g, string carrier, GroupAtom[] sendShape)
     {
-        var recvShape = VariableLengthCompatibility.GroupAtoms(g.Item);
+        if (VariableLengthCompatibility.GroupAtoms(g.Item) is not { } recvShape) return null;
         string moved = PlaceRenderer.VarGroupInShape(carrier, sendShape, recvShape);
         return VariableLengthCompatibility.IsVariableLength(g.Item)
             ? g.Item.CurrentExtentImageCapable
                 ? PlaceRenderer.WriteVarGroupImage(g, moved, "the receiving variable-length group", receivingOperand: true)
                 : null
-            : sendShape is not null && recvShape is not null && g.ImageCapable
+            : g.ImageCapable
                 ? PlaceRenderer.WriteGroupImage(g, RuntimeApi.StrStore($"{moved}.Fixed", g.Item.ImageWidth.ToString()),
                     "the receiving group of a variable-length group MOVE")
                 : null;

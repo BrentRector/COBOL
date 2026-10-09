@@ -628,18 +628,6 @@ public sealed record VarGroupWindow(AccessPath Cell, Position DynBase, IReadOnly
 
     /// <summary>True when <paramref name="group"/> would take this coding.</summary>
     public static bool Applies(DataItem group) => group.IsGroup && CellComponents.Of(group).Any();
-
-    /// <summary>Each component's position in the group's FIXED RUN — its window position less the reservations of
-    /// the tables before it — the coordinate <c>CobolVarGroup</c> interleaves components at (§8.8.4.2.17).</summary>
-    public IEnumerable<int> RunFixedAt()
-    {
-        int cut = 0;
-        for (int k = 0; k < DynFixedAt.Count; k++)
-        {
-            yield return DynFixedAt[k] - cut;
-            cut += DynTable[k];
-        }
-    }
 }
 
 /// <summary>
@@ -878,8 +866,8 @@ public sealed record CapacityRegisterPlace(AccessPath Table, DataItem RegisterIt
 /// <summary>
 /// A REPORT SECTION <b>sum counter</b> (ISO/IEC 1989:2023 §13.18.54.4 GR1/GR5/GR12; kb/Work PB840 × PB882): the
 /// conceptual numeric data item an entry containing a SUM clause establishes. It is RWCS engine state, never
-/// program storage, so this is a VIEW — reading renders <c>__RPT_{n}.SumValue({id})</c> and writing renders
-/// <c>__RPT_{n}.SetSumValue({id}, …)</c>, the ONE place GR12's "It is permissible for procedure division
+/// program storage, so this is a VIEW — reading renders <c>__RPT_{n}.SumImage({id}, profile)</c> and writing renders
+/// <c>__RPT_{n}.SetSumImage({id}, …, profile)</c> (the register is image-carried, kb/Work PB2553), the ONE place GR12's "It is permissible for procedure division
 /// statements to alter the content of sum counters" lands. <paramref name="CounterId"/> is the ENTRY's ordinal
 /// (GR1 — the identity is the entry, never GR5's data-name, which two entries may legally share);
 /// <paramref name="RegisterItem"/> carries the GR1 profile (<see cref="PicInfo.SumCounterItem"/>) so the numeric

@@ -227,7 +227,8 @@
   "pb2496_vlg_dynamic_element_tables",
   "pb2496_vlg_dynamic_element_tables_call",
   "pb2497_vlg_record_odo_element_tables",
-  "pb2689_vlg_element_measured_length"
+  "pb2689_vlg_element_measured_length",
+  "pb2691_vlg_bit_member_shapes"
  ],
  "pending": []
 }

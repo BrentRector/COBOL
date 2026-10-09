@@ -1,0 +1,8 @@
+L1 class condition (exempt)
+   not numeric
+L2 ADD
+CAUGHT=EC-DATA-INCOMPATIBLE           
+L3 GENERATE
+CAUGHT=EC-DATA-INCOMPATIBLE           
+L4 MOVE
+   D=[0005]
