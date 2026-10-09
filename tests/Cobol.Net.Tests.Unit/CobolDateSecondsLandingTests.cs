@@ -58,13 +58,13 @@ public sealed class CobolDateSecondsLandingTests
     public void ATinyNegativeFloat_TakesTheOutOfRangePath(bool leapSecond)
     {
         Int128 landed = CobolDate.SecondsOfReal(-1.0E-10);
-        Assert.Equal("", CobolDate.FormattedTime("hhmmss", landed, 9, 0, false, leapSecond));
+        Assert.Equal("", CobolDate.FormattedTime("hhmmss", landed, 9, 0, leapSecond));
         bool saved = ExceptionState.ArgumentFunctionChecking;
         ExceptionState.ArgumentFunctionChecking = true;
         try
         {
-            Assert.Throws<CobolFatalException>(() => CobolDate.FormattedTime("hhmmss", landed, 9, 0, false, leapSecond));
-            Assert.Throws<CobolFatalException>(() => CobolDate.FormattedDatetime("YYYYMMDDThhmmss", 1, landed, 9, 0, false, leapSecond));
+            Assert.Throws<CobolFatalException>(() => CobolDate.FormattedTime("hhmmss", landed, 9, 0, leapSecond));
+            Assert.Throws<CobolFatalException>(() => CobolDate.FormattedDatetime("YYYYMMDDThhmmss", 1, landed, 9, 0, leapSecond));
         }
         finally { ExceptionState.ArgumentFunctionChecking = saved; }
     }

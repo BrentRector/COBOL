@@ -335,11 +335,14 @@ public static class CobolDate
         secScale = 0;
     }
 
-    /// <summary>Emit a formatted value from integer date form + seconds-past-midnight (unscaled/scale) + an
-    /// optional UTC offset in minutes (§15.38–15.41). A date-only / time-only format ignores the components it
-    /// does not reference. An ill-formed format sets EC-ARGUMENT-FUNCTION and yields the §15.3 default "".</summary>
+    /// <summary>Emit a formatted value from integer date form + seconds-past-midnight (unscaled/scale) + a UTC
+    /// offset in minutes (§15.38–15.41). An OMITTED offset arrives as 0: §15.40.3 r7 / §15.41.3 r6 evaluate the
+    /// function "as though 0 were specified", so the omitted and the written 0 are one value on one path (kb/Work
+    /// PB2629: a separate "has offset" flag used to skip the UTC adjustment for the omitted form only, and the two
+    /// forms disagreed on the leap second). A date-only / time-only format ignores the components it does not
+    /// reference. An ill-formed format sets EC-ARGUMENT-FUNCTION and yields the §15.3 default "".</summary>
     private static string EmitFormatted(string format, long integerDate, Int128 secUnscaled, int secScale,
-                                        long offsetMinutes, bool hasOffset, bool leapSecond = false)
+                                        long offsetMinutes, bool leapSecond = false)
     {
         var segs = Tokenize(format);
         if (segs is null)
@@ -363,8 +366,16 @@ public static class CobolDate
             secScale = 18;
         }
         decimal secs = (decimal)secUnscaled / (decimal)(long)Pow10.AsWide(secScale);
+        // ⛔ THE LEAP SECOND IS SECOND 60 OF ITS MINUTE, NEVER A SECOND OF THE NEXT DAY (kb/Work PB2629). Under
+        // >>LEAP-SECOND ON a value in [86 400, 86 401) is the day's leap second (§7.3.17.4 GR4), the time 23:59:60
+        // (§15.3.3.3: the seconds subfield is below 61). It is set aside as the second it extends, 23:59:59 plus its
+        // fraction, BEFORE the §15.40.4 r2 / §15.41.4 r2 UTC adjustment, so the modular day roll below never reads
+        // it as 00:00 of the next day; the adjusted minute (an offset is whole minutes, so its second is still 59)
+        // shows it as second 60 again.
+        bool leap = leapSecond && secs >= 86400m;
+        if (leap) secs -= 1m;
         long day = integerDate;
-        if (hasTime && isUtc && hasOffset)                              // §15.40/41 r2 — a UTC format displays local − offset
+        if (hasTime && isUtc)                                           // §15.40/41 r2 — a UTC format displays local − offset
         {
             secs -= offsetMinutes * 60m;
             while (secs < 0) { secs += 86400m; day--; }
@@ -390,7 +401,8 @@ public static class CobolDate
             isoD = ((int)dt.DayOfWeek + 6) % 7 + 1;                    // Mon=1..Sun=7 (§15.3.1.7)
         }
         long tot = (long)Math.Floor(secs);
-        var (hh, mi, ss) = TimeOfDay(tot, leapSecond);
+        var (hh, mi, ss) = TimeOfDay(tot, leapSecond: false);
+        if (leap) ss = 60;
         decimal frac = secs - tot;
         long offMag = Math.Abs(offsetMinutes);
         int oh = (int)(offMag / 60), om = (int)(offMag % 60);
@@ -428,21 +440,21 @@ public static class CobolDate
         if (integerDate is < 1 or > 3067671)
             return Exceptions.ExceptionState.ArgumentErrorZeroLength(
                 $"FORMATTED-DATE argument {integerDate} outside 1..3,067,671 (§15.5.2; CONFORMANCE.md row DOC-A.1-90)");
-        return EmitFormatted(format, integerDate, 0, 0, 0, false);
+        return EmitFormatted(format, integerDate, 0, 0, 0);
     }
 
     /// <summary>FORMATTED-TIME (§15.41): seconds past midnight (a2, unscaled/scale) per the time format a1; a UTC
     /// format displays a2 adjusted by the offset a3 (r2), an offset format shows a2 direct + a3 in the offset field
-    /// (r3). a3 omitted with a UTC/offset format is treated as 0 (r7).</summary>
-    public static string FormattedTime(string format, Int128 secUnscaled, int secScale, long offsetMinutes, bool hasOffset,
+    /// (r3). a3 omitted with a UTC/offset format arrives as 0 (r6).</summary>
+    public static string FormattedTime(string format, Int128 secUnscaled, int secScale, long offsetMinutes,
                                        bool leapSecond = false)
         => SecondsOutOfStandardForm("FORMATTED-TIME", "argument-2", secUnscaled, secScale, leapSecond)
-           || OffsetOutOfRange("FORMATTED-TIME", "argument-3", offsetMinutes, hasOffset, "§15.41.3 r4")
+           || OffsetOutOfRange("FORMATTED-TIME", "argument-3", offsetMinutes, "§15.41.3 r4")
             // The predicate raised; this arm owes only the substituted result, and it READS the class rather
             // than spelling a literal (CONFORMANCE.md row DOC-A.1-90's zero-length class — the row names
             // FORMATTED-TIME in it; kb/Work PB383, PB470).
             ? Exceptions.ArgumentSubstitute.ZeroLength
-            : EmitFormatted(format, 1, secUnscaled, secScale, offsetMinutes, hasOffset, leapSecond);
+            : EmitFormatted(format, 1, secUnscaled, secScale, offsetMinutes, leapSecond);
 
     /// <summary>§15.41.3 r3 / §15.40.3 r4: the seconds argument "shall be a value in STANDARD NUMERIC TIME FORM".
     /// The §7.3.17 LEAP-SECOND directive defines that range — GR5 (OFF, the implied default): "greater than or
@@ -469,7 +481,10 @@ public static class CobolDate
     /// 60); OFF never admits such a value (<see cref="SecondsOutOfStandardForm(string, string, CobolDec, bool)"/>
     /// has already refused it). LOCALE-TIME-FROM-SECONDS read 86 400 as <c>24:00:00</c> — a time the day does not
     /// have — where §15.54.4 r2 returns "a character-string containing hours, minutes, and seconds of the time specified by argument-1",
-    /// which for the leap second are 23, 59 and 60, exactly what FORMATTED-TIME presents for the same value.</summary>
+    /// which for the leap second are 23, 59 and 60, exactly what FORMATTED-TIME presents for the same value.
+    /// <para>FORMATTED-TIME and FORMATTED-DATETIME may shift the time by a UTC offset first (§15.40.4 r2 / §15.41.4
+    /// r2), so <see cref="EmitFormatted"/> sets the leap second aside before the shift, reads the shifted second it
+    /// extends here, and shows that minute's second as 60 (kb/Work PB2629).</para></summary>
     internal static (int Hours, int Minutes, int Seconds) TimeOfDay(long wholeSeconds, bool leapSecond) =>
         leapSecond && wholeSeconds >= 86400
             ? (23, 59, 60 + (int)(wholeSeconds - 86400))
@@ -529,9 +544,9 @@ public static class CobolDate
     /// offset is an ordinary numeric argument, so its VALUE is generally not known until execution. It was
     /// enforced NOWHERE — an offset of 5000 minutes formatted a nonsense zone with no exception condition, which
     /// is the fabricated-value failure mode PB11 exists to close, not mere over-acceptance.</para></summary>
-    private static bool OffsetOutOfRange(string fn, string argName, long offsetMinutes, bool hasOffset, string cite)
+    private static bool OffsetOutOfRange(string fn, string argName, long offsetMinutes, string cite)
     {
-        if (!hasOffset || Math.Abs(offsetMinutes) <= 1439) return false;
+        if (offsetMinutes is >= -1439 and <= 1439) return false;    // an omitted offset arrives as 0 (never Math.Abs: long.MinValue)
         Exceptions.ExceptionState.ArgumentError(
             $"{fn} {argName} is {offsetMinutes} minutes; the magnitude shall be <= 1439, one minute less than a "
             + $"day (ISO {cite})");
@@ -541,7 +556,7 @@ public static class CobolDate
     /// <summary>FORMATTED-DATETIME (§15.40): integer date a2 + seconds a3 per the combined format a1; UTC ⇒ adjust
     /// by a4; offset ⇒ a3 direct in time and a4 direct in the offset field.</summary>
     public static string FormattedDatetime(string format, long integerDate, Int128 secUnscaled, int secScale,
-                                           long offsetMinutes, bool hasOffset, bool leapSecond = false)
+                                           long offsetMinutes, bool leapSecond = false)
     {
         if (integerDate is < 1 or > 3067671)
             return Exceptions.ExceptionState.ArgumentErrorZeroLength(
@@ -549,8 +564,8 @@ public static class CobolDate
         // Both predicates have already raised; these arms owe only the substituted result, and they READ row
         // DOC-A.1-90's zero-length class rather than spelling a literal (kb/Work PB383, PB470).
         if (SecondsOutOfStandardForm("FORMATTED-DATETIME", "argument-3", secUnscaled, secScale, leapSecond)) return Exceptions.ArgumentSubstitute.ZeroLength;
-        if (OffsetOutOfRange("FORMATTED-DATETIME", "argument-4", offsetMinutes, hasOffset, "§15.40.3 r5")) return Exceptions.ArgumentSubstitute.ZeroLength;
-        return EmitFormatted(format, integerDate, secUnscaled, secScale, offsetMinutes, hasOffset, leapSecond);
+        if (OffsetOutOfRange("FORMATTED-DATETIME", "argument-4", offsetMinutes, "§15.40.3 r5")) return Exceptions.ArgumentSubstitute.ZeroLength;
+        return EmitFormatted(format, integerDate, secUnscaled, secScale, offsetMinutes, leapSecond);
     }
 
     /// <summary>FORMATTED-CURRENT-DATE (§15.38): the current system date/time formatted per the combined format a1
@@ -566,7 +581,7 @@ public static class CobolDate
         long id = (now.Date - Epoch).Days + 1;
         long unscaled = now.TimeOfDay.Ticks * 100;                    // seconds past local midnight at 9 fraction digits (tick = 100 ns)
         long offMin = (long)now.Offset.TotalMinutes;
-        return EmitFormatted(format, id, unscaled, 9, offMin, true);
+        return EmitFormatted(format, id, unscaled, 9, offMin);
     }
 
     /// <summary>Walk <paramref name="data"/> against <paramref name="format"/>, validating every §15.3 separator

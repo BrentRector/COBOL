@@ -1474,7 +1474,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
             // BOOLEAN-OF-INTEGER (§15.13.4 r1) — a boolean-result function on the D-B1 '0'/'1' substrate:
             // rightmost position = low-order digit, left zero-fill/truncate to argument-2 positions.
             // Argument-1 crosses the WIDE bridge (Int128 — §15.13.3 r1 admits any positive integer, PB65);
-            // argument-2 stays on the long bridge (§15.4 caps the returned length at 8 191 positions).
+            // argument-2 stays on the long bridge (§15.4 caps the returned length at CobolIntrinsics.ReturnedValueMaximum).
             "BooleanOfInteger" =>
                 RuntimeApi.Intrinsic(sig.RuntimeMethod, $"{ArgIntWide(ic.Args[0])}, {ArgInt(ic.Args[1])}"),
             // DISPLAY-OF (§15.26) / NATIONAL-OF (§15.66) — the national↔alphanumeric repertoire pair (2002);
@@ -1546,9 +1546,8 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     private string RenderFormattedTime(BoundIntrinsicCall ic)
     {
         var (secExpr, secScale) = SecondsArg(ArgNum(ic.Args[1]));
-        bool hasOff = ic.Args.Count > 2;
         return RuntimeApi.DateFn(ic.Sig.RuntimeMethod, $"{Str(ic.Args[0])}, {secExpr}, {secScale}, "
-             + $"{(hasOff ? ArgInt(ic.Args[2]) : "0")}, {(hasOff ? "true" : "false")}{LeapSecondFlag}");
+             + $"{OffsetMinutesArg(ic, 2)}{LeapSecondFlag}");
     }
 
     /// <summary>The bound <see cref="BoundIntrinsicCall.Locale"/> as the runtime's <c>localeTag</c> argument: the named
@@ -1569,10 +1568,17 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     private string RenderFormattedDatetime(BoundIntrinsicCall ic)
     {
         var (secExpr, secScale) = SecondsArg(ArgNum(ic.Args[2]));
-        bool hasOff = ic.Args.Count > 3;
         return RuntimeApi.DateFn(ic.Sig.RuntimeMethod, $"{Str(ic.Args[0])}, {ArgInt(ic.Args[1])}, "
-             + $"{secExpr}, {secScale}, {(hasOff ? ArgInt(ic.Args[3]) : "0")}, {(hasOff ? "true" : "false")}{LeapSecondFlag}");
+             + $"{secExpr}, {secScale}, {OffsetMinutesArg(ic, 3)}{LeapSecondFlag}");
     }
+
+    /// <summary>The UTC offset in minutes of FORMATTED-TIME (argument-3) and FORMATTED-DATETIME (argument-4). An
+    /// omitted offset IS 0: §15.41.3 r6 / §15.40.3 r7 evaluate the function "as though 0 were specified", so the
+    /// runtime gets one value on one path whether the program wrote it or not (kb/Work PB2629: a separate "has
+    /// offset" flag skipped the UTC adjustment for the omitted form only, and the two forms disagreed on the leap
+    /// second).</summary>
+    private string OffsetMinutesArg(BoundIntrinsicCall ic, int index) =>
+        ic.Args.Count > index ? ArgInt(ic.Args[index]) : "0";
 
     /// <summary>The <c>&gt;&gt;LEAP-SECOND ON</c> argument every §15.3 date/time function that reads a seconds subfield or
     /// a standard numeric time form takes (ISO §7.3.17 / §15.3.3.3 — kb/Work PB65): the compilation group's ONE
@@ -1764,7 +1770,9 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         public string Visit(BoundOperandError n) => EmitText.LoudValue("string", n.Feature);
         // An address-identifier (kb/Work PB1021) is class pointer: the binder admits it only as a relation operand, which
         // ConditionRenderer's pointer arms render, and an INVOKE argument, which OoEmitter renders — never a
-        // character or numeric value. Reaching this is a binder hole, so it is LOUD, never a guessed value.
+        // character or numeric value. A class-screened intrinsic position refuses it even under --permissive, whose
+        // coercion is offered only for an operand that holds characters (IntrinsicBinder.ReportClass, kb/Work PB2079;
+        // PB2074 pins UPPER-CASE (ADDRESS OF X)). Reaching this is a binder hole, so it is LOUD, never a guessed value.
         public string Visit(BoundAddressOperand n) => EmitText.LoudValue("string", "address-identifier as a character argument");
         // Admitted PER-FUNCTION (PB59): the raw source-text image via the ONE OperandText channel where the
         // function's §15.x.3 rule admits a numeric literal (see StrNum); Loud everywhere else — see Str's ⛔.

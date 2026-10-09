@@ -24,6 +24,29 @@ public static partial class CobolIntrinsics
     /// (kb/Work PB470 — before it those guards spelled <c>" "</c> themselves).</summary>
     private const int CharPositions = 1;
 
+    /// <summary>⛔ THE §15.4 RETURNED-VALUE MAXIMUM, ONE NUMBER (docs/CONFORMANCE.md row <c>DOC-A.1-93</c>; kb/Work
+    /// PB2631). §15.4: "If the length of the returned value exceeds the maximum length specified by the implementor
+    /// for a returned value, an EC-ARGUMENT-FUNCTION exception condition is set to exist." The maximum is the
+    /// CARRIER's own ceiling, <see cref="CobolDynString.MaxLength"/> (a returned value IS a .NET
+    /// <see cref="string"/>), the determination row <c>DOC-A.1-62</c> already makes for a dynamic-length item: the
+    /// owner's rule-1 precedence takes GnuCOBOL's answer where the standard leaves the choice, and GnuCOBOL 3.2
+    /// returns a 10,000-position UPPER-CASE, REVERSE, CONCAT and SUBSTITUTE whole. It is NOT the 8,191-position
+    /// literal maximum (§8.3.3.4.3 SR1, <c>CobolLiteral.MaxLiteralPositions</c>): that bounds what source text can
+    /// write, and a returned value is sized by run-time data.</summary>
+    public const int ReturnedValueMaximum = CobolDynString.MaxLength;
+
+    /// <summary>The ONE §15.4 guard: <see langword="null"/> while <paramref name="length"/> is within
+    /// <see cref="ReturnedValueMaximum"/>, else EC-ARGUMENT-FUNCTION is set and the row <c>DOC-A.1-93</c> result,
+    /// the zero-length value, is returned for the caller to return. Asked by every function whose returned value can
+    /// outgrow its arguments (CONCAT, SUBSTITUTE, CONVERT, BASECONVERT, BOOLEAN-OF-INTEGER); a function whose length
+    /// follows an argument cannot pass the maximum, because no item is longer than the carrier.</summary>
+    private static string? ReturnedValueOverMaximum(string function, long length) =>
+        length <= ReturnedValueMaximum ? null
+        : Exceptions.ExceptionState.ArgumentErrorZeroLength(
+            $"FUNCTION {function}'s returned value reaches {length.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} "
+            + $"character positions, past the documented maximum of {ReturnedValueMaximum.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} "
+            + "(ISO §15.4; CONFORMANCE.md row DOC-A.1-93)");
+
     /// <summary>CHAR (§15.15.4): the character in ORDINAL position <paramref name="n"/> (1-based) of the
     /// alphanumeric program collating sequence — native sequence: position n is char code n−1 (IF105A asserts
     /// CHAR(37) = '$', ASCII 36). Out-of-range ordinal → EC-ARGUMENT default one-space result (§15.3).</summary>
@@ -161,8 +184,14 @@ public static partial class CobolIntrinsics
     /// <summary>CONCAT (§15.18.4, 2023): the characters of all arguments in order — argument-1 followed by each
     /// argument-2 (rules 1 &amp; 4). Each argument arrives as its fixed-width display IMAGE (trailing padding
     /// included — §15.18.4 rule 1 "all of the characters"), so the result length is the sum of the argument
-    /// widths.</summary>
-    public static string Concat(params string[] parts) => string.Concat(parts);
+    /// widths. That sum is the one CONCAT length that can pass the §15.4 maximum (<see cref="ReturnedValueMaximum"/>),
+    /// so it is measured before the value is built.</summary>
+    public static string Concat(params string[] parts)
+    {
+        long length = 0;
+        foreach (var part in parts) length += part.Length;
+        return ReturnedValueOverMaximum("CONCAT", length) ?? string.Concat(parts);
+    }
 
     /// <summary>BASECONVERT (§15.12.4, 2023): the unsigned integer whose digits are <paramref name="value"/> in
     /// base <paramref name="fromBase"/>, re-expressed as a string of 0-9 / A-F digits in base
@@ -179,10 +208,10 @@ public static partial class CobolIntrinsics
     /// §8.1.3.2 GR3a's case-insensitivity governs the compilation group's TEXT, not runtime data. The previous
     /// lowercase arm was an unadjudicated leniency with no vendor precedent (the GPL corpus has no BASECONVERT
     /// case) — rejected loudly, never silently widened.</para>
-    /// <para>The returned-value length is capped by the documented §15.4 maximum (8,191 character positions —
-    /// CONFORMANCE.md item 93, the §8.8.3.2 SR2 concatenation precedent): past it, EC-ARGUMENT-FUNCTION, which
-    /// also bounds §15.12.3 r3's input side (an input within its own 8,191-position item bound whose value
-    /// needs more output digits than the cap takes the same raise).</para></remarks>
+    /// <para>The returned-value length is capped by the documented §15.4 maximum (<see cref="ReturnedValueMaximum"/>,
+    /// CONFORMANCE.md row DOC-A.1-93): past it, EC-ARGUMENT-FUNCTION, which also bounds §15.12.3 r3's input side
+    /// ("neither it nor the returned value would exceed that defined by the implementor for a data item": an input
+    /// whose value needs more output digits than the maximum takes the same raise).</para></remarks>
     public static string BaseConvert(string value, long fromBase, long toBase)
     {
         if (fromBase is < 2 or > 16 || toBase is < 2 or > 16)
@@ -210,12 +239,16 @@ public static partial class CobolIntrinsics
                 "BASECONVERT argument-1 contains no digits (§15.12.3 rule 2; §15.3)");
         if (acc == 0) return "0";
         const string digits = "0123456789ABCDEF";
-        var sb = new System.Text.StringBuilder();
-        for (; acc > 0; acc /= toBase) sb.Insert(0, digits[(int)(acc % toBase)]);
-        if (sb.Length > 8191)
-            return Exceptions.ExceptionState.ArgumentErrorZeroLength(
-                $"BASECONVERT returned value of {sb.Length} digits exceeds the documented 8,191-position maximum (§15.4; §15.12.3 rule 3; CONFORMANCE.md row DOC-A.1-93)");
-        return sb.ToString();
+        // The digits come out low-order first and are reversed once at the end: inserting each at the front made
+        // the conversion quadratic in its own output length.
+        var lowFirst = new List<char>();
+        for (; acc > 0; acc /= toBase)
+        {
+            lowFirst.Add(digits[(int)(acc % toBase)]);
+            if (ReturnedValueOverMaximum("BASECONVERT", lowFirst.Count) is { } over) return over;
+        }
+        lowFirst.Reverse();
+        return new string(lowFirst.ToArray());
     }
 
     // ── CONVERT (§15.19, 2023) — data-representation conversion ─────────────────────────────────────────────────
@@ -263,6 +296,12 @@ public static partial class CobolIntrinsics
         if (!dstHex && dst != BYTE && (src == ANUM || src == NAT))
             return Repertoire(arg);
 
+        // A national source serializes to two bytes per position before anything below measures it, so its returned
+        // length (four hexadecimal digits or two bytes per position) is asked first: a value past the maximum is never
+        // serialized, which past half the carrier ceiling the serializer could not even hold (train 1045 review).
+        if (src == NAT && ReturnedValueOverMaximum("CONVERT", (dstHex ? 4L : 2L) * arg.Length) is { } natOver)
+            return natOver;
+
         // Bit/byte pathway — reduce argument-1 to a byte string per the source format.
         byte[] bytes = src switch
         {
@@ -289,8 +328,14 @@ public static partial class CobolIntrinsics
             // decides).
             if (dst == NAT && (bytes.Length & 1) != 0)
                 System.Array.Resize(ref bytes, bytes.Length + 1);
-            return ToHex(bytes);
+            // Two hexadecimal digits per byte (four per national source position), so a returned value can pass
+            // the §15.4 maximum from an argument within it.
+            return ReturnedValueOverMaximum("CONVERT", bytes.Length * 2L) ?? ToHex(bytes);
         }
+        // The byte pathways below return at most one character per byte; a national source serializes to two
+        // bytes per position, so a BYTE destination can still double the length.
+        if (ReturnedValueOverMaximum("CONVERT", dst == NAT ? (bytes.Length + 1L) / 2 : bytes.Length) is { } over)
+            return over;
         if (dst == NAT)                                              // HEX → NAT (r3): 2 bytes → one national char, pad a trailing odd byte
         {
             var sb = new System.Text.StringBuilder();
@@ -452,6 +497,9 @@ public static partial class CobolIntrinsics
                 { hit = p; break; }
             if (hit >= 0) { sb.Append(tos[hit]); i += froms[hit].Length; }        // rule 3 — resume past the source match
             else { sb.Append(source[i]); i++; }
+            // An argument-3 longer than its argument-2 grows the value, so the §15.4 maximum is asked as it grows
+            // (both lengths are within the carrier, so one append cannot overflow the builder first).
+            if (ReturnedValueOverMaximum("SUBSTITUTE", sb.Length) is { } over) return over;
         }
         return sb.ToString();
     }
@@ -689,8 +737,8 @@ public static partial class CobolIntrinsics
     /// argument-1 shall be positive (r1) — WiseOwl COBOL accepts 0 (all-zero bits; the r1-vs-r2
     /// "positive"/"positive nonzero" drafting contrast reads as arg-2-only excluding zero) and rejects a
     /// negative via EC-ARGUMENT-FUNCTION (§15.3). The documented WiseOwl COBOL maximum returned-value length
-    /// (§15.4) is the §8.3.3.4.3 SR1 boolean-literal maximum, 8 191 positions. The '0'/'1' string is the
-    /// D-B1 boolean substrate.</summary>
+    /// (§15.4) is <see cref="ReturnedValueMaximum"/>, the carrier ceiling (docs/CONFORMANCE.md row DOC-A.1-93). The
+    /// '0'/'1' string is the D-B1 boolean substrate.</summary>
     /// <remarks>⛔ THE VALUE CARRIER IS Int128, AND THE BIT WALK COVERS IT (fix-queue PB65 / RV-15.13.4-1 D1).
     /// §15.13.4 r1's "binary representation of the value of argument-1" is a mathematical bit configuration
     /// (its own NOTE says so), and §15.13.3 r1 admits ANY positive integer — the previous <c>long</c> carrier
@@ -715,16 +763,12 @@ public static partial class CobolIntrinsics
             return Exceptions.ExceptionState.ArgumentErrorZeroLength(
                 $"FUNCTION BOOLEAN-OF-INTEGER argument-2 {length} shall be a positive nonzero integer (§15.13.3 r2)");
 
-        // ── §15.4 — a RETURNED-VALUE-LENGTH rule, NOT an argument rule. 8,192 *is* a positive nonzero integer,
-        // so §15.13.3 r2 is satisfied; what is violated is "the maximum length specified by the implementor for
-        // a returned value", which docs/CONFORMANCE.md row DOC-A.1-93 fixes at 8,191 character positions (the
-        // §8.3.3.4.3 SR1 boolean-literal maximum). Row 93's documented result is likewise a zero-length value,
-        // and this is the second of the two enforcement sites that row names — CobolIntrinsics.BaseConvert,
-        // whose §15.4 guard is the first, has always answered it this way.
-        if (length > 8191)
-            return Exceptions.ExceptionState.ArgumentErrorZeroLength(
-                $"FUNCTION BOOLEAN-OF-INTEGER would return {length} boolean positions, past the documented "
-                + "8,191-position maximum returned-value length (§15.4; CONFORMANCE.md row DOC-A.1-93)");
+        // ── §15.4 — a RETURNED-VALUE-LENGTH rule, NOT an argument rule. Any length past the maximum *is* a
+        // positive nonzero integer, so §15.13.3 r2 is satisfied; what is violated is "the maximum length specified
+        // by the implementor for a returned value", docs/CONFORMANCE.md row DOC-A.1-93's ReturnedValueMaximum.
+        // Row 93's documented result is likewise a zero-length value, asked through the one §15.4 guard BEFORE
+        // the value is allocated.
+        if (ReturnedValueOverMaximum("BOOLEAN-OF-INTEGER", length) is { } over) return over;
 
         // ── §15.13.3 rule 1 — an ARGUMENT rule about argument-1. ⚠ THE SUBSTITUTE IS DELIBERATELY NOT ZERO
         // LENGTH: argument-2 is valid here, so the returned length is fully determined and row DOC-A.1-90's

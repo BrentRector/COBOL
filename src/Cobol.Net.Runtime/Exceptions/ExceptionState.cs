@@ -571,7 +571,7 @@ public sealed class ExceptionEngine
     /// <item>the standard hands the result to the implementor (§15.3 rule 14, §15.4) and docs/CONFORMANCE.md
     /// writes the determination down — row <c>DOC-A.1-90</c>, whose zero-length class is every function whose
     /// returned LENGTH is itself derived from the rejected argument, and row <c>DOC-A.1-93</c>, a returned
-    /// value past the documented 8,191-position maximum.</item>
+    /// value past the documented maximum (<c>CobolIntrinsics.ReturnedValueMaximum</c>).</item>
     /// </list>
     /// <para>So a rejected text function does NOT automatically come here. Its sibling
     /// <see cref="ArgumentErrorSpaces(string, int)"/> carries row DOC-A.1-90's OTHER text class — the general

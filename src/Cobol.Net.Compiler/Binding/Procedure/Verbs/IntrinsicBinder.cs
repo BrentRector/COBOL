@@ -741,7 +741,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // argument-1 is a literal, so `Describe` knows the zone, and the argument's presence is syntactic.
         // ⚠ ONE-SIDED, deliberately: the CONVERSE is explicitly legal — omitting the argument for a UTC/offset
         // format "shall be evaluated as though 0 were specified" (§15.40.3 r7 / §15.41.3 r6), which the emitter
-        // already does by passing hasOffset:false. Screening that too would reject conforming source.
+        // already does by passing an offset of 0. Screening that too would reject conforming source.
         // Before this the argument bound cleanly and was then SILENTLY DISCARDED by a local format.
         if (args.Count > 0 && args[0] is BoundStringLiteral zoneFmt
             && OffsetArgumentIndex(sig.Name) is { } offIx && args.Count > offIx

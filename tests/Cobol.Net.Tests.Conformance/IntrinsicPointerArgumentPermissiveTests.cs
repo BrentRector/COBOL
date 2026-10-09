@@ -26,6 +26,8 @@ public sealed class IntrinsicPointerArgumentPermissiveTests
     [Theory]
     [InlineData("pb58-concat-pointer")]
     [InlineData("pb2079-baseconvert-pointer-base")]
+    // kb/Work PB2074: an address-identifier (class pointer, §8.4.3.11.4 GR1) as a class-alphanumeric argument.
+    [InlineData("pb2074-upper-case-address-of")]
     public void PointerArgument_IsRefusedUnderPermissive_WithoutOfferingTheCoercion(string fixture)
     {
         var (ok, errors, warnings) = EditionHarness.CompileFull(Fixture(fixture), 2023, permissive: true);
