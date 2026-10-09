@@ -171,6 +171,42 @@ def process_name(pid: int) -> str | None:
         return None
 
 
+def process_table() -> list[dict[str, Any]]:
+    """Every live process as {pid, ppid, name, cmd}, or [] when the table cannot be read (read-only; no psutil here).
+    Windows asks CIM through PowerShell, because tasklist carries no command line; elsewhere it reads /proc."""
+    if os.name == "nt":
+        import shutil  # noqa: PLC0415
+        import subprocess  # noqa: PLC0415
+        query = ("Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine"
+                 " | ConvertTo-Json -Compress")
+        try:
+            out = subprocess.run([shutil.which("pwsh") or "powershell", "-NoProfile", "-NonInteractive", "-Command", query],
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60).stdout
+            rows = json.loads(out or "[]")
+        except (OSError, subprocess.SubprocessError, ValueError):
+            return []
+        return [{"pid": r.get("ProcessId"), "ppid": r.get("ParentProcessId"), "name": r.get("Name") or "",
+                 "cmd": r.get("CommandLine") or ""} for r in (rows if isinstance(rows, list) else [rows])
+                if isinstance(r, dict)]
+    table = []
+    try:
+        procs = list(pathlib.Path("/proc").iterdir())
+    except OSError:
+        return []   # no /proc (a POSIX host without procfs): the table cannot be read
+    for d in procs:
+        if not d.name.isdigit():
+            continue
+        try:
+            stat = (d / "stat").read_text()
+            table.append({"pid": int(d.name),
+                          "ppid": int(stat.rsplit(")", 1)[1].split()[1]),   # after `pid (comm) state`; comm may hold ')'
+                          "name": (d / "comm").read_text().strip(),
+                          "cmd": (d / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace").strip()})
+        except (OSError, ValueError, IndexError):
+            continue   # the process ended while the table was read
+    return table
+
+
 # THE LOOP'S LOCK (orchestrate.ps1 Take-Lock): {"pid", "started_at", "host"}, held while the supervisor runs; a lock
 # whose PID is gone is stale, exactly as the supervisor itself judges it. While the loop runs, its land unit is the ONE
 # landing queue: the attended session dispatches no lander (MANDATORY-PRACTICES O11, kb/Work PB2602).
@@ -209,6 +245,11 @@ def _self_test() -> int:
             got, why = loop_state(d)
             if got != want:
                 fails.append(f"lock {content!r}: want {want}, got {got} ({why})")
+    # process_table reads the REAL table (PowerShell CIM on Windows, /proc elsewhere): this process is in it, under
+    # its parent, with its own command line (mailbox.py's watcher check walks exactly these fields, kb/Work PB2814)
+    me = [p for p in process_table() if p["pid"] == os.getpid()]
+    if not me or me[0]["ppid"] != os.getppid() or "coord.py" not in me[0]["cmd"]:
+        fails.append(f"process_table: this process (pid {os.getpid()}, ppid {os.getppid()}) not found as itself: {me}")
     for f in fails:
         print(f"FAIL  {f}")
     print(f"=== COORD SELF-TEST: {'GREEN' if not fails else f'RED ({len(fails)})'} ===")

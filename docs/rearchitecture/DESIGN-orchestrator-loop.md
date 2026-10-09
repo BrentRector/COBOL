@@ -875,3 +875,15 @@ backspace; `operator-session.json` was invalid JSON with unescaped backslashes).
   `publish` message (per stamp) to the operator, pointing at the unit's log (section 14), so the attended session is
   woken by its watcher rather than by reading the supervisor's log.
 - It is a transport of pointers, never a work register (CLAUDE.md rule 8).
+- **The watcher is visible everywhere a session looks (kb/Work PB2814).** The watcher is the only wake-up between the
+  lanes, and only the session itself can arm it: it must be that session's own BACKGROUND Bash task, whose exit re-invokes
+  the session, so no hook can arm it for them. A restarted operator armed none on 2026-10-08, and the Mythos lane's
+  15:07 question waited until 16:47. `status` prints one line: this session's lane (None for a loop unit, which carries
+  `COBOL_LOOP_UNIT`; `operator` under the config dir `operator-session.json` names; otherwise `mythos`), its open
+  messages (count, oldest, any question, approval, task or needs_owner), and whether a `mailbox.py watch --inbox <lane>`
+  process is descended from THIS session's Claude Code process (`coord.process_table`; a watcher another session armed
+  wakes that session, so it does not count). With none, the line is a ⛔ that names the command to arm. The line is
+  printed by `session-probe.ps1`, which the SessionStart hook runs at every start, resume, clear and compaction; by
+  `list`; and by `done` whenever no watcher is armed. A firing `watch` prints the re-arm command as it exits. The
+  sender sees the other side: `send` warns when the recipient's inbox already holds messages open over 30 minutes
+  (`mailbox.stale`), because that peer is probably not watching (kb/Work PB2816, folded into PB2814).

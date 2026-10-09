@@ -117,7 +117,8 @@ def config_dir(env: Mapping[str, str] | None = None) -> pathlib.Path:
     return pathlib.Path(os.path.expanduser(v)) if v else default_config_dir()
 
 
-def _same(a: pathlib.Path, b: pathlib.Path) -> bool:
+def same_dir(a: pathlib.Path, b: pathlib.Path) -> bool:
+    """Whether two paths name the same directory (case- and separator-insensitive where the OS is)."""
     return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
 
 
@@ -143,7 +144,7 @@ def current(rules: dict[str, Any] | None = None, env: Mapping[str, str] | None =
     env = os.environ if env is None else env
     cdir = config_dir(env)
     for row in _table(rules):
-        if _same(_row_dir(row), cdir):
+        if same_dir(_row_dir(row), cdir):
             return _make(row, _row_dir(row), bool(row.get("config_dir")), rules)
     raise UnknownAccount(f"the Claude config dir {cdir} is not in model_rules.json accounts.list "
                          f"(known: {', '.join(r['name'] for r in _table(rules))}); add a row for it")
@@ -195,7 +196,7 @@ def seed_plan(acct: Account, rules: dict[str, Any], repo: pathlib.Path) -> dict[
 
 def _is_junction_to(link: pathlib.Path, target: pathlib.Path) -> bool:
     is_link = getattr(os.path, "isjunction", lambda p: False)(link) or os.path.islink(link)
-    return is_link and _same(pathlib.Path(os.path.realpath(link)), pathlib.Path(os.path.realpath(target)))
+    return is_link and same_dir(pathlib.Path(os.path.realpath(link)), pathlib.Path(os.path.realpath(target)))
 
 
 def seed_problems(acct: Account, rules: dict[str, Any], repo: pathlib.Path) -> list[str]:

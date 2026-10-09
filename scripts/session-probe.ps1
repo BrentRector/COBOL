@@ -15,6 +15,10 @@ Write-Host "branch : $branch @ $head $(if ($branch -ne 'phase-14' -and $branch -
 if ($dirty) { Write-Host "⚠ DIRTY TREE ($(@($dirty).Count) paths) — commit or explain before proceeding" } else { Write-Host "tree   : clean" }
 $unpushed = git log --oneline '@{u}..HEAD' 2>$null
 if ($unpushed) { Write-Host "⚠ UNPUSHED commits: $(@($unpushed).Count)" } else { Write-Host "push   : up to date" }
+# The two lanes' mailbox (kb/Work PB2814): this session's open messages and whether IT has an inbox watcher armed.
+# Only the session can arm one (a background Bash task, whose exit wakes it), so the probe — which the SessionStart hook
+# runs at every start, resume, clear and compaction — prints a ⛔ with the command whenever none is armed.
+& python scripts/orchestrator/mailbox.py status 2>&1 | ForEach-Object { Write-Host $_ }
 
 # 2. Diagnostic band — the next-free rule (the CEILING of the src scan, the catalog scan and every code already
 #    reserved for an in-flight worktree) lives ONCE, in scripts/orchestrator/alloc.py (`code_scans`, which carries
