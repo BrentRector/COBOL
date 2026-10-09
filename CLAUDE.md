@@ -71,6 +71,9 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
    (MANDATORY-PRACTICES I9, owner 2026-09-30).
 
 ## Start here every session
+0. **Load the skills the SessionStart hook's `SKILLS` block names** — `session-start` first, then your lane's
+   (`workstream` for the operator before it supervises, lands or dispatches) — at every start, resume and clear, in an
+   attended session and in a loop unit alike; after a compaction the loaded skills stay in force (owner 2026-10-08).
 1. **`kb/Work/` — THE WORK REGISTER, and the answer to "what do I do now".** Run
    `python scripts/spec/work.py next`; `kb/Work.base` → **Fix next** is the same list, sortable. It ranks on what
    a defect DOES to a user's program, not on its severity label. ⛔ Never re-derive a worklist from prose.

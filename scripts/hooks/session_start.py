@@ -139,12 +139,101 @@ def tooling(payload: dict) -> str:
         return f"\n\nTOOLING check failed: {exc} — ASK-OWNER: run python scripts/hooks/tooling_check.py and report"
 
 
-payload = hook_payload()   # read FIRST: the probe's child processes inherit stdin and could consume it
-text = init_cloud_submodules() + local_skills_hint() + (
-    "Mechanical live state (scripts/session-probe.ps1). Plan §0 is the live-state SSOT; "
-    "this is the computed half.\n\n" + probe()
-) + tooling(payload)
-json.dump(
-    {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": text}},
-    sys.stdout,
-)
+def session_lane() -> str:
+    """'operator' | 'mythos' (the two attended lanes, by mailbox.py's ONE lane rule), 'loop:<unit type>' for a loop unit
+    (the supervisor exports COBOL_LOOP_UNIT), 'solo' where no coordination directory exists (a cloud session, a clone
+    elsewhere), 'unknown' when the rule cannot be read — never an exception (a hook must never break the session)."""
+    try:
+        sys.path.insert(0, str(REPO / "scripts" / "orchestrator"))
+        import coord
+        import mailbox
+        if os.environ.get(coord.LOOP_UNIT_ENV):
+            return f"loop:{os.environ[coord.LOOP_UNIT_ENV]}"
+        cdir = coord.coord_path(None)
+        return mailbox.lane(cdir) or "unknown" if cdir.is_dir() else "solo"
+    except Exception:  # noqa: BLE001
+        return "unknown"
+
+
+# Owner 2026-10-08: "Be sure to setup all session start and resume processes to always use these skills, as
+# appropriate". A resumed attended session (`claude --resume <id>`) gets no restart prompt, only this hook, so the hook
+# is the one place that names the skills for every start, resume, clear and compaction, in every lane.
+WORK_SKILLS = ("Then, as the work arises: `spec-lookup` before any COBOL semantics, syntax or output question · "
+               "`land-a-fix` for a spec-derived fix · `gate` before every commit or merge · `kb-sync` after a landing · "
+               "`review` for a review · `architecture-review` for R2/R3 work · `new-construct` for a construct, grammar "
+               "rule or reserved word. A project skill that names a base (`brent-tools:…`) loads that base first.")
+LANE_SKILLS = {
+    "operator": "Lane OPERATOR (the config dir operator-session.json names): invoke `workstream` before you supervise "
+                "or steer the loop, land, or dispatch anything; act on the probe's `mailbox` line (arm this session's "
+                "inbox watcher).",
+    "mythos": "Lane MYTHOS: owner-assigned Mythos tasks only, each with its approval line; invoke `workstream` before any "
+              "dispatch; act on the probe's `mailbox` line (arm this session's inbox watcher).",
+    "solo": "No two-lane coordination directory here: invoke `workstream` before any dispatch.",
+    "unknown": "Lane unknown (the lane rule could not be read): invoke `workstream` before any dispatch; check "
+               "`python scripts/orchestrator/mailbox.py status`.",
+}
+
+
+def skills_block(source: str, lane: str) -> str:
+    """The SKILLS block that heads the hook's context: what to load now, by how the session started and its lane."""
+    head = "SKILLS (owner 2026-10-08: every session start and resume loads them)."
+    if lane.startswith("loop:"):
+        unit = lane.split(":", 1)[1]
+        if unit == "meter":
+            return f"{head} Loop unit `meter`: your unit prompt skips `session-start`; follow it.\n\n"
+        return (f"{head} Loop unit `{unit}`: 1. invoke `session-start` first (your unit prompt says the same); 2. the "
+                f"skills your unit prompt names (`workstream` for land and wave units). Arm no inbox watcher.\n\n")
+    lane_line = LANE_SKILLS.get(lane, LANE_SKILLS["unknown"])
+    if source == "compact":
+        return (f"{head} Context was COMPACTED: the skills invoked before it stay in force (the harness lists them); "
+                f"re-invoke one before applying it if its text is no longer in your context. {lane_line}\n\n")
+    return f"{head}\n1. Invoke `session-start` NOW, before any other step.\n2. {lane_line}\n3. {WORK_SKILLS}\n\n"
+
+
+def _self_test() -> int:
+    fails: list[str] = []
+
+    def check(what: str, ok: bool) -> None:
+        if not ok:
+            fails.append(what)
+
+    op = skills_block("resume", "operator")
+    check("a resumed operator invokes session-start first", "1. Invoke `session-start` NOW" in op)
+    check("the operator lane loads workstream and arms its watcher", "`workstream`" in op and "watcher" in op)
+    check("the work skills are named", all(s in op for s in ("`gate`", "`spec-lookup`", "`land-a-fix`", "`kb-sync`")))
+    check("a startup and a clear read the same as a resume",
+          skills_block("startup", "operator") == op == skills_block("clear", "operator"))
+    my = skills_block("startup", "mythos")
+    check("the Mythos lane names its approval rule and its watcher", "approval line" in my and "watcher" in my)
+    cp = skills_block("compact", "operator")
+    check("a compaction keeps the loaded skills instead of restarting", "stay in force" in cp and "NOW" not in cp)
+    check("a meter unit skips session-start, as its prompt says", "skips `session-start`" in skills_block("startup", "loop:meter"))
+    wave = skills_block("startup", "loop:wave")
+    check("a wave unit loads session-start then workstream, and arms no watcher",
+          "`session-start` first" in wave and "`workstream`" in wave and "Arm no inbox watcher" in wave)
+    check("a solo session has no mailbox to watch", "watcher" not in skills_block("startup", "solo"))
+    check("an unreadable lane falls back without a watcher claim", "mailbox.py status" in skills_block("resume", "bogus"))
+    check("session_lane never raises", isinstance(session_lane(), str))
+    for f in fails:
+        print("FAIL:", f)
+    print(f"=== SESSION-START HOOK SELF-TEST: {'GREEN' if not fails else f'RED ({len(fails)})'} ===")
+    return 1 if fails else 0
+
+
+def main() -> None:
+    payload = hook_payload()   # read FIRST: the probe's child processes inherit stdin and could consume it
+    text = skills_block(str(payload.get("source") or "startup"), session_lane()) + init_cloud_submodules() + \
+        local_skills_hint() + (
+            "Mechanical live state (scripts/session-probe.ps1). Plan §0 is the live-state SSOT; "
+            "this is the computed half.\n\n" + probe()
+        ) + tooling(payload)
+    json.dump(
+        {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": text}},
+        sys.stdout,
+    )
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--self-test"]:
+        sys.exit(_self_test())
+    main()
