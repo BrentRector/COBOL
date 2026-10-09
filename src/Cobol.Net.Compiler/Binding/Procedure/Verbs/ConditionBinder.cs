@@ -658,6 +658,17 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
                 + "it has its own unique class and category (ISO §8.8.4.4.3 SR1)");
             return;
         }
+        // §8.8.4.4.2 prints identifier-1: a computed operand built from an operator, a sign, a literal or a
+        // parenthesized data item is an arithmetic expression — `(N) IS NUMERIC` (kb/Work PB1935 binds a
+        // parenthesized operand as the expression it is) — and the condition would answer from its decoded value
+        // instead of the item's characters. A function-identifier and a counter register are identifiers whose value
+        // is computed (§8.5.2.12 items 3-7; kb/Work PB1401) and stay admitted.
+        if (op is BoundComputedOperand { Expr: BoundNumRef or BoundBinary or BoundNegate or BoundPower or BoundNumLiteral })
+        {
+            ctx.Edition.Error(DiagnosticCatalog.ClassConditionSubjectNotIdentifier,
+                "a class condition's subject shall be identifier-1, not an arithmetic expression (ISO §8.8.4.4.2)");
+            return;
+        }
         if (ClassConditionModel.Sr1Refusal(op) is { } why)
         {
             ctx.Edition.Error(DiagnosticCatalog.ClassConditionOperandClass,

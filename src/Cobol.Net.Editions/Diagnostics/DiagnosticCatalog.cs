@@ -4740,6 +4740,19 @@ public static class DiagnosticCatalog
         + "in a relation condition.",
         "ISO §8.4.4.2; §8.8.4.5.2; §8.4.3.3.3 SR5");
 
+    /// <summary>COBOLNET3318 — a class condition whose subject is an arithmetic expression, not identifier-1 (train
+    /// 1047 review of kb/Work PB1935): <c>IF (N) IS NUMERIC</c>, <c>EVALUATE (N) WHEN IS NUMERIC</c>. A parenthesized
+    /// operand binds as the arithmetic expression it is (§8.8.1.2 GR1), so it reached the class test as a computed
+    /// value and answered from the decoded number, not from the item's characters. Reported by
+    /// <c>ConditionBinder.CheckClassConditionOperand</c>, the one screen of every class condition's subject.</summary>
+    public static readonly DiagnosticDescriptor ClassConditionSubjectNotIdentifier = new(
+        "COBOLNET3318", "class-condition-subject-not-identifier", EditionSeverity.Error,
+        "The subject of a class condition is an arithmetic expression. The class condition's format prints "
+        + "identifier-1 alone (ISO §8.8.4.4.2), and the condition tests the characters of the data item identifier-1 "
+        + "references; a parenthesized operand or other arithmetic expression is a value, not a data item "
+        + "(§8.8.1.2 GR1). Write the identifier without parentheses.",
+        "ISO §8.8.4.4.2; §8.8.1.2 GR1");
+
     // ── COBOLNET2030/2031 — the two §14.9.20.3 screens INITIALIZE never asked at the one place identifier-1 and
     //    its REPLACING operands are resolved (kb/Work PB416). The statement's other two unasked rules need no new
     //    code: SR5 already had COBOLNET0835 (wired to a branch that could not reach a resolved RENAMES entry) and

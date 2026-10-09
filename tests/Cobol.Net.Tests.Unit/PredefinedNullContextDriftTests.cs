@@ -33,8 +33,10 @@ public sealed class PredefinedNullContextDriftTests
     {
         ["CallBinder.cs"] = "an argument in a program-prototype format CALL statement",
         ["OoBinder.cs"] = "an argument in a method invocation",
-        ["ConditionBinder.cs"] = "a pointer-or-object-reference relation condition",
-        ["EvaluateBinder.cs"] = "a relation condition (a selection subject/object pair, §14.9.13.3 SR7 a)",
+        // EVALUATE's selection subject/object pair (§14.9.13.3 SR7 a)) binds through ConditionBinder's one comparison
+        // operand dispatch since kb/Work PB1935 deleted EvaluateBinder's copy of it.
+        ["ConditionBinder.cs"] = "a pointer-or-object-reference relation condition, including an EVALUATE selection "
+            + "subject/object pair (§14.9.13.3 SR7 a))",
         ["InitializeBinder.cs"] = "a sending operand in an INITIALIZE statement",
         ["IntrinsicBinder.cs"] = "an argument in a function-prototype format function activation (BindArgOperand's "
             + "nullAdmitting leg, which only UdfBinder sets)",
