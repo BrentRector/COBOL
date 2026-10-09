@@ -323,7 +323,15 @@ public sealed class SequentialConnector : FileConnector
     /// seeks, and the sequential-access hint asks the host to evict what a seek comes back for.
     /// It carries <see cref="FileConnector.HostShare"/>, the posture the registry derived immediately before the
     /// OPEN body ran. The reader's buffer IS the connector's input-output areas (ISO §12.4.5.14.3 GR1;
-    /// <see cref="HostFile.InputOutputAreaBuffer"/>) — the handle beneath it holds none (kb/Work PB643).</summary>
+    /// <see cref="HostFile.InputOutputAreaBuffer"/>) — the handle beneath it holds none (kb/Work PB643).
+    /// <para>⛔ THE CHANNEL IS ALWAYS LATIN-1, ONE CHAR PER MEDIUM BYTE, and the reader NEVER sniffs a byte-order
+    /// mark (kb/Work PB2757). A record's bytes are the record (§14.9.30.4 GR13 c) makes "the record" available;
+    /// §9.1.7.2 leaves a record sequential record's extent to what the implementor adds to the medium, and a
+    /// fixed-length file adds nothing), so a first record whose bytes happen to be X'FFFE', X'FEFF' or X'EFBBBF' —
+    /// a PIC S9(4) COMP holding -2 is X'FFFE' — is data, never an encoding switch. Detection would re-decode the whole
+    /// file as UTF-16 or UTF-8: framing would count decoded chars, not bytes, and every byte anchor a REWRITE or a
+    /// START uses would drift. The ONE byte-order-mark rule is the LINE SEQUENTIAL file's (DOC-A.1-115 (b)), and it
+    /// is applied to the channel by <see cref="NextFrame"/> alone.</para></summary>
     private StreamReader OpenReader()
     {
         var stream = HostFile.OpenConnectorStream(HostPath, FileMode.Open, HostAccess(Mode), HostShare,
@@ -331,7 +339,7 @@ public sealed class SequentialConnector : FileConnector
         StreamReader r;
         try
         {
-            r = new StreamReader(stream, Encoding.Latin1, detectEncodingFromByteOrderMarks: true,
+            r = new StreamReader(stream, Encoding.Latin1, detectEncodingFromByteOrderMarks: false,
                 HostFile.InputOutputAreaBuffer(InputOutputAreas));
         }
         catch
