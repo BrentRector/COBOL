@@ -349,6 +349,7 @@
     "ca3_figurative_display_pcs",
     "ca26_char_unicode_pcs",
     "pb101_alphabet_locale_pcs",
+    "pb2761_locale_extension_position",
     "pb101_standard_compare",
     "pb101_ec_order_not_supported",
     "pb64t1_locale_declare",

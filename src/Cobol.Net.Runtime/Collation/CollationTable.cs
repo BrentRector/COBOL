@@ -114,6 +114,10 @@ public sealed class CollationTable
     /// identical-prefix skip backs its boundary up by this much.</summary>
     public int MaxContractionLength { get; private init; } = 1;
 
+    /// <summary>The number of precomposed characters <see cref="Rebuild"/> re-derived from tailored components — the
+    /// canonical closure over composites (diagnostics; 0 for the root).</summary>
+    public int ClosedComposites { get; private init; }
+
     /// <summary>The number of elements in the pool (diagnostics).</summary>
     public int ElementCount => _elements.Length;
 
@@ -250,8 +254,8 @@ public sealed class CollationTable
     /// <summary>The number of code points with a canonical decomposition mapping (Hangul syllables excluded).</summary>
     public int CanonicalDecompositionCount => _nfd.Count;
 
-    /// <summary>Every code point with a canonical decomposition and its full NFD sequence — what a rule builder
-    /// closes over (a tailored letter or mark changes every precomposed character that contains it).</summary>
+    /// <summary>Every code point with a canonical decomposition and its full NFD sequence — the set
+    /// <see cref="Rebuild"/>'s canonical closure covers, enumerated by the drift test that checks it.</summary>
     internal IEnumerable<KeyValuePair<int, int[]>> CanonicalDecompositions() => _nfd;
 
     /// <summary>The contractions that begin with <paramref name="codePoint"/>, LONGEST FIRST, or null.</summary>
@@ -364,11 +368,10 @@ public sealed class CollationTable
     /// <summary>A NEW table: this table's mappings with <paramref name="rules"/>' entries layered over them (an entry
     /// REPLACES the whole element sequence of its code point / contraction). The rules' weights are written against
     /// the ROOT scale; when this table renumbered (<see cref="IsRenumbered"/>) they are translated through its maps
-    /// first, so a site's <c>.tailor</c> composes with a CLDR-derived table. Canonical closure is automatic: a
-    /// tailored single code point whose canonical decomposition is a different sequence gets that decomposed
-    /// sequence registered as a contraction with the same elements, so the precomposed and decomposed spellings
-    /// keep collating identically after the tailoring (a duty the CLDR rule syntax discharges for its authors and a
-    /// numeric-weight file would otherwise silently drop).</summary>
+    /// first, so a site's <c>.tailor</c> composes with a CLDR-derived table. Canonical closure is automatic and the
+    /// same as for a CLDR collation (<see cref="Rebuild"/>): a tailored key's decomposed spelling maps like the key,
+    /// and every precomposed character containing a tailored code point is re-derived from its components — so
+    /// tailoring c moves ç with it, and the precomposed and decomposed spellings keep collating identically.</summary>
     public CollationTable WithTailoring(TailoringRules rules)
     {
         ArgumentNullException.ThrowIfNull(rules);
@@ -411,9 +414,10 @@ public sealed class CollationTable
 
     /// <summary>The ONE derivation step every tailoring goes through: a NEW table from this one and a
     /// <see cref="TailoringPlan"/> — the base pool re-weighted through the plan's remapping (renumbering, reordering;
-    /// identity when null), the plan's entries added or replacing existing mappings (canonical closure applied to
-    /// tailored single code points), contractions starting with the plan's suppressed code points removed, and the
-    /// plan's group ranges and root-scale maps recorded on the new table.</summary>
+    /// identity when null), the plan's entries added or replacing existing mappings, contractions starting with the
+    /// plan's suppressed code points removed, the result CANONICALLY CLOSED (the tailored keys' NFD spellings, and
+    /// every precomposed character whose decomposition the tailoring reaches), and the plan's group ranges and
+    /// root-scale maps recorded on the new table.</summary>
     internal CollationTable Rebuild(TailoringPlan plan)
     {
         var singles = new Dictionary<int, int>(_singles);
@@ -432,23 +436,107 @@ public sealed class CollationTable
         else
             pool.AddRange(_elements);
 
+        // The code points the tailoring can change the walk of: every code point of a key it maps, and the first code
+        // point of every contraction it suppresses. A composite whose decomposition holds none of them walks exactly
+        // as it does in this (already canonically closed) table.
+        var touched = new HashSet<int>();
+        if (plan.SuppressContractionsStartingWith is { } suppressed) touched.UnionWith(suppressed);
         foreach (var (codePoints, elements) in plan.Entries)
         {
             int offset = pool.Count;
             pool.AddRange(elements);
             AddMapping(singles, contractions, codePoints, offset, elements.Length, ref contractionCount);
-            // Canonical closure of a single tailored code point (Hangul syllables are algorithmic; skipped).
-            if (codePoints.Length == 1 && TryGetCanonicalDecomposition(codePoints[0], out var nfd)
-                && nfd.Length > 1 && !plan.Defines(nfd))
-                AddMapping(singles, contractions, nfd.ToArray(), offset, elements.Length, ref contractionCount);
+            touched.UnionWith(codePoints);
         }
+
+        // CANONICAL CLOSURE (the Collator.Compare contract: canonically equivalent texts compare equal; Normalizer walks
+        // a text with no non-starter as it is, trusting the table to be closed). ONE step for every front-end — a CLDR
+        // rule set and a numeric .tailor file alike — as ICU's builder closes every tailoring:
+        // (1) every tailored key that is not in NFD (a precomposed letter, a contraction whose first code point
+        //     decomposes, marks out of canonical order) also maps its NFD spelling — what Normalizer turns the text
+        //     into whenever it holds a combining mark — unless the plan maps that spelling itself;
+        foreach (var (codePoints, elements) in plan.Entries)
+        {
+            var nfd = CanonicalForm(codePoints);
+            if (nfd is null || plan.Defines(nfd)) continue;
+            int offset = pool.Count;
+            pool.AddRange(elements);
+            AddMapping(singles, contractions, nfd, offset, elements.Length, ref contractionCount);
+            touched.UnionWith(nfd);
+        }
+        // (2) every precomposed character the plan does not map itself, whose decomposition holds a code point the
+        //     tailoring touched, takes the elements its decomposition walks to under the TAILORED mappings (longest
+        //     contraction, discontiguous over unblocked marks — the engine's own walk, UTS #10 S2.1), when they differ
+        //     from what it maps to now: tailoring c moves ç; tailoring a mark moves every letter carrying it; a
+        //     tailored ă reaches ặ = a + dot below + breve. Hangul syllables are algorithmic and never mapped.
+        var provisional = Derived(plan, pool.ToArray(), singles, contractions, contractionCount);
+        var composites = new List<(int CodePoint, CollationElement[] Elements)>();
+        if (touched.Count > 0)
+        {
+            foreach (var (cp, decomposition) in _nfd)
+            {
+                if (plan.Defines([cp]) || !decomposition.Any(touched.Contains)) continue;
+                var walked = provisional.Walk(decomposition);
+                if (!provisional.GetElements(cp).Span.SequenceEqual(walked)) composites.Add((cp, walked));
+            }
+        }
+        if (composites.Count == 0) return provisional;
+        foreach (var (cp, elements) in composites)
+        {
+            int offset = pool.Count;
+            pool.AddRange(elements);
+            AddMapping(singles, contractions, [cp], offset, elements.Length, ref contractionCount);
+        }
+        return Derived(plan, pool.ToArray(), singles, contractions, contractionCount, composites.Count);
+    }
+
+    /// <summary>A table over this one's Unicode data with the given mappings and the plan's names, groups and maps.</summary>
+    private CollationTable Derived(TailoringPlan plan, CollationElement[] pool, Dictionary<int, int> singles,
+        Dictionary<int, Contraction[]> contractions, int contractionCount, int closedComposites = 0)
+    {
         int longest = 1;
         foreach (var list in contractions.Values)
             foreach (var c in list) longest = Math.Max(longest, c.Rest.Length + 1);
-        var groups = plan.Groups ?? _groups;
-        return new CollationTable(plan.Name, UcaVersion, SourceTag, _primaryShift, pool.ToArray(), singles, contractions,
-            _ccc, _implicit, _nfd, groups, plan.Tailoring, plan.Description, plan.PrimaryMap, plan.SecondaryMap, plan.TertiaryMap)
-        { ContractionCount = contractionCount, MaxContractionLength = longest };
+        return new CollationTable(plan.Name, UcaVersion, SourceTag, _primaryShift, pool, singles, contractions,
+            _ccc, _implicit, _nfd, plan.Groups ?? _groups, plan.Tailoring, plan.Description, plan.PrimaryMap, plan.SecondaryMap, plan.TertiaryMap)
+        { ContractionCount = contractionCount, MaxContractionLength = longest, ClosedComposites = closedComposites };
+    }
+
+    /// <summary>The NFD of a code point sequence under this table's Unicode data, or null when the sequence is already
+    /// in NFD.</summary>
+    private int[]? CanonicalForm(int[] codePoints)
+    {
+        string text = TextOf(codePoints);
+        if (!Normalizer.NeedsNfd(text, this, forIdentical: true)) return null;
+        string nfd = Normalizer.ToNfd(text, this);
+        var result = new List<int>(nfd.Length);
+        for (int i = 0; i < nfd.Length; i++)
+        {
+            if (char.IsHighSurrogate(nfd[i]) && i + 1 < nfd.Length && char.IsLowSurrogate(nfd[i + 1])) { result.Add(char.ConvertToUtf32(nfd[i], nfd[i + 1])); i++; }
+            else result.Add(nfd[i]);   // a BMP character, or an unpaired surrogate code unit as itself
+        }
+        return result.SequenceEqual(codePoints) ? null : result.ToArray();
+    }
+
+    /// <summary>The collation elements a (canonically ordered) code point sequence walks to in this table.</summary>
+    private CollationElement[] Walk(int[] codePoints)
+    {
+        var elements = new List<CollationElement>(codePoints.Length + 2);
+        var it = new CollationElementIterator(TextOf(codePoints), this);
+        while (it.TryNext(out var e)) elements.Add(e);
+        return elements.ToArray();
+    }
+
+    /// <summary>The UTF-16 text of a code point sequence; an unpaired surrogate code point stays one code unit.</summary>
+    private static string TextOf(int[] codePoints)
+    {
+        var text = new System.Text.StringBuilder(codePoints.Length + 2);
+        foreach (int cp in codePoints)
+        {
+            if (cp is >= 0xD800 and <= 0xDFFF) text.Append((char)cp);
+            else text.Append(char.ConvertFromUtf32(cp));
+        }
+        return text.ToString();
     }
 
     private static void AddMapping(Dictionary<int, int> singles, Dictionary<int, Contraction[]> contractions,
@@ -695,12 +783,12 @@ internal sealed class TailoringPlan
     public WeightMap? SecondaryMap { get; init; }
     public WeightMap? TertiaryMap { get; init; }
 
-    private HashSet<string>? _keys;
+    private HashSet<CodePointKey>? _keys;
 
     /// <summary>True when the plan itself defines this code point sequence (canonical closure must not override it).</summary>
     public bool Defines(ReadOnlySpan<int> codePoints)
     {
-        _keys ??= new HashSet<string>(Entries.Select(e => string.Join(",", e.CodePoints)), StringComparer.Ordinal);
-        return _keys.Contains(string.Join(",", codePoints.ToArray()));
+        _keys ??= new HashSet<CodePointKey>(Entries.Select(e => new CodePointKey(e.CodePoints)));
+        return _keys.Contains(new CodePointKey(codePoints));
     }
 }

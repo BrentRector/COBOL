@@ -25,7 +25,8 @@ public sealed record CldrBuildResult(CollationTable Table, CollationOptions Opti
 /// last element of the position and gives the tailored string a copy of it whose level-N weight is a NEW slot inserted
 /// immediately after the anchor's on that level's line and whose lower levels are the common weights; <c>=</c> and
 /// <c>&lt;&lt;&lt;&lt;</c> copy the position unchanged; <c>[before N]</c> resets to the slot just before X's;
-/// <c>/extension</c> appends the extension's elements; <c>prefix|string</c> becomes the contraction prefix+string
+/// <c>/extension</c> appends the extension's elements to the tailored string (never to the position the next
+/// relation of the chain is placed after); <c>prefix|string</c> becomes the contraction prefix+string
 /// (with the prefix's own elements first — the same order for every text). When all rules are in, each line is
 /// NUMBERED: a slot inserted between two adjacent root weights takes one of the free values between them (the root's
 /// primaries are spaced 16 apart for exactly this), and where more slots were inserted than the gap holds, every
@@ -258,7 +259,6 @@ public static class CldrTailoringBuilder
                     }
                 }
             }
-            CloseOverComposites();
             _unsupported.AddRange(settings.UnsupportedSettings());
             if (_quaternary > 0) _unsupported.Add($"{_quaternary} quaternary (<<<<) relation(s) applied as identities at levels 1-3");
             if (_prefixContexts > 0) _notes.Add($"{_prefixContexts} prefix-context relation(s) (prefix|string) represented as contractions of prefix+string");
@@ -349,7 +349,6 @@ public static class CldrTailoringBuilder
             // ---- the plan ------------------------------------------------------------------------------------
             var suppress = settings.SuppressContractions is { Count: > 0 } sc ? new HashSet<int>(sc) : null;
             var entries = new List<(int[] CodePoints, CollationElement[] Elements)>(_tailored.Count);
-            var defined = new HashSet<string>(StringComparer.Ordinal);
             foreach (string key in _tailoredOrder)
             {
                 var cps = CodePoints(key);
@@ -366,17 +365,6 @@ public static class CldrTailoringBuilder
                         ce.Variable, ce.Case);
                 }
                 entries.Add((cps, elements));
-                defined.Add(string.Join(",", cps));
-            }
-            // Canonical closure of multi-code-point keys (single code points are closed by Rebuild).
-            foreach (var (cps, elements) in entries.ToArray())
-            {
-                if (cps.Length < 2) continue;
-                string text = FromCodePoints(cps);
-                if (!Normalizer.NeedsNfd(text, _base, forIdentical: true)) continue;
-                var nfd = CodePoints(Normalizer.ToNfd(text, _base));
-                string k = string.Join(",", nfd);
-                if (!nfd.AsSpan().SequenceEqual(cps) && defined.Add(k)) entries.Add((nfd, elements));
             }
 
             Func<CollationElement, CollationElement>? remap = null;
@@ -405,7 +393,8 @@ public static class CldrTailoringBuilder
                 SecondaryMap = sMap,
                 TertiaryMap = tMap,
             };
-            var table = _base.Rebuild(plan);
+            var table = _base.Rebuild(plan);   // canonically closed there, as every tailoring is
+            if (table.ClosedComposites > 0) _notes.Add($"{table.ClosedComposites} precomposed character(s) re-derived from tailored components (canonical closure)");
             if (_p.Overflowed || _s.Overflowed || _t.Overflowed)
                 _notes.Add($"renumbered: {(_p.Overflowed ? "primary " : "")}{(_s.Overflowed ? "secondary " : "")}{(_t.Overflowed ? "tertiary " : "")}gap(s) widened");
             return new CldrBuildResult(table, options, _unsupported, _notes, _rulesApplied);
@@ -425,117 +414,23 @@ public static class CldrTailoringBuilder
             {
                 if (rule is CldrImportRule imp)
                 {
-                    var sel = CldrLocaleLoader.ResolveCollation(imp.Import.LocaleTag + "-u-co-" + imp.Import.Type);
-                    if (sel.Collation is null)
+                    // Exactly the named type along the imported locale's chain: a type the chain lacks is NOT
+                    // replaced by the locale's default collation (a misspelt [import es-u-co-tradtional] would
+                    // otherwise splice es/standard in silently).
+                    if (CldrLocaleLoader.FindCollation(imp.Import.LocaleTag, imp.Import.Type) is not (var found, var imported))
                     {
                         _unsupported.Add($"line {rule.Line}: {imp} — no such collation; nothing imported");
                         continue;
                     }
-                    var (inner, innerSettings) = Expand(sel.Collation, sel.Found?.Tag ?? "root");
+                    var (inner, innerSettings) = Expand(imported, found.Tag);
                     rules.AddRange(inner);
                     settings = settings.Merge(innerSettings);
-                    foreach (string u in sel.Collation.Unsupported) _unsupported.Add($"(imported {imp}) {u}");
+                    foreach (string u in imported.Unsupported) _unsupported.Add($"(imported {imp}) {u}");
                 }
                 else rules.Add(rule);
             }
             _importing.Remove(key);
             return (rules, settings.Merge(collation.Settings));
-        }
-
-        // ---- canonical closure over composites -----------------------------------------------------------------
-
-        /// <summary>A tailored code point (or contraction) changes every PRECOMPOSED character whose canonical
-        /// decomposition contains it — Vietnamese tailors the tone marks, so ả (a + hook above) must follow the new mark
-        /// order; Hungarian tailors ö, so ȫ (ö + macron) must follow ö. For each decomposable code point of the base
-        /// whose NFD holds a tailored sequence, the NFD is walked with the tailored mappings (longest match, then the
-        /// base's single mappings) and the composite gets that element sequence — the same closure ICU's builder
-        /// performs, so a text is ordered identically whether it is spelled precomposed or decomposed.</summary>
-        private void CloseOverComposites()
-        {
-            if (_tailored.Count == 0) return;
-            // Every tailored key, and the NFD spelling of every key that has one (a tailored precomposed ă must be
-            // found inside ằ's decomposition a + breve + grave), longest first.
-            var byFirst = new Dictionary<int, List<(string Key, int[] Cps)>>();
-            void Register(string key, int[] cps)
-            {
-                if (!byFirst.TryGetValue(cps[0], out var list)) byFirst[cps[0]] = list = [];
-                if (!list.Any(x => x.Cps.AsSpan().SequenceEqual(cps))) list.Add((key, cps));
-            }
-            foreach (string key in _tailoredOrder)
-            {
-                Register(key, CodePoints(key));
-                if (Normalizer.NeedsNfd(key, _base, forIdentical: true))
-                {
-                    string nfd = Normalizer.ToNfd(key, _base);
-                    if (nfd != key) Register(key, CodePoints(nfd));
-                }
-            }
-            foreach (var list in byFirst.Values) list.Sort((a, b) => b.Cps.Length.CompareTo(a.Cps.Length));   // longest first
-            var added = new List<(string Key, List<BuildElement> Ces)>();
-            foreach (var (cp, nfd) in _base.CanonicalDecompositions())
-            {
-                string key = char.ConvertFromUtf32(cp);
-                if (_tailored.ContainsKey(key)) continue;   // explicitly tailored: the rules decide
-                var walked = new List<BuildElement>();
-                bool relevant = false;
-                var consumed = new bool[nfd.Length];   // non-starters taken early by a discontiguous match
-                int i = 0;
-                while (i < nfd.Length)
-                {
-                    if (consumed[i]) { i++; continue; }
-                    bool matched = false;
-                    if (byFirst.TryGetValue(nfd[i], out var candidates))
-                    {
-                        // Longest contiguous match, then UTS #10 S2.1.1–S2.1.3: extend it with each following
-                        // UNBLOCKED non-starter (no intervening non-starter of the same or higher combining class)
-                        // for which the longer key exists — ặ = a + dot below + breve must find the tailored ă (a + breve).
-                        int bestLen = 0;
-                        string? bestKey = null;
-                        foreach (var (k, cps) in candidates)
-                            if (cps.Length > bestLen && i + cps.Length <= nfd.Length && nfd.AsSpan(i, cps.Length).SequenceEqual(cps)) { bestLen = cps.Length; bestKey = k; }
-                        int contiguous = bestLen == 0 ? 1 : bestLen;
-                        if (bestKey is not null || _base.CombiningClass(nfd[i]) == 0)
-                        {
-                            var matchedCps = new List<int>(nfd.AsSpan(i, contiguous).ToArray());
-                            int lastCcc = 0;
-                            for (int j = i + contiguous; j < nfd.Length; j++)
-                            {
-                                if (consumed[j]) continue;
-                                int ccc = _base.CombiningClass(nfd[j]);
-                                if (ccc == 0) break;                    // a starter ends the reach
-                                if (ccc == lastCcc) continue;           // blocked by an equal class before it
-                                var longer = matchedCps.Append(nfd[j]).ToArray();
-                                var hit = candidates.FirstOrDefault(c => c.Cps.AsSpan().SequenceEqual(longer));
-                                if (hit.Key is not null)
-                                {
-                                    matchedCps.Add(nfd[j]);
-                                    consumed[j] = true;
-                                    bestKey = hit.Key;
-                                }
-                                else lastCcc = ccc;
-                            }
-                        }
-                        if (bestKey is not null)
-                        {
-                            walked.AddRange(_tailored[bestKey]);
-                            i += contiguous;   // discontiguously consumed marks are skipped when reached
-                            matched = relevant = true;
-                        }
-                    }
-                    if (!matched) { walked.AddRange(Lookup(char.ConvertFromUtf32(nfd[i]))); i++; }
-                }
-                if (!relevant) continue;
-                var own = Lookup(key);
-                if (own.Count == walked.Count && own.Zip(walked).All(p => ReferenceEquals(p.First.P, p.Second.P) && ReferenceEquals(p.First.S, p.Second.S) && ReferenceEquals(p.First.T, p.Second.T)))
-                    continue;   // the composite already reads the same
-                added.Add((key, walked));
-            }
-            foreach (var (key, ces) in added)
-            {
-                _tailored[key] = ces;
-                _tailoredOrder.Add(key);
-            }
-            if (added.Count > 0) _notes.Add($"{added.Count} precomposed character(s) re-derived from tailored components (canonical closure)");
         }
 
         // ---- resets and relations ------------------------------------------------------------------------------
@@ -579,9 +474,13 @@ public static class CldrTailoringBuilder
                 ces = _position.Take(idx).ToList();
                 ces.Add(ce);
             }
-            if (rel.Extension is { } ext) ces.AddRange(Lookup(ext));
-            // The position moves to the tailored string's OWN elements (a prefix is context, not content).
+            // The position moves to the tailored string's OWN relation elements: neither the extension nor a prefix
+            // is part of it (UTS #35 Part 5 "Expansions": in &T<<þ/h<<<Þ/h the second relation is placed after þ's
+            // T-secondary element, not after its trailing h; ICU's CollationBuilder restores the element count it had
+            // before the extension once the relation is added). The extension is appended to a COPY, so the
+            // position never carries it into the next relation.
             _position = ces;
+            if (rel.Extension is { } ext) ces = [.. ces, .. Lookup(ext)];
             string key = rel.Text;
             if (rel.Prefix is { } prefix)
             {
@@ -765,17 +664,6 @@ public static class CldrTailoringBuilder
                 else list.Add(s[i]);
             }
             return list.ToArray();
-        }
-
-        private static string FromCodePoints(int[] cps)
-        {
-            var sb = new StringBuilder(cps.Length + 2);
-            foreach (int cp in cps)
-            {
-                if (cp is >= 0xD800 and <= 0xDFFF) sb.Append((char)cp);
-                else sb.Append(char.ConvertFromUtf32(cp));
-            }
-            return sb.ToString();
         }
     }
 }

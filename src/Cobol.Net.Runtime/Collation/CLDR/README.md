@@ -49,7 +49,7 @@ Everything the pinned release uses (a drift test parses every file with **0 unsu
 | contractions (`ch`, `dzs`, `เ`+consonant …) | multi-code-point strings | yes |
 | `'…'`, `''`, `\uXXXX`, `\UXXXXXXXX`, `\x{…}` | quoting and escapes | yes |
 | `# …` | comment | yes |
-| `[import loc-u-co-type]` | the imported collation's rules inserted here (recursively; cycle-checked) | yes |
+| `[import loc-u-co-type]` | the imported collation's rules inserted here (recursively; cycle-checked); exactly that type along loc's chain (`FindCollation`, no default-type fallback), and a type the chain lacks imports nothing and is reported | yes |
 | `[strength n]`, `[alternate shifted\|non-ignorable]`, `[maxVariable space\|punct\|symbol\|currency]`, `[caseFirst upper\|lower\|off]`, `[backwards 2]`, `[normalization on\|off]` | settings → `CollationOptions` | yes |
 | `[reorder code…]` | script/group reordering (§5) | yes |
 | `[suppressContractions [set]]` | remove the root's contractions starting with those code points | yes |
@@ -89,7 +89,8 @@ LDML reserves for the main component ("not used for components where text is not
 zh_Hant's collation parent stays zh, where its `stroke` default lives; else the tag with its last subtag dropped;
 then `root`. `ResolveCollation(tag)` walks that chain for the type the tag asks for (`-u-co-phonebk` → `phonebook`;
 else the most specific file's `<defaultCollation>`; else `standard`); a type no file of the chain defines falls back
-to the chain's default type (reported); a locale no file covers is the **root order** — which *is* the CLDR order
+to the chain's default type (reported) — for a locale TAG only: an `[import]` asks `FindCollation(loc, type)` for
+exactly its type, with no such fallback; a locale no file covers is the **root order** — which *is* the CLDR order
 for English, German, French, Dutch, Italian, Portuguese and many more (their files define only `search`, or nothing).
 
 BCP 47 `-u-` keys (`CldrLocaleTag`, pinned against `bcp47/collation.xml`): `co` type, `ka` alternate, `kb`
@@ -103,30 +104,32 @@ backwards, `kf` caseFirst, `ks` strength, `kv` maxVariable, `kr` reorder codes, 
 1. Each weight level of the root table is an ordered **line** of its distinct weights. A reset reads X's elements as
    the current position; a relation of strength N gives the string a copy of the last element with a **new slot
    inserted immediately after** the anchor's on line N and the common weights below it; `=` copies; `[before N]` steps
-   back one slot; extensions append; prefixes become contractions; starred relations expand.
-2. **Canonical closure**: every precomposed character whose decomposition contains a tailored sequence is re-derived
-   from its components (Vietnamese tone-mark rules reach every ả ắ ậ …; discontiguous marks handled per UTS #10
-   S2.1.1–S2.1.3), and every tailored precomposed letter also maps its decomposed spelling — so a text orders the same
-   however it is spelled.
-3. **Numbering**: a slot inserted between two adjacent root weights takes a free value between them (root primaries
+   back one slot; an extension (`x/y`) appends y's elements to x only — the next relation of the chain is placed
+   after x's own elements, never after y (`&T<<þ/h<<<Þ/h`: Þ is t h, not t h h); prefixes become contractions;
+   starred relations expand.
+2. **Numbering**: a slot inserted between two adjacent root weights takes a free value between them (root primaries
    are spaced 16 apart for exactly this); where more slots were inserted than the gap holds, every higher root weight
    is **shifted up** — the table records the root → table `WeightMap`s so a `.tailor` layer (root-scale weights) still
    lands right. Tertiary lines renumber for almost every `<<<` (root tertiaries are dense); it costs a pass over the
    pool.
-4. **Reordering**: `[reorder …]` permutes the **reordering groups** (space, punct, symbol, currency, digit, then one
+3. **Reordering**: `[reorder …]` permutes the **reordering groups** (space, punct, symbol, currency, digit, then one
    group per script — read from the table, which the generator derives from CLDR's FractionalUCA markers): the
    special groups stay first unless named; the named codes follow; `others` (or the rest) in root order. The space
    between the last regular script and the Han implicit range — where `&[last regular]<…` puts Chinese pinyin,
    stroke and zhuyin orders — belongs to the Hani tile, so those tailored primaries move with Hani
    (`[reorder Hani Bopo]` puts Chinese characters before Latin, as ICU does).
-5. **Case bits**: a tailored string's `ElementCase` is Upper / Lower / Mixed by its letters (`Aa` is Mixed), which
+4. **Case bits**: a tailored string's `ElementCase` is Upper / Lower / Mixed by its letters (`Aa` is Mixed), which
    is what `[caseFirst upper]` (Danish) orders by, ICU-style: Upper < Mixed < Lower.
-6. Settings become a `CollationOptions` (`[alternate shifted]` Thai, `[caseFirst upper]` Danish, `[backwards 2]`
+5. Settings become a `CollationOptions` (`[alternate shifted]` Thai, `[caseFirst upper]` Danish, `[backwards 2]`
    Canadian French, `[strength]`, `[maxVariable]`); `[suppressContractions]` removes root contractions;
    `[import]`s are expanded first (settings: imports', then the importer's own on top).
 
 The output is a `TailoringPlan` and `CollationTable.Rebuild` — the same construction a `.tailor` file goes through,
-so there is one table-building mechanism, two front-ends.
+so there is one table-building mechanism, two front-ends. **Canonical closure** happens there, for both: every
+tailored key also maps its NFD spelling, and every precomposed character whose decomposition holds a tailored code
+point takes the elements its decomposition walks to in the tailored table (longest contraction, discontiguous over
+unblocked marks per UTS #10 S2.1.1–S2.1.3 — the engine's own walk) — Vietnamese tone-mark rules reach every ả ắ ậ …,
+a tailored ă reaches ặ — so a text orders the same however it is spelled (`CanonicalClosureDriftTests`).
 
 **Verified**: 29 locales cross-checked pair-by-pair against the host's ICU (`CldrIcuCrossCheckTests`: es, da, sv,
 fr-CA, cs, hu, vi, ru, hr, th, ar, he, tr, pl, lt, fi, is, sk, ro, nb, et, lv, sl, uk, el, ja, ko, zh, de) with zero

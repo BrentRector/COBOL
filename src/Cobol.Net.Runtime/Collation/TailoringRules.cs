@@ -45,7 +45,7 @@ public sealed class TailoringRules
     private const string ResourcePrefix = "Collation/Tailoring/";
     private const string FileExtension = ".tailor";
 
-    private readonly Dictionary<string, Entry> _byKey;
+    private readonly Dictionary<CodePointKey, Entry> _byKey;
 
     private TailoringRules(string source, string? locale, string? ucaVersion, List<Entry> entries)
     {
@@ -53,8 +53,8 @@ public sealed class TailoringRules
         Locale = locale;
         UcaVersion = ucaVersion;
         Entries = entries;
-        _byKey = new Dictionary<string, Entry>(entries.Count, StringComparer.Ordinal);
-        foreach (var e in entries) _byKey[Key(e.CodePoints)] = e;
+        _byKey = new Dictionary<CodePointKey, Entry>(entries.Count);
+        foreach (var e in entries) _byKey[new CodePointKey(e.CodePoints)] = e;
     }
 
     /// <summary>Where the rules came from (a path or an embedded resource name) — for diagnostics.</summary>
@@ -73,15 +73,13 @@ public sealed class TailoringRules
     public string Name => Locale ?? Path.GetFileNameWithoutExtension(Source);
 
     /// <summary>True when the rules define an override for exactly this code point sequence.</summary>
-    public bool Defines(int[] codePoints) => _byKey.ContainsKey(Key(codePoints));
+    public bool Defines(int[] codePoints) => _byKey.ContainsKey(new CodePointKey(codePoints));
 
     /// <summary>The override for a code point sequence, or null.</summary>
-    public Entry? Find(params int[] codePoints) => _byKey.TryGetValue(Key(codePoints), out var e) ? e : null;
+    public Entry? Find(params int[] codePoints) => _byKey.TryGetValue(new CodePointKey(codePoints), out var e) ? e : null;
 
     /// <summary>The base table with these rules layered over it — a new table.</summary>
     public CollationTable Apply(CollationTable baseTable) => baseTable.WithTailoring(this);
-
-    private static string Key(int[] cps) => string.Join(",", cps);
 
     // ---- loading -------------------------------------------------------------------------------------------------
 
@@ -176,7 +174,7 @@ public sealed class TailoringRules
         ArgumentNullException.ThrowIfNull(reader);
         string? locale = null, version = null;
         var entries = new List<Entry>();
-        var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+        var seen = new Dictionary<CodePointKey, int>();
         int lineNo = 0;
         while (reader.ReadLine() is { } raw)
         {
@@ -200,7 +198,7 @@ public sealed class TailoringRules
                 continue;
             }
             var entry = ParseMapping(line, sourceName, lineNo);
-            string key = Key(entry.CodePoints);
+            var key = new CodePointKey(entry.CodePoints);
             if (seen.TryGetValue(key, out int first))
                 throw Error(sourceName, lineNo, $"duplicate mapping for {Describe(entry.CodePoints)} (first at line {first})");
             seen[key] = lineNo;

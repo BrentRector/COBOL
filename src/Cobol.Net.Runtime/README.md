@@ -76,8 +76,9 @@ keys whole texts.
         │
         ▼  CldrLocaleLoader.ResolveCollation: the CLDR file chain (tag → explicit parent (nb → no, yue → zh_Hant) or
         │  truncation → root), the type (-u-co-, else <defaultCollation>, else standard), the -u- settings keys
-        ▼  CldrTailoringBuilder.Build: rules → weights (insertions, renumbering, reordering, canonical closure,
-        │  case bits) + CollationOptions (strength, alternate/maxVariable, caseFirst, backwards)
+        ▼  CldrTailoringBuilder.Build: rules → weights (insertions, renumbering, reordering, case bits) +
+        │  CollationOptions (strength, alternate/maxVariable, caseFirst, backwards); CollationTable.Rebuild closes it
+        │  canonically (the one table-building step both front-ends use)
         ▼  TailoringRules.ForLocale (a .tailor for the tag or its language — the site override) → WithTailoring
         ▼
    ResolvedLocaleCollation (table · options · what came from where · Unsupported · Notes) — cached per tag

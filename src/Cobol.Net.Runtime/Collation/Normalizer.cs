@@ -14,7 +14,8 @@ namespace CobolNet.Runtime.Collation;
 /// REORDERING and its precomposed bases must decompose so their marks take part in it; at
 /// <see cref="CollationStrength.Identical"/> the tie-break compares NFD forms, so any decomposable character counts.
 /// Everything else is walked as-is — the derived table's explicit mapping of a precomposed character equals its
-/// decomposition's element sequence by construction (the CLDR/UCA data is canonically closed).</para>
+/// decomposition's element sequence by construction (the CLDR/UCA data is canonically closed, and
+/// <see cref="CollationTable.Rebuild"/> closes every tailored table, whichever front-end built it).</para>
 /// <para>NFD here means: replace every code point by its full canonical decomposition (Hangul syllables through the
 /// arithmetic L V T mapping), then stable-sort every maximal run of non-starters by combining class (The Unicode
 /// Standard §3.11, Canonical Ordering Algorithm). No composition step — collation never needs NFC.</para>

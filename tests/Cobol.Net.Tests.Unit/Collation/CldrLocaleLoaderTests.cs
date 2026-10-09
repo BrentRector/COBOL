@@ -313,6 +313,73 @@ public sealed class CldrLocaleLoaderTests(ITestOutputHelper output)
         Less(vi, "u", "ư"); Less(vi, "ư", "v");
     }
 
+    /// <summary>A collator built from a rules text alone (a one-collation file "zz", standard type) — the builder in
+    /// isolation, for rule shapes no embedded locale selects.</summary>
+    private static Collator FromRules(string rules)
+    {
+        var built = BuildRules(rules);
+        Assert.Empty(built.Unsupported);
+        return new Collator(built.Table, built.Options);
+    }
+
+    private static CldrBuildResult BuildRules(string rules)
+    {
+        string xml = "<ldml><identity><language type=\"zz\"/></identity><collations><collation type=\"standard\"><cr><![CDATA["
+            + rules + "]]></cr></collation></collations></ldml>";
+        var data = CldrParser.ParseXml(xml, "test rules");
+        var selection = new CldrCollationSelection(CldrLocaleTag.Parse("zz"), data, data, data.Find("standard"), "standard", []);
+        return CldrTailoringBuilder.Build(selection, "zz");
+    }
+
+    /// <summary>kb/Work PB2772: an <c>[import]</c> names EXACTLY a collation type. A type the imported locale's chain
+    /// lacks imports nothing and is reported ("no such collation; nothing imported"); it is never replaced by the
+    /// locale's default collation, which spliced es/standard in silently for a misspelt es-u-co-tradtional.</summary>
+    [Fact]
+    public void Import_OfAMissingType_ImportsNothing_AndIsReported()
+    {
+        var misspelt = BuildRules("[import es-u-co-tradtional]");
+        Assert.Contains(misspelt.Unsupported, u => u.Contains("[import es-u-co-tradtional]") && u.Contains("no such collation; nothing imported"));
+        var root = new Collator(misspelt.Table, misspelt.Options);
+        Less(root, "ña", "nz");                                   // the root order: ñ is n + tilde, a secondary difference
+        Less(root, "ch", "cz");
+        var spelt = BuildRules("[import es-u-co-traditional]");
+        Assert.Empty(spelt.Unsupported);
+        var traditional = new Collator(spelt.Table, spelt.Options);
+        Less(traditional, "nz", "ña");                            // es: &N<ñ
+        Less(traditional, "cz", "ch");                            // traditional: &C<ch
+        // A locale TAG with an unknown type still falls back to the default type, and says so.
+        var tag = CldrLocaleLoader.ResolveCollation("es-u-co-tradtional");
+        Assert.Equal("standard", tag.Type);
+        Assert.Contains(tag.Unsupported, u => u.Contains("'tradtional'"));
+        Assert.Null(CldrLocaleLoader.FindCollation("es", "tradtional"));
+        Assert.Equal("traditional", CldrLocaleLoader.FindCollation("es", "traditional")?.Collation.Type);
+        Assert.Equal("root", CldrLocaleLoader.FindCollation("zz-Nonexistent", "standard")?.Found.Tag);
+    }
+
+    /// <summary>kb/Work PB2761: the extension of <c>x/y</c> is appended to x's elements only; the next relation in
+    /// the chain is placed after x's OWN relation elements (UTS #35 Part 5 "Expansions"; ICU's builder restores the
+    /// element count it had before the extension). The defect carried y into the position, so every later link of
+    /// the chain gained y as an extra element: Finnish traditional Þ became t h h, the Hungarian geminate chain's ccS
+    /// became cs cs cs, and an <c>=</c> relation after an extension repeated it.</summary>
+    [Fact]
+    public void Extension_IsNotCarriedIntoTheNextRelationsPosition()
+    {
+        // fi.xml (traditional): &T<<þ/h<<<Þ/h — þ = [T'][h], Þ = [T''][h]: two primaries t h each.
+        var fi = L("fi-u-co-traditional");
+        Less(fi, "þa", "thb"); Less(fi, "Þa", "thb");          // t h a < t h b (the defect gave Þa t h h a)
+        Less(fi, "þa", "Þa");                                   // Þ is a tertiary variant of þ
+        Less(fi, "tha", "þa");                                  // þ is a secondary variant of t
+        // hu.xml's geminate digraph chain (alt="proposed" there, so built from its text): every link is cs + cs.
+        var hu = FromRules("&C<cs<<<cS<<<Cs<<<CS &cs<<<ccs/cs<<<ccS/cS<<<cCs/Cs<<<cCS/CS");
+        Less(hu, "meccsa", "meccsb"); Less(hu, "meccSa", "meccsb"); Less(hu, "mecCsa", "meccsb"); Less(hu, "mecCSa", "meccsb");
+        Less(hu, "meccs", "meccS"); Less(hu, "meccS", "mecCs"); Less(hu, "mecCs", "mecCS");
+        Same(hu.With(strength: CollationStrength.Primary), "mecCSa", "mecscsa");
+        // An identity relation after an extension copies the position WITHOUT the extension, then adds its own.
+        var id = FromRules("&a<x/y=z/y");
+        Same(id, "x", "z");
+        Less(id, "xa", "xyb");
+    }
+
     [Fact]
     public void Thai_ShiftedAndContractionsKept()
     {

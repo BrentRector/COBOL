@@ -132,7 +132,8 @@ A locale's order is built in TWO layers over the root table — never a mutation
 1. **The CLDR collation of the tag** (`CLDR/README.md`): the locale's rules from the pinned CLDR release, found along
    the CLDR parent chain (its file, its parents', root), for the requested type (`de-u-co-phonebk`) or the file's
    default — turned into weights by `CldrTailoringBuilder` (insertions between root weights, renumbering where a gap
-   overflows, script reordering, canonical closure, case bits) together with the settings the rules declare
+   overflows, script reordering, case bits; canonical closure in `CollationTable.Rebuild`, as for every tailoring)
+   together with the settings the rules declare
    (`CollationOptions`). This is the primary source: Spanish ñ, Danish æ ø å + caseFirst, Czech ch, Vietnamese tone
    marks, Russian Cyrillic-first, Chinese pinyin … 135 locale files, cross-checked against the host's ICU.
 2. **A `.tailor` file** for the tag or its language (`TailoringRules`, format below) — the SITE-OVERRIDE layer:
@@ -161,9 +162,12 @@ U+00E6         [23EC0 0020 0004] [0000 011F 0004] [24530 0020 0004]
 
 To place X immediately after Y at the primary level, give X a primary between `Lookup(Y).Primary` and the next
 root primary (any of the 15 free values); the shipped `es.tailor` shows the derivation from CLDR's `&N<ñ<<<Ñ`.
-An entry REPLACES the whole element sequence of its code point / contraction. **Canonical closure is automatic:**
-a tailored code point whose canonical decomposition is a different sequence gets that sequence registered as a
-contraction with the same elements, so `ñ` and `n + U+0303` keep collating identically. Errors name the file and
+An entry REPLACES the whole element sequence of its code point / contraction. **Canonical closure is automatic** —
+the same step a CLDR collation goes through (`CollationTable.Rebuild`): a tailored key whose NFD is a different
+sequence (a precomposed `ñ`; a contraction keyed `á + U+0323`) also maps that NFD spelling, and every precomposed
+character whose decomposition holds a tailored code point is re-derived from its components (tailor `c` and `ç`
+moves with it; tailor U+0301 and every letter with an acute does) — so a text collates the same however it is
+spelled (`CanonicalClosureDriftTests` checks every decomposable code point, per front-end). Errors name the file and
 line (`FormatException`); a duplicate mapping is an error, not "last wins".
 
 **Locale lookup** (`TailoringRules.ForLocale`, `CollationEngine.ForLocale/TableForLocale`): `<tag>.tailor` is

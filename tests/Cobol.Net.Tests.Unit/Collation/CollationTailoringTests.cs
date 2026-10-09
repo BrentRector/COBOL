@@ -84,6 +84,35 @@ public sealed class CollationTailoringTests
         Assert.Null(CollationTable.Root.Tailoring);
     }
 
+    /// <summary>kb/Work PB2765: a site .tailor layer is canonically closed over composites, exactly as a CLDR
+    /// collation is — tailoring a letter moves every precomposed letter built on it, tailoring a mark moves every
+    /// letter carrying it, and a contraction keyed by a precomposed first code point matches its decomposed spelling.
+    /// The defect left ç at its root weights after c was moved after d, so ç sorted before d while c + cedilla
+    /// sorted after it (the two spellings of one text collating apart, contrary to §8.8.4.2.11's single LC_COLLATE
+    /// order).</summary>
+    [Fact]
+    public void SiteTailoring_IsCanonicallyClosed_OverComposites()
+    {
+        var t = new Collator(CollationTable.Root.WithTailoring(CanonicalClosureDriftTests.SiteTailoring()), CollationOptions.Default);
+        // c after d: ç follows c, spelled either way.
+        Assert.True(t.Compare("c", "d") > 0);
+        Assert.Equal(0, t.Compare("ç", "ç"));
+        Assert.True(t.Compare("ç", "d") > 0);
+        Assert.True(t.Compare("ç", "d") > 0);
+        Assert.True(CollationEngine.Root.Compare("ç", "d") < 0);   // the root order, for contrast
+        // acute after grave at level 2: é now follows è (the root puts it before), spelled either way.
+        Assert.True(t.Compare("é", "è") > 0);
+        Assert.True(t.Compare("é", "è") > 0);
+        Assert.Equal(0, t.Compare("é", "é"));
+        Assert.True(CollationEngine.Root.Compare("é", "è") < 0);
+        // á + dot below (keyed precomposed) is a letter after z, however it is spelled: its NFD a + dot below + acute,
+        // and ạ (a + dot below, precomposed) followed by the acute.
+        Assert.True(t.Compare("ạ́", "z") > 0);
+        Assert.Equal(0, t.Compare("ạ́", "ạ́"));
+        Assert.Equal(0, t.Compare("ạ́", "ạ́"));
+        Assert.True(t.Compare("ạ́", "z") > 0);
+    }
+
     [Fact]
     public void Parse_TheFormat()
     {

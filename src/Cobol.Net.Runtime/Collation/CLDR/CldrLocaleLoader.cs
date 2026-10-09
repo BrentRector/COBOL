@@ -131,28 +131,43 @@ public static class CldrLocaleLoader
     public static CldrCollationSelection ResolveCollation(string? localeName)
     {
         var tag = CldrLocaleTag.Parse(localeName);
-        var chain = Chain(localeName).Select(LoadExact).Where(d => d is not null).Cast<CldrLocaleData>().ToList();
+        var chain = LoadChain(localeName);
         // The requested type, else the most specific file's default type.
         string type = tag.CollationType ?? chain.Select(d => d.DefaultCollation).FirstOrDefault(d => d is not null) ?? "standard";
-        CldrLocaleData? found = null;
-        CldrCollation? collation = null;
-        foreach (var d in chain)
-        {
-            if (d.Find(type) is { } c) { found = d; collation = c; break; }
-        }
+        var hit = FindAlong(chain, type);
         bool typeFellBack = false;
-        if (collation is null && !type.Equals("standard", StringComparison.OrdinalIgnoreCase))
+        if (hit is null && !type.Equals("standard", StringComparison.OrdinalIgnoreCase))
         {
-            // The type exists nowhere in the chain: fall back to the default type (ICU does the same).
+            // The type exists nowhere in the chain: a LOCALE TAG falls back to the default type (ICU does the same).
+            // An [import] never does: it asks FindCollation for exactly its type.
             typeFellBack = true;
             foreach (var d in chain)
             {
-                if (d.Find(d.EffectiveDefaultType) is { } c) { found = d; collation = c; type = c.Type; break; }
+                if (d.Find(d.EffectiveDefaultType) is { } c) { hit = (d, c); type = c.Type; break; }
             }
         }
         var unsupported = new List<string>(tag.Unsupported);
         if (typeFellBack) unsupported.Add($"collation type '{tag.CollationType}' is not defined for '{tag.BaseTag}' or its parents — the default type '{type}' is used");
-        return new CldrCollationSelection(tag, chain.FirstOrDefault(), found, collation, type, unsupported);
+        return new CldrCollationSelection(tag, chain.FirstOrDefault(), hit?.Found, hit?.Collation, type, unsupported);
+    }
+
+    /// <summary>The collation of EXACTLY <paramref name="type"/> along the parent chain of <paramref name="localeName"/>
+    /// (the most specific file that defines it), or null when no file of the chain does — never the chain's default
+    /// type. This is what an <c>[import locale-u-co-type]</c> names (UTS #35 Part 5 <c>[import]</c>; ICU's importer
+    /// loads exactly that type and fails on a missing one): a type the chain lacks imports nothing and is reported
+    /// by the builder, where a locale TAG's unknown type falls back (<see cref="ResolveCollation"/>).</summary>
+    public static (CldrLocaleData Found, CldrCollation Collation)? FindCollation(string localeName, string type) =>
+        FindAlong(LoadChain(localeName), type);
+
+    /// <summary>The data files of a tag's parent chain that exist, most specific first.</summary>
+    private static List<CldrLocaleData> LoadChain(string? localeName) =>
+        Chain(localeName).Select(LoadExact).Where(d => d is not null).Cast<CldrLocaleData>().ToList();
+
+    private static (CldrLocaleData Found, CldrCollation Collation)? FindAlong(List<CldrLocaleData> chain, string type)
+    {
+        foreach (var d in chain)
+            if (d.Find(type) is { } c) return (d, c);
+        return null;
     }
 
     /// <summary>The disk directories a site file is looked for in, in precedence order, existing ones only.</summary>
