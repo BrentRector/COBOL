@@ -37,9 +37,13 @@ the campaign narrative. ⛔ **It does NOT own a worklist — `kb/Work/` does, an
 pwsh -NoProfile -File scripts/session-probe.ps1
 ```
 
-Reports branch · dirty/unpushed · next-free diagnostic code · VCR todo count · corpus counts · inventory GAP.
+Reports branch · dirty/unpushed · mailbox (this session's lane, open messages, and whether IT has an inbox watcher armed)
+· next-free diagnostic code · VCR todo count · corpus counts · inventory GAP.
 
 Reading its output:
+- **`⛔ mailbox (<lane>) … NO watcher armed for this session`** — act on the inbox (`python
+  scripts/orchestrator/mailbox.py list --inbox <lane>`), then arm the watcher the line names as a BACKGROUND Bash task,
+  and re-arm it each time it fires. Only this session can arm it: its exit is what wakes this session (kb/Work PB2814).
 - **`⚠ UNEXPECTED BRANCH`** — expected is `phase-14` or `main`. Stop and ask before working on another.
 - **`⚠ DIRTY TREE`** — commit or explain before proceeding. Never start new work on top of unexplained changes.
 - **`diag`** — claim the next diagnostic code from `next free`, never by reading a list. `src-grep max >= catalog max`

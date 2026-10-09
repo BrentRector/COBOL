@@ -1549,6 +1549,15 @@
       "dns": 457,
       "label": "PB1636: the owner's 32 signe",
       "battery": null
+    },
+    {
+      "sha": "f6e4ad94",
+      "date": "2026-10-08",
+      "gap": 103,
+      "closed": 4244,
+      "dns": 457,
+      "label": "PB1085: REPOSITORY rule cita",
+      "battery": null
     }
   ],
   "program": [
@@ -1634,6 +1643,18 @@
       "retire_landed": 10,
       "retire_total": 10,
       "external_landed": 2,
+      "external_total": 8
+    },
+    {
+      "sha": "495e8fb6",
+      "date": "2026-10-08",
+      "total": 250,
+      "landed": 42,
+      "open": 208,
+      "waiting": 153,
+      "retire_landed": 10,
+      "retire_total": 10,
+      "external_landed": 3,
       "external_total": 8
     }
   ]
