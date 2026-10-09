@@ -125,8 +125,10 @@ public sealed class SelfTestDiscoveryDriftTests
         Assert.True(audits.Success, "scripts/run_gate_legs.py no longer declares its audits as `AUDITS = (…)`");
         Assert.Contains(@"(""SELF-TESTS"", [""scripts/self_tests.py""])", audits.Groups[1].Value, StringComparison.Ordinal);
         Assert.Matches(@"(?m)^BUILT_SELF_TESTS = \[""scripts/self_tests.py"", ""--built""\]\r?$", driver);
-        Assert.Matches(@"(?m)^selftests_leg selftests\r?$", linux);
-        Assert.Matches(@"(?m)^\s+selftests_leg selftests-built --built\r?$", linux);
+        // linux-gate.sh runs its legs in parallel (kb/Work PB2879), so each runner call redirects to its leg's result
+        // file and runs in the background; it still calls THE runner, and names no self-test by hand.
+        Assert.Matches(@"(?m)^selftests_leg selftests( > ""\$out/selftests\.result"" 2>&1 &)?\r?$", linux);
+        Assert.Matches(@"(?m)^\s+selftests_leg selftests-built --built( > ""\$out/selftests-built\.result"" 2>&1 &)?\r?$", linux);
 
         var steps = Jobs(workflow);
         Assert.Contains("run: python3 scripts/self_tests.py", RunLines(steps["audits"]));
