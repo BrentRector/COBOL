@@ -97,7 +97,10 @@ public static class PointerImage
 
     private static long NameBase(char category, string name)
     {
-        string key = category + name.ToUpperInvariant();   // §8.3.2.2 — externalized names compare case-insensitively
+        // §8.3.2.2 — externalized names compare by the Annex C fold, the key ProgramTable's ExternalizedNames.Comparer
+        // compares by (kb/Work PB1965): never the host's ToUpperInvariant, which merges what the fold keeps apart
+        // (final sigma and sigma at 2023) and splits what it merges (the Kelvin sign and K).
+        string key = category + CobolNames.UpperFold(name);
         lock (s_lock)
         {
             if (!s_nameBases.TryGetValue(key, out long b))

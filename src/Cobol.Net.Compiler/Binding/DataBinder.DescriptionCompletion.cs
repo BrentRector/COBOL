@@ -33,6 +33,23 @@ public sealed partial class DataBinder
     /// <summary>The subtrees completed ahead of the pipeline — each the operand of a constant's length phrase.</summary>
     private readonly HashSet<DataItem> _completedAhead = new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>The PICTURE profile each entry of a subtree completed ahead had before its ancestors' USAGE and SIGN
+    /// reached it — what a clause copy of that entry reads (<see cref="CopyEntryDescription"/>).</summary>
+    private readonly Dictionary<DataItem, PicInfo?> _picAsWrittenAhead = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>A CLAUSE copy (TYPE, SAME AS) of <paramref name="from"/>'s entry: <see cref="CopyEntryDescription"/>, then
+    /// the PICTURE profile as WRITTEN when a constant's length phrase completed <paramref name="from"/> ahead. The
+    /// pipeline expands every clause before the §13.18.60.4 GR1 / §13.18.52 GR1 walks, so a copy reads the entry as
+    /// it stood before its ancestors' USAGE and SIGN reached it: `01 S SAME AS E.` with E under GROUP-USAGE NATIONAL
+    /// stays PIC 9(3) DISPLAY (§13.18.49.4 GR3 transfers a usage only from a group S itself is subordinate to),
+    /// whether or not `CONSTANT AS BYTE-LENGTH OF E` measured E first (train 1047 review of kb/Work PB2465).</summary>
+    private void CopyClauseDescription(DataItem from, DataItem to, DescriptionCopyScope scope)
+    {
+        bool takesPicture = to.Pic is null;
+        CopyEntryDescription(from, to, scope);
+        if (takesPicture && _picAsWrittenAhead.TryGetValue(from, out var written)) to.Pic = written;
+    }
+
     /// <summary>Complete <paramref name="item"/>'s description now — the subtree's SR9 implied PICTUREs, TYPE and SAME
     /// AS expansions, and §13.18.60.4 GR1 / §13.18.52 GR1 inheritance from its ancestors — unless it, or a subtree
     /// holding it, is complete already. See the class remarks.</summary>
@@ -49,6 +66,9 @@ public sealed partial class DataBinder
         // ExpandTypes' order: every TYPE clause, then every SAME AS clause (a SAME AS source copies its expanded TYPE).
         foreach (var typed in PreOrder(item).Where(i => i.TypeRefName is not null).ToList()) ExpandType(typed);
         foreach (var sameAs in PreOrder(item).Where(i => i.SameAsName is not null).ToList()) ExpandSameAs(sameAs, []);
+        // The walks below replace each entry's PICTURE profile with the effective one; a later TYPE or SAME AS clause
+        // that names an entry of this subtree copies the profile as written (CopyEntryDescription).
+        foreach (var d in PreOrder(item)) _picAsWrittenAhead.TryAdd(d, d.Pic);
         UsageInheritanceWalk(item, InheritedUsageAt(item));
         InheritSignWalk(item, InheritedSignAt(item));
         _completedAhead.Add(item);

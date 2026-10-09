@@ -3786,7 +3786,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             foreach (var child in template.Children)
                 item.AddMember(CloneItem(child, item));
         bool wroteBased = item.IsBased;
-        CopyEntryDescription(template, item, DescriptionCopyScope.TypeSubject);
+        CopyClauseDescription(template, item, DescriptionCopyScope.TypeSubject);
         if (!wroteBased && item.IsBased) ScreenComposedBased(item, $"TYPE '{typeName}'");
         if (screenExternalRecord) ScreenExternalRecordTypes(item);
         // §13.18.57.4 GR3 — "If a VALUE clause is specified in the data description of the subject of the entry,
@@ -4060,7 +4060,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         };
         // Every data description CLAUSE of the member's own entry — §13.18.58.4 GR1 ("the subordinate entries
         // are part of the type") / §13.18.49.4 GR2a ("the same names, DESCRIPTIONS, and hierarchy").
-        CopyEntryDescription(src, clone, DescriptionCopyScope.Entry);
+        CopyClauseDescription(src, clone, DescriptionCopyScope.Entry);
         clone.RedefinesTargetName = src.RedefinesTargetName;   // a member's REDEFINES is part of the type
         clone.ClonedFrom = src;                                // §8.4.2.2.1 rule 4: the definition this copy reproduces
         clone.Uid = _uidCounter++;
@@ -4291,7 +4291,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         SynthesizeImpliedPicturesUnder(target);
         foreach (var pending in PreOrder(target).Where(t => t.TypeRefName is not null).ToList()) ExpandType(pending);
         bool wroteBased = item.IsBased;   // §13.16.3 SR12 admits no BASED beside SAME AS; an error-recovery guard
-        CopyEntryDescription(target, item, DescriptionCopyScope.Entry);
+        CopyClauseDescription(target, item, DescriptionCopyScope.Entry);
         if (!wroteBased && item.IsBased) ScreenComposedBased(item, $"SAME AS '{targetName}'");
         // GR3/GR5: a USAGE / SIGN clause of a group containing data-name-1 takes effect as though specified
         // for the SUBJECT (nearest enclosing clause, the §13.18.60 GR1 discipline; only an ELEMENTARY target
