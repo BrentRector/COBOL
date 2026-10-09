@@ -327,6 +327,7 @@ class Gate:
         if mode not in MODES:
             raise ValueError(f"--mode must be one of {MODES}, not {mode!r}")
         self.mode, self.host, self.run_root, self.base, self.say = mode, host, run_root, base, say
+        self._pool: concurrent.futures.ThreadPoolExecutor | None = None  # `run` owns it for the work `_beside` starts
 
     # The verdict line and exit code are decided here, once, for every path through the gate.
     def _finish(self, out: Outcome, run: Path | None, verdict: str, detail: str, code: int) -> Outcome:
@@ -375,6 +376,8 @@ class Gate:
         verdict), so they never interleave with a leg's report. `name` is one of BESIDE."""
         if name not in BESIDE:
             raise ValueError(f"beside work {name!r} is not one of BESIDE {BESIDE}")
+        if self._pool is None:
+            raise RuntimeError("beside work can only start inside Gate.run, which owns its pool")
         out.beside.append((name, self._pool.submit(work)))
 
     def _join_beside(self, out: Outcome) -> None:
