@@ -439,8 +439,9 @@ public abstract class KeyedConnector : FileConnector
         // ⛔ A FILE LONGER THAN ANY STORE THE FORMAT DESCRIBES IS NOT ONE THIS CONNECTOR CAN READ (kb/Work PB2748):
         // its header passed §14.9.27.4 GR10's comparison, but no store is ever written past MaxStoreBytes (StoreHolds
         // refuses the record that would take it there), so the bytes beyond are not records. It is §9.1.13.6 1)'s
-        // permanent error, "no further information is available", answered through the statement's one IOException
-        // mapping ('30') — a checked cast used to kill the run unit with an OverflowException instead.
+        // permanent error, "no further information is available", answered '30' through OPEN's IOException mapping — a
+        // checked cast used to kill the run unit with an OverflowException instead. A reload inside a later statement
+        // (Enter) has no such mapping yet: kb/Work PB2842.
         long length = RandomAccess.GetLength(handle);
         if (length > RecordFraming.MaxStoreBytes)
             throw new IOException($"'{HostPath}' is {length} bytes, longer than any store this format describes "

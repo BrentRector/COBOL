@@ -6172,11 +6172,11 @@
   "subject": "Function-identifier",
   "rule-digest": "9467205b4218",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#IsBooleanUserFunction; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#CreateCompilerTemp; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindIntrinsicCore",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfActivate; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#CreateCompilerTemp; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindIntrinsicCore; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#IsBooleanFunction",
   "test-ref": "conformance:2002/udf_returning_every_category; conformance-test:UdfInvocationTests.ReturningCategories_AreAllCarried",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1419 (wave 1005 C). GR1 (cite.py --check 8.4.3.2.4 'the description, class, and category of the temporary data item is that specified by the description in the linkage section of the item specified in the RETURNING phrase' -> OK 8.4.3.2.4 1)). UdfReturningResidue and its per-shape COBOLNET1510 refusals are deleted; FLOAT, BOOLEAN, INDEX, data pointer, object reference, strongly typed / REDEFINES / OCCURS DEPENDING groups are carried and read by their natural consumers (golden udf_returning_every_category); the boolean-expression channel reads a boolean-returning user function. A function-identifier of class pointer / object / index as a SET sender or a CALL USING argument is a separate consumer-routing gap (SET and CALL operand classifiers), not the temporary's description. retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfReturningResidue (UdfReturningResidue was deleted by kb/Work PB1419: the residue list it held refused legal RETURNING categories and no longer exists.)",
+  "notes": "kb/Work PB1419 (wave 1005 C). GR1 (cite.py --check 8.4.3.2.4 'the description, class, and category of the temporary data item is that specified by the description in the linkage section of the item specified in the RETURNING phrase' -> OK 8.4.3.2.4 1)). UdfReturningResidue and its per-shape COBOLNET1510 refusals are deleted; FLOAT, BOOLEAN, INDEX, data pointer, object reference, strongly typed / REDEFINES / OCCURS DEPENDING groups are carried and read by their natural consumers (golden udf_returning_every_category); the boolean-expression channel reads a boolean-returning user function. A function-identifier of class pointer / object / index as a SET sender or a CALL USING argument is a separate consumer-routing gap (SET and CALL operand classifiers), not the temporary's description. retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/UdfBinder.cs#UdfReturningResidue (UdfReturningResidue was deleted by kb/Work PB1419: the residue list it held refused legal RETURNING categories and no longer exists.) retired-witness: src/Cobol.Net.Compiler/Binding/Procedure/Verbs/ConditionBinder.cs#IsBooleanUserFunction (kb/Work PB1928 (train 1047) folded the two boolean-function arms into ConditionBinder.IsBooleanFunction, which reads the user function before the catalog (§12.3.8.4 GR12))",
   "state": "OK"
  },
  {
@@ -49702,11 +49702,11 @@
   "subject": "WRITE statement",
   "rule-digest": "d5f574690a46",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OpenCore; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ExistingRecordCount",
+  "code-location": "src/Cobol.Net.Runtime/IO/SequentialConnector.cs#OpenCore; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#CountRecords",
   "test-ref": "conformance:2023/pb713_shared_extend_open; conformance:2002/pb713_shared_extend_open; conformance:2023/l1_open_extend_position; unit:SharedExtendOpenDriftTests.SharedExtend_OpensAndAppends_ForEverySequentialFraming",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "The EXTEND write-ordinal base is the record count present at OPEN, measured before this OPEN's own writer exists (kb/Work PB713); the goldens read the appended record back as the successor of the existing one on every organization and framing.",
+  "notes": "The EXTEND write-ordinal base is the record count present at OPEN, measured before this OPEN's own writer exists (kb/Work PB713); the goldens read the appended record back as the successor of the existing one on every organization and framing. retired-witness: src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ExistingRecordCount (kb/Work PB2692 (train 1047) replaced ExistingRecordCount with the one bounded measurement SequentialConnector.CountRecords)",
   "state": "OK"
  },
  {
@@ -63577,11 +63577,11 @@
   "subject": "Line delimiter, specification of",
   "rule-digest": "7831faee1b9a",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-114; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#LineSequentialDelimiter; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ReadPhysicalLine; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ExistingRecordCount",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-114; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#LineSequentialDelimiter; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ReadPhysicalLine; src/Cobol.Net.Runtime/IO/SequentialConnector.cs#CountRecords",
   "test-ref": "conformance:2023/pb1540_ls_lone_cr_is_data; conformance-test:LinageConformanceTests.Bytes_LineSequential_EveryPlacementMix; conformance:2023/pb964_ls_plain_write_after_after",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB1540 landed (w67p). cite.py --check 12.4.5.10.3 'Each record in a line sequential file is terminated by an implementor-defined line delimiter' -> OK §12.4.5.10.3 2). The §7 determination (host newline written; LF or CR LF read on every host; a lone CR is data and '09') is now the code: SequentialConnector.LineSequentialDelimiter (Environment.NewLine) is every line end a line sequential connector writes (record delimiter, ADVANCING/LINAGE lines, CLOSE of an open line); ReadPhysicalLine ends a record only at LF or CR LF; ExistingRecordCount counts under the same rule. Witnesses: the golden reads 'AB<CR>CD<LF>EF<CR><LF>GH' as AB<CR>CD '09', EF '00', GH '00', '10'; LinageConformanceTests pin the host bytes of every write arm; pb964 is re-derived host-independently. The record sequential PRINT stream keeps CR LF (not governed by item 114; DOC-A.1-146 (c′)).",
+  "notes": "kb/Work PB1540 landed (w67p). cite.py --check 12.4.5.10.3 'Each record in a line sequential file is terminated by an implementor-defined line delimiter' -> OK §12.4.5.10.3 2). The §7 determination (host newline written; LF or CR LF read on every host; a lone CR is data and '09') is now the code: SequentialConnector.LineSequentialDelimiter (Environment.NewLine) is every line end a line sequential connector writes (record delimiter, ADVANCING/LINAGE lines, CLOSE of an open line); ReadPhysicalLine ends a record only at LF or CR LF; ExistingRecordCount counts under the same rule. Witnesses: the golden reads 'AB<CR>CD<LF>EF<CR><LF>GH' as AB<CR>CD '09', EF '00', GH '00', '10'; LinageConformanceTests pin the host bytes of every write arm; pb964 is re-derived host-independently. The record sequential PRINT stream keeps CR LF (not governed by item 114; DOC-A.1-146 (c′)). retired-witness: src/Cobol.Net.Runtime/IO/SequentialConnector.cs#ExistingRecordCount (kb/Work PB2692 (train 1047) replaced ExistingRecordCount with the one bounded measurement SequentialConnector.CountRecords)",
   "state": "OK"
  },
  {
