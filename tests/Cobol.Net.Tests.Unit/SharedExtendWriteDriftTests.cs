@@ -433,12 +433,12 @@ public sealed class SharedExtendWriteDriftTests
         try
         {
             File.WriteAllBytes(host, "AA"u8.ToArray());
-            using (var s = HostFile.OpenConnectorWriteStream(host, FileMode.Append, FileShare.ReadWrite))
+            using (var s = HostFile.OpenConnectorWriteStream(host, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
             {
                 s.Write("BB"u8);
                 s.Flush();
                 // Another connector appends behind this stream's back.
-                using (var other = HostFile.OpenConnectorWriteStream(host, FileMode.Append, FileShare.ReadWrite))
+                using (var other = HostFile.OpenConnectorWriteStream(host, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
                 {
                     other.Write("CC"u8);
                     other.Flush();

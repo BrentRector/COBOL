@@ -364,7 +364,14 @@ public static class CobolFile
 
     /// <summary>Resolve an ASSIGN target to a host file path: a target that already looks like a path (has a
     /// directory separator or an extension) is used verbatim; otherwise it becomes <c>&lt;lowercased&gt;.txt</c> in the
-    /// current directory — the convention the NIST and differential corpora rely on to find the same file.</summary>
+    /// current directory — the convention the NIST and differential corpora rely on to find the same file.
+    /// <para>⛔ THE RESULT IS ABSOLUTE (kb/Work PB2748), made so against the current directory at the moment of the
+    /// association (§12.4.5.3 GR3: the OPEN, SORT or MERGE that establishes it), which is the directory the host
+    /// would have resolved the relative spelling against anyway. The host path is the physical file's IDENTITY to
+    /// the run unit — Table 19's arbitration state and the keyed record stores are keyed on it, compared under the
+    /// host's case rule (<see cref="HostFile.PhysicalFileComparer"/>) — so <c>data.dat</c>, <c>./data.dat</c> and the
+    /// full path must be one key. (A symbolic or hard link is still a second spelling: the identity is the path,
+    /// docs/CONFORMANCE.md DOC-A.1-71.)</para></summary>
     public static string ResolveHostPath(string assignTarget)
     {
         // An EMPTY target identifies NO physical file, and the empty host path is exactly how a connector says
@@ -372,7 +379,7 @@ public static class CobolFile
         // because §12.4.5.3 GR3 gives it no device-name-1/literal-1 to be associated with until an OPEN/SORT/MERGE
         // runs FileConnector.Associate. (Without this the empty target became the literal file ".txt".)
         if (assignTarget.Length == 0) return "";
-        if (assignTarget.Contains('.') || assignTarget.Contains('/') || assignTarget.Contains('\\')) return assignTarget;
-        return assignTarget.ToLowerInvariant() + ".txt";
+        bool looksLikeAPath = assignTarget.Contains('.') || assignTarget.Contains('/') || assignTarget.Contains('\\');
+        return Path.GetFullPath(looksLikeAPath ? assignTarget : assignTarget.ToLowerInvariant() + ".txt");
     }
 }

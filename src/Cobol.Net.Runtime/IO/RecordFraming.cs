@@ -501,16 +501,21 @@ internal static class RecordFraming
     /// never by an organization body (<c>HostFileProbeDriftTests</c>, kb/Work PB323). Re-opening by path would
     /// also take a SECOND handle on a file the connector may hold under a deny-share mode, and could index a
     /// different file than the one the connector is reading. The walk moves the stream position and leaves it
-    /// where it stops; every caller reaches <c>SequentialConnector.SeekToRecord</c> immediately afterwards,
-    /// which seeks and discards the reader's buffer.</para></summary>
-    public static List<long> FrameStarts(Stream fs)
+    /// where it stops; the backward READ reaches <c>SequentialConnector.SeekToRecord</c> immediately afterwards,
+    /// which seeks and discards the reader's buffer. The record COUNTS of <c>SequentialConnector.CountRecords</c>
+    /// walk an auxiliary stream instead, because they run where the connector's own handle is a writer.</para>
+    /// <para><paramref name="from"/> and <paramref name="to"/> bound the walk to the frames that START in
+    /// [from, to): <paramref name="from"/> shall be a frame boundary (kb/Work PB2692 counts only the frames
+    /// another run unit appended since the last count).</para></summary>
+    public static List<long> FrameStarts(Stream fs, long from = 0, long to = long.MaxValue)
     {
         var starts = new List<long>();
-        fs.Seek(0, SeekOrigin.Begin);
+        fs.Seek(from, SeekOrigin.Begin);
         var len = new byte[4];
         while (true)
         {
             long at = fs.Position;
+            if (at >= to) break;
             if (!FillExactly(fs, len, 4)) break;
             uint word = BinaryPrimitives.ReadUInt32LittleEndian(len);
             if (word != GapTag)

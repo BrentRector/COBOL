@@ -15,7 +15,8 @@ namespace CobolNet.Runtime.IO;
 /// N exclusively", "does anybody ELSE hold byte N" and "give byte N back", and the map of which byte means what
 /// (<see cref="StoreMutexByte"/>, <see cref="RecordLockByte"/>).
 /// <para><b>One handle, the connector's own.</b> The locks are taken through the handle that IS the connector's
-/// §9.1.15 file lock (<c>KeyedConnector.Store</c>), never through a second handle on the path: a second handle
+/// §9.1.15 file lock (<c>KeyedConnector.Store</c>; the handle beneath a <c>SequentialConnector</c>'s reader or writer,
+/// kb/Work PB2692), never through a second handle on the path: a second handle
 /// would have to be admitted by the connector's own share mode, and every other open of a host path is
 /// <c>HostFile</c>'s (kb/Work PB713, PB771). Both host expressions below are owned by the HANDLE (the open file
 /// description on Linux, the file handle on Windows), so two connectors of one run unit, and two run units in one

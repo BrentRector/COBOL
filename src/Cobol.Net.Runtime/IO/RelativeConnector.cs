@@ -390,7 +390,12 @@ public sealed class RelativeConnector : KeyedConnector
     /// <see cref="HighestRelativeRecordNumber"/> → permanent error '34' (GR29b). A record the store cannot hold →
     /// invalid key '24' (GR33 b), <see cref="KeyedConnector.StoreHolds"/>); a record holding a character with no
     /// byte image → '91' (<see cref="FileConnector.RecordHasCharacterWithoutByteImage"/>). Open-mode legality per
-    /// §9.1.13.7 item 8 ('48').</summary>
+    /// §9.1.13.7 item 8 ('48').
+    /// <para>⛔ THE RULES ARE TESTED IN THE ORDER THE GENERAL RULES STATE THEM (docs/CONFORMANCE.md DOC-A.1-104;
+    /// kb/Work PB2751): the open mode (GR3, '48'), the record size (GR14, '44') and the record's content ('91'),
+    /// both through <see cref="KeyedConnector.RecordRulesFailure"/>, and only then the release rules of GR29 and the
+    /// invalid key conditions of GR33. The key rules used to come first, so a too-short record written to an
+    /// occupied slot answered '22' and ran the INVALID KEY phrase where GR14's '44' is a logic error.</para></summary>
     /// <param name="extents">The record's EXTENT TABLE when a variable-length group record is written
     /// (determination D-FRA (v); kb/Work PB1053), stored and persisted with it.</param>
     public string Write(string image, int length = -1, RecordExtents? extents = null)
@@ -407,38 +412,33 @@ public sealed class RelativeConnector : KeyedConnector
         {
             if (!IsOpen || Mode is not (FileOpenMode.Output or FileOpenMode.Extend))
                 return Status = FileStatusCode.WriteNotOpenForOutput;      // '48' §9.1.13.7 8a
-            long slot = NextSequentialSlot();
-            if (_keyDigits > 0 && slot.ToString().Length > _keyDigits)
-                return Status = FileStatusCode.BoundaryViolation;          // '24' §14.9.51 GR29a
-            if (Stored(image, length) is not { } seqRec)
-                return Status = FileStatusCode.RecordSizeViolation;        // '44' §13.18.43 GR14a
-            if (RecordHasCharacterWithoutByteImage(seqRec))
-                return Status = FileStatusCode.CharacterWithoutByteImage;  // '91' A.1 item 31 (R47)
-            var seqFrame = Framed(seqRec, image, extents);
-            if (!StoreHolds(_st.FramedBytesAfterPut(slot, seqFrame)))
-                return Status = FileStatusCode.BoundaryViolation;          // '24' §14.9.51.4 GR33 b)
-            _st.Put(slot, seqFrame);
-            _lastReleasedSlot = slot;
-            _lastSlot = slot;                                              // GR29a — MOVEd back into the key item
-            return Status = FileStatusCode.Success;
         }
         // §9.1.13.7 8 b) — "If the access mode is dynamic or random, the file connector is not open in the
         // I-O or output mode"; Table 20's Random/Extend and Dynamic/Extend WRITE cells are blank.
-        if (!IsOpen || Mode is not (FileOpenMode.IO or FileOpenMode.Output))
+        else if (!IsOpen || Mode is not (FileOpenMode.IO or FileOpenMode.Output))
             return Status = FileStatusCode.WriteNotOpenForOutput;          // '48' §9.1.13.7 8b
-        long key = _pendingKey;
-        if (key is < 1 or > HighestRelativeRecordNumber)
-            return Status = FileStatusCode.PermanentBoundary;              // '34' §14.9.51.4 GR29 b)
-        if (_slots.ContainsKey(key)) return Status = FileStatusCode.DuplicateKey;   // '22' §14.9.51 GR33a
-        if (Stored(image, length) is not { } rec)
-            return Status = FileStatusCode.RecordSizeViolation;            // '44' §13.18.43 GR14a
-        if (RecordHasCharacterWithoutByteImage(rec))
-            return Status = FileStatusCode.CharacterWithoutByteImage;      // '91' A.1 item 31 (R47)
+        if (RecordRulesFailure(image, length, out string rec) is { } badRecord)
+            return Status = badRecord;                                     // '44' §14.9.51.4 GR14, then '91'
+        long slot;
+        if (sequentialRelease)
+        {
+            slot = NextSequentialSlot();
+            if (_keyDigits > 0 && slot.ToString(System.Globalization.CultureInfo.InvariantCulture).Length > _keyDigits)
+                return Status = FileStatusCode.BoundaryViolation;          // '24' §14.9.51.4 GR29 a) / GR33 c)
+        }
+        else
+        {
+            slot = _pendingKey;
+            if (slot is < 1 or > HighestRelativeRecordNumber)
+                return Status = FileStatusCode.PermanentBoundary;          // '34' §14.9.51.4 GR29 b)
+            if (_slots.ContainsKey(slot)) return Status = FileStatusCode.DuplicateKey;   // '22' §14.9.51.4 GR33 a)
+        }
         var frame = Framed(rec, image, extents);
-        if (!StoreHolds(_st.FramedBytesAfterPut(key, frame)))
+        if (!StoreHolds(_st.FramedBytesAfterPut(slot, frame)))
             return Status = FileStatusCode.BoundaryViolation;              // '24' §14.9.51.4 GR33 b)
-        _st.Put(key, frame);
-        _lastSlot = key;
+        _st.Put(slot, frame);
+        if (sequentialRelease) _lastReleasedSlot = slot;
+        _lastSlot = slot;                                                  // GR29 a) — MOVEd back into the key item
         return Status = FileStatusCode.Success;
     }
 
@@ -474,24 +474,24 @@ public sealed class RelativeConnector : KeyedConnector
         bool wasRead = PrevOpWasSuccessfulRead;   // the terminal status assignment drops the gate (PB140)
         if (MutationOpenModeGuard() is { } notIO) return Status = notIO;   // '49' §14.9.35.4 GR3 / §14.9.10.4 GR1
         // §14.9.35 GR18 — a relative record's size MAY differ from the replaced record's; GR20 still bounds it.
-        if (Access == KeyedAccess.Sequential)   // §14.9.35.4 GR5 vs. GR21 — the ACCESS MODE alone
-        {
-            if (!wasRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;   // '43'
-            if (Stored(image, length) is not { } seqRec)
-                return Status = FileStatusCode.RecordSizeViolation;                             // '44' GR20
-            return Status = Replace(_lastSlot, seqRec, image, extents);
-        }
-        if (!_slots.ContainsKey(_pendingKey)) return Status = FileStatusCode.RecordNotFound;    // '23' GR21
-        if (Stored(image, length) is not { } rec)
-            return Status = FileStatusCode.RecordSizeViolation;                                 // '44' GR20
-        return Status = Replace(_pendingKey, rec, image, extents);
+        // ⛔ IN THE GENERAL RULES' ORDER (DOC-A.1-104, kb/Work PB2751): GR5's '43', then GR20's size '44' and the
+        // content's '91', and only then the record the statement replaces — GR21's '23' for random/dynamic access.
+        bool sequential = Access == KeyedAccess.Sequential;   // §14.9.35.4 GR5 vs. GR21 — the ACCESS MODE alone
+        if (sequential && !wasRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;   // '43' GR5
+        if (RecordRulesFailure(image, length, out string rec) is { } badRecord)
+            return Status = badRecord;                                                          // '44' GR20, then '91'
+        long slot = sequential ? _lastSlot : _pendingKey;
+        // GR21 for random/dynamic access; for sequential access GR5's "the record that was accessed by the READ
+        // statement", which another connector may have deleted since (§14.9.10.4 GR5: it "can no longer be
+        // accessed") — the record does not exist, '23', as the indexed organization answers (DOC-A.1-104 (4)).
+        if (!_slots.ContainsKey(slot)) return Status = FileStatusCode.RecordNotFound;           // '23'
+        return Status = Replace(slot, rec, image, extents);
     }
 
-    /// <summary>The REWRITE's one replacement, after its own target and size rules: the record-content ('91') and
-    /// boundary ('24') tests every write of a record into this store answers, then the replacement.</summary>
+    /// <summary>The REWRITE's one replacement, after its own target, size and content rules: the boundary ('24')
+    /// test every write of a record into this store answers, then the replacement.</summary>
     private string Replace(long slot, string stored, string image, RecordExtents? extents)
     {
-        if (RecordHasCharacterWithoutByteImage(stored)) return FileStatusCode.CharacterWithoutByteImage;   // '91'
         var frame = Framed(stored, image, extents);
         if (!StoreHolds(_st.FramedBytesAfterPut(slot, frame))) return FileStatusCode.BoundaryViolation;   // '24'
         _st.Put(slot, frame);
@@ -505,13 +505,12 @@ public sealed class RelativeConnector : KeyedConnector
     {
         bool wasRead = PrevOpWasSuccessfulRead;   // the terminal status assignment drops the gate (PB140)
         if (MutationOpenModeGuard() is { } notIO) return Status = notIO;   // '49' §14.9.35.4 GR3 / §14.9.10.4 GR1
-        if (Access == KeyedAccess.Sequential)   // §14.9.10.4 GR2 vs. GR4 — the ACCESS MODE alone
-        {
-            if (!wasRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;
-            _st.Remove(_lastSlot);
-            return Status = FileStatusCode.Success;
-        }
-        if (!_st.Remove(_pendingKey)) return Status = FileStatusCode.RecordNotFound;
+        bool sequential = Access == KeyedAccess.Sequential;   // §14.9.10.4 GR2 vs. GR4 — the ACCESS MODE alone
+        if (sequential && !wasRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;   // '43'
+        // GR4's invalid key for random/dynamic access; for sequential access GR2's "the record that was accessed by
+        // that READ statement", which another connector may have deleted since — '23', not a success over nothing
+        // (kb/Work PB2751; the indexed organization's answer, DOC-A.1-104 (4)).
+        if (!_st.Remove(sequential ? _lastSlot : _pendingKey)) return Status = FileStatusCode.RecordNotFound;
         return Status = FileStatusCode.Success;
     }
 

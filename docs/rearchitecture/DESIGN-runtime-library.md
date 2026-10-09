@@ -594,8 +594,19 @@ it with two `FileRegistry` instances (two run units sharing no table and no hand
 `REWRITE`, `IGNORING LOCK`, a sibling's `WRITE` visible at the next statement, every run unit's update surviving
 every CLOSE, and a `RETRY` (n TIMES and FOREVER) that waits outside the mutex.
 
-⛔ **The SEQUENTIAL organization does not publish its record locks yet** — `SequentialConnector` has no
-`RecordLockHandle`, so a sequential file's record lock is still its run unit's alone.
+**The SEQUENTIAL organization publishes its record locks the same way (kb/Work PB2692).** Its `RecordLockHandle` is
+the handle beneath its reader or writer (`HostFile.HandleOf`), and three facts make the published lock guard the
+right record across run units. (1) A writer that registered a record-locking posture opens its handle READ-WRITE
+(`SequentialConnector.HostAccess`): the presence byte is a SHARED hold, which Linux refuses through a write-only
+descriptor, and a lock with no presence byte is invisible to every other run unit's hot-path test. (2) A sharing
+writer's released record is NUMBERED OFF THE MEDIUM (`ReleaseRecord` → `PhysicalOrdinalOfRelease`): the record lands
+where `SharedAppendStream.ReleaseStart` says, and its ordinal is one more than the records starting before that
+offset, counted incrementally by the one framing-aware count (`CountRecords`). The in-run-unit mint
+(`PhysicalFileTable.State.ReleasedOrdinal`) serves only a writer that is the file's only writer, where it agrees with
+the medium. (3) A reader whose file lock admits another writer RE-ANCHORS AT EVERY FRAME
+(`EnsureReaderCoherent`): the release generation is one run unit's memory, so another run unit's REWRITE would
+otherwise be served from the read-ahead. `CrossRunUnitSequentialLockDriftTests` measures it for the fixed, line and
+varying framings.
 
 **Emptying a keyed store is done in ONE place: `KeyedStoreTable.AttachCreated` (kb/Work PB754).** An `OPEN OUTPUT`
 creates the file (§14.9.27.4 GR18, *"After the creation of the file, the file contains no records"*), and emptying

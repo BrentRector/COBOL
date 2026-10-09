@@ -801,7 +801,9 @@
   "pb1900_nested_product_cancellation",
   "pb289_argument_expression_lands_at_formal_scale",
   "pb2078_property_receivers_identified",
-  "pb2553_sum_counter_incompatible"
+  "pb2553_sum_counter_incompatible",
+  "pb2748_reopen_answers_41",
+  "pb2751_keyed_write_rule_order"
   ],
   "pending": []
 }

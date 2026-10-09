@@ -890,7 +890,7 @@ public sealed class FileRegistry
     {
         foreach (var (other, c) in _files)
             if (!string.Equals(other, name, StringComparison.OrdinalIgnoreCase)
-                && c.IsOpen && string.Equals(c.HostPath, host, StringComparison.OrdinalIgnoreCase))
+                && c.IsOpen && HostFile.PhysicalFileComparer.Equals(c.HostPath, host))
                 return true;
         return false;
     }
@@ -1014,14 +1014,26 @@ public sealed class FileRegistry
     public void OpenShared(string name, FileOpenMode mode, bool hasSharingOverride, FileSharing sharingOverride,
         FileRetryKind retryKind, long retryAmount, OpenTapePhrase tape, string assign, bool assignDynamic,
         LinagePage? page)
+        => OpenCore(name, mode, hasSharingOverride ? sharingOverride : null, retryKind, retryAmount, tape,
+            assign, assignDynamic, page, phraseParticipant: true);
+
+    /// <summary>⛔ §14.9.27.4 GR2 IS DECIDED FIRST, AND ALONE (kb/Work PB2748): <i>"The file connector referenced by
+    /// file-name-1 shall not be open. If it is open, the execution of the OPEN statement is unsuccessful and the I-O
+    /// status associated with file-name-1 is set to '41'"</i>, and GR25: <i>"If the execution of the OPEN statement is
+    /// unsuccessful, the file is not affected"</i>. An OPEN of an open connector therefore reaches nothing the OPEN
+    /// would otherwise establish — no Table 19 arbitration (which answered '61' over GR2's '41' when a sibling
+    /// connector's mode refused the new request; GR2 precedes the sharing rules, docs/CONFORMANCE.md DOC-A.1-104),
+    /// no record-locking posture from an OPEN phrase, no REVERSED or LINAGE request, no physical-file association and
+    /// no sharing mode: each of those used to be written onto the STILL-OPEN connector before
+    /// <see cref="FileConnector.Open"/> refused it, so the unsuccessful OPEN changed how the open file shared, locked
+    /// and released its records. The answer itself is the connector's own already-open arm (its §9.1.13.1 permanent
+    /// error replay first, kb/Work PB1541, else '41').</summary>
+    private bool RefusedAsAlreadyOpen(string name, FileOpenMode mode)
     {
-        // A sharing/retry phrase on the OPEN makes the connector a record-locking participant even without a
-        // SELECT clause. Its SHARING MODE is still whatever §9.1.15 gives it: the phrase's mode when a SHARING
-        // phrase is written, otherwise the implementor default of the open mode — never a hard-coded ALL OTHER.
-        if (!_connectorShares.ContainsKey(name))
-            RegisterSharing(name, null, FileLockMode.None, false);
-        OpenCore(name, mode, hasSharingOverride ? sharingOverride : null, retryKind, retryAmount, tape,
-            assign, assignDynamic, page);
+        var c = Require(name);   // an unregistered name is a COMPILER defect and LOUD (kb/Work PB140)
+        if (!c.IsOpen) return false;
+        _ = c.Open(mode);
+        return true;
     }
 
     /// <summary>⛔ THE ONE OPEN DISPATCH (ISO §14.9.27). Every OPEN — phrase-bearing or plain — arbitrates against
@@ -1036,7 +1048,10 @@ public sealed class FileRegistry
     /// attempt, so the plain <see cref="Open"/> is the same code path with <see cref="FileRetryKind.None"/>. The
     /// GC-deferred per-object close drains first, on this (mutator) thread, for both entries — it used to drain
     /// only for the plain one.</para>
-    /// <para><paramref name="noRewind"/> is the statement's WITH NO REWIND phrase, applied by
+    /// <para><paramref name="phraseParticipant"/> is true for an OPEN statement that writes a SHARING or RETRY phrase
+    /// (<see cref="OpenShared"/>); the record-locking posture such a phrase gives a clause-less connector is
+    /// registered only once GR2 has admitted the statement (<see cref="RefusedAsAlreadyOpen"/>).</para>
+    /// <para><paramref name="tape"/> carries the statement's WITH NO REWIND phrase, applied by
     /// <see cref="NoRewindPhraseEffect"/> AFTER the arbitrated open. It rides here rather than at either entry
     /// point because SHARING/RETRY and NO REWIND are independent phrases of one general format (§14.9.27.2), so
     /// an OPEN may write both and the '07' overlay has to reach the arbitrated path as well as the plain one
@@ -1044,9 +1059,15 @@ public sealed class FileRegistry
     /// <see cref="NoRewindPhraseEffect"/> writes '07' only over a status whose first digit is '0'.</para></summary>
     private void OpenCore(string name, FileOpenMode mode, FileSharing? sharingOverride,
         FileRetryKind retryKind, long retryAmount, OpenTapePhrase tape, string assign, bool assignDynamic,
-        LinagePage? page)
+        LinagePage? page, bool phraseParticipant = false)
     {
         DrainPendingObjectCloses();   // reclaim any GC-finalized per-object connectors on this (mutator) thread first
+        if (RefusedAsAlreadyOpen(name, mode)) return;   // §14.9.27.4 GR2 — before anything below touches the connector
+        // A sharing/retry phrase on the OPEN makes the connector a record-locking participant even without a
+        // SELECT clause. Its SHARING MODE is still whatever §9.1.15 gives it: the phrase's mode when a SHARING
+        // phrase is written, otherwise the implementor default of the open mode — never a hard-coded ALL OTHER.
+        if (phraseParticipant && !_connectorShares.ContainsKey(name))
+            RegisterSharing(name, null, FileLockMode.None, false);
         // §14.9.27.4 GR26 → §12.4.5.3 GR3, and BEFORE the Table-19 arbitration: a sharing conflict is defined
         // over "another file connector" holding THE PHYSICAL FILE this OPEN names (§9.1.13.9), so the association
         // this statement establishes has to stand before the physical-file table is consulted. OUTSIDE the RETRY

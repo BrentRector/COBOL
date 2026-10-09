@@ -570,12 +570,6 @@ public sealed class IndexedConnector : KeyedConnector
     public string Write(string image, int length = -1, RecordExtents? extents = null)
     {
         if (PermanentErrorReplay() is { } stuck) return Status = stuck;   // §9.1.13.1 — a permanent error in effect (kb/Work PB1541)
-        if (Stored(image, length) is not { } stored)
-            return Status = FileStatusCode.RecordSizeViolation;            // '44' §13.18.43 GR14a
-        if (RecordHasCharacterWithoutByteImage(stored))
-            return Status = FileStatusCode.CharacterWithoutByteImage;      // '91' A.1 item 31 (R47)
-        extents = Framed(stored, image, extents).Extents;
-        image = _layoutKeys ? stored : Fit(image);   // key slices come from the record-area image (KeyOf pads on demand)
         // §14.9.51.4 GR38 "If the access mode of the write file connector is sequential, records shall be
         // released … in ascending order of prime record key values" vs. GR39 "If the access mode … is random
         // or dynamic, WRITE statements may release records … in any order": the ACCESS MODE alone selects the
@@ -593,6 +587,13 @@ public sealed class IndexedConnector : KeyedConnector
         // I-O or output mode"; Table 20's Random/Extend and Dynamic/Extend WRITE cells are blank.
         else if (!IsOpen || Mode is not (FileOpenMode.IO or FileOpenMode.Output))
             return Status = FileStatusCode.WriteNotOpenForOutput;          // '48' §9.1.13.7 8b
+        // ⛔ AFTER THE OPEN MODE, BEFORE THE KEYS (DOC-A.1-104; kb/Work PB2751): GR3's '48' is stated before GR14's
+        // '44', which this statement used to test first — so a short record written through a connector open INPUT
+        // answered '44' where its own REWRITE and DELETE answer the open mode.
+        if (RecordRulesFailure(image, length, out string stored) is { } badRecord)
+            return Status = badRecord;                                     // '44' §14.9.51.4 GR14, then '91'
+        extents = Framed(stored, image, extents).Extents;
+        image = _layoutKeys ? stored : Fit(image);   // key slices come from the record-area image (KeyOf pads on demand)
         string prime = KeyOf(image, extents, PrimeKey);
         if (sequentialRelease && _lastWrittenPrime is { } lastPrime && KeyCompare(prime, lastPrime, PrimeKey) <= 0)
             return Status = FileStatusCode.SequenceError;                  // '21' GR38/GR42a
@@ -633,16 +634,16 @@ public sealed class IndexedConnector : KeyedConnector
         bool wasRead = PrevOpWasSuccessfulRead;   // the terminal status assignment drops the gate (PB140)
         if (MutationOpenModeGuard() is { } notIO) return Status = notIO;   // '49' §14.9.35.4 GR3 / §14.9.10.4 GR1
         // §14.9.35 GR18 — an indexed record's size MAY differ from the replaced record's; GR20 still bounds it.
-        if (Stored(image, length) is not { } stored)
-            return Status = FileStatusCode.RecordSizeViolation;                                 // '44' GR20
-        if (RecordHasCharacterWithoutByteImage(stored))
-            return Status = FileStatusCode.CharacterWithoutByteImage;                           // '91' (R47)
+        // ⛔ IN THE GENERAL RULES' ORDER (DOC-A.1-104; kb/Work PB2751): GR5's '43' is stated before GR20's '44'.
+        bool sequential = Access == KeyedAccess.Sequential;   // §14.9.35.4 GR22 vs. GR23 — the ACCESS MODE alone
+        if (sequential && !wasRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;   // '43' GR5
+        if (RecordRulesFailure(image, length, out string stored) is { } badRecord)
+            return Status = badRecord;                                                          // '44' GR20, then '91'
         extents = Framed(stored, image, extents).Extents;
         image = _layoutKeys ? stored : Fit(image);   // the WRITE's key image rule (kb/Work PB1025)
         string prime = KeyOf(image, extents, PrimeKey);
-        if (Access == KeyedAccess.Sequential)   // §14.9.35.4 GR22 vs. GR23 — the ACCESS MODE alone
+        if (sequential)
         {
-            if (!wasRead) return Status = FileStatusCode.NoSuccessfulReadBeforeDeleteRewrite;   // '43' GR5
             // '21' §14.9.35 GR22 — the prime key of the replaced record must EQUAL that of the last record read;
             // equality is collating-sequence-based per §12.4.5.12.4 GR1 (KeyEq honors _primeCollation), not ordinal.
             if (_lastReadPrime is not { } lastPrime || !KeyEq(prime, lastPrime, PrimeKey))

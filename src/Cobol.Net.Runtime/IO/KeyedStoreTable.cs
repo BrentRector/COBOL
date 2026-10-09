@@ -25,7 +25,7 @@ internal sealed class KeyedStoreTable
         public int Attached;
     }
 
-    private readonly Dictionary<string, Entry> _byHost = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Entry> _byHost = new(HostFile.PhysicalFileComparer);   // kb/Work PB2748
 
     /// <summary>Attach to the RELATIVE store for <paramref name="host"/>: the live store when one exists (its
     /// content is the truth — no reload), else a fresh store populated by <paramref name="loadFirst"/>.</summary>

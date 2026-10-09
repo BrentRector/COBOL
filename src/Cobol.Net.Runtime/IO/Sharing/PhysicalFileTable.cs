@@ -64,7 +64,11 @@ internal sealed class PhysicalFileTable
         /// <para>Seeded by a sharing-active <c>OPEN EXTEND</c> from the records already in the physical file
         /// (§14.9.51.4 GR18) and reset to 0 by a sharing-active <c>OPEN OUTPUT</c>, which truncates. The keyed
         /// organizations do not use it: their release identity is a key or an RRN minted from the shared record
-        /// store, which is their physical file.</para></summary>
+        /// store, which is their physical file.</para>
+        /// <para>⛔ ONLY THE FILE'S ONLY WRITER READS IT (kb/Work PB2692). The mint is one run unit's, and a writer
+        /// whose file lock admits another writer may meet one in ANOTHER run unit, whose appends this mint never
+        /// counts; such a writer numbers its release off the medium (<c>SequentialConnector.ReleaseRecord</c>), and
+        /// so does every writer Table 19 admits beside it, so this field is neither seeded nor read for them.</para></summary>
         public long ReleasedOrdinal;
 
         /// <summary>⭐ The RELEASE GENERATION of this physical file (kb/Work PB753): a count of the logical
@@ -97,7 +101,7 @@ internal sealed class PhysicalFileTable
     /// <summary>The per-run-unit record-lock ceiling (§12.4.5.9 GR7 — implementor max, ≥255) → status 53.</summary>
     private const int RunUnitLockMax = 255;
 
-    private readonly Dictionary<string, State> _byHost = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, State> _byHost = new(HostFile.PhysicalFileComparer);   // kb/Work PB2748
 
     /// <summary>The state for <paramref name="host"/>, created on first reference.</summary>
     public State For(string host)

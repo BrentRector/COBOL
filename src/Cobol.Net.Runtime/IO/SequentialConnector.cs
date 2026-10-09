@@ -134,7 +134,7 @@ public sealed class SequentialConnector : FileConnector
     /// one past the last record — so GR21 rule c)'s decreasing arm selects the last record and rule e)'s
     /// "no record is found" is the at-end at ordinal 0. A file with no records leaves the indicator at 0, GR21
     /// rule b)'s own value, and the first READ then takes the ordinary empty-file at-end path.</para>
-    /// <para>The count is <see cref="ExistingRecordCount"/> — the ONE measurement of how many records the
+    /// <para>The count is <see cref="CountRecords"/> — the ONE measurement of how many records the
     /// physical file holds, shared with the §14.9.51.4 GR19 EXTEND ordinal base, never a second walk. A medium
     /// that cannot be positioned (LINE SEQUENTIAL, a non-seekable stream) leaves the indicator at 0 and the
     /// first backward READ reports the permanent error <see cref="SeekToOrdinal"/> already answers with — the
@@ -206,16 +206,52 @@ public sealed class SequentialConnector : FileConnector
     /// where the physical file's shared state exists to mint it from. Gating the flush on the ordinal's
     /// antecedent left
     /// a clause-less pair sharing a physical file writing through two buffers, where a mid-record flush of one
-    /// buffer can split a record around the other's.</para></summary>
+    /// buffer can split a record around the other's.</para>
+    /// <para>⛔ AND WHERE ANOTHER WRITER MAY BE ON THE FILE, THE ORDINAL IS COUNTED OFF THE MEDIUM, NOT MINTED
+    /// (kb/Work PB2692). The mint is one run unit's: a writer in ANOTHER run unit appends records this run unit
+    /// never counted, so after its first append the minted ordinal names a different record than every other run
+    /// unit's READ calls by that number, and a record lock published under it (§9.1.16, <i>"in the same or a
+    /// different run unit"</i>) would guard the wrong record. A connector whose file lock admits another writer
+    /// has just flushed, so the record's place is known exactly
+    /// (<see cref="SharedAppendStream.ReleaseStart"/>): its ordinal is one more than the records that start before
+    /// it (<see cref="PhysicalOrdinalOfRelease"/>). A connector whose lock admits no other writer is the only
+    /// writer there is, so the mint and the medium agree and the mint costs nothing. ⚠ On a print stream the
+    /// release's first byte may be a travel or a top margin rather than the record (a LINAGE or ADVANCING file),
+    /// and an ordinal of a print line is no record identity in either arm.</para></summary>
     private void ReleaseRecord()
     {
-        if (FileLockPosture.AdmitsAnotherWriter(HostShare))
+        bool anotherWriter = FileLockPosture.AdmitsAnotherWriter(HostShare);
+        if (anotherWriter)
         {
             _writer!.Flush();                      // GR12 — released, not merely buffered
             NoteRelease();                         // …and now visible, so no sibling's read-ahead may hide it
         }
-        if (SharedPhysical is { } shared)
-            _writeOrdinal = ++shared.ReleasedOrdinal;   // §9.1.16 identity, minted from the physical file's mint
+        if (SharedPhysical is not { } shared) return;
+        _writeOrdinal = anotherWriter
+            ? PhysicalOrdinalOfRelease((SharedAppendStream)_writer!.BaseStream)   // §9.1.16 identity, off the medium
+            : ++shared.ReleasedOrdinal;                                           // …or the only writer's mint
+    }
+
+    /// <summary>The records counted so far of the physical file a sharing writer appends to: the ones that START
+    /// before <see cref="_countedTo"/>, which is always a record boundary (the start of this connector's previous
+    /// release, or 0). Reset by every OPEN. kb/Work PB2692.</summary>
+    private long _countedTo, _recordsBefore;
+
+    /// <summary>The ordinal of the record <paramref name="appended"/> has just released: one more than the records
+    /// that start before its first byte, counting only the bytes appended since the last release this connector
+    /// counted (by this connector, by its siblings, or by another run unit) — one pass over each byte for the
+    /// life of the OPEN.</summary>
+    private long PhysicalOrdinalOfRelease(SharedAppendStream appended)
+    {
+        long start = appended.ReleaseStart;
+        appended.NextRelease();
+        // Every release writes at least its record's delimiter or frame head, so a release that reached no byte of
+        // the medium is a broken invariant; it is numbered after the records already counted and moves no checkpoint
+        // (a negative offset is not a record boundary to count from).
+        if (start < 0) return _recordsBefore + 1;
+        _recordsBefore += CountRecords(_countedTo, start);
+        _countedTo = start;
+        return _recordsBefore + 1;
     }
 
     /// <summary>⛔ THE ONE PLACE A RELEASE THAT HAS REACHED THE PHYSICAL FILE IS ANNOUNCED TO THE CONNECTORS
@@ -258,10 +294,21 @@ public sealed class SequentialConnector : FileConnector
     /// <para>⛔ A TRUNCATING SIBLING CANNOT ARISE, so no rule is written for one: every cell of Table 19's two
     /// OUTPUT request rows is <i>Unsuccessful open</i> (§14.9.27.4; §9.1.13.9 1) e) — <i>"An attempt is made to
     /// open a physical file in the output mode and the physical file is currently open by another file
-    /// connector"</i>), so nothing may truncate this file while this connector holds it open.</para></summary>
+    /// connector"</i>), so nothing may truncate this file while this connector holds it open.</para>
+    /// <para>⛔ ACROSS RUN UNITS THERE IS NO GENERATION TO COMPARE, SO A READER THAT MAY MEET ANOTHER RUN UNIT'S
+    /// WRITER RE-ANCHORS AT EVERY FRAME (kb/Work PB2692). The release generation is one run unit's memory; a
+    /// writer in another run unit releases records this run unit never hears of, and its REWRITE of a record
+    /// this reader buffered before the release would otherwise be served stale, which is exactly the lost update
+    /// record locking exists to prevent (§9.1.16: the lock a READ WITH LOCK takes after the other run unit's
+    /// UNLOCK guards the record the file holds NOW, not a buffered image of it). Whether such a writer can exist
+    /// is this connector's own §9.1.15 file lock: only a lock that admits another writer
+    /// (<see cref="FileLockPosture.AdmitsAnotherWriter"/>, <c>SHARING WITH ALL OTHER</c>) lets one open the file,
+    /// so every other posture keeps the one-refill-per-buffer read.</para></summary>
     private void EnsureReaderCoherent()
     {
-        if (Physical is not { } physical || physical.ReleaseGeneration == _coherentAt) return;
+        if (Physical is not { } physical) return;
+        bool anotherRunUnitMayWrite = FileLockPosture.AdmitsAnotherWriter(HostShare);
+        if (!anotherRunUnitMayWrite && physical.ReleaseGeneration == _coherentAt) return;
         _coherentAt = physical.ReleaseGeneration;
         if (_reader is not { BaseStream.CanSeek: true } reader) return;
         reader.BaseStream.Seek(_lineSequential ? _lineByteOffset : _readOffset, SeekOrigin.Begin);
@@ -279,8 +326,7 @@ public sealed class SequentialConnector : FileConnector
     /// <see cref="HostFile.InputOutputAreaBuffer"/>) — the handle beneath it holds none (kb/Work PB643).</summary>
     private StreamReader OpenReader()
     {
-        var stream = HostFile.OpenConnectorStream(HostPath, FileMode.Open,
-            Mode == FileOpenMode.IO ? FileAccess.ReadWrite : FileAccess.Read, HostShare,
+        var stream = HostFile.OpenConnectorStream(HostPath, FileMode.Open, HostAccess(Mode), HostShare,
             Mode == FileOpenMode.IO ? FileOptions.None : FileOptions.SequentialScan);
         StreamReader r;
         try
@@ -293,6 +339,7 @@ public sealed class SequentialConnector : FileConnector
             stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
             throw;
         }
+        _handle = stream.SafeFileHandle;
         // A brand-new handle has read nothing, so it agrees with the medium by construction (kb/Work PB753).
         _coherentAt = Physical?.ReleaseGeneration ?? 0;
         return r;
@@ -310,10 +357,11 @@ public sealed class SequentialConnector : FileConnector
         // The file coded character set's STRICT encoding (kb/Work PB690): every write arm refuses a record holding
         // a character with no byte image before it reaches this writer ('91' / '71'), so the exception fallback is
         // the guard that keeps that refusal the only answer — never Latin-1's silent '?'.
-        var stream = HostFile.OpenConnectorWriteStream(HostPath, mode, HostShare);
+        var stream = HostFile.OpenConnectorWriteStream(HostPath, mode, HostAccess(Mode), HostShare);
+        StreamWriter w;
         try
         {
-            return new StreamWriter(stream, FileCharacterSet.Medium, HostFile.InputOutputAreaBuffer(InputOutputAreas))
+            w = new StreamWriter(stream, FileCharacterSet.Medium, HostFile.InputOutputAreaBuffer(InputOutputAreas))
                 { NewLine = _lineEnd };
         }
         catch
@@ -321,7 +369,38 @@ public sealed class SequentialConnector : FileConnector
             stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
             throw;
         }
+        _handle = HostFile.HandleOf(stream);
+        return w;
     }
+
+    /// <summary>The host handle beneath this connector's reader or writer — its §9.1.15 file lock, and the handle
+    /// its §9.1.16 record locks are published to other run units through (<see cref="RecordLockHandle"/>). Set where
+    /// the stream is opened, cleared where it is disposed.</summary>
+    private Microsoft.Win32.SafeHandles.SafeFileHandle? _handle;
+
+    /// <inheritdoc/>
+    /// <remarks>⛔ THE SEQUENTIAL ARM OF PB2660 (kb/Work PB2692). §9.1.16, <i>"While locked by a given file
+    /// connector, a record is not accessible to another file connector in the same or a different run unit"</i>,
+    /// is a rule of every organization, and a sequential record's lock identity is its ordinal, which every run
+    /// unit computes alike (<see cref="LastReadRecordId"/>; <see cref="ReleaseRecord"/> for a released one).</remarks>
+    internal override Microsoft.Win32.SafeHandles.SafeFileHandle? RecordLockHandle => _handle;
+
+    /// <inheritdoc/>
+    internal override bool RecordLockHandleWritable => _handle is not null && Mode is not FileOpenMode.Input;
+
+    /// <inheritdoc/>
+    /// <remarks>⛔ A WRITER THAT SETS RECORD LOCKS ALSO READS (kb/Work PB2692). A connector publishes the fact that
+    /// it holds ANY record lock as a SHARED hold on one byte (<see cref="HostRegionLocks.LockPresenceByte"/>) so that
+    /// several run units can announce it at once, and Linux refuses a shared lock through a descriptor that is not
+    /// open for reading (<c>EBADF</c>): an OUTPUT or EXTEND writer that took the mode's bare WRITE access would hold
+    /// its record locks with no announcement, and every other run unit's hot-path test
+    /// (<c>FileRegistry.NoRecordIsLocked</c>) would read the file as unlocked. Read is the one access the band
+    /// admits beyond a mode's floor (<c>FileLockPostureDriftTests</c>), and only a connector that registered a
+    /// record-locking posture (<see cref="FileConnector.SharedPhysical"/>) asks for it.</remarks>
+    internal override FileAccess HostAccess(FileOpenMode mode) =>
+        mode is FileOpenMode.Output or FileOpenMode.Extend && SharedPhysical is not null
+            ? FileAccess.ReadWrite
+            : base.HostAccess(mode);
 
     /// <summary>The count of records ALREADY IN the physical file, in the framing this connector reads — the
     /// write-ordinal base a sharing-active <c>OPEN EXTEND</c> continues from (§14.9.51.4 GR18: <i>"If there are
@@ -343,16 +422,22 @@ public sealed class SequentialConnector : FileConnector
     /// number.</para>
     /// <para>The stream is <see cref="HostFile.OpenAuxiliary"/> — the ONE role for a bookkeeping handle, share
     /// <see cref="FileShare.ReadWrite"/> — so the ordering above is belt AND braces: a sibling connector of this
-    /// run unit holding the same physical file under §9.1.15 sharing cannot refuse it either.</para></summary>
-    private long ExistingRecordCount()
+    /// run unit holding the same physical file under §9.1.15 sharing cannot refuse it either.</para>
+    /// <para>⛔ ONE COUNT, BOUNDED (kb/Work PB2692): the records whose frames START in [<paramref name="from"/>,
+    /// <paramref name="to"/>), <paramref name="from"/> being a record boundary. The whole file
+    /// (<c>0</c>, <see cref="long.MaxValue"/>) is the OPEN's count above; a sharing writer's release counts only the
+    /// bytes appended since its previous one (<see cref="PhysicalOrdinalOfRelease"/>), with the same framing, so
+    /// the two can never disagree about what a record is.</para></summary>
+    private long CountRecords(long from, long to)
     {
+        if (to <= from) return 0;
         if (IsVarying)
         {
             // The frame WALK, not ReadStore: FrameStarts seeks over every payload instead of materializing it,
             // so counting an existing file costs one pass and no record storage (ReadStore allocated a string
             // per record purely to take .Count of the list).
             using var fs = HostFile.OpenAuxiliary(HostPath, FileMode.Open, FileAccess.Read);
-            return RecordFraming.FrameStarts(fs).Count;
+            return RecordFraming.FrameStarts(fs, from, to).Count;
         }
         if (_lineSequential)
         {
@@ -361,10 +446,11 @@ public sealed class SequentialConnector : FileConnector
             // final record with no delimiter. StreamReader.ReadLine would also end a record at a lone CR — the
             // rule kb/Work PB1540 removed from the reader — and decode and allocate a string per line besides.
             using var fs = HostFile.OpenAuxiliary(HostPath, FileMode.Open, FileAccess.Read);
+            fs.Seek(from, SeekOrigin.Begin);
             Span<byte> buffer = stackalloc byte[4096];
-            long n = 0;
+            long n = 0, left = to - from;
             bool open = false;   // bytes seen since the last delimiter: a final, undelimited record
-            for (int got; (got = fs.Read(buffer)) > 0;)
+            for (int got; left > 0 && (got = fs.Read(buffer[..(int)Math.Min(buffer.Length, left)])) > 0; left -= got)
             {
                 ReadOnlySpan<byte> chunk = buffer[..got];
                 n += chunk.Count((byte)'\n');
@@ -374,7 +460,7 @@ public sealed class SequentialConnector : FileConnector
         }
         // Fixed-width record-sequential: arithmetic over the file's length. No handle at all, which is why this
         // arm never showed PB713 (FileInfo.Length is metadata).
-        return RecordWidth > 0 ? new FileInfo(HostPath).Length / RecordWidth : 0;
+        return RecordWidth > 0 ? (Math.Min(to, new FileInfo(HostPath).Length) - from) / RecordWidth : 0;
     }
 
     // A varying file's records are length-framed on disk (the ONE RecordFraming 4-byte little-endian length
@@ -875,6 +961,8 @@ public sealed class SequentialConnector : FileConnector
         // physical-file state (kb/Work PB739), and only the OUTPUT and EXTEND arms below touch it — INPUT and
         // I-O release no records through this connector and shall not disturb another connector's numbering.
         _writeOrdinal = 0;
+        _countedTo = 0;      // …and a sharing writer has counted nothing of the medium yet (kb/Work PB2692)
+        _recordsBefore = 0;
         // Table 18's "file is available" / "file is unavailable" axis. The base has already answered
         // §14.9.27.4 GR3, so on every mode that consults this an Unauthorized probe has become '37' and can
         // never be read here as "unavailable" (kb/Work PB323).
@@ -898,7 +986,7 @@ public sealed class SequentialConnector : FileConnector
                     NoticeIfLayoutDisagrees();
                     // OPEN INPUT … REVERSED: the count its position needs is taken HERE, inside the OPEN's try,
                     // so a host failure is this OPEN's '30' (see _reversedRecordCount).
-                    if (ReversedRequested) _reversedRecordCount = ExistingRecordCount();
+                    if (ReversedRequested) _reversedRecordCount = CountRecords(0, long.MaxValue);
                     break;
 
                 case FileOpenMode.Output:
@@ -926,13 +1014,16 @@ public sealed class SequentialConnector : FileConnector
                     // PB713). §14.9.51.4 GR19 — "the added records follow the records present in the physical
                     // file when it was opened" — is what makes this point the right one, and an OPEN EXTEND
                     // writes nothing, so the count is the same number the completed OPEN would have seen. See
-                    // ExistingRecordCount for why the ORDER, not merely the share mode, is the fix.
+                    // CountRecords for why the ORDER, not merely the share mode, is the fix.
                     // What it seeds is the PHYSICAL FILE's mint, not a base of this connector's own (kb/Work
                     // PB739): a second connector extending the same file measures the same physical file and
                     // writes the same number, and from then on the two share one ascending sequence. A file
-                    // that is not there holds no records, so the mint is 0.
-                    if (SharedPhysical is { } extShared)
-                        extShared.ReleasedOrdinal = exists ? ExistingRecordCount() : 0;
+                    // that is not there holds no records, so the mint is 0. A connector whose file lock admits
+                    // another writer counts its ordinals off the medium instead (kb/Work PB2692,
+                    // PhysicalOrdinalOfRelease), and every writer Table 19 admits beside it does the same, so no
+                    // mint is read and none is measured.
+                    if (SharedPhysical is { } extShared && !FileLockPosture.AdmitsAnotherWriter(HostShare))
+                        extShared.ReleasedOrdinal = exists ? CountRecords(0, long.MaxValue) : 0;
                     // ⛔ NOT FileMode.Append THROUGH OpenConnectorStream (kb/Work PB739). .NET's Append seeks
                     // to the end ONCE, at open; under §9.1.15 sharing two connectors then anchor at the same
                     // offset and the later flush lands on top of the earlier record.
@@ -989,7 +1080,7 @@ public sealed class SequentialConnector : FileConnector
         finally
         {
             try { _writer?.Dispose(); }
-            finally { _reader = null; _writer = null; }
+            finally { _reader = null; _writer = null; _handle = null; }
         }
     }
 
@@ -1041,6 +1132,7 @@ public sealed class SequentialConnector : FileConnector
             // present" state) DOES survive — §14.9.6.4 GR6; the next OPEN resets it.
             _reader = null;
             _writer = null;
+            _handle = null;   // its locks went with it (§9.1.15: the CLOSE removes the file lock)
             EndLinagePage();   // …and neither does the logical page — see EndLinagePage
         }
         ModeKnown = false;   // §9.1.4 — after a successful CLOSE the file is in no open mode
@@ -1116,6 +1208,11 @@ public sealed class SequentialConnector : FileConnector
         // AFTER write. A line sequential file takes the same path (it used to have a third, hand-placed arm).
         if (SupportsVerticalPositioning(page))
             return WriteAdvancingRecord(image, length, 1, before: false, page, national);
+        // ⛔ GR14's size rule is stated BEFORE GR23, and the record's content ('91') is no general rule at all, so
+        // '44' is tested first (DOC-A.1-104; kb/Work PB2751, the sequential sibling of the keyed reorder): a record
+        // both too short and holding a character outside the set is a size violation.
+        int len = WrittenLength(image, length);
+        if (OutsideVaryingBounds(len)) return Status = FileStatusCode.RecordSizeViolation;   // '44' §14.9.51.4 GR14
         // §14.9.51.4 GR23: "For a line sequential file, if the record area contains one or more characters that
         // are not in the implementor-defined character set defined for a line sequential file, the execution of
         // the WRITE statement is unsuccessful and the I-O status in the write file connector is set to '71'."
@@ -1127,10 +1224,8 @@ public sealed class SequentialConnector : FileConnector
         // file coded character set is REFUSED, never written as '?' — the record sequential twin of the '71'
         // above, which already covers a line sequential file (its character set excludes the same characters).
         // Asked of what the WRITE TRANSFERS: a varying record's positions past its length never reach the medium.
-        int len = WrittenLength(image, length);
         if (!_lineSequential && RecordHasCharacterWithoutByteImage(image.AsSpan(0, Math.Min(image.Length, len))))
             return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' §9.1.13.11 (DOC-A.1-110)
-        if (OutsideVaryingBounds(len)) return Status = FileStatusCode.RecordSizeViolation;   // '44' §14.9.51.4 GR14
         if (IsVarying)
         {
             if (_lineSequential) EmitRecordLine(TrimRecordEnd(FitRecord(image, len, national), national), national);
@@ -1209,6 +1304,11 @@ public sealed class SequentialConnector : FileConnector
         if (!IsOpen || _writer is null) return Status = FileStatusCode.WriteNotOpenForOutput;
         if (Mode is not (FileOpenMode.Output or FileOpenMode.Extend)) return Status = FileStatusCode.WriteNotOpenForOutput;
         if (_linagePageBroken) return LinageViolationStatus();   // §13.18.34.4 GR6 b) 2's latch — see Write()
+        // The ONE length decision (kb/Work PB1190): what the '91' test asks of, GR14's bound, and the characters
+        // presented are all the record at §13.18.43.4 GR13's length — the plain arm's rule, now this arm's too.
+        // GR14's '44' first, as on the plain arm (DOC-A.1-104; kb/Work PB2751).
+        int len = WrittenLength(image, length);
+        if (OutsideVaryingBounds(len)) return Status = FileStatusCode.RecordSizeViolation;   // '44' §14.9.51.4 GR14/GR15
         // §14.9.51.4 GR23 again — the SECOND WRITE ARM. GR23 is a property of the FILE, so it binds every entry
         // point a WRITE statement can reach on a line sequential connector, not just the plain-record one; it is
         // tested on the raw record area.
@@ -1219,12 +1319,8 @@ public sealed class SequentialConnector : FileConnector
         // U+0000–U+00FF the byte of the same value, so there is NO print-specific character map: one that wrote a
         // character above U+007F as '?' would be a second, silent answer to the question this refusal answers
         // (kb/Work PB690; DOC-A.1-159 / DOC-A.1-31).
-        // The ONE length decision (kb/Work PB1190): what the '91' test asks of, GR14's bound, and the characters
-        // presented are all the record at §13.18.43.4 GR13's length — the plain arm's rule, now this arm's too.
-        int len = WrittenLength(image, length);
         if (!_lineSequential && RecordHasCharacterWithoutByteImage(image.AsSpan(0, Math.Min(image.Length, len))))
             return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' §9.1.13.11 (DOC-A.1-110)
-        if (OutsideVaryingBounds(len)) return Status = FileStatusCode.RecordSizeViolation;   // '44' §14.9.51.4 GR14/GR15
         _printControl = true;
         string text = TrimRecordEnd(IsVarying ? FitRecord(image, len, national) : image, national);
         // §14.9.51.4 GR25 e)/f) — the ONE advance, placed before or after the presentation by the statement's

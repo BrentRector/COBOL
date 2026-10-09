@@ -207,6 +207,24 @@ public abstract class KeyedConnector : FileConnector
         return _storeHeaderBytes + framedBytes <= RecordFraming.MaxStoreBytes;
     }
 
+    /// <summary>⛔ THE RECORD'S OWN RULES, WRITTEN ONCE FOR EVERY KEYED WRITE AND REWRITE (kb/Work PB2751): the size
+    /// (§14.9.51.4 GR14 / §14.9.35.4 GR20, '44': <i>"If this rule is violated, the execution of the WRITE statement is
+    /// unsuccessful and the I-O status of the write file connector is set to '44'"</i>), then a character with no
+    /// byte image in the file's coded character set ('91', docs/CONFORMANCE.md DOC-A.1-110). Each statement asks it
+    /// after its open-mode rule (and REWRITE's GR5 '43') and BEFORE any key or invalid key rule, which is the order
+    /// the general rules state them in (DOC-A.1-104); the organizations used to ask it in four different places,
+    /// two of them after the key rules. Returns the failing status, or null with the record as stored.</summary>
+    private protected string? RecordRulesFailure(string image, int length, out string stored)
+    {
+        if (Stored(image, length) is not { } record)
+        {
+            stored = "";
+            return FileStatusCode.RecordSizeViolation;
+        }
+        stored = record;
+        return RecordHasCharacterWithoutByteImage(record) ? FileStatusCode.CharacterWithoutByteImage : null;
+    }
+
     /// <summary>Whether a CLOSE that owes a persist still holds the handle it persists through. Every writable
     /// arm of every keyed OPEN takes it (<see cref="TakeFileLock"/>), so false is an invariant breach, and
     /// §9.1.13.6 item 1's '30' is the answer: the records this connector holds cannot be written, and reporting
@@ -418,7 +436,16 @@ public abstract class KeyedConnector : FileConnector
     private List<StoredFrame?> ReadImage(KeyedStore into, out long releaseMint)
     {
         var handle = _handle!;
-        int size = checked((int)RandomAccess.GetLength(handle));
+        // ⛔ A FILE LONGER THAN ANY STORE THE FORMAT DESCRIBES IS NOT ONE THIS CONNECTOR CAN READ (kb/Work PB2748):
+        // its header passed §14.9.27.4 GR10's comparison, but no store is ever written past MaxStoreBytes (StoreHolds
+        // refuses the record that would take it there), so the bytes beyond are not records. It is §9.1.13.6 1)'s
+        // permanent error, "no further information is available", answered through the statement's one IOException
+        // mapping ('30') — a checked cast used to kill the run unit with an OverflowException instead.
+        long length = RandomAccess.GetLength(handle);
+        if (length > RecordFraming.MaxStoreBytes)
+            throw new IOException($"'{HostPath}' is {length} bytes, longer than any store this format describes "
+                + $"({RecordFraming.MaxStoreBytes} bytes)");
+        int size = (int)length;
         // RENTED, not allocated: a keyed store is routinely past the 85 KB large-object threshold, and this runs at
         // every OPEN and every coherent reload.
         byte[] all = ArrayPool<byte>.Shared.Rent(Math.Max(size, 1));

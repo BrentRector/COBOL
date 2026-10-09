@@ -469,10 +469,12 @@ public sealed class SharedExtendOpenDriftTests
             + "read it from opposite ends of an OPEN (kb/Work PB713, PB739). Sites:\n  " + string.Join("\n  ", writes));
         Assert.Contains("_connectorShares.ContainsKey(name)", writes[0], StringComparison.Ordinal);
 
-        // The complement: it is set BEFORE the open it governs, not after it (the PB713 ordering).
+        // The complement: it is set BEFORE the open it governs, not after it (the PB713 ordering). The open it
+        // governs is the arbitrated one, whose status the attempt reports; the already-open refusal ahead of it
+        // (FileRegistry.RefusedAsAlreadyOpen, kb/Work PB2748) opens nothing and is governed by no posture.
         int assign = Array.FindIndex(lines, l => l.Contains("AssociatePhysical(", StringComparison.Ordinal)
             && !l.TrimStart().StartsWith("//", StringComparison.Ordinal));
-        int open = Array.FindIndex(lines, l => l.Contains("c.Open(mode)", StringComparison.Ordinal)
+        int open = Array.FindIndex(lines, l => l.Contains("string status = c.Open(mode)", StringComparison.Ordinal)
             && !l.TrimStart().StartsWith("//", StringComparison.Ordinal));
         Assert.True(assign >= 0 && open > assign,
             $"The participation fact is assigned at line {assign + 1} and the open it governs is at line "

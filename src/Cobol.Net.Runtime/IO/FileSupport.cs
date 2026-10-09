@@ -197,6 +197,18 @@ public enum FilePresence
 /// review and costs a crash, so the guard is structural.</para></summary>
 public static class HostFile
 {
+    /// <summary>⛔ THE ONE ANSWER TO "DO THESE TWO HOST PATHS NAME ONE PHYSICAL FILE?" (kb/Work PB2748), for the two
+    /// tables keyed on the physical file — Table 19's arbitration state (<c>PhysicalFileTable</c>) and the keyed record
+    /// stores (<c>KeyedStoreTable</c>) — and every other comparison of two connectors' host paths. The paths are the
+    /// ABSOLUTE spellings <see cref="CobolFile.ResolveHostPath"/> produces, so <c>data.dat</c>, <c>./data.dat</c> and
+    /// the full path are one key; this comparer adds the host file system's case rule: case-insensitive where the
+    /// default file systems are (Windows, macOS), case-sensitive elsewhere, where <c>Cust.dat</c> and
+    /// <c>cust.dat</c> are two files. Both tables used <see cref="StringComparer.OrdinalIgnoreCase"/> over the
+    /// verbatim ASSIGN text, so two spellings of one file were two physical files (two record stores, no Table 19
+    /// conflict between them) and, on Linux, two files were one.</summary>
+    public static StringComparer PhysicalFileComparer { get; } =
+        OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
     /// <summary>Probe the physical file at <paramref name="hostPath"/>, distinguishing §9.1.13.6 item 5's
     /// ABSENT from §14.9.27.4 GR3's PRESENT-but-unauthorized. Never throws for either of those two.
     /// <para>The probe is <c>File.GetAttributes</c> rather than <c>File.Exists</c> precisely because its
@@ -475,13 +487,41 @@ public static class HostFile
     /// existing connector open in the OUTPUT mode (its <c>extend I-O output</c> column group), so the OUTPUT
     /// writer needs the same choice the EXTEND writer does; a <c>Create</c> under
     /// <see cref="SharedAppendStream"/> truncates first and then appends from zero, which is the same
-    /// sequence.</para></summary>
-    public static Stream OpenConnectorWriteStream(string hostPath, FileMode mode, FileShare share) =>
+    /// sequence.</para>
+    /// <para><paramref name="access"/> is the connector's <c>FileConnector.HostAccess</c> for its open mode, never a
+    /// literal here (kb/Work PB2758): a writer whose record locks are published to other run units through this
+    /// handle reads as well as writes (<c>SequentialConnector.HostAccess</c>, kb/Work PB2692).</para></summary>
+    public static Stream OpenConnectorWriteStream(string hostPath, FileMode mode, FileAccess access, FileShare share) =>
         FileLockPosture.AdmitsAnotherWriter(share)
-            ? new SharedAppendStream(new FileStream(hostPath, mode, FileAccess.Write,
+            ? new SharedAppendStream(new FileStream(hostPath, HostWriteMode(mode, access), access,
                 share, bufferSize: 1, FileOptions.None))
-            : new FileStream(hostPath, mode, FileAccess.Write,
-                share, bufferSize: 1, FileOptions.SequentialScan);
+            : AtEndWhenAppending(new FileStream(hostPath, HostWriteMode(mode, access), access,
+                share, bufferSize: 1, FileOptions.SequentialScan), mode);
+
+    /// <summary>The <see cref="FileMode"/> a write stream is opened with: .NET refuses <see cref="FileMode.Append"/>
+    /// for any access but bare <see cref="FileAccess.Write"/>, so a writer that also reads (kb/Work PB2692) opens the
+    /// file as <see cref="FileMode.OpenOrCreate"/>, Append's own creation rule, and is positioned at the end by
+    /// <see cref="AtEndWhenAppending"/> (the plain arm) or by every write (<see cref="SharedAppendStream"/>).</summary>
+    private static FileMode HostWriteMode(FileMode mode, FileAccess access) =>
+        mode == FileMode.Append && access != FileAccess.Write ? FileMode.OpenOrCreate : mode;
+
+    /// <summary>Position an appending writer at the end of the file, as <see cref="FileMode.Append"/> does at open.</summary>
+    private static FileStream AtEndWhenAppending(FileStream stream, FileMode mode)
+    {
+        if (mode == FileMode.Append) stream.Seek(0, SeekOrigin.End);
+        return stream;
+    }
+
+    /// <summary>The host handle beneath a connector stream one of the roles above opened: the handle that IS the
+    /// connector's §9.1.15 file lock, and through which its §9.1.16 record locks are published to other run units
+    /// (<see cref="HostRegionLocks"/>, kb/Work PB2692).</summary>
+    internal static Microsoft.Win32.SafeHandles.SafeFileHandle HandleOf(Stream connectorStream) => connectorStream switch
+    {
+        SharedAppendStream shared => shared.SafeFileHandle,
+        FileStream plain => plain.SafeFileHandle,
+        _ => throw new ArgumentException($"{connectorStream.GetType().Name} is not a stream a HostFile role opened.",
+            nameof(connectorStream)),
+    };
 }
 
 /// <summary>
@@ -504,8 +544,21 @@ internal sealed class SharedAppendStream(FileStream inner) : Stream
     public override void Write(ReadOnlySpan<byte> buffer)
     {
         _inner.Seek(0, SeekOrigin.End);
+        if (ReleaseStart < 0) ReleaseStart = _inner.Position;
         _inner.Write(buffer);
     }
+
+    /// <summary>The host handle this stream writes through (<see cref="HostFile.HandleOf"/>).</summary>
+    internal Microsoft.Win32.SafeHandles.SafeFileHandle SafeFileHandle => _inner.SafeFileHandle;
+
+    /// <summary>The offset at which the first write since the last <see cref="NextRelease"/> landed, or -1 when
+    /// nothing has been written since: the physical place of the record a connector has just released, which
+    /// another run unit's appends may have moved past any count this run unit kept (kb/Work PB2692,
+    /// <c>SequentialConnector.ReleaseRecord</c>).</summary>
+    internal long ReleaseStart { get; private set; } = -1;
+
+    /// <summary>Begin measuring the next release's <see cref="ReleaseStart"/>.</summary>
+    internal void NextRelease() => ReleaseStart = -1;
 
     /// <inheritdoc/>
     public override void Write(byte[] buffer, int offset, int count) =>
