@@ -81,7 +81,7 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
                 // GR6 advances the pointer once per character moved, so a moved character's position is below the
                 // final pointer: the content reaches position ptr-1 exactly when anything moved (ptr != its start).
                 w.Line(PlaceRenderer.Write(s.Into, ReceivingStore.Characters(s.Into.Item,
-                    $"{acc}.Substring(0, {ptr} != {ptr0} ? System.Math.Max({old}.Length, (int)({ptr} - 1)) : {old}.Length)", "")));
+                    $"{acc}.Substring(0, {ptr} != {ptr0} ? global::System.Math.Max({old}.Length, (int)({ptr} - 1)) : {old}.Length)", "")));
             else
                 WriteImage(s.Into, acc);
         });
@@ -142,8 +142,8 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         }
         else
         {
-            w.Line($"string[] {dels} = System.Array.Empty<string>();");
-            w.Line($"bool[] {alls} = System.Array.Empty<bool>();");
+            w.Line($"string[] {dels} = global::System.Array.Empty<string>();");
+            w.Line($"bool[] {alls} = global::System.Array.Empty<bool>();");
         }
         w.Line(s.Pointer is { } p0
             ? $"long {ptr} = {RuntimeApi.HostInt64(NumericRenderer.Align(num.AsNum(new BoundFieldOperand(p0), ReceiverContext.None), 0))};"   // GR11a / GR12 — user-initialized (by VALUE — kb/Work PB86; saturating — PB1033)

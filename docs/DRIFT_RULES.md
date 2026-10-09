@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-306 drift tests.
+308 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -116,6 +116,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [EcRaiseSelectionDriftTests](../tests/Cobol.Net.Tests.Unit/EcRaiseSelectionDriftTests.cs) | kb/Work PB1549 — "fatal, checking enabled, not resumed ⇒ abnormal run-unit termination" is decided in ONE place. | `src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs` |
 | [EcRaiseSiteDriftTests](../tests/Cobol.Net.Tests.Unit/EcRaiseSiteDriftTests.cs) | ⛔ THE RULE ORDINALS EcRaiseSite PRINTS ARE RE-DERIVED HERE FROM THE STANDARD, not asserted against a second copy of themselves (kb/Work PB388; CLAUDE.md rule 1 — "the failure mode is not inventing a citation, it is INHERITING one"). | `docs/rearchitecture/spec-rule-catalog.json` |
 | [EcSizeGuardDriftTests](../tests/Cobol.Net.Tests.Unit/EcSizeGuardDriftTests.cs) | kb/Work PB75 — the EC-SIZE family reaches NON-arithmetic statements through the generic fatal statement guard (EcEmitter.FatalAmbientGates), while ARITHMETIC statements own their §14.7.5 shape in ArithmeticEmitter.EmitArith. | `src/Cobol.Net.Compiler/CodeGen/EcEmitter.cs` |
+| [EmittedGlobalNameDriftTests](../tests/Cobol.Net.Tests.Unit/EmittedGlobalNameDriftTests.cs) | ⛔ EVERY NAMESPACE-QUALIFIED NAME THE CODE GENERATOR WRITES IS global::-ROOTED (docs/rearchitecture/ DESIGN-external-repository.md §4.5; kb/Work PB2097). | `src/Cobol.Net.Compiler` |
 | [EmptyArgumentListDriftTests](../tests/Cobol.Net.Tests.Unit/EmptyArgumentListDriftTests.cs) | ⛔ NO VARIADIC INTRINSIC BODY INVENTS A VALUE FOR AN EMPTY ARGUMENT LIST (kb/Work PB257). | `src/Cobol.Net.Runtime/Intrinsics` |
 | [EndMarkerRuleDriftTests](../tests/Cobol.Net.Tests.Unit/EndMarkerRuleDriftTests.cs) | ⛔ ISO §10.7.3's end-marker rules are asked ONCE, by Validation/EndMarkerPass, of every source unit (kb/Work PB988). | — |
 | [EvaluateBooleanExpressionOperandDriftTests](../tests/Cobol.Net.Tests.Unit/EvaluateBooleanExpressionOperandDriftTests.cs) | ⛔ AN EVALUATE SELECTION OPERAND THAT CARRIES A BOOLEAN OPERATOR IS TABLE 15's BOOLEAN-EXPRESSION KIND, NOT A CONDITION (kb/Work PB1412). | — |
@@ -261,6 +262,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [ReturnCovarianceKindDriftTests](../tests/Cobol.Net.Tests.Unit/ReturnCovarianceKindDriftTests.cs) | ⛔ EVERY OBJECT-REFERENCE RETURN KIND ISO §9.3.8.2.3 RULE 5 a) ADMITS HAS A LEG ON BOTH PATHS THAT NEED THE C# CONVERSION (kb/Work PB1499). | `tests/conformance/2002` |
 | [RunUnitFileLockDriftTests](../tests/Cobol.Net.Tests.Unit/RunUnitFileLockDriftTests.cs) | ⛔ A SECOND RUN UNIT IS ARBITRATED BY TABLE 19 TOO (kb/Work PB833). | — |
 | [RunUnitStateDriftTests](../tests/Cobol.Net.Tests.Unit/RunUnitStateDriftTests.cs) | ⛔ RUN-UNIT STATE LIVES ON RunUnit, NEVER IN A PROCESS-GLOBAL MUTABLE STATIC (kb/Work PB307). | — |
+| [RuntimeAbiPinDriftTests](../tests/Cobol.Net.Tests.Unit/RuntimeAbiPinDriftTests.cs) | ⛔ THE TWO VERSIONS A COMPILED MODULE IS REFUSED BY ARE PINNED BESIDE WHAT THEY GUARD (kb/Work PB2097; docs/rearchitecture/DESIGN-external-repository.md §15.4, §17.2 "Boundary layout"). | `src/Cobol.Net.Runtime/PublicAPI.Shipped.txt` |
 | [RuntimeApiWindowDriftTests](../tests/Cobol.Net.Tests.Unit/RuntimeApiWindowDriftTests.cs) | ⛔ A REFERENCE MODIFICATION THE PROGRAM WROTE AND A WINDOW THE COMPILER CHOSE ARE TWO EMITS, AND THE FIRST LIST IS CLOSED (kb/Work PB1707 part 2, owner decision R60). | `src/Cobol.Net.Compiler/CodeGen` |
 | [ScreenFacilityConstructDriftTests](../tests/Cobol.Net.Tests.Unit/ScreenFacilityConstructDriftTests.cs) | The Annex A.4.2 (screen handling) REFUSAL, held from the three directions a negative golden cannot reach (kb/Work PB260). | `tests/version-matrix/cobol-words.json`, `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4`, `src/Cobol.Net.Frontend/Grammar`, `src/Cobol.Net.Frontend/Grammar/Core/CobolScreen.g4`, `src/Cobol.Net.Frontend/Grammar/Core/CobolSpecialNames.g4` |
 | [SearchAllFormat2RuleCoverageDriftTests](../tests/Cobol.Net.Tests.Unit/SearchAllFormat2RuleCoverageDriftTests.cs) | ⛔ THE GUARD THAT KEEPS "ONE MODEL, SEVEN PREDICATES" TRUE (kb/Work PB445). | `specs/ISO_COBOL.md`, `src/Cobol.Net.Compiler/Binding/Validation/SearchAllFormat2Rules.cs`, `src/Cobol.Net.Compiler/Binding/Model/OdoModel.cs` |

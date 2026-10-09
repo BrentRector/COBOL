@@ -38,11 +38,11 @@ public sealed class CsNameReservationDriftTests
         RegexOptions.Compiled);
 
     /// <summary>Members of the two generated classes that carry NO COBOL-named member, so nothing can collide with
-    /// them: the <c>__CobolModule</c> registrar's <c>Register</c> and the entry class <c>Program</c>'s <c>Main</c>
+    /// them: the <c>__CobolModule</c> registrar's <c>EnsureRegistered</c> and <c>Register</c>, and the entry class <c>Program</c>'s <c>Main</c>
     /// (<c>ProgramEmitter.EmitEntryWrapper</c>).</summary>
     private static readonly HashSet<string> MembersOfClassesWithoutDataMembers = new(StringComparer.Ordinal)
     {
-        "Main", "Register",
+        "Main", "Register", "EnsureRegistered",
     };
 
     private static IEnumerable<(string Rel, string Name)> EmittedMemberNames()

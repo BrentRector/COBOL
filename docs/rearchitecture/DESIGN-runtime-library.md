@@ -676,8 +676,16 @@ Control/                        namespace Cobol.Net.Runtime.Control
   RunUnit (NEW) · ProgramTable (was ProgramRegistry) · ExternalStore · ModuleStack (was CobolModule)
   ManagedPointer / StorageCell / CellPointer · CobolArg / ICobolProgram / CobolArgAdapt
   CobolObject · CobolPtr · ExternalSwitches · CobolInvokeArg
+  RuntimeAbi (the runtime version and call ABI a compiled module records and RegisterModule checks; kb/Work PB2097)
   Signals/  StopRun · ProgramReturn · MethodReturn · ResumeSignal · NotImplemented
+Repository/                     namespace CobolNet.Runtime.Repository
+  CobolRepositoryAttribute (a module's assembly record: schema, runtime version, call ABI, registrar) — the attribute
+  family of the external repository's schema (DESIGN-external-repository §6) grows here
 ```
+A module joins a run unit only through its `__CobolModule.EnsureRegistered()` → `ProgramTable.RegisterModule`, the one
+writer of the run unit's registration set (DESIGN-external-repository §11.2). The runtime's public surface is recorded
+in `PublicAPI.Shipped.txt` (`Microsoft.CodeAnalysis.PublicApiAnalyzers`): a new public member is listed in
+`PublicAPI.Unshipped.txt` in the same change, and a removal or incompatible change raises the major version.
 `ProgramRegistry` → **`ProgramTable`** (an instance owned by `RunUnit`; the name "Registry" is reserved for the
 process-level nothing-here). The name-resolution / state-model / CANCEL / sibling-module-probe logic is ported
 verbatim onto the instance. `ExternalStore` and `CobolModule`→`ModuleStack` move off statics onto `RunUnit`. The CALL-

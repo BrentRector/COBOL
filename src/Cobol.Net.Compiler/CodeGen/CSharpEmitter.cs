@@ -36,7 +36,7 @@ public sealed partial class CSharpEmitter
     /// half of the bind/emit split) — a fresh <see cref="ProgramEmitter"/> per call; the compilation carries
     /// everything emission needs (incl. the OO class table + interface forests), so the emit side reads NO
     /// bind-host state.</summary>
-    internal string EmitBound(BoundCompilation comp, CobolNet.Frontend.CompilationInputs? inputs = null)
-        => new ProgramEmitter(inputs).Emit(comp);
+    internal string EmitBound(BoundCompilation comp, string assemblySimpleName, CobolNet.Frontend.CompilationInputs? inputs = null)
+        => new ProgramEmitter(inputs).Emit(comp, assemblySimpleName);
 
 }

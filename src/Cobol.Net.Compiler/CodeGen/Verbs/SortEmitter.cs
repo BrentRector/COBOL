@@ -788,19 +788,19 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
             w.Line($"var {oc} = {occurrences};");
             w.Line($"var {ix} = new int[{oc}.Length];");
             w.Line($"for (int {at} = 0; {at} < {ix}.Length; {at}++) {ix}[{at}] = {at};");
-            w.Line($"System.Comparison<int> __tc{id} = (__a, __b) =>");
+            w.Line($"global::System.Comparison<int> __tc{id} = (__a, __b) =>");
             EmitKeyComparer(ts, weightsArg,
                 (key, v) => PlaceRenderer.Read(
                     refs.ResolveItemAt(key.Key, [.. outer, PositionRenderer.OneBased(v)])
                     ?? throw new InvalidOperationException(
                         $"SORT table '{ts.Table.CobolName}': no window for '{key.Key.CobolName}' — the binder checked it (kb/Work PB599)")),
                 shared: true);
-            w.Line($"{RuntimeApi.TableSortInPlace($"System.MemoryExtensions.AsSpan({ix})", $"__tc{id}")};   // GR19 — the element order; stable (GR3c)");
+            w.Line($"{RuntimeApi.TableSortInPlace($"global::System.MemoryExtensions.AsSpan({ix})", $"__tc{id}")};   // GR19 — the element order; stable (GR3c)");
             w.Line($"var {cp} = {oc}.ToArray();");
             w.Line($"for (int {at} = 0; {at} < {ix}.Length; {at}++) {oc}[{at}] = {cp}[{ix}[{at}]];   // GR24 — placed back in data-name-2");
             return;
         }
-        w.Line($"System.Comparison<{elem}> __tc{id} = (__a, __b) =>");
+        w.Line($"global::System.Comparison<{elem}> __tc{id} = (__a, __b) =>");
         EmitKeyComparer(ts, weightsArg,
             (key, v) => key.MemberPath is not { } path
                 ? throw new InvalidOperationException($"table-sort key '{key.Key.CobolName}' has no member path in a member-path sort (kb/Work PB599)")
@@ -831,10 +831,10 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
         w.Line($"int {n} = (int)({PlaceRenderer.OccurrenceCount(ts.Count)});   // SORT table over a shared-storage area (ISO §14.9.40.4 Format 2 — GR18/GR20/GR24; §13.18.44.4 GR1)");
         w.Line($"var {ix} = new int[{n}];");
         w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {ix}[{at}] = {at};");
-        w.Line($"System.Comparison<int> __tc{id} = (__a, __b) =>");
+        w.Line($"global::System.Comparison<int> __tc{id} = (__a, __b) =>");
         EmitKeyComparer(ts, weightsArg,
             (key, v) => PlaceRenderer.Read(At(key.Key, PositionRenderer.OneBased(v))), shared: true);
-        w.Line($"{RuntimeApi.TableSortInPlace($"System.MemoryExtensions.AsSpan({ix})", $"__tc{id}")};   // GR19 — the element order; stable (GR3c)");
+        w.Line($"{RuntimeApi.TableSortInPlace($"global::System.MemoryExtensions.AsSpan({ix})", $"__tc{id}")};   // GR19 — the element order; stable (GR3c)");
         // ⛔ AN ELEMENT HOLDING A VARIABLE-LENGTH COMPONENT MOVES AS ITS COMPONENT CARRIER, NOT AS AN IMAGE (kb/Work
         // PB1951's sibling). In a cell-backed class (EXTERNAL) a dynamic-length item or a dynamic-capacity table inside
         // the element lives in the cell's component slots (VarGroupWindow), and the element's contiguous image
@@ -871,10 +871,10 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
             {
                 if (depth == levels.Count) return PlaceRenderer.Read(At(slotMembers[j], element, inner));
                 string q = $"__q{id}_{j}_{depth}";
-                return $"System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, {LevelCount(levels[depth], element, inner)}), {q} => "
+                return $"global::System.Linq.Enumerable.ToArray(global::System.Linq.Enumerable.Select(global::System.Linq.Enumerable.Range(0, {LevelCount(levels[depth], element, inner)}), {q} => "
                     + $"{Gather(depth + 1, [.. inner, PositionRenderer.OneBased(q)])}))";
             }
-            w.Line($"var {sv} = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, {n}), __k => {Gather(0, [])}));");
+            w.Line($"var {sv} = global::System.Linq.Enumerable.ToArray(global::System.Linq.Enumerable.Select(global::System.Linq.Enumerable.Range(0, {n}), __k => {Gather(0, [])}));");
         }
         w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {WriteElement(At(ts.Table, PositionRenderer.OneBased(at)), $"{im}[{ix}[{at}]]")}   // GR24 — placed back in data-name-2");
         for (int j = 0; j < slotMembers.Count; j++)

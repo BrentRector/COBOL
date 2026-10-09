@@ -104,7 +104,7 @@ public sealed class Format4UseObjectSelectorDriftTests
             Assert.False(diags.HasErrors, string.Join("\n", diags.Diagnostics));
             var emitter = new CSharpEmitter();
             var comp = emitter.Bind(tree!, new EditionContext(2002));
-            return (emitter.EmitBound(comp), comp.OoClasses);
+            return (emitter.EmitBound(comp, "DRIFTPROBE"), comp.OoClasses);
         }
         finally { try { File.Delete(path); } catch { /* best-effort */ } }
     }

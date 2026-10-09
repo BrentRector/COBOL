@@ -61,7 +61,7 @@ public sealed class ActivationStorageReseedDriftTests
             Assert.False(diags.HasErrors, string.Join("\n", diags.Diagnostics));
             var emitter = new CSharpEmitter();
             var bound = emitter.Bind(tree!, new EditionContext(2023));
-            return emitter.EmitBound(bound);
+            return emitter.EmitBound(bound, "DRIFTPROBE");
         }
         finally { try { File.Delete(path); } catch (IOException) { /* best-effort */ } }
     }

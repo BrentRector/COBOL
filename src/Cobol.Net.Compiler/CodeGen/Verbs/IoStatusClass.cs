@@ -62,5 +62,5 @@ internal static class IoStatusClass
     /// .IsFatalIoStatus</c>, which the generated <c>__IoCheckEc</c> already asks), so this renders a call to it
     /// rather than a second copy of the digit set. §9.1.13.1 makes fatality a property of the STATUS VALUE, not of
     /// exception checking — the SORT/MERGE implicit-transfer dispositions ask it with checking off (kb/Work PB993).</summary>
-    public static string Fatal(string status) => $"CobolNet.Runtime.Exceptions.ExceptionCatalog.IsFatalIoStatus({status})";
+    public static string Fatal(string status) => $"global::CobolNet.Runtime.Exceptions.ExceptionCatalog.IsFatalIoStatus({status})";
 }

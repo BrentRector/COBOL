@@ -8,6 +8,13 @@
     <Copyright>Copyright (c) 2026 Brent Rector</Copyright>
     <Authors>Brent Rector</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- THE PRODUCT VERSION (kb/Work PB2097; docs/rearchitecture/DESIGN-external-repository.md §15.4): the package
+         version, and so every assembly's AssemblyVersion. The runtime's MAJOR is a contract: every compiled COBOL module
+         records the runtime version it was compiled against ([assembly: CobolRepository], __CobolModule.EnsureRegistered),
+         and a run unit refuses a module of another major (RuntimeAbi.Skew). Raise the major exactly when the runtime's
+         public surface (src/Cobol.Net.Runtime/PublicAPI.Shipped.txt) or a codec's image layout changes incompatibly;
+         RuntimeAbiPinDriftTests pins it beside the surface's hash. -->
+    <Version>1.0.0</Version>
   </PropertyGroup>
   <!-- kb/Work PB985 (DESIGN-test-build-ci §3.12): a DEBUG build's bits must depend on its SOURCES, not on the commit
        it was built at. The SDK queries git and stamps the commit into AssemblyInformationalVersion ("1.0.0+<sha>")

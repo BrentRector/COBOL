@@ -376,7 +376,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         VarPartKind.DynLeaf or VarPartKind.DynTable or VarPartKind.DynGroupTable => CurrentMemberImage(p.Item!, agree: "true"),
         VarPartKind.Nested => $"{p.Field.Name}.CurrentImage({OdoArgument(p.Item!)})",
         VarPartKind.NestedTable =>
-            $"string.Concat(System.Array.ConvertAll({p.Field.Name}, __e => __e.CurrentImage()))",
+            $"string.Concat(global::System.Array.ConvertAll({p.Field.Name}, __e => __e.CurrentImage()))",
         // The first __odo occurrences, each at its own current extent (§13.18.38.4 GR8; kb/Work PB244).
         VarPartKind.OdoTable => RuntimeApi.TableConcatImages(p.Field.Name, "__odo", "static __e => __e.CurrentImage()"),
         _ => throw new InvalidOperationException($"unknown variable-length part {p.Kind}"),
@@ -595,7 +595,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                         {
                             VarPartKind.Nested => $"{p.Field.Name}.AsVarImage({AsVarImageArguments(p.Item!)});",
                             VarPartKind.NestedTable =>
-                                $"{RuntimeApi.VarGroupConcat($"System.Array.ConvertAll({p.Field.Name}, __e => __e.AsVarImage(__agree))")};",
+                                $"{RuntimeApi.VarGroupConcat($"global::System.Array.ConvertAll({p.Field.Name}, __e => __e.AsVarImage(__agree))")};",
                             _ => $"{RuntimeApi.TableConcatVarImages(p.Field.Name, "__odo", "__e => __e.AsVarImage(__agree)")};",
                         });
                         fixedParts.Add($"__n{n}.Fixed");
@@ -671,7 +671,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                         break;
                     case VarPartKind.NestedTable:
                     case VarPartKind.OdoTable:   // every occurrence it USES (§13.18.38.4 GR8 a: __odo of them), to its maximum
-                        using (w.Block($"for (int __i = 0; __i < {(p.Kind is VarPartKind.OdoTable ? $"System.Math.Min({p.Occurs}, __odo)" : p.Occurs.ToString())}; __i++)"))
+                        using (w.Block($"for (int __i = 0; __i < {(p.Kind is VarPartKind.OdoTable ? $"global::System.Math.Min({p.Occurs}, __odo)" : p.Occurs.ToString())}; __i++)"))
                             w.Line($"{p.Field.Name}[__i].FromVarImage(__v.Slice({off} + __i * {p.FixedWidth / p.Occurs}, "
                                 + $"{p.FixedWidth / p.Occurs}, {dynAt} + __i * {p.DynCount / p.Occurs}, {p.DynCount / p.Occurs}), __storage);");
                         off += p.FixedWidth;
@@ -802,7 +802,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     private static string SlotImageOf(PhysicalModel.Physical f, DataItem slot) =>
         !SlotWindow.CarriesPointerImage(slot) ? SlotPlaceholder(f.Width)
         : f.Occurs == 0 ? RuntimeApi.PointerImageOf(f.Name)
-        : $"string.Concat(System.Array.ConvertAll({f.Name}, __e => {RuntimeApi.PointerImageOf("__e")}))";
+        : $"string.Concat(global::System.Array.ConvertAll({f.Name}, __e => {RuntimeApi.PointerImageOf("__e")}))";
 
     /// <summary>The whole-group image facility of a record struct. <c>AsImage()</c> is emitted for every
     /// <see cref="DataItem.ElementTransferImageCapable"/> group; <c>FromImage</c> (and the bit / national faces)
@@ -989,7 +989,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// every occurrence's carrier (the AsImage run packer read the raw <c>string[]</c> field before, CS1503).</summary>
     private static string BitCarrierOf(DataItem m) =>
         m.Occurs is not null
-            ? (m.IsGroup ? $"string.Concat(System.Array.ConvertAll({m.CsName}, __e => __e.AsBits()))"
+            ? (m.IsGroup ? $"string.Concat(global::System.Array.ConvertAll({m.CsName}, __e => __e.AsBits()))"
                          : $"string.Concat({m.CsName})")
             : m.IsGroup ? $"{m.CsName}.AsBits()" : m.CsName;
 
@@ -1033,8 +1033,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                     ? RuntimeApi.NumFormatImageFloat(f.Name, leaf.ProfileName, leaf.Pic.IsSingle)
                     : RuntimeApi.NumFormatImage(f.Name, leaf.ProfileName))
                : f.Name)
-        : f.IsGroupStruct ? $"string.Concat(System.Array.ConvertAll({f.Name}, __e => __e.AsImage()))"
-        : f.NumLeaf is { } l ? $"string.Concat(System.Array.ConvertAll({f.Name}, __e => {(l.Pic!.IsFloat
+        : f.IsGroupStruct ? $"string.Concat(global::System.Array.ConvertAll({f.Name}, __e => __e.AsImage()))"
+        : f.NumLeaf is { } l ? $"string.Concat(global::System.Array.ConvertAll({f.Name}, __e => {(l.Pic!.IsFloat
                 ? RuntimeApi.NumFormatImageFloat("__e", l.ProfileName, l.Pic.IsSingle)
                 : RuntimeApi.NumFormatImage("__e", l.ProfileName))}))"
         : $"string.Concat({f.Name})";

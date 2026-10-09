@@ -3,8 +3,11 @@
 // </auto-generated>
 #nullable enable
 #pragma warning disable CS0164   // unreferenced label — SEARCH/NEXT-SENTENCE emit per-boundary labels; not every one is jumped to
-using System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
-using CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
+[assembly: global::CobolNet.Runtime.Repository.CobolRepositoryAttribute(1, "1.0.0.0", 1, Registrar = "Cobol.p.__CobolModule")]
+namespace Cobol.p;
+
+using global::System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
+using global::CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
 
 internal sealed class _PRG_CHAR_CONDITIONALS : ICobolProgram
 {
@@ -44,28 +47,28 @@ internal sealed class _PRG_CHAR_CONDITIONALS : ICobolProgram
                 {
                     if ((WS_N < 0))
                     {
-                        System.Console.WriteLine("NEG");
+                        global::System.Console.WriteLine("NEG");
                     }
                     else
                     {
-                        System.Console.WriteLine("NONNEG");
+                        global::System.Console.WriteLine("NONNEG");
                     }
                     if ((CobolClass.IsAlphabetic(WS_C)))
                     {
-                        System.Console.WriteLine("ALPHA");
+                        global::System.Console.WriteLine("ALPHA");
                     }
                     __sendval2_EVALUATE = CobolString.Store(WS_C, 1);
                     if (CobolString.Compare(__sendval2_EVALUATE, "A") == 0)
                     {
-                        System.Console.WriteLine("IS-A");
+                        global::System.Console.WriteLine("IS-A");
                     }
                     else if (CobolString.Compare(__sendval2_EVALUATE, "B") == 0)
                     {
-                        System.Console.WriteLine("IS-B");
+                        global::System.Console.WriteLine("IS-B");
                     }
                     else
                     {
-                        System.Console.WriteLine("OTHER");
+                        global::System.Console.WriteLine("OTHER");
                     }
                     throw new StopRun();
                 }
@@ -82,7 +85,9 @@ internal sealed class _PRG_CHAR_CONDITIONALS : ICobolProgram
 }
 public static class __CobolModule
 {
-    public static void Register()
+    public static void EnsureRegistered() => ProgramRegistry.RegisterModule("Cobol.p.__CobolModule", "1.0.0.0", 1, Register);
+
+    private static void Register()
     {
         ProgramRegistry.Register("CHAR-CONDITIONALS", "CHAR-CONDITIONALS", null, false, false, false, static __o => new _PRG_CHAR_CONDITIONALS(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
@@ -93,7 +98,7 @@ internal static class Program
     private static void Main()
     {
         ProgramRegistry.Reset();
-        __CobolModule.Register();
+        __CobolModule.EnsureRegistered();
         try { ProgramRegistry.RunMain("CHAR-CONDITIONALS"); }
         catch (StopRun) { }
     }

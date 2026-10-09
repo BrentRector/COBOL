@@ -282,12 +282,12 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         {
             int cid = ctx.Names.NextEc();
             w.Line($"catch (CobolSizeError __cse{cid}) {{ {flag} = true; {ecnVar} = __cse{cid}.EcName; }}");
-            w.Line($"catch (System.OverflowException) {{ {flag} = true; {ecnVar} = \"EC-SIZE-OVERFLOW\"; }}");
+            w.Line($"catch (global::System.OverflowException) {{ {flag} = true; {ecnVar} = \"EC-SIZE-OVERFLOW\"; }}");
         }
         else
         {
             w.Line($"catch (CobolSizeError) {{ {flag} = true; }}");
-            w.Line($"catch (System.OverflowException) {{ {flag} = true; }}");
+            w.Line($"catch (global::System.OverflowException) {{ {flag} = true; }}");
         }
     }
 

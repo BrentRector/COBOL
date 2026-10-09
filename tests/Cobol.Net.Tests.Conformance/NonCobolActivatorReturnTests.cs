@@ -11,7 +11,8 @@ namespace CobolNet.Tests.Conformance;
 /// the activating element in an implementor-defined fashion"; EXIT PROGRAM reaches the same rule through
 /// §14.9.14.4 3) (cite.py OK: "execution proceeds as specified in 14.9.18, GOBACK statement, General rules 3 and 4").
 /// <para>DETERMINATION PINNED: the only non-COBOL activator is a .NET host, which loads the compiled assembly, runs
-/// its public <c>__CobolModule.Register()</c> and activates a program through
+/// its module's one registration member, <c>__CobolModule.EnsureRegistered()</c> (the registrar its
+/// <c>[assembly: CobolRepository]</c> record names), and activates a program through
 /// <c>ProgramRegistry.CallProgram(name, callerPath, args, returning)</c>. When the program executes GOBACK or EXIT
 /// PROGRAM the host's call RETURNS NORMALLY and the host continues at its own call site: no .NET exception reaches
 /// it and the statements after the GOBACK / EXIT PROGRAM are not executed.</para>
@@ -58,7 +59,8 @@ public sealed class NonCobolActivatorReturnTests
                 foreach (var module in new[] { "L1HSTGB", "L1HSTEP" })
                 {
                     var asm = System.Reflection.Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, module + ".dll"));
-                    asm.GetType("__CobolModule")!.GetMethod("Register", Type.EmptyTypes)!.Invoke(null, null);
+                    var registrar = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<CobolNet.Runtime.Repository.CobolRepositoryAttribute>(asm)!.Registrar!;
+                    asm.GetType(registrar)!.GetMethod("EnsureRegistered", Type.EmptyTypes)!.Invoke(null, null);
                 }
                 Console.WriteLine("HOST BEFORE");
                 ProgramRegistry.CallProgram("L1HSTGB", "", Array.Empty<CobolArg>(), null);

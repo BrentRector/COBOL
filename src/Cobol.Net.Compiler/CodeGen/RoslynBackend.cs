@@ -28,7 +28,7 @@ internal sealed class RoslynBackend : ICodeGenBackend
     /// compiling, so the debugging artifact survives a failed compile), then <see cref="Compile"/>.</remarks>
     public BackendArtifact Emit(Binding.Model.BoundCompilation program, BackendOptions options)
     {
-        string csharp = _emitter.EmitBound(program, options.Inputs);
+        string csharp = _emitter.EmitBound(program, options.AssemblyName, options.Inputs);
         var written = new List<string>();
 
         string outDir = Path.GetDirectoryName(Path.GetFullPath(options.OutputPath)) is { Length: > 0 } d ? d : ".";

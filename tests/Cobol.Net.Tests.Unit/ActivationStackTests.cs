@@ -52,8 +52,9 @@ public sealed class ActivationStackTests
         var ru = new RunUnit();
         int depth = 0;
         string notFoundEc = function ? "EC-FUNCTION-NOT-FOUND" : "EC-PROGRAM-NOT-FOUND";
-        ru.Programs.Register("R", "R", null, initial: false, common: false, recursive: true,
-            _ => new SelfCaller(ru.Programs, "R", notFoundEc, () => depth++), isFunction: function);
+        ru.Programs.RegisterModule("Cobol.R.__CobolModule", RuntimeAbi.Version.ToString(), RuntimeAbi.CallAbi, () =>
+            ru.Programs.Register("R", "R", null, initial: false, common: false, recursive: true,
+                _ => new SelfCaller(ru.Programs, "R", notFoundEc, () => depth++), isFunction: function));
 
         var escaped = OnSmallStack(() => ru.Programs.CallProgram("R", "", [], null, notFoundEc));
 

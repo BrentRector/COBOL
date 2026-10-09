@@ -176,7 +176,7 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
             }
             // GR9: every pointer member of the record starts null, and a null pointer's storage image is the zero
             // address (DOC-A.1-216), so those runs are seeded with it instead of the fill (kb/Work PB1071).
-            w.Line($"{addr} = {RuntimeApi.PtrAllocate($"(System.Int128){cls.Width}", fill, na, [.. SlotWindow.PointerImageOffsetsOf(based)])};   // ALLOCATE based-item (ISO §14.9.3.4 GR3/GR4b/GR9)");
+            w.Line($"{addr} = {RuntimeApi.PtrAllocate($"(global::System.Int128){cls.Width}", fill, na, [.. SlotWindow.PointerImageOffsetsOf(based)])};   // ALLOCATE based-item (ISO §14.9.3.4 GR3/GR4b/GR9)");
             if (s.Returning is { } ret2)
                 w.Line(PlaceRenderer.Write(ret2, addr) + "   // GR4a — the RETURNING pointer also receives the address");
             EmitStorageNotAvail(w, na);   // GR5c — data-name-2 and the based address already hold NULL
@@ -192,7 +192,7 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
         // old `(long)` narrowing wrapped a 20-digit request into a small VALID allocation (the PB22 cast family).
         string alloc = x.Real
             ? RuntimeApi.PtrAllocateReal($"({x.Expr})", fill, na)
-            : RuntimeApi.PtrAllocate($"(System.Int128)({NumericRenderer.AlignRoundedUp(x)})", fill, na);
+            : RuntimeApi.PtrAllocate($"(global::System.Int128)({NumericRenderer.AlignRoundedUp(x)})", fill, na);
         w.Line(PlaceRenderer.Write(s.Returning!, alloc)
             + "   // ALLOCATE n CHARACTERS (ISO §14.9.3.4 GR1/GR2/GR5" + (s.Initialized ? "/GR6" : "/GR8") + ")");
         EmitStorageNotAvail(w, na);

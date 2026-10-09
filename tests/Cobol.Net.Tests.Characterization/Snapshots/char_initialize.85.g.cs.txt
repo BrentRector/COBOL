@@ -3,8 +3,11 @@
 // </auto-generated>
 #nullable enable
 #pragma warning disable CS0164   // unreferenced label — SEARCH/NEXT-SENTENCE emit per-boundary labels; not every one is jumped to
-using System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
-using CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
+[assembly: global::CobolNet.Runtime.Repository.CobolRepositoryAttribute(1, "1.0.0.0", 1, Registrar = "Cobol.p.__CobolModule")]
+namespace Cobol.p;
+
+using global::System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
+using global::CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
 
 internal sealed class _PRG_CHAR_INITIALIZE : ICobolProgram
 {
@@ -54,7 +57,7 @@ internal sealed class _PRG_CHAR_INITIALIZE : ICobolProgram
                 {
                     WS_REC.WS_N = (long)(CobolNum.Store(0L, 0, _P_1, CobolRounding.Truncation));
                     WS_REC.WS_A = new string(' ', 4);
-                    System.Console.WriteLine(CobolNum.FormatDisplay(WS_REC.WS_N, _P_1) + WS_REC.WS_A);
+                    global::System.Console.WriteLine(CobolNum.FormatDisplay(WS_REC.WS_N, _P_1) + WS_REC.WS_A);
                     throw new StopRun();
                 }
                 default:
@@ -70,7 +73,9 @@ internal sealed class _PRG_CHAR_INITIALIZE : ICobolProgram
 }
 public static class __CobolModule
 {
-    public static void Register()
+    public static void EnsureRegistered() => ProgramRegistry.RegisterModule("Cobol.p.__CobolModule", "1.0.0.0", 1, Register);
+
+    private static void Register()
     {
         ProgramRegistry.Register("CHAR-INITIALIZE", "CHAR-INITIALIZE", null, false, false, false, static __o => new _PRG_CHAR_INITIALIZE(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
@@ -81,7 +86,7 @@ internal static class Program
     private static void Main()
     {
         ProgramRegistry.Reset();
-        __CobolModule.Register();
+        __CobolModule.EnsureRegistered();
         try { ProgramRegistry.RunMain("CHAR-INITIALIZE"); }
         catch (StopRun) { }
     }

@@ -120,7 +120,8 @@ public sealed class DefaultLocaleDeterminationTests
             {
                 ProgramRegistry.Reset();
                 var asm = System.Reflection.Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "A118LOC.dll"));
-                asm.GetType("__CobolModule")!.GetMethod("Register", Type.EmptyTypes)!.Invoke(null, null);
+                var registrar = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<CobolNet.Runtime.Repository.CobolRepositoryAttribute>(asm)!.Registrar!;
+                asm.GetType(registrar)!.GetMethod("EnsureRegistered", Type.EmptyTypes)!.Invoke(null, null);
             }
 
             public static int Main()

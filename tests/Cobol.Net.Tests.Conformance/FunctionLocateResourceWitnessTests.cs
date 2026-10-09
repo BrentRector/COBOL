@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Conformance;
 /// that are checked in order to determine the availability of the function for execution are defined by the
 /// implementor."
 /// <para>DETERMINATION PINNED: the checked set is EMPTY. A function is located when a module registering it has been
-/// loaded and its <c>__CobolModule.Register()</c> has run; a <c>&lt;name&gt;.dll</c> beside the application that
+/// loaded and its <c>__CobolModule.EnsureRegistered()</c> has run; a <c>&lt;name&gt;.dll</c> beside the application that
 /// cannot be loaded (here a foreign, non-PE image) has therefore NOT been located, so the condition is
 /// EC-FUNCTION-NOT-FOUND and never EC-PROGRAM-RESOURCES. Both names are enabled and both are named in the USE
 /// statement, so whichever the runtime sets is the one EXCEPTION-STATUS reports (§15.33.3 1)), and RESUME AT NEXT
@@ -116,14 +116,21 @@ public sealed class FunctionLocateResourceWitnessTests
     /// throws has therefore NOT been located: EC-FUNCTION-NOT-FOUND". This is the case the rejected reading ("a
     /// module found on disk is located") would most naturally call EC-PROGRAM-RESOURCES, because the image loads.
     /// The library is built with Roslyn, the same way <c>NonCobolActivatorReturnTests.CompileHost</c> builds its host,
-    /// and holds only a global-namespace <c>__CobolModule.Register()</c> that throws.</summary>
+    /// and carries what every compiled module carries — the <c>[assembly: CobolRepository(…)]</c> record, at this
+    /// runtime's version and call ABI, naming its registrar — so the probe selects it exactly as it selects a compiled
+    /// module, and what is tested is the registrar: its one registration member, <c>EnsureRegistered()</c>, throws
+    /// (DESIGN-external-repository §11.2; kb/Work PB2097).</summary>
     [Fact]
     public void ThrowingRegistrarSiblingModule_IsNotFound_NeverProgramResources()
     {
-        const string library = """
-            public static class __CobolModule
+        string library = $$"""
+            [assembly: CobolNet.Runtime.Repository.CobolRepository({{CobolNet.Runtime.Repository.CobolRepositoryAttribute.CurrentSchemaVersion}}, "{{CobolNet.Runtime.RuntimeAbi.Version}}", {{CobolNet.Runtime.RuntimeAbi.CallAbi}}, Registrar = "Cobol.L1FRSX.__CobolModule")]
+            namespace Cobol.L1FRSX
             {
-                public static void Register() => throw new System.InvalidOperationException("registrar fails");
+                public static class __CobolModule
+                {
+                    public static void EnsureRegistered() => throw new System.InvalidOperationException("registrar fails");
+                }
             }
             """;
         string dir = CutRunner.NewTempDir("l1frs3");

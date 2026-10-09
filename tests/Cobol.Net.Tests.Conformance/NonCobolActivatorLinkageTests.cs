@@ -127,7 +127,8 @@ public sealed class NonCobolActivatorLinkageTests
             {
                 ProgramRegistry.Reset();
                 var asm = System.Reflection.Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "A116LNK.dll"));
-                asm.GetType("__CobolModule")!.GetMethod("Register", Type.EmptyTypes)!.Invoke(null, null);
+                var registrar = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<CobolNet.Runtime.Repository.CobolRepositoryAttribute>(asm)!.Registrar!;
+                asm.GetType(registrar)!.GetMethod("EnsureRegistered", Type.EmptyTypes)!.Invoke(null, null);
             }
 
             private static CobolArg Ref(ManagedPointer carrier) => new(CobolPassMode.Reference, carrier, null);

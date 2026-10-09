@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Reflection;
 using CobolNet.Runtime.Exceptions;
 
 namespace CobolNet.Runtime;
@@ -7,15 +8,17 @@ namespace CobolNet.Runtime;
 /// <summary>
 /// The run-unit program registry (one INSTANCE per run unit, owned by <see cref="RunUnit"/> — the verbatim port
 /// of the pre-P8 static <c>ProgramRegistry</c> bodies): every compiled program unit registers at run-unit start
-/// (name, containment, COMMON / INITIAL / RECURSIVE attributes, instance factory); CALL resolves names per the
+/// (name, containment, COMMON / INITIAL / RECURSIVE attributes, instance factory), each module whole through its
+/// <c>__CobolModule.EnsureRegistered()</c> and <see cref="RegisterModule"/>; CALL resolves names per the
 /// §8.4.6.3 scope rules and drives the §14.6.2.3 state model; CANCEL implements §14.9.5. Instances ARE the
 /// state: a plain program's cached singleton realizes last-used persistence (§8.6.4 / §14.6.2.3.3); dropping the
 /// instance realizes initial-state-on-next-CALL (§14.9.5 GR3); a fresh instance per activation realizes INITIAL
 /// (§14.6.2.3.2) and RECURSIVE (deep-dive D3/D4). In-assembly static registration is the primary profile; an
 /// unresolved outermost name additionally probes the application directory for a sibling compiled module
-/// (<c>&lt;name&gt;.dll</c>) and invokes its public <c>__CobolModule.Register()</c> registrar — the
-/// implementation-defined §14.9.4.4 GR3b "locate the program" mechanism (owner-approved; a
-/// prebuilt-static-registry profile remains possible for AOT/trimming, where the probe never fires).
+/// (<c>&lt;name&gt;.dll</c>) and invokes the <c>EnsureRegistered()</c> of the registrar its
+/// <see cref="Repository.CobolRepositoryAttribute"/> record names (<see cref="ProbeSiblingModule"/>) — the
+/// implementation-defined §14.9.4.4 GR3b "locate the program" mechanism (owner-approved; a host-composed run unit
+/// registers every module itself for AOT/trimming, where the probe never fires).
 /// </summary>
 public sealed class ProgramTable
 {
@@ -30,6 +33,8 @@ public sealed class ProgramTable
                                             // §14.9.4.4 GR3b routes CALL/CANCEL/ENTRY resolution through §8.3.2.2, so
                                             // THIS is the name they match (per-outermost unique, §8.4.6.3). PB303.
         public string? ParentPath;
+        public required string Module;      // the registrar of the module that registered it (Cobol.<S>.__CobolModule):
+                                            // what a refused duplicate names (§8.3.2.2; RegisterModule)
         public bool Initial, Common, Recursive;
         public required Func<ICobolProgram?, ICobolProgram> Factory;   // parent instance → new instance
         public ICobolProgram? Instance;     // the cached (last-used) instance; null = initial state on next CALL
@@ -55,7 +60,18 @@ public sealed class ProgramTable
     private readonly RunUnit _owner;
     private readonly Dictionary<string, Node> _byPath = new(ExternalizedNames.Comparer);
     private readonly List<Node> _order = [];
-    private readonly HashSet<string> _probedModules = new(ExternalizedNames.Comparer);
+    private readonly HashSet<string> _probedNames = new(ExternalizedNames.Comparer);
+    /// <summary>The run unit's ONE module-registration set (DESIGN-external-repository §11.2): the registrar full
+    /// name of every module registered into it, by whatever route (the emitted <c>Main</c>, the sibling-module probe,
+    /// a host). <see cref="RegisterModule"/> is its only writer.</summary>
+    private readonly HashSet<string> _modules = new(StringComparer.Ordinal);
+    /// <summary>The module <see cref="RegisterModule"/> is registering now, and the nodes its registrar has
+    /// registered so far: committed together, or not at all.</summary>
+    private (string Module, List<Node> Nodes, Dictionary<string, Node> ByPath)? _staging;
+    /// <summary>Why the probe could not supply a name (a load failure, a module with no registrar, a refused module),
+    /// keyed by the externalized name the activation asked for: appended to the EC-PROGRAM-NOT-FOUND /
+    /// EC-FUNCTION-NOT-FOUND message, so a module that is present but unusable is diagnosable rather than silent.</summary>
+    private readonly Dictionary<string, string> _probeFailure = new(ExternalizedNames.Comparer);
 
     public ProgramTable(RunUnit owner) => _owner = owner;
 
@@ -88,29 +104,99 @@ public sealed class ProgramTable
         bool isFunction = false, string? externalizedName = null, BoundaryItem? returning = null,
         BoundaryItem[]? formals = null)
     {
+        // RegisterModule is the only writer of the registration set (DESIGN-external-repository §11.2): a unit is
+        // registered only by its module's registrar, inside the module's staging, so a module is registered whole or
+        // not at all, and never twice.
+        var (module, staged, stagedByPath) = _staging
+            ?? throw new InvalidOperationException(
+                $"program {name} registered outside ProgramTable.RegisterModule: a module registers only through its "
+                + "__CobolModule.EnsureRegistered() (kb/Work PB2097)");
         var node = new Node
         {
             Path = path, Name = name, CallName = ExternalizedNames.Form(externalizedName ?? name), ParentPath = parentPath,
+            Module = module,
             Initial = initial, Common = common, Recursive = recursive, Factory = factory,
             FormalCount = formalCount, RequiredCount = requiredCount, ArgMismatchChecking = argMismatchChecking,
             Returning = returning, Formals = formals,
             StaticReset = staticReset, IsFunction = isFunction,
         };
-        _byPath[path] = node;
-        _order.Add(node);
         if (parentPath is not null)
         {
             // A containee whose container is unregistered would SILENTLY drop out of the GR4 cancel cascade
             // and the ParentInstance chain — the registrar emits containers first, so this is a compiler
-            // defect and LOUD (kb/Work PB154).
-            if (!_byPath.TryGetValue(parentPath, out var parent))
+            // defect and LOUD (kb/Work PB154). A container is in its containee's own module (one source element).
+            if (!stagedByPath.TryGetValue(parentPath, out var parent))
                 throw new InvalidOperationException(
                     $"program {name} registered before its container {parentPath} — the registrar emits containers first (kb/Work PB154)");
             parent.Children.Add(node);
         }
-        // Run-unit start = initial state for the unit's static data (§14.6.2.3.2 case 1), and run-unit termination
-        // releases it (§14.6.11 3/4/6) — both through the run unit's ONE static-storage adoption (kb/Work PB1069).
-        if (staticReset is not null) _owner.AdoptStaticStorage(staticReset);
+        stagedByPath[path] = node;
+        staged.Add(node);
+    }
+
+    /// <summary>Register one compiled module into this run unit: the body of every module's one public registration
+    /// member, <c>__CobolModule.EnsureRegistered()</c> (DESIGN-external-repository §11.2; kb/Work PB2097). The emitted
+    /// <c>Main</c>, the sibling-module probe and a host composing a run unit all reach a module through it, so there is
+    /// one way in:
+    /// <list type="number">
+    ///   <item>a module already in the run unit's registration set (<paramref name="registrar"/>) returns at once: a
+    ///     module a host registered is never registered again by a probe, and vice versa;</item>
+    ///   <item>a module compiled against another runtime MAJOR or another call ABI is refused
+    ///     (<see cref="RuntimeAbi.Skew"/>; design §11.3, §15.4): loading it would fail later inside the callee, or read
+    ///     argument images the two sides lay out differently;</item>
+    ///   <item><paramref name="register"/> runs into a STAGING list, committed only when none of the module's
+    ///     outermost programs or functions is already registered by another module: within a run unit one externalized
+    ///     name identifies one instance, of one kind (ISO §8.3.2.2 2), so a second module carrying it is refused whole, naming both
+    ///     modules, and nothing of it is registered.</item>
+    /// </list>
+    /// A refusal is a <see cref="CobolCallException"/> with EC-PROGRAM-NOT-FOUND and the reason: the condition the
+    /// activation that needed the module raises anyway (ISO §14.9.4.4 GR3 b), so the carried names are unchanged; reached
+    /// from the probe it becomes the probe's failure reason.</summary>
+    /// <param name="registrar">The module's registrar full name, <c>Cobol.&lt;S&gt;.__CobolModule</c>: its identity in
+    /// the registration set.</param>
+    /// <param name="runtimeVersion">The runtime version the module was compiled against.</param>
+    /// <param name="callAbi">The call ABI the module was compiled for.</param>
+    /// <param name="register">The module's private registrar body: one <see cref="Register"/> per unit, containers
+    /// before containees.</param>
+    public void RegisterModule(string registrar, string runtimeVersion, int callAbi, Action register)
+    {
+        if (_modules.Contains(registrar)) return;
+        if (RuntimeAbi.Skew(runtimeVersion, callAbi) is { } skew)
+            throw new CobolCallException($"module {registrar} cannot run in this run unit: {skew} "
+                + "(ISO §14.9.4.4 GR3b — EC-PROGRAM-NOT-FOUND)", "EC-PROGRAM-NOT-FOUND");
+        if (_staging is { } busy)
+            throw new InvalidOperationException(
+                $"module {registrar} registered while module {busy.Module} is registering: a registrar registers only its own units");
+        var staged = new List<Node>();
+        _staging = (registrar, staged, new Dictionary<string, Node>(ExternalizedNames.Comparer));
+        try { register(); }
+        finally { _staging = null; }
+        // ISO §8.3.2.2 2): "Within a run unit, all instances of a given name that is externalized to the operating
+        // environment shall identify the same kind of entity or item", and two source elements naming one externalized
+        // name "refer to the same instance". A second module defining an outermost program or function under a name
+        // another module already registered (as a program or as a function) is a second definition of that one
+        // instance, so the module is refused WHOLE: never a second node rule 4 would shadow, nor a half-registered module.
+        foreach (var n in staged)
+        {
+            if (n.ParentPath is not null) continue;
+            foreach (var existing in _order)
+                if (existing.ParentPath is null && ExternalizedNames.Same(existing.CallName, n.CallName))
+                    throw new CobolCallException(
+                        $"module {registrar} cannot run in this run unit: its {(n.IsFunction ? "function" : "program")} "
+                        + $"'{n.CallName}' is already registered, as a {(existing.IsFunction ? "function" : "program")}, by "
+                        + $"module {existing.Module}, and an externalized name identifies one instance in a run unit "
+                        + "(ISO §8.3.2.2 2; §14.9.4.4 GR3b — EC-PROGRAM-NOT-FOUND)",
+                        "EC-PROGRAM-NOT-FOUND");
+        }
+        _modules.Add(registrar);
+        foreach (var n in staged)
+        {
+            _byPath[n.Path] = n;
+            _order.Add(n);
+            // Run-unit start = initial state for the unit's static data (§14.6.2.3.2 case 1), and run-unit termination
+            // releases it (§14.6.11 3/4/6) — both through the run unit's ONE static-storage adoption (kb/Work PB1069).
+            if (n.StaticReset is not null) _owner.AdoptStaticStorage(n.StaticReset);
+        }
     }
 
     /// <summary>Run the run unit's MAIN program (the first program of the compilation group), owning the run-unit
@@ -222,9 +308,10 @@ public sealed class ProgramTable
         var n = ResolveVisible(name, callerPath, wantFunction: notFoundEc == "EC-FUNCTION-NOT-FOUND")
             ?? throw new CobolCallException(
                 notFoundEc == "EC-FUNCTION-NOT-FOUND"
-                    ? $"FUNCTION '{ExternalizedNames.Form(name)}': the user-defined function could not be located in the run unit "
-                      + "(ISO §8.4.3.2.4 GR6b — EC-FUNCTION-NOT-FOUND)"
-                    : $"CALL '{ExternalizedNames.Form(name)}': program not found in the run unit (ISO §14.9.4.4 GR3b — EC-PROGRAM-NOT-FOUND)",
+                    ? $"FUNCTION '{ExternalizedNames.Form(name)}': the user-defined function could not be located in the run unit"
+                      + $"{NotLocatedReason(name)} (ISO §8.4.3.2.4 GR6b — EC-FUNCTION-NOT-FOUND)"
+                    : $"CALL '{ExternalizedNames.Form(name)}': program not found in the run unit{NotLocatedReason(name)} "
+                      + "(ISO §14.9.4.4 GR3b — EC-PROGRAM-NOT-FOUND)",
                 notFoundEc);
         // §14.9.4.4 GR3c / §8.4.3.2.4 GR6c (kb/Work PB2659): "If the program is located but the resources necessary to
         // execute the program are not available, the EC-PROGRAM-RESOURCES exception condition is set to exist, the program
@@ -458,7 +545,7 @@ public sealed class ProgramTable
         string target = ExternalizedNames.Form(name);
         foreach (var n in _order)
             if (n.ParentPath is null && !n.IsFunction && ExternalizedNames.Same(n.CallName, target)) { notFound = false; return new ProgramPointer(n.CallName); }
-        if (ProbeSiblingModule(target))
+        if (ProbeSiblingModule(target, wantFunction: false))
             foreach (var n in _order)
                 if (n.ParentPath is null && !n.IsFunction && ExternalizedNames.Same(n.CallName, target)) { notFound = false; return new ProgramPointer(n.CallName); }
         notFound = true;
@@ -485,7 +572,7 @@ public sealed class ProgramTable
         string target = ExternalizedNames.Form(name);
         foreach (var n in _order)
             if (n.IsFunction && ExternalizedNames.Same(n.CallName, target)) { notFound = false; return new FunctionPointer(n.CallName); }
-        if (ProbeSiblingModule(target))
+        if (ProbeSiblingModule(target, wantFunction: true))
             foreach (var n in _order)
                 if (n.IsFunction && ExternalizedNames.Same(n.CallName, target)) { notFound = false; return new FunctionPointer(n.CallName); }
         notFound = true;
@@ -681,44 +768,80 @@ public sealed class ProgramTable
         // Rule-4 fallthrough: the run unit may be composed of SEPARATELY COMPILED modules ("a run unit contains
         // one or more runtime modules", ISO §14.6.1; §14.9.4.4 GR3b — the runtime system "attempts to locate"
         // the called program; the locating mechanics beyond the §8.4.6.3 name scope are implementor-defined).
-        // Probe the application directory for a sibling compiled module named after the program, invoke its
-        // public __CobolModule.Register() registrar (generated classes are internal — the registrar IS the
-        // discovery surface), and retry rule 4 once. Probed names are cached, hit or miss — one I/O probe per
-        // name per run unit.
-        if (probe && ProbeSiblingModule(target))
+        // Probe the application directory for a sibling compiled module named after the program, register it through
+        // its one registration member, and retry rule 4 once.
+        if (probe && ProbeSiblingModule(target, wantFunction))
             foreach (var n in _order)
                 if (n.ParentPath is null && n.IsFunction == wantFunction && ExternalizedNames.Same(n.CallName, target)) return n;
         return null;
     }
 
-    /// <summary>Load the sibling compiled module <c>&lt;name&gt;.dll</c> from <see cref="AppContext.BaseDirectory"/>
-    /// (exact name first, then a case-insensitive scan — Linux filesystems are case-sensitive) into the default
-    /// <see cref="System.Runtime.Loader.AssemblyLoadContext"/> and run its <c>__CobolModule.Register()</c>.
-    /// Returns true when a registrar ran (the caller re-resolves); a missing file / foreign dll / load failure
-    /// is a quiet false — the CALL then raises the ordinary EC-PROGRAM-NOT-FOUND surface.</summary>
-    private bool ProbeSiblingModule(string name)
+    /// <summary>The run-time locate step for a name no registered module carries (DESIGN-external-repository §11.2;
+    /// the implementor-defined part of ISO §14.9.4.4 GR3b and §8.4.3.2.4 GR6b): load the sibling compiled module
+    /// <c>&lt;name&gt;.dll</c> from <see cref="AppContext.BaseDirectory"/> (exact name first, then a case-insensitive
+    /// scan, because Linux file systems are case-sensitive) into the default
+    /// <see cref="System.Runtime.Loader.AssemblyLoadContext"/>, read the registrar its
+    /// <see cref="Repository.CobolRepositoryAttribute"/> names, and invoke that registrar's
+    /// <c>EnsureRegistered()</c>, the module's one way in (<see cref="RegisterModule"/>). The record is read as
+    /// attribute DATA, never instantiated, so a module of another runtime major is refused with its reason rather than
+    /// failing to decode.
+    /// <para>Returns true when the module registered <paramref name="name"/> (the caller re-resolves). Every other
+    /// outcome is false with its reason recorded in <c>_probeFailure</c>, which the EC-PROGRAM-NOT-FOUND /
+    /// EC-FUNCTION-NOT-FOUND message carries: no such file is the plain miss (no reason); a file that does not load, a
+    /// module with no record or no registrar, a version skew, a registrar that throws, a module <see cref="RegisterModule"/>
+    /// refuses, or a module that does not carry the name. None escapes the activation: "not located" is the CALL's
+    /// condition (§14.9.4.4 GR3 b). Probed names are cached, hit or miss: one probe per name and kind per run unit.</para></summary>
+    private bool ProbeSiblingModule(string name, bool wantFunction)
     {
-        if (!_probedModules.Add(name)) return false;   // already probed this run unit (negative/positive cache)
+        if (!_probedNames.Add($"{(wantFunction ? 'F' : 'P')}:{name}")) return false;
+        string path = "";
         try
         {
             string dir = AppContext.BaseDirectory;
-            string path = System.IO.Path.Combine(dir, name + ".dll");
+            path = System.IO.Path.Combine(dir, name + ".dll");
             if (!System.IO.File.Exists(path))
                 path = System.IO.Directory.EnumerateFiles(dir, "*.dll").FirstOrDefault(f =>
                     string.Equals(System.IO.Path.GetFileNameWithoutExtension(f), name,
                         StringComparison.OrdinalIgnoreCase)) ?? "";
             if (path.Length == 0) return false;
             var asm = System.Runtime.Loader.AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
-            var register = asm.GetType("__CobolModule")?.GetMethod("Register", Type.EmptyTypes);
-            if (register is null) return false;   // not a WiseOwl COBOL module — no registrar surface
-            register.Invoke(null, null);
-            return true;
+            var record = asm.GetCustomAttributesData()
+                .FirstOrDefault(a => a.AttributeType.FullName == typeof(Repository.CobolRepositoryAttribute).FullName);
+            if (record is not { ConstructorArguments: [_, { Value: string runtimeVersion }, { Value: int callAbi }] })
+                return ProbeFailed(name, $"'{path}' is not a WiseOwl COBOL module: it carries no CobolRepository record");
+            if (RuntimeAbi.Skew(runtimeVersion, callAbi) is { } skew)
+                return ProbeFailed(name, $"'{path}': {skew}");
+            string? registrar = record.NamedArguments
+                .FirstOrDefault(a => a.MemberName == nameof(Repository.CobolRepositoryAttribute.Registrar)).TypedValue.Value as string;
+            var ensure = string.IsNullOrEmpty(registrar) ? null
+                : asm.GetType(registrar)?.GetMethod("EnsureRegistered", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes);
+            if (ensure is null)
+                return ProbeFailed(name, $"'{path}' has no registrar {(string.IsNullOrEmpty(registrar) ? "(none named)" : registrar)} with an EnsureRegistered() member");
+            ensure.Invoke(null, null);   // → RegisterModule, the one way in
+            foreach (var n in _order)
+                if (n.ParentPath is null && n.IsFunction == wantFunction && ExternalizedNames.Same(n.CallName, name)) return true;
+            return ProbeFailed(name, $"'{path}' does not carry the {(wantFunction ? "function" : "program")} {name}");
         }
-        catch
+        catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException or BadImageFormatException
+                                      or TargetInvocationException or TypeLoadException or ArgumentException)
         {
-            return false;   // an unloadable/foreign dll is simply "not found" (§14.9.4.4 GR3b)
+            // IOException covers FileNotFoundException (a file removed between the listing and the load) and
+            // FileLoadException; a RegisterModule refusal or a throwing registrar arrives as TargetInvocationException;
+            // ArgumentException is a registrar name Assembly.GetType cannot parse (a hand-made or damaged record).
+            return ProbeFailed(name, $"'{path}': {e.GetBaseException().Message}");
         }
     }
+
+    private bool ProbeFailed(string name, string reason)
+    {
+        _probeFailure[name] = reason;
+        return false;
+    }
+
+    /// <summary>The probe's reason a module beside the application could not supply <paramref name="name"/>, as a
+    /// suffix for the not-found message the activation raises (empty when no module was found at all).</summary>
+    internal string NotLocatedReason(string name) =>
+        _probeFailure.TryGetValue(ExternalizedNames.Form(name), out var reason) ? $"; the sibling module was not usable: {reason}" : "";
 
     private Node? ParentOf(Node n) =>
         n.ParentPath is not null && _byPath.TryGetValue(n.ParentPath, out var p) ? p : null;

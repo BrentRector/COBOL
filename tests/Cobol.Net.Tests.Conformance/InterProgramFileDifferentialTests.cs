@@ -292,7 +292,8 @@ public sealed class InterProgramFileDifferentialTests
     /// <summary>"A run unit contains one or more runtime modules. A runtime module results from compiling a
     /// compilation unit" (§14.6.1); §14.9.4.4 GR3b — the runtime "attempts to locate" the called program, the
     /// mechanics implementor-defined: the registry's rule-4 fallthrough probes the application directory for the
-    /// sibling module <c>XASMS1.dll</c>, invokes its public <c>__CobolModule.Register()</c>, and the CALL
+    /// sibling module <c>XASMS1.dll</c>, invokes the <c>EnsureRegistered()</c> of the registrar its <c>[assembly:
+    /// CobolRepository]</c> record names, and the CALL
     /// proceeds with full BY REFERENCE semantics across the assembly boundary.</summary>
     [Fact]
     public void Call_SeparatelyCompiledSiblingModule_ResolvesAndAliases()

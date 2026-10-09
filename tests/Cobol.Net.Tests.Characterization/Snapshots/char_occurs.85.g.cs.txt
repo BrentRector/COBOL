@@ -3,8 +3,11 @@
 // </auto-generated>
 #nullable enable
 #pragma warning disable CS0164   // unreferenced label — SEARCH/NEXT-SENTENCE emit per-boundary labels; not every one is jumped to
-using System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
-using CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
+[assembly: global::CobolNet.Runtime.Repository.CobolRepositoryAttribute(1, "1.0.0.0", 1, Registrar = "Cobol.p.__CobolModule")]
+namespace Cobol.p;
+
+using global::System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
+using global::CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
 
 internal sealed class _PRG_CHAR_OCCURS : ICobolProgram
 {
@@ -12,7 +15,7 @@ internal sealed class _PRG_CHAR_OCCURS : ICobolProgram
     private record struct _T_0
     {
         public long[] WS_ELEM;   // WS-ELEM OCCURS 5
-        public readonly string AsImage() => string.Concat(System.Array.ConvertAll(WS_ELEM, __e => CobolNum.FormatImage(__e, _P_1)));
+        public readonly string AsImage() => string.Concat(global::System.Array.ConvertAll(WS_ELEM, __e => CobolNum.FormatImage(__e, _P_1)));
         public void FromImage(string __s)
         {
             __s = CobolString.Store(__s, 10);
@@ -69,7 +72,7 @@ internal sealed class _PRG_CHAR_OCCURS : ICobolProgram
                     {
                         _IX_1 = __set0;
                     }
-                    System.Console.WriteLine(CobolNum.FormatDisplay(CobolTable.At(WS_TBL.WS_ELEM, _IX_1), _P_1));
+                    global::System.Console.WriteLine(CobolNum.FormatDisplay(CobolTable.At(WS_TBL.WS_ELEM, _IX_1), _P_1));
                     if (_IX_1 < 1 || _IX_1 > 5L)
                     {
                         goto __searchAtEnd0;
@@ -77,7 +80,7 @@ internal sealed class _PRG_CHAR_OCCURS : ICobolProgram
                     __search0:
                     if (CobolTable.At(WS_TBL.WS_ELEM, _IX_1) == 4L)
                     {
-                        System.Console.WriteLine("FOUND4");
+                        global::System.Console.WriteLine("FOUND4");
                         goto __searchEnd0;
                     }
                     _IX_1 += 1;
@@ -104,7 +107,9 @@ internal sealed class _PRG_CHAR_OCCURS : ICobolProgram
 }
 public static class __CobolModule
 {
-    public static void Register()
+    public static void EnsureRegistered() => ProgramRegistry.RegisterModule("Cobol.p.__CobolModule", "1.0.0.0", 1, Register);
+
+    private static void Register()
     {
         ProgramRegistry.Register("CHAR-OCCURS", "CHAR-OCCURS", null, false, false, false, static __o => new _PRG_CHAR_OCCURS(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
@@ -115,7 +120,7 @@ internal static class Program
     private static void Main()
     {
         ProgramRegistry.Reset();
-        __CobolModule.Register();
+        __CobolModule.EnsureRegistered();
         try { ProgramRegistry.RunMain("CHAR-OCCURS"); }
         catch (StopRun) { }
     }

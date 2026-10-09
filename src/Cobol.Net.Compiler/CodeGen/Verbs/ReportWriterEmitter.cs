@@ -487,7 +487,7 @@ internal sealed class ReportWriterEmitter(
                 // NAMED argument, so every phrase-less line keeps its text.
                 var plan = PlanOf(r, group);
                 string lines = group.Lines.Count == 0
-                    ? "System.Array.Empty<ReportGroupLine>()"
+                    ? "global::System.Array.Empty<ReportGroupLine>()"
                     : "new[] { " + string.Join(", ", group.Lines.Select((l, li) =>
                         $"new ReportGroupLine(ReportLineKind.{l.Kind}, {l.Value}, __RPT_C_{r.CsIndex}_{gi}_{li}"
                         + (plan.Lines.TryGetValue(l, out int ls) ? $", {ls}" : l.Anchor > 0 ? ", -1" : "")
@@ -646,7 +646,7 @@ internal sealed class ReportWriterEmitter(
                     if (term.Upon.Count == 0)
                         w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, {addend}, null);");
                     else if (upon.Count == 0)
-                        w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, {addend}, System.Array.Empty<string>());");
+                        w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, {addend}, global::System.Array.Empty<string>());");
                     else if (local.Count > 0)
                         w.Line($"__RPT_{r.CsIndex}.AddSumTerm({sum.Id}, {addend}, "
                             + "new[] { " + string.Join(", ", local.Select(d => CsLiteral(d.Detail!.Name!))) + " });");
@@ -837,7 +837,7 @@ internal sealed class ReportWriterEmitter(
             if (!selects(r)) continue;
             dispatch.BeforeReportingSelectors.Add(r);
             w.Line();
-            w.Line($"{(asLocal ? "" : "private ")}System.Func<int, bool>? {SelectorField(r)}{(asLocal ? " = null" : "")};   // RD {r.Name}: the cached selector (ISO §14.9.49.4 GR4)");
+            w.Line($"{(asLocal ? "" : "private ")}global::System.Func<int, bool>? {SelectorField(r)}{(asLocal ? " = null" : "")};   // RD {r.Name}: the cached selector (ISO §14.9.49.4 GR4)");
             using (w.Block($"{(asLocal ? "" : "public ")}bool {SelectorName(r)}(int __gi, bool __globalOnly)   // RD {r.Name} — ISO §14.9.49.4 GR4 / GR8"))
             {
                 var cases = new List<string>();

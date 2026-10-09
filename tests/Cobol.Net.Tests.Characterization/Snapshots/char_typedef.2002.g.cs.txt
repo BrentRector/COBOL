@@ -3,8 +3,11 @@
 // </auto-generated>
 #nullable enable
 #pragma warning disable CS0164   // unreferenced label — SEARCH/NEXT-SENTENCE emit per-boundary labels; not every one is jumped to
-using System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
-using CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
+[assembly: global::CobolNet.Runtime.Repository.CobolRepositoryAttribute(1, "1.0.0.0", 1, Registrar = "Cobol.p.__CobolModule")]
+namespace Cobol.p;
+
+using global::System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
+using global::CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
 
 internal sealed class _PRG_CHAR_TYPEDEF : ICobolProgram
 {
@@ -55,7 +58,7 @@ internal sealed class _PRG_CHAR_TYPEDEF : ICobolProgram
                 {
                     P1.PX = (long)(CobolNum.Store(10L, 0, _P_4, CobolRounding.Truncation));
                     P1.PY = (long)(CobolNum.Store(20L, 0, _P_5, CobolRounding.Truncation));
-                    System.Console.WriteLine(CobolNum.FormatDisplay(P1.PX, _P_4) + CobolNum.FormatDisplay(P1.PY, _P_5));
+                    global::System.Console.WriteLine(CobolNum.FormatDisplay(P1.PX, _P_4) + CobolNum.FormatDisplay(P1.PY, _P_5));
                     throw new StopRun();
                 }
                 default:
@@ -71,7 +74,9 @@ internal sealed class _PRG_CHAR_TYPEDEF : ICobolProgram
 }
 public static class __CobolModule
 {
-    public static void Register()
+    public static void EnsureRegistered() => ProgramRegistry.RegisterModule("Cobol.p.__CobolModule", "1.0.0.0", 1, Register);
+
+    private static void Register()
     {
         ProgramRegistry.Register("CHAR-TYPEDEF", "CHAR-TYPEDEF", null, false, false, false, static __o => new _PRG_CHAR_TYPEDEF(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
@@ -82,7 +87,7 @@ internal static class Program
     private static void Main()
     {
         ProgramRegistry.Reset();
-        __CobolModule.Register();
+        __CobolModule.EnsureRegistered();
         try { ProgramRegistry.RunMain("CHAR-TYPEDEF"); }
         catch (StopRun) { }
     }

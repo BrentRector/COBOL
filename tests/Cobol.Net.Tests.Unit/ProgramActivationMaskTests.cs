@@ -45,7 +45,8 @@ public sealed class ProgramActivationMaskTests
             seenDuringCall = ru.Exceptions.ActivatorExternalMask;    // the activated element reads the CALL's half
             flagsDuringCall = ru.Exceptions.ExternalActivatingMask;  // its own statements start from all-off, so a
         };                                                           // nested CALL's guard sets its own half
-        ru.Programs.Register("P1", "P1", null, initial: false, common: false, recursive: false, _ => fake);
+        ru.Programs.RegisterModule("Cobol.P1.__CobolModule", RuntimeAbi.Version.ToString(), RuntimeAbi.CallAbi, () =>
+            ru.Programs.Register("P1", "P1", null, initial: false, common: false, recursive: false, _ => fake));
         ru.Exceptions.ActivatorExternalMask = 0b0001;
         ru.Exceptions.ExternalDataMismatchChecking = true;
         ru.Exceptions.ExternalFileMismatchChecking = true;

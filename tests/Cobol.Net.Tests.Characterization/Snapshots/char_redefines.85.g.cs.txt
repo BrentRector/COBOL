@@ -3,8 +3,11 @@
 // </auto-generated>
 #nullable enable
 #pragma warning disable CS0164   // unreferenced label — SEARCH/NEXT-SENTENCE emit per-boundary labels; not every one is jumped to
-using System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
-using CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
+[assembly: global::CobolNet.Runtime.Repository.CobolRepositoryAttribute(1, "1.0.0.0", 1, Registrar = "Cobol.p.__CobolModule")]
+namespace Cobol.p;
+
+using global::System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
+using global::CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
 
 internal sealed class _PRG_CHAR_REDEFINES : ICobolProgram
 {
@@ -43,9 +46,9 @@ internal sealed class _PRG_CHAR_REDEFINES : ICobolProgram
                 case 0:   // MAIN-PARA
                 {
                     WS_A = (long)(CobolNum.Store(1234L, 0, _P_0, CobolRounding.Truncation));
-                    System.Console.WriteLine(CobolNum.FormatDisplay(WS_A, _P_1));
+                    global::System.Console.WriteLine(CobolNum.FormatDisplay(WS_A, _P_1));
                     _redef_WS_G = CobolString.WindowInto(_redef_WS_G, (int)(0 + 1), 4, CobolString.Store("WXYZ", 4));
-                    System.Console.WriteLine(CobolString.Window(_redef_WS_G, (int)(0 + 1), 2) + CobolString.Window(_redef_WS_G, (int)(2 + 1), 2));
+                    global::System.Console.WriteLine(CobolString.Window(_redef_WS_G, (int)(0 + 1), 2) + CobolString.Window(_redef_WS_G, (int)(2 + 1), 2));
                     throw new StopRun();
                 }
                 default:
@@ -61,7 +64,9 @@ internal sealed class _PRG_CHAR_REDEFINES : ICobolProgram
 }
 public static class __CobolModule
 {
-    public static void Register()
+    public static void EnsureRegistered() => ProgramRegistry.RegisterModule("Cobol.p.__CobolModule", "1.0.0.0", 1, Register);
+
+    private static void Register()
     {
         ProgramRegistry.Register("CHAR-REDEFINES", "CHAR-REDEFINES", null, false, false, false, static __o => new _PRG_CHAR_REDEFINES(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
@@ -72,7 +77,7 @@ internal static class Program
     private static void Main()
     {
         ProgramRegistry.Reset();
-        __CobolModule.Register();
+        __CobolModule.EnsureRegistered();
         try { ProgramRegistry.RunMain("CHAR-REDEFINES"); }
         catch (StopRun) { }
     }

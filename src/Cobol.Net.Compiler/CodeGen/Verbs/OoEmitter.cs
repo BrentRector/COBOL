@@ -396,7 +396,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // §9.3.6 match rule 3 d) 4./5. — "the class specified in the invocation" of a universal INVOKE is the class of the
         // object it runs on; each half names the other half's type, so the run-time relation can ask an ACTIVE-CLASS
         // formal's question of either (CobolObject.__FactoryClassType / __InstanceClassType; kb/Work PB1112).
-        instExtras.Add($"protected override System.Type? __FactoryClassType => typeof({cls.Symbol.FactoryCsName});");
+        instExtras.Add($"protected override global::System.Type? __FactoryClassType => typeof({cls.Symbol.FactoryCsName});");
         if (lifeCycle)
             instExtras.Add($"protected override BASE__FACTORY __FactoryOfClass => {cls.Symbol.FactoryCsName}."
                 + $"{NamingConvention.FactoryInstanceField};   // FactoryObject (ISO §16.2.2.2 GR1)");
@@ -421,7 +421,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // reached as every other is (kb/Work PB2489).
             $"public {(cls.Symbol.Base is not null ? "new " : "")}static {cls.Symbol.FactoryCsName} "
                 + $"{NamingConvention.FactoryInstanceField} => {RuntimeApi.FactoryObject(cls.Symbol.FactoryCsName)};",
-            $"protected override System.Type? __InstanceClassType => typeof({cls.CsName});",
+            $"protected override global::System.Type? __InstanceClassType => typeof({cls.CsName});",
         };
         // New's creation step (§16.2.1.2 GR1), exactly when the class has BaseFactoryInterface through INHERITS
         // (§16.2; §9.3.9): a covariant override of BASE__FACTORY.__Create, so New invoked on a subclass's factory —

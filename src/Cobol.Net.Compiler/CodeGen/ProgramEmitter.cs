@@ -71,7 +71,10 @@ internal sealed class ProgramEmitter
     /// READ-ONLY — the storage-form decision and the file-connector qualification already ran inside Bind; the
     /// OO class table and interface-data forests arrive ON the compilation (P6 Step 2), so emission no longer
     /// touches the bind host's session state.</summary>
-    internal string Emit(BoundCompilation comp)
+    /// <param name="assemblySimpleName">The emitted assembly's simple name: every emitted type lives in its
+    /// one-segment namespace <c>Cobol.&lt;S&gt;</c> (<see cref="CsNames.ModuleNamespaceOf"/>; DESIGN-external-repository
+    /// §4.5).</param>
+    internal string Emit(BoundCompilation comp, string assemblySimpleName)
     {
         _ecState.Active = comp.EcActive;
         _ecState.OoClasses = comp.OoClasses;
@@ -86,31 +89,44 @@ internal sealed class ProgramEmitter
         w.Line("// </auto-generated>");
         w.Line("#nullable enable");
         w.Line("#pragma warning disable CS0164   // unreferenced label — SEARCH/NEXT-SENTENCE emit per-boundary labels; not every one is jumped to");
-        w.Line("using System;                    // Int128 — the wide arithmetic carrier (numeric design D1)");
-        w.Line("using CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)");
+        // The module's namespace and its record (DESIGN-external-repository §4.5, §6.2; kb/Work PB2097). Every emitted
+        // type lives in Cobol.<S>, and every name outside it is global::-rooted: the using directives sit INSIDE the
+        // namespace and name their namespaces from global::, so a simple name such as CobolNum finds the runtime's type
+        // before C# searches the enclosing Cobol namespace, and a qualified one is written global::System.… — an assembly
+        // named System, CobolNet or CobolNum (whose namespace Cobol.System … is a member of Cobol) captures neither
+        // (CS0234 / CS0118 on legal source otherwise). The assembly attribute precedes the namespace (C# requires it).
+        var ns = CsNames.ModuleNamespaceOf(assemblySimpleName);
+        w.Line(RuntimeApi.ModuleRecordAttribute(ns.RegistrarClrName));
+        w.Line($"namespace {ns.CsName};");
+        w.Line();
+        w.Line("using global::System;                    // Int128 — the wide arithmetic carrier (numeric design D1)");
+        w.Line("using global::CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)");
         if (anyFiles)
-            w.Line("using CobolNet.Runtime.IO;       // CobolFile — the sequential file-I/O facade (§8)");
+            w.Line("using global::CobolNet.Runtime.IO;       // CobolFile — the sequential file-I/O facade (§8)");
         if (_ecState.Active || classes.Count > 0)
             // The EC model, OR any class (D10): every class's generated __CobolInvoke switch raises
             // CobolFatalException (EC-OO-UNIVERSAL, GR7c). A class-less EC-free program keeps the
             // zero-scaffolding invariant byte-exact (SSOT §18.16 — the test greps the namespace).
-            w.Line("using CobolNet.Runtime.Exceptions; // CobolFatalException — the EC signal type (ISO §14.6.13) + the D10 universal-INVOKE raises (§14.9.23.4 GR7c)");
+            w.Line("using global::CobolNet.Runtime.Exceptions; // CobolFatalException — the EC signal type (ISO §14.6.13) + the D10 universal-INVOKE raises (§14.9.23.4 GR7c)");
         if (UnitsOf(comp).Any(u => u.Data.Classification is not null)
             || classes.Any(c => c.Data.Classification is not null || c.FactoryData.Classification is not null))
             // A CHARACTER CLASSIFICATION clause anywhere in the compilation group — a program, or a CLASS-ID whose methods
             // carry it as an activation local: the Globalization types (kb/Work PB64 T5 / PB111). Zero-scaffolding otherwise.
-            w.Line("using CobolNet.Runtime.Globalization; // CharacterClassification / LocalePhraseKind — OBJECT-COMPUTER CHARACTER CLASSIFICATION (ISO §12.3.6)");
+            w.Line("using global::CobolNet.Runtime.Globalization; // CharacterClassification / LocalePhraseKind — OBJECT-COMPUTER CHARACTER CLASSIFICATION (ISO §12.3.6)");
         w.Line();
 
         // Interfaces first (readability only — Roslyn needs no ordering), then classes (source order), then
         // the program classes and the run-unit entry wrapper. A class-only/interface-only compilation unit is
-        // legal (§10.6) — its module emits the types and an empty Main.
+        // legal (§10.6) — its module emits the types, a registrar with nothing to register (the record names it), and an
+        // empty Main.
         foreach (var iface in comp.OoClasses.Interfaces)
             _oo.EmitInterfaceUnit(iface, w);
         foreach (var cls in classes)
             _oo.EmitClassUnit(cls, w);
         if (units.Count == 0)
         {
+            EmitModuleRegistrar(units, w, ns);
+            w.Line();
             using (w.Block("internal static class Program"))
             using (w.Block("private static void Main()")) { }
             return w.ToString();
@@ -119,7 +135,7 @@ internal sealed class ProgramEmitter
         foreach (var unit in units)
             if (unit.Parent is null && !unit.IsPrototype)   // a prototype has no body (§10.6.2 SR4f) — no class
                 EmitProgramClass(unit, w);
-        EmitEntryWrapper(units, w, anyFiles);
+        EmitEntryWrapper(units, w, anyFiles, ns);
         return w.ToString();
     }
 
@@ -752,18 +768,33 @@ internal sealed class ProgramEmitter
         RuntimeApi.GroupAtomsNew(VariableLengthCompatibility.GroupAtoms(formal)
             ?? throw new InvalidOperationException($"variable-length formal '{formal.CobolName}' has no §8.5.1.12 atoms"));
 
-    /// <summary>Emit the module registrar + the run-unit entry wrapper. <c>__CobolModule</c> is the ONE public,
-    /// well-known discovery surface of a compiled module (deep-dive D2; the generated program classes are
-    /// internal): its <c>Register()</c> registers every program unit (containers before containees), serving
-    /// both the own-run-unit <c>Main</c> AND a CALLing run unit's sibling-assembly probe
-    /// (<c>ProgramRegistry.ResolveVisible</c> rule-4 fallthrough — the implementor-defined §14.9.4.4 GR3b
-    /// locate step; §14.6.1: a run unit contains one or more runtime modules). <c>Main</c> runs the first
-    /// program as main and performs the §14.6.11 implicit CLOSE at run-unit termination; STOP RUN unwinds to
-    /// here (§14.9.43); a main-program GOBACK already returned normally through its activation entry.</summary>
-    private void EmitEntryWrapper(IReadOnlyList<BoundUnit> units, CodeWriter w, bool anyFiles)
+    /// <summary>Emit the module registrar + the run-unit entry wrapper (<see cref="EmitModuleRegistrar"/>, then
+    /// <c>Main</c>). <c>Main</c> runs the first program as main and performs the §14.6.11 implicit CLOSE at run-unit
+    /// termination; STOP RUN unwinds to here (§14.9.43); a main-program GOBACK already returned normally through its
+    /// activation entry.</summary>
+    private void EmitEntryWrapper(IReadOnlyList<BoundUnit> units, CodeWriter w, bool anyFiles, ModuleNamespace ns)
     {
-        using (w.Block("public static class __CobolModule"))
-        using (w.Block("public static void Register()"))
+        EmitModuleRegistrar(units, w, ns);
+        w.Line();
+        EmitMain(units, w, anyFiles);
+    }
+
+    /// <summary>Emit <c>__CobolModule</c>, the ONE public, well-known registration surface of a compiled module (deep-dive
+    /// D2; DESIGN-external-repository §4.5, §11.2; the generated program classes are internal). Its one public member,
+    /// <c>EnsureRegistered()</c>, is <c>ProgramRegistry.RegisterModule(registrar, runtimeVersion, callAbi, Register)</c>:
+    /// it registers the module into the current run unit ONCE, refusing it when the runtime major or call ABI it was
+    /// compiled against differs from the running runtime's, or when another module already registered one of its
+    /// outermost names. Every route reaches a module through it — the own run unit's <c>Main</c>, a CALLing run unit's
+    /// sibling-assembly probe (the implementor-defined §14.9.4.4 GR3b locate step; §14.6.1: a run unit contains one or
+    /// more runtime modules), and a host composing a run unit — so no path registers a module twice. The private
+    /// <c>Register()</c> registers every program unit, containers before containees.</summary>
+    private void EmitModuleRegistrar(IReadOnlyList<BoundUnit> units, CodeWriter w, ModuleNamespace ns)
+    {
+        using (w.Block($"public static class {ModuleNamespace.RegistrarClass}"))
+        {
+            w.Line($"public static void EnsureRegistered() => {RuntimeApi.RegisterModule(ns.RegistrarClrName, "Register")};");
+            w.Line();
+            using (w.Block("private static void Register()"))
             foreach (var u in units)
             {
                 if (u.IsPrototype) continue;   // a prototype registers no runtime module — the separately-compiled definition does (§10.6.3 GR1)
@@ -819,10 +850,16 @@ internal sealed class ProgramEmitter
                 w.Line($"ProgramRegistry.Register({CsLiteral(u.Path)}, {CsLiteral(u.Name)}, {parentPath}, "
                     + $"{CallEmitter.CallBool(u.Initial)}, {CallEmitter.CallBool(u.Common)}, {CallEmitter.CallBool(u.Recursive)}, {factory}{resetNamed}{argMeta}{fnFlag}{extName});");
             }
-        w.Line();
+        }
+    }
+
+    /// <summary>Emit the run-unit entry, <c>Program.Main</c>: begin the run unit, register this module through its one
+    /// registration member, and run the main program.</summary>
+    private static void EmitMain(IReadOnlyList<BoundUnit> units, CodeWriter w, bool anyFiles)
+    {
         // The run-unit main is the first top-level PROGRAM unit (§8.3.1). A prototype precedes every other unit
         // (§10.6.2 SR1), so units[0] may be a prototype; a function/prototype-only module (a callable library —
-        // the cross-assembly UDF-3 target) has no main and only exposes Register() for the sibling probe.
+        // the cross-assembly UDF-3 target) has no main and is reached through EnsureRegistered() by the sibling probe.
         // A PROGRAM prototype (§11.10.2 Format 2, kb/Work PB894) is not a program definition and has no body
         // (§10.6.2 SR4 f), so it is never the main — the same exclusion the Register loop above applies.
         var mainUnit = units.FirstOrDefault(u => u is { Parent: null, IsFunction: false, IsPrototype: false });
@@ -831,7 +868,7 @@ internal sealed class ProgramEmitter
         {
             w.Line("ProgramRegistry.Reset();");
             if (anyFiles) w.Line($"{RuntimeApi.FileInit()};");
-            w.Line("__CobolModule.Register();");
+            w.Line($"{ModuleNamespace.RegistrarClass}.EnsureRegistered();");
             if (mainUnit is not null)
             {
                 // The run-unit TERMINATION surface is owned by the runtime's RunMain boundary

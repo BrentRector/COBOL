@@ -220,13 +220,13 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// signature and landed every argument at compile time, or it passes every argument BY REFERENCE.</summary>
     private string ProgramSpecifiersText(bool landsAtRunTime) => ctx.Data.ProgramSpecifiers.Count > 0
         ? $", programSpecifiers: new string[] {{ {string.Join(", ", ctx.Data.ProgramSpecifiers.Values.Select(s => CsLiteral(s.ExternalizedName)))} }}"
-        : landsAtRunTime ? ", programSpecifiers: System.Array.Empty<string>()" : "";
+        : landsAtRunTime ? ", programSpecifiers: global::System.Array.Empty<string>()" : "";
 
     /// <summary>The <c>CobolArg[]</c> expression of one bound call's arguments — the ONE argument-array text of
     /// <see cref="EmitCall"/>, which renders every activation, statement-position or operand (kb/Work PB892).</summary>
     private string ArgsArrayText(BoundCallProgram c, bool describeArguments)
     {
-        if (c.Args.Count == 0) return "System.Array.Empty<CobolArg>()";
+        if (c.Args.Count == 0) return "global::System.Array.Empty<CobolArg>()";
         bool landsAtRunTime = LandsAtRunTime(c);
         return $"new CobolArg[] {{ {string.Join(", ", c.Args.Select(a => ArgText(a, describeArguments, landsAtRunTime)))} }}";
     }

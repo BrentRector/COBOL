@@ -49,7 +49,7 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
             // non-injective, non-invertible image; an intrinsic function's string argument asks the same reader.
             : OperandText.AsTransferString(o, num, "DISPLAY of")).ToList();
         string image = parts.Count == 0 ? "\"\"" : string.Join(" + ", parts);
-        string sink = d.ToStdErr ? "System.Console.Error" : "System.Console";
+        string sink = d.ToStdErr ? "global::System.Console.Error" : "global::System.Console";
         ctx.Writer.Line(d.NoAdvancing ? $"{sink}.Write({image});" : $"{sink}.WriteLine({image});");
     }
 
@@ -96,7 +96,7 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
             // zero — the slice write below raises EC-BOUND-REF-MOD for that start (§8.4.3.3.4 item 5c).
             string len = rm.Length is { } l
                 ? RuntimeApi.RefModLength(l)
-                : $"(int)System.Math.Max(0L, {rm.Inner.Item.OperandPic?.Length ?? rm.Inner.Item.ImageWidth} - (long){RuntimeApi.RefModStart(rm.Start)} + 1)";
+                : $"(int)global::System.Math.Max(0L, {rm.Inner.Item.OperandPic?.Length ?? rm.Inner.Item.ImageWidth} - (long){RuntimeApi.RefModStart(rm.Start)} + 1)";
             w.Line(PlaceRenderer.Write(target, $"AcceptSource.Device({len})"));
             return;
         }

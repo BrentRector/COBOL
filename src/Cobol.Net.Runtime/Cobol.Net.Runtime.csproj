@@ -22,6 +22,21 @@
   </ItemGroup>
 
   <!--
+    THE PUBLIC SURFACE IS A RECORDED CONTRACT (kb/Work PB2097; docs/rearchitecture/DESIGN-external-repository.md
+    §15.4). Every compiled COBOL module calls this assembly's public members, and records the runtime version it was
+    compiled against; a run unit refuses a module of another MAJOR (RuntimeAbi.Skew). PublicAPI.Shipped.txt lists the
+    surface the current major ships; a new public member goes in PublicAPI.Unshipped.txt (RS0016), and a removed or
+    changed one is an RS0017 until the files say so, so no surface change is accidental. A removal or an incompatible
+    change raises the major (Directory.Build.props <Version>), and RuntimeAbiPinDriftTests pins the Shipped file's hash
+    beside the major.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+
+  <!--
     THE READYTORUN RUNTIME (kb/Work PB2528, owner decision 2026-10-07; DESIGN-test-build-ci §3.16). Every compiled
     COBOL program runs in its own process with this assembly beside it, so the JIT compiling the runtime's methods
     is paid at every program start. The ordinary build therefore also produces this assembly precompiled

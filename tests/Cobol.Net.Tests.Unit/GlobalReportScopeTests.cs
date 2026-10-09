@@ -300,7 +300,7 @@ public sealed class GlobalReportScopeTests
             var edition = new EditionContext(85);
             var bound = emitter.Bind(tree!, edition, frontend.Directives);
             Assert.False(edition.HasErrors, string.Join("\n", edition.Diagnostics));
-            return emitter.EmitBound(bound);
+            return emitter.EmitBound(bound, "DRIFTPROBE");
         }
         finally { try { File.Delete(path); } catch (IOException) { /* best-effort */ } }
     }

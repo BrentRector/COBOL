@@ -142,7 +142,7 @@ public sealed class NestedStatementEcRegionDriftTests
             var emitter = new CSharpEmitter();
             // ⛔ The >>TURN events ride frontend.Directives — without them the group binds under the §7.3.25.4
             // GR1 default (EC-ALL CHECKING OFF) and every assertion below passes for the wrong reason.
-            return emitter.EmitBound(emitter.Bind(tree!, new EditionContext(2023), frontend.Directives));
+            return emitter.EmitBound(emitter.Bind(tree!, new EditionContext(2023), frontend.Directives), "DRIFTPROBE");
         }
         finally { try { File.Delete(path); } catch { /* best-effort */ } }
     }

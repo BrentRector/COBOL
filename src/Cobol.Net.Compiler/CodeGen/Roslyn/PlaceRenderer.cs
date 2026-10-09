@@ -515,7 +515,7 @@ internal static class PlaceRenderer
                 string k = $"__lk{depth}";
                 string elem = c.IsGroup ? $"(object?){CellLeaves(at.Indexed(new PositionLocal(k)), depth + 1)}"
                     : $"({c.ElementType})({LeafCarrierRead(at.Indexed(new PositionLocal(k)).ToPlace())})";
-                parts.Add($"System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(1, {n}), {k} => {elem}))");
+                parts.Add($"global::System.Linq.Enumerable.ToArray(global::System.Linq.Enumerable.Select(global::System.Linq.Enumerable.Range(1, {n}), {k} => {elem}))");
             }
             else parts.Add(c.IsGroup ? CellLeaves(at, depth + 1) : $"(object?)({LeafCarrierRead(at.ToPlace())})");
         }

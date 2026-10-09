@@ -107,7 +107,7 @@ public sealed class DispatcherTransferIdiomDriftTests
             var tree = new CnFrontend { InitialFormat = InitialReferenceFormat.Auto, DialectLevel = 2002 }.Parse(path, diags);
             Assert.False(diags.HasErrors, string.Join("\n", diags.Diagnostics));
             var emitter = new CSharpEmitter();
-            return emitter.EmitBound(emitter.Bind(tree!, new EditionContext(2002)));
+            return emitter.EmitBound(emitter.Bind(tree!, new EditionContext(2002)), "DRIFTPROBE");
         }
         finally { try { File.Delete(path); } catch (IOException) { /* best-effort */ } }
     }

@@ -10,7 +10,8 @@ retired when it lands; a trimmed or AOT application composes the programs it cal
 refused); and the two standing directives: **COBOL semantics are honored
 regardless of cost**, and **otherwise the surface stays as close to .NET as possible** (strongly typed host calls,
 ECMA-335 metadata and attributes, no bespoke formats). This is the "R44 design doc" that `docs/CONFORMANCE.md` rows
-DOC-A.1-66/-67/-138/-161/-162 defer to; §9 carries the text those rows take.
+DOC-A.1-66/-67/-138/-161/-162 defer to; §9 carries the text those rows take. **Implementation:** slices 1 (kb/Work PB2097),
+2 (kb/Work PB2098) and 6 (kb/Work PB989) of §21 have landed; the rest are open.
 
 **Scope:** the compile-time resolution of every REPOSITORY-paragraph specifier against information outside the
 compilation group (ISO §8.13, §12.3.8); the metadata that carries that information; the two user mechanisms (update,
@@ -582,7 +583,8 @@ and a "facade" that "forwards" are rewritten to that statement in the same chang
 
 ### 4.5 Namespaces and `__CobolModule`
 Every emitted type lives in the namespace `Cobol.<S>`, where `<S>` is the assembly simple name made ONE identifier by
-`DataItem.IdentifierCharacters` (each character a C# identifier cannot hold, `.` included, written `_uXXXX_`), so
+`DataItem.Sanitize` (each character a C# identifier cannot hold, `.` included, written `_uXXXX_`; a leading digit
+prefixed with `_`; a C# keyword escaped with `@` in the source and bare in metadata), `CsNames.ModuleNamespaceOf`, so
 `PAY.V2.dll` is `Cobol.PAY_u002E_V2` and never meets a type `V2` in `Cobol.PAY` (r7-ns: the dotted form is CS0434 in
 a host and CS0437 in a group). No emitted type lives directly in `Cobol`, so a namespace never meets a type, and two
 COBOL assemblies referenced by one host never collide on a program or class name or on `__CobolModule`; two needed
@@ -604,10 +606,18 @@ so a legal word never collides with a generated member. **Landed for the interna
 program-class scope. `CsNameReservationDriftTests` reads every member declaration the code generator writes, the
 members C# synthesizes for a record struct and the `ICobolProgram` members, and is red when one is in neither seed.
 Within a run unit one externalized name identifies one kind of entity (§8.3.2.2), so a program and a class never
-legally share one. Generated code spells every name outside the unit's own namespace `global::`-qualified
-(`global::CobolNet.Runtime.ProgramRegistry`): an assembly named `Cobol` or `CobolNet` would otherwise capture the
-prefix (CS0234 on legal source). `__CobolModule`'s one public member is `EnsureRegistered()`, which registers this
-assembly's programs into the current run unit once (§11.2); its `Register` body is private.
+legally share one. Generated code roots every name outside the unit's own namespace at `global::`: an assembly named
+`System`, `Cobol` or `CobolNet` makes `Cobol.System` (…) a member of `Cobol`, which would otherwise capture a written
+prefix (CS0234 on legal source), and an assembly named after a runtime type (`CobolNum`) would capture that simple name
+(CS0118). Two mechanisms root them, both in `ProgramEmitter.Emit`: the file's using directives sit INSIDE the
+module's namespace and name their namespaces from `global::` (`using global::CobolNet.Runtime;`), so a simple name is
+found in the runtime before C# searches the enclosing `Cobol` namespace; and every QUALIFIED name the code generator
+writes is `global::`-qualified (`global::System.Math.Max`, `global::CobolNet.Runtime.Exceptions.ExceptionState`),
+which `EmittedGlobalNameDriftTests` enforces over every string the compiler holds. The record precedes the namespace
+(`[assembly: global::CobolNet.Runtime.Repository.CobolRepositoryAttribute(…)]`, C# requires it). `__CobolModule`'s one
+public member is `EnsureRegistered()`, which registers this assembly's programs into the current run unit once
+(§11.2); its `Register` body is private. A class-only or interface-only module emits a `__CobolModule` with nothing to
+register, so the record's `Registrar` always names a type. **Landed (kb/Work PB2097, slice 1).**
 
 ### 4.6 COBOL calling plain .NET (the extension point)
 A third provider behind the SAME resolver, `ClrTypeProvider`, answers a CLASS or INTERFACE specifier whose externalized
@@ -1237,9 +1247,13 @@ composing a run unit (§11.4) and the probe all reach a module through that memb
    never registered again by a probe, and vice versa — a second `Register` would duplicate every node in `_order`);
 2. refuses a module whose runtime major differs from the running runtime's or whose call ABI differs from the
    runtime's (§11.3, §15.4);
-3. runs `Register` into a STAGING list and commits it only when none of the module's outermost `kind:name`s is
-   already registered by another module: within a run unit one externalized name is one instance (§8.3.2.2), so a
-   second module carrying it is refused whole, naming both modules, and nothing of it is registered.
+3. runs `Register` into a STAGING list and commits it only when none of the module's outermost names is already
+   registered by another module, as a program or as a function: "Within a run unit, all instances of a given name that
+   is externalized to the operating environment shall identify the same kind of entity or item", and two source
+   elements naming one externalized name "refer to the same instance" (§8.3.2.2 2), so a second module carrying it is
+   refused whole, naming both modules, and nothing of it is registered. `ProgramTable.Register` writes only into the
+   staging list of the `RegisterModule` call that is running, and throws outside one, so `RegisterModule` is the only
+   writer of the registration set.
 A refusal is a `CobolCallException` with EC-PROGRAM-NOT-FOUND and the reason, the condition the activation that
 needed the module raises anyway, so `CarriedNames` is unchanged; reached from the probe it is the probe's failure
 reason (below).
@@ -1720,7 +1734,13 @@ green when the slices it depends on have landed, each carrying the sibling-docum
 REPO-n codes are allocated with `alloc.py code N` when the notes are filed. The dependency graph has no cycle: 1 and 2
 and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 needs 4, 5 and 6; 8 needs 7.
 
-1. **Namespace, registration and the version guard — one atomic change.** The one-segment `namespace Cobol.<S>` and
+1. **Namespace, registration and the version guard — LANDED (kb/Work PB2097).** `CsNames.ModuleNamespaceOf`;
+   `RuntimeApi.ModuleRecordAttribute` / `RegisterModule`; `ProgramEmitter.EmitModuleRegistrar`; `RuntimeAbi`
+   (`Version`, `CallAbi`, `Skew`); `CobolNet.Runtime.Repository.CobolRepositoryAttribute`; `ProgramTable.RegisterModule`
+   and the attribute-reading `ProbeSiblingModule` (still the named-file probe: the locator is slice 5), whose failure
+   reasons the not-found messages carry; the tests `EmittedGlobalNameDriftTests`, `ModuleRegistrationTests`,
+   `ModuleRegistrationHostTests`, `RuntimeAbiPinDriftTests` (the major beside `PublicAPI.Shipped.txt` and the codec
+   images; `CallAbi` beside the boundary-layout fixture). As designed: The one-segment `namespace Cobol.<S>` and
    `global::` on every emitted type; `[assembly: CobolRepository(schema, runtimeVersion, callAbi, Registrar)]` (the
    attribute type lands here); `__CobolModule.EnsureRegistered()` as the module's one public registration member,
    `Register` private; `ProgramTable.RegisterModule(registrar, runtimeVersion, callAbi, register)` with the version

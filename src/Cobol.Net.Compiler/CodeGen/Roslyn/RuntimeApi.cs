@@ -157,7 +157,7 @@ internal static class RuntimeApi
     /// <paramref name="count"/> elements, or a dynamic-capacity table's <c>CurrentOccurrences</c>.</summary>
     public static string TableCurrentOccurrences(string table, string? count) => count is null
         ? $"{table}.{nameof(CobolDynTable<int>.CurrentOccurrences)}"
-        : $"System.MemoryExtensions.AsSpan({table}, 0, {count})";
+        : $"global::System.MemoryExtensions.AsSpan({table}, 0, {count})";
 
     /// <summary>The checked read of a BOOLEAN sending operand — <c>CobolBool.Sending(value)</c>: raises the fatal
     /// EC-DATA-INCOMPATIBLE for content that is not all <c>'0'</c>/<c>'1'</c> under checking (ISO §14.6.13.2
@@ -1412,7 +1412,7 @@ internal static class RuntimeApi
     /// <c>StartKeyLength.OfScaled</c>): the scaled <c>Int128</c> and its scale travel intact, so the connector's
     /// integrality and range test sees the value the source computed.</summary>
     public static string StartKeyLengthScaled(string scaled, string scale, int unitWidth) =>
-        $"{nameof(StartKeyLength)}.{nameof(StartKeyLength.OfScaled)}((System.Int128)({scaled}), {scale}, {unitWidth})";
+        $"{nameof(StartKeyLength)}.{nameof(StartKeyLength.OfScaled)}((global::System.Int128)({scaled}), {scale}, {unitWidth})";
 
     /// <summary>The native-float lane of <see cref="StartKeyLengthScaled"/> — <c>StartKeyLength.OfReal</c>.</summary>
     public static string StartKeyLengthReal(string value, int unitWidth) =>
@@ -1985,7 +1985,7 @@ internal static class RuntimeApi
 
     /// <summary>The §8.5.1.12 atoms argument of a TABLE-LESS group formal — the empty array, which the adapter
     /// reads as <c>CobolVarGroup.FixedRun(width)</c> (kb/Work PB965, PB2280); allocation-free at every activation.</summary>
-    public const string NoTableGroupAtoms = "System.Array.Empty<GroupAtom>()";
+    public const string NoTableGroupAtoms = "global::System.Array.Empty<GroupAtom>()";
 
     /// <summary>The ACTIVATING element's §14.2.3 GR9/GR10 argument crossing — <c>CobolArgAdapt.LandForFormal</c>
     /// wrapped around a built <c>CobolArg</c> (kb/Work PB640). <paramref name="carrier"/> is the FORMAL's
@@ -2144,6 +2144,25 @@ internal static class RuntimeApi
     /// §14.6.11 run-unit-termination implicit CLOSE is runtime-side — <see cref="Runtime.ProgramTable.RunMain"/>'s
     /// finally — so a separately-compiled module's open files are closed even when this main group declares none.)</summary>
     public static string FileInit() => $"{nameof(CobolFile)}.{nameof(CobolFile.Init)}()";
+
+    // ── The module's repository record and its one registration member (DESIGN-external-repository §4.5, §11.2;
+    //    kb/Work PB2097). Both state the versions this compiler's runtime declares, as compiled against, so the run unit
+    //    a module joins can refuse it when its runtime major or call ABI differs (RuntimeAbi.Skew). ──
+
+    /// <summary>The module's assembly-level record, <c>[assembly: CobolRepository(schema, runtimeVersion, callAbi,
+    /// Registrar = …)]</c> (design §6.2): written before the module's namespace, global::-qualified like every foreign
+    /// name.</summary>
+    public static string ModuleRecordAttribute(string registrarClrName) =>
+        $"[assembly: global::{typeof(Runtime.Repository.CobolRepositoryAttribute).FullName}("
+        + $"{Runtime.Repository.CobolRepositoryAttribute.CurrentSchemaVersion}, {EmitText.CsLiteral(RuntimeAbi.Version.ToString())}, {RuntimeAbi.CallAbi}, "
+        + $"{nameof(Runtime.Repository.CobolRepositoryAttribute.Registrar)} = {EmitText.CsLiteral(registrarClrName)})]";
+
+    /// <summary>The body of a module's <c>EnsureRegistered()</c>: <c>ProgramRegistry.RegisterModule(registrar,
+    /// runtimeVersion, callAbi, register)</c> over the module's private registrar body.</summary>
+    public static string RegisterModule(string registrarClrName, string registerBody) =>
+        $"{nameof(ProgramRegistry)}.{nameof(ProgramRegistry.RegisterModule)}({EmitText.CsLiteral(registrarClrName)}, "
+        + $"{EmitText.CsLiteral(RuntimeAbi.Version.ToString())}, {RuntimeAbi.CallAbi}, {registerBody})";
+
 
     /// <summary>Mint a per-object instance-file connector key (§9.1.4) — <c>CobolFile.MintInstanceKey</c>.</summary>
     public static string FileMintInstanceKey(string baseKeyLiteral) =>
@@ -2463,7 +2482,7 @@ internal static class RuntimeApi
     /// the user cannot see. Qualifying the name here makes the emission independent of the conditional using,
     /// and keeps the zero-scaffolding invariant (SSOT §18.16) intact for programs that reference nothing.</para></summary>
     public static string ExceptionObjectRead { get; } =
-        $"CobolNet.Runtime.Exceptions.{nameof(Runtime.Exceptions.ExceptionState)}"
+        $"global::CobolNet.Runtime.Exceptions.{nameof(Runtime.Exceptions.ExceptionState)}"
         + $".{nameof(Runtime.Exceptions.ExceptionState.ExceptionObject)}";
 
     /// <summary>Push a METHOD activation frame (ISO §15.65.4 r5 — "This may be by a CALL statement, an INVOKE

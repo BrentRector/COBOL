@@ -3,9 +3,12 @@
 // </auto-generated>
 #nullable enable
 #pragma warning disable CS0164   // unreferenced label — SEARCH/NEXT-SENTENCE emit per-boundary labels; not every one is jumped to
-using System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
-using CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
-using CobolNet.Runtime.IO;       // CobolFile — the sequential file-I/O facade (§8)
+[assembly: global::CobolNet.Runtime.Repository.CobolRepositoryAttribute(1, "1.0.0.0", 1, Registrar = "Cobol.p.__CobolModule")]
+namespace Cobol.p;
+
+using global::System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
+using global::CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
+using global::CobolNet.Runtime.IO;       // CobolFile — the sequential file-I/O facade (§8)
 
 internal sealed class _PRG_CHAR_SEQ_FILE : ICobolProgram
 {
@@ -49,12 +52,12 @@ internal sealed class _PRG_CHAR_SEQ_FILE : ICobolProgram
                 case 0:   // MAIN-PARA
                 {
                     CobolFile.OpenOutput("CHAR-SEQ-FILE::OUT-FILE", "char-seq.dat", false, null);
-                    if (CobolNet.Runtime.Exceptions.ExceptionCatalog.IsFatalIoStatus(CobolFile.Status("CHAR-SEQ-FILE::OUT-FILE"))) CobolFile.TerminateOnUncoveredFatalStatus("CHAR-SEQ-FILE::OUT-FILE", "OPEN");
+                    if (global::CobolNet.Runtime.Exceptions.ExceptionCatalog.IsFatalIoStatus(CobolFile.Status("CHAR-SEQ-FILE::OUT-FILE"))) CobolFile.TerminateOnUncoveredFatalStatus("CHAR-SEQ-FILE::OUT-FILE", "OPEN");
                     OUT_REC = CobolString.Store("LINE-ONE", 10);
                     CobolFile.WriteShared("CHAR-SEQ-FILE::OUT-FILE", OUT_REC, -1, FileRecordLock.None, FileRetryKind.None, 0, null, WriteAdvance.None);
-                    if (CobolNet.Runtime.Exceptions.ExceptionCatalog.IsFatalIoStatus(CobolFile.Status("CHAR-SEQ-FILE::OUT-FILE"))) CobolFile.TerminateOnUncoveredFatalStatus("CHAR-SEQ-FILE::OUT-FILE", "WRITE");
+                    if (global::CobolNet.Runtime.Exceptions.ExceptionCatalog.IsFatalIoStatus(CobolFile.Status("CHAR-SEQ-FILE::OUT-FILE"))) CobolFile.TerminateOnUncoveredFatalStatus("CHAR-SEQ-FILE::OUT-FILE", "WRITE");
                     CobolFile.Close("CHAR-SEQ-FILE::OUT-FILE");
-                    if (CobolNet.Runtime.Exceptions.ExceptionCatalog.IsFatalIoStatus(CobolFile.Status("CHAR-SEQ-FILE::OUT-FILE"))) CobolFile.TerminateOnUncoveredFatalStatus("CHAR-SEQ-FILE::OUT-FILE", "CLOSE");
+                    if (global::CobolNet.Runtime.Exceptions.ExceptionCatalog.IsFatalIoStatus(CobolFile.Status("CHAR-SEQ-FILE::OUT-FILE"))) CobolFile.TerminateOnUncoveredFatalStatus("CHAR-SEQ-FILE::OUT-FILE", "CLOSE");
                     throw new StopRun();
                 }
                 default:
@@ -70,7 +73,9 @@ internal sealed class _PRG_CHAR_SEQ_FILE : ICobolProgram
 }
 public static class __CobolModule
 {
-    public static void Register()
+    public static void EnsureRegistered() => ProgramRegistry.RegisterModule("Cobol.p.__CobolModule", "1.0.0.0", 1, Register);
+
+    private static void Register()
     {
         ProgramRegistry.Register("CHAR-SEQ-FILE", "CHAR-SEQ-FILE", null, false, false, false, static __o => new _PRG_CHAR_SEQ_FILE(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
@@ -82,7 +87,7 @@ internal static class Program
     {
         ProgramRegistry.Reset();
         CobolFile.Init();
-        __CobolModule.Register();
+        __CobolModule.EnsureRegistered();
         try { ProgramRegistry.RunMain("CHAR-SEQ-FILE"); }
         catch (StopRun) { }
     }

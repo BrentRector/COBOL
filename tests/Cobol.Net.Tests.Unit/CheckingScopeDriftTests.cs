@@ -165,7 +165,7 @@ public sealed class CheckingScopeDriftTests
             Assert.False(diags.HasErrors, string.Join("\n", diags.Diagnostics));
             var emitter = new CSharpEmitter();
             // The >>TURN events ride frontend.Directives — without them every assertion passes for the wrong reason.
-            return emitter.EmitBound(emitter.Bind(tree!, new EditionContext(2023), frontend.Directives));
+            return emitter.EmitBound(emitter.Bind(tree!, new EditionContext(2023), frontend.Directives), "DRIFTPROBE");
         }
         finally { try { File.Delete(path); } catch { /* best-effort */ } }
     }

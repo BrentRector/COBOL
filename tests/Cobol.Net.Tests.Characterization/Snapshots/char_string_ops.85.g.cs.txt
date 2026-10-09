@@ -3,8 +3,11 @@
 // </auto-generated>
 #nullable enable
 #pragma warning disable CS0164   // unreferenced label — SEARCH/NEXT-SENTENCE emit per-boundary labels; not every one is jumped to
-using System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
-using CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
+[assembly: global::CobolNet.Runtime.Repository.CobolRepositoryAttribute(1, "1.0.0.0", 1, Registrar = "Cobol.p.__CobolModule")]
+namespace Cobol.p;
+
+using global::System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
+using global::CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)
 
 internal sealed class _PRG_CHAR_STRING_OPS : ICobolProgram
 {
@@ -104,7 +107,7 @@ internal sealed class _PRG_CHAR_STRING_OPS : ICobolProgram
                             if (__unsPtr1 <= __unsSrc1.Length) __unsOvf1 = true;   // unexamined characters remain (ISO §14.9.48.4 GR15b)
                         }
                     }
-                    System.Console.WriteLine(CobolNum.FormatDisplay(WS_CNT, _P_1) + WS_OUT + WS_P1 + WS_P2);
+                    global::System.Console.WriteLine(CobolNum.FormatDisplay(WS_CNT, _P_1) + WS_OUT + WS_P1 + WS_P2);
                     throw new StopRun();
                 }
                 default:
@@ -120,7 +123,9 @@ internal sealed class _PRG_CHAR_STRING_OPS : ICobolProgram
 }
 public static class __CobolModule
 {
-    public static void Register()
+    public static void EnsureRegistered() => ProgramRegistry.RegisterModule("Cobol.p.__CobolModule", "1.0.0.0", 1, Register);
+
+    private static void Register()
     {
         ProgramRegistry.Register("CHAR-STRING-OPS", "CHAR-STRING-OPS", null, false, false, false, static __o => new _PRG_CHAR_STRING_OPS(), formalCount: 0, requiredCount: 0, argMismatchChecking: false);
     }
@@ -131,7 +136,7 @@ internal static class Program
     private static void Main()
     {
         ProgramRegistry.Reset();
-        __CobolModule.Register();
+        __CobolModule.EnsureRegistered();
         try { ProgramRegistry.RunMain("CHAR-STRING-OPS"); }
         catch (StopRun) { }
     }

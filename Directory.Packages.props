@@ -12,6 +12,11 @@
     <!-- CLI argument parsing: Microsoft's first-party parser (the one the dotnet CLI uses) — correct
          inline-value and space-separated handling, arity, and auto-generated help (Cobol.Net.Cli). -->
     <PackageVersion Include="System.CommandLine" Version="2.0.9" />
+    <!-- The runtime's public surface is a recorded contract (kb/Work PB2097; DESIGN-external-repository §15.4):
+         src/Cobol.Net.Runtime/PublicAPI.Shipped.txt lists it, and RS0016/RS0017 make every change to it a deliberate,
+         reviewed edit of that file. 5.0.0 is the Roslyn the .NET 10.0.100 SDK band (global.json) carries, so the analyzer
+         never needs a newer compiler than the build has. -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.0.0" />
 
     <!-- The architecture census's Roslyn host (tools/ArchCensus; kb/Work PB2115): it loads Cobol.Net.sln through
          MSBuildWorkspace. The host's Roslyn packages share ONE version among themselves, and it need not be the

@@ -205,7 +205,7 @@ internal sealed class RecordStructEmitter(EmitContext ctx, PhysicalModel phys, G
                 (false, false) => f.Name,
                 (false, true) => $"{f.Name}.Clone()",
                 (true, false) => $"{f.Name}.AsLeaves()",
-                (true, true) => $"System.Array.ConvertAll({f.Name}, __e => (object?)__e.AsLeaves())",
+                (true, true) => $"global::System.Array.ConvertAll({f.Name}, __e => (object?)__e.AsLeaves())",
             };
         string In(PhysicalModel.Physical f, string v) =>
             (f.IsGroupStruct, f.Occurs > 0) switch
@@ -213,7 +213,7 @@ internal sealed class RecordStructEmitter(EmitContext ctx, PhysicalModel phys, G
                 (false, false) => $"__s.{f.Name} = ({f.Type}){v}!;",
                 (false, true) => $"__s.{f.Name} = ({f.Type})(({f.Type}){v}!).Clone();",
                 (true, false) => $"__s.{f.Name} = {f.Type}.OfLeaves((object?[]){v}!);",
-                (true, true) => $"__s.{f.Name} = System.Array.ConvertAll((object?[]){v}!, __e => {Elem(f.Type)}.OfLeaves((object?[])__e!));",
+                (true, true) => $"__s.{f.Name} = global::System.Array.ConvertAll((object?[]){v}!, __e => {Elem(f.Type)}.OfLeaves((object?[])__e!));",
             };
         w.Line($"public readonly object?[] AsLeaves() => [{string.Join(", ", fs.Select(Out))}];   // kb/Work PB1116");
         using (w.Block($"public static {item.StructName} OfLeaves(object?[] __l)"))
