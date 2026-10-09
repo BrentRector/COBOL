@@ -1458,16 +1458,23 @@ lowercase with Annex C. Three pieces, each in one place:
   every list from `specs/ISO_COBOL.md`. A word's length is counted in characters (code points), so a combining
   character counts separately (GR4 c).
 - **The fold** — `CobolNames` (Runtime, because the run-time externalized-name match needs it too): `Fold`, the
-  `Comparer` every name table uses, and `Same` / `StartsWith` / `EndsWith` / `Contains` over spans. No compiler or
-  frontend file compares a word by `OrdinalIgnoreCase` (`CobolNameFoldDriftTests`; a string that is not a COBOL word
-  says so on its line). The table is COBOL 2023's; the only fold difference a COBOL 2002/2014 word can observe is E.2
+  `Comparer` every name table uses, `Same` / `StartsWith` / `EndsWith` / `Contains` over spans, and `UpperFold`, a
+  word's one upper-case spelling (the fold with the basic letters raised), which is the key wherever a word is
+  compared by ordinal or with an upper-case keyword. No compiler, frontend or Editions file compares a word by
+  `OrdinalIgnoreCase` or keys one by the host's `ToUpperInvariant` (`CobolNameFoldDriftTests`; a string that is not a
+  COBOL word says so on its line). The table is COBOL 2023's; the only fold difference a COBOL 2002/2014 word can observe is E.2
   item 14 (U+0131 → i, U+03C2 → U+03C3 before 2023), so the lexer writes those letters in their edition's fold
   (`CobolNames.EditionSpelling`, primed through `TokenRetypes.PrimeLexer`) and the one comparer then answers for the
   edition. A C# identifier derived from a word keeps its extended letters, escaping only those C# cannot hold
-  (`DataItem.IdentifierCharacters`). The EXTERNAL-file group, the SR14/SR15 WHEN census and the REPOSITORY
-  specification table are keyed by the same comparer. Not yet on it: the Editions word tables (`CobolWordsMap`, the
-  directive catalog), because `Cobol.Net.Editions` references nothing and the fold lives in Runtime, and the C#
-  identifier derivations `Sanitize(x).ToUpperInvariant()`.
+  (`DataItem.IdentifierCharacters`); one whose word IS the identity (a class, interface, method, property, program
+  or formal) is `DataItem.WordIdentifier`, the `Sanitize` of the word's `UpperFold`, so two spellings of one word are
+  one C# member and two words are two (kb/Work PB1965: the host's upper-casing wrote final sigma and sigma alike at
+  2023, CS0111). The EXTERNAL-file group, the SR14/SR15 WHEN census, the REPOSITORY specification table and the
+  Editions word tables (`CobolWordsMap`, the directive catalog, the §8.10 and implementor-name tables) are keyed by
+  the same comparer: `Cobol.Net.Editions` references the runtime, the foundation layer below it
+  (`DESIGN-architecture-review.md` §8.1), for the fold. A default externalized name and the run-time EXTERNAL
+  identities (`BinderDriver.ExternalItemIdentity`, `OoEmitter.SelectFingerprint`'s word segments) are written in the
+  word's `UpperFold`, so the ordinal comparison at run time agrees with Annex C.
 - **The encoding of the grammar itself** (kb/Work PB1944) — ANTLR reads a `.g4` in the JVM's default charset (UTF-8 on
   Java 18+ and on Linux, Cp1252 on Windows CI's JVM), so `Invoke-Antlr4CSharp.ps1` passes `-encoding UTF-8` and every
   grammar file is valid UTF-8 without a byte-order mark (`GrammarEncodingDriftTests`). The encoding is declared, so

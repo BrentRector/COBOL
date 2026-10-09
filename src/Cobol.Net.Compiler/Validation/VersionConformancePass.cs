@@ -1436,7 +1436,7 @@ internal sealed class VersionConformancePass
                 _p.Check(Constructs.SpecialNamesForNational2002, "the FOR ALPHANUMERIC/NATIONAL phrase");
             if (ctx.alphabetDefinition() is { } def && def.alphabetEntry() is [{ ChildCount: 1 } entry]
                 && entry.GetChild(0) is CobolParserCore.CobolWordContext w
-                && _cobolWords.Resolve(w.GetText().ToUpperInvariant()) is "UCS-4" or "UTF-8" or "UTF-16")
+                && _cobolWords.Resolve(CobolNames.UpperFold(w.GetText())) is "UCS-4" or "UTF-8" or "UTF-16")
                 _p.Check(Constructs.AlphabetNational2002, $"the ALPHABET {w.GetText().ToUpperInvariant()} phrase");
             // `IS LOCALE [locale-name-2]` (§12.3.7.2, either branch) — the locale facility's collating sequence, a 2002
             // introduction (Annex A.4.9 item 10; kb/Work PB101). The grammar recognizes the phrase at every edition as
@@ -2587,7 +2587,7 @@ internal sealed class VersionConformancePass
                     CobolWordRule.LengthViolation(raw, _p._edition.Year)!, "", "ISO §8.3.2.1"));
             if (!CheckedTokenTypes.Contains(ctx.Start.Type) && !IsProvableUserWordPosition(ctx))
                 return base.VisitChildren(ctx);
-            string word = ctx.Start.Text.ToUpperInvariant();
+            string word = CobolNames.UpperFold(ctx.Start.Text);
             // A BARE word argument of a function reference may be a §15 PHRASE WORD (FIND-STRING ANYCASE,
             // CONVERT HEX/NAT/ANUM/BYTE, MODULE-NAME CURRENT/ACTIVATING/NESTED/STACK/TOP-LEVEL, …) — a use OF
             // the reserved word, not a user-defined-word use (§8.4.3.2 SR8 + the per-function §15 argument
@@ -2676,7 +2676,7 @@ internal sealed class VersionConformancePass
         /// it, and FILLER is not a user-defined word at all.</para></summary>
         public override object? VisitReservedGatedWord(CobolParserCore.ReservedGatedWordContext ctx)
         {
-            FlagReservedUserWord(ctx.GetText().ToUpperInvariant());
+            FlagReservedUserWord(CobolNames.UpperFold(ctx.GetText()));
             return base.VisitChildren(ctx);
         }
     }

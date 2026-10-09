@@ -414,7 +414,8 @@ behavior.
    relocates to `CobolErrorStrategy` as a token-keyed vendor hint.
 3. **Q3 — Assembly boundary? ✅ RESOLVED: dependency-free.** `Cobol.Net.Editions` references no ANTLR runtime;
    `Check` takes primitives (`EditionInfo` + `IDiagnosticSink`), and any parse-context mapping stays in the
-   frontend. Cleaner layering, as recommended.
+   frontend. Cleaner layering, as recommended. Its one project reference is `Cobol.Net.Runtime`, the dependency-free
+   foundation layer below it, for the Annex C fold (`CobolNames`) that keys its word tables (kb/Work PB1965).
 4. **Q4 — Scope of the behavior-variant matrix (§2.10)? ⏭ DEFERRED to P3.** Running every construct
    under all four `--std` values and diffing stdout is the P3 version-gating audit / `VersionBehaviorMatrixTests`,
    explicitly out of P2 scope. This is the one open question P2 does NOT resolve.

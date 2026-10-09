@@ -105,7 +105,7 @@ public static class TurnDirectiveProcessor
                     $">>TURN: the exception-name/file-name combination '{ec}{(file is null ? "" : " " + file)}' is "
                     + "specified more than once in this directive (ISO §7.3.25.3 SR3)", loc, default);
             else
-                names.Add((ec.ToUpperInvariant(), file?.ToUpperInvariant()));
+                names.Add((CobolNames.UpperFold(ec), file is null ? null : CobolNames.UpperFold(file)));
         }
 
         for (; k < words.Length; k++)

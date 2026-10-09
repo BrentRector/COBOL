@@ -374,7 +374,7 @@ internal sealed class BinderDriver
         if (!(r.HasExternalClause || r.ExternalFromType)) return null;   // root is not an external data item
         path.Add(r.CobolName ?? "?");
         path.Reverse();
-        return string.Join(".", path).ToUpperInvariant();
+        return CobolNames.UpperFold(string.Join(".", path));
     }
 
     /// <summary>Flatten the compilation group into the ordered unit lists — top-level program units in source
@@ -544,7 +544,7 @@ internal sealed class BinderDriver
         // the program itself") — both drew EC-PROGRAM-RECURSIVE-CALL / NOT-FOUND before.
         if (parent is { Recursive: true }) recursive = true;
 
-        string baseName = "_PRG_" + DataItem.Sanitize(name).ToUpperInvariant();
+        string baseName = "_PRG_" + DataItem.WordIdentifier(name);
         string className = baseName;
         for (int n = 2; !usedClassNames.Add(className); n++) className = $"{baseName}_{n}";
         return new BoundUnit

@@ -315,7 +315,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         {
             for (int i = 1; i < words.Length; i++)
             {
-                string written = words[i].GetText().ToUpperInvariant();
+                string written = CobolNames.UpperFold(words[i].GetText());
                 // The CANONICAL word decides the category (GR2/GR4); a de-reserved word resolves to null and
                 // is not a category at all (GR3) - the diagnostic below then names it, as it should.
                 string w = ctx.CobolWords.Resolve(written) ?? "";

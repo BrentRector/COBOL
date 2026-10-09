@@ -397,6 +397,15 @@ public sealed class DataItem
         "a reference is expanded in its OWN declaration before anything copies it (DataBinder.ExpandTemplate / ExpandSameAs complete the source first, kb/Work PB1302), so no copy carries a pending one")]
     public string? TypeRefName { get; set; }
 
+    /// <summary>The type-name the entry's OWN TYPE clause wrote (ISO §13.18.57), or null — the source fact, which
+    /// expansion never clears (<see cref="TypeRefName"/> is the pending-expansion mark it clears). §8.4.2.2.1 rule 4's
+    /// "type declaration … not referenced in any TYPE clause" asks it, so the answer does not depend on whether a
+    /// constant's length phrase expanded the entry ahead of the pipeline (<c>DataBinder.CompleteDescriptionAhead</c>,
+    /// kb/Work PB2465).</summary>
+    [DescriptionCopy(DescriptionCopyKind.None,
+        "a fact about the entry the programmer wrote — a copy writes no TYPE clause of its own, and the carried type identity is TypeName")]
+    public string? WrittenTypeName { get; init; }
+
     /// <summary>The <c>SAME AS data-name-1</c> target name (ISO §13.18.49), or null. Structurally the TYPE
     /// reference with a DATA-NAME source: <c>DataBinder.ExpandSameAs</c> (inside the ONE <c>ExpandTypes</c> pass)
     /// resolves the target entry and clones its description in via the SAME <c>CloneItem</c> machinery (GR1/GR2),
@@ -1280,6 +1289,13 @@ public sealed class DataItem
         if (s.Length == 0 || !SyntaxFacts.IsIdentifierStartCharacter(s[0])) s = "_" + s;
         return SyntaxFacts.GetKeywordKind(s) != SyntaxKind.None ? "@" + s : s;
     }
+
+    /// <summary>The C# identifier of a COBOL word whose IDENTITY is the word — a class, interface, method, property,
+    /// program or formal, where two spellings of one word name one thing (§8.1.3.2 GR3 and GR4 b), the Annex C fold):
+    /// <see cref="Sanitize"/> of the word's one upper-case spelling, <see cref="CobolNames.UpperFold"/> (kb/Work
+    /// PB1965). The host's <c>ToUpperInvariant</c> this replaced gave the Kelvin-sign spelling of a word a second
+    /// identifier, and at COBOL 2023 gave two different words (dotless i, final sigma) one.</summary>
+    public static string WordIdentifier(string cobolWord) => Sanitize(CobolNames.UpperFold(cobolWord));
 
     /// <summary>The characters of a COBOL word as C# identifier characters: a hyphen becomes an underscore, and a
     /// character a C# identifier cannot hold is written <c>_uXXXX_</c> by its code point — an extended letter of

@@ -3,6 +3,7 @@
 using Antlr4.Runtime;
 using CobolNet.Frontend.Diagnostics;
 using CobolNet.Frontend.Generated;
+using CobolNet.Runtime;
 
 namespace CobolNet.Frontend.Parsing;
 
@@ -101,7 +102,7 @@ public static class ReservationGateRewriter
             var tok = list[i];
             if (tok.Channel != Lexer.DefaultTokenChannel || !CobolLexer.IsReservationGated(tok.Type)) continue;
             // By WORD, not by type alone: the decision is §8.9's, and §8.9 is keyed by spelling (the PB250 text rule).
-            if (!freed.Contains(tok.Text.ToUpperInvariant())) continue;
+            if (!freed.Contains(CobolNames.UpperFold(tok.Text))) continue;
             list[i] = new CommonToken(tok) { Type = idType };
             changed++;
         }

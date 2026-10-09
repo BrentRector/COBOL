@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Collections.Frozen;
+using CobolNet.Runtime;
 
 namespace CobolNet.Editions;
 
@@ -137,6 +138,6 @@ public static class ImplementorNames
         };
         for (int i = 0; i <= 36; i++) rows.Add(new($"SWITCH-{i}", SystemNameKind.Switch));
         for (int i = 0; i <= 7; i++) rows.Add(new($"UPSI-{i}", SystemNameKind.Switch));
-        return rows.ToFrozenDictionary(r => r.Name, StringComparer.OrdinalIgnoreCase);
+        return rows.ToFrozenDictionary(r => r.Name, CobolNames.Comparer);
     }
 }

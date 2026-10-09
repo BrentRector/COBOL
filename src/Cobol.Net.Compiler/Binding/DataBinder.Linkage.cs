@@ -800,7 +800,7 @@ public sealed partial class DataBinder
         // connector's externalized name (GR4b/GR5's first alternative), already resolved at the FD entry.
         _callExternalBackings.Add(new CallExternalBacking(
             cls.BackingCsName, cls.BackingCellCsName,
-            externalName ?? item.ExternalizedAs ?? item.CobolName!.ToUpperInvariant(),
+            externalName ?? item.ExternalizedAs ?? CobolNames.UpperFold(item.CobolName!),
             cls.Width, item));
     }
 

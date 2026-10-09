@@ -9,6 +9,7 @@ using CobolNet.Runtime.Exceptions;
 namespace CobolNet.Binding;
 
 using Core = CobolParserCore;
+using CobolNet.Runtime;
 
 /// <summary>
 /// ⛔ THE ONE PARTITION OF A PROCEDURE-DIVISION-HEADER RAISING PHRASE (ISO §14.2.1 / §14.2.2 SR7–SR9;
@@ -39,7 +40,7 @@ internal static class RaisingPhrase
         foreach (var t in rc.raisingTarget())
         {
             var word = t.cobolWord();
-            string up = word.GetText().ToUpperInvariant();
+            string up = CobolNames.UpperFold(word.GetText());
             bool factory = t.FACTORY() is not null;
 
             // exception-name-1 (SR7). Direct TryGet, not the EcNameResolution funnel: an unresolved word here may

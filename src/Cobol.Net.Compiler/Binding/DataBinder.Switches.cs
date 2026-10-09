@@ -1546,7 +1546,7 @@ public sealed partial class DataBinder
         // >>COBOL-WORDS (ISO §7.3.10.4 GR2/GR3/GR4; kb/Work PB250): a §8.9/§8.10 word the lexer does not
         // tokenize (UCS-4 / UTF-8 / UTF-16 are §8.10 context-sensitive) is reached ONLY through the map. The
         // CANONICAL name is what is returned, so the downstream Phrase tag never carries a user synonym.
-        string? t = cobolWords.Resolve(w.GetText().ToUpperInvariant());
+        string? t = cobolWords.Resolve(CobolNames.UpperFold(w.GetText()));
         return t is "UCS-4" or "UTF-8" or "UTF-16" ? t : null;
     }
 

@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Editions;
 
 /// <summary>One ISO §8.10 context-sensitive word: the word and the language construct or context that reserves
@@ -33,7 +35,7 @@ public static partial class ContextSensitiveWords
     private static Dictionary<string, ContextSensitiveWordEntry>? _byWord;
 
     private static Dictionary<string, ContextSensitiveWordEntry> ByWord =>
-        _byWord ??= Entries.ToDictionary(e => e.Word, StringComparer.OrdinalIgnoreCase);
+        _byWord ??= Entries.ToDictionary(e => e.Word, CobolNames.Comparer);
 
     /// <summary>The §8.10 row for <paramref name="word"/> (case-insensitive), or null when the word is not a
     /// context-sensitive word.</summary>

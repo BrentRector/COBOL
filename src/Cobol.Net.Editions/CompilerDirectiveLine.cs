@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Editions;
 
 /// <summary>
@@ -60,7 +62,7 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
         while (i < s.Length && CobolCharacterRepertoire.IsWordCharacter(s[i])) i++;   // the ONE lexical word class (PB1402)
         if (i == wordStart) return false;                            // ">>" with no word heads no directive
 
-        string word = s[wordStart..i].ToString().ToUpperInvariant();
+        string word = CobolNames.UpperFold(s[wordStart..i].ToString());
         string operand = SeparatorsAsSpaces(StripInlineComment(s[i..].ToString()).TrimSpaces()).TrimSpaces();
         directive = new CompilerDirectiveLine(word, operand);
         return true;
@@ -109,7 +111,7 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
     {
         operand = "";
         if (!TryParse(line, out var d)
-            || !d.Word.Equals(word, StringComparison.OrdinalIgnoreCase)) return false;
+            || !CobolNames.Same(d.Word, word)) return false;
         operand = d.Operand;
         return true;
     }

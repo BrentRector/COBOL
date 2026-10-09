@@ -196,6 +196,13 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         // table the statement sorts (a rightmost ALL says the same). Read ONCE here, so `SORT E(2)` over a table inside
         // `ROW OCCURS 2` sorts ROW(2)'s E and an omitted or surplus subscript is the SOURCE's error, named (kb/Work
         // PB1055 — the written list used to be discarded unread, and both spellings drew one deferral).
+        // SR13 admits subscripting and nothing more: Format 2 prints `SORT data-name-2`, and "where data-name-n is
+        // used in a general format or syntax rule, then reference-modification is not permitted" (ISO §8.4.3.3.3
+        // NOTE; §5.2.4's NOTE says the same). The subscript reader below never looks at the reference-modifier
+        // suffix, so `SORT TE(1:2)` used to sort the WHOLE of TE in silence (kb/Work PB2511) — the same screen the
+        // KEY arm (ScreenDataNameShape) and SEARCH ALL's data-name-1 ask, refused before the subscripts are read.
+        if (!DataBinder.ScreenReferenceModifier(operand, "SORT table subject", ctx.Edition))
+            return BoundRejected.Reported(ctx.Edition);
         if (ctx.Refs.ReadTableSubjectSubscripts(operand, table, out var outer) is { } subjectAnswer)
             return subjectAnswer.Refusal(ctx.Edition);
         // WHERE the elements live (kb/Work PB1175 / PB1055): a table inside a REDEFINES class, a record area shared by

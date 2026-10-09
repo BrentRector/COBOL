@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Editions;
 
 /// <summary>The four mutually-exclusive options of a <c>&gt;&gt;COBOL-WORDS</c> directive (ISO §7.3.10.2).</summary>
@@ -56,9 +58,9 @@ public sealed class CobolWordsMap
     public CobolWordsMap(IReadOnlyList<CobolWordsOp> ops)
     {
         Ops = ops;
-        _synonyms = new(StringComparer.OrdinalIgnoreCase);
-        _deReserved = new(StringComparer.OrdinalIgnoreCase);
-        _reserved = new(StringComparer.OrdinalIgnoreCase);
+        _synonyms = new(CobolNames.Comparer);
+        _deReserved = new(CobolNames.Comparer);
+        _reserved = new(CobolNames.Comparer);
         foreach (var op in ops)
         {
             switch (op.Action)
@@ -126,7 +128,10 @@ public sealed class CobolWordsMap
     /// precedence choice. It matches the order <c>IntrinsicBinder.BindIntrinsicCore</c> has always used
     /// (removal tested against the ORIGINAL written name, then the synonym applied).
     /// </summary>
-    /// <param name="written">The word as written in the source, UPPER-CASE (SR2/GR1 — case-insensitive).</param>
+    /// <param name="written">The word as written in the source. The tables are keyed by the Annex C fold
+    /// (<see cref="CobolNames.Comparer"/>; SR2/GR1 — case-insensitive), so any spelling of the word finds its entry; a
+    /// caller that compares the RESULT with an upper-case keyword passes <see cref="CobolNames.UpperFold"/> of it, so
+    /// the word returned unchanged is in that spelling too.</param>
     public string? Resolve(string written)
     {
         if (Ops.Count == 0) return written;
@@ -140,8 +145,8 @@ public sealed class CobolWordsMap
     /// GR2/GR3/GR4 reading is applied once and no caller re-implements it. Used by the parser's text predicates
     /// (<c>CobolParserCoreBase.Word</c>) and by every binder site that recognizes a §8.9/§8.10 word the lexer
     /// does not tokenize — the SET-statement locale categories, the ALPHABET coded-set names, CALL … AS NESTED.
-    /// <para>Allocation-free on the no-directive path: the uppercase normalization <see cref="Resolve"/> needs
-    /// happens only when a directive is present, and these run inside ANTLR's speculative prediction.</para>
+    /// <para>Allocation-free: both comparisons are the Annex C fold (<see cref="CobolNames.Same(string?, string?)"/>),
+    /// and these run inside ANTLR's speculative prediction.</para>
     /// </summary>
     /// <remarks>⛔ Give this a word AS WRITTEN, and only for a word the LEXER does not tokenize (the
     /// §8.9/§8.10 words that arrive as bare IDENTIFIERs). For a word that may arrive as a keyword TOKEN use
@@ -150,7 +155,6 @@ public sealed class CobolWordsMap
     public bool Is(string? written, string keyword)
         => written is not null
            && (Ops.Count == 0
-               ? string.Equals(written, keyword, StringComparison.OrdinalIgnoreCase)
-               : Resolve(written.ToUpperInvariant()) is { } w
-                 && string.Equals(w, keyword, StringComparison.OrdinalIgnoreCase));
+               ? CobolNames.Same(written, keyword)
+               : Resolve(written) is { } w && CobolNames.Same(w, keyword));
 }

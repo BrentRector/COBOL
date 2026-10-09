@@ -1336,7 +1336,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // has a distinct leading token and `recordKeyClause` already back-tracks past `RECORD DELIMITER`.
                 else if (clauses.recordDelimiterClause() is { } rd)
                 {
-                    file.RecordDelimiter = rd.STANDARD_1() is not null ? "STANDARD-1" : rd.cobolWord().GetText().ToUpperInvariant();
+                    file.RecordDelimiter = rd.STANDARD_1() is not null ? "STANDARD-1" : CobolNames.UpperFold(rd.cobolWord().GetText());
                     Edition.Declined(DiagnosticCatalog.RecordDelimiterUnsupported,
                         $"the RECORD DELIMITER clause on file '{name}' ({Spelled(rd)})");
                 }
@@ -1994,8 +1994,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                         file.IsExternal = true;
                         // GR5's two sentences, in order: literal-1 when the AS phrase is written, the FD's own
                         // file-name otherwise (kb/Work PB511). The literal is a character-string, not a COBOL
-                        // word, so its case is kept, while the file-name is uppercased because §8.3.2 makes a
-                        // user-defined word case-insensitive. §13.18.22.3 SR3 screens it through the ONE shared
+                        // word, so its case is kept, while the file-name is written in its one upper-case spelling
+                        // (CobolNames.UpperFold: §8.1.3.2's Annex C fold, kb/Work PB1965). §13.18.22.3 SR3 screens it through the ONE shared
                         // externalized-name screen (COBOLNET2156), which also FORMS it — leading and trailing
                         // spaces removed (DOC-A.1-68, kb/Work PB1539).
                         file.ExternalName =
@@ -2005,7 +2005,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                                     $"file '{name}' IS EXTERNAL AS {asPhrase.literal().GetText()}", "literal-1",
                                     "ISO §13.18.22.3 SR3", LiteralEnv, rejectZeroLength: true)
                                 : null)
-                            ?? name.ToUpperInvariant();
+                            ?? CobolNames.UpperFold(name);
                     }
                     if (ge.GLOBAL() is not null) file.IsGlobal = true;
                 }
@@ -3543,9 +3543,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // declaration entry for which the type-name is not referenced in any TYPE clause in the source unit". EVERY
         // written TYPE clause counts — a storage item's, a linkage item's, and a member's of another type
         // declaration, which nothing may ever copy — so the exemption's lapse is a property of the source, never
-        // of which clones happen to reach the name index.
+        // of which clones happen to reach the name index. The WRITTEN clause is read (DataItem.WrittenTypeName), never
+        // the pending mark: a constant's length phrase may have expanded an entry already (kb/Work PB2465).
         foreach (var written in DeclaredForest())
-            if (written.TypeRefName is { } referenced && TryFindTypeDecl(referenced, out var decl))
+            if (written.WrittenTypeName is { } referenced && TryFindTypeDecl(referenced, out var decl))
                 decl.ReferencedByTypeClause = true;
         foreach (var template in TypeDecls.Values.ToList())
             ExpandTemplate(template);
@@ -3667,7 +3668,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         string typeName = item.TypeRefName!;
         item.TypeRefName = null;   // mark expanded (idempotent)
         string subject = item.CobolName ?? item.CsName;
-        if (!TryFindTypeDecl(typeName, out var template))
+        if (!TryFindTypeDecl(typeName, out var template)
+            && !(BindLaterTypeDeclaration(typeName) && TryFindTypeDecl(typeName, out template)))
         {
             Edition.Error("COBOLNET1530", $"TYPE '{typeName}' on '{subject}': the type-name is not defined by any "
                 + "TYPEDEF entry (ISO §13.18.57 / §13.18.58)");
@@ -4174,6 +4176,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // qualifier matcher this used knew nothing of the file-name qualifier (§8.4.2.2.2 Format 1's
         // file-report-qualifier), and its ambiguity sentence cited §8.4.3.2, a clause about something else.
         // §8.4.2.2.1 rule 5's implicit qualifiers apply: SAME AS is a data description entry clause.
+        // A subject expanded AHEAD of the pipeline (CompleteDescriptionAhead, kb/Work PB2465) may name an entry the
+        // section walk has not reached: it is bound now, out of source order, as a length phrase's operand is. After
+        // the walk nothing is described later and this is a no-op.
+        if (IsDescribedLater(targetName))
+        {
+            BindLaterRecords(targetName);
+            BindLaterEntriesOfOpenRecord(targetName);
+        }
         var candidates = EntryClauseCandidates(item, targetName, item.SameAsQualifiers, Model.Scope.Program);
         string writtenTarget = WrittenQualified(targetName, item.SameAsQualifiers);
         if (candidates.Count == 0)
@@ -4275,6 +4285,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // ── GR1/GR2: the copy. ──────────────────────────────────────────────────────────────────────────────
         // The entry description (PICTURE/USAGE/SIGN/VALUE/JUSTIFIED/BLANK WHEN ZERO/SYNCHRONIZED + the carried
         // TYPE identity; scope Entry — §13.18.49.4 GR1 does NOT exclude alignment, unlike §13.18.57.4 GR1).
+        // The source as the pipeline has it by now — its §13.16.3 SR9 implied PICTUREs given, its TYPE clauses expanded.
+        // Both hold already inside the pipeline (no-ops there); a subject expanded AHEAD of it for a constant's length
+        // phrase (CompleteDescriptionAhead, kb/Work PB2465) may copy a source the pipeline has not reached.
+        SynthesizeImpliedPicturesUnder(target);
+        foreach (var pending in PreOrder(target).Where(t => t.TypeRefName is not null).ToList()) ExpandType(pending);
         bool wroteBased = item.IsBased;   // §13.16.3 SR12 admits no BASED beside SAME AS; an error-recovery guard
         CopyEntryDescription(target, item, DescriptionCopyScope.Entry);
         if (!wroteBased && item.IsBased) ScreenComposedBased(item, $"SAME AS '{targetName}'");
@@ -5906,6 +5921,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             ExternalizedAs = externalizedAs,                // §13.18.22.4 GR5's literal-1 (kb/Work PB511)
             IsConstantRecord = isConstantRecord,
             TypeRefName = typeRefName,
+            WrittenTypeName = typeRefName,
             SameAsName = sameAsName,
         };
         if (sameAsName is not null) item.SameAsQualifiers.AddRange(sameAsQuals);
@@ -6812,11 +6828,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// (§13.18.60.3 SR2), decide what it hands DOWN, and dispatch to the group or the elementary arm.</summary>
     private void UsageInheritanceWalk(DataItem item, InheritedUsage inherited)
     {
+        // A subtree a constant's length phrase completed ahead of the pipeline was walked then, with the usage its
+        // ancestors hand down (CompleteDescriptionAhead, kb/Work PB2465): walking it again would screen it twice.
+        if (_completedAhead.Contains(item)) return;
         using var _ = Edition.At(item);
-
-        // The usage this entry carries in its OWN right (see DeclaredUsageOf). GR1 is written over
-        // "specified OR IMPLIED", so both spellings hand down.
-        Usage? ownOrImplied = DeclaredUsageOf(item);
 
         // ── §13.18.60.3 SR2 ─────────────────────────────────────────────────────────────────────────────────
         // "If the USAGE clause is written in the data description entry for a group item, it may also be written
@@ -6840,13 +6855,52 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // USAGE clause REPLACES the inherited one whole (nearest-enclosing wins), so a PACKED-DECIMAL WITH NO SIGN
         // group containing a plain `05 H USAGE PACKED-DECIMAL.` group hands NO SIGN no further down — H's clause
         // is the one that applies to H's leaves (§13.18.60.4 GR1).
-        var down = ownOrImplied is null && item.Pending is PicPending.None
-            ? inherited
-            : new InheritedUsage(ownOrImplied, item.PicIsUsageSynthesized ? item.Pic : null,
-                                 item.Pending, item.CobolName, item.OwnNoSign);
+        var down = HandDown(inherited, item);
 
         if (item.Children.Count > 0) UsageInheritanceGroup(item, down);
         else UsageInheritanceElementary(item, inherited);
+    }
+
+    /// <summary>⛔ THE ONE "what an entry hands down" derivation of the §13.18.60.4 GR1 walk: the entry's own (or
+    /// implied) clause together with the representation entry bind synthesized for it, else whatever it inherited,
+    /// unchanged. Read by the walk and by <see cref="InheritedUsageAt"/>, which folds it over an entry's ancestors.</summary>
+    private static InheritedUsage HandDown(InheritedUsage inherited, DataItem item)
+    {
+        Usage? ownOrImplied = DeclaredUsageOf(item);
+        return ownOrImplied is null && item.Pending is PicPending.None
+            ? inherited
+            : new InheritedUsage(ownOrImplied, item.PicIsUsageSynthesized ? item.Pic : null,
+                                 item.Pending, item.CobolName, item.OwnNoSign);
+    }
+
+    /// <summary>The usage <paramref name="item"/>'s ancestors hand down to it — what <see cref="UsageInheritanceWalk"/>
+    /// would pass it, computed before the walk reaches it, for <see cref="CompleteDescriptionAhead"/> (kb/Work
+    /// PB2465). <see cref="HandDown"/> folded from the root, with each enclosing GROUP-USAGE implied on its subordinate
+    /// groups first, exactly as the group arm implies it (<see cref="ImplyGroupUsage"/>).</summary>
+    private static InheritedUsage InheritedUsageAt(DataItem item)
+    {
+        var ancestors = new List<DataItem>();
+        for (var a = item.Parent; a is not null; a = a.Parent) ancestors.Add(a);
+        ancestors.Reverse();
+        InheritedUsage inherited = default;
+        DataItem? enclosing = null;
+        foreach (var a in ancestors)
+        {
+            if (enclosing is { GroupUsage: not GroupUsage.None }) ImplyGroupUsage(enclosing, a);
+            inherited = HandDown(inherited, a);
+            enclosing = a;
+        }
+        if (enclosing is { GroupUsage: not GroupUsage.None } && item.Children.Count > 0) ImplyGroupUsage(enclosing, item);
+        return inherited;
+    }
+
+    /// <summary>§13.18.29.3 SR2/SR3 — "all subordinate group items shall be explicitly or implicitly described with
+    /// GROUP-USAGE BIT / NATIONAL": a subordinate group that writes no GROUP-USAGE clause is implicitly described
+    /// with <paramref name="group"/>'s. False when it writes the OTHER usage, the violation the caller reports.</summary>
+    private static bool ImplyGroupUsage(DataItem group, DataItem subordinate)
+    {
+        if (subordinate.GroupUsage is GroupUsage.None) subordinate.GroupUsage = group.GroupUsage;
+        return subordinate.GroupUsage == group.GroupUsage;
     }
 
     /// <summary>The GROUP arm of the §13.18.60.4 GR1 walk: the GROUP-USAGE conformance rules (§13.18.29.3), the
@@ -6871,8 +6925,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             foreach (var c in item.Children)
             {
                 if (c.Children.Count == 0) continue;
-                if (c.GroupUsage is GroupUsage.None) c.GroupUsage = item.GroupUsage;   // implied (SR2/SR3)
-                else if (c.GroupUsage != item.GroupUsage)
+                if (!ImplyGroupUsage(item, c))
                 {
                     using var __c = Edition.At(c);
                     Edition.Error(DiagnosticCatalog.GroupUsageRule, $"data item '{c.CobolName ?? "FILLER"}': a group "
@@ -7105,15 +7158,29 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// widens the item's image, which feeds the class-max width.</summary>
     internal void InheritSignClauses()
     {
-        static void Walk(DataItem item, SignSpec? inherited)
-        {
-            SignSpec? effective = item.OwnSign ?? inherited;
-            // GR1 applies a group's clause to "each numeric item subordinate to the group", with no usage
-            // condition of its own; ApplyEffectiveSign holds the §13.18.52.3 SR2 usage pair, once.
-            if (item.OwnSign is null && effective is not null) ApplyEffectiveSign(item, effective);
-            foreach (var c in item.Children) Walk(c, effective);
-        }
-        foreach (var root in Roots) Walk(root, null);
+        foreach (var root in Roots) InheritSignWalk(root, null);
+    }
+
+    /// <summary>One entry of the §13.18.52 GR1 walk: the nearest enclosing clause, unless the entry wrote its own.
+    /// A subtree completed ahead of the pipeline (<see cref="CompleteDescriptionAhead"/>, kb/Work PB2465) took its
+    /// clause then and is passed over.</summary>
+    private void InheritSignWalk(DataItem item, SignSpec? inherited)
+    {
+        if (_completedAhead.Contains(item)) return;
+        SignSpec? effective = item.OwnSign ?? inherited;
+        // GR1 applies a group's clause to "each numeric item subordinate to the group", with no usage
+        // condition of its own; ApplyEffectiveSign holds the §13.18.52.3 SR2 usage pair, once.
+        if (item.OwnSign is null && effective is not null) ApplyEffectiveSign(item, effective);
+        foreach (var c in item.Children) InheritSignWalk(c, effective);
+    }
+
+    /// <summary>The SIGN clause <paramref name="item"/>'s ancestors hand down to it — the nearest enclosing one,
+    /// what <see cref="InheritSignWalk"/> would pass it (kb/Work PB2465).</summary>
+    private static SignSpec? InheritedSignAt(DataItem item)
+    {
+        for (var a = item.Parent; a is not null; a = a.Parent)
+            if (a.OwnSign is { } sign) return sign;
+        return null;
     }
 
     // ── REDEFINES / RENAMES resolution + classification (post-build, ISO §13.18.44/45) ───────────────────────
@@ -8158,8 +8225,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// takes <see cref="CompositionForest"/> instead; that distinction is why the §13.18.63.3 SR13/SR14 screen
     /// missed the whole TYPE population on its first landing.</para>
     /// </summary>
-    public IEnumerable<DataItem> ConformanceForest() =>
-        DeclaredForest().Where(item => StrongTypeModel.TypeAnchor(item) is null);
+    public IEnumerable<DataItem> ConformanceForest() => DeclaredForest().Where(IsWrittenEntry);
+
+    /// <summary>Is <paramref name="item"/> an entry the programmer WROTE — no TYPE clone (its <c>TypeAnchor</c> is
+    /// null)? The one filter <see cref="ConformanceForest"/> applies, asked of a single subtree by
+    /// <see cref="SynthesizeImpliedPicturesUnder"/>.</summary>
+    private static bool IsWrittenEntry(DataItem item) => StrongTypeModel.TypeAnchor(item) is null;
 
     /// <summary>
     /// Every data item this unit binds AS COMPOSED — the same forest as <see cref="ConformanceForest"/> plus the

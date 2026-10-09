@@ -98,54 +98,67 @@ public sealed partial class DataBinder
     {
         // The WRITTEN entries — the pass runs before ExpandTypes, so there are no clones to exclude yet; the forest
         // is named for what the rule is about (see the class remarks).
-        foreach (var item in ConformanceForest())
-        {
-            // ⛔ THE SAME PREDICATE THE SR8 GUARD USES, and deliberately so: SR9's subject is precisely the
-            // population SR8 would otherwise reject, so the two rules must never disagree about which entries
-            // they are looking at. It also excludes an entry whose description is a still-pending TYPE / SAME AS
-            // reference (its PICTURE is the referenced description's — §13.18.57.4 GR3, §13.18.49.4 GR1), and it
-            // is what makes this pass IDEMPOTENT: an entry that already has a PICTURE (written or
-            // usage-synthesized) fails it.
-            if (!IsPictureLessLeaf(item)) continue;
-            // ⛔ FORMAT 1 ONLY. SR9's grant is worded "specified in the DATA-ITEM FORMAT of the VALUE clause",
-            // which is §13.18.63.2 Format 1 (`VALUE IS literal-1`) — DataItem.RawValue. The Format-2 (table)
-            // carrier, DataItem.TableValues, is a different format and SR9 does not reach it, so a picture-less
-            // `OCCURS … VALUES ARE "AB" FROM (1)` stays SR8's rejection.
-            if (item.RawValue is not { } raw) continue;
-            if (Sr9ImpliedFor(raw, Sr9EffectiveUsage(item)) is not { } implied) continue;
+        foreach (var item in ConformanceForest()) SynthesizeImpliedPicture(item);
+    }
 
-            using var _ = Edition.At(item);
-            string where = $"data item '{item.CobolName ?? "FILLER"}'";
-            // The edition gate, through the ONE canonical funnel (ConstructRegistry.Check), once per SOURCE entry
-            // (every entry visited here is one — no clone exists yet): COBOL-85 required a PICTURE for every
-            // elementary item bar an index data item and the subject of a RENAMES clause, and had no
-            // VALUE-implied PICTURE at all. Its boolean and national arms are gated a second time and
-            // independently by `boolean-data-2002` / `national-data-2002`, which is why this row carries the
-            // alphanumeric arm's introduction.
-            ConstructRegistry.Check(Edition.Edition, Edition.Sink, Constructs.ValueImpliedPicture2002, where);
+    /// <summary>The same synthesis over one subtree's WRITTEN entries — what <see cref="CompleteDescriptionAhead"/>
+    /// runs for an operand a constant's length phrase measures before the pipeline reaches it (kb/Work PB2465). The
+    /// pass is idempotent (an entry with a PICTURE fails <see cref="IsPictureLessLeaf"/>), so the pipeline's own run
+    /// later passes over these entries.</summary>
+    private void SynthesizeImpliedPicturesUnder(DataItem root)
+    {
+        foreach (var item in PreOrder(root))
+            if (IsWrittenEntry(item)) SynthesizeImpliedPicture(item);
+    }
 
-            // ⛔ THE SAME CALL BindEntry MAKES FOR A WRITTEN PICTURE, argument for argument — the entry's OWN
-            // usage and its own SIGN clause, `explicitUsage` = "this entry wrote a USAGE clause". A usage the
-            // entry acquires from a GROUP is applied ONCE, by UsageInheritancePass's ApplyEffectiveUsage, exactly
-            // as it is for a written PICTURE; passing the inherited usage here as well would screen it twice and
-            // report the §13.18.60.3 SR3/SR5/SR12/SR20 violation twice.
-            item.PictureText = implied.Text;
-            item.PicIsValueImplied = true;   // an IMPLICIT clause: no SR4/SR5/SR10 size bound (see the property)
-            item.Pic = PictureAnalyzer.Analyze(implied.Text, item.OwnUsage ?? Usage.Display, Edition, where,
-                item.OwnSign, currencies: CurrencySigns, blankWhenZero: item.BlankWhenZero,
-                explicitUsage: item.OwnUsage is not null, decimalPointIsComma: DecimalPointIsComma);
-            // The entry is no longer picture-less, so the deferred §13.18.60.3 SR5/SR12 adjudication a
-            // PICTURE-less USAGE NATIONAL / BIT entry carries is ANSWERED — by the picture SR9 supplies. The
-            // screen above is the one that judges it (`01 A USAGE NATIONAL VALUE "AB".` is SR12's alphanumeric
-            // refusal; `01 A USAGE NATIONAL VALUE N"AB".` conforms).
-            item.Pending = PicPending.None;
+    /// <summary>§13.16.3 SR9 for one entry: the body of <see cref="SynthesizeImpliedPictures"/>.</summary>
+    private void SynthesizeImpliedPicture(DataItem item)
+    {
+        // ⛔ THE SAME PREDICATE THE SR8 GUARD USES, and deliberately so: SR9's subject is precisely the
+        // population SR8 would otherwise reject, so the two rules must never disagree about which entries
+        // they are looking at. It also excludes an entry whose description is a still-pending TYPE / SAME AS
+        // reference (its PICTURE is the referenced description's — §13.18.57.4 GR3, §13.18.49.4 GR1), and it
+        // is what makes this pass IDEMPOTENT: an entry that already has a PICTURE (written or
+        // usage-synthesized) fails it.
+        if (!IsPictureLessLeaf(item)) return;
+        // ⛔ FORMAT 1 ONLY. SR9's grant is worded "specified in the DATA-ITEM FORMAT of the VALUE clause",
+        // which is §13.18.63.2 Format 1 (`VALUE IS literal-1`) — DataItem.RawValue. The Format-2 (table)
+        // carrier, DataItem.TableValues, is a different format and SR9 does not reach it, so a picture-less
+        // `OCCURS … VALUES ARE "AB" FROM (1)` stays SR8's rejection.
+        if (item.RawValue is not { } raw) return;
+        if (Sr9ImpliedFor(raw, Sr9EffectiveUsage(item)) is not { } implied) return;
 
-            // ⚠ The VALUE literal is NOT re-screened through ScreenValueLiteral, and that is the rule's own
-            // doing: §13.18.63.3 SR4/SR5/SR10's size sentences bound the literal by "the size indicated by an
-            // EXPLICIT PICTURE clause", and this one is implied; their class sentences cannot bite because the
-            // implied picture's category IS the literal's class by construction; and SR2's numeric-range arm is
-            // unreachable, SR9 admitting only the three character categories.
-        }
+        using var _ = Edition.At(item);
+        string where = $"data item '{item.CobolName ?? "FILLER"}'";
+        // The edition gate, through the ONE canonical funnel (ConstructRegistry.Check), once per SOURCE entry
+        // (every entry visited here is one — no clone exists yet): COBOL-85 required a PICTURE for every
+        // elementary item bar an index data item and the subject of a RENAMES clause, and had no
+        // VALUE-implied PICTURE at all. Its boolean and national arms are gated a second time and
+        // independently by `boolean-data-2002` / `national-data-2002`, which is why this row carries the
+        // alphanumeric arm's introduction.
+        ConstructRegistry.Check(Edition.Edition, Edition.Sink, Constructs.ValueImpliedPicture2002, where);
+
+        // ⛔ THE SAME CALL BindEntry MAKES FOR A WRITTEN PICTURE, argument for argument — the entry's OWN
+        // usage and its own SIGN clause, `explicitUsage` = "this entry wrote a USAGE clause". A usage the
+        // entry acquires from a GROUP is applied ONCE, by UsageInheritancePass's ApplyEffectiveUsage, exactly
+        // as it is for a written PICTURE; passing the inherited usage here as well would screen it twice and
+        // report the §13.18.60.3 SR3/SR5/SR12/SR20 violation twice.
+        item.PictureText = implied.Text;
+        item.PicIsValueImplied = true;   // an IMPLICIT clause: no SR4/SR5/SR10 size bound (see the property)
+        item.Pic = PictureAnalyzer.Analyze(implied.Text, item.OwnUsage ?? Usage.Display, Edition, where,
+            item.OwnSign, currencies: CurrencySigns, blankWhenZero: item.BlankWhenZero,
+            explicitUsage: item.OwnUsage is not null, decimalPointIsComma: DecimalPointIsComma);
+        // The entry is no longer picture-less, so the deferred §13.18.60.3 SR5/SR12 adjudication a
+        // PICTURE-less USAGE NATIONAL / BIT entry carries is ANSWERED — by the picture SR9 supplies. The
+        // screen above is the one that judges it (`01 A USAGE NATIONAL VALUE "AB".` is SR12's alphanumeric
+        // refusal; `01 A USAGE NATIONAL VALUE N"AB".` conforms).
+        item.Pending = PicPending.None;
+
+        // ⚠ The VALUE literal is NOT re-screened through ScreenValueLiteral, and that is the rule's own
+        // doing: §13.18.63.3 SR4/SR5/SR10's size sentences bound the literal by "the size indicated by an
+        // EXPLICIT PICTURE clause", and this one is implied; their class sentences cannot bite because the
+        // implied picture's category IS the literal's class by construction; and SR2's numeric-range arm is
+        // unreachable, SR9 admitting only the three character categories.
     }
 
     /// <summary>The §13.15.3 SR14 arm of the same synthesis — the REPORT GROUP description entry's VALUE-implied

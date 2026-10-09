@@ -54,7 +54,7 @@ public abstract class CobolParserCoreBase : Parser
     private string? Canonical(string? written)
         => written is null ? null
          : CobolWords.IsEmpty ? written
-         : CobolWords.Resolve(written.ToUpperInvariant());
+         : CobolWords.Resolve(CobolNames.UpperFold(written));
 
     protected bool is85()   => Edition.Has(85);
     protected bool is2002() => Edition.Has(2002);
@@ -389,7 +389,7 @@ public abstract class CobolParserCoreBase : Parser
     protected void gatedDeclaration(IToken? word)
     {
         if (word?.Text is { Length: > 0 } t && userWordHere(t))
-            (_freeGatedDeclarations ??= new(StringComparer.Ordinal)).Add(t.ToUpperInvariant());
+            (_freeGatedDeclarations ??= new(StringComparer.Ordinal)).Add(CobolNames.UpperFold(t));
     }
 
     /// <summary>The token-level gate's SECOND witness (kb/Work PB655): a syntax error whose offending token is a
@@ -517,7 +517,7 @@ public abstract class CobolParserCoreBase : Parser
     {
         string? literal = Vocabulary.GetLiteralName(tokenType);
         if (literal is null || literal.Length < 3) return false;
-        if (Canonical(literal[1..^1].ToUpperInvariant()) is not { } w) return false;
+        if (Canonical(CobolNames.UpperFold(literal[1..^1])) is not { } w) return false;
         var row = ReservedWords.Find(w);
         return row is null || row.IsReservedAt(Edition.Year) || !(_declaredNames?.Contains(w) ?? false);
     }
@@ -569,7 +569,7 @@ public abstract class CobolParserCoreBase : Parser
     /// actions, which never run during prediction. Read by <see cref="IsKeywordReadingHere"/>.</summary>
     protected void declareName(IToken? name)
     {
-        if (name?.Text is { Length: > 0 } t) (_declaredNames ??= new(StringComparer.Ordinal)).Add(t.ToUpperInvariant());
+        if (name?.Text is { Length: > 0 } t) (_declaredNames ??= new(StringComparer.Ordinal)).Add(CobolNames.UpperFold(t));
     }
 
     /// <summary>The LL(1) follow walk behind <see cref="keywordContinuesHere"/>: can <paramref name="tokenType"/>
@@ -651,8 +651,8 @@ public abstract class CobolParserCoreBase : Parser
         // ReservedWordSet.Default is the generated §8.9 table with no >>COBOL-WORDS overlay — the right set here:
         // Canonical() has ALREADY applied this group's directive (an UNDEFINE'd word returns null, an EQUATEd
         // synonym its canonical spelling), so composing the overlay twice would double-count it. The table is keyed
-        // upper-case and the token keeps the source's spelling, so the word is upper-cased here.
-        return Canonical(token.Text)?.ToUpperInvariant() is { } w && ReservedWordSet.Default.RejectsAt(w, Edition.Year)
+        // upper-case and the token keeps the source's spelling, so the word is written in its UpperFold here.
+        return Canonical(token.Text) is { } c && CobolNames.UpperFold(c) is var w && ReservedWordSet.Default.RejectsAt(w, Edition.Year)
             ? w
             : null;
     }

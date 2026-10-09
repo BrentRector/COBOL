@@ -249,7 +249,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // VALUE clause specification, if any, for each record name ... shall be identical") — the
                 // record-level clause text, not the subordinate items' clauses.
                 string valueSpec = ext.Record.RawValue is { } rv ? CsLiteral(ValueSpecificationKey(rv)) : "null";
-                string strongKey = ext.Record.StrongType && ext.Record.TypeName is { } tn ? CsLiteral(tn.ToUpperInvariant()) : "null";
+                string strongKey = ext.Record.StrongType && ext.Record.TypeName is { } tn ? CsLiteral(CobolNames.UpperFold(tn)) : "null";
                 w.Line($"ExternalStore.Describe({CsLiteral(unitPath)}, {CsLiteral(ext.ExternalName)}, "
                     + $"new ExternalDescriptor(\"record\", ByteCount: {ext.Width}, ValueImage: {valueSpec}, "
                     + $"StrongTypeKey: {strongKey}, ConstantRecord: {(ext.Record.IsConstantRecord ? "true" : "false")}), "
@@ -290,8 +290,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // elementary/group shape and byte extent, its §14.8 conformance description (category, usage, PICTURE clause
         // identity, sign) and its byte offset within the record area (RecordLayout.OffsetOf, the same offset the
         // connector registers the key window at).
-        static string KeyEntry(string name, DataItem? item) => item is null ? name.ToUpperInvariant()
-            : $"{name.ToUpperInvariant()}@{RecordLayout.OffsetOf(item)?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?"}"
+        static string KeyEntry(string name, DataItem? item) => item is null ? CobolNames.UpperFold(name)
+            : $"{CobolNames.UpperFold(name)}@{RecordLayout.OffsetOf(item)?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?"}"
               + $":{(item.IsGroup ? "G" : "E")}{item.ByteWidth}:"
               + (ActivationDescriptions.Of(item) is { } d ? $"{d.Category}/{d.Clauses}/{d.Positions}" : "-");
         // k) "the same SUPPRESS WHEN phrase" — the operand as the literal position read it (form, class, characters,
@@ -307,18 +307,18 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         {
             if (k.Key is not null && ReferenceEquals(f.RecordKeyItem, k.Key)) return "P";
             int i = k.Key is null ? -1 : f.AlternateKeyNames.FindIndex(a => ReferenceEquals(a.Item, k.Key));
-            return i >= 0 ? $"A{i}" : k.Name.ToUpperInvariant();
+            return i >= 0 ? $"A{i}" : CobolNames.UpperFold(k.Name);
         }
-        string fileColl = f.FileLevelCollating is { } fc ? $"{fc.Alnum?.ToUpperInvariant()}/{fc.Nat?.ToUpperInvariant()}" : "";
+        string fileColl = f.FileLevelCollating is { } fc ? $"{(fc.Alnum is { } an ? CobolNames.UpperFold(an) : null)}/{(fc.Nat is { } nn ? CobolNames.UpperFold(nn) : null)}" : "";
         string keyColl = string.Join(",", f.KeyLevelCollating
-            .SelectMany(c => c.Keys.Select(k => $"{KeyPosition(k)}={c.Alphabet.ToUpperInvariant()}"))
+            .SelectMany(c => c.Keys.Select(k => $"{KeyPosition(k)}={CobolNames.UpperFold(c.Alphabet)}"))
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
         // b) "A consistent specification for data-name-1, device-name-1, and literal-1 in the ASSIGN clause" — all
         // THREE operands, so the USING data-name is part of the identity, not just the TO target. Consistency rule
         // (the implementor's, GR1 b's second sentence; docs/CONFORMANCE.md §7 DOC-A.1-72): the same data-name
         // spelling, qualifiers included.
         return $"OPT={f.Optional}|ASSIGN={f.AssignTarget.ToUpperInvariant()}"
-            + $"|USING={string.Join(" OF ", new[] { f.AssignUsingName ?? "" }.Concat(f.AssignUsingQualifiers)).ToUpperInvariant()}"
+            + $"|USING={CobolNames.UpperFold(string.Join(" OF ", new[] { f.AssignUsingName ?? "" }.Concat(f.AssignUsingQualifiers)))}"
             // c) "Either the STANDARD-1 phrase or a consistent value of feature-name-1" — consistency rule: the same
             // phrase (the clause is declined accept-inert, kb/Work PB292, so the written phrase is all there is).
             + $"|DELIM={f.RecordDelimiter}|RESERVE={f.ReserveAreas}"

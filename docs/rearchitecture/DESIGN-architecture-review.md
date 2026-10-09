@@ -516,7 +516,9 @@ stage**: `Cobol.Net.Runtime` references no other project (census `projects`), an
 `CobolNet.Frontend.Expressions → CobolNet.Runtime` 13 uses, `CobolNet.Binding → CobolNet.Runtime` 50,
 `CobolNet.CodeGen → CobolNet.Runtime` 81 — because the one numeric and text law is written there once
 (`CobolDec`, `CobolNames`, `CobolSpace`, `ExceptionCatalog` are the runtime types the front end names) and the
-compiler folds constants with the same code the generated program runs. (3) **The compiler's own layers are already
+compiler folds constants with the same code the generated program runs; the editions layer joined them for
+`CobolNames`, the Annex C fold its word tables are keyed by (kb/Work PB1965, the `["editions", "runtime"]` edge
+below). (3) **The compiler's own layers are already
 namespaces**: `CobolNet.Binding.Model` (147 types), `CobolNet.Binding.Bound` (263), the binders (`CobolNet.Binding`
 229, `.Procedure` 101, `.Passes` 10, `.Validation` 4, `CobolNet.Compiler.Oo` 22), `CobolNet.Validation` (25),
 `CobolNet.CodeGen` (77) and `.Emit` (17); the layering is enforced between them, and inside a layer the structure is
@@ -594,6 +596,7 @@ the assemblies contain that the file does not place fails the test. The file's c
   "compositionRoots": ["compiler.pipeline", "cli"],
   "excluded": [ { "assembly": "Cobol.Net.Compiler.SourceGen", "reason": "build-time generator; references no product assembly (census projects[].projectReferences = [])" } ],
   "allowed": [
+    ["editions", "runtime"],
     ["frontend.common", "editions"], ["frontend.common", "runtime"],
     ["frontend.diagnostics", "frontend.common"], ["frontend.diagnostics", "editions"],
     ["frontend.parse", "frontend.diagnostics"], ["frontend.parse", "frontend.common"], ["frontend.parse", "editions"], ["frontend.parse", "runtime"],

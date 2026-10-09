@@ -10,8 +10,10 @@
     IDiagnosticSink / EditionDiagnostic channel — referenced by BOTH Cobol.Net.Frontend and
     Cobol.Net.Compiler so neither has to reverse-engineer or duplicate edition metadata.
 
-    Dependency direction: Editions <- Frontend <- Compiler <- Cli. Editions references NOTHING in the
-    solution (dependency-free per DESIGN-edition-framework §2.5 / Open Q3) — it must stay below Frontend,
+    Dependency direction: Runtime <- Editions <- Frontend <- Compiler <- Cli. Editions references ONLY the
+    runtime foundation (DESIGN-architecture-review §8.1 layer 0, itself dependency-free), for the ONE Annex C
+    fold of a COBOL word (CobolNames, kb/Work PB1965) that keys its word tables; it references no ANTLR
+    runtime and no parse type (DESIGN-edition-framework Open Q3) — it must stay below Frontend,
     so it cannot use the frontend's SourceLocation/DiagnosticBag. TargetFramework(net10.0) / LangVersion(14)
     / Nullable / ImplicitUsings / TreatWarningsAsErrors are all inherited from the repo-root
     Directory.Build.props — do NOT restate them here.
@@ -23,6 +25,10 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Cobol.Net.Tests.Unit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cobol.Net.Runtime\Cobol.Net.Runtime.csproj" />
   </ItemGroup>
 
 </Project>

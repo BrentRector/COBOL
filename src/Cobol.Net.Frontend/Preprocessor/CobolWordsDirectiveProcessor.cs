@@ -237,7 +237,7 @@ public static class CobolWordsDirectiveProcessor
                     + $"compilation-variable-name (ISO §7.3.11.4 GR1), not '{tok.Text}'");
                 return false;
             }
-            content = tok.Text.ToUpperInvariant();
+            content = CobolNames.UpperFold(tok.Text);
             isWritten = false;
             return true;
         }
@@ -275,7 +275,7 @@ public static class CobolWordsDirectiveProcessor
             Invalid(diag, loc, $">>COBOL-WORDS: {role} literal must be a non-empty, space-free COBOL word (ISO §7.3.10.3 SR2)");
             return false;
         }
-        content = tok.Text.ToUpperInvariant();
+        content = CobolNames.UpperFold(tok.Text);
         return true;
     }
 

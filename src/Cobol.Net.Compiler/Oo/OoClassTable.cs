@@ -204,7 +204,7 @@ public sealed class OoClassTable
             using var atInterface = edition.At(ictx.interfaceName(0));   // PB975 — every pass-1 report is positioned
             // COBOL-2002 introduction gate: VersionConformancePass ParseArm.VisitInterfaceDefinition (rearch 14g.3,
             // recognition — fires per parse node, so a duplicate/colliding definition dropped below still names its edition).
-            string icsName = DataItem.Sanitize(iname).ToUpperInvariant();
+            string icsName = DataItem.WordIdentifier(iname);
             var isym = new OoInterfaceSymbol(iname, icsName, ictx)
             {
                 ExternalizedName = Externalized(ictx.externalizedNamePhrase(), iname,
@@ -253,7 +253,7 @@ public sealed class OoClassTable
                     HasReturning: pd?.returningClause() is not null,
                     m)
                 {
-                    CsName = psel is null ? DataItem.Sanitize(pname).ToUpperInvariant() : protoName,
+                    CsName = psel is null ? DataItem.WordIdentifier(pname) : protoName,
                     Accessor = psel is null ? '\0' : psel.GET() is not null ? 'G' : 'S',
                     PropertyName = psel is null ? null : pname,
                     // §11.7.2 prints [AS literal-1] on the method-name-1 arm only (the class arm's rule).
@@ -340,7 +340,7 @@ public sealed class OoClassTable
             using var atClass = edition.At(id.className(0));
             // COBOL-2002 introduction gate: VersionConformancePass ParseArm.VisitClassDefinition (rearch 14g.3,
             // recognition — fires per parse node, so a duplicate/colliding definition dropped below still names its edition).
-            string csName = DataItem.Sanitize(name).ToUpperInvariant();   // MUST match PicInfo.ClrType's mapping
+            string csName = DataItem.WordIdentifier(name);   // MUST match PicInfo.ClrType's mapping
             var bases = id.className().Skip(1).Select(c => c.GetText()).ToList();
             var sym = new OoClassSymbol(name, csName, ctx)
             {
@@ -378,7 +378,7 @@ public sealed class OoClassTable
                         : NamingConvention.SetAccessorName(sel.propertyName().GetText()))
                     : m.methodName(0).GetText();
                 var pd = m.procedureDivision();
-                string mcs = sel is not null ? methodName : DataItem.Sanitize(methodName).ToUpperInvariant();
+                string mcs = sel is not null ? methodName : DataItem.WordIdentifier(methodName);
                 // CS0542 guard: a C# member may not be named like its enclosing type — a METHOD-ID named like
                 // its CLASS-ID is legal COBOL, so the SYMBOL renames. Derivation (kb/Work PB975): §8.3.2.2 bars
                 // one word as two types of user-defined word only "Within a source element"; §10.4 makes a method
@@ -424,7 +424,7 @@ public sealed class OoClassTable
                         : NamingConvention.SetAccessorName(fsel.propertyName().GetText()))
                     : m.methodName(0).GetText();
                 var pd = m.procedureDivision();
-                string fcs = fsel is not null ? methodName : DataItem.Sanitize(methodName).ToUpperInvariant();
+                string fcs = fsel is not null ? methodName : DataItem.WordIdentifier(methodName);
                 if (fcs == csName + "__FACTORY") fcs += "_M";   // unreachable (no __ in COBOL names) — defensive
                 var method = new OoMethodSymbol(
                     methodName,

@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Editions;
 
 /// <summary>How the compiler treats the source form a <see cref="NonstandardExtension"/> row names.</summary>
@@ -131,13 +133,13 @@ public static class NonstandardExtensionRegister
             : throw new ArgumentException($"no nonstandard-extension row '{id}' (NonstandardExtensionRegister.Entries)", nameof(id));
 
     /// <summary>The ACCEPTED usage row whose <see cref="NonstandardExtension.Spellings"/> include
-    /// <paramref name="usageWord"/> (compared upper-cased), or null — the lookup the one usage funnel makes, so a new
-    /// usage spelling is flagged by adding it to its row and nothing else.</summary>
+    /// <paramref name="usageWord"/> (compared by the Annex C fold, <see cref="CobolNames.Comparer"/>), or null — the
+    /// lookup the one usage funnel makes, so a new usage spelling is flagged by adding it to its row and nothing else.</summary>
     public static NonstandardExtension? ForUsageSpelling(string usageWord)
     {
         _bySpelling ??= Entries.Where(e => e.Support == ExtensionSupport.Accepted)
             .SelectMany(e => e.Spellings.Select(s => (s, e)))
-            .ToDictionary(t => t.s, t => t.e, StringComparer.Ordinal);
-        return _bySpelling.GetValueOrDefault(usageWord.ToUpperInvariant());
+            .ToDictionary(t => t.s, t => t.e, CobolNames.Comparer);
+        return _bySpelling.GetValueOrDefault(usageWord);
     }
 }

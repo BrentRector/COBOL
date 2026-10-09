@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Editions;
 
 /// <summary>
@@ -25,7 +27,7 @@ public static class CompilerDirectiveCatalog
 {
     private static readonly Lazy<IReadOnlyDictionary<string, ConstructDialectStatus>> Map = new(() =>
     {
-        var map = new Dictionary<string, ConstructDialectStatus>(StringComparer.OrdinalIgnoreCase);
+        var map = new Dictionary<string, ConstructDialectStatus>(CobolNames.Comparer);
         foreach (var e in ConstructRegistry.Entries)
             foreach (string w in e.DirectiveWords)
                 if (!map.TryAdd(w, e))
@@ -86,11 +88,11 @@ public static class CompilerDirectiveCatalog
         // A word of a multi-word row whose own format writes no operand (kb/Work PB806): §7.3.3 SR3/SR4 — only spaces
         // and an optional inline comment may follow the directive, so ANY operand word is a violation, whatever the
         // row's Form says about the row's other words.
-        if (operand.Length > 0 && syntax.NoOperandWords.Contains(word, StringComparer.OrdinalIgnoreCase))
+        if (operand.Length > 0 && syntax.NoOperandWords.Contains(word, CobolNames.Comparer))
         {
             sink.Report(new EditionDiagnostic(
                 Diagnostics.DiagnosticCatalog.DirectiveMalformedOperand.Code, EditionSeverity.Error, row.Id,
-                $">>{word.ToUpperInvariant()} is malformed: '{operand}' follows it, but the general format writes no operand "
+                $">>{CobolNames.UpperFold(word)} is malformed: '{operand}' follows it, but the general format writes no operand "
                 + "and only space characters and an optional inline comment may follow a compiler directive "
                 + "(ISO §7.3.3 SR3/SR4; text-1 and text-2 begin on a new line)",
                 row.Display, syntax.Citation));
@@ -131,7 +133,7 @@ public static class CompilerDirectiveCatalog
             return false;
         var words = SignificantWords(s, operand);
         if (words.Count > 1) return false;
-        operandWord = words.Count == 1 ? words[0].ToUpperInvariant() : "";
+        operandWord = words.Count == 1 ? CobolNames.UpperFold(words[0]) : "";
         return true;
     }
 
@@ -141,7 +143,7 @@ public static class CompilerDirectiveCatalog
     /// <see cref="CheckWords"/> (what the diagnostic screens) shall never disagree about which words count.</summary>
     private static List<string> SignificantWords(DirectiveOperandSyntax syntax, string operand) =>
         [.. operand.SplitSpaces()
-                   .Where(w => !syntax.OptionalWords.Contains(w, StringComparer.OrdinalIgnoreCase))];
+                   .Where(w => !syntax.OptionalWords.Contains(w, CobolNames.Comparer))];
 
     /// <summary>The closed-word-set arm of <see cref="CheckOperand"/>: the optional words (§5.2.3) may be written
     /// anywhere and are ignored; what remains shall be exactly one admissible word, or nothing when the general
@@ -155,8 +157,8 @@ public static class CompilerDirectiveCatalog
             return $"'{string.Join(' ', words)}' is more than one operand";
 
         string w = words[0];
-        if (syntax.Choice.Contains(w, StringComparer.OrdinalIgnoreCase)) return null;
-        if (syntax.DirectiveName && OperandDirectiveNames(syntax, edition).Contains(w, StringComparer.OrdinalIgnoreCase))
+        if (syntax.Choice.Contains(w, CobolNames.Comparer)) return null;
+        if (syntax.DirectiveName && OperandDirectiveNames(syntax, edition).Contains(w, CobolNames.Comparer))
             return null;
         return $"'{w}' is not an admissible operand";
     }
@@ -171,7 +173,7 @@ public static class CompilerDirectiveCatalog
     /// out by itself.</summary>
     private static IReadOnlyList<string> OperandDirectiveNames(DirectiveOperandSyntax syntax, EditionInfo edition)
     {
-        var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var excluded = new HashSet<string>(CobolNames.Comparer);
         foreach (string name in syntax.ExcludedDirectives)
             foreach (string w in (Find(name)?.DirectiveWords ?? [name])) excluded.Add(w);   // the whole ROW, by one of its words
         return [.. Words.Where(w => !excluded.Contains(w)

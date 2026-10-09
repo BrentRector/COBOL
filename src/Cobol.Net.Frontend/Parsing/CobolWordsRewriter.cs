@@ -54,8 +54,8 @@ public static class CobolWordsRewriter
     /// </summary>
     public static string? CanonicalWordOf(IToken? tok, CobolWordsMap map)
         => tok is null ? null
-         : map.IsEmpty || tok.Type != CobolKeywordTokens.IdentifierType ? tok.Text.ToUpperInvariant()
-         : map.Resolve(tok.Text.ToUpperInvariant());
+         : map.IsEmpty || tok.Type != CobolKeywordTokens.IdentifierType ? CobolNames.UpperFold(tok.Text)
+         : map.Resolve(CobolNames.UpperFold(tok.Text));
 
     /// <summary>True when an already-lexed <paramref name="tok"/> denotes <paramref name="keyword"/> — the
     /// token-aware twin of <see cref="CobolWordsMap.Is"/>, carrying the same once-only guarantee as

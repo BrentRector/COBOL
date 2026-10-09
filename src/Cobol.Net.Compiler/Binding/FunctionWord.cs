@@ -3,6 +3,7 @@
 using Antlr4.Runtime;
 using CobolNet.Editions;
 using CobolNet.Frontend.Parsing;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding;
 
@@ -38,5 +39,5 @@ internal readonly record struct FunctionWord(string Written, string? Canonical)
 
     /// <summary>The word as WRITTEN in source text under <paramref name="map"/> — the directive applied once, here.</summary>
     public static FunctionWord OfWrittenWord(string written, CobolWordsMap map) =>
-        map.IsEmpty ? new(written, written) : new(written, map.Resolve(written.ToUpperInvariant()));
+        map.IsEmpty ? new(written, written) : new(written, map.Resolve(CobolNames.UpperFold(written)));
 }

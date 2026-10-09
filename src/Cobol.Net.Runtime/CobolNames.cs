@@ -66,6 +66,31 @@ public static partial class CobolNames
         return sb.ToString();
     }
 
+    /// <summary>The word's ONE upper-case spelling: its Annex C <see cref="Fold(string)"/> with the basic letters
+    /// a-z then written A-Z (kb/Work PB1965). Two spellings of one COBOL word give one string, so it is the key a
+    /// table compared by ordinal, a derived C# identifier, an externalized name the compiler forms, or a word
+    /// compared with an upper-case keyword reads. It replaces the host's <c>ToUpperInvariant</c>, which is not the
+    /// standard's mapping: it keeps the Kelvin sign U+212A apart from <c>K</c>, and at COBOL 2023 it writes the
+    /// dotless i U+0131 as <c>I</c> and final sigma U+03C2 as sigma's capital, joining words Annex C keeps apart
+    /// (Annex E.2 item 14). Only the basic letters are raised, because only their upper case is the standard's
+    /// (§8.1.3.1 Table 1: the basic letters A to Z are the "Latin capital letters (uppercase letters)"); an extended
+    /// letter stays in its fold, as Annex C maps only from upper case to lower.
+    /// All-basic words that are already upper case are returned as they are.</summary>
+    public static string UpperFold(string word)
+    {
+        int i = 0;
+        while (i < word.Length && word[i] < 0x80 && word[i] is not (>= 'a' and <= 'z')) i++;
+        if (i == word.Length) return word;
+        var sb = new StringBuilder(word.Length);
+        sb.Append(word, 0, i);
+        while (i < word.Length)
+        {
+            int cp = NextFolded(word, ref i);
+            AppendCodePoint(sb, cp is >= 'a' and <= 'z' ? cp & ~0x20 : cp);
+        }
+        return sb.ToString();
+    }
+
     /// <summary>The folded code point at <paramref name="i"/>, advancing past it — one UTF-16 unit, two for a
     /// surrogate pair, and a lone surrogate is its own unit (left unfolded: no mapping names one). Every Annex C
     /// mapping keeps a character's UTF-16 width (a BMP letter folds to a BMP letter, a supplementary one to a

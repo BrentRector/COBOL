@@ -10,9 +10,10 @@ namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// ⛔ A COBOL WORD IS COMPARED BY ONE FOLD, ANNEX C, AND BY NOTHING ELSE (kb/Work PB1402; ISO §8.1.3.2 GR3 b) and
-/// GR4 b)). Every name table and every word comparison in the compiler (Cobol.Net.Compiler) and the frontend
-/// (Cobol.Net.Frontend) goes through <see cref="CobolNames"/>; .NET's ordinal-ignore-case comparison may not appear
-/// there, because it upper-cases by the host's case mapping and disagrees with Annex C on the extended letters (it
+/// GR4 b)). Every name table and every word comparison in the compiler (Cobol.Net.Compiler), the frontend
+/// (Cobol.Net.Frontend) and the edition tables (Cobol.Net.Editions, kb/Work PB1965) goes through
+/// <see cref="CobolNames"/>; .NET's ordinal-ignore-case comparison may not appear there, and neither may its
+/// <c>ToUpperInvariant</c> as a word's key (<see cref="CobolNames.UpperFold"/> is that key), because it upper-cases by the host's case mapping and disagrees with Annex C on the extended letters (it
 /// makes final sigma the same letter as sigma and a lowercase Cherokee syllable the same as its capital, and keeps
 /// U+0130 and the Kelvin sign apart from i and k). The one exception is a comparison of a string that is not a COBOL
 /// word — a file-system path, a command-line option — and that line says so with the marker
@@ -23,11 +24,69 @@ public sealed class CobolNameFoldDriftTests
 {
     private const string Marker = "// not a COBOL word:";
 
+    /// <summary>The projects whose name tables and comparisons are COBOL words: the compiler, the front end, and the
+    /// edition tables (the <c>&gt;&gt;COBOL-WORDS</c> map, the directive catalog, the §8.10 and implementor-name
+    /// tables), which reference the runtime for the fold since kb/Work PB1965.</summary>
+    private static readonly string[] WordProjects = ["Cobol.Net.Compiler", "Cobol.Net.Frontend", "Cobol.Net.Editions"];
+
+    /// <summary>The host's upper-casing standing as a word's KEY (kb/Work PB1965): a C# identifier derived from a word
+    /// (<c>Sanitize(x).ToUpperInvariant()</c>), a word looked up in the <c>&gt;&gt;COBOL-WORDS</c> map
+    /// (<c>Resolve(x.ToUpperInvariant())</c>), and an item's default externalized name
+    /// (<c>CobolName.ToUpperInvariant()</c>). Each is <see cref="CobolNames.UpperFold"/> (or
+    /// <c>DataItem.WordIdentifier</c>) now.</summary>
+    private static readonly System.Text.RegularExpressions.Regex HostUpperKey = new(
+        @"Sanitize\([^;]*\)\.ToUpperInvariant\(|\bResolve\([^;]*\.ToUpperInvariant\(|\bCobolName!?\.ToUpperInvariant\(",
+        System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    [Fact]
+    public void NoHostUpperCase_AsTheKeyOfACobolWord()
+    {
+        var hits = new List<string>();
+        foreach (string project in WordProjects)
+            foreach (string file in Directory.EnumerateFiles(TestRepo.Src(project), "*.cs", SearchOption.AllDirectories))
+            {
+                string rel = Path.GetRelativePath(TestRepo.Root, file);
+                if (rel.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    .Any(p => p is "obj" or "bin" or "Generated")) continue;
+                string[] lines = File.ReadAllLines(file);
+                for (int i = 0; i < lines.Length; i++)
+                    if (!lines[i].TrimStart().StartsWith("//", StringComparison.Ordinal) && HostUpperKey.IsMatch(lines[i]))
+                        hits.Add($"{rel}:{i + 1}: {lines[i].Trim()}");
+            }
+        Assert.True(hits.Count == 0,
+            "a COBOL word's upper-case key is CobolNames.UpperFold (a C# identifier: DataItem.WordIdentifier), never "
+            + "the host's ToUpperInvariant, which keeps the Kelvin sign apart from K and joins final sigma with sigma:\n"
+            + string.Join("\n", hits));
+    }
+
+    /// <summary>The one upper-case spelling: Annex C's fold with only the basic letters raised.</summary>
+    [Theory]
+    [InlineData("kup", "KUP")]
+    [InlineData("KUP", "KUP")]   // K is U+212A, the KELVIN SIGN: (212A,006B)
+    [InlineData("café", "CAFé")]  // an extended letter stays in its fold
+    [InlineData("CAFÉ", "CAFé")]
+    [InlineData("Xς", "Xς")]     // final sigma: no mapping at 2023 (E.2 item 14), kept apart from sigma
+    [InlineData("Xσ", "Xσ")]
+    [InlineData("ıTEM", "ıTEM")]   // dotless i: no mapping at 2023 (E.2 item 14)
+    [InlineData("DİX", "DIX")]     // (0130,0069)
+    public void UpperFold_IsTheFoldWithTheBasicLettersRaised(string word, string upper)
+    {
+        Assert.Equal(upper, CobolNames.UpperFold(word));
+        Assert.True(CobolNames.Same(word, upper));
+    }
+
+    [Fact]
+    public void UpperFold_ReturnsAnUpperCaseBasicWordItself()
+    {
+        const string basic = "WS-TOTAL-1";
+        Assert.Same(basic, CobolNames.UpperFold(basic));
+    }
+
     [Fact]
     public void NoOrdinalIgnoreCase_OverACobolWord_InTheCompilerOrTheFrontend()
     {
         var hits = new List<string>();
-        foreach (string project in new[] { "Cobol.Net.Compiler", "Cobol.Net.Frontend" })
+        foreach (string project in WordProjects)
             foreach (string file in Directory.EnumerateFiles(TestRepo.Src(project), "*.cs", SearchOption.AllDirectories))
             {
                 string rel = Path.GetRelativePath(TestRepo.Root, file);

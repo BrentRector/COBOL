@@ -699,6 +699,10 @@ public sealed partial class DataBinder
         // written at all, and how many, is §8.4.2.3.3's, and a constant entry is not among SR5's seven
         // exemptions. `CONSTANT AS LENGTH OF PLAIN (1)` over a non-table item compiled and yielded 7.
         if (resolver.ScreenSubscriptArity(dref, item, subscripts)) return null;
+        // §13.10.4 GR5/GR6 measure the item AS DESCRIBED — its implied PICTURE, TYPE / SAME AS composition, group USAGE
+        // and group SIGN applied — and the pipeline that applies them has not run yet (kb/Work PB2465): the operand's
+        // description is completed now, by the same passes, before anything below reads it.
+        CompleteDescriptionAhead(item);
         if (item.IsAnyLength)
         {
             Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the {phrase} operand shall not be "
@@ -723,11 +727,11 @@ public sealed partial class DataBinder
         int width = bytes ? item.ByteWidth : ItemLength.Positions(item);
         if (width <= 0)
         {
-            // A TYPE-clause reference not yet expanded / a pending PICTURE-less usage — loud, never a wrong 0.
+            // The description is complete (CompleteDescriptionAhead), so a zero width is an operand whose own
+            // composition failed and was reported (an unresolved TYPE, a refused PICTURE) — loud, never a wrong 0.
             Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the length of '{written}' is "
-                + "not computable at this point in the data division (ISO §13.10.4 "
-                + (bytes ? "GR5 — the §15.14 BYTE-LENGTH value" : "GR6 — the §15.50 LENGTH value")
-                + "; a TYPE-expanded or usage-pending operand is a recorded residue)");
+                + "not computable — its description describes no data (ISO §13.10.4 "
+                + (bytes ? "GR5 — the §15.14 BYTE-LENGTH value" : "GR6 — the §15.50 LENGTH value") + ")");
             return null;
         }
         string text = width.ToString(CultureInfo.InvariantCulture);

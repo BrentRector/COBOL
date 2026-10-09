@@ -1,0 +1,68 @@
+// Copyright (c) 2026 Brent Rector. All rights reserved.
+// Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Collections.Generic;
+using System.Linq;
+
+using CobolNet.Binding.Model;
+
+namespace CobolNet.Binding;
+
+/// <summary>
+/// ⛔ A LENGTH PHRASE MEASURES THE COMPLETED DESCRIPTION (kb/Work PB2465). §13.10.4 GR5 / GR6 determine a constant's
+/// BYTE-LENGTH OF / LENGTH OF value "as specified in the BYTE-LENGTH intrinsic function" / "the LENGTH intrinsic
+/// function", which measure the item AS DESCRIBED — after every clause that decides its size has applied. Four of those
+/// clauses apply through the description-completion passes of <see cref="Passes.BindPipeline"/>, which run once over
+/// the whole forest after the DATA DIVISION is bound: the §13.16.3 SR9 VALUE-implied PICTURE
+/// (<see cref="SynthesizeImpliedPictures"/>), TYPE and SAME AS composition (<see cref="ExpandTypes"/>), group USAGE
+/// (§13.18.60.4 GR1, <see cref="UsageInheritancePass"/>) and group SIGN (§13.18.52 GR1, <see cref="InheritSignClauses"/>).
+/// A constant entry is bound when the section walk reaches it or when a reference demands its value — both BEFORE the
+/// pipeline — so the operand used to be measured half-described: a COMP-5 group's PIC 9(4) leaf 4 bytes where it
+/// occupies 2, a record holding a TYPE'd member 1 position where it is 6, a VALUE-implied picture 1 where it is 4, a
+/// group SIGN LEADING SEPARATE leaf 3 where it is 4 — and the program compiled and ran on the wrong value.
+/// <para><see cref="CompleteDescriptionAhead"/> brings the operand's subtree to its completed description at the
+/// moment it is measured, through the SAME bodies those passes run (one rule in one place): the subtree's implied
+/// PICTUREs, its TYPE / SAME AS expansions (a type declaration or SAME AS source described later is bound on demand,
+/// as a length operand is), and the usage and SIGN walks started at the operand with what its ancestors hand down
+/// (<see cref="InheritedUsageAt"/>, <see cref="InheritedSignAt"/>). The subtree is recorded, and the pipeline's walks
+/// pass over it (<see cref="UsageInheritanceWalk"/>, <see cref="InheritSignWalk"/>); the other two passes are
+/// idempotent. A subtree inside a record whose description is still OPEN (an entry bound ahead of the walk,
+/// kb/Work PB1941) completes the same way: its ancestors' clauses are already bound, and they are what it inherits.</para>
+/// </summary>
+public sealed partial class DataBinder
+{
+    /// <summary>The subtrees completed ahead of the pipeline — each the operand of a constant's length phrase.</summary>
+    private readonly HashSet<DataItem> _completedAhead = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>Complete <paramref name="item"/>'s description now — the subtree's SR9 implied PICTUREs, TYPE and SAME
+    /// AS expansions, and §13.18.60.4 GR1 / §13.18.52 GR1 inheritance from its ancestors — unless it, or a subtree
+    /// holding it, is complete already. See the class remarks.</summary>
+    private void CompleteDescriptionAhead(DataItem item)
+    {
+        for (var d = item; d is not null; d = d.Parent)
+            if (_completedAhead.Contains(d)) return;
+        // §13.18.57.4 GR3 makes a type declaration's implied PICTURE part of the description a TYPE clause copies, so
+        // the declarations this subtree may copy own theirs first — the pipeline's order (SynthesizeImpliedPictures
+        // before ExpandTypes). A declaration whose description is still open is not complete and copies nothing yet.
+        foreach (var declaration in TypeDecls.Values.Where(t => !IsDescriptionOpen(t)))
+            SynthesizeImpliedPicturesUnder(declaration);
+        SynthesizeImpliedPicturesUnder(item);
+        // ExpandTypes' order: every TYPE clause, then every SAME AS clause (a SAME AS source copies its expanded TYPE).
+        foreach (var typed in PreOrder(item).Where(i => i.TypeRefName is not null).ToList()) ExpandType(typed);
+        foreach (var sameAs in PreOrder(item).Where(i => i.SameAsName is not null).ToList()) ExpandSameAs(sameAs, []);
+        UsageInheritanceWalk(item, InheritedUsageAt(item));
+        InheritSignWalk(item, InheritedSignAt(item));
+        _completedAhead.Add(item);
+    }
+
+    /// <summary>Bind, out of source order, the type declaration <paramref name="typeName"/> names when the section walk
+    /// has not reached it — a TYPE clause expanded ahead of the pipeline (<see cref="CompleteDescriptionAhead"/>) may
+    /// name one declared later, which §13.18.57 permits — and give it its §13.16.3 SR9 implied PICTUREs, which it must
+    /// own before it is copied. False when nothing was bound; after the walk nothing is described later, so in the
+    /// pipeline this is a no-op.</summary>
+    private bool BindLaterTypeDeclaration(string typeName)
+    {
+        if (!IsDescribedLater(typeName) || !BindLaterRecords(typeName)) return false;
+        if (TryFindTypeDecl(typeName, out var declaration)) SynthesizeImpliedPicturesUnder(declaration);
+        return true;
+    }
+}

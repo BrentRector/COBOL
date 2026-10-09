@@ -702,7 +702,7 @@ public sealed partial class DataBinder
         {
             Level = 1,
             CobolName = cobolPrefix + _uidCounter,
-            CsName = csPrefix + _uidCounter + "_" + DataItem.Sanitize(tag).ToUpperInvariant(),
+            CsName = csPrefix + _uidCounter + "_" + DataItem.WordIdentifier(tag),
             IsCompilerTemp = true,   // kb/Work R26 — the positive is-a-declared-item discrimination
             // (P5.7: the clone-time StoreAsImage seed is gone — StorageFormPass's promoted-set re-sync derives
             //  the temp's storage from its model's PRE-whole-group facts, the fused pipeline's re-sync ordering.)

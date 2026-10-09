@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Runtime;
+
 namespace CobolNet.Editions;
 
 /// <summary>
@@ -37,9 +39,10 @@ public static partial class ReservedWords
 {
     private static Dictionary<string, ReservedWordEntry>? _byWord;
 
-    /// <summary>Look up <paramref name="upperWord"/> (already uppercase) in the generated table.</summary>
-    public static ReservedWordEntry? Find(string upperWord) =>
-        (_byWord ??= Entries.ToDictionary(e => e.Word, StringComparer.Ordinal)).GetValueOrDefault(upperWord);
+    /// <summary>Look up <paramref name="word"/> in the generated table, keyed by the Annex C fold
+    /// (<see cref="CobolNames.Comparer"/>, kb/Work PB1965), so any spelling of the word finds its row.</summary>
+    public static ReservedWordEntry? Find(string word) =>
+        (_byWord ??= Entries.ToDictionary(e => e.Word, CobolNames.Comparer)).GetValueOrDefault(word);
 }
 
 /// <summary>

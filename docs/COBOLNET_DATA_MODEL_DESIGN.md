@@ -256,6 +256,20 @@ anything measures it (`CompletePreboundGroup`). An operand SUBORDINATE to the ve
 the constant has no bound ancestor to link to (that entry's item does not exist yet) and stays recognized-not-implemented
 COBOLNET0899 `constant-length-operand-bound-later`.
 
+**⛔ A LENGTH PHRASE MEASURES THE COMPLETED DESCRIPTION** (kb/Work PB2465). §13.10.4 GR5/GR6 take the value "as
+specified in" the BYTE-LENGTH / LENGTH intrinsic, which measures the item as described — and four clauses that decide
+an item's size apply only through the description-completion passes of `BindPipeline` (the §13.16.3 SR9 implied
+PICTURE, TYPE / SAME AS composition, §13.18.60.4 GR1 group USAGE, §13.18.52 GR1 group SIGN), which run after the
+whole DATA DIVISION is bound, while a constant binds during it. So `DataBinder.DescriptionCompletion.cs#CompleteDescriptionAhead`
+completes the operand's subtree when the length phrase measures it, through those passes' OWN bodies
+(`SynthesizeImpliedPicturesUnder`, `ExpandType` / `ExpandSameAs`, `UsageInheritanceWalk` and `InheritSignWalk` started
+at the operand with what its ancestors hand down — `InheritedUsageAt` folds the walk's own `HandDown`), and records it;
+the pipeline's two walks pass over a recorded subtree, and the other two passes are idempotent. A TYPE or SAME AS
+source described later than the demand is bound on demand like a length operand (`BindLaterTypeDeclaration`,
+`ExpandSameAsEntry`), and §8.4.2.2.1 rule 4's "referenced in any TYPE clause" reads the clause as written
+(`DataItem.WrittenTypeName`), never the pending mark an early expansion clears. A NEW completion pass that changes
+an item's size joins `CompleteDescriptionAhead` in the same change, or a constant measures the item without it.
+
 **⛔ EVERY `integer-n` POSITION IS A LITERAL POSITION A CONSTANT-NAME STANDS IN, AND THE GRAMMAR SAYS SO ONCE** (kb/Work
 PB1947 report writer, PB1948 the rest). §5.5 1) calls each `integer-n` "a fixed-point integer literal" and §13.10.3 SR2
 lets a constant-name stand "anywhere that a format specifies a literal of the class and category of constant-name-1",
