@@ -32,11 +32,15 @@ public sealed class CancelCascadeOrderTests
         void Reg(string path, string name, string? parent) =>
             table.Register(path, name, parent, initial: false, common: false, recursive: false,
                 _ => new Probe(name, log), staticReset: () => log.Add("reset " + name));
-        Reg("OUTER", "OUTER", null);
-        Reg("OUTER/A", "A", "OUTER");
-        Reg("OUTER/B", "B", "OUTER");
-        Reg("OUTER/B/B1", "B1", "OUTER/B");
-        Reg("OUTER/C", "C", "OUTER");
+        // One module's registration set, as its __CobolModule.EnsureRegistered() makes it (kb/Work PB2097).
+        table.RegisterModule("Cobol.OUTER.__CobolModule", RuntimeAbi.Version.ToString(), RuntimeAbi.CallAbi, () =>
+        {
+            Reg("OUTER", "OUTER", null);
+            Reg("OUTER/A", "A", "OUTER");
+            Reg("OUTER/B", "B", "OUTER");
+            Reg("OUTER/B/B1", "B1", "OUTER/B");
+            Reg("OUTER/C", "C", "OUTER");
+        });
         table.CallProgram("OUTER", "", [], null);
         foreach (var n in new[] { "A", "B", "C" }) table.CallProgram(n, "OUTER", [], null);
         table.CallProgram("B1", "OUTER/B", [], null);

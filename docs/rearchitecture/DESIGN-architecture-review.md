@@ -154,7 +154,7 @@ is tracked tooling with a self-test, so the next batch is a command, never a bri
 | runtime values and numerics (`runtime-values`) | `src/Cobol.Net.Runtime/{Values,Intrinsics,Verbs}/**` `src/Cobol.Net.Runtime/*.{cs,csproj}` | — |
 | runtime collation, Unicode and globalization (`runtime-text`) | `src/Cobol.Net.Runtime/{Collation,Unicode,Globalization}/**` | — |
 | runtime I/O (`runtime-io`) | `src/Cobol.Net.Runtime/IO/**` | — |
-| runtime control and exceptions (`runtime-control`) | `src/Cobol.Net.Runtime/{Control,Exceptions}/**` | — |
+| runtime control and exceptions (`runtime-control`) | `src/Cobol.Net.Runtime/{Control,Exceptions,Repository}/**` | — |
 | editions and diagnostics (`editions-diagnostics`) | `src/Cobol.Net.Editions/**` `src/Cobol.Net.Frontend/Diagnostics/**` | — |
 | CLI (`cli`) | `src/Cobol.Net.Cli/**` | — |
 | tests, scripts and CI (`tests-scripts-ci`) | `tests/**` `scripts/**` `tools/**` `.github/**` `.claude/**` `*.ps1` `Directory.*.props` `Cobol.Net.sln` | — |
