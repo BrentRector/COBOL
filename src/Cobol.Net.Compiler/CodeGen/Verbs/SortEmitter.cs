@@ -814,14 +814,17 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
     /// occurrence the number names — and then places the elements back in that order (GR24). Every element's image
     /// is read BEFORE the first is written, so the placing back cannot disturb an element still to be read; a write
     /// through one view is visible through every other view of the class because it IS the class's one backing
-    /// (§13.18.44.4 GR1). Each element moves as the window that holds it: its bytes, in the member's own coding.</summary>
+    /// (§13.18.44.4 GR1). Each element moves WHOLE — everything its description holds (GR24 places the elements):
+    /// its bytes in the member's own coding, its variable-length components apart (an EXTERNAL element holding a
+    /// dynamic-length item or a dynamic-capacity table moves as its component carrier), and every managed pointer
+    /// slot at every occurrence of an inner OCCURS (kb/Work PB1922, PB1951).</summary>
     private void EmitSharedAreaTableSort(BoundTableSort ts, TableSortStorage.SharedArea shared, int id, List<string> weightsArg)
     {
         var w = ctx.Writer;
         // One window per element or key: the item at a 1-based occurrence, an index expression for each enclosing
         // table and then the element's own — through the ONE place builder, so the offset law is the class's.
-        Place At(DataItem item, Position occurrence) =>
-            refs.ResolveItemAt(item, [.. shared.OuterIndexExprs, occurrence])
+        Place At(DataItem item, Position occurrence, params IEnumerable<Position> inner) =>
+            refs.ResolveItemAt(item, [.. shared.OuterIndexExprs, occurrence, .. inner])
                 ?? throw new InvalidOperationException(
                     $"SORT table '{ts.Table.CobolName}': no window for '{item.CobolName}' — the binder checked it (kb/Work PB1175)");
         string n = $"__n{id}", ix = $"__ix{id}", im = $"__im{id}", at = $"__e{id}";
@@ -832,23 +835,73 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
         EmitKeyComparer(ts, weightsArg,
             (key, v) => PlaceRenderer.Read(At(key.Key, PositionRenderer.OneBased(v))), shared: true);
         w.Line($"{RuntimeApi.TableSortInPlace($"System.MemoryExtensions.AsSpan({ix})", $"__tc{id}")};   // GR19 — the element order; stable (GR3c)");
-        w.Line($"var {im} = new string[{n}];");
-        w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {im}[{at}] = {PlaceRenderer.Read(At(ts.Table, PositionRenderer.OneBased(at)))};");
+        // ⛔ AN ELEMENT HOLDING A VARIABLE-LENGTH COMPONENT MOVES AS ITS COMPONENT CARRIER, NOT AS AN IMAGE (kb/Work
+        // PB1951's sibling). In a cell-backed class (EXTERNAL) a dynamic-length item or a dynamic-capacity table inside
+        // the element lives in the cell's component slots (VarGroupWindow), and the element's contiguous image
+        // (§8.5.1.11.2) cannot be cut back into components unambiguously — two dynamic-length items run together, and
+        // a dynamic-capacity table's content was dropped. The carrier holds every component apart, so the element
+        // placed back (GR24) is the element that was read: at its maximum extent (the whole element, as an activation
+        // boundary carries it) and stored as the same storage (no receiving description truncates it).
+        bool carried = At(ts.Table, new PositionConstant(1)).Undecorated is RedefViewPlace { Coding: VarGroupWindow };
+        string ReadElement(Place p) => carried ? PlaceRenderer.VarGroupBoundaryImage(p, "SORT table element") : PlaceRenderer.Read(p);
+        string WriteElement(Place p, string value) =>
+            carried ? PlaceRenderer.WriteVarGroupImage(p, value, "SORT table element", formalStorage: true) : PlaceRenderer.Write(p, value);
+        w.Line($"var {im} = new {(carried ? RuntimeApi.VarGroupType : "string")}[{n}];");
+        w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {im}[{at}] = {ReadElement(At(ts.Table, PositionRenderer.OneBased(at)))};");
         // An element's pointer-class members ride the area's managed SLOTS, not its bytes (§14.9.3.4 GR9; kb/Work PB231,
         // PB1922): the image holds only their reserved placeholder positions, so each such member's value is read with
         // its element BEFORE the first write and written back by the same permutation AFTER the images, which
         // would otherwise leave every pointer behind at its old occurrence.
+        // A member under an inner OCCURS (a pointer TABLE in the element, kb/Work PB1951) has one slot per inner
+        // occurrence: its values are gathered per element as nested arrays, one level per inner OCCURS
+        // (SlotWindow.InnerLevelsOf, the binder's own question) — a fixed level at its every occurrence, a
+        // dynamic-capacity level at the source element's CURRENT capacity — and written back by nested loops bounded by
+        // the gathered arrays themselves: the element carrier written above gave each destination element its source's
+        // capacities, so every gathered slot has its occurrence again. A member with no inner OCCURS emits exactly the
+        // one-level form.
         var slotMembers = SlotWindow.MembersOf(ts.Table).ToList();
         var slots = new List<string>();
         for (int j = 0; j < slotMembers.Count; j++)
         {
             string sv = $"__sl{id}_{j}";
             slots.Add(sv);
-            w.Line($"var {sv} = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, {n}), __k => {PlaceRenderer.Read(At(slotMembers[j], PositionRenderer.OneBased("__k")))}));");
+            var levels = SlotWindow.InnerLevelsOf(slotMembers[j], ts.Table);
+            var element = PositionRenderer.OneBased("__k");
+            string Gather(int depth, List<Position> inner)
+            {
+                if (depth == levels.Count) return PlaceRenderer.Read(At(slotMembers[j], element, inner));
+                string q = $"__q{id}_{j}_{depth}";
+                return $"System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, {LevelCount(levels[depth], element, inner)}), {q} => "
+                    + $"{Gather(depth + 1, [.. inner, PositionRenderer.OneBased(q)])}))";
+            }
+            w.Line($"var {sv} = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, {n}), __k => {Gather(0, [])}));");
         }
-        w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {PlaceRenderer.Write(At(ts.Table, PositionRenderer.OneBased(at)), $"{im}[{ix}[{at}]]")}   // GR24 — placed back in data-name-2");
+        w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {WriteElement(At(ts.Table, PositionRenderer.OneBased(at)), $"{im}[{ix}[{at}]]")}   // GR24 — placed back in data-name-2");
         for (int j = 0; j < slotMembers.Count; j++)
-            w.Line($"for (int {at} = 0; {at} < {n}; {at}++) {PlaceRenderer.Write(At(slotMembers[j], PositionRenderer.OneBased(at)), $"{slots[j]}[{ix}[{at}]]")}   // GR24 — the element's managed slot travels with its image");
+        {
+            int depthCount = SlotWindow.InnerLevelsOf(slotMembers[j], ts.Table).Count;
+            var loops = new System.Text.StringBuilder($"for (int {at} = 0; {at} < {n}; {at}++) ");
+            var inner = new List<Position>();
+            var source = new System.Text.StringBuilder($"{slots[j]}[{ix}[{at}]]");
+            for (int d = 0; d < depthCount; d++)
+            {
+                string q = $"__q{id}_{j}_{d}";
+                loops.Append($"for (int {q} = 0; {q} < {source}.Length; {q}++) ");
+                inner.Add(PositionRenderer.OneBased(q));
+                source.Append($"[{q}]");
+            }
+            w.Line($"{loops}{PlaceRenderer.Write(At(slotMembers[j], PositionRenderer.OneBased(at), inner), source.ToString())}   // GR24 — the element's managed slots travel with its image");
+        }
+
+        // How many occurrences of the inner level one element holds, at the element and the inner occurrences that
+        // enclose the level: a fixed (or OCCURS DEPENDING) level's every allocated occurrence — the element's whole
+        // storage moves — and a dynamic-capacity level's current capacity (§8.5.1.9), which the binder checked it can
+        // address.
+        string LevelCount(DataItem level, Position element, List<Position> inner) =>
+            level.Occurs is { } fixedCount ? fixedCount.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : $"(int)({PlaceRenderer.OccurrenceCount(refs.CurrentOccurrenceCount(level, [.. shared.OuterIndexExprs, element, .. inner])
+                ?? throw new InvalidOperationException(
+                    $"SORT table '{ts.Table.CobolName}': no current capacity for '{level.CobolName}' — the binder checked it (kb/Work PB1951)"))})";
     }
 
     /// <summary>The table sort's key comparer BODY — the lambda's block, one compare per key in significance order

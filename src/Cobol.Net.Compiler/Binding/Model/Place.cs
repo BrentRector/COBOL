@@ -461,6 +461,16 @@ public sealed record SlotWindow(AccessPath Cell) : CellWindowCoding(Cell)
     public static IEnumerable<DataItem> MembersOf(DataItem item) =>
         CarriedBySlot(item) ? [item] : DataItem.DescendantsOf(item).Where(CarriedBySlot);
 
+    /// <summary>The table levels of the slot member <paramref name="member"/> that lie INSIDE <paramref name="item"/>
+    /// (the item <see cref="MembersOf"/> enumerated it from), outermost first: a member under an inner OCCURS — a
+    /// pointer TABLE inside a table element, <c>10 EP USAGE POINTER OCCURS 2</c> — has one managed slot per inner
+    /// occurrence, and an operation moving <paramref name="item"/> as a byte image carries every one of them (kb/Work
+    /// PB1951). §8.4.2.3.3 SR3's level list read past <paramref name="item"/>'s own levels, so the slot windows are
+    /// addressed with exactly the subscripts a reference to the member takes. Empty for a member with no inner
+    /// OCCURS (kb/Work PB1922's elementary pointer).</summary>
+    public static IReadOnlyList<DataItem> InnerLevelsOf(DataItem member, DataItem item) =>
+        member.SubscriptLevels().Skip(item.SubscriptArity).ToList();
+
     /// <summary>⛔ THE ONE test for "do this slot member's reserved positions hold a POINTER IMAGE?" (kb/Work PB1071;
     /// DOC-A.1-216): the three pointer categories do — <c>PointerImage</c> defines the image, NULL as eight zero
     /// positions — and the object reference, the one other slot-carried category, has no image and keeps its

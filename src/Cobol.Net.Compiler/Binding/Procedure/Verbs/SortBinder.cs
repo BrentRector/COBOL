@@ -218,8 +218,15 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
                     + DeferredShapes.Describe(DeferredShape.NestedClassBacking));
             // A pointer-class member's VALUE rides the area's managed slot, not its bytes (§14.9.3.4 GR9; kb/Work
             // PB231), and the elements move as byte images: the emitter carries each element's slots with its image
-            // (kb/Work PB1922), so every such member needs a window of its own here, placed by the ONE place builder.
-            if (SlotWindow.MembersOf(table).Any(m => ctx.Refs.ResolveItemAt(m, [.. outer, new PositionConstant(1)]) is null))
+            // (kb/Work PB1922), so every such member needs a window of its own here, placed by the ONE place builder —
+            // one per occurrence of every OCCURS level between the element and the member (a pointer TABLE inside the
+            // element, kb/Work PB1951), addressed as a reference to the member is (§8.4.2.3.3 SR3). The ask is at
+            // occurrence 1 of each level: the builder's answer turns on the shape, never on the occurrence. A
+            // dynamic-capacity inner level is enumerated at its current capacity, which must be addressable too.
+            if (SlotWindow.MembersOf(table).Any(m => SlotWindow.InnerLevelsOf(m, table) is var inner
+                    && (inner.Where((l, d) => l.Occurs is null
+                            && ctx.Refs.CurrentOccurrenceCount(l, [.. outer, new PositionConstant(1), .. inner.Take(d).Select(_ => new PositionConstant(1))]) is null).Any()
+                        || ctx.Refs.ResolveItemAt(m, [.. outer, new PositionConstant(1), .. inner.Select(_ => new PositionConstant(1))]) is null)))
                 return new BoundUnsupported($"SORT of table '{name}': "
                     + DeferredShapes.Describe(DeferredShape.UnbuiltAccessPath));
             storage = new TableSortStorage.SharedArea(outer);

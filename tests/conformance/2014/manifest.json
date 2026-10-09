@@ -3,6 +3,7 @@
  "enabled": [
   "pb2629_leap_second_utc_offset",
   "pb2630_integer_family_beyond_int128",
+  "pb1951_table_sort_external_variable_element",
   "pb2631_seconds_from_formatted_time_wide_fraction",
   "pb2633_trailing_p_seconds_argument",
   "pb895_zero_length_literal",

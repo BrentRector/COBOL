@@ -3,6 +3,7 @@
  "enabled": [
   "pb1965_annex_c_word_keys",
   "pb2631_anycase_fold_classification",
+  "pb1951_table_sort_external_pointer_dynamic_table",
   "doc_a1_132_module_name_stack_deep",
   "pb1027_plain_write_is_after_advancing",
   "pb1966_supplementary_letters_margin_r",

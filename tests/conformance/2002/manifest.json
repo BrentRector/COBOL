@@ -109,6 +109,7 @@
   "pb1055_table_sort_nested_subject",
   "pb599_table_sort_redefines_view_key",
   "pb1922_table_sort_pointer_element",
+  "pb1951_table_sort_pointer_table_element",
   "l1g4_leap_second_off_explicit_2002",
   "l1g4_global_redefines_subject_group",
   "l1c12_global_redefines_subject",

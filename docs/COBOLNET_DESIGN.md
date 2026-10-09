@@ -890,7 +890,12 @@ value of the typed RECORD KEY / RELATIVE KEY field.
   with the same key comparer (`EmitKeyComparer`, every key read through its own window, `ResolveItemAt`) and places
   the element images back through the class's windows, every image read before the first write (§14.9.40.4 GR24;
   §13.18.44.4 GR1) — and the managed SLOTS of the element's pointer-class members (a pointer's value is not in the
-  bytes, `SlotWindow.MembersOf`) are read with each element and written back by the same permutation (kb/Work PB1922).
+  bytes, `SlotWindow.MembersOf`) are read with each element and written back by the same permutation (kb/Work PB1922),
+  one slot per occurrence of every OCCURS level between the element and the member (`SlotWindow.InnerLevelsOf`; a
+  dynamic-capacity level at the source element's current capacity — kb/Work PB1951). An element holding a
+  variable-length component in a cell-backed class (an EXTERNAL element with a dynamic-length item or a
+  dynamic-capacity table — `VarGroupWindow`) moves as its §8.5.1.12 component CARRIER rather than its contiguous image,
+  which cannot be cut back into components (kb/Work PB1951): the element placed back is the element that was read.
   A typed-array table whose KEY has no stored field on the element struct (a member of a REDEFINES view of the
   element) is `TypedArray` with `KeyWindowOuter` set: every key is then read through its window at an element number,
   the NUMBERS are sorted and the elements permuted (kb/Work PB599) — one comparer, the member-path form kept for the
