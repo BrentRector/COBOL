@@ -91,4 +91,36 @@ public sealed class LinuxGateDriftTests
         Assert.True(defaults.Success, "scripts/linux-gate.sh no longer declares its default legs as legs=\"…\"");
         Assert.Contains("guard", defaults.Groups[1].Value.Split(','));
     }
+
+    /// <summary>
+    /// ⛔ THE LINUX GATE READS THE TREE WITH THE TREE'S OWN GIT, AND NO READ OF IT WRITES IT (kb/Work PB2880): every
+    /// git call of <c>scripts/linux-gate.sh</c> that names the tree goes through its one <c>wgit</c>, whose arms all
+    /// pass <c>--no-optional-locks</c>, and a tree on a Windows drive is read by Windows git (<c>git.exe</c>).
+    /// </summary>
+    /// <remarks>
+    /// Linux git reading a Windows tree through <c>/mnt</c> found the index's stat data foreign, re-hashed every
+    /// tracked file across the 9P boundary (34 s at half of one core: the gate's first serial valley, in every run),
+    /// and then wrote the refreshed index back into the real worktree, which Windows git rewrote on its next command.
+    /// A git call that bypasses <c>wgit</c>, or an arm without the flag, brings either cost back unseen: the gate's
+    /// verdict would still be GREEN.
+    /// </remarks>
+    [Fact]
+    public void TheLinuxGateReadsTheTree_WithItsOwnGit_AndNeverRefreshesItsIndex()
+    {
+        string[] code = File.ReadAllLines(TestRepo.Scripts("linux-gate.sh"))
+            .Where(l => !l.TrimStart().StartsWith('#')).ToArray();
+        string[] arms = code.Where(l => Regex.IsMatch(l, @"^\s*wgit\(\)\s*\{")).ToArray();
+
+        Assert.True(arms.Length == 2, "scripts/linux-gate.sh should define wgit once per tree kind (a Windows drive, "
+            + "a Linux filesystem); it defines it " + arms.Length + " time(s)");
+        Assert.All(arms, a => Assert.Contains("--no-optional-locks", a));
+        Assert.Contains(arms, a => Regex.IsMatch(a, @"\bgit\.exe\b") && a.Contains("$winroot", StringComparison.Ordinal));
+
+        // A git command word outside an echoed message (a message that NAMES git runs none), on a line naming the tree.
+        var direct = code.Where(l => !arms.Contains(l)
+                                     && Regex.IsMatch(Regex.Replace(l, @"\becho\s+""[^""]*""", ""), @"(^|[\s;(|&])git(\.exe)?\s")
+                                     && Regex.IsMatch(l, @"\$\{?(tree|winroot)\b")).ToList();
+        Assert.True(direct.Count == 0, "scripts/linux-gate.sh runs git on the tree outside wgit: "
+            + string.Join(" | ", direct.Select(l => l.Trim())));
+    }
 }

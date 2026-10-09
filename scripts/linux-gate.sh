@@ -25,8 +25,9 @@
 #     own scratch repository (gate_slot.py's self-test: git init, commit, worktree add) wrote into the REAL
 #     repository instead — `core.worktree` landed in the shared E:\COBOL\.git\config and broke git for every
 #     checkout until the owner removed it (2026-09-29, wave 72). So NOTHING here is exported: the only git calls on
-#     the Windows repository are this script's own two reads (HEAD, and the uncommitted-change count), with their
-#     settings passed inline, and the tests run in a clone that is an ordinary Linux repository.
+#     the Windows repository are this script's own READS (`wgit`: HEAD, the git directory, the uncommitted-change
+#     count, the tripwire), by the tree's own git and without optional locks (kb/Work PB2880), and the tests run in a
+#     clone that is an ordinary Linux repository.
 # The clone builds COMMITTED HEAD: commit before running it. Uncommitted tracked changes are counted and reported.
 #
 # Output: TestResults/linux-gate/<leg>.log (+ .trx) and build logs in the tree, one `leg <name>: GREEN|RED|NOT RUN`
@@ -59,21 +60,36 @@ if [ ! -f Cobol.Net.sln ]; then
 fi
 tree="$(pwd)"
 
-# The Windows tree's git directory, for this script's own READS only (never exported). A linked worktree's `.git` is a
-# file naming a Windows path; the main checkout's is a directory. /mnt trees trip git's ownership check and Git for
-# Windows' core.autocrlf lives in its SYSTEM config, so both are passed inline.
-gd="$tree/.git"
-if [ -f .git ]; then
-  gd="$(sed -n 's/^gitdir: //p' .git | tr -d '\r')"
-  case "$gd" in [A-Za-z]:*) gd="$(wslpath -u "$gd")" ;; esac
-fi
-wgit() { git -c safe.directory='*' -c core.autocrlf=true --git-dir="$gd" --work-tree="$tree" "$@"; }
-head="$(wgit rev-parse HEAD 2>/dev/null)"
+# THIS SCRIPT'S OWN READS OF THE TREE (never exported) go through `wgit`: the TREE'S OWN git, and never one that
+# writes. kb/Work PB2880 measured the alternative: Linux git reading a Windows tree through /mnt took 34 s for the one
+# `status` below (every run, at ~0.5 of one core: the gate's first serial valley). The index's stat data is Windows
+# git's, so Linux git re-read and re-hashed every tracked file across the 9P boundary, and then WROTE the refreshed
+# index back into the real worktree (an "optional lock"), which Windows git rewrote again on its next command. So:
+#  - a tree on a Windows drive (WSL; `wslpath -w` names a drive letter) is read by Windows git (`git.exe` through WSL
+#    interop) with its Windows path, against the stat data it wrote itself: 0.1-1.2 s;
+#  - a tree on a Linux filesystem (a cloud session, a CI-like host) is read by Linux git, as any Linux checkout;
+#  - both pass `--no-optional-locks`, so a read never refreshes the index of the repository it reads.
+# Each arm reports git's paths in this shell's form (`wpath`): the clone below reads the object store through it.
+winroot="$(wslpath -w "$tree" 2>/dev/null)"
+case "$winroot" in
+  [A-Za-z]:\\*)
+    if ! command -v git.exe >/dev/null 2>&1; then
+      echo "=== LINUX GATE: NOT RUN (the tree $winroot is on a Windows drive and Windows git (git.exe) is not reachable" \
+           "from WSL: enable WSL interop, or Linux git re-hashes the whole tree across /mnt — kb/Work PB2880) ==="; exit 2
+    fi
+    wgit() { git.exe --no-optional-locks -C "$winroot" "$@"; }
+    wpath() { wslpath -u "$(printf '%s' "$1" | tr -d '\r')"; } ;;
+  *)
+    wgit() { git -c safe.directory='*' --no-optional-locks -C "$tree" "$@"; }
+    wpath() { printf '%s' "$1"; } ;;
+esac
+head="$(wgit rev-parse HEAD 2>/dev/null | tr -d '\r')"
 common="$(wgit rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+[ -n "$common" ] && common="$(wpath "$common")"
 if [ -z "$head" ] || [ -z "$common" ]; then
-  echo "=== LINUX GATE: NOT RUN (cannot read this tree's HEAD from Linux: gitdir $gd) ==="; exit 2
+  echo "=== LINUX GATE: NOT RUN (cannot read this tree's HEAD and git directory: $tree) ==="; exit 2
 fi
-dirty="$(wgit status --porcelain --untracked-files=no 2>/dev/null | grep -v ' STATUS.md$' | wc -l)"
+dirty="$(wgit status --porcelain --untracked-files=no 2>/dev/null | tr -d '\r' | grep -v ' STATUS.md$' | wc -l)"
 # TRIPWIRE (group G's, kb/Work PB1719): nothing below may write to the REAL repository. The clone makes that true by
 # construction; this snapshot makes any future breach LOUD instead of silent. (Not the worktree list: other agents add
 # and remove worktrees of the shared repository while this runs.)
