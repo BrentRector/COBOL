@@ -13,7 +13,7 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
-## Entry 1950 — 2026-10-09 12:27 PDT — Train 1050: the gates' serial valleys removed (PB2880); PB2881-PB2884 filed
+## Entry 1950 — 2026-10-09 12:27 PDT — Train 1050: the gates' serial valleys removed (PB2880); PB2881-PB2885 filed
 
 Owner, 2026-10-09: "give this to Mythos session to figure out using Opus - Those serial steps are what PB2880 targets",
 and for the landing: "Land it alone now" (a one-change train; nothing else could be ready before the weekly reset).
@@ -38,6 +38,12 @@ current (§3.15 was stale since PB2879, fixed under I9). The four valleys measur
 PB2881 (the Conformance leg is latency-bound, not thread-bound), PB2882 (self-test long poles in the implementer's
 audit phase), PB2883 (the Linux unit leg's unbalanced NIST partition, 162 s against 54), PB2884 (the build's
 10-80 % CPU). PB2880 landed.
+
+Oracle (step 3c): `compare_oracle.py` on f3387ba8d reported DIFFERENT, 6 of 7,695 cases, every one ADDED and none
+CHANGED: the new conformance cases of PB2739 (3), PB2844 (2) and PB2757 (1), which train 1049 landed without
+re-recording the baseline (step 3c skipped in an operator hand-landing). This train's change compiles nothing, so none
+is its own; the baseline is re-recorded (e345db425878 to f3387ba8d9b5), and PB2885 is filed: nothing mechanical
+refuses a landing whose oracle baseline is behind the tree.
 
 ## Entry 1949 — 2026-10-09 11:05 PDT — Train 1049c: the Linux gate builds once and runs its legs in parallel (PB2879); PB2880 filed
 
