@@ -54,11 +54,27 @@ public static class SetAmount
 
     /// <summary>Land an amount that arrived as an EXACT scaled fixed-point value: <paramref name="scaled"/> is
     /// the value times 10^<paramref name="scale"/>, so the divisibility test IS the integrality test and no
-    /// fraction has been lost on the way in. An <see cref="Int128"/> amount is never
-    /// <see cref="SetAmountLanding.BeyondCarrier"/> — <see cref="Int128"/> IS the carrier.</summary>
+    /// fraction has been lost on the way in.
+    /// <para>⛔ A NEGATIVE <paramref name="scale"/> is a trailing-P amount (<c>PIC 9PP</c> stores 1 for the value
+    /// 100), and its VALUE is <paramref name="scaled"/> × 10^−<paramref name="scale"/>: "the symbol 'P' specifies
+    /// the location of an assumed decimal point when that point is not within the number that appears in the data
+    /// item" (ISO §13.18.40.4 GR14). Handing back the stored digits moved <c>SET IX UP BY</c> such an item by 1,
+    /// not 100, and fed the same wrong count to SET pointer UP BY, SET capacity and START … WITH LENGTH
+    /// (kb/Work PB2697). That widening is the one way an exact amount can be an integer too large for the
+    /// <see cref="Int128"/> carrier, so it is the one way this lane answers
+    /// <see cref="SetAmountLanding.BeyondCarrier"/> — decided before the multiply by the shared
+    /// <see cref="CobolNum.WideningFits"/>, so the product can never wrap.</para></summary>
     public static SetAmountLanding Land(Int128 scaled, int scale, out Int128 whole)
     {
-        if (scale <= 0) { whole = scaled; return SetAmountLanding.Integer; }
+        if (scale < 0)
+        {
+            whole = Int128.Zero;
+            if (scaled == 0) return SetAmountLanding.Integer;   // 0 at every scale, even one past Pow10's table
+            if (!CobolNum.WideningFits(scaled, -scale)) return SetAmountLanding.BeyondCarrier;
+            whole = scaled * Pow10.AsWide(-scale);
+            return SetAmountLanding.Integer;
+        }
+        if (scale == 0) { whole = scaled; return SetAmountLanding.Integer; }
         Int128 pow = Pow10.AsWide(scale);
         if (scaled % pow != 0) { whole = Int128.Zero; return SetAmountLanding.NotAnInteger; }
         whole = scaled / pow;

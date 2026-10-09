@@ -120,7 +120,11 @@ public static class CobolDynString
         current ??= "";
         int n;
         bool raised = false;
-        if (newLen < 0.0)
+        // ⛔ A NaN is not a number, so it "does not evaluate to a nonnegative number" — GR37's leg — yet it fails
+        // BOTH comparisons below and used to fall to the `(int)` cast, which .NET saturates to 0 SILENTLY: the
+        // length came out right and the condition was never set (kb/Work PB2647). The infinities need no screen:
+        // −∞ is below zero (GR37) and +∞ is above every maximum size (GR38's clamp).
+        if (double.IsNaN(newLen) || newLen < 0.0)
         {
             n = 0;                                                       // GR37 — not nonnegative → length 0
             raised = true;

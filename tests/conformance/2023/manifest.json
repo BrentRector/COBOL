@@ -3,6 +3,8 @@
  "enabled": [
   "pb1965_annex_c_word_keys",
   "pb1928_cobol_words_boolean_function_operand",
+  "pb2697_set_capacity_trailing_p",
+  "pb2647_set_size_not_finite",
   "pb2631_anycase_fold_classification",
   "pb1951_table_sort_external_pointer_dynamic_table",
   "doc_a1_132_module_name_stack_deep",

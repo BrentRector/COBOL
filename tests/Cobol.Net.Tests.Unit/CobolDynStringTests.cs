@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Runtime;
+using CobolNet.Runtime.Exceptions;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
@@ -117,6 +118,28 @@ public sealed class CobolDynStringTests
     [InlineData(-0.5)]
     public void SetSize_NotNonnegative_YieldsLengthZero(double newLen)
         => Assert.Equal("", CobolDynString.SetSize("ABCDE", newLen, 20));
+
+    /// <summary>kb/Work PB2647 — GR37 has TWO consequents ("the length of data-name-3 is set to 0 and an
+    /// EC-STORAGE-NOT-AVAIL exception condition is set to exist"), and a NaN, which is not a number at all, must
+    /// get both. It fails both range comparisons, so it used to fall to the <c>(int)</c> cast, which .NET saturates
+    /// to 0: the right length and NO condition. −∞ is below zero (GR37), and +∞ is a number above every maximum
+    /// size, GR38's clamp (with the same condition). The −1 row is the finite twin the fix must not disturb.</summary>
+    [Theory]
+    [InlineData(double.NaN, "")]
+    [InlineData(double.NegativeInfinity, "")]
+    [InlineData(-1.0, "")]
+    [InlineData(double.PositiveInfinity, "ABC  ")]
+    public void SetSize_NonFiniteOrNegative_TakesItsLeg_AndSetsEcStorageNotAvail(double newLen, string expected)
+    {
+        RunUnit.Run(_ =>
+        {
+            ExceptionState.Clear();
+            ExceptionState.StorageNotAvailChecking = true;
+            Assert.Equal(expected, CobolDynString.SetSize("ABC", newLen, 5));
+            Assert.Equal("EC-STORAGE-NOT-AVAIL", ExceptionState.LastName);
+            Assert.False(ExceptionState.LastFatal);   // Table 13: EC-STORAGE-NOT-AVAIL is nonfatal
+        });
+    }
 
     /// <summary>GR39 — the added positions are SPACES, and previously-truncated content is never restored.</summary>
     [Fact]

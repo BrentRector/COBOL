@@ -692,9 +692,12 @@ public static partial class CobolNum
             System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>An unscaled/scale pair rendered as its plain decimal VALUE — for the diagnostic text of the two
-    /// position conditions, so the message names the value the program computed (2.5) and never its storage (25).</summary>
+    /// position conditions, so the message names the value the program computed (2.5) and never its storage (25).
+    /// A negative scale is a trailing-P value, its storage times 10^|scale| (§13.18.40.4 GR14; kb/Work PB2697's
+    /// sweep): 1 at scale −2 is 100, never 1.</summary>
     public static string PlainValue(Int128 unscaled, int scale)
     {
+        if (scale < 0 && unscaled != 0) return unscaled.ToString() + new string('0', -scale);
         if (scale <= 0) return unscaled.ToString();
         bool neg = unscaled < 0;
         Int128 mag = neg ? -unscaled : unscaled, div = Pow10Wide(scale);

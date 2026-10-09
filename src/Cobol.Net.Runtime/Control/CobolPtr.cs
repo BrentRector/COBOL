@@ -182,19 +182,20 @@ public static class CobolPtr
     /// </list>
     /// The integrality DECISION itself is <see cref="SetAmount"/>'s, shared with the three index formats that
     /// state the identical test.</summary>
-    public static ManagedPointer UpByAmount(ManagedPointer? p, Int128 scaledBy, int scale, bool down)
-    {
-        if (SetAmount.Land(scaledBy, scale, out Int128 whole) == SetAmountLanding.NotAnInteger)
-            return NotAnInteger(p);
-        return UpBy(p, whole, down);
-    }
+    public static ManagedPointer UpByAmount(ManagedPointer? p, Int128 scaledBy, int scale, bool down) =>
+        Displace(p, SetAmount.Land(scaledBy, scale, out Int128 whole), whole, down);
 
     /// <summary>The NATIVE-FLOAT lane of <see cref="UpByAmount"/> (kb/Work PB151): GR19's integrality test runs
-    /// on the DOUBLE — an emitter-side <c>(long)(double)</c> truncation bypasses the raise entirely. An integral
-    /// amount too large for the widest integer carrier is NOT GR19's case (it IS an integer): no representable
-    /// address can result from it, which is GR20's.</summary>
+    /// on the DOUBLE — an emitter-side <c>(long)(double)</c> truncation bypasses the raise entirely.</summary>
     public static ManagedPointer UpByAmountReal(ManagedPointer? p, double by, bool down) =>
-        SetAmount.Land(by, out Int128 whole) switch
+        Displace(p, SetAmount.Land(by, out Int128 whole), whole, down);
+
+    /// <summary>Map <see cref="SetAmount"/>'s landing onto THIS format's two rules, ONCE for both lanes. An
+    /// integral amount too large for the widest integer carrier (a huge double, or a trailing-P amount whose
+    /// value is past <see cref="Int128"/>, kb/Work PB2697) is NOT GR19's case — it IS an integer — and no
+    /// representable address can result from it, which is GR20's.</summary>
+    private static ManagedPointer Displace(ManagedPointer? p, SetAmountLanding landing, Int128 whole, bool down) =>
+        landing switch
         {
             SetAmountLanding.NotAnInteger => NotAnInteger(p),
             SetAmountLanding.BeyondCarrier => Unrepresentable(p),

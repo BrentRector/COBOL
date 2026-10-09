@@ -3,6 +3,7 @@
   "enabled": [
   "pb2465_constant_length_completed_description",
   "pb1928_parenthesized_boolean_user_function",
+  "pb2697_set_pointer_start_trailing_p",
   "pb2631_numval_c_grouping_separator_needs_digit",
   "pb2631_numval_c_grouping_separator_needs_digit_comma",
   "pb2631_standard_compare_level_value",

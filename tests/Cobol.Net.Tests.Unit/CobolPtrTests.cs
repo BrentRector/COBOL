@@ -64,6 +64,25 @@ public sealed class CobolPtrTests
         Assert.Equal(0, ((CellPointer)CobolPtr.UpByAmount(p, 25, 1, down: false)).Offset);
     }
 
+    /// <summary>kb/Work PB2697 — a trailing-P amount (negative scale) displaces by its VALUE, the stored digits
+    /// × 10^|scale| (§13.18.40.4 GR14), and one whose value the widest carrier cannot hold IS an integer, so it is
+    /// GR20's EC-RANGE-PTR (no representable address results), never GR19's EC-SIZE-ADDRESS and never a
+    /// displacement by 0 — the exact lane now answers what the native-float lane already did.</summary>
+    [Fact]
+    public void UpByAmount_TrailingPAmount_DisplacesByItsValue_AndPastTheCarrierIsGr20()
+    {
+        var cell = new StorageCell { Ref = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" };
+        var p = ManagedPointer.At(cell, 0);
+        Assert.Equal(20, ((CellPointer)CobolPtr.UpByAmount(p, 2, -1, down: false)).Offset);   // PIC 9P holding 20
+        RunUnit.Run(_ =>
+        {
+            ExceptionState.RangePtrChecking = true;
+            Assert.Equal("EC-RANGE-PTR",
+                Assert.Throws<CobolFatalException>(() => CobolPtr.UpByAmount(p, 1, -39, down: false)).EcName);
+        });
+        Assert.Same(p, CobolPtr.UpByAmount(p, 1, -39, down: false));                // checking off: unchanged
+    }
+
     [Fact]
     public void UpBy_Null_RaisesWhenChecked_AndIsUnchangedWhenNot()
     {
