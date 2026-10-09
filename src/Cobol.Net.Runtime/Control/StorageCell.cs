@@ -279,7 +279,7 @@ public sealed class StorageCell
     /// <paramref name="elems"/> is each table component's element shape when its elements are variable-length groups
     /// (kb/Work PB2496): that component is carried nested, as its occurrences' own carriers.</summary>
     public CobolVarGroup VarGroupAt(int fixedAt, int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
-                                    ReadOnlySpan<int> dynTable, CellOdoTail tail, int count, CellGroupShape?[]? elems = null)
+                                    ReadOnlySpan<int> dynTable, OdoTail tail, int count, CellGroupShape?[]? elems = null)
     {
         // The occurrences beyond the OCCURS DEPENDING count carry no components (kb/Work PB244): the table is the
         // group's trailing storage, so they are its last ones - the carrier a declared group builds
@@ -314,7 +314,7 @@ public sealed class StorageCell
     /// <paramref name="storage"/> marks a formal's copy-in, whose dynamic-length items keep their whole content at every
     /// level (kb/Work PB1937).</para></summary>
     public void StoreVarGroupAt(int fixedAt, int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
-                                ReadOnlySpan<int> dynMax, ReadOnlySpan<int> dynTable, CellOdoTail tail, int count,
+                                ReadOnlySpan<int> dynMax, ReadOnlySpan<int> dynTable, OdoTail tail, int count,
                                 CobolVarGroup v, CellGroupShape?[]? elems = null, bool storage = false)
     {
         string run = v.Fixed;
@@ -333,7 +333,7 @@ public sealed class StorageCell
     /// its neighbors whenever a procedural operation is applied to a group containing it". Each component sits at its
     /// fixed-run position — the declared group's <c>CurrentImage()</c>, composed from the cell.</summary>
     public string ContiguousAt(int fixedAt, int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
-                               ReadOnlySpan<int> dynTable, CellOdoTail tail, int count,
+                               ReadOnlySpan<int> dynTable, OdoTail tail, int count,
                                CellGroupShape?[]? elems = null)
     {
         string run = RunOf(fixedAt, width, dynFixedAt, dynTable);
@@ -359,16 +359,19 @@ public sealed class StorageCell
     /// beside <see cref="ContiguousAt"/>, the declared group's <c>CurrentExtents()</c> composed from the cell.</summary>
     public RecordExtents ContiguousExtentsAt(int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
                                              ReadOnlySpan<int> dynMax, ReadOnlySpan<int> dynStructure,
-                                             ReadOnlySpan<int> dynTable, CellOdoTail tail, int count)
+                                             ReadOnlySpan<int> dynTable, OdoTail tail, int count)
     {
         var pos = RunPositions(dynFixedAt, dynTable);
         var layout = LayoutOf(width - Reserved(dynTable), pos, dynMax, dynStructure, dynTable, tail);
-        // The OCCURS DEPENDING table is the layout's LAST component (CobolContiguousLayout.OdoTail): the record's
-        // own length says how many occurrences it holds, so its extent is the count's share of the table.
-        int comps = pos.Length;
-        var lengths = new int[comps + (tail.Present ? 1 : 0)];
+        // An OCCURS DEPENDING table of fixed-image elements is the layout's LAST component: the record's own length
+        // says how many occurrences it holds, so its extent is the count's share of the table. A table of
+        // variable-length elements contributes the components of the occurrences the record holds, and the table
+        // says the count by how many it describes (OdoTail.CountFrom; kb/Work PB2497).
+        int comps = pos.Length - tail.CutComponents(count);
+        bool tableIsComponent = tail.Present && tail.Comps == 0;
+        var lengths = new int[comps + (tableIsComponent ? 1 : 0)];
         for (int k = 0; k < comps; k++) lengths[k] = ComponentAt(dynBase + k, dynTable[k]).Length;
-        if (tail.Present) lengths[comps] = tail.Width - tail.CutAt(count);
+        if (tableIsComponent) lengths[comps] = tail.Width - tail.CutAt(count);
         return layout.ExtentsFrom(lengths);
     }
 
@@ -378,41 +381,51 @@ public sealed class StorageCell
     /// declared group's generated layout gives the same members (<c>GroupImageCodec.ContiguousLayout</c>).
     /// <paramref name="dynStructure"/> is each component's <see cref="CobolDynStructure.Code"/> (0 = none; ISO
     /// §12.3.7.4 GR18/GR19; kb/Work PB1094) — constant data the compiler read off the same item, so this layout and a
-    /// declared group's cannot disagree. A group that holds an OCCURS DEPENDING table (<paramref name="tail"/>) has it
-    /// as the LAST component (§13.18.38.3 SR22; <see cref="CobolContiguousLayout"/>'s <c>OdoTail</c>), taken out of
-    /// the fixed run: <paramref name="runWidth"/> includes it at its maximum, the layout's fixed total does not.</summary>
+    /// declared group's cannot disagree. A group that holds an OCCURS DEPENDING table (<paramref name="tail"/>) of
+    /// fixed-image elements has it as the LAST component (§13.18.38.3 SR22; <see cref="CobolContiguousLayout"/>'s
+    /// <c>Odo</c>), taken out of the fixed run: <paramref name="runWidth"/> includes it at its maximum, the layout's
+    /// fixed total does not. A table of VARIABLE-LENGTH elements (<c>tail.Comps</c> above zero) stays in the fixed run
+    /// at its maximum, its components already among <paramref name="pos"/>, and the layout cuts both to the count a
+    /// record holds (kb/Work PB2497).</summary>
     private static CobolContiguousLayout LayoutOf(int runWidth, int[] pos, ReadOnlySpan<int> dynMax,
                                                   ReadOnlySpan<int> dynStructure, ReadOnlySpan<int> dynTable,
-                                                  CellOdoTail tail)
+                                                  OdoTail tail)
     {
-        int comps = pos.Length, n = comps + (tail.Present ? 1 : 0);
+        bool tableIsComponent = tail.Present && tail.Comps == 0;
+        int comps = pos.Length, n = comps + (tableIsComponent ? 1 : 0);
         var at = new int[n];
         var units = new int[n];
         var max = new long[n];
         for (int k = 0; k < comps; k++) { at[k] = pos[k]; units[k] = dynTable[k] > 0 ? dynTable[k] : 1; max[k] = dynMax[k]; }
-        if (tail.Present) { at[comps] = runWidth - tail.Width; units[comps] = tail.Elem; max[comps] = tail.Max; }
+        if (tableIsComponent) { at[comps] = runWidth - tail.Width; units[comps] = tail.Elem; max[comps] = tail.Max; }
         int[]? structure = null;
         if (dynStructure.ContainsAnyExcept(0))
         {
             structure = new int[n];
             dynStructure.CopyTo(structure);
         }
-        return new CobolContiguousLayout(tail.Present ? runWidth - tail.Width : runWidth, at, units, max, structure,
-            OdoTail: tail.Present);
+        return new CobolContiguousLayout(tableIsComponent ? runWidth - tail.Width : runWidth, at, units, max, structure, tail);
     }
 
     /// <summary>Make a contiguous image the group's content — the inverse of <see cref="ContiguousAt"/>, through the
     /// ONE decomposition (<see cref="CobolContiguousLayout.Decompose"/>, determination D-FRA): by the image's own
     /// <paramref name="extents"/> when they describe it (a record read back with its extent table — D-FRA (v),
     /// kb/Work PB1053), otherwise by the take step, each component taking as many characters as the image holds
-    /// beyond the fixed material still to come, up to its maximum size.</summary>
-    public void StoreContiguousAt(int fixedAt, int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
+    /// beyond the fixed material still to come, up to its maximum size. <paramref name="count"/> is the occurrence
+    /// count of an OCCURS DEPENDING table of variable-length elements when the image does not state it (kb/Work
+    /// PB2497): the declared group's generated <c>FromContiguousImage</c>, arm for arm.</summary>
+    /// <returns>Whether the image stated its own occurrence count (<see cref="CobolContiguousLayout.StatesCount"/>);
+    /// when it did not, the READ / RETURN stores it again at the count data-name-1 gives.</returns>
+    public bool StoreContiguousAt(int fixedAt, int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
                                   ReadOnlySpan<int> dynMax, ReadOnlySpan<int> dynStructure, ReadOnlySpan<int> dynTable,
-                                  CellOdoTail tail, string image, RecordExtents? extents = null, bool fixedForm = false)
+                                  OdoTail tail, string image, RecordExtents? extents = null, bool fixedForm = false,
+                                  int count = int.MaxValue)
     {
         var layout = LayoutOf(width - Reserved(dynTable), RunPositions(dynFixedAt, dynTable), dynMax, dynStructure, dynTable, tail);
+        image ??= "";
         StoreVarGroupAt(fixedAt, width, dynBase, dynFixedAt, dynMax, dynTable, tail, int.MaxValue,
-            layout.Decompose(image ?? "", extents, fixedForm));
+            layout.Decompose(image, extents, fixedForm, count));
+        return layout.StatesCount(image, extents, fixedForm);
     }
 
     /// <summary>The positions the tables reserve in a group's window — the window width less its fixed run.</summary>

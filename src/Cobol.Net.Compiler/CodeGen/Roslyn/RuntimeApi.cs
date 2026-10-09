@@ -1849,12 +1849,12 @@ internal static class RuntimeApi
     /// a variable-length member precedes (D-KWV; kb/Work PB1025). Emitted once per record type as the static
     /// field <see cref="ContiguousLayoutField"/>.</summary>
     public static string ContiguousLayoutNew(int fixedTotal, IEnumerable<int> fixedAt,
-        IEnumerable<int> unit, IEnumerable<long> maxUnits, IEnumerable<int> structure, bool odoTail = false) =>
+        IEnumerable<int> unit, IEnumerable<long> maxUnits, IEnumerable<int> structure, OdoTail odo) =>
         $"new {nameof(CobolContiguousLayout)}({fixedTotal}, "
         + $"new int[] {{ {string.Join(", ", fixedAt)} }}, new int[] {{ {string.Join(", ", unit)} }}, "
         + $"new long[] {{ {string.Join(", ", maxUnits.Select(m => $"{m}L"))} }}"
         + (structure.Any(c => c != 0) ? $", new int[] {{ {string.Join(", ", structure)} }}" : "")
-        + (odoTail ? ", OdoTail: true" : "") + ")";   // the constructor parameter of that name
+        + (odo.Present ? $", Odo: {OdoTailOf(odo)}" : "") + ")";   // the constructor parameter of that name
 
     /// <summary>The carrier of a fixed-OCCURS table of variable-length group elements: every occurrence's
     /// <c>AsVarImage()</c> concatenated, fixed runs and components in occurrence order (<c>CobolVarGroup.Concat</c>).</summary>
@@ -2242,8 +2242,8 @@ internal static class RuntimeApi
     /// <paramref name="dynTable"/> is each component's table element width, 0 for a dynamic-length item.</summary>
     public static string CellVarContiguous(string cellExpr, string fixedAtExpr, int width, string dynBase,
                                            IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable,
-                                           CellOdoTail odo, string count, IReadOnlyList<CellGroupShape?> dynElem) =>
-        $"{cellExpr}.{nameof(StorageCell.ContiguousAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count}{CellElemShapes(dynElem)})";
+                                           OdoTail odo, string count, IReadOnlyList<CellGroupShape?> dynElem) =>
+        $"{cellExpr}.{nameof(StorageCell.ContiguousAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)}, {OdoTailOf(odo)}, {count}{CellElemShapes(dynElem)})";
 
     /// <summary>The trailing <c>elems</c> argument of <c>StorageCell.ContiguousAt</c>, <c>VarGroupAt</c> and
     /// <c>StoreVarGroupAt</c>: for each component that is a
@@ -2256,20 +2256,24 @@ internal static class RuntimeApi
         : $"new {nameof(CellGroupShape)}({s.Width}, {IntSpan(s.DynFixedAt)}, {IntSpan(s.DynTable)}, {IntSpan(s.DynMax)}"
           + (s.Elems is null || s.Elems.All(e => e is null) ? ")" : $", [{string.Join(", ", s.Elems.Select(CellShapeText))}])");
 
-    /// <summary>The OCCURS DEPENDING table a cell-backed variable-length group holds as its trailing storage
-    /// (<c>CellOdoTail</c>, kb/Work PB244), as the argument of the cell's group helpers; <c>default</c> for a group
-    /// that holds none. <paramref name="odo"/> is the table's element width and maximum count (zero when absent).</summary>
-    private static string CellOdoTailOf(CellOdoTail odo) =>
-        odo.Max > 0 ? $"new {nameof(CellOdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps})" : "default";
+    /// <summary>The OCCURS DEPENDING table a variable-length group holds as its trailing storage (<c>OdoTail</c>,
+    /// kb/Work PB244, PB2497), as the argument of the cell's group helpers and of a record layout; <c>default</c> for
+    /// a group that holds none. <paramref name="odo"/> is the table's element width, maximum count and components per
+    /// occurrence (zero when absent).</summary>
+    private static string OdoTailOf(OdoTail odo) =>
+        odo.Max > 0 ? $"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps})" : "default";
 
-    /// <summary>Make a contiguous image a cell-backed variable-length group's content — <c>StorageCell.StoreContiguousAt</c>.</summary>
+    /// <summary>Make a contiguous image a cell-backed variable-length group's content — <c>StorageCell.StoreContiguousAt</c>,
+    /// whose value says whether the image stated its own OCCURS DEPENDING count. <paramref name="count"/> is the count
+    /// to decompose a table of variable-length elements at when it did not (kb/Work PB2497), null for the default.</summary>
     public static string CellVarStoreContiguous(string cellExpr, string fixedAtExpr, int width, string dynBase,
                                                 IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax,
                                                 IEnumerable<int> dynStructure, IEnumerable<int> dynTable,
-                                                CellOdoTail odo, string imageExpr,
-                                                string? extentsExpr = null, bool fixedForm = false) =>
+                                                OdoTail odo, string imageExpr,
+                                                string? extentsExpr = null, bool fixedForm = false, string? count = null) =>
         $"{cellExpr}.{nameof(StorageCell.StoreContiguousAt)}({fixedAtExpr}, {width}, (int)({dynBase}), "
-        + $"{IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {imageExpr}, {extentsExpr ?? "null"}{(fixedForm ? ", true" : "")})";
+        + $"{IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {IntSpan(dynTable)}, {OdoTailOf(odo)}, {imageExpr}, {extentsExpr ?? "null"}"
+        + $"{(fixedForm ? ", true" : "")}{(count is null ? "" : $", count: {count}")})";
 
     /// <summary>A cell-backed variable-length group's EXTENT TABLE — <c>StorageCell.ContiguousExtentsAt</c>
     /// (determination D-FRA (v); kb/Work PB1053). <paramref name="dynStructure"/> is each dynamic-length member's
@@ -2277,21 +2281,21 @@ internal static class RuntimeApi
     public static string CellVarContiguousExtents(string cellExpr, int width, string dynBase,
                                                   IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax,
                                                   IEnumerable<int> dynStructure, IEnumerable<int> dynTable,
-                                                  CellOdoTail odo, string count) =>
-        $"{cellExpr}.{nameof(StorageCell.ContiguousExtentsAt)}({width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count})";
+                                                  OdoTail odo, string count) =>
+        $"{cellExpr}.{nameof(StorageCell.ContiguousExtentsAt)}({width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {IntSpan(dynTable)}, {OdoTailOf(odo)}, {count})";
 
     /// <summary>A cell-backed variable-length group's §8.5.1.12 component carrier — <c>StorageCell.VarGroupAt</c>.</summary>
     public static string CellVarCarrier(string cellExpr, string fixedAtExpr, int width, string dynBase,
                                         IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable,
-                                        CellOdoTail odo, string count, IReadOnlyList<CellGroupShape?> dynElem) =>
-        $"{cellExpr}.{nameof(StorageCell.VarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count}{CellElemShapes(dynElem)})";
+                                        OdoTail odo, string count, IReadOnlyList<CellGroupShape?> dynElem) =>
+        $"{cellExpr}.{nameof(StorageCell.VarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)}, {OdoTailOf(odo)}, {count}{CellElemShapes(dynElem)})";
 
     /// <summary>Distribute a component carrier into a cell-backed variable-length group — <c>StorageCell.StoreVarGroupAt</c>.</summary>
     public static string CellVarStoreCarrier(string cellExpr, string fixedAtExpr, int width, string dynBase,
                                              IEnumerable<int> dynFixedAt, IEnumerable<int> dynMax,
-                                             IEnumerable<int> dynTable, CellOdoTail odo, string count, string carrierExpr,
+                                             IEnumerable<int> dynTable, OdoTail odo, string count, string carrierExpr,
                                              IReadOnlyList<CellGroupShape?> dynElem, bool storage) =>
-        $"{cellExpr}.{nameof(StorageCell.StoreVarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynTable)}, {CellOdoTailOf(odo)}, {count}, {carrierExpr}"
+        $"{cellExpr}.{nameof(StorageCell.StoreVarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynTable)}, {OdoTailOf(odo)}, {count}, {carrierExpr}"
         // the storage flag reaches only the nested elements' stores (the top level's maximum sizes already say it)
         + (dynElem.All(s => s is null) ? ")" : $"{CellElemShapes(dynElem)}{(storage ? ", true" : "")})");
 

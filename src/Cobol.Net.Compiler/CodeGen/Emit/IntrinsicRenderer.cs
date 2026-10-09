@@ -339,7 +339,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
                 // §15.50.4 rule 7 / §15.14.4 rule 6 over a variable-length group's CURRENT-EXTENT IMAGE (kb/Work PB244):
                 // the same string DISPLAY shows (A.1 item 57), whose storage characters are bytes.
                 return new NumX(RuntimeApi.Intrinsic("ByteLength",
-                    PlaceRenderer.VarGroupCurrentImage(vg, $"FUNCTION {sig.Name} of", transfer: true)), 0);
+                    PlaceRenderer.VarGroupCurrentImage(vg, $"FUNCTION {sig.Name} of")), 0);
             case "Length":                                                      // §15.50 runtime shapes (kb/Work PB61)
                 // (A group with a runtime length — an OCCURS DEPENDING table, dynamic-length items or
                 // dynamic-capacity tables beneath it — never arrives here: the binder's VariableLengthGroupSum

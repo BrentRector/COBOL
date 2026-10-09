@@ -27,9 +27,8 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
         // the two bytes it occupies — D-N1; kb/Work PB327 dissolved the old one-character divergence. An ODO table
         // beside a dynamic member displays at its CURRENT count, and a table of variable-length elements - OCCURS
         // DEPENDING or dynamic-capacity, in a declared group or a CELL-BACKED one (kb/Work PB244) - shows each
-        // occurrence's own current image: the gate is CurrentExtentImageCapable, the one operand capability).
-        // DISPLAY-ONLY by design: GR7 is a DISPLAY-statement determination, so the shared group-sender arm
-        // (WRITE/RELEASE) keeps the narrower record gate (DataItem.RecordImageCapable).
+        // occurrence's own current image: the gate is CurrentExtentImageCapable, the one current-extent capability,
+        // which a WRITE / RELEASE of such a record asks too - kb/Work PB2497).
         // ⛔ `vp is not RedefViewPlace`: a Tier-B class-tier VIEW's Read() is its string WINDOW — spelling
         // .CurrentImage() on it is CS1061 on `string` (the PB176 skeptic round; whether a dynamic-length
         // member under REDEFINES is even legal is kb/Work PB177's screen question — the emitter defends
@@ -41,7 +40,7 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
             o is BoundFieldOperand { Place: { Item.IsGroup: true, ImageCapable: false } vp }
                 && (vp is not RedefViewPlace || vp is RedefViewPlace { Coding: VarGroupWindow })
                 && vp.Item.CurrentExtentImageCapable
-            ? PlaceRenderer.VarGroupCurrentImage(vp, "DISPLAY of", transfer: true)
+            ? PlaceRenderer.VarGroupCurrentImage(vp, "DISPLAY of")
             // A strongly-typed group with a class pointer/object leaf (kb/Work PB244): a legal identifier-1
             // (§14.9.11.3 SR1 bars only an item OF class pointer/object; a strongly-typed group's class is its
             // type-name, §8.5.2.1) whose GR1 device conversion is ours to define — CONFORMANCE.md A.1 item 56:

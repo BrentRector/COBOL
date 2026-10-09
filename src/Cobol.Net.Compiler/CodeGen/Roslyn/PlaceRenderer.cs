@@ -134,7 +134,7 @@ internal static class PlaceRenderer
         // current extent — §8.5.1.11.2, the same composition a declared group's CurrentImage() performs.
         // (A plain read is the group's MAXIMUM image: the OCCURS DEPENDING count is an operand decision, made by
         // VarGroupCurrentImage through OdoGroupPlace — §13.18.38.4 GR8.)
-        RedefViewPlace { Coding: VarGroupWindow g } v => CellVarContiguous(v, g, g.Odo.Max.ToString(), CurrentExtentUse.Record),
+        RedefViewPlace { Coding: VarGroupWindow g } v => CellVarContiguous(v, g, g.Odo.Max.ToString()),
         RedefViewPlace v => ByteWindowRead(v),
         // The OCCURS DYNAMIC CAPACITY register (§13.18.38 GR15): a read-only view over the table's current capacity.
         CapacityRegisterPlace c => $"{RenderPath(c.Table, AccessDir.Sending)}.Capacity",
@@ -382,8 +382,8 @@ internal static class PlaceRenderer
     /// capability a declared group's composer is gated on (<see cref="DataItem.CurrentExtentImageCapable"/>): a table
     /// whose element holds a component of its own (kb/Work PB1042) has a run-time multiplicity of components that
     /// the element cell's fixed run does not carry, so it is the named loud, never a shortened image.</summary>
-    private static string CellVarContiguous(RedefViewPlace v, VarGroupWindow g, string count, CurrentExtentUse use) =>
-        v.Item.CanCompose(use)
+    private static string CellVarContiguous(RedefViewPlace v, VarGroupWindow g, string count) =>
+        v.Item.CurrentExtentImageCapable
             ? RuntimeApi.CellVarContiguous(RenderPath(g.Cell, AccessDir.Sending), $"(int)({PositionRenderer.Render(v.Offset)})", v.Width,
                 PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynTable, g.Odo, count, g.DynElem)
             : EmitText.LoudValue("string", TierCIsland.Reason(v.Item, "variable-length group image of"));
@@ -659,7 +659,7 @@ internal static class PlaceRenderer
         {
             // The cell's window holds the OCCURS DEPENDING table at its MAXIMUM, as the trailing storage of the run
             // (SR22); the operand's count cuts the carrier's fixed run to the current extent (kb/Work PB244).
-            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo, CurrentExtentUse.Operand) =>
+            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo) =>
                 RuntimeApi.CellVarCarrier(RenderPath(g.Cell, AccessDir.Sending),
                     $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynTable, g.Odo, CellOdoCount(odo), g.DynElem),   // kb/Work PB1026, PB1042, PB2496
             _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.CurrentExtentImageCapable =>
@@ -696,11 +696,11 @@ internal static class PlaceRenderer
     /// holds no such table — and a group that holds the table must be one the current-extent composer admits
     /// (<see cref="DataItem.CurrentExtentImageCapable"/>: the window cuts its fixed run, so the table has to be its
     /// trailing storage and nothing with a run-time multiplicity of components).</summary>
-    private static bool WindowComposes(RedefViewPlace v, string? odo, CurrentExtentUse use) =>
-        odo is "" || (odo is not null && v.Item.CanCompose(use));
+    private static bool WindowComposes(RedefViewPlace v, string? odo) =>
+        odo is "" || (odo is not null && v.Item.CurrentExtentImageCapable);
 
     /// <summary>The OCCURS DEPENDING count argument of the cell's group helpers: the operand's count, or zero for a
-    /// group without the table (the helpers ignore it then — <c>CellOdoTail.Present</c> is false).</summary>
+    /// group without the table (the helpers ignore it then — <c>OdoTail.Present</c> is false).</summary>
     private static string CellOdoCount(string? odo) => odo is null or "" ? "0" : odo;
 
     /// <summary>The WRITE half of <see cref="VarGroupImage"/> — the §14.2.3 GR8 copy-back at an activation
@@ -743,19 +743,17 @@ internal static class PlaceRenderer
     /// (the A.1 item 57 composer DISPLAY already uses), behind the same capability guard and unwrap as
     /// <see cref="VarGroupImage"/>. It is what a WRITE / REWRITE / RELEASE of a variable-length RECORD sends
     /// (determination D-FRA; kb/Work PB981).</summary>
-    /// <param name="transfer">True for a statement's OPERAND (DISPLAY - kb/Work PB244): the guard then asks
-    /// <see cref="DataItem.CurrentExtentImageCapable"/>, which also admits an OCCURS DEPENDING table of variable-length
-    /// ELEMENTS. A record's image (WRITE) leaves it false: that record must also be READ back, through the carrier's
-    /// layout (<see cref="DataItem.RecordImageCapable"/>).</param>
-    public static string VarGroupCurrentImage(Place group, string context, bool transfer = false)
+    /// <remarks>A statement's operand (DISPLAY, FUNCTION LENGTH) and a record (WRITE / REWRITE / RELEASE) ask the same
+    /// capability, <see cref="DataItem.CurrentExtentImageCapable"/>: since kb/Work PB2497 a record holding an OCCURS
+    /// DEPENDING table of variable-length elements is read back too (<see cref="WriteVarGroupContiguous"/>).</remarks>
+    public static string VarGroupCurrentImage(Place group, string context)
     {
-        var use = transfer ? CurrentExtentUse.Operand : CurrentExtentUse.Record;
         var (inner, odo) = PeelOdo(group, maximum: false);
         return inner.Undecorated switch
         {
             // the cell composition (kb/Work PB1026), cut to the OCCURS DEPENDING count when it holds the table (kb/Work PB244)
-            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo, use) => CellVarContiguous(v, g, CellOdoCount(odo), use),
-            _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.CanCompose(use) =>
+            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo) => CellVarContiguous(v, g, CellOdoCount(odo)),
+            _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.CurrentExtentImageCapable =>
                 EmitText.LoudValue("string", TierCIsland.Reason(inner.Item, context)),
             _ => $"{Read(inner)}.CurrentImage({odo})",
         };
@@ -814,10 +812,10 @@ internal static class PlaceRenderer
         var (inner, odo) = PeelOdo(group, maximum: false);
         return inner.Undecorated switch
         {
-            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo, CurrentExtentUse.Record) => RuntimeApi.CellVarContiguousExtents(
+            RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo) => RuntimeApi.CellVarContiguousExtents(
                 RenderPath(g.Cell, AccessDir.Sending), v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynMax, g.DynStructure, g.DynTable,
                 g.Odo, CellOdoCount(odo)),
-            _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.RecordImageCapable => "null",
+            _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.CurrentExtentImageCapable => "null",
             _ => $"{Read(inner)}.CurrentExtents({odo})",
         };
     }
@@ -827,20 +825,53 @@ internal static class PlaceRenderer
     /// <c>CobolContiguousLayout.Decompose</c>; determination D-FRA, kb/Work PB981) by the record's own
     /// <paramref name="extents"/> when they describe it (D-FRA (v), kb/Work PB1053) and by the take step
     /// otherwise. <paramref name="fixedForm"/> marks a record of a file of FIXED-LENGTH records (D-FRA (vi),
-    /// <c>CobolContiguousLayout.ToFixedForm</c>): each member takes its maximum width and drops the space padding.</summary>
+    /// <c>CobolContiguousLayout.ToFixedForm</c>): each member takes its maximum width and drops the space padding.
+    /// <para>⛔ AN OCCURS DEPENDING TABLE OF VARIABLE-LENGTH ELEMENTS (kb/Work PB2497; determination D-FRA (viii)): the
+    /// record's length cannot say how many occurrences it holds, so the decomposition needs a count. The record states
+    /// it when its extent table travelled with it (the number of components the table describes) and for the fixed form
+    /// (the maximum: every occurrence sits at its fixed-form position). Otherwise data-name-1 is the count source: the
+    /// record is first decomposed at the table's MAXIMUM — the receiving record area's maximum length, §13.18.38.4 GR8
+    /// b) — which places a data-name-1 the record holds itself when no variable-length member precedes it (§13.18.38.3
+    /// SR20 puts it before the table), and then decomposed again at data-name-1's value, clamped to the table's bounds;
+    /// a data-name-1 outside the record keeps its value from the start of the statement (GR8 a). When data-name-1 does
+    /// not read back the count it was decomposed at (a variable-length member before it was cut short by the maximum's
+    /// fixed run), the smallest count it does read back is taken. The generated <c>FromContiguousImage</c> (and the
+    /// cell's <c>StoreContiguousAt</c>) says which case it met.</para></summary>
     public static string WriteVarGroupContiguous(Place group, string record, string extents, string context,
-                                                 bool fixedForm = false) => group switch
+                                                 bool fixedForm = false)
     {
-        OdoGroupPlace o => WriteVarGroupContiguous(o.Inner, record, extents, context, fixedForm),
-        // the cell decomposition (kb/Work PB1026) — the same rule, over the cell's dynamic slots
-        // (a window holding an OCCURS DEPENDING table takes it as the layout's last component — kb/Work PB244)
-        RedefViewPlace { Coding: VarGroupWindow g } v when v.Item.RecordImageCapable =>
-            $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Receiving),
-            $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynMax, g.DynStructure, g.DynTable, g.Odo, record, extents, fixedForm)};",
-        _ when group is RedefViewPlace { Coding: VarGroupWindow } || !group.Item.RecordImageCapable =>
-            EmitText.LoudStmt(TierCIsland.Reason(group.Item, context)),
-        _ => $"{GroupTarget(group)}.FromContiguousImage({record}, {extents}{(fixedForm ? ", true" : "")});",
-    };
+        // data-name-1's value, clamped, for a group whose OCCURS DEPENDING table has variable-length elements
+        string? count = group is OdoGroupPlace o && DataItem.HasOdoTableOfVariableLengthElements(o.Inner.Item)
+            ? OdoCountArgument(o, maximum: false) : null;
+        var inner = group;
+        while (inner is OdoGroupPlace w) inner = w.Inner;
+        string? Store(string ext, string? n) => inner.Undecorated switch
+        {
+            // the cell decomposition (kb/Work PB1026) — the same rule, over the cell's dynamic slots
+            // (a window holding an OCCURS DEPENDING table takes it at the count the record holds — kb/Work PB244, PB2497)
+            RedefViewPlace { Coding: VarGroupWindow g } v when v.Item.CurrentExtentImageCapable =>
+                RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Receiving),
+                    $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt,
+                    g.DynMax, g.DynStructure, g.DynTable, g.Odo, record, ext, fixedForm, n),
+            _ when inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.CurrentExtentImageCapable => null,
+            _ => $"{GroupTarget(inner)}.FromContiguousImage({record}, {ext}{(fixedForm ? ", true" : "")}{(n is null ? "" : $", __odo: {n}")})",
+        };
+        if (Store(extents, null) is not { } store) return EmitText.LoudStmt(TierCIsland.Reason(inner.Item, context));
+        if (count is null) return $"{store};";
+        // The count data-name-1 gives after the first decomposition is right when nothing variable-length precedes it.
+        // When something does, the first decomposition (at the maximum, whose fixed run is longest) leaves that member
+        // too little of the record and misplaces data-name-1, so a count that data-name-1 does not read back after its
+        // own decomposition is searched for: the SMALLEST count that does (the take step's rule of giving the excess to
+        // the earlier member, D-FRA (ii)), else the first count again (train 1045 review; D-FRA (viii)).
+        // "Reads back" compares data-name-1's own value, never the clamped count: a misplaced data-name-1 past the
+        // maximum clamps to the maximum and would read back there.
+        var odo = (OdoGroupPlace)group;
+        string read = CountRead(odo.Depending);
+        return $"if (!{store}) {{ int __odoAt = {count}; {Store("null", "__odoAt")}; "
+             + $"if ({read} != __odoAt) {{ int __odoFirst = __odoAt; "
+             + $"for (__odoAt = {odo.MinOccurs}; __odoAt <= {odo.MaxOccurs}; __odoAt++) {{ {Store("null", "__odoAt")}; if ({read} == __odoAt) break; }} "
+             + $"if (__odoAt > {odo.MaxOccurs}) {Store("null", "__odoFirst")}; }} }}";
+    }
 
     /// <summary>⛔ THE ONE READER OF A GROUP OPERAND'S IMAGE IN A <b>SENDING</b> CONTEXT — <see cref="GroupImage"/>,
     /// except that an occurs-depending group sends only its ISO §13.18.38.4 GR8 CURRENT-count part. Both GR8 arms

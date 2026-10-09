@@ -16,9 +16,10 @@ namespace CobolNet.Tests.Conformance;
 /// pointer/object categories had no image until kb/Work PB244 gave them the ONE-WAY transfer image —
 /// <c>DisplayPointerGroup_RendersPlaceholderPositions</c>/<c>MovePointerGroup_SendsPlaceholderPositions</c> pin it WORKING). DISPLAY of a COMPOSABLE variable-length group is NOT here: it renders the documented A.1 item-57
 /// format (<c>2023/pb164_vlg_display</c>, and kb/Work PB244's tables of variable-length elements, struct-resident or
-/// cell-backed); the variable-length loud that remains is a RECORD of an OCCURS DEPENDING table of variable-length
-/// elements (<c>WriteRecordWithOdoTableOfDynamicElements_StaysLoudNamingTheCount</c>) and the group MOVE / comparison
-/// / CALL of a DYNAMIC-CAPACITY table of them. ACCEPT/STRING receivers and INSPECT's identifier-1
+/// cell-backed). A file or sort RECORD holding an OCCURS DEPENDING table of them is written and read back too (kb/Work
+/// PB2497, <c>2014/pb2497_vlg_record_odo_element_tables</c>), and a DYNAMIC-CAPACITY table of them moves and compares
+/// (kb/Work PB2496); the variable-length loud that remains is a fixed-length group opposite such a dynamic-capacity
+/// table across an activation boundary. ACCEPT/STRING receivers and INSPECT's identifier-1
 /// are BIND-screened by their own syntax rules (§14.9.1.3 SR6 / §14.9.43.3 SR11 / §14.9.22.3 SR1) and pinned as such.
 /// </summary>
 public sealed class TierCRejectionTests
@@ -247,52 +248,6 @@ public sealed class TierCRejectionTests
             """);
         Assert.True(ok, detail);
         Assert.Equal(["ab123", "ab123c456"], stdout.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
-    }
-
-    /// <summary>kb/Work PB244 - the one statement that still refuses a group whose OCCURS DEPENDING table holds
-    /// variable-length ELEMENTS: a file RECORD of that shape. MOVE, comparison and CALL carry such a group (the
-    /// count is a parameter of the operand's access path), but a record read back is decomposed by a fixed list
-    /// of components, and the record's length cannot say how many occurrences it holds - the DEPENDING item is
-    /// data, not layout. The statement is the named loud (<c>DataItem.RecordImageCapable</c>), never a record
-    /// written at the wrong extent.</summary>
-    [Fact]
-    public void WriteRecordWithOdoTableOfDynamicElements_StaysLoudNamingTheCount()
-    {
-        string dat = Path.Combine(Path.GetTempPath(), $"tiercre6-{Guid.NewGuid():N}.dat");
-        try
-        {
-            var (ok, _, detail) = new CobolNetCompiler(2023).CompileAndRun($$"""
-                IDENTIFICATION DIVISION.
-                PROGRAM-ID. TIERCRE6.
-                ENVIRONMENT DIVISION.
-                INPUT-OUTPUT SECTION.
-                FILE-CONTROL.
-                    SELECT F ASSIGN TO "{{dat}}" ORGANIZATION SEQUENTIAL.
-                DATA DIVISION.
-                FILE SECTION.
-                FD F.
-                01 REC.
-                   05 REC-N PIC 9(1).
-                   05 REC-T OCCURS 1 TO 3 DEPENDING ON REC-N.
-                      10 REC-D PIC X DYNAMIC LENGTH LIMIT 5.
-                      10 REC-F PIC X.
-                PROCEDURE DIVISION.
-                MAIN.
-                    OPEN OUTPUT F.
-                    MOVE 1 TO REC-N.
-                    MOVE "a" TO REC-D(1).
-                    WRITE REC.
-                    CLOSE F.
-                    STOP RUN.
-                """);
-            Assert.False(ok, "a record of OCCURS DEPENDING variable-length elements cannot be read back - loud, never written");
-            Assert.Contains("OCCURS DEPENDING table of variable-length elements", detail);
-            Assert.Contains("data, not layout", detail);
-        }
-        finally
-        {
-            File.Delete(dat);
-        }
     }
 
     /// <summary>kb/Work PB244 shape (b), ISO §14.9.11.4 GR7 (A.1 item 57): a group with BOTH an OCCURS DEPENDING

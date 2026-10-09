@@ -5,16 +5,6 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace CobolNet.Binding.Model;
 
-/// <summary>How a consumer uses a variable-length group's current extent - <see cref="DataItem.CanCompose"/>.</summary>
-public enum CurrentExtentUse
-{
-    /// <summary>A statement's operand: DISPLAY and FUNCTION LENGTH / BYTE-LENGTH read its image; a MOVE, a comparison
-    /// and an activation boundary carry it whole as the §8.5.1.12 component carrier.</summary>
-    Operand,
-    /// <summary>A file or sort RECORD: written as its contiguous image and read back by the layout.</summary>
-    Record,
-}
-
 /// <summary>The DATA DIVISION section a data-description entry is written in — the argument of
 /// <c>DataBinder.BindEntries</c> (the section-scoped placement rules, e.g. CONSTANT RECORD is WS/LS-only, ISO
 /// §13.18.15.3 SR1) and, per root, <see cref="DataItem.Section"/> (the section-worded operand rules).</summary>
@@ -994,8 +984,15 @@ public sealed class DataItem
     /// elements that each hold components of their own — and MOVE, comparison and CALL were a run-time loud on source
     /// §14.6.9.2 and §14.6.9.3 define. The carrier now holds such a table as ONE nested component whose occurrences ride
     /// as their own carriers (<c>CobolVarGroup.Elements</c>), so the one-way image and the carrier admit exactly the same
-    /// groups and are one capability. A RECORD is narrower (<see cref="RecordImageCapable"/>). (Since the R40 INDEX pin
-    /// no LEAF KIND excludes a group — only the shapes here do.)</para>
+    /// groups and are one capability. (Since the R40 INDEX pin no LEAF KIND excludes a group — only the shapes here
+    /// do.)</para>
+    /// <para>⛔ A RECORD IS THE SAME CAPABILITY (kb/Work PB2497). A file or sort record — WRITE, REWRITE, RELEASE, READ,
+    /// RETURN, a sort or indexed key — once asked a narrower one that refused an OCCURS DEPENDING table of
+    /// variable-length elements, because a record read back is decomposed by a component layout and its length cannot
+    /// say how many occurrences it holds. The record's extent table states the count (the number of components it
+    /// describes), the fixed form states the maximum, and with neither the READ / RETURN supplies data-name-1's value
+    /// (<c>PlaceRenderer.WriteVarGroupContiguous</c>; determination D-FRA (viii)), so every group whose current extent
+    /// composes is a record type too.</para>
     /// <para>⛔ MOVED HERE FROM <c>GroupImageCodec</c> at the PB204 landing. It was a CODEGEN predicate that a
     /// BIND-time screen now has to ask (§14.8.2.2's compatibility sentence admits the crossing, so the binder
     /// must know whether this compiler can carry it); a bind phase consulting a codegen class is the layering
@@ -1003,29 +1000,9 @@ public sealed class DataItem
     /// forbids. It is a pure declared-shape fact, so the data model is where it belongs.</para></summary>
     public bool CurrentExtentImageCapable => ComposesCurrentExtent();
 
-    /// <summary>Which of the two current-extent capabilities a consumer of a variable-length group asks (kb/Work
-    /// PB244, PB2496): a statement's operand (<see cref="CurrentExtentImageCapable"/> - DISPLAY, FUNCTION LENGTH, MOVE,
-    /// comparison, CALL / INVOKE) or a file / sort record (<see cref="RecordImageCapable"/>, a strict subset), so the
-    /// question has ONE spelling.</summary>
-    public bool CanCompose(CurrentExtentUse use) => use switch
-    {
-        CurrentExtentUse.Operand => CurrentExtentImageCapable,
-        _ => RecordImageCapable,
-    };
-
-    /// <summary>⛔ THE RECORD capability (kb/Work PB244): <see cref="CurrentExtentImageCapable"/> less the one shape a
-    /// RECORD cannot carry. A record read back is decomposed by its layout (<c>CobolContiguousLayout</c>) — a
-    /// FIXED list of components — and an OCCURS DEPENDING table of variable-length ELEMENTS has a run-time
-    /// multiplicity of them: the record's own length cannot say how many occurrences it holds (the elements have no
-    /// fixed width), and the DEPENDING item is data, not layout. A WRITE could send the image, but a record that
-    /// can be written and not read back is not a record type (determination D-FRA), so every record consumer — WRITE,
-    /// REWRITE, RELEASE, READ, RETURN, a sort or indexed key — asks THIS and stays the named loud for the shape.
-    /// A statement operand that is not a record (MOVE, comparison, CALL / INVOKE) asks
-    /// <see cref="CurrentExtentImageCapable"/>: there the count is a parameter of the operand's access path.</summary>
-    public bool RecordImageCapable => CurrentExtentImageCapable && !HasOdoTableOfVariableLengthElements(this);
-
     /// <summary>An OCCURS DEPENDING table whose elements are variable-length groups, at any depth beneath
-    /// <paramref name="g"/> (REDEFINES subtrees aside) - the shape <see cref="RecordImageCapable"/> excludes.</summary>
+    /// <paramref name="g"/> (REDEFINES subtrees aside): a record of this shape needs a count source to be read back
+    /// when it does not state its own (kb/Work PB2497; <c>PlaceRenderer.WriteVarGroupContiguous</c>).</summary>
     internal static bool HasOdoTableOfVariableLengthElements(DataItem g) =>
         g.IsGroup && g.Children.Any(c => c.RedefinesTargetName is null && c.IsGroup
             && ((c.OccursSpec?.DependingName is not null && CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(c))

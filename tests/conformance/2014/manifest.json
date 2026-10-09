@@ -224,7 +224,8 @@
   "pb2004_dyn_element_character_channels",
   "pb1900_nested_product_rounded_modes",
   "pb2496_vlg_dynamic_element_tables",
-  "pb2496_vlg_dynamic_element_tables_call"
+  "pb2496_vlg_dynamic_element_tables_call",
+  "pb2497_vlg_record_odo_element_tables"
  ],
  "pending": []
 }

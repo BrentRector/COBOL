@@ -4,6 +4,7 @@ using CobolNet.Common;
 using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.CodeGen.Emit;
+using OdoTail = CobolNet.Runtime.OdoTail;
 
 namespace CobolNet.CodeGen;
 
@@ -471,8 +472,9 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         /// has from whatever was carried (<c>FromVarImage</c> loops to the maximum; a slice the carrier does not hold is
         /// the §14.9.25.4 GR9b excess part). Its <see cref="VarPart.FixedWidth"/> / <see cref="VarPart.DynCount"/> are
         /// the MAXIMUM's, so every offset is the one the maximum-length formal sees (§14.8.2.2) and the table, the
-        /// group's trailing storage (§13.18.38.3 SR22), keeps every earlier component where it is. It has no RECORD
-        /// form (<c>DataItem.RecordImageCapable</c>).</summary>
+        /// group's trailing storage (§13.18.38.3 SR22), keeps every earlier component where it is. In the RECORD layout
+        /// its components are listed at the maximum and a record holding N occurrences is laid out by the first N
+        /// (<see cref="RecordOdo"/>; kb/Work PB2497).</summary>
         OdoTable,
     }
 
@@ -511,13 +513,17 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         return parts;
     }
 
-    /// <summary>The width, in the group's fixed run, of the OCCURS DEPENDING table it holds at its maximum
-    /// (zero for a group without one) — what the record layout takes out of the fixed run to make the table a
-    /// variable-length component.</summary>
-    private static int OdoTailWidth(DataItem group) =>
-        OdoModel.TableUnder(group) is { } t && !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(t)
-            ? t.ImageWidth * (t.Occurs ?? 1)
-            : 0;   // a table of variable-length ELEMENTS is not a tail of the fixed run: it is flattened (VarPartKind.OdoTable)
+    /// <summary>The OCCURS DEPENDING table the group holds as its trailing storage (§13.18.38.3 SR22), as its record
+    /// layout states it (<c>CobolContiguousLayout</c>'s <c>Odo</c>; kb/Work PB244, PB2497): one occurrence's width in
+    /// the FIXED run, the maximum count, and how many variable-length components one occurrence holds — zero for
+    /// elements of a fixed image, whose table the layout makes its LAST component (taken out of the fixed run, one
+    /// element per unit), and the element's own component count for variable-length elements, whose components the
+    /// layout lists at the maximum (<see cref="VarPartKind.OdoTable"/>, flattened in place). <c>default</c> for a group
+    /// without one.</summary>
+    private OdoTail RecordOdo(DataItem group) =>
+        OdoModel.TableUnder(group) is not { } t ? default
+        : !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(t) ? new OdoTail(t.ImageWidth, t.Occurs ?? 1)
+        : new OdoTail(VarFixedWidth(t), t.Occurs ?? 1, VarComponentCount(t));
 
     /// <summary>The character width of a variable-length group's FIXED run — its image with every
     /// variable-length component collapsed to nothing. This is the §8.5.1.12.3 accounting the compatibility
@@ -610,29 +616,31 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // nested variable-length group's components are located exactly where FromVarImage's Slice expects them.
         var layout = new List<(int FixedAt, int Unit, long MaxUnits, int Structure)>();
         ContiguousLayout(group, 0, layout);
+        var odo = RecordOdo(group);
         // ⛔ ONE LAYOUT OBJECT PER RECORD TYPE (kb/Work PB1025): the same layout locates a key a variable-length
         // member precedes (CobolContiguousLayout.Position, read through __Contiguous by the SORT/MERGE key and the
         // indexed key registrations), so the decomposition and the key window cannot disagree. It also carries each
         // component's DYNAMIC LENGTH STRUCTURE (kb/Work PB1094), so the same object frames the record on the way out
         // (MediumImage) and unframes it on the way in (Decompose).
         w.Line($"private static readonly CobolContiguousLayout {RuntimeApi.ContiguousLayoutField} = "
-            + RuntimeApi.ContiguousLayoutNew(totalFixed - OdoTailWidth(group), layout.Select(l => l.FixedAt),
-                layout.Select(l => l.Unit), layout.Select(l => l.MaxUnits), layout.Select(l => l.Structure),
-                odoTail: OdoTailWidth(group) > 0) + ";");
+            + RuntimeApi.ContiguousLayoutNew(totalFixed - (odo.Comps == 0 ? odo.Width : 0), layout.Select(l => l.FixedAt),
+                layout.Select(l => l.Unit), layout.Select(l => l.MaxUnits), layout.Select(l => l.Structure), odo) + ";");
         w.Line($"public readonly CobolContiguousLayout {RuntimeApi.ContiguousLayoutProperty} => "
             + $"{RuntimeApi.ContiguousLayoutField};");
         // ⛔ THE EXTENT TABLE (D-FRA (v); kb/Work PB1053): the WRITE / REWRITE / RELEASE side sends where each
         // component of CurrentImage() ends, and the READ / RETURN side decomposes by it when it describes the record
         // received — so every layout round-trips, however many variable-length members flank a fixed one.
-        // The RECORD half exists only for a group a record can be (DataItem.RecordImageCapable): a table of
-        // variable-length ELEMENTS under OCCURS DEPENDING has a run-time multiplicity of components, which the
-        // layout above (the components at the table's maximum, enough for compare and the boundary) cannot split a
-        // record back into - the record's length does not say how many occurrences it holds.
-        if (group.RecordImageCapable)
+        // A table of variable-length ELEMENTS under OCCURS DEPENDING (kb/Work PB2497) has a run-time multiplicity of
+        // components: the table states it by how many it describes (the layout above lists them at the maximum), and
+        // a record that carries no table is decomposed at the count the READ / RETURN passes in __odo. The result says
+        // whether the record stated its own count; when it did not, the landing decomposes it again at data-name-1's
+        // value (PlaceRenderer.WriteVarGroupContiguous; determination D-FRA (viii)).
+        w.Line($"public readonly RecordExtents CurrentExtents({OdoParameter(group)}) => "
+            + $"{RuntimeApi.ContiguousLayoutField}.ExtentsOf(AsVarImage({OdoArgument(group)}));");
+        using (w.Block("public bool FromContiguousImage(string __r, RecordExtents? __e, bool __fixedForm = false, int __odo = int.MaxValue)"))
         {
-            w.Line($"public readonly RecordExtents CurrentExtents({OdoParameter(group)}) => "
-                + $"{RuntimeApi.ContiguousLayoutField}.ExtentsOf(AsVarImage({OdoArgument(group)}));");
-            w.Line($"public void FromContiguousImage(string __r, RecordExtents? __e, bool __fixedForm = false) => FromVarImage({RuntimeApi.ContiguousLayoutField}.Decompose(__r, __e, __fixedForm));");
+            w.Line($"FromVarImage({RuntimeApi.ContiguousLayoutField}.Decompose(__r, __e, __fixedForm, __odo));");
+            w.Line($"return {RuntimeApi.ContiguousLayoutField}.StatesCount(__r, __e, __fixedForm);");
         }
         // ⛔ __storage (kb/Work PB1937) — the boundary copy-in of a LINKAGE formal: §14.2.3 GR8 makes the formal
         // "occupy the same storage area as the argument", so a dynamic-length member keeps the argument's WHOLE

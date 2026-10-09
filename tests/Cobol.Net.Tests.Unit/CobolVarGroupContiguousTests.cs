@@ -129,7 +129,7 @@ public sealed class CobolVarGroupContiguousTests
     public void OdoTailLayout_DecomposesARecordByTheTablesCurrentCount_AndRoundTripsItsExtents()
     {
         // fixed run 1 ("H"); D at fixed offset 1 (unit 1, max 5); T at fixed offset 1 (unit 1, max 3, the tail).
-        var layout = new CobolContiguousLayout(1, [1, 1], [1, 1], [5L, 3L], OdoTail: true);
+        var layout = new CobolContiguousLayout(1, [1, 1], [1, 1], [5L, 3L], Odo: new OdoTail(1, 3));
         var sent = new CobolVarGroup("Hxy", ["abc"]);                // the carrier AsVarImage(2) composes
         var extents = layout.ExtentsOf(sent);
         Assert.Equal([3, 2], extents.Lengths);                        // D "abc", T "xy"
@@ -147,7 +147,7 @@ public sealed class CobolVarGroupContiguousTests
     // Window H X(1) · D dynamic (max 5, ordinal 0 at window offset 1) · T X(1) OCCURS 1 TO 3 DEPENDING, held at its
     // maximum (3 positions) as the window's trailing storage: Ref "Hxyz", D "abc".
 
-    private static readonly CellOdoTail Tail = new(1, 3);
+    private static readonly OdoTail Tail = new(1, 3);
 
     private static StorageCell Cell()
     {
@@ -202,7 +202,7 @@ public sealed class CobolVarGroupContiguousTests
     // Window H X(1) · T X(1)+dynamic-DD OCCURS 1 TO 3 DEPENDING, at its maximum (3 positions): Ref "Hxyz", the
     // table's components (one per occurrence, ordinals 0..2, each BEFORE its occurrence's FX) "a", "bb", "ccc".
 
-    private static readonly CellOdoTail ElementTail = new(1, 3, Comps: 1);
+    private static readonly OdoTail ElementTail = new(1, 3, Comps: 1);
 
     private static StorageCell ElementCell()
     {
@@ -268,6 +268,100 @@ public sealed class CobolVarGroupContiguousTests
         // Without the shape the element is its fixed run only - the image the pre-PB244 composer gave, now the
         // fixed-element lane (an element with no components of its own).
         Assert.Equal("H12", cell.ContiguousAt(0, 2, 0, [1], [1], default, 0));
+    }
+
+    // ── kb/Work PB2497, a RECORD of an OCCURS DEPENDING table of VARIABLE-LENGTH ELEMENTS ────────────────────────────
+    // Record K X(1) · TE OCCURS 1 TO 3 DEPENDING ON K, each element DD dynamic (max 5) then FX X(1). At the maximum the
+    // fixed run is "K" + three FX (4 positions) and DD(i) sits before FX(i): fixed offsets 1, 2, 3. One occurrence is
+    // one fixed position and one component.
+
+    private static CobolContiguousLayout ElementRecord() =>
+        new(4, [1, 2, 3], [1, 1, 1], [5L, 5L, 5L], Odo: new OdoTail(1, 3, Comps: 1));
+
+    [Fact]
+    public void ARecordOfVariableLengthElements_IsReadBackAtTheCountItsExtentTableStates()
+    {
+        var layout = ElementRecord();
+        // the carrier AsVarImage(2) composes: the first two occurrences' fixed runs and components
+        var sent = new CobolVarGroup("2xy", ["ab", "cde"]);
+        var extents = layout.ExtentsOf(sent);
+        Assert.Equal([2, 3], extents.Lengths);
+        Assert.Equal([1, 2], extents.FixedAt);
+        Assert.Equal([1, 2, 3], layout.ComponentOffsets);   // the components at the maximum, for compare and the boundary
+        var back = layout.Decompose("2abxcdey", extents, count: 1);   // the record states 2: the count passed is ignored
+        Assert.Equal("2xy", back.Fixed);
+        Assert.Equal(["ab", "cde"], back.Dynamic);
+        Assert.True(layout.StatesCount("2abxcdey", extents, fixedForm: false));
+    }
+
+    [Fact]
+    public void ARecordOfVariableLengthElements_WithNoTable_IsDecomposedAtTheCountTheReadSupplies()
+    {
+        var layout = ElementRecord();
+        Assert.False(layout.StatesCount("1abx", null, fixedForm: false));
+        // at data-name-1's count (one occurrence) the take step is exact
+        var one = layout.Decompose("1abx", null, count: 1);
+        Assert.Equal("1x", one.Fixed);
+        Assert.Equal(["ab"], one.Dynamic);
+        // at the maximum (the default, §13.18.38.4 GR8 b) the same record leaves every component empty, the fixed run
+        // taking the characters in turn: the first pass, which places a data-name-1 the record holds before the table
+        var max = layout.Decompose("1abx");
+        Assert.Equal("1abx", max.Fixed);
+        Assert.Equal(["", "", ""], max.Dynamic);
+        // a table describing other characters than the record's does not describe the record
+        var stale = layout.ExtentsFrom([2, 3]);
+        Assert.False(layout.StatesCount("1abx", stale, fixedForm: false));
+    }
+
+    [Fact]
+    public void ARecordOfVariableLengthElements_TakesItsFixedForm_AtTheCountWritten_AndIsReadBackAtTheMaximum()
+    {
+        var layout = ElementRecord();
+        var extents = layout.ExtentsOf(new CobolVarGroup("2xy", ["ab", "cde"]));
+        // each DD padded to its maximum (5); the absent third occurrence is beyond the end, where the file fills spaces
+        string form = layout.ToFixedForm("2abxcdey", extents);
+        Assert.Equal("2ab   xcde  y", form);
+        string record = form.PadRight(4 + 15);   // the file's fixed length: the record's maximum size
+        Assert.True(layout.StatesCount(record, null, fixedForm: true));
+        var back = layout.Decompose(record, null, fixedForm: true);
+        Assert.Equal("2xy ", back.Fixed);
+        Assert.Equal(["ab", "cde", ""], back.Dynamic);
+    }
+
+    [Theory]
+    [InlineData(3, 3, 3)]
+    [InlineData(1, 3, 1)]
+    [InlineData(0, 3, 0)]
+    [InlineData(4, 3, null)]   // more components than the maximum holds
+    public void AnOdoTail_CountsTheOccurrencesOfARecord_ByItsComponents(int components, int total, int? expected) =>
+        Assert.Equal(expected, new OdoTail(1, 3, Comps: 1).CountFrom(components, total));
+
+    [Fact]
+    public void AnOdoTailOfTwoComponentsAnOccurrence_RefusesAPartialOccurrence_AndAFixedElementTailCountsNothing()
+    {
+        Assert.Equal(1, new OdoTail(1, 3, Comps: 2).CountFrom(2, 6));
+        Assert.Null(new OdoTail(1, 3, Comps: 2).CountFrom(3, 6));
+        Assert.Null(new OdoTail(1, 3).CountFrom(1, 1));
+    }
+
+    [Fact]
+    public void ACellWindowOfElementsWithComponents_IsWrittenAndReadBack_AtTheCountItsExtentTableStates()
+    {
+        // the ElementCell above at count 2: "H", (a, x), (bb, y)
+        var extents = ElementCell().ContiguousExtentsAt(4, 0, [1, 2, 3], [5, 5, 5], [0, 0, 0], [0, 0, 0], ElementTail, 2);
+        Assert.Equal([1, 2], extents.Lengths);
+        Assert.Equal([1, 2], extents.FixedAt);
+        var receiver = new StorageCell { Ref = "H   " };
+        Assert.True(receiver.StoreContiguousAt(0, 4, 0, [1, 2, 3], [5, 5, 5], [0, 0, 0], [0, 0, 0], ElementTail,
+            "Haxbby", extents, count: 1));
+        Assert.Equal("Hxy ", receiver.Ref);   // the third occurrence is beyond the record: space-filled
+        Assert.Equal(["a", "bb", ""], [receiver.DynAt(0), receiver.DynAt(1), receiver.DynAt(2)]);
+        // no table: the count is the one the READ supplies, and the call says the record did not state it
+        var taken = new StorageCell { Ref = "H   " };
+        Assert.False(taken.StoreContiguousAt(0, 4, 0, [1, 2, 3], [5, 5, 5], [0, 0, 0], [0, 0, 0], ElementTail,
+            "Hax", null, count: 1));
+        Assert.Equal("Hx  ", taken.Ref);
+        Assert.Equal("a", taken.DynAt(0));
     }
 
     [Fact]

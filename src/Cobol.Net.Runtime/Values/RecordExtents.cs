@@ -14,7 +14,7 @@ namespace CobolNet.Runtime;
 /// record area and the record size: the RECORD is still exactly the contiguous image.</para>
 /// <para>Component <c>k</c> is described by <see cref="FixedAt"/>[k] — its offset in the record's FIXED run, the
 /// §8.5.1.12.3 zero-length accounting — and <see cref="Lengths"/>[k], its current length in characters.
-/// <see cref="CobolContiguousLayout.Decompose(string, RecordExtents?)"/> honours the table only for a receiving
+/// <see cref="CobolContiguousLayout.Decompose"/> honours the table only for a receiving
 /// record whose components CORRESPOND to it (§8.5.1.12.2 — "Two dynamic-length elementary items correspond if they
 /// start at the same relative byte positions within their groups"), and only when it describes the very
 /// characters received; any other record is split by the D-FRA take step.</para>

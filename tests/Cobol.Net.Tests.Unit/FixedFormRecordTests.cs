@@ -11,7 +11,7 @@ namespace CobolNet.Tests.Unit;
 /// makes the record type and size fixed attributes every program shares, so such a file can neither be framed nor
 /// carry an extent table: each member sits at the position it has at its MAXIMUM size, space padded
 /// (<see cref="CobolContiguousLayout.ToFixedForm"/>), and a READ takes it back at that width and drops the padding
-/// (<see cref="CobolContiguousLayout.Decompose(string, RecordExtents?, bool)"/>). These pin the five things the form
+/// (<see cref="CobolContiguousLayout.Decompose"/>). These pin the five things the form
 /// owes: the shape every record shares; the exact round trip for every member that does not end in a space; the
 /// ONE documented loss (a trailing space is padding); a table that does not describe the record leaves it alone; and
 /// the table read from a frame carries no layout, so it can never be asked for the form.
