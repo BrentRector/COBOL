@@ -946,7 +946,9 @@ of an unsupported facility.
 - **SET SIZE OF — the storage-physically-unavailable EC-STORAGE-NOT-AVAIL leg (§14.9.39.4 GR38 third sentence)**:
   **implemented, not assumed away.** All three of GR37/GR38's outcomes are live and each sets the nonfatal
   EC-STORAGE-NOT-AVAIL under `>>TURN EC-STORAGE-NOT-AVAIL CHECKING ON`: a value that does not evaluate to a
-  nonnegative number gives length 0 (GR37); a value above the item's §8.5.1.10.1 **maximum size** is clamped to that
+  nonnegative number gives length 0 (GR37: a floating-point NaN is not a number, and −∞ is negative, so both take
+  it — `2023/pb2647_set_size_not_finite`, kb/Work PB2647); a value above the item's §8.5.1.10.1 **maximum size**,
+  +∞ included (an infinity is a number in ISO/IEC 60559), is clamped to that
   maximum (GR38 second sentence); and, when the host cannot hand over the storage that expansion needs, **the size
   is not changed** (GR38 third sentence) — an `OutOfMemoryException` at the growth site inside
   `CobolDynString.SetSize`, which returns the item unchanged instead of letting a framework exception escape into
