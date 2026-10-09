@@ -28,8 +28,11 @@ internal enum StoreFormat
 /// <summary>One record as it travels with its EXTENT TABLE (determination D-FRA (v); kb/Work PB1053) — between a
 /// keyed store and its connector, and through the sort store: the record's characters and, when the
 /// variable-length group that sent it had them, where each variable-length component ended. The table is framing
-/// information, never part of the record (§12.4.5.11.4 GR1).</summary>
-internal readonly record struct StoredFrame(string Image, RecordExtents? Extents);
+/// information, never part of the record (§12.4.5.11.4 GR1).
+/// <para><paramref name="Ordinals"/> is an INDEXED record's release-ordinal vector (the prime key's slot first, then
+/// one per alternate key — <c>KeyedRec.Ordinals</c>): the §14.9.30.4 GR26 order of its duplicates under every key,
+/// carried in the store so a reload keeps it (kb/Work PB2693). Null for every other frame.</para></summary>
+internal readonly record struct StoredFrame(string Image, RecordExtents? Extents, long[]? Ordinals = null);
 
 /// <summary>
 /// The ONE on-disk record framing shared by every organization (DESIGN-runtime-library §2.2): each framed record
@@ -54,8 +57,8 @@ internal readonly record struct StoredFrame(string Image, RecordExtents? Extents
 /// frames:
 /// <list type="bullet">
 /// <item><b>Store-level</b> (<see cref="ComposeStore"/>/<see cref="DecodeStore"/>/<see cref="ReadHeader"/>) — the
-/// whole-file rewrite/load the keyed connectors use (relative slots + the indexed persist order —
-/// IndexedConnector.PersistOrder). It opens with the header described below.</item>
+/// whole-file rewrite/load the keyed connectors use (relative slots; indexed records in release order, each with
+/// its release ordinals). It opens with the header described below.</item>
 /// <item><b>Stream-level</b> (<see cref="WritePrefix"/>/<see cref="PrefixLength"/>/<see cref="FrameStarts"/>) —
 /// the incremental prefix-per-record shape the sequential connector streams through its Latin-1 reader/writer
 /// (chars 0–255 map 1:1 to bytes under Latin-1, so the char-shaped prefix is byte-identical to the store-level
@@ -84,16 +87,23 @@ internal readonly record struct StoredFrame(string Image, RecordExtents? Extents
 /// this is the same answer for the same reason. Nothing is written beside a data file. Layout, all
 /// little-endian, immediately followed by the frames:</para>
 /// <code>
-///   0   8  magic "CBNFSTR" + format version (currently 3)
+///   0   8  magic "CBNFSTR" + format version (currently 4)
 ///   8   1  organization    'R' relative · 'I' indexed
 ///   9   1  record type     'F' fixed · 'V' varying
 ///  10   4  minimum logical record size (bytes)
 ///  14   4  maximum logical record size (bytes)
-///  18   2  key count (0 for a relative store)
+///  18   2  key count (0 for a relative store; the prime key plus each alternate key for an indexed one)
 ///  20   8  generation — the cross-run-unit coherence stamp (kb/Work PB2660; see GenerationOffset)
-///  28  ..  per key: offset(4) length(4) flags(1: bit0 DUPLICATES) suppress-length(2) suppress(Latin-1)
+///  28   8  release mint — an indexed store's next release ordinal (kb/Work PB2693; see ReleaseMintOffset); 0 otherwise
+///  36  ..  per key: offset(4) length(4) flags(1: bit0 DUPLICATES) suppress-length(2) suppress(Latin-1)
 ///          collation-length(1) collation(ASCII fingerprint)
 /// </code>
+/// <para>⛔ AN INDEXED FRAME CARRIES ITS RECORD'S RELEASE ORDINALS (kb/Work PB2693): key count × 8 bytes, the prime
+/// key's slot first, after the length word and the extent table and before the payload. §14.9.30.4 GR26 orders an
+/// alternate key's duplicates by release, and §14.9.35.4 GR24 b) moves a rewritten record last under each key it
+/// changed, independently per key — so the order is one number per record PER KEY, which no single physical order of
+/// the records can carry. A reload that derived the ordinals from file position renumbered them, and a connector
+/// partway through a set of duplicates skipped a record when another run unit deleted an earlier one.</para>
 /// <para>A format version this build does not know is <see cref="StoreFormat.Foreign"/> and NOT "attributes not
 /// recorded": a store whose layout is unknown cannot have its frames located either, so the only safe answer is
 /// to refuse it rather than to read it as if the header were absent.</para>
@@ -120,12 +130,23 @@ internal static class RecordFraming
     /// <para>Version 3 (kb/Work PB2660) adds the store GENERATION to the fixed header (<see cref="GenerationOffset"/>),
     /// the stamp by which a run unit learns that another run unit has rewritten the store. A version-2 store is
     /// Foreign to this build, as version 1 is: no reader for it is kept (there is no backward-compatibility
-    /// requirement, CLAUDE.md rule 4).</para></summary>
-    private const byte FormatVersion = 3;
+    /// requirement, CLAUDE.md rule 4).</para>
+    /// <para>Version 4 (kb/Work PB2693) adds the RELEASE MINT to the fixed header (<see cref="ReleaseMintOffset"/>) and
+    /// each indexed record's release-ordinal vector to its frame. A version-3 store is Foreign to this build.</para></summary>
+    private const byte FormatVersion = 4;
 
     /// <summary>The fixed part of the header — magic, organization, record type, the two record sizes, the key
-    /// count and the generation. Per-key descriptors follow it.</summary>
-    private const int FixedHeaderBytes = 28;
+    /// count, the generation and the release mint. Per-key descriptors follow it.</summary>
+    private const int FixedHeaderBytes = 36;
+
+    /// <summary>The offset of the RELEASE MINT in the fixed header, 8 bytes little-endian: an indexed store's next
+    /// release ordinal (<c>IndexedStore.NextOrdinal</c>), so the run unit that writes next — this one after a CLOSE
+    /// and OPEN, or another one sharing the file — releases its record AFTER every record already in the file
+    /// (§14.9.30.4 GR26). Zero for a relative store, which has no release order.</summary>
+    private const int ReleaseMintOffset = 28;
+
+    /// <summary>The bytes one release ordinal occupies in an indexed frame.</summary>
+    private const int OrdinalBytes = 8;
 
     // ── The store's capacity — the externally-defined boundary of a relative or indexed file ───────────────
 
@@ -144,21 +165,34 @@ internal static class RecordFraming
     /// number is bounded by the store's capacity long before it is bounded by its own range.</summary>
     public const int GapBytes = 4;
 
-    /// <summary>The bytes one record occupies in the store: its 4-byte length word, its extent table (if any)
-    /// and one byte per character — the file coded character set is one byte per character position
-    /// (<see cref="FileCharacterSet"/>), and a CODE-SET conversion is a per-character map, so the payload length
-    /// is the image's. The ONE size formula, shared by the WRITE-time boundary test and <see cref="ComposeStore"/>'s
-    /// composition, so the two cannot disagree about what fits.</summary>
-    public static long FrameBytes(StoredFrame frame) => 4L + ExtentTableBytes(frame.Extents) + frame.Image.Length;
+    /// <summary>The bytes one record occupies in the store: its 4-byte length word, its extent table (if any), its
+    /// release ordinals (an indexed record's) and one byte per character — the file coded character set is one byte
+    /// per character position (<see cref="FileCharacterSet"/>), and a CODE-SET conversion is a per-character map, so
+    /// the payload length is the image's. The ONE size formula, shared by the WRITE-time boundary test and
+    /// <see cref="ComposeStore"/>'s composition, so the two cannot disagree about what fits.</summary>
+    public static long FrameBytes(StoredFrame frame) =>
+        FrameBytes(frame.Image.Length, frame.Extents, frame.Ordinals?.Length ?? 0);
+
+    /// <summary><see cref="FrameBytes(StoredFrame)"/> of a record of <paramref name="chars"/> characters with the
+    /// extent table <paramref name="extents"/> and <paramref name="ordinalSlots"/> release ordinals — the same
+    /// formula, for a caller that holds the parts rather than a frame.</summary>
+    public static long FrameBytes(int chars, RecordExtents? extents, int ordinalSlots) =>
+        4L + ExtentTableBytes(extents) + (long)OrdinalBytes * ordinalSlots + chars;
 
     /// <summary>The bytes the store header for <paramref name="attributes"/> occupies — measured by encoding it
     /// with the ONE header writer, so the size cannot drift from the layout.</summary>
     public static long HeaderBytes(FixedFileAttributes attributes)
     {
         var header = new MemoryStream(FixedHeaderBytes + (64 * attributes.Keys.Count));
-        WriteHeader(header, attributes, generation: 0);
+        WriteHeader(header, attributes, generation: 0, releaseMint: 0);
         return header.Length;
     }
+
+    /// <summary>How many release ordinals each frame of a store described by <paramref name="attributes"/> carries:
+    /// one per key of an indexed store (<see cref="FixedFileAttributes.Keys"/> lists the prime key and each
+    /// alternate), none for a relative one.</summary>
+    public static int OrdinalSlots(FixedFileAttributes attributes) =>
+        attributes.Organization == FixedFileAttributes.Indexed ? attributes.Keys.Count : 0;
 
     // ── Store-level (byte) shape — the keyed connectors' whole-store persist/load ───────────────────────────
 
@@ -182,17 +216,29 @@ internal static class RecordFraming
     /// (a dense array sized by the highest RRN overflowed at a large key and allocated millions of slots for
     /// one record — kb/Work PB1192).</param>
     /// <param name="generation">The store's GENERATION — see <see cref="GenerationOffset"/>.</param>
+    /// <param name="releaseMint">An indexed store's next release ordinal — see <see cref="ReleaseMintOffset"/>; 0 for
+    /// a relative store.</param>
     /// <param name="codeSet">The file's §13.18.13 CODE-SET conversion, or null for the native character set
     /// (GR7). ⛔ It converts the PAYLOAD and not the frame: the 4-byte length prefix, the gap tag and this
     /// header are the §9.1.7.2 framing this processor adds, not data of the record (see
     /// <see cref="CodeSetConversion"/>).</param>
     /// <returns>The composed image; its <see cref="MemoryStream.Length"/> is the store's size.</returns>
+    /// <exception cref="InvalidOperationException">A frame carries a number of release ordinals other than
+    /// <see cref="OrdinalSlots"/> of <paramref name="attributes"/> — the decoder would mis-locate every later frame,
+    /// so the persist is refused before the file is touched.</exception>
     public static MemoryStream ComposeStore(FixedFileAttributes attributes, IEnumerable<StoredFrame?> frames,
-        ulong generation, CodeSetConversion? codeSet = null)
+        ulong generation, long releaseMint, CodeSetConversion? codeSet = null)
     {
+        int slots = OrdinalSlots(attributes);
         // Sized EXACTLY, by the one size formula the WRITE-time boundary test uses, so the compose never doubles.
         long size = HeaderBytes(attributes);
-        foreach (StoredFrame? f in frames) size += f is { } frame ? FrameBytes(frame) : GapBytes;
+        foreach (StoredFrame? f in frames)
+        {
+            if (f is { } frame && (frame.Ordinals?.Length ?? 0) != slots)
+                throw new InvalidOperationException($"a {attributes.Organization} store frame carries "
+                    + $"{frame.Ordinals?.Length ?? 0} release ordinals where its header's key count makes it {slots}");
+            size += f is { } framed ? FrameBytes(framed) : GapBytes;
+        }
         // ⛔ The keyed WRITE and REWRITE refuse a record the store cannot hold ('24', DOC-A.1-107), so a store
         // past the boundary here is a defect upstream of this call; it must not become a truncated file. Raised
         // BEFORE the file is touched, as an IOException, so the statement reports §9.1.13.6 item 1's '30' and the
@@ -201,8 +247,9 @@ internal static class RecordFraming
             throw new IOException($"the record store ({size} bytes) exceeds the {MaxStoreBytes}-byte capacity of a "
                 + "relative or indexed file");
         var composed = new MemoryStream((int)size);
-        WriteHeader(composed, attributes, generation);
+        WriteHeader(composed, attributes, generation, releaseMint);
         Span<byte> len = stackalloc byte[4];
+        Span<byte> ordinal = stackalloc byte[OrdinalBytes];
         foreach (StoredFrame? stored in frames)
         {
             if (stored is not { } frame)
@@ -218,6 +265,11 @@ internal static class RecordFraming
             BinaryPrimitives.WriteUInt32LittleEndian(len, FrameWord(payload.Length, frame.Extents));
             composed.Write(len);
             if (frame.Extents is { } extents) composed.Write(EncodeExtentTable(extents));
+            foreach (long o in frame.Ordinals ?? [])
+            {
+                BinaryPrimitives.WriteInt64LittleEndian(ordinal, o);
+                composed.Write(ordinal);
+            }
             composed.Write(payload, 0, payload.Length);
         }
         return composed;
@@ -235,13 +287,19 @@ internal static class RecordFraming
     /// <param name="size">The physical file's length.</param>
     /// <param name="codeSet">The file's §13.18.13 CODE-SET conversion, or null — see
     /// <see cref="ComposeStore"/>. The frames come back in the NATIVE character set (§13.18.13.4 GR6 a).</param>
-    public static List<StoredFrame?> DecodeStore(byte[] image, int size, CodeSetConversion? codeSet = null)
+    /// <param name="releaseMint">The store's release mint (<see cref="ReleaseMintOffset"/>); 0 when the image holds no
+    /// header this build understands.</param>
+    public static List<StoredFrame?> DecodeStore(byte[] image, int size, out long releaseMint,
+        CodeSetConversion? codeSet = null)
     {
         var frames = new List<StoredFrame?>();
+        releaseMint = 0;
         // The ONE decoder still answers "where do the frames start" — over the bytes already in hand, so a header
         // this build cannot read still yields no frames (see the summary of DecodeHeader).
         var over = new MemoryStream(image, 0, size, writable: false);
-        if (DecodeHeader(over) is null) return frames;   // empty, or a layout this build cannot locate frames in
+        if (DecodeHeader(over) is not { } attributes) return frames;   // empty, or a layout this build cannot locate frames in
+        releaseMint = BinaryPrimitives.ReadInt64LittleEndian(image.AsSpan(ReleaseMintOffset));
+        int slots = OrdinalSlots(attributes);
         int at = (int)over.Position;
         while (at + 4 <= size)
         {
@@ -255,11 +313,19 @@ internal static class RecordFraming
                 extents = table;
                 at += tableBytes;
             }
+            long[]? ordinals = null;
+            if (slots > 0)
+            {
+                if ((long)at + (long)OrdinalBytes * slots > size) break;   // torn
+                ordinals = new long[slots];
+                for (int k = 0; k < slots; k++, at += OrdinalBytes)
+                    ordinals[k] = BinaryPrimitives.ReadInt64LittleEndian(image.AsSpan(at, OrdinalBytes));
+            }
             uint n = word & ~ExtentFlag;
             if ((long)at + n > size) break;          // a torn tail ends the store (long: n is a uint)
             string payload = Encoding.Latin1.GetString(image, at, (int)n);
             at += (int)n;
-            frames.Add(new StoredFrame(FileCharacterSet.FromChannel(payload, codeSet), extents));
+            frames.Add(new StoredFrame(FileCharacterSet.FromChannel(payload, codeSet), extents, ordinals));
         }
         return frames;
     }
@@ -315,7 +381,7 @@ internal static class RecordFraming
 
     /// <summary>Write the store header. Kept beside <see cref="DecodeHeader"/> so the two halves of one byte
     /// layout cannot drift apart.</summary>
-    private static void WriteHeader(Stream fs, FixedFileAttributes a, ulong generation)
+    private static void WriteHeader(Stream fs, FixedFileAttributes a, ulong generation, long releaseMint)
     {
         var head = new byte[FixedHeaderBytes];
         Magic.CopyTo(head);
@@ -326,6 +392,7 @@ internal static class RecordFraming
         BinaryPrimitives.WriteInt32LittleEndian(head.AsSpan(14), a.MaxRecordSize);
         BinaryPrimitives.WriteUInt16LittleEndian(head.AsSpan(18), (ushort)a.Keys.Count);
         BinaryPrimitives.WriteUInt64LittleEndian(head.AsSpan(GenerationOffset), generation);
+        BinaryPrimitives.WriteInt64LittleEndian(head.AsSpan(ReleaseMintOffset), releaseMint);
         fs.Write(head, 0, head.Length);
         Span<byte> word = stackalloc byte[4];
         foreach (var k in a.Keys)

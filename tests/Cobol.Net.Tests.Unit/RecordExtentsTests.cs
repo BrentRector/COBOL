@@ -96,8 +96,8 @@ public sealed class RecordExtentsTests
         var extents = new RecordExtents([0, 3], [2, 4]);
         var attributes = new FixedFileAttributes(FixedFileAttributes.Relative, true, 5, 17, []);
         using var ms = RecordFraming.ComposeStore(attributes,
-            [new StoredFrame(Written, extents), null, new StoredFrame("PLAIN", null)], generation: 0);
-        var back = RecordFraming.DecodeStore(ms.GetBuffer(), (int)ms.Length);
+            [new StoredFrame(Written, extents), null, new StoredFrame("PLAIN", null)], generation: 0, releaseMint: 0);
+        var back = RecordFraming.DecodeStore(ms.GetBuffer(), (int)ms.Length, out _);
         Assert.Equal(3, back.Count);
         Assert.Equal(Written, back[0]!.Value.Image);
         Assert.Equal([2, 4], back[0]!.Value.Extents!.Lengths);

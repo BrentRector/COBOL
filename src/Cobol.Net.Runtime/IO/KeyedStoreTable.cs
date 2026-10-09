@@ -235,6 +235,9 @@ internal sealed class KeyedRec
     /// <summary>The EXTENT TABLE the record was released with (determination D-FRA (v); kb/Work PB1053) — null when
     /// the record carries none. Replaced with <see cref="Image"/>, never apart from it.</summary>
     public RecordExtents? Extents;
+    /// <summary>The record's release ordinal under each key — slot 0 the prime key, slot <c>i + 1</c> the i-th alternate
+    /// (§14.9.30.4 GR26, §14.9.35.4 GR24; kb/Work PB341) — persisted with the record (kb/Work PB2693). A change of its
+    /// LENGTH goes through <see cref="IndexedStore.GrowOrdinals"/>, which counts the bytes.</summary>
     public long[] Ordinals = [];
 }
 
@@ -257,24 +260,35 @@ internal sealed class IndexedStore : KeyedStore
     /// (Annex A.1 item 107).</summary>
     public long RecordBytes { get; private set; }
 
-    /// <summary>The frame bytes of one stored record — <see cref="RecordFraming.FrameBytes"/> of its image and
-    /// extent table.</summary>
-    public static long FrameBytes(string image, RecordExtents? extents) =>
-        RecordFraming.FrameBytes(new StoredFrame(image, extents));
+    /// <summary>The frame bytes of one stored record — <see cref="RecordFraming.FrameBytes(int, RecordExtents?, int)"/>
+    /// of its image, its extent table and its <paramref name="ordinalSlots"/> release ordinals (kb/Work PB2693).</summary>
+    public static long FrameBytes(string image, RecordExtents? extents, int ordinalSlots) =>
+        RecordFraming.FrameBytes(image.Length, extents, ordinalSlots);
+
+    /// <summary>Grow a record's release-ordinal vector to <paramref name="slots"/> — a connector of this run unit that
+    /// declares keys the record predates re-stamps one (§14.9.35.4 GR24 b)) — keeping <see cref="RecordBytes"/>
+    /// true. The new slots read 0, as a short vector's missing ones do.</summary>
+    public void GrowOrdinals(KeyedRec rec, int slots)
+    {
+        if (rec.Ordinals.Length >= slots) return;
+        RecordBytes += FrameBytes(rec.Image, rec.Extents, slots) - FrameBytes(rec.Image, rec.Extents, rec.Ordinals.Length);
+        Array.Resize(ref rec.Ordinals, slots);
+    }
+
 
     /// <summary>Release a record into the store (a WRITE, or the OPEN's load).</summary>
     public void Add(KeyedRec rec)
     {
         Mutated();
         _recs.Add(rec);
-        RecordBytes += FrameBytes(rec.Image, rec.Extents);
+        RecordBytes += FrameBytes(rec.Image, rec.Extents, rec.Ordinals.Length);
     }
 
     /// <summary>Replace a stored record's content in place (§14.9.35 REWRITE) — its image and extent table
     /// together, never apart (D-FRA (v)).</summary>
     public void Replace(KeyedRec rec, string image, RecordExtents? extents)
     {
-        RecordBytes += FrameBytes(image, extents) - FrameBytes(rec.Image, rec.Extents);
+        RecordBytes += FrameBytes(image, extents, rec.Ordinals.Length) - FrameBytes(rec.Image, rec.Extents, rec.Ordinals.Length);
         Mutated();
         rec.Image = image;
         rec.Extents = extents;
@@ -285,7 +299,7 @@ internal sealed class IndexedStore : KeyedStore
     {
         if (!_recs.Remove(rec)) return false;
         Mutated();
-        RecordBytes -= FrameBytes(rec.Image, rec.Extents);
+        RecordBytes -= FrameBytes(rec.Image, rec.Extents, rec.Ordinals.Length);
         return true;
     }
 

@@ -332,6 +332,7 @@
   "l1c37_indexed_dup_prime_key",
   "l1c38_write_key_any_order",
   "l1c38_write_alt_key_dup_order",
+  "pb2693_dup_orders_survive_close",
   "l1_call_foreign_module_not_located_85",
   "gl2m2_copy_resultant_spacing_85",
   "l1_initiate_multi_each_report_85",

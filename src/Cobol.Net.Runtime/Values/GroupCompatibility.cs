@@ -26,8 +26,9 @@ public enum GroupAtomKind
 /// item zero, a dynamic-capacity table one element) — the quantity §8.5.1.12.2's correspondence is stated in.</param>
 /// <param name="Chars">Its contribution in CHARACTER positions — the carrier's geometry (<see cref="CobolVarGroup"/>), where
 /// a national character is two bytes.</param>
-/// <param name="ElementBytes">A table's one-occurrence byte length (§8.5.1.12.3 sentence 2 compares it); zero
-/// otherwise.</param>
+/// <param name="ElementBytes">A table's one-occurrence byte length under §8.5.1.12.3's collapse conventions; zero
+/// otherwise. §8.5.1.12.3 sentence 2 compares it directly only for an ELEMENTARY element: a group element's length for
+/// the pair is measured by the walk over <paramref name="Element"/> (kb/Work PB2689).</param>
 /// <param name="ElementChars">A table's one-occurrence character length; zero otherwise.</param>
 /// <param name="Element">A table's element atoms when the element is a GROUP (§8.5.1.12.3's "their elements are
 /// compatible" recurses into them); null for an elementary element and for every non-table atom.</param>
@@ -55,7 +56,8 @@ public enum GroupMismatchKind
     /// <summary>A dynamic-capacity table at a position the other group has no atom starting at (§8.5.1.12.1 rule 1 /
     /// §8.5.1.12.2).</summary>
     DynamicTableUnpaired,
-    /// <summary>Two corresponding tables whose element byte lengths differ (§8.5.1.12.3 sentence 2).</summary>
+    /// <summary>Two corresponding tables whose element byte lengths, as the pair measures them, differ (§8.5.1.12.3
+    /// sentence 2; <see cref="GroupMismatch.FirstLength"/> and <see cref="GroupMismatch.SecondLength"/>).</summary>
     ElementBytesDiffer,
     /// <summary>Two corresponding tables whose elements are not compatible (§8.5.1.12.3 sentence 2) — the reason is
     /// <see cref="GroupMismatch.Inner"/>.</summary>
@@ -75,8 +77,12 @@ public enum GroupMismatchKind
 /// <param name="OtherAtom">The other group's atom of a table pair; −1 otherwise.</param>
 /// <param name="Position">The relative byte position the reason is stated at.</param>
 /// <param name="Inner">For <see cref="GroupMismatchKind.ElementsIncompatible"/>, the elements' reason.</param>
+/// <param name="FirstLength">For <see cref="GroupMismatchKind.ElementBytesDiffer"/>, the first table's element byte
+/// length as the pair measures it (§8.5.1.12.3 — not its one-occurrence atom when the element holds a dynamic-capacity
+/// table); zero otherwise.</param>
+/// <param name="SecondLength">The other table's element byte length, likewise.</param>
 public sealed record GroupMismatch(GroupMismatchKind Kind, bool OnFirst, int Atom, int OtherAtom, long Position,
-    GroupMismatch? Inner = null);
+    GroupMismatch? Inner = null, long FirstLength = 0, long SecondLength = 0);
 
 /// <summary>The per-side character tally the walk accumulates — the pair-relative character lengths of two
 /// groups (<c>VariableLengthCompatibility.PairCharWidths</c>).</summary>
@@ -121,14 +127,31 @@ public static class GroupCompatibility
     /// items and tables — as (<paramref name="a"/> index, <paramref name="b"/> index), left to right;
     /// <paramref name="tally"/>, when not null, the pair-relative character lengths.</summary>
     public static GroupMismatch? Walk(GroupAtom[] a, GroupAtom[] b, List<(int First, int Second)>? pairs = null,
-        GroupCharTally? tally = null)
+        GroupCharTally? tally = null) => Walk(a, b, pairs, tally, out _, out _);
+
+    /// <summary>The walk itself. <paramref name="lengthA"/> / <paramref name="lengthB"/> receive the two groups'
+    /// pair-relative BYTE lengths — each group's length under §8.5.1.12.3's conventions as they apply to THIS pair
+    /// (sentences 3 and 4 decide a corresponding table's length from the pair, not from either table alone) — and are
+    /// meaningful only when the walk returns null. They are what §8.5.1.12.3 sentence 2's "the byte length of their
+    /// elements" means for two group elements (<see cref="Elements"/>).</summary>
+    private static GroupMismatch? Walk(GroupAtom[] a, GroupAtom[] b, List<(int First, int Second)>? pairs,
+        GroupCharTally? tally, out long lengthA, out long lengthB)
     {
         int ia = 0, ib = 0;
         long pa = 0, pb = 0;
+        lengthA = lengthB = 0;
         while (ia < a.Length || ib < b.Length)
         {
-            if (ia >= a.Length) return Tail(b, ib, tally, first: false);
-            if (ib >= b.Length) return Tail(a, ia, tally, first: true);
+            if (ia >= a.Length)
+            {
+                lengthA = pa;
+                return Tail(b, ib, pb, pa, tally, first: false, out lengthB);
+            }
+            if (ib >= b.Length)
+            {
+                lengthB = pb;
+                return Tail(a, ia, pa, pb, tally, first: true, out lengthA);
+            }
             // The two sides are walked to the SAME relative byte position before any correspondence is decided:
             // §8.5.1.12.2 states BOTH correspondences as "the same relative byte positions within their groups".
             if (pa < pb)
@@ -165,20 +188,29 @@ public static class GroupCompatibility
             {
                 if (!x.IsTable || !y.IsTable)
                     return new GroupMismatch(GroupMismatchKind.DynamicTableOppositeNonTable, xDyn, xDyn ? ia : ib, -1, pa);
-                if (x.ElementBytes != y.ElementBytes)
-                    return new GroupMismatch(GroupMismatchKind.ElementBytesDiffer, true, ia, ib, pa);
-                if (Elements(x, y) is { } inner)
+                // §8.5.1.12.3 sentence 2: "Two corresponding tables match when the byte length of their elements is
+                // equal and their elements are compatible". The element lengths compared are the ones the element walk
+                // MEASURES for the pair (kb/Work PB2689): an element holding a dynamic-capacity table has no static
+                // length for this purpose, because sentence 3 makes that table "the same length as the corresponding
+                // table" — so a dynamic table's element holding `OCCURS DYNAMIC` matches one holding `OCCURS 2` when
+                // the rest agrees, although their one-element atoms are 1 and 2 bytes.
+                var elementChars = tally is null ? null : new GroupCharTally();
+                var inner = Elements(x, y, elementChars, out long ex, out long ey);
+                if (inner is null or { Kind: GroupMismatchKind.ElementShapeDiffers } && ex != ey)
+                    return new GroupMismatch(GroupMismatchKind.ElementBytesDiffer, true, ia, ib, pa,
+                        FirstLength: ex, SecondLength: ey);
+                if (inner is not null)
                     return new GroupMismatch(GroupMismatchKind.ElementsIncompatible, true, ia, ib, pa, inner);
                 // §8.5.1.12.3 sentence 3: when only ONE of the pair is a dynamic-capacity table, the dynamic one "is
                 // considered to be the same length as the corresponding table"; when BOTH are, sentence 4 makes each
-                // one element long — which is the Bytes each atom already carries.
-                long len = xDyn && yDyn ? x.ElementBytes : xDyn ? y.Bytes : x.Bytes;
+                // "the length of a single element of that table" — the element length the pair just measured.
+                bool both = xDyn && yDyn;
+                long len = both ? ex : xDyn ? y.Bytes : x.Bytes;
                 if (tally is not null)
                 {
                     // The same two sentences in CHARACTER positions.
-                    bool both = xDyn && yDyn;
-                    tally.First += both || !xDyn ? x.Chars : y.Chars;
-                    tally.Second += both || !yDyn ? y.Chars : x.Chars;
+                    tally.First += both ? elementChars!.First : !xDyn ? x.Chars : y.Chars;
+                    tally.Second += both ? elementChars!.Second : !yDyn ? y.Chars : x.Chars;
                 }
                 pairs?.Add((ia, ib));
                 pa += len; pb += len; ia++; ib++;
@@ -188,6 +220,7 @@ public static class GroupCompatibility
             if (tally is not null) tally.First += x.Chars;
             pa += x.Bytes; ia++;
         }
+        (lengthA, lengthB) = (pa, pb);
         return null;
     }
 
@@ -205,33 +238,57 @@ public static class GroupCompatibility
         return null;
     }
 
-    /// <summary>The atoms of the LONGER group beyond the shorter group's last byte. §8.5.1.12.2's last sentence grants
-    /// exactly one latitude here — a dynamic-capacity table there "is treated as if it corresponds to a space-filled
-    /// fixed-length table" — and grants it to TABLES ONLY. A trailing dynamic-LENGTH item still needs a real
-    /// counterpart (rule 3), so it fails.</summary>
-    private static GroupMismatch? Tail(GroupAtom[] list, int i, GroupCharTally? tally, bool first)
+    /// <summary>The remaining atoms of the LONGER group, from relative byte position <paramref name="p"/>, once the
+    /// other group's atoms are spent at <paramref name="shorter"/> bytes. An atom that still starts INSIDE the shorter
+    /// group (<c>p &lt; shorter</c>: the shorter group's last atom covers it) is opposite material that started
+    /// earlier, exactly as in <see cref="Skip"/>, so a variable-length item there fails rule 1 or 3. Past the shorter
+    /// group's last byte §8.5.1.12.2's last sentence grants exactly one latitude — a dynamic-capacity table there "is
+    /// treated as if it corresponds to a space-filled fixed-length table" — and grants it to TABLES ONLY: a trailing
+    /// dynamic-LENGTH item still needs a real counterpart (rule 3), so it fails. <paramref name="length"/> receives
+    /// the longer group's byte length.</summary>
+    private static GroupMismatch? Tail(GroupAtom[] list, int i, long p, long shorter, GroupCharTally? tally,
+        bool first, out long length)
     {
+        length = 0;
         for (; i < list.Length; i++)
         {
+            var at = list[i];
             if (tally is not null)
             {
-                if (first) tally.First += list[i].Chars;
-                else tally.Second += list[i].Chars;
+                if (first) tally.First += at.Chars;
+                else tally.Second += at.Chars;
             }
-            if (list[i].Kind is GroupAtomKind.DynamicLength)
-                return new GroupMismatch(GroupMismatchKind.DynamicLengthBeyondEnd, first, i, -1, 0);
+            if (p < shorter && at.IsComponent)
+                return at.Kind is GroupAtomKind.DynamicLength
+                    ? new GroupMismatch(GroupMismatchKind.DynamicLengthUnpaired, first, i, -1, p)
+                    : new GroupMismatch(GroupMismatchKind.DynamicTableUnpaired, first, i, -1, p);
+            if (at.Kind is GroupAtomKind.DynamicLength)
+                return new GroupMismatch(GroupMismatchKind.DynamicLengthBeyondEnd, first, i, -1, p);
+            p += at.Bytes;
         }
+        length = p;
         return null;
     }
 
-    /// <summary>§8.5.1.12.3 sentence 2's second conjunct — "their elements are compatible". A group element recurses
-    /// into the SAME relation; an elementary element has no atoms of its own and its byte length was compared by the
-    /// caller.</summary>
-    private static GroupMismatch? Elements(GroupAtom x, GroupAtom y) =>
-        x.Element is { } ex && y.Element is { } ey ? Walk(ex, ey)
-        : (x.Element is null) != (y.Element is null)
+    /// <summary>§8.5.1.12.3 sentence 2 for a pair of corresponding tables: whether "their elements are compatible", and
+    /// (<paramref name="xBytes"/> / <paramref name="yBytes"/>) "the byte length of their elements" the caller compares.
+    /// A group element recurses into the SAME relation, which measures the two elements' lengths for the pair; an
+    /// elementary element has no atoms of its own and is its one-occurrence length. <paramref name="chars"/>, when not
+    /// null, receives the elements' pair-relative character lengths.</summary>
+    private static GroupMismatch? Elements(GroupAtom x, GroupAtom y, GroupCharTally? chars, out long xBytes,
+        out long yBytes)
+    {
+        if (x.Element is { } ex && y.Element is { } ey) return Walk(ex, ey, null, chars, out xBytes, out yBytes);
+        (xBytes, yBytes) = (x.ElementBytes, y.ElementBytes);
+        if (chars is not null)
+        {
+            chars.First += x.ElementChars;
+            chars.Second += y.ElementChars;
+        }
+        return (x.Element is null) != (y.Element is null)
             ? new GroupMismatch(GroupMismatchKind.ElementShapeDiffers, x.Element is null, -1, -1, 0)
             : null;
+    }
 
     /// <summary>⛔ THE GROUP'S §8.5.1.12 LAYOUT as the carrier reads it — flat <c>(kind, chars, elementChars)</c>
     /// triples in CHARACTER positions, the kinds being <see cref="CobolVarGroup"/>'s <c>Layout*</c> constants (kb/Work

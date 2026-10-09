@@ -264,6 +264,133 @@ public sealed class CrossRunUnitKeyedStoreDriftTests
         finally { try { File.Delete(host); } catch (IOException) { } }
     }
 
+    /// <summary>kb/Work PB2693 — a duplicate-key walk keeps its place across another run unit's change. §14.9.30.4 GR26:
+    /// duplicates of an alternate key are made available "in the same order ... in which they are released by execution
+    /// of WRITE statements, or by execution of REWRITE statements that create such duplicate values", and GR21 f) 1.
+    /// resumes "immediately after the record that was made available by that prior READ statement". That order is
+    /// the file's, so it survives the reload a coherent connector makes when another run unit changed the file: the
+    /// release ordinals are PERSISTED with the records, never renumbered from file position. A reload that renumbered
+    /// them moved every record after B's deleted one down by one, and A's READ NEXT skipped D3.</summary>
+    [Theory]
+    [InlineData("delete")]
+    [InlineData("rewrite")]
+    [InlineData("write")]
+    public void ADuplicateKeyWalk_KeepsItsPlace_AcrossAnotherRunUnitsChange(string change)
+    {
+        if (!HostCarriesRegionLocks) return;
+        string host = Tmp($"dups-{change}");
+        try
+        {
+            void Indexed(FileRegistry reg, string name, FileSharing? sharing)
+            {
+                reg.RegisterIndexed(name, host, recordWidth: 8, optional: false, accessMode: (int)KeyedAccess.Dynamic,
+                    primeOffset: 0, primeLength: 4, varyMin: -1, varyMax: -1);
+                reg.AddAlternateKey(name, offset: 4, length: 1, duplicates: true);
+                if (sharing is { } s) reg.RegisterSharing(name, s, FileLockMode.Manual, multiple: false);
+            }
+            string W(FileRegistry reg, string name, string image) =>
+                reg.WriteShared(name, image, -1, FileRecordLock.None, FileRetryKind.None, 0, page: null);
+            var seed = new FileRegistry();
+            Indexed(seed, "S", null);
+            seed.OpenStatic("S", FileOpenMode.Output);
+            foreach (var image in new[] { "0001Aaaa", "0002Dbbb", "0003Dccc", "0004Dddd", "0005Beee" })
+                Assert.Contains(W(seed, "S", image), new[] { "00", "02" });   // §9.1.13.2 1) — 02: a duplicate key
+            seed.Close("S");
+
+            var a = new FileRegistry();
+            var b = new FileRegistry();
+            Indexed(a, "A", FileSharing.AllOther);
+            Indexed(b, "B", FileSharing.AllOther);
+            a.OpenStatic("A", FileOpenMode.IO);
+            b.OpenStatic("B", FileOpenMode.IO);
+            // GR32 — the first released record of the duplicate set; GR30 makes the alternate key the key of reference
+            // (and GR27 sets 02 on a SEQUENTIAL read only).
+            Assert.Equal("00", a.ReadKeyedShared("A", keyIndex: 0, "0000D   ", FileRecordLock.None, false,
+                FileRetryKind.None, 0, out string first));
+            Assert.Equal("0002Dbbb", first);
+
+            Assert.Contains(change switch
+            {
+                // An earlier-released record leaves the file.
+                "delete" => b.DeleteShared("B", "0001Aaaa", FileRetryKind.None, 0),
+                // A record's alternate key changes from B to D: it joins the set last (§14.9.35.4 GR24 b)).
+                "rewrite" => b.RewriteShared("B", "0005Deee", -1, FileRecordLock.None, FileRetryKind.None, 0),
+                // A new record joins the set D, last (GR26).
+                _ => W(b, "B", "0006Dfff"),
+            }, new[] { "00", "02" });
+
+            var walk = new List<string>();
+            while (a.ReadShared("A", previous: false, FileRecordLock.None, advancingOnLock: false, ignoringLock: false,
+                       FileRetryKind.None, 0, out string next) is "00" or "02")
+                walk.Add(next);
+            // The walk ends with the set: every other record's alternate key (A, B) is LOWER than D.
+            string[] expected = change switch
+            {
+                "delete" => ["0003Dccc", "0004Dddd"],
+                "rewrite" => ["0003Dccc", "0004Dddd", "0005Deee"],
+                _ => ["0003Dccc", "0004Dddd", "0006Dfff"],
+            };
+            Assert.Equal(expected, walk);
+            a.Close("A");
+            b.Close("B");
+        }
+        finally { try { File.Delete(host); } catch (IOException) { } }
+    }
+
+    /// <summary>kb/Work PB2693 — each key's duplicate order survives the CLOSE, even when no single order of the records
+    /// could carry them all. §14.9.35.4 GR24 b) moves a REWRITTEN record last among the duplicates of each key the
+    /// REWRITE changed and a) leaves its place under every other key, so two records can stand r2, r1 under one key and
+    /// r1, r2 under another. A store that kept the order in the sequence of its frames had to lose one of them at the
+    /// CLOSE; the ordinals now travel with the records.</summary>
+    [Fact]
+    public void EachKeysDuplicateOrder_SurvivesTheClose_WhenNoSingleRecordOrderCarriesThem()
+    {
+        string host = Tmp("cyclic");
+        try
+        {
+            void Indexed(FileRegistry reg)
+            {
+                reg.RegisterIndexed("F", host, recordWidth: 6, optional: false, accessMode: (int)KeyedAccess.Dynamic,
+                    primeOffset: 0, primeLength: 4, varyMin: -1, varyMax: -1);
+                reg.AddAlternateKey("F", offset: 4, length: 1, duplicates: true);
+                reg.AddAlternateKey("F", offset: 5, length: 1, duplicates: true);
+            }
+            var writer = new FileRegistry();
+            Indexed(writer);
+            writer.OpenStatic("F", FileOpenMode.Output);
+            foreach (var image in new[] { "0001ax", "0002ax" })
+                Assert.Contains(writer.WriteShared("F", image, -1, FileRecordLock.None, FileRetryKind.None, 0, page: null),
+                    new[] { "00", "02" });
+            writer.Close("F");
+            writer.OpenStatic("F", FileOpenMode.IO);
+            // The first alternate key leaves the set and comes back (GR24 b) twice), the second is never changed (a)).
+            foreach (var image in new[] { "0001bx", "0001ax" })
+                Assert.Contains(writer.RewriteShared("F", image, -1, FileRecordLock.None, FileRetryKind.None, 0),
+                    new[] { "00", "02" });
+            writer.Close("F");
+
+            var reader = new FileRegistry();
+            Indexed(reader);
+            reader.OpenStatic("F", FileOpenMode.Input);
+            Assert.Equal(["0002ax", "0001ax"], Duplicates(reader, keyIndex: 0, "0000a "));
+            Assert.Equal(["0001ax", "0002ax"], Duplicates(reader, keyIndex: 1, "0000 x"));
+            reader.Close("F");
+        }
+        finally { try { File.Delete(host); } catch (IOException) { } }
+
+        // §14.9.30.4 GR32 then GR21 f) 1.: the first released duplicate, then each one after it.
+        static List<string> Duplicates(FileRegistry reg, int keyIndex, string keyImage)
+        {
+            Assert.Equal("00", reg.ReadKeyedShared("F", keyIndex, keyImage, FileRecordLock.None, false,
+                FileRetryKind.None, 0, out string first));
+            var all = new List<string> { first };
+            while (reg.ReadShared("F", previous: false, FileRecordLock.None, advancingOnLock: false, ignoringLock: false,
+                       FileRetryKind.None, 0, out string next) is "00" or "02")
+                all.Add(next);
+            return all;
+        }
+    }
+
     /// <summary>The guard behind the arbitration fires when the arbitration is bypassed: a store being created while
     /// another connector holds it is a loud defect, never a silent emptying (kb/Work PB754).</summary>
     [Fact]

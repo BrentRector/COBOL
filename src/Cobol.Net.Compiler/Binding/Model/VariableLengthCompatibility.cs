@@ -327,7 +327,7 @@ internal static class VariableLengthCompatibility
         DataItem x = a.Items[m.Atom], y = b.Items[m.OtherAtom];
         if (m.Kind is GroupMismatchKind.ElementBytesDiffer)
             return $"corresponding tables '{x.CobolName}' and '{y.CobolName}' do not match: "
-                + $"their elements are {a.Atoms[m.Atom].ElementBytes} and {b.Atoms[m.OtherAtom].ElementBytes} bytes "
+                + $"their elements are {m.FirstLength} and {m.SecondLength} bytes "
                 + "(ISO §8.5.1.12.3 — the byte length of their elements shall be equal)";
         // §8.5.1.12.3 sentence 2's second conjunct — "their elements are compatible": a group element recursed into
         // the same walk (over the tables' own atoms); an elementary element opposite a group one does not.

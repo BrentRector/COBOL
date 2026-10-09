@@ -284,36 +284,63 @@ public sealed class IndexedConnector : KeyedConnector
     private protected override KeyedStore AttachedStore => _st;
 
     /// <inheritdoc/>
-    private protected override void Fill(KeyedStore into, List<StoredFrame?> frames)
+    /// <remarks>⛔ THE RELEASE ORDINALS ARE THE FILE'S, NOT RE-DERIVED (kb/Work PB2693). §14.9.30.4 GR26's duplicate
+    /// order and GR21 f)'s "logical position within the set of duplicates" are each record's release ordinal under the
+    /// key of reference, which the store persists with the record (<see cref="StoredFrame.Ordinals"/>), together with
+    /// the mint the next release takes (<paramref name="releaseMint"/>). A reload therefore leaves every ordinal where
+    /// it was — the position a connector partway through a duplicate set holds (<c>_readOrdinal</c>) still names the
+    /// same place after another run unit's change. When this run unit renumbered the records from their file order
+    /// instead, another run unit's DELETE of an earlier record moved every later one down by one and the next READ
+    /// NEXT skipped a duplicate.</remarks>
+    private protected override void Fill(KeyedStore into, List<StoredFrame?> frames, long releaseMint)
     {
         var store = (IndexedStore)into;
         store.Clear();
-        store.NextOrdinal = 1;
+        long next = Math.Max(releaseMint, 1);
         // A varying file's frames keep their exact stored lengths (§13.18.43 GR15 reports them on READ);
         // fixed frames normalize to the record width.
         foreach (StoredFrame? stored in frames)
             if (stored is { } frame)
-                // The physical file order IS the release order under every key (§14.9.30.4 GR26) — PersistOrder
-                // wrote it that way, so one ordinal per record fills the whole vector (kb/Work PB341).
+            {
+                long[] ordinals = OrdinalVector(frame.Ordinals);
+                foreach (long o in ordinals) next = Math.Max(next, o + 1);
                 store.Add(new KeyedRec
                 {
                     Image = IsVarying ? frame.Image : Fit(frame.Image),
                     Extents = IsVarying ? frame.Extents : null,   // a fitted fixed record is not the image a table describes
-                    Ordinals = ReleaseOrdinals(store.NextOrdinal++),
+                    Ordinals = ordinals,
                 });
+            }
+        // The mint is never below an ordinal already in the store, so the next release is last under every key.
+        store.NextOrdinal = next;
+    }
+
+    /// <summary>A stored ordinal vector in THIS connector's key count (the prime key's slot first). They agree
+    /// whenever §14.9.27.4 GR10 admitted the OPEN; under the <c>COBOLNET_KEYCHECK</c> opt-out a vector written for
+    /// fewer keys reads 0 for each missing one, exactly as <see cref="Ordinal"/> reads a short vector in memory, and
+    /// one written for more keys keeps the slots this connector declares.</summary>
+    private long[] OrdinalVector(long[]? stored)
+    {
+        var ordinals = new long[_alts.Count + 1];
+        if (stored is not null) Array.Copy(stored, ordinals, Math.Min(stored.Length, ordinals.Length));
+        return ordinals;
     }
 
     /// <inheritdoc/>
-    /// <remarks>In <see cref="PersistOrder"/> — the ONE physical order that reproduces §14.9.30.4 GR26's duplicate
-    /// retrieval order under EVERY key of reference after the reload. Materialized, because the compose enumerates
-    /// the frames twice.</remarks>
+    /// <remarks>In RELEASE order (the prime-key ordinal), each frame carrying its record's ordinal vector — the
+    /// order the file is written in decides nothing, because the ordinals travel with the records (kb/Work PB2693).
+    /// Materialized, because the compose enumerates the frames twice.</remarks>
     private protected override IEnumerable<StoredFrame?> PersistFrames() =>
-        PersistOrder().Select(r => (StoredFrame?)new StoredFrame(r.Image, r.Extents)).ToList();
+        _recs.OrderBy(r => Ordinal(r, PrimeKey))
+            .Select(r => (StoredFrame?)new StoredFrame(r.Image, r.Extents,
+                r.Ordinals.Length == _alts.Count + 1 ? r.Ordinals : OrdinalVector(r.Ordinals))).ToList();
 
-    /// <summary>The indexed CLOSE body (§14.9.6): a writable mode persists the store in <see cref="PersistOrder"/>
-    /// — the ONE physical order that reproduces §14.9.30.4 GR26's duplicate retrieval order under EVERY key of
-    /// reference after the reload — so the order survives a CLOSE/OPEN cycle and run-unit termination.
-    /// The not-open '42' guard lives on <see cref="FileConnector.Close"/>.</summary>
+    /// <inheritdoc/>
+    private protected override long ReleaseMint => _st.NextOrdinal;
+
+    /// <summary>The indexed CLOSE body (§14.9.6): a writable mode persists the store with every record's release
+    /// ordinals (<see cref="PersistFrames"/>), so §14.9.30.4 GR26's duplicate retrieval order survives a CLOSE/OPEN
+    /// cycle and run-unit termination. The not-open '42' guard lives on <see cref="FileConnector.Close"/>.</summary>
     protected override string CloseCore()
     {
         // A persist IOException maps to '30' on FileConnector.Close (§9.1.13.6 item 1 — the ONE mapping),
@@ -583,7 +610,7 @@ public sealed class IndexedConnector : KeyedConnector
         // §14.9.51.4 GR42 d) — "When the record that is to be released to the operating environment would reside
         // outside the externally defined boundaries of the physical file, the I-O status … is set to '24'":
         // the store's capacity (Annex A.1 item 107, KeyedConnector.StoreHolds), tested before the release.
-        if (!StoreHolds(_st.RecordBytes + IndexedStore.FrameBytes(stored, extents)))
+        if (!StoreHolds(_st.RecordBytes + IndexedStore.FrameBytes(stored, extents, _alts.Count + 1)))
             return Status = FileStatusCode.BoundaryViolation;              // '24' GR42d
         // §14.9.51.4 GR40 — the WRITE RELEASES the record, so it is positioned last in the duplicate set of
         // EVERY key at once: one fresh ordinal stamped into every slot (the prime slot doubles as the record's
@@ -643,7 +670,8 @@ public sealed class IndexedConnector : KeyedConnector
         // §9.1.13.5 item 4 — a replacing record the store cannot hold (a longer record, §14.9.35.4 GR18) is an
         // attempt to write outside the file's externally-defined boundaries: '24', still inside the validation
         // pass, so nothing below has been repositioned (Annex A.1 item 107).
-        if (!StoreHolds(_st.RecordBytes + IndexedStore.FrameBytes(stored, extents) - IndexedStore.FrameBytes(target.Image, target.Extents)))
+        if (!StoreHolds(_st.RecordBytes + IndexedStore.FrameBytes(stored, extents, target.Ordinals.Length)
+            - IndexedStore.FrameBytes(target.Image, target.Extents, target.Ordinals.Length)))
             return Status = FileStatusCode.BoundaryViolation;                                   // '24'
         // §14.9.35.4 GR24 a) — "When the value of a specific alternate record key is not changed, the order of
         // retrieval when that key is the key of reference remains unchanged" — so ONLY the keys this REWRITE
@@ -820,90 +848,31 @@ public sealed class IndexedConnector : KeyedConnector
     // ── The per-key release-ordinal model (ISO §14.9.30.4 GR26, §14.9.35.4 GR24; kb/Work PB341) ──────────────
 
     /// <summary>The ordinal slot for a key index: 0 the prime key, <c>i + 1</c> the i-th alternate. A record
-    /// stored by a connector that declared FEWER keys reads 0 for the missing slots — unreachable while the
-    /// §12.4.5.6.4 GR3 key count is a fixed file attribute the §14.9.27.4 GR10 conflict check enforces ('39'),
-    /// and a total order either way.</summary>
+    /// released through a connector of this run unit that declared FEWER keys (the store is shared, kb/Work PB143)
+    /// reads 0 for the missing slots — unreachable while the §12.4.5.6.4 GR3 key count is a fixed file attribute the
+    /// §14.9.27.4 GR10 conflict check enforces ('39'), and a total order either way.</summary>
     private static long Ordinal(KeyedRec rec, int keyIndex)
     {
         int slot = keyIndex + 1;
         return (uint)slot < (uint)rec.Ordinals.Length ? rec.Ordinals[slot] : 0;
     }
 
-    /// <summary>Stamp <paramref name="keyIndex"/>'s release ordinal, growing the vector if this connector
-    /// declares keys the stored record predates.</summary>
+    /// <summary>Stamp <paramref name="keyIndex"/>'s release ordinal, growing the vector (through the store, which
+    /// counts its bytes) if this connector declares keys the stored record predates.</summary>
     private void Stamp(KeyedRec rec, int keyIndex, long ordinal)
     {
         int slot = keyIndex + 1;
-        if (slot >= rec.Ordinals.Length) Array.Resize(ref rec.Ordinals, _alts.Count + 1);
+        if (slot >= rec.Ordinals.Length) _st.GrowOrdinals(rec, _alts.Count + 1);
         rec.Ordinals[slot] = ordinal;
     }
 
     /// <summary>A freshly released record's ordinal vector: ONE ordinal in every slot — a WRITE releases the
-    /// record under every key at the same instant (§14.9.51.4 GR40), and a load makes the physical file order
-    /// the release order under every key (§14.9.30.4 GR26).</summary>
+    /// record under every key at the same instant (§14.9.51.4 GR40).</summary>
     private long[] ReleaseOrdinals(long ordinal)
     {
         var ordinals = new long[_alts.Count + 1];
         Array.Fill(ordinals, ordinal);
         return ordinals;
-    }
-
-    /// <summary>The ONE physical order to persist the store in at CLOSE.
-    /// <para>A reload can only give every key the file's own order, so the file has to be written in an order
-    /// that is simultaneously each key's §14.9.30.4 GR26 release order within each of ITS duplicate sets. Those
-    /// per-key orders are independent (§14.9.35.4 GR24 a) keeps an untouched key's order while b) moves the
-    /// record last under a changed one), so this is a topological sort: one edge per adjacent pair of a
-    /// duplicate set, Kahn's algorithm, ties broken by the prime-key ordinal — the record's own release order,
-    /// which is never re-stamped. With no REWRITE repositioning every key's order already IS release order, so
-    /// the result is exactly release order and the on-disk shape is unchanged.</para>
-    /// <para>⛔ RESIDUE: the per-key orders can be made mutually CYCLIC (rewrite one record's key A into another
-    /// record's duplicate set while both stay duplicates under key B), and then NO single sequence of record
-    /// images can carry them — the physical format has one order and the model has one per key. Those records
-    /// are appended in release order, which loses the repositioning of at least one key. Carrying them all needs
-    /// the per-key ordinals in the physical file, which this framing has no slot for.</para></summary>
-    private List<KeyedRec> PersistOrder()
-    {
-        int n = _recs.Count;
-        var order = new List<KeyedRec>(n);
-        int[] byRelease = [.. Enumerable.Range(0, n).OrderBy(i => Ordinal(_recs[i], PrimeKey))];
-        if (n < 2 || _alts.Count == 0)
-        {
-            foreach (int i in byRelease) order.Add(_recs[i]);
-            return order;
-        }
-        // KeyedRec overrides neither Equals nor GetHashCode, so the default comparer IS reference identity.
-        var slotOf = new Dictionary<KeyedRec, int>(n);
-        for (int i = 0; i < n; i++) slotOf[_recs[i]] = i;
-        var successors = new List<int>?[n];
-        var indegree = new int[n];
-        for (int k = 0; k < _alts.Count; k++)
-        {
-            var seq = Ordered(k);   // this key's retrieval sequence — the ONE place that ordering is written
-            for (int j = 1; j < seq.Count; j++)
-            {
-                if (KeyCompare(KeyOf(seq[j - 1], k), KeyOf(seq[j], k), k) != 0)
-                    continue;   // a set boundary constrains nothing — key order alone decides across sets
-                int before = slotOf[seq[j - 1]], after = slotOf[seq[j]];
-                (successors[before] ??= []).Add(after);
-                indegree[after]++;
-            }
-        }
-        var ready = new PriorityQueue<int, long>();
-        foreach (int i in byRelease)
-            if (indegree[i] == 0) ready.Enqueue(i, Ordinal(_recs[i], PrimeKey));
-        var placed = new bool[n];
-        while (ready.TryDequeue(out int i, out _))
-        {
-            order.Add(_recs[i]);
-            placed[i] = true;
-            if (successors[i] is not { } next) continue;
-            foreach (int j in next)
-                if (--indegree[j] == 0) ready.Enqueue(j, Ordinal(_recs[j], PrimeKey));
-        }
-        if (order.Count < n)
-            foreach (int i in byRelease)
-                if (!placed[i]) order.Add(_recs[i]);   // the cyclic residue — see the remark above
-        return order;
     }
 
     /// <summary>The key value at <paramref name="keyIndex"/> (−1 = prime) — an (offset, length) slice of the

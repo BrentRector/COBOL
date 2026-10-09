@@ -1228,7 +1228,9 @@ image, is what every whole-group operation the standard admits over such a group
 §8.8.4.2.17 RELATION: `PlaceRenderer.VarGroupOperand` (the ONE reader of a group operand that meets a
 variable-length group, shared by the MOVE and the comparison) gives each operand's carrier IN ITS OWN SHAPE — a fixed
 group is its record image with no components — with its §8.5.1.12 atoms, and the pair is joined over the TWO shapes
-by the walk that decided it compatible (`GroupCompatibility.Walk`): the MOVE reshapes the sender's carrier into the
+by the walk that decided it compatible (`GroupCompatibility.Walk`, which compares two corresponding tables' elements
+at the byte lengths it MEASURES for the pair, so an element holding a dynamic-capacity table opposite one holding a
+fixed table counts that table at the fixed one's length, §8.5.1.12.3 sentence 3 — kb/Work PB2689): the MOVE reshapes the sender's carrier into the
 receiver's (`CobolVarGroup.Reshape`, `PlaceRenderer.VarGroupInShape` — kb/Work PB2496: handing it over ordinally put
 a dynamic table's occurrences into the receiver's dynamic-length item when the shapes differed), and
 `CobolVarGroup.Compare` walks the corresponding pairs — fixed material and component pairs in order, each a §8.8.4.2.7

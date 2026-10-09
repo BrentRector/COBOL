@@ -475,7 +475,10 @@ fixed-length record sequential file is still plain bytes and a line sequential f
 the interchange property those shapes exist for, and a varying record-sequential file still carries only the
 per-record prefix it always carried.
 
-**The header is VERSION 2 (kb/Work PB1602).** Each key's SUPPRESS WHEN value is stored as its exact UTF-16 code
+**The store format is VERSION 4** (`RecordFraming.FormatVersion`): version 3 (kb/Work PB2660) added the store
+generation, and version 4 (kb/Work PB2693) the release mint and each indexed record's release ordinals; a store of
+any earlier version is Foreign and refused with '39'. **Version 2 (kb/Work PB1602)** set the SUPPRESS WHEN
+encoding the header still uses. Each key's SUPPRESS WHEN value is stored as its exact UTF-16 code
 units behind an Int32 count biased by one (0 = no phrase). The header records what the program DECLARED, and the
 OPEN comparison asks it back, so the encoding must be lossless over the whole repertoire, lone surrogates in a
 national literal included. Version 1 wrote the value through Latin-1: `SUPPRESS WHEN "€€"` was recorded as `??`,
@@ -2394,10 +2397,11 @@ A process-wide registry keyed by external name (with an Area discriminator for r
   14.9.41.4 GR17 e) 1. puts only a KEY VALUE in the file position indicator, so a START-seeded walk enters a
   duplicate set at the end GR26 names for ITS direction - first-released forward, last-released backward - and
   the duplicate-set position of a prior READ is separate connector state, which is what 14.9.30.4 GR21 rules
-  e)/f) name instead of the indicator. CLOSE persists a TOPOLOGICAL order of the per-key duplicate orders
-  (`IndexedConnector.PersistOrder`), so a reload - which can only give every key the file's own order -
-  reproduces all of them; with no REWRITE repositioning that IS release order, byte-identical to before. RESIDUE:
-  the per-key orders can be made mutually cyclic, and one sequence of record images cannot then carry them.
+  e)/f) name instead of the indicator. The persist writes each record's WHOLE ordinal vector in its frame and the
+  release mint in the store header (`RecordFraming`, store format 4; `IndexedConnector.PersistFrames` / `Fill`,
+  kb/Work PB2693), so a reload keeps every key's order exactly - including per-key orders no single sequence of
+  records could carry (GR24 b) can put r2 before r1 under one key and after it under another) - and a connector
+  partway through a duplicate set keeps its place when a coherent reload follows another run unit's DELETE.
 - I-O status discipline (kb/Work PB140): `FileConnector.Status`'s setter is the ONE assignment path — it records `EverAccessed` AND drops the §9.1.13.7 3) '43' gate (READ terminals re-arm through `ReadSucceeded`); openness is the ONE base `_openMode` bit, separate from the `OptionalAbsent` file-position state a CLOSE leaves unchanged (§14.9.6.4 GR6); `FileRegistry` throws on an unregistered or misrouted name (never a fail-open '00' — the SD/organization screens reject at bind time, COBOLNET1692/1693); `FileConnector.Close` maps OS failures to '30' (§9.1.13.6 item 1) with the sequential streams nulled either way; CLOSE WITH LOCK locks only on a successful close.
 - Keyed-verb branch discipline (kb/Work PB325): the ACCESS MODE is the SOLE discriminator of a keyed verb's branch, and it lives in ONE place — `KeyedConnector.Access`, the abstract base `RelativeConnector` and `IndexedConnector` share. Every branch the standard draws inside a keyed verb is drawn on it (§14.9.51.4 GR29 a)/b), GR38/GR39; §14.9.35.4 GR5 vs. GR21/GR22/GR23; §14.9.10.4 GR2 vs. GR3/GR4), and the OPEN MODE enters only as the permission test that FOLLOWS — Table 20 (§14.9.27.4 GR8), whose unsuccessful cells §9.1.13.7 items 8 and 9 name. ⛔ An open mode in a branch PREDICATE inverts that dependency: `_access == Sequential || Mode == Extend` made the runtime's answer depend on an unenforced bind-time screen (§14.9.27.3 SR2) and turned Table 20's blank Random/Dynamic × WRITE × Extend cell into a successful append instead of item 8 b)'s '48'. The whole table is walked by conformance:2023/l1_table20_seq_relative + l1_table20_indexed and, for the cell conforming source cannot reach, unit:Table20WriteOpenModeTests.
 - READ preconditions live in the BASE, once, in the standard's own order (kb/Work PB336). `FileConnector` owns

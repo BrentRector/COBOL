@@ -867,9 +867,10 @@ value of the typed RECORD KEY / RELATIVE KEY field.
   slot per key, slot 0 the prime (assigned at release, never re-stamped, so it doubles as the record's physical
   release order). §14.9.41.4 GR17 e) 1. puts only a KEY VALUE in the file position indicator, so a START-seeded
   walk enters a duplicate set at the end GR26 names for its direction; the duplicate-set position of a prior READ
-  is separate connector state, which is what §14.9.30.4 GR21 rules e)/f) name instead of the FPI. CLOSE persists a
-  topological order of the per-key duplicate orders so a reload — which can only give every key the file's own
-  order — reproduces all of them (kb/Work PB341, PB342).
+  is separate connector state, which is what §14.9.30.4 GR21 rules e)/f) name instead of the FPI. The store
+  PERSISTS each record's ordinal vector with the record, and the release mint in its header (store format 4), so a
+  reload — at the next OPEN, or a coherent connector's reload after another run unit's change — keeps every key's
+  order and every connector's position within a duplicate set (kb/Work PB341, PB342, PB2693).
 - **Multiple 01s under one FD (and SAME RECORD AREA) = a discriminated record-area wrapper:** READ deserializes the
   raw bytes into EVERY 01 view; WRITE serializes the named view. This is the file-edge analogue of REDEFINES (ISO
   §9.1.2 NOTE / §13.18.33 GR3).

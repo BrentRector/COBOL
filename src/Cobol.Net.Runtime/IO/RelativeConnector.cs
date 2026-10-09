@@ -183,7 +183,8 @@ public sealed class RelativeConnector : KeyedConnector
     private protected override KeyedStore AttachedStore => _st;
 
     /// <inheritdoc/>
-    private protected override void Fill(KeyedStore into, List<StoredFrame?> frames)
+    /// <remarks>A relative store has no release order, so <paramref name="releaseMint"/> is not read.</remarks>
+    private protected override void Fill(KeyedStore into, List<StoredFrame?> frames, long releaseMint)
     {
         var store = (RelativeStore)into;
         store.Clear();
@@ -195,6 +196,10 @@ public sealed class RelativeConnector : KeyedConnector
     /// <inheritdoc/>
     /// <remarks>The slots LAZILY, gaps included — never a dense array sized by the highest RRN (kb/Work PB1192).</remarks>
     private protected override IEnumerable<StoredFrame?> PersistFrames() => _st.Ordinal();
+
+    /// <inheritdoc/>
+    /// <remarks>A relative record is identified by its relative record number, never by a release order.</remarks>
+    private protected override long ReleaseMint => 0;
 
     /// <summary>The relative CLOSE body (ISO §14.9.6): a writable mode persists the store — including via the
     /// run-unit-termination <c>CloseAll</c>, which keyed chains (RL208A) depend on. The not-open '42' guard

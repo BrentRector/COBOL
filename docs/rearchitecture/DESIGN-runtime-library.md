@@ -301,10 +301,11 @@ registered by `CobolFile.RegisterReserve`, else `HostFile.ImplementorInputOutput
 its records to the medium as its areas fill; one whose file lock admits another writer releases at every WRITE /
 REWRITE (`SequentialConnector.ReleaseRecord`), so the posture decides WHEN the areas are emptied, never WHETHER they
 exist (before PB643 the areas were the host handle's 4,096-byte buffer in one posture and the reader's default buffer
-in the other, so RESERVE had no one place to land). `OpenConnectorStore(path, mode, access, share, areas)` is a
-RELATIVE or INDEXED connector's long-lived store handle (kb/Work PB771, below), and ITS buffer is that connector's
-areas in every posture: the store is loaded once at the OPEN by a fresh handle and persisted once at the CLOSE, so
-the stale-read hazard that keeps the sequential handle unbuffered cannot arise. `OpenAuxiliary(path, mode, access)` is a short-lived
+in the other, so RESERVE had no one place to land). `OpenConnectorStore(path, mode, access, share)` is a
+RELATIVE or INDEXED connector's long-lived store handle (kb/Work PB771, below), UNBUFFERED: the store is read and
+written positionally (kb/Work PB2660), and every byte of it passes through the connector's own areas,
+`KeyedConnector._areas`, allocated by the OPEN that takes the handle (kb/Work PB2693 — before it the areas were the
+handle's stream buffer, which no store byte passed through). `OpenAuxiliary(path, mode, access)` is a short-lived
 bookkeeping handle over a path a connector may already hold — the shared `OPEN EXTEND` write-base measurement,
 the §14.9.27.4 GR10 store-header read and the varying framing's parse check — and is **always**
 `FileShare.ReadWrite`, because a handle's share mode has to admit the access every outstanding handle already
@@ -535,7 +536,9 @@ run unit's `READ … WITH LOCK` of a record the first held answered `00`, its `R
 the first run unit's CLOSE then rewrote the file from the image it had read at its OPEN — measured on both keyed
 organizations. Three pieces close it, and each lives in one place:
 
-- **The store GENERATION (`RecordFraming.GenerationOffset`, store format 3).** Eight bytes in the fixed header,
+- **The store GENERATION (`RecordFraming.GenerationOffset`, store format 3; format 4 adds the release mint and each
+  indexed record's release ordinals, kb/Work PB2693, so a reload keeps every duplicate order; a format-3 store is
+  Foreign to this build and its OPEN answers '39', with no reader or migration kept, CLAUDE.md rule 4).** Eight bytes in the fixed header,
   stamped by every persist with one more than the generation the file carried at that moment. A run unit compares
   them with the generation its store reflects (`KeyedStore.Generation`) and reloads only when they differ, so a
   statement costs one small positional read, not a whole-store load. It is the cross-run-unit twin of

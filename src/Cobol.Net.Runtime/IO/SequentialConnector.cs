@@ -279,10 +279,20 @@ public sealed class SequentialConnector : FileConnector
     /// <see cref="HostFile.InputOutputAreaBuffer"/>) — the handle beneath it holds none (kb/Work PB643).</summary>
     private StreamReader OpenReader()
     {
-        var r = new StreamReader(HostFile.OpenConnectorStream(HostPath, FileMode.Open,
+        var stream = HostFile.OpenConnectorStream(HostPath, FileMode.Open,
             Mode == FileOpenMode.IO ? FileAccess.ReadWrite : FileAccess.Read, HostShare,
-            Mode == FileOpenMode.IO ? FileOptions.None : FileOptions.SequentialScan), Encoding.Latin1,
-            detectEncodingFromByteOrderMarks: true, HostFile.InputOutputAreaBuffer(InputOutputAreas));
+            Mode == FileOpenMode.IO ? FileOptions.None : FileOptions.SequentialScan);
+        StreamReader r;
+        try
+        {
+            r = new StreamReader(stream, Encoding.Latin1, detectEncodingFromByteOrderMarks: true,
+                HostFile.InputOutputAreaBuffer(InputOutputAreas));
+        }
+        catch
+        {
+            stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
+            throw;
+        }
         // A brand-new handle has read nothing, so it agrees with the medium by construction (kb/Work PB753).
         _coherentAt = Physical?.ReleaseGeneration ?? 0;
         return r;
@@ -300,8 +310,17 @@ public sealed class SequentialConnector : FileConnector
         // The file coded character set's STRICT encoding (kb/Work PB690): every write arm refuses a record holding
         // a character with no byte image before it reaches this writer ('91' / '71'), so the exception fallback is
         // the guard that keeps that refusal the only answer — never Latin-1's silent '?'.
-        return new StreamWriter(HostFile.OpenConnectorWriteStream(HostPath, mode, HostShare),
-            FileCharacterSet.Medium, HostFile.InputOutputAreaBuffer(InputOutputAreas)) { NewLine = _lineEnd };
+        var stream = HostFile.OpenConnectorWriteStream(HostPath, mode, HostShare);
+        try
+        {
+            return new StreamWriter(stream, FileCharacterSet.Medium, HostFile.InputOutputAreaBuffer(InputOutputAreas))
+                { NewLine = _lineEnd };
+        }
+        catch
+        {
+            stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
+            throw;
+        }
     }
 
     /// <summary>The count of records ALREADY IN the physical file, in the framing this connector reads — the

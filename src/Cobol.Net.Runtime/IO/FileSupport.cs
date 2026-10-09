@@ -383,16 +383,15 @@ public static class HostFile
 
     /// <summary>A RELATIVE or INDEXED connector's own long-lived handle — its §9.1.15 file lock, the ONE handle its
     /// whole store is loaded and persisted through (kb/Work PB771), and the handle its cross-run-unit store mutex
-    /// and record locks are held by (kb/Work PB2660). Its stream buffer is sized as the connector's input-output
-    /// areas (<see cref="InputOutputAreaBuffer"/>), but the store's bytes never pass through it: the load and the
-    /// persist are POSITIONAL reads and writes on the handle (<c>KeyedConnector.Load</c>/<c>Persist</c>), because a
-    /// connector that may meet another run unit's writer re-reads a file that run unit has rewritten, and a stream
-    /// buffer would hand back the superseded bytes — the hazard that keeps the sequential read handle
-    /// (<see cref="OpenConnectorStream"/>) unbuffered. <paramref name="share"/> is
-    /// <see cref="FileConnector.HostShare"/>, the posture <see cref="FileLockPosture"/> derived.</summary>
-    public static FileStream OpenConnectorStore(string hostPath, FileMode mode, FileAccess access,
-        FileShare share, int areas) =>
-        new(hostPath, mode, access, share, InputOutputAreaBuffer(areas), FileOptions.None);
+    /// and record locks are held by (kb/Work PB2660). UNBUFFERED, like the sequential read handle
+    /// (<see cref="OpenConnectorStream"/>): the load and the persist are POSITIONAL reads and writes on the handle,
+    /// passing through the connector's own input-output areas (<c>KeyedConnector._areas</c>, sized by
+    /// <see cref="InputOutputAreaBuffer"/>; kb/Work PB2693), because a connector that may meet another run unit's
+    /// writer re-reads a file that run unit has rewritten, and a stream buffer would hand back the superseded bytes.
+    /// <paramref name="share"/> is <see cref="FileConnector.HostShare"/>, the posture <see cref="FileLockPosture"/>
+    /// derived.</summary>
+    public static FileStream OpenConnectorStore(string hostPath, FileMode mode, FileAccess access, FileShare share) =>
+        new(hostPath, mode, access, share, bufferSize: 1, FileOptions.None);
 
     // ── The input-output areas (ISO §12.4.5.14) ───────────────────────────────────────────────────────────────
 
@@ -418,7 +417,8 @@ public static class HostFile
     /// <summary>⛔ THE ONE SIZE OF A CONNECTOR'S INPUT-OUTPUT AREAS — ISO §12.4.5.14.3 GR1, <i>"If the RESERVE clause
     /// is specified, the number of input-output areas allocated is equal to the value of integer-1"</i>:
     /// <paramref name="areas"/> areas of <see cref="InputOutputAreaBytes"/>, as the one buffer the connector keeps
-    /// between its record area and the medium (the sequential reader's and writer's, the keyed store handle's).</summary>
+    /// between its record area and the medium (the sequential reader's and writer's; the buffer a relative or
+    /// indexed store's load and persist pass through).</summary>
     public static int InputOutputAreaBuffer(int areas)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(areas, 1);

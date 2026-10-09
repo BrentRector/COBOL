@@ -141,14 +141,18 @@ public abstract class KeyedConnector : FileConnector
     /// <para><paramref name="create"/> is §14.9.27.4 GR17/GR18's creation — the OUTPUT arm and the absent
     /// OPTIONAL I-O/EXTEND arms — and is the only difference between the arms, because the store's own
     /// truncation is <see cref="Persist"/>'s.</para>
-    /// <para>The handle's buffer is this connector's input-output areas (ISO §12.4.5.14.3 GR1;
-    /// <see cref="HostFile.OpenConnectorStore"/>, kb/Work PB643).</para></summary>
+    /// <para>The same OPEN allocates this connector's input-output areas (ISO §12.4.5.14.3 GR1; <see cref="_areas"/>,
+    /// kb/Work PB643, PB2693), the buffer every byte of the store passes through between the handle and the store.</para></summary>
     /// <returns>The handle, so the arm that took it writes its store through that value rather than through a
     /// nullable field it has to re-assert.</returns>
     protected FileStream TakeFileLock(bool create)
     {
+        // The areas first: an allocation that fails (a RESERVE the host cannot commit) must fail before a handle is
+        // taken, because nothing would dispose a handle that never reached _store (train 1045 review).
+        var areas = new byte[HostFile.InputOutputAreaBuffer(InputOutputAreas)];
         var taken = HostFile.OpenConnectorStore(HostPath, create ? FileMode.OpenOrCreate : FileMode.Open,
-            HostAccess(Mode), HostShare, InputOutputAreas);
+            HostAccess(Mode), HostShare);
+        _areas = areas;
         _store?.Dispose();   // no arm takes it twice; belt-and-braces so a future one cannot leak
         _store = taken;
         // Taken ONCE: the store is read and written positionally through it (never through the stream's buffer,
@@ -166,8 +170,19 @@ public abstract class KeyedConnector : FileConnector
         // The field is cleared whatever the disposal throws (a final flush refused on an exhausted medium — the
         // disposal still closes the host handle), so a later CLOSE or re-OPEN never meets a disposed handle.
         try { _store?.Dispose(); }
-        finally { _store = null; _handle = null; _coherent = false; }
+        finally { _store = null; _handle = null; _coherent = false; _areas = null; }
     }
+
+    /// <summary>⛔ THIS CONNECTOR'S INPUT-OUTPUT AREAS — ISO §12.4.5.14.3 GR1, <i>"If the RESERVE clause is specified,
+    /// the number of input-output areas allocated is equal to the value of integer-1"</i> — allocated by the OPEN that
+    /// takes the file lock (<see cref="TakeFileLock"/>; a run unit that cannot supply them gets '30' on that OPEN,
+    /// <c>FileConnector.Open</c>) and released by the CLOSE. Every byte of the store passes through them: the load
+    /// reads the file one buffer of areas at a time (<see cref="ReadImage"/>) and the persist writes it the same way
+    /// (<see cref="Persist"/>), positionally on the handle, because a stream buffer would hand back bytes another
+    /// run unit has since replaced (kb/Work PB2660). Until kb/Work PB2693 the areas were the HANDLE's stream buffer,
+    /// which no store byte ever passed through, so RESERVE allocated memory nothing used. Null while the connector
+    /// holds no file lock.</summary>
+    private byte[]? _areas;
 
     /// <inheritdoc/>
     protected override void AbandonOpen() => ReleaseFileLock();
@@ -222,11 +237,16 @@ public abstract class KeyedConnector : FileConnector
 
     /// <summary>Replace the records of <paramref name="into"/> with <paramref name="frames"/>, the physical file's
     /// frames in ordinal order — the organization's half of a load or a reload. The store is the SHARED one, so
-    /// every connector of the run unit attached to it sees the reload, which is the point.</summary>
-    private protected abstract void Fill(KeyedStore into, List<StoredFrame?> frames);
+    /// every connector of the run unit attached to it sees the reload, which is the point.
+    /// <paramref name="releaseMint"/> is the file's release mint (<c>RecordFraming.ReleaseMintOffset</c>).</summary>
+    private protected abstract void Fill(KeyedStore into, List<StoredFrame?> frames, long releaseMint);
 
     /// <summary>The store's frames in the order the organization persists them (null = a relative gap).</summary>
     private protected abstract IEnumerable<StoredFrame?> PersistFrames();
+
+    /// <summary>The release mint the persist records with the frames: an indexed store's next release ordinal, 0 for
+    /// a relative store (kb/Work PB2693).</summary>
+    private protected abstract long ReleaseMint { get; }
 
     /// <inheritdoc/>
     internal override SafeFileHandle? RecordLockHandle => _handle;
@@ -338,7 +358,8 @@ public abstract class KeyedConnector : FileConnector
 
     private void Reload(KeyedStore store)
     {
-        Fill(store, ReadImage(store));
+        var frames = ReadImage(store, out long releaseMint);
+        Fill(store, frames, releaseMint);
         store.PersistedVersion = store.Version;
     }
 
@@ -349,7 +370,7 @@ public abstract class KeyedConnector : FileConnector
     {
         if (_handle is null)
         {
-            Fill(into, []);
+            Fill(into, [], releaseMint: 0);
             into.PersistedVersion = into.Version;
             return;
         }
@@ -374,8 +395,9 @@ public abstract class KeyedConnector : FileConnector
         try
         {
             ulong generation = (ReadGeneration() ?? store.Generation) + 1;
-            using var image = RecordFraming.ComposeStore(DeclaredAttributes, PersistFrames(), generation, CodeSet);
-            RandomAccess.Write(handle, new ReadOnlySpan<byte>(image.GetBuffer(), 0, (int)image.Length), 0);
+            using var image = RecordFraming.ComposeStore(DeclaredAttributes, PersistFrames(), generation, ReleaseMint,
+                CodeSet);
+            WriteThroughAreas(handle, new ReadOnlySpan<byte>(image.GetBuffer(), 0, (int)image.Length));
             RandomAccess.SetLength(handle, image.Length);
             store.Generation = generation;
             store.PersistedVersion = store.Version;
@@ -390,9 +412,10 @@ public abstract class KeyedConnector : FileConnector
         if (store.Version != store.PersistedVersion) Persist(store);
     }
 
-    /// <summary>The whole physical file, in ONE positional read under the caller's mutex, decoded; the store is
-    /// stamped with the generation the image carries.</summary>
-    private List<StoredFrame?> ReadImage(KeyedStore into)
+    /// <summary>The whole physical file, read positionally through the input-output areas under the caller's mutex,
+    /// decoded; the store is stamped with the generation the image carries and <paramref name="releaseMint"/> receives
+    /// its release mint.</summary>
+    private List<StoredFrame?> ReadImage(KeyedStore into, out long releaseMint)
     {
         var handle = _handle!;
         int size = checked((int)RandomAccess.GetLength(handle));
@@ -401,15 +424,46 @@ public abstract class KeyedConnector : FileConnector
         byte[] all = ArrayPool<byte>.Shared.Rent(Math.Max(size, 1));
         try
         {
-            int got = ReadAt(handle, all.AsSpan(0, size), 0);
+            int got = ReadThroughAreas(handle, all.AsSpan(0, size));
             into.Generation = RecordFraming.DecodeGeneration(all.AsSpan(0, got)) ?? 0;
-            return RecordFraming.DecodeStore(all, got, CodeSet);
+            return RecordFraming.DecodeStore(all, got, out releaseMint, CodeSet);
         }
         finally { ArrayPool<byte>.Shared.Return(all); }
     }
 
+    /// <summary>Fill <paramref name="into"/> from the start of the file through the input-output areas
+    /// (<see cref="_areas"/>), one buffer of areas per positional read, until it is full or the file ends; returns the
+    /// bytes read.</summary>
+    private int ReadThroughAreas(SafeFileHandle handle, Span<byte> into)
+    {
+        var areas = _areas!;
+        int total = 0;
+        while (total < into.Length)
+        {
+            int n = RandomAccess.Read(handle, areas.AsSpan(0, Math.Min(areas.Length, into.Length - total)), total);
+            if (n <= 0) break;
+            areas.AsSpan(0, n).CopyTo(into[total..]);
+            total += n;
+        }
+        return total;
+    }
+
+    /// <summary>Write <paramref name="from"/> at the start of the file through the input-output areas
+    /// (<see cref="_areas"/>), one buffer of areas per positional write.</summary>
+    private void WriteThroughAreas(SafeFileHandle handle, ReadOnlySpan<byte> from)
+    {
+        var areas = _areas!;
+        for (int at = 0; at < from.Length; at += areas.Length)
+        {
+            int n = Math.Min(areas.Length, from.Length - at);
+            from.Slice(at, n).CopyTo(areas);
+            RandomAccess.Write(handle, new ReadOnlySpan<byte>(areas, 0, n), at);
+        }
+    }
+
     /// <summary>Fill <paramref name="into"/> from <paramref name="offset"/> until it is full or the file ends;
-    /// returns the bytes read.</summary>
+    /// returns the bytes read. Only the generation probe reads this way: it is the coherence stamp, not a transfer
+    /// of the store.</summary>
     private static int ReadAt(SafeFileHandle handle, Span<byte> into, long offset)
     {
         int total = 0;

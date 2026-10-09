@@ -161,14 +161,15 @@ public sealed class FileBoundaryTests : IDisposable
         Assert.Equal([null, null, "ABCDEFG", null, "ABCD"], store.Ordinal().Select(f => f?.Image));
     }
 
-    /// <summary>The indexed store's running size agrees with the composed image through Add, Replace and Remove.</summary>
+    /// <summary>The indexed store's running size agrees with the composed image through Add, Replace and Remove —
+    /// each frame with its release ordinals, one per key (kb/Work PB2693).</summary>
     [Fact]
     public void IndexedStore_RecordBytes_IsTheComposedSize()
     {
         var attributes = new IndexedConnector("i.dat", 8, KeyedAccess.Random, 0, 4, varyMin: 4, varyMax: 8).DeclaredAttributes;
         var store = new IndexedStore();
-        var a = new KeyedRec { Image = "K001AAAA" };
-        var b = new KeyedRec { Image = "K002", Extents = RecordFraming.VoidExtents(1) };
+        var a = new KeyedRec { Image = "K001AAAA", Ordinals = [1] };
+        var b = new KeyedRec { Image = "K002", Extents = RecordFraming.VoidExtents(1), Ordinals = [2] };
         store.Add(a);
         store.Add(b);
         Check();
@@ -180,14 +181,37 @@ public sealed class FileBoundaryTests : IDisposable
         Check();
 
         void Check() => Assert.Equal(RecordFraming.HeaderBytes(attributes) + store.RecordBytes,
-            Composed(attributes, store.Recs.Select(r => (StoredFrame?)new StoredFrame(r.Image, r.Extents))));
+            Composed(attributes, store.Recs.Select(r => (StoredFrame?)new StoredFrame(r.Image, r.Extents, r.Ordinals))));
     }
 
-    /// <summary>The relative boundary, exactly: a 4-character fixed record's store is a 28-byte header (format 3,
-    /// whose last 8 bytes are the generation stamp — kb/Work PB2660), a 4-byte gap tag for every empty slot below the
-    /// record and the record's own 8-byte frame — so RRN 536 870 889 is the last that fits
-    /// <see cref="RecordFraming.MaxStoreBytes"/> (2 147 483 588 bytes) and 536 870 890 the first that does not
-    /// (2 147 483 592). Beyond the store, GR29 b)'s highest permitted RRN (2 147 483 647) splits
+    /// <summary>An indexed store keeps every record's release ordinals and its release mint through the framing
+    /// (kb/Work PB2693): the §14.9.30.4 GR26 order of each key's duplicates is one number per record PER KEY, which the
+    /// order of the frames alone cannot carry. A frame whose vector does not match the header's key count is refused
+    /// before anything is composed, because the decoder locates every later frame by that count.</summary>
+    [Fact]
+    public void IndexedStore_Framing_CarriesTheReleaseOrdinals()
+    {
+        var c = new IndexedConnector("i.dat", 8, KeyedAccess.Random, 0, 4, varyMin: -1, varyMax: -1);
+        c.AddAlternateKey(4, 1, duplicates: true);
+        var attributes = c.DeclaredAttributes;
+        Assert.Equal(2, RecordFraming.OrdinalSlots(attributes));
+        using var ms = RecordFraming.ComposeStore(attributes,
+            [new StoredFrame("K001D   ", null, [1, 7]), new StoredFrame("K002D   ", null, [2, 2])],
+            generation: 5, releaseMint: 8);
+        var back = RecordFraming.DecodeStore(ms.GetBuffer(), (int)ms.Length, out long mint);
+        Assert.Equal(8, mint);
+        Assert.Equal([1L, 7L], back[0]!.Value.Ordinals!);
+        Assert.Equal([2L, 2L], back[1]!.Value.Ordinals!);
+        Assert.Equal("K002D   ", back[1]!.Value.Image);
+        Assert.Throws<InvalidOperationException>(() => RecordFraming.ComposeStore(attributes,
+            [new StoredFrame("K001D   ", null, [1])], generation: 0, releaseMint: 2));
+    }
+
+    /// <summary>The relative boundary, exactly: a 4-character fixed record's store is a 36-byte header (format 4,
+    /// whose generation stamp — kb/Work PB2660 — and release mint — kb/Work PB2693 — take its last 16 bytes), a 4-byte
+    /// gap tag for every empty slot below the record and the record's own 8-byte frame — so RRN 536 870 887 is the
+    /// last that fits <see cref="RecordFraming.MaxStoreBytes"/> (2 147 483 588 bytes) and 536 870 888 the first that
+    /// does not (2 147 483 592). Beyond the store, GR29 b)'s highest permitted RRN (2 147 483 647) splits
     /// '24' (a relative record number that does not fit — the invalid key condition) from '34' (one that is not
     /// permitted at all). Nothing is released by either, so the CLOSE persists only the in-bounds record.</summary>
     [Fact]
@@ -195,14 +219,14 @@ public sealed class FileBoundaryTests : IDisposable
     {
         var c = new RelativeConnector(Host("rel.dat"), 4, KeyedAccess.Random, 18);
         long header = RecordFraming.HeaderBytes(c.DeclaredAttributes);
-        Assert.Equal(28, header);
+        Assert.Equal(36, header);
         var probe = new RelativeStore();
         var four = new StoredFrame("ABCD", null);
-        Assert.True(header + probe.FramedBytesAfterPut(536_870_889, four) <= RecordFraming.MaxStoreBytes);
-        Assert.True(header + probe.FramedBytesAfterPut(536_870_890, four) > RecordFraming.MaxStoreBytes);
+        Assert.True(header + probe.FramedBytesAfterPut(536_870_887, four) <= RecordFraming.MaxStoreBytes);
+        Assert.True(header + probe.FramedBytesAfterPut(536_870_888, four) > RecordFraming.MaxStoreBytes);
 
         Assert.Equal(FileStatusCode.Success, c.Open(FileOpenMode.Output));
-        c.SetPendingKey(536_870_890);
+        c.SetPendingKey(536_870_888);
         Assert.Equal(FileStatusCode.BoundaryViolation, c.Write("ABCD"));
         c.SetPendingKey(RelativeConnector.HighestRelativeRecordNumber);
         Assert.Equal(FileStatusCode.BoundaryViolation, c.Write("ABCD"));
@@ -347,7 +371,7 @@ public sealed class FileBoundaryTests : IDisposable
 
     private static long Composed(FixedFileAttributes attributes, IEnumerable<StoredFrame?> frames)
     {
-        using var ms = RecordFraming.ComposeStore(attributes, frames, generation: 0);
+        using var ms = RecordFraming.ComposeStore(attributes, frames, generation: 0, releaseMint: 0);
         return ms.Length;
     }
 }
