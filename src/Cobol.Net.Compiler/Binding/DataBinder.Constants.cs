@@ -758,16 +758,27 @@ public sealed partial class DataBinder
         string phrase, string written, string where, bool demanded, out bool waits)
     {
         waits = false;
-        DataItem? item = resolver.FindItem(baseName, qualifiers);
+        // A subordinate a TYPE or SAME AS clause supplies exists once its subject is composed (kb/Work PB2844):
+        // `M OF V` with `01 V TYPE T.` names T's M, copied under V only when V's clause is expanded.
+        DataItem? FindComposed() => resolver.FindItem(baseName, qualifiers)
+            ?? (ComposePendingSubjectsAhead() ? resolver.FindItem(baseName, qualifiers) : null);
+        DataItem? item = FindComposed();
         if (item is null && ReportEntryCandidates(baseName, qualifiers) is { Count: > 0 } reportEntries)
             return ReportLengthOperand(reportEntries, baseName, phrase, written, where, demanded, out waits);
-        if (item is null && IsDescribedLater(baseName))
+        // Any word of the reference may be described later: the data-name, or a qualifier whose TYPE or SAME AS clause
+        // supplies a data-name its type declaration already declared (`M OF V` with `01 V TYPE T.` after the constant).
+        string[] words = [baseName, .. qualifiers];
+        string? laterWord = item is null ? words.FirstOrDefault(IsDescribedLater) : null;
+        if (laterWord is not null)
         {
             if (!demanded) { waits = true; return null; }
-            // Both orders are asked (`|`, not `||`): the name may be declared in a record not yet begun AND later in
-            // the record being described, and qualification picks among them once all are bound.
-            if (BindLaterRecords(baseName) | BindLaterEntriesOfOpenRecord(baseName))
-                item = resolver.FindItem(baseName, qualifiers);
+            // Both orders are asked (`|`, not `||`): a word may be declared in a record not yet begun AND later in the
+            // record being described, and qualification picks among them once all are bound.
+            bool bound = false;
+            foreach (var word in words.Where(IsDescribedLater))
+                bound |= BindLaterRecords(word) | BindLaterEntriesOfOpenRecord(word);
+            if (bound) item = FindComposed();
+            laterWord = item is null ? words.FirstOrDefault(IsDescribedLater) : null;
         }
         // A group an earlier constant bound ahead ALONE is completed before it is measured (kb/Work PB1941).
         if (item is not null) CompletePreboundGroup(item);
@@ -779,10 +790,10 @@ public sealed partial class DataBinder
                 + "shall not be dependent, directly or indirectly, upon the value of constant-name-1)");
             return null;
         }
-        if (item is null && IsDescribedLater(baseName))
+        if (laterWord is not null)
         {
             Edition.Error(DiagnosticCatalog.ConstantLengthOperandBoundLater, $"{where}: {phrase} '{written}' — "
-                + $"'{baseName}' is described later, subordinate to the entry whose description references "
+                + $"'{laterWord}' is described later, subordinate to the entry whose description references "
                 + $"'{constantName}'; measuring an item subordinate to that open entry out of source order is "
                 + "recognized but not yet implemented");
             return null;

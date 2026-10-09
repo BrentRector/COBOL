@@ -57,6 +57,20 @@ public sealed partial class DataBinder
     {
         for (var d = item; d is not null; d = d.Parent)
             if (_completedAhead.Contains(d)) return;
+        ComposeAhead(item);
+        // The walks below replace each entry's PICTURE profile with the effective one; a later TYPE or SAME AS clause
+        // that names an entry of this subtree copies the profile as written (CopyEntryDescription).
+        foreach (var d in PreOrder(item)) _picAsWrittenAhead.TryAdd(d, d.Pic);
+        UsageInheritanceWalk(item, InheritedUsageAt(item));
+        InheritSignWalk(item, InheritedSignAt(item));
+        _completedAhead.Add(item);
+    }
+
+    /// <summary>The COMPOSITION half of <see cref="CompleteDescriptionAhead"/>: <paramref name="item"/>'s subtree gets its
+    /// §13.16.3 SR9 implied PICTUREs and its TYPE and SAME AS expansions, in the pipeline's order. Every step is idempotent
+    /// (an expanded clause is marked expanded), so the pipeline passes over what this did.</summary>
+    private void ComposeAhead(DataItem item)
+    {
         // §13.18.57.4 GR3 makes a type declaration's implied PICTURE part of the description a TYPE clause copies, so
         // the declarations this subtree may copy own theirs first — the pipeline's order (SynthesizeImpliedPictures
         // before ExpandTypes). A declaration whose description is still open is not complete and copies nothing yet.
@@ -66,12 +80,24 @@ public sealed partial class DataBinder
         // ExpandTypes' order: every TYPE clause, then every SAME AS clause (a SAME AS source copies its expanded TYPE).
         foreach (var typed in PreOrder(item).Where(i => i.TypeRefName is not null).ToList()) ExpandType(typed);
         foreach (var sameAs in PreOrder(item).Where(i => i.SameAsName is not null).ToList()) ExpandSameAs(sameAs, []);
-        // The walks below replace each entry's PICTURE profile with the effective one; a later TYPE or SAME AS clause
-        // that names an entry of this subtree copies the profile as written (CopyEntryDescription).
-        foreach (var d in PreOrder(item)) _picAsWrittenAhead.TryAdd(d, d.Pic);
-        UsageInheritanceWalk(item, InheritedUsageAt(item));
-        InheritSignWalk(item, InheritedSignAt(item));
-        _completedAhead.Add(item);
+    }
+
+    /// <summary>⛔ A LENGTH OPERAND MAY BE A SUBORDINATE THAT A TYPE OR SAME AS CLAUSE SUPPLIES (kb/Work PB2844).
+    /// §13.18.57.4 GR2 a) makes a TYPE'd group's subject "a group whose subordinate elements have the same names,
+    /// descriptions, and hierarchy as the subordinate elements of type-name-1" (§13.18.49.4 GR2 a) says the same of SAME
+    /// AS), so `01 V TYPE T.` has the subordinate `M OF V` — but those subordinates exist only once the clause is
+    /// expanded, and the pipeline expands after the DATA DIVISION is bound, while a constant's length phrase is
+    /// evaluated during it. When a length operand's name finds no item, every bound subject whose composition is still
+    /// pending (outside a type declaration, which <see cref="ExpandTemplate"/> composes, and outside an open
+    /// description, which is not complete) is composed now (<see cref="ComposeAhead"/>); true when one was.</summary>
+    private bool ComposePendingSubjectsAhead()
+    {
+        var pending = _entryItems.Values
+            .Where(i => (i.TypeRefName is not null || i.SameAsName is not null)
+                && !InTypeDeclaration(i) && !IsDescriptionOpen(i))
+            .ToList();
+        foreach (var subject in pending) ComposeAhead(subject);
+        return pending.Count > 0;
     }
 
     /// <summary>Bind, out of source order, the type declaration <paramref name="typeName"/> names when the section walk
