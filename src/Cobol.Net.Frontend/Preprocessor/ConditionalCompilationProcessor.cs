@@ -98,7 +98,7 @@ public static partial class ConditionalCompilationProcessor
     {
         var run = new Run(leaveDirectives, diagnostics, sourcePath, copyProcessor,
             dialectLevel, permissive, inputs, implicitOps);
-        var expanded = run.Render(text);
+        var expanded = run.Render(text, new DivisionCursor(startsInIdentificationDivision: true));   // a source text begins in an IDENTIFICATION DIVISION
         var resultant = CopyProcessor.ApplyReplaceStatements(expanded, diagnostics, EditionInfo.Of(dialectLevel, permissive));   // Step 3 — REPLACE over the expanded compilation group
         if (run.Encounters.Count == 0) return new ConditionalCompilationResult(resultant, [], []);
         // Each encounter's line in the driver's OUTPUT frame, carried through REPLACE (which may drop and join lines)
@@ -209,11 +209,16 @@ public static partial class ConditionalCompilationProcessor
         /// (COPY-expanded when interleaving) at each directive/omitted-line boundary — a COPY statement always lies
         /// wholly within one emitting block, so multi-line COPY REPLACING and mid-line COPY are handled by the
         /// copybook engine's char scan.</summary>
-        public string Render(string text) => Render(MappedText.Identity(text, _diag.SourcePath ?? "<source>")).Text;
+        public string Render(string text)
+            => Render(MappedText.Identity(text, _diag.SourcePath ?? "<source>"), new DivisionCursor(startsInIdentificationDivision: true)).Text;
 
         /// <summary>The MAPPED render (kb/Work PB82): every output line carries the origin of the input line it came
-        /// from — an omitted or directive line its own, a block its lines', a copybook expansion the copybook's.</summary>
-        public MappedText Render(MappedText input)
+        /// from — an omitted or directive line its own, a block its lines', a copybook expansion the copybook's.
+        /// <paramref name="division"/> is the cursor of THIS text — the source text, which begins in an IDENTIFICATION
+        /// DIVISION, or a copybook, which begins in the division its COPY statement stands in — and every block the text
+        /// is flushed in reads it in turn, so a COPY after a directive line is judged by the whole text before it
+        /// (kb/Work PB2739).</summary>
+        public MappedText Render(MappedText input, DivisionCursor division)
         {
             // §7.3.16.3 SR7 / §7.3.13.3 SR9 (kb/Work PB1363): every text this driver renders — the source text and
             // each incorporated copybook — is ONE library text, and the directives OPENED in it shall be closed in it.
@@ -241,7 +246,7 @@ public static partial class ConditionalCompilationProcessor
                 _flushBase = _renderBase + output.Count;
                 MappedText expanded = _copy is null
                     ? blockText
-                    : _copy.ExpandCopiesOneLevel(blockText, _alreadyIncluded, _depth, RenderCopybook);
+                    : _copy.ExpandCopiesOneLevel(blockText, _alreadyIncluded, _depth, division, RenderCopybook);
                 output.AddRange(expanded.Text.Split('\n'));
                 outputOrigins.AddRange(expanded.Lines);
             }
@@ -543,12 +548,12 @@ public static partial class ConditionalCompilationProcessor
         /// (its path and physical lines — kb/Work PB82). <paramref name="lineOffset"/> is the line of the block's
         /// expansion at which the copybook is spliced, so a directive inside it is recorded at its output-frame
         /// line (kb/Work PB1066).</summary>
-        private MappedText RenderCopybook(MappedText copybookText, int depth, int lineOffset)
+        private MappedText RenderCopybook(MappedText copybookText, int depth, int lineOffset, DivisionCursor division)
         {
             (int savedDepth, int savedRenderBase, int savedFlushBase) = (_depth, _renderBase, _flushBase);
             _depth = depth;
             _renderBase = _flushBase + lineOffset;   // the copybook's first line in the output frame (kb/Work PB1066)
-            var result = Render(copybookText);
+            var result = Render(copybookText, division);
             (_depth, _renderBase, _flushBase) = (savedDepth, savedRenderBase, savedFlushBase);
             return result;
         }

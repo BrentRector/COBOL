@@ -414,7 +414,9 @@
   "pb2506_signed_comma_decimal_argument",
   "pb845_national_bit_user_words",
   "pb2610_go_to_before_conditional",
-  "pb2553_sum_counter_character_cell"
+  "pb2553_sum_counter_character_cell",
+  "pb2739_indented_division_header_remarks",
+  "pb2739_data_name_ending_id_then_copy"
  ],
  "pending": []
 }

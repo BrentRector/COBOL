@@ -25,10 +25,13 @@ internal static class CompilationUnitStart
     public static bool IsAt(string trimmed)
         => CobolNames.StartsWith(trimmed, "IDENTIFICATION DIVISION")
         || CobolNames.StartsWith(trimmed, "ID DIVISION")
-        || CobolNames.StartsWith(trimmed, "PROGRAM-ID")
-        || CobolNames.StartsWith(trimmed, "CLASS-ID")
-        || CobolNames.StartsWith(trimmed, "FUNCTION-ID")
-        || CobolNames.StartsWith(trimmed, "INTERFACE-ID");
+        || UnitParagraphNames.Any(name => CobolNames.StartsWith(trimmed, name));
+
+    /// <summary>The paragraphs that open a compilation unit's identification division when its header is left out
+    /// (§11.2.1 General format: program-id-paragraph, function-id-paragraph, class-id-paragraph,
+    /// interface-id-paragraph). The one list: <see cref="DivisionCursor"/> reads it too, adding METHOD-ID, which opens a
+    /// unit NESTED in a class definition.</summary>
+    public static readonly IReadOnlyList<string> UnitParagraphNames = ["PROGRAM-ID", "CLASS-ID", "FUNCTION-ID", "INTERFACE-ID"];
 
     /// <summary>The 1-based line of the first compilation unit of <paramref name="text"/>, or <see cref="int.MaxValue"/>
     /// when none begins — for a text with NO <c>&gt;&gt;COBOL-WORDS</c> directive left in it, where no synonym can spell a

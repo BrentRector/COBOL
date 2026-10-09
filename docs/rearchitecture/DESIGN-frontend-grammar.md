@@ -879,7 +879,13 @@ reference formats, and the only place source comments are recognized. Its model:
   only in an IDENTIFICATION DIVISION, so library text is converted starting in the division its COPY statement stands in
   (`DivisionCursor` reads it off the text-words before the COPY; `CopyProcessor` hands it to the shared walker, and the
   state is carried across a text's SOURCE FORMAT segments) — a `REMARKS.` paragraph copied into a PROCEDURE DIVISION is
-  program text; and the `D` indicator is
+  program text. `DivisionCursor` is the ONE rule for which division a text is in (kb/Work PB2739), fed by the fixed-form
+  converter line by line and by the COPY driver over logical text: a `DIVISION` word preceded by `IDENTIFICATION` / `ID`
+  enters, any other `… DIVISION` leaves, and `PROGRAM-ID` / `CLASS-ID` / `FUNCTION-ID` / `INTERFACE-ID` / `METHOD-ID`
+  enter (the header being optional, §11.2.1) — wherever the word begins in the program-text area (§6.3.1 draws no Area A
+  line), a word merely ending in `-ID` being a user's name; only the comment-entry paragraph's start and end are Area-A
+  facts. The cursor belongs to a TEXT, not to a block the merged driver flushes between directive lines; a spliced library
+  text hands its end division back to the text it was spliced into. And the `D` indicator is
   gated by the registry row `debugging-line-removed-2014` (accepted at 85, obsolete at 2002 — COBOLNET0903 — removed at
   2014 — COBOLNET0902; the NIST S / Y letters are the CCVS dialect, never gated, and excluded as comment lines). A `D`
   line is NOT decided here (kb/Work PB1705, owner decision R56): the clause that makes it source is further down the text

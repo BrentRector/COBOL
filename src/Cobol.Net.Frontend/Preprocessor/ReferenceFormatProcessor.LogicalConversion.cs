@@ -31,16 +31,16 @@ public static partial class ReferenceFormatProcessor
         /// its free-text body is commentary until the next Area-A header. See <see cref="CommentEntryParagraphs"/>.</summary>
         private bool _inCommentEntry;
 
-        /// <summary>True while the text is in an IDENTIFICATION DIVISION — the only place a comment-entry paragraph
-        /// exists (kb/Work PB1494: a PROCEDURE DIVISION paragraph named REMARKS was dropped with every line after it).
-        /// A source text starts in one (a program's IDENTIFICATION DIVISION header is where it begins), library text in
-        /// the division its COPY statement stands in (<see cref="DivisionCursor"/>), an IDENTIFICATION / ID DIVISION
-        /// header or a <c>*-ID</c> paragraph re-enters it, and any other division header leaves it.</summary>
-        private bool _inIdentificationDivision = startsInIdentificationDivision;
+        /// <summary>Which division the text read so far is in — the one rule the COPY driver shares
+        /// (<see cref="DivisionCursor"/>, kb/Work PB2739). A comment-entry paragraph exists only in an IDENTIFICATION
+        /// DIVISION (kb/Work PB1494: a PROCEDURE DIVISION paragraph named REMARKS was dropped with every line after it). A
+        /// source text starts in one (a program's IDENTIFICATION DIVISION header is where it begins), library text in the
+        /// division its COPY statement stands in.</summary>
+        private readonly DivisionCursor _division = new(startsInIdentificationDivision);
 
         /// <summary>Whether the text read so far ends in an IDENTIFICATION DIVISION — the state the next SOURCE FORMAT
         /// segment of the same text starts in.</summary>
-        public bool InIdentificationDivision => _inIdentificationDivision;
+        public bool InIdentificationDivision => _division.InIdentificationDivision;
 
         /// <summary>Convert the lines of one text — a whole file, one SOURCE FORMAT segment of it, or a copybook —
         /// returning the resultant lines and, per resultant line, the 1-based physical source line it came from (kb/Work
@@ -165,23 +165,19 @@ public static partial class ReferenceFormatProcessor
         {
             if (kind == LineKind.Continuation) return _inCommentEntry ? CommentEntryText.Body : CommentEntryText.None;
             if (kind is not (LineKind.Source or LineKind.NotAnIndicator)) return CommentEntryText.None;
+            // COBOL-85's comment-entry paragraph begins at an Area-A word and ends at the next one — the only place the
+            // Area A / Area B line matters here. WHERE the text is (the division) is read from the words of the line
+            // wherever they begin (§6.3.1: the program-text area has no such line), by the one DivisionCursor rule.
             string? firstAreaAWord = FirstAreaAWord(area);
-            if (firstAreaAWord is not null && DivisionHeader(area, firstAreaAWord) is { } division)
-            {
-                _inIdentificationDivision = division is "IDENTIFICATION" or "ID";
-                _inCommentEntry = false;
-                return CommentEntryText.None;
-            }
-            if (firstAreaAWord is not null && CobolNames.EndsWith(firstAreaAWord, "-ID"))
-                _inIdentificationDivision = true;           // PROGRAM-ID / CLASS-ID / ... (the header is optional)
-            if (_inIdentificationDivision && firstAreaAWord is not null && CommentEntryParagraphs.Contains(firstAreaAWord))
+            if (_division.InIdentificationDivision && firstAreaAWord is not null && CommentEntryParagraphs.Contains(firstAreaAWord))
             {
                 _inCommentEntry = true;                     // start (or continue, back-to-back) a comment-entry
                 return CommentEntryText.Header;
             }
-            if (_inCommentEntry && firstAreaAWord is not null)
-                _inCommentEntry = false;                    // the next Area-A header ends it
-            return _inCommentEntry ? CommentEntryText.Body : CommentEntryText.None;
+            if (_inCommentEntry && firstAreaAWord is null) return CommentEntryText.Body;   // Area-B text (or blank): the entry goes on
+            _inCommentEntry = false;                        // the next Area-A word ends it
+            _division.Read(area);
+            return CommentEntryText.None;
         }
 
         /// <summary>The logical-conversion text of a comment-entry paragraph's header line: the paragraph word at its own
@@ -222,8 +218,9 @@ public static partial class ReferenceFormatProcessor
     /// <summary>
     /// If the source area begins with a word in Area A (its first non-space character falls within
     /// columns 8-11, i.e. the first <see cref="AreaAWidth"/> characters), return that word (the run of
-    /// non-space, non-period characters), else null. Used to detect division/section/paragraph headers,
-    /// which begin in Area A, versus Area-B continuation/free text, which is indented to column 12+.
+    /// non-space, non-period characters), else null. Used only for the COBOL-85 comment-entry paragraph, which
+    /// begins and ends at an Area-A word (<c>CommentEntryOf</c>); which DIVISION the text is in is never decided by
+    /// the area a word begins in (<see cref="DivisionCursor"/>, kb/Work PB2739).
     /// </summary>
     private static string? FirstAreaAWord(string sourceArea)
     {
@@ -234,16 +231,5 @@ public static partial class ReferenceFormatProcessor
         int end = start;
         while (end < sourceArea.Length && sourceArea[end] is not (' ' or '.')) end++;
         return sourceArea[start..end];
-    }
-
-    /// <summary>The division a division header names — <paramref name="firstWord"/> when the Area-A text is
-    /// <c>&lt;word&gt; DIVISION</c> — or null.</summary>
-    private static string? DivisionHeader(string sourceArea, string firstWord)
-    {
-        int at = sourceArea.IndexOf(firstWord, StringComparison.Ordinal) + firstWord.Length;
-        ReadOnlySpan<char> rest = sourceArea.AsSpan(at).TrimStart(' ');
-        return CobolNames.StartsWith(rest, "DIVISION")
-               && (rest.Length == 8 || rest[8] is ' ' or '.')
-            ? firstWord.ToUpperInvariant() : null;
     }
 }
