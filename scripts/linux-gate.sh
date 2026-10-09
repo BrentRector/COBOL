@@ -103,12 +103,15 @@ echo "linux-gate: Linux clone of HEAD ${head:0:9} at $snap"
 [ "$dirty" -gt 0 ] && echo "linux-gate: NOTE — $dirty uncommitted tracked change(s) are NOT tested (the clone is HEAD)"
 
 bad="$corpus_red"; ran=""
-# Every script self-test, on Linux, through the ONE runner CI runs (kb/Work PB2563): CI's audits job runs
-# `python3 scripts/self_tests.py`, and greenfield-unit runs `python3 scripts/self_tests.py --built` after its build.
-# The runner DISCOVERS the self-tests, so this gate never names one (a hand list here went stale: it ran three guard-hook
-# self-tests while CI ran six). They are path-sensitive: a drive-letter path that Linux reads as relative turned CI red on
-# 2026-10-07 after a green Windows run (kb/Work PB2142). `selftests` runs first and is never skipped; `selftests-built`
-# runs after the unit and conformance legs have built the assemblies it reads.
+# PB2879 (owner 2026-10-09): the legs ran one after another and used about 10 % of a 32-CPU WSL VM (351 s alone). The
+# clone is now built ONCE (`dotnet build Cobol.Net.sln`) and every leg runs in PARALLEL against that build, each to its
+# own log. A background leg cannot set this shell's variables, so each writes its report lines to <leg>.result and
+# GREEN|RED|NOT RUN to <leg>.status; after `wait` they are printed in a fixed order and folded into the verdict.
+# `selftests` needs no build, so it starts beside the build. Every script self-test runs on Linux through the ONE runner
+# CI runs (kb/Work PB2563): `selftests` is `python3 scripts/self_tests.py`, `selftests-built` its `--built` half, which
+# reads the built test assemblies. They are path-sensitive: a drive-letter path that Linux reads as relative turned CI
+# red on 2026-10-07 after a green Windows run (kb/Work PB2142).
+leg_status() { printf '%s\n' "$2" > "$out/$1.status"; }   # <leg> <GREEN|RED|NOT RUN>
 selftests_leg() {  # <leg name> [runner arguments…]
   local name="$1"; shift
   local start rc secs verdict
@@ -118,55 +121,40 @@ selftests_leg() {  # <leg name> [runner arguments…]
   secs=$(( $(date +%s) - start ))
   verdict="$(grep -E '^=== SELF-TESTS: ' "$out/$name.log" | tail -1)"
   if [ $rc -eq 0 ] && [[ "$verdict" == "=== SELF-TESTS: GREEN"* ]]; then
-    echo "leg $name: GREEN in ${secs}s — $verdict"; ran="$ran $name"
+    leg_status "$name" GREEN; echo "leg $name: GREEN in ${secs}s — $verdict"
   else
     # A red runner prints its WHOLE log less the self-tests that passed: trim what passed, never what failed (PB1573).
+    leg_status "$name" RED
     echo "leg $name: RED (rc=$rc) in ${secs}s — ${verdict:-no self-test verdict; see TestResults/linux-gate/$name.log}"
     grep -vE '^self-test .*: GREEN in ' "$out/$name.log" | sed 's/^/    /'
-    bad="$bad $name"
   fi
 }
-selftests_leg selftests
-built_unit=0; built_conformance=0
-IFS=',' read -r -a wanted <<< "$legs"
-for leg in "${wanted[@]}"; do
+guard_leg() {
+  # CI's `guard` job (kb/Work PB1955, PB1957 row 40): the NIST suite through the `cobol` CLI from bash, the manifest
+  # audit, the baseline check and the guard's own self-tests — the one CI Linux job that runs a SCRIPT rather than
+  # `dotnet test`, so it was the one no local gate ran. Train 1013's CI red on PB322's TERMINATES rows was invisible to
+  # every local leg. Its scratch is private to this clone (the guard writes fixed file names under TMPDIR, and
+  # implementers run this gate concurrently). Its own `dotnet build` of the CLI is up to date after the ONE build.
+  local start rc secs summary
   start=$(date +%s)
-  case "$leg" in
-    unit)             proj="tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj" ;;
-    characterization) proj="tests/Cobol.Net.Tests.Characterization/Cobol.Net.Tests.Characterization.csproj" ;;
-    conformance)      proj="tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj" ;;
-    guard)
-      # CI's `guard` job (kb/Work PB1955, PB1957 row 40): the NIST suite through the `cobol` CLI from bash, the
-      # manifest audit, the baseline check and the guard's own self-tests — the one CI Linux job that runs a SCRIPT
-      # rather than `dotnet test`, so it was the one no local gate ran. Train 1013's CI red on
-      # PB322's TERMINATES rows was invisible to every local leg. Its scratch is private to this clone (the guard
-      # writes fixed file names under TMPDIR, and implementers run this gate concurrently).
-      mkdir -p "$snap/.guard-tmp"
-      ( cd "$snap" && TMPDIR="$snap/.guard-tmp" "${nice_prefix[@]}" bash scripts/guard-fast.sh ) > "$out/guard.log" 2>&1
-      rc=$?
-      secs=$(( $(date +%s) - start ))
-      summary="$(grep -E '^=== (NIST \(|NIST AUDIT: population|ALL GREEN|FAILURES)' "$out/guard.log" | tr '\n' ' ')"
-      if [ $rc -eq 0 ] && grep -qx '=== ALL GREEN ===' "$out/guard.log"; then
-        echo "leg guard: GREEN in ${secs}s — $summary"; ran="$ran guard"
-      else
-        # A red guard prints its WHOLE log less the per-program verdicts that came out as predicted: trim what passed,
-        # never what failed (kb/Work PB1573). The audit's findings and every non-matching verdict's evidence stay.
-        echo "leg guard: RED (rc=$rc) in ${secs}s — ${summary:-no guard verdict; see TestResults/linux-gate/guard.log}"
-        grep -vE '^ *[A-Z][A-Z0-9]+: (MATCH|TERMINATES EC-|NO BASELINE)' "$out/guard.log" | sed 's/^/    /'
-        bad="$bad guard"
-      fi
-      continue ;;
-    *) echo "leg $leg: NOT RUN (unknown leg)"; bad="$bad $leg:unknown"; continue ;;
-  esac
-  ( cd "$snap" && "${nice_prefix[@]}" dotnet build "$proj" -c Debug ) > "$out/$leg-build.log" 2>&1
-  brc=$?
-  if [ $brc -ne 0 ]; then
-    echo "leg $leg: RED — the Linux BUILD failed (rc=$brc); see TestResults/linux-gate/$leg-build.log"
-    grep -E ' error ' "$out/$leg-build.log" | sort -u | head -10 | sed 's/^/    /'
-    bad="$bad $leg:build"; continue
+  mkdir -p "$snap/.guard-tmp"
+  ( cd "$snap" && TMPDIR="$snap/.guard-tmp" "${nice_prefix[@]}" bash scripts/guard-fast.sh ) > "$out/guard.log" 2>&1
+  rc=$?
+  secs=$(( $(date +%s) - start ))
+  summary="$(grep -E '^=== (NIST \(|NIST AUDIT: population|ALL GREEN|FAILURES)' "$out/guard.log" | tr '\n' ' ')"
+  if [ $rc -eq 0 ] && grep -qx '=== ALL GREEN ===' "$out/guard.log"; then
+    leg_status guard GREEN; echo "leg guard: GREEN in ${secs}s — $summary"
+  else
+    # A red guard prints its WHOLE log less the per-program verdicts that came out as predicted: trim what passed,
+    # never what failed (kb/Work PB1573). The audit's findings and every non-matching verdict's evidence stay.
+    leg_status guard RED
+    echo "leg guard: RED (rc=$rc) in ${secs}s — ${summary:-no guard verdict; see TestResults/linux-gate/guard.log}"
+    grep -vE '^ *[A-Z][A-Z0-9]+: (MATCH|TERMINATES EC-|NO BASELINE)' "$out/guard.log" | sed 's/^/    /'
   fi
-  case "$leg" in unit) built_unit=1 ;; conformance) built_conformance=1 ;; esac
-  bsecs=$(( $(date +%s) - start ))
+}
+test_leg() {  # <leg> <project> — `dotnet test --no-build` against the ONE build
+  local leg="$1" proj="$2" start rc secs summary
+  start=$(date +%s)
   # Scrubbed (kb/Work PB1718): a gate-leg handshake or VSTest* variable inherited from the caller would narrow the run
   # to PART of its assembly while it exits 0. The one statement of that rule is test_population.py.
   ( cd "$snap" && "${nice_prefix[@]}" "$py" "$snap/scripts/test_population.py" scrubbed dotnet test "$proj" \
@@ -175,21 +163,66 @@ for leg in "${wanted[@]}"; do
   secs=$(( $(date +%s) - start ))
   summary="$(grep -E '^(Passed!|Failed!)' "$out/$leg.log" | tail -1)"
   if [ $rc -eq 0 ] && grep -qE '^Passed!' "$out/$leg.log"; then
-    echo "leg $leg: GREEN in ${secs}s (build ${bsecs}s) — $summary"; ran="$ran $leg"
+    leg_status "$leg" GREEN; echo "leg $leg: GREEN in ${secs}s — $summary"
   else
+    leg_status "$leg" RED
     echo "leg $leg: RED (rc=$rc) in ${secs}s — ${summary:-no test summary; see TestResults/linux-gate/$leg.log}"
     grep -E '^\s+Failed ' "$out/$leg.log" | head -20 | sed 's/^/    /'
-    bad="$bad $leg"
   fi
-done
-if [ $built_unit -eq 1 ] && [ $built_conformance -eq 1 ]; then
-  selftests_leg selftests-built --built
-else
-  # Not run because a needed build is missing: a failed build is already a red leg above, and a `--legs` list without
-  # unit and conformance chose not to build them. Said, never silent.
-  echo "leg selftests-built: NOT RUN (it reads the unit and conformance legs' builds, and this run built" \
-       "unit=$built_unit conformance=$built_conformance)"
+}
+
+IFS=',' read -r -a wanted <<< "$legs"
+order=(selftests)
+selftests_leg selftests > "$out/selftests.result" 2>&1 &
+start=$(date +%s)
+( cd "$snap" && "${nice_prefix[@]}" dotnet build Cobol.Net.sln -c Debug ) > "$out/build.log" 2>&1
+brc=$?
+echo "linux-gate: ONE build of Cobol.Net.sln in $(( $(date +%s) - start ))s (rc=$brc); the legs run in parallel against it"
+if [ $brc -ne 0 ]; then
+  echo "linux-gate: the Linux BUILD failed; see TestResults/linux-gate/build.log"
+  grep -E ' error ' "$out/build.log" | sort -u | head -10 | sed 's/^/    /'
 fi
+for leg in "${wanted[@]}"; do
+  order+=("$leg")
+  case "$leg" in
+    unit)             proj="tests/Cobol.Net.Tests.Unit/Cobol.Net.Tests.Unit.csproj" ;;
+    characterization) proj="tests/Cobol.Net.Tests.Characterization/Cobol.Net.Tests.Characterization.csproj" ;;
+    conformance)      proj="tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj" ;;
+    guard)            guard_leg > "$out/guard.result" 2>&1 & continue ;;
+    *) leg_status "$leg" "NOT RUN"; echo "leg $leg: NOT RUN (unknown leg)" > "$out/$leg.result"; continue ;;
+  esac
+  if [ $brc -ne 0 ]; then
+    leg_status "$leg" RED; echo "leg $leg: RED — the Linux BUILD failed (rc=$brc)" > "$out/$leg.result"; continue
+  fi
+  test_leg "$leg" "$proj" > "$out/$leg.result" 2>&1 &
+done
+# selftests-built reads the unit and conformance assemblies, which the ONE build made; it needs no leg to finish first.
+order+=(selftests-built)
+case ",$legs," in
+  *,unit,*conformance,*|*,conformance,*unit,*)
+    if [ $brc -eq 0 ]; then
+      selftests_leg selftests-built --built > "$out/selftests-built.result" 2>&1 &
+    else
+      leg_status selftests-built "NOT RUN"
+      echo "leg selftests-built: NOT RUN (the Linux build failed)" > "$out/selftests-built.result"
+    fi ;;
+  *)
+    # Not run because the legs asked for build neither unit nor conformance: said, never silent.
+    leg_status selftests-built "NOT RUN"
+    echo "leg selftests-built: NOT RUN (it reads the unit and conformance assemblies, and --legs '$legs' asks for" \
+         "neither of them)" > "$out/selftests-built.result" ;;
+esac
+wait
+for leg in "${order[@]}"; do
+  cat "$out/$leg.result"
+  st="$(cat "$out/$leg.status" 2>/dev/null)"
+  case "$st" in
+    GREEN) ran="$ran $leg" ;;
+    "NOT RUN") case "$leg" in selftests-built) [ $brc -ne 0 ] && bad="$bad $leg" ;; *) bad="$bad $leg:unknown" ;; esac ;;
+    *) bad="$bad $leg" ;;
+  esac
+done
+[ $brc -ne 0 ] && bad="$bad build"
 
 state_after="$(repo_state)"
 if [ "$state_after" != "$state_before" ]; then
