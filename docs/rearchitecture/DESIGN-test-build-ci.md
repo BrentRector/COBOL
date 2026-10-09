@@ -1022,7 +1022,10 @@ set by the eleven parallel `test_orchestrate_*.ps1` parts, against the old seria
 3. The audits — FIRST, since none needs a build or a test result, and in implementer mode FAIL-FAST: a red audit ends
    the gate `RED — <audit> RED — fail-fast: the audits run before the slot and the build and NO LEG RAN` in seconds
    (kb/Work PB2523: four of wave 1034's eight first-run implementer reds were audit-only, each reported after a whole
-   ~6-min population); a lander's gate goes on, so its one run shows every red of the train — then the per-worktree
+   ~6-min population); a lander's gate goes on, so its one run shows every red of the train, and therefore runs its
+   audits BESIDE its build and legs instead of ahead of them (the driver's `BESIDE` work, joined before the population
+   check, its output printed whole; kb/Work PB2880: ahead of the build they were a 42-s serial valley at about a third
+   of the host in every landing, set by the self-test runner's long poles) — then the per-worktree
    GnuCOBOL corpus by THE one rule `scripts/external_corpus.py`, which `battery.sh`, the Linux gate and the impact-map
    recorder apply too (absent in a fresh worktree, so fetched; a failed fetch makes the gate RED as `EXTERNAL CORPUS
    FETCH FAILED, POPULATION UNMEASURED`; kb/Work PB2611). **Both run
@@ -1380,8 +1383,8 @@ on Windows and red in CI's Linux unit job. That was a ~30-minute round trip and 
 the test projects CI's Linux jobs run, and the scripts they run: leg `guard` runs `bash scripts/guard-fast.sh`, CI's
 `guard` job (the NIST suite through the `cobol` CLI, the manifest audit, the baseline check and the guard's own
 self-tests), with a `TMPDIR` private to the clone because the guard writes fixed file names there. Leg `selftests`
-runs first and always: `scripts/self_tests.py` in the clone, as CI's `audits` job runs it; `selftests-built` runs
-`self_tests.py --built` after the unit and conformance legs have built (kb/Work PB2563). Its first Linux run found two
+runs always, beside the build: `scripts/self_tests.py` in the clone, as CI's `audits` job runs it; `selftests-built`
+runs `self_tests.py --built` against the one build, beside the other legs (kb/Work PB2563, PB2879). Its first Linux run found two
 self-tests that had never run on Linux: an unguarded Windows-only arm in `fleet_active_build.py` and
 `test_autostart.ps1`, which installs a Windows Startup entry and is now marked windows-only.
 `LinuxGateDriftTests` holds both sets equal to the workflow's: every `dotnet test` project and every `run: bash
@@ -1392,9 +1395,10 @@ because CI runs that job on Linux only; a Git Bash run on Windows would add minu
 
 **How: a Linux clone of the commit, never the Windows tree.** The tree's COMMITTED HEAD is cloned into
 `~/linux-gate/<tree>` on the Linux filesystem. The clone is `--shared`: it borrows the Windows repository's object
-store read-only, so nothing is copied. Each leg's project is built there with the Linux SDK and tested there, the
-shape of CI's ubuntu jobs. The git-ignored GnuCOBOL corpus is copied in from the tree, or fetched as CI fetches it.
-Commit before running: uncommitted changes are counted, reported, and not tested.
+store read-only, so nothing is copied. The solution is built there ONCE with the Linux SDK, and every leg then runs
+in PARALLEL against that build, each to its own log (kb/Work PB2879: 234 s against 351 s with the legs one after
+another), the shape of CI's ubuntu jobs. The git-ignored GnuCOBOL corpus is copied in from the tree, or fetched as CI
+fetches it. Commit before running: uncommitted changes are counted, reported, and not tested.
 
 Two earlier designs failed, and each failure was measured:
 1. **Windows-built binaries run `--no-build`.** The Conformance tests find their goldens through `[CallerFilePath]`,
@@ -1404,8 +1408,14 @@ Two earlier designs failed, and each failure was measured:
    worktree add in its own temp repositories) then wrote into the REAL repository: `core.worktree` landed in the
    shared `.git/config` and broke git in every checkout until the owner removed it (2026-09-29).
 
-So the script exports nothing. Its only git calls on the Windows repository are two READS (HEAD, and the count of
-uncommitted changes), with `safe.directory` and `core.autocrlf` passed inline.
+So the script exports nothing. Its only git calls on the tree are READS (HEAD, the git directory, the count of
+uncommitted changes, the tripwire below), all through one function, `wgit`: the TREE'S OWN git, without optional
+locks. A tree on a Windows drive is read by Windows git (`git.exe`, through WSL interop) with its Windows path; a tree
+on a Linux filesystem by Linux git. kb/Work PB2880 measured why: Linux git found the Windows-written index's stat data
+foreign, re-hashed all ~16,000 tracked files across the 9P boundary for the one `status` (34 s at half of one core, the
+gate's first serial valley in every run) and then wrote the refreshed index back into the real worktree, which Windows
+git rewrote on its next command; `git.exe` reads it in 0.1-1.2 s. `LinuxGateDriftTests` holds every git call on the
+tree to `wgit`, and every arm of it to `--no-optional-locks`.
 
 Two guards stay beside the clone (group G, kb/Work PB1719). A self-test that builds its own repositories first drops
 every variable `git rev-parse --local-env-vars` names (`gate_slot.py`, `status_guard.py`), so an inherited `GIT_DIR`

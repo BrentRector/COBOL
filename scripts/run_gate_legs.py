@@ -34,7 +34,10 @@ ONE GATE, in this order (§3.14.3):
      scripts/self_tests.py — kb/Work PB2563) — in implementer mode FAIL-FAST: a red audit ends the gate RED right there, with
      no leg run (kb/Work PB2523) — then the GnuCOBOL corpus, by the ONE rule scripts/external_corpus.py (kb/Work
      PB2611). Both run BEFORE the slot (kb/Work PB2524): they
-     read only the tree, and inside the slot they were 35-45 % of its hold while every other implementer gate queued;
+     read only the tree, and inside the slot they were 35-45 % of its hold while every other implementer gate queued.
+     A LANDER's audits instead run BESIDE its build and legs (BESIDE, kb/Work PB2880): it never stops on a red one, so
+     run first they were only a serial valley (42 s at a third of the host) ahead of every landing; their output is
+     printed whole, and their reds merged, before the population check;
   4. the gate slot (implementer only), always after the lock, so no two gates can wait on each other in a cycle; then
      the solution build and the SHA-256 of every binary the legs will run;
   5. `--list-tests` per assembly (scrubbed), then BESIDE the legs the self-tests that read the built assemblies
@@ -68,6 +71,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import traceback
 from collections import Counter
@@ -122,6 +126,12 @@ AUDITS = (
 )
 #: The post-build half of the self-tests: the ones declaring `SELF-TEST-NEEDS: build` (scripts/self_tests.py).
 BUILT_SELF_TESTS = ["scripts/self_tests.py", "--built"]
+#: ⛔ THE WORK THAT RUNS BESIDE THE GATE'S CRITICAL PATH (`Gate._beside`, kb/Work PB2880), each joined once before the
+#: verdict: the LANDER's audits, which read only the tree and never stop its gate, beside its build and legs; and the
+#: post-build self-tests, which read the built assemblies, beside the legs. A step that needs nothing the critical
+#: path is still making belongs here, not in a serial valley ahead of it. (An implementer's audits stay AHEAD of its
+#: slot and build on purpose: they fail fast, kb/Work PB2523.)
+BESIDE = ("audits", "post_build_self_tests")
 
 Spawn = Callable[..., dict]
 
@@ -307,6 +317,8 @@ class Outcome:
     stopped: bool = False
     timings: dict[str, float] = field(default_factory=dict)
     timings_store: str = ""  # what the publish to the shared timings store did (kb/Work PB2527)
+    #: Work running BESIDE the gate's critical path (`Gate._beside`), joined once before the verdict: (name, future).
+    beside: list[tuple[str, concurrent.futures.Future]] = field(default_factory=list)
 
 
 class Gate:
@@ -318,6 +330,7 @@ class Gate:
 
     # The verdict line and exit code are decided here, once, for every path through the gate.
     def _finish(self, out: Outcome, run: Path | None, verdict: str, detail: str, code: int) -> Outcome:
+        self._join_beside(out)  # an early end (a failed build, an unlistable population) still reports work beside it
         out.verdict, out.exit_code = verdict, code
         out.line = f"{VERDICT}{verdict} — {detail} ==="
         if run is not None:
@@ -343,12 +356,43 @@ class Gate:
                     return self._finish(out, None, "NOT RUN", str(e), 2)
                 if setting is not None and setting.until is not None:
                     out.scope_until = setting.until.isoformat()
+            # The pool the work BESIDE the critical path runs in (`_beside`); leaving it waits for that work, so no
+            # gate returns while a thread it started still runs.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(BESIDE), thread_name_prefix="beside") as pool:
+                self._pool = pool
+                try:
+                    return self._gate(out, label, started)
+                except Exception as e:  # noqa: BLE001 — a defect in the driver still ends in a verdict line, never
+                    # silence: every caller BLOCKS on that line (MANDATORY-PRACTICES P2), so a traceback alone would
+                    # hang it.
+                    self.say(traceback.format_exc().rstrip())
+                    return self._finish(out, None, "NOT RUN", f"the gate driver failed: {type(e).__name__}: {e}", 2)
+
+    def _beside(self, out: Outcome, name: str, work: Callable[[], tuple[list[str], list[str]]]) -> None:
+        """Start `work` BESIDE the gate's critical path (kb/Work PB2880): a step that needs nothing the critical path
+        is still making runs concurrently with it instead of in a serial valley ahead of it. `work` returns (its RED
+        reasons, its output lines); the lines are printed whole when it is joined (`_join_beside`, once, before the
+        verdict), so they never interleave with a leg's report. `name` is one of BESIDE."""
+        if name not in BESIDE:
+            raise ValueError(f"beside work {name!r} is not one of BESIDE {BESIDE}")
+        out.beside.append((name, self._pool.submit(work)))
+
+    def _join_beside(self, out: Outcome) -> None:
+        """Join every piece of work started beside the critical path, in the order it was started: print its lines,
+        merge its RED reasons, time the wait as `<name>_wait_s`. A piece that RAISED is a named RED with its
+        traceback — never a silent pass, never an escape that leaves the gate without its verdict line."""
+        while out.beside:
+            name, future = out.beside.pop(0)
+            t = time.monotonic()
             try:
-                return self._gate(out, label, started)
-            except Exception as e:  # noqa: BLE001 — a defect in the driver still ends in a verdict line, never silence:
-                # every caller BLOCKS on that line (MANDATORY-PRACTICES P2), so a traceback alone would hang it.
-                self.say(traceback.format_exc().rstrip())
-                return self._finish(out, None, "NOT RUN", f"the gate driver failed: {type(e).__name__}: {e}", 2)
+                reds, lines = future.result()
+            except Exception as e:  # noqa: BLE001 — see the docstring
+                reds = [f"{name.upper().replace('_', ' ')} FAILED ({type(e).__name__}: {e})"]
+                lines = traceback.format_exception(e)
+            out.timings[f"{name}_wait_s"] = round(time.monotonic() - t, 1)
+            for line in "".join(f"{l}\n" for l in lines).rstrip().splitlines():
+                self.say(line)
+            out.reasons += reds
 
     def _new_run(self) -> Path:
         self.run_root.mkdir(parents=True, exist_ok=True)
@@ -376,25 +420,36 @@ class Gate:
     def _gate(self, out: Outcome, label: str, started: float) -> Outcome:
         run = self._new_run()
         self.say(f"build-local: {self.mode} gate, run directory {run}")
-        # ⛔ THE AUDITS AND THE CORPUS FETCH RUN BEFORE THE GATE SLOT IS TAKEN (kb/Work PB2524). They read only the
-        # tree — no build output, no test result — so they need nothing the slot rations (concurrent builds and test
-        # legs, DESIGN-test-build-ci §3.14.6). Inside the slot they were 35-45 % of its hold (~230 s of serial Python
-        # per gate, one core busy) while every other implementer gate queued behind it. They still BLOCK the verdict:
-        # a red audit ends an implementer gate RED before it ever queues, and is merged into the lander's verdict.
+        if self.mode == "lander":
+            # ⛔ THE LANDER'S AUDITS RUN BESIDE ITS BUILD AND LEGS (kb/Work PB2880). They read only the tree, and the
+            # lander does not stop on a red one (its one run reports every red of the train), so nothing waits for
+            # them: run first, they were a serial valley of 42 s at about a third of the host (the self-test runner's
+            # long poles) ahead of every landing. The corpus fetch stays ahead of the build: the legs read the corpus.
+            def audits() -> tuple[list[str], list[str]]:
+                lines: list[str] = []
+                t0 = time.monotonic()
+                reds = self.host.audits(_no_slot, lines.append)
+                out.timings["audits_s"] = round(time.monotonic() - t0, 1)
+                return reds, lines
+            out.reasons += self.host.fetch_corpus(_no_slot, self.say)
+            self._beside(out, "audits", audits)
+            return self._tested(out, run, None, started)
+        # ⛔ AN IMPLEMENTER'S AUDITS AND CORPUS FETCH RUN BEFORE THE GATE SLOT IS TAKEN (kb/Work PB2524). They read
+        # only the tree — no build output, no test result — so they need nothing the slot rations (concurrent builds
+        # and test legs, DESIGN-test-build-ci §3.14.6). Inside the slot they were 35-45 % of its hold (~230 s of
+        # serial Python per gate, one core busy) while every other implementer gate queued behind it.
         t = time.monotonic()
         audit_reds = self.host.audits(_no_slot, self.say)
         out.timings["audits_s"] = round(time.monotonic() - t, 1)
-        if audit_reds and self.mode == "implementer":
+        if audit_reds:
             # FAIL FAST ON THE AUDITS (kb/Work PB2523): they need no build and no test result and take seconds, while
             # a red one used to be reported only after the whole ~6-min population — 4 of wave 1034's 8 first-run
-            # reds were audit-only. The lander keeps going: its one run reports every red of the train at once.
+            # reds were audit-only.
             out.reasons += audit_reds
             return self._finish(out, run, "RED", f"{'; '.join(audit_reds)} — fail-fast: the audits run before the "
                                 f"slot and the build and NO LEG RAN; fix the audit and re-gate · {self.mode} mode "
                                 f"(run {run.name})", 1)
-        out.reasons += audit_reds + self.host.fetch_corpus(_no_slot, self.say)
-        if self.mode != "implementer":
-            return self._tested(out, run, None, started)
+        out.reasons += self.host.fetch_corpus(_no_slot, self.say)
         t = time.monotonic()
         try:
             slot = self.host.take_slot(label, self.say)
@@ -429,15 +484,11 @@ class Gate:
 
         # The self-tests that read the BUILT assemblies (kb/Work PB2563) run beside the legs: they only list tests, and
         # the legs are the gate's longest step, so they add no wall time. Joined, and printed, after the legs.
-        post_build_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        post_build = post_build_pool.submit(self.host.built_self_tests, spawn)
-        try:
-            return self._legs_and_checks(out, run, listings, binaries, started, spawn, post_build)
-        finally:
-            post_build_pool.shutdown(wait=True)
+        self._beside(out, "post_build_self_tests", lambda: self.host.built_self_tests(spawn))
+        return self._legs_and_checks(out, run, listings, binaries, started, spawn)
 
     def _legs_and_checks(self, out: Outcome, run: Path, listings: dict[str, Counter], binaries: dict,
-                         started: float, spawn: Spawn, post_build: concurrent.futures.Future) -> Outcome:
+                         started: float, spawn: Spawn) -> Outcome:
         plan, digest = self._plan(out, listings, run)
         legs = self._legs(plan)
         to_run = legs
@@ -461,12 +512,7 @@ class Gate:
         reds = [r for r in out.runs if r.red]
         if reds:
             out.timings["first_red_s"] = round(min(r.finished_s for r in reds), 1)
-        t = time.monotonic()
-        post_reds, post_lines = post_build.result()
-        out.timings["post_build_self_tests_wait_s"] = round(time.monotonic() - t, 1)
-        for line in post_lines:
-            self.say(line)
-        out.reasons += post_reds
+        self._join_beside(out)
 
         self._check_populations(out, listings, legs, run)
         self._publish_timings(out, run, listings)
@@ -695,6 +741,11 @@ class FakeHost(Host):
         self.root, self._lock, self.plant, self.plan_fails, self.scope = root, lock, set(plant), plan_fails, scope
         self.slots_taken = 0
         self.audited = self.built = False
+        self.build_started = threading.Event()
+        #: Plant "await-build": the audits wait for the build to START and record whether it did, which it can only
+        #: do while they still run when the gate runs them BESIDE it (a gate that ran them first would wait out the
+        #: bound and record False).
+        self.audits_saw_build: bool | None = None
         self.events: list[str] = []  # the order the gate drove the host in: audits, fetch, slot, build
         self.envs: dict[tuple[int, str], dict[str, str]] = {}
         self.plan_obj: dict | None = None
@@ -723,6 +774,11 @@ class FakeHost(Host):
     def audits(self, spawn, say) -> list[str]:
         self.audited = True
         self.events.append("audits")
+        if "await-build" in self.plant:
+            self.audits_saw_build = self.build_started.wait(timeout=60)
+        if "audit-crash" in self.plant:
+            raise RuntimeError("planted: a defect in an audit's runner")
+        say("PLANTED-AUDIT-OUTPUT")
         return ["DRIFT RULES INDEX RED"] if "audit" in self.plant else []
 
     def built_self_tests(self, spawn):
@@ -738,6 +794,7 @@ class FakeHost(Host):
     def build(self, spawn) -> bool:
         self.built = True
         self.events.append("build")
+        self.build_started.set()
         return "build" not in self.plant
 
     def publish_timings(self, run, listings):
@@ -963,6 +1020,25 @@ def self_test() -> int:
         o, h = gate("lander", "audit-lander", plant={"audit"})
         arm("a red audit in -Mode lander is RED and the legs still run: the train's one run shows every red",
             o.verdict == "RED" and "DRIFT RULES INDEX RED" in o.line and h.built and len(o.runs) == 3, o.line)
+        o, h = gate("lander", "beside-lander", plant={"await-build"})
+        out_at = sink.index("PLANTED-AUDIT-OUTPUT") if "PLANTED-AUDIT-OUTPUT" in sink else -1
+        pop_at = min((i for i, l in enumerate(sink) if l.startswith("=== POPULATION")), default=-1)
+        arm("-Mode lander runs its audits BESIDE its build and legs (kb/Work PB2880): they are still running when the "
+            "build starts, their output is printed whole after the legs and before the populations, and the gate is "
+            "GREEN",
+            h.audits_saw_build is True and o.verdict == "GREEN" and "audits_s" in o.timings
+            and "audits_wait_s" in o.timings and out_at > 0
+            and any(l.startswith("Characterization leg 1") for l in sink[:out_at]) and out_at < pop_at,
+            f"saw build: {h.audits_saw_build}; output at {out_at}, populations at {pop_at}; {o.line}")
+        o, h = gate("lander", "audit-crash-lander", plant={"audit-crash"})
+        arm("a defect in work beside the critical path is a named RED with its traceback, and the legs still ran",
+            o.verdict == "RED" and o.exit_code == 1 and "AUDITS FAILED (RuntimeError" in o.line and len(o.runs) == 3
+            and said("planted: a defect in an audit's runner"), o.line)
+        o, h = gate("lander", "build-lander", plant={"build", "audit"})
+        arm("a lander whose build fails still reports the audits that ran beside it: BUILD FAILED, the audit's red "
+            "and output recorded",
+            o.verdict == "BUILD FAILED" and "DRIFT RULES INDEX RED" in o.reasons and said("PLANTED-AUDIT-OUTPUT"),
+            f"{o.line} {o.reasons}")
         o, _ = gate("implementer", "crash", plant={"crash"})
         arm("a defect in the driver still ends in ONE verdict line (NOT RUN, exit 2) — the callers block on it",
             o.verdict == "NOT RUN" and o.exit_code == 2 and sink[-1] == o.line and "RuntimeError" in o.line
