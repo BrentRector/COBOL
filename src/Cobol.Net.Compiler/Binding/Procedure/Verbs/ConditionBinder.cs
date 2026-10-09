@@ -199,24 +199,28 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             // `IF G(1:3) = B"110"` read the three characters of a one-character image), and the slice is now a
             // BitImagePlace in boolean positions, so GR6's unique item really does keep usage bit / boolean.
             return p.OperandCategory is PicCategory.Boolean;
-        // A sole FUNCTION-keyword reference to a catalogued BOOLEAN-typed function (§15.2 type 2 — today
-        // BOOLEAN-OF-INTEGER): diagnostic-free, from the catalog's declared type (kb/Work PB68).
-        if (ConditionOperandExpression(vo) is { } fx && SoleFunctionCall(fx) is { } sfc && sfc.functionName() is { } fn
-            && IntrinsicCatalog.TryGet(fn.GetText(), out var fsig) && fsig.Type == IntrinsicType.Boolean)
-            return true;
-        // …and a sole reference to a USER-DEFINED function whose RETURNING item is category boolean (§8.4.3.2.4 GR1:
-        // the temporary's category IS the RETURNING item's; kb/Work PB1419), asked from the same definition the
-        // activation binds from, diagnostic-free.
-        return vo.arithmeticExpression() is { } ux && SoleFunctionCall(ux)?.functionName() is { } un
-            && IsBooleanUserFunction(un.GetText());
+        // A sole FUNCTION-keyword reference whose result is boolean, through the enclosing parentheses like the arms
+        // above (§8.8.2: "a boolean expression enclosed in parentheses" — kb/Work PB1928).
+        return ConditionOperandExpression(vo) is { } fx && SoleFunctionCall(fx) is { } sfc && IsBooleanFunction(sfc);
     }
 
-    /// <summary>True when <paramref name="written"/> names a REPOSITORY-declared user-defined function (or the
-    /// containing function itself) whose RETURNING item is category boolean — the one answer the routing predicate
-    /// <see cref="IsBooleanValueOperand"/> reads, from the definition <c>UdfBinder.UdfActivate</c> clones.</summary>
-    private bool IsBooleanUserFunction(string written) =>
-        ctx.CobolWords.Resolve(written) is { } name
-        && host.Intrinsic.ReturningItemOf(name)?.OperandPic?.Category is PicCategory.Boolean;
+    /// <summary>True when a function-identifier's result is boolean, asked diagnostic-free in the bind path's own
+    /// dispatch order (<c>IntrinsicBinder.BindFunctionResult</c>, §12.3.8.4 GR12: a REPOSITORY-declared user function
+    /// or the containing function first): a USER-DEFINED function whose RETURNING item is category boolean (§8.4.3.2.4
+    /// GR1: the temporary's category IS the RETURNING item's; kb/Work PB1419), else a catalogued BOOLEAN-typed
+    /// intrinsic (§15.2 type 2, today BOOLEAN-OF-INTEGER; kb/Work PB68).
+    /// <para>⛔ THE NAME IS THE ONE <see cref="FunctionWord"/> READING OF THE TOKEN (kb/Work PB1928, PB1372). This used to
+    /// re-resolve the WRITTEN text through <c>CobolWords.Resolve</c>, which reads a word the <c>&gt;&gt;COBOL-WORDS</c>
+    /// directive removed as null, so a boolean user function named by an UNDEFINE'd word bound as a function but was
+    /// not routed as a boolean operand (`IF FUNCTION SUM(3)` refused as "a function reference" while the relation form
+    /// compiled); and the intrinsic arm looked the written text up in the catalog, which a SUBSTITUTE'd name misses.
+    /// <c>IntrinsicBinder.ReturningItemOf(FunctionCallContext)</c> and <see cref="FunctionWord.Canonical"/> are the
+    /// bind path's own readings.</para></summary>
+    private bool IsBooleanFunction(Core.FunctionCallContext sfc) =>
+        host.Intrinsic.ReturningItemOf(sfc) is { } returning
+            ? returning.OperandPic?.Category is PicCategory.Boolean
+            : sfc.functionName() is { } fn && FunctionWord.OfToken(fn.Start, ctx.CobolWords).Canonical is { } canonical
+              && IntrinsicCatalog.TryGet(canonical, out var sig) && sig.Type == IntrinsicType.Boolean;
 
     /// <summary>The sole <c>functionCall</c> primary of an arithmetic expression (no operators, signs or
     /// parentheses around it), or null — the function-identifier twin of <see cref="SoleDataRef"/>, over the ONE
@@ -1395,9 +1399,14 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             : new BoundBoolOperand(BindBoolOperandValue(vo));
     }
 
-    /// <summary>Bind a <c>valueOperand</c> as a comparison operand (the shared body of <see cref="ComparisonOperand"/>
-    /// and the boolean-alt unwrap path — feedback_one_mechanism_per_job).</summary>
-    private BoundOperand ComparisonOperandOf(Core.ValueOperandContext? vo)
+    /// <summary>Bind a <c>valueOperand</c> as a comparison operand: the ONE body of <see cref="ComparisonOperand"/>,
+    /// the boolean-alt unwrap path, and EVALUATE's subject and object operands (<c>EvaluateBinder.BindValueOperand</c>,
+    /// whose pair §14.9.13.4 GR4 a) 6. "is considered to be a conditional expression" of the form
+    /// <c>selection-subject = selection-object</c>). The EVALUATE binder used to keep an
+    /// arm-for-arm copy of this dispatch (kb/Work PB224 aligned its order by hand); kb/Work PB1935 found both copies
+    /// mapping a parenthesized operand to the item it encloses, and the copy is now this call. <paramref name="role"/>
+    /// names the operand in the refusal of a shape no arm reads.</summary>
+    internal BoundOperand ComparisonOperandOf(Core.ValueOperandContext? vo, string role = "comparison operand")
     {
         // §8.8.3.3 GR3: a concatenation expression folds to (and compares as) the equivalent single literal.
         // Through the ONE literal mapping. ⛔ THIS was the copy that lacked the hexadecimal arm, so
@@ -1436,17 +1445,36 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
                 // participates as its WRITTEN character form, leading zeros intact (ISO §8.8.4.2.1), which a
                 // computed wrapper would lose.
                 : SoleNumLiteral(expr) is { } lit ? host.Expr.NumericLiteralOperand(lit)
-                // The ONE expression→operand mapping (IntrinsicBinder.OperandOf): a user-function reference
-                // binds to a BoundNumRef over its result temp, which MUST surface as a FIELD operand here so
-                // the temp's cloned category (§8.4.3.2.4 GR1) drives the relation's class dispatch — a raw
-                // computed wrapper would compare an alphanumeric/national result NUMERICALLY. Numeric
-                // renderings are identical either way (AsNum unwraps both to the same FieldNum read).
-                : IntrinsicBinder.OperandOf(host.Expr.BindExpr(expr));   // a COMPOUND relation operand is an arithmetic expression (§8.8.1.1): no index-name or index data item inside it (kb/Work PB2018)
-        return BoundOperandError.Refused(ctx.Edition, "comparison operand");
+                : CompoundOperand(expr);
+        return BoundOperandError.Refused(ctx.Edition, role);
     }
+
+    /// <summary>⛔ A COMPOUND RELATION OR EVALUATE OPERAND IS AN ARITHMETIC EXPRESSION, NEVER THE ITEM OR LITERAL IT
+    /// ENCLOSES (kb/Work PB1935). Every sole shape — a data reference, a function-identifier, an OO identifier, a
+    /// numeric literal — has its own arm above; what reaches here carries an operator, a unary sign or enclosing
+    /// parentheses, so it is an arithmetic expression (§8.8.1.1, "an arithmetic expression enclosed in
+    /// parentheses"), and §8.8.1.2 GR1 makes a parenthesized value "a single operand", not the data item. The bound
+    /// expression drops the grouping parentheses, so <c>(C)</c> binds to the same <see cref="BoundNumRef"/> as
+    /// <c>C</c> and <c>(3)</c> to the same <see cref="BoundNumLiteral"/> as <c>3</c>; the former mapping here
+    /// (<see cref="IntrinsicBinder.OperandOf"/>) then handed back a field or literal operand, and the §8.8.4.2.5
+    /// screen admitted <c>A = (C)</c>, <c>A = B OR (C)</c> and <c>A = (3)</c> over an alphanumeric A as if the bare
+    /// item or literal had been written ("The numeric integer operand shall be an integer literal or an integer
+    /// numeric data item of usage display or national"), while it refused <c>A = (C + 0)</c>. Wrapping every shape
+    /// as the computed operand it is makes the screen see an arithmetic expression for all of them; against a
+    /// numeric operand the comparison is numeric either way, so no conforming value changes. The bind keeps the
+    /// §8.8.1.1 operand screen, so no index-name or index data item is inside it (kb/Work PB2018).</summary>
+    private BoundOperand CompoundOperand(Core.ArithmeticExpressionContext expr) =>
+        host.Expr.BindExpr(expr) switch
+        {
+            BoundExprError err => BoundOperandError.Carry(err.Feature, err.IsUnbuilt),
+            var e => new BoundComputedOperand(e),
+        };
 
     /// <summary>The condition-name references already reported as ambiguous — one report per source reference.</summary>
     private readonly HashSet<Core.DataReferenceContext> _condDiagnosed = [];
+
+    /// <summary>The condition-name references already reported as reference-modified (kb/Work PB2468).</summary>
+    private readonly HashSet<Core.DataReferenceContext> _refModCondDiagnosed = [];
 
     /// <summary>The condition-name references already reported as §13.7.3 SR4 e) violations.</summary>
     private readonly HashSet<Core.DataReferenceContext> _linkageCondDiagnosed = [];
@@ -1483,6 +1511,23 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         // declared-but-misqualified condition-name case — or a caller that admits only a condition-name asks
         // ReportMisqualifiedCondition.
         if (matches.Count == 0) return null;
+        // ⛔ A CONDITION-NAME TAKES NO REFERENCE MODIFIER (kb/Work PB2468). §8.4.4.2 prints condition-name-1,
+        // qualified and subscripted (§8.4.2.3.2 Format 2), and §8.8.4.5.2 condition-name-1 alone; §8.4.3.3.3 SR5 admits
+        // reference modification only where "an identifier referencing a data item of class alphanumeric, boolean,
+        // or national is permitted", and a condition-name is no data item. `IF CN(1:2)` and SEARCH ALL
+        // `WHEN CN(IX)(1:2)` used to bind the level-88 and silently drop the (1:2). Every condition-name position
+        // (IF / EVALUATE / PERFORM UNTIL / SEARCH WHEN, SET condition-name-1 TO TRUE/FALSE) resolves through here,
+        // so this one screen covers them; the reference still names its level-88, so the caller binds on and the
+        // compile fails here, once per source reference (the asker count is not the fact count, as below).
+        if (ReferenceResolver.ReadOperandSuffixes(dref).RefMods > 0 && _refModCondDiagnosed.Add(dref))
+        {
+            using var _ = ctx.Edition.At(dref);
+            ctx.Edition.Error(DiagnosticCatalog.ConditionNameReferenceModified,
+                $"the condition-name '{DataBinder.WrittenText(dref)}' is written with a reference modifier; a "
+                + "condition-name reference is condition-name-1, qualified and subscripted, with no reference "
+                + "modifier (ISO §8.4.4.2; §8.8.4.5.2), and §8.4.3.3.3 SR5 allows reference modification only on an "
+                + "identifier referencing a data item");
+        }
         // ONE report per SOURCE reference (the ReferenceResolver._diagnosed discipline, kb/Work PB70/PB443): a
         // reference is now resolved here more than once — the SEARCH ALL Format-2 screen asks which level-88 a
         // WHEN operand names BEFORE the condition binds it (§14.9.37.3 SR9/SR11 are about that very 88) — and the

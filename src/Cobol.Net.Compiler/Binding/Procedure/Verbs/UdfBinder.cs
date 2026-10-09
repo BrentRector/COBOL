@@ -75,7 +75,7 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
     internal PendingMark Mark => new(Pending.Count, ctx.Data.OoPendingPropertyOps.Count);
 
     /// <summary>Bind one user-function reference (the <see cref="BindIntrinsicCore"/> dispatch target for a
-    /// REPOSITORY-declared name, which per §12.3.8.2 GR12 refers to the user function and never a same-named
+    /// REPOSITORY-declared name, which per §12.3.8.4 GR12 refers to the user function and never a same-named
     /// intrinsic): resolve the signature, bind the arguments in the §8.4.3.2.4 GR5 manner, synthesize the
     /// result temporary, register the hoisted activation, and return the temp-reading expression.</summary>
     internal BoundExpr UdfBindCall(string name, IReadOnlyList<Core.FunctionArgumentContext> argCtxs)

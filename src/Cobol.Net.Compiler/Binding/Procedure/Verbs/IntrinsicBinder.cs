@@ -29,7 +29,7 @@ using Core = CobolParserCore;
 /// §15.3 arity, MAX/MIN category resolution, the §15.68.3 r3 default-currency injection, the D7 LENGTH fold —
 /// happen HERE; backends only render the resulting <see cref="BoundIntrinsicCall"/>.
 /// P7 Step 10k: a real collaborator over <see cref="BinderContext"/>, landed TOGETHER with
-/// <see cref="UdfBinder"/> (the bidirectional §12.3.8.2 GR12 pair: the user-function dispatch here PRECEDES
+/// <see cref="UdfBinder"/> (the bidirectional §12.3.8.4 GR12 pair: the user-function dispatch here PRECEDES
 /// the catalog lookup and reaches <c>host.Udf</c>; UdfBinder's argument bind reaches BACK into
 /// <see cref="BindArgOperand"/>). The D8 IntroducedIn/RemovedIn windows, the &lt;2002 keyword-omitted
 /// routing gate, and TRIM-arg2 moved VERBATIM (Exec Step E folds the diagnostics; the &lt;2002 routing gate
@@ -108,7 +108,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// always treated as the left parenthesis of that function's arguments." The ONE answer to "does this
     /// function's DEFINITION permit arguments", read from the definition the reference names: the
     /// REPOSITORY-declared user function's prototype (its USING formals — SR6 names function-prototype-name-1
-    /// too, and §12.3.8.2 GR12 gives the user function precedence over a same-named intrinsic) or the catalog
+    /// too, and §12.3.8.4 GR12 gives the user function precedence over a same-named intrinsic) or the catalog
     /// signature (a >>COBOL-WORDS synonym resolves to its canonical first). Asked BEFORE any argument binds, by
     /// every route a `NAME (start:length)` can arrive on — the FUNCTION-keyword form, the reserved-name
     /// keyword-omitted form and <see cref="KeywordOmittedFunction"/> — because once the group has been read as
@@ -222,7 +222,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     public static BoundOperand OperandOf(BoundExpr e) => e switch
     {
         BoundNumLiteral l => new BoundNumericLiteral(l.Text) { FunctionValue = l.FunctionValue, FunctionType = l.FunctionType, DecimalSeparator = l.DecimalSeparator },   // a folded function (LENGTH …) keeps saying so, and its type
-        BoundNumRef r => new BoundFieldOperand(r.Place),            // a user-function result temp (M2-UDF-1)
+        // A user-function result temp (M2-UDF-1). ⚠ Nothing here can tell it from a numeric data item whose grouping
+        // parentheses the expression binder dropped: `(C)` binds to C's BoundNumRef. A position whose operand is an
+        // arithmetic expression by SHAPE wraps the bound expression itself (ConditionBinder.CompoundOperand, kb/Work
+        // PB1935), never maps it through here.
+        BoundNumRef r => new BoundFieldOperand(r.Place),
         BoundExprError err => BoundOperandError.Carry(err.Feature, err.IsUnbuilt),
         _ => new BoundComputedOperand(e),
     };
@@ -271,7 +275,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
 
     /// <summary><see cref="ReturningItemOf(Core.FunctionCallContext)"/> for a function name already resolved through
     /// >>COBOL-WORDS (<see cref="FunctionWord.Name"/>), in <see cref="BindFunctionResult"/>'s dispatch order: the user
-    /// function first (§12.3.8.2 GR12), the function-pointer second.</summary>
+    /// function first (§12.3.8.4 GR12), the function-pointer second.</summary>
     internal DataItem? ReturningItemOf(string name)
     {
         string? prototype = ctx.Data.UserFunctionNames.Contains(name) || CobolNet.Runtime.CobolNames.Same(name, host.UdfSelfName)
@@ -564,7 +568,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         string name = word.Name;
         bool cobolWordsRemoved = word.RemovedByDirective;
 
-        // §12.3.8.2 GR12 (:14885): within the environment division's scope, a REPOSITORY-declared
+        // §12.3.8.4 GR12 (:14885): within the environment division's scope, a REPOSITORY-declared
         // function-prototype-name refers to the USER-DEFINED function "and not to an intrinsic function of
         // the same name" (the spec's own factorial-override example, :43651) — so the user-function
         // dispatch PRECEDES the catalog. §8.4.6.6 adds the CONTAINING function definition's own name with
@@ -587,7 +591,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                 + (definedInGroup
                     ? $"; the compilation group defines FUNCTION-ID {name.ToUpperInvariant()} — declare "
                       + $"FUNCTION {name.ToUpperInvariant()} in this unit's REPOSITORY paragraph to reference "
-                      + "it as a user-defined function (ISO §12.3.8.2 GR12)"
+                      + "it as a user-defined function (ISO §12.3.8.4 GR12)"
                     : ""));
             return BoundExprError.Refused(ctx.Edition, $"FUNCTION {name}");
         }

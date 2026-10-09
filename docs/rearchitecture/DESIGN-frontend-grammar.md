@@ -1681,6 +1681,13 @@ regression bisects to one step.
   from the `_fnParenStack` it already maintains, and the rewriter's rule became true as written. The pass also
   gained the reference-modification `COLON` as arithmetic context (§8.4.3.3.3 SR4 — both positions are arithmetic
   expressions), because a ref-mod written directly after a function name is delimited by FNARG parens too.
+  ⛔ **One grouping paren is no longer arithmetic context; a pair around the ZERO alone is** (kb/Work PB2734). A
+  plain `(` also groups a CONDITION (§8.8.4.9), so the single-paren arms made `IF (WS-A = ZERO)` compare an
+  alphanumeric item with the numeric literal 0 (a silent wrong branch against §8.3.3.6.4 GR4, where `IF WS-A =
+  ZERO` compares it with "000") and made `IF (N IS ZERO)` a parse error. Inside an arithmetic paren a ZERO's other
+  neighbour is an operator, whose own arm rewrites it, or the matching `)`; so the pass rewrites at a paren only
+  for `( ZERO )` (`ZeroTokenRewriter.IsParenthesizedAlone`), and a ZERO with one paren beside it keeps its
+  figurative identity.
   ⚠ `refModPart` accepts BOTH paren flavours: SR6's precondition is "if a function's definition **permits
   arguments**", a catalog question no lexer can answer, so after a zero-argument name that token is the ref-mod.
   ⚠ The FUNCTION of `ADDRESS [OF] FUNCTION word` (§8.4.3.12.2) heads no function-identifier — its operand is a

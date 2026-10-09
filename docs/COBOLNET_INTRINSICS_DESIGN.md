@@ -421,7 +421,7 @@ its header), `pb24_length_*`, `v59_length_agrees`, and the `pb61-*` negatives.
 DefinitionPermitsArguments` / `Sr6ArgumentListError`, PB61 row SR-8.4.3.2.3-6): "if a function's definition permits
 arguments and a left parenthesis immediately follows … the left parenthesis is always treated as the left
 parenthesis of that function's arguments" — so `NAME (start:length)` on an argument-permitting intrinsic OR a
-REPOSITORY user function with USING formals (SR6 names function-prototype-name-1 too; §12.3.8.2 GR12 gives the user
+REPOSITORY user function with USING formals (SR6 names function-prototype-name-1 too; §12.3.8.4 GR12 gives the user
 function precedence) is an ARGUMENT LIST holding a non-argument (SR8), reported COBOLNET1543 on every route: the
 FUNCTION-keyword form (`FUNCTION UPPER-CASE (1:4)` — the FNARG_LPAREN belongs to the refModPart, so the argument list
 is EMPTY and binding first reported the §15.3 arity error), the reserved-name keyword-omitted form (RANDOM/SIGN/SUM),

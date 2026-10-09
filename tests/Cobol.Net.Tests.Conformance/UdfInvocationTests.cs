@@ -8,7 +8,7 @@ namespace CobolNet.Tests.Conformance;
 /// User-defined function invocation (ISO §9.4 / §8.4.3.2 / §12.3.8; Phase 4c M2-UDF-1 — DEVLOG 615).
 /// End-to-end behavior rides the three udf_* conformance goldens (COMPUTE/MOVE receiving forms, inline
 /// sub-expression, literal + arithmetic-expression arguments — all byte-exact); these lock the edition
-/// gate, the §12.3.8.2 GR12 repository semantics, and the COBOLNET1501/1505–1509 diagnostic band.
+/// gate, the §12.3.8.4 GR12 repository semantics, and the COBOLNET1501/1505–1509 diagnostic band.
 /// </summary>
 public sealed class UdfInvocationTests
 {
@@ -56,7 +56,7 @@ public sealed class UdfInvocationTests
         Assert.True(ok02, "must bind at 2002: " + string.Join("\n", e02));
     }
 
-    /// <summary>§12.3.8.2 GR12 is a PRECONDITION: without the repository FUNCTION specifier the name is not
+    /// <summary>§12.3.8.4 GR12 is a PRECONDITION: without the repository FUNCTION specifier the name is not
     /// a user-function reference — COBOLNET1501, with the hint naming the in-group FUNCTION-ID.</summary>
     [Fact]
     public void MissingRepositoryEntry_1501_WithGr12Hint()
@@ -608,7 +608,7 @@ public sealed class UdfInvocationTests
         Assert.True(ok, string.Join("\n", errors));
     }
 
-    /// <summary>§12.3.8.2 GR12 (:14885): a REPOSITORY-declared function-prototype-name refers to the
+    /// <summary>§12.3.8.4 GR12 (:14885): a REPOSITORY-declared function-prototype-name refers to the
     /// USER-DEFINED function "and not to an intrinsic function of the same name" — the spec's own
     /// factorial-override pattern (:43651). A user function named SQRT must bind against the FUNCTION-ID
     /// unit's ONE formal, not the intrinsic catalog's signature.</summary>

@@ -66,7 +66,7 @@
            MOVE W-E (FUNCTION INTEGER(W-F (FUNCTION INTEGER(2)))) TO W-R.
            DISPLAY "NESTED=" W-R.
       *> 4 - a USER-DEFINED function as a subscript. The fragment binds through
-      *> BindIntrinsicCore, which 12.3.8.2 GR12 dispatches to the REPOSITORY name.
+      *> BindIntrinsicCore, which 12.3.8.4 GR12 dispatches to the REPOSITORY name.
            MOVE W-E (FUNCTION PB17PICK(W-X)) TO W-R.
            DISPLAY "UDFSUB=" W-R.
       *> 5 - THE 8.8.4.13 r2 PER-EVALUATION WINDOW, decisively. The subscript's

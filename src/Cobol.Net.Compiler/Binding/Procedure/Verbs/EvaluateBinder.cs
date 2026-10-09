@@ -930,51 +930,13 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         public bool NeedsIntermediate => !(Uses == 1 && ReadByFirstPhrase);
     }
 
-    /// <summary>Bind a <c>valueOperand</c> (an arithmetic expression or a non-numeric literal) as a comparison
-    /// operand — the same shapes <see cref="ComparisonOperand"/> produces.</summary>
-    private BoundOperand BindValueOperand(Core.ValueOperandContext vo)
-    {
-        // ⛔ THROUGH THE ONE nonNumericLiteral MAPPING (kb/Work PB172's sweep). This was a FOURTH hand-written
-        // copy of that dispatch — concatenation, figurative, STRINGLIT, NATLIT, BOOLLIT — and it was **missing
-        // the HEXLIT arm**, so `EVALUATE X WHEN X"6162"` fell past all five, found no arithmeticExpression, and
-        // bound to `BoundOperandError("EVALUATE operand")` → an unhandled NotImplementedCobolFeatureException at
-        // RUN TIME on conforming source (§8.3.3.2.1 makes both formats of the alphanumeric literal class and
-        // category alphanumeric). That is DA3's defect exactly, in the one copy DA3's extraction missed:
-        // ExpressionBinder.NonNumericLiteralOperand's own remark lists the three it collapsed. Measured on
-        // 9a89fbd1 before the fix, not deduced.
-        // NULL as a subject/object: §14.9.13.3 SR7 a) makes a selection object "valid operands for comparison … in
-        // accordance with 8.8.4.2", i.e. the pair is a relation condition — a §8.4.3.10.3 SR1 context — and the
-        // relation checkpoint decides the class pairing.
-        if (host.Expr.NullAdmittingOperand(vo.nonNumericLiteral()) is { } litOp) return litOp;
-        // A boolean operand enclosed in parentheses is that boolean operand (§8.8.2) — the relation side's reading
-        // (ConditionBinder.EnclosedBooleanOperand, kb/Work PB1464).
-        if (host.Cond.EnclosedBooleanOperand(vo) is { } enclosedBoolean) return enclosedBoolean;
-        if (vo.arithmeticExpression() is { } expr)
-            // ⛔ ARM FOR ARM IN THE SAME ORDER AS ConditionBinder.ComparisonOperandOf, DELIBERATELY (kb/Work
-            // PB224). §14.9.13.4 GR2 makes an EVALUATE subject/object comparison "as if" the corresponding
-            // relation condition were written, so the two operand binders answer ONE question and any divergence
-            // between them is a latent Table-15-vs-§8.8.4.2 split. The order was data-ref → num-literal →
-            // function-call here and data-ref → function-call → num-literal there; the alternatives are disjoint,
-            // so the two agreed by luck, and "agrees by luck" is what this cluster keeps finding.
-            return ConditionBinder.SoleDataRef(expr) is { } dref ? host.Expr.FieldOperand(dref)
-                // A SOLE function-identifier is a §15.2 sending item of its own class, not an arithmetic term —
-                // the same short-circuit ConditionBinder.ComparisonOperandOf makes, and for the same reason
-                // (kb/Work PB172): `EVALUATE FUNCTION LOWER-CASE(X) WHEN "abc"` compares alphanumerically.
-                : ConditionBinder.SoleFunctionCall(expr) is { } sfc
-                    ? IntrinsicBinder.OperandOf(host.Intrinsic.BindIntrinsic(sfc))
-                // …and its Format-4 twin, as on the relation side (kb/Work PB1142): a sole inline method
-                // invocation is an identifier of its temporary's class (ISO §8.4.3.4.4 GR1); an object-view and SELF
-                // are identifiers of class object (kb/Work PB1425).
-                : ConditionBinder.SoleOoIdentifier(expr) is { } soi ? host.Oo.OoIdentifierOperand(soi)
-                // A sole numeric LITERAL stays a literal operand — against an alphanumeric/group operand it
-                // participates as its WRITTEN character form, leading zeros intact (ISO §8.8.4.2.1).
-                : ConditionBinder.SoleNumLiteral(expr) is { } lit ? host.Expr.NumericLiteralOperand(lit)
-                // The ONE expression→operand mapping, as on the relation side: a user-function reference binds to
-                // a BoundNumRef over its result temp and MUST surface as a FIELD operand so the temp's cloned
-                // category (§8.4.3.2.4 GR1) drives the class dispatch; a raw BoundComputedOperand — which this
-                // arm used to build — would compare an alphanumeric/national result NUMERICALLY. For every other
-                // shape OperandOf returns the identical BoundComputedOperand, so the emit floor is unchanged.
-                : IntrinsicBinder.OperandOf(host.Expr.BindExpr(expr));   // a COMPOUND selection operand is an arithmetic expression (§8.8.1.1), as on the relation side (kb/Work PB2018)
-        return BoundOperandError.Refused(ctx.Edition, "EVALUATE operand");
-    }
+    /// <summary>Bind a <c>valueOperand</c> (an arithmetic expression or a non-numeric literal) as an EVALUATE subject
+    /// or object operand. §14.9.13.4 GR4 a) 6. says the pair "is considered to be a conditional expression" of the
+    /// form <c>selection-subject = selection-object</c>, so the binding IS the relation operand's, <see cref="ConditionBinder.ComparisonOperandOf"/>. This
+    /// method used to be an arm-for-arm copy of that dispatch (kb/Work PB172 added its missing HEXLIT arm, PB224
+    /// aligned its order by hand), and both copies mapped a parenthesized operand to the item it encloses (kb/Work
+    /// PB1935); one body now answers both. NULL is admitted as on the relation side: §14.9.13.3 SR7 a) makes a
+    /// selection object "valid operands for comparison … in accordance with 8.8.4.2", a §8.4.3.10.3 SR1 context.</summary>
+    private BoundOperand BindValueOperand(Core.ValueOperandContext vo) =>
+        host.Cond.ComparisonOperandOf(vo, "EVALUATE operand");
 }

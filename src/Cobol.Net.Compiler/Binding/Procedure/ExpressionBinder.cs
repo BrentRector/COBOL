@@ -1285,7 +1285,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// SOLE alphanumeric identifier is a legal §8.8.4.2.1 operand (`IF FUNCTION LOWER-CASE(X) = Y`). The boundary
     /// is SOLE-vs-COMPOUND, not statement-vs-statement, so the comparand binders short-circuit the sole forms
     /// before the spine — <c>ConditionBinder.SoleFunctionCall</c> / <c>SoleInlineInvocation</c> in
-    /// <c>ComparisonOperandOf</c> and <c>EvaluateBinder.BindValueOperand</c> — and this screen keys on the RULE
+    /// <c>ConditionBinder.ComparisonOperandOf</c>, which EVALUATE's operands also bind through — and this screen keys on the RULE
     /// (<c>Rules().NumericClassScreen</c>). ⛔ THE VERDICT READS THE CLASS, NOT ResultCategory (PB124 wave 5b):
     /// the storage model folds §15.2 item 6's INDEX functions into category numeric.
     /// </para></summary>

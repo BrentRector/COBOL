@@ -2509,10 +2509,10 @@
   {
    "id": "user-function-invocation-2002",
    "status": "active",
-   "description": "User-defined function reference FUNCTION function-prototype-name(args) - ISO §8.4.3.2 function-identifier / §9.4 user-defined functions / §12.3.8.2 GR12 (a REPOSITORY-declared name refers to the user function, never a same-named intrinsic). LIVE (Phase 4c M2-UDF-1, DEVLOG 615): in-group whole-source activation lowered onto the program-activation ABI - a hoisted CALL...RETURNING over an §8.4.3.2.4 GR1 result temporary; args in the §8.4.3.2.4 GR5 manner (identifier BY REFERENCE, literal/arith-expr private copy). Below 2002 the binder gate names the edition (0900); the {is2002()}?-gated PD-header RETURNING parse hint fires there too (procedure-returning-2002).",
+   "description": "User-defined function reference FUNCTION function-prototype-name(args) - ISO §8.4.3.2 function-identifier / §9.4 user-defined functions / §12.3.8.4 GR12 (a REPOSITORY-declared name refers to the user function, never a same-named intrinsic). LIVE (Phase 4c M2-UDF-1, DEVLOG 615): in-group whole-source activation lowered onto the program-activation ABI - a hoisted CALL...RETURNING over an §8.4.3.2.4 GR1 result temporary; args in the §8.4.3.2.4 GR5 manner (identifier BY REFERENCE, literal/arith-expr private copy). Below 2002 the binder gate names the edition (0900); the {is2002()}?-gated PD-header RETURNING parse hint fires there too (procedure-returning-2002).",
    "display": "a user-defined function reference (FUNCTION function-prototype-name)",
    "diagnosticCode": "COBOLNET0900",
-   "citation": "ISO §8.4.3.2 function-identifier / §9.4 user-defined functions / §12.3.8.2 GR12; LIVE (Phase 4c M2-UDF-1) — in-group whole-source activation lowered onto the program-activation ABI (hoisted CALL…RETURNING over a §8.4.3.2.4 GR1 result temp); introduction gate 0900 below 2002 (the PD-header RETURNING parse hint fires there too)",
+   "citation": "ISO §8.4.3.2 function-identifier / §9.4 user-defined functions / §12.3.8.4 GR12; LIVE (Phase 4c M2-UDF-1) — in-group whole-source activation lowered onto the program-activation ABI (hoisted CALL…RETURNING over a §8.4.3.2.4 GR1 result temp); introduction gate 0900 below 2002 (the PD-header RETURNING parse hint fires there too)",
    "introducedIn": 2002,
    "removedIn": null,
    "expectDiagnostic": "COBOLNET0900",

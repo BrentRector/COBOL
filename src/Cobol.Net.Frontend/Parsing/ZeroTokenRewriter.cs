@@ -11,16 +11,32 @@ namespace CobolNet.Frontend.Parsing;
 /// grammar's primaryExpression rule, which causes exponential ANTLR prediction time.
 ///
 /// Arithmetic context is detected by adjacency (<see cref="PrecedingArithmeticContext"/>,
-/// <see cref="FollowingArithmeticContext"/>):
+/// <see cref="FollowingArithmeticContext"/>, <see cref="IsParenthesizedAlone"/>):
 ///   ZERO followed by  +, -, *, /, **   → rewrite to ZERO_ARITH
 ///   ZERO preceded by  +, -, *, /, **   → rewrite to ZERO_ARITH
-///   ZERO followed by  )                → rewrite (closing a parenthesized expression)
-///   ZERO preceded by  (                → rewrite (opening a parenthesized expression)
+///   ZERO between a grouping ( and )    → rewrite (<c>(ZERO)</c>, a parenthesized arithmetic expression)
 ///   ZERO beside the ref-mod :          → rewrite (a reference-modification position or length)
 ///
 /// All other ZERO tokens are left unchanged — they remain figurative constants
 /// for VALUE, MOVE, comparison, and other non-arithmetic contexts.
 ///
+/// <para>
+/// ⛔ ONE GROUPING PAREN IS NOT AN ARITHMETIC CONTEXT; A PAIR AROUND THE ZERO ALONE IS (kb/Work PB2734). A plain
+/// <c>LPAREN</c>/<c>RPAREN</c> (GROUPING-PAREN-ONLY: the FNARG_ and REF_ twins below never enclose a condition)
+/// also groups a CONDITION (§8.8.4.9: a complex condition's truth value is the same
+/// "whether parenthesized or not"), and adjacency cannot tell that '(' from an arithmetic one. The paren arms used
+/// to rewrite a ZERO beside EITHER paren, so <c>IF (WS-A = ZERO)</c> and <c>IF (ZERO = WS-A)</c> bound the numeric
+/// literal 0 where the unparenthesized relation binds the figurative constant: over a <c>PIC X(3) VALUE "000"</c>
+/// item the bare relation answered EQUAL and the parenthesized one NOT EQUAL, a silent wrong branch against
+/// §8.3.3.6.4 GR4 (the zero format is the value 0 or the character '0' "depending on context") and GR2's NOTE 1
+/// (the figurative is associated with the item it is "compared with"); and <c>IF (WS-N IS ZERO)</c>, whose ZERO is
+/// the sign condition's keyword, did not parse at all. Inside an arithmetic paren the ZERO's other neighbour is an
+/// arithmetic operator (which its own arm rewrites) or the matching ')': only <c>( ZERO )</c> leaves the parens
+/// as the ZERO's whole context, and only there is the paren the deciding fact (§8.8.1.1: "an arithmetic expression
+/// enclosed in parentheses"). A ZERO with a paren on one side and anything else on the other is a relation
+/// operand, an abbreviated object or a sign-condition keyword inside a parenthesized condition, and keeps its
+/// figurative identity.
+/// </para>
 /// <para>
 /// ⛔ THE PAREN ARMS MEAN <b>ARITHMETIC</b> PARENS, AND THAT ONLY BECAME TRUE WITH fix-queue PB48. A FUNCTION
 /// argument list is delimited by <c>FNARG_LPAREN</c>/<c>FNARG_RPAREN</c>, retyped by the lexer from the paren
@@ -46,8 +62,8 @@ namespace CobolNet.Frontend.Parsing;
 public static class ZeroTokenRewriter
 {
     /// <summary>
-    /// Token types that indicate ZERO is inside an expression when they precede it.
-    /// Includes arithmetic operators, LPAREN (e.g., "(ZERO + 1)") and the ref-mod COLON.
+    /// Token types that indicate ZERO is inside an expression when they precede it: the arithmetic operators and the
+    /// ref-mod COLON. A grouping paren is NOT one by itself (kb/Work PB2734): see <see cref="IsParenthesizedAlone"/>.
     /// </summary>
     private static readonly HashSet<int> PrecedingArithmeticContext = new()
     {
@@ -56,9 +72,6 @@ public static class ZeroTokenRewriter
         CobolLexer.STAR,
         CobolLexer.SLASH,
         CobolLexer.POWER,
-        // GROUPING-PAREN-ONLY — see the class remarks: excluding FNARG_LPAREN is the whole of fix-queue PB48, and
-        // REF_LPAREN is excluded for the same reason (kb/Work PB2113).
-        CobolLexer.LPAREN,
         // The reference-modification COLON (§8.4.3.3.3 SR4 — "leftmost-character-position and length shall be
         // arithmetic expressions"). Its ONE grammar use is refModSpec, so both neighbours are arithmetic by
         // construction; `FUNCTION CURRENT-DATE (2:ZERO)` needs it because the delimiting parens of a ref-mod
@@ -67,8 +80,8 @@ public static class ZeroTokenRewriter
     };
 
     /// <summary>
-    /// Token types that indicate ZERO is inside an expression when they follow it.
-    /// Includes arithmetic operators, RPAREN (e.g., "(1 + ZERO)") and the ref-mod COLON.
+    /// Token types that indicate ZERO is inside an expression when they follow it: the arithmetic operators and the
+    /// ref-mod COLON. A grouping paren is NOT one by itself (kb/Work PB2734): see <see cref="IsParenthesizedAlone"/>.
     /// </summary>
     private static readonly HashSet<int> FollowingArithmeticContext = new()
     {
@@ -77,8 +90,6 @@ public static class ZeroTokenRewriter
         CobolLexer.STAR,
         CobolLexer.SLASH,
         CobolLexer.POWER,
-        // GROUPING-PAREN-ONLY — FNARG_RPAREN and REF_RPAREN excluded deliberately (PB48, PB2113); see the remarks.
-        CobolLexer.RPAREN,
         CobolLexer.COLON,   // the ref-mod COLON — see PrecedingArithmeticContext (`… (ZERO:2)`)
     };
 
@@ -106,26 +117,26 @@ public static class ZeroTokenRewriter
             if (token.Type is not (CobolLexer.ZERO or CobolLexer.ZEROS or CobolLexer.ZEROES))
                 continue;
 
-            // Look at the next non-hidden token to the right
+            // The nearest non-hidden token on each side (-1 at either end of the stream, which no set contains).
             int nextType = GetAdjacentTokenType(tokens, i, forward: true);
-            if (nextType != -1 && FollowingArithmeticContext.Contains(nextType))
-            {
-                ReplaceWithZeroArith(tokens, i);
-                continue;
-            }
-
-            // Look at the previous non-hidden token to the left
             int prevType = GetAdjacentTokenType(tokens, i, forward: false);
-            if (prevType != -1 && PrecedingArithmeticContext.Contains(prevType))
-            {
+            if (FollowingArithmeticContext.Contains(nextType) || PrecedingArithmeticContext.Contains(prevType)
+                || IsParenthesizedAlone(prevType, nextType))
                 ReplaceWithZeroArith(tokens, i);
-                continue;
-            }
         }
 
         // Reset the stream position so the parser reads from the beginning.
         tokenStream.Seek(0);
     }
+
+    /// <summary>
+    /// The ZERO is the whole content of a grouping paren pair, <c>( ZERO )</c>: an arithmetic expression enclosed in
+    /// parentheses (§8.8.1.1), which no condition can be, so the pair is an arithmetic context by itself. One paren
+    /// alone is not, because it may group a condition (kb/Work PB2734; the class remarks).
+    /// GROUPING-PAREN-ONLY: the FNARG_ and REF_ twins are excluded deliberately (PB48, PB2113; the class remarks).
+    /// </summary>
+    private static bool IsParenthesizedAlone(int prevType, int nextType) =>
+        prevType == CobolLexer.LPAREN && nextType == CobolLexer.RPAREN;
 
     /// <summary>
     /// Finds the nearest non-hidden token in the given direction and returns its type.

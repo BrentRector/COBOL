@@ -4725,6 +4725,21 @@ public static class DiagnosticCatalog
         + "is evaluated as written; the warning is the §4.2.2 indication that the source is outside the standard.",
         "ISO §8.8.4.2.1");
 
+    /// <summary>COBOLNET3317 — a condition-name reference written with a reference modifier (kb/Work PB2468):
+    /// <c>IF CN(1:2)</c>, SEARCH ALL <c>WHEN CN(IX)(1:2)</c>, <c>SET CN(1:2) TO TRUE</c>. The binder used to resolve
+    /// the level-88 and silently drop the modifier. Reported once per reference by
+    /// <c>ConditionBinder.ConditionOf</c>, the one resolver every condition-name position asks.</summary>
+    public static readonly DiagnosticDescriptor ConditionNameReferenceModified = new(
+        "COBOLNET3317", "condition-name-reference-modified", EditionSeverity.Error,
+        "A condition-name is written with a reference modifier. A condition-name reference is condition-name-1, "
+        + "qualified and subscripted as its conditional variable requires (ISO §8.4.4.2; §8.4.2.3.2 Format 2), and the "
+        + "condition-name condition prints condition-name-1 alone (§8.8.4.5.2): neither format has a reference "
+        + "modifier. §8.4.3.3.3 SR5 allows reference modification only \"anywhere an identifier referencing a data "
+        + "item of class alphanumeric, boolean, or national is permitted\", and a condition-name names a value of its "
+        + "conditional variable, not a data item. Remove the modifier, or reference-modify the conditional variable "
+        + "in a relation condition.",
+        "ISO §8.4.4.2; §8.8.4.5.2; §8.4.3.3.3 SR5");
+
     // ── COBOLNET2030/2031 — the two §14.9.20.3 screens INITIALIZE never asked at the one place identifier-1 and
     //    its REPLACING operands are resolved (kb/Work PB416). The statement's other two unasked rules need no new
     //    code: SR5 already had COBOLNET0835 (wired to a branch that could not reach a resolved RENAMES entry) and
