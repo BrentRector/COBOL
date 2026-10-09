@@ -70,6 +70,22 @@ public sealed class CanonicalClosureDriftTests
         Assert.True(apart.Count == 0, $"{which}: {apart.Count} precomposed character(s) collate apart from their NFD:\n" + string.Join("\n", apart.Take(30)));
     }
 
+    /// <summary>A tailored precomposed Hangul syllable keeps its canonical equivalence with its jamo spelling (train
+    /// 1047 review of kb/Work PB2765): the engine decomposes a syllable to its jamo before the table, so the closure
+    /// must not give the jamo spelling alone the syllable's tailored weights.</summary>
+    [Fact]
+    public void TailoredHangulSyllable_CollatesEqualToItsJamoSpelling()
+    {
+        var tailoring = TailoringRules.Parse(new StringReader($"""
+            @locale zz
+            U+AC00         {After('z')} 0020 0002
+            U+AC01         {After('z')} 0020 0003
+            """), "hangul.tailor");
+        var collator = new Collator(CollationTable.Root.WithTailoring(tailoring), AllLevels);
+        Assert.Equal(0, collator.Compare("가", "가"));         // 가 = L V
+        Assert.Equal(0, collator.Compare("각", "각"));   // 각 = L V T
+    }
+
     private static string Text(int[] codePoints)
     {
         var sb = new StringBuilder();

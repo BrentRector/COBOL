@@ -455,8 +455,13 @@ public sealed class CollationTable
         // (1) every tailored key that is not in NFD (a precomposed letter, a contraction whose first code point
         //     decomposes, marks out of canonical order) also maps its NFD spelling — what Normalizer turns the text
         //     into whenever it holds a combining mark — unless the plan maps that spelling itself;
+        //     A key that starts with a precomposed Hangul syllable is passed over: the engine never looks such a key
+        //     up (CollationElementIterator decomposes a syllable to its jamo before the table, UTS #10 S2.1's
+        //     algorithmic Hangul arm), so mapping its jamo spelling would move the jamo text alone and set the two
+        //     canonically equivalent spellings apart — ICU's builder refuses such a key outright.
         foreach (var (codePoints, elements) in plan.Entries)
         {
+            if (IsHangulSyllable(codePoints[0])) continue;
             var nfd = CanonicalForm(codePoints);
             if (nfd is null || plan.Defines(nfd)) continue;
             int offset = pool.Count;

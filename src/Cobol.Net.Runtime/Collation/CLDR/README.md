@@ -10,7 +10,7 @@ locale's CLDR collation *rules* by the loader and builder in this folder. The ha
 |---|---|
 | `CldrLocaleData.cs` | the data model: `CldrLocaleData` (identity, default type, the `CldrCollation`s), `CldrCollation` (type/alt/draft, rules text, parsed `Rules`, `Settings`, `Imports`, `Unsupported`), `CldrSettings`, the rule records (`CldrReset`, `CldrRelation`, `CldrImportRule`), `CldrSpecialPosition`, `CldrRelationStrength` |
 | `CldrParser.cs` | LDML XML (`<identity>`, `<defaultCollation>`, `<collation type= alt= draft=><cr>`), the JSON mirror (§3), the **rule syntax** (§2) and the UnicodeSet subset of `[suppressContractions]` / `[optimize]` |
-| `CldrLocaleLoader.cs` | `Load(name)` / `LoadExact` / `Root`, the parent chain (`Chain`, `ParentOf`), `ResolveCollation(tag)` (which collation of which file a BCP 47 tag means, `-u-` keys included), the sources (§4), `CldrLocaleTag` |
+| `CldrLocaleLoader.cs` | `Load(name)` / `LoadExact` / `Root`, the parent chain (`Chain`, `ParentOf`), `ResolveCollation(tag)` (which collation of which file a BCP 47 tag means, `-u-` keys included), `FindCollation(locale, type)` (the exact type an `[import]` names, along the chain), the sources (§4), `CldrLocaleTag` |
 | `CldrTailoringBuilder.cs` | rules → a tailored `CollationTable` + `CollationOptions` (§5) |
 | `Data/cldr-collation.zip` + `.manifest.json` | the pack of CLDR release files (embedded resource `Collation/CLDR/Data/cldr-collation.zip`) |
 
