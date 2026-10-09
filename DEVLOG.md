@@ -13,6 +13,26 @@ and lessons learned — intended as source material for a series of articles.
 > `2026-06-09 13:01 PDT`). The time gives the per-day granularity older entries lack, so same-day entries are always
 > ordered/renumber-able. (Entries 001–511 predate this rule — many are undated and none have a time; left as-is.)
 
+## Entry 1948 — 2026-10-09 10:40 PDT — Train 1049b: the lander's Windows and Linux gates run concurrently (PB2877); PB2878 filed
+
+Owner, 2026-10-09: "Why don't we run the Windows local and the WSL local gates in parallel? I.e. Concurrently?" — and
+"I approve this one-change train". The Linux gate (`scripts/linux-gate.sh` under WSL) builds and tests its own clone of
+the committed HEAD and shares nothing with the Windows lander gate, which holds no gate slot; the sequence was a
+fail-fast choice that saved almost nothing (a red is fixed and both gates re-run anyway) and cost the sum of the two.
+Measured on train 1049: started overlapped with the Windows gate, the Linux legs ran at their solo speed (unit 84 s,
+conformance 63 s, guard 69 s against 87, 64 and 70 s the night before), so a landing's gates take the longer of the two
+(~6 min) instead of their sum (~10 min). MANDATORY-PRACTICES L10 and step 3b of lander-train-brief.md and lander-brief.md
+now start the Linux gate in the background the moment every cluster is committed; both must be GREEN on the same head,
+and a commit made to fix either red re-runs both. I8 (the implementer's Linux gate) is unchanged until measured under
+the gate-slot cap. `check_practices.py` GREEN. PB2877 landed.
+
+PB2878 filed (analysis, owner: "Should this require a full CI run? I would think not"): `main` requires `ci-gate` on
+every commit, and here the practices files, briefs, notes and docs are test inputs, so a docs-only change can still turn
+CI red; the design question is a path-classified fast lane for landings confined to paths no test reads, proved by a
+drift test and applied identically by the local gates (the CI invariant).
+
+This train's own gates ran concurrently under the new rule.
+
 ## Entry 1947 — 2026-10-09 10:14 PDT — Train 1049: the last 2 % of both accounts — PB2757 (sequential medium bytes never BOM-sniffed), PB2739 (one DivisionCursor rule), PB2844 (a constant's LENGTH OF through TYPE / SAME AS)
 
 Owner, 2026-10-09 ~09:55: "Both your and Mythos session have 2% quota remaining. Is there useful work you can divide
