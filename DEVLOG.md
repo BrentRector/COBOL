@@ -19,9 +19,9 @@ Owner, 2026-10-09: "Why don't we run the Windows local and the WSL local gates i
 "I approve this one-change train". The Linux gate (`scripts/linux-gate.sh` under WSL) builds and tests its own clone of
 the committed HEAD and shares nothing with the Windows lander gate, which holds no gate slot; the sequence was a
 fail-fast choice that saved almost nothing (a red is fixed and both gates re-run anyway) and cost the sum of the two.
-Measured on train 1049: started overlapped with the Windows gate, the Linux legs ran at their solo speed (unit 84 s,
-conformance 63 s, guard 69 s against 87, 64 and 70 s the night before), so a landing's gates take the longer of the two
-(~6 min) instead of their sum (~10 min). MANDATORY-PRACTICES L10 and step 3b of lander-train-brief.md and lander-brief.md
+Measured on 2026-10-09: alone, the Windows lander gate takes ~4.1 min and the Linux gate ~5.9 min (~10 min in
+sequence); fully overlapped on this train they slowed each other by sharing the CPU (7.1 and 7.3 min), so the gates took
+7.3 min instead of ~10 (~27 % less). A first, partial overlap on train 1049 had suggested no slowdown. MANDATORY-PRACTICES L10 and step 3b of lander-train-brief.md and lander-brief.md
 now start the Linux gate in the background the moment every cluster is committed; both must be GREEN on the same head,
 and a commit made to fix either red re-runs both. I8 (the implementer's Linux gate) is unchanged until measured under
 the gate-slot cap. `check_practices.py` GREEN. PB2877 landed.
