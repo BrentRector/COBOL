@@ -15516,13 +15516,13 @@
   "ordinal": 12,
   "subject": "REPOSITORY paragraph",
   "rule-digest": "1b6daa12bd84",
-  "verdict": "PARTIAL",
+  "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#BindIntrinsicCore; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/IntrinsicBinder.cs#KeywordOmittedFunction; src/Cobol.Net.Compiler/Binding/DataBinder.cs#BindDeclarations; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#InheritConfiguration; src/Cobol.Net.Compiler/Oo/OoDriver.cs#BindClassBody; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#UserFunctionsOf",
-  "test-ref": "conformance-test:UdfInvocationTests.UserFunctionShadowsIntrinsic_Gr12; conformance:2002/pb1100_class_repository_function_program; conformance:negative/pb1100-class-repository-function-undefined",
+  "test-ref": "conformance-test:UdfInvocationTests.UserFunctionShadowsIntrinsic_Gr12; conformance:2002/pb1100_class_repository_function_program; conformance:negative/pb1100-class-repository-function-undefined; conformance-test:UdfInvocationTests.MissingRepositoryEntry_1501_WithGr12Hint",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1100 LANDED (w68z): the CLASS half of the rule's scope. cite.py --check 12.3.8.4 'a reference to function-prototype-name-1 is a reference to a user-defined function' -> OK §12.3.8.4 12); cite.py --check 12.3.4 'apply to each directly or indirectly contained source unit' -> OK §12.3.4 1). The class bodies used to bind BEFORE any program unit's DATA division and against no user-function table, so every method reference to a class-REPOSITORY function drew COBOLNET1505. BinderDriver.Bind now binds every DATA division, builds the group REPOSITORY tables once (BindSession.Repository) and only then the class bodies; OoDriver.BindClassBody hands the OBJECT and FACTORY binders the same UserFunctionsOf / ProgramPrototypesOf lookups a program unit gets (the program-prototype sibling: a method's CALL program-prototype-name was 'not defined'). Golden pb1100_class_repository_function_program prints F=0043 O=0010 C=0121; the negative pins COBOLNET1505 for a genuinely undefined class-REPOSITORY function. REMAINING (why PARTIAL): kb/Work PB1085 — the rule is cited as '§12.3.8.2 GR12' in code, tests, the COBOLNET1501 message and the constructs.json citation.",
-  "state": "GAP"
+  "notes": "kb/Work PB1100 LANDED (w68z): the CLASS half of the rule's scope (class bodies bind against the group REPOSITORY tables; golden pb1100_class_repository_function_program prints F=0043 O=0010 C=0121). kb/Work PB1085 LANDED (train 1047): the rule is cited where it is. cite.py --check 12.3.8.4 'a reference to function-prototype-name-1 is a reference to a user-defined function' -> OK §12.3.8.4 12). Wave 1047 E (PB1928) re-derived the inherited '§12.3.8.2 GR12' in the binder comments, the COBOLNET1501 message (now '(ISO §12.3.8.4 GR12)', pinned by UdfInvocationTests.MissingRepositoryEntry_1501_WithGr12Hint) and the constructs.json citation; the train corrected the last site, OoNameResolution.cs's class/interface self-specifier comment, to §12.3.8.3 SR5/SR8 (cite.py --check 12.3.8.3 'this class-specifier is ignored' -> OK §12.3.8.3 5)).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-12.3.8.4-13",

@@ -130,7 +130,7 @@ public static class OoNameResolution
 /// <summary>
 /// The set of object-class-names and interface-names ONE source element may reference (ISO §8.4.6.4): its own
 /// REPOSITORY declarations plus every containing source element's (§12.3.4 GR1), plus the name of the
-/// containing class or interface definition itself — §12.3.8.2 GR5/GR8 say the self-naming specifier "is
+/// containing class or interface definition itself — §12.3.8.3 SR5/SR8 say the self-naming specifier "is
 /// ignored", so the definition's own name is in scope whether or not it is declared.
 /// </summary>
 public sealed class OoRepositoryScope

@@ -67,6 +67,8 @@ public sealed class UdfInvocationTests
         Assert.False(ok);
         EditionHarness.AssertHasDiagnostic(errors, "COBOLNET1501");
         Assert.Contains(errors, e => e.Contains("REPOSITORY", StringComparison.Ordinal));
+        // The hint cites the rule where it is (kb/Work PB1085): §12.3.8.4 GR12, never the general format §12.3.8.2.
+        Assert.Contains(errors, e => e.Contains("§12.3.8.4 GR12", StringComparison.Ordinal));
     }
 
     /// <summary>A REPOSITORY-declared function with NO in-group FUNCTION-ID definition is the
