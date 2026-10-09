@@ -99,21 +99,6 @@ CobolNet.Runtime.CellGroupShape.Elems.init -> void
 CobolNet.Runtime.CellGroupShape.Equals(CobolNet.Runtime.CellGroupShape? other) -> bool
 CobolNet.Runtime.CellGroupShape.Width.get -> int
 CobolNet.Runtime.CellGroupShape.Width.init -> void
-CobolNet.Runtime.CellOdoTail
-CobolNet.Runtime.CellOdoTail.CellOdoTail() -> void
-CobolNet.Runtime.CellOdoTail.CellOdoTail(int Elem, int Max, int Comps = 0) -> void
-CobolNet.Runtime.CellOdoTail.Comps.get -> int
-CobolNet.Runtime.CellOdoTail.Comps.init -> void
-CobolNet.Runtime.CellOdoTail.CutAt(int count) -> int
-CobolNet.Runtime.CellOdoTail.CutComponents(int count) -> int
-CobolNet.Runtime.CellOdoTail.Deconstruct(out int Elem, out int Max, out int Comps) -> void
-CobolNet.Runtime.CellOdoTail.Elem.get -> int
-CobolNet.Runtime.CellOdoTail.Elem.init -> void
-CobolNet.Runtime.CellOdoTail.Equals(CobolNet.Runtime.CellOdoTail other) -> bool
-CobolNet.Runtime.CellOdoTail.Max.get -> int
-CobolNet.Runtime.CellOdoTail.Max.init -> void
-CobolNet.Runtime.CellOdoTail.Present.get -> bool
-CobolNet.Runtime.CellOdoTail.Width.get -> int
 CobolNet.Runtime.CellPointer
 CobolNet.Runtime.CellPointer.Cell.get -> CobolNet.Runtime.StorageCell!
 CobolNet.Runtime.CellPointer.CellPointer(CobolNet.Runtime.StorageCell! cell, long offset) -> void
@@ -178,15 +163,15 @@ CobolNet.Runtime.CobolCollation
 CobolNet.Runtime.CobolCollation.CobolCollation() -> void
 CobolNet.Runtime.CobolCollation.ThruMember(string? read, string? lo, string? hi) -> bool
 CobolNet.Runtime.CobolContiguousLayout
-CobolNet.Runtime.CobolContiguousLayout.CobolContiguousLayout(int FixedTotal, int[]! FixedAt, int[]! Unit, long[]! MaxUnits, System.Collections.Generic.IReadOnlyList<int>? StructureCodes = null, bool OdoTail = false) -> void
-CobolNet.Runtime.CobolContiguousLayout.ComponentOffsets.get -> System.Collections.Generic.IReadOnlyList<int>!
-CobolNet.Runtime.CobolContiguousLayout.Decompose(string! record, CobolNet.Runtime.RecordExtents? extents = null, bool fixedForm = false) -> CobolNet.Runtime.CobolVarGroup!
+CobolNet.Runtime.CobolContiguousLayout.CobolContiguousLayout(int FixedTotal, int[]! FixedAt, int[]! Unit, long[]! MaxUnits, System.Collections.Generic.IReadOnlyList<int>? StructureCodes = null, CobolNet.Runtime.OdoTail Odo = default(CobolNet.Runtime.OdoTail)) -> void
+CobolNet.Runtime.CobolContiguousLayout.Decompose(string! record, CobolNet.Runtime.RecordExtents? extents = null, bool fixedForm = false, int count = 2147483647) -> CobolNet.Runtime.CobolVarGroup!
 CobolNet.Runtime.CobolContiguousLayout.ExtentsFrom(int[]! lengths) -> CobolNet.Runtime.RecordExtents!
 CobolNet.Runtime.CobolContiguousLayout.ExtentsOf(CobolNet.Runtime.CobolVarGroup! current) -> CobolNet.Runtime.RecordExtents!
 CobolNet.Runtime.CobolContiguousLayout.HasStructure.get -> bool
 CobolNet.Runtime.CobolContiguousLayout.MediumExtents(CobolNet.Runtime.RecordExtents! extents) -> CobolNet.Runtime.RecordExtents!
 CobolNet.Runtime.CobolContiguousLayout.MediumImage(string! image, CobolNet.Runtime.RecordExtents! extents) -> string!
 CobolNet.Runtime.CobolContiguousLayout.Position(string! record, int fixedOffset, CobolNet.Runtime.RecordExtents? extents = null) -> int
+CobolNet.Runtime.CobolContiguousLayout.StatesCount(string! record, CobolNet.Runtime.RecordExtents? extents, bool fixedForm) -> bool
 CobolNet.Runtime.CobolContiguousLayout.StructureOf(int k) -> CobolNet.Runtime.CobolDynStructure?
 CobolNet.Runtime.CobolContiguousLayout.ToFixedForm(string! image, CobolNet.Runtime.RecordExtents? extents) -> string!
 CobolNet.Runtime.CobolDate
@@ -647,6 +632,7 @@ CobolNet.Runtime.Collation.CollationStrength.Secondary = 2 -> CobolNet.Runtime.C
 CobolNet.Runtime.Collation.CollationStrength.Tertiary = 3 -> CobolNet.Runtime.Collation.CollationStrength
 CobolNet.Runtime.Collation.CollationTable
 CobolNet.Runtime.Collation.CollationTable.CanonicalDecompositionCount.get -> int
+CobolNet.Runtime.Collation.CollationTable.ClosedComposites.get -> int
 CobolNet.Runtime.Collation.CollationTable.CombiningClass(int codePoint) -> int
 CobolNet.Runtime.Collation.CollationTable.ContractionCount.get -> int
 CobolNet.Runtime.Collation.CollationTable.Description.get -> string!
@@ -1287,9 +1273,11 @@ CobolNet.Runtime.GroupMismatch
 CobolNet.Runtime.GroupMismatch.<Clone>$() -> CobolNet.Runtime.GroupMismatch!
 CobolNet.Runtime.GroupMismatch.Atom.get -> int
 CobolNet.Runtime.GroupMismatch.Atom.init -> void
-CobolNet.Runtime.GroupMismatch.Deconstruct(out CobolNet.Runtime.GroupMismatchKind Kind, out bool OnFirst, out int Atom, out int OtherAtom, out long Position, out CobolNet.Runtime.GroupMismatch? Inner) -> void
+CobolNet.Runtime.GroupMismatch.Deconstruct(out CobolNet.Runtime.GroupMismatchKind Kind, out bool OnFirst, out int Atom, out int OtherAtom, out long Position, out CobolNet.Runtime.GroupMismatch? Inner, out long FirstLength, out long SecondLength) -> void
 CobolNet.Runtime.GroupMismatch.Equals(CobolNet.Runtime.GroupMismatch? other) -> bool
-CobolNet.Runtime.GroupMismatch.GroupMismatch(CobolNet.Runtime.GroupMismatchKind Kind, bool OnFirst, int Atom, int OtherAtom, long Position, CobolNet.Runtime.GroupMismatch? Inner = null) -> void
+CobolNet.Runtime.GroupMismatch.FirstLength.get -> long
+CobolNet.Runtime.GroupMismatch.FirstLength.init -> void
+CobolNet.Runtime.GroupMismatch.GroupMismatch(CobolNet.Runtime.GroupMismatchKind Kind, bool OnFirst, int Atom, int OtherAtom, long Position, CobolNet.Runtime.GroupMismatch? Inner = null, long FirstLength = 0, long SecondLength = 0) -> void
 CobolNet.Runtime.GroupMismatch.Inner.get -> CobolNet.Runtime.GroupMismatch?
 CobolNet.Runtime.GroupMismatch.Inner.init -> void
 CobolNet.Runtime.GroupMismatch.Kind.get -> CobolNet.Runtime.GroupMismatchKind
@@ -1300,6 +1288,8 @@ CobolNet.Runtime.GroupMismatch.OtherAtom.get -> int
 CobolNet.Runtime.GroupMismatch.OtherAtom.init -> void
 CobolNet.Runtime.GroupMismatch.Position.get -> long
 CobolNet.Runtime.GroupMismatch.Position.init -> void
+CobolNet.Runtime.GroupMismatch.SecondLength.get -> long
+CobolNet.Runtime.GroupMismatch.SecondLength.init -> void
 CobolNet.Runtime.GroupMismatchKind
 CobolNet.Runtime.GroupMismatchKind.DynamicLengthBeyondEnd = 6 -> CobolNet.Runtime.GroupMismatchKind
 CobolNet.Runtime.GroupMismatchKind.DynamicLengthUnpaired = 0 -> CobolNet.Runtime.GroupMismatchKind
@@ -1352,11 +1342,11 @@ CobolNet.Runtime.IO.CobolReport.PageCounter.get -> long
 CobolNet.Runtime.IO.CobolReport.Place(CobolNet.Runtime.IO.ReportLineImage! line, int column, string! image) -> void
 CobolNet.Runtime.IO.CobolReport.SetCode(System.Func<string!>! read) -> void
 CobolNet.Runtime.IO.CobolReport.SetPageCounter(long value) -> void
-CobolNet.Runtime.IO.CobolReport.SetSumValue(int baseId, System.ReadOnlySpan<int> extents, System.ReadOnlySpan<long> subscripts, System.Int128 value) -> void
-CobolNet.Runtime.IO.CobolReport.SetSumValue(int id, System.Int128 value) -> void
+CobolNet.Runtime.IO.CobolReport.SetSumImage(int baseId, System.ReadOnlySpan<int> extents, System.ReadOnlySpan<long> subscripts, string! image, in CobolNet.Runtime.NumProfile profile) -> void
+CobolNet.Runtime.IO.CobolReport.SetSumImage(int id, string! image, in CobolNet.Runtime.NumProfile profile) -> void
+CobolNet.Runtime.IO.CobolReport.SumImage(int baseId, System.ReadOnlySpan<int> extents, System.ReadOnlySpan<long> subscripts, in CobolNet.Runtime.NumProfile profile) -> string!
+CobolNet.Runtime.IO.CobolReport.SumImage(int id, in CobolNet.Runtime.NumProfile profile) -> string!
 CobolNet.Runtime.IO.CobolReport.SumPresentable(int id) -> bool
-CobolNet.Runtime.IO.CobolReport.SumValue(int baseId, System.ReadOnlySpan<int> extents, System.ReadOnlySpan<long> subscripts) -> System.Int128
-CobolNet.Runtime.IO.CobolReport.SumValue(int id) -> System.Int128
 CobolNet.Runtime.IO.CobolReport.SuppressPrinting(int groupIndex) -> void
 CobolNet.Runtime.IO.CobolReport.Terminate(System.Func<int, bool>? beforeReporting = null) -> void
 CobolNet.Runtime.IO.CobolSort
@@ -1916,6 +1906,22 @@ CobolNet.Runtime.ObjectReferenceKind.Interface = 2 -> CobolNet.Runtime.ObjectRef
 CobolNet.Runtime.ObjectReferenceKind.None = 0 -> CobolNet.Runtime.ObjectReferenceKind
 CobolNet.Runtime.ObjectReferenceKind.ObjectClass = 3 -> CobolNet.Runtime.ObjectReferenceKind
 CobolNet.Runtime.ObjectReferenceKind.Universal = 1 -> CobolNet.Runtime.ObjectReferenceKind
+CobolNet.Runtime.OdoTail
+CobolNet.Runtime.OdoTail.Comps.get -> int
+CobolNet.Runtime.OdoTail.Comps.init -> void
+CobolNet.Runtime.OdoTail.CountFrom(int components, int total) -> int?
+CobolNet.Runtime.OdoTail.CutAt(int count) -> int
+CobolNet.Runtime.OdoTail.CutComponents(int count) -> int
+CobolNet.Runtime.OdoTail.Deconstruct(out int Elem, out int Max, out int Comps) -> void
+CobolNet.Runtime.OdoTail.Elem.get -> int
+CobolNet.Runtime.OdoTail.Elem.init -> void
+CobolNet.Runtime.OdoTail.Equals(CobolNet.Runtime.OdoTail other) -> bool
+CobolNet.Runtime.OdoTail.Max.get -> int
+CobolNet.Runtime.OdoTail.Max.init -> void
+CobolNet.Runtime.OdoTail.OdoTail() -> void
+CobolNet.Runtime.OdoTail.OdoTail(int Elem, int Max, int Comps = 0) -> void
+CobolNet.Runtime.OdoTail.Present.get -> bool
+CobolNet.Runtime.OdoTail.Width.get -> int
 CobolNet.Runtime.OmittedFormal
 CobolNet.Runtime.PointerImage
 CobolNet.Runtime.PredefinedNullArgument
@@ -2016,8 +2022,8 @@ CobolNet.Runtime.StopRun.StopRun() -> void
 CobolNet.Runtime.StorageByte
 CobolNet.Runtime.StorageCell
 CobolNet.Runtime.StorageCell.Allocated -> bool
-CobolNet.Runtime.StorageCell.ContiguousAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.CellOdoTail tail, int count, CobolNet.Runtime.CellGroupShape?[]? elems = null) -> string!
-CobolNet.Runtime.StorageCell.ContiguousExtentsAt(int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynMax, System.ReadOnlySpan<int> dynStructure, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.CellOdoTail tail, int count) -> CobolNet.Runtime.RecordExtents!
+CobolNet.Runtime.StorageCell.ContiguousAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, int count, CobolNet.Runtime.CellGroupShape?[]? elems = null) -> string!
+CobolNet.Runtime.StorageCell.ContiguousExtentsAt(int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynMax, System.ReadOnlySpan<int> dynStructure, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, int count) -> CobolNet.Runtime.RecordExtents!
 CobolNet.Runtime.StorageCell.CopyArea(long offset, int width) -> CobolNet.Runtime.StorageCell!
 CobolNet.Runtime.StorageCell.DynAt(int ordinal) -> string!
 CobolNet.Runtime.StorageCell.DynTableAt(int ordinal, int min, int elementWidth) -> CobolNet.Runtime.CobolDynTable<CobolNet.Runtime.StorageCell!>!
@@ -2033,9 +2039,9 @@ CobolNet.Runtime.StorageCell.SetSlotAt(int byteOffset, object? value) -> void
 CobolNet.Runtime.StorageCell.SlotAt(int byteOffset) -> object?
 CobolNet.Runtime.StorageCell.StorageCell() -> void
 CobolNet.Runtime.StorageCell.StoreArea(long offset, CobolNet.Runtime.StorageCell! source) -> void
-CobolNet.Runtime.StorageCell.StoreContiguousAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynMax, System.ReadOnlySpan<int> dynStructure, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.CellOdoTail tail, string! image, CobolNet.Runtime.RecordExtents? extents = null, bool fixedForm = false) -> void
-CobolNet.Runtime.StorageCell.StoreVarGroupAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynMax, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.CellOdoTail tail, int count, CobolNet.Runtime.CobolVarGroup! v, CobolNet.Runtime.CellGroupShape?[]? elems = null, bool storage = false) -> void
-CobolNet.Runtime.StorageCell.VarGroupAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.CellOdoTail tail, int count, CobolNet.Runtime.CellGroupShape?[]? elems = null) -> CobolNet.Runtime.CobolVarGroup!
+CobolNet.Runtime.StorageCell.StoreContiguousAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynMax, System.ReadOnlySpan<int> dynStructure, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, string! image, CobolNet.Runtime.RecordExtents? extents = null, bool fixedForm = false, int count = 2147483647) -> bool
+CobolNet.Runtime.StorageCell.StoreVarGroupAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynMax, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, int count, CobolNet.Runtime.CobolVarGroup! v, CobolNet.Runtime.CellGroupShape?[]? elems = null, bool storage = false) -> void
+CobolNet.Runtime.StorageCell.VarGroupAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, int count, CobolNet.Runtime.CellGroupShape?[]? elems = null) -> CobolNet.Runtime.CobolVarGroup!
 CobolNet.Runtime.StorageEnd
 CobolNet.Runtime.StorageEnd.ActivationEnded = 2 -> CobolNet.Runtime.StorageEnd
 CobolNet.Runtime.StorageEnd.Cancelled = 3 -> CobolNet.Runtime.StorageEnd
@@ -2157,6 +2163,7 @@ const CobolNet.Runtime.CobolInspect.ReplaceLeading = 2 -> int
 const CobolNet.Runtime.CobolInspect.TallyAll = 0 -> int
 const CobolNet.Runtime.CobolInspect.TallyCharacters = 2 -> int
 const CobolNet.Runtime.CobolInspect.TallyLeading = 1 -> int
+const CobolNet.Runtime.CobolIntrinsics.ReturnedValueMaximum = 1073741791 -> int
 const CobolNet.Runtime.CobolNum.MaxSendingCharacterPositions = 31 -> int
 const CobolNet.Runtime.CobolPtr.MaxAddress = 9223372036854775807 -> long
 const CobolNet.Runtime.CobolPtr.MinAddress = -9223372036854775808 -> long
@@ -2269,7 +2276,6 @@ override CobolNet.Runtime.CarrierLanding<T>.Land(in CobolNet.Runtime.CobolArg ar
 override CobolNet.Runtime.CellGroupShape.Equals(object? obj) -> bool
 override CobolNet.Runtime.CellGroupShape.GetHashCode() -> int
 override CobolNet.Runtime.CellGroupShape.ToString() -> string!
-override CobolNet.Runtime.CellOdoTail.GetHashCode() -> int
 override CobolNet.Runtime.CellPointer.IsNull.get -> bool
 override CobolNet.Runtime.CobolArg.GetHashCode() -> int
 override CobolNet.Runtime.CobolBoolSized.GetHashCode() -> int
@@ -2403,6 +2409,7 @@ override CobolNet.Runtime.ManagedPointer<T>.IsNull.get -> bool
 override CobolNet.Runtime.MoveLanding.Land(in CobolNet.Runtime.CobolArg arg, CobolNet.Runtime.NumProfile? formal, bool checking) -> CobolNet.Runtime.CobolArg
 override CobolNet.Runtime.MoveSending.GetHashCode() -> int
 override CobolNet.Runtime.NumProfile.GetHashCode() -> int
+override CobolNet.Runtime.OdoTail.GetHashCode() -> int
 override CobolNet.Runtime.ProgramPointer.GetHashCode() -> int
 override CobolNet.Runtime.SavedLocalePointer.ToString() -> string!
 override CobolNet.Runtime.SignPunchTable.GetHashCode() -> int
@@ -2440,8 +2447,6 @@ static CobolNet.Runtime.BoundaryItem.operator !=(CobolNet.Runtime.BoundaryItem l
 static CobolNet.Runtime.BoundaryItem.operator ==(CobolNet.Runtime.BoundaryItem left, CobolNet.Runtime.BoundaryItem right) -> bool
 static CobolNet.Runtime.CellGroupShape.operator !=(CobolNet.Runtime.CellGroupShape? left, CobolNet.Runtime.CellGroupShape? right) -> bool
 static CobolNet.Runtime.CellGroupShape.operator ==(CobolNet.Runtime.CellGroupShape? left, CobolNet.Runtime.CellGroupShape? right) -> bool
-static CobolNet.Runtime.CellOdoTail.operator !=(CobolNet.Runtime.CellOdoTail left, CobolNet.Runtime.CellOdoTail right) -> bool
-static CobolNet.Runtime.CellOdoTail.operator ==(CobolNet.Runtime.CellOdoTail left, CobolNet.Runtime.CellOdoTail right) -> bool
 static CobolNet.Runtime.CobolArg.operator !=(CobolNet.Runtime.CobolArg left, CobolNet.Runtime.CobolArg right) -> bool
 static CobolNet.Runtime.CobolArg.operator ==(CobolNet.Runtime.CobolArg left, CobolNet.Runtime.CobolArg right) -> bool
 static CobolNet.Runtime.CobolArgAdapt.Aliased(CobolNet.Runtime.CobolArg[]! args, int i, CobolNet.Runtime.ManagedPointer! area) -> bool
@@ -2547,8 +2552,8 @@ static CobolNet.Runtime.CobolDate.Format21(System.DateTimeOffset t) -> string!
 static CobolNet.Runtime.CobolDate.FormatFractionDigits(string! format) -> int
 static CobolNet.Runtime.CobolDate.FormattedCurrentDate(string! format) -> string!
 static CobolNet.Runtime.CobolDate.FormattedDate(string! format, long integerDate) -> string!
-static CobolNet.Runtime.CobolDate.FormattedDatetime(string! format, long integerDate, System.Int128 secUnscaled, int secScale, long offsetMinutes, bool hasOffset, bool leapSecond = false) -> string!
-static CobolNet.Runtime.CobolDate.FormattedTime(string! format, System.Int128 secUnscaled, int secScale, long offsetMinutes, bool hasOffset, bool leapSecond = false) -> string!
+static CobolNet.Runtime.CobolDate.FormattedDatetime(string! format, long integerDate, System.Int128 secUnscaled, int secScale, long offsetMinutes, bool leapSecond = false) -> string!
+static CobolNet.Runtime.CobolDate.FormattedTime(string! format, System.Int128 secUnscaled, int secScale, long offsetMinutes, bool leapSecond = false) -> string!
 static CobolNet.Runtime.CobolDate.IntegerOfDate(long yyyymmdd) -> long
 static CobolNet.Runtime.CobolDate.IntegerOfDay(long yyyyddd) -> long
 static CobolNet.Runtime.CobolDate.IntegerOfFormattedDate(string! format, string! data, bool leapSecond = false) -> long
@@ -2597,6 +2602,7 @@ static CobolNet.Runtime.CobolEdit.Format(System.Int128 value, int valueScale, st
 static CobolNet.Runtime.CobolEdit.FormatFloatStore(CobolNet.Runtime.CobolDec value, string! picture, CobolNet.Runtime.CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, CobolNet.Runtime.CobolEdit.EditRule[]? edits = null) -> string!
 static CobolNet.Runtime.CobolEdit.FormatFloatStore(System.Int128 value, int valueScale, string! picture, CobolNet.Runtime.CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, CobolNet.Runtime.CobolEdit.EditRule[]? edits = null) -> string!
 static CobolNet.Runtime.CobolEdit.FormatFloatStore(double value, string! picture, CobolNet.Runtime.CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, CobolNet.Runtime.CobolEdit.EditRule[]? edits = null) -> string!
+static CobolNet.Runtime.CobolEdit.FormatFloatStoreU(System.UInt128 value, int valueScale, string! picture, CobolNet.Runtime.CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, CobolNet.Runtime.CobolEdit.EditRule[]? edits = null) -> string!
 static CobolNet.Runtime.CobolEdit.FormatSimpleInsertion(string! source, string! picture, CobolNet.Runtime.CobolEdit.EditRule[]? edits = null) -> string!
 static CobolNet.Runtime.CobolEdit.IsBlanked(string? image) -> bool
 static CobolNet.Runtime.CobolEdit.IsEditedCategorySymbol(char maskChar, System.Collections.Generic.IReadOnlySet<char>? char1 = null) -> bool
@@ -2608,6 +2614,7 @@ static CobolNet.Runtime.CobolEdit.TryFormat(System.Int128 value, int valueScale,
 static CobolNet.Runtime.CobolEdit.TryFormatFloat(CobolNet.Runtime.CobolDec value, string! picture, out string! image, CobolNet.Runtime.CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, CobolNet.Runtime.CobolEdit.EditRule[]? edits = null) -> bool
 static CobolNet.Runtime.CobolEdit.TryFormatFloat(System.Int128 value, int valueScale, string! picture, out string! image, CobolNet.Runtime.CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, CobolNet.Runtime.CobolEdit.EditRule[]? edits = null) -> bool
 static CobolNet.Runtime.CobolEdit.TryFormatFloat(double value, string! picture, out string! image, CobolNet.Runtime.CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, CobolNet.Runtime.CobolEdit.EditRule[]? edits = null) -> bool
+static CobolNet.Runtime.CobolEdit.TryFormatFloatU(System.UInt128 value, int valueScale, string! picture, out string! image, CobolNet.Runtime.CobolRounding mode, bool blankWhenZero = false, bool commaMode = false, CobolNet.Runtime.CobolEdit.EditRule[]? edits = null) -> bool
 static CobolNet.Runtime.CobolFloat.AddChecked(double a, double b) -> double
 static CobolNet.Runtime.CobolFloat.Display(double v) -> string!
 static CobolNet.Runtime.CobolFloat.Display(float v) -> string!
@@ -2834,6 +2841,7 @@ static CobolNet.Runtime.CobolNames.Fold(string! word) -> string!
 static CobolNet.Runtime.CobolNames.Same(System.ReadOnlySpan<char> a, System.ReadOnlySpan<char> b) -> bool
 static CobolNet.Runtime.CobolNames.Same(string? a, string? b) -> bool
 static CobolNet.Runtime.CobolNames.StartsWith(System.ReadOnlySpan<char> word, System.ReadOnlySpan<char> prefix) -> bool
+static CobolNet.Runtime.CobolNames.UpperFold(string! word) -> string!
 static CobolNet.Runtime.CobolNum.AddChecked(System.Int128 a, System.Int128 b) -> System.Int128
 static CobolNet.Runtime.CobolNum.CapDigits(System.Int128 v, int digits) -> System.Int128
 static CobolNet.Runtime.CobolNum.Compare(System.Int128 a, int aScale, System.Int128 b, int bScale) -> int
@@ -2884,8 +2892,10 @@ static CobolNet.Runtime.CobolNum.PositionOf(System.UInt128 unscaled, int scale) 
 static CobolNet.Runtime.CobolNum.PositionOf(double value) -> long
 static CobolNet.Runtime.CobolNum.Rescale(System.Int128 value, int fromScale, int toScale, CobolNet.Runtime.CobolRounding mode) -> System.Int128
 static CobolNet.Runtime.CobolNum.RescaleChecked(System.Int128 value, int fromScale, int toScale, CobolNet.Runtime.CobolRounding mode) -> System.Int128
+static CobolNet.Runtime.CobolNum.RescaleCheckedU(System.UInt128 value, int fromScale, int toScale, CobolNet.Runtime.CobolRounding mode) -> System.Int128
 static CobolNet.Runtime.CobolNum.RescaleEscape(System.Int128 value, int fromScale, int toScale, CobolNet.Runtime.CobolRounding mode) -> System.Int128
 static CobolNet.Runtime.CobolNum.RescaleStoreCap(System.Int128 value, int fromScale, int toScale, CobolNet.Runtime.CobolRounding mode) -> System.Int128
+static CobolNet.Runtime.CobolNum.RescaleStoreCapU(System.UInt128 value, int fromScale, int toScale, CobolNet.Runtime.CobolRounding mode) -> System.Int128
 static CobolNet.Runtime.CobolNum.RetainSign(string! digits, string! current, in CobolNet.Runtime.NumProfile receiver) -> string!
 static CobolNet.Runtime.CobolNum.SendingImage(string! image, in CobolNet.Runtime.NumProfile item) -> string!
 static CobolNet.Runtime.CobolNum.Store(CobolNet.Runtime.CobolDec value, in CobolNet.Runtime.NumProfile receiver, CobolNet.Runtime.CobolRounding mode = CobolNet.Runtime.CobolRounding.Truncation) -> System.Int128
@@ -2986,7 +2996,6 @@ static CobolNet.Runtime.CobolValueClass.IsExtreme(CobolNet.Runtime.CobolDec valu
 static CobolNet.Runtime.CobolValueClass.IsInArithmeticRange(CobolNet.Runtime.CobolDec value, CobolNet.Runtime.CobolDec farthest, CobolNet.Runtime.CobolDec nearest) -> bool
 static CobolNet.Runtime.CobolValueClass.IsNumeric(CobolNet.Runtime.CobolDec value) -> bool
 static CobolNet.Runtime.CobolVarGroup.Compare(CobolNet.Runtime.CobolVarGroup! a, CobolNet.Runtime.GroupAtom![]! aShape, CobolNet.Runtime.CobolVarGroup! b, CobolNet.Runtime.GroupAtom![]! bShape, CobolNet.Runtime.CobolCollation? collation = null) -> int
-static CobolNet.Runtime.CobolVarGroup.CompareInLayout(CobolNet.Runtime.CobolVarGroup! a, CobolNet.Runtime.CobolVarGroup! b, System.Collections.Generic.IReadOnlyList<int>! fixedAt, CobolNet.Runtime.CobolCollation? collation = null) -> int
 static CobolNet.Runtime.CobolVarGroup.Concat(CobolNet.Runtime.CobolVarGroup![]! occurrences) -> CobolNet.Runtime.CobolVarGroup!
 static CobolNet.Runtime.CobolVarGroup.CorrespondingSpans(int[]? fixedLayout, int[]! varLayout) -> int[]?
 static CobolNet.Runtime.CobolVarGroup.FixedRun(int chars) -> int[]!
@@ -3031,6 +3040,7 @@ static CobolNet.Runtime.Collation.Cldr.CldrLocaleLoader.AvailableLocales() -> Sy
 static CobolNet.Runtime.Collation.Cldr.CldrLocaleLoader.Chain(string? localeName) -> System.Collections.Generic.IEnumerable<string!>!
 static CobolNet.Runtime.Collation.Cldr.CldrLocaleLoader.ClearCache() -> void
 static CobolNet.Runtime.Collation.Cldr.CldrLocaleLoader.DescribeSearch() -> string!
+static CobolNet.Runtime.Collation.Cldr.CldrLocaleLoader.FindCollation(string! localeName, string! type) -> (CobolNet.Runtime.Collation.Cldr.CldrLocaleData! Found, CobolNet.Runtime.Collation.Cldr.CldrCollation! Collation)?
 static CobolNet.Runtime.Collation.Cldr.CldrLocaleLoader.IsCollationType(string! type) -> bool
 static CobolNet.Runtime.Collation.Cldr.CldrLocaleLoader.Load(string! localeName) -> CobolNet.Runtime.Collation.Cldr.CldrLocaleData!
 static CobolNet.Runtime.Collation.Cldr.CldrLocaleLoader.LoadExact(string! localeName) -> CobolNet.Runtime.Collation.Cldr.CldrLocaleData?
@@ -3531,10 +3541,11 @@ static CobolNet.Runtime.IO.HostFile.IsHeldByAnother(string! hostPath) -> bool
 static CobolNet.Runtime.IO.HostFile.IsMediumBoundary(System.IO.IOException! failure) -> bool
 static CobolNet.Runtime.IO.HostFile.IsSharingRefusal(System.IO.IOException! refusal) -> bool
 static CobolNet.Runtime.IO.HostFile.OpenAuxiliary(string! hostPath, System.IO.FileMode mode, System.IO.FileAccess access) -> System.IO.FileStream!
-static CobolNet.Runtime.IO.HostFile.OpenConnectorStore(string! hostPath, System.IO.FileMode mode, System.IO.FileAccess access, System.IO.FileShare share, int areas) -> System.IO.FileStream!
+static CobolNet.Runtime.IO.HostFile.OpenConnectorStore(string! hostPath, System.IO.FileMode mode, System.IO.FileAccess access, System.IO.FileShare share) -> System.IO.FileStream!
 static CobolNet.Runtime.IO.HostFile.OpenConnectorStream(string! hostPath, System.IO.FileMode mode, System.IO.FileAccess access, System.IO.FileShare share, System.IO.FileOptions options = System.IO.FileOptions.None) -> System.IO.FileStream!
-static CobolNet.Runtime.IO.HostFile.OpenConnectorWriteStream(string! hostPath, System.IO.FileMode mode, System.IO.FileShare share) -> System.IO.Stream!
+static CobolNet.Runtime.IO.HostFile.OpenConnectorWriteStream(string! hostPath, System.IO.FileMode mode, System.IO.FileAccess access, System.IO.FileShare share) -> System.IO.Stream!
 static CobolNet.Runtime.IO.HostFile.PermitsWrite(string! hostPath) -> bool
+static CobolNet.Runtime.IO.HostFile.PhysicalFileComparer.get -> System.StringComparer!
 static CobolNet.Runtime.IO.HostFile.Probe(string! hostPath) -> CobolNet.Runtime.IO.FilePresence
 static CobolNet.Runtime.IO.HostFile.ShareModesAreMandatory.get -> bool
 static CobolNet.Runtime.IO.LinagePage.operator !=(CobolNet.Runtime.IO.LinagePage left, CobolNet.Runtime.IO.LinagePage right) -> bool
@@ -3587,6 +3598,8 @@ static CobolNet.Runtime.NotImplemented.Run(string! feature) -> void
 static CobolNet.Runtime.NotImplemented.Value<T>(string! feature) -> T
 static CobolNet.Runtime.NumProfile.operator !=(CobolNet.Runtime.NumProfile left, CobolNet.Runtime.NumProfile right) -> bool
 static CobolNet.Runtime.NumProfile.operator ==(CobolNet.Runtime.NumProfile left, CobolNet.Runtime.NumProfile right) -> bool
+static CobolNet.Runtime.OdoTail.operator !=(CobolNet.Runtime.OdoTail left, CobolNet.Runtime.OdoTail right) -> bool
+static CobolNet.Runtime.OdoTail.operator ==(CobolNet.Runtime.OdoTail left, CobolNet.Runtime.OdoTail right) -> bool
 static CobolNet.Runtime.OmittedFormal.Carrier<TCarrier>(TCarrier carrier, bool omitted, CobolNet.Runtime.ActivatedElementKind kind, string! formal) -> TCarrier
 static CobolNet.Runtime.OmittedFormal.ConditionName(CobolNet.Runtime.ActivatedElementKind kind) -> string!
 static CobolNet.Runtime.OmittedFormal.Raise(CobolNet.Runtime.ActivatedElementKind kind, string! formal) -> void
@@ -3710,8 +3723,6 @@ virtual CobolNet.Runtime.IO.FileConnector.PeekSequentialRecordId(bool previous) 
 virtual CobolNet.Runtime.ManagedPointer.IsNull.get -> bool
 ~override CobolNet.Runtime.BoundaryItem.Equals(object obj) -> bool
 ~override CobolNet.Runtime.BoundaryItem.ToString() -> string
-~override CobolNet.Runtime.CellOdoTail.Equals(object obj) -> bool
-~override CobolNet.Runtime.CellOdoTail.ToString() -> string
 ~override CobolNet.Runtime.CobolArg.Equals(object obj) -> bool
 ~override CobolNet.Runtime.CobolArg.ToString() -> string
 ~override CobolNet.Runtime.CobolBoolSized.Equals(object obj) -> bool
@@ -3748,6 +3759,8 @@ virtual CobolNet.Runtime.ManagedPointer.IsNull.get -> bool
 ~override CobolNet.Runtime.MoveSending.ToString() -> string
 ~override CobolNet.Runtime.NumProfile.Equals(object obj) -> bool
 ~override CobolNet.Runtime.NumProfile.ToString() -> string
+~override CobolNet.Runtime.OdoTail.Equals(object obj) -> bool
+~override CobolNet.Runtime.OdoTail.ToString() -> string
 ~override CobolNet.Runtime.ProgramPointer.Equals(object obj) -> bool
 ~override CobolNet.Runtime.ProgramPointer.ToString() -> string
 ~override CobolNet.Runtime.SignPunchTable.Equals(object obj) -> bool
