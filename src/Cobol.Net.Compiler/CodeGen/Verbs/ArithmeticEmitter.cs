@@ -58,9 +58,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             // state (EmitGiving never called SetTarget) -- the H1 staleness ReceiverContext kills.
             // The float-quantization headroom is the MOST CONSTRAINING receiver's — the widest integer part —
             // since one rendered value has to land in all of them (PB13).
-            var rcv = new ReceiverContext(targets.Max(t => ScaleOf(t.Place)),
-                targets.All(t => t.Place.Item.Pic is { IsFloat: true }), CobolRounding.Truncation, ise,
-                targets.Max(t => IntDigitsOf(t.Place)));
+            var rcv = SetRcv(targets, ise);
             NumX v = value(rcv);
             // ONE initial evaluation (§14.7.7 GR4 + NOTE 3): materialized with several receivers so a receiver
             // aliasing a sender cannot change the value the remaining receivers store.
@@ -80,9 +78,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             // Operand sub-expressions render for the receiver SET (the widest scale, Real only when EVERY receiver is
             // float — D16), as EmitDivide's operands do.
             var opRcv = targets.Count == 1 ? RcvFor(targets[0], ise)
-                : new ReceiverContext(targets.Max(t => ScaleOf(t.Place)),
-                    targets.All(t => t.Place.Item.Pic is { IsFloat: true }), CobolRounding.Truncation, ise,
-                    targets.Max(t => IntDigitsOf(t.Place)));
+                : SetRcv(targets, ise);
             NumX ax = num.Render(a, opRcv), bx = num.Render(b, opRcv);
             if (targets.Count > 1) { ax = Snapshot(ax); bx = Snapshot(bx); }
             foreach (var r in targets)
@@ -99,9 +95,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             // DIVISION itself still renders per receiver, at that receiver's scale + ROUNDED mode — equal to
             // rounding the spec's intermediate to each resultant. Sub-expression quotients inside the operands
             // render at the widest receiver scale (the intermediate must not lose receiver-visible digits).
-            var opRcv = new ReceiverContext(targets.Max(t => ScaleOf(t.Place)),
-                targets.All(t => t.Place.Item.Pic is { IsFloat: true }), CobolRounding.Truncation, ise,
-                targets.Max(t => IntDigitsOf(t.Place)));
+            var opRcv = SetRcv(targets, ise);
             NumX divisorX = num.Render(divisor, opRcv);
             NumX? dividendX = dividend is not null ? num.Render(dividend, opRcv) : null;
             if (targets.Count > 1)
@@ -227,18 +221,22 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
                 // scale so no receiver-visible digit is lost — is materialized, and every receiver stores from the
                 // temp with its own ROUNDED mode. Re-rendering per receiver would re-read senders a prior
                 // receiver may alias. Real only when EVERY target is float (D16).
-                var rcv = new ReceiverContext(c.Targets.Max(t => ScaleOf(t.Place)),
-                    c.Targets.All(t => t.Place.Item.Pic is { IsFloat: true }), CobolRounding.Truncation, ise,
-                    c.Targets.Max(t => IntDigitsOf(t.Place)));
-                // A PRODUCT at the root of the RHS is each receiver's FINAL TRANSFER, so it renders per receiver like
-                // MULTIPLY GIVING's (NumericRenderer.Multiply's outermost arm: exact, rounded once at the receiver's
-                // scale with its mode — whatever width it is), from operands that are still evaluated ONCE.
-                if (c.Rhs is BoundBinary { Op: '*' } product)
+                var rcv = SetRcv(c.Targets, ise);
+                // A PRODUCT or QUOTIENT at the root of the RHS is each receiver's FINAL TRANSFER, so it renders per
+                // receiver like MULTIPLY GIVING's and DIVIDE GIVING's (NumericRenderer.Multiply's and Divide's outermost
+                // arms: exact, rounded once at the receiver's scale with its mode — whatever width it is — or, for a
+                // floating-point edited receiver, the round-to-odd SDIDI its significand rounds from), from operands
+                // that are still evaluated ONCE. A root quotient rendered ONCE for the set (kb/Work PB2694) was
+                // truncated at the widest fixed receiver's scale plus guard digits: `COMPUTE FE ROUNDED, X = 1 / HUGE`
+                // stored +0.00E+00 where +3.33E-25 is owed, and any receiver's ROUNDED tie or PROHIBITED test saw a
+                // truncated tail.
+                if (c.Rhs is BoundBinary { Op: '*' or '/' } root)
                 {
-                    NumX ax = Snapshot(num.Render(product.Left, rcv)), bx = Snapshot(num.Render(product.Right, rcv));
+                    string rootOp = root.Op.ToString();
+                    NumX ax = Snapshot(num.Render(root.Left, rcv)), bx = Snapshot(num.Render(root.Right, rcv));
                     foreach (var r in c.Targets)
                         GuardedStore(ise, r.Place, () =>
-                            StoreArith(r.Place, num.Combine(ax, "*", bx, RcvFor(r, ise), outermost: true), r.Rounding));
+                            StoreArith(r.Place, num.Combine(ax, rootOp, bx, RcvFor(r, ise), outermost: true), r.Rounding));
                     return;
                 }
                 // An exact WIDE value (a nested product past the Int128 carrier, kb/Work PB1900) is snapshotted AS ITSELF and
@@ -303,6 +301,12 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             using (ctx.Writer.Block("try")) emitOne();
             WriteSizeCatches(ecState.SizeErrVar!, ecState.SizeErrEcVar);
         });
+
+    /// <summary>The <see cref="ReceiverContext"/> a statement with several resultants renders its once-evaluated
+    /// operands FOR — <see cref="ReceiverContext.OfSet"/>, the one rule (kb/Work PB2694). Each receiver's own final
+    /// transfer is <see cref="RcvFor"/>.</summary>
+    private static ReceiverContext SetRcv(IReadOnlyList<Receiver> targets, bool inSizeError) =>
+        ReceiverContext.OfSet(targets.Select(t => t.Place.Item.Pic).ToList(), inSizeError);
 
     /// <summary>The <see cref="ReceiverContext"/> for receiver <paramref name="r"/> (P7 Step 3 — the pure
     /// factory replacing the mutable <c>SetTarget</c> context writes).</summary>

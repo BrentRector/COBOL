@@ -77,7 +77,33 @@ internal readonly record struct ReceiverContext(
             pic is null ? 0 : Math.Max(0, pic.DigitPositions - scale), FloatEdited: pic is { IsFloatEdited: true });
     }
 
-    /// <summary>Decimal digits the <c>Int128</c> intermediate carrier holds: <c>Int128.MaxValue</c> ≈ 1.7014×10³⁸,
+    /// <summary>⛔ THE ONE RULE FOR "THE CONTEXT OF A SET OF RESULTANTS" (kb/Work PB2694): the context a statement with
+    /// SEVERAL resultant identifiers renders its once-evaluated operands (or its one initial evaluation) FOR. One
+    /// rendered value has to land in every receiver, so the set takes the WIDEST receiver scale (no receiver-visible
+    /// digit is lost), the widest INTEGER part (the most constraining float-quantization headroom, PB13), is
+    /// floating-point only when EVERY receiver is (D16), and is <see cref="FloatEdited"/> when ANY receiver is — a
+    /// floating-point numeric-edited resultant has no fraction scale to carry a quotient AT, so a nested quotient
+    /// rendered for the set must not be cut to the widest FIXED receiver's scale plus guard digits (the digits that
+    /// receiver's normalized significand needs are far below them). It is <see cref="Truncation"/>-moded: the set has
+    /// no single ROUNDED mode — each receiver's own final transfer is rendered by <see cref="Of"/> (kb/Work PB2694;
+    /// before it five emit sites each spelled this out again and none carried the floating-point edited flag).</summary>
+    public static ReceiverContext OfSet(IReadOnlyList<PicInfo?> pics, bool inSizeError)
+    {
+        int scale = 0, integerDigits = 0;
+        bool allFloat = true, anyFloatEdited = false;
+        foreach (var pic in pics)
+        {
+            int s = pic?.ReceiverScale() ?? 0;
+            scale = Math.Max(scale, s);
+            integerDigits = Math.Max(integerDigits, pic is null ? 0 : Math.Max(0, pic.DigitPositions - s));
+            allFloat &= pic is { IsFloat: true };
+            anyFloatEdited |= pic is { IsFloatEdited: true };
+        }
+        return new ReceiverContext(scale, allFloat, CobolRounding.Truncation, inSizeError, integerDigits,
+            FloatEdited: anyFloatEdited);
+    }
+
+    /// <summary>Decimal digits the <c>Int128</c> intermediate carrier holds:<c>Int128.MaxValue</c> ≈ 1.7014×10³⁸,
     /// so any value below 10³⁸ is representable (numeric design D1 — the "Int128 escape boundary").</summary>
     public const int IntermediateDigits = 38;
 

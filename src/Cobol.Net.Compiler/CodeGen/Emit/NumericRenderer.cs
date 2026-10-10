@@ -862,7 +862,10 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // working-scale hint, lost every digit of a small quotient (`1 / 3E24` into `+9.99E+99` stored +0.00E+00)
         // and showed the store a truncated tail that cannot break a rounding tie. The round-to-odd SDIDI keeps
         // 34 significant digits and the inexact marker, which is all that rounding (and PROHIBITED) reads.
-        if (a.Wide || b.Wide || (_outermost && _rcv.FloatEdited))
+        // ⛔ A NESTED quotient for a receiver set holding a floating-point edited resultant is no different (kb/Work
+        // PB2694): `COMPUTE FE = 1 / HUGE + 0` cut the quotient at the hint scale plus guard digits and stored
+        // +0.00E+00 as well, and the set context (ReceiverContext.OfSet) carries the flag for that reason.
+        if (a.Wide || b.Wide || _rcv.FloatEdited)
             return new NumX(RuntimeApi.DecDivToOdd(DecOperand(a), DecOperand(b)), 0, Dec: true);
         int ds;
         CobolRounding mode;
