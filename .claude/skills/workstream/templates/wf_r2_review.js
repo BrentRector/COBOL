@@ -1,7 +1,7 @@
 export const meta = {
   name: 'r2-review-fleet',
   description: 'R2 architecture review (DESIGN-architecture-review §3 R2): per (shard x dimension) finders over computed file sets, a completeness pass to the unread remainder, an examiner for every null result, three lens skeptics per finding; every decision a JSON line on disk, the launch state rebuilt from disk, decided by r2_collect.py',
-  whenToUse: 'Run a batch from the launch-args.json that `r2_collect.py --out <batch dir> --launch` wrote (first launch and every relaunch); collect with r2_collect.py; file with file_census_notes.py --r2',
+  whenToUse: 'Never directly: `r2_collect.py --out <batch dir> --launch` sizes the batch and writes <batch dir>\\launch.js, this script with its plan from disk (first launch and every relaunch); launch that file with no args; collect with r2_collect.py; file with file_census_notes.py --r2',
   phases: [
     { title: 'Review', detail: 'finders read the unread remainder of their shard WHOLE (two, from opposite ends, over 4,000 lines); a finisher reads what is still unread' },
     { title: 'Examine nulls', detail: 'a pair that found nothing is examined by an agent trying to find what the finders missed' },
@@ -13,25 +13,28 @@ export const meta = {
 // scripts/arch/r2_inputs.py (the shard table, the mechanical checks run ONCE, one input file per shard); decisions go to
 // disk as JSON lines through `r2_collect.py --append`, and scripts/arch/r2_collect.py — never this script's return —
 // decides what the batch found.
-// ⛔ RESUME IS FROM DISK, PER PAIR (the w1034 refuter's C2). A Workflow script has no filesystem, so every launch — the
-// first and each relaunch — is made from `r2_collect.py --out <batch dir> --launch`, which writes launch-args.json: the
-// batch args plus each pair's ON-DISK state (files read by ANY of its finders, every finding on disk, which lens has
-// decided which finding). This script plans from that state and never from what an earlier launch's agents returned,
-// so a relaunch skips decided work, runs the undecided, decides nothing twice and orphans no finding a finder wrote
-// before it died. Within a launch every agent asks `--status` for its PAIR's decisions, not only its own file's.
-const A = args || {}
+// ⛔ RESUME IS FROM DISK, PER PAIR (the w1034 refuter's C2), AND THE LAUNCH IS A FILE (kb/Work PB2707). A Workflow script
+// has no filesystem, so every launch — the first and each relaunch — is `<batch dir>\launch.js`, which
+// `r2_collect.py --out <batch dir> --launch` writes: this script with the plan line below replaced by the PLAN it built
+// from disk, after sizing it against the quota left (r2_cost.py). The operator's whole call is
+// Workflow({scriptPath: '<batch dir>\\launch.js'}) with no args, whatever the batch's progress: batch 2's relaunch needed
+// a 95,644-byte state transcribed by hand into six calls. The plan holds one entry per pair with WORK LEFT (the files no
+// finder read, with their lines; per lens the findings no skeptic decided); a decided pair is not in it. This script
+// plans only from it, never from what an earlier launch's agents returned, so a relaunch skips decided work, runs the
+// undecided, decides nothing twice and orphans no finding a finder wrote before it died. Within a launch every agent
+// asks `--status` for its PAIR's decisions, not only its own file's.
+const A = args   // the plan line: `r2_collect.py --launch` replaces it in launch.js; the template run directly has no plan
+if (!A || typeof A !== 'object' || !A.planOf || !Array.isArray(A.pairs) || !A.shards || typeof A.shards !== 'object')
+  throw new Error('no launch plan: run `python scripts/arch/r2_collect.py --out <batch dir> --launch` and launch the <batch dir>\\launch.js it writes, with no args (a launch never plans from agent returns, and nobody transcribes a plan: kb/Work PB2707)')
 const PIN = A.pinnedTree, PIN_COMMIT = A.pinCommit, OUT = A.outDir, INPUTS = A.inputsDir
-const SHARDS = A.shards, DIMS = A.dimensions
+const SHARDS = A.shards
 const WIDTH = A.width || 8
 const STOPS = [A.stopFile, A.globalStopFile].filter(Boolean)
-if (!PIN || !PIN_COMMIT || !OUT || !INPUTS || !Array.isArray(SHARDS) || !Array.isArray(DIMS) || !A.stopFile || !A.globalStopFile)
-  throw new Error('pass the launch-args.json `r2_collect.py --out <batch dir> --launch` wrote: pinnedTree, pinCommit, outDir, inputsDir, shards[], dimensions[], args.stopFile, args.globalStopFile, state')
-if (!A.state || typeof A.state !== 'object' || A.stateOf !== OUT)
-  throw new Error('no on-disk launch state for ' + OUT + ': run `python scripts/arch/r2_collect.py --out ' + OUT + ' --launch` and pass the launch-args.json it writes (a launch never plans from agent returns)')
-for (const s of SHARDS)
-  if (!Array.isArray(s.fileLines) || s.fileLines.length !== s.files.length)
-    throw new Error('shard ' + s.id + ' has no fileLines: rewrite the batch args with r2_inputs.py --batch')
-const STATE = A.state
+if (!PIN || !PIN_COMMIT || !OUT || !INPUTS || A.planOf !== OUT || !A.stopFile || !A.globalStopFile)
+  throw new Error('the plan lacks pinnedTree, pinCommit, outDir (= planOf), inputsDir, args.stopFile or args.globalStopFile: rewrite it with r2_collect.py --launch')
+for (const e of A.pairs)
+  if (e.slug !== 'global--duplication' && (!SHARDS[e.shard] || !Array.isArray(e.unread) || !e.unread.every(u => Array.isArray(u) && u.length === 2)))
+    throw new Error('pair ' + e.slug + ' has no shard or no [file, lines] unread list: rewrite the plan with r2_collect.py --launch')
 const COLLECT = 'python scripts/arch/r2_collect.py'
 const TWO_FINDERS_OVER = 4000   // lines: a remainder this big gets a second finder starting from its other end (base review Scale: audit)
 const CHUNK = 4                 // findings per skeptic transcript (one 80-turn refuter deciding 15 capped out at #11; B6)
@@ -139,7 +142,7 @@ function nullPrompt(p) {
 
 TASK: EXAMINE A NULL RESULT. The finders of shard "${p.shard.id}" (${p.shard.name}) found NOTHING along the dimension ${p.dim}
 (LENS: ${DIM_LENS[p.dim]}); your pair is ${p.slug}. A null result is accepted only when someone tried to break it. Read the input
-file ${p.shard.input} (the shard's ${p.shard.files.length} files with their lines and facts), then look where a finding would most
+file ${p.shard.input} (the shard's ${p.shard.files} files with their lines and facts), then look where a finding would most
 likely hide: the largest files, the most fanned-in types, the files with analyzer warnings, drift rules or census rows. Append any
 finding you are sure of; then append {"type": "null-check", "missed": [<the ids you wrote>]} — that line is what records the
 examination, even when it is empty.
@@ -161,14 +164,20 @@ YOUR CHECKPOINT FILE: ${OUT}\\refute-${p.slug}--c${j}--${lens}.jsonl — one lin
 YOUR lens you would change: ${'site: files, sites, members, existing_note; rule: design_ref, wave_kind, severity; scenario: measurement, harm, spec_refs'.split('; ').find(x => x.startsWith(lens))}}}.`
 }
 
-const EMPTY = { read: [], findings: [], finders: 0, done: 0, null_checked: false, decided: { site: [], rule: [], scenario: [] } }
+// A finding is NEW to this launch when an agent of this launch wrote it: a finder number above the plan's (every new
+// agent takes a new number) or the null examiner of a pair whose null was unexamined. Every other id the agents return
+// was on disk when the plan was made, and the plan's `undecided` already lists it under each lens that has not decided it.
+function isNew(e, id) {
+  const f = /--f(\d+)#\d+$/.exec(id)
+  return f ? +f[1] > e.finders : /--null#\d+$/.test(id) && !e.null_checked
+}
 
-// every finding the pair holds that a lens has not decided, in chunks of four per skeptic transcript
-async function verify(p, ids, decided) {
+// every finding of the pair that a lens has not decided, in chunks of four per skeptic transcript
+async function verify(p, e, ids) {
+  const fresh = [...ids].filter(i => isNew(e, i))
   const jobs = []
   for (const lens of Object.keys(LENSES)) {
-    const done = new Set(decided[lens] || [])
-    const todo = [...ids].filter(i => !done.has(i)).sort()
+    const todo = [...new Set([...(e.undecided[lens] || []), ...fresh])].sort()
     for (let i = 0, j = 1; i < todo.length; i += CHUNK, j++) {
       const c = todo.slice(i, i + CHUNK)
       jobs.push(() => run(skepticPrompt(p, c, j, lens), { label: `skeptic:${p.slug}:c${j}:${lens}`, phase: 'Verify', schema: SKEPTIC_OUT }))
@@ -177,13 +186,13 @@ async function verify(p, ids, decided) {
   return (await parallel(jobs)).filter(Boolean).length
 }
 
-async function reviewPair(p) {
-  const S = STATE[p.slug] || EMPTY
-  const files = p.shard.files
-  const linesOf = new Map(files.map((f, i) => [f, p.shard.fileLines[i]]))
-  const read = new Set(S.read)
-  const ids = new Set(S.findings)
-  let k = S.finders            // a new agent always takes a new finder number, so no two agents share a file or an id prefix
+async function reviewPair(e) {
+  const p = { slug: e.slug, dim: e.dim, shard: { id: e.shard, ...SHARDS[e.shard] } }
+  const linesOf = new Map(e.unread)
+  const unreadAtStart = e.unread.map(([f]) => f)
+  const read = new Set()       // the files this launch's agents report read (the plan already left out the earlier ones)
+  const ids = new Set()        // the findings this launch's agents report on disk (the pair's whole list)
+  let k = e.finders            // a new agent always takes a new finder number, so no two agents share a file or an id prefix
   let blind = false            // an agent returned nothing: what it wrote is on disk, but this launch has not seen it
   const absorb = r => { if (!r) { blind = true; return } r.read.forEach(f => read.add(f)); r.findings.forEach(i => ids.add(i)) }
   async function readRound(rest, kind) {
@@ -193,40 +202,33 @@ async function reviewPair(p) {
       run(finderPrompt(p, kk, list, order), { label: `${kind}:${p.slug}:f${kk}`, phase: 'Review', schema: FINDER_OUT }) }))
     got.forEach(absorb)
   }
-  // the review: what no finder of the pair has read, from disk; a pair whose state shows every file read starts no finder
-  const unreadAtStart = files.filter(f => !read.has(f))
+  // the review: what no finder of the pair has read, from disk; a pair the plan shows fully read starts no finder
   if (unreadAtStart.length && !STOPPED) await readRound(unreadAtStart, 'find')
   // the completeness pass: a finisher for exactly the unread remainder, twice at most (B2); after a blind return it runs
   // even with nothing unread, because only an agent can read the disk and recover what the silent one wrote
   for (let round = 0; round < 2 && !STOPPED; round++) {
-    const rest = files.filter(f => !read.has(f))
+    const rest = unreadAtStart.filter(f => !read.has(f))
     if (!rest.length && !blind) break
     blind = false
-    log(`${p.slug}: ${rest.length} of ${files.length} files unread — finisher`)
+    log(`${p.slug}: ${rest.length} of ${unreadAtStart.length} unread files still unread — finisher`)
     await readRound(rest, 'finish')
   }
-  const unread = files.filter(f => !read.has(f))
+  const unread = unreadAtStart.filter(f => !read.has(f))
   if (unread.length) log(`${p.slug}: INCOMPLETE — ${unread.length} file(s) unread; a null result here is not accepted (r2_collect.py)`)
-  if (!ids.size && !unread.length && !S.null_checked && !STOPPED) {
+  if (!e.findings && !ids.size && !unread.length && !e.null_checked && !STOPPED) {
     const n = await run(nullPrompt(p), { label: `null:${p.slug}`, phase: 'Examine nulls', schema: NULL_OUT })
     absorb(n)
   }
-  const skeptics = ids.size && !STOPPED ? await verify(p, ids, S.decided) : 0
-  return { pair: p.slug, files: files.length, read: read.size, unread: unread.length, findings: ids.size, skeptics }
+  const skeptics = (e.findings || ids.size) && !STOPPED ? await verify(p, e, ids) : 0
+  return { pair: p.slug, files: p.shard.files, unreadAtStart: unreadAtStart.length, unread: unread.length,
+    findings: Math.max(e.findings, ids.size), skeptics }
 }
 
-const pairs = []
-for (const s of SHARDS) for (const d of DIMS) pairs.push({ shard: s, dim: d, slug: `${s.id}--${d}` })
-log(`R2 batch ${A.batch}: ${pairs.length} pairs (${SHARDS.length} shards x ${DIMS.length} dimensions)${A.duplicationPass ? ' + the whole-codebase clone pass' : ''}, ${WIDTH} agents at a time, pin ${PIN_COMMIT.slice(0, 12)}, state of ${Object.keys(STATE).length} pair(s) from disk`)
-
-const jobs = pairs.map(p => () => reviewPair(p))
-if (A.duplicationPass) {
-  const g = { slug: 'global--duplication', dim: 'duplication', shard: { id: 'global', name: 'the whole codebase', lines: 0, files: [], input: '' } }
-  jobs.push(async () => {
-    const S = STATE[g.slug] || EMPTY
-    const ids = new Set(S.findings)
-    if (!S.done && !STOPPED) {
-      const r = await run(`${COMMON}
+async function clonePass(e) {
+  const g = { slug: e.slug, dim: 'duplication', shard: { id: 'global', name: 'the whole codebase', lines: 0, files: 0, input: '' } }
+  const ids = new Set()
+  if (!e.done && !STOPPED) {
+    const r = await run(`${COMMON}
 
 TASK: THE ONE WHOLE-CODEBASE DUPLICATION PASS (design §5.2; the R2 adversarial review's B4); your pair is ${g.slug}. Read
 ${INPUTS}\\inputs\\in-duplication.json: every census clone family (type-2, by structure), each copy mapped to its shard, cross-shard
@@ -235,15 +237,16 @@ every copy's file in "files"), an accident of shape that should stay, or already
 RULES the clone detector cannot see across subsystems — the same decision (an edition gate, a usage classification, a name mangling)
 written in two subsystems — and report those you can show. One family is ONE finding however many shards it touches. Append
 {"type": "read", "file": "<family id>"} per family decided (skip the families --status shows read) and {"type": "done"} at the end.
-YOUR CHECKPOINT FILE: ${OUT}\\review-${g.slug}--f${S.finders + 1}.jsonl; your finding id prefix: ${g.slug}--f${S.finders + 1}.`,
-        { label: `find:${g.slug}`, phase: 'Review', schema: FINDER_OUT })
-      if (r) r.findings.forEach(i => ids.add(i))
-    }
-    const skeptics = ids.size && !STOPPED ? await verify(g, ids, S.decided) : 0
-    return { pair: g.slug, files: 0, read: 0, unread: 0, findings: ids.size, skeptics }
-  })
+YOUR CHECKPOINT FILE: ${OUT}\\review-${g.slug}--f${e.finders + 1}.jsonl; your finding id prefix: ${g.slug}--f${e.finders + 1}.`,
+      { label: `find:${g.slug}`, phase: 'Review', schema: FINDER_OUT })
+    if (r) r.findings.forEach(i => ids.add(i))
+  }
+  const skeptics = (e.findings || ids.size) && !STOPPED ? await verify(g, e, ids) : 0
+  return { pair: g.slug, files: 0, unreadAtStart: 0, unread: 0, findings: Math.max(e.findings, ids.size), skeptics }
 }
-const results = (await parallel(jobs)).filter(Boolean)
+
+log(`R2 batch ${A.batch}: ${A.pairs.length} pair(s) with work left (${A.decidedPairs} decided, not planned), ${WIDTH} agents at a time, pin ${PIN_COMMIT.slice(0, 12)}, the plan of ${A.planOf} from disk`)
+const results = (await parallel(A.pairs.map(e => () => e.slug === 'global--duplication' ? clonePass(e) : reviewPair(e)))).filter(Boolean)
 if (STOPPED) log('STOPPED: an agent saw a stop file')
-log(`next: python scripts/arch/r2_collect.py --out ${OUT} --launch — COMPLETE files the batch; LAUNCH NEEDED means launch again with the launch-args.json it rewrote`)
+log(`next: python scripts/arch/r2_collect.py --out ${OUT} — COMPLETE files the batch; LAUNCH NEEDED means \`r2_collect.py --out ${OUT} --launch\` and launch the launch.js it rewrites`)
 return { batch: A.batch, stopped: STOPPED, pairs: results }

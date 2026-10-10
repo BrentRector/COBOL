@@ -765,8 +765,8 @@ def file_r2(collected_path, id_pool, notes_dir, dry_run, path_root=REPO, areas=N
     with open(collected_path, encoding="utf-8") as fh:
         rep = json.load(fh)
     if not rep.get("complete"):
-        raise SystemExit("the batch is not COMPLETE (%s): run `r2_collect.py --out <batch dir> --launch` and launch "
-                         "again until it is" % "; ".join(rep.get("relaunch") or ["no verdict: re-run r2_collect.py"]))
+        raise SystemExit("the batch is not COMPLETE (%s): run `r2_collect.py --out <batch dir> --launch`, launch the "
+                         "launch.js it writes, and collect again until it is" % "; ".join(rep.get("relaunch") or ["no verdict: re-run r2_collect.py"]))
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import r2_collect
     if areas is None:

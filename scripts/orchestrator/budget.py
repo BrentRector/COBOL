@@ -163,6 +163,19 @@ def estimate(now: dt.datetime, readings: list[dict[str, Any]], all_events_for, r
     }
 
 
+def current(account: str | None = None, borrow_days: int = 0, now: dt.datetime | None = None,
+            coord_dir: str | None = None, telemetry_dir: str | pathlib.Path = usage_report.DIR) -> dict[str, Any]:
+    """The estimate for the account `account` names (None: the one CLAUDE_CONFIG_DIR selects) at `now` (None: now),
+    exactly as `budget.py --json` prints it; what another tool that sizes work against the quota calls (kb/Work
+    PB2707: `r2_cost.py`). Raises accounts.UnknownAccount for an account model_rules.json does not name."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    rules = coord.rules()
+    acct = accounts.resolve(account, rules)
+    tdir = pathlib.Path(telemetry_dir)
+    return estimate(now, coord.read_json(coord.coord_dir(coord_dir) / "readings.json", []),
+                    lambda s, u: telemetry_events(tdir, s, u), rules, acct, borrow_days)
+
+
 def record(cdir: pathlib.Path, acct_name: str, weekly: float, session: float, session_reset: str | None,
            now: dt.datetime) -> dict:
     if session_reset:
@@ -194,21 +207,17 @@ def main(argv: list[str] | None = None) -> int:
     except AttributeError:
         pass
     now = parse_ts(a.now) if a.now else dt.datetime.now(dt.timezone.utc)
-    cdir = coord.coord_dir(a.coord)
-    rules = coord.rules()
     try:
-        acct = accounts.resolve(a.account, rules)
+        acct = accounts.resolve(a.account, coord.rules())
     except accounts.UnknownAccount as e:
         print(f"budget: {e}", file=sys.stderr)
         return 2
     if a.record:
         if a.weekly is None or a.session is None:
             ap.error("--record needs --weekly and --session")
-        print(json.dumps(record(cdir, acct.name, a.weekly, a.session, a.session_reset, now)))
+        print(json.dumps(record(coord.coord_dir(a.coord), acct.name, a.weekly, a.session, a.session_reset, now)))
         return 0
-    tdir = pathlib.Path(a.telemetry_dir)
-    out = estimate(now, coord.read_json(cdir / "readings.json", []),
-                   lambda s, u: telemetry_events(tdir, s, u), rules, acct, a.borrow_days)
+    out = current(acct.name, a.borrow_days, now, a.coord, a.telemetry_dir)
     if a.json:
         print(json.dumps(out, indent=1))
     else:

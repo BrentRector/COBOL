@@ -29,13 +29,17 @@ STEP_VERSION and what else it depends on — and reused only for the same key, s
   inputs/perf.json      the R0 performance baseline record and the command that re-measures against it: a
                         performance claim without a measurement on the pin is a lead, never a finding (N3).
 
-`--batch <label>` writes a batch's Workflow args to `<out>/batch-<label>/batch-args.json` (the shards in the order
-given, the dimensions, the stop files, the pin); the batch's checkpoint files go to that directory, and
-`r2_collect.py --out <out>/batch-<label>` reads them.
+`--batch <label>` writes a batch's args to `<out>/batch-<label>/batch-args.json` (the shards in the order given, the
+dimensions, the stop files, the pin); the batch's checkpoint files go to that directory, `r2_collect.py --out
+<out>/batch-<label> --launch` plans each launch from them, and `r2_collect.py --out <out>/batch-<label>` decides
+them. A batch is SIZED first (kb/Work PB2707; `r2_cost.py`): one that cannot finish in the session's and the week's
+room left is refused, nothing is written, and the estimate is printed with the batches to write instead (`<label>a`,
+`<label>b`, ... one command each: the first fits the room left now, each later one a fresh session window).
 
 Usage:
     python scripts/arch/r2_inputs.py --pin <built tree at the pin> --out <dir>            # shards + mechanical + inputs
     python scripts/arch/r2_inputs.py --out <dir> --batch 1 --shards a,b,c [--duplication] [--width 8]
+                                     [--borrow-days N] [--session-reserve P]
     python scripts/arch/r2_inputs.py --self-test
 
 The last line printed is the verdict: `=== R2 INPUTS: ... ===`.
@@ -58,6 +62,8 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(REPO / "scripts" / "spec"))
+import r2_collect  # noqa: E402  (the launch plan a batch is sized by)
+import r2_cost  # noqa: E402
 import r2_subsystems  # noqa: E402
 import work  # noqa: E402
 
@@ -516,6 +522,16 @@ def self_test():
         except SystemExit:
             arm("batch args refuse an unknown dimension", True)
         arm("batch args carry each file's lines, so a resumed pair can size its remainder", a["shards"][0]["fileLines"] == [3])
+        # PB2707: a new batch is sized as the plan of its first launch (every pair unread, the clone pass undone):
+        # 2 dimensions x 3 lines x (100 finder + 3 x 0.01 x 10,000 verdict) tokens + the 50,000-token clone pass
+        b = {"session_soft_stop_pct": 97, "session_est_pct": 0.0, "headroom_pct": 50.0, "resume_at": None}
+        est = r2_cost.size(r2_collect.plan_of(a, {}, {}), r2_cost.fixture_rules(), b, 0.0)
+        arm("a new batch is sized as its first launch's plan: every pair's finders and expected verdicts, the clone pass",
+            est["tokens"] == 2 * 3 * 400 + 50_000 and est["pairs"] == 3 and est["fits"])
+        est = r2_cost.size(r2_collect.plan_of(a, {}, {}), r2_cost.fixture_rules(), dict(b, session_est_pct=96.99), 0.0)
+        arm("a new batch that cannot finish in the room left is refused, its parts named (the room now, then a window)",
+            not est["fits"] and [p["shards"] for p in est["parts"]] == [["cli"], ["global"]]
+            and [p["when"] for p in est["parts"]] == ["now", "next session window"])
         runs = []
         k1, k2 = {"pin": "c", "version": 1}, {"pin": "c", "version": 2}
         cached(out, "s", k1, lambda: runs.append(1) or {"x": 1})
@@ -549,6 +565,7 @@ def main():
     ap.add_argument("--width", type=int, default=8)
     ap.add_argument("--stop-file", default=str(COORD / "scratch" / "STOP-r2"))
     ap.add_argument("--global-stop-file", default=str(COORD / "scratch" / "STOP"))
+    r2_cost.add_budget_args(ap)
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
@@ -556,13 +573,31 @@ def main():
     if not a.out:
         ap.error("--out is required")
     if a.batch:
-        if not a.shards:
-            ap.error("--batch needs --shards")
+        if not a.shards and not a.duplication:
+            ap.error("--batch needs --shards (or --duplication alone: a batch of only the clone pass)")
         m = json.loads((a.out / "shards.json").read_text(encoding="utf-8"))
         pin = a.pin or Path(json.loads((a.out / "pin.json").read_text(encoding="utf-8"))["pin"])
-        args = batch_args(a.out, [s.strip() for s in a.shards.split(",") if s.strip()],
+        args = batch_args(a.out, [s.strip() for s in (a.shards or "").split(",") if s.strip()],
                           [d.strip() for d in a.dimensions.split(",") if d.strip()], str(pin), a.duplication, a.width,
                           a.stop_file, a.global_stop_file, a.batch)
+        # SIZED BEFORE IT IS WRITTEN (kb/Work PB2707): a batch that cannot finish in the room left is refused, with
+        # its estimate and the batches to write instead, one command each
+        est = r2_cost.size(r2_collect.plan_of(args, {}, {}), r2_cost.rules(), r2_cost.budget_from(a), a.session_reserve)
+        flags = "".join((" --duplication" if a.duplication else "", " --width %d" % a.width if a.width != 8 else "",
+                         " --dimensions %s" % a.dimensions if a.dimensions != ",".join(DIMENSIONS) else "",
+                         " --borrow-days %d" % a.borrow_days if a.borrow_days else "",
+                         " --session-reserve %g" % a.session_reserve if a.session_reserve else ""))
+        def part_command(p, i):
+            # the clone pass is `--duplication`, never a shard id; a part of only the clone pass names no shard
+            ids = [s for s in p["shards"] if s != "global"]
+            return "python scripts/arch/r2_inputs.py --out %s --batch %s%s%s%s" % (
+                a.out, a.batch, chr(ord("a") + i), " --shards " + ",".join(ids) if ids else "",
+                flags if "global" in p["shards"] else flags.replace(" --duplication", ""))
+        print(r2_cost.report(est, "batch %s" % a.batch, part_command))
+        if not est["fits"]:
+            print("=== R2 INPUTS: REFUSED batch %s — it cannot finish in the room left; write the parts above, one "
+                  "command each, and launch each when its window comes (nothing written) ===" % a.batch)
+            return r2_cost.REFUSED
         dest = Path(args["outDir"]) / "batch-args.json"
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(json.dumps(args, indent=1), encoding="utf-8")

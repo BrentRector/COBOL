@@ -56,7 +56,9 @@ BRIEFS = {
     'wf_r2_review.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r'CHECKPOINT PER DECISION',
                         r"agentType: 'cobol-reviewer'", r'r2_collect\.py', r'null-check', r'LENSES',
                         # the w1034 refuter's C2: the launch state is the PAIR's, from disk, through one tool
-                        r'stateOf', r'--launch', r'--status', r'--append'],
+                        r'planOf', r'--launch', r'--status', r'--append',
+                        # PB2707: the launch is launch.js, the template with its plan from disk; nothing is transcribed
+                        r'launch\.js', r'const A = args'],
     'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'-Mode implementer', r'\{global_stop\}', r'\{stop_file\}',
                                      r'until grep -q', r'where\.py', r'orient\.py', r'semgrep/verify\.py', r'cite\.py --check',
                                      r'Turn cap 220', r'code site', r'leg-1-Conformance\.trx', r'drift_rules\.py', r'STATUS-AT:',

@@ -11,9 +11,19 @@ line per decision the moment it is made, and this script — never the workflow'
 the batch found. The w1034 refuter then showed that per-AGENT skipping is not enough: the workflow rebuilt its state
 from what agents RETURNED, so a relaunch re-read a finisher's files, never re-ran the finisher, left its findings
 unverified forever, and re-decided findings whose skeptic chunks had moved; a finder that wrote findings and then
-returned nothing (turn cap, API error) orphaned them in a single run. So the state is PER PAIR, FROM DISK:
-`--launch` writes `launch-args.json` (the batch args plus each pair's on-disk state), the workflow refuses to start
-without it, and every agent asks `--status` what its PAIR (not its own file) has decided.
+returned nothing (turn cap, API error) orphaned them in a single run. So the state is PER PAIR, FROM DISK, and every
+agent asks `--status` what its PAIR (not its own file) has decided.
+
+THE LAUNCH (kb/Work PB2707). A workflow script cannot read a file, and batch 2's relaunch state was a 95,644-byte JSON
+line the operator had to transcribe by hand into six Workflow calls. So `--launch` writes the launch itself:
+`<batch dir>/launch.js` is the workflow template (`wf_r2_review.js`) with its plan line replaced by the PLAN, built
+here from disk, and the operator's whole call is `Workflow({scriptPath: "<batch dir>\\launch.js"})`, whatever the
+batch's progress. The plan carries only what is UNDECIDED: per pair with work left, the files no finder has read
+(with their lines) and per lens the findings no skeptic has decided; a pair that is finished is not in it, so its
+size is O(undecided pairs and findings), never O(all pairs). Before writing it, `--launch` sizes the plan
+(`r2_cost.py`: the measured cost of earlier batches against the session's and the week's room left) and REFUSES a
+plan that cannot finish, printing the estimate and the split (`--launch --shards ...`, one launch per part); a
+refused launch removes any earlier launch.js, so a stale plan is never launched.
 
 THE FILES (all in the batch directory `<inputs dir>/batch-<label>/`, beside its `batch-args.json`; the shard table
 `shards.json` is the inputs dir's; `<pair>` is `<shard>--<dimension>`, `<k>` a finder's number, unique per agent):
@@ -57,13 +67,14 @@ DECISIONS.
   * A pair is COMPLETE when the union of its finders' `read` lines equals the shard's files. A pair's null result is
     ACCEPTED only when it is complete and examined (`null-check`).
   * The batch is COMPLETE when every pair is complete, every null is examined and no finding is unverified; until
-    then the verdict says RELAUNCH, and `--launch` writes the state the next launch resumes from.
+    then the verdict says LAUNCH NEEDED, and `--launch` writes the launch that resumes it.
   * An INVALID record (a missing field, a file not in the pin's tree, a defect without harm or a checked clause, two
     records under one id) is never filed; leads and suggestions are reported, not filed.
 
 Usage:
     python scripts/arch/r2_collect.py --out <batch dir>                 # decide; writes collected.json
-    python scripts/arch/r2_collect.py --out <batch dir> --launch        # + launch-args.json for the next launch
+    python scripts/arch/r2_collect.py --out <batch dir> --launch [--shards a,b] [--borrow-days N] [--session-reserve P]
+                                                                        # size the plan; write <batch dir>/launch.js
     python scripts/arch/r2_collect.py --status <batch dir> <pair>       # an agent: what its pair has decided
     python scripts/arch/r2_collect.py --append <checkpoint file> '<one JSON object>'   # an agent: one decision
     python scripts/arch/r2_collect.py --self-test
@@ -88,6 +99,11 @@ SEVERITIES = ("Critical", "Warning", "Suggestion")
 HARMS = ("wrong-answer", "crashes", "silent", "rejects-legal-source", "under-rejects")
 sys.path.insert(0, str(REPO / "scripts" / "spec"))
 from work import HARM_FLAGS  # noqa: E402  (the register's ONE definition of a harm `work.py next` ranks)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import r2_cost  # noqa: E402  (the ONE estimator of what a launch plan spends)
+TEMPLATE = REPO / ".claude" / "skills" / "workstream" / "templates" / "wf_r2_review.js"
+# the template's one plan line, which `--launch` replaces with the plan (the line's own comment says so)
+PLAN_LINE = re.compile(r"^const A = args\b.*$", re.M)
 # `silent` qualifies a harm and is never one by itself: a defect filed with only `silent` sets no flag in HARM_FLAGS and
 # is invisible to `work.py next` (batch 1 of 8be230068 filed one, PB2647, and `work.py check` refused it).
 RANKED_HARMS = tuple(h for h in HARMS if h.replace("-", "_") in HARM_FLAGS)
@@ -228,7 +244,7 @@ def scan(out: Path):
 
 
 def pair_state(pair, votes) -> dict:
-    """The JSON state of one pair, as `--status` prints it and `--launch` hands the workflow."""
+    """The JSON state of one pair, as `--status` prints it for an agent (the launch takes `plan_entry` instead)."""
     ids = sorted(pair["findings"])
     nxt = defaultdict(int)
     for fid in ids:
@@ -426,24 +442,89 @@ def relaunch_reasons(rep) -> list[str]:
 
 def summary(rep) -> str:
     dup = sum(len(m["ids"]) - 1 for m in rep["mechanisms"])
-    head = ("COMPLETE" if rep["complete"] else "LAUNCH NEEDED (%s): `--launch`, then the workflow with "
-            "launch-args.json" % "; ".join(rep["relaunch"]))
+    head = ("COMPLETE" if rep["complete"] else "LAUNCH NEEDED (%s): `--launch`, then Workflow({scriptPath: "
+            "<batch dir>\\launch.js})" % "; ".join(rep["relaunch"]))
     return ("%s — pairs %d · upheld %d in %d mechanism(s) (%d merged as duplicates) · refuted %d · unverified %d · "
             "leads %d · invalid %d · already tracked %d" % (
                 head, len(rep["pairs"]), len(rep["upheld"]), len(rep["mechanisms"]), dup, len(rep["refuted"]),
                 len(rep["unverified"]), len(rep["leads"]), len(rep["invalid"]), len(rep["already_tracked"])))
 
 
-def launch(out: Path) -> dict:
-    """The next launch's Workflow args: batch-args.json plus every pair's ON-DISK state. The workflow refuses args
-    without it, so no launch rebuilds its state from agent returns (the w1034 refuter's C2)."""
-    _, args = batch_files(out)
-    if args is None:
+def plan_entry(slug: str, shard: str | None, dim: str, pair, votes, files=(), lines=None) -> dict | None:
+    """One pair's work left, from disk, or None when it has none: the files no finder read (with their lines), the
+    findings on disk (their count), the examined null, and per lens the findings no skeptic has decided."""
+    ids = sorted(pair["findings"]) if pair else []
+    read = pair["read"] if pair else set()
+    e = {"slug": slug, "shard": shard, "dim": dim, "finders": max(pair["finders"], default=0) if pair else 0,
+         "findings": len(ids), "undecided": {lens: [i for i in ids if lens not in votes.get(i, {})] for lens in LENSES}}
+    if slug == GLOBAL_PAIR:   # the clone pass reads census families, not shard files: it is done when it says so
+        e["done"] = bool(pair and pair["done"])
+        return e if not e["done"] or any(e["undecided"].values()) else None
+    e["unread"] = [[f, lines[f]] for f in files if f not in read]
+    e["null_checked"] = bool(pair and pair["null_checked"])
+    return e if e["unread"] or any(e["undecided"].values()) or not (ids or e["null_checked"]) else None
+
+
+def plan(out: Path, only: list[str] | None = None) -> dict:
+    """The next launch's PLAN, from disk (never from agent returns, the w1034 refuter's C2): the batch's settings, the
+    shards its pairs need, and one entry per pair with work left (of `only`'s shards, or the clone pass `global`)."""
+    bf = out / "batch-args.json"
+    if not bf.exists():
         raise SystemExit("no batch-args.json in %s: write it with r2_inputs.py --batch" % out)
-    pairs, votes = scan(out)
-    la = dict(args, stateOf=str(out), state={name: pair_state(p, votes) for name, p in sorted(pairs.items())})
-    (out / "launch-args.json").write_text(json.dumps(la, indent=1), encoding="utf-8")
-    return la
+    args = json.loads(bf.read_text(encoding="utf-8"))
+    if Path(args["outDir"]).resolve() != out.resolve():
+        raise SystemExit("%s names the batch directory %s, not %s: a moved batch is rewritten with r2_inputs.py "
+                         "--batch" % (bf, args["outDir"], out))
+    return plan_of(args, *scan(out), only)
+
+
+def plan_of(args: dict, pairs, votes, only: list[str] | None = None) -> dict:
+    """The plan of the batch `args` over the on-disk state `pairs`, `votes` (`scan`'s; empty for a batch not yet
+    launched, which is how `r2_inputs.py --batch` sizes a new one)."""
+    known = [s["id"] for s in args["shards"]] + (["global"] if args.get("duplicationPass") else [])
+    unknown = sorted(set(only or ()) - set(known))
+    if unknown:
+        raise SystemExit("not shards of this batch: %s (its shards: %s)" % (", ".join(unknown), ", ".join(known)))
+    shards = [s for s in args["shards"] if only is None or s["id"] in only]
+    entries = []
+    for s in shards:
+        lines = dict(zip(s["files"], s["fileLines"]))
+        for d in args["dimensions"]:
+            slug = "%s--%s" % (s["id"], d)
+            entries.append(plan_entry(slug, s["id"], d, pairs.get(slug), votes, s["files"], lines))
+    if args.get("duplicationPass") and (only is None or "global" in only):
+        entries.append(plan_entry(GLOBAL_PAIR, None, "duplication", pairs.get(GLOBAL_PAIR), votes))
+    work = [e for e in entries if e]
+    used = {e["shard"] for e in work}
+    return {**{k: args[k] for k in ("batch", "pinnedTree", "pinCommit", "outDir", "inputsDir", "stopFile",
+                                    "globalStopFile", "width")},
+            "planOf": args["outDir"], "decidedPairs": len(entries) - len(work),
+            "shard_order": [s["id"] for s in shards if s["id"] in used],
+            "shards": {s["id"]: {"name": s["name"], "lines": s["lines"], "input": s["input"], "files": len(s["files"])}
+                       for s in shards if s["id"] in used},
+            "pairs": work}
+
+
+def launch_script(pl: dict) -> str:
+    """The workflow template with its plan line replaced by `pl`: the whole launch, one file."""
+    body = TEMPLATE.read_text(encoding="utf-8")
+    if len(PLAN_LINE.findall(body)) != 1:
+        raise SystemExit("%s has no single `const A = args` plan line to replace" % TEMPLATE)
+    line = "const A = %s   // the plan of %s, written by r2_collect.py --launch from disk (kb/Work PB2707)" % (
+        json.dumps(pl, ensure_ascii=False, separators=(",", ":")), pl["outDir"])
+    return PLAN_LINE.sub(lambda _: line, body, count=1)
+
+
+def launch(out: Path, b: dict, reserve: float = 0.0, only: list[str] | None = None, rl: dict | None = None):
+    """Plan the next launch from disk and size it; -> (plan, estimate). Writes `<out>/launch.js` only when the plan
+    has work and fits the room left; otherwise removes any earlier one, so a stale plan is never launched."""
+    pl = plan(out, only)
+    est = r2_cost.size(pl, rl or r2_cost.rules(), b, reserve)
+    target = out / "launch.js"
+    target.unlink(missing_ok=True)
+    if est["fits"] and pl["pairs"]:
+        target.write_text(launch_script(pl), encoding="utf-8", newline="\n")
+    return pl, est
 
 
 # ── the agent's two calls ────────────────────────────────────────────────────────────────────────────────────────
@@ -512,15 +593,28 @@ def self_test():
     def vote(fid, lens, refuted, corrected=None):
         return {"type": "verdict", "finding": fid, "lens": lens, "refuted": refuted, "why": "w", "corrected": corrected}
 
+    def batch_fixture(out: Path, files: dict, dims: list) -> dict:
+        """batch-args.json as r2_inputs.py --batch writes it, every file 9 lines."""
+        return {"batch": "t", "pinnedTree": "P", "pinCommit": "c" * 40, "outDir": str(out), "inputsDir": str(out.parent),
+                "stopFile": "S-r2", "globalStopFile": "S", "width": 8, "dimensions": dims, "duplicationPass": False,
+                "shards": [{"id": s, "name": s, "lines": 9 * len(fs), "input": "in-%s.json" % s, "files": fs,
+                            "fileLines": [9] * len(fs)} for s, fs in files.items()]}
+
+    def refuses(fn) -> bool:
+        try:
+            fn()
+        except SystemExit:
+            return True
+        return False
+
     tracked = {"src/A.cs", "src/B.cs", "src/C.cs"}
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp)
         (out / "shards.json").write_text(json.dumps({"commit": "c", "shards": [
             {"id": "s1", "files": [["src/A.cs", 9], ["src/B.cs", 9]]}, {"id": "s2", "files": [["src/C.cs", 9]]}]}),
             encoding="utf-8")
-        (out / "batch-args.json").write_text(json.dumps({"shards": [{"id": "s1", "files": ["src/A.cs", "src/B.cs"]},
-                                                                    {"id": "s2", "files": ["src/C.cs"]}],
-                                                         "dimensions": ["architecture", "performance", "duplication"]}),
+        (out / "batch-args.json").write_text(json.dumps(batch_fixture(out, {"s1": ["src/A.cs", "src/B.cs"], "s2": ["src/C.cs"]},
+                                                                      ["architecture", "performance", "duplication"])),
                                              encoding="utf-8")
         f = "s1--architecture--f1#%d"
         write(out / "review-s1--architecture--f1.jsonl", [
@@ -601,13 +695,37 @@ def self_test():
         (out / "review-s1--architecture.jsonl").unlink()
         rep2 = collect(out, tracked)
         arm("collection is idempotent", json.dumps(rep2, sort_keys=True) == json.dumps(rep, sort_keys=True))
-        st = launch(out)["state"]["s1--architecture"]
-        arm("the launch state is the PAIR's, from disk: reads of every finder, every finding, decisions per lens",
+        st = status(out, "s1--architecture")
+        arm("--status is the PAIR's, from disk: reads of every finder, every finding, decisions per lens",
             st["read"] == ["src/A.cs", "src/B.cs"] and f2 in st["findings"] and st["finders"] == 2 and
             f2 in st["decided"]["scenario"] and f % 3 not in st["decided"]["rule"] and
             st["next_n"]["s1--architecture--f1"] == 11)
-        arm("launch-args.json carries the batch args and names the directory its state is of",
-            json.loads((out / "launch-args.json").read_text(encoding="utf-8"))["stateOf"] == str(out))
+        pl = plan(out)
+        by = {e["slug"]: e for e in pl["pairs"]}
+        e = by["s1--architecture"]
+        arm("the plan is the pair's WORK LEFT, from disk: no read file, the finding count, the undecided per lens",
+            e["unread"] == [] and e["finders"] == 2 and e["findings"] == 11 and f % 3 in e["undecided"]["rule"]
+            and f2 not in e["undecided"]["scenario"] and f % 1 not in e["undecided"]["site"])
+        arm("the plan sends finders to exactly the unread files, with their lines (a never-started pair: all)",
+            by["s1--performance"]["unread"] == [["src/B.cs", 9]] and by["s2--performance"]["unread"] == [["src/C.cs", 9]])
+        arm("a finished pair (complete, null examined) is NOT in the plan", "s2--architecture" not in by
+            and pl["decidedPairs"] == 1 and set(pl["shards"]) == {"s1", "s2"})
+        arm("a plan of some shards holds only their pairs; an unknown shard is refused",
+            {x["shard"] for x in plan(out, ["s2"])["pairs"]} == {"s2"} and refuses(lambda: plan(out, ["s9"])))
+        roomy = {"session_soft_stop_pct": 97, "session_est_pct": 0.0, "headroom_pct": 90.0, "resume_at": None}
+        js = out / "launch.js"
+        pl, est = launch(out, roomy, 0.0, None, r2_cost.fixture_rules())
+        text = js.read_text(encoding="utf-8") if js.exists() else ""
+        planned = json.loads(text.split("const A = ", 1)[1].split("   // the plan of", 1)[0]) if text else None
+        arm("a launch that fits writes launch.js: the template with its plan line replaced by the plan from disk",
+            est["fits"] and planned == pl and not PLAN_LINE.search(text) and "CHECKPOINT PER DECISION" in text
+            and text.count("const A = ") == 1)
+        pl, est = launch(out, dict(roomy, session_est_pct=96.99), 0.0, None, r2_cost.fixture_rules())
+        arm("an over-budget launch is REFUSED with its estimate and split, and the earlier launch.js is removed",
+            not est["fits"] and est["parts"] and est["session_points"] > 0 and not js.exists())
+        (out / "batch-args.json").write_text(json.dumps(dict(json.loads((out / "batch-args.json").read_text(
+            encoding="utf-8")), outDir=str(out / "elsewhere"))), encoding="utf-8")
+        arm("the plan of a batch whose args name another directory is refused", refuses(lambda: plan(out)))
         ck = out / "review-s2--code--f1.jsonl"
         good = json.dumps(rec(1, id="s2--code--f1#1", files=["src/C.cs"], sites=["src/C.cs:1-4 (C.F)"]))
         arm("--append writes a valid finding", append(ck, good, tracked).startswith("APPENDED") and
@@ -625,6 +743,25 @@ def self_test():
                 arm("--append refuses " + name, False)
             except ValueError:
                 arm("--append refuses " + name, True)
+    with tempfile.TemporaryDirectory() as tmp:
+        # O(undecided): one open pair, then 40 more pairs decided on disk; the plan and the launch grow by nothing
+        roomy = {"session_soft_stop_pct": 97, "session_est_pct": 0.0, "headroom_pct": 90.0, "resume_at": None}
+        sizes = []
+        for n in (1, 40):
+            out = Path(tmp) / ("b%02d" % n)   # equal-length names: the paths add no byte
+            out.mkdir()
+            files = {"open": ["src/Open.cs"]}
+            files.update({"done%d" % i: ["src/Some/Long/Directory/Path/File%d_%d.cs" % (i, j) for j in range(5)]
+                          for i in range(n)})
+            (out / "batch-args.json").write_text(json.dumps(batch_fixture(out, files, ["code"])), encoding="utf-8")
+            for i in range(n):
+                write(out / ("review-done%d--code--f1.jsonl" % i), [{"type": "read", "file": x} for x in files["done%d" % i]]
+                      + [{"type": "done"}], broken=False)
+                write(out / ("null-done%d--code.jsonl" % i), [{"type": "null-check", "missed": []}], broken=False)
+            pl, _ = launch(out, roomy, 0.0, None, r2_cost.fixture_rules())
+            sizes.append((len(json.dumps(pl)), (out / "launch.js").stat().st_size, pl["decidedPairs"]))
+        arm("a relaunch with N decided pairs carries O(undecided) bytes: 40 decided pairs add nothing but a count",
+            sizes[0][2] == 1 and sizes[1][2] == 40 and sizes[1][0] - sizes[0][0] <= 1 and sizes[1][1] - sizes[0][1] <= 1)
     print("=== R2 COLLECT SELF-TEST: %s ===" % ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
@@ -633,7 +770,11 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path)
-    ap.add_argument("--launch", action="store_true", help="with --out: also write launch-args.json for the next launch")
+    ap.add_argument("--launch", action="store_true",
+                    help="with --out: size the next launch's plan and write <batch dir>/launch.js when it fits")
+    ap.add_argument("--shards", help="with --launch: plan only these shards (comma-separated; `global` is the clone "
+                                     "pass), the parts a refused launch names")
+    r2_cost.add_budget_args(ap)
     ap.add_argument("--status", nargs=2, metavar=("BATCH_DIR", "PAIR"))
     ap.add_argument("--append", nargs=2, metavar=("CHECKPOINT", "JSON"))
     ap.add_argument("--self-test", action="store_true")
@@ -650,12 +791,32 @@ def main():
             print("REFUSED: %s" % e)
             return 1
         return 0
+    if a.shards and not a.launch:
+        ap.error("--shards plans a launch: it needs --launch")
     if not a.out:
         ap.error("--out is required")
-    rep = collect(a.out)
     if a.launch:
-        la = launch(a.out)
-        print("r2_collect: wrote %s (state of %d pair(s))" % (a.out / "launch-args.json", len(la["state"])))
+        only = [s.strip() for s in a.shards.split(",") if s.strip()] if a.shards else None
+        pl, est = launch(a.out, r2_cost.budget_from(a), a.session_reserve, only)
+        flags = "".join((" --borrow-days %d" % a.borrow_days if a.borrow_days else "",
+                         " --session-reserve %g" % a.session_reserve if a.session_reserve else ""))
+        print(r2_cost.report(est, "launch of %s%s" % (a.out, " (shards %s)" % a.shards if a.shards else ""),
+                             lambda p, i: "python scripts/arch/r2_collect.py --out %s --launch --shards %s%s" % (
+                                 a.out, ",".join(p["shards"]), flags)))
+        if not pl["pairs"]:
+            print("=== R2 LAUNCH: NOTHING TO LAUNCH — every pair of %s is decided (%d); collect it: "
+                  "r2_collect.py --out %s ===" % (a.out, pl["decidedPairs"], a.out))
+            return 0
+        if not est["fits"]:
+            print("=== R2 LAUNCH: REFUSED — the plan cannot finish in the room left; launch the parts above, one "
+                  "call each (no launch.js written) ===")
+            return r2_cost.REFUSED
+        js = a.out / "launch.js"
+        print("=== R2 LAUNCH: WROTE %s — %d pair(s) with work (%d decided, not in the plan), %d bytes; launch it "
+              "with Workflow({scriptPath: \"%s\"}) and no args ===" % (
+                  js, len(pl["pairs"]), pl["decidedPairs"], js.stat().st_size, str(js).replace("\\", "\\\\")))
+        return 0
+    rep = collect(a.out)
     print("=== R2 COLLECT: %s ===" % summary(rep))
     return 0
 

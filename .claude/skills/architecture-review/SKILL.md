@@ -51,6 +51,20 @@ usual (the `workstream` skill, rule 9). PB2118 is held for the owner's per-dispa
   driven by a Roslyn rewriter or a code fix, and Delete waves whose items the census measured dead. The oracle proves
   a mechanical wave; a Sonnet agent that meets a judgment returns `NEEDS-OPUS`.
 
+**An R2 batch** (design §3 R2, "Sizing a batch" and "Running a batch"; kb/Work PB2707) is not a campaign wave: it is
+the `wf_r2_review.js` fleet, launched by the attended operator in three commands, and NOTHING is transcribed by hand.
+1. `python scripts/arch/r2_inputs.py --out <inputs dir> --batch <label> --shards <ids> [--borrow-days N]
+   [--session-reserve P]` writes the batch only when it can finish in the session's and the week's room left; when it
+   cannot, it writes nothing and prints the estimate and the batches to write instead (`<label>a`, `<label>b`, ...,
+   one command each, the first for now and each later one for a fresh session window).
+2. `python scripts/arch/r2_collect.py --out <batch dir> --launch` plans the launch FROM DISK (only what is undecided),
+   sizes it again at that moment, and writes `<batch dir>\launch.js`; a launch that no longer fits is refused with its
+   `--launch --shards ...` parts.
+3. `Workflow({scriptPath: "<batch dir>\\launch.js"})` with no args, the stall watchdog beside it. After it ends,
+   `r2_collect.py --out <batch dir>` decides it; while it says LAUNCH NEEDED, repeat 2 and 3 (a relaunch is the same
+   one small call however far the batch got); once COMPLETE, file it and append its `r2_cost.py --measure` record to
+   `model_rules.json` `cost.r2.batches`.
+
 ## The oracle (the design's §4) — what "behavior-neutral" means here
 
 1. **Emitted C#.** For every program the suites compile (corpus goldens, NIST CCVS, version-matrix construct

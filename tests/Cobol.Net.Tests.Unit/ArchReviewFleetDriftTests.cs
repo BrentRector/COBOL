@@ -11,8 +11,10 @@ namespace CobolNet.Tests.Unit;
 /// docs/rearchitecture/DESIGN-architecture-review.md §3 R2): <c>scripts/arch/r2_subsystems.py --check</c> finds every
 /// reviewed file of the committed tree in exactly one subsystem (no hole, no overlap) and the design's subsystem block
 /// equal to the table it is rendered from; and the fleet's instruments — <c>r2_subsystems.py</c>, <c>r2_inputs.py</c>,
-/// <c>r2_collect.py</c>, <c>file_census_notes.py</c> (its R2 filing path) and the workflow's dry run
-/// <c>test_wf_r2_review.mjs</c> — each pass a self-test that drives every arm.
+/// <c>r2_collect.py</c>, <c>r2_cost.py</c> (kb/Work PB2707: a batch and a launch sized against the quota left),
+/// <c>file_census_notes.py</c> (its R2 filing path) and the workflow's dry run <c>test_wf_r2_review.mjs</c> (which runs
+/// the launch.js <c>r2_collect.py --launch</c> writes, as the operator launches it) — each pass a self-test that drives
+/// every arm.
 /// </summary>
 /// <remarks>
 /// The fleet's first brief named its subsystems in prose: one file sat in two of them, about 6,000 lines of the runtime
@@ -35,6 +37,7 @@ public sealed class ArchReviewFleetDriftTests
     [InlineData("r2_subsystems.py", "=== R2 SUBSYSTEMS SELF-TEST: PASS ===")]
     [InlineData("r2_inputs.py", "=== R2 INPUTS SELF-TEST: PASS ===")]
     [InlineData("r2_collect.py", "=== R2 COLLECT SELF-TEST: PASS ===")]
+    [InlineData("r2_cost.py", "=== R2 COST SELF-TEST: PASS ===")]
     [InlineData("file_census_notes.py", "self-test R2 OK")]
     public void EachFleetInstrument_PassesItsSelfTest(string script, string verdict)
     {
@@ -66,7 +69,11 @@ public sealed class ArchReviewFleetDriftTests
                      "resume after a stop: every finding — the finisher's included — is verified",
                      "a decided pair starts no agent on a relaunch",
                      "a silent finder whose files another finder saw read still has its findings verified",
-                     "args without the on-disk launch state are refused",
+                     // PB2707: the launch is the file r2_collect.py writes from disk; nothing is transcribed
+                     "the launch is launch.js, which r2_collect.py --launch wrote from disk, run with no args",
+                     "a relaunch with N decided pairs launches O(undecided) bytes and no agent for them",
+                     "the template run with no plan (no args) is refused, naming launch.js",
+                     "the old launch-args shape (a state, no plan) is refused",
                  })
         {
             Assert.True(r.Stdout.Contains("PASS  " + arm, StringComparison.Ordinal),

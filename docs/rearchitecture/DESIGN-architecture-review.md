@@ -207,12 +207,20 @@ Under review: `src/**/*.{cs,g4,ps1,csproj}`, `tests/**/*.{cs,csproj,props,py,ps1
   that. **Resume is from disk, per pair** (the w1034 claim refuter's C2: a workflow that planned from what agents
   RETURNED re-read a finisher's files on a relaunch, never ran the finisher again, left its findings unverified and
   re-decided findings whose skeptic chunks had moved; a finder that wrote findings and returned nothing orphaned
-  them). Every launch, the first included, is made from `launch-args.json`, which `r2_collect.py --out <batch dir>
-  --launch` writes: the batch args plus each pair's on-disk state. The workflow refuses args without it and plans
-  each pair from it: finders only for the unread remainder, each new agent under a new finder number, a finisher
-  after any agent that returned nothing (only an agent can read the disk), skeptics only for findings their lens has
-  not decided; a decided pair starts no agent. Width: eight agents at once across every stage; a stop file (the
-  owner's `scratch\STOP` or the fleet's `scratch\STOP-r2`) ends the batch after the agent that saw it.
+  them). **The launch is a file** (kb/Work PB2707: a Workflow script cannot read one, and batch 2's relaunch state was
+  a 95,644-byte JSON line the operator transcribed by hand into six Workflow calls). Every launch, the first included,
+  is `<batch dir>\launch.js`, which `r2_collect.py --out <batch dir> --launch` writes: the template with its one plan
+  line (`const A = args`) replaced by the PLAN it built from disk, and the operator's whole call is
+  `Workflow({scriptPath: "<batch dir>\\launch.js"})` with no args, whatever the batch's progress. The plan holds one
+  entry per pair with work left — the files no finder has read, with their lines, the finder number reached, the
+  findings on disk (a count) and, per lens, the findings no skeptic has decided — so it is O(undecided pairs and
+  findings): a decided pair is not in it at all. The template run directly has no plan and refuses to start, and a
+  refused launch (below) removes any earlier launch.js, so a stale plan is never launched. The workflow plans each
+  pair from its entry: finders only for the unread files, each new agent under a new finder number, a finisher after
+  any agent that returned nothing (only an agent can read the disk), skeptics for the findings the plan lists
+  undecided under their lens plus the findings this launch's agents wrote (told apart by their finder number). Width:
+  eight agents at once across every stage; a stop file (the owner's `scratch\STOP` or the fleet's `scratch\STOP-r2`)
+  ends the batch after the agent that saw it.
 - **Verification** (B6). Every finding is attacked by three skeptics with distinct lenses — the site (real, current,
   not already a note), the rule (it applies, the target agrees with §8, the wave kind and severity), the scenario (it
   occurs; the measurement; a defect is a spec defect) — in chunks of four findings per transcript. A finding stands
@@ -244,12 +252,32 @@ Under review: `src/**/*.{cs,g4,ps1,csproj}`, `tests/**/*.{cs,csproj,props,py,ps1
   `plan_wave.py` compute the wave's file set (§8.7) rather than anyone listing it. Ids come from `alloc.py`; the
   finding ids on the note's `r2_ids:` line (and its `r2_members:`) make a re-run file only what is new; a path the
   committed tree no longer has is refused as stale.
-- **Running a batch** (MANDATORY-PRACTICES O8, N7): read `scripts/orchestrator/budget.py` before each batch; write
-  its args with `r2_inputs.py --out <dir> --batch <label> --shards <ids>` (the SMALL shards first, so the shape is
-  measured before binding's 76,000 lines); `r2_collect.py --out <batch dir> --launch`, then launch the workflow with
-  the `launch-args.json` it wrote; start `tools/claude-skills/skills/agent-fleet/references/stall_watch.py <its
-  transcript dir>` beside it; after it ends (or stops), `r2_collect.py --out <batch dir> --launch` again, and launch
-  again while it says LAUNCH NEEDED; file once it says COMPLETE.
+- **Sizing a batch** (kb/Work PB2707). Batch 2 was launched with no estimate at 08:30 on 2026-10-08; by 10:02 the
+  session meter read 90 % and the batch was stopped with 52 of 65 pairs' finders done and no skeptic started, so it
+  had paid its finders and decided nothing. `scripts/arch/r2_cost.py` is the one estimator: a plan's work is the
+  unread shard lines per dimension, the undecided lens verdicts, the verdicts the unread lines are expected to need,
+  the unexamined nulls and the clone pass, priced at rates pooled from every batch recorded in `model_rules.json`
+  `cost.r2.batches`. Each record is `r2_cost.py --measure <batch dir> <its Workflow runs' subagent dirs>`, the counted
+  tokens (the kinds `budget.py` counts) of every agent transcript by kind; at batches 1 and 2 of 8be230068 that is
+  90.3 tokens per shard line per dimension, 29,330 per lens verdict and 0.00128 findings per line (29.4 M and 52.5 M
+  counted tokens for 36 and 65 pairs: about 0.8 M a pair, so a session window holds about 40 pairs). Tokens become weekly points at the Opus rate (every reviewer is
+  Opus) and session points at `session_pct_per_weekly_pct`. The room is `budget.py`'s for the running account: the
+  session's soft stop less what it has spent less `--session-reserve` (what the orchestrator loop running beside the
+  batch will spend), and the week's headroom (`--borrow-days`, never assumed; the owner's 2026-10-10 grant of the
+  whole weekly quota is `--borrow-days 6`). `r2_inputs.py --batch` REFUSES a batch that cannot finish in that room,
+  writes nothing, and prints the estimate with the batches to write instead (`<label>a`, `<label>b`, ...: the
+  shards packed in the order given, the first part into the room left now, each later one into one fresh session
+  window while the week has room, the rest after the weekly reset; a shard is never split). `r2_collect.py --launch`
+  sizes every launch the same way at the moment it is made and refuses one that no longer fits, naming its parts as
+  `--launch --shards ...`, one call each. A batch then always finishes inside one window, and each finished batch is
+  filed on its own.
+- **Running a batch** (MANDATORY-PRACTICES O8, N7): write its args with `r2_inputs.py --out <dir> --batch <label>
+  --shards <ids>` (the SMALL shards first, so the shape is measured before binding's 76,000 lines), which sizes it
+  as above; `r2_collect.py --out <batch dir> --launch`, then `Workflow({scriptPath: "<batch dir>\\launch.js"})`;
+  start `tools/claude-skills/skills/agent-fleet/references/stall_watch.py <its transcript dir>` beside it; after it
+  ends (or stops), `r2_collect.py --out <batch dir>` decides it, and while it says LAUNCH NEEDED, `--launch` again and
+  launch the launch.js it rewrites; file once it says COMPLETE, then append the batch's `r2_cost.py --measure` record
+  to `model_rules.json`.
 - **Dimensions:** the four of `PROMPT.md` §4 (architecture · full code · performance · duplication and efficiency),
   plus modern-C# conformance (§5.5). Their criteria are written once, in `.claude/skills/review/SKILL.md`, the base
   skill's `references/dimensions.md` and §5; the workflow adds only each batch's inputs (N4).

@@ -51,6 +51,13 @@
     "_why": "Opus where the work is design-heavy (OO, grammar), where a note says a design question is open, or where a note has already failed twice (a note that fails twice is a task-spec problem, kb/Work PB1981). Opus also for the legacy-retirement cuts (CI and gate wiring carry the CI invariant) and the architecture review's R0/R1 items (kb/Work R69). Fable and Mythos are never values here: each needs explicit owner approval per dispatch (owner 2026-10-02; R69 2026-10-06)."
   },
   "cost": {
+    "r2": {
+      "_doc": "The R2 review fleet's measured cost, per batch (kb/Work PB2707; DESIGN-architecture-review.md section 3 R2, Sizing a batch). Each record is `scripts/arch/r2_cost.py --measure <batch dir> <its Workflow runs' subagent dirs>` verbatim: the batch's work from its directory (shard lines x dimensions, findings, lens verdicts, examined nulls) and the counted tokens (calibration.counted_token_kinds) of every agent transcript by kind. r2_cost.py pools them into the rates it sizes every batch and launch with; append each finished batch's record.",
+      "batches": [
+        {"batch": "1", "pin": "8be23006851a", "line_dimensions": 133865, "findings": 167, "verdicts": 501, "nulls": 0, "finder_tokens": 13175736, "skeptic_tokens": 15024151, "null_tokens": 0, "duplication_pass_tokens": 1151483, "workflow_runs": 1, "agents": 231, "measured": "2026-10-10", "source": "r2_cost.py --measure batch-1 over its one Workflow run wf_f0bdb4a4-f00 (operator session 7128ef77, 2026-10-08)"},
+        {"batch": "2", "pin": "8be23006851a", "line_dimensions": 262995, "findings": 343, "verdicts": 1029, "nulls": 0, "finder_tokens": 22641140, "skeptic_tokens": 29850763, "null_tokens": 0, "duplication_pass_tokens": null, "workflow_runs": 7, "agents": 425, "measured": "2026-10-10", "source": "r2_cost.py --measure batch-2 over its seven Workflow runs: wf_4c432e36-5b7 (the first launch, stopped at 52 of 65 pairs' finders) and the six hand-split relaunches wf_197c5609-ca5, wf_5bba5907-8be, wf_996b0c5b-192, wf_b15e9b16-1f5, wf_eecbb59e-80f, wf_fa8e3b6b-4f1 (kb/Work PB2707)"}
+      ]
+    },
     "per_group_tokens": {"sonnet": 400000, "opus": 160000},
     "per_note_tokens": {"sonnet": 240000, "opus": 96000},
     "lander_tokens": 480000,
