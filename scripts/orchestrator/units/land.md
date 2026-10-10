@@ -14,7 +14,8 @@ Finished implementer branches are waiting for a lander.
    takes the LANDING LEASE before its final rebase and gates (lander-train-brief step 2b, kb/Work PB2537): if
    `python scripts/orchestrator/landing_lease.py status` names another holder, the lander waits for it rather than
    gating against a main that holder is about to move; push-main.sh releases it. After the push, `python scripts/prune_worktrees.py --apply` removes the branches that landed.
-3. Render the ledger in the same turn: `python scripts/spec/gen_ledger.py --out {COORD}\ledger.html`. You cannot PUBLISH it
+3. Render the ledger in the same turn: `python scripts/spec/gen_ledger.py --out {COORD}\ledger.html` (every figure on it is computed; its
+   trend file gains a point when GAP or the register's series moved). You cannot PUBLISH it
    (a headless session has no Artifact tool): the supervisor announces the owed publish after you end, and the attended
    session publishes `{COORD}\ledger.html` to the owner's artifact. Do not look for a way around that.
 4. Write the handoff (`landed`, the branches still pending, `next_unit` null unless you know better).

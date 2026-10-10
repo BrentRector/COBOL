@@ -387,6 +387,17 @@ def file_set_collisions(files: list[str] | set[str], busy: dict[str, set[str]]) 
     return [f"{owner} ({sorted(mine & theirs)[0]})" for owner, theirs in sorted(busy.items()) if mine & theirs]
 
 
+def run_fix_clusters(status: str, out: pathlib.Path, rules: dict[str, Any]) -> dict[str, Any]:
+    """The fix lane's groups: fix_clusters.py --json over .agent-fleet.json's population (`kind`, `skip_flag`) at the
+    planner's group cap, written to `out` and returned whole (`clusters`, `unsited`). The ONE call, shared by this
+    planner and the ledger's estimate (scripts/spec/ledger_plan.py, kb/Work PB2912), so both size the lane alike."""
+    if not FIX_CLUSTERS.exists():
+        raise SystemExit(f"⛔ {FIX_CLUSTERS} is missing: run `git submodule update --init tools/claude-skills`")
+    subprocess.run([sys.executable, str(FIX_CLUSTERS), "--max", str(rules["wave"]["max_notes_per_group"]),
+                    "--open-status", status, "--json", str(out)], cwd=REPO, check=True, capture_output=True)
+    return json.loads(out.read_text(encoding="utf-8"))
+
+
 def load_fix_clusters() -> Any:
     """The public submodule's fix_clusters.py as a module: a campaign reuses its site index and clustering (never a
     fork of them) over a wider tree than .agent-fleet.json gives the fix lane."""
@@ -880,12 +891,7 @@ def main(argv: list[str] | None = None) -> int:
     def fix_clusters(status: str, given: str | None) -> list[dict[str, Any]]:
         if given:
             return json.loads(pathlib.Path(given).read_text(encoding="utf-8"))["clusters"]
-        if not FIX_CLUSTERS.exists():
-            raise SystemExit(f"⛔ {FIX_CLUSTERS} is missing: run `git submodule update --init tools/claude-skills`")
-        tmp = cdir / f"clusters-{status}.json"
-        subprocess.run([sys.executable, str(FIX_CLUSTERS), "--max", str(rules["wave"]["max_notes_per_group"]),
-                        "--open-status", status, "--json", str(tmp)], cwd=REPO, check=True, capture_output=True)
-        return json.loads(tmp.read_text(encoding="utf-8"))["clusters"]
+        return run_fix_clusters(status, cdir / f"clusters-{status}.json", rules)["clusters"]
 
     deps, waiting, campaign = None, {}, ""
     if a.cluster:

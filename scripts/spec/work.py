@@ -500,7 +500,7 @@ def open_blockers(it: dict, by_id: dict[str, dict]) -> list[str]:
 
 def cluster_members(items: list[dict], lead: str) -> list[dict]:
     """Every note whose `cluster` list names `lead`, terminal or not — THE membership rule, so `cluster_order` and the
-    ledger's program section (`gen_ledger.py`) count one population. A list only: a scalar `cluster: PB2108` would
+    ledger's lanes (`ledger_plan.py`: the campaign and held clusters of WHAT REMAINS) count one population. A list only: a scalar `cluster: PB2108` would
     match by SUBSTRING (`check` reports that shape)."""
     return [i for i in items if isinstance(i.get("cluster"), list) and lead in i["cluster"]]
 

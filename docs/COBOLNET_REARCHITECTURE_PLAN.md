@@ -24,12 +24,19 @@ a DEVLOG entry per landing on main (kb/Work PB2605); commit AND push every check
 
 ### Where we are
 
-- **▶ GATE POLICY (2026-10-07, kb/Work PB2514, PB2515): the batched-gating TRIAL until Sat 2026-10-10 10:00 PDT.** The
-  implementer gate cap is one shared setting (`gate_slot.py set-cap`, 3 until Saturday, then the default 1); while the
-  shared implementer scope is `leg1` an implementer gate runs leg 1 only (`LEG 1 ONLY (batched-gating trial, PB2515)`),
-  the lander's whole-population train gate is the population check and attributes a red per cluster
-  (MANDATORY-PRACTICES L12), and every train is recorded with `scripts/orchestrator/train_measure.py`. Both settings
-  expire by themselves; the owner decides on `train_measure.py summary` against the baseline trains 1033–1035.
+- **▶ PRIORITY (owner 2026-10-10, kb/Work PB2911): THE COMPILER AND ZERO GAP COME FIRST.** The loop runs
+  `-Cluster PB2911,PB1086`: the GAP campaign (the 51 open notes holding the inventory's 103 GAP rows, which the fix
+  lane never planned: 34 are analyses and 29 process-only, and GAP had not moved since 2026-10-08) and the §8.13
+  external-repository slices, alternating with the fix lane's defect waves. The Delete program PB2119 and the R2
+  review's batch 3 are HELD until zero GAP and zero known compiler defects. Quota: owner 2026-10-10, 100 % of the
+  weekly allowance (loop `-BorrowDays 6`), never past the 5-hour session limit.
+- **▶ GATE POLICY (owner 2026-10-10, kb/Work PB2514, PB2515): batched gating and an implementer gate cap of 3 are
+  PERMANENT.** An implementer gate runs leg 1 only (`LEG 1 ONLY`), the lander's whole-population train gate is the
+  population check and attributes a red per cluster (MANDATORY-PRACTICES L12), and every train is recorded with
+  `scripts/orchestrator/train_measure.py`. The trial's measurement (15 batched trains 3.43 changes landed/h against 8
+  whole-population trains 0.71/h, confounded by the cap; no CI red that batching let through) is in PB2515. They are
+  `gate_slot.py`'s coded defaults (`DEFAULT_SCOPE`, `DEFAULT_SLOTS`; train 1052), and `gate_slot.py clear` drops the
+  bridging settings that carried them before.
 - **▶ LIVE STATE (2026-10-06 23:40 PDT) — THE COMPLETION PLAN IS DECIDED (kb/Work R69; DEVLOG 1901).** Main is train 1024 plus this plan commit; no compiler code changed. Three owner decisions of 2026-10-06, each recorded in R69 and never to be re-asked:
   - **The legacy `CobolSharp.*` engine is DELETED from main** (trains 1025 and 1027, 2026-10-07; the archive tag `legacy-byte-engine-final` marks `48a44548c`, the last commit holding it; `docs/rearchitecture/LEGACY-ARCHIVE.md` is the pointer). The decision supersedes DEVLOG 997's "keep engine" and amends D14. P15's Cut 2.5 (D10), the prose sweep, the solution rename and the grammar unification run as wave 1028 of the `PB2108` cluster (lead PB2108; the register's `cluster` and `blocked_by` fields carry the membership and order: Cut 1a and 1b in parallel → Cut 2 with the archive tag → the prose sweep, the solution rename, D10 and the grammar unification). v1.0 keeps Cut 3 (the runtime namespace flip) and the §4.2.16 conformance documentation. Evidence: R69 §1 (zero product defects caught since July; its one purpose dissolved when PB750 made the guard greenfield-driven; its costs measured).
   - **R2, the review fleet (2026-10-07 23:06 PDT, DEVLOG 1932):** rebuilt from the owner-approved adversarial review of its first brief (PB2558–PB2561: computed subsystems and shards, inputs once, per-decision checkpoints, three-lens skeptics, scripted filing into PB1754); DESIGN-architecture-review §3 R2 describes it as built. Batch 1 (the small shards: runtime values, editions and diagnostics, the CLI, plus the one whole-codebase clone pass) is ready for the operator; nothing of R2 has run yet.
@@ -3208,10 +3215,12 @@ already-derivable coverage; none change the pipeline.
   burn-down reports). `python scripts/spec/backfill_closes_rows.py`
   re-derives the back-link from the inventory's own commit history — idempotent, and it never overwrites an
   answer a human wrote.
-- Owner status page: `python scripts/spec/gen_ledger.py` renders the **WiseOwl COBOL Completion Ledger** artifact (kb/Work R69's plan lane by lane, measured by `scripts/spec/ledger_plan.py`; PB2462)
+- Owner status page: `python scripts/spec/gen_ledger.py` renders the **WiseOwl COBOL Completion Ledger** artifact (what remains to v1.0, bucket by bucket with the lane that plans each note and an
+  estimate from measured inputs, measured by `scripts/spec/ledger_plan.py`; PB2912)
   from the repo — inventory, `kb/Work` (through `work.py`'s own predicate), `audit_annex_a1.py --json`, `CONFORMANCE.md`
   §2/§4/§5 and §0's CURRENT battery bullet — so a refresh is one run plus one publish to the artifact's existing URL,
-  never a hand rewrite; `--check` reports staleness and the GAP series lives in `docs/rearchitecture/evidence/ledger-trend.json`.
+  never a hand rewrite; `--check` reports staleness and the GAP series, with the register's defect series beside it,
+  lives in `docs/rearchitecture/evidence/ledger-trend.json`.
 
 ## §10 Document map (post-consolidation)
 

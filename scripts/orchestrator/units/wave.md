@@ -23,7 +23,8 @@ UNIT: wave.
    stall watchdog's log between waits. Never end a turn while that file is empty.
    Judge each lander report: a dropped cluster gets its reason into its kb/Work note.
 5. In the same turn as the landing report, render the ledger: `python scripts/spec/gen_ledger.py --out {COORD}\ledger.html`
-   (and refresh the narrative in docs/rearchitecture/evidence/ledger-in-flight.md if the lanes changed). You cannot
+   (every figure on it is computed; its trend file gains a point when GAP or the register's series moved, so commit
+   docs/rearchitecture/evidence/ledger-trend.json with the landing when it changed). You cannot
    PUBLISH it (a headless session has no Artifact tool): the supervisor announces the owed publish after you end, and the
    attended session publishes `{COORD}\ledger.html` to the owner's artifact. Do not look for a way around that.
 6. Write the handoff: `workflow.state`, `landed`, and every unlanded branch in `branches_pending`; `next_unit` null

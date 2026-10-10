@@ -76,6 +76,17 @@ check("the published stamp is the old one", s["published_stamp"] != s["stamp"], 
 run("mark-published")
 check("a later mark keeps the recorded url", (run("owed")["state"], run("owed")["url"]), ("current", URL1))
 
+# the fix lane's population is an input of the page's WHAT REMAINS block (kb/Work PB2912): changing it is owed
+(REPO / ".agent-fleet.json").write_text('{"kind": "defect"}', encoding="utf-8")
+git("add", "."); git("commit", "-q", "-m", "the fix lane's population")
+check("a commit to .agent-fleet.json makes it owed", run("owed")["state"], "owed")
+run("mark-published")
+# the held architecture review's evidence is no longer on the page: its folders are not inputs
+(REPO / "docs" / "rearchitecture" / "evidence" / "arch-census").mkdir(parents=True)
+(REPO / "docs" / "rearchitecture" / "evidence" / "arch-census" / "x.json").write_text("{}", encoding="utf-8")
+git("add", "."); git("commit", "-q", "-m", "a census record")
+check("a census record no longer makes it owed", run("owed")["state"], "current")
+
 if fails:
     print("\n".join("FAIL: " + f for f in fails))
     sys.exit(1)

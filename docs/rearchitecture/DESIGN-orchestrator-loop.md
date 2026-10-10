@@ -809,7 +809,8 @@ Owner 2026-10-04: "Publish ledger each time." The page is the owner's live view 
 its session has no `Artifact` tool (probed 2026-10-04 on Haiku: asked whether the tool is available, it answers NO), and a
 wrapper around the claude.ai API would be a second author of the page. So the work splits where the capability is:
 - **A unit renders** (`units/wave.md` step 5, `units/land.md` step 3): `python scripts/spec/gen_ledger.py --out
-  {COORD}\ledger.html`, refreshing `docs/rearchitecture/evidence/ledger-in-flight.md` when the lanes changed.
+  {COORD}\ledger.html`; every figure on the page is computed and none is hand-written (the in-flight narrative was
+  removed, kb/Work PB2912).
 - **The supervisor announces.** After every unit it runs `ledger_state.py owed`, which compares the page's own stamp (the
   last commit touching an input of the page, `gen_ledger.STAMP_PATHS`, imported so the two cannot disagree) with
   `ledger-published.json`, and prints `LEDGER PUBLISH OWED` in its log when they differ. `stop.ps1 -Status` shows the same.

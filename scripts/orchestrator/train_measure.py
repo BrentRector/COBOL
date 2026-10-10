@@ -94,6 +94,15 @@ def record(path: pathlib.Path, rec: dict, replace: bool) -> None:
     os.replace(tmp, path)
 
 
+def landing_rate(records: list[dict]) -> tuple[int, float, float]:
+    """(changes landed, the wall-clock window in hours from the first train's start to the last train's push, changes
+    per hour) over `records`, which must be non-empty. The ONE rate rule: `summarize` prints it and the ledger's
+    remaining-work estimate divides by it (scripts/spec/ledger_plan.py, kb/Work PB2912)."""
+    window_h = (max(_when(r["pushed"]) for r in records) - min(_when(r["started"]) for r in records)).total_seconds() / 3600
+    landed = sum(r["landed"] for r in records)
+    return landed, window_h, landed / window_h
+
+
 def summarize(records: list[dict], since: dt.datetime | None = None) -> list[str]:
     """Per gating mode: changes landed per hour (landed clusters over the wall-clock window from the first train's
     start to the last train's push), whole-population runs per train, red first runs with their mean attribution time,
@@ -104,8 +113,7 @@ def summarize(records: list[dict], since: dt.datetime | None = None) -> list[str
         if not rs:
             lines.append(f"{gating}: no trains recorded")
             continue
-        window_h = (max(_when(r["pushed"]) for r in rs) - min(_when(r["started"]) for r in rs)).total_seconds() / 3600
-        landed = sum(r["landed"] for r in rs)
+        landed, window_h, _ = landing_rate(rs)
         reds = [r for r in rs if r["first_run"] == "red"]
         attribution = (f", mean attribution {sum(r['attribution_min'] for r in reds) / len(reds):.1f} min"
                        if reds else "")

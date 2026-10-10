@@ -180,6 +180,13 @@
   .trend .tl-mark  { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 2 3; }
   .trend .tl-lab   { fill: var(--ink-3); font-family: "IBM Plex Mono", Consolas, monospace; font-size: 11px; }
   .trend .tl-lab-e { fill: var(--ink); font-family: "IBM Plex Mono", Consolas, monospace; font-size: 11px; font-weight: 500; }
+  /* the register series beside the GAP line (kb/Work PB2912): one stroke per series, its legend swatch alike */
+  .trend .rl-0, .trend .rl-1, .trend .rl-2, .trend .rl-3, .trend .rl-4 { fill: none; stroke-width: 2; stroke-linejoin: round; }
+  .trend .rl-0 { stroke: var(--ink-2); }   .legend .sw.rl-0 { background: var(--ink-2); }
+  .trend .rl-1 { stroke: var(--s-open); }  .legend .sw.rl-1 { background: var(--s-open); }
+  .trend .rl-2 { stroke: var(--crit-text); } .legend .sw.rl-2 { background: var(--crit-text); }
+  .trend .rl-3 { stroke: var(--s-testowed); } .legend .sw.rl-3 { background: var(--s-testowed); }
+  .trend .rl-4 { stroke: var(--s-closed); } .legend .sw.rl-4 { background: var(--s-closed); }
   .trend .note { font-size: 12px; color: var(--ink-3); margin: 2px 0 0; max-width: none; }
 
   /* ── pills ────────────────────────────────────────── */
@@ -224,23 +231,11 @@
   .meter .fill { height: 100%; background: var(--s-closed); border-radius: 3px 0 0 3px; }
   .meter-card .note { font-size: 12.5px; color: var(--ink-3); margin-top: 8px; max-width: 70ch; }
 
-  /* ── work / lists ─────────────────────────────────── */
-  .cardgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
-  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 16px 18px; }
-  .card h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-  .card p { font-size: 13.5px; color: var(--ink-2); margin: 0 0 6px; }
-  .card ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; color: var(--ink-2); }
-  .card li { margin-bottom: 5px; }
-  .card li::marker { color: var(--accent); }
-
-  .flight {
-    background: var(--accent-soft); border: 1px solid var(--rule); border-radius: 8px;
-    padding: 18px 20px; margin-bottom: 14px;
-  }
-  .flight h3 { margin: 0 0 6px; font-size: 15px; }
-  .flight p { font-size: 13.5px; color: var(--ink-2); margin: 0 0 8px; max-width: none; }
-  .flight ol { margin: 4px 0 0; padding-left: 20px; font-size: 13.5px; color: var(--ink-2); }
-  .flight li { margin-bottom: 3px; }
+  /* ── the loud flags of WHAT REMAINS (kb/Work PB2912) ── */
+  .alert { border-radius: 8px; padding: 12px 16px; margin: 0 0 12px; font-size: 13.5px; max-width: none; }
+  .alert.crit { background: var(--crit-bg); color: var(--crit-text); border: 1px solid var(--crit-text); }
+  .alert.good { background: var(--good-bg); color: var(--good-text); border: 1px solid var(--rule); }
+  .alert .mono { color: var(--ink); }
 
   /* ── footer ───────────────────────────────────────── */
   footer {

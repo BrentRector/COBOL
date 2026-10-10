@@ -1,6 +1,6 @@
 {
   "_frozen": "⛔ FROZEN EVIDENCE — an append-only series of MEASUREMENTS, one point per battery or GAP-moving landing, appended by scripts/spec/gen_ledger.py; a point records what that commit's own tree measured and is never revised (owner decision, kb/Work/PB785, 2026-09-06). The directory rule is its siblings': the record is not edited to stay current, and a claim the tree has since REFUTED carries a `superseded_by` object — note · devlog · date · why — as the first key of the object holding it. `python scripts/spec/audit_evidence_supersession.py --check` is the gate.",
-  "_comment": "GAP burn-down series for the COBOL.NET Conformance Ledger artifact, appended by scripts/spec/gen_ledger.py. ONE POINT PER BATTERY OR GAP-MOVING LANDING - a commit that moves no row adds no point, or this becomes a commit log with a y-axis. Every field is MEASURED, never remembered: each point's gap/closed/dns were read out of that commit's own tests/version-matrix/traceability-inventory.json (git show <sha>:<path>), which is why the series can be re-derived by anyone who doubts it. `battery` carries the battery number when the point is the tree a comprehensive run was measured on, and null otherwise; the chart marks that point, because a burn-down without its last gate on it invites the reader to trust an ungated number. `label` is a short chart caption for the first point only - the rest are dated. This file is DATA for a derived view; it is not a work list and must never grow one (CLAUDE.md rule 8). Seeded 2026-09-02 from the five landings that moved the inventory since the 2026-08-29 phase-B batch; earlier history is in DEVLOG.md and is recoverable the same way.",
+  "_comment": "GAP burn-down series for the COBOL.NET Conformance Ledger artifact, appended by scripts/spec/gen_ledger.py. ONE POINT PER BATTERY OR GAP-MOVING LANDING - a commit that moves no row adds no point, or this becomes a commit log with a y-axis. Every field is MEASURED, never remembered: each point's gap/closed/dns were read out of that commit's own tests/version-matrix/traceability-inventory.json (git show <sha>:<path>), which is why the series can be re-derived by anyone who doubts it. `battery` carries the battery number when the point is the tree a comprehensive run was measured on, and null otherwise; the chart marks that point, because a burn-down without its last gate on it invites the reader to trust an ungated number. `label` is a short chart caption for the first point only - the rest are dated. Since 2026-10-10 (kb/Work PB2912) each point also carries the REGISTER series, measured from the same commit's own kb/Work frontmatter and inventory: compiler_open (open notes that are not process_only), defects (of them kind: defect), wrong_answer, crashes, and gap_holders (open notes whose inventory_rows hold a GAP row; null where that tree's notes carried no inventory_rows yet); a point is appended when the inventory OR the register series moves. The 173 points recorded before then gained those five fields by gen_ledger.py --backfill-register, each from its own sha; no recorded value was changed. The program list (the re-architecture program, 2026-10-07 to 2026-10-08) is frozen history: the program is held (kb/Work PB2911) and nothing appends to it. This file is DATA for a derived view; it is not a work list and must never grow one (CLAUDE.md rule 8). Seeded 2026-09-02 from the five landings that moved the inventory since the 2026-08-29 phase-B batch; earlier history is in DEVLOG.md and is recoverable the same way.",
   "points": [
     {
       "sha": "8cc64aa0",
@@ -9,7 +9,12 @@
       "closed": 569,
       "dns": 2,
       "label": "phase-B batch 8",
-      "battery": null
+      "battery": null,
+      "compiler_open": 31,
+      "defects": 25,
+      "wrong_answer": 18,
+      "crashes": 2,
+      "gap_holders": null
     },
     {
       "sha": "8ca74a3d",
@@ -18,7 +23,12 @@
       "closed": 670,
       "dns": 20,
       "label": "burn-down cluster A",
-      "battery": null
+      "battery": null,
+      "compiler_open": 31,
+      "defects": 26,
+      "wrong_answer": 10,
+      "crashes": 5,
+      "gap_holders": null
     },
     {
       "sha": "6f8461d9",
@@ -27,7 +37,12 @@
       "closed": 670,
       "dns": 36,
       "label": "defective-row registration",
-      "battery": null
+      "battery": null,
+      "compiler_open": 59,
+      "defects": 54,
+      "wrong_answer": 20,
+      "crashes": 9,
+      "gap_holders": 50
     },
     {
       "sha": "1318032e",
@@ -36,7 +51,12 @@
       "closed": 675,
       "dns": 36,
       "label": "arithmetic review fleet",
-      "battery": null
+      "battery": null,
+      "compiler_open": 57,
+      "defects": 54,
+      "wrong_answer": 20,
+      "crashes": 9,
+      "gap_holders": 48
     },
     {
       "sha": "2acbd842",
@@ -45,7 +65,12 @@
       "closed": 675,
       "dns": 36,
       "label": "PB277 CI repair",
-      "battery": 41
+      "battery": 41,
+      "compiler_open": 57,
+      "defects": 54,
+      "wrong_answer": 20,
+      "crashes": 9,
+      "gap_holders": 48
     },
     {
       "sha": "a54f4502",
@@ -54,7 +79,12 @@
       "closed": 693,
       "dns": 36,
       "label": "Annex A.1 DOC-row mechanism",
-      "battery": null
+      "battery": null,
+      "compiler_open": 57,
+      "defects": 54,
+      "wrong_answer": 21,
+      "crashes": 9,
+      "gap_holders": 49
     },
     {
       "sha": "2f4fbda9",
@@ -63,7 +93,12 @@
       "closed": 693,
       "dns": 333,
       "label": "derived-verdict selectors",
-      "battery": null
+      "battery": null,
+      "compiler_open": 58,
+      "defects": 55,
+      "wrong_answer": 21,
+      "crashes": 10,
+      "gap_holders": 52
     },
     {
       "sha": "c11949e3",
@@ -72,7 +107,12 @@
       "closed": 844,
       "dns": 333,
       "label": "The golden lane: 151 rows cl",
-      "battery": null
+      "battery": null,
+      "compiler_open": 65,
+      "defects": 62,
+      "wrong_answer": 24,
+      "crashes": 10,
+      "gap_holders": 55
     },
     {
       "sha": "0b1c39bc",
@@ -81,7 +121,12 @@
       "closed": 855,
       "dns": 333,
       "label": "Cluster E — PB142/PB144/PB19",
-      "battery": null
+      "battery": null,
+      "compiler_open": 63,
+      "defects": 60,
+      "wrong_answer": 23,
+      "crashes": 10,
+      "gap_holders": 52
     },
     {
       "sha": "66c85a90",
@@ -90,7 +135,12 @@
       "closed": 904,
       "dns": 333,
       "label": "Witness cluster A — A.4.8/A.",
-      "battery": null
+      "battery": null,
+      "compiler_open": 63,
+      "defects": 60,
+      "wrong_answer": 23,
+      "crashes": 9,
+      "gap_holders": 51
     },
     {
       "sha": "cbd696ce",
@@ -99,7 +149,12 @@
       "closed": 917,
       "dns": 333,
       "label": "Cluster F — PB183/PB152: USA",
-      "battery": null
+      "battery": null,
+      "compiler_open": 64,
+      "defects": 59,
+      "wrong_answer": 23,
+      "crashes": 9,
+      "gap_holders": 50
     },
     {
       "sha": "617c5568",
@@ -108,7 +163,12 @@
       "closed": 932,
       "dns": 333,
       "label": "Batch b1 registered: 179 row",
-      "battery": null
+      "battery": null,
+      "compiler_open": 117,
+      "defects": 111,
+      "wrong_answer": 55,
+      "crashes": 12,
+      "gap_holders": 105
     },
     {
       "sha": "60bf02d7",
@@ -117,7 +177,12 @@
       "closed": 1084,
       "dns": 333,
       "label": "A.4.2 screen handling: refus",
-      "battery": null
+      "battery": null,
+      "compiler_open": 117,
+      "defects": 111,
+      "wrong_answer": 55,
+      "crashes": 12,
+      "gap_holders": 103
     },
     {
       "sha": "80c6f46e",
@@ -126,7 +191,12 @@
       "closed": 1088,
       "dns": 333,
       "label": "Cluster D: USAGE float-forma",
-      "battery": null
+      "battery": null,
+      "compiler_open": 115,
+      "defects": 109,
+      "wrong_answer": 55,
+      "crashes": 12,
+      "gap_holders": 101
     },
     {
       "sha": "a68d959f",
@@ -135,7 +205,12 @@
       "closed": 1088,
       "dns": 335,
       "label": "PB280 answered whole: an OPT",
-      "battery": null
+      "battery": null,
+      "compiler_open": 115,
+      "defects": 109,
+      "wrong_answer": 55,
+      "crashes": 12,
+      "gap_holders": 101
     },
     {
       "sha": "56878ebf",
@@ -144,7 +219,12 @@
       "closed": 1192,
       "dns": 340,
       "label": "Witness B2: the declined A.4",
-      "battery": null
+      "battery": null,
+      "compiler_open": 117,
+      "defects": 111,
+      "wrong_answer": 55,
+      "crashes": 12,
+      "gap_holders": 99
     },
     {
       "sha": "4cbb8f3c",
@@ -153,7 +233,12 @@
       "closed": 1205,
       "dns": 346,
       "label": "PB371 + PB375: two owner dec",
-      "battery": null
+      "battery": null,
+      "compiler_open": 117,
+      "defects": 110,
+      "wrong_answer": 55,
+      "crashes": 12,
+      "gap_holders": 98
     },
     {
       "sha": "0fa1fe9e",
@@ -162,7 +247,12 @@
       "closed": 1257,
       "dns": 346,
       "label": "Golden lane round 2: 49 witn",
-      "battery": null
+      "battery": null,
+      "compiler_open": 118,
+      "defects": 111,
+      "wrong_answer": 56,
+      "crashes": 12,
+      "gap_holders": 99
     },
     {
       "sha": "073d764a",
@@ -171,7 +261,12 @@
       "closed": 1289,
       "dns": 346,
       "label": "Lane-3 batch 2 registered: 2",
-      "battery": null
+      "battery": null,
+      "compiler_open": 194,
+      "defects": 185,
+      "wrong_answer": 84,
+      "crashes": 26,
+      "gap_holders": 177
     },
     {
       "sha": "6d61b95a",
@@ -180,7 +275,12 @@
       "closed": 1298,
       "dns": 346,
       "label": "PB386: the DERIVATION eviden",
-      "battery": null
+      "battery": null,
+      "compiler_open": 193,
+      "defects": 184,
+      "wrong_answer": 83,
+      "crashes": 26,
+      "gap_holders": 175
     },
     {
       "sha": "3c5274a6",
@@ -189,7 +289,12 @@
       "closed": 1306,
       "dns": 346,
       "label": "Train: DEVLOG 1460 + plan §0",
-      "battery": null
+      "battery": null,
+      "compiler_open": 190,
+      "defects": 181,
+      "wrong_answer": 83,
+      "crashes": 24,
+      "gap_holders": 175
     },
     {
       "sha": "4545c3bf",
@@ -198,7 +303,12 @@
       "closed": 1319,
       "dns": 346,
       "label": "Lane-3 batch b3 registered:",
-      "battery": null
+      "battery": null,
+      "compiler_open": 291,
+      "defects": 269,
+      "wrong_answer": 105,
+      "crashes": 40,
+      "gap_holders": 270
     },
     {
       "sha": "e4d04748",
@@ -207,7 +317,12 @@
       "closed": 1342,
       "dns": 346,
       "label": "Train: DEVLOG 1468 + plan §0",
-      "battery": null
+      "battery": null,
+      "compiler_open": 289,
+      "defects": 267,
+      "wrong_answer": 105,
+      "crashes": 40,
+      "gap_holders": 267
     },
     {
       "sha": "03b59a1d",
@@ -216,7 +331,12 @@
       "closed": 1386,
       "dns": 346,
       "label": "Golden lane round 3: 59 gold",
-      "battery": null
+      "battery": null,
+      "compiler_open": 292,
+      "defects": 270,
+      "wrong_answer": 105,
+      "crashes": 41,
+      "gap_holders": 271
     },
     {
       "sha": "dbdcb0d2",
@@ -225,7 +345,12 @@
       "closed": 1405,
       "dns": 346,
       "label": "PB594: spec_refs + the natio",
-      "battery": null
+      "battery": null,
+      "compiler_open": 295,
+      "defects": 273,
+      "wrong_answer": 107,
+      "crashes": 39,
+      "gap_holders": 270
     },
     {
       "sha": "4af4132c",
@@ -234,7 +359,12 @@
       "closed": 1418,
       "dns": 346,
       "label": "Train 4: inventory + DEVLOG",
-      "battery": null
+      "battery": null,
+      "compiler_open": 296,
+      "defects": 274,
+      "wrong_answer": 106,
+      "crashes": 39,
+      "gap_holders": 268
     },
     {
       "sha": "919df18c",
@@ -243,7 +373,12 @@
       "closed": 1428,
       "dns": 346,
       "label": "PB252: the exact Int128 carr",
-      "battery": null
+      "battery": null,
+      "compiler_open": 296,
+      "defects": 273,
+      "wrong_answer": 104,
+      "crashes": 40,
+      "gap_holders": 264
     },
     {
       "sha": "63236244",
@@ -252,7 +387,12 @@
       "closed": 1447,
       "dns": 346,
       "label": "Golden-lane round 4: 19 spec",
-      "battery": null
+      "battery": null,
+      "compiler_open": 297,
+      "defects": 274,
+      "wrong_answer": 105,
+      "crashes": 40,
+      "gap_holders": 264
     },
     {
       "sha": "092f07f1",
@@ -261,7 +401,12 @@
       "closed": 1461,
       "dns": 352,
       "label": "Train 6: DEVLOG 1491 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 301,
+      "defects": 276,
+      "wrong_answer": 104,
+      "crashes": 43,
+      "gap_holders": 262
     },
     {
       "sha": "36137faa",
@@ -270,7 +415,12 @@
       "closed": 1466,
       "dns": 352,
       "label": "Train 7: DEVLOG 1498 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 300,
+      "defects": 275,
+      "wrong_answer": 103,
+      "crashes": 43,
+      "gap_holders": 262
     },
     {
       "sha": "fed2fc1f",
@@ -279,7 +429,12 @@
       "closed": 1481,
       "dns": 352,
       "label": "Train 8: DEVLOG 1504 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 302,
+      "defects": 276,
+      "wrong_answer": 103,
+      "crashes": 43,
+      "gap_holders": 260
     },
     {
       "sha": "601664d0",
@@ -288,7 +443,12 @@
       "closed": 1490,
       "dns": 352,
       "label": "Train 9: inventory + DIAGNOS",
-      "battery": null
+      "battery": null,
+      "compiler_open": 306,
+      "defects": 279,
+      "wrong_answer": 104,
+      "crashes": 44,
+      "gap_holders": 257
     },
     {
       "sha": "65b82827",
@@ -297,7 +457,12 @@
       "closed": 1501,
       "dns": 352,
       "label": "Train 10: inventory + DIAGNO",
-      "battery": null
+      "battery": null,
+      "compiler_open": 304,
+      "defects": 276,
+      "wrong_answer": 101,
+      "crashes": 44,
+      "gap_holders": 253
     },
     {
       "sha": "ee29d1d1",
@@ -306,7 +471,12 @@
       "closed": 1509,
       "dns": 352,
       "label": "Train 11: inventory (GAP 281",
-      "battery": null
+      "battery": null,
+      "compiler_open": 304,
+      "defects": 276,
+      "wrong_answer": 102,
+      "crashes": 45,
+      "gap_holders": 249
     },
     {
       "sha": "607174a2",
@@ -315,7 +485,12 @@
       "closed": 1517,
       "dns": 352,
       "label": "Train 12: inventory (GAP 280",
-      "battery": null
+      "battery": null,
+      "compiler_open": 302,
+      "defects": 272,
+      "wrong_answer": 99,
+      "crashes": 45,
+      "gap_holders": 245
     },
     {
       "sha": "d7e8845f",
@@ -324,7 +499,12 @@
       "closed": 1518,
       "dns": 364,
       "label": "PB689: the denominator was s",
-      "battery": null
+      "battery": null,
+      "compiler_open": 308,
+      "defects": 277,
+      "wrong_answer": 101,
+      "crashes": 45,
+      "gap_holders": 245
     },
     {
       "sha": "4aa88ead",
@@ -333,7 +513,12 @@
       "closed": 1551,
       "dns": 364,
       "label": "Train 13 narrative (plan §0",
-      "battery": null
+      "battery": null,
+      "compiler_open": 308,
+      "defects": 275,
+      "wrong_answer": 99,
+      "crashes": 43,
+      "gap_holders": 234
     },
     {
       "sha": "f86a5764",
@@ -342,7 +527,12 @@
       "closed": 1556,
       "dns": 364,
       "label": "Battery #57 NOT GREEN at c34",
-      "battery": null
+      "battery": null,
+      "compiler_open": 307,
+      "defects": 274,
+      "wrong_answer": 98,
+      "crashes": 44,
+      "gap_holders": 232
     },
     {
       "sha": "61ef98cb",
@@ -351,7 +541,12 @@
       "closed": 1561,
       "dns": 364,
       "label": "Battery #58 NOT GREEN at f86",
-      "battery": null
+      "battery": null,
+      "compiler_open": 308,
+      "defects": 276,
+      "wrong_answer": 98,
+      "crashes": 45,
+      "gap_holders": 233
     },
     {
       "sha": "be451309",
@@ -360,7 +555,12 @@
       "closed": 1560,
       "dns": 364,
       "label": "PB751–PB759 filed with every",
-      "battery": null
+      "battery": null,
+      "compiler_open": 317,
+      "defects": 285,
+      "wrong_answer": 101,
+      "crashes": 44,
+      "gap_holders": 234
     },
     {
       "sha": "43adf97b",
@@ -369,7 +569,12 @@
       "closed": 1568,
       "dns": 364,
       "label": "Battery #59 at 1e7b5085: eve",
-      "battery": null
+      "battery": null,
+      "compiler_open": 317,
+      "defects": 285,
+      "wrong_answer": 100,
+      "crashes": 44,
+      "gap_holders": 234
     },
     {
       "sha": "61d13d3e",
@@ -378,7 +583,12 @@
       "closed": 1571,
       "dns": 364,
       "label": "Notes 8-9: PB767-PB769 + PB7",
-      "battery": null
+      "battery": null,
+      "compiler_open": 316,
+      "defects": 285,
+      "wrong_answer": 100,
+      "crashes": 44,
+      "gap_holders": 236
     },
     {
       "sha": "169e6765",
@@ -387,7 +597,12 @@
       "closed": 1580,
       "dns": 365,
       "label": "Battery #61 at 61d13d3e: eve",
-      "battery": null
+      "battery": null,
+      "compiler_open": 312,
+      "defects": 281,
+      "wrong_answer": 99,
+      "crashes": 44,
+      "gap_holders": 234
     },
     {
       "sha": "8d1eb643",
@@ -396,7 +611,12 @@
       "closed": 1587,
       "dns": 365,
       "label": "Notes 10-11: PB779, PB781, P",
-      "battery": null
+      "battery": null,
+      "compiler_open": 311,
+      "defects": 280,
+      "wrong_answer": 99,
+      "crashes": 43,
+      "gap_holders": 234
     },
     {
       "sha": "5bf5a7f1",
@@ -405,7 +625,12 @@
       "closed": 1596,
       "dns": 365,
       "label": "Train 21: DEVLOG 1569 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 309,
+      "defects": 278,
+      "wrong_answer": 97,
+      "crashes": 42,
+      "gap_holders": 234
     },
     {
       "sha": "a7a99860",
@@ -414,7 +639,12 @@
       "closed": 1600,
       "dns": 365,
       "label": "Train 22: PB793's batch, two",
-      "battery": null
+      "battery": null,
+      "compiler_open": 309,
+      "defects": 278,
+      "wrong_answer": 97,
+      "crashes": 42,
+      "gap_holders": 234
     },
     {
       "sha": "835a3677",
@@ -423,7 +653,12 @@
       "closed": 1600,
       "dns": 365,
       "label": "Train 23: DEVLOG 1574 + plan",
-      "battery": 65
+      "battery": 65,
+      "compiler_open": 308,
+      "defects": 278,
+      "wrong_answer": 96,
+      "crashes": 42,
+      "gap_holders": 234
     },
     {
       "sha": "30bc29d2",
@@ -432,7 +667,12 @@
       "closed": 1612,
       "dns": 365,
       "label": "A.4.2 ACCEPT Format-3 rows:",
-      "battery": null
+      "battery": null,
+      "compiler_open": 308,
+      "defects": 278,
+      "wrong_answer": 96,
+      "crashes": 42,
+      "gap_holders": 234
     },
     {
       "sha": "3ac5da64",
@@ -441,7 +681,12 @@
       "closed": 1615,
       "dns": 365,
       "label": "Owner decisions Q25-Q27: thr",
-      "battery": null
+      "battery": null,
+      "compiler_open": 308,
+      "defects": 278,
+      "wrong_answer": 96,
+      "crashes": 42,
+      "gap_holders": 234
     },
     {
       "sha": "16073192",
@@ -450,7 +695,12 @@
       "closed": 1622,
       "dns": 364,
       "label": "Train 24: DEVLOG 1579 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 309,
+      "defects": 279,
+      "wrong_answer": 94,
+      "crashes": 42,
+      "gap_holders": 231
     },
     {
       "sha": "88cd1199",
@@ -459,7 +709,12 @@
       "closed": 1635,
       "dns": 364,
       "label": "Golden round for PB245: thir",
-      "battery": null
+      "battery": null,
+      "compiler_open": 309,
+      "defects": 279,
+      "wrong_answer": 94,
+      "crashes": 42,
+      "gap_holders": 231
     },
     {
       "sha": "99998ede",
@@ -468,7 +723,12 @@
       "closed": 1641,
       "dns": 364,
       "label": "Golden round for PB258: six",
-      "battery": null
+      "battery": null,
+      "compiler_open": 320,
+      "defects": 288,
+      "wrong_answer": 96,
+      "crashes": 42,
+      "gap_holders": 240
     },
     {
       "sha": "42ebf400",
@@ -477,7 +737,12 @@
       "closed": 1689,
       "dns": 364,
       "label": "Train 25: DEVLOG 1584 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 313,
+      "defects": 281,
+      "wrong_answer": 94,
+      "crashes": 40,
+      "gap_holders": 233
     },
     {
       "sha": "e842f763",
@@ -486,7 +751,12 @@
       "closed": 1705,
       "dns": 364,
       "label": "Golden round for PB451 and P",
-      "battery": null
+      "battery": null,
+      "compiler_open": 311,
+      "defects": 279,
+      "wrong_answer": 94,
+      "crashes": 39,
+      "gap_holders": 231
     },
     {
       "sha": "18525f97",
@@ -495,7 +765,12 @@
       "closed": 1739,
       "dns": 365,
       "label": "Train 26: DEVLOG 1587 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 308,
+      "defects": 276,
+      "wrong_answer": 93,
+      "crashes": 38,
+      "gap_holders": 224
     },
     {
       "sha": "e1bf7b3b",
@@ -504,7 +779,12 @@
       "closed": 1759,
       "dns": 366,
       "label": "Train 27: DEVLOG 1590 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 307,
+      "defects": 275,
+      "wrong_answer": 92,
+      "crashes": 37,
+      "gap_holders": 220
     },
     {
       "sha": "5782d2b0",
@@ -513,7 +793,12 @@
       "closed": 1787,
       "dns": 366,
       "label": "Battery #70 at 1840778e: com",
-      "battery": null
+      "battery": null,
+      "compiler_open": 302,
+      "defects": 271,
+      "wrong_answer": 91,
+      "crashes": 37,
+      "gap_holders": 216
     },
     {
       "sha": "a21b4633",
@@ -522,7 +807,12 @@
       "closed": 1802,
       "dns": 366,
       "label": "Train 29: DEVLOG 1594 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 299,
+      "defects": 268,
+      "wrong_answer": 90,
+      "crashes": 36,
+      "gap_holders": 214
     },
     {
       "sha": "eb7719b3",
@@ -531,7 +821,12 @@
       "closed": 1815,
       "dns": 366,
       "label": "Train 30: DEVLOG 1596 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 296,
+      "defects": 265,
+      "wrong_answer": 87,
+      "crashes": 36,
+      "gap_holders": 211
     },
     {
       "sha": "67be3552",
@@ -540,7 +835,12 @@
       "closed": 1831,
       "dns": 366,
       "label": "Train 31: DEVLOG 1598 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 292,
+      "defects": 261,
+      "wrong_answer": 85,
+      "crashes": 37,
+      "gap_holders": 206
     },
     {
       "sha": "359a2ebc",
@@ -549,7 +849,12 @@
       "closed": 1847,
       "dns": 366,
       "label": "Train 32: DEVLOG 1600 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 288,
+      "defects": 257,
+      "wrong_answer": 83,
+      "crashes": 36,
+      "gap_holders": 202
     },
     {
       "sha": "c60a49c5",
@@ -558,7 +863,12 @@
       "closed": 1867,
       "dns": 366,
       "label": "Battery #75 at d80cb676: com",
-      "battery": null
+      "battery": null,
+      "compiler_open": 314,
+      "defects": 277,
+      "wrong_answer": 92,
+      "crashes": 36,
+      "gap_holders": 209
     },
     {
       "sha": "db68907f",
@@ -567,7 +877,12 @@
       "closed": 1880,
       "dns": 366,
       "label": "Train 34: DEVLOG 1606 + plan",
-      "battery": 76
+      "battery": 76,
+      "compiler_open": 309,
+      "defects": 272,
+      "wrong_answer": 87,
+      "crashes": 35,
+      "gap_holders": 205
     },
     {
       "sha": "9cfab584",
@@ -576,7 +891,12 @@
       "closed": 1905,
       "dns": 366,
       "label": "Train PB877: DEVLOG 1610 + §",
-      "battery": null
+      "battery": null,
+      "compiler_open": 298,
+      "defects": 261,
+      "wrong_answer": 78,
+      "crashes": 33,
+      "gap_holders": 194
     },
     {
       "sha": "c3ce1e52",
@@ -585,7 +905,12 @@
       "closed": 1913,
       "dns": 366,
       "label": "Train 37: DEVLOG 1612 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 292,
+      "defects": 256,
+      "wrong_answer": 73,
+      "crashes": 33,
+      "gap_holders": 188
     },
     {
       "sha": "bdbe660a",
@@ -594,7 +919,12 @@
       "closed": 1925,
       "dns": 366,
       "label": "Train 38: DEVLOG 1614 + plan",
-      "battery": 80
+      "battery": 80,
+      "compiler_open": 288,
+      "defects": 252,
+      "wrong_answer": 72,
+      "crashes": 32,
+      "gap_holders": 184
     },
     {
       "sha": "00bd0a01",
@@ -603,7 +933,12 @@
       "closed": 1941,
       "dns": 366,
       "label": "Train 39 close: the inventor",
-      "battery": null
+      "battery": null,
+      "compiler_open": 297,
+      "defects": 261,
+      "wrong_answer": 80,
+      "crashes": 35,
+      "gap_holders": 180
     },
     {
       "sha": "937b4835",
@@ -612,7 +947,12 @@
       "closed": 1952,
       "dns": 366,
       "label": "CI fix: train 39's GOBACK pa",
-      "battery": null
+      "battery": null,
+      "compiler_open": 289,
+      "defects": 253,
+      "wrong_answer": 77,
+      "crashes": 35,
+      "gap_holders": 174
     },
     {
       "sha": "70943a54",
@@ -621,7 +961,12 @@
       "closed": 1973,
       "dns": 366,
       "label": "Train 41: verdict batches, r",
-      "battery": null
+      "battery": null,
+      "compiler_open": 274,
+      "defects": 238,
+      "wrong_answer": 73,
+      "crashes": 33,
+      "gap_holders": 161
     },
     {
       "sha": "b3069d92",
@@ -630,7 +975,12 @@
       "closed": 1982,
       "dns": 366,
       "label": "Wave 40: §15 reaches ZERO GA",
-      "battery": null
+      "battery": null,
+      "compiler_open": 270,
+      "defects": 234,
+      "wrong_answer": 70,
+      "crashes": 33,
+      "gap_holders": 154
     },
     {
       "sha": "c701786d",
@@ -639,7 +989,12 @@
       "closed": 2009,
       "dns": 366,
       "label": "Train 42: DEVLOG 1622 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 252,
+      "defects": 216,
+      "wrong_answer": 65,
+      "crashes": 28,
+      "gap_holders": 137
     },
     {
       "sha": "3484829c",
@@ -648,7 +1003,12 @@
       "closed": 2038,
       "dns": 366,
       "label": "Wave 42 close: ledger artifa",
-      "battery": null
+      "battery": null,
+      "compiler_open": 249,
+      "defects": 212,
+      "wrong_answer": 60,
+      "crashes": 21,
+      "gap_holders": 126
     },
     {
       "sha": "c7cd0d46",
@@ -657,7 +1017,12 @@
       "closed": 2060,
       "dns": 366,
       "label": "Train 44: DEVLOG 1630, plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 240,
+      "defects": 203,
+      "wrong_answer": 56,
+      "crashes": 20,
+      "gap_holders": 122
     },
     {
       "sha": "5ee9305c",
@@ -666,7 +1031,12 @@
       "closed": 2072,
       "dns": 369,
       "label": "REGISTRAR #9 step 3: DEVLOG",
-      "battery": null
+      "battery": null,
+      "compiler_open": 231,
+      "defects": 194,
+      "wrong_answer": 50,
+      "crashes": 17,
+      "gap_holders": 121
     },
     {
       "sha": "ef38a292",
@@ -675,7 +1045,12 @@
       "closed": 2082,
       "dns": 369,
       "label": "Battery #84 at ec095d120 (tr",
-      "battery": null
+      "battery": null,
+      "compiler_open": 219,
+      "defects": 182,
+      "wrong_answer": 41,
+      "crashes": 15,
+      "gap_holders": 119
     },
     {
       "sha": "c752785a",
@@ -684,7 +1059,12 @@
       "closed": 2150,
       "dns": 369,
       "label": "Battery #85 at train 48's he",
-      "battery": null
+      "battery": null,
+      "compiler_open": 209,
+      "defects": 173,
+      "wrong_answer": 38,
+      "crashes": 16,
+      "gap_holders": 121
     },
     {
       "sha": "0ad34ddf",
@@ -693,7 +1073,12 @@
       "closed": 2218,
       "dns": 369,
       "label": "Train 50: verdict batches, D",
-      "battery": null
+      "battery": null,
+      "compiler_open": 204,
+      "defects": 163,
+      "wrong_answer": 35,
+      "crashes": 10,
+      "gap_holders": 121
     },
     {
       "sha": "c54434a8",
@@ -702,7 +1087,12 @@
       "closed": 2288,
       "dns": 370,
       "label": "Train 57: verdict batches, s",
-      "battery": null
+      "battery": null,
+      "compiler_open": 140,
+      "defects": 100,
+      "wrong_answer": 18,
+      "crashes": 5,
+      "gap_holders": 83
     },
     {
       "sha": "a53bce79",
@@ -711,7 +1101,12 @@
       "closed": 2311,
       "dns": 370,
       "label": "Train 58: verdict batches, P",
-      "battery": null
+      "battery": null,
+      "compiler_open": 155,
+      "defects": 113,
+      "wrong_answer": 27,
+      "crashes": 6,
+      "gap_holders": 87
     },
     {
       "sha": "21247b6f",
@@ -720,7 +1115,12 @@
       "closed": 2684,
       "dns": 370,
       "label": "Registrar 15d: batch 15d rec",
-      "battery": null
+      "battery": null,
+      "compiler_open": 459,
+      "defects": 413,
+      "wrong_answer": 147,
+      "crashes": 34,
+      "gap_holders": 419
     },
     {
       "sha": "5b51fbb9",
@@ -729,7 +1129,12 @@
       "closed": 2696,
       "dns": 381,
       "label": "Cloud registrar-1: every inv",
-      "battery": null
+      "battery": null,
+      "compiler_open": 470,
+      "defects": 423,
+      "wrong_answer": 152,
+      "crashes": 36,
+      "gap_holders": 440
     },
     {
       "sha": "138a8724",
@@ -738,7 +1143,12 @@
       "closed": 2721,
       "dns": 386,
       "label": "Cloud doc-rows-1: 67 Annex A",
-      "battery": null
+      "battery": null,
+      "compiler_open": 478,
+      "defects": 431,
+      "wrong_answer": 158,
+      "crashes": 37,
+      "gap_holders": 448
     },
     {
       "sha": "226c5b6d",
@@ -747,7 +1157,12 @@
       "closed": 2833,
       "dns": 386,
       "label": "Golden lane #1 wave 4 (GAP 1",
-      "battery": null
+      "battery": null,
+      "compiler_open": 479,
+      "defects": 431,
+      "wrong_answer": 158,
+      "crashes": 37,
+      "gap_holders": 449
     },
     {
       "sha": "3668923e",
@@ -756,7 +1171,12 @@
       "closed": 2890,
       "dns": 386,
       "label": "DEVLOG 1695, plan §0, LANDIN",
-      "battery": null
+      "battery": null,
+      "compiler_open": 480,
+      "defects": 432,
+      "wrong_answer": 159,
+      "crashes": 37,
+      "gap_holders": 448
     },
     {
       "sha": "5360450b",
@@ -765,7 +1185,12 @@
       "closed": 2973,
       "dns": 386,
       "label": "Register: PB1568-PB1579; MAN",
-      "battery": null
+      "battery": null,
+      "compiler_open": 488,
+      "defects": 440,
+      "wrong_answer": 164,
+      "crashes": 37,
+      "gap_holders": 449
     },
     {
       "sha": "ab810eb9",
@@ -774,7 +1199,12 @@
       "closed": 3094,
       "dns": 455,
       "label": "Train 62: DEVLOG 1702 + plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 479,
+      "defects": 432,
+      "wrong_answer": 158,
+      "crashes": 36,
+      "gap_holders": 434
     },
     {
       "sha": "d4aa22c9",
@@ -783,7 +1213,12 @@
       "closed": 3106,
       "dns": 456,
       "label": "Register: PB1590 (DeepNestin",
-      "battery": null
+      "battery": null,
+      "compiler_open": 477,
+      "defects": 432,
+      "wrong_answer": 158,
+      "crashes": 36,
+      "gap_holders": 430
     },
     {
       "sha": "86e17b70",
@@ -792,7 +1227,12 @@
       "closed": 3165,
       "dns": 456,
       "label": "Community standards, user-do",
-      "battery": null
+      "battery": null,
+      "compiler_open": 478,
+      "defects": 432,
+      "wrong_answer": 158,
+      "crashes": 36,
+      "gap_holders": 430
     },
     {
       "sha": "8a0079da",
@@ -801,7 +1241,12 @@
       "closed": 3238,
       "dns": 456,
       "label": "Train w61: DEVLOG 1718, plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 473,
+      "defects": 423,
+      "wrong_answer": 149,
+      "crashes": 35,
+      "gap_holders": 419
     },
     {
       "sha": "4134bdc7",
@@ -810,7 +1255,12 @@
       "closed": 3282,
       "dns": 457,
       "label": "Train 62: DEVLOG 1719, plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 470,
+      "defects": 419,
+      "wrong_answer": 144,
+      "crashes": 34,
+      "gap_holders": 413
     },
     {
       "sha": "b854ed64",
@@ -819,7 +1269,12 @@
       "closed": 3286,
       "dns": 457,
       "label": "Train 63: DEVLOG 1721, plan",
-      "battery": null
+      "battery": null,
+      "compiler_open": 469,
+      "defects": 418,
+      "wrong_answer": 141,
+      "crashes": 34,
+      "gap_holders": 412
     },
     {
       "sha": "c3dff804",
@@ -828,7 +1283,12 @@
       "closed": 3529,
       "dns": 457,
       "label": "Archive PB1522's eleven clou",
-      "battery": null
+      "battery": null,
+      "compiler_open": 390,
+      "defects": 333,
+      "wrong_answer": 84,
+      "crashes": 19,
+      "gap_holders": 311
     },
     {
       "sha": "b62408c2",
@@ -837,7 +1297,12 @@
       "closed": 3637,
       "dns": 457,
       "label": "RL118A approved (R68 item 6)",
-      "battery": null
+      "battery": null,
+      "compiler_open": 341,
+      "defects": 276,
+      "wrong_answer": 51,
+      "crashes": 18,
+      "gap_holders": 267
     },
     {
       "sha": "a09e3d40",
@@ -846,7 +1311,12 @@
       "closed": 3665,
       "dns": 457,
       "label": "Golden lane gl4 (witness reu",
-      "battery": null
+      "battery": null,
+      "compiler_open": 327,
+      "defects": 263,
+      "wrong_answer": 41,
+      "crashes": 18,
+      "gap_holders": 259
     },
     {
       "sha": "76bde072",
@@ -855,7 +1325,12 @@
       "closed": 3672,
       "dns": 457,
       "label": "Train 1002: DEVLOG 1837, pla",
-      "battery": null
+      "battery": null,
+      "compiler_open": 330,
+      "defects": 263,
+      "wrong_answer": 41,
+      "crashes": 18,
+      "gap_holders": 260
     },
     {
       "sha": "5bdbfd24",
@@ -864,7 +1339,12 @@
       "closed": 3678,
       "dns": 457,
       "label": "Train 1003: DEVLOG 1843, PB1",
-      "battery": null
+      "battery": null,
+      "compiler_open": 326,
+      "defects": 260,
+      "wrong_answer": 37,
+      "crashes": 18,
+      "gap_holders": 257
     },
     {
       "sha": "e0e7878e",
@@ -873,7 +1353,12 @@
       "closed": 3749,
       "dns": 457,
       "label": "Train 1004: DEVLOG 1844, PB1",
-      "battery": null
+      "battery": null,
+      "compiler_open": 308,
+      "defects": 238,
+      "wrong_answer": 32,
+      "crashes": 17,
+      "gap_holders": 234
     },
     {
       "sha": "805fb16c",
@@ -882,7 +1367,12 @@
       "closed": 3783,
       "dns": 457,
       "label": "Train 1005: DEVLOG 1845, PB1",
-      "battery": null
+      "battery": null,
+      "compiler_open": 300,
+      "defects": 228,
+      "wrong_answer": 32,
+      "crashes": 17,
+      "gap_holders": 221
     },
     {
       "sha": "2af61c9b",
@@ -891,7 +1381,12 @@
       "closed": 3803,
       "dns": 457,
       "label": "Train 1006: DEVLOG 1846, PB1",
-      "battery": null
+      "battery": null,
+      "compiler_open": 292,
+      "defects": 219,
+      "wrong_answer": 32,
+      "crashes": 18,
+      "gap_holders": 211
     },
     {
       "sha": "5838ebfd",
@@ -900,7 +1395,12 @@
       "closed": 3815,
       "dns": 457,
       "label": "Train 1007: DEVLOG 1847, PB1",
-      "battery": null
+      "battery": null,
+      "compiler_open": 288,
+      "defects": 214,
+      "wrong_answer": 31,
+      "crashes": 18,
+      "gap_holders": 204
     },
     {
       "sha": "e08b604c",
@@ -909,7 +1409,12 @@
       "closed": 3824,
       "dns": 457,
       "label": "Train 1008: DEVLOG 1852, PB1",
-      "battery": null
+      "battery": null,
+      "compiler_open": 283,
+      "defects": 210,
+      "wrong_answer": 31,
+      "crashes": 17,
+      "gap_holders": 201
     },
     {
       "sha": "5e276ff8",
@@ -918,7 +1423,12 @@
       "closed": 3843,
       "dns": 457,
       "label": "Train 1009: DEVLOG 1853, PB1",
-      "battery": null
+      "battery": null,
+      "compiler_open": 271,
+      "defects": 198,
+      "wrong_answer": 31,
+      "crashes": 15,
+      "gap_holders": 195
     },
     {
       "sha": "475ff4aa",
@@ -927,7 +1437,12 @@
       "closed": 3850,
       "dns": 457,
       "label": "Train 1010: DEVLOG 1855, PB1",
-      "battery": null
+      "battery": null,
+      "compiler_open": 269,
+      "defects": 196,
+      "wrong_answer": 31,
+      "crashes": 15,
+      "gap_holders": 193
     },
     {
       "sha": "030236b3",
@@ -936,7 +1451,12 @@
       "closed": 3857,
       "dns": 457,
       "label": "PB1181+PB1182+PB1180+PB1527:",
-      "battery": null
+      "battery": null,
+      "compiler_open": 265,
+      "defects": 192,
+      "wrong_answer": 31,
+      "crashes": 14,
+      "gap_holders": 189
     },
     {
       "sha": "d8f9168e",
@@ -945,7 +1465,12 @@
       "closed": 3880,
       "dns": 457,
       "label": "PB1051+PB1497+PB1251: OO BY",
-      "battery": null
+      "battery": null,
+      "compiler_open": 262,
+      "defects": 189,
+      "wrong_answer": 31,
+      "crashes": 14,
+      "gap_holders": 186
     },
     {
       "sha": "426ef6cb",
@@ -954,7 +1479,12 @@
       "closed": 3895,
       "dns": 457,
       "label": "PB1222+PB1224+PB1270+PB1288+",
-      "battery": null
+      "battery": null,
+      "compiler_open": 257,
+      "defects": 184,
+      "wrong_answer": 31,
+      "crashes": 14,
+      "gap_holders": 181
     },
     {
       "sha": "bb889d6d",
@@ -963,7 +1493,12 @@
       "closed": 3921,
       "dns": 457,
       "label": "PB1087+PB1242+PB1262+PB1280+",
-      "battery": null
+      "battery": null,
+      "compiler_open": 248,
+      "defects": 175,
+      "wrong_answer": 31,
+      "crashes": 14,
+      "gap_holders": 174
     },
     {
       "sha": "4d976541",
@@ -972,7 +1507,12 @@
       "closed": 3925,
       "dns": 457,
       "label": "PB1523+PB1249+PB1250: GLOBAL",
-      "battery": null
+      "battery": null,
+      "compiler_open": 246,
+      "defects": 173,
+      "wrong_answer": 31,
+      "crashes": 13,
+      "gap_holders": 171
     },
     {
       "sha": "c8fd8d43",
@@ -981,7 +1521,12 @@
       "closed": 3933,
       "dns": 457,
       "label": "PB995+PB599+PB1922+PB1473+PB",
-      "battery": null
+      "battery": null,
+      "compiler_open": 242,
+      "defects": 169,
+      "wrong_answer": 31,
+      "crashes": 13,
+      "gap_holders": 169
     },
     {
       "sha": "220c0956",
@@ -990,7 +1535,12 @@
       "closed": 3942,
       "dns": 457,
       "label": "PB1375+PB1376: FLAG-02/FLAG-",
-      "battery": null
+      "battery": null,
+      "compiler_open": 240,
+      "defects": 167,
+      "wrong_answer": 30,
+      "crashes": 13,
+      "gap_holders": 167
     },
     {
       "sha": "eaab2a18",
@@ -999,7 +1549,12 @@
       "closed": 3952,
       "dns": 457,
       "label": "PB1270+PB1295+PB1299+PB1474+",
-      "battery": null
+      "battery": null,
+      "compiler_open": 235,
+      "defects": 162,
+      "wrong_answer": 30,
+      "crashes": 13,
+      "gap_holders": 163
     },
     {
       "sha": "e755aae9",
@@ -1008,7 +1563,12 @@
       "closed": 3966,
       "dns": 457,
       "label": "PB1133+PB1303+PB1404+PB1507+",
-      "battery": null
+      "battery": null,
+      "compiler_open": 230,
+      "defects": 157,
+      "wrong_answer": 30,
+      "crashes": 13,
+      "gap_holders": 158
     },
     {
       "sha": "008babef",
@@ -1017,7 +1577,12 @@
       "closed": 3975,
       "dns": 457,
       "label": "PB1167+PB1499+PB1502: ANY LE",
-      "battery": null
+      "battery": null,
+      "compiler_open": 228,
+      "defects": 155,
+      "wrong_answer": 30,
+      "crashes": 12,
+      "gap_holders": 154
     },
     {
       "sha": "a21c19d5",
@@ -1026,7 +1591,12 @@
       "closed": 3988,
       "dns": 457,
       "label": "PB917+PB1134+PB1212+PB1246+P",
-      "battery": null
+      "battery": null,
+      "compiler_open": 222,
+      "defects": 149,
+      "wrong_answer": 29,
+      "crashes": 11,
+      "gap_holders": 147
     },
     {
       "sha": "86ed1ce2",
@@ -1035,7 +1605,12 @@
       "closed": 3993,
       "dns": 457,
       "label": "PB1402+PB1944: extended lett",
-      "battery": null
+      "battery": null,
+      "compiler_open": 223,
+      "defects": 149,
+      "wrong_answer": 30,
+      "crashes": 11,
+      "gap_holders": 146
     },
     {
       "sha": "15bc8db9",
@@ -1044,7 +1619,12 @@
       "closed": 3999,
       "dns": 457,
       "label": "PB1455+PB1426+PB1416+PB1425:",
-      "battery": null
+      "battery": null,
+      "compiler_open": 219,
+      "defects": 145,
+      "wrong_answer": 30,
+      "crashes": 11,
+      "gap_holders": 143
     },
     {
       "sha": "dfd45c9e",
@@ -1053,7 +1633,12 @@
       "closed": 4011,
       "dns": 457,
       "label": "PB1429+PB1136+PB1165+PB1275+",
-      "battery": null
+      "battery": null,
+      "compiler_open": 215,
+      "defects": 141,
+      "wrong_answer": 29,
+      "crashes": 10,
+      "gap_holders": 140
     },
     {
       "sha": "02da5894",
@@ -1062,7 +1647,12 @@
       "closed": 4019,
       "dns": 457,
       "label": "PB1407+PB1062+PB665+PB816: o",
-      "battery": null
+      "battery": null,
+      "compiler_open": 216,
+      "defects": 142,
+      "wrong_answer": 30,
+      "crashes": 10,
+      "gap_holders": 138
     },
     {
       "sha": "b3c14aff",
@@ -1071,7 +1661,12 @@
       "closed": 4021,
       "dns": 457,
       "label": "PB351+PB1146+PB937: Procedur",
-      "battery": null
+      "battery": null,
+      "compiler_open": 213,
+      "defects": 139,
+      "wrong_answer": 30,
+      "crashes": 10,
+      "gap_holders": 137
     },
     {
       "sha": "5437188b",
@@ -1080,7 +1675,12 @@
       "closed": 4037,
       "dns": 457,
       "label": "PB322+PB165+PB1422+PB1531+PB",
-      "battery": null
+      "battery": null,
+      "compiler_open": 209,
+      "defects": 135,
+      "wrong_answer": 29,
+      "crashes": 10,
+      "gap_holders": 134
     },
     {
       "sha": "b3c8f591",
@@ -1089,7 +1689,12 @@
       "closed": 4058,
       "dns": 457,
       "label": "PB988+PB1274+PB1503+PB1449+P",
-      "battery": null
+      "battery": null,
+      "compiler_open": 203,
+      "defects": 129,
+      "wrong_answer": 29,
+      "crashes": 10,
+      "gap_holders": 129
     },
     {
       "sha": "d4548bca",
@@ -1098,7 +1703,12 @@
       "closed": 4066,
       "dns": 457,
       "label": "PB1674+PB1263+PB1261+PB1265:",
-      "battery": null
+      "battery": null,
+      "compiler_open": 200,
+      "defects": 126,
+      "wrong_answer": 29,
+      "crashes": 10,
+      "gap_holders": 125
     },
     {
       "sha": "34be0697",
@@ -1107,7 +1717,12 @@
       "closed": 4067,
       "dns": 457,
       "label": "F PB1191: line sequential WR",
-      "battery": null
+      "battery": null,
+      "compiler_open": 199,
+      "defects": 125,
+      "wrong_answer": 28,
+      "crashes": 10,
+      "gap_holders": 124
     },
     {
       "sha": "008bfe1a",
@@ -1116,7 +1731,12 @@
       "closed": 4070,
       "dns": 457,
       "label": "A PB1260+PB1264+PB1266: OCCU",
-      "battery": null
+      "battery": null,
+      "compiler_open": 196,
+      "defects": 122,
+      "wrong_answer": 26,
+      "crashes": 9,
+      "gap_holders": 122
     },
     {
       "sha": "238b6802",
@@ -1125,7 +1745,12 @@
       "closed": 4076,
       "dns": 457,
       "label": "C PB1363+PB1364+PB1367+PB806",
-      "battery": null
+      "battery": null,
+      "compiler_open": 192,
+      "defects": 118,
+      "wrong_answer": 25,
+      "crashes": 9,
+      "gap_holders": 118
     },
     {
       "sha": "1a522525",
@@ -1134,7 +1759,12 @@
       "closed": 4081,
       "dns": 457,
       "label": "B PB1123+PB1128: item identi",
-      "battery": null
+      "battery": null,
+      "compiler_open": 191,
+      "defects": 117,
+      "wrong_answer": 24,
+      "crashes": 9,
+      "gap_holders": 116
     },
     {
       "sha": "2d93d1ec",
@@ -1143,7 +1773,12 @@
       "closed": 4084,
       "dns": 457,
       "label": "D PB758+PB1446+PB1425 part:",
-      "battery": null
+      "battery": null,
+      "compiler_open": 188,
+      "defects": 114,
+      "wrong_answer": 23,
+      "crashes": 9,
+      "gap_holders": 115
     },
     {
       "sha": "7d796d67",
@@ -1152,7 +1787,12 @@
       "closed": 4086,
       "dns": 457,
       "label": "E PB1110: binary32 ACCEPT de",
-      "battery": null
+      "battery": null,
+      "compiler_open": 188,
+      "defects": 114,
+      "wrong_answer": 22,
+      "crashes": 9,
+      "gap_holders": 114
     },
     {
       "sha": "6586e58a",
@@ -1161,7 +1801,12 @@
       "closed": 4091,
       "dns": 457,
       "label": "H PB1179: every legal STRING",
-      "battery": null
+      "battery": null,
+      "compiler_open": 187,
+      "defects": 113,
+      "wrong_answer": 22,
+      "crashes": 8,
+      "gap_holders": 113
     },
     {
       "sha": "1abf5111",
@@ -1170,7 +1815,12 @@
       "closed": 4092,
       "dns": 457,
       "label": "G PB1529: CONTINUE AFTER sat",
-      "battery": null
+      "battery": null,
+      "compiler_open": 186,
+      "defects": 112,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 112
     },
     {
       "sha": "d2e27abb",
@@ -1179,7 +1829,12 @@
       "closed": 4096,
       "dns": 457,
       "label": "PB1365: pin every stage-owne",
-      "battery": null
+      "battery": null,
+      "compiler_open": 188,
+      "defects": 113,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 111
     },
     {
       "sha": "d2f3412b",
@@ -1188,7 +1843,12 @@
       "closed": 4098,
       "dns": 457,
       "label": "PB1407+PB1969+PB1458: name t",
-      "battery": null
+      "battery": null,
+      "compiler_open": 186,
+      "defects": 111,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 109
     },
     {
       "sha": "5d5c77a2",
@@ -1197,7 +1857,12 @@
       "closed": 4101,
       "dns": 457,
       "label": "PB529+PB533+PB819+PB1089: fo",
-      "battery": null
+      "battery": null,
+      "compiler_open": 182,
+      "defects": 107,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 106
     },
     {
       "sha": "b5066aa6",
@@ -1206,7 +1871,12 @@
       "closed": 4104,
       "dns": 457,
       "label": "PB1183+PB755+PB756+PB746: th",
-      "battery": null
+      "battery": null,
+      "compiler_open": 178,
+      "defects": 103,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 103
     },
     {
       "sha": "5bb9982b",
@@ -1215,7 +1885,12 @@
       "closed": 4115,
       "dns": 457,
       "label": "PB1425+PB1197: identifier Fo",
-      "battery": null
+      "battery": null,
+      "compiler_open": 177,
+      "defects": 102,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 102
     },
     {
       "sha": "9833d1e2",
@@ -1224,7 +1899,12 @@
       "closed": 4120,
       "dns": 457,
       "label": "PB2003+PB1373: omitted-branc",
-      "battery": null
+      "battery": null,
+      "compiler_open": 176,
+      "defects": 100,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 101
     },
     {
       "sha": "4e34a3c6",
@@ -1233,7 +1913,12 @@
       "closed": 4125,
       "dns": 457,
       "label": "PB1374: FLAG-02/FLAG-14 defa",
-      "battery": null
+      "battery": null,
+      "compiler_open": 175,
+      "defects": 99,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 100
     },
     {
       "sha": "edbc2fd7",
@@ -1242,7 +1927,12 @@
       "closed": 4133,
       "dns": 457,
       "label": "PB1301+PB1302+PB1476+PB2018+",
-      "battery": null
+      "battery": null,
+      "compiler_open": 169,
+      "defects": 93,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 95
     },
     {
       "sha": "16a17629",
@@ -1251,7 +1941,12 @@
       "closed": 4137,
       "dns": 457,
       "label": "PB1525+PB855+PB876: extensio",
-      "battery": null
+      "battery": null,
+      "compiler_open": 166,
+      "defects": 90,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 93
     },
     {
       "sha": "96815ba6",
@@ -1260,7 +1955,12 @@
       "closed": 4139,
       "dns": 457,
       "label": "PB643: RESERVE integer-1 siz",
-      "battery": null
+      "battery": null,
+      "compiler_open": 165,
+      "defects": 89,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 92
     },
     {
       "sha": "1ebf0c5d",
@@ -1269,7 +1969,12 @@
       "closed": 4144,
       "dns": 457,
       "label": "PB773+PB1073: one table of f",
-      "battery": null
+      "battery": null,
+      "compiler_open": 163,
+      "defects": 87,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 90
     },
     {
       "sha": "df469049",
@@ -1278,7 +1983,12 @@
       "closed": 4146,
       "dns": 457,
       "label": "PB1425: SELF, SUPER, object-",
-      "battery": null
+      "battery": null,
+      "compiler_open": 163,
+      "defects": 87,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 90
     },
     {
       "sha": "6e87def8",
@@ -1287,7 +1997,12 @@
       "closed": 4150,
       "dns": 457,
       "label": "PB1281+PB1252: REDEFINES ope",
-      "battery": null
+      "battery": null,
+      "compiler_open": 158,
+      "defects": 82,
+      "wrong_answer": 21,
+      "crashes": 8,
+      "gap_holders": 87
     },
     {
       "sha": "6834e113",
@@ -1296,7 +2011,12 @@
       "closed": 4153,
       "dns": 457,
       "label": "PB516+PB486+PB1650+PB1744+PB",
-      "battery": null
+      "battery": null,
+      "compiler_open": 154,
+      "defects": 78,
+      "wrong_answer": 22,
+      "crashes": 8,
+      "gap_holders": 85
     },
     {
       "sha": "241bd0d0",
@@ -1305,7 +2025,12 @@
       "closed": 4156,
       "dns": 457,
       "label": "PB1221: report LINE, COLUMN,",
-      "battery": null
+      "battery": null,
+      "compiler_open": 154,
+      "defects": 78,
+      "wrong_answer": 22,
+      "crashes": 8,
+      "gap_holders": 84
     },
     {
       "sha": "59b45b13",
@@ -1314,7 +2039,12 @@
       "closed": 4159,
       "dns": 457,
       "label": "PB1408+PB609+PB1282: ADDRESS",
-      "battery": null
+      "battery": null,
+      "compiler_open": 151,
+      "defects": 75,
+      "wrong_answer": 22,
+      "crashes": 8,
+      "gap_holders": 81
     },
     {
       "sha": "f79b7ccd",
@@ -1323,7 +2053,12 @@
       "closed": 4160,
       "dns": 457,
       "label": "PB1421+PB1060+PB434: functio",
-      "battery": null
+      "battery": null,
+      "compiler_open": 149,
+      "defects": 73,
+      "wrong_answer": 22,
+      "crashes": 8,
+      "gap_holders": 81
     },
     {
       "sha": "cea9cce2",
@@ -1332,7 +2067,12 @@
       "closed": 4162,
       "dns": 457,
       "label": "PB480+PB1112: structured uni",
-      "battery": null
+      "battery": null,
+      "compiler_open": 148,
+      "defects": 72,
+      "wrong_answer": 22,
+      "crashes": 8,
+      "gap_holders": 79
     },
     {
       "sha": "f4716089",
@@ -1341,7 +2081,12 @@
       "closed": 4169,
       "dns": 457,
       "label": "PB1425+PB1783: object-proper",
-      "battery": null
+      "battery": null,
+      "compiler_open": 146,
+      "defects": 71,
+      "wrong_answer": 22,
+      "crashes": 8,
+      "gap_holders": 79
     },
     {
       "sha": "bc4f0ade",
@@ -1350,7 +2095,12 @@
       "closed": 4172,
       "dns": 457,
       "label": "PB781+PB858+PB1415+PB1039+PB",
-      "battery": null
+      "battery": null,
+      "compiler_open": 142,
+      "defects": 67,
+      "wrong_answer": 22,
+      "crashes": 8,
+      "gap_holders": 75
     },
     {
       "sha": "e9e1d589",
@@ -1359,7 +2109,12 @@
       "closed": 4174,
       "dns": 457,
       "label": "PB1042: dynamic tables and d",
-      "battery": null
+      "battery": null,
+      "compiler_open": 141,
+      "defects": 66,
+      "wrong_answer": 22,
+      "crashes": 8,
+      "gap_holders": 74
     },
     {
       "sha": "22a4f183",
@@ -1368,7 +2123,12 @@
       "closed": 4177,
       "dns": 457,
       "label": "PB1229: compile-time arithme",
-      "battery": null
+      "battery": null,
+      "compiler_open": 159,
+      "defects": 82,
+      "wrong_answer": 28,
+      "crashes": 11,
+      "gap_holders": 73
     },
     {
       "sha": "cad6957d",
@@ -1377,7 +2137,12 @@
       "closed": 4180,
       "dns": 457,
       "label": "PB434+PB387: UNTIL EXIT with",
-      "battery": null
+      "battery": null,
+      "compiler_open": 156,
+      "defects": 79,
+      "wrong_answer": 27,
+      "crashes": 11,
+      "gap_holders": 71
     },
     {
       "sha": "8a22e2a3",
@@ -1386,7 +2151,12 @@
       "closed": 4183,
       "dns": 457,
       "label": "PB397: EXIT alone, GO TO and",
-      "battery": null
+      "battery": null,
+      "compiler_open": 155,
+      "defects": 78,
+      "wrong_answer": 27,
+      "crashes": 11,
+      "gap_holders": 70
     },
     {
       "sha": "911246a6",
@@ -1395,7 +2165,12 @@
       "closed": 4185,
       "dns": 457,
       "label": "PB2093+PB545+PB552: one C# n",
-      "battery": null
+      "battery": null,
+      "compiler_open": 150,
+      "defects": 73,
+      "wrong_answer": 27,
+      "crashes": 10,
+      "gap_holders": 68
     },
     {
       "sha": "86111033",
@@ -1404,7 +2179,12 @@
       "closed": 4187,
       "dns": 457,
       "label": "PB2040+PB1291+PB1189+PB666+P",
-      "battery": null
+      "battery": null,
+      "compiler_open": 147,
+      "defects": 69,
+      "wrong_answer": 27,
+      "crashes": 10,
+      "gap_holders": 66
     },
     {
       "sha": "7c72ac5e",
@@ -1413,7 +2193,12 @@
       "closed": 4188,
       "dns": 457,
       "label": "PB989 (F): REPOSITORY detail",
-      "battery": null
+      "battery": null,
+      "compiler_open": 145,
+      "defects": 67,
+      "wrong_answer": 27,
+      "crashes": 10,
+      "gap_holders": 65
     },
     {
       "sha": "2851c3d3",
@@ -1422,7 +2207,12 @@
       "closed": 4189,
       "dns": 457,
       "label": "PB812+PB1545+PB895+PB1567+PB",
-      "battery": null
+      "battery": null,
+      "compiler_open": 140,
+      "defects": 62,
+      "wrong_answer": 27,
+      "crashes": 10,
+      "gap_holders": 64
     },
     {
       "sha": "e68c3365",
@@ -1431,7 +2221,12 @@
       "closed": 4191,
       "dns": 457,
       "label": "PB1353+PB1670: >>SOURCE FORM",
-      "battery": null
+      "battery": null,
+      "compiler_open": 139,
+      "defects": 61,
+      "wrong_answer": 28,
+      "crashes": 10,
+      "gap_holders": 63
     },
     {
       "sha": "24a007fe",
@@ -1440,7 +2235,12 @@
       "closed": 4192,
       "dns": 457,
       "label": "PB1457: SEARCH ALL Format 2",
-      "battery": null
+      "battery": null,
+      "compiler_open": 139,
+      "defects": 61,
+      "wrong_answer": 29,
+      "crashes": 10,
+      "gap_holders": 62
     },
     {
       "sha": "42a68e20",
@@ -1449,7 +2249,12 @@
       "closed": 4194,
       "dns": 457,
       "label": "PB833: Table 19 file lock ac",
-      "battery": null
+      "battery": null,
+      "compiler_open": 134,
+      "defects": 55,
+      "wrong_answer": 26,
+      "crashes": 10,
+      "gap_holders": 61
     },
     {
       "sha": "68cb97c7",
@@ -1458,7 +2263,12 @@
       "closed": 4195,
       "dns": 457,
       "label": "PB244: tables of variable-le",
-      "battery": null
+      "battery": null,
+      "compiler_open": 135,
+      "defects": 67,
+      "wrong_answer": 27,
+      "crashes": 10,
+      "gap_holders": 61
     },
     {
       "sha": "bddea9df",
@@ -1467,7 +2277,12 @@
       "closed": 4197,
       "dns": 457,
       "label": "PB1508: OPTIONS and CONFIGUR",
-      "battery": null
+      "battery": null,
+      "compiler_open": 138,
+      "defects": 70,
+      "wrong_answer": 27,
+      "crashes": 12,
+      "gap_holders": 60
     },
     {
       "sha": "a8d7d11e",
@@ -1476,7 +2291,12 @@
       "closed": 4198,
       "dns": 457,
       "label": "PB1045: one SR4 GLOBAL-claus",
-      "battery": null
+      "battery": null,
+      "compiler_open": 137,
+      "defects": 69,
+      "wrong_answer": 27,
+      "crashes": 12,
+      "gap_holders": 59
     },
     {
       "sha": "d4fe71e3",
@@ -1485,7 +2305,12 @@
       "closed": 4200,
       "dns": 457,
       "label": "PB1430: inline invocation ne",
-      "battery": null
+      "battery": null,
+      "compiler_open": 136,
+      "defects": 68,
+      "wrong_answer": 27,
+      "crashes": 12,
+      "gap_holders": 58
     },
     {
       "sha": "a2c2aa9b",
@@ -1494,7 +2319,12 @@
       "closed": 4201,
       "dns": 457,
       "label": "PB2499: a mnemonic-name oper",
-      "battery": null
+      "battery": null,
+      "compiler_open": 132,
+      "defects": 64,
+      "wrong_answer": 26,
+      "crashes": 12,
+      "gap_holders": 57
     },
     {
       "sha": "82e96cfb",
@@ -1503,7 +2333,12 @@
       "closed": 4202,
       "dns": 457,
       "label": "PB165: run-time 14.8.2/14.8.",
-      "battery": null
+      "battery": null,
+      "compiler_open": 131,
+      "defects": 63,
+      "wrong_answer": 26,
+      "crashes": 12,
+      "gap_holders": 56
     },
     {
       "sha": "8109e5cb",
@@ -1512,7 +2347,12 @@
       "closed": 4203,
       "dns": 457,
       "label": "PB1470+PB1544: two-literal r",
-      "battery": null
+      "battery": null,
+      "compiler_open": 116,
+      "defects": 47,
+      "wrong_answer": 17,
+      "crashes": 11,
+      "gap_holders": 55
     },
     {
       "sha": "8f332a13",
@@ -1521,7 +2361,12 @@
       "closed": 4205,
       "dns": 457,
       "label": "PB2650: one FROM-phrase rule",
-      "battery": null
+      "battery": null,
+      "compiler_open": 130,
+      "defects": 61,
+      "wrong_answer": 29,
+      "crashes": 14,
+      "gap_holders": 54
     },
     {
       "sha": "3077c142",
@@ -1530,7 +2375,12 @@
       "closed": 4206,
       "dns": 457,
       "label": "PB2659+PB2660: run-unit stac",
-      "battery": null
+      "battery": null,
+      "compiler_open": 131,
+      "defects": 62,
+      "wrong_answer": 30,
+      "crashes": 14,
+      "gap_holders": 55
     },
     {
       "sha": "14dab530",
@@ -1539,7 +2389,12 @@
       "closed": 4211,
       "dns": 457,
       "label": "PB2671: unbound and omitted",
-      "battery": null
+      "battery": null,
+      "compiler_open": 131,
+      "defects": 62,
+      "wrong_answer": 30,
+      "crashes": 14,
+      "gap_holders": 55
     },
     {
       "sha": "9697e84f",
@@ -1548,7 +2403,12 @@
       "closed": 4243,
       "dns": 457,
       "label": "PB1636: the owner's 32 signe",
-      "battery": null
+      "battery": null,
+      "compiler_open": 119,
+      "defects": 50,
+      "wrong_answer": 20,
+      "crashes": 10,
+      "gap_holders": 54
     },
     {
       "sha": "f6e4ad94",
@@ -1557,7 +2417,12 @@
       "closed": 4244,
       "dns": 457,
       "label": "PB1085: REPOSITORY rule cita",
-      "battery": null
+      "battery": null,
+      "compiler_open": 118,
+      "defects": 50,
+      "wrong_answer": 17,
+      "crashes": 11,
+      "gap_holders": 53
     }
   ],
   "program": [
