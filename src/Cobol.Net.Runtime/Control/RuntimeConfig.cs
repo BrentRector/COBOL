@@ -20,9 +20,14 @@ namespace CobolNet.Runtime;
 /// <param name="Values">The values it accepts, and what an unset variable means.</param>
 /// <param name="DeclaringType">The type that declares the name constant (and reads the variable).</param>
 /// <param name="DeclaredIn">The declaring source file, relative to <c>src/Cobol.Net.Runtime/</c> — the drift test looks there for the constant and the read.</param>
-/// <param name="IsPattern">True for a family of variables whose names are computed at run time.</param>
+/// <param name="IsPattern">True for a family of variables whose names are computed at run time; the entry then names the
+/// family's members through <see cref="FamilyMember"/>.</param>
 public sealed record ConfigEntry(string Name, string Subsystem, string Purpose, string Values, Type DeclaringType, string DeclaredIn, bool IsPattern = false)
 {
+    /// <summary>For a family entry (<see cref="IsPattern"/>), the test that says whether a variable name is one the runtime
+    /// reads (<c>SwitchStore.IsVariableName</c>); a family that declares none matches no name. Null for an exact entry.</summary>
+    public Func<string, bool>? FamilyMember { get; init; }
+
     /// <summary>The variable's current value in this process (null when unset, or for a pattern entry).</summary>
     public string? CurrentValue => IsPattern ? null : Environment.GetEnvironmentVariable(Name);
 
@@ -32,7 +37,7 @@ public sealed record ConfigEntry(string Name, string Subsystem, string Purpose, 
     /// <summary>Does <paramref name="variableName"/> belong to this entry — the exact name, or (for a pattern) a
     /// name the family can produce?</summary>
     public bool Matches(string variableName) => IsPattern
-        ? variableName.StartsWith(SwitchStore.Prefix, StringComparison.Ordinal) && variableName.Length > SwitchStore.Prefix.Length
+        ? FamilyMember?.Invoke(variableName) ?? false
         : string.Equals(Name, variableName, StringComparison.Ordinal);
 
     public override string ToString() => $"{Name} ({Subsystem}): {Purpose}";
@@ -108,8 +113,8 @@ public static class RuntimeConfig
         // ── external switches (Control/SwitchStore.cs — the ONE computed family) ──
         new(SwitchStore.Prefix + "<SWITCH-NAME>", "switches",
             "the initial status of an implementor-defined external switch named in SPECIAL-NAMES (ISO/IEC 1989:2023 §12.3.7.4 GR4, implementor-defined item 191): SWITCH-1 reads COBOL_SWITCH_1 (hyphens become underscores, upper-cased; SwitchStore.VariableNameFor)",
-            "ON | 1 | TRUE (case-insensitive) = on; anything else or unset = off; probed once per run unit, then SET governs",
-            typeof(SwitchStore), "Control/SwitchStore.cs", IsPattern: true),
+            "ON | 1 | TRUE (case-insensitive) = on; anything else, empty or unset = off; read once, at the switch's first interrogation in the run unit, then SET governs; the switch-names are SWITCH-0 … SWITCH-36 and UPSI-0 … UPSI-7 (SwitchStore.Names)",
+            typeof(SwitchStore), "Control/SwitchStore.cs", IsPattern: true) { FamilyMember = SwitchStore.IsVariableName },
     ];
 
     /// <summary>The entry for a variable name — exact, or the family that can produce it; null when the runtime does

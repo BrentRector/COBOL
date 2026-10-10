@@ -136,8 +136,7 @@ public static class ImplementorNames
             new("C01", SystemNameKind.Feature, Advance: FeatureAdvance.TopOfPage),
             new("CSP", SystemNameKind.Feature, Advance: FeatureAdvance.SuppressSpacing),
         };
-        for (int i = 0; i <= 36; i++) rows.Add(new($"SWITCH-{i}", SystemNameKind.Switch));
-        for (int i = 0; i <= 7; i++) rows.Add(new($"UPSI-{i}", SystemNameKind.Switch));
+        rows.AddRange(SwitchStore.Names.Select(n => new ImplementorName(n, SystemNameKind.Switch)));
         return rows.ToFrozenDictionary(r => r.Name, CobolNames.Comparer);
     }
 }
