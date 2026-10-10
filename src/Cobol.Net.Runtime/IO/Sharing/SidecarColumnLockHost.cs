@@ -131,7 +131,6 @@ internal sealed class SidecarColumnLockHost : IColumnLockHost
             bool pending = name.StartsWith(PendingPrefix, StringComparison.Ordinal);
             if (!pending && !IsRefused(refused, name)) continue;
             if (!HostFile.IsHeldByAnother(path)) { TryDelete(path); continue; }   // a holder that was killed (or a publisher racing us, which publishes again): nobody to refuse for
-            if (HostFile.IsLockFileUnderSweep(path)) continue;                   // a killed holder's file another tester holds exclusively while it sweeps: no connector
             if (!pending) return RunUnitFileLock.Outcome.Refused;
         }
         return RunUnitFileLock.Outcome.Held;

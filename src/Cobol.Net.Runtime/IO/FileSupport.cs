@@ -346,25 +346,6 @@ public static class HostFile
         new(lockFilePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete,
             bufferSize: 1, FileOptions.None);
 
-    /// <summary>A lock file whose exclusive test (<see cref="IsHeldByAnother"/>) was refused: is it a DEAD holder's file
-    /// that another tester is sweeping right now, or gone already? A live holder only ever holds the SHARED lock
-    /// <see cref="OpenLockHolder"/> takes, and only a tester takes the exclusive one, and only on a file no holder holds,
-    /// so a shared request refused too (or a file already deleted) means no connector stands behind it: §9.1.13.9 1)'s
-    /// '61' needs a file "already open by another file connector", and a tester is not one (kb/Work PB2484, the train
-    /// 1052 review). Asked with the holder's own share mode, so on Windows a live holder's handle admits it and only a
-    /// tester's <see cref="FileShare.None"/> handle refuses it.</summary>
-    internal static bool IsLockFileUnderSweep(string lockFilePath)
-    {
-        try
-        {
-            using var _ = new FileStream(lockFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            return false;
-        }
-        catch (IOException e) when (e is FileNotFoundException or DirectoryNotFoundException || IsSharingRefusal(e)) { return true; }
-        catch (IOException) { return false; }                   // not a sharing answer: the conservative reading, a live holder
-        catch (UnauthorizedAccessException) { return false; }    // another user's file (kb/Work PB2917's question)
-    }
-
     /// <summary>Are this host's share modes MANDATORY and PER-ACCESS — a handle opened with <see cref="FileShare.Read"/>
     /// refuses an outside writer, and one opened <see cref="FileShare.None"/> refuses every other handle? That is
     /// Windows; every other host reaches <see cref="FileShare"/> through .NET's advisory <c>flock</c>, which has two
