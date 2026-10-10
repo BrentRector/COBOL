@@ -5,14 +5,15 @@ using CobolNet.CodeGen;
 using CobolNet.CodeGen.Emit;
 using CobolNet.Frontend.Preprocessor;
 using CobolNet.Runtime;
+using CobolNet.Runtime.Exceptions;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// CONTINUE AFTER's runtime lanes (ISO §14.9.9.4 GR1; kb/Work PB138, PB1529) — the legs no stdout golden can pin:
-/// the NON-FINITE screen (`(long)double.NaN` saturates to 0, so a NaN interval used to silently skip the
-/// suspension where §14.6.13.2 item 3 names EC-DATA-NOT-FINITE), the raise REPORT the emitted §14.6.13.1.4
+/// the NON-FINITE intervals (`(long)double.NaN` saturates to 0, so a NaN interval is read as zero seconds on
+/// purpose, and kb/Work PB2841 pins that none of them is the fatal EC-DATA-NOT-FINITE), the raise REPORT the emitted §14.6.13.1.4
 /// dispatch consumes, the exact truncation contract, and the saturation of a huge interval to the maximum
 /// meaningful value on EVERY carrier the interval can evaluate on. A suspension is OBSERVED through
 /// <see cref="CobolTiming.SuspensionObserver"/>, never timed (kb/Work PB1590: no test asserts a wall clock, and a
@@ -29,19 +30,33 @@ public sealed class CobolTimingTests
         Assert.Empty(suspensions);   // no suspension at all — observed, not timed (kb/Work PB1590)
     }
 
+    /// <summary>⛔ kb/Work PB2841 — a NON-FINITE interval takes the rule of its kind, and never the fatal
+    /// EC-DATA-NOT-FINITE: §14.6.13.2 item 3 limits that condition to a sending operand described with a STANDARD
+    /// floating-point usage and the emitter raises it where such an operand is READ (CobolFloat.Sending), so a
+    /// non-finite double that reaches <see cref="CobolTiming.ContinueAfter(double, bool)"/> is a non-standard usage's
+    /// content (or a standard one read with its checking off). The checking is ON here, which is what makes the
+    /// absence of the raise a witness. −∞ is a value below zero (§14.9.9.4 GR1 a-c: reported when checked, else a
+    /// silent zero), +∞ is a number above the maximum meaningful value (the maximum, the PB2647 determination that
+    /// an infinity is a number), and a NaN is no number: a zero interval, no suspension, no condition.</summary>
     [Fact]
-    public void NaNInterval_DataNotFiniteChecking_IsTheFatal()
+    public void NonFiniteInterval_TakesTheRuleOfItsKind_NeverEcDataNotFinite()
     {
-        var ru = new RunUnit();
-        var saved = RunUnit.Current;   // the ambient accessor is thread-static; run against a fresh unit
-        try
+        var suspensions = Observe(() => RunUnit.Run(_ =>
         {
-            ru.Exceptions.FloatNotFiniteChecking = true;
-            Assert.Throws<CobolNet.Runtime.Exceptions.CobolFatalException>(
-                () => ru.Exceptions.FloatNotFiniteError("probe"));
-            Assert.Equal("EC-DATA-NOT-FINITE", ru.Exceptions.LastName);
-        }
-        finally { _ = saved; }
+            ExceptionState.Clear();
+            ExceptionState.FloatNotFiniteChecking = true;
+            Assert.True(CobolTiming.ContinueAfter(double.NegativeInfinity, checkLessThanZero: true));   // GR1b: reported
+            Assert.Equal("EC-CONTINUE-LESS-THAN-ZERO", ExceptionState.LastName);
+            Assert.False(ExceptionState.LastFatal);
+            ExceptionState.Clear();
+            ExceptionState.FloatNotFiniteChecking = true;
+            Assert.False(CobolTiming.ContinueAfter(double.NegativeInfinity, checkLessThanZero: false)); // GR1c: nothing
+            Assert.False(CobolTiming.ContinueAfter(double.NaN, checkLessThanZero: true));                // zero interval
+            Assert.False(CobolTiming.ContinueAfter(double.NaN, checkLessThanZero: false));
+            Assert.Null(ExceptionState.LastName);   // none of the three set a condition
+            Assert.False(CobolTiming.ContinueAfter(double.PositiveInfinity, checkLessThanZero: true));  // the maximum
+        }));
+        Assert.Equal([MaxMs], suspensions);   // only +Infinity suspended, and for exactly the maximum
     }
 
     [Fact]

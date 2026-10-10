@@ -32,19 +32,22 @@ public static class CobolTiming
     /// <paramref name="checkLessThanZero"/> (EC-CONTINUE-LESS-THAN-ZERO checking was enabled at the statement), the
     /// nonfatal EC-CONTINUE-LESS-THAN-ZERO is set to exist and REPORTED to the site by the return value, which runs
     /// the §14.6.13.1.4 USE-declarative selection (kb/Work PB138). A value above <see cref="MaxSeconds"/> suspends
-    /// for the maximum.
+    /// for the maximum. A NON-FINITE interval takes the rule of its kind (kb/Work PB2841): -Infinity is a value
+    /// below zero, +Infinity a value above the maximum, and a NaN, which is no number, a zero interval.
     /// </summary>
     public static bool ContinueAfter(double seconds, bool checkLessThanZero)
     {
-        // kb/Work PB138: screen NON-FINITE before anything — `(long)double.NaN` saturates to 0, so a NaN
-        // interval silently skipped the suspension where §14.6.13.2 item 3 makes a NaN/±Inf sending operand
-        // EC-DATA-NOT-FINITE (the CA10 checked raise; unchecked, no suspension is the documented benign
-        // outcome — sleeping forever on +Inf is the one thing no reading licenses).
-        if (!double.IsFinite(seconds))
-        {
-            ExceptionState.FloatNotFiniteError($"CONTINUE AFTER interval is {seconds} (ISO §14.6.13.2 item 3)");
-            return false;
-        }
+        // ⛔ NO EC-DATA-NOT-FINITE SCREEN HERE (kb/Work PB2841, which corrects PB138's). §14.6.13.2 item 3 raises
+        // EC-DATA-NOT-FINITE for a STANDARD floating-point SENDING OPERAND only, and that raise is made where such an
+        // operand is READ (CobolFloat.Sending, wrapped by the emitter), so a NaN or an infinity that reaches this
+        // method came from a NON-standard usage (FLOAT-LONG, COMP-2) or from a standard one with its checking off:
+        // the standard names no condition for it, and every value takes the rule GR1 gives a value of its kind
+        // (PB2647's determination: an infinity is a number in ISO/IEC 60559, a NaN is not):
+        //   -Infinity  a value less than zero → GR1 a-c (the sign test below, the saturating reader gives long.MinValue);
+        //   +Infinity  a number greater than the maximum meaningful value → the maximum (MaxSeconds), like 1E30;
+        //   NaN        no number, so no seconds: CobolNum.PositionOf reads it as 0 (the disposition CobolFloat.ToScaled
+        //              gives a NaN landing in a fixed-point receiver), which is a zero interval — no suspension and
+        //              no condition (`seconds < 0.0` is false for a NaN).
         // GR1a/GR1b operate on arithmetic-expression-1's EVALUATED value (the sign test precedes the m=0
         // truncation), so a negative FRACTIONAL interval in (-1, 0) must still set the exception.
         return Continue(seconds < 0.0, CobolNum.PositionOf(seconds), checkLessThanZero);
