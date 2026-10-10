@@ -97,7 +97,8 @@ public sealed class GateLegDriftTests
     /// fail-fast stop and its named remainder, the population's dropped, duplicated and skipped cases, the identity
     /// mismatches, the empty leg, the no-plan fallback, the scrubbed all-or-none handshake, the lander's single leg,
     /// the refused second gate (kb/Work PB1721; DESIGN-test-build-ci.md section 3.14.4), and the implementer scope
-    /// <c>leg1</c> of the batched-gating trial (kb/Work PB2515): leg 1 only, its verdict never a plain GREEN; and the
+    /// <c>leg1</c> of batched gating (kb/Work PB2515), the coded default when no scope is set: leg 1 only, its verdict
+    /// <c>LEG 1 ONLY (batched gating, PB2515)</c>, never a plain GREEN; and the
     /// audits' fail-fast (kb/Work PB2523): a red audit stops an implementer gate before the build, never a lander's;
     /// and the audits run before the implementer's gate slot is taken (kb/Work PB2524); and every gate publishes its
     /// measured durations to the shared timings store a fresh worktree's plan reads (kb/Work PB2527).
@@ -127,7 +128,8 @@ public sealed class GateLegDriftTests
                      "a red leg's whole output, its failure message included",
                      "no plan (the planner failed): ONE leg in the plain order",
                      "a leg host's environment is scrubbed",
-                     "scope leg1 (the batched-gating trial): leg 1 only, every leg-2 case named NOT RUN",
+                     "no scope set: the coded default is leg1 (batched gating)",
+                     "scope leg1 (batched gating): leg 1 only, every leg-2 case named NOT RUN",
                      "scope leg1: a red in leg 1 is LEG 1 ONLY: RED",
                      "scope leg1 with no plan: the one leg IS the whole population",
                      "malformed shared gate settings: the implementer gate is NOT RUN",

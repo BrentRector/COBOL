@@ -15,7 +15,7 @@ sign the Contributor License Agreement (CLA.md) — once, for all your future pu
 ## How it was verified
 
 <!-- The gate you ran and its verdict line, e.g.
-     pwsh scripts/build-local.ps1 -Mode implementer  →  === BUILD-LOCAL GATE: GREEN — … cases ran … === -->
+     pwsh scripts/build-local.ps1 -Mode implementer  →  === BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — … === -->
 
 ## Checklist
 

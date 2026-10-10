@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""train_measure.py — the batched-gating trial's measurement, one record per lander train (kb/Work PB2515).
+"""train_measure.py — the gating policy's measurement, one record per lander train (kb/Work PB2515).
 
     python scripts/orchestrator/train_measure.py record --train 1036 --gating batched --started <ISO> --pushed <ISO> \
         --clusters 5 --landed 4 --ejected 1 --population-runs 2 --first-run red --attribution-min 14 \
@@ -7,13 +7,14 @@
     python scripts/orchestrator/train_measure.py summary [--since <ISO>]
     python scripts/orchestrator/train_measure.py --self-test
 
-WHY. The owner adopted batched gating as a TRIAL until Sat 2026-10-10 10:00 PDT (kb/Work PB2515): an implementer gates
-leg 1 only, and the lander's whole-population train gate is the population check for every cluster. Whether it stays
-is decided on what it measured against the per-commit whole population (kb/Work PB1708) — changes landed per hour,
-whole-population runs per train, red trains and their attribution time, finishers created by ejection, and CI reds,
-which must stay ZERO (the CI invariant, kb/Work PB1957). Each lander records its train once it has pushed (or given
-up); the baseline trains are recorded with `--gating whole`. `summary` computes the comparison PB2515's
-"Measured" section quotes.
+WHY. Batched gating is the gate policy (kb/Work PB2515; the owner's decision 2026-10-10, "Yes, permanently", after
+a measured trial from 2026-10-07): an implementer gates leg 1 only, and the lander's whole-population train gate is
+the population check for every cluster. It was decided on what it measured against the per-commit whole population
+(kb/Work PB1708) — changes landed per hour, whole-population runs per train, red trains and their attribution time,
+finishers created by ejection, and CI reds, which must stay ZERO (the CI invariant, kb/Work PB1957) — and every train
+is still recorded, so a policy that stops paying shows in the numbers. Each lander records its train once it has
+pushed (or given up), `--gating batched` while the implementer scope is `leg1` (the default) and `--gating whole`
+while the owner has set it to `whole`. `summary` computes the comparison PB2515 quotes.
 
 The records are one JSON object per line in `<coord>/train-measurements.jsonl`, outside every git worktree
 (scripts/orchestrator/coord.py), so no branch switch or worktree removal loses one.
@@ -126,7 +127,8 @@ def parser() -> argparse.ArgumentParser:
     r = sub.add_parser("record", help="append one train's measurement")
     r.add_argument("--train", required=True, help="the train label (e.g. 1036, 1036b)")
     r.add_argument("--gating", required=True, choices=GATINGS,
-                   help="batched: its implementers gated leg 1 only (the trial); whole: the per-commit whole population")
+                   help="batched: its implementers gated leg 1 only (scope leg1, the default); whole: the per-commit "
+                        "whole population (scope whole)")
     r.add_argument("--started", required=True, help="ISO time with offset: the lander was dispatched")
     r.add_argument("--pushed", required=True, help="ISO time with offset: push-main finished (or the lander gave up)")
     r.add_argument("--clusters", type=int, required=True, help="clusters the train was dispatched with")

@@ -165,7 +165,7 @@ if re.search(r"\bdotnet\s+test\b", commands) and "--filter" in commands:
         if bare:
             block(f"filter term(s) {bare} have no property, so they match NOTHING and the run exits 0 — a silent "
                   "green. Write `FullyQualifiedName~X` for every term. (A GATE never filters: it is "
-                  "`scripts/build-local.ps1 -Mode implementer`, the ordered whole population.)")
+                  "`scripts/build-local.ps1 -Mode implementer`, the ordered gate.)")
     if not re.search(r"(>|\|\s*(tail|grep|Select-String|Tee-Object|tee|findstr|Out-File))", commands):
         block("a filtered `dotnet test` must redirect its output to a log (or pipe it through tail/grep) and read the "
               "verdict line — unredirected output floods the context and hides the verdict. A GATE is "

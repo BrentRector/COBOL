@@ -6,7 +6,8 @@ their filtered gates never ran (`DiagnosticPositionTests` for a COPY library-sea
 crash in `DataBinder.Constants.cs` no filter term named), and wave 69 existed only to finish them. The map this
 script records answers the question the names were guessing: WHICH TESTS EXECUTE WHICH SOURCE FILES.
 `scripts/spec/impacted_tests.py` turns it into the TIERS of a change, which `scripts/gate_plan.py` uses to ORDER the
-implementer's whole-population gate — the map never selects a gate (kb/Work PB1708, PB1717).
+implementer's gate (leg 1 is what an implementer runs, kb/Work PB2515) — the map never filters a gate (kb/Work PB1708,
+PB1717).
 
 How (the design is docs/rearchitecture/DESIGN-test-build-ci.md §3.13):
 

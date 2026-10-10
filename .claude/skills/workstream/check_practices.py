@@ -23,14 +23,14 @@ LANDER_HANDOFF = [r'READY-TO-PUSH <this worktree> <HEAD sha>', r'LOOP STATE: \{L
 # that are cheapest to lose silently.
 BRIEFS = {
     # P4: the stamped handoff (kb/Work/PB1698) — STATUS.md names the commit it describes; a resumer reads the delta.
-    # PB1721: the implementer's gate is the ORDERED whole population — `build-local.ps1 -Mode implementer`.
+    # PB1721: the implementer's gate is the ORDERED gate — `build-local.ps1 -Mode implementer`; PB2515: leg 1 only.
     'fix-lane-implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'STATUS-AT:',
                                       r'status_delta\.py', r'BUILD-LOCAL GATE: GREEN',
                                       # PB1732 (I8): CI's Linux legs run under WSL before the report
                                       r'linux-gate\.sh', r'FIX WHAT YOU FIND',  # I9
-                                      r'LEG 1 ONLY \(batched-gating trial, PB2515\)'],  # PB2515: the trial's done-state
+                                      r'LEG 1 ONLY \(batched gating, PB2515\)'],  # PB2515: the implementer's done-state
     'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'BUILD-LOCAL GATE: GREEN',
-                             r'FIX WHAT YOU FIND', r'LEG 1 ONLY \(batched-gating trial, PB2515\)'],  # I9; PB2515
+                             r'FIX WHAT YOU FIND', r'LEG 1 ONLY \(batched gating, PB2515\)'],  # I9; PB2515
     'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN',
                               r'compare_oracle',  # PB2152 (L11): the R0 oracle runs after every train's gate
                               r'-Mode lander',  # PB1721 (L2): the lander's gate is the whole population, one leg
@@ -66,7 +66,7 @@ BRIEFS = {
                                      # PB1732 (I8): CI's Linux legs run under WSL before the report
                                      r'linux-gate\.sh', r'FIX WHAT YOU FIND',  # I9
                                      r'LSP DIAGNOSTICS',  # P13: act on the language server's diagnostics
-                                     r'LEG 1 ONLY \(batched-gating trial, PB2515\)'],  # PB2515: the trial's done-state
+                                     r'LEG 1 ONLY \(batched gating, PB2515\)'],  # PB2515: the implementer's done-state
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit
     # final StructuredOutput reminder (three agents in waves 65-67 ended without it and stranded finished branches).
     # PB1703 / PB1704: a dead agent (rejection) and a hung agent (ceiling) must not hold the wave.

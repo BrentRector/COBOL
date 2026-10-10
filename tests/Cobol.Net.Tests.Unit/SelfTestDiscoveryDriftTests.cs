@@ -9,7 +9,8 @@ namespace CobolNet.Tests.Unit;
 /// <summary>
 /// ⛔ EVERY SCRIPT SELF-TEST RUNS IN EVERY GATE AND IN CI, THROUGH ONE DISCOVERING RUNNER (kb/Work PB2563):
 /// <c>scripts/self_tests.py</c> finds every self-test under <c>scripts/</c>, and the local gate's audits, the Linux gate
-/// and CI's jobs all run that runner and name no self-test by hand.
+/// and CI's jobs all run that runner and name no self-test by hand; only the implementer's gate may REUSE a PASS
+/// recorded for unchanged inputs, while the lander's gate, the Linux gate and CI run them all (kb/Work PB2914).
 /// </summary>
 /// <remarks>
 /// Until PB2563 the gates ran self-tests from hand lists: the gate driver's AUDITS named five, CI's audits job six,
@@ -125,6 +126,11 @@ public sealed class SelfTestDiscoveryDriftTests
         Assert.True(audits.Success, "scripts/run_gate_legs.py no longer declares its audits as `AUDITS = (…)`");
         Assert.Contains(@"(""SELF-TESTS"", [""scripts/self_tests.py""])", audits.Groups[1].Value, StringComparison.Ordinal);
         Assert.Matches(@"(?m)^BUILT_SELF_TESTS = \[""scripts/self_tests.py"", ""--built""\]\r?$", driver);
+        // kb/Work PB2914: only the implementer's gate REUSES a recorded PASS (run_gate_legs adds SELF_TESTS_REUSE to its
+        // audits); CI and the Linux gate run every self-test, as the lander's gate does, and so record the PASSes.
+        Assert.Matches(@"(?m)^SELF_TESTS_REUSE = ""--reuse""\r?$", driver);
+        Assert.DoesNotContain("--reuse", linux, StringComparison.Ordinal);
+        Assert.DoesNotContain("--reuse", workflow, StringComparison.Ordinal);
         // linux-gate.sh runs its legs in parallel (kb/Work PB2879), so each runner call redirects to its leg's result
         // file and runs in the background; it still calls THE runner, and names no self-test by hand.
         Assert.Matches(@"(?m)^selftests_leg selftests( > ""\$out/selftests\.result"" 2>&1 &)?\r?$", linux);
@@ -212,6 +218,16 @@ public sealed class SelfTestDiscoveryDriftTests
                      "a self-test for another platform is NOT RUN, not run",
                      "one red makes the verdict RED",
                      "the verdict names the red and the not-run one with its reason",
+                     // kb/Work PB2914: N concurrent simulated gates — reuse, the machine-wide budget, the hang detector.
+                     "the lander's run runs every self-test and records each PASS",
+                     "the recorded PASS holds a file read through a name built at run time (the trace saw it)",
+                     "a malformed record in the store is skipped, never a crash of the gate, and the good PASS still found",
+                     "4 concurrent implementer gates on an unchanged tree re-run nothing (every one REUSED)",
+                     "a changed input re-runs exactly the self-test that read it, in every gate; the others are REUSED",
+                     "4 gates wanting the same self-test at once run at most the budget's 2 at a time, and none hangs",
+                     "an edited import re-runs the self-test that imports it, and only that one",
+                     "a self-test still running past the hang detector is HANG — its own state, verdict and exit code, never RED",
+                     "a Python self-test whose trace does not show its own file records no PASS (the tracer did not run)",
                  })
         {
             Assert.True(r.Stdout.Contains("ok   arm: " + arm, StringComparison.Ordinal),

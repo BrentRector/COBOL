@@ -3151,7 +3151,8 @@ already-derivable coverage; none change the pipeline.
   no default; there is no filter. The driver is `scripts/run_gate_legs.py` (`--self-test` proves every arm); each
   gate writes a fresh run directory `TestResults/build-local/<UTC stamp>-<nonce>/` (listings, `plan.json`, every
   leg's log, trx and identity record, `verdict.json` with the timings and the first red; the newest five are kept)
-  and prints one `=== BUILD-LOCAL GATE: GREEN|RED|RED/INCOMPLETE|BUILD FAILED|NOT RUN — … ===` line.
+  and prints one `=== BUILD-LOCAL GATE: GREEN|RED|RED/INCOMPLETE|LEG 1 ONLY (batched gating, PB2515):
+  GREEN|RED|BUILD FAILED|NOT RUN — … ===` line (an implementer's, under the default scope `leg1`, is `LEG 1 ONLY …`).
   ⛔ Any OTHER filtered `dotnet test` you run or script goes through `scripts/filter_population.py` first (PB708,
   PB751/PB752 — vstest answers an unmatched filter with a passing run of zero tests); add `--allow-build` when the
   run itself is what builds the project.
@@ -3164,6 +3165,10 @@ already-derivable coverage; none change the pipeline.
   The gate runs it as its `SELF-TESTS` audit, the Linux gate as legs `selftests`/`selftests-built`, and CI in its
   `audits`, `greenfield-unit` and `windows-build-test` jobs (kb/Work PB2563; `SelfTestDiscoveryDriftTests`). A
   self-test that cannot run on one platform says so in its header (`# SELF-TEST-PLATFORM: windows — <reason>`).
+  `--reuse` (the implementer gate's) reports a self-test REUSED while everything its recorded PASS read is unchanged;
+  every other run records; each self-test that runs takes a place in one machine-wide budget, and a hung one is HANG,
+  never RED (kb/Work PB2914; DESIGN-test-build-ci.md §3.14.10). `python scripts/self_test_inputs.py <self-test>` prints
+  a self-test's static inputs.
 - The order plan (kb/Work PB1683, PB1717, PB1721; `docs/rearchitecture/DESIGN-test-build-ci.md` sections 3.13 and
   3.14.2): the gate builds it in-process — `impacted_tests.py`'s tiers of the change against the impact map for the
   cut point, then `gate_plan.py` (`NameKey`, tiers 0a/0u/1–3, the leg-1 budgets and collection cap). By hand:
@@ -3174,13 +3179,15 @@ already-derivable coverage; none change the pipeline.
   a stale plan, makes every case an execution error, so never export them by hand). Maps are recorded ON DEMAND:
   `python scripts/spec/record_impact_map.py [--commit <sha>]` (inside a gate slot; a detached worktree, a
   probe-instrumented build, every test assembly once with the compile cache off; the map lands in
-  `<git common dir>/cobol-impact/<sha>.json.gz`, shared by every worktree). The gate cap and the implementer scope are ONE
-  shared setting each, in the slot directory every worktree shares (kb/Work PB2514, PB2515): `python
-  scripts/gate_slot.py set-cap N [--until ISO] [--why TEXT]` and `set-implementer-scope whole|leg1 --until ISO`
-  (`leg1` = the batched-gating trial: the implementer gate runs leg 1 only and its verdict says `LEG 1 ONLY
-  (batched-gating trial, PB2515)`; an expired setting is its default again); `gate_slot.py status` shows both, every
-  held slot and the queue. A lander records each train with `python scripts/orchestrator/train_measure.py record`,
-  and `train_measure.py summary` compares the trial with the whole-population baseline.
+  `<git common dir>/cobol-impact/<sha>.json.gz`, shared by every worktree). The gate cap and the implementer scope have
+  CODED DEFAULTS, the owner's decisions of 2026-10-10 (kb/Work PB2514, PB2515): cap 3, and scope `leg1` — batched
+  gating: the implementer gate runs leg 1 only and its verdict says `LEG 1 ONLY (batched gating, PB2515)`, and the
+  lander's whole-population train gate is the population check. ONE shared setting each, in the slot directory every
+  worktree shares, departs from them: `python scripts/gate_slot.py set-cap N [--until ISO] [--why TEXT]` and
+  `set-implementer-scope leg1|whole [--until ISO]` (`whole` = both legs, the owner's switch back; an expired setting
+  is its default again); `gate_slot.py clear [cap] [implementer-scope]` returns to the defaults; `gate_slot.py status`
+  shows both, every held slot and the queue. A lander records each train with `python
+  scripts/orchestrator/train_measure.py record`, and `train_measure.py summary` compares the gating modes.
 - Greenfield conformance: `dotnet test tests/Cobol.Net.Tests.Conformance` · unit: `tests/Cobol.Net.Tests.Unit` ·
   characterization: `tests/Cobol.Net.Tests.Characterization` ·
   FULL CLI-level NIST guard: `bash scripts/guard.sh` (fast: `guard-fast.sh`; gate on the VERDICT line). It drives
@@ -3839,7 +3846,7 @@ namespace flip) cannot be done as a one-file change — STOP and finish P7/P8 fi
 **Baseline the battery once, green, before any change** (this is the number every later step must reproduce):
 
 ```bash
-pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal   # the ordered whole population; read the verdict line
+pwsh scripts/build-local.ps1 -Mode lander   # the whole population in one leg (an implementer gate runs leg 1 only, PB2515); read the verdict line
 ```
 Record the verdict line's per-assembly counts. Any later step that changes them is a regression to investigate before
 the commit boundary.

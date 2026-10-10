@@ -5,7 +5,8 @@ and THE SHARED GATE SETTINGS that every gate reads from the same place (kb/Work 
     python scripts/gate_slot.py run [--label TEXT] -- <command> [args…]   # take a slot, run the command inside it
     python scripts/gate_slot.py status                                   # the settings, every slot, the queue
     python scripts/gate_slot.py set-cap N [--until ISO] [--why TEXT]     # the cap, for every gate at once
-    python scripts/gate_slot.py set-implementer-scope whole|leg1 [--until ISO] [--why TEXT]
+    python scripts/gate_slot.py set-implementer-scope leg1|whole [--until ISO] [--why TEXT]
+    python scripts/gate_slot.py clear [cap] [implementer-scope]          # back to the coded defaults (none named: both)
     python scripts/gate_slot.py --self-test                              # the arms of DESIGN §3.14.6
 
 ⛔ WHY. Concurrent whole-population implementer gates starve the lander's gate: train 48's lander leg took 30.6 min
@@ -30,17 +31,20 @@ THE MECHANISM — every piece is an OS file lock, so nothing is ever cleaned up 
   order    Acquisition nests in one fixed order — (the caller's worktree lock, then) ticket, then slot — so no two
            gates can wait on each other in a cycle.
 
-  settings ONE file, `<git common dir>/cobol-gate-slots/settings.json`, written only by `set-cap` and
-           `set-implementer-scope` (under `settings.lock`, replaced atomically, recording who, when and why) and read
-           by every gate and by `status`. ⛔ The cap is a property of the SLOT DIRECTORY, never of a process: while
+  settings ONE file, `<git common dir>/cobol-gate-slots/settings.json`, written only by `set-cap`,
+           `set-implementer-scope` and `clear` (under `settings.lock`, replaced atomically, recording who, when and
+           why) and read by every gate and by `status`. ⛔ The cap is a property of the SLOT DIRECTORY, never of a process: while
            each gate read N from its own environment (the deleted COBOLNET_GATE_SLOTS), gates started with different
            N shared one FIFO queue, and a cap-1 gate at its head waited for slot 1 while slot 3 stood free, blocking
            every cap-3 gate behind it (kb/Work PB2514, 2026-10-07 16:13 PDT). A waiter re-reads the cap on every
            poll, so a raise frees the queue at once. A setting may carry an expiry (`--until`, an ISO time with its
-           UTC offset); once it passes, the DEFAULT is in force again with no one acting. `leg1` must carry one.
-  scope    The implementer gate's population (`run_gate_legs.py` reads it): `whole` (the default; kb/Work PB1708)
-           or `leg1`, the owner's batched-gating trial (kb/Work PB2515): leg 1 only, the whole population left
-           to the lander's train gate.
+           UTC offset); once it passes, the CODED DEFAULT is in force again with no one acting. `clear` removes a
+           setting, so its coded default is in force at once.
+  defaults THE OWNER'S DECISIONS, coded here and nowhere else (2026-10-10): the cap is DEFAULT_SLOTS = 3 and the
+           implementer scope is DEFAULT_SCOPE = `leg1`. A setting exists only to depart from them.
+  scope    The implementer gate's population (`run_gate_legs.py` reads it): `leg1` (the default; batched gating,
+           kb/Work PB2515): leg 1 only, the whole population left to the lander's train gate; or `whole`
+           (kb/Work PB1708): both legs, the owner's switch back.
 
 N is the settings' cap while it is live, else DEFAULT_SLOTS. ⛔ The cap does not span operating systems: a Windows
 lock and a WSL lock on a drvfs mount do not see each other. The repository's gates run on Windows; a WSL run is an
@@ -49,8 +53,10 @@ ad hoc Linux reproduction, and the self-test proves the Linux arm there.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import getpass
+import io
 import json
 import os
 import platform
@@ -74,18 +80,23 @@ SLOT_DIR_NAME = "cobol-gate-slots"
 SETTINGS_FILE = "settings.json"
 SETTINGS_LOCK = "settings.lock"
 SETTINGS_SCHEMA = 1
-#: The implementer gate's population: `whole` (kb/Work PB1708, the default) or `leg1` (the batched-gating trial,
-#: kb/Work PB2515 — leg 1 only; the lander's whole-population train gate is the population check).
-SCOPES = ("whole", "leg1")
-DEFAULT_SCOPE = "whole"
+#: The implementer gate's population: `leg1` (batched gating, kb/Work PB2515 — leg 1 only; the lander's
+#: whole-population train gate is the population check) or `whole` (kb/Work PB1708 — both legs).
+#: ⛔ THE OWNER'S DECISION (2026-10-10 10:19 PDT, kb/Work PB2515): batched gating is the rule, "Yes, permanently".
+#: Tried from 2026-10-07 and measured by `train_measure.py summary` (3.43 changes landed per hour batched against 0.71
+#: whole, 0 interaction reds, 1 CI red from an environment difference), it was kept.
+SCOPES = ("leg1", "whole")
+DEFAULT_SCOPE = "leg1"
 _SLOT_FILE = re.compile(r"(\d+)\.lock")
 
-# ⛔ MEASURED (DESIGN §3.14.6, kb/Work PB1720; evidence impact-map-pb1708/m13): the default is the largest N at which the
-# lander's whole-Conformance leg stays within 1.25x of its quiet time with N implementer gates running, builds included.
-# On the shared 32-core host, every gate cold (COBOLNET_COMPILE_CACHE=off), the lander at Normal and the implementers at
-# BelowNormal, 2026-09-29: quiet 143.1 / 135.8 / 133.6 s; N=1 1.24x and 1.30x; N=2 1.58x and 1.52x; N=3 1.56x. N=2 is
-# far over, and N=1 is at the line — the only value that meets it — so the cap is ONE implementer gate at a time.
-DEFAULT_SLOTS = 1
+# ⛔ THE OWNER'S DECISION (2026-10-10 10:20 PDT, kb/Work PB2514): "Cap 3 permanently" — at most three implementer
+# gates build or test at once, repository-wide. The measurement it was decided against (DESIGN §3.14.6, kb/Work
+# PB1720; evidence impact-map-pb1708/m13): the lander's whole-Conformance leg with N implementer gates running, builds
+# included, on the shared 32-core host, every gate cold, the lander at Normal and the implementers at BelowNormal,
+# 2026-09-29: quiet 143.1 / 135.8 / 133.6 s; N=1 1.24x and 1.30x; N=2 1.58x and 1.52x; N=3 1.56x. Only N=1 stayed
+# within 1.25x, but at cap 1 implementer gates waited 62 % of their wall time (the w1033 survey), and under batched
+# gating (DEFAULT_SCOPE) each one runs leg 1 only; the owner chose the throughput.
+DEFAULT_SLOTS = 3
 DEFAULT_POLL_S = 1.0
 #: What a slot holder's children run without (Slot.spawn_kwargs): the persistent build servers that would outlive them.
 BUILD_SERVERS_OFF = {"MSBUILDDISABLENODEREUSE": "1", "UseSharedCompilation": "false"}
@@ -257,8 +268,6 @@ def _validate(key: str, value: object, until: dt.datetime | None) -> int | str:
         return value
     if value not in SCOPES:
         raise ValueError(f"the implementer scope must be one of {SCOPES}, not {value!r}")
-    if value != DEFAULT_SCOPE and until is None:
-        raise ValueError(f"implementer scope {value!r} needs an expiry (--until): a trial must end by itself")
     return value
 
 
@@ -282,8 +291,8 @@ class GateSettings:
         try:
             raw = json.loads(text)
         except ValueError as e:
-            raise ValueError(f"{path}: not JSON ({e}); rewrite it with `gate_slot.py set-cap` / "
-                             "`set-implementer-scope`") from None
+            raise ValueError(f"{path}: not JSON ({e}); rewrite it with `gate_slot.py clear` (the coded defaults) "
+                             "or `set-cap` / `set-implementer-scope`") from None
         if not isinstance(raw, dict) or raw.get("schema") != SETTINGS_SCHEMA or \
                 set(raw) - {"schema", *cls.KEYS}:
             raise ValueError(f"{path}: not a schema-{SETTINGS_SCHEMA} gate settings file (keys {sorted(raw)})")
@@ -312,30 +321,43 @@ class GateSettings:
         now = now or _now()
         scope, _ = self.effective_scope(now)
         return [f"gate-slot: cap {self.effective_cap(now)}" + (f" ({self.cap.describe(now)})" if self.cap else
-                                                              f" (the default; no cap set)"),
+                                                              " (the default; no cap set)"),
                 f"gate-slot: implementer scope {scope}" + (
                     f" ({self.implementer_scope.describe(now)})" if self.implementer_scope else " (the default)")]
 
     @classmethod
     def write(cls, directory: Path, key: str, value: int | str, until: dt.datetime | None, why: str,
               set_by: str, now: dt.datetime | None = None) -> "GateSettings":
-        """THE ONE WRITER: validate, then replace one key under `settings.lock`, atomically."""
+        """Set one key: validated, then stored by `_store`."""
         if key not in cls.KEYS:
             raise ValueError(f"unknown gate setting {key!r}")
         now = now or _now()
         _validate(key, value, until)
         if until is not None and until <= now:
             raise ValueError(f"--until {until.isoformat()} has already passed")
+        return cls._store(directory, {key: Setting(value, until, why, set_by, now.isoformat(timespec="seconds"))})
+
+    @classmethod
+    def clear(cls, directory: Path, keys: tuple[str, ...]) -> "GateSettings":
+        """Remove settings, so the CODED DEFAULTS (DEFAULT_SLOTS, DEFAULT_SCOPE) are in force for them at once.
+        Clearing every key replaces the file without reading it: the one repair of a malformed file."""
+        unknown = sorted(set(keys) - set(cls.KEYS))
+        if unknown or not keys:
+            raise ValueError(f"unknown gate setting(s) {unknown}; clear any of {cls.KEYS}")
+        return cls._store(directory, dict.fromkeys(keys), replace_all=set(keys) == set(cls.KEYS))
+
+    @classmethod
+    def _store(cls, directory: Path, changes: dict[str, Setting | None],
+               replace_all: bool = False) -> "GateSettings":
+        """THE ONE WRITER: under `settings.lock`, apply `changes` (a Setting sets its key, None removes it) to the
+        current file and replace it atomically; every other key is carried over as it was."""
         directory.mkdir(parents=True, exist_ok=True)
         with _Mutex(directory / SETTINGS_LOCK, DEFAULT_POLL_S):
-            current = cls.read(directory)
+            current = cls(directory) if replace_all else cls.read(directory)
             out: dict = {"schema": SETTINGS_SCHEMA}
             for k in cls.KEYS:
-                s = getattr(current, k)
-                if k == key:
-                    out[k] = {"value": value, "until": until.isoformat() if until else None, "why": why,
-                              "set_by": set_by, "set_at": now.isoformat(timespec="seconds")}
-                elif s is not None:
+                s = changes[k] if k in changes else getattr(current, k)
+                if s is not None:
                     out[k] = {"value": s.value, "until": s.until.isoformat() if s.until else None, "why": s.why,
                               "set_by": s.set_by, "set_at": s.set_at}
             sharedfile.replace_text(directory / SETTINGS_FILE, json.dumps(out, indent=1, sort_keys=True) + "\n")
@@ -654,6 +676,21 @@ def _cmd_set(args: argparse.Namespace, key: str, value: int | str) -> int:
     return 0
 
 
+#: `clear`'s names for the settings: each key of GateSettings.KEYS spelled as its subcommand is (`set-cap`,
+#: `set-implementer-scope`), derived so a new key is clearable with no second list to keep.
+CLEAR_NAMES = {k.replace("_", "-"): k for k in GateSettings.KEYS}
+
+
+def _cmd_clear(args: argparse.Namespace) -> int:
+    unknown = [n for n in args.names if n not in CLEAR_NAMES]
+    if unknown:
+        raise ValueError(f"clear: unknown setting(s) {unknown}; name any of {sorted(CLEAR_NAMES)} (none: both)")
+    keys = tuple(dict.fromkeys(CLEAR_NAMES[n] for n in (args.names or CLEAR_NAMES)))
+    for line in GateSettings.clear(slot_dir(args.repo), keys).report():
+        print(line)
+    return 0
+
+
 # ── self-test ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 _GUARD_S = 90.0  # a HANG guard: an arm that has not seen its event by then has failed; it is never a speed bound
@@ -773,6 +810,14 @@ def self_test() -> int:
         return subprocess.run([py, me, *argv, "--repo", str(repo)], cwd=root.parent, capture_output=True, text=True,
                               encoding="utf-8", env={**os.environ, "PYTHONUTF8": "1"}, timeout=_GUARD_S)
 
+    def inproc(repo: Path, *argv: str) -> subprocess.CompletedProcess:
+        """`main(argv)` in THIS process, its output captured: the same CLI path as `cli` without an interpreter start
+        per call (the self-test runs under `GateSlotDriftTests`' harness budget)."""
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = main([*argv, "--repo", str(repo)])
+        return subprocess.CompletedProcess(argv, rc, out.getvalue(), err.getvalue())
+
     def plant_settings(repo: Path, body: str) -> None:
         """A settings file written by hand — the shapes the one writer refuses to produce."""
         d = slot_dir(repo)
@@ -794,16 +839,23 @@ def self_test() -> int:
     try:
         git = ["git", "-c", "user.name=gate-slot", "-c", "user.email=gate-slot@invalid", "-c", "init.defaultBranch=main"]
 
-        def make_repo(name: str) -> tuple[Path, Path]:
-            """A throwaway repository and one linked worktree of it: its own slot directory and settings."""
+        def make_repo(name: str, one_slot: bool = True) -> tuple[Path, Path]:
+            """A throwaway repository and one linked worktree of it: its own slot directory and settings. The queue
+            arms prove FIFO, release and sharing on ONE slot, so they set cap 1 explicitly (`one_slot`); the arms
+            about the coded defaults start with no settings file at all."""
             repo, wt = root / name, root / f"{name}-linked"
             repo.mkdir()
             for argv in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "self-test"],
                          ["worktree", "add", "-q", "--detach", str(wt)]):
                 subprocess.run(git + argv, cwd=repo, check=True, capture_output=True)
+            if one_slot:
+                GateSettings.write(slot_dir(repo), "cap", 1, None, "self-test: the queue arms use one slot", "self-test")
             return repo, wt
 
         main_repo, linked = make_repo("repo")
+        # The coded-defaults and clear arms share one repository with NO settings file (the defaults arm runs first
+        # and writes none; the clear arm writes its own).
+        bare_repo, _ = make_repo("defaults", one_slot=False)
 
         def arm(name: str, body: Callable[[], None]) -> None:
             try:
@@ -926,30 +978,36 @@ def self_test() -> int:
             d = slot_dir(repo)
             past = "2000-01-01T00:00:00+00:00"
             entry = '{"value": %s, "until": "%s", "why": "", "set_by": "t", "set_at": "t"}'
+            # An expired LOWERED cap and an expired `whole`: once they pass, the coded defaults are in force.
             plant_settings(repo, '{"schema": 1, "cap": %s, "implementer_scope": %s}'
-                           % (entry % (3, past), entry % ('"leg1"', past)))
+                           % (entry % (1, past), entry % ('"whole"', past)))
             s = GateSettings.read(d)
             assert s.effective_cap() == DEFAULT_SLOTS and s.effective_scope() == (DEFAULT_SCOPE, None), \
-                f"an expired raise is still in force: {s}"
+                f"an expired setting is still in force: {s}"
             go = root / "expiry.go"
             h = gate(repo, "H", hold(go))
             h.expect(r"^held pid=")
             w = gate(repo, "W", [py, "-c", "print('ran', flush=True)"])
-            w.expect(r"gate-slot: waiting, 0 ahead \(ticket \d+, cap 1,")  # the expired cap 3 frees no slot
-            go.touch()
+            w.expect(rf"gate-slot: took slot 2 of {DEFAULT_SLOTS}")  # the expired cap 1 holds no gate back
             w.expect(r"^ran$")
+            go.touch()
             assert h.finish() == 0 and w.finish() == 0
             refused = {
-                "leg1 without --until": cli(repo, "set-implementer-scope", "leg1"),
                 "an --until already past": cli(repo, "set-cap", "2", "--until", past),
                 "an --until with no UTC offset": cli(repo, "set-cap", "2", "--until", "2999-01-01T00:00:00"),
                 "a cap of 0": cli(repo, "set-cap", "0"),
+                "an unknown scope": cli(repo, "set-implementer-scope", "trial"),
             }
             bad = {k: r.stdout + r.stderr for k, r in refused.items() if r.returncode != 2}
             assert not bad, f"accepted: {bad}"
-            r = cli(repo, "set-implementer-scope", "leg1", "--until", "2999-01-01T00:00:00+00:00", "--why", "trial")
+            # Either scope is settable with or without an expiry: `whole` is the owner's switch back (through the
+            # CLI once; the other shapes in-process, which is the same writer and costs no interpreter start).
+            r = cli(repo, "set-implementer-scope", "whole", "--why", "switch to whole")
             scope, setting = GateSettings.read(d).effective_scope()
-            assert r.returncode == 0 and scope == "leg1" and setting.why == "trial", f"{r.stdout}{r.stderr}"
+            assert r.returncode == 0 and scope == "whole" and setting.why == "switch to whole", f"{r.stdout}{r.stderr}"
+            for value, until in (("leg1", None), ("whole", parse_until("2999-01-01T00:00:00+00:00"))):
+                GateSettings.write(d, "implementer_scope", value, until, f"switch to {value}", "self-test")
+                assert GateSettings.read(d).effective_scope()[0] == value, f"set-implementer-scope {value} {until}"
             plant_settings(repo, "{not json")
             bad_gate = gate(repo, "malformed", [py, "-c", "print('ran', flush=True)"])
             bad_gate.expect(r"^gate_slot\.py: .*settings\.json: not JSON")
@@ -971,6 +1029,53 @@ def self_test() -> int:
             go.touch()
             assert a.finish() == 0 and b.finish() == 0
 
+        def coded_defaults() -> None:
+            # The owner's decisions of 2026-10-10 (kb/Work PB2514, PB2515), with NO settings file: three gates hold a
+            # slot at once, a fourth queues under cap 3, and the implementer scope is leg1.
+            repo = bare_repo
+            d = slot_dir(repo)
+            assert not (d / SETTINGS_FILE).exists(), "the defaults arm must start with no settings file"
+            s = GateSettings.read(d)
+            assert (s.effective_cap(), s.effective_scope()) == (3, ("leg1", None)), \
+                f"the coded defaults are not cap 3 and scope leg1: cap {s.effective_cap()}, {s.effective_scope()}"
+            r = inproc(repo, "status")
+            assert r.returncode == 0 and "cap 3 (the default; no cap set)" in r.stdout \
+                and "implementer scope leg1 (the default)" in r.stdout, f"status:\n{r.stdout}{r.stderr}"
+            go = root / "defaults.go"
+            holders = [gate(repo, f"H{k}", hold(go)) for k in (1, 2, 3)]
+            for h in holders:
+                h.expect(r"^held pid=")
+            w = gate(repo, "W", [py, "-c", "print('ran', flush=True)"])
+            w.expect(r"gate-slot: waiting, 0 ahead \(ticket \d+, cap 3,")
+            go.touch()
+            w.expect(r"^ran$")
+            assert all(h.finish() == 0 for h in holders) and w.finish() == 0
+
+        def clear_settings() -> None:
+            repo = bare_repo
+            d = slot_dir(repo)
+            GateSettings.write(d, "cap", 1, None, "departed", "self-test")
+            GateSettings.write(d, "implementer_scope", "whole", None, "departed", "self-test")
+            r = inproc(repo, "clear", "implementer-scope")
+            s = GateSettings.read(d)
+            assert r.returncode == 0 and s.implementer_scope is None and s.effective_scope() == ("leg1", None) \
+                and s.cap is not None and s.effective_cap() == 1, f"clear implementer-scope: {r.stdout}{r.stderr}{s}"
+            r = inproc(repo, "clear")
+            s = GateSettings.read(d)
+            assert r.returncode == 0 and s.cap is None and s.implementer_scope is None \
+                and json.loads((d / SETTINGS_FILE).read_text(encoding="utf-8")) == {"schema": SETTINGS_SCHEMA} \
+                and "cap 3 (the default; no cap set)" in r.stdout, f"clear: {r.stdout}{r.stderr}"
+            plant_settings(repo, "{not json")
+            assert GateSettings.clear(d, GateSettings.KEYS).effective_cap() == 3, "clear did not repair a malformed file"
+            plant_settings(repo, "{not json")
+            try:  # clearing one key must read the other: a malformed file is not guessed at
+                GateSettings.clear(d, ("cap",))
+                raise AssertionError("clear cap over a malformed file was accepted")
+            except ValueError as e:
+                assert "not JSON" in str(e), f"clear cap over a malformed file: {e}"
+            r = inproc(repo, "clear", "slots")
+            assert r.returncode == 2 and "unknown setting" in r.stderr, f"clear slots: {r.stdout}{r.stderr}"
+
         print(f"gate_slot.py --self-test ({'Windows Job object' if IS_WINDOWS else 'Linux flock'} arm)")
         arm("FIFO order: a later waiter never overtakes a live earlier ticket, a re-gate queues last", fifo)
         arm("a killed holder releases its slot", killed_holder)
@@ -982,6 +1087,9 @@ def self_test() -> int:
         arm("an expired setting is the default again; a malformed file stops the gate; bad values are refused",
             expiry_and_refusals)
         arm("status shows every held slot, one above the cap in force included", status_every_slot)
+        arm("the coded defaults, with no setting: cap 3 (three gates at once, a fourth queues) and scope leg1",
+            coded_defaults)
+        arm("clear returns one setting or both to the coded defaults, and repairs a malformed file", clear_settings)
     finally:
         alive.unlink(missing_ok=True)
         for pr in procs:
@@ -994,7 +1102,7 @@ def self_test() -> int:
     if failures:
         print(f"gate_slot.py --self-test: RED — {len(failures)} arm(s) failed")
         return 1
-    print("gate_slot.py --self-test: ALL GREEN — 8 arms")
+    print("gate_slot.py --self-test: ALL GREEN — 10 arms")
     return 0
 
 
@@ -1006,21 +1114,26 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--self-test", action="store_true", help="run every arm of DESIGN-test-build-ci.md §3.14.6")
     sub = ap.add_subparsers(dest="action")
-    for name in ("run", "status", "set-cap", "set-implementer-scope"):
+    for name in ("run", "status", "set-cap", "set-implementer-scope", "clear"):
         p = sub.add_parser(name)
         p.add_argument("--repo", type=Path, default=REPO, help="a checkout of the repository (default: this one)")
         if name == "run":
             p.add_argument("--label", help="who is waiting, as `status` shows it (default: the command)")
             p.add_argument("--poll", type=float, default=DEFAULT_POLL_S, help=argparse.SUPPRESS)
             p.add_argument("command", nargs=argparse.REMAINDER)
+        elif name == "clear":
+            p.add_argument("names", nargs="*", metavar="SETTING",
+                           help=f"any of {', '.join(CLEAR_NAMES)}; none named: both. Its coded default "
+                                f"(cap {DEFAULT_SLOTS}, scope {DEFAULT_SCOPE}) is in force at once")
         elif name.startswith("set-"):
             if name == "set-cap":
-                p.add_argument("value", type=int, metavar="N", help="at most N implementer gates at once")
+                p.add_argument("value", type=int, metavar="N",
+                               help=f"at most N implementer gates at once (the default is {DEFAULT_SLOTS})")
             else:
-                p.add_argument("value", choices=SCOPES, help="whole: the whole population (the default); leg1: "
-                                                            "leg 1 only, the batched-gating trial (kb/Work PB2515)")
-            p.add_argument("--until", help="an ISO time with its UTC offset, after which the default is in force "
-                                           "again (required for leg1)")
+                p.add_argument("value", choices=SCOPES, help="leg1: leg 1 only, batched gating (kb/Work PB2515, the "
+                                                            "default); whole: the whole population (kb/Work PB1708)")
+            p.add_argument("--until", help="an ISO time with its UTC offset, after which the coded default is in "
+                                           "force again")
             p.add_argument("--why", help="the reason, as `status` shows it")
             p.add_argument("--by", help="who set it (default: user@host)")
     args = ap.parse_args(argv)
@@ -1035,6 +1148,8 @@ def main(argv: list[str]) -> int:
             return _cmd_set(args, "cap", args.value)
         if args.action == "set-implementer-scope":
             return _cmd_set(args, "implementer_scope", args.value)
+        if args.action == "clear":
+            return _cmd_clear(args)
     except ValueError as e:  # malformed settings or a refused value: nothing starts or changes, and it says why
         print(f"gate_slot.py: {e}", file=sys.stderr)
         return 2

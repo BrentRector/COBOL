@@ -56,20 +56,20 @@ silent-failure-hunter.md and comment-analyzer.md (+ type-design-analyzer.md if y
 
 GATE — ORDER, DON'T SKIP (owner 2026-09-28; kb/Work PB1708, PB1721): `pwsh scripts/build-local.ps1 -Mode implementer
 -Priority BelowNormal` — nothing to derive, pass or trim. It takes a gate slot (`gate-slot: waiting, k ahead` is the cap
-working: keep blocking), builds, and runs EVERY discovered case of Conformance, Unit and Characterization in two legs —
-your added tests, your previous gate's reds and the cheapest cases your change reaches first — FAIL-FAST: a red in leg 1
-stops it `RED/INCOMPLETE` with the remainder named; fix it and re-gate. Done only on `=== BUILD-LOCAL GATE: GREEN — …`,
-printed only when every leg ran and every population is exact. ALWAYS `-Priority BelowNormal`; one gate per worktree.
-⭐ BATCHED-GATING TRIAL (owner 2026-10-07, kb/Work PB2515, MANDATORY-PRACTICES I1; until Sat 2026-10-10 10:00 PDT):
-while the shared implementer scope is `leg1` (`python scripts/gate_slot.py status`), the gate runs LEG 1 ONLY and is
-done on `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched-gating trial, PB2515): GREEN — …`; the lander's whole-population
-train gate checks the population and attributes any red to your branch.
+working: keep blocking), builds, and plans EVERY discovered case of Conformance, Unit and Characterization into two
+legs — your added tests, your previous gate's reds and the cheapest cases your change reaches in leg 1 — FAIL-FAST.
+⭐ BATCHED GATING (owner 2026-10-10, kb/Work PB2515, MANDATORY-PRACTICES I1): the gate runs LEG 1 ONLY, names every
+leg-2 case NOT RUN, and is done on `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — …`; a red
+is `…: RED` — fix it and re-gate. The lander's whole-population train gate checks the population and attributes any
+red to your branch. (Only while the owner has set the shared implementer scope to `whole`, as `python
+scripts/gate_slot.py status` shows, does it run both legs, stop `RED/INCOMPLETE` on a leg-1 red, and finish on
+`=== BUILD-LOCAL GATE: GREEN — …`.) ALWAYS `-Priority BelowNormal`; one gate per worktree.
 ⛔ `python scripts/semgrep/verify.py` must not increase any rule's count (train 57 dropped a cluster for +20 BigInteger).
 Print a real verdict line; never leave a placeholder in the report.
 
 GOLDENS: one positive at the introducing edition + one negative below it, a copy per edition only where behaviour differs.
 Every golden/negative you ADD runs in leg 1 of your gate — quote its `UnitTestResult` from `TestResults/build-local/<run>/leg-1-Conformance.trx` (MANDATORY-PRACTICES I7).
-LINUX GATE (I8, PB1732): after the Windows gate is green and COMMITTED, run `wsl -d Ubuntu --cd <your worktree> -- bash -lc 'bash scripts/linux-gate.sh --nice'` through the PowerShell tool (all four of CI's Linux legs, ~6 min). Quote its `=== LINUX GATE:` line in your report. During the batched-gating trial (a `LEG 1 ONLY` verdict) the Linux gate is the lander's: skip it and report `LINUX GATE: the lander's (batched-gating trial)`.
+LINUX GATE (I8, PB1732): with a `LEG 1 ONLY` verdict (batched gating, the default) the Linux gate is the lander's: skip it and report `LINUX GATE: the lander's (batched gating)`. Only with a plain `GREEN` verdict (the owner set the scope to `whole`): after the Windows gate is green and COMMITTED, run `wsl -d Ubuntu --cd <your worktree> -- bash -lc 'bash scripts/linux-gate.sh --nice'` through the PowerShell tool (all four of CI's Linux legs, ~6 min) and quote its `=== LINUX GATE:` line in your report.
 Parser + emitter + golden + manifest entry in ONE commit.
 
 REGISTER: flip each note's `status` and write its `closes_rows` IN THE COMMIT THAT LANDS IT (with `closes_rows_reason:`

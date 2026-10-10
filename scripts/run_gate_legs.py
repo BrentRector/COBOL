@@ -7,20 +7,21 @@ docs/rearchitecture/DESIGN-test-build-ci.md §3.14.1, §3.14.3–3.14.4, §3.14.
     python scripts/run_gate_legs.py --self-test
 
 Called by `scripts/build-local.ps1 -Mode …` and `scripts/build-local.sh --mode …`, which only set the process
-priority. ⛔ EVERY GATE RUNS THE WHOLE DISCOVERED POPULATION of Conformance, Unit and Characterization. Ordering
-changes WHEN a case runs, never WHETHER (owner, 2026-09-28: "order, don't skip") — with ONE exception the owner
-chose as a measured trial: the implementer SCOPE `leg1` below (kb/Work PB2515, 2026-10-07).
+priority. ⛔ THE WHOLE DISCOVERED POPULATION of Conformance, Unit and Characterization runs at every LANDING, in the
+lander's gate. Ordering changes WHEN a case runs, never WHETHER (owner, 2026-09-28: "order, don't skip"); an
+implementer gate runs leg 1 only by default — batched gating, the owner's decision (kb/Work PB2515: tried from
+2026-10-07, kept "permanently" 2026-10-10) — so each change's population check is its train's lander gate.
 
 THE MODES are named by the caller, never inferred (§3.14.1):
   implementer  the order plan (scripts/gate_plan.py), TWO legs — the likely-red cases first — and FAIL-FAST: a red in
                leg 1 stops the gate there, RED/INCOMPLETE, with the remainder named. It holds a GATE SLOT
                (scripts/gate_slot.py) from before the build to the verdict, so at most N implementer gates build or
                test at once, repository-wide; its audits run BEFORE it queues for the slot (kb/Work PB2524).
-               Its SCOPE is a shared gate setting (`gate_slot.py set-implementer-scope`, read once at the start):
-               `whole` (the default) runs both legs; `leg1` — the batched-gating trial, which must carry an expiry
-               and reverts to `whole` by itself — runs leg 1 only and names every leg-2 case NOT RUN, and its verdict
-               line says `LEG 1 ONLY (batched-gating trial, PB2515)` so it is never read as a whole-population GREEN.
-               The lander's train gate is then the population check for every cluster in the train.
+               Its SCOPE is a shared gate setting (gate_slot.py, read once at the start): `leg1` (the coded
+               default, batched gating) runs leg 1 only and names every leg-2 case NOT RUN, and its verdict line says
+               `LEG 1 ONLY (batched gating, PB2515)` so it is never read as a whole-population GREEN — the lander's
+               train gate is the population check for every cluster in the train; `whole`
+               (`gate_slot.py set-implementer-scope whole`, the owner's switch back) runs both legs.
   lander       no plan, ONE leg, so every red of every cluster shows in one run, and no slot: the lander never waits.
                The implementer scope never applies to it.
 
@@ -51,7 +52,7 @@ ONE GATE, in this order (§3.14.3):
      leg host's record names this plan's digest and the binaries step 3 hashed), then the verdict line:
      `=== BUILD-LOCAL GATE: GREEN — Conformance 9,317/9,317 · Unit … cases ran (skipped 0) in 2 legs · … ===`.
 It is GREEN only when every leg ran, every leg is green, every population is exact and every identity matches. Under
-the `leg1` scope the verdict is `LEG 1 ONLY (batched-gating trial, PB2515): GREEN` or `…: RED` instead, whenever the
+the `leg1` scope the verdict is `LEG 1 ONLY (batched gating, PB2515): GREEN` or `…: RED` instead, whenever the
 plan had a leg 2 it did not run (a gate with no plan runs its one leg — the whole population — and says plain GREEN).
 
 Exit codes: 0 GREEN (or LEG 1 ONLY: GREEN) · 1 RED (or RED/INCOMPLETE, LEG 1 ONLY: RED, or the build failed) · 2 NOT
@@ -85,6 +86,7 @@ sys.path.insert(0, str(REPO / "scripts" / "spec"))
 import external_corpus  # noqa: E402
 import gate_plan  # noqa: E402
 import impacted_tests  # noqa: E402
+from self_tests import HANG_EXIT as SELF_TESTS_HANG_EXIT  # noqa: E402
 from gate_slot import (DEFAULT_SCOPE, ExclusiveLock, GateSettings, GateSlots, Setting, Slot,  # noqa: E402
                        drop_git_local_env, git_common_dir, slot_dir)
 from test_population import (GATED_ASSEMBLIES, HANDSHAKE, Population, PopulationError, check as check_population,  # noqa: E402
@@ -94,7 +96,7 @@ MODES = ("implementer", "lander")
 VERDICT = "=== BUILD-LOCAL GATE: "
 #: The verdict prefix of an implementer gate that ran leg 1 only under the `leg1` scope (kb/Work PB2515): never a
 #: whole-population GREEN, and never mistaken for one — `GATE: GREEN` does not match it.
-LEG1_ONLY = "LEG 1 ONLY (batched-gating trial, PB2515)"
+LEG1_ONLY = "LEG 1 ONLY (batched gating, PB2515)"
 RUN_ROOT = Path("TestResults") / "build-local"
 RUN_DIR = re.compile(r"\d{8}T\d{6}Z-[0-9a-f]{6}")
 KEEP_RUNS = 5
@@ -124,6 +126,10 @@ AUDITS = (
     ("SPEC CORRECTIONS", ["scripts/spec/verify_publishable.py"]),
     ("SELF-TESTS", ["scripts/self_tests.py"]),
 )
+#: ⛔ WHO REUSES A SELF-TEST'S RECORDED PASS (kb/Work PB2914; DESIGN-test-build-ci.md §3.14.10): the IMPLEMENTER's audits
+#: add this to SELF-TESTS, so a self-test whose inputs are unchanged since a recorded PASS is REUSED, not run; the
+#: LANDER's audits never do — they run every self-test and record each PASS, as CI and the Linux gate do.
+SELF_TESTS_REUSE = "--reuse"
 #: The post-build half of the self-tests: the ones declaring `SELF-TEST-NEEDS: build` (scripts/self_tests.py).
 BUILT_SELF_TESTS = ["scripts/self_tests.py", "--built"]
 #: ⛔ THE WORK THAT RUNS BESIDE THE GATE'S CRITICAL PATH (`Gate._beside`, kb/Work PB2880), each joined once before the
@@ -161,8 +167,9 @@ class Host:
         return GateSlots.for_repo(self.repo).acquire(label, say=say)
 
     def implementer_scope(self) -> tuple[str, Setting | None]:
-        """The shared implementer scope (gate_slot.py; kb/Work PB2515): `whole` or `leg1`, and the live setting that
-        chose it (None: the default). Malformed settings raise ValueError: the gate is NOT RUN, with the reason."""
+        """The shared implementer scope (gate_slot.py; kb/Work PB2515): `leg1` or `whole`, and the live setting that
+        chose it (None: no live setting, so the coded default gate_slot.DEFAULT_SCOPE). Malformed settings raise
+        ValueError: the gate is NOT RUN, with the reason."""
         return GateSettings.read(slot_dir(self.repo)).effective_scope()
 
     def default_base(self) -> str:
@@ -174,12 +181,14 @@ class Host:
                            errors="replace", **spawn())
         return r.returncode, (r.stdout or "") + (r.stderr or ""), time.monotonic() - t
 
-    def audits(self, spawn: Spawn, say: Callable[[str], None]) -> list[str]:
-        """The audits (AUDITS), every one of them, CONCURRENTLY. Each audit's whole output is printed as one block when
-        it finishes, so no two interleave. Returns the RED reasons."""
-        reds = []
+    def audits(self, spawn: Spawn, say: Callable[[str], None], reuse: bool) -> list[str]:
+        """The audits (AUDITS), every one of them, CONCURRENTLY; with `reuse`, the self-tests reuse recorded PASSes
+        (SELF_TESTS_REUSE). Each audit's whole output is printed as one block when it finishes, so no two interleave.
+        Returns the RED reasons in AUDITS order; a hung self-test is `SELF-TESTS HANG`, never RED (kb/Work PB2914)."""
+        reds: dict[str, str] = {}
+        commands = [(name, [*cmd, SELF_TESTS_REUSE] if reuse and name == "SELF-TESTS" else cmd) for name, cmd in AUDITS]
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(AUDITS)) as pool:
-            futures = {pool.submit(self._captured, cmd, spawn): name for name, cmd in AUDITS}
+            futures = {pool.submit(self._captured, cmd, spawn): name for name, cmd in commands}
             for f in concurrent.futures.as_completed(futures):
                 name = futures[f]
                 rc, text, secs = f.result()
@@ -187,9 +196,10 @@ class Host:
                 for line in text.rstrip().splitlines():
                     say(line)
                 if rc != 0:
-                    say(f"=== {name}: RED (see above) ===")
-                    reds.append(f"{name} RED")
-        return sorted(reds, key=[f"{n} RED" for n, _ in AUDITS].index)
+                    state = "HANG" if name == "SELF-TESTS" and rc == SELF_TESTS_HANG_EXIT else "RED"
+                    say(f"=== {name}: {state} (see above) ===")
+                    reds[name] = f"{name} {state}"
+        return [reds[name] for name, _ in AUDITS if name in reds]
 
     def built_self_tests(self, spawn: Spawn) -> tuple[list[str], list[str]]:
         """The self-tests that read the built assemblies (BUILT_SELF_TESTS), after the build. Returns (the RED reasons,
@@ -431,7 +441,7 @@ class Gate:
             def audits() -> tuple[list[str], list[str]]:
                 lines: list[str] = []
                 t0 = time.monotonic()
-                reds = self.host.audits(_no_slot, lines.append)
+                reds = self.host.audits(_no_slot, lines.append, reuse=False)  # every self-test runs, and is recorded
                 out.timings["audits_s"] = round(time.monotonic() - t0, 1)
                 return reds, lines
             out.reasons += self.host.fetch_corpus(_no_slot, self.say)
@@ -442,7 +452,7 @@ class Gate:
         # and test legs, DESIGN-test-build-ci §3.14.6). Inside the slot they were 35-45 % of its hold (~230 s of
         # serial Python per gate, one core busy) while every other implementer gate queued behind it.
         t = time.monotonic()
-        audit_reds = self.host.audits(_no_slot, self.say)
+        audit_reds = self.host.audits(_no_slot, self.say, reuse=True)  # an unchanged self-test is REUSED (PB2914)
         out.timings["audits_s"] = round(time.monotonic() - t, 1)
         if audit_reds:
             # FAIL FAST ON THE AUDITS (kb/Work PB2523): they need no build and no test result and take seconds, while
@@ -496,7 +506,7 @@ class Gate:
         legs = self._legs(plan)
         to_run = legs
         if self.mode == "implementer" and out.scope == "leg1" and len(legs) > 1:
-            # The batched-gating trial (kb/Work PB2515): leg 2 is the lander's whole-population train gate. The
+            # Batched gating (kb/Work PB2515): leg 2 is the lander's whole-population train gate. The
             # population check below still measures every planned leg, so each leg-2 case is named NOT RUN.
             to_run = {1: legs[1]}  # two planned legs: leg 1 is one of them
             out.leg1_only = True
@@ -739,7 +749,7 @@ class FakeHost(Host):
             "Characterization": ([1], ["N.Char.A", "N.Char.B"], [])}
 
     def __init__(self, root: Path, lock: Path, plant: set[str] = frozenset(), plan_fails: bool = False,
-                 scope: str = DEFAULT_SCOPE):
+                 scope: str | None = None):
         super().__init__(root)
         self.root, self._lock, self.plant, self.plan_fails, self.scope = root, lock, set(plant), plan_fails, scope
         self.slots_taken = 0
@@ -749,6 +759,7 @@ class FakeHost(Host):
         #: do while they still run when the gate runs them BESIDE it (a gate that ran them first would wait out the
         #: bound and record False).
         self.audits_saw_build: bool | None = None
+        self.audits_reuse: bool | None = None  # whether the gate asked its audits to reuse recorded self-test PASSes
         self.events: list[str] = []  # the order the gate drove the host in: audits, fetch, slot, build
         self.envs: dict[tuple[int, str], dict[str, str]] = {}
         self.plan_obj: dict | None = None
@@ -764,19 +775,21 @@ class FakeHost(Host):
         return Slot(0, 1, 1, 0.0, -1)  # a held slot's shape, no lock: the cap itself is gate_slot.py's self-test
 
     def implementer_scope(self):
-        """The planted scope; reading the real shared settings file is gate_slot.py's self-test."""
+        """The planted scope: None plants NO setting, so the coded default is in force, as `Host.implementer_scope`
+        returns it; reading the real shared settings file is gate_slot.py's self-test."""
         if "settings" in self.plant:
             raise ValueError("planted: a malformed settings.json")
-        if self.scope == DEFAULT_SCOPE:
+        if self.scope is None:
             return DEFAULT_SCOPE, None
         return self.scope, Setting(self.scope, dt.datetime(2999, 1, 1, tzinfo=dt.timezone.utc), "planted", "t", "t")
 
     def default_base(self) -> str:
         return "0" * 40
 
-    def audits(self, spawn, say) -> list[str]:
+    def audits(self, spawn, say, reuse) -> list[str]:
         self.audited = True
         self.events.append("audits")
+        self.audits_reuse = reuse
         if "await-build" in self.plant:
             self.audits_saw_build = self.build_started.wait(timeout=60)
         if "audit-crash" in self.plant:
@@ -873,8 +886,11 @@ def self_test() -> int:
     sink: list[str] = []
 
     def gate(mode: str, name: str, **fake) -> tuple[Outcome, FakeHost]:
+        """The arms of the two-leg mechanics (fail-fast, the population, the identity, …) run under the `whole`
+        scope unless they name another; `scope=None` plants no setting, the coded default."""
         d = root / name
         d.mkdir()
+        fake.setdefault("scope", "whole")
         host = FakeHost(d, d / "gate.lock", **fake)
         sink.clear()
         return Gate(mode, host, d / "runs", say=sink.append).run(), host
@@ -957,9 +973,13 @@ def self_test() -> int:
             "COBOLNET_GATE_LEG" not in env and "VSTestTestCaseFilter" not in env and planned["COBOLNET_GATE_LEG"] == "1"
             and "VSTestTestCaseFilter" not in planned and partial_refused)
 
-        # The batched-gating trial (kb/Work PB2515): the shared implementer scope `leg1`.
+        # Batched gating (kb/Work PB2515): the shared implementer scope `leg1`, and with no setting the coded default.
+        o, h = gate("implementer", "default-scope", scope=None)
+        arm("no scope set: the coded default is leg1 (batched gating) — leg 1 only, LEG 1 ONLY: GREEN, no expiry",
+            o.scope == "leg1" and o.scope_until is None and o.leg1_only and 2 not in o.legs_invoked
+            and o.verdict == f"{LEG1_ONLY}: GREEN" and o.exit_code == 0 and "until" not in o.line, o.line)
         o, h = gate("implementer", "leg1", scope="leg1")
-        arm("scope leg1 (the batched-gating trial): leg 1 only, every leg-2 case named NOT RUN, the verdict line says "
+        arm("scope leg1 (batched gating): leg 1 only, every leg-2 case named NOT RUN, the verdict line says "
             "LEG 1 ONLY and is never a plain GREEN",
             o.verdict == f"{LEG1_ONLY}: GREEN" and o.exit_code == 0 and o.leg1_only and not o.stopped
             and 2 not in o.legs_invoked and not any(k[0] == 2 for k in h.envs)
@@ -1023,6 +1043,24 @@ def self_test() -> int:
         o, h = gate("lander", "audit-lander", plant={"audit"})
         arm("a red audit in -Mode lander is RED and the legs still run: the train's one run shows every red",
             o.verdict == "RED" and "DRIFT RULES INDEX RED" in o.line and h.built and len(o.runs) == 3, o.line)
+        reuse = (gate("implementer", "reuse-implementer")[1].audits_reuse, h.audits_reuse)
+        arm("the implementer's audits REUSE a self-test's recorded PASS while its inputs are unchanged; the lander's "
+            "run every self-test and record (kb/Work PB2914)", reuse == (True, False), str(reuse))
+
+        class HungSelfTests(Host):  # the real Host.audits over planted exit codes: no audit runs
+            def __init__(self):
+                super().__init__(root)
+                self.commands: list[list[str]] = []
+
+            def _captured(self, cmd, spawn):
+                self.commands.append(cmd)
+                return (SELF_TESTS_HANG_EXIT if cmd[0] == "scripts/self_tests.py" else 0), "", 0.0
+        hung = HungSelfTests()
+        reasons = hung.audits(_no_slot, lambda _: None, reuse=True)
+        arm("a hung self-test is `SELF-TESTS HANG` in the gate's reasons, never RED, and the implementer's self-tests "
+            "run with --reuse (kb/Work PB2914)",
+            reasons == ["SELF-TESTS HANG"] and ["scripts/self_tests.py", SELF_TESTS_REUSE] in hung.commands,
+            f"{reasons} {hung.commands}")
         o, h = gate("lander", "beside-lander", plant={"await-build"})
         out_at = sink.index("PLANTED-AUDIT-OUTPUT") if "PLANTED-AUDIT-OUTPUT" in sink else -1
         pop_at = min((i for i, l in enumerate(sink) if l.startswith("=== POPULATION")), default=-1)

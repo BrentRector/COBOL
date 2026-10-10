@@ -783,9 +783,10 @@ acceptance (§3.14.9) records the time to the first red of every implementer gat
 
 #### 3.14.1 The contract
 
-- **Every implementer gate runs the WHOLE discovered population** of Conformance, Unit and Characterization, every
-  time, in two LEGS: the likely-red tests first, everything else second. Ordering changes WHEN a test runs, never
-  WHETHER.
+- **Every implementer gate PLANS the WHOLE discovered population** of Conformance, Unit and Characterization, every
+  time, into two LEGS: the likely-red tests first, everything else second. Ordering changes WHEN a test runs, never
+  WHETHER: under batched gating (below) leg 2 runs in the lander's train gate, which runs the whole population at
+  every landing.
 - ⛔ **Sound by construction: every discovered test case runs exactly once across the legs.** A case's leg is a TOTAL
   function of its display name and one plan file (§3.14.2), so the legs cannot overlap and cannot leave a case out;
   the gate CHECKS it on every run (§3.14.4) and a drift test proves the check fires.
@@ -794,13 +795,18 @@ acceptance (§3.14.9) records the time to the first red of every implementer gat
   and every whole-assembly run — the battery and CI as well as the gate — asserts its population with one tool
   (§3.14.4). A filtered run can therefore never pass as a whole one.
 - **Fail fast:** the gate stops at the first leg with a red and reports RED and INCOMPLETE. It never reports GREEN
-  unless every leg ran. An implementer is done only on GREEN.
-- ⭐ **The batched-gating trial (owner 2026-10-07 16:25 PDT, kb/Work PB2515, until Sat 2026-10-10 10:00 PDT):** the
-  ONE exception to the first bullet. While the shared implementer SCOPE is `leg1` (`gate_slot.py
-  set-implementer-scope leg1 --until <ISO>`, §3.14.6; it must carry an expiry and reverts to `whole` by itself), an
-  implementer gate whose plan has a leg 2 runs leg 1 only, names every leg-2 case NOT RUN through the population
-  check, and prints `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched-gating trial, PB2515): GREEN|RED — … ===` — never
-  `GREEN`, so no reader takes it for a whole-population green. The lander's whole-population train gate is then the
+  unless every leg ran. An implementer is done only on GREEN — under batched gating, on `LEG 1 ONLY (batched gating,
+  PB2515): GREEN`.
+- ⭐ **Batched gating (owner 2026-10-10 10:19 PDT, kb/Work PB2515: "Yes, permanently", after a measured trial from
+  2026-10-07).** The implementer SCOPE is `leg1` by default (`gate_slot.DEFAULT_SCOPE`, §3.14.6): an implementer gate
+  whose plan has a leg 2 runs leg 1 only, names every leg-2 case NOT RUN through the population check, and prints
+  `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN|RED — … ===` — never `GREEN`, so no reader takes
+  it for a whole-population green. The owner's switch back is the shared scope `whole` (`gate_slot.py
+  set-implementer-scope whole [--until ISO]`), under which the gate runs both legs and the fail-fast bullet above
+  applies as written. The trial's measurement (`train_measure.py summary`, 2026-10-10): batched 15 trains, 85 changes
+  in 24.8 h = 3.43 landed per hour, 2.7 whole-population runs per train, 0 interaction reds, 1 CI red (an environment
+  difference, kb/Work PB2563); whole 8 trains, 25 changes in 35.3 h = 0.71 per hour (confounded by the cap of 3 during
+  the trial). The lander's whole-population train gate is then the
   population check for every cluster; a red there is attributed per cluster (MANDATORY-PRACTICES L12) and every train
   is measured (`scripts/orchestrator/train_measure.py`). A gate with no plan runs its one leg, the whole population,
   and says GREEN. The lander ignores the scope.
@@ -1011,7 +1017,9 @@ reason. Its post-build half (`self_tests.py --built`: the self-tests marked `# S
 them to name a self-test by hand (kb/Work PB2563: eleven orchestrator self-tests had run in no gate, and
 `landing_check.py --self-test` only in CI). Measured 2026-10-08 on a loaded Windows host: the runner takes about 80 s,
 set by the eleven parallel `test_orchestrate_*.ps1` parts, against the old serial audit phase's 42.5 s; on Linux the
-44 self-tests that run there take 5 s. One gate:
+44 self-tests that run there take 5 s. An implementer gate REUSES the recorded PASS of every self-test whose inputs are
+unchanged, every self-test takes a place in one machine-wide budget, and a hung one is HANG, never RED (§3.14.10,
+kb/Work PB2914). One gate:
 1. **The worktree's gate lock** — an exclusive OS lock on `<worktree git dir>/cobol-gate.lock`, held from before the
    build to the verdict. A second gate in the same worktree REFUSES at once, naming the holder's pid: its build would
    otherwise overwrite the binaries between the first gate's legs.
@@ -1298,29 +1306,40 @@ ReadyToRun runtime for the programs the tests run.
   every gate applies the same cap at the same moment and a raise reaches the queue at once. While each gate read N
   from its own environment, gates started with different N shared one FIFO queue, and a cap-1 gate at its head
   waited for slot 1 while slot 3 stood free, blocking every cap-3 gate behind it (2026-10-07 16:13 PDT). A setting
-  may carry an expiry (an ISO time with its UTC offset); once it passes, the default is in force again with no one
-  acting. Malformed settings stop the gate with the reason. The same file carries the implementer SCOPE (`whole`,
-  the default, or `leg1`, the batched-gating trial of §3.14.1, which must carry an expiry). Its default is the largest N at which the lander's whole-Conformance leg stays
-  within 1.25× of its quiet time with N implementer gates running, builds included, since the slot now covers them
-  (M2's acceptance). MEASURED by M13's landing (kb/Work PB1720, evidence `m13`: every gate cold, the lander at Normal,
-  the implementers at BelowNormal, each rebuilding its compiler): quiet 143.1, 135.8 and 133.6 s; with ONE implementer
-  gate 1.24x and 1.30x; with two 1.58x and 1.52x; with three 1.56x. Two is far over the line and one is at it, so
-  `DEFAULT_SLOTS = 1`: one implementer gate builds or tests at a time, repository-wide. The measurement was made on
-  a quiet host (kb/Work PB1720). The verdict line prints the wait and the slot (`Slot.describe()`).
+  may carry an expiry (an ISO time with its UTC offset); once it passes, the CODED DEFAULT is in force again with no
+  one acting, and `gate_slot.py clear [cap] [implementer-scope]` removes a setting (none named: both) so its default
+  is in force at once — clearing both rewrites the file without reading it, the one repair of a malformed file.
+  Malformed settings stop the gate with the reason. The same file carries the implementer SCOPE (`leg1`, batched
+  gating, the default; or `whole`, both legs — §3.14.1), set with `gate_slot.py set-implementer-scope leg1|whole
+  [--until ISO]`. ⛔ THE CODED DEFAULTS ARE THE OWNER'S DECISIONS (2026-10-10, kb/Work PB2514, PB2515), in
+  `gate_slot.py` and nowhere else: `DEFAULT_SCOPE = "leg1"` and `DEFAULT_SLOTS = 3` ("Cap 3 permanently"). The cap's
+  measurement (M2's acceptance: the largest N at which the lander's whole-Conformance leg stays within 1.25× of its
+  quiet time with N implementer gates running, builds included; kb/Work PB1720, evidence `m13`: every gate cold, the
+  lander at Normal, the implementers at BelowNormal, each rebuilding its compiler) gave quiet 143.1, 135.8 and 133.6 s;
+  ONE implementer gate 1.24x and 1.30x; two 1.58x and 1.52x; three 1.56x — only N = 1 met the line. The owner chose
+  three anyway: at cap 1 implementer gates waited 62 % of their wall time (the w1033 survey), and under batched gating
+  an implementer gate runs leg 1 only, so the lander's whole-population gate competes with three short gates rather
+  than three whole populations. The verdict line prints the wait and the slot (`Slot.describe()`).
   `gate_slot.py status` prints the cap and the scope with who set them, EVERY held slot (one taken under an earlier,
   higher cap included) and the live tickets in queue order.
-- `gate_slot.py --self-test` proves eight arms against throwaway repositories, each with one linked worktree: the FIFO
+- `gate_slot.py --self-test` proves ten arms against throwaway repositories, each with one linked worktree (the queue
+  arms set cap 1 explicitly, so they prove FIFO, release and sharing on one slot whatever the default): the FIFO
   order (three waiters queued behind a holder are served in ticket order, and the holder re-gating the moment it
   releases is served LAST), the release on a killed holder, a dead waiter leaving the queue, the orphaned tree (on
   Windows the job kills the orphaned child and grandchild and the slot frees; on Linux the tree keeps the slot until it
   exits) and the sharing across worktrees (both checkouts resolve one slot directory, and a holder in one makes a
   waiter in the other wait); the SHARED CAP (a gate queued at the head under cap 1 and one behind it both take a slot
   the moment `set-cap 3` is written from the linked worktree, while the first holder still holds slot 1: no
-  head-of-line block); the EXPIRY and the refusals (an expired cap 3 frees no slot; `leg1` without `--until`, an
-  expiry already past or without its offset, and a cap of 0 are refused; a malformed settings file stops a gate);
-  and STATUS (a slot held above a lowered cap is shown). Each arm was seen RED on a planted defect: no ticket check, a
-  ticket file counted live unlocked, no Job object, the descriptor withheld from Linux children, the per-worktree git
-  dir, the cap read once per process (kb/Work PB2514's defect), and `status` probing only the slots below the cap. It passes on
+  head-of-line block); the EXPIRY and the refusals (an expired cap 1 holds no gate back under the default 3, and an
+  expired `whole` leaves the default `leg1`; an expiry already past or without its offset, a cap of 0 and an unknown
+  scope are refused; either scope is accepted with or without an expiry; a malformed settings file stops a gate);
+  STATUS (a slot held above a lowered cap is shown); the CODED DEFAULTS (with no settings file the cap is 3 — three
+  gates hold a slot at once and a fourth queues — and the scope is `leg1`, and `status` says both are the default);
+  and CLEAR (one setting or both back to the defaults, a malformed file repaired by clearing both and refused by
+  clearing one). Each arm was seen RED on a planted defect: no ticket check, a ticket file counted live unlocked, no
+  Job object, the descriptor withheld from Linux children, the per-worktree git dir, the cap read once per process
+  (kb/Work PB2514's defect), `status` probing only the slots below the cap, and the defaults reverted to cap 1 and
+  scope `whole` (the expiry, defaults and clear arms). It passes on
   Windows and under WSL, and `GateSlotDriftTests` (Unit) runs it in every Unit run, including CI's Linux unit jobs,
   so each operating system's arm is proven where it runs. Every helper process it starts exits once its sentinel
   file is deleted, so a red arm leaves nothing running on the host. ⛔ The cap does not span operating systems: a
@@ -1359,7 +1378,7 @@ above. The rejected design and both reviews are in the DEVLOG entry that pivoted
 | M11 | the order plan: `NameKey`, tiers 0a/0u/1–3, the budgets and the collection cap (§3.13, §3.14.2); the NARROWING deleted — LANDED (kb/Work PB1717: b4 first red 0.32 %, b7 one tier-0u case and a 15.3 s floor; tier 0a corrected to ADDED test methods) | `scripts/spec/impacted_tests.py` (selection code DELETED — its filter line is always the whole-assembly filter until M13 deletes the line; `--plan` added), `scripts/gate_plan.py`, `tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs`, kb/Work PB1712 (closed) | `--self-test` covers every tier arm, `NameKey`, the unknown budget, the collection cap and the no-map / no-timings / stale-map / empty-leg-1 / whole-assembly-in-leg-1 arms; the filter line is the whole-assembly filter for a base WITH a map; `b4` re-run through the new script reproduces cheapest-first on 68b X (first red ≤ 1 % of the work); `b7` re-run through it: a golden appended to the 85 manifest leaves ONE tier-0u case and a leg-1 floor ≤ 16 s | — | 110–160 turns |
 | M14 | ONE population check for every whole-assembly run, and the handshake scrub (§3.14.3–4) | `scripts/test_population.py` + `--self-test`; `scripts/battery.sh` (PHASE 1 population check; scrub); `.github/workflows/build-and-test.yml` (`conformance-population` runs the tool on the shard trx files; the inline `grep -c` block DELETED; scrub); `gen-vcr.ps1`, `gen-diagnostics-doc.ps1`, `scripts/spec/record_verdicts.py`, `scripts/spec/record_impact_map.py` (scrub); `GateLegDriftTests` (6); `docs/DRIFT_RULES.md`. As landed, the arm-(6) scan also found `build-local.ps1`/`.sh`, `guard.sh`, `guard-fast.sh`, `measure-battery-determinism.sh` and `filter_population.py` (scrubbed), the scrub grew the VSTest channel, the two other `--list-tests` parsers were folded into the tool's, and `FilterPopulationGuardDriftTests` recognises the new shard shape | the self-test's arms (short, over, skipped, definitions vs results); the battery's PHASE 1 prints each assembly's population line and is red on a planted dropped case; CI's guard red on a planted shard overlap that keeps the count; `b8`'s two inputs pass | — | 60–100 turns |
 | M12 | the in-assembly leg filter, the handshake and the identity records (§3.14.3) — LANDED (kb/Work PB1719, evidence `m12`: no handshake, 35 / 29,715 / 9,319 definitions = `--list-tests`; a plan from `gate_plan.py` ran Characterization in one leg and Unit 28,754 + 961 and Conformance 5,069 + 4,250, each leg exactly its plan's cases, union = `--list-tests`, five identity records; eight partial or stale handshakes each `Failed!`, exit 1; a recording at its head recorded 39,100 tests, the gate's 9,319 + 29,746 + 35, with the watchdog clean) | `tests/_shared/GateLegs.cs` + `GateLegAudit.cs` (linked by the existing `_shared` glob, so no `.csproj` changes), `tests/Directory.Build.props` (the framework attribute, by assembly name), `tools/impact/ImpactTestFramework.cs` + `ImpactRecording.targets` (`IMPACT_RECORDING`), `tests/Cobol.Net.Tests.Unit/ParenTokenTwinDriftTests.cs` (repository-relative path argument), `GateLegDriftTests` (1), (2), (4), (5) in Unit and (4), (5) in Conformance and Characterization | with no handshake every assembly's count and verdict are unchanged; with a full one, each leg's trx definitions are exactly its leg's cases and the two legs' union equals `--list-tests`; each partial handshake (one variable, two, missing file, digest mismatch, bad leg) makes every case an execution error and the run RED; each leg writes its identity record; a planted non-permutation throws; no display name carries the repository root; a recording at HEAD still records every test (the recorder's watchdog) | M11 (the plan format) | 130–190 turns |
-| M2 | the cross-worktree gate cap, FIFO (§3.14.6) — LANDED (kb/Work PB1720: the tool in train 71; N measured by M13's landing, evidence `m13`: one implementer gate 1.24x and 1.30x of the lander's quiet Conformance leg, two 1.58x and 1.52x, so `DEFAULT_SLOTS = 1`) | `scripts/gate_slot.py` + `--self-test`; `tests/Cobol.Net.Tests.Unit/GateSlotDriftTests.cs` | the self-test's five arms (FIFO order included), on Windows and on Linux; N measured: the lander's whole-Conformance leg ≤ 1.25× quiet with N implementer gates, their builds included | — | 90–130 turns |
+| M2 | the cross-worktree gate cap, FIFO (§3.14.6) — LANDED (kb/Work PB1720: the tool in train 71; N measured by M13's landing, evidence `m13`: one implementer gate 1.24x and 1.30x of the lander's quiet Conformance leg, two 1.58x and 1.52x, three 1.56x; the owner set `DEFAULT_SLOTS = 3` on 2026-10-10, kb/Work PB2514) | `scripts/gate_slot.py` + `--self-test`; `tests/Cobol.Net.Tests.Unit/GateSlotDriftTests.cs` | the self-test's five arms (FIFO order included), on Windows and on Linux; N measured: the lander's whole-Conformance leg ≤ 1.25× quiet with N implementer gates, their builds included | — | 90–130 turns |
 | M13 | the ordered gate: driver, modes, worktree lock, run directory, fail-fast, and the wiring that deletes the selection interface (§3.14.1, §3.14.3–4) — LANDED (kb/Work PB1721, evidence `m13`: a real implementer gate GREEN with every population equal to `--list-tests`, 9,321 / 29,728 / 35; a planted leg-1 red stopped the gate after leg 1 11.7 s into the legs with 5,402 Conformance and 817 Unit cases named NOT RUN; a real `-Mode lander` gate ran one leg with no slot; `check_practices.py` green with no `impacted_tests` pattern; the self-test's 22 arms each seen RED on a planted defect. Corrected on the way: a slot holder's children run with persistent build servers OFF (§3.14.6), the gate's audit list moved into the driver, and a defect in the driver still ends in one `NOT RUN` verdict line) | `scripts/run_gate_legs.py` (takes the slot, §3.14.6), `scripts/spec/record_impact_map.py` (the recorder takes a slot too, and spawns every child through `Slot.spawn_kwargs`), `scripts/build-local.ps1` + `.sh` (`-Filter` removed, `-Mode lander\|implementer` required, `Leg` replaced); `scripts/spec/impacted_tests.py` (the filter line and `--plus` DELETED); `GateLegDriftTests` (3); in the SAME change every caller of either interface: `.claude/skills/workstream/templates/MANDATORY-PRACTICES.md` (I1, I2, I7), `implementer-brief.md`, `fix-lane-implementer-brief.md`, `dispatch-spec-implementer.md`, `lander-train-brief.md` and `lander-brief.md` (`-Mode lander`), `.claude/skills/workstream/check_practices.py` (its required `impacted_tests\.py --base` patterns), `.claude/skills/workstream/SKILL.md`, `.claude/agents/cobol-implementer.md`, `.claude/skills/gate/SKILL.md`, `scripts/hooks/test_forbidden_commands.py` (its `-Filter` fixture), `tests/Cobol.Net.Tests.Unit/ImpactedTestsDriftTests.cs`, `docs/DRIFT_RULES.md`, `docs/DOC_INDEX.md`, plan §9, README, CONTRIBUTING, the PR template | the self-test's arms (§3.14.4 (3)); a real gate on a planted red in a leg-1 test stops after leg 1 with the remainder named; a real green gate's population equals `--list-tests` for all three assemblies; a real `-Mode lander` gate runs one leg with no slot; `check_practices.py` green with no `impacted_tests` pattern left; over the next train, each implementer gate's time to first red, whole wall and green-path barrier cost (leg 1's wall beyond its share of the work, plus the extra host starts) are recorded, against the lander's single leg | M11, M12, M14, M2 | 170–220 turns |
 
 M6, M7, M11, M14 and M2 are independent and may run in parallel groups; M12 follows M11; M13 lands last, with M2's N
@@ -1370,6 +1389,77 @@ caller named above. M13's landing updated CLAUDE.md "Testing" to the landed gate
 authorization (kb/Work PB1708, fifth decision, 2026-09-28). What M13's acceptance still records over the next train
 — each implementer gate's time to first red, whole wall and green-path barrier cost against the lander's single leg —
 every gate now writes into its run directory's `verdict.json` (`timings`, and each leg's per-assembly wall).
+
+#### 3.14.10 The self-test phase: a PASS reused for unchanged inputs, one machine-wide budget, no verdict from the clock (kb/Work PB2914)
+
+**The defect it removes.** Every implementer gate ran all of the ~68 script self-tests (§3.14.3 step 3) in a pool as
+wide as the cores, AHEAD of its gate slot (kb/Work PB2524), and the runner judged a self-test RED after a fixed 900 s.
+Nothing bounded the self-tests across gates, so a fleet's N gates ran N × 32 of them at once, the slowest
+(`test_orchestrate_{stop,steer,breaker,handoff}.ps1`, `landing_check.py --self-test`) passed only after 15-20 minutes,
+and on 2026-10-10 every one of 15+ implementer gates ended `SELF-TESTS RED … NO LEG RAN` on the clock alone: a test
+that fails with no regression, which the owner forbids (2026-09-25), sitting inside the gate.
+
+**1. Reuse — who records, who reuses.** `scripts/self_tests.py` TRACES every self-test it runs and records each PASS
+with the content of everything it read, in ONE store shared by every checkout of the repository:
+`<git common dir>/cobol-self-test-passes/<platform>/<test digest>/<deps digest>.json` (beside the gate slots, never
+keyed on a branch name; the newest PASS_KEEP per self-test). `scripts/self_test_inputs.py` owns what "read" means:
+- **traced** — the runner puts a `sitecustomize` tracer first on PYTHONPATH, so every Python process a self-test
+  starts records, through the interpreter's audit hooks (PEP 578), each file it opens (a module's `__pycache__` file
+  counts as its source), each directory it lists and each path it hands a child process, inside the repository;
+- **static** — what no audit hook sees: the self-test's own file, the runner itself (`self_tests.py`,
+  `self_test_inputs.py`: a change to how self-tests run re-runs them all), `# SELF-TEST-READS: <path> …` header
+  declarations, and for a PowerShell or bash self-test the closure over the files its CODE mentions (comments
+  dropped; a path resolved from the root, the mentioning file's directory or one above it; a directory only as a bare
+  word beside the mentioning file, so `kb/Work` in a message string never pulls in the register);
+- **git** — a `git` command a traced process runs inside the repository reads what `git_reads` says: nothing for its
+  location, configuration, worktrees or a commit id; the NAMES (`ls-files`) or the CONTENT (`diff`, `ls-files -s`,
+  `show <rev>:<path>`, any other command) under its pathspec, the whole tree when it names none.
+A record holds each file's git blob id (`-` where the run looked and found nothing tracked) and a digest of what it saw
+of each directory (`Tree.digest`: `entries`, `paths` or `content`); the blob ids are the index's, `git hash-object`'s
+for a file the working tree edited, a submodule's commit for anything under it. `--reuse` reports a self-test REUSED,
+unrun, while a record's inputs are ALL unchanged on the tree being gated. **The IMPLEMENTER gate reuses**
+(`run_gate_legs.py` adds `SELF_TESTS_REUSE` to its SELF-TESTS audit); **the LANDER's gate, CI's `audits` and
+`windows-build-test` jobs and the Linux gate never reuse**: they run every self-test and record, so a branch that changes
+nothing a self-test reads reuses the PASS main's lander gate recorded, and the CI invariant (kb/Work PB1957) is
+untouched — CI still runs them all. The `--built` phase reads build output no record covers: it always runs and never
+records. Measured 2026-10-10 on this host: the whole phase recorded in 71-76 s; the same tree with `--reuse`, 0 ran and
+69 reused in 0.9 s; a one-line edit of a `src/` file re-ran 2 (`test_dispatch_guard.py`, whose `git diff`/`ls-files -s`
+read `src/` and `tests/`, and `test_plan_wave.py`, which opens 3,712 tracked files, `src/` among them) in 10 s; an edit
+of one `kb/Work` note re-ran 4 in 10 s.
+**What nothing sees**, and why it is safe: a PowerShell or bash process's own reads of a path it builds at run time
+(declare it), the git commands such a process runs itself, `os.stat`-style probes (no audit event), and a self-test
+whose Python children are started without the inherited PYTHONPATH (`-I`, a scrubbed environment). A PASS reused past
+such a read is caught by the lander's whole-population train gate, which never reuses — the same backstop batched
+gating already relies on for an implementer's leg 2 (kb/Work PB2515). A Python self-test whose trace does not show its
+own file had no tracer, and records no PASS.
+
+**2. The machine-wide budget.** A self-test waits for one of `BUDGET_CAP` places (one per core: the width one gate
+alone always ran at) before it starts, and holds it to its end: one OS file lock per place under
+`<git common dir>/cobol-self-test-slots/` (gate_slot.py's `ExclusiveLock`, so a dead holder's place is freed by the
+OS). One thread per runner polls for a place; the rest wait without spinning. N gates therefore share the cores
+instead of multiplying them, and a gate's self-test time no longer grows with N. ⚖ **Why a budget of its own and not
+the gate slot:** the slot rations builds and test legs and is held for a whole gate (~4-6 min); moving the self-tests
+inside it would make a red self-test wait behind up to three other gates' builds and legs, which is exactly what
+PB2524 moved the audits out of the slot to stop (fail fast, kb/Work PB2523). A per-self-test place keeps fail-fast and
+bounds the load, and with reuse an implementer gate rarely needs a place at all. Every caller takes it, the lander's
+audits too (they run beside its legs, so a wait there is off its critical path).
+
+**3. No verdict from the clock.** A self-test is never RED for being slow. A run still going HANG_AFTER_S = 3600 s after
+it took its place — counted from the place, so waiting behind other gates never counts; far above every PASS
+measured (466 s beside four gates, 1,291 s at the worst of the unbounded fleet load the budget removed) — is stopped and
+reported HANG with its output so far: its own state, `=== SELF-TESTS: HANG — … ===`, exit 3, and the gate's reason
+`SELF-TESTS HANG`, never `SELF-TESTS RED`.
+
+**Proof.** `self_tests.py --self-test` (`fleet_arms`) runs the phase from four CONCURRENT simulated gates over one
+planted repository — each its own Runner, Budget and PassStore over the shared directories: a lander run records; the
+four gates on the unchanged tree re-run nothing; a changed input (a file read through a name built at run time, which
+only the trace sees) re-runs exactly its self-test in every gate, at most the budget's two at a time; an edited import
+re-runs only its importer; a planted 60-s self-test under a 1-s detector is HANG; a malformed store record is skipped.
+Each arm was seen RED once with its mechanism disabled (reuse off: three arms; budget 99: the overlap arm; a hang
+mapped to RED: the HANG arm). `self_test_inputs.py --self-test` proves the static rule, the git classification and the
+tracer; `run_gate_legs.py --self-test` proves the implementer reuses and the lander does not, and that a hung
+self-test is `SELF-TESTS HANG`; `SelfTestDiscoveryDriftTests` holds the arms by name and forbids `--reuse` in CI and
+the Linux gate.
 
 ### 3.15 THE LOCAL LINUX GATE — CI's Linux legs under WSL before a push (kb/Work PB1732)
 
@@ -1428,7 +1518,9 @@ checks the script out CRLF, and bash dies at its first line (`set: -: invalid op
 
 **Verdict.** One `=== LINUX GATE: GREEN|RED|NOT RUN ===` line naming the HEAD it tested. NOT RUN is never green.
 
-**Which legs run (MANDATORY-PRACTICES I8, L10): all four, at every implementer gate and every landing.**
+**Which legs run (MANDATORY-PRACTICES I8, L10): all four, at every landing** — and at an implementer gate only while
+the owner has set the implementer scope to `whole`; under batched gating (kb/Work PB2515, the default) the Linux gate
+is the lander's, beside its whole-population gate.
 - **Measured at `044d2aa4f`** (wave 1015 group V), 2026-10-04, `--nice`: unit 137 s, characterization 10 s,
   conformance 127 s, **guard 81 s** (364 NIST programs MATCH, audit clean, legacy Unit + Integration green). The
   guard leg adds about 1.4 minutes to a ~4.6-minute gate.

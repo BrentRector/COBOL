@@ -779,8 +779,8 @@ marked, owed again after an input-touching commit, not after an unrelated one; p
 against the schema's required and permitted keys), `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
 real dispatch-spec template and `check_practices.py`'s same-file rule; the fix lane's whole plan against a golden the pre-campaign planner wrote; the campaign lane's selection, `blocked_by` order, `after:` derivation and waits, and `work.py check`'s topology rules, section 9.1), `test_watch_agent.py` (a transcript with a
 partial last line), `landing_lease.py --self-test` (two landers, takeover, holder-only renew and release, a race;
-section 4.7; `LandingLeaseDriftTests` also pins its arms by name), `train_measure.py --self-test` (the batched-gating
-trial's per-train record and summary, kb/Work PB2515; `TrainMeasureDriftTests` also pins its arms), `landing_check.py
+section 4.7; `LandingLeaseDriftTests` also pins its arms by name), `train_measure.py --self-test` (the gating
+policy's per-train record and summary, kb/Work PB2515; `TrainMeasureDriftTests` also pins its arms), `landing_check.py
 --self-test` (section 4.7's file-set guarantee). The supervisor's self-test is twelve parallel parts,
 `scripts/orchestrator/test_orchestrate_*.ps1`, sharing the harness `testdata/orchestrate_test_lib.ps1`: they drive the
 loop with a fake `-ClaudeExe` (`testdata/fake-claude.ps1`) and `open-watchers.ps1` with a fake `wt.exe`
@@ -796,7 +796,9 @@ each `test_*.py`/`test_*.ps1` and each script that handles `--self-test` under `
 each with a private `COBOL_COORD_DIR`, so none touches the live coordination directory. It is one of the gate driver's
 audits (`run_gate_legs.py` `AUDITS`, before the gate slot), a leg of `linux-gate.sh`, and a step of CI's `audits` job
 (Linux) and `windows-build-test` job (Windows, where the Windows-only parts run); a self-test for the other platform is
-reported `NOT RUN on <platform>` with its declared reason, never skipped silently. `test_plan_wave.py` imports
+reported `NOT RUN on <platform>` with its declared reason, never skipped silently. An implementer gate reuses the
+recorded PASS of a self-test whose inputs its change left unchanged, so these long parts run there only when a change
+touches what they read (kb/Work PB2914; DESIGN-test-build-ci.md §3.14.10). `test_plan_wave.py` imports
 `check_practices.py`, so the runner fetches the `tools/claude-skills` submodule when a checkout lacks it.
 `test_inventory_ratchet.py` reads the inventory at `HEAD`, which CI's full-history checkout provides.
 

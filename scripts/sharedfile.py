@@ -21,6 +21,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Callable, TypeVar
@@ -53,8 +54,10 @@ def read_text(path: Path) -> str | None:
 
 def replace_text(path: Path, text: str) -> None:
     """Write `text` to a sibling temp file and rename it over `path`, so a crash never leaves a half-written file and
-    a reader sees the old text or the new one. A rename refused past the retries removes the temp file and raises."""
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    a reader sees the old text or the new one. A rename refused past the retries removes the temp file and raises.
+    The temp file is named by process AND thread, so two threads of one process replacing the same file never write
+    one temp file (the self-test runner's workers record passes from threads, kb/Work PB2914)."""
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     tmp.write_text(text, encoding="utf-8")
     try:
         retry(lambda: os.replace(tmp, path))

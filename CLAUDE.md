@@ -115,19 +115,21 @@ comprehensive pass once the design settles (`PROMPT.md` §4).
   (`git submodule update --init --recursive`) — needed only to render a page (`scripts/render-spec-page.py`).
 
 ## Testing
-The owner decided on 2026-09-28 (kb/Work PB1708): ORDER, DON'T SKIP. Every gate runs the whole discovered
-population of Conformance, Unit and Characterization, and no gate filters. Per commit, an implementer runs
+The owner decided on 2026-09-28 (kb/Work PB1708): ORDER, DON'T SKIP. Every gate plans the whole discovered
+population of Conformance, Unit and Characterization, ordered, and no gate filters; an implementer's gate runs leg 1
+and the lander's runs it all (batched gating, owner 2026-10-10, kb/Work PB2515). Per commit, an implementer runs
 `pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal` (MANDATORY-PRACTICES I1/I2; kb/Work PB1721):
-two legs with the likely failures first, fail-fast, inside a gate slot that caps how many implementer gates run at
-once (one shared cap, `gate_slot.py set-cap`, kb/Work PB2514). **Batched-gating trial (owner 2026-10-07, kb/Work
-PB2515, until Sat 2026-10-10 10:00 PDT):** while `gate_slot.py`'s implementer scope is `leg1`, an implementer gate
-runs leg 1 only and its verdict reads `LEG 1 ONLY (batched-gating trial, PB2515): GREEN|RED`; the lander's
-whole-population gate is then each change's population check, and the implementer leaves the Linux gate to the
-lander. A lander runs `-Mode lander`: the whole population in one leg, with no slot. A stale or missing impact map only
+the likely failures first, fail-fast, inside a gate slot that caps how many implementer gates run at once (one shared
+cap, 3 by default, kb/Work PB2514). **Batched gating (owner 2026-10-10, kb/Work PB2515):** an implementer gate runs
+leg 1 only and its verdict reads `LEG 1 ONLY (batched gating, PB2515): GREEN|RED`; the lander's whole-population gate
+is each change's population check, and the implementer leaves the Linux gate to the lander. A self-test whose inputs
+are unchanged since a recorded PASS is reused, never re-run, by an implementer gate (kb/Work PB2914). A lander runs
+`-Mode lander`: the whole population in one leg, with no slot, every self-test run and recorded. A stale or missing impact map only
 changes the order, never what runs, and impact maps are recorded on demand, never per commit. Run the comprehensive
 battery plus the GnuCOBOL differential once per accumulated batch, pre-merge, in its own worktree. **CI also runs on
 Linux, so every gate runs CI's Linux legs under WSL before a push** (`scripts/linux-gate.sh`, kb/Work PB1732). Every
-implementer and lander runs all four legs (unit, characterization, conformance, and CI's `guard` job), about 6 minutes. Build `Cobol.Net.sln` (not a single project) before
+lander runs all four legs (unit, characterization, conformance, and CI's `guard` job), about 6 minutes (an implementer
+only while the owner sets the scope `whole`). Build `Cobol.Net.sln` (not a single project) before
 any `--no-build` run. Commands and the current battery baseline are in plan §0 "Gates" and §9.
 ⛔ **THE CI INVARIANT (owner 2026-10-04): GitHub CI must never fail when the same code was tested locally by the same
 processes.** CI is the verification of the local process, never its first run. A CI red is therefore ALSO a defect in the

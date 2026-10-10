@@ -13,7 +13,9 @@ namespace CobolNet.Tests.Unit;
 /// worktrees — and every arm passes on the host running this test. ⛔ AND THE CAP IS ONE SHARED SETTING (kb/Work
 /// PB2514): a raise written by <c>gate_slot.py set-cap</c> in one worktree reaches gates already queued in another at
 /// once (no head-of-line block), an expired setting is the default again, malformed settings stop a gate, and
-/// <c>status</c> shows every held slot, one above the cap in force included.
+/// <c>status</c> shows every held slot, one above the cap in force included. ⛔ AND THE CODED DEFAULTS ARE THE OWNER'S
+/// DECISIONS (2026-10-10, kb/Work PB2514, PB2515): with no setting the cap is 3 and the implementer scope is
+/// <c>leg1</c>, and <c>gate_slot.py clear</c> returns one setting or both to them.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -39,7 +41,7 @@ public sealed class GateSlotDriftTests
         Assert.True(File.Exists(script), $"the gate cap is missing: {script}");
         var r = PythonInstrument.Run(script, "--self-test");
         Assert.True(r.ExitCode == 0, $"`gate_slot.py --self-test` is RED:\n{r.Stdout}{r.Stderr}");
-        Assert.Contains("ALL GREEN — 8 arms", r.Stdout, StringComparison.Ordinal);
+        Assert.Contains("ALL GREEN — 10 arms", r.Stdout, StringComparison.Ordinal);
         foreach (string arm in new[]
                  {
                      "PASS  FIFO order: a later waiter never overtakes a live earlier ticket, a re-gate queues last",
@@ -50,6 +52,8 @@ public sealed class GateSlotDriftTests
                      "PASS  one shared cap: a raise from another worktree reaches the queued gates at once, no head-of-line block",
                      "PASS  an expired setting is the default again; a malformed file stops the gate; bad values are refused",
                      "PASS  status shows every held slot, one above the cap in force included",
+                     "PASS  the coded defaults, with no setting: cap 3 (three gates at once, a fourth queues) and scope leg1",
+                     "PASS  clear returns one setting or both to the coded defaults, and repairs a malformed file",
                  })
         {
             Assert.True(r.Stdout.Contains(arm, StringComparison.Ordinal),

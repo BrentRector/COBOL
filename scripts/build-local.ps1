@@ -1,13 +1,14 @@
 # build-local.ps1 — THE GATE, as one command (kb/Work PB1708, PB1721; docs/rearchitecture/DESIGN-test-build-ci.md
 # §3.14.1–3.14.6; the pwsh twin of build-local.sh). It sets the process PRIORITY and hands the gate to its driver,
 # scripts/run_gate_legs.py, which holds this worktree's gate lock, runs the audits (before any slot, kb/Work PB2524),
-# takes a gate slot (implementer), runs the solution build, lists the population, plans the order and runs the WHOLE discovered population of Conformance,
-# Unit and Characterization — then checks that population and prints `=== BUILD-LOCAL GATE: … ===`.
+# takes a gate slot (implementer), runs the solution build, lists the population, plans the order and runs it — the
+# WHOLE discovered population of Conformance, Unit and Characterization for the lander, leg 1 of it for an implementer
+# (batched gating, kb/Work PB2515) — then checks that population and prints `=== BUILD-LOCAL GATE: … ===`.
 # ⛔ ORDER, DON'T SKIP (owner, 2026-09-28): no gate filters. -Mode is REQUIRED and has no default — the caller names it:
-#   implementer  two legs, the likely-red cases first, FAIL-FAST, a gate slot (at most N implementer gates at once;
-#                N is the shared `gate_slot.py set-cap` setting, kb/Work PB2514) — LEG 1 ONLY while the shared
-#                implementer scope is `leg1`, the owner's batched-gating trial (kb/Work PB2515), whose verdict line
-#                says `LEG 1 ONLY (batched-gating trial, PB2515)`;
+#   implementer  the likely-red cases first, FAIL-FAST, a gate slot (at most N implementer gates at once: the shared
+#                cap, 3 by default, `gate_slot.py set-cap`, kb/Work PB2514); LEG 1 ONLY under the shared implementer
+#                scope `leg1` (the default, batched gating, kb/Work PB2515), whose verdict line says
+#                `LEG 1 ONLY (batched gating, PB2515)`, and both legs under `whole`;
 #   lander       one leg, every red of every cluster in one run, no slot (the lander never waits).
 # Usage:  pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal     (every IMPLEMENTER gate)
 #         pwsh scripts/build-local.ps1 -Mode lander                                (the LANDER, at Normal priority)

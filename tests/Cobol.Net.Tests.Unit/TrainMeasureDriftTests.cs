@@ -6,15 +6,15 @@ using Xunit;
 namespace CobolNet.Tests.Unit;
 
 /// <summary>
-/// ⛔ THE BATCHED-GATING TRIAL IS DECIDED ON NUMBERS THAT ARE RECORDED RIGHT (kb/Work PB2515):
+/// ⛔ THE GATING POLICY IS MEASURED ON NUMBERS THAT ARE RECORDED RIGHT (kb/Work PB2515):
 /// <c>scripts/orchestrator/train_measure.py --self-test</c> refuses an inconsistent train record and a train recorded
-/// twice, and computes the trial's comparison — changes landed per hour, whole-population runs per train, red trains
+/// twice, and computes the comparison of the gating modes — changes landed per hour, whole-population runs per train, red trains
 /// and their attribution time, finishers created by ejection, CI reds — per gating mode, as every arm it names.
 /// </summary>
 /// <remarks>
-/// The owner adopted batched gating as a trial (2026-10-07, until Sat 2026-10-10 10:00 PDT) and decides whether it stays
-/// on what the landers recorded per train against the per-commit whole population (kb/Work PB1708). A summary that
-/// miscounted would decide the gate policy on a wrong number, so the self-test runs in every Unit run and its arms are
+/// The owner made batched gating the rule (2026-10-10, kb/Work PB2515) on what the landers recorded per train against
+/// the per-commit whole population (kb/Work PB1708), and every train is still recorded, so the policy stays measured.
+/// A summary that miscounted would decide the gate policy on a wrong number, so the self-test runs in every Unit run and its arms are
 /// asserted by name: a self-test reduced to its happy path still exits 0. This test measures nothing and times nothing.
 /// </remarks>
 public sealed class TrainMeasureDriftTests
