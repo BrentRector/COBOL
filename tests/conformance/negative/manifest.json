@@ -597,6 +597,7 @@
   "pb1136-invoke-self-method",
   "pb1136-invoke-identifier-2-typed-receiver",
   "pb1275-set-property-no-set",
+  "pb2618-string-into-property-no-set",
   "pb428-inline-invocation-no-returning",
   "pb428-inline-invocation-returning-active-class",
   "pb1167-inline-invocation-returning-any-length",

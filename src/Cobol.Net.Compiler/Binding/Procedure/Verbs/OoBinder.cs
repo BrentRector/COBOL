@@ -67,8 +67,11 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // TOTAL over every bound statement (kb/Work PB1275): §8.4.3.9.3 SR5/SR6 admit a property wherever a
             // data item of its description may send or receive, so every statement that can carry one classifies it.
             var kind = BoundStores.StoreKindOf(core, op.Temp);
-            bool needGet = kind == StoreKind.None || kind == StoreKind.ReadWrite;
-            bool needSet = kind == StoreKind.Write || kind == StoreKind.ReadWrite;
+            // WriteInPart (§14.9.43.4 GR7; §8.4.3.3.4 GR5): the statement stores a PART of the item and keeps the rest, so
+            // the get method supplies the kept portion where the class has one; a class WITH NO GET is not refused,
+            // for the position is a receiving one (§14.9.43.3 SR10) and SR3 speaks of a sending use only (kb/Work PB2618).
+            bool needGet = kind == StoreKind.None || kind == StoreKind.ReadWrite || (kind == StoreKind.WriteInPart && op.Get is not null);
+            bool needSet = kind != StoreKind.None;
             string where = $"'{op.PropName}' OF '{op.ReceiverName}'";
             var tempPlace = ctx.Refs.ResolveItem(op.Temp)!;
 

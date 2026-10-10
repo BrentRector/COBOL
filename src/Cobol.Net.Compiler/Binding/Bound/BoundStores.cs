@@ -43,8 +43,12 @@ namespace CobolNet.Binding.Bound;
 /// <summary>How a statement touches a given item through its STORE positions (the polarity that selects the
 /// §8.4.3.9.4 general rule): <see cref="None"/> → the occurrence is purely SENDING (GR1, get only);
 /// <see cref="Write"/> → a WRITE-only receiving position (GR2, set only — the get method is NOT invoked);
-/// <see cref="ReadWrite"/> → an in-place read-modify-write position (GR3, get before + set after).</summary>
-public enum StoreKind { None, Write, ReadWrite }
+/// <see cref="ReadWrite"/> → an in-place read-modify-write position (GR3, get before + set after);
+/// <see cref="WriteInPart"/> → a receiving position that stores only PART of the item and keeps the rest (ISO
+/// §14.9.43.4 GR7 for STRING; §8.4.3.3.4 GR5 for a reference-modified receiver), so the kept portion is the
+/// property's value: get before when the class has a get method, set after — and a class with NO get method is
+/// not an error (the position is a RECEIVING one, §14.9.43.3 SR10, so §8.4.3.9.3 SR3 asks nothing of it).</summary>
+public enum StoreKind { None, Write, ReadWrite, WriteInPart }
 
 public static class BoundStores
 {
@@ -53,8 +57,14 @@ public static class BoundStores
     /// <see cref="StoreKind.Write"/> / <see cref="StoreKind.ReadWrite"/> per the emitter-verified
     /// classification. A property temp occurs at exactly ONE Place in the tree, so the first store found is
     /// total.</summary>
-    public static StoreKind StoreKindOf(BoundStatement s, DataItem item) =>
-        s.Accept(new StoreKindVisitor(x => ReferenceEquals(x, item), crossingsStore: true));
+    public static StoreKind StoreKindOf(BoundStatement s, DataItem item)
+    {
+        var visitor = new StoreKindVisitor(x => ReferenceEquals(x, item), crossingsStore: true);
+        var kind = s.Accept(visitor);
+        // A whole-receiver arm answered Write for a store into a WINDOW of the item: only that subset is a receiving
+        // item (§8.4.3.3.4 GR5), so the rest of the item is kept, which is the same polarity STRING's GR7 gives.
+        return kind == StoreKind.Write && visitor.StoredThroughWindow ? StoreKind.WriteInPart : kind;
+    }
 
     /// <summary>Does <paramref name="s"/>, or any statement nested in it, STORE into an item
     /// <paramref name="matches"/> accepts? The second client (kb/Work PB363, ISO §14.9.49.3 SR11 "A USE BEFORE
@@ -65,14 +75,27 @@ public static class BoundStores
     /// would reject a conforming program. The OO property desugar counts them (it must run the SET accessor after
     /// a crossing), which is why the choice is a parameter of the walk and not of the node.</para></summary>
     public static bool StoresInto(BoundStatement s, Func<DataItem, bool> matches) =>
-        s.Accept(new StoreKindVisitor(matches, crossingsStore: false)) is StoreKind.Write or StoreKind.ReadWrite;
+        s.Accept(new StoreKindVisitor(matches, crossingsStore: false)) is not StoreKind.None;
 
     /// <summary>The per-node store classification (the former <c>StoreKindOf</c> switch, one arm per leaf) —
     /// the exhaustive <see cref="IBoundStatementVisitor{T}"/> over the bound statements, carrying the target
     /// <paramref name="item"/> so recursion is <c>child.Accept(this)</c>.</summary>
     private sealed class StoreKindVisitor(Func<DataItem, bool> matches, bool crossingsStore) : IBoundStatementVisitor<StoreKind>
     {
-        private bool Hit(Place? p) => p is not null && matches(p.Item);
+        /// <summary>Does the statement store through <paramref name="p"/> into a matching item? Every arm asks its store
+        /// positions through here (or through a helper that does), so a store into a reference-modified WINDOW of the
+        /// item (<see cref="Place.DenotedItem"/> is null: §8.4.3.3.4 GR5 "a unique data item that is a subset") is
+        /// noted once, for every present and future whole-receiver arm, in <see cref="StoredThroughWindow"/>.</summary>
+        private bool Hit(Place? p)
+        {
+            if (p is null || !matches(p.Item)) return false;
+            if (p.DenotedItem is null) StoredThroughWindow = true;
+            return true;
+        }
+
+        /// <summary>True once a matching store went through a window of the item (see <see cref="Hit"/>); the visitor is
+        /// one query's, single-threaded.</summary>
+        public bool StoredThroughWindow { get; private set; }
         private bool TargetHit(BoundSetTarget? t) => t is SetPlaceTarget sp && Hit(sp.Place);
         /// <summary>The RECEIVER of a bound <c>… INTO</c> implicit move (kb/Work PB348 — identifier-1 now rides
         /// the move rather than the I-O node). Asked of the move's own target list, which is the same single
@@ -207,13 +230,16 @@ public static class BoundStores
         // ── ACCEPT / STRING / UNSTRING / INSPECT ────────────────────────────────────────────────────────
         public StoreKind Visit(BoundAccept n) => Hit(n.Target) ? StoreKind.Write : StoreKind.None;
         // identifier-4 (POINTER) is read (GR4) and written back, so it is read-modify-write. identifier-3 (INTO) is
-        // WRITE-only for this query: §14.9.43.3 SR10 — "The data item referenced by identifier-3 is the receiving
-        // operand" — so an object property there is "used only as a receiving item" (§8.4.3.9.4 GR2: SET only, the
-        // get method NOT invoked), and a property WITH NO GET is legal there (§8.4.3.9.3 SR3 asks for a GET only of
-        // a SENDING use). Classifying INTO as read-modify-write demanded a GET the rule does not (kb/Work PB1275).
+        // a RECEIVING operand (§14.9.43.3 SR10 — "The data item referenced by identifier-3 is the receiving
+        // operand"), so a property WITH NO GET is legal there (§8.4.3.9.3 SR3 asks for a GET only of a SENDING use;
+        // classifying INTO as read-modify-write demanded one the rule does not — kb/Work PB1275). It is receiving
+        // IN PART, though (GR7, below): WriteInPart takes the get method where the class has one.
+        // STRING changes "only the portion of the data item referenced by identifier-3 that was referenced during the
+        // execution" (§14.9.43.4 GR7), so the item's earlier content outside that portion survives and the receiving
+        // reference is WriteInPart: its get method (if the class has one) supplies that content (kb/Work PB2618).
         public StoreKind Visit(BoundStringStmt n) =>
             Hit(n.Pointer) ? StoreKind.ReadWrite
-            : StoreOrKids(Hit(n.Into), StoreKind.Write, n.OnOverflow, n.NotOnOverflow);
+            : StoreOrKids(Hit(n.Into), StoreKind.WriteInPart, n.OnOverflow, n.NotOnOverflow);
         public StoreKind Visit(BoundUnstringStmt n) =>
             Hit(n.Pointer) || Hit(n.Tallying)
                 ? StoreKind.ReadWrite                                   // GR11a/GR13 + GR14 read-then-add

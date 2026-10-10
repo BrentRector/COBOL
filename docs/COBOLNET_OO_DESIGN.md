@@ -374,7 +374,11 @@ both) is `BoundStores.StoreKindOf`, a TOTAL classification — a non-nullable an
 visitor — so every statement that can carry a property classifies it, the SET formats for object references,
 pointers, program- and function-pointers and saved locales, ALLOCATE and FREE included (kb/Work PB1275: those
 answered "outside the taxonomy" and the property was refused 0843 in every one, against §8.4.3.9.3 SR5/SR6); STRING
-INTO is receiving-only (§14.9.43.3 SR10), so a WITH NO GET property is legal there. The GET's PLACEMENT follows the reference's evaluation
+INTO is a RECEIVING operand (§14.9.43.3 SR10), so a WITH NO GET property is legal there, but it stores only the positions it
+references (§14.9.43.4 GR7: the rest "will contain data that was present before"), as does a store into a reference-modified
+receiver (§8.4.3.3.4 GR5: a subset). Both are `StoreKind.WriteInPart`: the GET runs first when the class has one (the kept
+positions are the property's value), the SET after, and a missing GET is not refused (kb/Work PB2618; `BoundStores.Hit` notes a
+store through a window once for every whole-receiver arm). The GET's PLACEMENT follows the reference's evaluation
 window exactly as a function activation's does (kb/Work PB987; §8.8.4.13 2)): a reference evaluated once per
 statement is a statement-level pre-op, but one written in a per-evaluation window — a PERFORM UNTIL / VARYING
 condition, a SEARCH WHEN, an EVALUATE object, a non-first AND/OR operand, a VARYING BY / AFTER FROM operand — is
