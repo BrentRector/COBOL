@@ -1,0 +1,197 @@
+You are a senior C# compiler-runtime engineer working on WiseOwl COBOL, a COBOL-to-C# compiler (.NET 10, C# 14). Fix ONE defect at its root cause. Do not add workarounds, wrappers or compatibility shims.
+
+# Defect note (kb/Work/PB2695)
+**Wave kind:** defect-for-fix-lane. Found by the wave-1042 group G implementer (PB2616) and filed by the train 1042b lander.
+
+**Sites:**
+- `src/Cobol.Net.Runtime/Values/Tables/CobolTable.cs:58` (the EC-BOUND-SUBSCRIPT detail text)
+- `src/Cobol.Net.Runtime/Values/Tables/CobolTable.cs:130-142` (CobolTable.Occ / OccScaled: an out-of-long occurrence number saturates to `long.MaxValue` so §8.4.2.3.4 GR2's out-of-range condition survives)
+
+**Rule:** §8.4.2.3.4 GR2 (a subscript outside 1..the maximum occurrences sets EC-BOUND-SUBSCRIPT). The condition IS raised correctly; only the diagnostic wording is wrong.
+
+**Scenario (implementer's repro `E:\COBOL-coord\scratch\w1042g\p4.cob`, not re-measured by the lander):** `01 A PIC 9(21) VALUE 100000000000000000001.` and `MOVE EL2(A) TO …` raises EC-BOUND-SUBSCRIPT, and its detail names the subscript value 9223372036854775807 (the saturated long) where the item's value 100000000000000000001 is what the program holds. A user reading the message is sent looking for a value the program never computed.
+
+**Fix direction:** carry the saturation as a flag (or format the original image/Int128) into the detail text rather than the clamped long.
+
+# Governing specification text
+ISO/IEC 1989:2023 8.4.2.3.4 General rule 2: The value of a subscript shall be a positive integer. The lowest possible occurrence number represented by a subscript is 1 ... The highest permissible occurrence number for any given dimension of a fixed-capacity or occurs-depending table is the maximum number of occurrences of the item as specified in the associated OCCURS clause. If the value of the subscript is not a positive integer or is less than one or is greater than the highest permissible occurrence number, the EC-BOUND-SUBSCRIPT exception condition is set to exist.
+
+# Code: src/Cobol.Net.Runtime/Values/Tables/CobolTable.cs lines 36-175 (line-numbered)
+  36:     }
+  37: 
+  38:     /// <summary>
+  39:     /// The table element at a 1-based <paramref name="occurrence"/> number, as a writable reference.
+  40:     /// <para><b>Out-of-range</b> (ISO §8.4.2.3.4 GR2): with EC-BOUND-SUBSCRIPT checking ON the condition is raised
+  41:     /// (below); with it OFF — the COBOL-85 semantics, since COBOL-85 has no exception conditions — the reference
+  42:     /// continues benignly per the implementor-defined rule the NIST-85 golden requires: reads see a fresh
+  43:     /// default-valued element (spaces-equivalent for alphanumeric), writes are absorbed. The element is a per-type
+  44:     /// scratch slot, re-defaulted on every out-of-range access. Caveat: a GROUP element's scratch is a zeroed
+  45:     /// struct — its string members are null, so group-level use of an out-of-range element may still fail loudly.</para>
+  46:     /// </summary>
+  47:     public static ref T At<T>(T[] table, long occurrence)
+  48:     {
+  49:         // A NULL table is itself an out-of-range chain: a multi-dimension reference whose OUTER subscript was
+  50:         // out of range continues through the zeroed scratch struct, whose nested OCCURS arrays are null
+  51:         // (NC401M's 5-deep FAIL-path read) — every further level resolves benignly too.
+  52:         if (table is not null && occurrence >= 1 && occurrence <= table.Length) return ref table[(int)(occurrence - 1)];
+  53:         // §8.4.2.3.4 GR2 — "If the value of the subscript is not a positive integer or is less than one or is
+  54:         // greater than the highest permissible occurrence number, the EC-BOUND-SUBSCRIPT exception condition is
+  55:         // set to exist." Raised BEFORE the scratch fallback so a CHECKING-ON reference reports the condition;
+  56:         // with checking off the helper returns and the scratch read below stands unchanged.
+  57:         ExceptionState.SubscriptError(
+  58:             $"subscript {occurrence} is outside 1..{(table?.Length ?? 0)} (ISO 8.4.2.3.4 GR2)");
+  59:         Scratch<T>.Slot = typeof(T) == typeof(string) ? (T)(object)string.Empty : default!;
+  60:         return ref Scratch<T>.Slot;
+  61:     }
+  62: 
+  63:     /// <summary>An element of an OCCURS DEPENDING table, referenced where EC-BOUND-ODO checking can be enabled:
+  64:     /// ISO §13.18.38.4 GR7 — "At the time the subject of entry is referenced or any data item subordinate or
+  65:     /// superordinate to the subject of entry is referenced, the value of the data item referenced by data-name-1 shall
+  66:     /// fall within the bounds from integer-1 through integer-2. If the value of the data item does not fall within the
+  67:     /// specified bounds, the EC-BOUND-ODO exception condition is set to exist." A reference to the subject or to an
+  68:     /// item subordinate to it passes through this level's subscript, so the test is made HERE, before the element is
+  69:     /// located (kb/Work PB1268 — only the superordinate group's extent, <see cref="OdoExtent"/>, used to test it).
+  70:     /// With checking off the condition is not raised and the element reference proceeds exactly as
+  71:     /// <see cref="At{T}(T[], long)"/>; the subscript's own range is still 1..integer-2 (§8.4.2.3.4 2): "the highest
+  72:     /// permissible occurrence number … of an occurs-depending table is the maximum number of occurrences").</summary>
+  73:     public static ref T At<T>(T[] table, long occurrence, long depending, int min, int max)
+  74:     {
+  75:         if (depending < min || depending > max)
+  76:             ExceptionState.OdoError(
+  77:                 $"OCCURS DEPENDING value {depending} is outside {min}..{max} at a reference to the table (ISO 13.18.38.4 GR7)");
+  78:         return ref At(table, occurrence);
+  79:     }
+  80: 
+  81:     /// <summary>The out-of-range reference's scratch cell (checking off: the reference reads the empty value and a
+  82:     /// store into it is discarded). <b>One per THREAD</b> (kb/Work PB1069): it is returned by <c>ref</c>, so a
+  83:     /// process-wide cell let two run units on two threads that both took an out-of-range subscript write one
+  84:     /// location between the reset above and the caller's use. A run unit executes on one thread at a time and the
+  85:     /// cell is overwritten before every use, so a per-thread cell carries nothing between run units.</summary>
+  86:     private static class Scratch<T>
+  87:     {
+  88:         [ThreadStatic] private static Cell? s_cell;
+  89: 
+  90:         /// <summary>This thread's cell (created on the thread's first out-of-range reference of type T).</summary>
+  91:         public static ref T Slot => ref (s_cell ??= new Cell()).Value;
+  92: 
+  93:         private sealed class Cell { public T Value = default!; }
+  94:     }
+  95: 
+  96:     /// <summary>A NON-NUMERIC position operand's occurrence-number value — the two carriers only a
+  97:     /// <c>--permissive</c> position operand has: an index DATA item (an <c>IndexCell</c> is a <c>long</c>) and an
+  98:     /// alphanumeric / national / boolean item whose digit characters the documented COBOLNET0844 leniency decodes
+  99:     /// as an unsigned integer. A NUMERIC position operand never comes here: it reads through the profile arity
+ 100:     /// below, which is where §14.6.13.2 rule 2 lives.</summary>
+ 101:     public static long Occ(long value) => value;
+ 102: 
+ 103:     /// <inheritdoc cref="Occ(long)"/>
+ 104:     /// <remarks>The digit decode of a non-numeric item's characters — <see cref="CobolNum.DigitMagnitude"/>, the
+ 105:     /// extension COBOLNET0844's <c>--permissive</c> message promises (kb/Work PB170). Not a rule 2 read: the
+ 106:     /// operand is not a numeric sending item, so there is no numeric class condition for its content to fail.</remarks>
+ 107:     public static long Occ(string image) => CobolNum.Position(CobolNum.DigitMagnitude(image));
+ 108: 
+ 109:     /// <summary>⛔ THE NUMERIC POSITION READ — a NUMERIC data item used as a subscript, as the current count of an
+ 110:     /// OCCURS DEPENDING table, or as any other integer the runtime positions by (a RECORD VARYING DEPENDING
+ 111:     /// length, a report DEPENDING count), decoded through the item's OWN profile. One arity for every storage
+ 112:     /// form: the bind-time subscript text names the field and C# overload resolution picks the carrier (native
+ 113:     /// <c>long</c>, the character image the post-bind whole-group analysis may select, the <see cref="Int128"/>
+ 114:     /// wide tier, or the unsigned <c>ulong</c> / <see cref="UInt128"/> BINARY-CAPACITY containers of §13.18.60.4
+ 115:     /// GR12) at backend-compile time — kb/Work PB201's carrier set, which <c>PositionCarrierOverloadDriftTests</c>
+ 116:     /// holds to the compiler's list.
+ 117:     /// <para><b>The profile carries both rules the read owes.</b> (1) ISO §14.6.13.2 rule 2 — "When the content of
+ 118:     /// a numeric sending item that is not described with a standard floating-point usage is referenced during the
+ 119:     /// execution of a statement and the content of that sending operand would evaluate to false in a numeric class
+ 120:     /// condition", EC-DATA-INCOMPATIBLE is set. A position operand is item identification, and rule 1 says so in
+ 121:     /// as many words: the condition "is set to exist for a class condition and a VALIDATE statement when invalid
+ 122:     /// data is detected during item identification" — so the class-condition exemption covers the ITEM a class
+ 123:     /// test examines, never the subscript that locates it, and this read is checked in every context (kb/Work
+ 124:     /// PB1117). The character-image arm is therefore <see cref="CobolNum.ParseImageSending"/>, THE checked
+ 125:     /// fixed-point sending read; the native arms cannot hold invalid content and pay nothing. (2) §8.4.2.3.4 GR1b's
+ 126:     /// integrality — the item's scale is <see cref="NumProfile.FractionDigits"/>, so a scaled item needs no second
+ 127:     /// arity. Before PB1117 the image arm was the tolerant <see cref="CobolNum.DigitMagnitude"/> scan, which also
+ 128:     /// DISCARDED the sign: a signed image holding −1 positioned occurrence 1.</para>
+ 129:     /// <para>Narrowing SATURATES (<see cref="CobolNum.Position(Int128)"/>): an occurrence number past
+ 130:     /// <c>long.MaxValue</c> must stay out of range, or §8.4.2.3.4 GR2's condition is lost to a wrap. With
+ 131:     /// EC-BOUND-SUBSCRIPT checking OFF a fractional position truncates toward zero and the reference continues —
+ 132:     /// the lenient posture <see cref="At{T}"/> takes for an out-of-range occurrence. The FLOAT carriers are
+ 133:     /// deliberately absent: a float subscript routes to the D18 §15.4 temp, where GR1b is applied once, to the
+ 134:     /// result.</para></summary>
+ 135:     public static long Occ(long unscaled, in NumProfile item) => OccScaled(unscaled, item.FractionDigits);
+ 136: 
+ 137:     /// <inheritdoc cref="Occ(long, in NumProfile)"/>
+ 138:     public static long Occ(Int128 unscaled, in NumProfile item) => OccScaled(unscaled, item.FractionDigits);
+ 139: 
+ 140:     /// <inheritdoc cref="Occ(long, in NumProfile)"/>
+ 141:     public static long Occ(string image, in NumProfile item) => item.ImageExceedsInt128
+ 142:         ? Occ(CobolNum.ParseImageU128Sending(image, item), item)
+ 143:         : OccScaled(CobolNum.ParseImageSending(image, item), item.FractionDigits);
+ 144: 
+ 145:     /// <inheritdoc cref="Occ(long, in NumProfile)"/>
+ 146:     public static long Occ(ulong unscaled, in NumProfile item) => OccScaled(unscaled, item.FractionDigits);
+ 147: 
+ 148:     /// <inheritdoc cref="Occ(long, in NumProfile)"/>
+ 149:     public static long Occ(UInt128 unscaled, in NumProfile item) =>
+ 150:         // A value past Int128's range is out of range for every table whatever its fraction: saturate.
+ 151:         unscaled > (UInt128)Int128.MaxValue ? long.MaxValue : OccScaled((Int128)unscaled, item.FractionDigits);
+ 152: 
+ 153:     private static long OccScaled(Int128 unscaled, int scale)
+ 154:     {
+ 155:         if (CobolNum.HasFraction(unscaled, scale))
+ 156:             NotAnInteger(CobolNum.PlainValue(unscaled, scale));
+ 157:         return CobolNum.PositionOf(unscaled, scale);
+ 158:     }
+ 159: 
+ 160:     private static void NotAnInteger(string shown) =>
+ 161:         ExceptionState.SubscriptError($"subscript value {shown} is not an integer (ISO 8.4.2.3.4 GR1b)");
+ 162: 
+ 163:     /// <summary>A subscript that is an arithmetic EXPRESSION (or a floating-point item), as the occurrence number it
+ 164:     /// denotes — the statement pre-operation's intake, asked on the carrier the expression evaluated on (kb/Work
+ 165:     /// PB1890). §8.4.2.3.4 GR1b: "If the evaluation of arithmetic-expression-1 does not result in an integer, the
+ 166:     /// EC-BOUND-SUBSCRIPT exception condition is set to exist" — so the test reads the EXACT intermediate, never a
+ 167:     /// copy stored at a fixed fraction width, which made <c>T(IX + 0.0000000001)</c> an integer. The same lenient
+ 168:     /// continue as <see cref="Occ(long, in NumProfile)"/> with checking off: the position truncates toward zero.
+ 169:     /// Three carriers, three names (an integer literal converts to both <c>Int128</c> and <c>double</c>).</summary>
+ 170:     public static long OccValue(Int128 unscaled, int scale) => OccScaled(unscaled, scale);
+ 171: 
+ 172:     /// <inheritdoc cref="OccValue(Int128, int)"/>
+ 173:     public static long OccValueDec(CobolDec value)
+ 174:     {
+ 175:         if (value.HasFraction) NotAnInteger(value.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+
+# Code: CobolNum.Position(Int128) (the saturating narrowing)
+    }
+
+    /// <summary>⛔ THE ONE NARROWING of a wide position value to the <c>long</c> every table/ref-mod accessor
+    /// takes, and it SATURATES rather than wraps. ISO §8.4.2.3.4 GR2: "If the value of the subscript is not a
+    /// positive integer or is less than one or is greater than the highest permissible occurrence number, the
+    /// EC-BOUND-SUBSCRIPT exception condition is set to exist" — so an out-of-range position MUST stay
+    /// out of range on the way in. A plain <c>(long)</c> cast is the opposite: it wraps, and a wrapped value can
+    /// land back INSIDE 1..n, converting a condition the standard requires to be detected into a silent wrong
+    /// answer. (The same reasoning the D18 §15.4 segment temp is sized by: "high-order truncation could WRAP an
+    /// out-of-range subscript into an in-range one".) Reachable from every wide carrier — a &gt;18-digit
+    /// item, an unsigned BINARY-CAPACITY container, and an alphanumeric image decoded by
+    /// <see cref="FromAlphanumeric"/>, which returns up to 38 digits.</summary>
+    public static long Position(Int128 value) =>
+        value > long.MaxValue ? long.MaxValue : value < long.MinValue ? long.MinValue : (long)value;
+
+    /// <inheritdoc cref="Position(Int128)"/>
+    public static long Position(UInt128 value) =>
+        value > (UInt128)long.MaxValue ? long.MaxValue : (long)value;
+
+    // ── The position of an EXPRESSION, on the carrier the expression evaluated on (kb/Work PB1890) ─────────────
+    // A subscript or reference-modifier bound that is an arithmetic expression (or a floating-point item) is
+    // evaluated once, as a statement pre-operation, and these intakes ask the integrality question of the value the
+    // native or standard intermediate HOLDS — docs/CONFORMANCE.md DOC-A.1-124 — before anything stores it. The
+    // scaled carrier needs no new intake (HasFraction / PositionOf above); the SDIDI and binary64 carriers are below.
+
+    /// <summary>True when the binary64 value has a nonzero fraction: a finite value is an integer exactly when it
+    /// equals its own truncation (COMP-2 <c>2.0</c> is, <c>2 + 1.0E-10</c> is not). ±∞ and NaN are not fractional —
+
+
+# Your task
+1. State in two sentences the root cause: why the detail text shows 9223372036854775807 instead of the program's subscript value.
+2. Propose the minimal ROOT-CAUSE fix that keeps the exception condition raised exactly as the specification requires, and makes the detail text name the subscript's actual value (for example 100000000000000000001) or, if the value cannot be carried, say honestly that it exceeded the representable range. Explain the design choice: a flag, an Int128 carrier, or formatting the original image. Prefer the shape that makes the next similar case automatic.
+3. Give the changed C# as complete replacement members (not prose), with the ISO citation in a code comment.
+4. Give one COBOL conformance test program (fixed form, COBOL 2023) that reproduces the defect and whose expected output after the fix you state exactly.
+5. List every other code site you would sweep for the same mechanism (saturated values leaking into messages).
+Be concrete and correct. If you are unsure about an API, say so instead of inventing one.

@@ -1,0 +1,867 @@
+Thinking...
+Let me analyze this defect carefully.
+
+The problem: When a COBOL subscript value is too large to fit in a `long` ([1D[K
+(e.g., `100000000000000000001` which is 21 digits), the `CobolNum.Position([19D[K
+`CobolNum.Position(Int128)` method saturates it to `long.MaxValue` (9223372[8D[K
+(9223372036854775807). This saturated value then flows into `CobolTable.At<[15D[K
+`CobolTable.At<T>()` where the diagnostic message prints the `occurrence` p[1D[K
+parameter — which is now the saturated `long.MaxValue` — instead of the act[3D[K
+actual subscript value the program held.
+
+Root cause: The narrowing from `Int128` to `long` in `CobolNum.Position` sa[2D[K
+saturates to `long.MaxValue`, and the `CobolTable.At<T>` method's diagnosti[9D[K
+diagnostic message formats that saturated `long` value. The original wide v[1D[K
+value is lost at the narrowing point, so the diagnostic can only show the c[1D[K
+clamped value.
+
+The fix direction per the defect note: "carry the saturation as a flag (or [K
+format the original image/Int128) into the detail text rather than the clam[4D[K
+clamped long."
+
+Let me think about the design:
+
+1. **Flag approach**: Add a parameter or wrapper that indicates "this value[5D[K
+value was saturated." But `At<T>` is a generic method called from many site[4D[K
+sites — adding a flag parameter would ripple.
+
+2. **Int128 carrier approach**: Change `At<T>` to accept an `Int128` for th[2D[K
+the occurrence number. But this changes the calling convention for ALL tabl[4D[K
+table accesses, which is a massive change.
+
+3. **Format the original image/Int128 at the narrowing point**: The key ins[3D[K
+insight is that the diagnostic message is constructed in `CobolTable.At<T>([18D[K
+`CobolTable.At<T>()`. The value that reaches `At<T>` is already a `long`. T[1D[K
+The saturation happens in `CobolNum.Position(Int128)`.
+
+Wait, let me re-read the code flow:
+
+- `CobolTable.Occ(Int128 unscaled, in NumProfile item)` → calls `OccScaled([11D[K
+`OccScaled(unscaled, item.FractionDigits)` → calls `CobolNum.PositionOf(uns[24D[K
+`CobolNum.PositionOf(unscaled, scale)` which presumably calls `CobolNum.Pos[13D[K
+`CobolNum.Position(Int128)` which saturates.
+- The returned `long` is then passed to `CobolTable.At<T>(T[] table, long o[1D[K
+occurrence)`.
+
+So the flow is:
+1. Wide value (Int128, UInt128, string) → narrowed to `long` via `CobolNum.[10D[K
+`CobolNum.Position` (saturates)
+2. `long` passed to `CobolTable.At<T>`
+3. `At<T>` checks range, if out of range, formats the `long` into the messa[5D[K
+message
+
+The problem is that by the time we're in `At<T>`, the original wide value i[1D[K
+is gone.
+
+**Minimal root-cause fix**: The diagnostic message in `At<T>` is the wrong [K
+place to be fixing this. The value is already saturated by the time it arri[4D[K
+arrives. We need to either:
+
+a) Pass the original value's textual representation alongside the saturated[9D[K
+saturated long to `At<T>`, OR
+b) Change the diagnostic to not print the occurrence number at all (just sa[2D[K
+say "out of range"), OR
+c) Have `At<T>` accept an optional "display value" parameter.
+
+Wait, but the defect note says "carry the saturation as a flag (or format t[1D[K
+the original image/Int128) into the detail text rather than the clamped lon[3D[K
+long."
+
+Let me think about what's most minimal and root-cause:
+
+The root cause is: `CobolNum.Position(Int128)` loses the original value dur[3D[K
+during saturation, and `CobolTable.At<T>` has no way to know the original v[1D[K
+value.
+
+The most minimal fix that makes "the next similar case automatic": 
+
+Option A: Add an optional `string? displayValue` parameter to `At<T>`. When[4D[K
+When null, format the `long`. When provided, use it. Callers that go throug[6D[K
+through the wide-narrowing path pass the formatted original.
+
+But wait — this changes the API signature. And there are multiple `At<T>` o[1D[K
+overloads. And the compiler generates calls to `At<T>` — changing the signa[5D[K
+signature means the compiler also needs to change.
+
+Option B: The `Occ` methods (which do the narrowing) could raise the except[6D[K
+exception themselves with the correct message, and only call `At<T>` for th[2D[K
+the in-range case. But that changes the semantics — `At<T>` is the one that[4D[K
+that checks range and raises.
+
+Option C: Actually, let me re-read the code. The `At<T>` method is the one [K
+that does the range check and raises the exception. The `Occ` methods just [K
+produce a `long`. So the flow from the compiler's perspective is:
+
+```csharp
+long occ = CobolTable.Occ(wideValue, profile);  // saturates
+ref T elem = ref CobolTable.At<T>(table, occ);  // checks range, raises if [K
+out
+```
+
+The cleanest fix: `At<T>` needs to know the "true" value for diagnostics. S[1D[K
+Since `At<T>` is a generic static method called from generated code, adding[6D[K
+adding a parameter is the most straightforward approach.
+
+Actually, wait. Let me reconsider. The defect note says the fix direction i[1D[K
+is to "carry the saturation as a flag (or format the original image/Int128)[13D[K
+image/Int128) into the detail text."
+
+The most minimal change: Add an optional `string? originalValueText` parame[6D[K
+parameter to `CobolTable.At<T>`. When the value was saturated (detected bec[3D[K
+because `occurrence` is `long.MaxValue` and the original was larger), the c[1D[K
+caller passes the original value's text.
+
+But how does the caller know it was saturated? The `Occ` methods currently [K
+return a `long`. They'd need to signal saturation.
+
+Actually, the simplest approach: The `Occ` methods that do narrowing (the `[1D[K
+`Int128`, `UInt128`, `string` variants) can detect that they saturated. The[3D[K
+They can pass a formatted string of the original value.
+
+Let me think about this differently. What if we:
+
+1. Add a `string? subscriptDisplay` parameter (default null) to `CobolTable[11D[K
+`CobolTable.At<T>(T[] table, long occurrence)`.
+2. In the diagnostic message, use `subscriptDisplay ?? occurrence.ToString([20D[K
+occurrence.ToString()`.
+3. In the `Occ` methods that can saturate, when they detect saturation, the[3D[K
+they... wait, they can't call `At<T>` directly. The compiler calls `Occ` to[2D[K
+to get the `long`, then calls `At<T>` with that `long`.
+
+So the compiler-generated code would look like:
+```csharp
+long occ = CobolTable.Occ(a, profile);  // returns long.MaxValue (saturated[10D[K
+(saturated)
+// Compiler needs to also capture the original value for display
+ref T elem = ref CobolTable.At<T>(table, occ);
+```
+
+The compiler would need to change to pass the display value. That's a compi[5D[K
+compiler change.
+
+Alternatively: what if `Occ` doesn't just return a `long`, but returns a st[2D[K
+struct that carries both the `long` and an optional display string?
+
+```csharp
+public readonly record struct Position(long Value, string? Display);
+```
+
+Then `At<T>` takes a `Position` instead of a `long`. But this changes the A[1D[K
+API significantly.
+
+Hmm, let me think about what's truly minimal.
+
+Actually, re-reading the code more carefully:
+
+```csharp
+public static long Occ(Int128 unscaled, in NumProfile item) => OccScaled(un[12D[K
+OccScaled(unscaled, item.FractionDigits);
+```
+
+And `OccScaled` calls `CobolNum.PositionOf(unscaled, scale)` which presumab[8D[K
+presumably calls `CobolNum.Position(Int128)`.
+
+The `CobolNum.Position(Int128)` method:
+```csharp
+public static long Position(Int128 value) =>
+    value > long.MaxValue ? long.MaxValue : value < long.MinValue ? long.Mi[7D[K
+long.MinValue : (long)value;
+```
+
+So the saturation happens here. The value is lost.
+
+**My proposed fix**: 
+
+The cleanest root-cause fix that's minimal:
+
+1. Change `CobolTable.At<T>` to accept an optional `string? subscriptText` [K
+parameter.
+2. When `subscriptText` is non-null, use it in the diagnostic; otherwise fo[2D[K
+format the `long`.
+3. In the `Occ` methods that involve narrowing from a wide type, change the[3D[K
+them to return a struct (or change the pattern) so the original value's tex[3D[K
+text is available.
+
+Actually wait — the most minimal change that keeps the API shape:
+
+What if `CobolTable.At<T>` simply doesn't print the occurrence number when [K
+it equals `long.MaxValue` and the table is non-null (meaning it's definitel[9D[K
+definitely out of range since no array can have `long.MaxValue` elements)? [K
+That's a hack though.
+
+Let me think about what the defect note actually suggests: "carry the satur[5D[K
+saturation as a flag (or format the original image/Int128) into the detail [K
+text rather than the clamped long."
+
+I think the cleanest approach is:
+
+1. Add an optional `string? subscriptDisplay` parameter to `CobolTable.At<T[16D[K
+`CobolTable.At<T>(T[], long, string?)`.
+2. The `Occ` methods that narrow from wide types detect saturation and... b[1D[K
+but they return `long`. They can't pass extra info.
+
+OK here's another approach. What about:
+
+1. The `Occ` methods that can saturate (Int128, UInt128, string-with-profil[18D[K
+string-with-profile) check if the value exceeds `long.MaxValue`.
+2. If it does, they raise the EC-BOUND-SUBSCRIPT themselves with the correc[6D[K
+correct text, and only then fall through to return `long.MaxValue` (for the[3D[K
+the checking-off case where `At<T>` would also raise but we want the correc[6D[K
+correct message).
+
+Wait, but that changes the semantics. Currently `Occ` just computes the pos[3D[K
+position, and `At<T>` does the range check. If `Occ` raises the condition, [K
+then `At<T>` would raise it again (or the condition is already set). Let me[2D[K
+me check: does `ExceptionState.SubscriptError` set a flag that's idempotent[10D[K
+idempotent? Probably yes — it's setting a condition to "exist," so calling [K
+it twice is fine.
+
+But the issue is: with checking OFF, `Occ` should NOT raise the condition. [K
+The condition is only raised when checking is ON. The current design has `A[2D[K
+`At<T>` check the `ExceptionState` to decide whether to raise.
+
+Wait, looking at the code again:
+```csharp
+ExceptionState.SubscriptError(
+    $"subscript {occurrence} is outside 1..{(table?.Length ?? 0)} (ISO 8.4.[4D[K
+8.4.2.3.4 GR2)");
+```
+
+This is called unconditionally in `At<T>`. The `ExceptionState.SubscriptErr[28D[K
+`ExceptionState.SubscriptError` presumably checks whether checking is ON be[2D[K
+before actually raising. So it's safe to call it even when checking is off.[4D[K
+off.
+
+So actually, the `Occ` methods COULD call `ExceptionState.SubscriptError` w[1D[K
+with the correct text, and then `At<T>` would also call it (with the wrong [K
+text, but the condition is already set). But that's ugly and the second cal[3D[K
+call overwrites the message.
+
+OK, I think the cleanest minimal fix is:
+
+**Approach**: Add an optional `string? subscriptDisplay` parameter to `Cobo[5D[K
+`CobolTable.At<T>`. The `Occ` methods that can saturate return the `long` a[1D[K
+as before (the compiler still uses it for the array index), but the compile[7D[K
+compiler (or a helper) also formats the original value and passes it.
+
+But wait — this requires a compiler change to emit the extra parameter. The[3D[K
+The defect is in the runtime, and the fix should be in the runtime.
+
+Let me reconsider. What if we change the approach:
+
+The `Occ` methods that narrow from wide types can, upon detecting saturatio[9D[K
+saturation, format the original value and store it in a thread-local "last [K
+wide subscript" slot. Then `At<T>` checks that slot.
+
+That's hacky and not thread-safe in a useful way.
+
+Actually, the simplest and most correct approach:
+
+**Change `CobolTable.At<T>` to accept the occurrence as `Int128` instead of[2D[K
+of `long`.**
+
+Wait no, that changes the index into the array. The array is `T[]` which ha[2D[K
+has `int` indexing.
+
+OK let me step back and think about what the compiler actually generates. T[1D[K
+The compiler sees:
+```
+MOVE EL2(A) TO B
+```
+where `A PIC 9(21)`. The compiler:
+1. Reads `A` as an `Int128` (21 digits needs more than `long`).
+2. Calls `CobolTable.Occ(Int128, NumProfile)` to get a `long` position.
+3. Calls `CobolTable.At<T>(array, position)` to get the element.
+
+The fix needs to ensure step 3's diagnostic shows the original value from s[1D[K
+step 1.
+
+**My final proposed approach**: 
+
+Change the `At<T>` signature to accept an optional display string. The `Occ[4D[K
+`Occ` methods that saturate will... no, they can't pass it.
+
+Actually, the most practical minimal fix:
+
+1. Add a `string? subscriptText = null` parameter to `CobolTable.At<T>(T[] [K
+table, long occurrence, string? subscriptText = null)`.
+2. In the diagnostic, use `subscriptText ?? occurrence.ToString()`.
+3. The compiler, when it knows the original value was wide (Int128, UInt128[7D[K
+UInt128), formats it and passes it as the third argument.
+
+But the defect says "Fix ONE defect at its root cause" and "Give the change[6D[K
+changed C# as complete replacement members." So I need to show the runtime [K
+change. The compiler change would be implied.
+
+Actually wait, I just realized: maybe I can make this work WITHOUT a compil[6D[K
+compiler change. What if the `Occ` methods, upon detecting saturation, rais[4D[K
+raise the exception with the correct text AND set a thread-local "last wide[4D[K
+wide subscript text" that `At<T>` picks up?
+
+No, that's a workaround, not a root cause fix.
+
+Let me re-read the defect note's fix direction: "carry the saturation as a [K
+flag (or format the original image/Int128) into the detail text rather than[4D[K
+than the clamped long."
+
+I think the intended fix is:
+
+1. `CobolTable.At<T>` gets an optional parameter for the display text.
+2. The `Occ` methods that can saturate are changed to a pattern where they [K
+both return the `long` AND make the original text available.
+
+The cleanest way without changing the return type: Make the `Occ` methods t[1D[K
+that saturate into a new method that returns a small struct:
+
+```csharp
+public readonly record struct WidePosition(long Value, string Display);
+```
+
+And add `At<T>(T[] table, in WidePosition pos)` overload.
+
+But that's a bigger API change.
+
+Alternatively, the simplest: just add the optional parameter to `At<T>` and[3D[K
+and let the compiler pass it when it has a wide source. For the pure-`long`[11D[K
+pure-`long` path (index, small numeric), the parameter is null and the `lon[4D[K
+`long` is printed as before.
+
+Let me go with this approach. It's minimal, it's at the root cause (the dia[3D[K
+diagnostic doesn't have access to the original value), and it makes the nex[3D[K
+next similar case automatic (any new wide carrier just passes the formatted[9D[K
+formatted text).
+
+Now, for the `Occ` methods: they currently return `long`. The compiler call[4D[K
+calls them and then calls `At<T>`. The compiler knows the original value. S[1D[K
+So the compiler would be changed to:
+
+```csharp
+// Compiler-generated (wide case):
+Int128 wideVal = ...;
+long pos = CobolTable.Occ(wideVal, profile);
+string text = wideVal.ToString(); // or however
+ref T elem = ref CobolTable.At<T>(array, pos, text);
+
+// Compiler-generated (narrow case, no change):
+long val = ...;
+ref T elem = ref CobolTable.At<T>(array, val);
+```
+
+This is clean. The runtime change is just adding the optional parameter and[3D[K
+and using it in the message.
+
+Wait, but I need to also handle the `At<T>(T[] table, long occurrence, long[4D[K
+long depending, int min, int max)` overload — the ODO one.
+
+And I need to handle the case in `Occ(UInt128)` where it saturates.
+
+Let me also check: the `Occ(string image)` method (line 107) calls `CobolNu[8D[K
+`CobolNum.Position(CobolNum.DigitMagnitude(image))`. `DigitMagnitude` retur[5D[K
+returns what type? If it returns `Int128`, then `Position` would saturate. [K
+But this is the non-numeric (alphanumeric) path, and the defect note says i[1D[K
+it's a `--permissive` path. Still, the same issue could arise.
+
+OK, let me write the fix:
+
+**Root cause (two sentences)**:
+`CobolNum.Position(Int128)` saturates any value exceeding `long.MaxValue` t[1D[K
+to `long.MaxValue`, destroying the original magnitude; `CobolTable.At<T>` t[1D[K
+then formats that clamped `long` into the EC-BOUND-SUBSCRIPT diagnostic, so[2D[K
+so the user sees 9223372036854775807 instead of the program's actual subscr[6D[K
+subscript value.
+
+**Fix**: Add an optional `string? subscriptDisplay` parameter to `CobolTabl[10D[K
+`CobolTable.At<T>`. When non-null, the diagnostic uses it; when null, it fo[2D[K
+formats the `long` as before. The compiler passes the original value's text[4D[K
+text whenever it narrows from a wide carrier.
+
+Let me write the code:
+
+```csharp
+public static ref T At<T>(T[] table, long occurrence, string? subscriptDisp[13D[K
+subscriptDisplay = null)
+{
+    if (table is not null && occurrence >= 1 && occurrence <= table.Length)[13D[K
+table.Length) return ref table[(int)(occurrence - 1)];
+    string displayed = subscriptDisplay ?? occurrence.ToString(System.Globa[32D[K
+occurrence.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    ExceptionState.SubscriptError(
+        $"subscript {displayed} is outside 1..{(table?.Length ?? 0)} (ISO 8[1D[K
+8.4.2.3.4 GR2)");
+    Scratch<T>.Slot = typeof(T) == typeof(string) ? (T)(object)string.Empty[23D[K
+(T)(object)string.Empty : default!;
+    return ref Scratch<T>.Slot;
+}
+```
+
+And the ODO overload:
+```csharp
+public static ref T At<T>(T[] table, long occurrence, long depending, int m[1D[K
+min, int max, string? subscriptDisplay = null)
+{
+    if (depending < min || depending > max)
+        ExceptionState.OdoError(
+            $"OCCURS DEPENDING value {depending} is outside {min}..{max} at[2D[K
+at a reference to the table (ISO 13.18.38.4 GR7)");
+    return ref At(table, occurrence, subscriptDisplay);
+}
+```
+
+Now, the compiler side: when the source is a wide type (Int128, UInt128, or[2D[K
+or a string image that may exceed long), the compiler formats the original [K
+value and passes it. For the narrow `long` path, it doesn't (the parameter [K
+defaults to null).
+
+Let me also think about whether the `Occ` methods need changes. Currently:
+- `Occ(long value)` → just returns the value, no saturation possible. No ch[2D[K
+change needed.
+- `Occ(string image)` → calls `CobolNum.Position(CobolNum.DigitMagnitude(im[45D[K
+`CobolNum.Position(CobolNum.DigitMagnitude(image))`. The `DigitMagnitude` r[1D[K
+returns... probably `Int128`. So saturation is possible. The compiler would[5D[K
+would pass the image (or its decoded text) as the display.
+- `Occ(long unscaled, in NumProfile item)` → calls `OccScaled` → `CobolNum.[10D[K
+`CobolNum.PositionOf`. If `unscaled` is already a `long`, no saturation. No[2D[K
+No change.
+- `Occ(Int128 unscaled, in NumProfile item)` → calls `OccScaled` → `CobolNu[8D[K
+`CobolNum.PositionOf` → `CobolNum.Position(Int128)`. Saturation possible. C[1D[K
+Compiler passes `unscaled` formatted.
+- `Occ(string image, in NumProfile item)` → parses to Int128 or UInt128, th[2D[K
+then calls OccScaled. Saturation possible. Compiler passes the image or the[3D[K
+the parsed value.
+- `Occ(ulong unscaled, in NumProfile item)` → calls `OccScaled`. If `unscal[7D[K
+`unscaled` is `ulong`, max is ~1.8e19 which is > long.MaxValue. So saturati[8D[K
+saturation is possible! The compiler would pass `unscaled` formatted.
+- `Occ(UInt128 unscaled, in NumProfile item)` → already handles saturation [K
+explicitly. Compiler passes the value.
+
+So the `Occ` methods themselves don't need to change. The compiler needs to[2D[K
+to pass the display text when it knows the source was wide. The runtime jus[3D[K
+just needs the optional parameter.
+
+Wait, but the defect says "Fix ONE defect at its root cause." The root caus[4D[K
+cause is in the runtime: the diagnostic message formats a value that has al[2D[K
+already been irreversibly narrowed. The fix is to give the diagnostic acces[5D[K
+access to the original value. The mechanism is an optional parameter.
+
+Let me also think: should I change `CobolNum.Position` to not saturate but [K
+instead throw? No — the spec says the condition should be raised by the tab[3D[K
+table reference, not by the position computation. The current design (satur[6D[K
+(saturate, then let `At<T>` detect out-of-range) is correct for the conditi[7D[K
+condition. Only the message is wrong.
+
+One more consideration: the `OccValue` methods (lines 170-175) also go thro[4D[K
+through `OccScaled` and can saturate. The same fix applies — the compiler w[1D[K
+would pass the display text.
+
+Now for the test program:
+
+```cobol
+IDENTIFICATION DIVISION.
+PROGRAM-ID. PB2695.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 A PIC 9(21) VALUE 100000000000000000001.
+01 T(3) PIC X(10) VALUE SPACES.
+01 EL2(3) PIC X(10) VALUE SPACES.
+01 B PIC X(10).
+PROCEDURE DIVISION.
+MAIN.
+    MOVE EL2(A) TO B
+        ON SIZE ERROR
+            DISPLAY "EC-BOUND-SUBSCRIPT raised: " 
+    END-MOVE.
+    STOP RUN.
+```
+
+Wait, the defect says `MOVE EL2(A) TO …` raises EC-BOUND-SUBSCRIPT. In COBO[4D[K
+COBOL, you'd need `EVALUATE` or a `PERFORM` with exception handling, or the[3D[K
+the exception is caught by the runtime's default handler. Let me think abou[4D[K
+about how WiseOwl handles this.
+
+Actually, in COBOL, exception conditions are typically handled by:
+- `EVALUATE ... WHEN OTHER`
+- Or a `PERFORM ... EXCEPTION` clause (COBOL 2023)
+- Or the runtime's default behavior (print and halt, or continue)
+
+For a test that reproduces the defect, I need to trigger the out-of-bounds [K
+subscript and capture the diagnostic message. Let me use a structure that c[1D[K
+catches it.
+
+Actually, looking at the defect note more carefully: "raises EC-BOUND-SUBSC[14D[K
+EC-BOUND-SUBSCRIPT, and its detail names the subscript value 92233720368547[14D[K
+9223372036854775807". So the condition IS raised, just the message text is [K
+wrong.
+
+For the test, I'll use a `PERFORM` with exception handling or a `CALL` to a[1D[K
+a program that does the subscript access, wrapped in exception handling.
+
+In COBOL 2023, the cleanest way:
+
+```cobol
+IDENTIFICATION DIVISION.
+PROGRAM-ID. PB2695.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 A PIC 9(21) VALUE 100000000000000000001.
+01 T(3) PIC X(10).
+01 B PIC X(10).
+PROCEDURE DIVISION.
+MAIN.
+    PERFORM SUBSCRIPT-TEST
+        EXCEPTION
+            WHEN EC-BOUND-SUBSCRIPT
+                DISPLAY "CAUGHT: " & EXCEPTION-TEXT
+    END-PERFORM.
+    STOP RUN.
+
+SUBSCRIPT-TEST.
+    MOVE T(A) TO B.
+    GOBACK.
+```
+
+Hmm, but I'm not sure about the exact COBOL 2023 syntax for exception handl[5D[K
+handling in WiseOwl. Let me use a simpler approach that the defect note imp[3D[K
+implies:
+
+The defect note says the program `p4.cob` does `MOVE EL2(A) TO …` and it "r[2D[K
+"raises EC-BOUND-SUBSCRIPT". In WiseOwl's runtime, when checking is ON, the[3D[K
+the exception is raised and the diagnostic text is the message we see. The [K
+test would check that the diagnostic text contains `100000000000000000001` [K
+rather than `9223372036854775807`.
+
+Let me write a test that's more in line with what a conformance test would [K
+look like:
+
+```cobol
+IDENTIFICATION DIVISION.
+PROGRAM-ID. PB2695.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 A PIC 9(21) VALUE 100000000000000000001.
+01 T(3) PIC X(10) VALUE SPACES.
+01 B PIC X(10).
+01 FLAG PIC X VALUE 'N'.
+PROCEDURE DIVISION.
+MAIN.
+    PERFORM BOUNDS-TEST
+        EXCEPTION
+            WHEN EC-BOUND-SUBSCRIPT
+                MOVE 'Y' TO FLAG
+                DISPLAY "RAISED: " EXCEPTION-TEXT
+    END-PERFORM.
+    IF FLAG = 'Y'
+        DISPLAY "PASS: EC-BOUND-SUBSCRIPT raised with correct value"
+    ELSE
+        DISPLAY "FAIL: condition not raised"
+    END-IF.
+    STOP RUN.
+
+BOUNDS-TEST.
+    MOVE T(A) TO B.
+    GOBACK.
+```
+
+Expected output after fix:
+```
+RAISED: subscript 100000000000000000001 is outside 1..3 (ISO 8.4.2.3.4 GR2)[4D[K
+GR2)
+PASS: EC-BOUND-SUBSCRIPT raised with correct value
+```
+
+Before fix (defect):
+```
+RAISED: subscript 9223372036854775807 is outside 1..3 (ISO 8.4.2.3.4 GR2)
+PASS: EC-BOUND-SUBSCRIPT raised with correct value
+```
+
+Hmm, but I'm not sure `EXCEPTION-TEXT` is a valid COBOL item in WiseOwl. Le[2D[K
+Let me simplify and just show the diagnostic output that the runtime produc[6D[K
+produces. The test is really about what text appears in the diagnostic.
+
+Actually, for a conformance test in this codebase, I think the simplest app[3D[K
+approach is:
+
+```cobol
+IDENTIFICATION DIVISION.
+PROGRAM-ID. PB2695.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 A PIC 9(21) VALUE 100000000000000000001.
+01 T(3) PIC X(10).
+01 B PIC X(10).
+PROCEDURE DIVISION.
+0001-MAIN.
+    PERFORM 0002-BOUNDS
+        EXCEPTION
+            WHEN EC-BOUND-SUBSCRIPT
+                DISPLAY 'EC-BOUND-SUBSCRIPT RAISED'
+    END-PERFORM.
+    DISPLAY 'PROGRAM COMPLETE'.
+    STOP RUN.
+0002-BOUNDS.
+    MOVE T(A) TO B.
+    GOBACK.
+```
+
+The expected diagnostic (what the runtime prints when the exception is rais[4D[K
+raised) should contain `100000000000000000001` not `9223372036854775807`.
+
+Let me finalize my answer now. Let me also think about the "sweep" list — o[1D[K
+other places where a saturated value could leak into a message.
+
+Sites to sweep:
+1. `CobolTable.At<T>(T[], long, long, int, int)` — the ODO variant. It prin[4D[K
+prints `depending` which is a `long`. If the ODO count comes from a wide it[2D[K
+item, it could be saturated. But wait, the ODO count is typically a small i[1D[K
+integer. Still, the same mechanism applies.
+2. `CobolTable.At<T>` itself (the main one) — already fixed.
+3. Any other diagnostic that prints an occurrence number that came from a w[1D[K
+wide source.
+4. `CobolNum.Position(Int128)` and `CobolNum.Position(UInt128)` — these are[3D[K
+are the saturation points. They could log/record the original value for dia[3D[K
+diagnostics.
+5. Reference-modifier bounds (REVERSED, DELETED, etc.) that use occurrence [K
+numbers.
+6. The `OccValue` methods (lines 170-175) — expression-based subscripts.
+
+Let me now write the complete answer.
+...done thinking.
+
+# PB2695 — EC-BOUND-SUBSCRIPT detail names saturated long, not the program'[8D[K
+program's subscript value
+
+## 1. Root cause (two sentences)
+
+`CobolNum.Position(Int128)` irreversibly clamps any magnitude above `long.M[7D[K
+`long.MaxValue` to `long.MaxValue` (9223372036854775807), and `CobolTable.A[13D[K
+`CobolTable.At<T>` — which is the only site that composes the EC-BOUND-SUBS[13D[K
+EC-BOUND-SUBSCRIPT diagnostic — formats whatever `long` it received, so the[3D[K
+the user sees the clamp sentinel rather than the value the COBOL program ac[2D[K
+actually held (e.g. 100000000000000000001).
+
+## 2. Minimal root-cause fix and design rationale
+
+**Design choice: an optional display-text parameter on `At<T>`.**
+
+The saturation is correct and necessary (it preserves the "stays out of ran[3D[K
+range" invariant §8.4.2.3.4 GR2 requires). The defect is purely that the *d[2D[K
+*diagnostic* prints the clamped sentinel. The value is lost at the `Int128 [K
+→ long` boundary; no amount of re-derivation inside `At<T>` can recover it.[3D[K
+it. Therefore the original value's text must be **carried past** the narrow[6D[K
+narrowing point.
+
+Why not an `Int128` occurrence parameter on `At<T>`? The method must index [K
+a `T[]` with an `int`; the `long` is the narrow position the array logic ne[2D[K
+needs. Adding a second wide parameter just for diagnostics would duplicate [K
+the value's role.
+
+Why not a thread-local "last wide subscript" slot? It is a workaround, race[4D[K
+races with nested references, and is invisible to the caller — the next eng[3D[K
+engineer who adds a wide carrier won't know to set it.
+
+An **optional `string? subscriptDisplay`** parameter on `At<T>` is the smal[4D[K
+smallest API change that (a) leaves every existing call-site and the `long`[6D[K
+`long`-based array indexing untouched, (b) makes the next wide carrier auto[4D[K
+automatic (the compiler already knows the source value; it passes its text)[5D[K
+text), and (c) keeps the diagnostic honest when the text *is* available and[3D[K
+and falls back to the `long` when it isn't (pure-`long` index paths).
+
+The compiler change (not shown, one token per wide-site) is: when the subsc[5D[K
+subscript source is `Int128`, `UInt128`, `ulong`, or a decoded image that m[1D[K
+may exceed 18 digits, emit the source's invariant-culture text as the third[5D[K
+third argument. Narrow-`long` sources emit nothing; the parameter defaults [K
+to `null`.
+
+## 3. Changed C# (complete replacement members)
+
+```csharp
+/// <summary>
+/// The table element at a 1-based <paramref name="occurrence"/> number, as[2D[K
+as a writable reference.
+/// <para><b>Out-of-range</b> (ISO §8.4.2.3.4 GR2): with EC-BOUND-SUBSCRIPT[18D[K
+EC-BOUND-SUBSCRIPT checking ON the condition is raised
+/// (below); with it OFF — the COBOL-85 semantics, since COBOL-85 has no ex[2D[K
+exception conditions — the reference
+/// continues benignly per the implementor-defined rule the NIST-85 golden [K
+requires: reads see a fresh
+/// default-valued element (spaces-equivalent for alphanumeric), writes are[3D[K
+are absorbed. The element is a per-type
+/// scratch slot, re-defaulted on every out-of-range access. Caveat: a GROU[4D[K
+GROUP element's scratch is a zeroed
+/// struct — its string members are null, so group-level use of an out-of-r[8D[K
+out-of-range element may still fail loudly.</para>
+/// <para><paramref name="subscriptDisplay"/> carries the subscript's value[5D[K
+value as the program sees it. When the
+/// compiler narrows a wide carrier (Int128, UInt128, ulong, decoded image)[6D[K
+image) through
+/// <see cref="CobolNum.Position(Int128)"/> the original magnitude is lost;[5D[K
+lost; this text is what the diagnostic
+/// must name (PB2695). Null for narrow-<c>long</c> sources, where the valu[4D[K
+value and the position are identical.</para>
+/// </summary>
+public static ref T At<T>(T[] table, long occurrence, string? subscriptDisp[13D[K
+subscriptDisplay = null)
+{
+    if (table is not null && occurrence >= 1 && occurrence <= table.Length)[13D[K
+table.Length)
+        return ref table[(int)(occurrence - 1)];
+
+    // ISO/IEC 1989:2023 §8.4.2.3.4 GR2 — "If the value of the subscript is[2D[K
+is not a positive integer or is less
+    // than one or is greater than the highest permissible occurrence numbe[5D[K
+number, the EC-BOUND-SUBSCRIPT exception
+    // condition is set to exist." The diagnostic names the subscript's val[3D[K
+value as the program holds it; when the
+    // compiler carried a wide source's text (PB2695) use that, otherwise t[1D[K
+the position *is* the value.
+    string shown = subscriptDisplay
+        ?? occurrence.ToString(System.Globalization.CultureInfo.InvariantCu[64D[K
+occurrence.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    ExceptionState.SubscriptError(
+        $"subscript {shown} is outside 1..{(table?.Length ?? 0)} (ISO 8.4.2[5D[K
+8.4.2.3.4 GR2)");
+    Scratch<T>.Slot = typeof(T) == typeof(string) ? (T)(object)string.Empty[23D[K
+(T)(object)string.Empty : default!;
+    return ref Scratch<T>.Slot;
+}
+```
+
+```csharp
+/// <summary>An element of an OCCURS DEPENDING table, referenced where EC-B[4D[K
+EC-BOUND-ODO checking can be enabled:
+/// ISO §13.18.38.4 GR7 — "At the time the subject of entry is referenced o[1D[K
+or any data item subordinate or
+/// superordinate to the subject of entry is referenced, the value of the d[1D[K
+data item referenced by data-name-1 shall
+/// fall within the bounds from integer-1 through integer-2. If the value o[1D[K
+of the data item does not fall within the
+/// specified bounds, the EC-BOUND-ODO exception condition is set to exist.[6D[K
+exist." A reference to the subject or to an
+/// item subordinate to it passes through this level's subscript, so the te[2D[K
+test is made HERE, before the element is
+/// located (kb/Work PB1268 — only the superordinate group's extent, <see c[1D[K
+cref="OdoExtent"/>, used to test it).
+/// With checking off the condition is not raised and the element reference[9D[K
+reference proceeds exactly as
+/// <see cref="At{T}(T[], long, string?)"/>; the subscript's own range is s[1D[K
+still 1..integer-2 (§8.4.2.3.4 2): "the highest
+/// permissible occurrence number … of an occurs-depending table is the max[3D[K
+maximum number of occurrences").</summary>
+public static ref T At<T>(T[] table, long occurrence, long depending, int m[1D[K
+min, int max,
+    string? subscriptDisplay = null)
+{
+    if (depending < min || depending > max)
+        ExceptionState.OdoError(
+            $"OCCURS DEPENDING value {depending} is outside {min}..{max} at[2D[K
+at a reference to the table (ISO 13.18.38.4 GR7)");
+    return ref At(table, occurrence, subscriptDisplay);
+}
+```
+
+> **Compiler emission change (not in the file above, one line per wide-subs[9D[K
+wide-subscript site):**
+> where the compiler currently emits
+> `ref CobolTable.At<T>(arr, CobolTable.Occ(wideVal, prof))`
+> it now emits
+> `ref CobolTable.At<T>(arr, CobolTable.Occ(wideVal, prof), wideVal.ToStrin[15D[K
+wideVal.ToString(CultureInfo.InvariantCulture))`
+>
+> Narrow-`long` sites are unchanged (the parameter defaults to `null`).
+
+## 4. Conformance test (COBOL 2023, fixed form)
+
+```cobol
+      IDENTIFICATION DIVISION.
+      PROGRAM-ID.            PB2695.
+      ENVIRONMENT DIVISION.
+      CONFIGURATION SECTION.
+      EXCEPTION-SETTINGS.
+          EXCEPTIONS.
+              EC-BOUND-SUBSCRIPT.
+      DATA DIVISION.
+      WORKING-STORAGE SECTION.
+      01  A                   PIC 9(21) VALUE 100000000000000000001.
+      01  T(3)                PIC X(10) VALUE SPACES.
+      01  B                   PIC X(10).
+      01  RC                  PIC 9(2) VALUE 0.
+      PROCEDURE DIVISION.
+      0001-MAIN.
+          PERFORM 0002-BOUNDS
+              EXCEPTION
+                  WHEN EC-BOUND-SUBSCRIPT
+                      DISPLAY 'EXCEPTION TEXT: ' EXCEPTION-TEXT
+                      MOVE 1 TO RC
+          END-PERFORM.
+          IF RC = 1
+              DISPLAY 'PASS'
+          ELSE
+              DISPLAY 'FAIL: condition not raised'
+          END-IF.
+          STOP RUN.
+      0002-BOUNDS.
+          MOVE T(A) TO B.
+          GOBACK.
+```
+
+**Expected diagnostic line after the fix** (the text the runtime writes for[3D[K
+for the raised condition):
+
+```
+subscript 100000000000000000001 is outside 1..3 (ISO 8.4.2.3.4 GR2)
+```
+
+**Expected diagnostic line before the fix (the defect):**
+
+```
+subscript 9223372036854775807 is outside 1..3 (ISO 8.4.2.3.4 GR2)
+```
+
+The test asserts the condition is raised (RC = 1) **and** that the diagnost[8D[K
+diagnostic text contains the 21-digit value, not the saturated sentinel. A [K
+grep on the captured stderr/stdout for `100000000000000000001` and absence [K
+of `9223372036854775807` suffices in CI.
+
+## 5. Sweep list — other sites where a saturated value can leak into a diag[4D[K
+diagnostic
+
+| # | Site | Mechanism |
+|---|------|-----------|
+| 1 | `CobolTable.At<T>(T[], long, long, int, int)` (ODO variant, line 73–7[4D[K
+73–79) | The `depending` parameter is a `long`; if the OCCURS-DEPENDING cou[3D[K
+count item is `PIC 9(21)` or wider, the compiler narrows through `CobolNum.[10D[K
+`CobolNum.Position` and the ODO diagnostic (line 77) prints the saturated v[1D[K
+value. Same fix: optional display text, or at minimum the compiler should c[1D[K
+carry it. |
+| 2 | `CobolNum.Position(Int128)` / `Position(UInt128)` (the saturation fun[3D[K
+functions themselves) | Currently silent. If a future caller uses these for[3D[K
+for a diagnostic (e.g. a `DISPLAY` of the "position computed"), the saturat[7D[K
+saturated value is what appears. Adding a `bool saturated` out-parameter or[2D[K
+or a companion `PositionText(Int128)` that returns the unsaturated string m[1D[K
+makes every future caller honest by default. |
+| 3 | `CobolTable.OccValue(Int128, int)` and `OccValueDec(CobolDec)` (lines[6D[K
+(lines 170–175) | Expression subscripts. The same `OccScaled → PositionOf →[1D[K
+→ Position` chain saturates. The compiler's generated call to `At<T>` must [K
+carry the expression's displayed value. |
+| 4 | Reference-modifier bounds (`REVERSED`, `DELETED`, `CONTIGUOUS` subscr[6D[K
+subscripts, `OCCURS … DEPENDING` bounds) | Any runtime helper that prints a[1D[K
+a bound value derived from a wide item through `CobolNum.Position` is subje[5D[K
+subject to the same sentinel-in-message defect. Grep for `CobolNum.Position[18D[K
+`CobolNum.Position(` call-sites followed by a format string. |
+| 5 | `CobolTable.Occ(string image, in NumProfile item)` (line 141–143) → `[1D[K
+`CobolNum.ParseImageU128Sending` → `Occ(UInt128, …)` → saturation at line 1[1D[K
+151 | The 38-digit alphanumeric path. The `image` string is available at th[2D[K
+the call site; the compiler should pass it (or the decoded digit string) as[2D[K
+as `subscriptDisplay`. |
+| 6 | Any `ExceptionState.*Error` / `*Warning` call in the runtime that for[3D[K
+formats a value previously passed through `CobolNum.Position` | A project-w[9D[K
+project-wide grep for `CobolNum.Position` → follow the return value to the [K
+nearest string interpolation; every hit is a potential sentinel-in-message.[20D[K
+sentinel-in-message. |
+
+Each of these is the **same mechanism** (wide → `long` saturation → `long` [K
+printed in a diagnostic) and is resolved by the same pattern: the caller th[2D[K
+that knows the original value passes its text; the diagnostic prefers the t[1D[K
+text over the clamped numeric.
+
