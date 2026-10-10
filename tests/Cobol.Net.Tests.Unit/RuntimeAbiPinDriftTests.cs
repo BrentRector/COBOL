@@ -1,10 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using CobolNet.Binding;
@@ -39,7 +35,7 @@ namespace CobolNet.Tests.Unit;
 ///     pass, compiled by THIS compiler; the hash reads the boundary's compiler-side decisions in the emitted code — each
 ///     argument's <c>CobolArg</c> (the crossing arm, carrier type and description it carries), the callee's formal
 ///     adapters (<c>FormalCrossing</c>, <c>FormalCarrierType</c>), the registered formals and RETURNING item
-///     (<c>RegisteredFormal</c> / <c>RegisteredReturning</c>) and every profile they name.</item>
+///     (<c>RegisteredFormal</c> / <c>RegisteredReturning</c>) and every profile and group atom array they name.</item>
 /// </list>
 /// When a hash moves: decide whether the boundary really changed. If it did, raise the number that guards it (a
 /// compiler-side crossing change → <see cref="RuntimeAbi.CallAbi"/>; a surface removal or a codec change → the major),
@@ -52,7 +48,7 @@ public sealed class RuntimeAbiPinDriftTests
     private const int PinnedMajor = 2;
     private const string PinnedRuntimeHash = "515C5AA3212AD0FB";
     private const int PinnedCallAbi = 1;
-    private const string PinnedBoundaryHash = "EE5763106914991E";
+    private const string PinnedBoundaryHash = "304F0F7F986F680F";
 
     /// <summary>The boundary-layout fixture: every elementary category and byte form a Format 1 CALL passes BY
     /// REFERENCE and BY CONTENT, a group and a table, and a RETURNING item, with EC-PROGRAM-ARG-MISMATCH checking on
@@ -209,6 +205,12 @@ public sealed class RuntimeAbiPinDriftTests
         // Every numeric profile the two programs declare: the registered and adopted profiles the lines above name.
         foreach (var field in root.DescendantNodes().OfType<FieldDeclarationSyntax>()
                      .Where(f => f.Declaration.Type.ToString() == "NumProfile"))
+            yield return Tokens(field);
+        // Every §8.5.1.12 atom array the arguments and formal adapters above name by field (GroupAtomTable writes each
+        // distinct array once into __GroupAtoms, kb/Work PB2690): the shape of a group or table that crosses, which the
+        // lines above now carry only as a reference.
+        foreach (var field in root.DescendantNodes().OfType<FieldDeclarationSyntax>()
+                     .Where(f => f.Declaration.Type.ToString() == "GroupAtom[]"))
             yield return Tokens(field);
     }
 
