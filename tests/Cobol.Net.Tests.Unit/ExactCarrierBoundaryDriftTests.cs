@@ -55,7 +55,9 @@ public sealed class ExactCarrierBoundaryDriftTests
         ["MinScaled"] = "§15.63.4 r1 returns the CONTENT of an argument — pure selection, no arithmetic at all.",
         ["RemScaled"] = "§15.77.4 r1's EAE is C#'s `%` exactly (truncated remainder), whose result satisfies "
                       + "|r| < |b| ≤ Int128.MaxValue for every operand pair the aligner can produce.",
-        ["AbsScaled"] = "§15.7.4 r1 is |v|, in range for every |v| ≤ Int128.MaxValue.",
+        // ABS is not listed: |Int128.MinValue| = 2^127 is past the carrier, so it is boundary-pinned below (kb/Work
+        // PB2698). The premise this table rests on — RescaleEscape holds every ARGUMENT at or below MaxValue — is
+        // true of a RESCALED argument only; a signed 16-byte field read reaches an arm at MinValue unrescaled.
     };
 
     /// <summary>The closed set of exact-carrier value entries: they take and return CARRIER values only (an
@@ -77,7 +79,7 @@ public sealed class ExactCarrierBoundaryDriftTests
     [Fact]
     public void EveryExactCarrierEntry_IsEitherGuardedOrExplicitlyExempt()
     {
-        string[] guarded = ["SumScaled", "RangeScaled", "MedianScaled", "MidrangeScaled", "ModScaled"];
+        string[] guarded = ["SumScaled", "RangeScaled", "MedianScaled", "MidrangeScaled", "ModScaled", "AbsScaled"];
         var entries = ExactCarrierEntries().Select(m => m.Name).ToHashSet(StringComparer.Ordinal);
 
         Assert.True(entries.Count >= 9,
@@ -105,6 +107,7 @@ public sealed class ExactCarrierBoundaryDriftTests
     [InlineData("MEDIAN-EVEN")]
     [InlineData("MIDRANGE")]
     [InlineData("MOD")]
+    [InlineData("ABS")]
     public void AtTheBoundary_TheExactCarrierRaisesEcSizeOverflow(string which)
     {
         var e = Assert.Throws<CobolSizeError>(() => AtBoundary(which));
@@ -126,6 +129,8 @@ public sealed class ExactCarrierBoundaryDriftTests
         "MIDRANGE" => CobolIntrinsics.MidrangeScaled(Max / 2, Max / 2),
         // b × FUNCTION INTEGER(a/b) reaches |a| + |b| once the floor adjustment fires on opposite signs.
         "MOD" => CobolIntrinsics.ModScaled(Max, -(Max - 1)),
+        // -Int128.MinValue wraps to itself: the magnitude 2^127 is the one value past the carrier (kb/Work PB2698).
+        "ABS" => CobolIntrinsics.AbsScaled(Int128.MinValue),
         _ => throw new ArgumentOutOfRangeException(nameof(which)),
     };
 
@@ -143,6 +148,8 @@ public sealed class ExactCarrierBoundaryDriftTests
         Assert.Equal(tenth * 5, CobolIntrinsics.MidrangeScaled(tenth, 0));           // (max + min) × 5
         Assert.Equal(4, CobolIntrinsics.ModScaled(-11, 5));                          // §15.64.4 NOTE's sign table
         Assert.Equal(-1, CobolIntrinsics.RemScaled(-11, 5));                         // §15.77.4 truncates
+        Assert.Equal(Max, CobolIntrinsics.AbsScaled(Int128.MinValue + 1));           // -(2^127 - 1): the largest magnitude that fits
+        Assert.Equal(Max, CobolIntrinsics.AbsScaled(Max));
     }
 
     // ── 2. Cross-aligning arms route to the SDIDI under a standard mode ────────────────────────────────────

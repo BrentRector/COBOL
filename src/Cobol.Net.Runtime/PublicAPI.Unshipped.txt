@@ -1,1 +1,4 @@
 #nullable enable
+static CobolNet.Runtime.CobolIntrinsics.FractionPartU(System.UInt128 v, int scale) -> System.Int128
+static CobolNet.Runtime.CobolIntrinsics.IntegerPartU(System.UInt128 v, int scale) -> System.UInt128
+static CobolNet.Runtime.CobolIntrinsics.SignOfU(System.UInt128 v) -> long

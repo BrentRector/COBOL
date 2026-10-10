@@ -73,17 +73,50 @@ public static partial class CobolIntrinsics
     /// unscaled value at <paramref name="scale"/> fraction digits; the result is a scale-0 integer.</summary>
     public static Int128 Floor(Int128 v, int scale)
     {
-        if (scale <= 0) return v * Pow10.AsWide(-scale);           // already an integer (negative scale = P-trailing zeros)
+        if (scale <= 0) return ExactMul(v, Pow10.AsWide(-scale), "INTEGER");   // already an integer (negative scale = P-trailing zeros); the ×10^k is a step on the carrier, so it escapes loud
         Int128 d = Pow10.AsWide(scale);
         Int128 q = v / d;
         return v < 0 && v % d != 0 ? q - 1 : q;
     }
 
     /// <summary>INTEGER-PART (§15.49.4): the integer part of the argument (truncation toward zero), scale 0.</summary>
-    public static Int128 Truncate(Int128 v, int scale) => scale <= 0 ? v * Pow10.AsWide(-scale) : v / Pow10.AsWide(scale);
+    public static Int128 Truncate(Int128 v, int scale) => scale <= 0 ? ExactMul(v, Pow10.AsWide(-scale), "INTEGER-PART") : v / Pow10.AsWide(scale);
 
     /// <summary>ABS (§15.7.4, COBOL-2014+): the absolute value, at the argument's own scale.</summary>
-    public static Int128 AbsScaled(Int128 v) => v < 0 ? -v : v;
+    /// <remarks>⛔ <see cref="Int128.MinValue"/> HAS NO REPRESENTABLE MAGNITUDE (kb/Work PB2698). A signed 16-byte binary
+    /// item holds −2^127 (its container, §13.18.60.4 GR12), <c>-v</c> on it wraps to itself, and the former
+    /// <c>v &lt; 0 ? -v : v</c> returned a NEGATIVE "absolute value" that a signed receiver then stored as garbage. The
+    /// result 2^127 is past the native intermediate data item (a scaled <see cref="Int128"/>, DOC-A.1-123), so it is
+    /// the size error condition like every other step that leaves the carrier — §14.7.5 rule 5 with the range CHECKED
+    /// (DOC-A.1-179), the ONE <see cref="SizeEscape"/> every exact function shares — and never a wrap. (A UInt128
+    /// result would hold it, but it changes this public entry's signature, an incompatible change of the runtime
+    /// surface that raises the runtime major; the unsigned-wide ARGUMENT is handled by the renderer without a call,
+    /// |U| being U.)</remarks>
+    public static Int128 AbsScaled(Int128 v) => v == Int128.MinValue ? SizeEscape("ABS") : v < 0 ? -v : v;
+
+    /// <summary>SIGN (§15.81.4) of an UNSIGNED-WIDE argument (a 16-byte unsigned COMP-5 item's full container, or a
+    /// fold past <see cref="Int128.MaxValue"/>): never negative, so 0 or +1. A separate U-named entry (see
+    /// <see cref="CobolNum.FormatDisplayU"/> for why the lanes are named, not overloaded) — narrowing the argument
+    /// through <see cref="CobolNum.Widen"/> would raise a size error for a function whose result is −1, 0 or +1
+    /// (kb/Work PB2698).</summary>
+    public static long SignOfU(UInt128 v) => v == 0 ? 0 : 1;
+
+    /// <summary>INTEGER (§15.44.4) and INTEGER-PART (§15.49.4) of an UNSIGNED-WIDE argument at
+    /// <paramref name="scale"/> fraction digits: floor and truncation agree on a non-negative value, so one body
+    /// answers both. The result is a scale-0 integer in the unsigned-wide lane — an argument of 2^127 + 1 at scale 0
+    /// IS its own integer part, which the Int128 body cannot hold (kb/Work PB2698). A negative scale (trailing P)
+    /// multiplies, and a product past 2^128 is the §14.7.5 rule 5 size error like every other exact step.</summary>
+    public static UInt128 IntegerPartU(UInt128 v, int scale)
+    {
+        if (scale > 0) return v / (UInt128)Pow10.AsWide(scale);
+        try { return checked(v * (UInt128)Pow10.AsWide(-scale)); }
+        catch (OverflowException) { throw SizeEscapeError("INTEGER-PART"); }
+    }
+
+    /// <summary>FRACTION-PART (§15.42.4) of an UNSIGNED-WIDE argument: <c>argument − INTEGER-PART(argument)</c>,
+    /// at the argument's own scale. The fraction is below 10^scale, so it always fits the Int128 carrier — the one
+    /// unary exact function whose unsigned-wide result needs no wide lane (kb/Work PB2698).</summary>
+    public static Int128 FractionPartU(UInt128 v, int scale) => scale <= 0 ? 0 : (Int128)(v % (UInt128)Pow10.AsWide(scale));
 
     /// <summary>FRACTION-PART (§15.42.4, COBOL-2002+): <c>argument − FUNCTION INTEGER-PART(argument)</c> — the
     /// fractional part with the argument's sign, at the argument's own scale.</summary>
@@ -236,9 +269,12 @@ public static partial class CobolIntrinsics
     /// paths wrap MODULARLY on purpose (§13.18.40, §14.9.25.4 GR6), and a project-wide switch would turn every one
     /// of those conforming wraps into an exception.</para>
     /// </remarks>
-    private static Int128 SizeEscape(string fn) =>
-        throw new CobolSizeError(
-            $"FUNCTION {fn}: an arithmetic operation took the intermediate outside the Int128 carrier's range "
+    private static Int128 SizeEscape(string fn) => throw SizeEscapeError(fn);
+
+    /// <summary>The §14.7.5 rule 5 condition itself, for the bodies whose carrier is not <see cref="Int128"/>
+    /// (the unsigned-wide <see cref="IntegerPartU"/>) — the ONE message and EC name (see <see cref="SizeEscape"/>).</summary>
+    private static CobolSizeError SizeEscapeError(string fn) =>
+        new($"FUNCTION {fn}: an arithmetic operation took the intermediate outside the Int128 carrier's range "
             + "(COBOLNET_NUMERIC_DESIGN.md D1; ISO §14.7.5 rule 5)", "EC-SIZE-OVERFLOW");
 
     /// <summary>The sum of two aligned unscaled operands at the exact carrier's boundary
@@ -462,6 +498,10 @@ public static partial class CobolIntrinsics
     /// ⚠ <c>Pow10.AsWide</c> itself WRAPS past 10³⁸ (its fallback loop is unchecked), so the exponent is bounded
     /// BEFORE the call — without that guard a large <c>E±nn</c> would multiply by a wrapped power and produce a
     /// plausible wrong value rather than a saturated one.</summary>
+    /// <remarks><paramref name="unscaled"/> is the scan's NON-NEGATIVE magnitude (the caller applies the sign after),
+    /// below 10^digitCap with the cap at most 34, so <see cref="Int128.MinValue"/> is unreachable today; the test
+    /// still reads the MinValue-safe <see cref="CobolDec.UAbs"/> so the bound does not rest on that reachability
+    /// (kb/Work PB2698).</remarks>
     private static Int128 Rescaled(Int128 unscaled, int shift, bool checkedLanding)
     {
         if (unscaled == 0) return Int128.Zero;
@@ -470,7 +510,7 @@ public static partial class CobolIntrinsics
         if (!checkedLanding) return CobolNum.RescaleStoreCap(unscaled, 0, shift, CobolRounding.Truncation);
         if (shift > 38) return unscaled > 0 ? Int128.MaxValue : Int128.MinValue;
         Int128 limit = Int128.MaxValue / Pow10.AsWide(shift);
-        if (Int128.Abs(unscaled) > limit) return unscaled > 0 ? Int128.MaxValue : Int128.MinValue;
+        if (CobolDec.UAbs(unscaled) > (UInt128)limit) return unscaled > 0 ? Int128.MaxValue : Int128.MinValue;   // UAbs, not Int128.Abs: total over MinValue (kb/Work PB2698)
         return unscaled * Pow10.AsWide(shift);
     }
 
@@ -509,6 +549,9 @@ public static partial class CobolIntrinsics
     {
         NvfParse p = NvfScan(text, commaMode, digitCap);
         if (p.ErrPos != 0) return (double)NumvalFReject(p, text, digitCap);
+        // The scan accumulates a NON-NEGATIVE magnitude below 10^digitCap (the cap is tested BEFORE each digit and
+        // is at most 34), so negating it is total: Int128.MinValue is unreachable here (kb/Work PB2698 measured it,
+        // CobolIntrinsicsMinValueTests pins the largest admitted significand).
         return CobolFloat.ScaledToSingle(p.Neg ? -p.Unscaled : p.Unscaled, p.Frac - p.Exp);
     }
 

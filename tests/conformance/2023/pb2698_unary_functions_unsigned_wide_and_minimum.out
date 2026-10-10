@@ -1,0 +1,12 @@
+ABS(-2**127): size error
+UR unchanged
+ABS(-2**127+1): stored
+UR holds 2**127-1
+ABS(U2): stored
+UR holds U2 truncated to an integer
+SIGN(U2) = 1
+INTEGER(U2): stored
+UR holds the integer part
+INTEGER-PART(U2): stored
+UR holds the integer part
+FRACTION-PART(U2) = 029

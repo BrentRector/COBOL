@@ -444,6 +444,7 @@
   "pb2639_floating_char1_digit_positions",
   "pb2163_unsigned_wide_into_edited",
   "pb2639_binary_minvalue_unsigned_magnitude",
+  "pb2698_unary_functions_unsigned_wide_and_minimum",
   "pb66_float_edited_comma_mode",
   "pb66_float_edited_algebraic_and_checking",
   "pb2643_float_edited_deedit_blank_and_normalized",

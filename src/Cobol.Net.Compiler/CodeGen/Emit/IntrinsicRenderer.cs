@@ -197,27 +197,36 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
             // Integer functions — scale-0 results (§15.2 type 5).
             case "Factorial":                                                   // §15.36 (Int128; 34! overflows → EC default 0)
                 return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, IntArg(ic, 0)), 0);
+            // ⛔ THE FIVE UNARY EXACT ARMS TAKE AN UNSIGNED-WIDE ARGUMENT ON ITS OWN LANE (kb/Work PB2698). `Arg` passes a
+            // `NumX.U` operand (a 16-byte unsigned COMP-5 item above Int128.MaxValue) through unlanded, and these arms
+            // handed its UInt128 expression to Int128 parameters — Roslyn CS1503 on conforming source for ABS, SIGN,
+            // INTEGER, INTEGER-PART and FRACTION-PART alike. Each now has a U-named runtime twin (named, never
+            // overloaded: an int literal converts to both Int128 and UInt128, CS0121 — see CobolNum.FormatDisplayU)
+            // whose result is correct WITHOUT narrowing (ABS of an unsigned operand is the operand itself), so the
+            // five agree on the one carrier question.
             case "SignOf":                                                      // §15.81 — scale-independent sign
-                return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, Arg(ic, 0).Expr), 0);
-            case "Floor":                                                       // §15.44 INTEGER — floor to scale 0
             {
                 NumX a = Arg(ic, 0);
-                return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, $"{a.Expr}, {a.Scale}"), 0);
+                return new NumX(RuntimeApi.Intrinsic(a.U ? "SignOfU" : sig.RuntimeMethod, a.Expr), 0);
             }
+            case "Floor":                                                       // §15.44 INTEGER — floor to scale 0
             case "Truncate":                                                    // §15.49 INTEGER-PART — truncate to scale 0
             {
                 NumX a = Arg(ic, 0);
-                return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, $"{a.Expr}, {a.Scale}"), 0);
+                return a.U
+                    ? new NumX(RuntimeApi.Intrinsic("IntegerPartU", $"{a.Expr}, {a.Scale}"), 0, U: true)
+                    : new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, $"{a.Expr}, {a.Scale}"), 0);
             }
             case "AbsScaled":                                                   // §15.7 ABS — argument's own scale
             {
                 NumX a = Arg(ic, 0);
-                return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, a.Expr), a.Scale);
+                // |U| is U itself (an unsigned operand is never negative): no call, the operand passes on its own lane.
+                return a.U ? a : new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, a.Expr), a.Scale);
             }
             case "FractionPart":                                                // §15.42 — argument's own scale
             {
                 NumX a = Arg(ic, 0);
-                return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, $"{a.Expr}, {a.Scale}"), a.Scale);
+                return new NumX(RuntimeApi.Intrinsic(a.U ? "FractionPartU" : sig.RuntimeMethod, $"{a.Expr}, {a.Scale}"), a.Scale);
             }
             case "ModScaled":                                                   // §15.64 — floored modulus (sign table)
             case "RemScaled":                                                   // §15.77 — truncated remainder

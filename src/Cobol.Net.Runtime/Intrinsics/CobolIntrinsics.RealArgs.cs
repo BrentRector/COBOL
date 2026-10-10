@@ -257,14 +257,20 @@ public static partial class CobolIntrinsics
             if (b == -1) return CobolDec.From((e & 1) == 0 ? 1 : -1, 0);
             // |b| >= 2: every multiplication at least doubles the magnitude, so the loop leaves the carrier - and
             // stops - after at most 127 steps whatever the exponent.
-            Int128 r = 1, mag = Int128.Abs(b);
+            // ⛔ THE MAGNITUDE IS UNSIGNED (kb/Work PB2698): a signed 16-byte base can hold Int128.MinValue, whose
+            // Int128.Abs throws OverflowException (the statement then reported a size error, whatever the exponent).
+            // CobolDec.UAbs is the repository's one total magnitude. |Int128.MinValue| = 2^127 is past the carrier's
+            // positive range, so its powers take the documented double approximation below like any other power that
+            // leaves it - and no SDIDI ever carries Int128.MinValue as a significand (its own Int128.Abs sites would
+            // throw), which is why B ** 1 is not special-cased to return B.
+            UInt128 mag = CobolDec.UAbs(b), acc = 1;
             bool fits = true;
             for (Int128 i = 0; i < e; i++)
             {
-                if (Int128.Abs(r) > Int128.MaxValue / mag) { fits = false; break; }
-                r *= b;
+                if (acc > (UInt128)Int128.MaxValue / mag) { fits = false; break; }
+                acc *= mag;
             }
-            if (fits) return CobolDec.From(r, 0);
+            if (fits) return CobolDec.From(b < 0 && (e & 1) != 0 ? -(Int128)acc : (Int128)acc, 0);
         }
         return CobolDec.FromDouble(Math.Pow((double)b, (double)e));
     }
