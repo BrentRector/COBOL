@@ -106,6 +106,58 @@ public sealed class ModuleRegistrationTests
         Assert.True(Located(table, "P2097F"));
     }
 
+    /// <summary>kb/Work PB2843: an outermost unit's path is rooted at its EXTERNALIZED name, escaped so that an AS
+    /// literal holding the separator never meets a containee's path: <c>AS "A/B"</c> and the containee <c>B</c> of an
+    /// outermost <c>A</c> are two paths, and both register.</summary>
+    [Fact]
+    public void ThePath_IsInjective_EvenForAnExternalizedNameHoldingTheSeparator()
+    {
+        string a = ProgramTable.OutermostPath("P2843A");
+        string contained = ProgramTable.ContainedPath(a, "B");
+        string slashed = ProgramTable.OutermostPath("P2843A/B");
+        Assert.NotEqual(contained, slashed, StringComparer.OrdinalIgnoreCase);
+        Assert.NotEqual(ProgramTable.OutermostPath("P2843A\\/B"), slashed, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(ProgramTable.OutermostPath("P2843A"), ProgramTable.OutermostPath("  P2843A "));   // formed first
+
+        var table = new RunUnit().Programs;
+        table.RegisterModule("Cobol.PA.__CobolModule", Current, RuntimeAbi.CallAbi, () =>
+        {
+            table.Register(a, "P2843A", null, initial: false, common: false, recursive: false, _ => new Stub());
+            table.Register(contained, "B", a, initial: false, common: false, recursive: false, _ => new Stub());
+        });
+        table.RegisterModule("Cobol.PZ.__CobolModule", Current, RuntimeAbi.CallAbi, () =>
+            table.Register(slashed, "Z", null, initial: false, common: false, recursive: false, _ => new Stub(),
+                externalizedName: "P2843A/B"));
+        Assert.True(Located(table, "P2843A"));
+        Assert.True(Located(table, "P2843A/B"));
+    }
+
+    /// <summary>kb/Work PB2843: a registrar that repeats a path, inside its module or across modules, is a compiler
+    /// defect, refused LOUDLY rather than replacing a node another unit registered.</summary>
+    [Fact]
+    public void ARepeatedPath_IsRefusedLoudly_NeverReplacingANode()
+    {
+        var table = new RunUnit().Programs;
+        string w = ProgramTable.OutermostPath("P2843W");
+        var inModule = Assert.Throws<InvalidOperationException>(() =>
+            table.RegisterModule("Cobol.PW.__CobolModule", Current, RuntimeAbi.CallAbi, () =>
+            {
+                table.Register(w, "P2843W", null, initial: false, common: false, recursive: false, _ => new Stub());
+                table.Register(w, "P2843V", null, initial: false, common: false, recursive: false, _ => new Stub());
+            }));
+        Assert.Contains("PB2843", inModule.Message, StringComparison.Ordinal);
+
+        table.RegisterModule("Cobol.PW2.__CobolModule", Current, RuntimeAbi.CallAbi, () =>
+            table.Register(w, "P2843W", null, initial: false, common: false, recursive: false, _ => new Stub()));
+        // A hand-made registrar that roots its program at the declared name P2843W while externalizing P2843X.
+        var across = Assert.Throws<InvalidOperationException>(() =>
+            table.RegisterModule("Cobol.PX.__CobolModule", Current, RuntimeAbi.CallAbi, () =>
+                table.Register(w, "P2843W", null, initial: false, common: false, recursive: false, _ => new Stub(),
+                    externalizedName: "P2843X")));
+        Assert.Contains("Cobol.PW2.__CobolModule", across.Message, StringComparison.Ordinal);
+        Assert.False(Located(table, "P2843X"));
+    }
+
     [Fact]
     public void AProgram_IsRegisteredOnlyThroughItsModule()
     {

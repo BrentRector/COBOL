@@ -49,7 +49,7 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
     public void AddParagraph(string name, Core.SentenceContext[] sentences, SectionInfo? section, HashSet<string> used)
     {
         ctx.Data.DeclareUserWord(name, UserWordKind.ParagraphName);   // §8.3.2.2 — the one declaration funnel (kb/Work PB65, PB1083)
-        string baseName = "P_" + DataItem.IdentifierCharacters(name.Replace('.', '_'));   // extended letters too (PB1402)
+        string baseName = "P_" + DataItem.IdentifierCharacters(name);   // extended letters too (PB1402)
         string method = baseName;
         for (int n = 2; !used.Add(method); n++) method = $"{baseName}_{n}";
         // ⛔ DECLARE, never TryAdd (kb/Work PB466): a repeated spelling is KEPT, so §8.4.2.2.1's "No other name

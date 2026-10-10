@@ -79,23 +79,22 @@ public sealed class ExceptionEngine
     // Before this channel, only the sites an emitter could hand literals to answered r2; every other site
     // returned 63 spaces under WITH LOCATION (the F3 defect family). ──────────────────────────────────────────
 
-    private string? _stmtName;
-    private string? _stmtLoc;
-    private string[]? _stmtLocNames;
+    // The context lives IN the checking state (CheckingFlags.Statement), so it has the flags' scope: a checking
+    // BASELINE (PushAllCheckingOff — an activation, a USE procedure, a PERFORMed range) starts other source text with
+    // no context, and its restore brings the activating statement's back (kb/Work PB2745).
 
     /// <summary>Enter a checked statement's ambient context; returns the PRIOR context for the emitted
     /// finally's <see cref="ExitStatement"/> (save/restore, so a nested activation — a CALL inside the
     /// statement — restores the caller's context on return).</summary>
     public (string? Stmt, string? Loc, string[]? Names) EnterStatement(string stmt, string loc, string[] locNames)
     {
-        var prior = (_stmtName, _stmtLoc, _stmtLocNames);
-        (_stmtName, _stmtLoc, _stmtLocNames) = (stmt, loc, locNames);
+        var prior = _checking.Statement;
+        _checking.Statement = (stmt, loc, locNames);
         return prior;
     }
 
     /// <summary>Restore the prior ambient statement context (the emitted finally).</summary>
-    public void ExitStatement((string? Stmt, string? Loc, string[]? Names) prior) =>
-        (_stmtName, _stmtLoc, _stmtLocNames) = prior;
+    public void ExitStatement((string? Stmt, string? Loc, string[]? Names) prior) => _checking.Statement = prior;
 
     /// <summary>Record a raised non-I-O exception condition (§14.6.13.1.1: sets the last exception status;
     /// EXCEPTION-OBJECT is set to null — §14.9.29.4 GR1). With no explicit pair, the §15.32.3 r2 / §15.30.3 r2
@@ -104,10 +103,11 @@ public sealed class ExceptionEngine
     public void Set(string name, bool fatal, string? statement = null, string? location = null)
     {
         LastName = name.ToUpperInvariant();
-        if (statement is null && _stmtLocNames is { } names && System.Array.IndexOf(names, LastName) >= 0)
+        if (statement is null && _checking.Statement is { LocationNames: { } names } ambient
+            && System.Array.IndexOf(names, LastName) >= 0)
         {
-            statement = _stmtName;
-            location = _stmtLoc;
+            statement = ambient.Name;
+            location = ambient.Location;
         }
         LastFatal = fatal;
         LastFile = null;
@@ -405,8 +405,9 @@ public sealed class ExceptionEngine
     /// site it guarded later in the same statement read "not enabled").</summary>
     public CheckingFlags SaveChecking() => _checking;
 
-    /// <summary>Open a checking scope at the <b>BASELINE</b> — return the current state and disable ALL of it.
-    /// Pair with <see cref="RestoreChecking"/> in a <c>finally</c>.
+    /// <summary>Open a checking scope at the <b>BASELINE</b> — return the current state and disable ALL of it: every
+    /// flag, and the ambient statement context the same value carries (<see cref="CheckingFlags.Statement"/>; kb/Work
+    /// PB2745). Pair with <see cref="RestoreChecking"/> in a <c>finally</c>.
     ///
     /// <para>Enablement is a property of the SOURCE TEXT at the executing statement (§7.3.25.4 GR6: checking "is
     /// enabled for the procedure division statements and procedure division headers that follow in the

@@ -383,11 +383,13 @@ internal sealed class EcState
     /// around each <c>BoundEcChecked</c> body.</summary>
     public EcStatementInfo? Info { get; set; }
 
-    /// <summary>True while the code being emitted runs with some statement guard's run-time checking flags
-    /// STANDING — inside an <c>EcEmitter.OpenGateFlags</c> scope and not yet re-based by an
-    /// <c>EcEmitter.EnterCheckingBaseline</c> one (kb/Work PB891). Read only by <c>EnterCheckingBaseline</c>, so
-    /// the all-off scope around other source statements is emitted exactly where a guard's flags could leak into
-    /// them, and a statement list no flag guard encloses emits nothing.</summary>
+    /// <summary>True while the code being emitted runs with some statement's run-time checking state STANDING — a
+    /// guard's flags (inside an <c>EcEmitter.OpenGateFlags</c> scope) or its ambient statement context (inside
+    /// <c>EcEmitter.EmitChecked</c>'s <c>EnterStatement</c>, which the same <c>CheckingFlags</c> value carries; kb/Work
+    /// PB2745) — and not yet re-based by an <c>EcEmitter.EnterCheckingBaseline</c> one (kb/Work PB891). Read only by
+    /// <c>EnterCheckingBaseline</c>, so the all-off scope around other source statements is emitted exactly where a
+    /// statement's checking state could leak into them, and a statement list no such statement encloses emits
+    /// nothing.</summary>
     public bool FlagsStanding { get; set; }
 
     /// <summary>True while the statement being emitted has any EC-SIZE-* condition enabled (kb/Work PB91): the
@@ -422,9 +424,17 @@ internal sealed class EcState
 /// <summary>The inter-program emission state of the unit being emitted (COBOLNET_INTERPROGRAM_DESIGN D1–D5).</summary>
 internal sealed class CallUnitState
 {
-    /// <summary>The emitted unit's qualified program path — the CALL/CANCEL calling-path argument (§8.4.6.3).
-    /// Set per unit (a method body names its class).</summary>
-    public string SelfPath { get; set; } = "";
+    /// <summary>The emitted unit's qualified program path (<see cref="BoundUnit.Path"/>) — the CALL/CANCEL calling-path
+    /// argument (§8.4.6.3). Set per unit; <see cref="NoProgramPath"/> in a method body.</summary>
+    public string SelfPath { get; set; } = NoProgramPath;
+
+    /// <summary>The calling path of a CALL or CANCEL written in a METHOD: a method is contained in no program, so
+    /// §8.4.6.3 3)'s outermost programs are the only ones it can name. No unit's path is empty (an outermost path is
+    /// rooted at a non-empty externalized name), so this path names no program. The class name used to stand here,
+    /// and it named any program whose path is spelled like it, exposing that program's containees to the method
+    /// (kb/Work PB2843). It is not null: a null calling path is an activator outside every program, the host
+    /// boundary (DESIGN-external-repository §4.1).</summary>
+    public const string NoProgramPath = "";
 
     /// <summary>The LINKAGE RETURNING item's place (null when none) — the EXIT PROGRAM / GOBACK result store.
     /// Set per unit (methods deliver results via slice-2 RETURNING, never the program ABI).</summary>

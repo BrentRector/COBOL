@@ -139,4 +139,84 @@ public sealed class ModuleRegistrationHostTests
         }
         finally { CutRunner.TryDelete(dir); }
     }
+
+    /// <summary>kb/Work PB2839: modules <c>P2839-R</c> and <c>P2839_R</c> are two assemblies and two namespaces, because the
+    /// identifier derived from a name is injective (<c>DataItem.IdentifierCharacters</c>). The old mapping wrote both
+    /// <c>Cobol.P2839_R</c>, so the second module's registrar was the first's, <c>RegisterModule</c> returned at once for
+    /// it, and <c>CALL "P2839_R"</c> answered EC-PROGRAM-NOT-FOUND ("does not carry the program").</summary>
+    [Fact]
+    public void ModulesWhoseNamesDifferOnlyInHyphenAndUnderscore_AreTwoModules()
+    {
+        const string main = """
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. P2839M.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 W-N PIC 9(4) VALUE 7.
+            PROCEDURE DIVISION.
+                CALL "P2839-R" USING W-N
+                DISPLAY "AFTER HYPHEN " W-N
+                CALL "P2839_R" USING W-N
+                DISPLAY "AFTER UNDERSCORE " W-N
+                STOP RUN.
+            END PROGRAM P2839M.
+            """;
+        string dir = CutRunner.NewTempDir("pb2839");
+        try
+        {
+            NonCobolElement.CompileCobol(dir, "P2839-R", Callee("P2839-R", 10));
+            NonCobolElement.CompileCobol(dir, "P2839_R", Callee("P2839_R", 100));
+            NonCobolElement.CompileCobol(dir, "P2839M", main);
+            var (exit, stdout, detail) = CutRunner.RunExit(Path.Combine(dir, "P2839M.dll"), dir);
+            Assert.True(exit == 0, detail);
+            Assert.Equal("AFTER HYPHEN 0017\nAFTER UNDERSCORE 0117", stdout);   // 7 + 10, then + 100
+        }
+        finally { CutRunner.TryDelete(dir); }
+    }
+
+    /// <summary>kb/Work PB2843: two modules each DECLARE an outermost <c>P2843W</c>, the sibling's <c>AS "P2843X"</c>
+    /// (legal: §8.3.2.2 2) externalizes the AS literal, so the two externalized names differ). Each outermost program's
+    /// run-unit path is rooted at its externalized name (<c>ProgramTable.OutermostPath</c>), so loading the sibling
+    /// leaves the main module's node, and its containee, in place: §8.4.6.3 1) (cite.py OK) "that program-name may be
+    /// referenced only by statements included in that containing program", and P2843W contains P2843H. With a
+    /// declared-name root the sibling's node replaced the main module's, and <c>CALL "P2843H"</c> was not found.</summary>
+    [Fact]
+    public void ASiblingModuleDeclaringTheSameProgramNameAsAnotherName_LeavesTheFirstModulesContaineesCallable()
+    {
+        const string main = """
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. P2843W.
+            PROCEDURE DIVISION.
+                CALL "P2843X" ON EXCEPTION DISPLAY "X NOT FOUND" END-CALL
+                CALL "P2843H" ON EXCEPTION DISPLAY "H NOT FOUND" END-CALL
+                CANCEL "P2843H"
+                CALL "P2843H" ON EXCEPTION DISPLAY "H NOT FOUND" END-CALL
+                STOP RUN.
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. P2843H.
+            PROCEDURE DIVISION.
+                DISPLAY "MAIN'S CONTAINEE"
+                GOBACK.
+            END PROGRAM P2843H.
+            END PROGRAM P2843W.
+            """;
+        const string sibling = """
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. P2843W AS "P2843X".
+            PROCEDURE DIVISION.
+                DISPLAY "SIBLING"
+                GOBACK.
+            END PROGRAM P2843W.
+            """;
+        string dir = CutRunner.NewTempDir("pb2843");
+        try
+        {
+            NonCobolElement.CompileCobol(dir, "P2843X", sibling);
+            NonCobolElement.CompileCobol(dir, "P2843W", main);
+            var (exit, stdout, detail) = CutRunner.RunExit(Path.Combine(dir, "P2843W.dll"), dir);
+            Assert.True(exit == 0, detail);
+            Assert.Equal("SIBLING\nMAIN'S CONTAINEE\nMAIN'S CONTAINEE", stdout);
+        }
+        finally { CutRunner.TryDelete(dir); }
+    }
 }

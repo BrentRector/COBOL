@@ -1297,21 +1297,34 @@ public sealed class DataItem
     /// identifier, and at COBOL 2023 gave two different words (dotless i, final sigma) one.</summary>
     public static string WordIdentifier(string cobolWord) => Sanitize(CobolNames.UpperFold(cobolWord));
 
-    /// <summary>The characters of a COBOL word as C# identifier characters: a hyphen becomes an underscore, and a
-    /// character a C# identifier cannot hold is written <c>_uXXXX_</c> by its code point — an extended letter of
-    /// Annex B that C# does not accept (KATAKANA MIDDLE DOT U+30FB, a supplementary-plane letter, whose surrogates
-    /// Roslyn refuses in an identifier; kb/Work PB1402). Every other extended letter is kept as written, so the
-    /// generated program reads like its source.</summary>
+    /// <summary>The characters of a COBOL word as C# identifier characters, by an INJECTIVE mapping (kb/Work PB2839): two
+    /// different words never give one identifier, so <c>METHOD-ID. A-B</c> and <c>METHOD-ID. A_B</c> (two COBOL words
+    /// since the underscore joined the word characters; ISO §8.3.2.1) are two C# members, and modules <c>PAY-ROLL</c> and
+    /// <c>PAY_ROLL</c> two namespaces. The mapping, character by character:
+    /// <list type="bullet">
+    ///   <item>a hyphen is an underscore, the common case, so the generated program reads like its source — except a
+    ///     hyphen that is the FIRST character or is followed by a lowercase <c>u</c>, which is escaped like the next
+    ///     item (a COBOL word never begins with a hyphen, §8.3.2.1, and an upper-folded word has no lowercase <c>u</c>,
+    ///     so these arise only for the non-word strings <see cref="Sanitize"/> also maps, such as an assembly name);</item>
+    ///   <item>an underscore, and any character a C# identifier cannot hold, is written <c>_uXXXX_</c> by its code point
+    ///     (upper-case hex): an extended letter of Annex B that C# does not accept (KATAKANA MIDDLE DOT U+30FB, a
+    ///     supplementary-plane letter, whose surrogates Roslyn refuses in an identifier; kb/Work PB1402);</item>
+    ///   <item>every other character is kept as written.</item>
+    /// </list>
+    /// So an underscore in the output is either a hyphen (never followed by <c>u</c>) or opens an escape (always followed
+    /// by <c>u</c>, whose upper-case hex ends at the next underscore), and the input can be read back: the mapping is
+    /// injective, which <c>IdentifierInjectivityTests</c> pins.</summary>
     public static string IdentifierCharacters(string cobolName)
     {
         System.Text.StringBuilder? sb = null;
         for (int i = 0; i < cobolName.Length; i++)
         {
             char c = cobolName[i];
-            if (c == '-' || !SyntaxFacts.IsIdentifierPartCharacter(c))
+            bool plainHyphen = c == '-' && i > 0 && (i + 1 == cobolName.Length || cobolName[i + 1] != 'u');
+            if (plainHyphen || c == '_' || c == '-' || !SyntaxFacts.IsIdentifierPartCharacter(c))
             {
                 sb ??= new System.Text.StringBuilder(cobolName.Length + 8).Append(cobolName, 0, i);
-                if (c == '-') { sb.Append('_'); continue; }
+                if (plainHyphen) { sb.Append('_'); continue; }
                 bool pair = char.IsHighSurrogate(c) && i + 1 < cobolName.Length && char.IsLowSurrogate(cobolName[i + 1]);
                 int cp = pair ? char.ConvertToUtf32(c, cobolName[++i]) : c;
                 sb.Append("_u").Append(cp.ToString("X4")).Append('_');

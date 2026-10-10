@@ -4,5 +4,7 @@ CobolNet.Runtime.ConfigEntry.FamilyMember.init -> void
 static CobolNet.Runtime.CobolIntrinsics.FractionPartU(System.UInt128 v, int scale) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.IntegerPartU(System.UInt128 v, int scale) -> System.UInt128
 static CobolNet.Runtime.CobolIntrinsics.SignOfU(System.UInt128 v) -> long
+static CobolNet.Runtime.ProgramTable.ContainedPath(string! containerPath, string! name) -> string!
+static CobolNet.Runtime.ProgramTable.OutermostPath(string! externalizedName) -> string!
 static CobolNet.Runtime.SwitchStore.IsVariableName(string! variableName) -> bool
 static CobolNet.Runtime.SwitchStore.Names.get -> System.Collections.Generic.IReadOnlyList<string!>!

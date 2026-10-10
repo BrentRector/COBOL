@@ -452,7 +452,12 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
   **AMBIENT statement context** (kb/Work R14): `EmitChecked` emits `ExceptionState.EnterStatement(name, loc,
   withLocationNames)` around each checked statement (save/restore, so a nested activation restores its
   caller's), and the 2-argument `ExceptionState.Set` — the form every raise site uses — resolves the pair from
-  it PER-CONDITION (§15.32.3 r1 keys on the RAISED name's own TURN; kb/Work R06). ⚠ The former design recorded
+  it PER-CONDITION (§15.32.3 r1 keys on the RAISED name's own TURN; kb/Work R06). The context is a field of the
+  checking state itself (`CheckingFlags.Statement`), so it has the checking flags' scope: every checking BASELINE
+  (`PushAllCheckingOff` — a CALL or function activation, a method body, a USE procedure, a PERFORMed range or a
+  nested statement list) starts the other source text with NO context and its restore brings the activating
+  statement's back; a raise in a callee whose own TURN has no LOCATION answers spaces, never the CALL's name and
+  location (kb/Work PB2745). ⚠ The former design recorded
   the pair "at the raise site" via per-site baked literals, and every site the emitter could NOT hand literals
   to (SEARCH's range Sets, CONTINUE AFTER, `CobolString`/`CobolDynString`/`CobolTiming`) answered 63 spaces
   under WITH LOCATION — the F3 defect family. The ONE remaining positional channel is `__IoCheckEc`'s

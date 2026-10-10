@@ -386,8 +386,14 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
             string arr = string.Join(", ", locNames.Select(CsLiteral));
             w.Line($"var __ecs{id} = ExceptionState.EnterStatement({CsLiteral(ec.Info.StatementName)}, "
                 + $"{CsLiteral(ec.Info.Location)}, new[] {{ {arr} }});");
+            // The context is part of the run-time checking state (CheckingFlags.Statement), so while it stands the
+            // checking state is not the baseline: other source text reached from inside this statement (a PERFORMed
+            // range, a nested statement list) opens one, whether or not a gate flag is set (kb/Work PB2745).
+            bool standing = ecState.FlagsStanding;
+            ecState.FlagsStanding = true;
             using (w.Block("try"))
                 terminated = EmitGatesOrInner(ec);
+            ecState.FlagsStanding = standing;
             w.Line($"finally {{ ExceptionState.ExitStatement(__ecs{id}); }}");
         }
         else

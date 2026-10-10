@@ -456,7 +456,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         CodeWriter w, IReadOnlyList<string>? headerExtras, bool sealedType = false)
     {
         program.BeginUnit(w, data, refs);
-        callState.SelfPath = cobolName;       // a CALL from a method names the class as its calling path (§8.4.6.3)
+        callState.SelfPath = CallUnitState.NoProgramPath;   // a method is contained in no program (§8.4.6.3; kb/Work PB2843)
         callState.ReturningPlace = null;      // methods deliver results via slice-2 RETURNING, never the program ABI
         callState.Formals = [];               // a class has no program-ABI formals — clear the last program's (GR1c recognition)
         ecState.UnitHasF3 = false;            // declaratives inside methods are staged loud (no __EcDispatch here)

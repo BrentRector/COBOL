@@ -24,7 +24,7 @@ public sealed class ProgramTable
 {
     private sealed class Node
     {
-        public required string Path;        // containment path id, e.g. "OUTER/INNER" (unique run-unit-wide)
+        public required string Path;        // containment path id (OutermostPath / ContainedPath), unique run-unit-wide
         public required string Name;        // program-name-1 / user-function-name-1 AS WRITTEN — what FUNCTION
                                             // MODULE-NAME reports (§15.65.4 r4 determination, CONFORMANCE DOC-A.1-135)
                                             // and what a diagnostic names. NEVER the AS literal.
@@ -75,6 +75,27 @@ public sealed class ProgramTable
 
     public ProgramTable(RunUnit owner) => _owner = owner;
 
+    /// <summary>⛔ THE path of an OUTERMOST unit — the run-unit key every <see cref="Register"/>, CALL, CANCEL and
+    /// <see cref="RunMain"/> names a unit by, formed here ONCE for the compiler that emits it (kb/Work PB2843). It is
+    /// rooted at the unit's EXTERNALIZED name, never its declared one: §8.3.2.2 2) makes the externalized name the one
+    /// that identifies an outermost program within a run unit ("Within a run unit, all instances of a given name that
+    /// is externalized to the operating environment shall identify the same kind of entity or item"), and
+    /// <see cref="RegisterModule"/> refuses a second module carrying one, so the root is unique run-unit-wide. Two
+    /// modules may each declare <c>PROGRAM-ID. WORKER</c> (one of them <c>AS "X"</c>); a declared-name root gave both
+    /// the key <c>WORKER</c>, and the second module's node replaced the first's, so the first's contained programs
+    /// were no longer contained in its caller (EC-PROGRAM-NOT-FOUND). The root is ESCAPED (<c>\</c> → <c>\\</c>,
+    /// <c>/</c> → <c>\/</c>) because an AS literal may hold the separator: <c>AS "A/B"</c> must never meet the
+    /// containee <c>B</c> of an outermost <c>A</c>. A containee's segment is a COBOL word, which holds neither
+    /// character, so the whole path is injective.</summary>
+    public static string OutermostPath(string externalizedName) =>
+        ExternalizedNames.Form(externalizedName).Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("/", "\\/", StringComparison.Ordinal);
+
+    /// <summary>The path of a CONTAINED unit: its container's path and its program-name. §8.4.6.3: "The names
+    /// assigned to programs that are contained directly or indirectly within the same outermost program shall be
+    /// unique within that outermost program", so the path is unique under its unique root (<see cref="OutermostPath"/>).</summary>
+    public static string ContainedPath(string containerPath, string name) => containerPath + "/" + name;
+
     /// <summary>Register one program unit (emitted once per unit at run-unit start, containers before containees).
     /// <paramref name="staticReset"/> — supplied ONLY by a RECURSIVE-and-not-INITIAL unit with static WS
     /// storage or unit-scoped file connectors (kb/Work PB168) — re-initializes that unit's STATIC WS fields
@@ -120,6 +141,11 @@ public sealed class ProgramTable
             Returning = returning, Formals = formals,
             StaticReset = staticReset, IsFunction = isFunction,
         };
+        // A path is one unit's (OutermostPath / ContainedPath are injective), so a second unit under a path the module
+        // already staged is a compiler defect: LOUD, never a silent replacement (kb/Work PB2843).
+        if (stagedByPath.ContainsKey(path))
+            throw new InvalidOperationException(
+                $"program {name} registered under the path '{path}', which module {module} already registered (kb/Work PB2843)");
         if (parentPath is not null)
         {
             // A containee whose container is unregistered would SILENTLY drop out of the GR4 cancel cascade
@@ -130,7 +156,7 @@ public sealed class ProgramTable
                     $"program {name} registered before its container {parentPath} — the registrar emits containers first (kb/Work PB154)");
             parent.Children.Add(node);
         }
-        stagedByPath[path] = node;
+        stagedByPath.Add(path, node);
         staged.Add(node);
     }
 
@@ -188,10 +214,18 @@ public sealed class ProgramTable
                         + "(ISO §8.3.2.2 2; §14.9.4.4 GR3b — EC-PROGRAM-NOT-FOUND)",
                         "EC-PROGRAM-NOT-FOUND");
         }
+        // Once no outermost name repeats, no path does (OutermostPath roots each at its unique externalized name), so a
+        // repeated path is a module whose registrar did not form its paths through OutermostPath / ContainedPath: LOUD,
+        // because committing it would replace another module's node (kb/Work PB2843).
+        foreach (var n in staged)
+            if (_byPath.TryGetValue(n.Path, out var other))
+                throw new InvalidOperationException(
+                    $"module {registrar} registers the path '{n.Path}' module {other.Module} already registered: a path "
+                    + "is formed by ProgramTable.OutermostPath / ContainedPath (kb/Work PB2843)");
         _modules.Add(registrar);
         foreach (var n in staged)
         {
-            _byPath[n.Path] = n;
+            _byPath.Add(n.Path, n);
             _order.Add(n);
             // Run-unit start = initial state for the unit's static data (§14.6.2.3.2 case 1), and run-unit termination
             // releases it (§14.6.11 3/4/6) — both through the run unit's ONE static-storage adoption (kb/Work PB1069).

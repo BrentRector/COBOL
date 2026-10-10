@@ -583,10 +583,12 @@ and a "facade" that "forwards" are rewritten to that statement in the same chang
 
 ### 4.5 Namespaces and `__CobolModule`
 Every emitted type lives in the namespace `Cobol.<S>`, where `<S>` is the assembly simple name made ONE identifier by
-`DataItem.Sanitize` (each character a C# identifier cannot hold, `.` included, written `_uXXXX_`; a leading digit
-prefixed with `_`; a C# keyword escaped with `@` in the source and bare in metadata), `CsNames.ModuleNamespaceOf`, so
+`DataItem.Sanitize` (each character a C# identifier cannot hold, `.` and `_` included, written `_uXXXX_`; a hyphen
+written `_`; a leading digit prefixed with `_`; a C# keyword escaped with `@` in the source and bare in metadata — an
+INJECTIVE mapping, `DataItem.IdentifierCharacters`, kb/Work PB2839), `CsNames.ModuleNamespaceOf`, so
 `PAY.V2.dll` is `Cobol.PAY_u002E_V2` and never meets a type `V2` in `Cobol.PAY` (r7-ns: the dotted form is CS0434 in
-a host and CS0437 in a group). No emitted type lives directly in `Cobol`, so a namespace never meets a type, and two
+a host and CS0437 in a group), and `PAY-ROLL.dll` (`Cobol.PAY_ROLL`) and `PAY_ROLL.dll` (`Cobol.PAY_u005F_ROLL`) are
+two namespaces and two registrars. No emitted type lives directly in `Cobol`, so a namespace never meets a type, and two
 COBOL assemblies referenced by one host never collide on a program or class name or on `__CobolModule`; two needed
 assemblies whose namespaces coincide are REPO-6. `[assembly: CobolRepository(…, Registrar = "Cobol.ACCT.__CobolModule")]`
 tells the run-time probe which type to invoke.
@@ -1254,6 +1256,13 @@ composing a run unit (§11.4) and the probe all reach a module through that memb
    refused whole, naming both modules, and nothing of it is registered. `ProgramTable.Register` writes only into the
    staging list of the `RegisterModule` call that is running, and throws outside one, so `RegisterModule` is the only
    writer of the registration set.
+   Every unit's run-unit key, its PATH, is formed by `ProgramTable.OutermostPath` (an outermost unit: its EXTERNALIZED
+   name, escaped so an AS literal holding `/` never meets a containee's path) and `ProgramTable.ContainedPath` (a
+   containee: its container's path and its program-name), so once no outermost name repeats no path does: two modules
+   that each DECLARE `PROGRAM-ID. WORKER`, one `AS "X"`, keep two nodes (kb/Work PB2843). A repeated path, in the
+   module or across modules, is a registrar defect and is refused loudly (`InvalidOperationException`), never a
+   replaced node. A CALL or CANCEL written in a METHOD names no program as its calling path
+   (`CallUnitState.NoProgramPath`), never its class's name.
 A refusal is a `CobolCallException` with EC-PROGRAM-NOT-FOUND and the reason, the condition the activation that
 needed the module raises anyway, so `CarriedNames` is unchanged; reached from the probe it is the probe's failure
 reason (below).

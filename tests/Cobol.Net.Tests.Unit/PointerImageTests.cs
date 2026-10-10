@@ -48,6 +48,22 @@ public sealed class PointerImageTests
         Assert.NotEqual(at0, other);
     }
 
+    /// <summary>kb/Work PB2741: a program- or function-pointer's image is keyed by the SAME mapping its equality uses,
+    /// the Annex C fold (<see cref="CobolNames"/>, DOC-A.1-219), never the host's case mapping — so pointers
+    /// <see cref="ProgramPointer.SameTarget"/> calls equal (§8.8.4.2.16, "The operands are equal if they reference the same
+    /// address", cite.py OK) have one image, and pointers it calls unequal have two. The witnesses are where the host's
+    /// <c>ToUpperInvariant</c> disagrees with Annex C: it raises U+017F LATIN SMALL LETTER LONG S to S, which Annex C maps
+    /// nowhere, and leaves U+212A KELVIN SIGN alone, which Annex C folds to k.</summary>
+    [Theory]
+    [InlineData("Pſ", "PS", false)]
+    [InlineData("KP2741", "KP2741", true)]
+    public void AProgramPointersImage_FollowsItsEquality(string a, string b, bool sameTarget)
+    {
+        Assert.Equal(sameTarget, ProgramPointer.SameTarget(new ProgramPointer(a), new ProgramPointer(b)));
+        Assert.Equal(sameTarget, PointerImage.Of(new ProgramPointer(a)) == PointerImage.Of(new ProgramPointer(b)));
+        Assert.Equal(sameTarget, PointerImage.Of(new FunctionPointer(a)) == PointerImage.Of(new FunctionPointer(b)));
+    }
+
     [Fact]
     public void ProgramAndFunctionPointers_AreStablePerName_AndDistinctPerCategory()
     {

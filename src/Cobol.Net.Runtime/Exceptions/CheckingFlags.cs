@@ -255,4 +255,16 @@ public struct CheckingFlags
     /// <summary>EC-LOCALE-SIZE — locale editing of a PICTURE format-2 item truncated a character that is neither a
     /// zero nor a space caused by a suppressed zero (§13.18.40.5 r14 b); Table 13 Fatal; PB64 T6).</summary>
     public bool LocaleSize;
+
+    /// <summary>The AMBIENT STATEMENT CONTEXT (<see cref="ExceptionEngine.EnterStatement"/>): the executing statement's
+    /// Table 12 name and location, and the exception-names whose enabling TURN carried WITH LOCATION there — what a raise
+    /// with no explicit pair answers for §15.32.3 r2 / §15.30.3 r2. It is part of THIS value, not a field beside it,
+    /// because it is a property of the same source text as the flags (§7.3.25.4 GR6) and so has the same scope: every
+    /// boundary that opens a checking BASELINE (<see cref="ExceptionEngine.PushAllCheckingOff"/> — a CALL or function
+    /// activation, a method body, a USE procedure, a PERFORMed range or a nested statement list) clears it, and its
+    /// restore brings the activating statement's context back (kb/Work PB2745: kept beside the flags, it leaked across
+    /// those boundaries, and a raise in a CALLed program whose own TURN had no LOCATION answered the CALL statement's
+    /// name and location where §15.32.3 r1 requires spaces). Internal: generated code reaches it only through
+    /// <c>EnterStatement</c> / <c>ExitStatement</c>.</summary>
+    internal (string? Name, string? Location, string[]? LocationNames) Statement;
 }

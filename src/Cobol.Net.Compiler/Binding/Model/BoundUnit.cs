@@ -56,8 +56,13 @@ internal sealed class BoundUnit
     public BoundProgram Bound = null!;
     public List<CallBridge> Bridges = [];
 
-    /// <summary>The run-unit-unique containment path id (registry key; §8.4.6.3 scoping).</summary>
-    public string Path => Parent is null ? Name : Parent.Path + "/" + Name;
+    /// <summary>The run-unit-unique containment path id (registry key; §8.4.6.3 scoping), formed by the run-time
+    /// table's own two formers: an outermost unit's is rooted at its EXTERNALIZED name, which alone identifies it in a
+    /// run unit (§8.3.2.2 2), so two separately compiled modules declaring the same program-name never share one
+    /// (kb/Work PB2843).</summary>
+    public string Path => Parent is null
+        ? CobolNet.Runtime.ProgramTable.OutermostPath(ExternalizedName)
+        : CobolNet.Runtime.ProgramTable.ContainedPath(Parent.Path, Name);
 
     /// <summary>The C# nested-type reference from the top-level scope (factory construction).</summary>
     public string ClassRef => Parent is null ? ClassName : Parent.ClassRef + "." + ClassName;
