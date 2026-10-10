@@ -104,7 +104,7 @@ public sealed class CobolCallException(string message, string ecName = "EC-PROGR
 
 /// <summary>
 /// The static facade over the run unit's <see cref="ProgramTable"/> (the emitted surface — generated run-unit
-/// drivers call <c>ProgramRegistry.Reset()/RunMain(...)</c>, a module's <c>__CobolModule.EnsureRegistered()</c> calls
+/// drivers call <c>ProgramRegistry.Reset()/RunModule(...)</c> (a host: <c>RunMain(...)</c>), a module's <c>__CobolModule.EnsureRegistered()</c> calls
 /// <c>RegisterModule(...)</c> and its private registrar <c>Register(...)</c>, and call sites emit
 /// <c>CallProgram/Cancel</c>; kept name-stable pre-G8, DESIGN-runtime-library §2.1). Every member forwards to
 /// <c>RunUnit.Current.Programs</c>; <see cref="Reset"/> is the run-unit lifecycle's BEGIN
@@ -135,6 +135,10 @@ public static class ProgramRegistry
 
     /// <inheritdoc cref="ProgramTable.RunMain"/>
     public static void RunMain(string path) => RunUnit.Current.Programs.RunMain(path);
+
+    /// <inheritdoc cref="ProgramTable.RunModule"/>
+    public static void RunModule(Action ensureRegistered, string? mainPath)
+        => RunUnit.Current.Programs.RunModule(ensureRegistered, mainPath);
 
     /// <inheritdoc cref="ProgramTable.CallProgram"/>
     public static void CallProgram(string name, string callerPath, CobolArg[] args, CobolArg? returning,

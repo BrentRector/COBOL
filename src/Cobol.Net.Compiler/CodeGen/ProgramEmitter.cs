@@ -30,6 +30,7 @@ internal sealed class ProgramEmitter
     // collaborator emitters receive explicitly. The per-unit/per-statement mutation discipline is documented
     // on each; NameAllocator is ONE per run unit so unique-name sequences span units (Step 9a).
     private readonly NameAllocator _names = new();
+    private readonly GroupAtomTable _atoms = new();   // ONE per run unit, like _names (kb/Work PB2690)
     private readonly DispatchState _dispatchState = new();
     private readonly EcState _ecState = new();
     private readonly CallUnitState _callState = new();
@@ -62,7 +63,7 @@ internal sealed class ProgramEmitter
     /// collaborator emitter over the fresh writer/data/resolver (the <see cref="UnitEmitters"/> ctor wires
     /// the cycles).</summary>
     internal void BeginUnit(CodeWriter w, DataBinder data, ReferenceResolver refs)
-        => Current = new UnitEmitters(w, data, refs, _names, _dispatchState, _ecState, _callState, _oo,
+        => Current = new UnitEmitters(w, data, refs, _names, _atoms, _dispatchState, _ecState, _callState, _oo,
             _whenCompiledStamp);
 
     /// <summary>The EMIT half (rearch PHASE-03 Step 14a / PHASE-06 Step 2): render the run unit's C# from an
@@ -129,6 +130,7 @@ internal sealed class ProgramEmitter
             w.Line();
             using (w.Block("internal static class Program"))
             using (w.Block("private static void Main()")) { }
+            _atoms.Emit(w);
             return w.ToString();
         }
 
@@ -136,6 +138,7 @@ internal sealed class ProgramEmitter
             if (unit.Parent is null && !unit.IsPrototype)   // a prototype has no body (§10.6.2 SR4f) — no class
                 EmitProgramClass(unit, w);
         EmitEntryWrapper(units, w, anyFiles, ns);
+        _atoms.Emit(w);   // every §8.5.1.12 atom array a unit named, once (kb/Work PB2690)
         return w.ToString();
     }
 
@@ -158,7 +161,7 @@ internal sealed class ProgramEmitter
     /// The BY VALUE leg is the detached value copy (§14.2.3 GR10). A BY VALUE dynamic-length formal cannot
     /// arise — §14.2.2 SR2 admits only class numeric, message-tag, object or pointer BY VALUE — so the dynamic
     /// arm is stated first without a mode test rather than duplicated under both.</summary>
-    private static string FormalTextCarrier(LinkageFormal f, int fixedWidth, DataEmitter seeds) =>
+    private string FormalTextCarrier(LinkageFormal f, int fixedWidth, DataEmitter seeds) =>
         f.Item.IsDynamicLength
             ? RuntimeApi.ArgAdaptDynText("__args", f.Position, $"{f.Item.DynMaxSize}")
         : f.ByValue
@@ -177,7 +180,7 @@ internal sealed class ProgramEmitter
     /// docs/CONFORMANCE.md DOC-A.1-141): the same category-default value its declared carrier starts with at the
     /// main-program entry (<see cref="DataEmitter.UnboundFormalCarrier"/>), so an omitted formal and an unbound one
     /// read alike — spaces, boolean zeros, a numeric zero image — in every arm.</summary>
-    private static string UnboundFactory(LinkageFormal f, int width, DataEmitter seeds) =>
+    private string UnboundFactory(LinkageFormal f, int width, DataEmitter seeds) =>
         $"static () => {seeds.UnboundFormalCarrier(f.Item, Math.Max(1, width))}";
 
     /// <summary>A fixed-length GROUP formal's §8.5.1.12 atoms, the one fact a VARIABLE-LENGTH group argument
@@ -185,12 +188,12 @@ internal sealed class ProgramEmitter
     /// <see cref="RuntimeApi.NoTableGroupAtoms"/> when it has none (its length is then the whole description),
     /// and null for a formal that is not a group, which no variable-length group is compatible with
     /// (§8.5.1.12.1).</summary>
-    private static string? GroupFormalAtoms(DataItem formal) =>
+    private string? GroupFormalAtoms(DataItem formal) =>
         // A bit / national group crosses as its ELEMENTARY value (kb/Work PB1166 — CallEmitter.CallStringRead),
         // which has no §8.5.1.12 image layout to meet.
         !ItemCategory.IsGroupItem(formal) || formal.IsAsIfElementary
             || VariableLengthCompatibility.GroupAtoms(formal) is not { } atoms ? null
-        : VariableLengthCompatibility.HasTableOrVariable(atoms) ? RuntimeApi.GroupAtomsNew(atoms)
+        : VariableLengthCompatibility.HasTableOrVariable(atoms) ? _atoms.Ref(atoms)
         : RuntimeApi.NoTableGroupAtoms;
 
     /// <summary>⛔ THE ONE ADOPTION EXPRESSION for a formal's carrier at the activation boundary — one arm per
@@ -200,7 +203,7 @@ internal sealed class ProgramEmitter
     /// this repo's two-arm-dispatch shape with the arms one method apart.
     /// <paramref name="textWidth"/> is the character arm's window — the formal's PICTURE length for a resident
     /// formal, its whole record image for a round-tripped one.</summary>
-    private static string FormalAdopt(LinkageFormal f, CallCrossing crossing, string carrier, int textWidth, DataEmitter seeds) =>
+    private string FormalAdopt(LinkageFormal f, CallCrossing crossing, string carrier, int textWidth, DataEmitter seeds) =>
         crossing switch
         {
             CallCrossing.Native => f.ByValue
@@ -743,15 +746,15 @@ internal sealed class ProgramEmitter
     /// never a re-parse of the text as a number (which aborted on spaces);</item>
     /// <item>anything else — its content alone.</item>
     /// </list></summary>
-    private static string ReturningDelivery(Place ret)
+    private string ReturningDelivery(Place ret)
     {
         // A strongly-typed group with an object-reference or pointer leaf has no character image: its content is its
         // AREA — the characters and the references of its cell — delivered into the receiver's area (kb/Work PB1940;
         // DataBinder.PtrBindBasedAndAddressables claims both onto cells).
         if (ret.DenotedItem is { } leafGroup && CobolNet.Compiler.Oo.OoClassTable.LeafCarried(leafGroup)
-            && CallEmitter.AreaOf(ret) is { } area)
+            && CallEmitter.AreaOf(ret, _atoms) is { } area)
             return RuntimeApi.ArgAdaptStoreReturnArea("__ret", area, leafGroup.ByteWidth);
-        string? atoms = CallEmitter.BoundaryAtoms(ret);
+        string? atoms = CallEmitter.BoundaryAtoms(ret, _atoms);
         if (CallEmitter.CallPlaceIsVarGroup(ret))
             return RuntimeApi.ArgAdaptStoreReturn("__ret", PlaceRenderer.VarGroupBoundaryImage(ret, "RETURNING item"), atoms!);
         string? profile = ret.DenotedItem is { Pic: { Category: PicCategory.Numeric, IsFloat: false, Usage: not Usage.Index } } item
@@ -764,8 +767,8 @@ internal sealed class ProgramEmitter
     }
 
     /// <summary>A variable-length group formal's §8.5.1.12 atoms, emitted for its adapter (kb/Work PB965, PB2280).</summary>
-    private static string FormalAtoms(DataItem formal) =>
-        RuntimeApi.GroupAtomsNew(VariableLengthCompatibility.GroupAtoms(formal)
+    private string FormalAtoms(DataItem formal) =>
+        _atoms.Ref(VariableLengthCompatibility.GroupAtoms(formal)
             ?? throw new InvalidOperationException($"variable-length formal '{formal.CobolName}' has no §8.5.1.12 atoms"));
 
     /// <summary>Emit the module registrar + the run-unit entry wrapper (<see cref="EmitModuleRegistrar"/>, then
@@ -868,19 +871,23 @@ internal sealed class ProgramEmitter
         {
             w.Line("ProgramRegistry.Reset();");
             if (anyFiles) w.Line($"{RuntimeApi.FileInit()};");
-            w.Line($"{ModuleNamespace.RegistrarClass}.EnsureRegistered();");
+            // The run-unit TERMINATION surface is owned by the runtime's RunModule boundary
+            // (ProgramTable.RunModule): the module's OWN registration (EnsureRegistered, which the run unit may refuse,
+            // PB2097 — kb/Work PB2846: it used to run before the boundary, so a version-skew refusal of the main module
+            // escaped as an unhandled .NET exception), the STOP-status flush (§14.9.42.4 GR5, via the
+            // RunUnit.ExitStatus setter), the §14.6.12 abnormal-termination diagnostic + nonzero exit on a fatal EC, and
+            // the §14.6.11 implicit CLOSE of ALL run-unit connectors. Runtime-side so each applies to the WHOLE run unit —
+            // incl. a separately-compiled CALLed module whose EC/file descriptors this compilation group never
+            // saw — not just this group (SSOT §18.16 keeps the wrapper scaffolding-free). The entry wrapper only
+            // catches StopRun, the normal STOP RUN / main-program-GOBACK unwind boundary. A module with no main
+            // program (a callable library) registers through the same boundary and has no unwind to catch.
+            string ensure = $"{ModuleNamespace.RegistrarClass}.EnsureRegistered";
             if (mainUnit is not null)
             {
-                // The run-unit TERMINATION surface is owned by the runtime's RunMain boundary
-                // (ProgramTable.RunMain): the STOP-status flush (§14.9.42.4 GR5, via the RunUnit.ExitStatus setter),
-                // the §14.6.12 abnormal-termination diagnostic + nonzero exit on a fatal EC, and the §14.6.11
-                // implicit CLOSE of ALL run-unit connectors. Runtime-side so each applies to the WHOLE run unit —
-                // incl. a separately-compiled CALLed module whose EC/file descriptors this compilation group never
-                // saw — not just this group (SSOT §18.16 keeps the wrapper scaffolding-free). The entry wrapper only
-                // catches StopRun, the normal STOP RUN / main-program-GOBACK unwind boundary.
-                w.Line($"try {{ ProgramRegistry.RunMain({CsLiteral(mainUnit.Path)}); }}");
+                w.Line($"try {{ {RuntimeApi.RunModule(ensure, CsLiteral(mainUnit.Path))}; }}");
                 w.Line("catch (StopRun) { }");
             }
+            else w.Line($"{RuntimeApi.RunModule(ensure, "null")};");
         }
     }
 }

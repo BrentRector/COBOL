@@ -554,12 +554,14 @@ argument. Golden `2002/pb615_unreadable_argument_carrier`; unit
 
 **⛔ A FIXED-LENGTH GROUP OPPOSITE A VARIABLE-LENGTH ONE (kb/Work PB965).** §8.5.1.12.1 admits the pair ("only
 one of the operands may be a variable-length group") and §14.8.2.2 / §14.8.3.2 import it into every boundary. The
-fixed group decomposes into the same `CobolVarGroup` (`FromFixedImage`) and is rebuilt from it (`ToFixedImage`)
-at the spans of ITS tables that CORRESPOND to the variable-length group's dynamic-capacity tables — and
-correspondence is a fact about the PAIR (§8.5.1.12.2: "they occupy the same relative byte positions within their
-groups"), so it is computed by ONE walk, `CobolVarGroup.CorrespondingSpans(fixedLayout, varLayout)`, over each
-group's §8.5.1.12 LAYOUT (`GroupCompatibility.Layout` of the group's atoms — `(kind, chars, elementChars)` triples:
-fixed run, fixed table, occurs-depending table, dynamic-capacity table, dynamic-length item). The corresponding fixed table
+fixed group is its record image with no components, a carrier in its OWN shape (`CobolVarGroup.OfImage`), and it
+converts to and from the variable-length group's carrier through the same `Reshape` / `Overlay` a MOVE uses
+(`FromImage`, `ToImage`, `OverlayImage`, `OverlaidImage`; kb/Work PB2690, which folded the former span walk
+`CorrespondingSpans` and its `*FixedImage` converters into them, PB2281) — and correspondence is a fact about the PAIR
+(§8.5.1.12.2: "they occupy the same relative byte positions within their groups"), so it is decided by ONE walk,
+`GroupCompatibility.Walk`, over the two groups' §8.5.1.12 ATOMS, which carry every table's element layout: a fixed table of
+fixed elements opposite a dynamic-capacity table of variable-length elements crosses element by element
+(§14.6.9.2). The corresponding fixed table
 crosses at its fixed occurrence count (§8.5.1.12.3 sentence 3); a fixed table opposite plain bytes is plain
 material (the former `FlatTableSpans` lifted EVERY table and moved the wrong one); a dynamic-capacity table past the
 fixed group's last character gets no component (§8.5.1.12.2's last sentence — the receiver's §14.6.9.4 space fill).
@@ -568,15 +570,15 @@ The two sides of a CALL are compiled apart, so each side's §8.5.1.12 ATOMS TRAV
 `VariableLengthCompatibility.GroupAtoms`), emitted for a group with a table or a variable-length member; the formal's
 adapter (`CobolArgAdapt.VarGroup/VarGroupValue(args, i, formalAtoms)`) and the RETURNING legs
 (`StoreReturnGroup`, `StoreReturn(ret, CobolVarGroup, atoms)`) pair them; a table-less fixed group states only
-its length (`CobolVarGroup.FixedRun`). The atoms, not the `int[]` layout derived from them, are what travel because
+its length (`GroupCompatibility.FixedRun`). The atoms are what travel because
 TWO VARIABLE-LENGTH GROUPS OF DIFFERENT SHAPES are compatible too (§8.5.1.12.1 constrains only where the variable-length
 items lie): the formal sees the argument's carrier rebuilt in its own shape (`CobolVarGroup.Reshape`) and a BY REFERENCE
 store overlays the argument's storage (`CobolVarGroup.Overlay`, §14.2.3 GR8), so the argument material the formal does not
 describe survives; a RETURNING value is rebuilt in the receiver's shape. This is the conversion the INVOKE lanes
 (`UniversalGroupCarrier`, `OoEmitter.VarGroupShapes`) already made; an incompatible pair met at run time fails the
-activation with EC-PROGRAM-ARG-MISMATCH. Golden `2014/pb2280_call_variable_length_shapes`. ⚠ The fixed-⇄-variable pair
-still converts through the span walk over layouts; kb/Work PB2281 folds it into `Reshape` / `Overlay`. The §14.9.25.4 GR9 MOVE and the typed INVOKE know both descriptions at
-compile time and call the SAME walk there (`VariableLengthCompatibility.CorrespondingSpans`). ⚠ DETERMINATION: a
+activation with EC-PROGRAM-ARG-MISMATCH. Golden `2014/pb2280_call_variable_length_shapes`. The §14.9.25.4 GR9 MOVE and
+the typed INVOKE know both descriptions at compile time and state the two shape arrays there
+(`VariableLengthCompatibility.GroupAtoms`; `OoEmitter.FixedArgumentShapes` / `VarPlaceShapes`). ⚠ DETERMINATION: a
 callee cannot grow a fixed-length argument's table past its fixed extent — that storage has no more occurrences —
 so the write-back fits each component to its table as §14.6.9.2 fits a dynamic sending table into a non-dynamic
 receiving one ("superfluous elements are not moved"; missing ones are space filled). Goldens
@@ -596,10 +598,10 @@ table") — `VariableLengthCompatibility.PairCharWidths`, the SAME walk that dec
 prototype signature equality (§9.3.8.2.3) keeps strict equality. The admitted VARIABLE-into-FIXED pairs run through
 the same correspondence: every group formal states its atoms to `CobolArgAdapt.Text` / `TextValue`
 (`ProgramEmitter.GroupFormalAtoms`; `System.Array.Empty<GroupAtom>()` for a table-less group, read as `FixedRun(width)`),
-whose variable-carrier arm reads the argument through `ToFixedImage`; the typed INVOKE does the same at compile time
-(`OoEmitter.VarPlaceSpans`), including both mixed RETURNING directions. ⚠ DETERMINATION: a formal with a FIXED
+whose variable-carrier arm reads the argument through `ToImage`; the typed INVOKE does the same at compile time
+(`OoEmitter.VarPlaceShapes`), including both mixed RETURNING directions. ⚠ DETERMINATION: a formal with a FIXED
 occurrence count cannot change the argument table's current capacity, so a BY REFERENCE store OVERLAYS the argument's
-storage (`CobolVarGroup.OverlayFixedImage`, §14.2.3 GR8): the occurrences the argument has are written, one it lacks
+storage (`CobolVarGroup.OverlayImage`, §14.2.3 GR8): the occurrences the argument has are written, one it lacks
 is not, one past the formal's count is untouched, and material past a prefix formal survives. Goldens
 `2014/pb965_vlg_into_fixed_boundary`, `2014/pb965_vlg_into_fixed_invoke`; negative
 `pb965-vlg-into-larger-fixed-formal`.
@@ -638,9 +640,9 @@ the argument, RETURNING and override/implements checks all read.
 **Tier-C at the boundary, in BOTH halves.** A group with no boundary image at all (a pointer/object-class leaf,
 or a variable-length shape outside the current-extent gate; `DataItem.BoundaryImageCapable`) stages the documented
 Tier-C loud rather than crossing. (A runtime-length item inside a DYNAMIC-CAPACITY table's element crosses since kb/Work
-PB2496 as a nested component; a FIXED-length group opposite it at the boundary, decomposed by the flat
-`CorrespondingSpans` adapters that carry no element layout, is the named run-time loud of
-`CobolVarGroup.ElementCarriersAt`.) (An OCCURS DEPENDING table BESIDE a dynamic member, and a runtime-length item inside a FIXED-OCCURS
+PB2496 as a nested component; a FIXED-length group opposite it at the boundary converts through the pair's two shapes
+like any other, element by element, kb/Work PB2690; goldens `2014/pb2690_fixed_group_vlg_element_tables_call` and
+`_invoke`.) (An OCCURS DEPENDING table BESIDE a dynamic member, and a runtime-length item inside a FIXED-OCCURS
 element, cross since kb/Work PB244: the former rides the carrier's fixed run at its **maximum** — §14.8.2.2, "the
 maximum length is used" — through `PlaceRenderer.VarGroupBoundaryImage`, the latter flattens `Occurs` times in place,
 `VarPartKind.NestedTable`; so does an OCCURS DEPENDING table whose ELEMENTS hold runtime-length items,

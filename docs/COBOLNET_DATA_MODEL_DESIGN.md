@@ -1325,8 +1325,9 @@ larger table's remainder against spaces) take. The receiver recreates the table 
 §14.6.9.2 recreation with its FROM-minimum fill) and an uncarried table space-fills each element at its unaffected
 capacity (§14.6.9.4: the empty carrier, which GR9b's own steps space-fill). `Reshape` / `Overlay` / `Compare` recurse per
 element over the element atoms (`GroupAtom.Element`), so a fixed table of fixed-length elements opposite such a table
-(§8.5.1.12.3 sentence 3) converts at a statement too; only the activation boundary's FIXED-group span adapters
-(`FromFixedImage` / `ToFixedImage`, which carry no element layout) refuse a nested component by name. Since the one-way
+(§8.5.1.12.3 sentence 3) converts at a statement too, and at an activation boundary: `FromImage` / `ToImage` /
+`OverlayImage` / `OverlaidImage` are `Reshape` / `Overlay` over the fixed group's record image in its own shape (kb/Work
+PB2690), so a fixed table opposite a dynamic-capacity table of variable-length elements crosses element by element. Since the one-way
 image and the carrier now admit the same groups, the former `CurrentImageCapable` capability is gone. A RECORD takes
 an OCCURS DEPENDING table of variable-length elements too (kb/Work PB2497; the record layout above).
 

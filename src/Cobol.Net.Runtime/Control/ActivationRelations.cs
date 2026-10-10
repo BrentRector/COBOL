@@ -492,25 +492,18 @@ public static class ActivationRelations
     /// <summary>§14.8.2.2 / §14.8.3.2: "If either … is a variable length group, … shall be compatible, as described
     /// in 8.5.1.12" — the ONE §8.5.1.12 walk (<see cref="GroupCompatibility.Walk"/>, the walk the compiler's bind-time
     /// screen asks) over the atoms both descriptions carry. A variable-length group is compatible only with a GROUP
-    /// (§8.5.1.12.1: "unless the other operand is a compatible group"). A fixed-length partner is converted through the
-    /// carrier's character correspondence (<see cref="CobolVarGroup.CorrespondingSpans"/>), so a pair whose
-    /// correspondence that carrier cannot state is not admitted either. Null when compatible.</summary>
+    /// (§8.5.1.12.1: "unless the other operand is a compatible group"). A fixed-length partner is converted over the two
+    /// shapes by the same walk (<see cref="CobolVarGroup.Reshape"/>, kb/Work PB2690), so the walk is the whole question.
+    /// Null when compatible.</summary>
     private static string? VariableLengthViolation(ActivationDescription a, ActivationDescription b, string aRole,
         string bRole)
     {
         string Refusal(string why) => $"the {aRole} ({a}) and the {bRole} ({b}) are not compatible: {why}";
-        bool aVar = a.Shape is ActivationShape.VariableLengthGroup, bVar = b.Shape is ActivationShape.VariableLengthGroup;
         if (!IsGroupPartner(a) || !IsGroupPartner(b))
             return Refusal("a variable-length group is compatible only with a group (ISO §8.5.1.12.1)");
         if (GroupCompatibility.Walk(AtomsOf(a), AtomsOf(b)) is { } why)
             return Refusal($"{GroupMismatchText(why)} (ISO §8.5.1.12)");
-        if (aVar && bVar) return null;
-        var (fixedSide, varSide) = aVar ? (b, a) : (a, b);
-        return CobolVarGroup.CorrespondingSpans(GroupCompatibility.Layout(AtomsOf(fixedSide)),
-                   GroupCompatibility.Layout(AtomsOf(varSide))) is not null
-            ? null
-            : Refusal("a variable-length group is compatible only with a group whose items correspond to its "
-                      + "variable-length items (ISO §8.5.1.12.1 / §8.5.1.12.2)");
+        return null;
     }
 
     /// <summary>A side §8.5.1.12 can pair: a variable-length group or a fixed-length alphanumeric group.</summary>

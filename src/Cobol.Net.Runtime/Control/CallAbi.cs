@@ -959,12 +959,11 @@ public static class CobolArgAdapt
     /// the argument is a variable length group, the formal parameter and the argument shall be compatible, as
     /// described in 8.5.1.12", and §8.5.1.12.1 admits the pair "only one of the operands may be a variable-length
     /// group". The argument arrives on the §8.5.1.12 carrier with its atoms (<see cref="CobolArg.Atoms"/>); the
-    /// ONE correspondence walk (<see cref="CobolVarGroup.CorrespondingSpans"/>) pairs the formal's tables with
-    /// the argument's dynamic-capacity tables, the view reads the argument's image through it
-    /// (<see cref="CobolVarGroup.ToFixedImage"/> — each table fitted to the formal's occurrence count, §8.5.1.12.3
-    /// sentence 3), and a store overlays the argument's storage (<see cref="CobolVarGroup.OverlayFixedImage"/>,
-    /// §14.2.3 GR8). Before PB965's finisher the pair was refused at bind by a size compare on the collapsed
-    /// width, and this arm did not exist.</para></summary>
+    /// ONE correspondence walk (<see cref="GroupCompatibility.Walk"/>, the walk that decided the pair compatible, over the
+    /// two shapes) pairs the formal's tables with the argument's dynamic-capacity tables, the view reads the argument's
+    /// carrier in the formal's shape (<see cref="CobolVarGroup.ToImage"/> — each table fitted to the formal's occurrence
+    /// count, §8.5.1.12.3 sentence 3), and a store overlays the argument's storage (<see cref="CobolVarGroup.OverlayImage"/>,
+    /// §14.2.3 GR8) — element by element where a table holds variable-length elements (kb/Work PB2690).</para></summary>
     /// <remarks><paramref name="unbound"/> is the factory of the formal's UNBOUND value (kb/Work PB992, PB2671;
     /// docs/CONFORMANCE.md DOC-A.1-116 and DOC-A.1-141) — the category default its declared carrier starts with, which
     /// an unchecked reference to an OMITTED formal reads (the documented §14.9.4.4 GR12 leniency): spaces for a
@@ -976,11 +975,11 @@ public static class CobolArgAdapt
         if (groupAtoms is null && IsPointerContent(args[i])) args = WithPointerContent(args, i, width);
         switch (args[i].Carrier)
         {
-            case ManagedPointer<CobolVarGroup> vp when VarGroupSpans(args[i], groupAtoms, width) is { } spans:
+            case ManagedPointer<CobolVarGroup> vp when VariableToFixedPair(args[i], groupAtoms, width) is { } pair:
                 return ManagedPointer<string>.OverField(
-                    () => CobolVarGroup.ToFixedImage(vp.Value ?? CobolVarGroup.Empty, width, spans),
-                    v => vp.Value = CobolVarGroup.OverlayFixedImage(vp.Value ?? CobolVarGroup.Empty,
-                        CobolString.Store(v, width), spans));
+                    () => CobolVarGroup.ToImage(vp.Value ?? CobolVarGroup.Empty, pair.Argument, pair.Formal, width),
+                    v => vp.Value = CobolVarGroup.OverlayImage(vp.Value ?? CobolVarGroup.Empty, pair.Argument,
+                        CobolString.Store(v, width), pair.Formal));
             case ManagedPointer<string> sp when width < 0:   // ANY LENGTH (§13.18.2 GR1) — the full-string view
                 return ManagedPointer<string>.OverField(
                     () => sp.Value ?? "",
@@ -1073,8 +1072,8 @@ public static class CobolArgAdapt
         if (!Present(args, i)) return OmittedText(unbound);
         // A variable-length group argument into a fixed-length GROUP formal BY CONTENT (kb/Work PB965): §14.8.2.2
         // rule 2's MOVE, which §14.9.25.4 GR9 performs through the same correspondence (§8.5.1.12.3 sentence 3).
-        if (args[i].Carrier is ManagedPointer<CobolVarGroup> vp && VarGroupSpans(args[i], groupAtoms, width) is { } vspans)
-            return ManagedPointer<string>.Cell(CobolVarGroup.ToFixedImage(vp.Value ?? CobolVarGroup.Empty, width, vspans));
+        if (args[i].Carrier is ManagedPointer<CobolVarGroup> vp && VariableToFixedPair(args[i], groupAtoms, width) is { } pair)
+            return ManagedPointer<string>.Cell(CobolVarGroup.ToImage(vp.Value ?? CobolVarGroup.Empty, pair.Argument, pair.Formal, width));
         if (formal is { } f)
         {
             string? image = IsFloatFormal(f)
@@ -1109,16 +1108,17 @@ public static class CobolArgAdapt
     /// <para>⛔ A FIXED-LENGTH GROUP ARGUMENT IS A LEGAL SENDER TOO (kb/Work PB965). §14.8.2.2 requires only that
     /// "the formal parameter and the argument shall be compatible, as described in 8.5.1.12", and §8.5.1.12.1
     /// admits the pair ("only one of the operands may be a variable-length group"). Such an argument arrives on
-    /// the fixed group's own character carrier, carrying its atoms (<see cref="CobolArg.Atoms"/>); the formal's
-    /// are <paramref name="formalAtoms"/>, and <see cref="CobolVarGroup.CorrespondingSpans"/> pairs their layouts.
-    /// The view decomposes the argument's image into the §8.5.1.12 carrier — its corresponding table crossing at
-    /// its fixed occurrence count (§8.5.1.12.3 sentence 3) — and, BY REFERENCE, writes the formal's changes back
-    /// into the SAME storage (§14.2.3 GR8) through the inverse. Before PB965 this arm did not exist: the
-    /// argument read as an empty carrier and the callee's stores were lost.</para>
+    /// the fixed group's own character carrier, carrying its atoms (<see cref="CobolArg.Atoms"/>, or none for a group
+    /// with no table: one fixed run); the formal's are <paramref name="formalAtoms"/>, and the walk over the two shapes
+    /// pairs their tables. The view is the argument's image reshaped into the §8.5.1.12 carrier
+    /// (<see cref="CobolVarGroup.FromImage"/>) — its corresponding table crossing at its fixed occurrence count
+    /// (§8.5.1.12.3 sentence 3), element by element where the formal's table holds variable-length elements (§14.6.9.2;
+    /// kb/Work PB2690) — and, BY REFERENCE, the formal's changes are overlaid back into the SAME storage (§14.2.3 GR8)
+    /// through the inverse (<see cref="CobolVarGroup.OverlaidImage"/>).</para>
     /// <para>⚠ The callee cannot grow a fixed-length argument's table past its fixed extent — that storage has
     /// no more occurrences — so the write-back fits each component to its table exactly as §14.6.9.2 fits a
     /// dynamic sending table into a non-dynamic receiving one: superfluous occurrences are not moved, missing
-    /// ones are space filled (<see cref="CobolVarGroup.ToFixedImage"/>).</para>
+    /// ones are space filled, and the argument's material the formal does not describe survives.</para>
     /// <para>Any other carrier, or a layout pair that does not correspond, means the two sides do not conform
     /// (§14.8.2.2 via §14.9.4.4 GR3 d)) — loud, never a silent reinterpretation.</para></summary>
     public static ManagedPointer<CobolVarGroup> VarGroup(CobolArg[] args, int i, GroupAtom[] formalAtoms)
@@ -1133,10 +1133,10 @@ public static class CobolArgAdapt
                         v => vp.Value = CobolVarGroup.Overlay(vp.Value ?? CobolVarGroup.Empty, v, argAtoms, formalAtoms))
                     : Unreadable<CobolVarGroup>(args, i, "a variable-length group formal of an incompatible shape"),
             ManagedPointer<CobolVarGroup> vp => vp,
-            ManagedPointer<string> sp when CobolVarGroup.CorrespondingSpans(FixedLayoutOf(args[i], sp), GroupCompatibility.Layout(formalAtoms)) is { } spans =>
+            ManagedPointer<string> sp when FixedToVariableShape(args[i], sp, formalAtoms) is { } fixedShape =>
                 ManagedPointer<CobolVarGroup>.OverField(
-                    () => CobolVarGroup.FromFixedImage(sp.Value ?? "", spans),
-                    v => sp.Value = CobolVarGroup.ToFixedImage(v, sp.Value?.Length ?? 0, spans)),
+                    () => CobolVarGroup.FromImage(sp.Value ?? "", fixedShape, formalAtoms),
+                    v => sp.Value = CobolVarGroup.OverlaidImage(sp.Value ?? "", fixedShape, v, formalAtoms)),
             _ => Unreadable<CobolVarGroup>(args, i, "a variable-length group formal"),
         };
     }
@@ -1176,7 +1176,7 @@ public static class CobolArgAdapt
     /// <summary>The BY VALUE / BY CONTENT twin of <see cref="VarGroup"/> (ISO §14.2.3 GR9/GR10 — a copy
     /// allocated by the activating element): a DETACHED cell holding the argument's carrier value, so the
     /// callee's stores never reach the caller's storage. A fixed-length group argument decomposes through the
-    /// same correspondence <see cref="VarGroup"/> uses (kb/Work PB965), and a variable-length one of another shape is
+    /// same pair conversion <see cref="VarGroup"/> uses (kb/Work PB965, PB2690), and a variable-length one of another shape is
     /// rebuilt in the formal's (<see cref="CobolVarGroup.Reshape"/>; kb/Work PB2280).</summary>
     public static ManagedPointer<CobolVarGroup> VarGroupValue(CobolArg[] args, int i, GroupAtom[] formalAtoms)
     {
@@ -1188,8 +1188,8 @@ public static class CobolArgAdapt
                     ? ManagedPointer<CobolVarGroup>.Cell(CobolVarGroup.Reshape(vp.Value ?? CobolVarGroup.Empty, argAtoms, formalAtoms))
                     : Unreadable<CobolVarGroup>(args, i, "a BY VALUE variable-length group formal of an incompatible shape"),
             ManagedPointer<CobolVarGroup> vp => ManagedPointer<CobolVarGroup>.Cell(vp.Value ?? CobolVarGroup.Empty),
-            ManagedPointer<string> sp when CobolVarGroup.CorrespondingSpans(FixedLayoutOf(args[i], sp), GroupCompatibility.Layout(formalAtoms)) is { } spans =>
-                ManagedPointer<CobolVarGroup>.Cell(CobolVarGroup.FromFixedImage(sp.Value ?? "", spans)),
+            ManagedPointer<string> sp when FixedToVariableShape(args[i], sp, formalAtoms) is { } fixedShape =>
+                ManagedPointer<CobolVarGroup>.Cell(CobolVarGroup.FromImage(sp.Value ?? "", fixedShape, formalAtoms)),
             _ => Unreadable<CobolVarGroup>(args, i, "a BY VALUE variable-length group formal"),
         };
     }
@@ -1407,11 +1407,11 @@ public static class CobolArgAdapt
         // and reads the same digit image a native cell does, written back in its own record representation.
         if (c is ManagedPointer<string> sp && r.Num is null) { sp.Value = FitToReceiver(value, r); return; }
         // A table-less fixed group into a variable-length receiver (kb/Work PB965): its one §8.5.1.12 fact is
-        // its length (CobolVarGroup.FixedRun).
+        // its length (GroupCompatibility.FixedRun).
         if (c is ManagedPointer<CobolVarGroup> vp && r.Atoms is { } ra
-            && CobolVarGroup.CorrespondingSpans(CobolVarGroup.FixedRun(value.Length), GroupCompatibility.Layout(ra)) is { } vspans)
+            && GroupCompatibility.FixedRun(value.Length) is var runShape && GroupCompatibility.Walk(runShape, ra) is null)
         {
-            vp.Value = CobolVarGroup.FromFixedImage(value, vspans);
+            vp.Value = CobolVarGroup.FromImage(value, runShape, ra);
             return;
         }
         string t = value.Trim();
@@ -1428,27 +1428,32 @@ public static class CobolArgAdapt
     /// <summary>⛔ A FIXED-LENGTH GROUP returning item with a table (kb/Work PB965). <paramref name="atoms"/> are
     /// its §8.5.1.12 atoms. §14.8.3.2: "If either the sending or the receiving operand is a variable length
     /// group, the sending operand and the receiving operand shall be compatible, as described in 8.5.1.12" — so
-    /// a VARIABLE-length receiver is legal, and the image decomposes into its carrier at the spans the two
-    /// layouts correspond at (<see cref="CobolVarGroup.CorrespondingSpans"/>), the fixed table crossing at its
-    /// occurrence count (§8.5.1.12.3 sentence 3). A character receiver takes the image as it stands.</summary>
+    /// a VARIABLE-length receiver is legal, and the image reshapes into its carrier over the two shapes
+    /// (<see cref="CobolVarGroup.FromImage"/>), the fixed table crossing at its occurrence count (§8.5.1.12.3
+    /// sentence 3). A character receiver takes the image as it stands.</summary>
     public static void StoreReturnGroup(CobolArg? ret, string image, GroupAtom[] atoms)
     {
         if (ret is not { Carrier: var c } r) return;
         if (c is ManagedPointer<string> sp) { sp.Value = FitToReceiver(image, r); return; }
-        if (c is ManagedPointer<CobolVarGroup> vp && r.Atoms is { } ra
-            && CobolVarGroup.CorrespondingSpans(GroupCompatibility.Layout(atoms), GroupCompatibility.Layout(ra)) is { } spans)
+        if (c is ManagedPointer<CobolVarGroup> vp && r.Atoms is { } ra && GroupCompatibility.Walk(atoms, ra) is null)
         {
-            vp.Value = CobolVarGroup.FromFixedImage(image, spans);
+            vp.Value = CobolVarGroup.FromImage(image, atoms, ra);
             return;
         }
         Undeliverable(c, "the group result");
     }
 
-    /// <summary>The §8.5.1.12 layout of a FIXED-length group on a character carrier: the one its atoms state, or —
-    /// for a group with no table, which carries none — the single fixed run of its length
-    /// (<see cref="CobolVarGroup.FixedRun"/>).</summary>
-    private static int[] FixedLayoutOf(in CobolArg a, ManagedPointer<string> sp) =>
-        a.Atoms is { } atoms ? GroupCompatibility.Layout(atoms) : CobolVarGroup.FixedRun(sp.Value?.Length ?? 0);
+    /// <summary>The §8.5.1.12 shape of a FIXED-length group on a character carrier: the atoms it states, or — for a
+    /// group with no table, which states none — the single fixed run of its length
+    /// (<see cref="GroupCompatibility.FixedRun"/>).</summary>
+    private static GroupAtom[] FixedShapeOf(in CobolArg a, ManagedPointer<string> sp) =>
+        a.Atoms is { } atoms ? atoms : GroupCompatibility.FixedRun(sp.Value?.Length ?? 0);
+
+    /// <summary>The fixed-length ARGUMENT's shape when it meets the variable-length group formal of
+    /// <paramref name="formalAtoms"/> and the pair is compatible (<see cref="GroupCompatibility.Walk"/>, ISO §8.5.1.12);
+    /// null otherwise — the pair does not conform (§14.8.2.2 via §14.9.4.4 GR3 d)) and the caller takes the loud arm.</summary>
+    private static GroupAtom[]? FixedToVariableShape(in CobolArg a, ManagedPointer<string> sp, GroupAtom[] formalAtoms) =>
+        FixedShapeOf(a, sp) is var shape && GroupCompatibility.Walk(shape, formalAtoms) is null ? shape : null;
 
     /// <summary>The ARGUMENT's atoms when <paramref name="a"/> is a variable-length group whose shape is not
     /// <paramref name="formalAtoms"/>' (kb/Work PB2280) — the pair <see cref="CobolVarGroup.Reshape"/> and
@@ -1457,15 +1462,18 @@ public static class CobolArgAdapt
     private static GroupAtom[]? OtherShape(in CobolArg a, GroupAtom[] formalAtoms) =>
         a.Atoms is { } argAtoms && !GroupCompatibility.SameShape(argAtoms, formalAtoms) ? argAtoms : null;
 
-    /// <summary>The pair's correspondence spans when a VARIABLE-length group argument <paramref name="a"/> meets a
-    /// fixed-length GROUP formal of <paramref name="width"/> characters whose atoms are
-    /// <paramref name="groupAtoms"/> (the empty array = a table-less group, <see cref="CobolVarGroup.FixedRun"/>);
-    /// null for a non-group formal, an argument that carries no atoms, or a pair that does not correspond.</summary>
-    private static int[]? VarGroupSpans(in CobolArg a, GroupAtom[]? groupAtoms, int width) =>
-        groupAtoms is null || a.Atoms is not { } argAtoms ? null
-        : CobolVarGroup.CorrespondingSpans(
-            groupAtoms.Length == 0 ? CobolVarGroup.FixedRun(width) : GroupCompatibility.Layout(groupAtoms),
-            GroupCompatibility.Layout(argAtoms));
+    /// <summary>The pair's two shapes when a VARIABLE-length group argument <paramref name="a"/> meets a fixed-length
+    /// GROUP formal of <paramref name="width"/> characters whose atoms are <paramref name="groupAtoms"/> (the empty array
+    /// = a table-less group, <see cref="GroupCompatibility.FixedRun"/>) and the two are compatible
+    /// (<see cref="GroupCompatibility.Walk"/>); null for a non-group formal, an argument that carries no atoms, or an
+    /// incompatible pair.</summary>
+    private static (GroupAtom[] Argument, GroupAtom[] Formal)? VariableToFixedPair(in CobolArg a, GroupAtom[]? groupAtoms,
+        int width)
+    {
+        if (groupAtoms is null || a.Atoms is not { } argAtoms) return null;
+        var formal = groupAtoms.Length == 0 ? GroupCompatibility.FixedRun(width) : groupAtoms;
+        return GroupCompatibility.Walk(argAtoms, formal) is null ? (argAtoms, formal) : null;
+    }
 
     /// <summary>⛔ THE UNCHECKED RETURNING STORE INTO A TEXT-CARRIED RECEIVER (kb/Work PB1040): <paramref name="image"/>
     /// in the receiver's OWN width. §14.9.4.4 GR3 d) makes a result whose length does not conform an
@@ -1525,10 +1533,10 @@ public static class CobolArgAdapt
             else vp.Value = value;
             return;
         }
-        if (c is ManagedPointer<string> sp
-            && CobolVarGroup.CorrespondingSpans(FixedLayoutOf(r, sp), GroupCompatibility.Layout(atoms)) is { } spans)
+        if (c is ManagedPointer<string> sp && FixedShapeOf(r, sp) is var imageShape
+            && GroupCompatibility.Walk(atoms, imageShape) is null)
         {
-            sp.Value = CobolVarGroup.ToFixedImage(value, sp.Value?.Length ?? 0, spans);
+            sp.Value = CobolVarGroup.ToImage(value, atoms, imageShape, sp.Value?.Length ?? 0);
             return;
         }
         Undeliverable(c, "the variable-length-group result");

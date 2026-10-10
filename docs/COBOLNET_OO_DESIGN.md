@@ -482,8 +482,8 @@ prescribes (kb/Work PB1500):
   described with the ANY LENGTH clause"), §14.8.2.2 rule 1 (a formal group no larger than the argument), the
   strong-type sentence (§8.5.3.1 equivalence of the two declarations, `StrongTypeModel.TypeIdentityKey`), §8.5.1.12
   compatibility of a variable-length pair (`GroupCompatibility.Walk` over the `GroupAtom` layouts both descriptions
-  carry — the ONE walk the compiler's bind-time screens ask too, kb/Work PB480 — and, for a fixed partner, the carrier's
-  `CobolVarGroup.CorrespondingSpans`), §14.8.2.3.2 "Additionally" b)/c) for bit / national groups, and §14.8.3
+  carry — the ONE walk the compiler's bind-time screens ask too, kb/Work PB480; a fixed partner is that walk's other side,
+  its record image a carrier in its own shape, kb/Work PB2690), §14.8.2.3.2 "Additionally" b)/c) for bit / national groups, and §14.8.3
   for the RETURNING pair (§14.8.3.2's same length, §14.8.3.3's clause identity; an object reference is delivered by the
   SET-rule narrowing `CobolObject.NarrowUniversal`). The EC-OO-UNIVERSAL
   exception condition is set to exist WHEN checking for it is enabled in BOTH the activated method and the
@@ -531,8 +531,8 @@ BOTH sides (kb/Work PB1781): `OoEmitter.OoUnivCallerRead` reads it through `Call
 INVOKE lanes use — and `UniversalCrossingShapeDriftTests` holds the universal lane to the typed lane shape by shape. A
 group FORMAL the relations admitted in another shape is converted by the callee (`UniversalGroupCarrier`): §14.8.2.2
 rule 1's PREFIX (the formal sees the argument's leading positions; its write-back is spliced over them and the tail
-survives), §8.5.1.12's fixed / variable-length pair (through the pair's `CorrespondingSpans`, both directions, and the
-RETURNING delivery) and two variable-length groups of different shapes (`CobolVarGroup.Reshape` rebuilds the argument's
+survives), §8.5.1.12's fixed / variable-length pair (through the pair's two shapes, `CobolVarGroup.FromImage` / `ToImage` /
+`OverlayImage` / `OverlaidImage`, both directions, and the RETURNING delivery) and two variable-length groups of different shapes (`CobolVarGroup.Reshape` rebuilds the argument's
 carrier in the formal's shape segment by segment of the walk's correspondence, `CobolVarGroup.Overlay` stores the
 formal's back over the argument's storage, keeping what the formal does not reach — the typed INVOKE lane uses the same
 pair, `OoEmitter.VarGroupShapes`). A REFERENCE-MODIFIED argument is the §8.4.3.3.4 GR6 unique data item — no PICTURE, so it matches

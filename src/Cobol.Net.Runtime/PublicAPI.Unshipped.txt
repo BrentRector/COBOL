@@ -1,9 +1,16 @@
 #nullable enable
 CobolNet.Runtime.ConfigEntry.FamilyMember.get -> System.Func<string!, bool>?
 CobolNet.Runtime.ConfigEntry.FamilyMember.init -> void
+CobolNet.Runtime.ProgramTable.RunModule(System.Action! ensureRegistered, string? mainPath) -> void
 static CobolNet.Runtime.CobolIntrinsics.FractionPartU(System.UInt128 v, int scale) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.IntegerPartU(System.UInt128 v, int scale) -> System.UInt128
 static CobolNet.Runtime.CobolIntrinsics.SignOfU(System.UInt128 v) -> long
+static CobolNet.Runtime.CobolVarGroup.FromImage(string! image, CobolNet.Runtime.GroupAtom![]! imageShape, CobolNet.Runtime.GroupAtom![]! to) -> CobolNet.Runtime.CobolVarGroup!
+static CobolNet.Runtime.CobolVarGroup.OfImage(string! image) -> CobolNet.Runtime.CobolVarGroup!
+static CobolNet.Runtime.CobolVarGroup.OverlaidImage(string! current, CobolNet.Runtime.GroupAtom![]! imageShape, CobolNet.Runtime.CobolVarGroup! view, CobolNet.Runtime.GroupAtom![]! viewShape) -> string!
+static CobolNet.Runtime.CobolVarGroup.OverlayImage(CobolNet.Runtime.CobolVarGroup! current, CobolNet.Runtime.GroupAtom![]! currentShape, string! image, CobolNet.Runtime.GroupAtom![]! imageShape) -> CobolNet.Runtime.CobolVarGroup!
+static CobolNet.Runtime.CobolVarGroup.ToImage(CobolNet.Runtime.CobolVarGroup! v, CobolNet.Runtime.GroupAtom![]! from, CobolNet.Runtime.GroupAtom![]! imageShape, int width) -> string!
+static CobolNet.Runtime.ProgramRegistry.RunModule(System.Action! ensureRegistered, string? mainPath) -> void
 static CobolNet.Runtime.ProgramTable.ContainedPath(string! containerPath, string! name) -> string!
 static CobolNet.Runtime.ProgramTable.OutermostPath(string! externalizedName) -> string!
 static CobolNet.Runtime.SwitchStore.IsVariableName(string! variableName) -> bool

@@ -90,6 +90,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
 
     private UnitEmitters U => program.Current;
     private EmitContext Ctx => U.Ctx;
+
+    /// <summary>The module's static field holding a §8.5.1.12 atom array (<see cref="GroupAtomTable"/>, kb/Work PB2690).</summary>
+    private string Atoms(GroupAtom[] shape) => Ctx.Atoms.Ref(shape);
     private NumericRenderer Num => U.Num;
     private ConditionRenderer Cond => U.Cond;
     private ReferenceResolver Refs => U.Refs;
@@ -877,27 +880,32 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     public void EmitSelfReference(BoundSelfReference s) =>
         Ctx.Writer.Line(PlaceRenderer.Write(s.Target, $"({s.Target.Item.Pic!.ClrType})(this)") + "   // SELF (ISO §8.4.3.8.4 GR1)");
 
-    /// <summary>The spans of a FIXED-length group argument's tables that correspond to a variable-length group
-    /// formal's dynamic-capacity tables (kb/Work PB965) — null when the argument is itself variable-length (it
-    /// composes its own carrier) or is not a group place the correspondence can be stated for. A redefinition or cell
-    /// VIEW of a group is that group's storage and has its layout like any other (a group passed BY REFERENCE is claimed
-    /// onto a cell, kb/Work PB2087/PB2089 — the INVOKE twin of <c>CallEmitter.BoundaryAtoms</c>); a reference-modified
-    /// operand denotes no item, so it has none.</summary>
-    private static int[]? FixedArgumentSpans(Place arg, DataItem formal) =>
+    /// <summary>The two §8.5.1.12 shapes of a FIXED-length group argument and the variable-length group formal it meets
+    /// (kb/Work PB965, PB2690) — what <c>CobolVarGroup.FromImage</c> / <c>OverlaidImage</c> convert between; null when the
+    /// argument is itself variable-length (it composes its own carrier) or is not a group place a shape can be stated for.
+    /// A redefinition or cell VIEW of a group is that group's storage and has its shape like any other (a group passed BY
+    /// REFERENCE is claimed onto a cell, kb/Work PB2087/PB2089 — the INVOKE twin of <c>CallEmitter.BoundaryAtoms</c>); a
+    /// reference-modified operand denotes no item, so it has none. Bind has already run the §8.5.1.12 relation, so the
+    /// pair is compatible here, as it is for a MOVE.</summary>
+    private static (GroupAtom[] Argument, GroupAtom[] Formal)? FixedArgumentShapes(Place arg, DataItem formal) =>
         !CallEmitter.CallPlaceIsVarGroup(arg)
         && arg.DenotedItem is { IsImageCapable: true } item
-            ? VariableLengthCompatibility.CorrespondingSpans(item, formal)
+        && VariableLengthCompatibility.GroupAtoms(item) is { } argShape
+        && VariableLengthCompatibility.GroupAtoms(formal) is { } formalShape
+            ? (argShape, formalShape)
             : null;
 
-    /// <summary>The mirror of <see cref="FixedArgumentSpans"/> (kb/Work PB965): the spans of a FIXED-length group
-    /// <paramref name="fixedSide"/>'s tables that correspond to the dynamic-capacity tables of the VARIABLE-length
-    /// group place <paramref name="varSide"/> — a variable-length argument into a fixed-length group formal, or a
-    /// RETURNING pair with one side of each (§14.8.2.2 / §14.8.3.2: "shall be compatible, as described in
-    /// 8.5.1.12"). Null for any other pair — including two variable-length groups, which cross component-wise.</summary>
-    private static int[]? VarPlaceSpans(Place varSide, DataItem fixedSide) =>
+    /// <summary>The mirror of <see cref="FixedArgumentShapes"/> (kb/Work PB965, PB2690): the shapes of the VARIABLE-length
+    /// group place <paramref name="varSide"/> and of the FIXED-length group <paramref name="fixedSide"/> it meets — a
+    /// variable-length argument into a fixed-length group formal, or a RETURNING pair with one side of each (§14.8.2.2 /
+    /// §14.8.3.2: "shall be compatible, as described in 8.5.1.12"). Null for any other pair — including two
+    /// variable-length groups, which cross component-wise (<see cref="VarGroupShapes"/>).</summary>
+    private static (GroupAtom[] Variable, GroupAtom[] Fixed)? VarPlaceShapes(Place varSide, DataItem fixedSide) =>
         CallEmitter.CallPlaceIsVarGroup(varSide) && ItemCategory.IsGroupItem(fixedSide)
         && !VariableLengthCompatibility.IsVariableLength(fixedSide)
-            ? VariableLengthCompatibility.CorrespondingSpans(fixedSide, varSide.Item)
+        && VariableLengthCompatibility.GroupAtoms(varSide.Item) is { } varShape
+        && VariableLengthCompatibility.GroupAtoms(fixedSide) is { } fixedShape
+            ? (varShape, fixedShape)
             : null;
 
     /// <summary>The §8.5.1.12 atoms of the variable-length group place <paramref name="place"/> and of the
@@ -1619,25 +1627,25 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // the receiving side's own FromVarImage re-fits both halves. Bind has already run the
                 // compatibility relation (OoBinder → DescriptionMismatch), so the pairing is sound here.
                 // ⛔ A FIXED-length group argument is admitted too (§8.5.1.12.1 "only one of the operands may be
-                // a variable-length group"; kb/Work PB965): it decomposes at the spans of ITS tables that
-                // correspond to the formal's dynamic-capacity tables — the ONE correspondence walk, run here at
-                // compile time because both descriptions are in hand.
+                // a variable-length group"; kb/Work PB965): its image is a carrier in its OWN shape, reshaped into the
+                // formal's by the same two-shape conversion a MOVE uses (kb/Work PB2690), element by element where the
+                // formal's table holds variable-length elements — both descriptions are in hand here.
                 // Two variable-length groups of DIFFERENT shapes (kb/Work PB480): the argument's carrier is rebuilt in
                 // the formal's (§8.5.1.12 constrains only where their variable-length items lie).
                 Decl(RuntimeApi.VarGroupType, a.Source is { } vgp
-                    ? FixedArgumentSpans(vgp, a.Formal) is { } fs
-                        ? RuntimeApi.VarGroupFromFixedImage(CallEmitter.CallStringRead(vgp), CallEmitter.LayoutArray(fs))
+                    ? FixedArgumentShapes(vgp, a.Formal) is (var argImageShape, var formalShapeOfFixed)
+                        ? RuntimeApi.VarGroupFromImage(CallEmitter.CallStringRead(vgp), Atoms(argImageShape), Atoms(formalShapeOfFixed))
                         : VarGroupShapes(vgp, a.Formal) is (var argShape, var formalShape)
                             ? RuntimeApi.VarGroupReshape(PlaceRenderer.VarGroupBoundaryImage(vgp, "INVOKE argument"),
-                                argShape, formalShape)
+                                Atoms(argShape), Atoms(formalShape))
                             : PlaceRenderer.VarGroupBoundaryImage(vgp, "INVOKE argument")
                     : RuntimeApi.VarGroupEmpty);
             }
-            else if (a.Source is { } vsp && VarPlaceSpans(vsp, a.Formal) is { } vs)
+            else if (a.Source is { } vsp && VarPlaceShapes(vsp, a.Formal) is (var vsArg, var vsFormal))
                 // ⛔ A VARIABLE-length group argument into a FIXED-length group formal (§14.8.2.2; kb/Work PB965):
-                // the formal reads the argument's image through the pair's correspondence, each corresponding
-                // table fitted to the formal's occurrence count (§8.5.1.12.3 sentence 3).
-                Decl("string", RuntimeApi.VarGroupToFixedImage(PlaceRenderer.VarGroupBoundaryImage(vsp, "INVOKE argument"), a.Formal.ImageWidth, CallEmitter.LayoutArray(vs)));
+                // the formal reads the argument's carrier in its own shape, each corresponding table fitted to the
+                // formal's occurrence count (§8.5.1.12.3 sentence 3).
+                Decl("string", RuntimeApi.VarGroupToImage(PlaceRenderer.VarGroupBoundaryImage(vsp, "INVOKE argument"), Atoms(vsArg), Atoms(vsFormal), a.Formal.ImageWidth));
             // ⛔ A BY CONTENT VALUE INTO A FLOATING-POINT FORMAL OF ANOTHER DESCRIPTION (kb/Work PB1114). §14.8.2.3.3 2)
             // a) — "the same as for a COMPUTE statement" — and §14.2.3 GR9's "a COMPUTE statement without the ROUNDED
             // phrase" have no floating-point exemption, so a fixed-point or other-usage float sender, a literal-2 or an
@@ -1821,23 +1829,24 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // — a dynamic table's occurrences fitted to the fixed table (§14.6.9.2), a fixed table crossing at its
             // occurrence count (§8.5.1.12.3 sentence 3). The same two legs the program ABI's StoreReturn takes. A cell or
             // redefinition VIEW of a fixed group is that group's storage (a receiver also passed BY REFERENCE somewhere is
-            // claimed onto a cell, kb/Work PB2087/PB2089 — the FixedArgumentSpans twin); a reference-modified receiver
+            // claimed onto a cell, kb/Work PB2087/PB2089 — the FixedArgumentShapes twin); a reference-modified receiver
             // denotes no item.
             if (OoVarGroupCarried(rs) && recv.DenotedItem is { } ri
                 && !CallEmitter.CallPlaceIsVarGroup(recv) && ItemCategory.IsGroupItem(ri)
-                && VariableLengthCompatibility.CorrespondingSpans(ri, rs) is { } rvs)
+                && VariableLengthCompatibility.GroupAtoms(rs) is { } rsShape
+                && VariableLengthCompatibility.GroupAtoms(ri) is { } riShape)
                 w.Line(CallEmitter.CallStringWrite(inv.Returning,
-                    RuntimeApi.VarGroupToFixedImage(tmp, ri.ImageWidth, CallEmitter.LayoutArray(rvs))));
+                    RuntimeApi.VarGroupToImage(tmp, Atoms(rsShape), Atoms(riShape), ri.ImageWidth)));
             else if (OoVarGroupCarried(rs))
                 // A variable-length receiver of another shape takes the result rebuilt in its own (kb/Work PB480).
                 w.Line(PlaceRenderer.WriteVarGroupImage(inv.Returning,
                     VarGroupShapes(recv, rs) is (var recvShape, var sendShape)
-                        ? RuntimeApi.VarGroupReshape(tmp, sendShape, recvShape)
+                        ? RuntimeApi.VarGroupReshape(tmp, Atoms(sendShape), Atoms(recvShape))
                         : tmp,
                     "INVOKE RETURNING delivery into"));
-            else if (ItemCategory.IsGroupItem(rs) && VarPlaceSpans(recv, rs) is { } fvs)
+            else if (ItemCategory.IsGroupItem(rs) && VarPlaceShapes(recv, rs) is (var recvVarShape, var rsFixedShape))
                 w.Line(PlaceRenderer.WriteVarGroupImage(inv.Returning,
-                    RuntimeApi.VarGroupFromFixedImage(tmp, CallEmitter.LayoutArray(fvs)), "INVOKE RETURNING delivery into"));
+                    RuntimeApi.VarGroupFromImage(tmp, Atoms(rsFixedShape), Atoms(recvVarShape)), "INVOKE RETURNING delivery into"));
             else if (OoClassTable.LeafCarried(rs))
                 w.Line(PlaceRenderer.WriteGroupLeaves(inv.Returning, tmp));   // §14.8.3.2 same type — the leaf vector (kb/Work PB1116)
             else if (rs.IsGroup || recv.Item.IsGroup)
@@ -1884,24 +1893,23 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // the exact inverse of the read (kb/Work PB204) — for a FIXED-length argument, the inverse of
             // its decomposition, each component fitted to its fixed table as §14.6.9.2 fits a dynamic
             // sender into a non-dynamic receiver (kb/Work PB965).
-            return FixedArgumentSpans(src, a.Formal) is { } ws
+            return FixedArgumentShapes(src, a.Formal) is (var fixedArgShape, var fixedFormalShape)
                 ? CallEmitter.CallStringWrite(src,
-                    RuntimeApi.VarGroupToFixedImage(value, src.Item.ImageWidth, CallEmitter.LayoutArray(ws)))
+                    RuntimeApi.VarGroupOverlaidImage(CallEmitter.CallStringRead(src), Atoms(fixedArgShape), value, Atoms(fixedFormalShape)))
                 // …and of a variable-length argument of another shape, the formal's store overlaid on the argument's
                 // storage: its material past the formal and its components the formal does not reach survive (kb/Work
                 // PB480; §14.2.3 GR8).
                 : VarGroupShapes(src, a.Formal) is (var argShape, var formalShape)
                     ? PlaceRenderer.WriteVarGroupImage(src,
                         RuntimeApi.VarGroupOverlay(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into"), value,
-                            argShape, formalShape),
+                            Atoms(argShape), Atoms(formalShape)),
                         "INVOKE copy-out into")
                 : PlaceRenderer.WriteVarGroupImage(src, value, "INVOKE copy-out into");
-        else if (VarPlaceSpans(src, a.Formal) is { } wv)
+        else if (VarPlaceShapes(src, a.Formal) is (var wvArg, var wvFormal))
             // …and its write-back OVERLAYS the argument's storage (§14.2.3 GR8): the argument's tables keep
             // their current capacities and its material past the formal survives (kb/Work PB965).
             return PlaceRenderer.WriteVarGroupImage(src,
-                RuntimeApi.VarGroupOverlayFixedImage(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into"), value,
-                    CallEmitter.LayoutArray(wv)),
+                RuntimeApi.VarGroupOverlayImage(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into"), Atoms(wvArg), value, Atoms(wvFormal)),
                 "INVOKE copy-out into");
         else if (OoClassTable.LeafCarried(a.Formal))
             return PlaceRenderer.WriteGroupLeaves(src, value);   // the leaf vector's copy-back (kb/Work PB1116)

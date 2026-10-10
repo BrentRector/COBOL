@@ -242,6 +242,10 @@ public sealed class RunUnitStateDriftTests
             "memo of checking profiles, keyed by the profile's immutable name",
         ["CobolNet.Runtime.Exceptions.ExceptionCatalog::Table"] =
             "the standard's exception-condition table (Table 12), built once by the static initializer and never mutated",
+        ["CobolNet.Runtime.CobolVarGroup::s_geometries"] =
+            "memo of a §8.5.1.12 atom array's carrier geometry, keyed weakly by the (immutable) array: derived data (kb/Work PB2690)",
+        ["CobolNet.Runtime.CobolVarGroup::s_pairPlans"] =
+            "memo of the §8.5.1.12 correspondence of two atom arrays, keyed weakly by the two (immutable) arrays: derived data (kb/Work PB2690)",
         ["CobolNet.Runtime.PointerImage::s_areaBases"] =
             "see PointerImage::s_nextBase in " + nameof(ProcessLifetimeStatics) + ": pointer-image bases count per PROCESS",
         ["CobolNet.Runtime.PointerImage::s_nameBases"] =

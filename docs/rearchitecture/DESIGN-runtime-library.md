@@ -716,6 +716,12 @@ A module joins a run unit only through its `__CobolModule.EnsureRegistered()` �
 writer of the run unit's registration set (DESIGN-external-repository §11.2). The runtime's public surface is recorded
 in `PublicAPI.Shipped.txt` (`Microsoft.CodeAnalysis.PublicApiAnalyzers`): a new public member is listed in
 `PublicAPI.Unshipped.txt` in the same change, and a removal or incompatible change raises the major version.
+The standalone executable's generated `Main` registers its own module INSIDE the run-unit boundary: it calls
+`ProgramRegistry.RunModule(__CobolModule.EnsureRegistered, mainPath)` (`ProgramTable.RunModule`, kb/Work PB2846), which
+runs the registration and then the main program under the §14.6.12 abnormal-termination surface and the §14.6.11
+epilogue, so a registration the run unit refuses (another runtime major or call ABI, or an already-registered
+outermost name) ends the run unit through that surface and never escapes as an unhandled .NET exception. A host that
+registers its modules itself enters through `ProgramRegistry.RunMain(path)`, the same boundary without the registration.
 `ProgramRegistry` → **`ProgramTable`** (an instance owned by `RunUnit`; the name "Registry" is reserved for the
 process-level nothing-here). The name-resolution / state-model / CANCEL / sibling-module-probe logic is ported
 verbatim onto the instance. `ExternalStore` and `CobolModule`→`ModuleStack` move off statics onto `RunUnit`. The CALL-

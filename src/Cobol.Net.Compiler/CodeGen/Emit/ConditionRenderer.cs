@@ -311,7 +311,7 @@ internal sealed class ConditionRenderer(NumericRenderer num, EmitContext ctx) : 
         // alphanumeric program collating sequence §8.8.4.2.7 names.
         var (leftCat, rightCat) = RelationCategories(r.Left, r.Right);
         string collate = ctx.CollateArgFor(leftCat, rightCat);
-        return $"{RuntimeApi.VarGroupCompare(lc, ls, rc, rs, collate)} {r.Op} 0";
+        return $"{RuntimeApi.VarGroupCompare(lc, ctx.Atoms.Ref(ls), rc, ctx.Atoms.Ref(rs), collate)} {r.Op} 0";
     }
 
     /// <summary>GR3's content test for whichever operand is the subject of a BLANK WHEN ZERO entry and has a

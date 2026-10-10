@@ -91,14 +91,12 @@ public sealed class CobolVarGroupNestedTests
     }
 
     [Fact]
-    public void AFixedGroupsSpanAdapter_RefusesANestedComponentByName_NeverAsAnEmptyTable()
+    public void ANestedComponent_IsNeverReadAsAnEmptyTable_OrAsCharacters()
     {
-        var nested = Carrier("h", "zz", DynElement("ab", "p"));
-        var ex = Assert.Throws<NotImplementedCobolFeatureException>(() => CobolVarGroup.ToFixedImage(nested, 6, [1, 3]));
-        Assert.Contains("kb/Work PB2496", ex.Message);
-        // A component carried as the characters of a fixed group's table cannot be split into variable-length elements.
+        // kb/Work PB2690: a fixed-length group meets the nested table through the pair's two shapes (Reshape), so the
+        // only way a nested component holds characters and no occurrence carriers is a carrier built wrongly.
         var flat = new CobolVarGroup("hzz", ["abc"]);
-        Assert.Throws<NotImplementedCobolFeatureException>(() => flat.ElementCarriersAt(0));
+        Assert.Throws<InvalidOperationException>(() => flat.ElementCarriersAt(0));
         Assert.Empty(new CobolVarGroup("hzz", [""]).ElementCarriersAt(0));
     }
 

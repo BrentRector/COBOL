@@ -16,7 +16,8 @@ namespace CobolNet.CodeGen.Emit;
 /// receiver a numeric render is computed for now travels BY PARAMETER (<see cref="ReceiverContext"/>), killing
 /// the H1 staleness class by construction.
 /// </summary>
-internal sealed class EmitContext(CodeWriter writer, DataBinder data, NameAllocator names, Lazy<string> whenCompiledStamp)
+internal sealed class EmitContext(CodeWriter writer, DataBinder data, NameAllocator names, GroupAtomTable atoms,
+    Lazy<string> whenCompiledStamp)
 {
     /// <summary>The C# output writer.</summary>
     public CodeWriter Writer { get; } = writer;
@@ -43,6 +44,11 @@ internal sealed class EmitContext(CodeWriter writer, DataBinder data, NameAlloca
     /// <summary>The RUN-UNIT-scoped unique-name allocator (P7 Step 9a) — the SAME instance rides every per-unit
     /// context of one generated module, so minted temporaries never collide across units.</summary>
     public NameAllocator Names { get; } = names;
+
+    /// <summary>The RUN-UNIT-scoped table of §8.5.1.12 atom arrays (kb/Work PB2690) — the SAME instance rides every per-unit
+    /// context of one generated module, and states each distinct array once as a static field instead of allocating it at
+    /// every execution of the statement that names it.</summary>
+    public GroupAtomTable Atoms { get; } = atoms;
 
     /// <summary>⛔ ONE EVALUATION, N STORES — the emitter half of every "… is stored in each data item referenced
     /// by identifier-N <b>in the order specified</b>" rule (kb/Work PB394). ISO §14.9.39.4 GR12 / GR14 / GR16 /

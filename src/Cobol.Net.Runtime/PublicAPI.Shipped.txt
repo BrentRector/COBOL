@@ -2997,15 +2997,10 @@ static CobolNet.Runtime.CobolValueClass.IsInArithmeticRange(CobolNet.Runtime.Cob
 static CobolNet.Runtime.CobolValueClass.IsNumeric(CobolNet.Runtime.CobolDec value) -> bool
 static CobolNet.Runtime.CobolVarGroup.Compare(CobolNet.Runtime.CobolVarGroup! a, CobolNet.Runtime.GroupAtom![]! aShape, CobolNet.Runtime.CobolVarGroup! b, CobolNet.Runtime.GroupAtom![]! bShape, CobolNet.Runtime.CobolCollation? collation = null) -> int
 static CobolNet.Runtime.CobolVarGroup.Concat(CobolNet.Runtime.CobolVarGroup![]! occurrences) -> CobolNet.Runtime.CobolVarGroup!
-static CobolNet.Runtime.CobolVarGroup.CorrespondingSpans(int[]? fixedLayout, int[]! varLayout) -> int[]?
-static CobolNet.Runtime.CobolVarGroup.FixedRun(int chars) -> int[]!
 static CobolNet.Runtime.CobolVarGroup.FromContiguous(string! record, int fixedTotal, System.Collections.Generic.IReadOnlyList<int>! fixedAt, System.Collections.Generic.IReadOnlyList<int>! unit, System.Collections.Generic.IReadOnlyList<long>! maxUnits, System.Collections.Generic.IReadOnlyList<int>? recorded = null, bool fixedForm = false, System.Collections.Generic.IReadOnlyList<CobolNet.Runtime.CobolDynStructure?>? structure = null) -> CobolNet.Runtime.CobolVarGroup!
-static CobolNet.Runtime.CobolVarGroup.FromFixedImage(string! image, int[]! spans) -> CobolNet.Runtime.CobolVarGroup!
 static CobolNet.Runtime.CobolVarGroup.Occurrences(string! content, int elementWidth) -> string![]!
 static CobolNet.Runtime.CobolVarGroup.Overlay(CobolNet.Runtime.CobolVarGroup! current, CobolNet.Runtime.CobolVarGroup! view, CobolNet.Runtime.GroupAtom![]! currentShape, CobolNet.Runtime.GroupAtom![]! viewShape) -> CobolNet.Runtime.CobolVarGroup!
-static CobolNet.Runtime.CobolVarGroup.OverlayFixedImage(CobolNet.Runtime.CobolVarGroup! current, string! image, int[]! spans) -> CobolNet.Runtime.CobolVarGroup!
 static CobolNet.Runtime.CobolVarGroup.Reshape(CobolNet.Runtime.CobolVarGroup! v, CobolNet.Runtime.GroupAtom![]! from, CobolNet.Runtime.GroupAtom![]! to) -> CobolNet.Runtime.CobolVarGroup!
-static CobolNet.Runtime.CobolVarGroup.ToFixedImage(CobolNet.Runtime.CobolVarGroup! v, int totalWidth, int[]! spans) -> string!
 static CobolNet.Runtime.CobolVarGroup.operator !=(CobolNet.Runtime.CobolVarGroup? left, CobolNet.Runtime.CobolVarGroup? right) -> bool
 static CobolNet.Runtime.CobolVarGroup.operator ==(CobolNet.Runtime.CobolVarGroup? left, CobolNet.Runtime.CobolVarGroup? right) -> bool
 static CobolNet.Runtime.CobolWide.Add(CobolNet.Runtime.CobolWide a, CobolNet.Runtime.CobolWide b) -> CobolNet.Runtime.CobolWide

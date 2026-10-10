@@ -784,8 +784,8 @@ internal static class PlaceRenderer
 
     /// <summary>A §8.5.1.12 carrier of shape <paramref name="from"/> seen in shape <paramref name="to"/>: the carrier
     /// itself when the shapes are the same, else <c>CobolVarGroup.Reshape</c> (kb/Work PB480, PB2496, PB2691).</summary>
-    public static string VarGroupInShape(string carrier, GroupAtom[] from, GroupAtom[] to) =>
-        GroupCompatibility.SameShape(from, to) ? carrier : RuntimeApi.VarGroupReshape(carrier, from, to);
+    public static string VarGroupInShape(string carrier, GroupAtom[] from, GroupAtom[] to, GroupAtomTable atoms) =>
+        GroupCompatibility.SameShape(from, to) ? carrier : RuntimeApi.VarGroupReshape(carrier, atoms.Ref(from), atoms.Ref(to));
 
     /// <summary>The EXTENT TABLE that travels beside <see cref="VarGroupCurrentImage"/> (determination D-FRA (v);
     /// kb/Work PB1053): where each variable-length component of the group ends in that image — the generated

@@ -223,16 +223,6 @@ internal static class VariableLengthCompatibility
     public static GroupAtom[]? GroupAtoms(DataItem g) =>
         ItemCategory.IsGroupItem(g) && AtomsOf(g) is { Unplaced: null } laid ? laid.Atoms : null;
 
-    /// <summary>⛔ THE GROUP'S §8.5.1.12 LAYOUT as the runtime reads it — flat <c>(kind, chars, elementChars)</c>
-    /// triples in CHARACTER positions (<see cref="GroupCompatibility.Layout"/>, derived from the same atoms the walk
-    /// reads; kb/Work PB965). It is the compile-time half of <c>CobolVarGroup.CorrespondingSpans</c>, which pairs a
-    /// FIXED group's layout with a VARIABLE-length group's and answers which of the fixed group's tables correspond
-    /// (§8.5.1.12.2) — the spans <c>CobolVarGroup.FromFixedImage</c> lifts out so a fixed group can stand on the other
-    /// side of an ISO §14.9.25.4 GR9 move. Across a CALL each side is compiled apart, so the ATOMS travel
-    /// (<c>CobolArg.Atoms</c>, <see cref="GroupAtoms"/>; kb/Work PB2280) and the runtime derives this layout from them.
-    /// <see langword="null"/> where <see cref="GroupAtoms"/> is.</summary>
-    private static int[]? Layout(DataItem g) => GroupAtoms(g) is { } atoms ? GroupCompatibility.Layout(atoms) : null;
-
     /// <summary>True when a group's atoms have anything but fixed material — a table or a variable-length member, the
     /// only atoms §8.5.1.12.2's correspondence can pair. Fixed material alone states nothing beyond the group's length,
     /// which the runtime recovers from the carrier (<c>GroupCompatibility.FixedRun</c>), so the boundary does not emit
@@ -243,17 +233,6 @@ internal static class VariableLengthCompatibility
             if (a.Kind != GroupAtomKind.Fixed) return true;
         return false;
     }
-
-    /// <summary>The spans of <paramref name="fixedGroup"/>'s tables that correspond to
-    /// <paramref name="varGroup"/>'s dynamic-capacity tables — the compile-time call of the ONE correspondence
-    /// walk (<c>CobolVarGroup.CorrespondingSpans</c>), for a pair both of whose descriptions are in hand at an INVOKE
-    /// boundary (<c>OoEmitter</c>'s fixed-group arms; a statement — the §14.9.25.4 GR9 MOVE, the §8.8.4.2.17 relation —
-    /// pairs the two shapes through <c>CobolVarGroup.Reshape</c> / <c>Compare</c> instead, kb/Work PB2496). Null when
-    /// either layout cannot be stated or the pair does not correspond.</summary>
-    public static int[]? CorrespondingSpans(DataItem fixedGroup, DataItem varGroup) =>
-        Layout(fixedGroup) is { } f && Layout(varGroup) is { } v
-            ? CobolNet.Runtime.CobolVarGroup.CorrespondingSpans(f, v)
-            : null;
 
     /// <summary>⛔ ISO §8.5.1.12.1's PROHIBITION OVER AN OPERAND PAIR, for every operation it names — "a
     /// variable-length group is not equivalent to an alphanumeric data item and may not undergo a comparison or a

@@ -379,6 +379,7 @@ public static class GroupCompatibility
     /// need no reshaping (<see cref="CobolVarGroup.Reshape"/>).</summary>
     public static bool SameShape(GroupAtom[] a, GroupAtom[] b)
     {
+        if (ReferenceEquals(a, b)) return true;   // the compiler states each distinct array once (kb/Work PB2690)
         if (a.Length != b.Length) return false;
         for (int i = 0; i < a.Length; i++)
         {

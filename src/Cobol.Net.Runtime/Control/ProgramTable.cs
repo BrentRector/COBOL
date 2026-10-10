@@ -245,33 +245,34 @@ public sealed class ProgramTable
     /// depth and the activation past the last one the stack can hold is §14.9.4.4 GR3c's EC-PROGRAM-RESOURCES rather
     /// than a process kill. The thread is transparent: the <see cref="StopRun"/> unwind still reaches the entry
     /// wrapper's catch on the calling thread.</para></summary>
-    public void RunMain(string path) => ActivationStack.RunOnRunUnitThread(() => RunMainOnThisThread(path));
+    public void RunMain(string path) => ActivationStack.RunOnRunUnitThread(() => RunOnThisThread(null, path));
 
-    private void RunMainOnThisThread(string path)
+    /// <summary>Run a compiled module as the run unit's entry — the standalone executable's <c>Main</c> (kb/Work PB2846):
+    /// <see cref="RunMain"/>'s boundary with the module's own registration INSIDE it. <paramref name="ensureRegistered"/>
+    /// is the module's registration member (<c>__CobolModule.EnsureRegistered</c>), and a registration the run unit
+    /// refuses (a module built against another runtime major or call ABI, or one carrying an already-registered
+    /// outermost name; PB2097) is a <see cref="CobolCallException"/> that reaches the same §14.6.12 abnormal-termination
+    /// surface as any other fatal condition, because no statement of the entry runs outside the boundary that owns it.
+    /// A host that registers its modules itself enters through <see cref="RunMain"/>.</summary>
+    /// <param name="ensureRegistered">The module's registration member.</param>
+    /// <param name="mainPath">The main program's path, or null for a module with no main program (a callable library of
+    /// functions or prototypes, §8.3.1): it registers and ends.</param>
+    public void RunModule(Action ensureRegistered, string? mainPath)
+        => ActivationStack.RunOnRunUnitThread(() => RunOnThisThread(ensureRegistered, mainPath));
+
+    private void RunOnThisThread(Action? ensureRegistered, string? path)
     {
         // The standard display device writes UTF-8 (fix-queue PB59; CONFORMANCE.md item 59). ⛔ The rule lives in
         // ONE place — CobolNet.Runtime.IO.StandardStreams — because this `if` used to BE that place and the
         // `cobol` CLI's diagnostic path had no copy of it, so every ISO citation the compiler printed left the
         // process mangled at the OS code page (kb/Work PB899, feedback_two_arm_dispatch).
         IO.StandardStreams.EnsureUtf8();
-        var n = _byPath[path];
-        var inst = n.Instance ??= n.Factory(null);
-        n.Active++;
-        n.CalledSinceCancel = true;   // §14.9.5 GR7 — the main activation counts as "called in this run unit"
-        _owner.Modules.PushMain(n.Name);   // TOP-LEVEL / the run-unit main (§15.65.4 r5/r10)
-        // The §14.6.13.1.4 #3 selector for a NONFATAL condition raised at a RUNTIME site is the ACTIVATION's
-        // (kb/Work PB367b) — same scope, same boundary, as the ModuleStack frame and the §14.9.28.4 PERFORM
-        // depth above it. The main program's activator is the run-unit boundary, so the prior value is null.
-        var mainExc = _owner.Exceptions;
-        var savedNonfatalDispatcher = mainExc.NonfatalDispatcher;
-        mainExc.NonfatalDispatcher = inst;
         try
         {
-            // A GOBACK … RAISING in the MAIN program stages for no activation at all (ModuleStack.ActivatingActivation
-            // is −1 for the main frame), so nothing can ever take it — §14.9.18.4 GR3: "A RAISING phrase, if
-            // specified, is ignored" (kb/Work PB892 Arm B).
-            try { inst.Activate(); }
-            finally { n.Active--; _owner.Modules.Pop(); mainExc.NonfatalDispatcher = savedNonfatalDispatcher; }
+            // The module's own registration is a statement of the run unit like any other (kb/Work PB2846): a refusal
+            // is a CobolCallException (EC-PROGRAM-NOT-FOUND, §14.9.4.4 GR3 b), and the catches below end the run unit.
+            ensureRegistered?.Invoke();
+            if (path is not null) ActivateMain(path);
         }
         // The §14.6.12 abnormal-termination surface for a FATAL condition that reached the run-unit boundary
         // unhandled — BOTH families, so neither escapes as a raw CLR crash: exception-condition fatals
@@ -296,6 +297,29 @@ public sealed class ProgramTable
             // wrapper's catch.
             _owner.Terminate();
         }
+    }
+
+    /// <summary>Activate the run unit's main program: the ModuleStack main frame, the activation's nonfatal selector and the
+    /// §14.9.5 GR7 "called" mark, all restored when the activation ends. Runs inside <see cref="RunOnThisThread"/>'s
+    /// termination boundary.</summary>
+    private void ActivateMain(string path)
+    {
+        var n = _byPath[path];
+        var inst = n.Instance ??= n.Factory(null);
+        n.Active++;
+        n.CalledSinceCancel = true;   // §14.9.5 GR7 — the main activation counts as "called in this run unit"
+        _owner.Modules.PushMain(n.Name);   // TOP-LEVEL / the run-unit main (§15.65.4 r5/r10)
+        // The §14.6.13.1.4 #3 selector for a NONFATAL condition raised at a RUNTIME site is the ACTIVATION's
+        // (kb/Work PB367b) — same scope, same boundary, as the ModuleStack frame and the §14.9.28.4 PERFORM
+        // depth above it. The main program's activator is the run-unit boundary, so the prior value is null.
+        var mainExc = _owner.Exceptions;
+        var savedNonfatalDispatcher = mainExc.NonfatalDispatcher;
+        mainExc.NonfatalDispatcher = inst;
+        // A GOBACK … RAISING in the MAIN program stages for no activation at all (ModuleStack.ActivatingActivation
+        // is −1 for the main frame), so nothing can ever take it — §14.9.18.4 GR3: "A RAISING phrase, if
+        // specified, is ignored" (kb/Work PB892 Arm B).
+        try { inst.Activate(); }
+        finally { n.Active--; _owner.Modules.Pop(); mainExc.NonfatalDispatcher = savedNonfatalDispatcher; }
     }
 
     /// <summary>The §14.6.12 abnormal-run-unit-termination indication (§14.6.11 CLOSE is the caller's finally): the

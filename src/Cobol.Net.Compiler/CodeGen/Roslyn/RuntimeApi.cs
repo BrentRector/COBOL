@@ -1903,40 +1903,45 @@ internal static class RuntimeApi
     /// (<see cref="VarGroupReshape"/>, <see cref="VarGroupCompare"/>).</summary>
     public static string VarGroupOfImage(string image) => $"new {nameof(CobolVarGroup)}({image}, [])";
 
-    /// <summary>A FIXED-length group's decomposition into the same carrier (ISO §8.5.1.12.3 sentence 3 /
-    /// §14.6.9.1 — its table is treated as a dynamic-capacity table of its fixed or DEPENDING count), so a fixed
-    /// group can stand on the other side of a §14.9.25.4 GR9 move (kb/Work PB393). <paramref name="spans"/> is
-    /// the flat (offset, width) pair list from <c>VariableLengthCompatibility.CorrespondingSpans</c> (the PAIR's §8.5.1.12.2 correspondence).</summary>
-    public static string VarGroupFromFixedImage(string image, string spans) =>
-        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.FromFixedImage)}({image}, {spans})";
+    /// <summary>A FIXED-length group's record image <paramref name="image"/> (of shape <paramref name="imageShape"/>) as the
+    /// carrier of the variable-length group shape <paramref name="to"/> (ISO §8.5.1.12.3 sentence 3 / §14.6.9.1 — its
+    /// table is treated as a dynamic-capacity table of its fixed or DEPENDING count) — <c>CobolVarGroup.FromImage</c>
+    /// (kb/Work PB393, PB2690).</summary>
+    public static string VarGroupFromImage(string image, string imageShape, string to) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.FromImage)}({image}, {imageShape}, {to})";
 
     /// <summary>The ISO §8.8.4.2.17 comparison of two compatible groups' carriers, each in its own shape —
     /// <c>CobolVarGroup.Compare</c>, &lt;0 / 0 / &gt;0; <paramref name="collateArg"/> is the <c>, __COLLATE</c> suffix or
     /// empty (kb/Work PB1467, PB2496).</summary>
-    public static string VarGroupCompare(string left, GroupAtom[] leftShape, string right, GroupAtom[] rightShape,
+    public static string VarGroupCompare(string left, string leftShape, string right, string rightShape,
                                          string collateArg) =>
-        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Compare)}({left}, {GroupAtomsNew(leftShape)}, {right}, "
-        + $"{GroupAtomsNew(rightShape)}{collateArg})";
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Compare)}({left}, {leftShape}, {right}, {rightShape}{collateArg})";
 
-    /// <summary>The inverse of <see cref="VarGroupFromFixedImage"/> — rebuild the fixed group's record image.</summary>
-    public static string VarGroupToFixedImage(string carrier, int totalWidth, string spans) =>
-        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.ToFixedImage)}({carrier}, {totalWidth}, {spans})";
+    /// <summary>The inverse of <see cref="VarGroupFromImage"/> — a variable-length carrier (of shape <paramref name="from"/>)
+    /// as the record image of <paramref name="totalWidth"/> characters of the fixed group of shape
+    /// <paramref name="imageShape"/>: <c>CobolVarGroup.ToImage</c>.</summary>
+    public static string VarGroupToImage(string carrier, string from, string imageShape, int totalWidth) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.ToImage)}({carrier}, {from}, {imageShape}, {totalWidth})";
 
     /// <summary>A fixed-length formal's store back over a variable-length argument's storage (§14.2.3 GR8;
-    /// kb/Work PB965) — <c>CobolVarGroup.OverlayFixedImage</c>.</summary>
-    public static string VarGroupOverlayFixedImage(string current, string image, string spans) =>
-        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.OverlayFixedImage)}({current}, {image}, {spans})";
+    /// kb/Work PB965) — <c>CobolVarGroup.OverlayImage</c>.</summary>
+    public static string VarGroupOverlayImage(string current, string currentShape, string image, string imageShape) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.OverlayImage)}({current}, {currentShape}, {image}, {imageShape})";
+
+    /// <summary>A variable-length formal's carrier stored back over a fixed-length argument's record image (§14.2.3 GR8;
+    /// kb/Work PB2690) — <c>CobolVarGroup.OverlaidImage</c>.</summary>
+    public static string VarGroupOverlaidImage(string currentImage, string imageShape, string view, string viewShape) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.OverlaidImage)}({currentImage}, {imageShape}, {view}, {viewShape})";
 
     /// <summary>A variable-length group's carrier rebuilt in the shape of another, compatible one (ISO §8.5.1.12;
     /// kb/Work PB480) — <c>CobolVarGroup.Reshape</c>.</summary>
-    public static string VarGroupReshape(string carrier, GroupAtom[] from, GroupAtom[] to) =>
-        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Reshape)}({carrier}, {GroupAtomsNew(from)}, {GroupAtomsNew(to)})";
+    public static string VarGroupReshape(string carrier, string from, string to) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Reshape)}({carrier}, {from}, {to})";
 
     /// <summary>A variable-length view's store back over the variable-length storage it views (ISO §14.2.3 GR8;
     /// kb/Work PB480) — <c>CobolVarGroup.Overlay</c>.</summary>
-    public static string VarGroupOverlay(string current, string view, GroupAtom[] currentShape, GroupAtom[] viewShape) =>
-        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Overlay)}({current}, {view}, {GroupAtomsNew(currentShape)}, "
-        + $"{GroupAtomsNew(viewShape)})";
+    public static string VarGroupOverlay(string current, string view, string currentShape, string viewShape) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Overlay)}({current}, {view}, {currentShape}, {viewShape})";
 
     /// <summary>A DETACHED variable-length carrier cell (BY CONTENT / BY VALUE, §14.2.3 GR9/GR10).</summary>
     public static string VarGroupCell(string value) => $"ManagedPointer<{VarGroupType}>.Cell({value})";
@@ -1984,7 +1989,7 @@ internal static class RuntimeApi
         $"{nameof(CobolArgAdapt)}.{nameof(CobolArgAdapt.TextValue)}({args}, {position}, {width}, {profile}, {scale}, {groupAtoms ?? "null"}, {unbound})";
 
     /// <summary>The §8.5.1.12 atoms argument of a TABLE-LESS group formal — the empty array, which the adapter
-    /// reads as <c>CobolVarGroup.FixedRun(width)</c> (kb/Work PB965, PB2280); allocation-free at every activation.</summary>
+    /// reads as <c>GroupCompatibility.FixedRun(width)</c> (kb/Work PB965, PB2280); allocation-free at every activation.</summary>
     public const string NoTableGroupAtoms = "global::System.Array.Empty<GroupAtom>()";
 
     /// <summary>The ACTIVATING element's §14.2.3 GR9/GR10 argument crossing — <c>CobolArgAdapt.LandForFormal</c>
@@ -2141,9 +2146,16 @@ internal static class RuntimeApi
     // ── Run-unit lifecycle (CobolFile) ──
 
     /// <summary>Run-unit file-subsystem init (the entry wrapper's Main) — <c>CobolFile.Init</c>. (The matching
-    /// §14.6.11 run-unit-termination implicit CLOSE is runtime-side — <see cref="Runtime.ProgramTable.RunMain"/>'s
+    /// §14.6.11 run-unit-termination implicit CLOSE is runtime-side — <see cref="Runtime.ProgramTable.RunModule"/>'s
     /// finally — so a separately-compiled module's open files are closed even when this main group declares none.)</summary>
     public static string FileInit() => $"{nameof(CobolFile)}.{nameof(CobolFile.Init)}()";
+
+    /// <summary>The entry wrapper's one run-unit statement: <c>ProgramRegistry.RunModule(registrar.EnsureRegistered,
+    /// mainPath)</c> (kb/Work PB2846) — the module's registration member and its main program's path (a literal, or
+    /// <c>null</c> for a module with no main), handed to the runtime boundary that owns the §14.6.11 / §14.6.12 run-unit
+    /// termination, so the module's own registration is inside it.</summary>
+    public static string RunModule(string registrarEnsureRegistered, string mainPathLiteralOrNull) =>
+        $"{nameof(ProgramRegistry)}.{nameof(ProgramRegistry.RunModule)}({registrarEnsureRegistered}, {mainPathLiteralOrNull})";
 
     // ── The module's repository record and its one registration member (DESIGN-external-repository §4.5, §11.2;
     //    kb/Work PB2097). Both state the versions this compiler's runtime declares, as compiled against, so the run unit

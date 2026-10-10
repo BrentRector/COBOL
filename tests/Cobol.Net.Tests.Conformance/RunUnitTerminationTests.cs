@@ -218,4 +218,49 @@ public sealed class RunUnitTerminationTests
         }
         finally { CutRunner.TryDelete(dir); }
     }
+
+    // ── kb/Work PB2846: the main module's own registration is INSIDE the run-unit boundary ──
+
+    /// <summary>A module of another runtime major is refused by the run unit's module registration (PB2097:
+    /// EC-PROGRAM-NOT-FOUND, ISO §14.9.4.4 GR3 "If the program cannot be located", cite.py OK). When that module is the
+    /// run unit's own MAIN, the refusal reaches the §14.6.12 abnormal-termination surface (a stderr diagnostic naming the
+    /// condition and the skew, exit 1), never an unhandled .NET exception: the emitted <c>Main</c> hands its
+    /// registration to the runtime boundary (<c>ProgramRegistry.RunModule</c>), so no statement of the entry runs
+    /// outside the boundary that owns the termination surface. The skew is made real by rewriting the runtime version the
+    /// module recorded, in the compiled assembly's user-string heap.</summary>
+    [Fact]
+    public void MainModuleRefusedAtRegistration_RaisesAbnormalTerminationSurface()
+    {
+        const string source = """
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. PB2846SKEW.
+            PROCEDURE DIVISION.
+            MAIN.
+                DISPLAY "must not run".
+                STOP RUN.
+            """;
+        string dir = CutRunner.NewTempDir("pb2846");
+        try
+        {
+            CompileTo(source, dir, "PB2846SKEW");
+            string dll = Path.Combine(dir, "PB2846SKEW.dll");
+            byte[] image = File.ReadAllBytes(dll);
+            byte[] recorded = System.Text.Encoding.Unicode.GetBytes(CobolNet.Runtime.RuntimeAbi.Version.ToString());
+            byte[] skewed = System.Text.Encoding.Unicode.GetBytes(
+                new Version(CobolNet.Runtime.RuntimeAbi.Version.Major + 1, 0, 0, 0).ToString());
+            Assert.Equal(recorded.Length, skewed.Length);
+            int at = image.AsSpan().IndexOf(recorded);
+            Assert.True(at >= 0, "the module's recorded runtime version was not found in its user-string heap");
+            skewed.CopyTo(image, at);
+            File.WriteAllBytes(dll, image);
+
+            var (exit, stdout, stderr) = CutRunner.RunExit(dll, dir);
+            Assert.Equal(1, exit);
+            Assert.Equal("", stdout);
+            Assert.Contains("abnormal run-unit termination", stderr);
+            Assert.Contains("EC-PROGRAM-NOT-FOUND", stderr);
+            Assert.DoesNotContain("Unhandled exception", stderr);
+        }
+        finally { CutRunner.TryDelete(dir); }
+    }
 }

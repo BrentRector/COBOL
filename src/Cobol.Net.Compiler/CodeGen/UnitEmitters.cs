@@ -44,12 +44,12 @@ internal sealed class UnitEmitters
     public StatementEmitter Statements { get; }
     public DispatchEmitter Dispatch { get; }
 
-    public UnitEmitters(CodeWriter w, DataBinder data, ReferenceResolver refs, NameAllocator names,
+    public UnitEmitters(CodeWriter w, DataBinder data, ReferenceResolver refs, NameAllocator names, GroupAtomTable atoms,
         DispatchState dispatchState, EcState ecState, CallUnitState callState, OoEmitter oo,
         Lazy<string> whenCompiledStamp)
     {
         Refs = refs;
-        Ctx = new EmitContext(w, data, names, whenCompiledStamp);
+        Ctx = new EmitContext(w, data, names, atoms, whenCompiledStamp);
         Num = new NumericRenderer(Ctx, ecState);
         Cond = new ConditionRenderer(Num, Ctx);
 

@@ -3,7 +3,7 @@
 // </auto-generated>
 #nullable enable
 #pragma warning disable CS0164   // unreferenced label — SEARCH/NEXT-SENTENCE emit per-boundary labels; not every one is jumped to
-[assembly: global::CobolNet.Runtime.Repository.CobolRepositoryAttribute(1, "1.0.0.0", 1, Registrar = "Cobol.p.__CobolModule")]
+[assembly: global::CobolNet.Runtime.Repository.CobolRepositoryAttribute(1, "2.0.0.0", 1, Registrar = "Cobol.p.__CobolModule")]
 namespace Cobol.p;
 
 using global::System;                    // Int128 — the wide arithmetic carrier (numeric design D1)
@@ -69,7 +69,7 @@ internal sealed class _PRG_CHAR_MOVE_BASIC : ICobolProgram
 }
 public static class __CobolModule
 {
-    public static void EnsureRegistered() => ProgramRegistry.RegisterModule("Cobol.p.__CobolModule", "1.0.0.0", 1, Register);
+    public static void EnsureRegistered() => ProgramRegistry.RegisterModule("Cobol.p.__CobolModule", "2.0.0.0", 1, Register);
 
     private static void Register()
     {
@@ -82,8 +82,7 @@ internal static class Program
     private static void Main()
     {
         ProgramRegistry.Reset();
-        __CobolModule.EnsureRegistered();
-        try { ProgramRegistry.RunMain("CHAR-MOVE-BASIC"); }
+        try { ProgramRegistry.RunModule(__CobolModule.EnsureRegistered, "CHAR-MOVE-BASIC"); }
         catch (StopRun) { }
     }
 }

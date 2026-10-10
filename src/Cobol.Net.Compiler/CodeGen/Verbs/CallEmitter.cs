@@ -537,7 +537,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     private string PlaceDescription(Place p)
     {
         string meta = BoundaryProfile(p, ctx.SignEncoding) ?? "null";
-        return BoundaryAtoms(p) is { } atoms ? $"{meta}, {atoms}" : meta;
+        return BoundaryAtoms(p, ctx.Atoms) is { } atoms ? $"{meta}, {atoms}" : meta;
     }
 
     /// <summary>The emitted <c>NumProfile</c> of an elementary NUMERIC place's storage, or null when it has none
@@ -646,14 +646,14 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// <summary>The emitted §8.5.1.12 ATOMS of a group place that has a table or a variable-length member
     /// (<c>CobolArg.Atoms</c>; kb/Work PB2280), or null when it has neither (its one §8.5.1.12 fact is then its length,
     /// which the runtime reads off the carrier). A reference-modified view is character storage, never a group.</summary>
-    internal static string? BoundaryAtoms(Place p) =>
+    internal static string? BoundaryAtoms(Place p, GroupAtomTable table) =>
         // A redefinition or cell VIEW of a group is that group's storage and states its atoms like any other (the
         // group a CALL claims onto a cell is one — kb/Work PB2087); a reference-modified one denotes no item.
         // A bit / national group crosses as its ELEMENTARY value, which has no image layout (kb/Work PB1166).
         p.DenotedItem is { IsAsIfElementary: false } item
         && VariableLengthCompatibility.GroupAtoms(item) is { } atoms
         && VariableLengthCompatibility.HasTableOrVariable(atoms)
-            ? RuntimeApi.GroupAtomsNew(atoms)
+            ? table.Ref(atoms)
             : null;
 
     /// <summary>⛔ THE STORAGE AREA OF A BY REFERENCE ARGUMENT (kb/Work PB2087) — the C# expression of the cell area it
@@ -666,7 +666,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// view's offset displaced by the checked zero-based start, as ADDRESS OF displaces it. A CALL states it as the
     /// <c>CobolArg</c>'s <c>Area</c> (<see cref="AreaArgument"/>) and an INVOKE passes it as the method formal's area
     /// parameter; a whole formal of the current source element answers through <see cref="ArgumentArea"/>.</summary>
-    internal static string? AreaOf(Place p)
+    internal static string? AreaOf(Place p, GroupAtomTable table)
     {
         string? start = null;
         if (p is RefModPlace rm)
@@ -696,7 +696,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         // description could be shown to share its storage, so the formal holds a copy.
         if (view.Coding is VarGroupWindow g)
             return view.DenotedItem is { } group && VariableLengthCompatibility.GroupAtoms(group) is { } atoms
-                ? RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset, PositionRenderer.Render(g.DynBase), RuntimeApi.GroupAtomsNew(atoms))
+                ? RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset, PositionRenderer.Render(g.DynBase), table.Ref(atoms))
                 : null;
         return RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset);
     }
@@ -704,7 +704,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// <summary>The area expression of a BY REFERENCE argument for any activation lane: a whole formal of the current
     /// source element passes on the area it occupies (<c>CallUnitState.WholeFormalArea</c>), any other operand its own
     /// cell area (<see cref="AreaOf"/>); "null" when it has none.</summary>
-    internal string ArgumentArea(Place p) => callState.WholeFormalArea(p) ?? AreaOf(p) ?? "null";
+    internal string ArgumentArea(Place p) => callState.WholeFormalArea(p) ?? AreaOf(p, ctx.Atoms) ?? "null";
 
     /// <summary>The trailing named <c>Area</c> argument of a BY REFERENCE <c>CobolArg</c>, or empty when it has none.</summary>
     private string AreaArgument(Place p) => ArgumentArea(p) is var area && area != "null" ? $", Area: {area}" : "";
@@ -722,9 +722,6 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         && ArgumentArea(p) is var area && area != "null"
             ? $", Area: {RuntimeApi.ArgAdaptContentRecord(area, p.Item.ByteWidth)}"
             : "";
-
-    /// <summary>The C# array literal of a §8.5.1.12 layout.</summary>
-    internal static string LayoutArray(int[] layout) => $"new int[] {{ {string.Join(", ", layout)} }}";
 
     /// <summary>The RETURNING item's <c>CobolArg</c> (kb/Work PB962/PB965): the same BY REFERENCE carrier an
     /// argument gets (§14.2.3 GR6 NOTE 1 — "the storage for the returning item is allocated in the activating

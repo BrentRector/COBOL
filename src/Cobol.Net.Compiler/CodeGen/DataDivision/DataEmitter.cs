@@ -18,9 +18,11 @@ internal sealed class DataEmitter
     private readonly RecordStructEmitter _structs;
     private readonly GroupImageCodec _codec;
     private readonly ValueInitializer _values;
+    private readonly EmitContext _ctx;
 
     public DataEmitter(EmitContext ctx)
     {
+        _ctx = ctx;
         var phys = new PhysicalModel(ctx);
         PhysicalModel.Observer.Value?.Invoke(phys);
         _values = new ValueInitializer(ctx);
@@ -60,7 +62,7 @@ internal sealed class DataEmitter
     /// reads.</summary>
     public (string Shape, string Fresh) AreaFormalShape(DataItem formal) =>
         (VarGroupWindow.Applies(formal) && VariableLengthCompatibility.GroupAtoms(formal) is { } atoms
-                ? RuntimeApi.GroupAtomsNew(atoms) : "null",
+                ? _ctx.Atoms.Ref(atoms) : "null",
             $"static () => new StorageCell {{ Ref = {UnboundFormalRecord(formal, formal.Class!.Width)} }}"
             + CellDynSeeds(formal, useValues: false));
 
