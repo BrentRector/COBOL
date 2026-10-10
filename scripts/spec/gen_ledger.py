@@ -443,28 +443,32 @@ def register_counts_at(sha: str) -> dict | None:
 
 
 def missed_points(pts: list[dict]) -> list[dict]:
-    """The inventory-moving commits since the series' last point that no generator run recorded.
+    """The measurement-moving commits since the series' last point that no generator run recorded.
 
     ⛔ A generator run measures ONE tree, so a session that landed three trains between runs recorded one point
     for three landings (2026-10-04: trains 1011 and 1012 were missing until the owner noticed the page stale).
     Every commit that touched the inventory file after the last recorded sha is measured from its own tree here,
     so the series is one point per GAP-moving landing no matter how rarely the generator runs. Each such point
-    carries the register's series too, measured from the same tree (kb/Work PB2912)."""
+    carries the register's series too, measured from the same tree (kb/Work PB2912), and a commit that moves only the
+    register (a `kb/Work` landing that leaves the inventory alone) is a point as well: the movement test is
+    MOVING_KEYS, the same one `trend_series` applies to the current point (train 1052 review)."""
     last = pts[-1] if pts else None
     if last is None or not git("rev-parse", "--verify", "--quiet", last["sha"]):
         return []
     log = git("log", "--reverse", "--format=%h|%cI", "--abbrev=8", f"{last['sha']}..HEAD", "--",
-              INVENTORY_REL)
+              INVENTORY_REL, "kb/Work")
     out: list[dict] = []
     for line in filter(None, log.splitlines()):
         sha, _, iso = line.partition("|")
         counts = inventory_counts_at(sha)
-        prev = out[-1] if out else last
-        if counts is None or all(counts[k] == prev.get(k) for k in ("gap", "closed", "dns")):
+        if counts is None:
             continue
-        out.append({"sha": sha, "date": iso[:10], **counts,
-                    "label": git("log", "-1", "--format=%s", sha)[:28].rstrip(), "battery": None,
-                    **(register_counts_at(sha) or {})})
+        point = {**counts, **(register_counts_at(sha) or {})}
+        prev = out[-1] if out else last
+        if all(point.get(k) == prev.get(k) for k in MOVING_KEYS):
+            continue
+        out.append({"sha": sha, "date": iso[:10], **point,
+                    "label": git("log", "-1", "--format=%s", sha)[:28].rstrip(), "battery": None})
     return out
 
 
