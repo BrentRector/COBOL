@@ -1966,7 +1966,22 @@ reallocated).
    > **DETERMINATION L12** (generalizing L10): every LC_TIME pattern and LC_MONETARY string is normalized —
    > Unicode Cf characters removed, U+00A0/U+202F/U+2009 mapped to the plain space (host-ICU stability: monetary
    > strings occupy character positions of a fixed-width item, so a host-varying byte would move EC-LOCALE-SIZE
-   > itself; U+2212 is kept — a real character); recognition matches through the same equivalence.
+   > itself; U+2212 is kept — a real character); recognition matches through the same equivalence. **L12 covers
+   > EVERY locale-sourced string a result carries, not only the patterns** (kb/Work PB2764): `TimeFacts` (the LC_TIME
+   > snapshot, the twin of `MonetaryFacts`) normalizes the date and time separators, the AM/PM designators, the era, the
+   > day and month names and the seconds fraction's decimal point once and renders `d_fmt` / `t_fmt` itself, so ICU's
+   > U+200F inside every ar-* date separator and U+00A0 inside the `a. m.` / `p. m.` of es-US, es-CO, es-DO, es-PA,
+   > es-PH, es-PR, es-VE, yrl-CO and yrl-VE can no longer reach a result through a pattern L10 had already cleaned.
+   > **DETERMINATION L13:** the date rendered is the GREGORIAN date argument-1 names (§15.52.3 r2: "a date in the same
+   > format as the year, month, and day returned in character positions 1 through 8 by the CURRENT-DATE function") and
+   > `d_fmt` formats it (§15.52.4 r2) — ISO/IEC 9945's `d_fmt` is a strftime format of a Gregorian broken-down time,
+   > its alternative-era rendering being the separate `era_d_fmt` — never the culture's own calendar: .NET defaults fa-*,
+   > ps-*, ckb-IR, lrc, mzn and uz-Arab to the Persian calendar, th-* to the Thai Buddhist and ar-SA to Umm al-Qura, so
+   > `LOCALE-DATE("20261008")` read 1405/7/16 under fa-IR and 8/10/2569 under th-TH; it is 2026/10/8 and 8/10/2026.
+   > Day and month names and the era come from a Gregorian clone of the culture's format data. `LocaleTextNormalizationDriftTests`
+   > holds all three: no format character or NBSP/narrow/thin space in any predefined culture's result, every pattern
+   > letter a token the renderer handles, and no product source outside the snapshot classes reading a culture's raw
+   > `DateTimeFormat` / `NumberFormat`.
 
    > ⚖ **A.4.9 items 2–5 — `LOCALE-COMPARE` (§15.51), `LOCALE-DATE` (§15.52), `LOCALE-TIME` (§15.53),
    > `LOCALE-TIME-FROM-SECONDS` (§15.54) — ARE IMPLEMENTED** (owner decision Q1; kb/Work PB64, increment T4 of

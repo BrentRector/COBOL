@@ -234,6 +234,8 @@ public sealed class RunUnitStateDriftTests
             "memo of order vectors, keyed by the (immutable) collator",
         ["CobolNet.Runtime.Globalization.MonetaryFacts::s_cache"] =
             "memo of monetary facts, keyed by the (immutable) LocaleFacts object",
+        ["CobolNet.Runtime.Globalization.TimeFacts::s_cache"] =
+            "memo of LC_TIME facts, keyed by the (immutable) LocaleFacts object",
         ["CobolNet.Runtime.CobolIntrinsics::s_orderingCollators"] =
             "memo of collators for FUNCTION ORDERING, keyed by (table, level): derived from immutable inputs",
         ["CobolNet.Runtime.Exceptions.EcCheckingProfile::Cache"] =

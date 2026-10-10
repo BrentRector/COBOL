@@ -135,9 +135,9 @@ public sealed class CobolLocaleTests
     {
         var facts = LocaleFacts.Root;
         // Tokens rendered against a hand-built pattern through the invariant culture's designators/separators.
-        Assert.Equal("13:05:09", CobolLocale.FormatTime(facts, 13, 5, 9, null));
+        Assert.Equal("13:05:09", TimeFacts.Of(facts).FormatTime(13, 5, 9, null));
         var us = LocaleFacts.For("en-US");
-        string rendered = CobolLocale.FormatTime(us, 0, 7, 3, null);
+        string rendered = TimeFacts.Of(us).FormatTime(0, 7, 3, null);
         Assert.Contains("12", rendered);                                          // h/hh: hour 0 renders as 12 on a 12-hour pattern
         Assert.Contains(us.DateTimeFormat.AMDesignator, rendered);
         Assert.True(us.TimeFormat.Length > 0 && us.DateFormat.Length > 0);

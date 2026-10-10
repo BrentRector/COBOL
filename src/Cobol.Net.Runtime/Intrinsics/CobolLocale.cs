@@ -1,7 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Globalization;
-using System.Text;
 using CobolNet.Runtime.Collation;
 using CobolNet.Runtime.Exceptions;
 using CobolNet.Runtime.Globalization;
@@ -17,7 +16,9 @@ namespace CobolNet.Runtime;
 /// an unavailable named locale is EC-LOCALE-MISSING (§15.51.4 r3 / §15.52.4 r1 / §15.53.4 r1 / §15.54.4 r1;
 /// checking-gated per §14.6.13.1.1, the root locale's answer standing when checking is off); an available locale
 /// whose LC_TIME content this environment lacks (no .NET culture data — <see cref="LocaleFacts.HasCultureData"/>)
-/// is EC-LOCALE-INVALID (§8.2.1 "invalid or incomplete", the invariant format standing).
+/// is EC-LOCALE-INVALID (§8.2.1 "invalid or incomplete", the invariant format standing). The three time functions
+/// render ONLY through the locale's <see cref="TimeFacts"/> (the LC_TIME snapshot, kb/Work PB2764): no culture string
+/// reaches a result except through DETERMINATION L12's normalization.
 /// <para>LOCALE-COMPARE IS the locale-based relation comparison (<see cref="LocaleCollation"/> — §15.51.4 r2's
 /// trailing-space truncation is §8.8.4.2.11 sentence 1 verbatim; r4 the cultural ordering) plus the sign→character
 /// map of r5; it is deliberately NOT a second comparison implementation.</para>
@@ -77,7 +78,7 @@ public static class CobolLocale
                 LocaleSubstitutePositions);
         }
         var facts = Facts(localeTag, LocaleCategory.Time, "LOCALE-DATE");
-        return date.ToString(facts.DateFormat, facts.DateTimeFormat);
+        return TimeFacts.Of(facts).FormatDate(date);
     }
 
     /// <summary>LOCALE-TIME (§15.53): argument-1 — a time in CURRENT-DATE positions 9–14 form (HHMMSS, r1/r2) with
@@ -102,7 +103,7 @@ public static class CobolLocale
                 LocaleSubstitutePositions);
         }
         var facts = Facts(localeTag, LocaleCategory.Time, "LOCALE-TIME");
-        return FormatTime(facts, hh, mm, ss, fraction: null);
+        return TimeFacts.Of(facts).FormatTime(hh, mm, ss, fraction: null);
     }
 
     /// <summary>LOCALE-TIME-FROM-SECONDS (§15.54): argument-1 — seconds past midnight in standard numeric time form
@@ -126,7 +127,7 @@ public static class CobolLocale
         var (hh, mm, ss) = CobolDate.TimeOfDay(whole, leapSecond);
         string? fraction = secScale > 0 ? frac.ToString().PadLeft(secScale, '0') : null;
         var facts = Facts(localeTag, LocaleCategory.Time, "LOCALE-TIME-FROM-SECONDS");
-        return FormatTime(facts, hh, mm, ss, fraction);
+        return TimeFacts.Of(facts).FormatTime(hh, mm, ss, fraction);
     }
 
     // ── UPPER-CASE / LOWER-CASE (§15.97 / §15.57; A.4.9 items 13 / 6; T5) ───────────────────────────────────────
@@ -186,65 +187,6 @@ public static class CobolLocale
             _ => "ISO §8.2.1",
         };
         return LocaleFacts.For(tag).Require(category, $"FUNCTION {fn}{(localeTag is not null ? " (locale-name-1)" : "")}", rule) ?? LocaleFacts.Root;
-    }
-
-    // ── t_fmt rendering ────────────────────────────────────────────────────────────────────────────────────────
-
-    /// <summary>Render hours/minutes/seconds per the culture's <c>t_fmt</c> (the long time pattern). Done over the
-    /// pattern's tokens rather than through <see cref="DateTime"/> because the standard's values are WIDER than a
-    /// DateTime can hold (§15.53.3 r3: hour 24, seconds up to 99 — a leap-second or end-of-day value renders as
-    /// the number it is). Tokens: <c>H</c>/<c>HH</c> 0–24 hour, <c>h</c>/<c>hh</c> 12-hour clock (12 for 0 and 12;
-    /// hour 24 → 12 with the AM designator of the day's end), <c>m</c>/<c>mm</c>, <c>s</c>/<c>ss</c> (the fraction,
-    /// when any, follows the seconds with the culture's decimal separator), <c>t</c>/<c>tt</c> the AM/PM designator,
-    /// <c>:</c> the culture's time separator, quoted and escaped literals verbatim.</summary>
-    internal static string FormatTime(LocaleFacts facts, int hh, int mm, int ss, string? fraction)
-    {
-        var dtf = facts.DateTimeFormat;
-        string pattern = facts.TimeFormat;
-        var sb = new StringBuilder(pattern.Length + 8);
-        bool pm = hh >= 12 && hh < 24;
-        int h12 = hh % 12 == 0 ? 12 : hh % 12;
-        for (int i = 0; i < pattern.Length;)
-        {
-            char c = pattern[i];
-            int run = 1;
-            while (i + run < pattern.Length && pattern[i + run] == c) run++;
-            switch (c)
-            {
-                case 'H': sb.Append(run >= 2 ? hh.ToString("00", CultureInfo.InvariantCulture) : hh.ToString(CultureInfo.InvariantCulture)); break;
-                case 'h': sb.Append(run >= 2 ? h12.ToString("00", CultureInfo.InvariantCulture) : h12.ToString(CultureInfo.InvariantCulture)); break;
-                case 'm': sb.Append(run >= 2 ? mm.ToString("00", CultureInfo.InvariantCulture) : mm.ToString(CultureInfo.InvariantCulture)); break;
-                case 's':
-                    sb.Append(run >= 2 ? ss.ToString("00", CultureInfo.InvariantCulture) : ss.ToString(CultureInfo.InvariantCulture));
-                    if (fraction is not null) sb.Append(facts.NumberFormat.NumberDecimalSeparator).Append(fraction);
-                    break;
-                case 't':
-                {
-                    string des = pm ? dtf.PMDesignator : dtf.AMDesignator;
-                    sb.Append(run >= 2 ? des : des.Length > 0 ? des[..1] : "");
-                    break;
-                }
-                case ':': sb.Append(dtf.TimeSeparator); run = 1; break;
-                case '\'':
-                case '"':
-                {
-                    int close = pattern.IndexOf(c, i + 1);
-                    if (close < 0) close = pattern.Length;
-                    sb.Append(pattern, i + 1, close - i - 1);
-                    i = close + 1;
-                    continue;
-                }
-                case '\\':
-                    if (i + 1 < pattern.Length) sb.Append(pattern[i + 1]);
-                    i += 2;
-                    continue;
-                default:
-                    sb.Append(c, run);
-                    break;
-            }
-            i += run;
-        }
-        return sb.ToString();
     }
 
     private static bool IsDigits(string s)

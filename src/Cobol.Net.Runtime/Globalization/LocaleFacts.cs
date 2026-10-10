@@ -117,7 +117,11 @@ public sealed class LocaleFacts
     };
 
     /// <summary>LC_TIME — the culture's date/time formats (<c>d_fmt</c> = <see cref="DateTimeFormatInfo.ShortDatePattern"/>,
-    /// <c>t_fmt</c> = <see cref="DateTimeFormatInfo.LongTimePattern"/>; L10).</summary>
+    /// <c>t_fmt</c> = <see cref="DateTimeFormatInfo.LongTimePattern"/>; L10). ⛔ RAW .NET culture data: its separators,
+    /// designators and names carry the host ICU's U+200F / U+00A0 bytes, so nothing that builds a COBOL result reads
+    /// it — <see cref="TimeFacts"/> is the LC_TIME snapshot that normalizes each string (DETERMINATION L12, kb/Work
+    /// PB2764; <c>LocaleTextNormalizationDriftTests</c>). Removing this shipped public member is a runtime-major
+    /// change (<c>RuntimeAbiPinDriftTests</c>), which is why it is documented here rather than deleted.</summary>
     public DateTimeFormatInfo DateTimeFormat { get; }
 
     /// <summary>ISO 9945 <c>d_fmt</c> — the culture's short date pattern (L10), spacing-normalized.</summary>
@@ -143,7 +147,8 @@ public sealed class LocaleFacts
     /// <summary>⚖ DETERMINATION L12, generalizing the L10 addendum (kb/Work PB64 T6): the ONE normalization of
     /// locale-sourced text — every Unicode FORMAT character (category Cf: the ar-* currency symbols' trailing
     /// U+200F, the U+061C/U+200E marks inside sign strings) is REMOVED, and U+00A0 NO-BREAK SPACE joins the
-    /// L10 pair (U+202F, U+2009) in mapping to the PLAIN SPACE. Applied to the LC_TIME patterns above AND to
+    /// L10 pair (U+202F, U+2009) in mapping to the PLAIN SPACE. Applied to every LC_TIME string — the patterns above AND
+    /// the separators, designators, era, names and decimal point (<see cref="TimeFacts"/>, kb/Work PB2764) — AND to
     /// every LC_MONETARY string (<see cref="MonetaryFacts"/>): ICU 72 moved fr-FR's mon_thousands_sep from
     /// U+00A0 to U+202F, and monetary strings consume CHARACTER POSITIONS of a fixed-width PICTURE format-2
     /// item, so a host-varying byte would change the §13.18.40.5 r14 b) truncation arithmetic and
@@ -173,7 +178,9 @@ public sealed class LocaleFacts
     }
 
     /// <summary>LC_MONETARY — the culture's number format (currency symbol, separators, grouping, digits, signs,
-    /// patterns; the PICTURE format 2 / NUMVAL-C increment T6 reads these).</summary>
+    /// patterns; the PICTURE format 2 / NUMVAL-C increment T6 reads these). ⛔ RAW .NET culture data, like
+    /// <see cref="DateTimeFormat"/>: only the snapshots that normalize it (<see cref="MonetaryFacts"/> for LC_MONETARY,
+    /// <see cref="TimeFacts"/> for the decimal point of a seconds fraction) read it.</summary>
     public NumberFormatInfo NumberFormat { get; }
 
     /// <summary>LC_MONETARY <c>int_curr_symbol</c> — the region's ISO 4217 code, or null for a neutral / invariant culture.</summary>

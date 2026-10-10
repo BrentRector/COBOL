@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-309 drift tests.
+310 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -75,6 +75,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [CobolWordsReachDriftTests](../tests/Cobol.Net.Tests.Unit/CobolWordsReachDriftTests.cs) | The >>COBOL-WORDS REACH invariant (ISO §7.3.10; kb/Work PB250). | `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4`, `tests/version-matrix/reserved-words.json`, `tests/version-matrix/context-sensitive-words.json` |
 | [CollatingComparisonClassDriftTests](../tests/Cobol.Net.Tests.Unit/CollatingComparisonClassDriftTests.cs) | ⛔ TWO QUESTIONS, TWO CLASSIFIERS — the guard that keeps them from being folded onto one again (kb/Work PB741). | — |
 | [CanonicalClosureDriftTests](../tests/Cobol.Net.Tests.Unit/Collation/CanonicalClosureDriftTests.cs) | Every collation table is CANONICALLY CLOSED, whichever front-end built it: each code point with a canonical decomposition collates EQUAL to its NFD at every level but the code point tie-break, in the root table, in a table a CLDR rule set derived, in a table a numeric .tailor file derived, and in a .tailor layered over a CLDR table. | — |
+| [LocaleTextNormalizationDriftTests](../tests/Cobol.Net.Tests.Unit/Collation/LocaleTextNormalizationDriftTests.cs) | ⛔ NO LOCALE-SOURCED STRING REACHES A COBOL RESULT UN-NORMALIZED (DETERMINATION L12; kb/Work PB2764). | `src` |
 | [CompilerDirectiveCatalogDriftTests](../tests/Cobol.Net.Tests.Unit/CompilerDirectiveCatalogDriftTests.cs) | The compiler-directive roster is derived, not hand-kept (kb/Work PB725) — these tests are what keeps "derived" true. | `specs/ISO_COBOL.md` |
 | [CompilerDirectiveWordsDriftTests](../tests/Cobol.Net.Tests.Unit/CompilerDirectiveWordsDriftTests.cs) | kb/Work PB1366 — CompilerDirectiveWords is the ONE representation of ISO/IEC 1989:2023 §8.12, "Compiler-directive words", and these tests are what keeps it equal to the standard: a word the table prints and the code lacks is a compilation-variable-name this compiler would accept (§7.3.11.3 SR1, §7.3.8.4.3 SR1), and a word the code has and the table lacks is legal source it would reject. | `specs/ISO_COBOL.md` |
 | [Condition88CloneDriftTests](../tests/Cobol.Net.Tests.Unit/Condition88CloneDriftTests.cs) | ⛔ THE DRIFT CHECK THAT KEEPS CopyOnto EXHAUSTIVE (kb/Work PB555). | — |

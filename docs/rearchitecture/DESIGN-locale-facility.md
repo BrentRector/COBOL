@@ -841,7 +841,10 @@ Three consequences the design must carry:
 "*hours, minutes, and seconds*"). Documented under §4.2.7. `LOCALE-TIME-FROM-SECONDS` additionally honours
 D.31.4.5's NOTE that it "*recognizes and processes argument values representing precision to the nanosecond*"
 by carrying the fractional part into the formatted value when the argument's scale is nonzero — Annex D is
-informative, so this is a determination, not a rule.
+informative, so this is a determination, not a rule. **L12/L13 (kb/Work PB2764):** every string the rendering emits
+(separators, AM/PM designators, era, day and month names, the fraction's decimal point) is normalized by the one
+`NormalizeLocaleText`, not only the pattern, and the year, month and day rendered are the GREGORIAN date argument-1
+names, never the culture's default calendar; both are `TimeFacts`' job (CONFORMANCE.md §4 item 5).
 
 ### 4.8 `LOCALE-COMPARE` (A.4.9 item 2)
 
@@ -1036,7 +1039,7 @@ lands in `docs/CONFORMANCE.md`.
 | … `int_frac_digits` | international form | **no .NET carrier** | WiseOwl COBOL uses `CurrencyDecimalDigits` for both; a documented limit |
 | … `positive_sign` / `negative_sign` | sign strings | `PositiveSign` / `NegativeSign` | — |
 | … `p_cs_precedes`, `n_cs_precedes`, `p_sign_posn`, `n_sign_posn` | placement | derived from `CurrencyPositivePattern` (4 values) and `CurrencyNegativePattern` (16 values) | A **generated** pattern→triple table, never hand-maintained (see below) |
-| LC_TIME `d_fmt` / `t_fmt` | LOCALE-DATE / -TIME | `ShortDatePattern` / `LongTimePattern` | DETERMINATION L10 — ✅ T4 (`LocaleFacts.DateFormat` / `TimeFormat`; `CobolLocale.FormatTime` renders `t_fmt` over its tokens, since hour 24 / seconds 99 / a fraction exceed a `DateTime`) |
+| LC_TIME `d_fmt` / `t_fmt` | LOCALE-DATE / -TIME | `ShortDatePattern` / `LongTimePattern` | DETERMINATIONS L10, L12, L13 — ✅ T4 + PB2764 (`TimeFacts`, the LC_TIME snapshot beside `MonetaryFacts`: `TimeFacts.FormatDate` / `FormatTime` render `d_fmt` / `t_fmt` over their tokens, since hour 24 / seconds 99 / a fraction exceed a `DateTime`, and every separator, designator, name, era and decimal point they emit has passed `LocaleFacts.NormalizeLocaleText`; the date is the Gregorian date argument-1 names) |
 | LC_MESSAGES, LC_NUMERIC | settable and queryable only | stored slots | §8.2.1: "*not used directly by COBOL; however, the ability to set and query these locale categories is provided*" (`--check` OK) |
 
 **The pattern→placement tables are DERIVED AT RUNTIME, not written and not build-time-generated** (a T6
