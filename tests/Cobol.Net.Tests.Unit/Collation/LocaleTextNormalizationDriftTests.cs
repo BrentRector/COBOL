@@ -98,9 +98,19 @@ public sealed class LocaleTextNormalizationDriftTests
     {
         if (LocaleFacts.InvariantMode || !LocaleFacts.For("ar-EG").HasCultureData) return;
         Assert.Equal("8/10/2026", CobolLocale.Date("20261008", "ar-EG"));                     // not 8 U+200F / 10 U+200F / 2026
-        Assert.Equal("9:30:00 a. m.", CobolLocale.Time("093000", "es-US"));                    // not a. U+00A0 m.
-        Assert.Equal("9:45:00 p. m.", CobolLocale.Time("214500", "es-US"));
+        // The es-US designators are the HOST ICU's data, not a fixed byte string: the Windows ICU has "a.<U+00A0>m."
+        // and the Linux ICU CI runs "a.m.". So the expected designator is the host's own, with L12's rule applied
+        // independently here (Cf removed, U+00A0/U+202F/U+2009 to the plain space), and it must be free of them.
+        var es = CultureInfo.GetCultureInfo("es-US").DateTimeFormat;
+        Assert.Equal("9:30:00 " + Plain(es.AMDesignator), CobolLocale.Time("093000", "es-US")); // never a. U+00A0 m.
+        Assert.Equal("9:45:00 " + Plain(es.PMDesignator), CobolLocale.Time("214500", "es-US"));
+        Assert.DoesNotContain(CobolLocale.Time("093000", "es-US"), IsHostVarying);
     }
+
+    /// <summary>DETERMINATION L12's rule, written independently of <see cref="LocaleFacts.NormalizeLocaleText"/>.</summary>
+    private static string Plain(string s) =>
+        string.Concat(s.Where(c => char.GetUnicodeCategory(c) != UnicodeCategory.Format)
+                       .Select(c => IsHostVarying(c) ? ' ' : c));
 
     [Fact]
     public void TheNameTokens_RenderTheNormalizedGregorianNames()
