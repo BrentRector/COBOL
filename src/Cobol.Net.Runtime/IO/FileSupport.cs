@@ -207,7 +207,18 @@ public static class HostFile
     /// verbatim ASSIGN text, so two spellings of one file were two physical files (two record stores, no Table 19
     /// conflict between them) and, on Linux, two files were one.</summary>
     public static StringComparer PhysicalFileComparer { get; } =
-        OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        FileSystemFoldsCase ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+
+    /// <summary>Does this host's DEFAULT file system treat two spellings that differ only in case as one file
+    /// (Windows, macOS)? The one fact behind <see cref="PhysicalFileComparer"/> and <see cref="PhysicalFileKey"/>.</summary>
+    private static bool FileSystemFoldsCase => OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
+
+    /// <summary>The identity of <paramref name="name"/> (a file NAME, or any path) as a STRING that another process
+    /// computes identically — equal for two spellings exactly when <see cref="PhysicalFileComparer"/> calls them equal.
+    /// A comparer decides within one process; a name another run unit must derive from the same physical file (the
+    /// lock directory <see cref="SidecarColumnLockHost"/> publishes beside it, kb/Work PB2484) needs the identity
+    /// SPELLED, so the case rule is applied here and nowhere else.</summary>
+    internal static string PhysicalFileKey(string name) => FileSystemFoldsCase ? name.ToUpperInvariant() : name;
 
     /// <summary>Probe the physical file at <paramref name="hostPath"/>, distinguishing §9.1.13.6 item 5's
     /// ABSENT from §14.9.27.4 GR3's PRESENT-but-unauthorized. Never throws for either of those two.
@@ -321,6 +332,19 @@ public static class HostFile
         catch (IOException) { return false; }
         catch (UnauthorizedAccessException) { return false; }
     }
+
+    /// <summary>Create the lock file of ONE holder at <paramref name="lockFilePath"/> and hold it open — the other
+    /// half of <see cref="IsHeldByAnother"/> for a host whose file lock is a file per holder
+    /// (<see cref="SidecarColumnLockHost"/>, kb/Work PB2484). It is a lock file, not a physical file: nothing a program
+    /// reads or writes is ever in it.
+    /// <para>⛔ <see cref="FileMode.CreateNew"/>, so a name is one holder's for ever, and a share mode other than
+    /// <see cref="FileShare.None"/>, which is what makes .NET take a SHARED <c>flock</c> on Unix: every
+    /// <see cref="IsHeldByAnother"/> (an exclusive request) is then refused while this stream lives, and no holder's
+    /// stream refuses another holder's tester. <see cref="FileShare.Delete"/> lets Windows rename the open file.
+    /// Throws what a <see cref="FileStream"/> throws; the caller maps it.</para></summary>
+    internal static FileStream OpenLockHolder(string lockFilePath) =>
+        new(lockFilePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete,
+            bufferSize: 1, FileOptions.None);
 
     /// <summary>Are this host's share modes MANDATORY and PER-ACCESS — a handle opened with <see cref="FileShare.Read"/>
     /// refuses an outside writer, and one opened <see cref="FileShare.None"/> refuses every other handle? That is

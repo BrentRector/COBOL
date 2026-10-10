@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-308 drift tests.
+309 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -276,6 +276,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [SharedExtendOpenDriftTests](../tests/Cobol.Net.Tests.Unit/SharedExtendOpenDriftTests.cs) | ⛔ AN OPEN HAS ONLY I-O STATUSES AS OUTCOMES — never an escaping exception (kb/Work PB713). | `src/Cobol.Net.Runtime/IO`, `src/Cobol.Net.Runtime/IO/FileRegistry.cs` |
 | [SharedExtendWriteDriftTests](../tests/Cobol.Net.Tests.Unit/SharedExtendWriteDriftTests.cs) | ⛔ TWO FILE CONNECTORS EXTENDING ONE SHARED PHYSICAL FILE KEEP BOTH RECORDS (kb/Work PB739). | `src/Cobol.Net.Runtime/IO`, `src/Cobol.Net.Runtime/IO/FileSupport.cs` |
 | [SharedReadCoherenceDriftTests](../tests/Cobol.Net.Tests.Unit/SharedReadCoherenceDriftTests.cs) | ⛔ A READ DELIVERS THE RECORD THE PHYSICAL FILE HOLDS NOW, NEVER A BUFFERED IMAGE A SIBLING CONNECTOR HAS ALREADY REPLACED (kb/Work PB753) — the READ-side twin of SharedExtendWriteDriftTests's write-side rule. | `src/Cobol.Net.Runtime/IO/SequentialConnector.cs`, `src/Cobol.Net.Runtime/IO/FileSupport.cs`, `src/Cobol.Net.Runtime/IO/KeyedConnector.cs`, `src/Cobol.Net.Runtime/IO/FileRegistry.cs` |
+| [SidecarColumnLockHostDriftTests](../tests/Cobol.Net.Tests.Unit/SidecarColumnLockHostDriftTests.cs) | ⛔ A HOST WITHOUT OPEN-FILE-DESCRIPTION LOCKS ARBITRATES A SECOND RUN UNIT BY TABLE 19 TOO (kb/Work PB2484). | — |
 | [SignedIntegerSlotDriftTests](../tests/Cobol.Net.Tests.Unit/SignedIntegerSlotDriftTests.cs) | ⛔ THE SIGNED-INTEGER SLOT INVENTORY (kb/Work PB553). The grammar carries TWO integer-literal rules and the difference between them is a RULE, not an oversight: integerLiteral : INTEGERLIT is the metalanguage integer-n of a printed general format. | `src/Cobol.Net.Frontend/Grammar`, `src/Cobol.Net.Compiler` |
 | [SignedLiteralShapeDriftTests](../tests/Cobol.Net.Tests.Unit/SignedLiteralShapeDriftTests.cs) | ⛔ THE SIGNED-LITERAL SHAPE SYMMETRY (kb/Work R17 — ledger F12; kb/Work PB2506). | `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4`, `src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4` |
 | [SingleInstancePictureDriftTests](../tests/Cobol.Net.Tests.Unit/SingleInstancePictureDriftTests.cs) | ⛔ ONE "ONE INSTANCE OF THE PICTURE SYMBOL" PREDICATE FOR BOTH CLAUSES THAT ASK IT (kb/Work PB1210). | `src/Cobol.Net.Compiler/Binding/DataBinder.cs` |

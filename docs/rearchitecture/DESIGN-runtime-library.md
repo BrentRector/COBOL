@@ -445,10 +445,37 @@ refuses the reader rule 2 admits; it is a second expression of the same table:
   lives on the inode, so a device node such as `/dev/null` would arbitrate every run unit on the machine that assigns
   it. An unavailable lock
   leaves the connector the file lock its `FileShare` gives, nothing more.
+- **One policy, two hosts (`IColumnLockHost`, kb/Work PB2484).** `RunUnitFileLock.Take` is the POLICY — the column
+  an OPEN publishes (`Table19.Column`), the columns its row refuses (`Table19.Cell`), the wire number of each
+  (`RunUnitFileLock.WireNumber`) — and speaks to the host of the process through `IColumnLockHost.Establish`,
+  chosen ONCE (`RunUnitFileLock.HostOfThisProcess`): `OfdColumnLockHost` where `OfdRegionLocks.Available` (Linux
+  x86-64/arm64), no host on Windows (`HostFile.ShareModesAreMandatory`), `SidecarColumnLockHost` everywhere else.
+  Both hosts publish BEFORE they test and never count the asker's own publication, which is the whole of the
+  race-freedom argument. Adding a host is one class and one line in the choice.
+- **The lock-file host (`SidecarColumnLockHost`).** macOS has no host primitive for the Linux bytes: its classic
+  `fcntl` locks are process-owned, its open-file-description commands are private, and `fcntl` is variadic, which
+  Apple's arm64 calling convention passes differently from a fixed P/Invoke signature — so the class makes NO native
+  call. A holder's lock is a FILE — `.wolk-<16 hex digits>/<column>-<guid>` in a directory BESIDE the physical
+  file (the digits: SHA-256 of the file's name under `HostFile.PhysicalFileKey`, the case rule that
+  `HostFile.PhysicalFileComparer` also reads) — held open through `HostFile.OpenLockHolder` (`FileShare` other than
+  `None`, hence a shared `flock`) and tested by `HostFile.IsHeldByAnother` (an exclusive request, refused while the
+  holder lives; the kernel drops the lock with the descriptor, so a killed run unit holds nothing). A lock file
+  PER HOLDER and not per column, because a request row can refuse its own column and a `flock` cannot say "anybody
+  but me" about a file the asker holds: the tester skips only its own file. A holder creates and locks
+  `pending-<guid>`, verifies the lock is in force (a host that does not refuse the second request — a network file
+  system, `DOTNET_SYSTEM_IO_DISABLEFILELOCKING` — is `Unavailable`) and RENAMES it to its column name, so the testers,
+  which read only column names, never see a half-published holder; a column file or pending file they can open freely
+  belongs to a dead run unit and is deleted. The CLOSE deletes the file BEFORE closing the descriptor (a `fork` for
+  `CALL "SYSTEM"` holds a copy of the description until its `exec`; a name nobody can see cannot refuse a successor)
+  and the directory with its last file. A directory the process may not write is `Unavailable`, never an exception.
 - **Guards.** `RunUnitFileLockDriftTests` opens a file in one `FileRegistry` and then in a second — a second
   registry shares nothing with the first, neither the `PhysicalFileTable` nor a handle — for every sharing spelling
   × open mode × sharing spelling × open mode × organization (768 pairs) and asserts the second OPEN is `61` exactly
-  where `Table19.Conflicts` refuses and a success-family status where it permits; it runs on Windows and Linux.
+  where `Table19.Conflicts` refuses and a success-family status where it permits; it runs on Windows and Linux,
+  through the host of the machine. `SidecarColumnLockHostDriftTests` holds the lock-file host to the same table over
+  every (sharing × open mode) pair directly (`RunUnitFileLock.Take(host, …)`), plus the simultaneous-open race, the
+  sweep of a dead holder's leftovers, the wire names and the case rule — it is plain managed code, so it runs on
+  EVERY host (Windows, Linux and macOS) and needs no Mac to witness the macOS path.
 
 **⛔ DETERMINATION (Annex A.1 item 75, `docs/CONFORMANCE.md` DOC-A.1-75) — WHO IS BOUND.** §9.1.15 binds other RUN
 UNITS, and every WiseOwl COBOL run unit is arbitrated by Table 19 on a host that carries the region lock (Linux
@@ -463,9 +490,10 @@ part in no protocol meets only the share mode of the connector's own handle, who
   detected. `HostCapability.Sharing` (tests/_shared) MEASURES the share-mode semantics and
   `FileLockPostureDriftTests.TheHostsShareModeSemanticsAreTheDocumentedOnes` asserts the measurement against this
   paragraph, so if the host moves, the gate goes red naming this section rather than an assertion being adjusted.
-- **On macOS** (and any Unix whose kernel exposes no open-file-description locks) the region lock is
-  `Unavailable`, so only the share-mode strength is present: rule 2 is not refused across run units there. The
-  classic `fcntl` locks macOS offers are process-owned and cannot be used for the reason above.
+- **On macOS** (and every Unix that is not Linux on x86-64/arm64) the file lock is the LOCK FILE PER HOLDER of
+  `SidecarColumnLockHost` (kb/Work PB2484, the bullet "The lock-file host" above), so every WiseOwl COBOL run unit
+  is arbitrated by Table 19 there too; an outside program meets the share mode only, as on Linux. The classic
+  `fcntl` locks macOS offers are process-owned and cannot be used for the reason above.
 
 
 **The rule generalizes, and that is why it is written here rather than in the sequential connector.** Each
@@ -588,8 +616,10 @@ hold and answers held with nobody else holding it. The region map: `RegionBase` 
 Table 19 column bytes at +0..+4 (`RunUnitFileLock`); the store mutex at +0x100; the LOCK-PRESENCE byte at +0x101,
 held shared by every handle that holds at least one published record lock, so a statement asks that one byte
 (`PhysicalFileTable.AnotherRunUnitHoldsLocks`) before it pays for a record identity, a SHA-256 and a record byte; the
-record region at 2^62 + 2^60 for 2^60 bytes. A host without byte-range locks (macOS) answers `Unavailable` everywhere, and each run unit keeps
-only its own record locks and store (docs/CONFORMANCE.md DOC-A.1-75). `CrossRunUnitKeyedStoreDriftTests` measures
+record region at 2^62 + 2^60 for 2^60 bytes. A host without byte-range locks (macOS) answers `Unavailable` for the store mutex, the
+presence byte and every record byte, and each run unit keeps only its own record locks and store
+(docs/CONFORMANCE.md DOC-A.1-75); the five Table 19 column bytes are the exception, which macOS carries as lock files
+(`SidecarColumnLockHost`, kb/Work PB2484) because a column needs no byte-range lock, only a held file. `CrossRunUnitKeyedStoreDriftTests` measures
 it with two `FileRegistry` instances (two run units sharing no table and no handle): `51` on `READ WITH LOCK` and
 `REWRITE`, `IGNORING LOCK`, a sibling's `WRITE` visible at the next statement, every run unit's update surviving
 every CLOSE, and a `RETRY` (n TIMES and FOREVER) that waits outside the mutex.

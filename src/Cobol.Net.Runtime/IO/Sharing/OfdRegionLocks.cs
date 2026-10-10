@@ -8,9 +8,11 @@ namespace CobolNet.Runtime.IO;
 /// <summary>
 /// ⛔ THE HOST PRIMITIVE UNDER ISO §9.1.15's FILE LOCK WHERE <see cref="FileShare"/> CANNOT CARRY IT — Linux
 /// <b>open-file-description</b> byte-range locks (<c>fcntl</c> <c>F_OFD_SETLK</c> / <c>F_OFD_GETLK</c>, kernel 3.15),
-/// and nothing else (kb/Work PB833). The policy that uses it — WHICH bytes a connector publishes and tests — is
-/// <see cref="RunUnitFileLock"/>'s; this class is only the host's words for "hold a shared lock on byte N" and
-/// "does anybody ELSE hold one on byte N".
+/// and nothing else (kb/Work PB833). The policy that uses it — WHICH columns a connector publishes and tests — is
+/// <see cref="RunUnitFileLock"/>'s, spoken to this host by <see cref="OfdColumnLockHost"/>; this class is only the
+/// host's words for "hold a shared lock on byte N" and "does anybody ELSE hold one on byte N". A host whose process
+/// shape it was not written for (<see cref="Available"/> false: macOS, any other Unix) is served by
+/// <see cref="SidecarColumnLockHost"/> instead (kb/Work PB2484).
 /// <para><b>Why these locks and not .NET's.</b> .NET on Unix maps every <see cref="FileShare"/> but
 /// <see cref="FileShare.None"/> onto ONE advisory <c>flock</c> <c>LOCK_SH</c>, which admits another run unit's
 /// writer under every posture but NO OTHER; <c>FileStream.Lock</c> takes a classic <c>F_SETLK</c> lock, which the
@@ -181,8 +183,8 @@ internal static class OfdRegionLocks
             handle.DangerousAddRef(ref added);
             if (NativeFcntl((int)handle.DangerousGetHandle(), command, ref request) >= 0) return onSuccess;
             int errno = Marshal.GetLastPInvokeError();
-            if (errno is EAGAIN or EACCES) return Result.Held;
-            if (errno == EINTR) { interrupted = true; return Result.Unavailable; }   // a signal broke a waiting request   // F_OFD_SETLK's refusal: another description holds an incompatible lock
+            if (errno is EAGAIN or EACCES) return Result.Held;   // F_OFD_SETLK's refusal: another description holds an incompatible lock
+            if (errno == EINTR) { interrupted = true; return Result.Unavailable; }   // a signal broke a waiting request
             return Result.Unavailable;   // EINVAL (this kernel has no OFD locks), ENOLCK, EOPNOTSUPP, ENOSYS, EBADF — none of them is a conflict
         }
         finally { if (added) handle.DangerousRelease(); }

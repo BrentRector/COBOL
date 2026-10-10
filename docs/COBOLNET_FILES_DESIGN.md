@@ -827,12 +827,12 @@ refuses an open by its ACCESS, so on Unix (one advisory `flock`, two states) rul
 … to input mode"* — admit a reader, refuse a writer — cannot be said at all, and on EVERY host it cannot refuse the
 truncation of an `OPEN OUTPUT` a sibling's posture admitted (measured: a second run unit's `OPEN OUTPUT` answered
 `00` against a file the first held `SHARING WITH ALL OTHER`, and emptied it). A connector therefore also takes
-`RunUnitFileLock` at the OPEN — its Table 19 column published as a shared byte-range lock on the physical file, then
+`RunUnitFileLock` at the OPEN — its Table 19 column published (a shared byte-range lock on the physical file on Linux, a lock file per holder beside it on macOS and every other Unix, `IColumnLockHost`), then
 the columns its request row refuses tested for another holder — and, on a host whose share modes are mandatory
 (Windows), an OUTPUT open on an existing file first asks the host for exclusive access, before anything is truncated. Both are taken ONCE, in `FileConnector.Open`, above the
 organizations, and released by the CLOSE or an unsuccessful OPEN; the verdict is `Table19.Cell`, so the cross-run-unit
 and in-run-unit answers cannot drift (`RunUnitFileLockDriftTests`, 768 pairs through two registries). The mechanism,
-the host primitive (Linux open-file-description locks) and the hosts that cannot carry it are in
+the two host primitives (Linux open-file-description locks, and the lock files of every other Unix) and the hosts that cannot carry it are in
 `DESIGN-runtime-library.md`.
 
 **⛔ AND THE LOCK IS OWED BY EVERY ORGANIZATION, WHICH IS A SEPARATE FACT FROM THE DERIVATION BEING RIGHT**

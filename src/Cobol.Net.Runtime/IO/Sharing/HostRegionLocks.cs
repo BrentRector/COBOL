@@ -31,15 +31,17 @@ namespace CobolNet.Runtime.IO;
 /// <item><b>Elsewhere</b> (macOS, or a filesystem without byte-range locks) every request answers
 /// <see cref="OfdRegionLocks.Result.Unavailable"/>, and the run unit keeps the guarantees it can keep alone:
 /// its own record locks and its own store, as before PB2660 — the determination is docs/CONFORMANCE.md
-/// <c>DOC-A.1-75</c>.</item>
+/// <c>DOC-A.1-75</c>. ⚠ That is the RECORD region's residue only: the §9.1.15 file lock of the five column bytes is
+/// carried on macOS by lock files (<see cref="SidecarColumnLockHost"/>, kb/Work PB2484), which a byte offset cannot
+/// name, so the store mutex and the record bytes below have no expression there.</item>
 /// </list>
 /// </summary>
 internal static class HostRegionLocks
 {
     // ── The region map — every byte a run unit publishes about a physical file ──────────────────────────────
 
-    /// <summary>The first byte of the lock region. The five Table 19 column bytes of <see cref="RunUnitFileLock"/>
-    /// occupy [<see cref="RegionBase"/>, <see cref="RegionBase"/> + 5).</summary>
+    /// <summary>The first byte of the lock region. The five Table 19 column bytes of <see cref="OfdColumnLockHost"/>
+    /// (<see cref="RunUnitFileLock.WireNumber"/>) occupy [<see cref="RegionBase"/>, <see cref="RegionBase"/> + 5).</summary>
     internal const long RegionBase = 1L << 62;
 
     /// <summary>⭐ The keyed store's cross-run-unit MUTEX: held exclusively by a connector for the length of ONE
