@@ -1304,8 +1304,10 @@ public sealed class DataItem
     /// <list type="bullet">
     ///   <item>a hyphen is an underscore, the common case, so the generated program reads like its source — except a
     ///     hyphen that is the FIRST character or is followed by a lowercase <c>u</c>, which is escaped like the next
-    ///     item (a COBOL word never begins with a hyphen, §8.3.2.1, and an upper-folded word has no lowercase <c>u</c>,
-    ///     so these arise only for the non-word strings <see cref="Sanitize"/> also maps, such as an assembly name);</item>
+    ///     item (a COBOL word never begins with a hyphen, §8.3.2.1, and an upper-folded word has no lowercase <c>u</c>;
+    ///     a name kept as written, such as a lowercase data or paragraph name, does: <c>ws-user</c> is
+    ///     <c>ws_u002D_user</c>, and so are the non-word strings <see cref="Sanitize"/> also maps, such as an assembly
+    ///     name);</item>
     ///   <item>an underscore, and any character a C# identifier cannot hold, is written <c>_uXXXX_</c> by its code point
     ///     (upper-case hex): an extended letter of Annex B that C# does not accept (KATAKANA MIDDLE DOT U+30FB, a
     ///     supplementary-plane letter, whose surrogates Roslyn refuses in an identifier; kb/Work PB1402);</item>
