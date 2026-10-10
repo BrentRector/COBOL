@@ -170,7 +170,9 @@ class Tree:
     @classmethod
     def load(cls, repo: Path) -> "Tree":
         """`git ls-files -s` for the index, then `git hash-object` for every file the working tree has edited (the
-        marker DELETED for one it has removed): a gate tests the working tree, uncommitted edits included."""
+        marker DELETED for one it has removed) and for every UNTRACKED file git does not ignore: a gate tests the working
+        tree, uncommitted edits and not-yet-added files included, so an untracked helper a self-test imports is keyed
+        by its content, never by the "-" of a path that is absent (train 1052 review: a false REUSED)."""
         blobs, gitlinks = {}, set()
         for entry in _git(repo, "ls-files", "-s", "-z").split("\0"):
             if not entry:
@@ -183,6 +185,8 @@ class Tree:
         edited = [p for p in _git(repo, "ls-files", "-m", "-z").split("\0") if p and p not in gitlinks]
         present = [p for p in edited if (repo / p).is_file()]
         blobs.update((p, "DELETED") for p in edited if p not in present)
+        present += [p for p in _git(repo, "ls-files", "-o", "--exclude-standard", "-z").split("\0")
+                    if p and "__pycache__/" not in p and (repo / p).is_file()]   # a .pyc is keyed by its source (owner)
         if present:
             ids = _git(repo, "hash-object", "--stdin-paths", stdin="\n".join(present) + "\n").split()
             blobs.update(zip(present, ids))

@@ -829,6 +829,16 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
         check("arm: an edited import re-runs the self-test that imports it, and only that one",
               {r.test.path: r.state for r in again},
               {"scripts/test_a.py": REUSED, "scripts/test_b.py": GREEN, "scripts/test_c.py": REUSED})
+        # An UNTRACKED helper (written, never `git add`ed) is keyed by its content like a tracked one: editing it
+        # re-runs its importer (train 1052 review: it was keyed "-" whatever it held, a false REUSED).
+        (root / "scripts" / "helper_u.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (root / "scripts" / "helper_b.py").write_text("import helper_u\nVALUE = 3\n", encoding="utf-8")
+        gate(True, [])
+        (root / "scripts" / "helper_u.py").write_text("VALUE = 2\n", encoding="utf-8")
+        again = gate(True, [])
+        check("arm: an edited UNTRACKED import re-runs the self-test that imports it, and only that one",
+              {r.test.path: r.state for r in again},
+              {"scripts/test_a.py": REUSED, "scripts/test_b.py": GREEN, "scripts/test_c.py": REUSED})
         said: list[str] = []
         hung = gate(False, said, hang_after_s=1.0, which=[found["test_hang.py"]])
         rc, line = verdict(hung, plat, 1.0)

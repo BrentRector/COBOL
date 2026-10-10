@@ -1414,7 +1414,7 @@ keyed on a branch name; the newest PASS_KEEP per self-test). `scripts/self_test_
 - **git** — a `git` command a traced process runs inside the repository reads what `git_reads` says: nothing for its
   location, configuration, worktrees or a commit id; the NAMES (`ls-files`) or the CONTENT (`diff`, `ls-files -s`,
   `show <rev>:<path>`, any other command) under its pathspec, the whole tree when it names none.
-A record holds each file's git blob id (`-` where the run looked and found nothing tracked) and a digest of what it saw
+A record holds each file's git blob id (the working tree's content id for an edited or untracked, not-ignored file; `-` where the run looked and found nothing) and a digest of what it saw
 of each directory (`Tree.digest`: `entries`, `paths` or `content`); the blob ids are the index's, `git hash-object`'s
 for a file the working tree edited, a submodule's commit for anything under it. `--reuse` reports a self-test REUSED,
 unrun, while a record's inputs are ALL unchanged on the tree being gated. **The IMPLEMENTER gate reuses**
