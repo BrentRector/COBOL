@@ -1468,7 +1468,7 @@ of an unsupported facility.
   property is used as a sending item, a get property method shall exist"); §14.9.43.3 SR10 calls STRING's identifier-3 "the
   receiving operand", and a STRING into a property WITH NO GET was already accepted (kb/Work PB1275). This compiler keeps
   that: the position is a RECEIVING use (SR4 asks for a set method, `conformance:negative/pb2618-string-into-property-no-set`),
-  and when the class has no get method the receiving temporary starts as spaces (an alphanumeric property; measured: STRING "Q" gives "Q     "), so
+  and when the class has no get method the receiving temporary starts as spaces (an alphanumeric property; zeros for a numeric one) at EVERY execution of the statement, reset before it (measured: STRING "Q" gives "Q     ", the second time too; `conformance:2002/pb2618_no_get_part_store_every_execution`), so
   the positions a partial store does not reach are those, not an error and not a stale value. GnuCOBOL has no object
   properties, so no vendor behavior informs the reading. Witnesses:
   `conformance:2002/pb2618_string_into_property_keeps_unreferenced`,

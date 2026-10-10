@@ -95,6 +95,14 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 receiver = identified;
             }
             if (needGet && PropertyGet(op, receiver) is { } get) open.Add(get);
+            // D-PROP1 (docs/CONFORMANCE.md; kb/Work PB2618): with no get method the positions a part-store does not reach
+            // are the temporary's INITIAL value at EVERY execution, never what the previous execution left in it (the
+            // temporary is program storage, so a second pass of `STRING ... INTO NM OF D` stored "QBCDEF" for "Q     ").
+            // It runs before the statement, never inside a bracket: a store to the temporary inside its own bracket
+            // would be bracketed again (ReceiverBracketEmitter.Receive), and nothing reads the temporary in between.
+            if (kind == StoreKind.WriteInPart && op.Get is null)
+                pre.Add(new BoundMove(new BoundFigurative(tempPlace.Item is { Pic.Category: PicCategory.Numeric } ? 'Z' : 'S'),
+                    [tempPlace]));
             if (needSet)
             {
                 if (op.Set is null)
