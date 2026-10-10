@@ -205,8 +205,9 @@ Each quotation was run through `cite.py --check`. **(group)** marks a row the in
 ### 3.1 Facts verified (source in parentheses; unverified items marked)
 - **Toolchain** (`dotnet --list-sdks/--list-runtimes`): SDKs 10.0.303, **10.0.401**, 11.0.100-preview.7; runtimes 10.0.11,
   10.0.12, 11.0.0-preview.7. The repo targets `net10.0`, `LangVersion 14`, `Nullable enable`, `TreatWarningsAsErrors`
-  (`Directory.Build.props`), and sets NO `Version`: every assembly is 1.0.0.0 today — §15.4 sets it from the package
-  version and keys the ABI guard on its major. The emitted assembly's simple name is the output file's base name
+  (`Directory.Build.props`), whose `<Version>` is 2.0.0 (the runtime major, raised when train 1052 removed shipped
+  runtime members; DESIGN-runtime-library.md) — §15.4 sets it from the package version and keys the ABI guard on its
+  major. The emitted assembly's simple name is the output file's base name
   (`CompilerDriver.Compile`); `BackendOptions.AssemblyName`'s remark "(the COBOL PROGRAM-ID)" is wrong and is
   corrected (§12).
 - **Support policy** (dotnet.microsoft.com): .NET 10 LTS 2025-11-11 → 2028-11-14; .NET 9 STS → 2026-11-10; .NET 8 LTS →
