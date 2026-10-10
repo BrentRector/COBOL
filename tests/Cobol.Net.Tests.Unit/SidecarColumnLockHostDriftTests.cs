@@ -157,6 +157,33 @@ public sealed class SidecarColumnLockHostDriftTests
         finally { Clean(dir); }
     }
 
+    /// <summary>A killed holder's leftover file that ANOTHER tester holds exclusively while it sweeps it refuses nobody
+    /// either: only a tester ever takes the exclusive lock, and only on a dead file, so the request is not refused '61'
+    /// for a connector that does not exist (§9.1.13.9 1); the train 1052 review). The sweeping tester is this test's own
+    /// <see cref="FileShare.None"/> handle.</summary>
+    [Fact]
+    public void ALeftoverFileUnderAnotherTestersSweepRefusesNobody()
+    {
+        var (dir, file) = NewFile();
+        try
+        {
+            string lockDir = SidecarColumnLockHost.LockDirectoryOf(file);
+            System.IO.Directory.CreateDirectory(lockDir);
+            string staleColumn = Path.Combine(lockDir, $"0-{Guid.NewGuid():N}");   // NO OTHER: refuses every request row
+            System.IO.File.WriteAllText(staleColumn, "");
+            using (new FileStream(staleColumn, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                Assert.Equal(RunUnitFileLock.Outcome.Held, RunUnitFileLock.Take(Host, file, FileSharing.ReadOnly, FileOpenMode.Input, out var held));
+                held!.Dispose();
+            }
+            // A LIVE holder of the same column still refuses the same request: the sweep arm is the tester's alone.
+            Assert.Equal(RunUnitFileLock.Outcome.Held, RunUnitFileLock.Take(Host, file, FileSharing.NoOther, FileOpenMode.IO, out var live));
+            Assert.Equal(RunUnitFileLock.Outcome.Refused, RunUnitFileLock.Take(Host, file, FileSharing.ReadOnly, FileOpenMode.Input, out _));
+            live!.Dispose();
+        }
+        finally { Clean(dir); }
+    }
+
     /// <summary>The names are a contract between run units (two runtime versions must find each other): the lock
     /// directory is <c>.wolk-</c> and sixteen hex digits, beside the physical file, and a holder's file is its column's
     /// <see cref="RunUnitFileLock.WireNumber"/>, a dash and a GUID.</summary>
