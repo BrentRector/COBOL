@@ -18,7 +18,7 @@ New-Item -ItemType Directory -Force -Path $bigDir | Out-Null
 $env:FAKE_CLAUDE_MODE = 'bigstart'
 $env:FAKE_CLAUDE_MARK = Join-Path $bigDir 'fake-invocations.txt'
 $bp = Start-Process -PassThru -WindowStyle Hidden -FilePath (Get-Command pwsh).Source -RedirectStandardOutput (Join-Path $bigDir 'out.txt') -ArgumentList @(
-    '-NoProfile', '-File', $Orch, '-ClaudeExe', $Fake, '-CoordDir', $bigDir, '-TelemetryDir', $Tele, '-BackoffBaseSeconds', '0',
+    '-NoProfile', '-File', $Orch, '-ClaudeExe', $Fake, '-CoordDir', $bigDir, '-RepoDir', $FxRepo, '-TelemetryDir', $Tele, '-BackoffBaseSeconds', '0',
     '-IdleCloseSeconds', '1', '-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0')
 # A hang guard, never a speed bound: 90 s expired under the parallel self-test runner on a shared host (train 1037t).
 $finished = $bp.WaitForExit(600000)
@@ -38,5 +38,17 @@ Check 'the watchdog says so' ($r.out -match 'hung at start') $true
 # never by host speed: a 60 s bound failed under the gate's parallel SELF-TESTS phase with the Linux gate running
 # beside it (train 1037t, 2026-10-08), and passed alone. The kill itself is the `killed` check above.
 Check 'the supervisor did not wait out the 600 s the unit would have slept' ($r.units[0].duration_s -lt 600) $true
+
+# 4k'. THE WATCHDOG NEVER WAITS ON A CHECKPOINT (kb/Work PB2590). The first checkpoint write takes 40 s (fake-python.ps1:
+# the worktree probe on a loaded host) and the unit, hung at start, is gone after 20 s. A supervisor whose event loop
+# waited on the write would find the unit exited and kill nothing: gate 20261011T041736Z-d08bb8 went red that way, its
+# silent unit outsleeping 600 s behind a checkpoint of the machine's real worktrees. A slower host can only make the
+# unit's 20 s longer, never the kill later, so this case cannot fail without the regression.
+$env:FAKE_PYTHON_CHECKPOINT_SECONDS = '40'
+$r = Run-Orch 'slowcheckpoint' 'silentshort' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0', '-StartupTicks', '3',
+    '-Python', $FakePython)
+Check 'the slow first checkpoint really ran (fake-python.ps1 marked it)' (Test-Path (Join-Path $r.coord 'fake-python-slow-checkpoint')) $true
+Check 'a slow checkpoint does not hold the startup watchdog: the hung unit is killed' $r.units[0].killed $true
+Check '... and the watchdog says so' ($r.out -match 'hung at start') $true
 
 Complete-OrchTest 'startup'

@@ -11,7 +11,7 @@ $Here = $PSScriptRoot
 
 # 4i. PUBLISH THE LEDGER EACH TIME: a headless unit cannot publish, so the supervisor announces an owed publish after every unit
 # (and says nothing once the current stamp is marked published)
-$r = Run-Orch 'ledgerowed' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0')
+$r = Run-Orch 'ledgerowed' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0', '-RepoDir', $RealRepo)
 Check 'an owed ledger publish is announced after a unit' ($r.out -match 'LEDGER PUBLISH OWED') $true
 # ... and posted to the operator's mailbox (kb/Work PB2482), as a well-formed `publish` from the loop
 $mb = @(Get-ChildItem (Join-Path $r.coord 'mailbox/to-operator') -Filter '*.json' -ErrorAction SilentlyContinue)
@@ -20,9 +20,9 @@ if ($mb.Count) {
     $m = Get-Content $mb[0].FullName -Raw | ConvertFrom-Json
     Check 'the publish message: from the loop, kind publish, a ref to the unit log' "$($m.from) $($m.kind) $([bool](Test-Path $m.refs[0]))" 'loop publish True'
 }
-$r2 = Run-Orch 'ledgerowed' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0')
+$r2 = Run-Orch 'ledgerowed' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0', '-RepoDir', $RealRepo)
 Check 'a second owed unit adds no second message for the same stamp' @(Get-ChildItem (Join-Path $r.coord 'mailbox/to-operator') -Filter '*.json').Count 1
-$r = Run-Orch 'ledgercurrent' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0') {
+$r = Run-Orch 'ledgercurrent' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0', '-RepoDir', $RealRepo) {
     param($c) & python (Join-Path (Split-Path $Orch) 'ledger_state.py') mark-published --coord $c --url 'https://claude.ai/artifact/test' | Out-Null }
 Check 'a published ledger is not announced again' ($r.out -match 'LEDGER PUBLISH OWED') $false
 

@@ -9,6 +9,8 @@
 #   softcap    passes a small soft cap while its Workflow runs: records whether the fleet stop exists (it must not) and
 #              whether the dispatch guard refuses a second fleet launch from this loop unit, then its fleet finishes
 #   steersme   the operator steers the NEXT unit while this one runs (once per coordination dir); hands off naming land
+#   silent     hung at start: emits nothing and sleeps 600 s (the startup watchdog must kill it)
+#   silentshort hung at start for 20 s, then exits 0 (with fake-python.ps1's slow first checkpoint, kb/Work PB2590)
 # Every mode records the previous handoff it was given (prev-handoff-seen.json), as a unit reads {PREV_HANDOFF}.
 # Like the real session, a mode that emits `result` then STAYS ALIVE until the supervisor closes stdin (eof.txt records it).
 # Every invocation appends its arguments and its CLAUDE_CONFIG_DIR (the account it runs as) to FAKE_CLAUDE_MARK, so a
@@ -32,6 +34,12 @@ if (Test-Path $prev) { Copy-Item $prev (Join-Path $coord 'prev-handoff-seen.json
 if ($env:FAKE_CLAUDE_MODE -eq 'silent') {
     # A unit hung at start: it read its prompt and then emits NOTHING, not even `init` (the startup watchdog must kill it).
     Start-Sleep -Seconds 600
+    exit 0
+}
+if ($env:FAKE_CLAUDE_MODE -eq 'silentshort') {
+    # Hung at start like `silent`, but gone after 20 s: sooner than the slow first checkpoint of fake-python.ps1, so a
+    # supervisor whose event loop waited on that checkpoint would find the unit exited and kill nothing (kb/Work PB2590).
+    Start-Sleep -Seconds 20
     exit 0
 }
 function Emit($o) { [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress -Depth 10)); [Console]::Out.Flush() }

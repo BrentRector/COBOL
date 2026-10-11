@@ -142,12 +142,40 @@ function Wait-Until([datetime]$until) {
 }
 
 # The supervisor's own frequent handoff (checkpoint.py): never fatal, a missed checkpoint must not end the unit.
-function Write-Checkpoint([string]$unit, [string]$sessionId, [datetime]$started, $stats, [int]$bgTasks, [datetime]$lastEventAt) {
+$script:CheckpointWrite = $null   # the background checkpoint.py write in flight: @{ proc; err }
+
+function Write-Checkpoint([string]$unit, [string]$sessionId, [datetime]$started, $stats, [int]$bgTasks, [datetime]$lastEventAt, [switch]$Wait) {
+    # ⛔ NEVER ON THE EVENT LOOP (kb/Work PB2590). checkpoint.py probes every worktree of the repository (git status and
+    # rev-list in each: 8 s for 33 worktrees on an idle host, minutes on one running six gates). Called synchronously from
+    # the unit's event loop, it stalled everything the loop does: no stdout read, no startup-watchdog tick, no STOP or
+    # context check. Gate 20261011T041736Z-d08bb8: the startup self-test's silent unit outslept its 600 s while the first
+    # checkpoint ran, so the watchdog found it exited and killed nothing. So the loop's writes run in the BACKGROUND, one at
+    # a time (a write due while one runs is skipped: the next carries the newer state), and only the final write, after
+    # the unit has exited, waits (-Wait: a successor reads it).
+    if ($script:CheckpointWrite) {
+        $p = $script:CheckpointWrite.proc
+        if (-not $p.HasExited) {
+            if (-not $Wait) { return }
+            $p.WaitForExit()
+        }
+        if ($p.ExitCode -ne 0) { Say "checkpoint not written (the unit continues): $($script:CheckpointWrite.err.Result)" }
+        $script:CheckpointWrite = $null
+    }
+    $argList = @((Join-Path $Here 'checkpoint.py'), 'write', '--unit', $unit, '--session', $sessionId,
+        '--started', $started.ToString('o'), '--last-event', $lastEventAt.ToString('o'), '--calls', "$($stats.calls)",
+        '--context', "$($stats.context)", '--cost', "$([double]$(if ($null -ne $stats.cost_usd) { $stats.cost_usd } else { 0 }))",
+        '--bg-tasks', "$bgTasks", '--repo', $RepoDir)
     try {
-        [void](Invoke-Py @((Join-Path $Here 'checkpoint.py'), 'write', '--unit', $unit, '--session', $sessionId,
-            '--started', $started.ToString('o'), '--last-event', $lastEventAt.ToString('o'), '--calls', "$($stats.calls)",
-            '--context', "$($stats.context)", '--cost', "$([double]$(if ($null -ne $stats.cost_usd) { $stats.cost_usd } else { 0 }))",
-            '--bg-tasks', "$bgTasks", '--repo', $RepoDir))
+        if ($Wait) { [void](Invoke-Py $argList); return }
+        $exe, $pre = Resolve-Launch $Python
+        $psi = [System.Diagnostics.ProcessStartInfo]::new($exe)
+        foreach ($a in @($pre) + $argList) { $psi.ArgumentList.Add([string]$a) }
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $script:CheckpointWrite = @{ proc = $proc; out = $proc.StandardOutput.ReadToEndAsync(); err = $proc.StandardError.ReadToEndAsync() }
     } catch { Say "checkpoint not written (the unit continues): $_" }
 }
 
@@ -376,7 +404,7 @@ function Invoke-Unit([string]$unit, [string]$model, [string]$sessionId, [string]
             }
         }
         $proc.WaitForExit()
-        Write-Checkpoint $unit $sessionId $unitStarted $stats $bgTasks $lastEventAt   # the final state, for the log and a successor
+        Write-Checkpoint $unit $sessionId $unitStarted $stats $bgTasks $lastEventAt -Wait   # the final state, for the log and a successor
     } finally {
         $log.Close()
         if ($watcher -and -not $watcher.HasExited) { Stop-Process -Id $watcher.Id -Force -ErrorAction SilentlyContinue }

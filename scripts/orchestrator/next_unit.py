@@ -87,8 +87,9 @@ def fresh_unlanded(repo: pathlib.Path, since: dt.datetime) -> list[str]:
         name, _, when = b.partition(" ")
         if name == "main" or not when or dt.datetime.fromisoformat(when) <= since:
             continue
-        names = names if names is not None else prune_worktrees.main_names()
-        if prune_worktrees.classify(name, names)[0] == "UNLANDED":
+        # the repository it listed, never prune_worktrees' default (kb/Work PB2590: a supervisor under test reads a scratch one)
+        names = names if names is not None else prune_worktrees.main_names(repo)
+        if prune_worktrees.classify(name, names, repo)[0] == "UNLANDED":
             out.append(name)
     return out
 
