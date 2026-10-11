@@ -52,8 +52,7 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
         if (line.Length == 0) return false;
         ReadOnlySpan<char> s = line.AsSpan().TrimEnd('\r');
 
-        int i = 0;
-        while (i < s.Length && (s[i] == ' ' || s[i] == '\t')) i++;
+        int i = IndicatorIndex(s);
         if (i + 1 >= s.Length || s[i] != '>' || s[i + 1] != '>') return false;
         i += 2;
         while (i < s.Length && (s[i] == ' ' || s[i] == '\t')) i++;   // SR5: the space after the indicator is optional
@@ -66,6 +65,16 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
         string operand = SeparatorsAsSpaces(StripInlineComment(s[i..].ToString()).TrimSpaces()).TrimSpaces();
         directive = new CompilerDirectiveLine(word, operand);
         return true;
+    }
+
+    /// <summary>The index in <paramref name="line"/> where its compiler-directive indicator stands — after the spaces
+    /// that alone may precede it (§7.3.3 SR2) — the column a diagnostic about the directive line names (kb/Work
+    /// PB1801).</summary>
+    public static int IndicatorIndex(ReadOnlySpan<char> line)
+    {
+        int i = 0;
+        while (i < line.Length && (line[i] == ' ' || line[i] == '\t')) i++;
+        return i;
     }
 
     /// <summary>

@@ -48,7 +48,8 @@ public static class FlagDirectiveProcessor
             else continue;
 
             string operand = line.Operand;
-            var loc = lineMap?.Locate(i + 1, sourcePath) ?? new SourceLocation(sourcePath, 0, i, 0);   // the SOURCE origin of resultant line i (kb/Work PB82)
+            int at = CompilerDirectiveLine.IndicatorIndex(lines[i]);
+            var loc = lineMap?.Locate(i + 1, at, sourcePath) ?? new SourceLocation(sourcePath, 0, i, at);   // the SOURCE position of the directive (kb/Work PB82, PB1801)
 
             // The directive-WORD edition gate already fired at the ONE directive-recognition point
             // (CompilerDirectiveCatalog, from the flag-14-directive-2023 and flag-02-directive-2014 rows'

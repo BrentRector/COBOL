@@ -19,7 +19,9 @@ namespace CobolNet.Frontend.Preprocessor;
 /// <c>directive-name</c>): that directive's <c>constructs.json</c> row. §7.3.20.3 SR2 / §7.3.22.3 SR2 — the PUSH or
 /// POP "shall not be specified where directive-name must not be specified" — so the named row's placement rule
 /// judges the PUSH/POP too (kb/Work PB1377). Null for every other directive and for the ALL form.</param>
-public readonly record struct DirectiveSite(int Line, string Word, bool AllForm = false, string? NamedRow = null);
+/// <param name="Column">The 0-based RESULTANT column of the directive's indicator on <paramref name="Line"/> — where a
+/// diagnostic about the directive points, mapped to the physical column through the source map (kb/Work PB1801).</param>
+public readonly record struct DirectiveSite(int Line, string Word, bool AllForm = false, string? NamedRow = null, int Column = 0);
 
 /// <summary>
 /// The POSITION-RULED compiler directives (ISO §7.3): the three whose syntax rules are about WHERE the directive
@@ -89,7 +91,7 @@ public static class DirectiveSiteProcessor
                       + $"(ISO §7.3.20.3 SR2, §7.3.22.3 SR2) — \"{placement.Text}\" (ISO {placement.Citation})"
                     : $">>{site.Word} is written after the first compilation unit began — \"{placement.Text}\" "
                       + $"(ISO {placement.Citation}); write it before the first IDENTIFICATION DIVISION of the compilation group",
-                lineMap?.Locate(site.Line, sourcePath) ?? new SourceLocation(sourcePath, 0, site.Line - 1, 0), default);
+                lineMap?.Locate(site.Line, site.Column, sourcePath) ?? new SourceLocation(sourcePath, 0, site.Line - 1, site.Column), default);
         }
     }
 
@@ -113,8 +115,9 @@ public static class DirectiveSiteProcessor
             if (!CompilerDirectiveLine.TryParse(lines[i], out var directive)) continue;
             if (!PositionRuled.Contains(directive.Word) && !PlacementRuled.Contains(directive.Word)) continue;
             bool isOp = DirectiveStackOp.TryParse(directive, i + 1, out var op);
-            (sites ??= []).Add(new DirectiveSite(i + 1, directive.Word, AllForm: isOp && op.Row is null,
-                NamedRow: isOp ? op.Row : null));
+            var site = new DirectiveSite(i + 1, directive.Word, AllForm: isOp && op.Row is null,
+                NamedRow: isOp ? op.Row : null, Column: CompilerDirectiveLine.IndicatorIndex(lines[i]));
+            (sites ??= []).Add(site);
             // §7.3.10.3 SR1 (COBOL-WORDS) is a rule about the TEXT, judged against the first unit's first line — which
             // only the COBOL-WORDS stage can name, because a header may be spelled with that group's own synonym — by
             // JudgeFirstUnitPlacement over the sites recorded here. The rules that need the parse tree are judged by
@@ -128,7 +131,7 @@ public static class DirectiveSiteProcessor
                         $">>POP {directive.Operand.ToUpperInvariant()} is unsuccessful: no state of that directive "
                         + "was saved by a PUSH directive that an earlier POP has not already restored, so nothing "
                         + "is restored (ISO §7.3.20.4 GR2)",
-                        lineMap?.Locate(i + 1, sourcePath) ?? new SourceLocation(sourcePath, 0, i, 0), default);
+                        lineMap?.Locate(i + 1, site.Column, sourcePath) ?? new SourceLocation(sourcePath, 0, i, site.Column), default);
             }
             lines[i] = "";   // blank, never delete — line-count preserving (H3)
             blanked = true;

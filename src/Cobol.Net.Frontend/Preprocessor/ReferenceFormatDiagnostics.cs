@@ -184,9 +184,9 @@ public sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive
     /// admits FIXED or FREE and nothing else, and this is the only stage that sees the line. One producer
     /// (COBOLNET1911) for every directive whose operand is a closed word set.</para>
     /// </summary>
-    public void OnSourceFormatDirective(string file, int line, string operand)
+    public void OnSourceFormatDirective(string file, int line, string operand, int column)
     {
-        var sink = new BagSink(diagnostics, At(file, line));
+        var sink = new BagSink(diagnostics, At(file, line, column));
         CompilerDirectiveCatalog.CheckRow(Constructs.SourceFormatDirective2002, Edition, sink);
         CompilerDirectiveCatalog.CheckOperand(ReferenceFormatProcessor.SourceFormatWord, operand, Edition, sink);
     }

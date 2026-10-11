@@ -40,11 +40,10 @@ public sealed class CopyProcessor(
     {
         if (dialectLevel < 2023 || _nonPseudoTextFlagged || _diagnostics is null) return;
         _nonPseudoTextFlagged = true;
-        var at = mapped.OriginAt(pos);   // the SOURCE origin (kb/Work PB82)
-        int line = at.Line;
+        var loc = mapped.LocateAt(pos);   // the SOURCE position (kb/Work PB82, PB1801)
+        int line = loc.Line + 1;
         const string msg = "a non-pseudo-text COPY REPLACING operand (identifier/literal/word) was removed in "
             + "COBOL-2023 (Annex E.2 item 1 bullet 4) — use ==pseudo-text==; first use at line ";
-        var loc = at.ToLocation();
         var severity = EditionSeverityPolicy.For(ConstructAvailability.Removed, EditionInfo.Of(dialectLevel, permissive));
         if (severity == EditionSeverity.Error)
             _diagnostics.ReportError("COBOLNET0902", msg + line, loc, default);
@@ -84,8 +83,8 @@ public sealed class CopyProcessor(
 
     /// <summary>Report at a SOURCE origin (kb/Work PB82) — the file and physical line the text at a position came
     /// from, never an ordinal of the text being processed.</summary>
-    private void Report(DiagnosticDescriptor descriptor, SourceOrigin at, params object[] args)
-        => _diagnostics?.Report(descriptor, at.ToLocation(), TextSpan.Empty, args);
+    private void Report(DiagnosticDescriptor descriptor, SourceLocation at, params object[] args)
+        => _diagnostics?.Report(descriptor, at, TextSpan.Empty, args);
 
     /// <summary>
     /// Step 3 of text manipulation (§7.2.1): the REPLACE statements of the conditionally-processed compilation group
@@ -116,7 +115,7 @@ public sealed class CopyProcessor(
                 Editions.Diagnostics.DiagnosticCatalog.TextManipulationStatementSyntax.Code,
                 "REPLACE is glued to the character-string before it (no space follows the period, comma or semicolon), "
                 + "so it forms no REPLACE statement — §7.2.4.3 SR2: \"A REPLACE statement shall be preceded by a space "
-                + "except when it is the first statement in a compilation group\"", mapped.OriginAt(glued).ToLocation(), default));
+                + "except when it is the first statement in a compilation group\"", mapped.LocateAt(glued), default));
             if (replaceIdx < 0)
             {
                 w.AppendMapped(ApplyReplacements(mapped.Slice(pos, text.Length - pos), states.Active, ReplaceResultRule, diagnostics));
@@ -129,7 +128,7 @@ public sealed class CopyProcessor(
             // period INSIDE pseudo-text is a text-word of the operand, never the statement's end (kb/Work PB1354).
             var statement = new StatementCursor(text, replaceIdx + "REPLACE".Length, (p, message) =>
                 diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.TextManipulationStatementSyntax.Code,
-                    "REPLACE statement: " + message + " (§7.2.4.2)", mapped.OriginAt(p).ToLocation(), default));
+                    "REPLACE statement: " + message + " (§7.2.4.2)", mapped.LocateAt(p), default));
             // §7.2.4.3 SR2: "A REPLACE statement shall be preceded by a space except when it is the first statement in
             // a compilation group" — REPLACE directly after a parenthesis, a colon, a literal or a pseudo-text delimiter.
             if (replaceIdx > 0 && !CobolSpace.IsSeparator(text[replaceIdx - 1]))
@@ -140,7 +139,7 @@ public sealed class CopyProcessor(
             void Gate(in TextWord phrase)
             {
                 if (edition is { } e && diagnostics is not null)
-                    ConstructRegistry.Check(e, new BagSink(diagnostics, mapped.OriginAt(phrase.Start).ToLocation()),
+                    ConstructRegistry.Check(e, new BagSink(diagnostics, mapped.LocateAt(phrase.Start)),
                         Constructs.ReplaceAlsoLast2002, $"REPLACE {phrase.Value.ToUpperInvariant()}");
             }
 
@@ -180,7 +179,7 @@ public sealed class CopyProcessor(
                         + "(and ==partial-word== under LEADING/TRAILING) operands only, in every ISO edition "
                         + "(§7.2.4.2; §7.2.4.3 SR7 bars literals as partial-words). Write ==operand== "
                         + "(empty ==== deletes)",
-                        mapped.OriginAt(p).ToLocation(), default);
+                        mapped.LocateAt(p), default);
                 });
                 states.Replacing(operands, also);
             }
@@ -258,7 +257,7 @@ public sealed class CopyProcessor(
         int j = 0;
         for (int i = 0; i < map.Length; i++)
         {
-            while (j + 1 < resultant.Length && resultant[j + 1].Line - 1 <= i) j++;
+            while (j + 1 < resultant.Length && resultant[j + 1].Origin.Line - 1 <= i) j++;
             map[i] = j;
         }
         return map;
@@ -333,12 +332,12 @@ public sealed class CopyProcessor(
         var active = replacements.Where(r => r.From.Count > 0).ToList();   // an empty operand cannot match
         if (active.Count == 0) return mapped;
         HashSet<int>? reported = null;
-        void Forbidden(int operand, SourceOrigin at, string what)
+        void Forbidden(int operand, int at, string what)
         {
             if (diagnostics is null || !(reported ??= []).Add(operand)) return;
             diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.ReplacingResultForbidden.Code,
                 $"the replacing action of a {rule.Statement} statement produces {what} — {rule.Rule}: \"{rule.Quoted}\"",
-                at.ToLocation(), default);
+                mapped.LocateAt(at), default);
         }
 
         string text = mapped.Text;
@@ -373,18 +372,19 @@ public sealed class CopyProcessor(
                     int matchStart = words[w].Start;
                     int matchEnd = words[w + from.Count - 1].End;
                     sb.AppendSlice(mapped, copiedUpTo, matchStart - copiedUpTo);
-                    sb.Append(to.AsSpan(), mapped.OriginAt(matchStart));
-                    if (introduces is not null) Forbidden(operand, mapped.OriginAt(matchStart), introduces);
+                    // The replacement is written here, so it stands at the position of the text it replaced (kb/Work PB1801).
+                    sb.Append(to.AsSpan(), mapped.PointAt(matchStart));
+                    if (introduces is not null) Forbidden(operand, matchStart, introduces);
                     while (nextDirective < directives.Count && directives[nextDirective].Start < matchStart) nextDirective++;
                     bool keptDirective = false;
                     for (; nextDirective < directives.Count && directives[nextDirective].Start < matchEnd; nextDirective++)
                     {
                         var directive = directives[nextDirective];
-                        sb.NewLine(mapped.OriginAt(directive.Start));
+                        sb.NewLine(mapped.PointAt(directive.Start));
                         sb.AppendSlice(mapped, directive.Start, directive.End - directive.Start);
                         keptDirective = true;
                     }
-                    if (keptDirective) sb.NewLine(mapped.OriginAt(matchEnd));
+                    if (keptDirective) sb.NewLine(mapped.PointAt(matchEnd));
                     copiedUpTo = matchEnd;
                     w += from.Count;
                     matched = true;
@@ -403,11 +403,11 @@ public sealed class CopyProcessor(
                 if (!leading && !trailing) continue;
 
                 sb.AppendSlice(mapped, copiedUpTo, words[w].Start - copiedUpTo);
-                SourceOrigin at = mapped.OriginAt(words[w].Start);
+                var at = mapped.PointAt(words[w].Start);
                 string produced = leading ? string.Concat(to.AsSpan(), word[part.Length..])
                     : string.Concat(word[..^part.Length], to.AsSpan());
                 sb.Append(produced.AsSpan(), at);
-                if (ForbiddenIn(produced, rule) is { } what) Forbidden(operand, at, what);
+                if (ForbiddenIn(produced, rule) is { } what) Forbidden(operand, words[w].Start, what);
                 copiedUpTo = words[w].End;
                 w++;
                 matched = true;
@@ -438,7 +438,7 @@ public sealed class CopyProcessor(
         bool standsInIdentificationDivision, out int afterCopy)
     {
         string text = mapped.Text;
-        SourceOrigin at = mapped.OriginAt(copyIdx);   // the COPY statement's SOURCE origin (kb/Work PB82)
+        var at = mapped.LocateAt(copyIdx);   // the COPY statement's SOURCE position (kb/Work PB82, PB1801)
 
         // §7.2.3.3 SR2: "A COPY statement shall be preceded by a space except when it is the first statement in a
         // compilation group" — a COPY word directly after a parenthesis, a colon, a literal's closing delimiter or a
@@ -462,7 +462,7 @@ public sealed class CopyProcessor(
                 $"COPY {libraryName} REPLACING is written inside library text — ISO §7.2.3.4 GR12: \"If the REPLACING "
                 + "phrase is not specified, the library text may contain a COPY statement that does not include a "
                 + "REPLACING phrase\". Move the REPLACING phrase to the outermost COPY, or flatten the copybook.",
-                at.ToLocation(), default);
+                at, default);
 
         string? copybookPath = FindCopybook(libraryName, statement.LibraryName);
         if (copybookPath == null)
@@ -486,7 +486,8 @@ public sealed class CopyProcessor(
         // Library text goes through the same §6.5 logical conversion as the source text, starting in the format in
         // effect for this COPY statement (§7.3.24.3 3)) — its own >>SOURCE FORMAT directives switch it from there, and
         // the COPY's text is unaffected after it (5), the revert). Then COPY … REPLACING (§7.2.3.4 9)).
-        bool? copyFixed = _referenceFormats.TryGetValue(at.File, out var copyFormats) ? copyFormats.LibraryTextDefaultAt(at.Line) : null;
+        var copyLine = mapped.PointAt(copyIdx).Origin;   // the file and physical line the COPY word stands on
+        bool? copyFixed = _referenceFormats.TryGetValue(copyLine.File, out var copyFormats) ? copyFormats.LibraryTextDefaultAt(copyLine.Line) : null;
         var normalizedMapped = NormalizeCopybookMapped(_inputs.ReadAllText(copybookPath), copybookPath, copyFixed,
             standsInIdentificationDivision);
         string normalized = normalizedMapped.Text;
@@ -515,7 +516,7 @@ public sealed class CopyProcessor(
                 + "GR10 forbids the combination (\"If the REPLACING phrase is specified, the library text "
                 + "shall not contain a COPY statement\"); nesting is permitted only without REPLACING "
                 + "(GR12). Flatten the copybook, or drop the REPLACING phrase.",
-                at.ToLocation(), default);
+                at, default);
         var copybookMapped = ApplyReplacements(normalizedMapped, statement.Replacements, CopyResultRule, _diagnostics);
         return new OneCopyResult(CopyOutcome.Found, copybookMapped.Text, copybookPath, copybookMapped);
     }
@@ -537,7 +538,7 @@ public sealed class CopyProcessor(
     {
         var c = new StatementCursor(mapped.Text, copyIdx + "COPY".Length, (p, message) =>
             _diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.TextManipulationStatementSyntax.Code,
-                "COPY statement: " + message + " (§7.2.3.2)", mapped.OriginAt(p).ToLocation(), default));
+                "COPY statement: " + message + " (§7.2.3.2)", mapped.LocateAt(p), default));
 
         string? textName = ReadCopyName(mapped, c, "text-name-1 or literal-1");
         string? libraryName = null;
@@ -562,13 +563,13 @@ public sealed class CopyProcessor(
             ParseReplacingOperands(c, replacements,
                 new OperandScreen(CopyOperandRules, _diagnostics, mapped, EditionInfo.Of(dialectLevel, permissive)),
                 nonPseudoText: p => OnNonPseudoTextOperand(mapped, p),
-                nestedCopy: p => ReportPlacement(mapped.OriginAt(p), "a COPY statement is written inside the "
+                nestedCopy: p => ReportPlacement(mapped.LocateAt(p), "a COPY statement is written inside the "
                     + "REPLACING phrase of another COPY statement — §7.2.3.3 SR1: \"a COPY statement shall not "
                     + "appear within a COPY statement\""));
         }
         if (!c.HasError && c.TryPeek(out w) && w.IsWord("COPY"))
         {
-            ReportPlacement(mapped.OriginAt(w.Start), "a COPY statement begins inside another COPY statement — "
+            ReportPlacement(mapped.LocateAt(w.Start), "a COPY statement begins inside another COPY statement — "
                 + "§7.2.3.3 SR1: \"a COPY statement shall not appear within a COPY statement\"");
             c.MarkError();
         }
@@ -599,7 +600,7 @@ public sealed class CopyProcessor(
     {
         void LiteralForm(int at, string message)
             => _diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.CopyLiteralForm.Code,
-                $"COPY {operand}: {message}", mapped.OriginAt(at).ToLocation(), default);
+                $"COPY {operand}: {message}", mapped.LocateAt(at), default);
 
         if (!c.TryPeek(out var w))
         {
@@ -608,7 +609,7 @@ public sealed class CopyProcessor(
         }
         if (w.IsWord("COPY"))
         {
-            ReportPlacement(mapped.OriginAt(w.Start), "a COPY statement begins inside another COPY statement — "
+            ReportPlacement(mapped.LocateAt(w.Start), "a COPY statement begins inside another COPY statement — "
                 + "§7.2.3.3 SR1: \"a COPY statement shall not appear within a COPY statement\"");
             c.MarkError();
             return null;
@@ -659,10 +660,10 @@ public sealed class CopyProcessor(
         return name;
     }
 
-    /// <summary>Report a §7.2.3.3 SR1 / SR2 placement violation (COBOLNET2451) at a SOURCE origin.</summary>
-    private void ReportPlacement(SourceOrigin at, string message)
+    /// <summary>Report a §7.2.3.3 SR1 / SR2 placement violation (COBOLNET2451) at a SOURCE position.</summary>
+    private void ReportPlacement(SourceLocation at, string message)
         => _diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.CopyStatementPlacement.Code,
-            message, at.ToLocation(), default);
+            message, at, default);
 
     /// <summary>Expand every COPY statement in <paramref name="mapped"/> ONE level (no recursion into the copybook):
     /// for each found copybook, its resolved text is handed to <paramref name="expandCopybook"/> (the merged
@@ -688,7 +689,7 @@ public sealed class CopyProcessor(
         string text = mapped.Text;
         if (depth > MaxCopyDepth)
         {
-            Report(DiagnosticDescriptors.CBL3622, mapped.OriginAt(0), MaxCopyDepth);
+            Report(DiagnosticDescriptors.CBL3622, mapped.LocateAt(0), MaxCopyDepth);
             return mapped;
         }
 
@@ -696,7 +697,7 @@ public sealed class CopyProcessor(
         int pos = 0;
         while (pos < text.Length)
         {
-            int copyIdx = FindStatementKeyword(text, pos, "COPY", glued => ReportPlacement(mapped.OriginAt(glued),
+            int copyIdx = FindStatementKeyword(text, pos, "COPY", glued => ReportPlacement(mapped.LocateAt(glued),
                 "COPY is glued to the character-string before it (no space follows the period, comma or semicolon), "
                 + "so it forms no COPY statement — §7.2.3.3 SR2: \"A COPY statement shall be preceded by a space "
                 + "except when it is the first statement in a compilation group\""));
@@ -706,7 +707,7 @@ public sealed class CopyProcessor(
                 break;
             }
             w.AppendSlice(mapped, pos, copyIdx - pos);
-            SourceOrigin copyLine = mapped.OriginAt(copyIdx);
+            var copyLine = mapped.PointAt(copyIdx);   // the COPY statement's own position: where an unexpanded one stays
 
             bool standsInIdentification = division.InIdentificationDivisionAt(text, copyIdx);
             var one = ResolveOneCopy(mapped, copyIdx, alreadyIncluded, inLibraryText: depth > 0, standsInIdentification, out int afterCopy);
@@ -909,7 +910,7 @@ public sealed class CopyProcessor(
         {
             if (edition is not { } e || diagnostics is null || _partialWordGated) return;
             _partialWordGated = true;
-            ConstructRegistry.Check(e, new BagSink(diagnostics, mapped.OriginAt(phrase.Start).ToLocation()),
+            ConstructRegistry.Check(e, new BagSink(diagnostics, mapped.LocateAt(phrase.Start)),
                 Constructs.ReplacingPartialWord2002, $"{Rules.Statement} REPLACING {phrase.Value.ToUpperInvariant()}");
         }
 
@@ -917,14 +918,14 @@ public sealed class CopyProcessor(
         public void Content(int at, int rule, string quoted, string what)
             => diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.ReplacingOperandContent.Code,
                 $"{Rules.Statement} statement: {what} — {Rules.Clause} SR{rule}: \"{quoted}\"",
-                mapped.OriginAt(at).ToLocation(), default);
+                mapped.LocateAt(at), default);
 
         /// <summary>COBOLNET2573 — a pseudo-text delimiter not separated as §8.3.5 6) requires.</summary>
         public void Delimiter(int at, string what)
             => diagnostics?.ReportError(Editions.Diagnostics.DiagnosticCatalog.PseudoTextDelimiterPlacement.Code,
                 $"{Rules.Statement} statement: {what} — §8.3.5 6): \"An opening pseudo-text delimiter shall be "
                 + "immediately preceded by a space; a closing pseudo-text delimiter shall be immediately followed by one "
-                + "of the separators space, comma, semicolon, or period\"", mapped.OriginAt(at).ToLocation(), default);
+                + "of the separators space, comma, semicolon, or period\"", mapped.LocateAt(at), default);
     }
 
     /// <summary>Screen one operand pair against its statement's content rules (kb/Work PB1353). Only a

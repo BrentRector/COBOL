@@ -81,10 +81,10 @@ public static partial class ReferenceFormatProcessor
         InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
         => NormalizeToFreeFormMapped(sourceText, gates, sourcePath, initial).Text;
 
-    /// <summary>The MAPPED normalizer (kb/Work PB82): the free-form text plus, per output line, the physical line of
-    /// <paramref name="sourcePath"/> it came from — a fixed-form continuation JOINS lines, so the output line count is
-    /// smaller than the source's and every later stage (COPY, the parser, the binder) would otherwise number lines the
-    /// user cannot find. The string overload is this one's <c>.Text</c>.</summary>
+    /// <summary>The MAPPED normalizer (kb/Work PB82, PB1801): the free-form text plus, per output line, the physical
+    /// lines and columns of <paramref name="sourcePath"/> it came from — a fixed-form continuation JOINS lines and the
+    /// conversion drops positions 1–7, so without the map every later stage (COPY, the parser, the binder) would name
+    /// lines and columns the user cannot find. The string overload is this one's <c>.Text</c>.</summary>
     public static MappedText NormalizeToFreeFormMapped(string sourceText, ReferenceFormatDiagnostics? gates, string sourcePath,
         InitialReferenceFormat initial = InitialReferenceFormat.Fixed)
         => NormalizeToFreeFormMapped(sourceText, gates, sourcePath, initial.InitialFixed(), out _);
@@ -144,7 +144,7 @@ public static partial class ReferenceFormatProcessor
         formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null,
             segments.Select(s => (s.Index + 2, s.Fixed)), directiveLines, physicalText);
         var outLines = new List<string>();
-        var outOrigins = new List<int>();   // the 1-based source line of each output line (kb/Work PB82)
+        var outOrigins = new List<LineOrigin>();   // where each output line came from (kb/Work PB82, PB1801)
         bool segFixed = firstFixed;
         bool inIdentification = startsInIdentificationDivision;   // carried across the text's fixed segments
         int segStart = 0;
@@ -158,7 +158,7 @@ public static partial class ReferenceFormatProcessor
             {
                 var segment = lines[segStart..segEnd];
                 List<string> sl;
-                List<int> so;
+                List<LineOrigin> so;
                 if (segFixed)
                 {
                     var converter = new FixedFormConverter(gates, sourcePath, ccvsIndicators, inIdentification);
@@ -175,7 +175,7 @@ public static partial class ReferenceFormatProcessor
                 if (!keepsLine)
                 {
                     outLines.Add("");                 // the discarded directive line → a blank line (slot preserved)
-                    outOrigins.Add(segments[s].Index + 1);
+                    outOrigins.Add(new LineOrigin(new SourceOrigin(sourcePath, segments[s].Index + 1)));
                 }
                 segFixed = segments[s].Fixed;
                 segStart = segments[s].Index + 1;
@@ -235,13 +235,17 @@ public static partial class ReferenceFormatProcessor
                 if (current != before) segments.Add((i - 1, current, true));
             }
             CompilerDirectiveLine d = default;
+            bool readFixed = current;   // the form the directive line was read in: its column depends on it
             bool isDirective = DirectiveText(lines[i].Text, current) is { } text && CompilerDirectiveLine.TryParse(text, out d);
             // §7.3.24.3 4): "A SOURCE FORMAT directive that is the first line of a compilation group or library text
             // may be in either fixed form or free form" — so `>>SOURCE FORMAT FREE` in column 1 of line 1 is a
             // directive even though the text starts in fixed form, where column 1 is the sequence area.
             if (!isDirective && i == 0 && DirectiveText(lines[0].Text, !current) is { } other
                 && CompilerDirectiveLine.TryParse(other, out d) && d.Word == SourceFormatWord)
+            {
                 isDirective = true;
+                readFixed = !current;
+            }
             if (!isDirective) continue;
             if (DirectiveStackOp.TryParse(d, i + 1, out var op))
             {
@@ -253,7 +257,7 @@ public static partial class ReferenceFormatProcessor
             else if (d.Word == SourceFormatWord)
             {
                 directiveLines.Add(i + 1);
-                gates?.OnSourceFormatDirective(file, i + 1, d.Operand);
+                gates?.OnSourceFormatDirective(file, i + 1, d.Operand, DirectiveIndicatorIndex(lines[i], readFixed));
                 if (CompilerDirectiveCatalog.TryOperandWord(SourceFormatWord, d.Operand, out string w) && w is "FIXED" or "FREE")
                     current = w == "FIXED";
                 segments.Add((i, current, false));
@@ -312,6 +316,17 @@ public static partial class ReferenceFormatProcessor
         return fixedLine.HasProgramText && fixedLine.Indicator.Value == ' ' ? fixedLine.ProgramText : null;
     }
 
+    /// <summary>The 0-based PHYSICAL index of the directive indicator of a line <see cref="DirectiveText"/> read as a
+    /// directive in the given form — where a diagnostic about the line points, as every other directive's does
+    /// (<see cref="CompilerDirectiveLine.IndicatorIndex"/>; kb/Work PB1801): the program-text area's start in fixed form
+    /// (0 in free form) plus the spaces before the indicator, mapped back through the line's tab map.</summary>
+    private static int DirectiveIndicatorIndex(PhysicalLine line, bool fixedForm)
+    {
+        int start = fixedForm ? new FixedFormLine(line.Text).ProgramTextIndex : 0;
+        int expanded = start + CompilerDirectiveLine.IndicatorIndex(DirectiveText(line.Text, fixedForm)!);
+        return line.Tabs is null ? expanded : line.Tabs.ToPhysical(expanded);
+    }
+
     /// <summary>For the <see cref="InitialReferenceFormat.Auto"/> detector only: the index of the first line that is a
     /// &gt;&gt;SOURCE directive in EITHER reading (the format is not known yet — it is what is being detected), or
     /// the line count. The detector classifies the text before it.</summary>
@@ -325,11 +340,11 @@ public static partial class ReferenceFormatProcessor
         return lines.Length;
     }
 
-    /// <summary>Assemble output lines and their source lines into a <see cref="MappedText"/> of <paramref name="file"/>.</summary>
-    private static MappedText Mapped(List<string> outLines, List<int> outOrigins, string file)
+    /// <summary>Assemble output lines and their origins into a <see cref="MappedText"/> of <paramref name="file"/>.</summary>
+    private static MappedText Mapped(List<string> outLines, List<LineOrigin> outOrigins, string file)
     {
-        var origins = new SourceOrigin[outLines.Count == 0 ? 1 : outLines.Count];
-        for (int i = 0; i < origins.Length; i++) origins[i] = new SourceOrigin(file, i < outOrigins.Count ? outOrigins[i] : 1);
+        var origins = new LineOrigin[outLines.Count == 0 ? 1 : outLines.Count];
+        for (int i = 0; i < origins.Length; i++) origins[i] = i < outOrigins.Count ? outOrigins[i] : new LineOrigin(new SourceOrigin(file, 1));
         return new MappedText(string.Join('\n', outLines), origins);
     }
 

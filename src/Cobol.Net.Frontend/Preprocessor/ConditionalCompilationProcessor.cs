@@ -227,9 +227,9 @@ public static partial class ConditionalCompilationProcessor
             _currentText = textId;
             var lines = input.Text.Split('\n');
             var output = new List<string>(lines.Length);
-            var outputOrigins = new List<SourceOrigin>(lines.Length);
+            var outputOrigins = new List<LineOrigin>(lines.Length);
             var block = new List<string>();
-            var blockOrigins = new List<SourceOrigin>();
+            var blockOrigins = new List<LineOrigin>();
             string openStatementText = "";   // the text of a COPY / REPLACE statement still open at a directive line (§7.3.3 SR8 b)
 
             // The text of the COPY / REPLACE statement a directive line would interrupt: what was carried from the last
@@ -254,15 +254,17 @@ public static partial class ConditionalCompilationProcessor
             for (int i = 0; i < lines.Length; i++)
             {
                 string line = lines[i];
-                SourceOrigin origin = input.Lines[i];
+                LineOrigin origin = input.Lines[i];
                 string trimmed = line.TrimSpacesStart();
-                _diag.At = origin;
+                // A directive is reported at its indicator, in the file, line and column the user edits (kb/Work PB1801).
+                var at = origin.Locate(CompilerDirectiveLine.IndicatorIndex(line));
+                _diag.At = at;
 
                 // §7.3.3 SR8 b) for the one directive this stage never sees: logical conversion DISCARDED a
                 // >>SOURCE FORMAT line (§6.5 1)) and left this blank one, so the line is asked of the map of the text it
                 // was read from (kb/Work PB1353). The block is not flushed — the discarded line takes nothing from the text —
                 // so the question is asked of the statement text WITHOUT consuming it; the next directive line asks it again.
-                if (trimmed.Length == 0 && _copy is not null && _copy.IsDiscardedFormatDirective(origin)
+                if (trimmed.Length == 0 && _copy is not null && _copy.IsDiscardedFormatDirective(origin.Origin)
                     && CopyProcessor.OpenStatementAt(PendingStatementText()) is { } within)
                     _diag.WithinStatement(within.Keyword, within.InPseudoText);
 
@@ -300,7 +302,7 @@ public static partial class ConditionalCompilationProcessor
                 // so the block's copybooks' own directives (a copybook >>DEFINE / >>IF) have already run — the
                 // following directive's condition + emitting state see them (ISO §7.2.1 Step-2 encounter order).
                 Flush();
-                _diag.At = origin;   // Flush may have re-anchored _diag.At inside a copybook; restore for this line
+                _diag.At = at;   // Flush may have re-anchored _diag.At inside a copybook; restore for this line
                 // §14.9.28.4 GR14 (kb/Work PB1066): an implicit PUSH ALL / POP ALL a previous parse placed before THIS
                 // directive acts on the state here first, exactly as a written >>PUSH ALL / >>POP ALL would.
                 int encounter = _encounters.Count;
@@ -326,7 +328,7 @@ public static partial class ConditionalCompilationProcessor
                 // their operands in an omitted branch too (they only EVALUATE them in a compiled one).
                 if (_bag is not null)
                 {
-                    var sink = new BagSink(_bag, _diag.At.ToLocation());
+                    var sink = new BagSink(_bag, _diag.At);
                     if (emitting) CompilerDirectiveCatalog.Check(keyword, _edition, sink);
                     // ── AND THE OPERAND, from the same row (kb/Work PB794) ───────────────────────────────
                     // §7.3.3 SR6 composes compiler-instruction "as specified in the syntax of each directive",
@@ -339,7 +341,7 @@ public static partial class ConditionalCompilationProcessor
                     CompilerDirectiveCatalog.CheckOperand(keyword, rest, _edition, sink);
                     // The directives a DOWNSTREAM stage parses never reach that stage from an omitted branch (the line is
                     // consumed below), so the stage's own syntax-only entry asks their operand here (kb/Work PB2003).
-                    if (!emitting) StageOperandChecks.CheckOmitted(keyword, rest, _dialectLevel, _bag, _diag.At.ToLocation());
+                    if (!emitting) StageOperandChecks.CheckOmitted(keyword, rest, _dialectLevel, _bag, _diag.At);
                 }
                 string emit = "";   // directives are consumed by default (output blank line)
                 switch (keyword)
@@ -350,11 +352,11 @@ public static partial class ConditionalCompilationProcessor
                         if (!parentActive) CheckCceSyntax(rest, _diag, ">>IF");   // omitted branch: parsed (§7.2.1), never evaluated
                         bool cond = parentActive && EvaluateCceText(rest, _evaluator, _diag, ">>IF");
                         _stack.Push(new Frame { Kind = FrameKind.If, Phase = FramePhase.IfThen, TextId = _currentText,
-                            ParentActive = parentActive, Emitting = cond, BranchTaken = cond, Start = origin });
+                            ParentActive = parentActive, Emitting = cond, BranchTaken = cond, Start = at });
                         break;
                     }
                     case "ELSE":
-                        if (PhraseFrame(FrameKind.If, "ELSE", origin) is { } ifFrame)
+                        if (PhraseFrame(FrameKind.If, "ELSE") is { } ifFrame)
                         {
                             if (ifFrame.Phase == FramePhase.IfElse)
                                 _diag.Structure($">>ELSE: the >>IF opened at {DescribeStart(ifFrame)} already has its >>ELSE — "
@@ -367,7 +369,7 @@ public static partial class ConditionalCompilationProcessor
                         }
                         break;
                     case "END-IF":
-                        if (PhraseFrame(FrameKind.If, "END-IF", origin) is not null) _stack.Pop();
+                        if (PhraseFrame(FrameKind.If, "END-IF") is not null) _stack.Pop();
                         break;
                     case "EVALUATE":
                     {
@@ -375,7 +377,7 @@ public static partial class ConditionalCompilationProcessor
                         bool parentActive = _stack.Count == 0 || _stack.Peek().Emitting;
                         var f = new Frame { Kind = FrameKind.Evaluate, Phase = FramePhase.EvaluateBeforeWhen, TextId = _currentText,
                             ParentActive = parentActive, Emitting = false, BranchTaken = false,
-                            Start = origin, EvaluateFlagOn = _flagScan.IsOn(FlagOption.Flag14Evaluate) };   // c anchor (§7.3.15.4 GR4 c)
+                            Start = at, EvaluateFlagOn = _flagScan.IsOn(FlagOption.Flag14Evaluate) };   // c anchor (§7.3.15.4 GR4 c)
                         string subj = rest.TrimSpaces();
                         if (CobolNames.Same(subj, "TRUE")) f.TruthForm = true;
                         else if (parentActive) f.Subject = EvaluateOperandText(subj, _evaluator, _diag, ">>EVALUATE");
@@ -384,7 +386,7 @@ public static partial class ConditionalCompilationProcessor
                         break;
                     }
                     case "WHEN":
-                        if (PhraseFrame(FrameKind.Evaluate, "WHEN", origin) is { } evalFrame)
+                        if (PhraseFrame(FrameKind.Evaluate, "WHEN") is { } evalFrame)
                         {
                             string obj = rest.TrimSpaces();
                             // §7.3.13.3 SR5/SR6: `>>WHEN OTHER` is specified entirely on its line — OTHER and nothing else.
@@ -430,7 +432,7 @@ public static partial class ConditionalCompilationProcessor
                         }
                         break;
                     case "END-EVALUATE":
-                        if (PhraseFrame(FrameKind.Evaluate, "END-EVALUATE", origin) is { } endFrame)
+                        if (PhraseFrame(FrameKind.Evaluate, "END-EVALUATE") is { } endFrame)
                         {
                             if (endFrame.Phase == FramePhase.EvaluateBeforeWhen)
                                 _diag.Structure($">>END-EVALUATE: the >>EVALUATE opened at {DescribeStart(endFrame)} has no >>WHEN — "
@@ -521,7 +523,7 @@ public static partial class ConditionalCompilationProcessor
         /// reporting that there is none (§7.3.16.2 / §7.3.13.2: a phrase follows its own opening directive). A phrase
         /// written in a different library text from its opening directive is reported too, but the frame is still
         /// returned so the stack keeps the nesting the source wrote (§7.3.16.3 SR7, §7.3.13.3 SR9).</summary>
-        private Frame? PhraseFrame(FrameKind kind, string word, SourceOrigin at)
+        private Frame? PhraseFrame(FrameKind kind, string word)
         {
             string opener = kind == FrameKind.If ? "IF" : "EVALUATE";
             if (_stack.Count == 0 || _stack.Peek().Kind != kind)
@@ -540,7 +542,7 @@ public static partial class ConditionalCompilationProcessor
             return f;
         }
 
-        private static string DescribeStart(Frame f) => $"{f.Start.File} line {f.Start.Line}";
+        private static string DescribeStart(Frame f) => $"{f.Start.FileName} line {f.Start.Line + 1}";
 
         /// <summary>Expand one incorporated copybook through the SAME driver at <paramref name="depth"/> — its own
         /// directives + nested COPY are processed with this run's shared state; the depth is restored on return so
@@ -583,7 +585,7 @@ public static partial class ConditionalCompilationProcessor
         // >>WHEN OTHER — syntactic presence (independent of which branch emits). Captured at the >>EVALUATE line.
         public bool SawWhen;
         public bool SawWhenOther;
-        public SourceOrigin Start;   // where the >>EVALUATE directive is (its source file and physical line)
+        public SourceLocation Start;   // where the opening directive is (its source file, physical line and column)
         public bool EvaluateFlagOn;   // FLAG-14 EVALUATE was ON at the >>EVALUATE directive's line (the GR2 anchor)
     }
 
@@ -887,8 +889,8 @@ public static partial class ConditionalCompilationProcessor
         /// <summary>The source file the directives are read from (kb/Work PB82 — the identity origin of unmapped text).</summary>
         public string? SourcePath => sourcePath;
         private readonly FlagScanState _flagScan = flagScan;
-        /// <summary>The origin (file, physical line) of the directive being processed.</summary>
-        public SourceOrigin At = new(sourcePath ?? "", 1);
+        /// <summary>Where the directive being processed is: its file, physical line and column (kb/Work PB1801).</summary>
+        public SourceLocation At = new SourceOrigin(sourcePath ?? "", 1).ToLocation(0);
 
         /// <summary>FLAG-14 b (§7.3.15.4 GR4 b; E.2 item 6) — flag a compile-time arithmetic EXPRESSION (one with a
         /// real <c>addOp</c>/<c>mulOp</c>, not a bare literal) when COMPILE-TIME-ARITHMETIC-EXPRESSIONS is ON at the
@@ -906,7 +908,7 @@ public static partial class ConditionalCompilationProcessor
         /// the ONE body the compilation-unit walk uses (<see cref="BooleanOperatorGate"/>), once per fragment.</summary>
         public void GateBooleanOperators(Antlr4.Runtime.Tree.IParseTree fragment)
         {
-            if (bag is not null) BooleanOperatorGate.Check(edition, new BagSink(bag, At.ToLocation()), fragment);
+            if (bag is not null) BooleanOperatorGate.Check(edition, new BagSink(bag, At), fragment);
         }
 
         /// <summary>The logical-operator introduction gate over an evaluated constant-conditional-expression
@@ -916,7 +918,7 @@ public static partial class ConditionalCompilationProcessor
         /// (<see cref="LogicalOperatorGate"/>), once per fragment.</summary>
         public void GateLogicalOperators(Antlr4.Runtime.Tree.IParseTree fragment)
         {
-            if (bag is not null) LogicalOperatorGate.Check(edition, new BagSink(bag, At.ToLocation()), fragment);
+            if (bag is not null) LogicalOperatorGate.Check(edition, new BagSink(bag, At), fragment);
         }
 
         public void Report(CtDiagCode code, string message) => Emit(
@@ -967,7 +969,7 @@ public static partial class ConditionalCompilationProcessor
         /// <summary>Emit a migration-flag WARNING for a frontend-inline FLAG option (b / c) at
         /// <paramref name="at"/> — the same code/message shape as <c>FlagConformancePass</c> for the bound
         /// options, so the two collection sites are indistinguishable to the user.</summary>
-        public void FlagWarn(FlagOption option, SourceOrigin at)
+        public void FlagWarn(FlagOption option, SourceLocation at)
         {
             var info = FlagOptions.Info(option);
             string code = info.Directive == FlagDirective.Flag14
@@ -975,7 +977,7 @@ public static partial class ConditionalCompilationProcessor
                 : Editions.Diagnostics.DiagnosticCatalog.Flag02Warning.Code;
             bag?.ReportWarning(code,
                 $"{info.Change} — flagged by >>{FlagDirectiveLine.DirectiveWord(info.Directive)} {info.Word}",
-                at.ToLocation(), default);
+                at, default);
         }
 
         /// <summary>COBOLNET1567 / COBOLNET2773 — the §8.3.2.1 word length and word characters of a directive-carried
@@ -983,6 +985,6 @@ public static partial class ConditionalCompilationProcessor
         public void WordRule(string code, string violation) => Emit(code, violation);
 
         private void Emit(string code, string message) =>
-            bag?.ReportError(code, message, At.ToLocation(), default);
+            bag?.ReportError(code, message, At, default);
     }
 }

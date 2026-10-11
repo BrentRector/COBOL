@@ -819,12 +819,14 @@ reference formats, and the only place source comments are recognized. Its model:
   ⚠ The stage's scope estimate ("five consumers, one slot") held; what the estimate missed is that the lexer and the
   text-word scanner each carried a private copy of the tab and CR rules (nine lexer sites, `TextWord`, `SeparatorRule`,
   three `TrimEnd('\r')` in later stages) — deleted in the same change.
-- **The source map has no column** (kb/Work PB1801): `MappedText` records one `SourceOrigin(File, Line)` per
-  resultant line, so a fixed-form diagnostic column is program-text-relative (7 short — PB1688), a COPY/REPLACE
-  diagnostic is column 1 (PB1671), and a continuation fragment keeps the continued line's origin — and, after PB1586, a
-  diagnostic column on a line that held a tab is the EXPANDED position, not the editor's physical column (the `TabMap`
-  is the stage's answer; nothing consumes it yet). **Target:** an origin span list per resultant line, born in the
-  line-entry stage and carried by `OriginWriter` (PB1801).
+- **The source map carries the column** (kb/Work PB1801, PB1688, PB1671): `MappedText` records a `LineOrigin` per
+  resultant line — ordered `OriginSpan`s, each a physical line and the PHYSICAL column its stretch starts at — born
+  where the reference format reads each physical line (`TextSite`: the program text's index in the expanded line and
+  the line's `TabMap`, so a tab counts one column as in the editor) and carried by `OriginWriter` through COPY,
+  REPLACE and conditional compilation (`DESIGN-cc-in-copy.md` §3.5). A fixed-form diagnostic names the column the text
+  was written in (positions 1–7 dropped by §6.5 no longer shift it), a continuation fragment its own line and column,
+  and a COPY / REPLACE diagnostic the column of the operand it is about. The reference-format gates' program-text
+  columns go through the same `TextSite` (`Col`), so the two can never disagree.
 - **The format is STATE of an in-order walk** (`FormatSegments`, kb/Work PB1361): each line is asked whether it is a
   directive in the program-text area of the format in effect (`DirectiveText` — positions 8 to margin R of a source
   line in fixed form, the whole line in free form; §7.3.3 SR2/SR3), `>>SOURCE` and a format-changing `>>POP` update the

@@ -212,6 +212,6 @@ public sealed class PhysicalLinesTests
             ">>SOURCE FORMAT FIXED\n      *\n" + "000100" + "X" + "DISPLAY \"A\".\n", new ReferenceFormatDiagnostics(2023, false, bag), "t.cob",
             InitialReferenceFormat.Free);
         Assert.Contains(bag.Diagnostics, d => d.Code == "COBOLNET2616" && d.Location.Line == 2);   // line 3 (0-based 2)
-        Assert.Equal(3, m.Lines[2].Line);
+        Assert.Equal(3, m.Lines[2].Origin.Line);
     }
 }

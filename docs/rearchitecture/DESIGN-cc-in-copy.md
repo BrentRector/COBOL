@@ -148,15 +148,27 @@ text detected free hands nothing on and the library text is detected on its own 
 copybook's own `>>SOURCE FORMAT` segments are resolved within it and the COPY's text was converted on its own, so
 GR5's revert holds by construction.
 
-### §3.5 The origin line map (kb/Work PB82 — landed 2026-08-18)
+### §3.5 The origin map (kb/Work PB82 — landed 2026-08-18; columns kb/Work PB1801 / PB1688)
 
-Every stage of the chain that CHANGES the line count is MAPPED: it takes and returns a `MappedText` (the text plus
-ONE `SourceOrigin(File, Line)` per `Split('
+Every stage of the chain that CHANGES the line count or the columns is MAPPED (one exception, kb/Work PB2986: the
+`--nist` placeholder substitution, `NistPreprocessor.Process` in `Frontend.cs`, changes columns after the line map is
+built and is asserted only to keep the line count): it takes and returns a `MappedText`
+(the text plus ONE `LineOrigin` per `Split('
 ')` piece — the invariant the constructor asserts), and its string
-overload is the mapped one's `.Text` (one implementation, never two). `OriginWriter` assembles the outputs: an
-output line piece takes the origin of the FIRST content written into it. The stages and their splice rules —
-- the fixed→free normalizer (`ConvertFixedToFree(..., origins)`): a continuation join strips the previous output
-  line's newline and REOPENS its origin, so the joined line keeps its head line's number; a discarded
+overload is the mapped one's `.Text` (one implementation, never two). A `LineOrigin` is the piece's ordered list of
+`OriginSpan(ResultColumn, SourceOrigin(File, Line), SourceColumn)`: the characters from a resultant column on came
+from that physical line, starting at that PHYSICAL column (an index of the line as the file holds it, so a TAB counts
+one, as in the user's editor). The piece is NAMED by its first span's line (`LineOrigin.Origin`, the PB82 rule: the
+origin of the first content written into it), and `LineOrigin.Locate(column)` is the one place a resultant column
+becomes a physical one. `OriginWriter` assembles the outputs: a slice of a mapped input keeps the input's spans,
+rebased to the column it lands on; text a stage writes itself takes one span at the position it stands for
+(`MappedText.PointAt`). The stages and their splice rules —
+- the reference-format conversion (`ReferenceFormatProcessor.LogicalLineBuilder`, fed a `TextSite` per physical line:
+  the program text's start index in the expanded line and the line's `TabMap`) BEARS the spans: a fixed-form line's
+  program text maps from position 8, a free-form line from position 1, a line that held a tab gets a span wherever the
+  physical columns stop running one for one, and a continuation join appends the continuation's own span (its line,
+  and the column of its first appended character — the one after its opening quotation symbol for a literal), so the
+  joined line keeps its head line's NUMBER while every fragment keeps its own line and column; a discarded
   `>>SOURCE FORMAT` directive line keeps its slot;
 - the CC driver's `Render(MappedText)`: an omitted or directive line keeps its own origin (a blank output line), a
   block keeps its lines', a copybook expansion the copybook's (through `RenderCopybook(MappedText, depth,
@@ -166,15 +178,18 @@ output line piece takes the origin of the FIRST content written into it. The sta
 - `CopyProcessor.ExpandCopiesOneLevel(MappedText)`: the text before a COPY keeps its origins, the two framing
   newlines belong to the COPY statement's own line, the incorporated text carries the copybook's path and physical
   lines (`NormalizeCopybookMapped` — a fixed-form member's continuation joins are tracked exactly like the main
-  source's) — and `ResolveOneCopy`, `OnNonPseudoTextOperand`, the CC `DirectiveDiag` all report at the SOURCE
-  origin of the position they are looking at, never at an ordinal of the text being processed;
+  source's) — and `ResolveOneCopy`, `OnNonPseudoTextOperand` and every COPY / REPLACE statement diagnostic report at
+  `MappedText.LocateAt(position)` (the file, line AND column of the position they are looking at), the CC
+  `DirectiveDiag` at the directive's indicator, never at an ordinal of the text being processed. `MappedText` has no
+  accessor that answers a position with a column-less `SourceOrigin` (`SourceLineMapTests`);
 - `ApplyReplaceStatements(MappedText)` / `ApplyReplacements(MappedText)`: a REPLACE statement's own lines vanish
-  from the resultant text; kept text keeps its origins, a replacement's text takes the origin of the line its
-  match started on. `ReplaceLineMap` is the same pass over line-index origins: where each input line lands in the
+  from the resultant text; kept text keeps its origins, a replacement's text takes ONE span at the position of the
+  text it replaced (the only honest answer for synthesized text), and the text after it on the line keeps its own
+  columns. `ReplaceLineMap` is the same pass over line-index origins: where each input line lands in the
   resultant text (the directive encounters' resultant lines, kb/Work PB1066).
 
 `Frontend.Preprocess` returns the final `MappedText`, publishes `Frontend.LineMap` (`SourceLineMap`: resultant
-line → origin; `Locate` is the ONE conversion to a 0-based `SourceLocation`), asserts every later stage (NIST
+line → origin; `Locate(line, column, fallbackFile)` is the ONE conversion to a 0-based `SourceLocation`), asserts every later stage (NIST
 substitution, the six directive stages) is line-count preserving, and hands the map to the parser listener
 (`CobolErrorListener` — which also stopped reporting every syntax error one line late), to the directive stages'
 diagnostics, and (via `CompilerDriver` → `EditionContext.LineMap`) to the binder's diagnostic cursor and

@@ -141,11 +141,11 @@ public sealed class ReferenceFormatLogicalConversionTests
         var lines = m.Text.Split('\n');
         // §6.5 6) a): appended to the LATEST LOGICAL line, the continued line space-filled to margin R (DOC-A.1-157)
         Assert.Equal("01 X PIC X(80) VALUE \"AB" + new string(' ', 41) + "CD\".", lines[1]);
-        Assert.Equal(2, m.Lines[1].Line);
+        Assert.Equal(2, m.Lines[1].Origin.Line);
         Assert.Equal("", lines[2]);                    // §6.5 2): the interspersed line is discarded, its slot kept
-        Assert.Equal(3, m.Lines[2].Line);
+        Assert.Equal(3, m.Lines[2].Origin.Line);
         Assert.Equal("01 Y PIC X.", lines[3].Trim()); // the continuation occupies no line; Y keeps its number
-        Assert.Equal(5, m.Lines[3].Line);
+        Assert.Equal(5, m.Lines[3].Origin.Line);
         Assert.DoesNotContain(bag.Diagnostics, d => d.IsError);
     }
 

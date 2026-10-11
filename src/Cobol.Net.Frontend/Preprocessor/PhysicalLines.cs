@@ -134,6 +134,11 @@ public sealed class TabMap
     public int ToExpanded(int physical) => _toExpanded[physical];
 
     /// <summary>The 0-based physical index of the character that produced the 0-based expanded position
-    /// <paramref name="expanded"/> (the expanded length maps to the physical length).</summary>
-    public int ToPhysical(int expanded) => _toPhysical[expanded];
+    /// <paramref name="expanded"/> (the expanded length maps to the physical length, and a position past it continues
+    /// the line one for one — the program-text area of a short fixed-form line is read as space-filled to margin R).</summary>
+    public int ToPhysical(int expanded)
+    {
+        int end = _toPhysical.Length - 1;   // the expanded length
+        return expanded <= end ? _toPhysical[expanded] : _toPhysical[end] + (expanded - end);
+    }
 }

@@ -300,8 +300,8 @@ public sealed class ExceptionPerformSourceFormatScopeTests
     [Fact]
     public void Place_KeepsOnlyBracketsEnclosingAFormatDirective_OfOneFile()
     {
-        var origins = Enumerable.Range(1, 20).Select(n => new SourceOrigin("main.cob", n)).ToList();
-        origins[14] = new SourceOrigin("lib.cpy", 3);   // resultant line 15 is library text
+        var origins = Enumerable.Range(1, 20).Select(n => new LineOrigin(new SourceOrigin("main.cob", n))).ToList();
+        origins[14] = new LineOrigin(new SourceOrigin("lib.cpy", 3));   // resultant line 15 is library text
         var formats = new Dictionary<string, ReferenceFormatMap>
         {
             ["main.cob"] = ReferenceFormatMap.Create(true, false, [], [7], []),

@@ -170,6 +170,70 @@ public sealed class DiagnosticPositionTests : IDisposable
         AssertPositioned(lines, "m.cob", 1, "error COBOLNET2616");
     }
 
+    /// <summary>⛔ kb/Work PB1688 / PB1801 — a diagnostic names the PHYSICAL COLUMN, in every producer arm of the source
+    /// map. The fixed-form logical conversion (§6.5) keeps only the program-text area (positions 8 to margin R), joins a
+    /// continuation line's text onto the latest logical line, and the line-entry stage expands a TAB; COPY and REPLACE
+    /// splice text of other lengths into a line. The resultant column the parser and the binder hold is none of the
+    /// user's columns, so each arm is pinned at the column the programmer's editor shows: `char_neg_typedef85` used to
+    /// report `(5,9)` for a word written at column 16.</summary>
+    [Theory]
+    // a plain fixed-form line: the parse error at the '.' written in column 21
+    [InlineData("plain", "       PROCEDURE DIVISION.\n           MOVE 1 TO.\n           STOP RUN.\n", "plain.cob(7,21)", "COBOL0001")]
+    // the binder's statement cursor on a plain fixed-form line: DISPLAY at column 12
+    [InlineData("cursor", "       PROCEDURE DIVISION.\n           DISPLAY UNDEF.\n           STOP RUN.\n", "cursor.cob(7,12)", "COBOLNET1639")]
+    // a fixed continuation FRAGMENT: the '.' is on the continuation line, at its own line and column
+    [InlineData("contin", "       PROCEDURE DIVISION.\n           MOVE \"ABC\n      -    \"DEF\" TO.\n           STOP RUN.\n", "contin.cob(8,20)", "COBOL0001")]
+    // a TAB in the program text counts ONE column, as in the editor (the tab expanded to positions 18-24)
+    [InlineData("tabbed", "       PROCEDURE DIVISION.\n           MOVE 1\tTO.\n           STOP RUN.\n", "tabbed.cob(7,21)", "COBOL0001")]
+    // after a >>SOURCE FORMAT FREE switch the line is read whole: DISPLAY at column 4
+    [InlineData("switch", "       >>SOURCE FORMAT FREE\nPROCEDURE DIVISION.\n   DISPLAY UNDEF.\n   STOP RUN.\n", "switch.cob(8,4)", "COBOLNET1639")]
+    public void FixedForm_DiagnosticNamesThePhysicalColumn(string name, string tail, string position, string code)
+    {
+        Write(name + ".cob", Head + tail);
+        var (ok, lines) = Compile(name + ".cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.True(lines.Any(d => d.Contains(position + ": error " + code)),
+            $"expected '{position}: error {code}'; got:\n" + string.Join("\n", lines));
+    }
+
+    [Fact] // kb/Work PB1688 / PB1801 — the copybook arm and the REPLACE arm keep the physical column
+    public void FixedForm_CopybookAndReplacedText_NameThePhysicalColumn()
+    {
+        Write("cols.cpy", "      *> line 1\n               MOVE 1 TO.\n");   // the '.' in column 25 of the copybook's line 2
+        Write("k7.cob", Head + "       PROCEDURE DIVISION.\n           COPY \"cols.cpy\".\n           STOP RUN.\n");
+        var (ok, lines) = Compile("k7.cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("cols.cpy(2,25): error COBOL0001"));
+        // REPLACE substitutes a SHORTER text before the error on the same line: the '.' keeps the column it was written in
+        Write("r7.cob", Head + "       REPLACE ==LONG-REPLACED-OPERAND== BY ==1==.\n       PROCEDURE DIVISION.\n"
+            + "           MOVE LONG-REPLACED-OPERAND TO.\n           STOP RUN.\n");
+        (ok, lines) = Compile("r7.cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("r7.cob(8,41): error COBOL0001"));
+    }
+
+    [Fact] // kb/Work PB1671 — a COPY / REPLACE / directive diagnostic names the column of what it is about, not column 1
+    public void TextManipulationAndDirectiveDiagnostics_NameTheirColumn()
+    {
+        Write("t7.cob", Head
+            + "           >>DEFINE\n"                           // line 6: the directive's indicator in column 12
+            + "       PROCEDURE DIVISION.\n"
+            + "           COPY \"no-such-member.cpy\".\n"       // line 8: COPY in column 12
+            + "           REPLACE \"LIT\" BY ==X==.\n"          // line 9: the literal operand in column 20
+            + "           STOP RUN.\n");
+        var (ok, lines) = Compile("t7.cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("t7.cob(6,12): error COBOLNET2651"));
+        Assert.Contains(lines, d => d.Contains("t7.cob(8,12): error CBL3620"));
+        Assert.Contains(lines, d => d.Contains("t7.cob(9,20): error COBOLNET1641"));
+        // >>SOURCE FORMAT is read by the reference-format stage, not the directive stage: the same indicator column
+        // (train 1055 review — it named column 1)
+        Write("s7.cob", Head + "           >>SOURCE FORMAT BOGUS\n       PROCEDURE DIVISION.\n           STOP RUN.\n");
+        (ok, lines) = Compile("s7.cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("s7.cob(6,12): error COBOLNET1911"));
+    }
+
     [Fact] // the parse-tree conformance arm: an edition gate names the construct's position
     public void EditionGate_NamesTheConstructLine()
     {

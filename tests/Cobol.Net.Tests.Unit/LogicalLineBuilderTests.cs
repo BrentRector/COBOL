@@ -41,7 +41,7 @@ public sealed class LogicalLineBuilderTests
     {
         var (m, bag) = Normalize(Lines(fixedForm, "01 X PIC X(20) VALUE \"ABC\"-", "    \"DEF\"."), Format(fixedForm), std: 2002);
         Assert.Equal("01 X PIC X(20) VALUE \"ABCDEF\".", m.Text.Split('\n')[0]);
-        Assert.Equal(1, m.Lines[0].Line);
+        Assert.Equal(1, m.Lines[0].Origin.Line);
         Assert.DoesNotContain(bag.Diagnostics, d => d.IsError);
     }
 
@@ -71,7 +71,7 @@ public sealed class LogicalLineBuilderTests
         Assert.Equal("", lines[1]);                     // the comment line's slot
         Assert.Equal("", lines[2]);                     // the blank line's slot
         Assert.Equal("STOP RUN.", lines[3].Trim());
-        Assert.Equal(6, m.Lines[3].Line);               // the two continuation lines took no slot, the numbering is physical
+        Assert.Equal(6, m.Lines[3].Origin.Line);               // the two continuation lines took no slot, the numbering is physical
         Assert.DoesNotContain(bag.Diagnostics, d => d.IsError);
     }
 
@@ -340,7 +340,7 @@ public sealed class LogicalLineBuilderTests
         Assert.Equal(prefix + new string('A', 65 - prefix.Length) + "TAIL\" TO V.", lines[0]);   // the literal, whole
         Assert.Equal(Carrier + "    DISPLAY \"X\".", lines[1]);    // the debugging line keeps a line of its own, after the one it interrupted
         Assert.Equal("    STOP RUN.", lines[2]);
-        Assert.Equal([1, 2, 4], m.Lines.Select(o => o.Line).Take(3).ToArray());
+        Assert.Equal([1, 2, 4], m.Lines.Select(o => o.Origin.Line).Take(3).ToArray());
         Assert.DoesNotContain(bag.Diagnostics, d => d.IsError);
     }
 

@@ -77,12 +77,12 @@ public sealed class CobolErrorListener(DiagnosticBag diagnostics, string sourceP
             message = reservedWordMessage;
         }
 
-        // ANTLR's `line` is 1-based and counts the RESULTANT text (after COPY / REPLACE / continuation joins);
-        // SourceLocation.Line is 0-based (its ToString adds the 1 back). Passing the token line straight through
-        // reported every parse error one line late — kb/Work PB82. The map names the file and physical line the
-        // user edits (a copybook's own path and line for an error inside copied text).
-        var origin = lineMap?.Origin(line) ?? new SourceOrigin(sourcePath, line);
-        var location = new SourceLocation(origin.File, 0, Math.Max(origin.Line - 1, 0), charPositionInLine);
+        // ANTLR's `line` and `charPositionInLine` count the RESULTANT text (after the reference-format conversion,
+        // COPY, REPLACE and continuation joins). The map names the file, physical line AND column the user edits (a
+        // copybook's own path and line for an error inside copied text — kb/Work PB82; the column of the physical
+        // line, not of the program-text area the fixed-form conversion kept — kb/Work PB1688, PB1801).
+        var location = lineMap?.Locate(line, charPositionInLine, sourcePath)
+                       ?? new SourceOrigin(sourcePath, line).ToLocation(charPositionInLine);
         var span = new TextSpan(offendingSymbol?.StartIndex ?? 0,
             offendingSymbol?.StopIndex ?? 0);
         diagnostics.ReportError(code, message, location, span);

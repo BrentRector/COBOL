@@ -47,7 +47,8 @@ public static class TurnDirectiveProcessor
             // and the trailing inline comment (SR3/SR4) are its rules, not this stage's.
             if (!CompilerDirectiveLine.TryParse(lines[i], "TURN", out string operand)) continue;
 
-            var loc = lineMap?.Locate(i + 1, sourcePath) ?? new SourceLocation(sourcePath, 0, i, 0);   // the SOURCE origin of resultant line i (kb/Work PB82)
+            int at = CompilerDirectiveLine.IndicatorIndex(lines[i]);
+            var loc = lineMap?.Locate(i + 1, at, sourcePath) ?? new SourceLocation(sourcePath, 0, i, at);   // the SOURCE position of the directive (kb/Work PB82, PB1801)
             // The introduction gate fired at the ONE directive-recognition point (CompilerDirectiveCatalog,
             // from the turn-directive-2002 row) — this stage ran its own `if (dialectLevel < 2002)` with a
             // BESPOKE COBOLNET0875 until kb/Work PB725 reconciled the three mechanisms onto the registry's

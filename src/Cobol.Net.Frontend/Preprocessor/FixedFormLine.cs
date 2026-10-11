@@ -75,6 +75,11 @@ internal readonly struct FixedFormLine
         }
     }
 
+    /// <summary>The index in the line of the first character of <see cref="ProgramText"/> — where a resultant column of
+    /// the program text maps back to (kb/Work PB1801). A line too short to reach the area has its program text wholly
+    /// space-filled, read as if the line went on to position 8.</summary>
+    public int ProgramTextIndex => HasProgramText ? _programTextAt : _programTextAt + SourceAreaStart - CharacterPositions.Count(_text);
+
     /// <summary>The text past margin R, which is ignored (Annex A item 158).</summary>
     public ReadOnlySpan<char> BeyondMarginR => _text.AsSpan(_marginRAt);
 }

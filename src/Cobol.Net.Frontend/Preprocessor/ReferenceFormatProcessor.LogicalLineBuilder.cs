@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Editions;
+using CobolNet.Frontend.Common;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -32,7 +33,7 @@ public static partial class ReferenceFormatProcessor
     private sealed class LogicalLineBuilder(string file, ReferenceFormatDiagnostics? gates, bool fixedForm)
     {
         private readonly List<string> _lines = [];
-        private readonly List<int> _origins = [];
+        private readonly List<List<OriginSpan>> _origins = [];   // per resultant line, where its characters came from (PB1801)
 
         /// <summary>The index in <see cref="_lines"/> of the latest logical line — the §6.5 6) / 8) join target — or -1
         /// before the first one.</summary>
@@ -46,21 +47,37 @@ public static partial class ReferenceFormatProcessor
         /// directive is specified on ONE line, so such a line is never a join target (kb/Work PB1360).</summary>
         private bool _latestIsDirective;
 
-        /// <summary>The resultant lines and, per line, the 1-based physical source line it came from (kb/Work PB82): a
-        /// continuation line joins its latest logical line, which keeps the number of the line that began it.</summary>
-        public (List<string> Lines, List<int> Origins) Result => (_lines, _origins);
+        /// <summary>The resultant lines and, per line, where its characters came from (kb/Work PB82, PB1801): the physical
+        /// line and column of each stretch — a continuation line's text joins its latest logical line, which keeps the
+        /// line that began it as its name, and the joined text keeps its own line and column.</summary>
+        public (List<string> Lines, List<LineOrigin> Origins) Result
+        {
+            get
+            {
+                var origins = new List<LineOrigin>(_origins.Count);
+                for (int i = 0; i < _origins.Count; i++)
+                {
+                    // A stretch a later scan cut away (an inline comment, trailing spaces) maps no character.
+                    var spans = _origins[i];
+                    int kept = 1;
+                    while (kept < spans.Count && spans[kept].ResultColumn < _lines[i].Length) kept++;
+                    origins.Add(new LineOrigin([.. spans.GetRange(0, kept)]));
+                }
+                return (_lines, origins);
+            }
+        }
 
         /// <summary>A logically discarded line (§6.5 2)): its slot stays, empty, so later lines keep their numbers; the
         /// latest logical line and its literal state are untouched.</summary>
-        public void Discard(int lineNo)
+        public void Discard(TextSite site)
         {
             _lines.Add("");
-            _origins.Add(lineNo);
+            _origins.Add([site.Span(file, 0, 0)]);
         }
 
-        /// <summary>A new logical line the classifier built itself (a comment-entry paragraph header): the §6.5 6) join
-        /// target from now on, outside any literal.</summary>
-        public void Emit(string text, int lineNo) => Emit(text, lineNo, LiteralState.Outside, isDirective: false);
+        /// <summary>A new logical line the classifier built itself (a comment-entry paragraph header) from the program text
+        /// at <paramref name="site"/>: the §6.5 6) join target from now on, outside any literal.</summary>
+        public void Emit(string text, TextSite site) => Emit(text, site.Spans(file, 0, 0, text.Length), LiteralState.Outside, isDirective: false);
 
         /// <summary>A fixed-form DEBUGGING line (indicator <c>D</c>), carried as <paramref name="carrier"/> (the
         /// <see cref="DebugLineCarrier"/> and the line's program text) for <c>DebuggingLineRewriter</c> to keep or hide
@@ -76,85 +93,82 @@ public static partial class ReferenceFormatProcessor
         /// <item>any other debugging line is a new logical line and the join target from now on, so a continuation line
         /// after it continues the debugging line ("continuation of debugging lines is permitted").</item>
         /// </list></summary>
-        public void EmitDebugging(string carrier, string programText, int lineNo, int column)
+        public void EmitDebugging(string carrier, string programText, TextSite site)
         {
             // The line is read like any source line (§6.5 3) and 4): an inline comment is removed, a floating literal
             // continuation indicator ends it, and the literal state it ends in is tracked), so a continuation line after
             // it finds the literal it left open.
             var state = LiteralState.Outside;
-            string kept = Scan(programText, 0, ref state, lineNo, column, fixedContinuation: false);
+            string kept = Scan(programText, 0, ref state, site, fixedContinuation: false);
             if (CobolSpace.IsBlank(kept))
             {
-                Discard(lineNo);
+                Discard(site);
                 return;
             }
             string text = carrier + (state.InLiteral ? kept : kept.TrimSpacesEnd());
+            var spans = site.Spans(file, carrier.Length, 0, text.Length - carrier.Length);   // the carrier is written, not read
             if (_latest >= 0 && (_literal.AwaitsFloating || _literal.InLiteral && !_literal.PendingClose))
             {
                 _lines.Add(text);
-                _origins.Add(lineNo);
+                _origins.Add(spans);
                 return;
             }
-            Emit(text, lineNo, state, isDirective: false);
+            Emit(text, spans, state, isDirective: false);
         }
-
-        /// <summary>The 0-based physical column, in character positions (<see cref="CharacterPositions"/>), of the
-        /// character at <paramref name="index"/> of <paramref name="text"/>, whose first character stands at
-        /// <paramref name="column"/> — the column a diagnostic names.</summary>
-        private static int Col(string text, int column, int index) => column + CharacterPositions.PositionAt(text, index);
 
         /// <summary>One line of program text. <paramref name="text"/> is the program-text area — characters 8 through
         /// margin R of a fixed-form line, space-filled to margin R (DOC-A.1-157), or a whole free-form line — and
-        /// <paramref name="column"/> the 0-based physical column of its first character.
+        /// <paramref name="site"/> where its first character stands in its physical line.
         /// <paramref name="fixedContinuation"/> is a fixed-form line whose indicator area holds the fixed continuation
         /// indicator; every other line is a source line, which is a continuation line all the same when the latest
         /// logical line ended in a floating literal continuation indicator (§6.5 8)).</summary>
-        public void Add(string text, int lineNo, int column, bool fixedContinuation)
+        public void Add(string text, TextSite site, bool fixedContinuation)
         {
-            if (fixedContinuation) gates?.OnContinuation(file, lineNo);
+            if (fixedContinuation) gates?.OnContinuation(file, site.Line);
             int first = FirstNonSpace(text);
             if (first < 0)
             {
-                if (!fixedContinuation) Discard(lineNo);   // a blank line (§6.3.6): discarded; a blank continuation has no text to append
+                if (!fixedContinuation) Discard(site);   // a blank line (§6.3.6): discarded; a blank continuation has no text to append
                 return;
             }
             if (text.AsSpan(first).StartsWith("*>", StringComparison.Ordinal))
             {
-                ReportComment(text, first, lineNo, column);
-                Discard(lineNo);                           // a comment line (§6.2.3.1 1)): discarded, never a join
+                ReportComment(text, first, site);
+                Discard(site);                           // a comment line (§6.2.3.1 1)): discarded, never a join
                 return;
             }
             if (_latest >= 0 && _latestIsDirective && (fixedContinuation || _literal.AwaitsFloating))
-                DropDirectiveContinuation(lineNo, Col(text, column, first));
-            else if (_latest >= 0 && _literal.AwaitsFloating) ContinueFloating(text, first, lineNo, column, fixedContinuation);
-            else if (_latest >= 0 && fixedContinuation) ContinueFixed(text, first, lineNo, column);
-            else NewLine(text, lineNo, column);
+                DropDirectiveContinuation(site, site.Col(text, first));
+            else if (_latest >= 0 && _literal.AwaitsFloating) ContinueFloating(text, first, site, fixedContinuation);
+            else if (_latest >= 0 && fixedContinuation) ContinueFixed(text, first, site);
+            else NewLine(text, site);
         }
 
         /// <summary>§7.3.3 SR1: a line that would continue a compiler directive line — a fixed-form hyphen in column 7, or
         /// the line after a floating literal continuation indicator that ended the directive — is diagnosed and NOT
         /// joined, so the directive keeps exactly what its own line says; the line takes its discarded slot, like a
         /// comment. A literal the directive left open is closed with it.</summary>
-        private void DropDirectiveContinuation(int lineNo, int column)
+        private void DropDirectiveContinuation(TextSite site, int column)
         {
-            gates?.OnDirectiveContinued(file, lineNo, column);
+            gates?.OnDirectiveContinued(file, site.Line, column);
             _literal = LiteralState.Outside;
-            Discard(lineNo);
+            Discard(site);
         }
 
         /// <summary>§6.5 5) / 7): the program text is copied to the resultant group as a NEW logical line — after §6.5 3)
         /// (an inline comment is removed) and §6.5 4) (a floating literal continuation indicator ends it). Trailing
         /// spaces are kept only while a literal is left open, where they are part of it (§6.3.5).</summary>
-        private void NewLine(string text, int lineNo, int column)
+        private void NewLine(string text, TextSite site)
         {
             var state = LiteralState.Outside;
-            string kept = Scan(text, 0, ref state, lineNo, column, fixedContinuation: false);
+            string kept = Scan(text, 0, ref state, site, fixedContinuation: false);
             if (CobolSpace.IsBlank(kept))
             {
-                Discard(lineNo);
+                Discard(site);
                 return;
             }
-            Emit(state.InLiteral ? kept : kept.TrimSpacesEnd(), lineNo, state, IsDirectiveLine(kept));
+            string line = state.InLiteral ? kept : kept.TrimSpacesEnd();
+            Emit(line, site.Spans(file, 0, 0, line.Length), state, IsDirectiveLine(kept));
         }
 
         /// <summary>Whether program text is a compiler directive line (§7.3.3 SR2): the indicator preceded only by
@@ -165,21 +179,21 @@ public static partial class ReferenceFormatProcessor
         /// <summary>§6.5 8): the continuation line of a literal continued with a floating indicator. Its first nonblank
         /// character shall be the quotation symbol of the opening delimiter (§6.2.3.2 SR6); the content after it is
         /// appended immediately to the right of the latest logical line, whose trailing spaces are literal content.</summary>
-        private void ContinueFloating(string text, int first, int lineNo, int column, bool fixedContinuation)
+        private void ContinueFloating(string text, int first, TextSite site, bool fixedContinuation)
         {
             var state = _literal with { AwaitsFloating = false };
             // A hyphen in column 7 on the continuation line of a floating-continued literal is the SECOND form of
             // continuation of that literal (§6.2.3.2 SR4).
-            if (fixedContinuation) gates?.OnTwoContinuationForms(file, lineNo, FixedFormLine.IndicatorColumn);
-            int contentAt = AfterOpeningQuote(text, first, state.Quote, lineNo, column);
+            if (fixedContinuation) gates?.OnTwoContinuationForms(file, site.Line, FixedFormLine.IndicatorColumn);
+            int contentAt = AfterOpeningQuote(text, first, state.Quote, site);
             string content = text[contentAt..];
             if (!fixedForm && PartIsEmpty(content, state.Quote))
-                gates?.OnEmptyLiteralPart(file, lineNo, Col(text, column, contentAt));
-            Join(_lines[_latest], content, 0, state, lineNo, Col(text, column, contentAt), fixedContinuation);
+                gates?.OnEmptyLiteralPart(file, site.Line, site.Col(text, contentAt));
+            Join(_lines[_latest], content, 0, state, site.At(contentAt), fixedContinuation);
         }
 
         /// <summary>§6.5 6): a fixed-form continuation line identified by the fixed continuation indicator.</summary>
-        private void ContinueFixed(string area, int first, int lineNo, int column)
+        private void ContinueFixed(string area, int first, TextSite site)
         {
             string head = _lines[_latest];
             var state = _literal;
@@ -196,25 +210,25 @@ public static partial class ReferenceFormatProcessor
                 // literal continuation and non-word splices (after a period or parenthesis) are not word continuation.
                 if (gates is not null && LastNonSpace(head) is { } prev)
                 {
-                    if (IsCobolWordChar(prev) && IsCobolWordChar(firstChar)) gates.OnWordContinuation(file, lineNo);
+                    if (IsCobolWordChar(prev) && IsCobolWordChar(firstChar)) gates.OnWordContinuation(file, site.Line);
                     // §6.2.3.2 SR3 / §6.3.5 2): "All characters composing any multiple-character separator or
                     // multiple-character indicator shall be specified on the same line" — the join would SPELL a
                     // token nobody wrote on one line.
                     foreach (var indicator in MultipleCharacterFloatingIndicators)
                         if (prev == indicator[0] && area.AsSpan(first).StartsWith(indicator.AsSpan(1), StringComparison.Ordinal))
-                            gates.OnSplitFloatingIndicator(file, lineNo, indicator);
+                            gates.OnSplitFloatingIndicator(file, site.Line, indicator);
                     foreach (var token in MultipleCharacterSeparators)
                         if (prev == token[0] && area.AsSpan(first).StartsWith(token.AsSpan(1), StringComparison.Ordinal))
-                            gates.OnSplitSeparator(file, lineNo, token);
+                            gates.OnSplitSeparator(file, site.Line, token);
                 }
-                Join(head.TrimSpacesEnd(), area[first..], 0, LiteralState.Outside, lineNo, Col(area, column, first), fixedContinuation: true);
+                Join(head.TrimSpacesEnd(), area[first..], 0, LiteralState.Outside, site.At(first), fixedContinuation: true);
                 return;
             }
 
             // A continued literal. §6.3.5 2): "National literals may be continued only with a floating literal
             // continuation indicator"; §6.2.3.2 SR4: one form of continuation per literal.
-            if (state.Kind == LiteralKind.National) gates?.OnNationalFixedContinuation(file, lineNo);
-            if (state.Form == ContinuationForm.Floating) gates?.OnTwoContinuationForms(file, lineNo, FixedFormLine.IndicatorColumn);
+            if (state.Kind == LiteralKind.National) gates?.OnNationalFixedContinuation(file, site.Line);
+            if (state.Form == ContinuationForm.Floating) gates?.OnTwoContinuationForms(file, site.Line, FixedFormLine.IndicatorColumn);
             state = state with { Form = ContinuationForm.Fixed };
 
             if (state.PendingClose)
@@ -222,37 +236,50 @@ public static partial class ReferenceFormatProcessor
                 // The continued line ended on its literal's quotation symbol at margin R and the continuation's first
                 // character is that quotation symbol: it is the SECOND HALF of a doubled quotation symbol (content), and a
                 // quotation symbol right after it is the continuation's own opening one, which is stripped.
-                string content = first + 1 < area.Length && area[first + 1] == state.Quote
-                    ? area[first] + area[(first + 2)..]
-                    : area[first..];
-                Join(head, content, 1, state with { PendingClose = false }, lineNo, Col(area, column, first), fixedContinuation: true);
+                // The stripped opening quotation symbol leaves a seam in the content: the text after it is at its own column.
+                bool stripped = first + 1 < area.Length && area[first + 1] == state.Quote;
+                string content = stripped ? area[first] + area[(first + 2)..] : area[first..];
+                Join(head, content, 1, state with { PendingClose = false }, site.At(first), fixedContinuation: true,
+                    seam: stripped ? (1, site.At(first + 2)) : null);
                 return;
             }
-            int contentAt = AfterOpeningQuote(area, first, state.Quote, lineNo, column);
-            Join(head, area[contentAt..], 0, state, lineNo, Col(area, column, contentAt), fixedContinuation: true);
+            int contentAt = AfterOpeningQuote(area, first, state.Quote, site);
+            Join(head, area[contentAt..], 0, state, site.At(contentAt), fixedContinuation: true);
         }
 
         /// <summary>The index in <paramref name="text"/> of the first character of a literal's continuation: the one after
         /// the continuation line's initial quotation symbol, which shall be <paramref name="quote"/> (§6.2.3.2 SR6; §6.3.5
         /// 2); §6.4.2). A different first character is diagnosed (COBOLNET2684) and read the way the standard's rule would
         /// have it were it correct: another quotation symbol is dropped like the right one, anything else is content.</summary>
-        private int AfterOpeningQuote(string text, int first, char quote, int lineNo, int column)
+        private int AfterOpeningQuote(string text, int first, char quote, TextSite site)
         {
             char c = text[first];
             if (c == quote) return first + 1;
-            gates?.OnContinuationQuote(file, lineNo, Col(text, column, first), quote);
+            gates?.OnContinuationQuote(file, site.Line, site.Col(text, first), quote);
             return c is '"' or '\'' ? first + 1 : first;
         }
 
         /// <summary>Append <paramref name="content"/> to <paramref name="head"/> (the latest logical line) after §6.5 3)
         /// and 4) have been applied to the appended text, scanned from <paramref name="scanFrom"/> with
-        /// <paramref name="state"/> carried in.</summary>
-        private void Join(string head, string content, int scanFrom, LiteralState state, int lineNo, int column,
-            bool fixedContinuation)
+        /// <paramref name="state"/> carried in. <paramref name="site"/> is where the content's first character stands —
+        /// the appended text keeps its own physical line and column (kb/Work PB1801) — and <paramref name="seam"/>, when
+        /// the content is not one run of its line, the index in it where the rest stands elsewhere.</summary>
+        private void Join(string head, string content, int scanFrom, LiteralState state, TextSite site,
+            bool fixedContinuation, (int At, TextSite Site)? seam = null)
         {
-            string kept = Scan(content, scanFrom, ref state, lineNo, column, fixedContinuation);
+            string kept = Scan(content, scanFrom, ref state, site, fixedContinuation);
             string joined = head + kept;
             _lines[_latest] = state.InLiteral ? joined : joined.TrimSpacesEnd();
+            // The stretches the head lost to a trim (or an earlier join that kept no character) map nothing now.
+            var spans = _origins[_latest];
+            for (int k = spans.Count - 1; k >= 0; k--)
+                if (spans[k].ResultColumn >= head.Length && (k > 0 || head.Length == 0)) spans.RemoveAt(k);
+            if (seam is { } cut && cut.At < kept.Length)
+            {
+                spans.AddRange(site.Spans(file, head.Length, 0, cut.At));
+                spans.AddRange(cut.Site.Spans(file, head.Length + cut.At, 0, kept.Length - cut.At));
+            }
+            else spans.AddRange(site.Spans(file, head.Length, 0, kept.Length));
             _literal = state;
         }
 
@@ -260,35 +287,35 @@ public static partial class ReferenceFormatProcessor
         /// <paramref name="state"/> carried in and left as it is at the end of the piece: an inline comment is removed,
         /// and a floating literal continuation indicator ends the program text before it (the literal stays open for the
         /// next line, §6.5 8)). Returns the text that remains.</summary>
-        private string Scan(string text, int scanFrom, ref LiteralState state, int lineNo, int column, bool fixedContinuation)
+        private string Scan(string text, int scanFrom, ref LiteralState state, TextSite site, bool fixedContinuation)
         {
             var stop = ScanProgramText(text.AsSpan(scanFrom), ref state);
             int at = scanFrom + stop.At;
             switch (stop.Kind)
             {
                 case ScanStopKind.Comment:
-                    ReportComment(text, at, lineNo, column);
+                    ReportComment(text, at, site);
                     return text[..at];
                 case ScanStopKind.FloatingContinuation:
                     // The introduction gate is asked in FIXED form only, as the floating comment indicator's is (see
                     // ReportComment): free form is itself a 2002 introduction and this is its only continuation.
-                    if (fixedForm) gates?.OnFloatingLiteralContinuation(file, lineNo, Col(text, column, at));
-                    if (stop.CommentFollows) gates?.OnCommentAfterFloatingContinuation(file, lineNo, Col(text, column, at));
+                    if (fixedForm) gates?.OnFloatingLiteralContinuation(file, site.Line, site.Col(text, at));
+                    if (stop.CommentFollows) gates?.OnCommentAfterFloatingContinuation(file, site.Line, site.Col(text, at));
                     // Never on a fixed continuation line (§6.2.3.2 SR5). A literal continued BOTH ways (SR4) is found where
                     // the second form is written: by ContinueFloating (a hyphen in column 7 after a floating indicator) and
                     // by ContinueFixed (a hyphen after a literal a floating indicator continued before).
-                    if (fixedContinuation) gates?.OnFloatingOnFixedContinuation(file, lineNo, Col(text, column, at));
+                    if (fixedContinuation) gates?.OnFloatingOnFixedContinuation(file, site.Line, site.Col(text, at));
                     // A literal opened in THIS text with no content before the indicator (a carried-in literal's part is
                     // ContinueFloating's PartIsEmpty).
                     if (!fixedForm && stop.LiteralStart >= 0 && scanFrom + stop.LiteralStart == at)
-                        gates?.OnEmptyLiteralPart(file, lineNo, Col(text, column, at));
+                        gates?.OnEmptyLiteralPart(file, site.Line, site.Col(text, at));
                     state = state with { AwaitsFloating = true, Form = ContinuationForm.Floating };
                     return text[..at];
                 case ScanStopKind.Directive:
                     // §7.3.3 SR2: a compiler directive is preceded only by spaces. The directive and the rest of the line
                     // are not program text — they are what the author meant as a directive — so they are cut, and the
                     // parser does not add a second, nameless error for the stray indicator (kb/Work PB1690).
-                    gates?.OnDirectiveAfterProgramText(file, lineNo, Col(text, column, at));
+                    gates?.OnDirectiveAfterProgramText(file, site.Line, site.Col(text, at));
                     return text[..at];
                 default:
                     return text;
@@ -307,21 +334,58 @@ public static partial class ReferenceFormatProcessor
         /// <c>--source-format free|auto</c> selection (docs/CONFORMANCE.md DOC-A.1-158; kb/Work PB1362), and a free-form
         /// source has no comment but the floating one, so gating it there would gate the extension's only comment rather
         /// than a construct.</para></summary>
-        private void ReportComment(string text, int at, int lineNo, int column)
+        private void ReportComment(string text, int at, TextSite site)
         {
             if (gates is null) return;
-            if (fixedForm) gates.OnFloatingComment(file, lineNo, Col(text, column, at));
-            if (at > 0 && text[at - 1] != ' ') gates.OnUnseparatedFloatingComment(file, lineNo, Col(text, column, at));
+            if (fixedForm) gates.OnFloatingComment(file, site.Line, site.Col(text, at));
+            if (at > 0 && text[at - 1] != ' ') gates.OnUnseparatedFloatingComment(file, site.Line, site.Col(text, at));
         }
 
         /// <summary>A new logical line: the §6.5 6) / 8) join target from now on.</summary>
-        private void Emit(string text, int lineNo, LiteralState state, bool isDirective)
+        private void Emit(string text, List<OriginSpan> spans, LiteralState state, bool isDirective)
         {
             _lines.Add(text);
-            _origins.Add(lineNo);
+            _origins.Add(spans);
             _latest = _lines.Count - 1;
             _literal = state;
             _latestIsDirective = isDirective;
+        }
+    }
+
+    /// <summary>
+    /// WHERE PROGRAM TEXT STANDS in its physical line (kb/Work PB1801): the text a classifier hands the
+    /// <see cref="LogicalLineBuilder"/> — the program-text area of a fixed-form line, a whole free-form line — begins at
+    /// 0-based character position <see cref="Column"/> and index <see cref="Index"/> of the EXPANDED line of physical line
+    /// <see cref="Line"/>, whose <see cref="Tabs"/> (null when it held none) lead back to the characters the file holds.
+    /// The one place a position of that text becomes a physical column: a diagnostic's (<see cref="Col"/>) and a
+    /// resultant line's origin spans (<see cref="Spans"/>), so the two can never disagree.
+    /// </summary>
+    private readonly record struct TextSite(int Line, int Column, int Index, TabMap? Tabs)
+    {
+        /// <summary>The site of the text from its index <paramref name="i"/> on.</summary>
+        public TextSite At(int i) => this with { Column = Column + i, Index = Index + i };
+
+        /// <summary>The 0-based physical column of the character at <paramref name="i"/> of <paramref name="text"/> — the
+        /// column a diagnostic names: a character position (<see cref="CharacterPositions"/>) of a line without a tab,
+        /// the character's own index on a line that held one (a TAB counts one column, as in the user's editor).</summary>
+        public int Col(string text, int i) => Tabs is null ? Column + CharacterPositions.PositionAt(text, i) : Tabs.ToPhysical(Index + i);
+
+        /// <summary>A one-span origin of text at <paramref name="i"/>, written at resultant column
+        /// <paramref name="resultColumn"/>.</summary>
+        public OriginSpan Span(string file, int resultColumn, int i)
+            => new(resultColumn, new SourceOrigin(file, Line), Tabs is null ? Index + i : Tabs.ToPhysical(Index + i));
+
+        /// <summary>The origin spans of the <paramref name="length"/> characters of the text from <paramref name="i"/>
+        /// on, written at resultant column <paramref name="resultColumn"/>: one span, or on a line that held a tab a new
+        /// one wherever the physical columns stop running one for one (a tab's expansion all maps to the tab).</summary>
+        public List<OriginSpan> Spans(string file, int resultColumn, int i, int length)
+        {
+            var spans = new List<OriginSpan> { Span(file, resultColumn, i) };
+            if (Tabs is null) return spans;
+            for (int k = 1; k < length; k++)
+                if (Tabs.ToPhysical(Index + i + k) != Tabs.ToPhysical(Index + i + k - 1) + 1)
+                    spans.Add(Span(file, resultColumn + k, i + k));
+            return spans;
         }
     }
 

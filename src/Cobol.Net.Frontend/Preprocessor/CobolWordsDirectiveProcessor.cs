@@ -93,7 +93,8 @@ public static class CobolWordsDirectiveProcessor
             if (!CompilerDirectiveLine.TryParse(lines[i], Keyword, out string operand)) continue;
             if (!sawFirstIdDivision) state.AdvanceTo(i + 1);   // the PUSH/POP written before this directive
 
-            var loc = lineMap?.Locate(i + 1, sourcePath) ?? new SourceLocation(sourcePath, 0, i, 0);   // the SOURCE origin of resultant line i (kb/Work PB82)
+            int at = CompilerDirectiveLine.IndicatorIndex(lines[i]);
+            var loc = lineMap?.Locate(i + 1, at, sourcePath) ?? new SourceLocation(sourcePath, 0, i, at);   // the SOURCE position of the directive (kb/Work PB82, PB1801)
 
             // The introduction gate (§7.3.10 is a COBOL-2023 addition, Annex E.3.3 item 12) already fired at
             // the ONE directive-recognition point — CompilerDirectiveCatalog, from the cobol-words-directive-2023

@@ -194,7 +194,7 @@ public sealed class Frontend
         IReadOnlyDictionary<string, ReferenceFormatMap> formats)
     {
         var origins = processed.Lines;
-        SourceOrigin OriginOf(int resultantLine) => origins[Math.Clamp(resultantLine, 1, origins.Length) - 1];
+        SourceOrigin OriginOf(int resultantLine) => origins[Math.Clamp(resultantLine, 1, origins.Length) - 1].Origin;
         var at = OriginOf(p.statementBlock().Stop.Line);
         // The physical text is the line-entry stage's product, kept by the file's reference-format map — this stage never
         // splits a file itself (PhysicalLinesDriftTests).
@@ -212,7 +212,7 @@ public sealed class Frontend
                 || new FixedFormLine(line).Indicator.Value is '*' or '/' || !EndPerformWord.IsMatch(line))
                 continue;
             for (int r = 0; r < origins.Length; r++)
-                if (origins[r].File == at.File && origins[r].Line >= n) return r + 1;
+                if (origins[r].Origin is var o && o.File == at.File && o.Line >= n) return r + 1;
             return 0;
         }
         return 0;

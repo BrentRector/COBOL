@@ -26,7 +26,7 @@ public sealed class SourceLineMapTests : IDisposable
 
     private void Copybook(string name, string content) => File.WriteAllText(Path.Combine(_dir, name), content);
 
-    private static int[] LinesOf(MappedText m) => m.Lines.Select(o => o.Line).ToArray();
+    private static int[] LinesOf(MappedText m) => m.Lines.Select(o => o.Origin.Line).ToArray();
 
     // ── MappedText / OriginWriter primitives ──────────────────────────────────────────────────────────────
 
@@ -35,24 +35,64 @@ public sealed class SourceLineMapTests : IDisposable
     {
         var ok = MappedText.Identity("a\nb\nc", "f");
         Assert.Equal([1, 2, 3], LinesOf(ok));
-        Assert.Equal(new SourceOrigin("f", 2), ok.OriginAt(2));   // position 2 = the 'b' piece
-        Assert.Throws<InvalidOperationException>(() => new MappedText("a\nb", [new SourceOrigin("f", 1)]));
+        Assert.Equal("f(2,1)", ok.LocateAt(2).ToString());   // position 2 = the 'b' piece, its first column
+        Assert.Throws<InvalidOperationException>(() => new MappedText("a\nb", [new LineOrigin(new SourceOrigin("f", 1))]));
     }
 
     [Fact]
     public void OriginWriter_EachOutputPieceTakesTheOriginOfItsFirstContent()
     {
         var w = new OriginWriter();
-        w.Append("head ".AsSpan(), new SourceOrigin("main", 5));
-        w.NewLine(new SourceOrigin("main", 5));
+        w.Append("head ".AsSpan(), new LineOrigin(new SourceOrigin("main", 5)));
+        w.NewLine(new LineOrigin(new SourceOrigin("main", 5)));
         w.AppendMapped(MappedText.Identity("c1\nc2", "cpy"));
-        w.NewLine(new SourceOrigin("main", 5));
-        w.Append("tail".AsSpan(), new SourceOrigin("main", 6));
+        w.NewLine(new LineOrigin(new SourceOrigin("main", 5)));
+        w.Append("tail".AsSpan(), new LineOrigin(new SourceOrigin("main", 6)));
         var m = w.Finish();
         Assert.Equal("head \nc1\nc2\ntail", m.Text);
-        Assert.Equal([("main", 5), ("cpy", 1), ("cpy", 2), ("main", 6)], m.Lines.Select(o => (o.File, o.Line)).ToArray());
+        Assert.Equal([("main", 5), ("cpy", 1), ("cpy", 2), ("main", 6)], m.Lines.Select(o => (o.Origin.File, o.Origin.Line)).ToArray());
         var slice = m.Slice(6, 5);   // "c1\nc2"
-        Assert.Equal([("cpy", 1), ("cpy", 2)], slice.Lines.Select(o => (o.File, o.Line)).ToArray());
+        Assert.Equal([("cpy", 1), ("cpy", 2)], slice.Lines.Select(o => (o.Origin.File, o.Origin.Line)).ToArray());
+    }
+
+    // ── kb/Work PB1801: a resultant line maps to its source COLUMN by COLUMN ─────────────────────────────────
+
+    [Fact]
+    public void LineOrigin_LocatesEachStretchAtItsOwnLineAndColumn()
+    {
+        // "01 A VALUE 'xy" (line 5, program text from physical column 7) joined with "z'." (line 6, from column 12)
+        var o = new LineOrigin([new OriginSpan(0, new SourceOrigin("p", 5), 7), new OriginSpan(14, new SourceOrigin("p", 6), 12)]);
+        Assert.Equal(new SourceOrigin("p", 5), o.Origin);                  // the piece is named by its first stretch
+        Assert.Equal("p(5,8)", o.Locate(0).ToString());
+        Assert.Equal("p(5,21)", o.Locate(13).ToString());
+        Assert.Equal("p(6,13)", o.Locate(14).ToString());                  // the joined fragment: its own line and column
+        Assert.Equal("p(6,15)", o.Locate(16).ToString());
+        Assert.Throws<ArgumentException>(() => new LineOrigin([new OriginSpan(3, new SourceOrigin("p", 1), 0), new OriginSpan(3, new SourceOrigin("p", 2), 0)]));
+    }
+
+    [Fact]
+    public void OriginWriter_ASliceKeepsItsColumns_AndWrittenTextStandsAtThePointItReplaced()
+    {
+        var input = MappedText.Identity("MOVE OLD-NAME TO X.", "r.cob");
+        var w = new OriginWriter();
+        w.AppendSlice(input, 0, 5);                             // "MOVE "
+        w.Append("NEW".AsSpan(), input.PointAt(5));             // a REPLACE replacement for OLD-NAME
+        w.AppendSlice(input, 13, input.Text.Length - 13);       // " TO X."
+        var m = w.Finish();
+        Assert.Equal("MOVE NEW TO X.", m.Text);
+        Assert.Equal("r.cob(1,6)", m.LocateAt(5).ToString());   // NEW stands where OLD-NAME was written
+        Assert.Equal("r.cob(1,18)", m.LocateAt(12).ToString()); // X keeps its own column, past the longer text replaced
+        Assert.Equal("r.cob(1,18)", m.Slice(12, 2).LocateAt(0).ToString());   // a slice begun mid-line is rebased
+    }
+
+    /// <summary>⛔ No consumer can reach a column-less origin of a POSITION (kb/Work PB1801): MappedText answers a position
+    /// with a full <see cref="SourceLocation"/> (or a <see cref="LineOrigin"/> to write at), never a bare
+    /// <see cref="SourceOrigin"/>, so a diagnostic cannot again print the column of the resultant text.</summary>
+    [Fact]
+    public void MappedText_ExposesNoColumnlessOriginOfAPosition()
+    {
+        var bare = typeof(MappedText).GetMethods().Where(m => m.ReturnType == typeof(SourceOrigin)).Select(m => m.Name).ToArray();
+        Assert.Empty(bare);
     }
 
     // ── the normalizer: a fixed-form continuation JOINS lines; the head line's number survives ────────────
@@ -72,9 +112,9 @@ public sealed class SourceLineMapTests : IDisposable
         var lines = m.Text.Split('\n');
         int bIndex = Array.FindIndex(lines, l => l.Contains("01 B PIC X"));
         Assert.True(bIndex >= 0, m.Text);
-        Assert.Equal(7, m.Lines[bIndex].Line);           // the line AFTER the join is still physical line 7
+        Assert.Equal(7, m.Lines[bIndex].Origin.Line);           // the line AFTER the join is still physical line 7
         int aIndex = Array.FindIndex(lines, l => l.Contains("01 A PIC"));
-        Assert.Equal(5, m.Lines[aIndex].Line);           // the joined line keeps its head line
+        Assert.Equal(5, m.Lines[aIndex].Origin.Line);           // the joined line keeps its head line
         // and IS joined — the short continued line read as space-filled to margin R, so positions 33–72 are part of
         // the literal (§6.3.5 "any spaces at the end of the fixed-form continued line are part of the literal";
         // DOC-A.1-157; kb/Work PB1491)
@@ -95,14 +135,14 @@ public sealed class SourceLineMapTests : IDisposable
         Assert.False(bag.HasErrors, string.Join("\n", bag.Diagnostics));
         var lines = m.Text.Split('\n');
         int b = Array.FindIndex(lines, l => l.Contains("01 B PIC X"));
-        Assert.Equal(("t.cob", 3), (m.Lines[b].File, m.Lines[b].Line));
+        Assert.Equal(("t.cob", 3), (m.Lines[b].Origin.File, m.Lines[b].Origin.Line));
         int c2 = Array.FindIndex(lines, l => l.Contains("01 C2"));
         // The path is the one the search FOUND: DOC-A.1-40 tries `.CPY` before `.cpy`, and on a case-insensitive file
         // system (Windows) `three.CPY` is this same file (kb/Work PB1355).
-        Assert.EndsWith("three.cpy", m.Lines[c2].File, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(2, m.Lines[c2].Line);
+        Assert.EndsWith("three.cpy", m.Lines[c2].Origin.File, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, m.Lines[c2].Origin.Line);
         int a = Array.FindIndex(lines, l => l.Contains("01 A PIC X"));
-        Assert.Equal(("t.cob", 1), (m.Lines[a].File, m.Lines[a].Line));
+        Assert.Equal(("t.cob", 1), (m.Lines[a].Origin.File, m.Lines[a].Origin.Line));
     }
 
     [Fact]
@@ -117,9 +157,9 @@ public sealed class SourceLineMapTests : IDisposable
         var lines = m.Text.Split('\n');
         Assert.DoesNotContain(lines, l => l.Contains("REPLACE"));
         int c = Array.FindIndex(lines, l => l.Contains("01 C PIC X"));
-        Assert.Equal(3, m.Lines[c].Line);
+        Assert.Equal(3, m.Lines[c].Origin.Line);
         int b = Array.FindLastIndex(lines, l => l.Contains("01 B PIC X"));   // the replaced A → B on source line 4
-        Assert.Equal(4, m.Lines[b].Line);
+        Assert.Equal(4, m.Lines[b].Origin.Line);
     }
 
     // ── the cursor + the prefix ───────────────────────────────────────────────────────────────────────────
@@ -130,7 +170,7 @@ public sealed class SourceLineMapTests : IDisposable
         var ed = new EditionContext(2023)
         {
             SourceFile = "main.cob",
-            LineMap = new SourceLineMap([new("main.cob", 1), new("main.cob", 2), new("lib.cpy", 7), new("main.cob", 4)]),
+            LineMap = new SourceLineMap([new(new SourceOrigin("main.cob", 1)), new(new SourceOrigin("main.cob", 2)), new(new SourceOrigin("lib.cpy", 7)), new(new SourceOrigin("main.cob", 4))]),
         };
         ed.Error("COBOLNET9999", "bare");
         Assert.Equal("error COBOLNET9999: bare", ed.Diagnostics[^1]);
@@ -164,7 +204,7 @@ public sealed class SourceLineMapTests : IDisposable
     {
         var ed = new EditionContext(2023) { SourceFile = "m.cob" };
         Assert.Equal(12, ed.SourceLineOf(12));                       // no map: identity
-        ed.LineMap = new SourceLineMap([new("m.cob", 1), new("m.cob", 5)]);
+        ed.LineMap = new SourceLineMap([new(new SourceOrigin("m.cob", 1)), new(new SourceOrigin("m.cob", 5))]);
         Assert.Equal(5, ed.SourceLineOf(2));
         Assert.Equal(new SourceOrigin("m.cob", 5), ed.OriginOf(2));
         Assert.Equal(new SourceOrigin("m.cob", 3), ed.OriginOf(3));   // beyond the map: identity on the main file

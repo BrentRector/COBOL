@@ -50,12 +50,12 @@ public sealed class ImplicitFormatOps : IEquatable<ImplicitFormatOps>
     /// <param name="origins">The source origin of each resultant line (<see cref="MappedText.Lines"/>).</param>
     /// <param name="formats">Each text's reference-format map, by file — the compilation group's and every library
     /// text's (<see cref="CopyProcessor.ReferenceFormats"/>).</param>
-    public static ImplicitFormatOps Place(IReadOnlyList<DirectiveStackOp> ops, IReadOnlyList<SourceOrigin> origins,
+    public static ImplicitFormatOps Place(IReadOnlyList<DirectiveStackOp> ops, IReadOnlyList<LineOrigin> origins,
         IReadOnlyDictionary<string, ReferenceFormatMap> formats)
     {
         if (ops.Count == 0 || origins.Count == 0) return None;
         var at = new SourceOrigin[ops.Count];
-        for (int i = 0; i < ops.Count; i++) at[i] = origins[Math.Clamp(ops[i].Line, 1, origins.Count) - 1];
+        for (int i = 0; i < ops.Count; i++) at[i] = origins[Math.Clamp(ops[i].Line, 1, origins.Count) - 1].Origin;
 
         // The ops nest (every exception-checking PERFORM contributes a PUSH then a POP, in token order): pair each POP
         // with its PUSH and keep the pair only when a written format directive of their one file lies between them.

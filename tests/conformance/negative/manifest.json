@@ -2605,7 +2605,8 @@
   "pb2727-special-names-period-per-clause",
   "pb2727-special-names-period-missing",
   "pb2727-repository-period-per-specifier",
-  "pb2727-repository-period-missing"
+  "pb2727-repository-period-missing",
+  "pb1688-fixed-form-diagnostic-column"
  ],
  "pending": []
 }

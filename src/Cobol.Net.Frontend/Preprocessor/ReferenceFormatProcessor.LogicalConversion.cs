@@ -43,13 +43,13 @@ public static partial class ReferenceFormatProcessor
         public bool InIdentificationDivision => _division.InIdentificationDivision;
 
         /// <summary>Convert the lines of one text — a whole file, one SOURCE FORMAT segment of it, or a copybook —
-        /// returning the resultant lines and, per resultant line, the 1-based physical source line it came from (kb/Work
-        /// PB82). Each <see cref="PhysicalLine.Number"/> is the file's own, so a segment reports file lines, never
+        /// returning the resultant lines and, per resultant line, the physical lines and columns it came from (kb/Work
+        /// PB82, PB1801). Each <see cref="PhysicalLine.Number"/> is the file's own, so a segment reports file lines, never
         /// segment-relative ones.</summary>
-        public (List<string> Lines, List<int> Origins) Convert(ReadOnlySpan<PhysicalLine> physicalLines)
+        public (List<string> Lines, List<LineOrigin> Origins) Convert(ReadOnlySpan<PhysicalLine> physicalLines)
         {
             foreach (var line in physicalLines)
-                ConvertLine(line.Text, line.Number);
+                ConvertLine(line);
             return _builder.Result;
         }
 
@@ -69,11 +69,14 @@ public static partial class ReferenceFormatProcessor
             _ => LineKind.Source,                               // CCVS: a primary-configuration line
         };
 
-        private void ConvertLine(string line, int lineNo)
+        private void ConvertLine(PhysicalLine line)
         {
-            var fixedLine = new FixedFormLine(line);
+            var fixedLine = new FixedFormLine(line.Text);
             var indicator = fixedLine.Indicator;
             string area = fixedLine.ProgramText;
+            int lineNo = line.Number;
+            // The program-text area is resultant text from its first character, which is position 8 (kb/Work PB1801).
+            var site = new TextSite(lineNo, FixedFormLine.SourceAreaStart, fixedLine.ProgramTextIndex, line.Tabs);
             var kind = KindOf(indicator.Value);
             switch (CommentEntryOf(kind, area))
             {
@@ -83,17 +86,17 @@ public static partial class ReferenceFormatProcessor
                     // free form (kb/Work PB1494, PB1758) — and only the comment-entry is discarded. The entry's end is
                     // implied by the next Area-A word (COBOL-85), so the logical conversion writes the paragraph's
                     // terminating period explicitly: `AUTHOR. .` is the paragraph `AUTHOR DOT DOT` with no content.
-                    _builder.Emit(CommentEntryHeader(area), lineNo);
+                    _builder.Emit(CommentEntryHeader(area), site);
                     return;
                 case CommentEntryText.Body:
-                    _builder.Discard(lineNo);
+                    _builder.Discard(site);
                     return;
             }
 
             switch (kind)
             {
                 case LineKind.Comment:   // a comment line (§6.2.2 fixed comment indicators; §6.5 2))
-                    _builder.Discard(lineNo);
+                    _builder.Discard(site);
                     break;
 
                 case LineKind.Debugging:
@@ -104,7 +107,7 @@ public static partial class ReferenceFormatProcessor
                     // per source unit after lexing (kb/Work PB1705, owner decision R56). Its tokens stay matchable by COPY
                     // REPLACING / REPLACE as if the D were absent (TextWordScanner skips the carrier).
                     gates?.OnDebuggingLine(file, lineNo);
-                    _builder.EmitDebugging(DebugLineCarrier, area, lineNo, FixedFormLine.SourceAreaStart);
+                    _builder.EmitDebugging(DebugLineCarrier, area, site);
                     break;
 
                 // 'S' and 'Y' (the CCVS debug-suite letters, §6.2.2 lists neither) are excluded the same way: they are the
@@ -135,20 +138,20 @@ public static partial class ReferenceFormatProcessor
                 // through. The test's own working-storage key images use the 'T' form, so 'T' is the active
                 // configuration (kept as ordinary code) and 'U' is the excluded alternate.
                 case LineKind.CcvsExcluded:
-                    _builder.Discard(lineNo);
+                    _builder.Discard(site);
                     break;
 
                 case LineKind.Continuation:
-                    _builder.Add(area, lineNo, FixedFormLine.SourceAreaStart, fixedContinuation: true);
+                    _builder.Add(area, site, fixedContinuation: true);
                     break;
 
                 case LineKind.NotAnIndicator:
                     gates?.OnInvalidIndicator(file, lineNo, indicator);   // COBOLNET2616, then read as a source line
-                    _builder.Add(area, lineNo, FixedFormLine.SourceAreaStart, fixedContinuation: false);
+                    _builder.Add(area, site, fixedContinuation: false);
                     break;
 
                 default:
-                    _builder.Add(area, lineNo, FixedFormLine.SourceAreaStart, fixedContinuation: false);
+                    _builder.Add(area, site, fixedContinuation: false);
                     break;
             }
         }
@@ -196,8 +199,8 @@ public static partial class ReferenceFormatProcessor
     /// (§6.5 2) and 3)); the only line that is not copied as a new logical line is the continuation line of a literal
     /// continued with a floating literal continuation indicator (§6.5 8), kb/Work PB1359), which the
     /// <see cref="LogicalLineBuilder"/> joins to its latest logical line. A discarded or joined line keeps its slot as
-    /// an empty line only when discarded; each resultant line's origin is the physical line it was read from.</summary>
-    private static (List<string> Lines, List<int> Origins) ConvertFreeLines(ReadOnlySpan<PhysicalLine> physicalLines,
+    /// an empty line only when discarded; each resultant line's origin is the physical line and column it was read from.</summary>
+    private static (List<string> Lines, List<LineOrigin> Origins) ConvertFreeLines(ReadOnlySpan<PhysicalLine> physicalLines,
         ReferenceFormatDiagnostics? gates, string file)
     {
         var builder = new LogicalLineBuilder(file, gates, fixedForm: false);
@@ -205,7 +208,7 @@ public static partial class ReferenceFormatProcessor
         {
             int positions = CharacterPositions.Count(line.Text);
             if (positions > FreeFormMaxPositions) gates?.OnFreeFormLineTooLong(file, line.Number, positions);
-            builder.Add(line.Text, line.Number, column: 0, fixedContinuation: false);
+            builder.Add(line.Text, new TextSite(line.Number, Column: 0, Index: 0, line.Tabs), fixedContinuation: false);
         }
         return builder.Result;
     }

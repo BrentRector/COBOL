@@ -52,8 +52,10 @@ semantics).
   `Validation/CursorFollowingVisitor` (the cursor follows the walk, restored on exit). `EditionContext` implements
   the cursor for real and `Error`/`Warning` stamp the prefix AUTOMATICALLY; no cursor ⇒ the bare
   `error CODE: message` (a diagnostic about the unit as a whole — never a fabricated line). (2) **The ORIGIN LINE
-  MAP**: the cursor is in RESULTANT-text space (the ANTLR token line after COPY / REPLACE / continuation joins);
-  `EditionContext.OriginOf` maps it to the source file and physical line through `Frontend.LineMap`, the table the
+  MAP**: the cursor is in RESULTANT-text space (the ANTLR token line and column after the reference-format
+  conversion, COPY / REPLACE / continuation joins); `EditionContext.LocationOf` maps it to the source file, physical
+  line AND physical column (kb/Work PB1801: the fixed-form program text keeps the columns it was written in) through
+  `Frontend.LineMap`, the table the
   preprocessing chain builds (`MappedText`/`OriginWriter` through the normalizer, the CC+COPY driver, REPLACE) —
   the same map the parser listener, the directive stages' diagnostics, `EXCEPTION-LOCATION`'s line identifier and
   the bound tree's DEBUG-LINE `SourceLine` fields (`BinderContext.SourceLine`) consume. The `>>TURN` / `>>FLAG` /

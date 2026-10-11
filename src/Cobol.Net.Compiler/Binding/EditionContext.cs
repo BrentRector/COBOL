@@ -122,7 +122,13 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
     /// itself (the ONE format source; the parse-layer diagnostics print the same object), or empty when no cursor
     /// is set — a diagnostic about the compilation unit as a whole.</summary>
     private string Prefix() =>
-        Cursor.IsSet ? OriginOf(Cursor.Line).ToLocation(Cursor.Column) + ": " : "";
+        Cursor.IsSet ? LocationOf(Cursor.Line, Cursor.Column) + ": " : "";
+
+    /// <summary>The file, physical line and column the user edits for RESULTANT line <paramref name="resultantLine"/>
+    /// at 0-based resultant <paramref name="column"/> (kb/Work PB1801) — a fixed-form line's program text keeps the
+    /// columns it was written in, and a joined continuation fragment names its own line.</summary>
+    public SourceLocation LocationOf(int resultantLine, int column) =>
+        LineMap?.Locate(resultantLine, column, SourceFile) ?? new SourceOrigin(SourceFile, resultantLine).ToLocation(column);
 
     /// <summary>Record an edition-gating error (fails the compile).</summary>
     public void Error(string code, string message)
