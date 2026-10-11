@@ -236,7 +236,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// contributes nothing (GR6's explicit exemption — the descriptor is built from the base record only).
     /// The file connector's §12.4.5.3 GR1 identity is <see cref="SelectFingerprint"/>.</summary>
     /// <param name="data">The describing element's data.</param>
-    /// <param name="unitPath">The describer's run-unit identity (the program's path, or the class half's C# name).</param>
+    /// <param name="unitPath">The describer's run-unit identity (the program's path, or the class half's
+    /// <see cref="OoClassSymbol.HalfPath"/>, both rooted at the EXTERNALIZED name; kb/Work PB2920).</param>
     /// <param name="signature">The emitted member's declaration: the program ABI's <c>public void DescribeExternals()</c>,
     /// or a class half's <c>private static void __DescribeExternals(int __self)</c>, which each method's prologue passes
     /// to <c>ExternalStore.DescribeAtMethodActivation</c> with the METHOD's own mask (kb/Work PB1138).</param>
@@ -403,7 +404,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         if (lifeCycle)
             instExtras.Add($"protected override BASE__FACTORY __FactoryOfClass => {cls.Symbol.FactoryCsName}."
                 + $"{NamingConvention.FactoryInstanceField};   // FactoryObject (ISO §16.2.2.2 GR1)");
-        EmitTypeHalf(cls.Name, cls.CsName, instBase,
+        EmitTypeHalf(cls.Name, cls.CsName, cls.Symbol.HalfPath(factory: false), instBase,
             cls.Data, cls.Refs, cls.Bound, cls.Symbol.Methods, w,
             headerExtras: instExtras.Count > 0 ? instExtras : null,
             sealedType: cls.Symbol.IsFinal);
@@ -445,7 +446,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         if (adopt.Count > 0)
             extras.Add("protected override void __AdoptRunUnitStorage(RunUnit runUnit) { base.__AdoptRunUnitStorage(runUnit); "
                 + string.Join(" ", adopt) + " }   // method WORKING-STORAGE → this run unit (ISO §14.6.2.3.2 / §14.6.11)");
-        EmitTypeHalf(cls.Name, cls.Symbol.FactoryCsName, facBase,
+        EmitTypeHalf(cls.Name, cls.Symbol.FactoryCsName, cls.Symbol.HalfPath(factory: true), facBase,
             cls.FactoryData, cls.FactoryRefs, cls.FactoryBound, cls.Symbol.FactoryMethods, w, extras,
             sealedType: cls.Symbol.IsFinal);
     }
@@ -454,7 +455,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// fields + methods + dispatch into a named type — called for the instance class and the factory class
     /// of every CLASS-ID (identical machinery; only the type identity, base, data forest, roster, and header
     /// extras differ).</summary>
-    private void EmitTypeHalf(string cobolName, string csName, string baseCsName,
+    private void EmitTypeHalf(string cobolName, string csName, string describerPath, string baseCsName,
         DataBinder data, ReferenceResolver refs, BoundProgram bound, IReadOnlyList<OoMethodSymbol> roster,
         CodeWriter w, IReadOnlyList<string>? headerExtras, bool sealedType = false)
     {
@@ -488,7 +489,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // reference — this factory's or object's — so the half renders their registrations once, and every method
             // prologue passes them to the activation boundary with its own §14.8.4.1 mask (EmitMethod).
             if (WantsExternalDescribes(data) && roster.Count > 0)
-                EmitExternalDescribes(data, csName, "private static void __DescribeExternals(int __self)", "__self", w);
+                EmitExternalDescribes(data, describerPath, "private static void __DescribeExternals(int __self)", "__self", w);
             EmitPointerBackings(data, w);        // BASED bridges + ADDRESS-OF cells of object/factory AND method data (kb/Work PB956)
             U.ReportWriter.EmitReportMembers(w);              // M2-OO-1i review: a class REPORT SECTION's engine fields + compose methods (Report Writer is complete)
             EmitFileMembers(csName, data, bound, w);   // M2-OO-1i: object/factory file connectors + report construction register in an emitted ctor

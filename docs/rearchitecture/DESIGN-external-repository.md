@@ -1262,7 +1262,11 @@ composing a run unit (§11.4) and the probe all reach a module through that memb
    containee: its container's path and its program-name), so once no outermost name repeats no path does: two modules
    that each DECLARE `PROGRAM-ID. WORKER`, one `AS "X"`, keep two nodes (kb/Work PB2843). A repeated path, in the
    module or across modules, is a registrar defect and is refused loudly (`InvalidOperationException`), never a
-   replaced node. A CALL or CANCEL written in a METHOD names no program as its calling path
+   replaced node. A CLASS's run-unit keys have the same root: `ProgramTable.ClassPath` (its EXTERNALIZED name, escaped
+   the same way, behind a leading `/` that no program path can begin with) roots its factory and object file connectors
+   and SORT stores, and `ProgramTable.ClassHalfPath` (`.../OBJECT`, `.../FACTORY`) is each half's EXTERNAL describer
+   identity, so two modules that each DECLARE `CLASS-ID. ACCT` (one `AS "LEDGER-ACCT"`) share no connector and no
+   describer (kb/Work PB2920). A CALL or CANCEL written in a METHOD names no program as its calling path
    (`CallUnitState.NoProgramPath`), never its class's name.
 A refusal is a `CobolCallException` with EC-PROGRAM-NOT-FOUND and the reason, the condition the activation that
 needed the module raises anyway, so `CarriedNames` is unchanged; reached from the probe it is the probe's failure

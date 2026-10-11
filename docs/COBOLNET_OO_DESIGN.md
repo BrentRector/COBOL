@@ -56,7 +56,8 @@ early) + `OoConformance` (the §9.3.8.2/§9.3.11 validator; `ValidateImplements`
 bind bodies: interface prototype data, class OBJECT/FACTORY halves + signatures, method-body rosters — owned
 and sequenced by `BinderDriver.Bind`; the former emitter-hosted `IOoBindHost` seam is DELETED) +
 `NamingConvention` (the ONE home for `__GET_`/`__SET_`, `__FACTORY`/`__Instance`, the
-`::EXT::`/`::INST::`/`::FACT::` file-key bands — the runtime's `::EXT::` recognition is the documented wire
+`::EXT::`/`::INST::`/`::FACT::` file-key bands, which follow the class's run-unit root `OoClassSymbol.RunUnitPath`
+(`ProgramTable.ClassPath` of the EXTERNALIZED name, never the declared C# name; kb/Work PB2920) — the runtime's `::EXT::` recognition is the documented wire
 contract — and EVERY synthesized C# name that embeds a user-defined word: each such family carries a NON-EMPTY
 tag (`__formal_` for a method formal's `ref` parameter, `__addr_`, `__fkey_`, `__cap_`, `__dbg_`, `__new_`,
 `__sum_`), listed once in `CobolWordDerivedPrefixes`; `SynthesizedNameFamilyDriftTests` proves no emitter-fixed

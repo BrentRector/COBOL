@@ -73,6 +73,17 @@ public sealed class OoClassSymbol(string name, string csName, CobolParserCore.Cl
     /// collision).</summary>
     public string FactoryCsName => CsName + NamingConvention.FactorySuffix;
 
+    /// <summary>⛔ THE root of every RUN-UNIT key this class owns — its factory and object file connectors and its
+    /// SORT stores (<c>BinderDriver.QualifyClassFiles</c>) — formed by the run-time table's own former
+    /// (<see cref="ProgramTable.ClassPath"/>) from the EXTERNALIZED name, never from <see cref="CsName"/>: the C# name
+    /// is a wire contract with <c>PicInfo.ClrType</c> and is the DECLARED name, which two separately compiled modules
+    /// may both use for different classes (kb/Work PB2920; ISO §8.3.2.2 2)).</summary>
+    public string RunUnitPath => ProgramTable.ClassPath(ExternalizedName);
+
+    /// <summary>The run-unit identity of this class's OBJECT or FACTORY half as an EXTERNAL describer
+    /// (<see cref="ProgramTable.ClassHalfPath"/>; ISO §14.8.4).</summary>
+    public string HalfPath(bool factory) => ProgramTable.ClassHalfPath(ExternalizedName, factory);
+
     /// <summary>The emitted C# types a COBOL reference to THIS class selects when the rule names the class
     /// WITHOUT distinguishing the two object kinds — ISO/IEC 1989:2023 §14.9.49.4 GR14 a): "the exception
     /// object that was raised is a factory object or instance object of object-class-name-1 or of a subclass

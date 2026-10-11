@@ -1273,7 +1273,9 @@ internal sealed class BinderDriver
 
     /// <summary>Qualify a class's OBJECT/FACTORY file connectors into the run-unit registry namespace (M2-OO-1i —
     /// the OO analogue of the per-program qualification in <see cref="Bind"/>). A FACTORY file (the class
-    /// singleton, §9.3.14.2) keys by class — <c>Class::FACT::name</c>; an EXTERNAL class file keys by its run-unit
+    /// singleton, §9.3.14.2) keys by class — <c>Class::FACT::name</c>, where <c>Class</c> is the class's run-unit root
+    /// (<see cref="OoClassSymbol.RunUnitPath"/>: its EXTERNALIZED name, §8.3.2.2 2), never the declared C# name — kb/Work
+    /// PB2920); an EXTERNAL class file keys by its run-unit
     /// external name (§13.18.22.4 GR4a — one connector shared by every describer, inc 5). An OBJECT (instance) file
     /// is per-object (inc 4): a class-qualified BASE key plus a minted per-object <c>__fkey</c> field. Name
     /// resolution is done (bound nodes hold FileModel references), so this is a pure rename. (Relocated from the
@@ -1291,16 +1293,16 @@ internal sealed class BinderDriver
                 // OoEmitFileMembers / EmitFileRegistration both skip SDs (host = !IsSortMerge). So it must keep a
                 // STATIC key (no InstanceKeyField), or FileKeyExpr would emit an undeclared this.__fkey_X for a
                 // SORT/MERGE/RELEASE/RETURN in a method (M2-OO-1i review). Class-qualified for cross-class uniqueness.
-                f.CobolName = cls.CsName + "::SORT::" + f.CobolName;
+                f.CobolName = cls.Symbol.RunUnitPath + "::SORT::" + f.CobolName;
             else
             {
                 f.InstanceKeyField = NamingConvention.InstanceFileKeyName(f.CobolName);
-                f.CobolName = cls.CsName + NamingConvention.InstanceFileBand + f.CobolName;
+                f.CobolName = cls.Symbol.RunUnitPath + NamingConvention.InstanceFileBand + f.CobolName;
             }
         // FACTORY files: the class singleton (§9.3.14.2) — a static class-qualified key (no per-object field).
         foreach (var f in cls.FactoryData.Files)
             f.CobolName = f is { IsExternal: true, ExternalName: { } ext }
                 ? NamingConvention.ExternalFileBand + ext
-                : cls.CsName + NamingConvention.FactoryFileBand + f.CobolName;
+                : cls.Symbol.RunUnitPath + NamingConvention.FactoryFileBand + f.CobolName;
     }
 }

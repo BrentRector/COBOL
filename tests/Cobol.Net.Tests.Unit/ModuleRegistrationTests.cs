@@ -132,6 +132,22 @@ public sealed class ModuleRegistrationTests
         Assert.True(Located(table, "P2843A/B"));
     }
 
+    /// <summary>kb/Work PB2920: a class's run-unit keys are rooted at its EXTERNALIZED name, in a namespace no program's
+    /// path can enter (<c>OutermostPath</c> escapes every <c>/</c>, so none begins with one), and its two halves are two
+    /// identities: <c>CLASS-ID. ACCT</c> and <c>CLASS-ID. ACCT AS "LEDGER-ACCT"</c> differ, a class and an outermost
+    /// program of one name differ, and a class named <c>A/FACTORY</c> never meets the factory half of class <c>A</c>.</summary>
+    [Fact]
+    public void AClassPath_IsRootedAtTheExternalizedName_AndNeverMeetsAProgramOrAHalf()
+    {
+        Assert.Equal(ProgramTable.ClassPath("P2920A"), ProgramTable.ClassPath("  P2920A "));   // formed first
+        Assert.NotEqual(ProgramTable.ClassPath("P2920A"), ProgramTable.ClassPath("P2920-LEDGER"));
+        Assert.NotEqual(ProgramTable.ClassPath("P2920A"), ProgramTable.OutermostPath("P2920A"));
+        Assert.NotEqual(ProgramTable.ClassHalfPath("P2920A", factory: false), ProgramTable.ClassHalfPath("P2920A", factory: true));
+        Assert.NotEqual(ProgramTable.ClassHalfPath("P2920A", factory: true), ProgramTable.ClassHalfPath("P2920A/FACTORY", factory: false));
+        Assert.NotEqual(ProgramTable.ClassHalfPath("P2920A", factory: true), ProgramTable.ClassPath("P2920A/FACTORY"));
+        Assert.False(ProgramTable.OutermostPath("/P2920A").StartsWith('/'));   // the namespace is the one character no program path begins with
+    }
+
     /// <summary>kb/Work PB2843: a registrar that repeats a path, inside its module or across modules, is a compiler
     /// defect, refused LOUDLY rather than replacing a node another unit registered.</summary>
     [Fact]

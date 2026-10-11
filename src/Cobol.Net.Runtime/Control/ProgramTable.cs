@@ -96,6 +96,22 @@ public sealed class ProgramTable
     /// unique within that outermost program", so the path is unique under its unique root (<see cref="OutermostPath"/>).</summary>
     public static string ContainedPath(string containerPath, string name) => containerPath + "/" + name;
 
+    /// <summary>⛔ THE run-unit ROOT of a CLASS's keys — the root of its factory and object file connectors, of its
+    /// EXTERNAL describers and of its SORT stores — formed here ONCE, the class sibling of <see cref="OutermostPath"/>
+    /// (kb/Work PB2920). It is rooted at the class's EXTERNALIZED name (CLASS-ID <c>AS literal-1</c>, §11.3.4 GR1), never
+    /// its declared one: §8.3.2.2 2) makes the externalized name the one that identifies a class within a run unit, so
+    /// two separately compiled modules that each DECLARE <c>CLASS-ID. ACCT</c> (one of them <c>AS "LEDGER-ACCT"</c>) must
+    /// not share a file connector or an EXTERNAL describer, and two that SHARE an externalized name are one class. The
+    /// leading <c>/</c> is the namespace: <see cref="OutermostPath"/> escapes every <c>/</c> it holds, so no program's
+    /// path, contained or not, can begin with one, and a class's keys never meet a program's.</summary>
+    public static string ClassPath(string externalizedName) => "/" + OutermostPath(externalizedName);
+
+    /// <summary>The run-unit identity of one HALF of a class (the OBJECT or the FACTORY paragraph — two source
+    /// elements that each describe their own external items, §14.8.4.3): its class's <see cref="ClassPath"/> and the
+    /// half's keyword. The <c>/</c> separator cannot occur unescaped in the root, so the identity is injective.</summary>
+    public static string ClassHalfPath(string externalizedName, bool factory) =>
+        ClassPath(externalizedName) + (factory ? "/FACTORY" : "/OBJECT");
+
     /// <summary>Register one program unit (emitted once per unit at run-unit start, containers before containees).
     /// <paramref name="staticReset"/> — supplied ONLY by a RECURSIVE-and-not-INITIAL unit with static WS
     /// storage or unit-scoped file connectors (kb/Work PB168) — re-initializes that unit's STATIC WS fields

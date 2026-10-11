@@ -219,4 +219,149 @@ public sealed class ModuleRegistrationHostTests
         }
         finally { CutRunner.TryDelete(dir); }
     }
+
+    /// <summary>One module of the PB2920 pair: <c>PROGRAM-ID. {prog}</c> invokes its own class's factory methods
+    /// <c>OPENIT</c> and <c>CLOSEIT</c>; the class declares <c>CLASS-ID. P2920C{asPhrase}</c> and a factory file FF
+    /// assigned to <paramref name="dat"/> whose FILE STATUS it shows after each verb.</summary>
+    private static string ClassWithFactoryFile(string prog, string asPhrase, string tag, string dat, string callSibling) => $"""
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. {prog}.
+        ENVIRONMENT DIVISION.
+        CONFIGURATION SECTION.
+        REPOSITORY.
+            CLASS P2920C.
+        PROCEDURE DIVISION.
+        MAIN-P.
+            INVOKE P2920C "OPENIT"
+            {callSibling}
+            INVOKE P2920C "CLOSEIT"
+            GOBACK.
+        END PROGRAM {prog}.
+        IDENTIFICATION DIVISION.
+        CLASS-ID. P2920C{asPhrase}.
+        IDENTIFICATION DIVISION.
+        FACTORY.
+        ENVIRONMENT DIVISION.
+        INPUT-OUTPUT SECTION.
+        FILE-CONTROL.
+            SELECT FF ASSIGN TO "{dat}" FILE STATUS IS ST.
+        DATA DIVISION.
+        FILE SECTION.
+        FD FF.
+        01 FF-REC PIC X(12).
+        WORKING-STORAGE SECTION.
+        01 ST PIC XX.
+        PROCEDURE DIVISION.
+        METHOD-ID. OPENIT.
+        PROCEDURE DIVISION.
+        MAIN-P.
+            OPEN OUTPUT FF
+            DISPLAY "{tag} OPEN " ST.
+        END METHOD OPENIT.
+        METHOD-ID. CLOSEIT.
+        PROCEDURE DIVISION.
+        MAIN-P.
+            CLOSE FF
+            DISPLAY "{tag} CLOSE " ST.
+        END METHOD CLOSEIT.
+        END FACTORY.
+        IDENTIFICATION DIVISION.
+        OBJECT.
+        END OBJECT.
+        END CLASS P2920C.
+        """;
+
+    /// <summary>kb/Work PB2920: two modules each DECLARE <c>CLASS-ID. P2920C</c>, the sibling's <c>AS "P2920-LEDGER"</c>
+    /// (legal: §8.3.2.2 2) externalizes the AS literal, so the two classes differ). Each factory file's connector key is
+    /// rooted at its class's externalized name (<c>ProgramTable.ClassPath</c>), so the sibling's factory opens, writes and
+    /// closes ITS file and the main module's connector is still open when the main module closes it. With the declared
+    /// C# name as the root both factories shared one connector: the sibling's CLOSE closed the main module's file and the
+    /// main module's CLOSE answered status 42 (file not open).</summary>
+    [Fact]
+    public void TwoModulesDeclaringTheSameClassNameAsDifferentClasses_KeepTheirFactoryFileConnectorsApart()
+    {
+        string sibling = ClassWithFactoryFile("P2920S", " AS \"P2920-LEDGER\"", "B", "pb2920-b.dat", "");
+        string main = ClassWithFactoryFile("P2920M", "", "A", "pb2920-a.dat", "CALL \"P2920S\" ON EXCEPTION DISPLAY \"S NOT FOUND\" END-CALL");
+        string dir = CutRunner.NewTempDir("pb2920f");
+        try
+        {
+            NonCobolElement.CompileCobol(dir, "P2920S", sibling);
+            NonCobolElement.CompileCobol(dir, "P2920M", main);
+            var (exit, stdout, detail) = CutRunner.RunExit(Path.Combine(dir, "P2920M.dll"), dir);
+            Assert.True(exit == 0, detail);
+            Assert.Equal("A OPEN 00\nB OPEN 00\nB CLOSE 00\nA CLOSE 00", stdout);
+        }
+        finally { CutRunner.TryDelete(dir); }
+    }
+
+    /// <summary>One module of the PB2920 EXTERNAL pair: a factory method that shows <paramref name="tag"/>, in a class
+    /// whose factory describes the EXTERNAL item <c>P2920X</c> as <c>PIC X(<paramref name="width"/>)</c>.
+    /// EC-EXTERNAL-FORMAT-CONFLICT checking is on for the whole module, so the method's activation compares this
+    /// describer with every other one in the run unit (§14.8.4.1; ISO §14.8.4.3, cite.py OK).</summary>
+    private static string ClassWithExternalItem(string prog, string asPhrase, string tag, int width, string declaratives, string callSibling) => $"""
+        >>TURN EC-EXTERNAL-FORMAT-CONFLICT CHECKING ON
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. {prog}.
+        ENVIRONMENT DIVISION.
+        CONFIGURATION SECTION.
+        REPOSITORY.
+            CLASS P2920C.
+        PROCEDURE DIVISION.
+        {declaratives}
+        MAIN-SECTION SECTION.
+        MAIN-P.
+            INVOKE P2920C "PEEK"
+            {callSibling}
+            GOBACK.
+        END PROGRAM {prog}.
+        IDENTIFICATION DIVISION.
+        CLASS-ID. P2920C{asPhrase}.
+        IDENTIFICATION DIVISION.
+        FACTORY.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 P2920X PIC X({width}) EXTERNAL.
+        PROCEDURE DIVISION.
+        METHOD-ID. PEEK.
+        PROCEDURE DIVISION.
+        MAIN-P.
+            DISPLAY "{tag} METHOD".
+        END METHOD PEEK.
+        END FACTORY.
+        IDENTIFICATION DIVISION.
+        OBJECT.
+        END OBJECT.
+        END CLASS P2920C.
+        """;
+
+    /// <summary>kb/Work PB2920, the EXTERNAL-describer arm: the two modules' classes describe the external item
+    /// <c>P2920X</c> as 4 and as 8 bytes. They are two classes (two externalized names), so each is a describer and the
+    /// second activation is §13.18.22 GR6's nonconformance (cite.py OK for §14.8.4.3): EC-EXTERNAL-FORMAT-CONFLICT, the
+    /// sibling's method never runs, and the declarative's RESUME continues. With the declared C# name as the describer's
+    /// identity the two classes were ONE describer, the comparison skipped it, and the sibling's method ran.</summary>
+    [Fact]
+    public void TwoModulesDeclaringTheSameClassNameAsDifferentClasses_AreTwoExternalDescribers()
+    {
+        const string declaratives = """
+            DECLARATIVES.
+            H SECTION.
+                USE AFTER EXCEPTION CONDITION EC-EXTERNAL-FORMAT-CONFLICT.
+            H-P.
+                DISPLAY "HANDLED=" FUNCTION EXCEPTION-STATUS
+                RESUME AT NEXT STATEMENT.
+            END DECLARATIVES.
+            """;
+        string sibling = ClassWithExternalItem("P2920S", " AS \"P2920-LEDGER\"", "B", 8, declaratives, "");
+        string main = ClassWithExternalItem("P2920M", "", "A", 4, "", "CALL \"P2920S\" ON EXCEPTION DISPLAY \"S NOT FOUND\" END-CALL");
+        string dir = CutRunner.NewTempDir("pb2920x");
+        try
+        {
+            NonCobolElement.CompileCobol(dir, "P2920S", sibling);
+            NonCobolElement.CompileCobol(dir, "P2920M", main);
+            var (exit, stdout, detail) = CutRunner.RunExit(Path.Combine(dir, "P2920M.dll"), dir);
+            Assert.True(exit == 0, detail);
+            Assert.Equal("A METHOD\nHANDLED=EC-EXTERNAL-FORMAT-CONFLICT", stdout);   // the host trims the status's trailing spaces
+        }
+        finally { CutRunner.TryDelete(dir); }
+    }
 }
