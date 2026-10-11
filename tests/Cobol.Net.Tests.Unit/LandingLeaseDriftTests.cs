@@ -24,16 +24,14 @@ namespace CobolNet.Tests.Unit;
 /// </remarks>
 public sealed class LandingLeaseDriftTests
 {
+    /// <summary>⛔ THIS TEST DOES NOT RUN THE SELF-TEST (kb/Work PB2882): <c>scripts/self_tests.py</c> discovers
+    /// <c>landing_lease.py --self-test</c> and runs it in every gate and CI job, where a red arm is a non-zero exit; what
+    /// is held here is that each arm is still DECLARED (<see cref="SelfTestArmSource"/>). Run a second time under the
+    /// harness's fixed 120 s budget it measured 107 s in train 1055's lander gate and was retried in train 1058's.</summary>
     [Fact]
-    public void TheLandingLease_ProvesEveryArm()
+    public void TheLandingLease_DeclaresEveryArm()
     {
-        string script = TestRepo.Scripts("orchestrator", "landing_lease.py");
-        Assert.True(File.Exists(script), $"the landing lease script is missing: {script}");
-        var r = PythonInstrument.Run(script, "--self-test");
-
-        Assert.True(r.ExitCode == 0 && r.Stdout.Contains("landing_lease SELF-TEST: PASS", StringComparison.Ordinal),
-            $"landing_lease.py --self-test failed (exit {r.ExitCode}).\n{r.Stdout}\n{r.Stderr}");
-        foreach (string arm in new[]
+        SelfTestArmSource.AssertDeclares(TestRepo.Scripts("orchestrator", "landing_lease.py"), new[]
                  {
                      "one lander holds the lease: a second acquire is refused, at once or when its wait runs out",
                      "a second lander waits instead of gating, and gates once the first releases",
@@ -44,10 +42,6 @@ public sealed class LandingLeaseDriftTests
                      "check answers push-main: own, free or held elsewhere",
                      "a file that is not a lease stops every verb loudly",
                      "the loop starts no land unit while a lease is live",
-                 })
-        {
-            Assert.True(r.Stdout.Contains("PASS  " + arm, StringComparison.Ordinal),
-                $"`landing_lease.py --self-test` no longer passes '{arm}'.\n{r.Stdout}{r.Stderr}");
-        }
+                 });
     }
 }

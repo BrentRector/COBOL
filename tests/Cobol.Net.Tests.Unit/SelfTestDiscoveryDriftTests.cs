@@ -191,15 +191,15 @@ public sealed class SelfTestDiscoveryDriftTests
     /// <summary>
     /// The runner's own arms, by name: a self-test reduced to its happy path still exits 0. The planted-tree arms are
     /// the "a failing self-test turns the gate red" proof; the gate driver's audit arm (GateLegDriftTests) carries a red
-    /// audit to a RED gate before the slot.
+    /// audit to a RED gate before the slot. ⛔ THIS TEST DOES NOT RUN THE SELF-TEST (kb/Work PB2882): the runner
+    /// discovers its own <c>--self-test</c> and runs it in every gate and CI job, where a red arm is a non-zero exit;
+    /// what is held here is that each arm is still DECLARED (<see cref="SelfTestArmSource"/>). Run a second time under
+    /// the harness's fixed 120 s budget it took 19 s alone and timed out twice in train 1058's lander gate.
     /// </summary>
     [Fact]
-    public void TheRunner_ProvesEveryArm()
+    public void TheRunner_DeclaresEveryArm()
     {
-        var r = PythonInstrument.Run(TestRepo.Scripts("self_tests.py"), "--self-test");
-        Assert.True(r.ExitCode == 0 && r.Stdout.Contains("self_tests.py --self-test: ALL GREEN", StringComparison.Ordinal),
-            $"`self_tests.py --self-test` failed (exit {r.ExitCode}).\n{r.Stdout}\n{r.Stderr}");
-        foreach (string arm in new[]
+        SelfTestArmSource.AssertDeclares(TestRepo.Scripts("self_tests.py"), new[]
                  {
                      "a script that only PASSES --self-test to another is not",
                      "a docstring or comment mention is not",
@@ -209,8 +209,7 @@ public sealed class SelfTestDiscoveryDriftTests
                      "a marker SHOWN past the header (a docstring example) declares nothing",
                      "--built runs exactly the build-needing ones, the default run the rest",
                      "discovery finds the planted tree's three self-tests",
-                     "a tracked script discovery cannot read (broken.py) fails discovery, never drops out",
-                     "a tracked script discovery cannot read (latin1.py) fails discovery, never drops out",
+                     "a tracked script discovery cannot read ({planted}) fails discovery, never drops out",
                      "each self-test gets a private COBOL_COORD_DIR",
                      "each self-test commits under the private global config's identity, never the caller's",
                      "a failing self-test is RED",
@@ -222,17 +221,38 @@ public sealed class SelfTestDiscoveryDriftTests
                      "the lander's run runs every self-test and records each PASS",
                      "the recorded PASS holds a file read through a name built at run time (the trace saw it)",
                      "a malformed record in the store is skipped, never a crash of the gate, and the good PASS still found",
-                     "4 concurrent implementer gates on an unchanged tree re-run nothing (every one REUSED)",
+                     "{_FLEET_GATES} concurrent implementer gates on an unchanged tree re-run nothing (every one REUSED)",
                      "a changed input re-runs exactly the self-test that read it (each run a real one); the others are REUSED in every gate",
-                     "4 gates running the same self-test at once run at most the budget's 2 at a time, and none hangs",
+                     "{_FLEET_GATES} gates running the same self-test at once run at most the budget's {_FLEET_CAP} at a time, and none hangs",
                      "an edited import re-runs the self-test that imports it, and only that one",
                      "a self-test still running past the hang detector is HANG — its own state, verdict and exit code, never RED",
                      "a Python self-test whose trace does not show its own file records no PASS (the tracer did not run)",
-                 })
-        {
-            Assert.True(r.Stdout.Contains("ok   arm: " + arm, StringComparison.Ordinal),
-                $"`self_tests.py --self-test` no longer passes '{arm}'.\n{r.Stdout}{r.Stderr}");
-        }
+                 }.Select(arm => "arm: " + arm));
+        // The `({planted})` arm runs once per planted unreadable script: both stay planted.
+        SelfTestArmSource.AssertDeclares(TestRepo.Scripts("self_tests.py"), ["(\"broken.py\", ", "(\"latin1.py\", "]);
+    }
+
+    /// <summary>The arm reader is seen to fire (<see cref="SelfTestArmSource"/>): a planted deleted arm is reported by
+    /// name, a label split across two literals (an f-string's among them, after a CRLF) is found whole, and a present
+    /// label is not reported.</summary>
+    [Fact]
+    public void TheArmReader_ReportsADeletedArm_AndFindsASplitLabelWhole()
+    {
+        string planted = string.Join("\n",
+            "    check(\"arm: a failing self-test is RED\", got, want)",
+            "    check(\"arm: a changed input re-runs the self-test that read it; the others are \"",
+            "          \"REUSED in every gate\", got, want)",
+            "    check(f\"arm: {_FLEET_GATES} gates at once run at most {_FLEET_CAP} \"\r",
+            "          f\"at a time, and none hangs\", got, want)");
+        string[] arms =
+        [
+            "arm: a failing self-test is RED",
+            "arm: a changed input re-runs the self-test that read it; the others are REUSED in every gate",
+            "arm: {_FLEET_GATES} gates at once run at most {_FLEET_CAP} at a time, and none hangs",
+            "arm: one red makes the verdict RED",
+        ];
+        Assert.Equal(["arm: one red makes the verdict RED"], SelfTestArmSource.Missing(planted, arms));
+        Assert.Empty(SelfTestArmSource.Missing(planted, arms[..3]));
     }
 
     /// <summary>The workflow's jobs, by id: each job's text up to the next job.</summary>

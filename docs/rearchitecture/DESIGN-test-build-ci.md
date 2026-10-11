@@ -1463,6 +1463,17 @@ tracer; `run_gate_legs.py --self-test` proves the implementer reuses and the lan
 self-test is `SELF-TESTS HANG`; `SelfTestDiscoveryDriftTests` holds the arms by name and forbids `--reuse` in CI and
 the Linux gate.
 
+⛔ **A drift test holds a script self-test's arms from its SOURCE and never runs it a second time (kb/Work PB2882).**
+The runner above is the one place a script self-test RUNS: in the lander's gate, the Linux gate and CI, where a red arm
+is a non-zero exit and a hang is bounded by the budget place, never by a clock. What the runner cannot see is an arm
+deleted from a self-test, which still exits 0, so a Unit drift test names the arms it requires and
+`SelfTestArmSource.AssertDeclares` finds each label among the script's string literals (implicitly concatenated
+literals joined; an f-string arm named as its source spells it). A drift test that ran the self-test again did so under
+the test harness's fixed 120 s per-process budget (`COBOLNET_RUN_TIMEOUT_MS`), and under a lander's gate beside the WSL
+Linux gate each went past it with every arm passing: `GateSlotDriftTests` (train 1055), then
+`SelfTestDiscoveryDriftTests`, `LandingLeaseDriftTests` and `GateLegDriftTests`' two driver tests (train 1058;
+`self_tests.py --self-test` 19 s alone, over 120 s twice in that train's first gate).
+
 ### 3.15 THE LOCAL LINUX GATE — CI's Linux legs under WSL before a push (kb/Work PB1732)
 
 CI runs most of its test jobs on `ubuntu-26.04` (pinned, so the runner image moves only when the repository says so),

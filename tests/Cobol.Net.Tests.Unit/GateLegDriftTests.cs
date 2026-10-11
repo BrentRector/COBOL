@@ -59,19 +59,14 @@ public sealed class GateLegDriftTests
 
     /// <summary>
     /// Arm (3), the population half: <c>test_population.py --self-test</c> passes and still drives every arm by
-    /// name — a self-test quietly reduced to its happy path also exits 0.
+    /// name — a self-test quietly reduced to its happy path also exits 0. ⛔ This test does not run the self-test
+    /// (kb/Work PB2882): the runner (<c>scripts/self_tests.py</c>) runs it in every gate and CI job, and this holds that
+    /// each arm is still DECLARED (<see cref="SelfTestArmSource"/>).
     /// </summary>
     [Fact]
-    public void Arm3_ThePopulationCheck_FiresEveryArmOnPlantedInputs()
+    public void Arm3_ThePopulationCheck_DeclaresEveryArm()
     {
-        string path = TestRepo.Scripts(PopulationTool);
-        Assert.True(File.Exists(path), $"the population check is missing: {path}");
-
-        ProcessObservation r = PythonInstrument.Run(path, "--self-test");
-
-        Assert.True(r.ExitCode == 0 && r.Stdout.Contains("SELF-TEST: PASS", StringComparison.Ordinal),
-            $"`{PopulationTool} --self-test` failed (exit {r.ExitCode}):\n{r.Stdout}{r.Stderr}");
-        foreach (string arm in new[]
+        SelfTestArmSource.AssertDeclares(TestRepo.Scripts(PopulationTool), new[]
                  {
                      "short: a dropped case is NEVER RAN",
                      "over: a case twice is RAN TWICE",
@@ -84,12 +79,7 @@ public sealed class GateLegDriftTests
                      "an EMPTY population is an ERROR",
                      "`scrubbed <command>` runs the command without a planted handshake",
                      "audit-callers flags every unscrubbed shape",
-                 })
-        {
-            Assert.True(r.Stdout.Contains("PASS  " + arm, StringComparison.Ordinal),
-                $"`{PopulationTool} --self-test` no longer drives '{arm}' — a check that has never been seen to fail "
-                + $"is not evidence.\n{r.Stdout}");
-        }
+                 });
     }
 
     /// <summary>
@@ -101,19 +91,15 @@ public sealed class GateLegDriftTests
     /// <c>LEG 1 ONLY (batched gating, PB2515)</c>, never a plain GREEN; and the
     /// audits' fail-fast (kb/Work PB2523): a red audit stops an implementer gate before the build, never a lander's;
     /// and the audits run before the implementer's gate slot is taken (kb/Work PB2524); and every gate publishes its
-    /// measured durations to the shared timings store a fresh worktree's plan reads (kb/Work PB2527).
+    /// measured durations to the shared timings store a fresh worktree's plan reads (kb/Work PB2527). ⛔ This test does
+    /// not run the self-test (kb/Work PB2882): the runner runs it in every gate and CI job, and this holds that each arm
+    /// is still DECLARED (<see cref="SelfTestArmSource"/>); run a second time under the harness's fixed 120 s budget it
+    /// took 311 s, retried, in train 1058's lander gate.
     /// </summary>
     [Fact]
-    public void Arm3_TheGateDriver_FiresEveryArmOnPlantedInputs()
+    public void Arm3_TheGateDriver_DeclaresEveryArm()
     {
-        string path = TestRepo.Scripts(DriverTool);
-        Assert.True(File.Exists(path), $"the gate driver is missing: {path}");
-
-        ProcessObservation r = PythonInstrument.Run(path, "--self-test");
-
-        Assert.True(r.ExitCode == 0 && r.Stdout.Contains("run_gate_legs SELF-TEST: PASS", StringComparison.Ordinal),
-            $"`{DriverTool} --self-test` failed (exit {r.ExitCode}):\n{r.Stdout}{r.Stderr}");
-        foreach (string arm in new[]
+        SelfTestArmSource.AssertDeclares(TestRepo.Scripts(DriverTool), new[]
                  {
                      "a whole planted population in two legs is GREEN",
                      "an assembly whose leg 1 is empty is not invoked for leg 1",
@@ -143,12 +129,7 @@ public sealed class GateLegDriftTests
                      "a second gate in the same worktree is REFUSED",
                      "a defect in the driver still ends in ONE verdict line",
                      "the gate lock is per worktree",
-                 })
-        {
-            Assert.True(r.Stdout.Contains("PASS  " + arm, StringComparison.Ordinal),
-                $"`{DriverTool} --self-test` no longer drives '{arm}' — a check that has never been seen to fail "
-                + $"is not evidence.\n{r.Stdout}");
-        }
+                 });
     }
 
     /// <summary>
