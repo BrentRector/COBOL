@@ -227,8 +227,10 @@ def fix_writers(root: Path) -> int:
 # ── the working-tree fix ─────────────────────────────────────────────────────────────────────────────────────────
 
 def fix_tree(root: Path) -> tuple[int, list[str]]:
-    """Rewrite every TEXT file whose checkout holds CRLF to LF. Returns (files rewritten, files left: a lone CR that no
-    mechanical rule may remove — the file is either declared byte-exact in .gitattributes, with its reason, or edited)."""
+    """Rewrite every TEXT file whose checkout holds CRLF to LF. Returns (files rewritten, files left). A file holding a
+    lone CR is LEFT UNTOUCHED, terminators included: whether that CR is an accident or the file's subject (a fixture of
+    the line-terminator rule) is a judgment no mechanical rule makes — it is removed by hand, or the file is declared
+    byte-exact in .gitattributes with its reason."""
     rewritten, left = 0, []
     for e in entries(root):
         if e.byte_exact or not e.index or e.worktree not in ("crlf", "mixed", "-text"):
@@ -238,11 +240,11 @@ def fix_tree(root: Path) -> tuple[int, list[str]]:
         if NUL in data or CR not in data:
             continue
         fixed = data.replace(CRLF, LF)
-        if fixed != data:
-            path.write_bytes(fixed)
-            rewritten += 1
         if CR in fixed:
             left.append(e.path)
+            continue
+        path.write_bytes(fixed)
+        rewritten += 1
     return rewritten, left
 
 
@@ -329,6 +331,16 @@ def self_test() -> int:
         expect("--fix never touches a declared -text file", (root / "pinned.xml").read_bytes(), b"<a/>" + CRLF)
         _, in_index, in_tree = scan_tree(root)
         expect("after --fix the tree is clean", (in_index, in_tree), ([], []))
+
+        accident = b"one" + CRLF + b"two" + CR + CRLF
+        (root / "accident.md").write_bytes(accident)
+        run("add", "-A")
+        run("commit", "-q", "-m", "a stray CR")
+        _, in_index, in_tree = scan_tree(root)
+        expect("arm INDEX + WORKING TREE: an undeclared lone CR is found although git stores the file as binary",
+               (in_index, in_tree), (["accident.md"], ["accident.md"]))
+        expect("--fix leaves a lone-CR file untouched, terminators included, and names it",
+               (fix_tree(root), (root / "accident.md").read_bytes()), ((0, ["accident.md"]), accident))
 
     planted = "\n".join([
         "from pathlib import Path",
