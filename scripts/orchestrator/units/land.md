@@ -13,7 +13,11 @@ Finished implementer branches are waiting for a lander.
    hours). A previous handoff's `branches_pending` is already in the survey. An operator steer that names the train
    (`handoff.last.json`) wins over `--train`. Dispatch one cobol-lander train over them, its prompt naming `LOOP STATE: running` (the
    dispatch guard refuses a lander call without it), with lead ids from `python scripts/orchestrator/alloc.py pb 5`,
-   and stay until it lands or reports every drop. A lander whose push-main.sh the permission layer refused reports
+   and stay until it lands or reports every drop. Once `python scripts/orchestrator/ruleset.py check` reports the
+   merge queue ACTIVE the lander lands by `enqueue.py queue` and reports `ENQUEUED pr=<n>` instead of a pushed sha
+   (lander-train-brief step 6, kb/Work PB3024): the train is ON MAIN only when the PR has merged (`gh pr view <n>
+   --json state,mergedAt`), so a queued train's branches stay pending in the handoff until then, and a PR the queue
+   bounced is a finisher dispatch with the merge group's CI red named. A lander whose push-main.sh the permission layer refused reports
    `READY-TO-PUSH <worktree> <sha>` (L13): hand that line off in `summary`; never push some other way. The lander
    takes the LANDING LEASE before its final rebase and gates (lander-train-brief step 2b, kb/Work PB2537): if
    `python scripts/orchestrator/landing_lease.py status` names another holder, the lander waits for it rather than

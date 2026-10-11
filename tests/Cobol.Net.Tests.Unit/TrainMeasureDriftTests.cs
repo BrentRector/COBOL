@@ -34,6 +34,7 @@ public sealed class TrainMeasureDriftTests
                      "refuses a train recorded twice and rewrites it with --replace",
                      "summarizes changes landed per hour, population runs, red trains, ejections and CI reds per gating mode",
                      "--since narrows the summary",
+                     "a queued pull request is recorded with its number and counted apart from CI's verdicts",
                  })
         {
             Assert.True(r.Stdout.Contains("PASS  " + arm, StringComparison.Ordinal),
