@@ -7,7 +7,7 @@
 > frontend-collected `FlagState`, a dedicated post-bind `FlagConformancePass`, and the two frontend-inline
 > option detectors that have no bound residue). Design SSOT for the Wave-D "real FLAG-14/FLAG-02 flagging"
 > item and VCR **Table 5** (rows 98, 100–113 + the directive-word rows 11/64/91/96/115). Keep CURRENT
-> (describes the compiler as built); the how-we-got-here narrative lives only in `DEVLOG.md`.
+> (describes the compiler as built); the how-we-got-here narrative lives only in `DEVLOG/`.
 
 ## 0. What the directives are, and the master constraint
 

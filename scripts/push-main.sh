@@ -35,8 +35,9 @@
 #             NOT touched; acquire it with `landing_lease.py acquire --wait-min 9`, rebase, re-gate, then re-run
 #         5 = the commit IS on main but its main-branch run's verdict could not be read (UNVERIFIED, kb/Work PB1639):
 #             read it by hand; never re-land it
-#         6 = the landing carries no new DEVLOG entry, or a malformed or misplaced one (scripts/orchestrator/
-#             landing_devlog.py, kb/Work PB2605): main NOT touched; write the entry at the TOP, commit, re-run
+#         6 = the landing carries no new DEVLOG entry, or a malformed, unstamped or stale one (scripts/devlog.py
+#             check, kb/Work PB2605, PB3025): main NOT touched; write DEVLOG/pending-<slug>.md, run
+#             `python scripts/devlog.py stamp <branch>`, re-run
 #         7 = the arch-oracle baseline is behind the landing (scripts/orchestrator/landing_oracle.py, kb/Work PB2885):
 #             main NOT touched; compare_oracle.py, then capture_oracle.py --record, commit the manifest, re-run
 
@@ -254,9 +255,9 @@ fi
 
 # ── EVERY LANDING ON MAIN CARRIES A NEW DEVLOG ENTRY (owner 2026-10-08, kb/Work PB2605: the rule covers "Only commits
 # landing on main"; an implementer's WIP checkpoints carry none, the lander writes the train's one). Checked HERE, on
-# this landing's own range (DEVLOG.md at $BASE against DEVLOG.md at $SHA), because every landing passes here and a
-# commit cannot know whether it will land. Refused before a run is spent. ──
-"$PY" scripts/orchestrator/landing_devlog.py --rev "$SHA" --base "$BASE"
+# this landing's own range (DEVLOG/ at $BASE against DEVLOG/ at $SHA, one file per entry, kb/Work PB3025), because
+# every landing passes here and a commit cannot know whether it will land. Refused before a run is spent. ──
+"$PY" scripts/devlog.py check --rev "$SHA" --base "$BASE"
 case $? in
   0) ;;
   1) echo "⛔ push-main: this landing carries no valid new DEVLOG entry (above) — main NOT touched." >&2

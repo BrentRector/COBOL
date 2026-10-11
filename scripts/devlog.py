@@ -179,6 +179,13 @@ def highest(files: dict[str, str]) -> int:
     return max((k[0] for k, _ in entries(files)), default=0)
 
 
+def newest(repo: pathlib.Path, count: int) -> list[str]:
+    """The texts of the `count` newest entries of the working tree, newest first, reading only those files."""
+    d = repo / DIR
+    names = sorted(((k, p.name) for p in d.iterdir() if (k := key_of(p.name))), reverse=True) if d.is_dir() else []
+    return [(d / n).read_bytes().decode("utf-8").replace("\r\n", "\n") for _, n in names[:count]]
+
+
 # ── render ───────────────────────────────────────────────────────────────────────────────────────────────────────
 def render(files: dict[str, str], since: int | None = None) -> str:
     """The README, then every entry newest first, each file's text exactly as written (a file that does not end in a
@@ -191,23 +198,32 @@ def render(files: dict[str, str], since: int | None = None) -> str:
 
 
 # ── check ────────────────────────────────────────────────────────────────────────────────────────────────────────
-def check(base: dict[str, str], base_extra_headers: set[str], rev: dict[str, str], rev_monolith: bool) -> tuple[
-        list[str], list[str]]:
-    """(refusal reasons, the new entries' names) for a landing from the tree `base` to the tree `rev`."""
+def lint(files: dict[str, str], monolith: bool) -> list[str]:
+    """What is wrong with a DEVLOG/ tree as a whole, whatever the landing: the monolith back, a stray file, an entry
+    whose header disagrees with its name, two files holding one number. A pending entry is legal here (a branch
+    carries one until its landing stamps it); `check` refuses it at the landing. The self-test runs this on the
+    repository's own tree, so every gate holds the whole log to it."""
     reasons = []
-    if rev_monolith:
+    if monolith:
         reasons.append(f"the tree still has {MONOLITH}: the log is {DIR}/, one file per entry (kb/Work PB3025)")
-    pending = sorted(n for n in rev if PENDING_NAME.match(n))
-    for n in pending:
-        reasons.append(f"{DIR}/{n} is an unstamped entry: run `python scripts/devlog.py stamp <branch>` before landing")
-    strays = sorted(n for n in rev if n != README and not key_of(n) and not PENDING_NAME.match(n))
+    strays = sorted(n for n in files if n != README and not key_of(n) and not PENDING_NAME.match(n))
     reasons += [f"{DIR}/{n} is neither {README} nor an entry (`NNNN-<slug>.md`)" for n in strays]
     seen: dict[tuple[int, str], str] = {}
-    for k, n in entries(rev):
-        reasons += entry_problems(n, rev[n])
+    for k, n in entries(files):
+        reasons += entry_problems(n, files[n])
         if k in seen:
             reasons.append(f"{DIR}/{n} and {DIR}/{seen[k]} hold the same entry number {k[0]}{k[1]}")
         seen[k] = n
+    return reasons
+
+
+def check(base: dict[str, str], base_extra_headers: set[str], rev: dict[str, str], rev_monolith: bool) -> tuple[
+        list[str], list[str]]:
+    """(refusal reasons, the new entries' names) for a landing from the tree `base` to the tree `rev`."""
+    reasons = lint(rev, rev_monolith)
+    pending = sorted(n for n in rev if PENDING_NAME.match(n))
+    for n in pending:
+        reasons.append(f"{DIR}/{n} is an unstamped entry: run `python scripts/devlog.py stamp <branch>` before landing")
     history = {first_line(base[n]) for _, n in entries(base)} | base_extra_headers
     new = [n for _, n in entries(rev) if first_line(rev[n]) not in history]
     floor = max([highest(base)] + [int(m.group("num")) for h in base_extra_headers if (m := HEADER.match(h))])
@@ -486,6 +502,10 @@ def self_test() -> int:
     ok("the PB2605 repro: a worktree WIP commit without a DEVLOG entry draws no DEVLOG ask from any hook",
        staged == ["code.py"] and not asked and not missing and ran >= 3,
        f"staged={staged}; asked by: {asked}; hooks run: {ran}; registered but missing: {sorted(missing)}")
+
+    # THE REPOSITORY'S OWN LOG: every gate and CI run this self-test, so the whole of DEVLOG/ is held to `lint`.
+    own = lint(worktree_files(REPO), (REPO / MONOLITH).exists())
+    ok(f"this repository's {DIR}/ passes lint ({len(entries(worktree_files(REPO)))} entries)", not own, "; ".join(own[:5]))
 
     sh("worktree", "remove", "--force", str(wt))
     shutil.rmtree(root, ignore_errors=True)

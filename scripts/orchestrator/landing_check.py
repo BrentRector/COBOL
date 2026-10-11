@@ -36,7 +36,7 @@ dispatched earlier stops it, and the stop names how it was identified and how to
 Fix-lane trains with no R3 work in flight pass untouched: fix-lane implementers share files by design, and a train
 merges them. The partition's domain is the campaign's code roots (model_rules.json `campaign`: src, tests, scripts,
 .github, docs, minus exclude_dir) and only CODE files there (its extensions but .md): a document both sides edit is a
-text merge the rebase resolves, and kb/Work and DEVLOG.md are every landing's bookkeeping.
+text merge the rebase resolves, and kb/Work and DEVLOG/ are every landing's bookkeeping.
 
 Usage:
     python scripts/orchestrator/landing_check.py [--rev HEAD] [--base origin/main] [--coord DIR]

@@ -176,7 +176,7 @@ OVERLAYS = ['workstream', 'gate', 'review', 'spec-lookup']
 PIN = re.compile(r'brent-tools (\d+\.\d+\.\d+)')
 RETIRED = re.compile(r'scripts/spec/(?:orient|fix_clusters|status_delta)\.py')
 SUBMODULE_SCRIPT = re.compile(r'tools/claude-skills/([\w./-]+\.(?:py|js))')
-FROZEN = ('DEVLOG.md', 'docs/rearchitecture/evidence/')
+FROZEN = ('DEVLOG/', 'docs/rearchitecture/evidence/')
 
 
 def fleet_tooling():

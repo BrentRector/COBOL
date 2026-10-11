@@ -65,13 +65,12 @@ Use the `gate` skill. Read the verdict line, then commit as a separate call.
 
 ## 7. DEVLOG, commit, push
 
-- `DEVLOG.md`: insert a new entry directly beneath the ordering note (DESCENDING, newest first) with
-  `python scripts/prepend-devlog.py <entry.md>`, the one inserter: the file is CRLF, so it splices bytes and prints
-  the expected and actual diffstat (additions only). Header
-  `## Entry NNN — YYYY-MM-DD HH:MM TZ — Title`, stamped from `date "+%Y-%m-%d %H:%M %Z"`. Write narratively —
-  what changed, why, what broke, what was learned. Log the failures too. One entry per LANDING ON MAIN, not per
-  commit (owner 2026-10-08, kb/Work PB2605): `push-main.sh` refuses a landing whose range adds no new, stamped,
-  top-placed entry (exit 6, `scripts/orchestrator/landing_devlog.py`), and refuses a landing whose arch-oracle baseline is behind its tree (exit 7, `scripts/orchestrator/landing_oracle.py`, kb/Work PB2885: run `scripts/arch/compare_oracle.py`, then `scripts/arch/capture_oracle.py --record`, and commit the manifest).
+- DEVLOG: one file per entry (kb/Work PB3025). Write `DEVLOG/pending-<slug>.md`: the first line `## <Title>`
+  (no number, no stamp), then the narrative — what changed, why, what broke, what was learned; log the failures
+  too. The landing numbers and stamps it with `python scripts/devlog.py stamp <branch>` (the number from
+  `alloc.py devlog`, the header completed as `## Entry NNNN — YYYY-MM-DD HH:MM TZ — Title`, one commit). One entry
+  per LANDING ON MAIN, not per commit (owner 2026-10-08, kb/Work PB2605): `push-main.sh` refuses a landing whose
+  range adds no new, stamped entry numbered above main's, or more than one (exit 6, `scripts/devlog.py check`), and refuses a landing whose arch-oracle baseline is behind its tree (exit 7, `scripts/orchestrator/landing_oracle.py`, kb/Work PB2885: run `scripts/arch/compare_oracle.py`, then `scripts/arch/capture_oracle.py --record`, and commit the manifest).
 - Commit message: write it to a scratchpad file and use `git commit -F <file>`. Do NOT inline a PowerShell
   here-string in the Bash tool — it is POSIX sh and the markers leak into the message.
 - **Update the item's `kb/Work/` note in the SAME commit** — `status: landed`, and `closes_rows:` naming the

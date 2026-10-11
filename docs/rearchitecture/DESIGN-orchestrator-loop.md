@@ -527,7 +527,7 @@ and the repository.
 
 - **One rule per kind, in one place.** The next value is `max(truth, reserved) + 1`, where truth is read from the
   repository on every call:
-  - `devlog`: the first line-start `## Entry NNN` of `DEVLOG.md` (the file is descending, so that is the top);
+  - `devlog`: the highest entry number in `DEVLOG/` (`devlog.py`'s reader; one file per entry, kb/Work PB3025);
   - `pb`: the highest `kb/Work/PB<n>.md`;
   - `code`: the ceiling of BOTH scans: every `COBOLNET\d{4}` in `src/**/*.cs` (outside `bin`/`obj`) and every
     quoted `"COBOLNET\d{4}"` in `src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs`. This is the rule
@@ -556,7 +556,7 @@ as `audit_witness_loss.py`, whose `rows_at` it reuses).
   (present, state `OK`).
 - GAP may not rise: when the GAP count at `head` exceeds the count at `base`, every row that is GAP at `head` and
   was not GAP at `base` (a reopened row or a newly catalogued one) is an offender.
-- **The excuse marker**: an offender is excused when a line ADDED between `base` and `head` in `DEVLOG.md` or in a
+- **The excuse marker**: an offender is excused when a line ADDED between `base` and `head` in a `DEVLOG/` entry or in a
   `kb/Work/*.md` note reads `reopens-rows: <id-or-glob>[, <id-or-glob>...] — <reason>` (an ASCII ` - ` or `: ` is
   accepted in place of the dash; the reason must be non-empty; globs use `fnmatch`, so a catalog harvest can write
   `reopens-rows: SR-10.7.3-* — 10.7.3 harvested`). Only lines added in the range count, so an old note cannot
@@ -648,13 +648,14 @@ applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status
    `tokens_per_point`; one lander per `train_size` groups at `lander_tokens` on Opus. Groups are taken in rank
    order while they fit; a group that does not fit is skipped and a smaller later one may still fit; a successor
    only with its predecessor; at most `wave.max_groups` (8) groups.
-7. **Allocation** through `alloc.py`: three codes per group and one lead-id block of five per train. `devlog_n` is a
-   peek, not a reservation: the lander re-reads the top of `DEVLOG.md` anyway, and a reserved number that no train
-   used would leave a gap in the log. `--dry-run` peeks everything and writes nothing.
+7. **Allocation** through `alloc.py`: three codes per group and one lead-id block of five per train. No DEVLOG number
+   is planned: an entry is written unnumbered (`DEVLOG/pending-<slug>.md`) and numbered when it lands, by
+   `devlog.py stamp`, which takes it from `alloc.py devlog` (kb/Work PB3025). `--dry-run` peeks everything and writes
+   nothing.
 8. **Outputs** (not in `--dry-run`): `<scratch>\groups.json` in exactly `make_dispatch_specs.py`'s format (each
    group also carries its `model`), the rendered specs and `check_practices.py`'s verdict (by running
    `make_dispatch_specs.py`; exit 1 when red), and `<scratch>\wf-args-w<wave>.json` with the rolling wave's args
-   (`scratch, wave, concurrency, train_size, min_final_train, devlog_n, previous_train, lead_id_blocks,
+   (`scratch, wave, concurrency, train_size, min_final_train, previous_train, lead_id_blocks,
    implementer_model, authorization, groups`).
 9. **Frontier models wait for the owner.** A note whose body says its work needs Fable or Mythos under the owner's
    approval (`routing.owner_approval_patterns`) is never planned, in either lane: that approval is per dispatch

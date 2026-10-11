@@ -77,6 +77,7 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "spec"))
 import alloc  # noqa: E402
 import coord  # noqa: E402
+import devlog  # noqa: E402  (the one reader of DEVLOG/)
 import work  # noqa: E402  (cluster_order: the ONE reader of cluster: and blocked_by:)
 from work import parse_frontmatter  # noqa: E402  (the ONE frontmatter reader, with its C# parity twin)
 
@@ -784,18 +785,23 @@ def as_group_json(g: Group, wave: str, notes: dict[str, Note], codes: str) -> di
     return out
 
 
+#: How much of the newest DEVLOG the wave and train numbering reads (one file per entry, kb/Work PB3025): the newest
+#: RECENT_ENTRIES entries, and of those the first RECENT_LINES lines for wave and train labels.
+RECENT_ENTRIES = 20
+RECENT_LINES = 200
+
+
 def previous_train(repo: pathlib.Path) -> str:
-    with open(repo / "DEVLOG.md", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            m = re.match(r"^## Entry \d+ .*?\bTrain (\d+[a-z]?)", line)
-            if m:
-                return f"train {m.group(1)}"
-    return "the previous train (see DEVLOG.md)"
+    for text in devlog.newest(repo, RECENT_ENTRIES):
+        m = re.match(r"^## Entry \d+ .*?\bTrain (\d+[a-z]?)", text)
+        if m:
+            return f"train {m.group(1)}"
+    return "the previous train (see DEVLOG/)"
 
 
 def next_wave(repo: pathlib.Path, reports: list[Report], coord_dir: pathlib.Path | None = None) -> int:
     """One past the highest wave OR train number in the reports directory, the dispatch ledger (`coord_dir`) or the
-    newest 200 DEVLOG lines. A wave's first train is labelled with the wave number, so a train label counts as taken
+    newest RECENT_LINES lines of the DEVLOG's newest entries. A wave's first train is labelled with the wave number, so a train label counts as taken
     too (kb/Work PB2562: trains 1035 and 1036 came from waves 1031 and 1032, the planner proposed wave 1035, and
     "Train 1034" had already landed twice). A wave planned but with no report yet (another session's, awaiting the
     operator's GO) is taken as well, or the next wave reuses its number and overwrites its specs (kb/Work PB2806)."""
@@ -803,9 +809,8 @@ def next_wave(repo: pathlib.Path, reports: list[Report], coord_dir: pathlib.Path
     if coord_dir is not None:
         seen += [int(g["wave"]) for g in coord.read_json(coord_dir / DISPATCH_LEDGER, {"groups": []}).get("groups", [])
                  if str(g.get("wave", "")).isdigit()]
-    with open(repo / "DEVLOG.md", encoding="utf-8", errors="replace") as f:
-        for _, line in zip(range(200), f):
-            seen += [int(w) for w in re.findall(r"\b(?:[Ww]aves?|[Tt]rains?) (\d{3,})", line)]
+    for line in "".join(devlog.newest(repo, RECENT_ENTRIES)).split("\n")[:RECENT_LINES]:
+        seen += [int(w) for w in re.findall(r"\b(?:[Ww]aves?|[Tt]rains?) (\d{3,})", line)]
     return max(seen, default=0) + 1
 
 
@@ -978,8 +983,7 @@ def main(argv: list[str] | None = None) -> int:
         print("  UNLANDED branches naming no open note (judgment): " + ", ".join(p["unlanded_without_note"]))
     print(f"  next {len(p['skipped'])} candidates skipped (budget, cap or predecessor): " +
           ", ".join(f"{g.letter}({'+'.join(g.notes[:2])}{'…' if len(g.notes) > 2 else ''})" for g in p["skipped"][:8]))
-    print(f"  lead-id blocks: {', '.join(blocks) or 'none'}; devlog_n {alloc.peek('devlog', REPO, cdir)}; "
-          f"previous {previous_train(REPO)}")
+    print(f"  lead-id blocks: {', '.join(blocks) or 'none'}; previous {previous_train(REPO)}")
     if a.dry_run or not p["groups"]:
         return 0
 
@@ -997,8 +1001,7 @@ def main(argv: list[str] | None = None) -> int:
                      encoding="utf-8")
     args = {"scratch": str(scratch), "wave": wave, "stop_file": str(stop_file), "global_stop": str(coord.global_stop(a.coord)),
             "concurrency": rules["wave"]["concurrency"], "train_size": train,
-            "min_final_train": rules["wave"]["min_final_train"], "devlog_n": alloc.peek("devlog", REPO, cdir),
-            "previous_train": previous_train(REPO), "lead_id_blocks": blocks,
+            "min_final_train": rules["wave"]["min_final_train"], "previous_train": previous_train(REPO), "lead_id_blocks": blocks,
             "implementer_model": rules["wave"]["implementer_model"], "authorization": a.authorization,
             "groups": [{k: j[k] for k in ("letter", "lead", "notes", "codes", "model", "after") if k in j}
                        for j in gjson]}

@@ -629,9 +629,11 @@ check("an untracked path is missing even if a local file has that name",
 # PB2562: a train label is a taken wave number, because a wave's first train is labelled with the wave number.
 with tempfile.TemporaryDirectory() as td:
     tdir = pathlib.Path(td)
-    (tdir / "DEVLOG.md").write_text("## Entry 2 — Train 1036 (wave 1032: D, E)" + NL + "## Entry 1 — wave 1034 dispatched" + NL,
-                                     encoding="utf-8")
+    (tdir / "DEVLOG").mkdir()                                    # one file per entry (kb/Work PB3025)
+    (tdir / "DEVLOG" / "0002-train-1036.md").write_text("## Entry 2 — Train 1036 (wave 1032: D, E)" + NL, encoding="utf-8")
+    (tdir / "DEVLOG" / "0001-wave-1034.md").write_text("## Entry 1 — wave 1034 dispatched" + NL, encoding="utf-8")
     check("next_wave counts a train label above every wave number", pw.next_wave(tdir, []), 1037)
+    check("previous_train reads the newest entry naming a train", pw.previous_train(tdir), "train 1036")
     # PB2806: a wave recorded in the dispatch ledger with no report yet (another session's) is a taken number too
     pw.record_dispatch(tdir, "1045", [pw.Group(kind="cluster", notes=["PB5"], file="", files=["src/X.cs"], letter="a")],
                        lambda i: False)

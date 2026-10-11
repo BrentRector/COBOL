@@ -8,7 +8,7 @@ export const meta = {
   ],
 }
 
-// args: { scratch, wave, stop_file, global_stop, concurrency (6), train_size (5), min_final_train (3), devlog_n,
+// args: { scratch, wave, stop_file, global_stop, concurrency (6), train_size (5), min_final_train (3),
 //         previous_train, lead_id_blocks: ["PB1665-PB1669", ...] (one block per train), groups: [{letter, lead, notes, codes}] }
 // Specs are pre-rendered by make_dispatch_specs.py as <scratch>\msg-w<wave>-<letter>.txt.
 const S = args.scratch
@@ -125,7 +125,7 @@ function land(batch) {
   log(`train ${label}: landing ${batch.map(r => r.letter).join(' ')}`)
   return agent(
     AUTH + `You are the train-${label} LANDER. Read E:\\COBOL\\.claude\\skills\\workstream\\templates\\lander-train-brief.md WHOLE and follow it, with these substitutions: ` +
-    `{CLUSTERS} = ${clusters}; {DEVLOG_N} = ${args.devlog_n} (ALWAYS re-read the top entry of DEVLOG.md first and use top+1 — an earlier train of this wave may have landed); ` +
+    `{CLUSTERS} = ${clusters}; ` +
     `{TRAIN_MANIFEST} = ${S}\\train${label}-manifest.json — FIRST write that file with exactly this JSON:\n${manifest}\n` +
     `PIPELINED: ${prev} may still be landing; bring your clusters in, then take the landing lease (brief step 2b: landing_lease.py acquire --holder "train ${label} lander" --wait-min 9, re-issued until ACQUIRED; never gate while another lander holds main), and only then rebase onto origin/main and gate. ` +
     `New leads found in the reports get kb/Work notes with ids from ${leadIds} (orchestrator-allocated; use in order, return the unused). ` +

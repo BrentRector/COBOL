@@ -60,7 +60,7 @@ CASES = [
     ("git status --short && git log --oneline -3", False),
     ("bash -c 'dotnet test x.csproj > t.log && echo done'", False),
     # 5b. a command that merely NAMES a gate or landing script is not a verdict command
-    ("git add -- scripts/push-main.sh DEVLOG.md && git commit -q -m x", False),
+    ("git add -- scripts/push-main.sh DEVLOG/1961-x.md && git commit -q -m x", False),
     ("sed -n 17,20p scripts/push-main.sh && head -3 x.txt", False),
     ("git add -- .github/workflows/build-and-test.yml && git commit -q -m x", False),
     ("pwsh -NoProfile -File scripts/build-local.ps1 -Mode lander > b.log 2>&1; git status", True),

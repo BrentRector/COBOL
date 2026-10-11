@@ -34,11 +34,12 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
    structure belongs. **Prefer the shape that makes the NEXT case automatic over the one that makes this case
    small**, and pair it with a drift test so "automatic" stays true. Correcting the estimate is part of the work:
    update the design doc and say so. (Rule 3 forbids shrinking the FEATURE; this forbids shrinking the DESIGN.)
-6. **Keep the docs CURRENT in the same change set.** Every doc except `DEVLOG.md` describes the CURRENT compiler.
-   The historical narrative lives ONLY in `DEVLOG.md`, which is DESCENDING — add each new entry at the TOP, under
-   the ordering note, headed `## Entry NNN — YYYY-MM-DD HH:MM TZ — Title` (stamp from `date "+%Y-%m-%d %H:%M %Z"`).
-   **One entry per landing on main** (owner 2026-10-08, kb/Work PB2605: the rule covers "Only commits landing on
-   main"; a worktree's checkpoint commits carry none): `push-main.sh` refuses a landing that adds no entry.
+6. **Keep the docs CURRENT in the same change set.** Every doc except the DEVLOG describes the CURRENT compiler.
+   The historical narrative lives ONLY in `DEVLOG/`, one file per entry, read newest first (`python scripts/devlog.py
+   render`; kb/Work PB3025). Write the entry as `DEVLOG/pending-<slug>.md` (first line `## <Title>`); the landing
+   numbers and stamps it with `python scripts/devlog.py stamp <branch>`, as `## Entry NNNN — YYYY-MM-DD HH:MM TZ —
+   Title`. **One entry per landing on main** (owner 2026-10-08, kb/Work PB2605: the rule covers "Only commits landing
+   on main"; a worktree's checkpoint commits carry no stamped one): `devlog.py check` refuses a landing without it.
 7. **Work autonomously.** Commit AND push every checkpoint, with a forensic commit message; each landing on main
    carries its DEVLOG entry (rule 6).
    Grammar changes are pre-authorized. Prompt only for genuine owner decisions — one at a time, as a bare question.
@@ -108,7 +109,7 @@ comprehensive pass once the design settles (`PROMPT.md` §4).
   on what a defect DOES to a user's program, not on its severity label. `python scripts/spec/work.py next`
   prints it and session-probe shows it every session. ⛔ It replaced FIVE overlapping registers, three of
   which each claimed to be canonical; `CONFORMANCE-FIX-QUEUE.md` is now a pointer.
-- **History:** `DEVLOG.md`, and nowhere else. **Doctrine:** `PROMPT.md`.
+- **History:** `DEVLOG/` (one file per entry), and nowhere else. **Doctrine:** `PROMPT.md`.
 - **Doc map:** `docs/DOC_INDEX.md` — consult it to find the right doc and keep it in sync. Exactly one canonical
   doc per subsystem: extend it, never fork a second.
 - **Spec:** `specs/ISO_COBOL.md` (tracked in this repo). The licensed PDF is the private submodule `specs-private`

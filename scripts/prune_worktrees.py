@@ -720,13 +720,13 @@ def self_test() -> int:
         # but its lander ejected it: no E commit in train 9999, and the earlier train's E must not carry it
         commit('src/K0.cs', 'class KiloEarlier {}\n', 'K PB2: an earlier train\'s cluster K\n\nTrain-Cluster: K\n')
         commit('src/E0.cs', 'class EchoEarlier {}\n', 'E PB3: an earlier train\'s cluster E\n\nTrain-Cluster: E\n')
-        commit('DEVLOG.md', 'train 9998\n', 'Train 9998: DEVLOG 0, the earlier train\'s last commit')
+        commit('DEVLOG/9998-train.md', 'train 9998\n', 'Train 9998: DEVLOG 0, the earlier train\'s last commit')
         train_commit('carried', 'src/K.cs', 'class KiloCarried { int EditedInTrain; }\n', 'K')
         k9999 = g('log', '-1', '--format=%h').stdout.strip()
         train_commit('carried-moved', 'src/M.cs', 'class MikeMoved { int EditedInTrain; }\n', 'M')
         manifest.append({'cluster': 'E', 'branch': 'ejected', 'base': g('merge-base', 'ejected', 'main').stdout.strip(),
                          'head': g('rev-parse', 'ejected').stdout.strip()})
-        commit('DEVLOG.md', 'train 9999\n', 'Train 9999: DEVLOG 1, the train\'s last commit')
+        commit('DEVLOG/9999-train.md', 'train 9999\n', 'Train 9999: DEVLOG 1, the train\'s last commit')
         (landed_coord / 'scratch' / 'train9999-manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
         for b, f, text in (('picked', 'src/P.cs', 'class PapaPicked { int LaterOnMain; }\n'),
                            ('picked-lost', 'src/Q.cs', 'class QuebecRenamed {}\n')):
