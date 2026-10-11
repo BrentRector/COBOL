@@ -3,7 +3,9 @@
 docs/rearchitecture/DESIGN-test-build-ci.md section 3.17.4).
 
     python scripts/devlog.py render [--since NNNN] [--out FILE]   the descending narrative (README, then newest first)
-    python scripts/devlog.py stamp <branch> [--coord DIR]          number and stamp the branch's pending entry; one commit
+    python scripts/devlog.py stamp <branch> [--coord DIR] [--base origin/main]
+                                                                   number and stamp the branch's pending entry (or
+                                                                   re-stamp one main has overtaken); one commit
     python scripts/devlog.py check [--base origin/main] [--rev HEAD] the landing rule, on the trees of the range
     python scripts/devlog.py next                                  the highest entry number in DEVLOG/ (the allocator's floor)
     python scripts/devlog.py --self-test
@@ -314,13 +316,39 @@ def stamp(wt: pathlib.Path, number: int, now: dt.datetime) -> tuple[str, str]:
     return name, header
 
 
-def run_stamp(repo: pathlib.Path, branch: str, coord_override: str | None) -> int:
+def unstamp_overtaken(wt: pathlib.Path, base: str) -> str | None:
+    """The branch's ONE added entry, when <base> (main) has since reached its number, made pending again so the next
+    stamp numbers it above main's (kb/Work PB3023: a branch waits after its stamp — a merge-queue bounce, a finisher —
+    while other landings take higher numbers, and `check` then refuses the stale number). Returns the stale file's
+    name, or None when there is nothing to re-stamp (no added entry, more than one, or one still above main's)."""
+    try:
+        base_files, _ = commit_files(wt, base)
+    except RangeError:
+        return None
+    files = worktree_files(wt)
+    added = [n for n in files if key_of(n) and n not in base_files]
+    if len(added) != 1 or key_of(added[0])[0] > highest(base_files):
+        return None
+    stale, text = added[0], files[added[0]]
+    title = title_of(first_line(text))
+    body = text.split("\n", 1)[1] if "\n" in text else ""
+    (wt / DIR / f"pending-{slugify(title)}.md").write_bytes(f"## {title}\n{body}".encode("utf-8"))
+    (wt / DIR / stale).unlink()
+    _git(wt, "rm", "-q", "--cached", "--ignore-unmatch", "--", f"{DIR}/{stale}", check=True)
+    return stale
+
+
+def run_stamp(repo: pathlib.Path, branch: str, coord_override: str | None, base: str = "origin/main") -> int:
     sys.path.insert(0, str(HERE / "orchestrator"))
     import alloc  # noqa: PLC0415
     import coord  # noqa: PLC0415
     wt = worktree_of(repo, branch)
     if not any(PENDING_NAME.match(n) for n in names_in(wt)):
-        raise SystemExit(f"⛔ devlog stamp: {wt / DIR} has no pending entry to stamp")
+        stale = unstamp_overtaken(wt, base)
+        if not stale:
+            raise SystemExit(f"⛔ devlog stamp: {wt / DIR} has no pending entry to stamp (and no stamped entry that "
+                             f"{base} has overtaken)")
+        print(f"re-stamping {DIR}/{stale}: {base} already holds its number")
     number, _ = alloc.allocate("devlog", 1, wt, coord.coord_dir(coord_override))
     name, header = stamp(wt, number, dt.datetime.now().astimezone())
     _git(wt, "commit", "-q", "-m", f"DEVLOG {number}: stamp the entry ({DIR}/{name})", check=True)
@@ -475,7 +503,23 @@ def self_test() -> int:
                             "--coord", str(cdir)], capture_output=True, text=True, encoding="utf-8", env=env)
     ok("stamp: a branch with no pending entry is refused, nothing allocated", again.returncode != 0 and
        json.loads((cdir / "alloc.json").read_text(encoding="utf-8")).get("devlog") == 12, again.stdout + again.stderr)
-    ok("next: the highest number in the tree", highest(names_in(wt)) == 12)
+    # RE-STAMP (kb/Work PB3023): another landing took 12 and 13 on main while `impl` waited (a queue bounce); main is
+    # merged in, and the stale 12 is numbered again above main's, in one commit that removes the stale file
+    sh("checkout", "-q", "main")
+    tree({f"{DIR}/0012-another-landing.md": e("12", "another landing"), f"{DIR}/0013-a-third.md": e("13", "a third")})
+    sh("add", "-A")
+    sh("commit", "-qm", "two landings on main")
+    sh("merge", "-q", "--no-edit", "main", cwd=wt)
+    restamp = subprocess.run([sys.executable, str(pathlib.Path(__file__).resolve()), "stamp", "impl", "--repo",
+                              str(repo), "--coord", str(cdir), "--base", "main"], capture_output=True, text=True,
+                             encoding="utf-8", env=env)
+    names = sorted(p.name for p in (wt / DIR).iterdir())
+    ok("stamp: an entry main has overtaken is re-stamped above main's, the stale file removed, in one commit",
+       restamp.returncode == 0 and "0014-pb9-the-fix-and-why.md" in names and "0012-pb9-the-fix-and-why.md" not in names
+       and not any(n.startswith("pending-") for n in names) and not sh("status", "--porcelain", cwd=wt)
+       and not check(commit_files(repo, "main")[0], set(), *commit_files(repo, "impl"))[0],
+       restamp.stdout + restamp.stderr + repr(names))
+    ok("next: the highest number in the tree", highest(names_in(wt)) == 14)
     ok("zone: a spelled-out zone name is abbreviated as date +%Z prints it",
        zone_abbrev(dt.datetime(2026, 10, 11, tzinfo=dt.timezone(dt.timedelta(hours=-7), "Pacific Daylight Time")))
        == "PDT")
@@ -535,6 +579,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("stamp", help="number and stamp a branch's pending entry, in one commit in its worktree")
     s.add_argument("branch")
     s.add_argument("--coord", help="the coordination directory alloc.py reserves the number in")
+    s.add_argument("--base", default="origin/main", help="main: a stamped entry whose number it has reached is re-stamped")
     c = sub.add_parser("check", help="the landing rule on the committed range base..rev")
     c.add_argument("--base", default="origin/main")
     c.add_argument("--rev", default="HEAD")
@@ -561,7 +606,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "check":
         return run_check(repo, a.base, a.rev)
     if a.cmd == "stamp":
-        return run_stamp(repo, a.branch, a.coord)
+        return run_stamp(repo, a.branch, a.coord, a.base)
     if a.cmd == "next":
         print(highest(names_in(repo)))
         return 0
