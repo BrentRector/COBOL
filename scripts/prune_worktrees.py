@@ -105,8 +105,21 @@ LOCK_PID = re.compile(r'\(pid (\d+)\)')
 SETTINGS = ':!.claude/settings.local.json'   # always dirty in an agent's worktree, never work (2026-10-03)
 
 
-def git(*args, cwd=REPO):
-    return subprocess.run(['git', '-C', str(cwd), *args], capture_output=True, text=True, encoding='utf-8', errors='replace')
+def git(*args, cwd=REPO, stdin: str | None = None):
+    return subprocess.run(['git', '-C', str(cwd), *args], input=stdin, capture_output=True, text=True, encoding='utf-8',
+                          errors='replace')
+
+
+def absent_from(ref: str, paths: list[str], repo=REPO) -> list[str]:
+    """The paths `ref` does not hold, from ONE `git cat-file --batch-check` (one output line per input line, `<ref>:<path>
+    missing` for an absent one). One `cat-file -e` per path spawned a process per added file: a branch that splits the
+    DEVLOG into 1,984 entry files (kb/Work PB3025) held the whole survey past five minutes (kb/Work PB3027, found there)."""
+    if not paths:
+        return []
+    out = git('cat-file', '--batch-check', cwd=repo, stdin=''.join(f'{ref}:{p}\n' for p in paths)).stdout.splitlines()
+    if len(out) != len(paths):
+        raise RuntimeError(f'git cat-file --batch-check answered {len(out)} lines for {len(paths)} paths')
+    return [p for p, line in zip(paths, out) if line.endswith(' missing')]
 
 
 def main_names(repo=REPO):
@@ -223,9 +236,11 @@ def classify(branch, names, repo=REPO, coord_dir: pathlib.Path | None = None):
     when its own merge would still change main: carried(), else '')."""
     if git('merge-base', '--is-ancestor', branch, 'origin/main', cwd=repo).returncode == 0:
         return 'MERGED', [], [], ''
-    absent = [f for f in git('diff', '--name-only', '--diff-filter=A', 'origin/main...' + branch, cwd=repo).stdout.split()
-              if not f.startswith(('TestResults/', 'tools/')) and f != 'STATUS.md'
-              and git('cat-file', '-e', 'origin/main:' + f, cwd=repo).returncode != 0]   # ANY added file absent from main counts (2026-10-04: a branch that added only scripts/ and docs/ was classified LANDED and would have been deleted)
+    # ANY added file absent from main counts (2026-10-04: a branch that added only scripts/ and docs/ was classified
+    # LANDED and would have been deleted)
+    absent = absent_from('origin/main', [
+        f for f in git('diff', '--name-only', '--diff-filter=A', 'origin/main...' + branch, cwd=repo).stdout.splitlines()
+        if f and not f.startswith(('TestResults/', 'tools/')) and f != 'STATUS.md'], repo)
     # The names the branch's NET change declares (merge base to tip), never each commit's: a name one WIP commit added
     # and a later commit deleted is not lost (kb/Work PB2708: 908-1's RunsOfEqual, added in fb4c17001, gone at its head).
     declared = set()
@@ -496,12 +511,14 @@ def contained(rows: list[Row], repo=REPO) -> None:
     """A branch that lands THROUGH another one is IN FLIGHT, not a decision and not a second landing: its tip is an
     ancestor of the tip of a fix-lane branch (one a report names) that is IN FLIGHT or waiting. That is a same-file
     predecessor (MANDATORY-PRACTICES O2: it lands through its successor) and a branch a review finisher merged
-    (kb/Work PB3027: the finisher's report names only its own branch). Once the carrier lands, the content test reads
+    (kb/Work PB3027: the wave's finisher rewrites the report for its own branch; a later wave's finisher writes a new
+    report and leaves the FINDINGS-stamped one behind). Once the carrier lands, the content test reads
     it LANDED and --apply deletes it. Two names for one commit carry nothing."""
     carriers = [c for c in rows if c.report and c.tip and c.state in CARRIER_STATES]
     for r in rows:
+        findings = bool(r.report and r.report.review and r.report.review.verdict == 'FINDINGS')
         if not r.tip or r.dirty or r.content in LANDED_CONTENT or r.state not in ('DECISION', *CARRIER_STATES[1:]) \
-                or (r.state == 'DECISION' and r.report is not None):
+                or (r.state == 'DECISION' and r.report is not None and not findings):
             continue
         c = next((c for c in carriers if c.tip != r.tip
                   and git('merge-base', '--is-ancestor', r.tip, c.tip, cwd=repo).returncode == 0), None)
@@ -728,7 +745,7 @@ def self_test() -> int:
                      # stamp at a head the branch has since moved past; `pred` carries no report and lands through
                      # `succ`, which was cut from it and is DONE and reviewed CLEAN
                      ('unreviewed', 'src/N.cs'), ('review-findings', 'src/O.cs'), ('reviewed-moved', 'src/S.cs'),
-                     ('pred', 'src/T.cs')):
+                     ('pred', 'src/T.cs'), ('fnd-pred', 'src/W.cs')):
             g('switch', '-q', '-c', b, 'main')
             commit(f, f'class {b.replace("-", "_").title()}X {{}}\n', b)
         reviewed_at = g('rev-parse', 'reviewed-moved').stdout.strip()
@@ -736,7 +753,10 @@ def self_test() -> int:
         commit('src/S.cs', 'class ReviewedMovedX { int AfterTheReview; }\n', 'a commit after the review')
         g('switch', '-q', '-c', 'succ', 'pred')
         commit('src/V.cs', 'class SuccessorX {}\n', 'succ')
-        tips = {b: g('rev-parse', b).stdout.strip() for b in ('done-branch', 'review-findings', 'succ')}
+        # `fnd-pred` was reviewed FINDINGS; a later wave's finisher `fnd-fix` merged it and was reviewed CLEAN
+        g('switch', '-q', '-c', 'fnd-fix', 'fnd-pred')
+        commit('src/W2.cs', 'class FindingsFixedX {}\n', 'the findings answered')
+        tips = {b: g('rev-parse', b).stdout.strip() for b in ('done-branch', 'review-findings', 'succ', 'fnd-pred', 'fnd-fix')}
         # modified-only: an unlanded change to an EXISTING file that declares no new name (train 1039b review: the
         # name test called it LANDED, and --apply would have deleted it)
         g('switch', '-q', '-c', 'modified-only', 'main')
@@ -828,6 +848,9 @@ def self_test() -> int:
                 ('w9998m-PB14-report.md', 'Status: DONE\nBranch: reviewed-moved\n'
                                           f'**Review:** CLEAN w9998m-review-r1 {reviewed_at[:12]}\n', 10),
                 ('w9998n-PB15-report.md', f'Status: DONE\nBranch: succ\n**Review:** CLEAN w9998n-r1 {tips["succ"]}\n', 10),
+                ('w9998o-PB16-report.md', 'Status: DONE\nBranch: fnd-pred\n**Review:** FINDINGS 1 w9998o-r1 '
+                                          f'{tips["fnd-pred"]} E:/s/review-w9998-o.jsonl\n', 10),
+                ('w9998p-PB16-report.md', f'Status: DONE\nBranch: fnd-fix\n**Review:** CLEAN w9998p-r1 {tips["fnd-fix"]}\n', 10),
                 ('w9998b-PB2-report.md', 'SPLIT\nBranch: split-branch\n', 10),
                 ('w9998c-PB3-report-v2.md', 'Status: DONE\nBranch: orphan\n', 10),        # suffixed: invisible
                 ('w9998d-PB4-report.md', '**Status:** DONE · **branch:** `superseded`\n', 10),
@@ -862,7 +885,7 @@ def self_test() -> int:
                 'carried': 'LANDED', 'carried-moved': 'DECISION', 'add-del': 'DECISION', 'picked': 'LANDED',
                 'picked-lost': 'DECISION', 'unlanded-train': 'DECISION', 'ejected': 'DECISION',
                 'unreviewed': 'WAITING FOR REVIEW', 'review-findings': 'DECISION', 'reviewed-moved': 'WAITING FOR REVIEW',
-                'pred': 'IN FLIGHT', 'succ': 'WAITING TO LAND'}
+                'pred': 'IN FLIGHT', 'succ': 'WAITING TO LAND', 'fnd-pred': 'IN FLIGHT', 'fnd-fix': 'WAITING TO LAND'}
         for name, state in want.items():
             got = rows.get(name)
             check(got is not None and got.state == state, f'{name}: want {state}, got {got.state if got else "no row"} ({got.why if got else ""})')
@@ -878,6 +901,8 @@ def self_test() -> int:
         check('2 finding(s)' in rows['review-findings'].why and 'finisher' in rows['review-findings'].why,
               'a FINDINGS stamp is a finisher DECISION, with the findings file')
         check('contained in succ' in rows['pred'].why, f'a predecessor lands through its successor: {rows["pred"].why}')
+        check('contained in fnd-fix' in rows['fnd-pred'].why,
+              f'a FINDINGS branch its finisher merged lands through the finisher: {rows["fnd-pred"].why}')
         check(set(rows) == set(want), f'every branch and detached worktree has a row: {sorted(set(rows) ^ set(want))}')
         check(rows['modified-only'].content == 'CHECK', 'a branch that only modifies an existing file is not LANDED')
         check(rows['unreadable'].dirty > 0, 'a worktree whose status git cannot produce counts as dirty')
@@ -919,8 +944,8 @@ def self_test() -> int:
         check([r.name for r in train] == ['b3', 'b5', 'b2', 'b6', 'b1', 'b7'] and [r.name for r in held] == ['b0', 'b4'],
               f'the next train is the {TRAIN_MAX} most harmful waiting rows, compiler before process, oldest first: '
               f'{[r.name for r in train]}, held {[r.name for r in held]}')
-        check(verdict(list(rows.values())).startswith('=== BRANCH LIFECYCLE: 28 · 4 in flight · 2 waiting for review · '
-                                                      '2 waiting to land · 5 landed'),
+        check(verdict(list(rows.values())).startswith('=== BRANCH LIFECYCLE: 30 · 5 in flight · 2 waiting for review · '
+                                                      '3 waiting to land · 5 landed'),
               f'verdict line: {verdict(list(rows.values()))}')
         # the pure rule: a lock with no pid is honoured; a ledger slug matches only at a word boundary
         r0 = dataclasses.replace(rows['orphan'], lock='')
