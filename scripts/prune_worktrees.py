@@ -20,7 +20,9 @@ who acts next:
                    dispatch-ledger wave group still in flight names it (`<coord>/inflight-groups.json`, the planner's
                    ledger, read through plan_wave.inflight_file_sets; the branch name starts with the group's slug
                    `w<wave><letter>`), the train whose lander holds the landing lease carries it (its manifest,
-                   landing_train_members), or it was touched in the last --min-age minutes (its HEAD reflog or STATUS.md).
+                   landing_train_members), the train whose pull request is OPEN in GitHub's merge queue carries it
+                   (queued_train_members, kb/Work PB3024: it lands when the PR merges; offline the rule is git-only), or it
+                   was touched in the last --min-age minutes (its HEAD reflog or STATUS.md).
                    Nobody touches it.
   WAITING TO LAND  not on main, and its newest fix-lane report (`w<wave><letter>-PB<lead>-report.md`, plan_wave.py
                    REPORT_NAME, under coord.reports_dir()) says `Status: DONE`: a land unit's train takes it. A train
@@ -309,12 +311,15 @@ REPORT_SLACK_MIN = 10   # an agent writes its report right after its last STATUS
 
 
 def lifecycle(row: Row, *, in_flight_slugs: set[str], min_age: int, stale_hours: float = 24,
-              live: Callable[[str | None], bool] = live_lock, in_train: dict[str, str] | None = None) -> tuple[str, str]:
+              live: Callable[[str | None], bool] = live_lock, in_train: dict[str, str] | None = None,
+              queued: dict[str, str] | None = None) -> tuple[str, str]:
     """THE lifecycle rule (module doc), as a pure function of what the survey measured: (state, the evidence)."""
     if live(row.lock):
         return 'IN FLIGHT', f'worktree locked by a live agent ({row.lock or "locked by hand"})'
     if in_train and row.name in in_train and row.content not in LANDED_CONTENT:
         return 'IN FLIGHT', f'a member of train {in_train[row.name]}, whose lander holds the landing lease now'
+    if queued and row.name in queued and row.content not in LANDED_CONTENT:
+        return 'IN FLIGHT', f'{queued[row.name]}: it lands when that pull request merges (kb/Work PB3024)'
     slug = next((s for s in sorted(in_flight_slugs) if re.match(re.escape(s) + r'(?![a-z0-9])', row.name.lower())), None)
     if slug:
         return 'IN FLIGHT', f'dispatch ledger: group {slug} is still in flight'
@@ -412,6 +417,39 @@ def landing_train_members(coord_dir: pathlib.Path | None = None) -> dict[str, st
     return out
 
 
+def queued_train_members(coord_dir: pathlib.Path | None = None, gh=None) -> dict[str, str]:
+    """{branch: why it is IN FLIGHT} for every OPEN pull request into main (kb/Work PB3024): its head branch (the
+    lander's), and, when its title is `Train <label>: …`, every member of `<coord>/scratch/train<label>-manifest.json`.
+    A queued train no longer holds the landing lease (enqueue.py ends without a CI wait), so without this its members read
+    WAITING TO LAND again and the next train would carry them twice. Offline, unauthenticated or with no gh it is {} and
+    the lifecycle is git-only (a non-observation, never a claim that nothing is queued)."""
+    import ruleset  # noqa: PLC0415  (its gh runner: a hang guard, and Unobserved on any failure to read)
+    run = gh or ruleset.real_gh
+    try:
+        rc, out, _ = run(['pr', 'list', '--base', 'main', '--state', 'open', '--limit', '100',
+                          '--json', 'number,title,headRefName'])
+        prs = json.loads(out) if rc == 0 else []
+    except (ruleset.Unobserved, ValueError):
+        return {}
+    cdir = coord_dir or coord.coord_path()
+    out_: dict[str, str] = {}
+    for pr in prs if isinstance(prs, list) else ():
+        number, title, head = pr.get('number'), str(pr.get('title') or ''), str(pr.get('headRefName') or '')
+        if head:
+            out_[head] = f'the head of pull request #{number}, open in the merge queue'
+        m = re.match(r'Train (\S+?):', title)
+        f = cdir / 'scratch' / f'train{m.group(1)}-manifest.json' if m else None
+        if f is not None and f.is_file():
+            try:
+                members = coord.read_json(f, []) or []
+            except ValueError:
+                members = []
+            for mem in members if isinstance(members, list) else ():
+                if isinstance(mem, dict) and mem.get('branch'):
+                    out_.setdefault(str(mem['branch']), f'a member of train {m.group(1)}, queued as pull request #{number}')
+    return out_
+
+
 def in_flight_slugs(coord_dir: pathlib.Path | None, terminal: Callable[[str], bool]) -> set[str]:
     """The `w<wave><letter>` slugs of the dispatch-ledger wave groups still in flight, by the planner's own liveness rule
     (plan_wave.inflight_file_sets, source 3: a group with a note that is not landed or retired). A hand entry has no
@@ -423,9 +461,11 @@ def in_flight_slugs(coord_dir: pathlib.Path | None, terminal: Callable[[str], bo
 
 def survey(repo=REPO, *, reports: list[Report] = (), slugs: set[str] = frozenset(), min_age: int = 180,
            stale_hours: float = 24, live: Callable[[str | None], bool] = live_lock,
-           in_train: dict[str, str] | None = None, coord_dir: pathlib.Path | None = None) -> list[Row]:
+           in_train: dict[str, str] | None = None, queued: dict[str, str] | None = None,
+           coord_dir: pathlib.Path | None = None) -> list[Row]:
     """Every local branch but main, and every detached worktree, measured and given its lifecycle state. `in_train`:
-    {branch: train label} of the train landing now (landing_train_members)."""
+    {branch: train label} of the train landing now (landing_train_members); `queued`: {branch: why} of the open pull
+    requests in the merge queue (queued_train_members)."""
     names = main_names(repo)
     trees = worktrees(repo)
     by_branch = {t.branch: t for t in trees if t.branch}
@@ -459,7 +499,7 @@ def survey(repo=REPO, *, reports: list[Report] = (), slugs: set[str] = frozenset
         rows = list(pool.map(measure, branches)) + list(pool.map(measure_detached, [t for t in trees if not t.branch]))
     for r in rows:
         r.state, r.why = lifecycle(r, in_flight_slugs=set(slugs), min_age=min_age, stale_hours=stale_hours, live=live,
-                                   in_train=in_train)
+                                   in_train=in_train, queued=queued)
     return rows
 
 
@@ -604,7 +644,7 @@ def main(argv=None):
     terminal = note_terminal()
     rows = survey(reports=report_index(a.reports or coord.reports_dir(), terminal),
                   slugs=in_flight_slugs(None, terminal), min_age=a.min_age, stale_hours=a.stale_hours,
-                  in_train=landing_train_members())
+                  in_train=landing_train_members(), queued=queued_train_members())
     rank = note_rank()
     train, held = next_train(rows, rank)
     if a.json:
@@ -834,6 +874,22 @@ def self_test() -> int:
         (cdir / 'landing-lease.json').write_text(json.dumps({'holder': 'train 9999 lander', 'worktree': str(tmp),
                                                              'expires_at': '2000-01-01T00:00:00+00:00'}), encoding='utf-8')
         check(landing_train_members(cdir) == {}, 'an expired lease carries no train')
+        # THE QUEUED TRAIN (kb/Work PB3024): an open pull request titled `Train <label>:` keeps its manifest's members and
+        # its own head IN FLIGHT after the lease is released; offline it is a non-observation ({}), never a claim
+        def fake_gh(args):
+            return 0, json.dumps([{'number': 17, 'title': 'Train 9999: five clusters', 'headRefName': 'lander-9999'},
+                                  {'number': 18, 'title': 'docs: a hand PR', 'headRefName': 'docs-x'}]), ''
+        queued = queued_train_members(cdir, fake_gh)
+        check(set(queued) == {'done-branch', 'lander-9999', 'docs-x'} and '#17' in queued['done-branch'],
+              f'the members and heads of the open pull requests: {queued}')
+        state, why = lifecycle(rows['done-branch'], in_flight_slugs=set(), min_age=180, live=live, queued=queued)
+        check(state == 'IN FLIGHT' and 'pull request #17' in why, f'a member of a queued train is IN FLIGHT: {state} {why}')
+
+        def offline_gh(args):
+            import ruleset  # noqa: PLC0415
+            raise ruleset.Unobserved('no network')
+        check(queued_train_members(cdir, offline_gh) == {} and queued_train_members(cdir, lambda a: (1, '', 'x')) == {},
+              'offline, or a gh failure, the queued set is empty (git-only lifecycle)')
         # THE TRAIN SIZE (kb/Work PB2981): of eight waiting rows the next train is TRAIN_MAX, the most harmful lead
         # first, a compiler fix before process work at equal harm, the oldest report first; the rest are held
         def waiting(name, lead, age):

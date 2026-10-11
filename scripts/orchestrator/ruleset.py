@@ -11,7 +11,8 @@ WHY A FILE AND A CHECK. Classic branch protection has no merge queue, so `main` 
 request, require the merge queue (merge method MERGE: a merge commit, so the branch's commits stay ancestors of main),
 require `ci-gate` (evaluated on the merge group), no bypass (enforced for administrators, as the classic protection's
 enforce_admins was), no force push, no deletion; and three repository settings the queue needs (`allow_auto_merge`,
-so `gh pr merge --auto` can queue a PR whose checks are still running; `allow_merge_commit`; `delete_branch_on_merge`).
+so a pull request whose checks are still running can be queued by auto-merge; `allow_merge_commit`;
+`delete_branch_on_merge`).
 A setting clicked into GitHub's UI is invisible to the tree and drifts unseen; this file IS the setting, and `check`
 says whether the live repository still matches it.
 
