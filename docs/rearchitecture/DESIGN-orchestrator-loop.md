@@ -116,6 +116,15 @@ one session.
 Fable is never selected: the supervisor refuses any model name other than `opus` and `sonnet` (owner 2026-10-02:
 Fable only with explicit approval per dispatch, which an unattended loop cannot obtain).
 
+> ⛔ **The landing pipeline is redesigned (owner 2026-10-11, kb/Work PB3015; the design is `DESIGN-test-build-ci.md`
+> §3.17, the SSOT for it).** When PB3023/PB3024 land: the `land` unit becomes **`enqueue`** — for every WAITING TO LAND
+> branch, in harm order, `scripts/orchestrator/enqueue.py` rebases it onto `origin/main`, runs the ONE local gate (leg 1
+> plus the host-only witnesses), the DEVLOG-entry and R3 partition checks, opens its pull request and adds it to
+> GitHub's merge queue; the unit's own turns are the finisher dispatches (a rebase conflict, a queue bounce) and the
+> handoff. A `wave` unit ends when its Workflow returned: it starts no lander and lands no train (`wf_rolling_wave.js`
+> loses its trains, PB3016 by removal). There is no landing lease (§4.7) and no `push-main.sh`. The rows above describe
+> the loop as built until then.
+
 ### 3.1 How a Workflow in flight constrains unit boundaries
 
 A Workflow lives inside its `claude` process and dies with it. So a `wave` unit is NOT bounded by its own context:
@@ -394,6 +403,10 @@ split with a claim undecided. One session's stop must never abort another sessio
   and only `-Clear -Global` removes the global one.
 
 ### 4.7 The landing lease: one lander on main at a time (`landing_lease.py`, kb/Work PB2537)
+
+> ⛔ **Retired by `DESIGN-test-build-ci.md` §3.17 (owner 2026-10-11, kb/Work PB3015/PB3024): GitHub's merge queue
+> serializes landings, so there is no lease to take; `landing_lease.py`, its drift tests and MANDATORY-PRACTICES L3 go
+> when PB3024 lands.** The record below explains why the lease existed.
 
 `push-main.sh` refuses a HEAD that is not a descendant of origin/main, so it serialized the PUSH. A landing's cost
 comes before that step: the final rebase, the whole-population lander gate, the Linux gate, the oracle and CI, about

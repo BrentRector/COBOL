@@ -819,6 +819,9 @@ acceptance (§3.14.9) records the time to the first red of every implementer gat
   required, no default; `-Priority` only sets the process priority). `implementer`: a plan, two legs, fail-fast, a gate
   slot (§3.14.6). `lander`: no plan, ONE leg, no fail-fast — every red of every cluster in one run — and no slot. Both
   hold the worktree's gate lock and both run the population check. The battery and CI do not use the driver.
+  ⛔ **Superseded by §3.17.3 (owner 2026-10-11, kb/Work PB3015/PB3022): the gate has ONE mode, the ordered leg 1; the
+  `lander` mode is deleted when PB3022 lands, and CI's merge-group run is the whole-population check.** This bullet
+  describes the as-built driver until then.
 
 #### 3.14.2 The plan: `scripts/gate_plan.py`
 
@@ -1476,6 +1479,12 @@ Linux gate each went past it with every arm passing: `GateSlotDriftTests` (train
 
 ### 3.15 THE LOCAL LINUX GATE — CI's Linux legs under WSL before a push (kb/Work PB1732)
 
+> ⛔ **Reshaped by §3.17.3 (owner 2026-10-11, kb/Work PB3015, Q1a and the 12:45 correction "Yes, both hosts, leg 1"):
+> the WSL run becomes the LINUX HALF OF THE TARGETED LEG — leg 1 of the same plan in a WSL clone, in every local gate —
+> and CI's whole Linux legs run only on the merge group.** `linux-gate.sh` keeps its whole-leg form as the tool that
+> reproduces a Linux CI red on this box (`reference wsl_linux_repro`) and gains the leg-1 plan form once PB3022 lands.
+> Below is the as-built gate until then.
+
 CI runs most of its test jobs on `ubuntu-26.04` (pinned, so the runner image moves only when the repository says so),
 and every local gate runs on the Windows host, so without this a
 change's first Linux run was CI's. Train 71b showed the cost: a Windows path literal in a new drift test was green
@@ -1615,6 +1624,174 @@ Build cost (probe `buildcost.py`: `dotnet build Cobol.Net.sln -c Debug` with nod
 as the gate slot runs it, three rounds): a change to a runtime source costs 8.5–11.5 s with the images against
 4.3–7.1 s without, about **+4 s** (two Release compiles and two crossgens, in parallel); a no-op build is unchanged
 (2.3–4.6 s either way). A clean restore also downloads the crossgen2 pack and the two runtime packs once.
+
+### 3.17 THE LANDING PIPELINE — a targeted local gate, CI as the regression net, one pull request per branch through GitHub's merge queue (kb/Work PB3015; owner decisions 2026-10-11)
+
+#### 3.17.1 The decisions this section is built from
+
+Measured on 2026-10-10 (frozen: `evidence/fleet-optimization/2026-10-11-pipeline-measurement-2026-10-10.md`): of 567
+lander minutes, 233 (41 %) were local whole-population gate runs — 7–13 min on a quiet host, 25–53 min under load, 8
+of 15 RED, mostly from fixed time limits under load — and 94 (16.5 %) were `push-main.sh` holding the landing lease
+while CI ran the same population a third time on 20 free runners in 13 min; 10 landers for 6 trains; first commit on
+main 6 h 49 min after the day began. The owner, 2026-10-11:
+
+- ~10:38: "We are free to completely rearchitect the build pipeline as needed to be maximally productive and minimally costly."
+- ~11:20, the principle: "We need local testing to confirm the targeted changes are correct. The CI / CD should primarily
+  ensure no regression on the remaining codebase. Another consideration, local runs are free." (The repository is PUBLIC,
+  so GitHub-hosted standard runners are free for it; only larger runners or a private repository bill minutes.)
+- ~11:30, Q1a: the lander's local gate becomes the TARGETED leg (its clusters' own tests, the likely reds, and the
+  Windows file-system race witnesses that reproduce only on this box's ReFS drive); its local whole-population run and
+  the WSL copy of CI's Linux legs are removed; CI stays the whole-population regression net on the pushed head.
+- ~11:33, Q1b: landing goes through a **GitHub merge queue** on `main`.
+- ~11:36, Q2: the DEVLOG becomes **one file per entry**, rendered as a view (the kb/Work pattern); rule 6 unchanged.
+- ~11:40, Q3: **one pull request per finished branch**; the train and the lander role retire.
+- ~12:45, the owner's correction, asked as "doesn't this mean many (all?) of the Linux only failures that we caught in
+  WSL runs now aren't found until CI (very late)": **"Yes, both hosts, leg 1"** — the targeted leg runs natively on
+  Windows AND under WSL in every local gate (implementer and enqueue); only the whole-population regression run is CI's.
+
+The operator's constraint (2026-10-11 11:19): `E:` is ReFS and CI's Windows runner is NTFS; they delete differently (the
+PB2917 race reproduced here in 20 of 7,200 probes and may not on NTFS), so the Windows file-system race witnesses run
+locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
+
+#### 3.17.2 The contract — what every change goes through, in order
+
+1. **Implement** (unchanged): an implementer in its worktree; its gate is the ordered leg 1 (§3.14, scope `leg1`), its
+   report `Status: DONE` with the O11 header; it writes its own **DEVLOG entry file** (§3.17.4) with the number its
+   dispatch spec allocated, and flips its notes.
+2. **Review on the branch** (new position, PB3027): a read-only reviewer (`cobol-reviewer`, the `review` skill's
+   full-code pass over `origin/main...HEAD` plus the drift rules of the changed files) runs when the branch is DONE,
+   inside the wave; a confirmed finding goes back to the implementer or a finisher. The enqueue step never fixes.
+3. **Enqueue** (`scripts/orchestrator/enqueue.py <branch>`, PB3023 — a SCRIPT, deterministic, no agent): fetch; rebase the
+   branch onto `origin/main` (a conflict stops it: the branch returns to WAITING with the conflict named, a finisher
+   resolves); run the ONE local gate on the rebased head (§3.17.3); run the landing checks that used to live in
+   `push-main.sh` — `landing_devlog.py` (exactly one new entry file, well-formed) and `landing_check.py` (the R3 file-set
+   partition, PB2118) — then `gh pr create` (title = the branch's one-line subject, body = the forensic message) and
+   `gh pr merge --merge-queue`-equivalent (`gh pr merge --auto`) so the PR joins the queue. Done. No lease, no local
+   whole population, no whole-leg WSL run (the targeted leg runs on both hosts, §3.17.3), no waiting for CI.
+4. **The merge queue** (PB3024): GitHub builds the merge group (several queued PRs on top of `main`), the workflow runs on
+   the `merge_group` event — the full matrix: Linux and Windows, the sharded conformance legs, unit + characterization,
+   the population check (§3.14.4), audits, guard, INV-1 — `ci-gate` stays the one required check, and main advances in
+   order. A red bounces only the PR that caused it (GitHub re-tests the rest); the loop sees the bounce
+   (`gh pr view --json mergeQueueEntry,statusCheckRollup`), names the CI red in the branch's report and dispatches a
+   finisher; the fixed branch is enqueued again.
+5. **On `main`**: the merged commit is the tested merge-group tree. The `push` run keeps only `changes` + `ci-gate` (the
+   record the probe reads); the matrix runs on `merge_group` and `workflow_dispatch`. On `pull_request` only the cheap
+   jobs run (audits, the DEVLOG and work-register checks), so twenty PRs do not queue eighty matrix jobs behind the
+   20-concurrent-job limit of a public repository.
+
+The implementer's leg-1 gate stays first for every change (the owner's principle); CI is the regression net and the
+only whole-population run.
+
+#### 3.17.3 The gate driver's ONE mode (PB3022)
+
+- `build-local.ps1 -Mode lander` and the lander-mode arm of `run_gate_legs.py` are deleted: the gate has one shape, the
+  ordered leg 1 of §3.14 (a plan, fail-fast, a gate slot). The scope `whole` stays as the owner's on-demand switch
+  (`gate_slot.py set-implementer-scope whole`) and the battery's form; it is nobody's per-change gate.
+- **The targeted leg runs on BOTH hosts** (owner 2026-10-11 ~12:45, after asking whether dropping the WSL gate would
+  push every Linux-only failure to CI: "Yes, both hosts, leg 1"): the one gate runs leg 1 natively on Windows and then,
+  under the same gate slot, leg 1 in a WSL clone of the committed head (`linux-gate.sh` gains the plan: it runs
+  `build-local.sh --mode implementer` on the same leg-1 plan instead of CI's whole legs), in the implementer's gate and
+  at enqueue alike. Measured why: on 2026-10-10 three of 38 clusters had Linux-only reds, all in the clusters' OWN
+  tests (a locale golden's Linux text, a lock-race fix red 10 of 10 on Linux, a host-path length test), and the WSL
+  run caught each before a CI round trip; a leg-1 run under WSL costs the clone and build (~1–2 min) plus the leg,
+  not the 5–10 min of CI's whole Linux legs. Only the whole-population regression run is CI's. Fail-fast order:
+  Windows first (no clone), Linux second; a Linux-only red names its host in the verdict line. Until this lands, the
+  land units keep today's whole-leg WSL gate (operator steer, 2026-10-11 12:37).
+- **Tier 0h — host-only witnesses.** A new plan tier (§3.14.2's `TIER_ORDER` becomes `0a, 0h, 0u, 1, 2, 3`): every
+  test case whose class carries the xUnit trait `Host` with a value naming a property CI's runners lack (`ReFS` today)
+  is in leg 1 at every gate, whatever the diff. Membership is DERIVED from the trait, never listed; a drift test asserts
+  that every test class under the file-system race witnesses (`SidecarColumnLockHostDriftTests`, `RegionLocksDriftTests`,
+  their siblings found by `drift_rules.py`) carries it. CI runs the same tests on NTFS, where they may not reproduce.
+- **Audits only when their inputs changed, at every gate** (PB2914 generalized from the implementer gate to the one
+  gate): a script self-test, a drift-rules regeneration or a citation check with inputs unchanged since a recorded PASS
+  is reused, never re-run; CI's `audits` job (53 s, its own runner) runs them all on every merge group.
+- **No fixed time limit in any test** (owner rule 2026-09-25): the six drift-test files with seven fixed limits
+  (`GateSlotDriftTests`'s 120 s and its siblings, the top recurring load red) are rewritten to deterministic witnesses
+  or, where a process must be timed, to a limit scaled from a measured baseline on the same host; `NoWallClockDriftTests`
+  (or the existing guard) fails on a new literal `TimeSpan` limit in a test.
+
+#### 3.17.4 Conflict-free landing files — the tree holds SOURCES, views are RENDERED (PB3025, PB3026)
+
+Two queued PRs that both insert at the top of one file collide, and the second is bounced; the queue is only as parallel
+as the files are disjoint. The rule: a landing adds or edits files that are ITS OWN; anything derived is rendered on
+demand and not committed.
+
+- **DEVLOG (PB3025).** `DEVLOG/NNNN-<slug>.md`, one file per landing, header line unchanged (`## Entry NNNN —
+  YYYY-MM-DD HH:MM TZ — Title`). The implementer writes the entry WITHOUT a number, as `DEVLOG/pending-<slug>.md`; the
+  number is stamped AT ENQUEUE (`devlog.py stamp`, called by `enqueue.py`: `alloc.py devlog` allocates `NNNN`, the file
+  is renamed and its header completed, one commit on the branch before the pull request opens), so number order IS
+  enqueue order IS queue order IS landing order, and "newest first" by number is newest first on main (operator review
+  item 2; a bounced PR keeps its number, gaps are fine). `python scripts/devlog.py render [--since NNNN] [--out <file>]`
+  prints the descending narrative (`DEVLOG.rendered.md` is gitignored); `devlog.py check` is what `landing_devlog.py`
+  becomes (exactly one new, stamped entry file in the PR, header well-formed, number unused on `main`; a `pending-`
+  file in a PR is a red). **Line endings (PB3029; owner 2026-10-11 ~12:35: "standardize on a single line-ending
+  format"):** LF everywhere — `.gitattributes` `* text=auto eol=lf`, `merge.renormalize`, one normalization landing,
+  tools write LF, a drift check refuses a CR in any tracked text file; the index is already LF for 15,234 files, so the
+  change is what the WORKING TREE shows each OS, and the entry files below are written LF. A ONE-TIME migration script
+  splits the 1,976 entries of the 7.1 MB CRLF `DEVLOG.md` into files content-faithfully with LF line endings (PB3029)
+  and deletes `DEVLOG.md` and `prepend-devlog.py` in the same landing; CLAUDE.md rule 6, the `devlog` memory and skill, `session-probe`, the ledger
+  and every brief that says "the TOP of DEVLOG.md" change in that landing. Rule 6's substance is untouched: one entry per
+  landing on main, newest first, the only history.
+- **Generated indexes leave the tree (PB3026):** `docs/DRIFT_RULES.md` (regenerated by `drift_rules.py` whenever a drift
+  test changes — two PRs adding drift tests collide today), the `kb/Conformance` burn-down (`gen_conformance_notes.py`,
+  STALE in the probe for days) and any other "Generated — do not hand-edit" file become rendered views: gitignored,
+  rendered by their script on demand and by CI's `audits` job, which fails when a view no longer renders. `kb/Work.base`
+  is a view DEFINITION (a query over the notes), not generated content: it stays.
+- **Plan §0 and other shared prose** are edited only by the loop's own `ledger`/§0 refresh PR, never inside a fix PR; a
+  fix PR edits its notes, its code, its tests, its goldens and the design doc of its subsystem. `CONFORMANCE.md` rows
+  stay hand-written (rare collisions bounce and re-enqueue; measured before any further change).
+
+#### 3.17.5 The loop's units and the fleet after this design (PB3023, PB3024, PB3027; DESIGN-orchestrator-loop.md §3, §4.7, §9)
+
+- `land` becomes **`enqueue`**: for every WAITING TO LAND branch (`prune_worktrees.py --brief`), in harm order, run
+  `enqueue.py`; dispatch a finisher for a rebase conflict or a queue bounce; render the ledger; hand off. It is mostly
+  a script run; its model turns are the finisher dispatches and the handoff.
+- The **train, the lander role, `lander-train-brief.md`, `lander-brief.md`, `golden-lander-brief.md`, `train_apply.py`,
+  `landing_lease.py`, `push-main.sh` and the `ci/**` branches retire** (CLAUDE.md rule 4: delete, never wrap).
+  `cobol-lander` becomes `cobol-finisher` (resolve a conflict, fix a bounce, re-enqueue; turn cap 160).
+- `wf_rolling_wave.js` **starts no lander**: a wave produces DONE branches; the enqueue unit lands them. This removes
+  PB3016's policy question (may THIS wave land?) by removing the mechanism; `train_size` and `min_final_train` go.
+- **Measurement continues** (PB3028): `landing_measure.py` replaces `train_measure.py` — per PR: DONE → enqueued →
+  on main, bounces and their causes, CI wall; `summary` compares against the 2026-10-10 evidence. The design is judged
+  by changes landed per hour and by minutes and tokens per landing, before and after.
+
+#### 3.17.6 CI and repository settings (PB3024)
+
+- `build-and-test.yml`: add `merge_group:`; `push.branches` becomes `[main]` (the `ci/**` landing branches are gone);
+  the `changes` job runs the matrix on `merge_group` and `workflow_dispatch`, and only the cheap jobs on `pull_request`
+  and on `push` to main (the merged tree was tested as the merge group). `ci-gate`'s `needs:` and its drift check
+  (every job wired) are unchanged.
+- A **ruleset** on `main` (classic branch protection has no merge queue): require a pull request, require the merge
+  queue with merge method **merge commit** — the branch's commits stay ancestors of `main`, so the branch lifecycle
+  (`prune_worktrees.py`'s landed test, `carried()`, `git cherry`) keeps working offline, and `git log --first-parent
+  main` reads one merge commit per landing whose message is the PR body (the forensic record; the implementer's
+  checkpoint commits sit beneath it). Squash was considered and rejected on the operator's review (2026-10-11 12:16): a
+  squashed head is never an ancestor of main, so every lifecycle tool would have to key on the merged-PR record instead.
+  Required status check `ci-gate` on the merge group, enforce for administrators (the owner's credentials make every
+  push), minimum group size 1, maximum 5, check timeout 60 min. The classic protection is removed in the same change.
+- **Cutover (operator review item 4):** every step of this design lands through the THEN-CURRENT pipeline. PB3023 and
+  PB3024 are ONE landing — the last one through `push-main.sh` — and applying the ruleset (`gh api` from the committed
+  JSON) is an owner-attended step: the lander asks the owner for an explicit go at that moment (one bare question),
+  because from that instant main accepts only queued pull requests.
+- `guard` (12.8 min) is the long pole of a merge-group run; sharding it is a follow-up measured after the queue lands.
+
+#### 3.17.7 What each document says after this lands (the implementer's sweep; rule 6, same change set)
+
+`CLAUDE.md` (rule 6's DEVLOG shape; the Testing paragraph: one gate mode, CI as the regression net, the merge queue,
+no WSL gate, the CI invariant restated as "a PR bounced by the queue is a defect fixed on its branch before re-enqueue")
+· `MANDATORY-PRACTICES.md` L1–L3, L10–L13, O10, O11 · `.claude/skills/{gate,land-a-fix,workstream,session-start,
+kb-sync}` · `scripts/orchestrator/units/{land,wave,resume}.md` → `enqueue.md` · `DESIGN-orchestrator-loop.md` §3, §4.7,
+§9 · plan §0 "Gates" and §9 · `docs/DOC_INDEX.md` · `.claude/agents/cobol-lander.md` → `cobol-finisher.md` ·
+`scripts/session-probe.ps1` (the `gate :` line) · `scripts/hooks/dispatch_guard.py` (refuses a lander dispatch: there is
+none) · §3.14.1 (one mode), §3.15 (the WSL gate becomes the Linux-red REPRO tool, `linux-gate.sh` kept for that use
+only, out of every gate path and brief).
+
+#### 3.17.8 Drift tests that pin the design
+
+`LandingPipelineDriftTests`: the workflow has a `merge_group` trigger and no `ci/**` branch; no file in the tree
+references `push-main.sh`, `landing_lease.py`, `-Mode lander` or `train_apply.py`; `TIER_ORDER` contains `0h` and every
+race-witness class carries the `Host` trait; `DEVLOG.md` does not exist and every `DEVLOG/*.md` has a well-formed
+header and a unique number; no generated index is tracked (`git ls-files` ∩ the generators' outputs is empty).
 
 ---
 
