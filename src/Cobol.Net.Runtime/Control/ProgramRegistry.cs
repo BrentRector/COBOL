@@ -168,7 +168,7 @@ public static class ProgramRegistry
         var p = EntryOf(name, out bool notFound);
         if (notFound && checkNotFound)
             throw new CobolCallException(
-                $"ADDRESS OF PROGRAM '{ExternalizedNames.Form(name)}': the program could not be located{RunUnit.Current.Programs.NotLocatedReason(name)} (ISO §8.4.3.13.4 GR4 — "
+                $"{AddressNotLocated(name, function: false)} (ISO §8.4.3.13.4 GR4 — "
                 + "EC-PROGRAM-NOT-FOUND; §14.9.4.4 GR3a — no program is called)", "EC-PROGRAM-NOT-FOUND");
         return p;
     }
@@ -187,12 +187,18 @@ public static class ProgramRegistry
         var p = EntryOf(name, out bool notFound);
         if (notFound && checkNotFound)
         {
-            string detail = $"ADDRESS OF PROGRAM '{ExternalizedNames.Form(name)}': the program could not be located{RunUnit.Current.Programs.NotLocatedReason(name)} (ISO §8.4.3.13.4 GR4)";
+            string detail = $"{AddressNotLocated(name, function: false)} (ISO §8.4.3.13.4 GR4)";
             ExceptionState.Set("EC-PROGRAM-NOT-FOUND", fatal: true);
             throw new CobolFatalException("EC-PROGRAM-NOT-FOUND", detail);
         }
         return p;
     }
+
+    /// <summary>The one wording of a miss on an address-identifier, probe reason included (kb/Work PB2847): the emitted
+    /// <c>SET … TO ENTRY</c> / <c>ADDRESS OF FUNCTION</c> raise sites build their fatal reason from it, exactly as the
+    /// CALL-argument and operand arms above do.</summary>
+    public static string AddressNotLocated(string name, bool function)
+        => RunUnit.Current.Programs.AddressNotLocated(name, function);
 
     /// <inheritdoc cref="ProgramTable.FunctionAddressOf"/>
     public static FunctionPointer FunctionAddressOf(string name, out bool notFound)

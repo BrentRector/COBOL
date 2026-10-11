@@ -69,8 +69,12 @@ public sealed class ProgramTable
     /// registered so far: committed together, or not at all.</summary>
     private (string Module, List<Node> Nodes, Dictionary<string, Node> ByPath)? _staging;
     /// <summary>Why the probe could not supply a name (a load failure, a module with no registrar, a refused module),
-    /// keyed by the externalized name the activation asked for: appended to the EC-PROGRAM-NOT-FOUND /
-    /// EC-FUNCTION-NOT-FOUND message, so a module that is present but unusable is diagnosable rather than silent.</summary>
+    /// keyed by <see cref="ProbeKey"/> — the externalized name AND the kind of unit the lookup asked for (kb/Work
+    /// PB2847): a program lookup and a function lookup of one name are two probes with two reasons ("does not carry the
+    /// program X" is not "does not carry the function X"), and CALL and SET … TO ENTRY, which look up a program the
+    /// same way, share one. Appended to the EC-PROGRAM-NOT-FOUND / EC-FUNCTION-NOT-FOUND message by every path that
+    /// reports a miss (<see cref="NotLocatedReason"/>), so a module that is present but unusable is diagnosable
+    /// rather than silent.</summary>
     private readonly Dictionary<string, string> _probeFailure = new(ExternalizedNames.Comparer);
 
     public ProgramTable(RunUnit owner) => _owner = owner;
@@ -383,8 +387,8 @@ public sealed class ProgramTable
             ?? throw new CobolCallException(
                 notFoundEc == "EC-FUNCTION-NOT-FOUND"
                     ? $"FUNCTION '{ExternalizedNames.Form(name)}': the user-defined function could not be located in the run unit"
-                      + $"{NotLocatedReason(name)} (ISO §8.4.3.2.4 GR6b — EC-FUNCTION-NOT-FOUND)"
-                    : $"CALL '{ExternalizedNames.Form(name)}': program not found in the run unit{NotLocatedReason(name)} "
+                      + $"{NotLocatedReason(name, wantFunction: true)} (ISO §8.4.3.2.4 GR6b — EC-FUNCTION-NOT-FOUND)"
+                    : $"CALL '{ExternalizedNames.Form(name)}': program not found in the run unit{NotLocatedReason(name, wantFunction: false)} "
                       + "(ISO §14.9.4.4 GR3b — EC-PROGRAM-NOT-FOUND)",
                 notFoundEc);
         // §14.9.4.4 GR3c / §8.4.3.2.4 GR6c (kb/Work PB2659): "If the program is located but the resources necessary to
@@ -867,7 +871,7 @@ public sealed class ProgramTable
     /// condition (§14.9.4.4 GR3 b). Probed names are cached, hit or miss: one probe per name and kind per run unit.</para></summary>
     private bool ProbeSiblingModule(string name, bool wantFunction)
     {
-        if (!_probedNames.Add($"{(wantFunction ? 'F' : 'P')}:{name}")) return false;
+        if (!_probedNames.Add(ProbeKey(name, wantFunction))) return false;
         string path = "";
         try
         {
@@ -882,19 +886,19 @@ public sealed class ProgramTable
             var record = asm.GetCustomAttributesData()
                 .FirstOrDefault(a => a.AttributeType.FullName == typeof(Repository.CobolRepositoryAttribute).FullName);
             if (record is not { ConstructorArguments: [_, { Value: string runtimeVersion }, { Value: int callAbi }] })
-                return ProbeFailed(name, $"'{path}' is not a WiseOwl COBOL module: it carries no CobolRepository record");
+                return ProbeFailed(name, wantFunction, $"'{path}' is not a WiseOwl COBOL module: it carries no CobolRepository record");
             if (RuntimeAbi.Skew(runtimeVersion, callAbi) is { } skew)
-                return ProbeFailed(name, $"'{path}': {skew}");
+                return ProbeFailed(name, wantFunction, $"'{path}': {skew}");
             string? registrar = record.NamedArguments
                 .FirstOrDefault(a => a.MemberName == nameof(Repository.CobolRepositoryAttribute.Registrar)).TypedValue.Value as string;
             var ensure = string.IsNullOrEmpty(registrar) ? null
                 : asm.GetType(registrar)?.GetMethod("EnsureRegistered", BindingFlags.Public | BindingFlags.Static, Type.EmptyTypes);
             if (ensure is null)
-                return ProbeFailed(name, $"'{path}' has no registrar {(string.IsNullOrEmpty(registrar) ? "(none named)" : registrar)} with an EnsureRegistered() member");
+                return ProbeFailed(name, wantFunction, $"'{path}' has no registrar {(string.IsNullOrEmpty(registrar) ? "(none named)" : registrar)} with an EnsureRegistered() member");
             ensure.Invoke(null, null);   // → RegisterModule, the one way in
             foreach (var n in _order)
                 if (n.ParentPath is null && n.IsFunction == wantFunction && ExternalizedNames.Same(n.CallName, name)) return true;
-            return ProbeFailed(name, $"'{path}' does not carry the {(wantFunction ? "function" : "program")} {name}");
+            return ProbeFailed(name, wantFunction, $"'{path}' does not carry the {(wantFunction ? "function" : "program")} {name}");
         }
         catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException or BadImageFormatException
                                       or TargetInvocationException or TypeLoadException or ArgumentException)
@@ -902,20 +906,38 @@ public sealed class ProgramTable
             // IOException covers FileNotFoundException (a file removed between the listing and the load) and
             // FileLoadException; a RegisterModule refusal or a throwing registrar arrives as TargetInvocationException;
             // ArgumentException is a registrar name Assembly.GetType cannot parse (a hand-made or damaged record).
-            return ProbeFailed(name, $"'{path}': {e.GetBaseException().Message}");
+            return ProbeFailed(name, wantFunction, $"'{path}': {e.GetBaseException().Message}");
         }
     }
 
-    private bool ProbeFailed(string name, string reason)
+    /// <summary>⛔ THE ONE KEY of the probe's two per-lookup tables (<see cref="_probedNames"/>, <see cref="_probeFailure"/>):
+    /// the externalized name and the KIND of unit asked for (kb/Work PB2847). §8.4.6.3's first paragraph makes a
+    /// program-name and a function-name different kinds of name, so a probe for one is not a probe for the other.</summary>
+    private static string ProbeKey(string name, bool wantFunction) => $"{(wantFunction ? 'F' : 'P')}:{name}";
+
+    private bool ProbeFailed(string name, bool wantFunction, string reason)
     {
-        _probeFailure[name] = reason;
+        _probeFailure[ProbeKey(name, wantFunction)] = reason;
         return false;
     }
 
-    /// <summary>The probe's reason a module beside the application could not supply <paramref name="name"/>, as a
-    /// suffix for the not-found message the activation raises (empty when no module was found at all).</summary>
-    internal string NotLocatedReason(string name) =>
-        _probeFailure.TryGetValue(ExternalizedNames.Form(name), out var reason) ? $"; the sibling module was not usable: {reason}" : "";
+    /// <summary>The probe's reason a module beside the application could not supply <paramref name="name"/> as the kind
+    /// of unit <paramref name="wantFunction"/> names, as a suffix for the not-found message the activation raises
+    /// (empty when no module was found at all). The one source of that suffix for every not-found path: CALL, a
+    /// function reference, and the three address-identifiers (<see cref="AddressNotLocated"/>).</summary>
+    internal string NotLocatedReason(string name, bool wantFunction) =>
+        _probeFailure.TryGetValue(ProbeKey(ExternalizedNames.Form(name), wantFunction), out var reason)
+            ? $"; the sibling module was not usable: {reason}" : "";
+
+    /// <summary>⛔ THE ONE WORDING of a miss on an address-identifier (kb/Work PB2847): ISO §8.4.3.13.4 GR4 for a
+    /// <c>PROGRAM</c> / <c>ENTRY</c> operand, §8.4.3.12.4 GR4 for <c>FUNCTION</c> — "If the runtime system cannot locate
+    /// the program [function], the EC-PROGRAM-NOT-FOUND [EC-FUNCTION-NOT-FOUND] exception condition is set to exist and
+    /// the value of the address-identifier is the predefined address NULL" — with the probe's reason, so every
+    /// surface that raises it (<c>ADDRESS OF PROGRAM</c> as a CALL argument or an operand, <c>SET … TO ENTRY</c>,
+    /// <c>ADDRESS OF FUNCTION</c>) tells the user why the module was not found.</summary>
+    internal string AddressNotLocated(string name, bool function) =>
+        $"ADDRESS OF {(function ? "FUNCTION" : "PROGRAM")} '{ExternalizedNames.Form(name)}': "
+        + $"the {(function ? "function" : "program")} could not be located{NotLocatedReason(name, function)}";
 
     private Node? ParentOf(Node n) =>
         n.ParentPath is not null && _byPath.TryGetValue(n.ParentPath, out var p) ? p : null;

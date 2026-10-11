@@ -154,23 +154,7 @@ public sealed class CobolNetCompiler(int dialectLevel = 85)
         string dir = CutRunner.NewTempDir("cn");
         try
         {
-            foreach (string companion in companions)
-            {
-                // The assembly must be NAMED for its PROGRAM-ID: ProgramTable's sibling-module probe locates a
-                // separately-compiled program by looking for <program-name>.dll beside the caller (§8.4.6.3
-                // rule 4). A generic "companion0.dll" compiles fine and is then never found at run time, which
-                // surfaces as EC-PROGRAM-NOT-FOUND rather than as a harness error.
-                var m = System.Text.RegularExpressions.Regex.Match(
-                    companion, @"PROGRAM-ID\.\s*([A-Za-z0-9][A-Za-z0-9-]*)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                if (!m.Success) return (false, "", "[harness] a companion module has no PROGRAM-ID to name its assembly after");
-                string name = m.Groups[1].Value;
-                string csrc = Path.Combine(dir, name + ".cob");
-                csrc = CompiledProgramCache.StageSource(csrc, companion);
-                var cr = CompiledProgramCache.Compile(new CompilerDriver.Options(
-                    csrc, Path.Combine(dir, name + ".dll"), DialectLevel: dialectLevel, SourceFormat: InitialReferenceFormat.Auto));
-                if (!cr.Success)
-                    return (false, "", $"[cobolnet compile {name}] {cr.Status}: {string.Join("\n", cr.Errors)}");
-            }
+            if (CompileCompanions(dir, companions) is { } failure) return (false, "", failure);
 
             string src = Path.Combine(dir, "prog.cob");
             string dll = Path.Combine(dir, "prog.dll");
@@ -184,14 +168,40 @@ public sealed class CobolNetCompiler(int dialectLevel = 85)
         finally { CutRunner.TryDelete(dir); }
     }
 
+    /// <summary>Compile each of <paramref name="companions"/> into its own assembly in <paramref name="dir"/>, named for its
+    /// PROGRAM-ID; null when all compiled, else the harness failure text.</summary>
+    private string? CompileCompanions(string dir, string[] companions)
+    {
+        foreach (string companion in companions)
+        {
+            // The assembly must be NAMED for its PROGRAM-ID: ProgramTable's sibling-module probe locates a
+            // separately-compiled program by looking for <program-name>.dll beside the caller (§8.4.6.3
+            // rule 4). A generic "companion0.dll" compiles fine and is then never found at run time, which
+            // surfaces as EC-PROGRAM-NOT-FOUND rather than as a harness error.
+            var m = System.Text.RegularExpressions.Regex.Match(
+                companion, @"PROGRAM-ID\.\s*([A-Za-z0-9][A-Za-z0-9-]*)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!m.Success) return "[harness] a companion module has no PROGRAM-ID to name its assembly after";
+            string name = m.Groups[1].Value;
+            string csrc = Path.Combine(dir, name + ".cob");
+            csrc = CompiledProgramCache.StageSource(csrc, companion);
+            var cr = CompiledProgramCache.Compile(new CompilerDriver.Options(
+                csrc, Path.Combine(dir, name + ".dll"), DialectLevel: dialectLevel, SourceFormat: InitialReferenceFormat.Auto));
+            if (!cr.Success)
+                return $"[cobolnet compile {name}] {cr.Status}: {string.Join("\n", cr.Errors)}";
+        }
+        return null;
+    }
+
     /// <summary>Compile+run and return the NUMERIC process exit code — the STOP RUN / GOBACK termination status
     /// "passed to the operating system" (ISO §14.9.42.4 GR5 / §14.9.18.4 GR10). A compile failure returns
     /// <c>(-1, "", detail)</c>.</summary>
-    public (int exitCode, string stdout, string detail) CompileAndRunExit(string source)
+    public (int exitCode, string stdout, string detail) CompileAndRunExit(string source, params string[] companions)
     {
         string dir = CutRunner.NewTempDir("cn");
         try
         {
+            if (CompileCompanions(dir, companions) is { } failure) return (-1, "", failure);
+
             string src = Path.Combine(dir, "prog.cob");
             string dll = Path.Combine(dir, "prog.dll");
             src = CompiledProgramCache.StageSource(src, source);

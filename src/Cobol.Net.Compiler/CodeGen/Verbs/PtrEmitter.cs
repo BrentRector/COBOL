@@ -246,8 +246,10 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
             : NameImage(s.NamePlace!);   // §8.4.3.13 GR1a — the identifier's value names the program
         int id = ctx.Names.NextPtr();
         string nf = $"__ppNf{id}";
+        string nm = $"__ppNm{id}";
+        w.Line($"string {nm} = {nameExpr};");   // read once: the lookup and the miss's message name the same content
         w.Line($"bool {nf};");
-        w.Line($"var __ppE{id} = ProgramRegistry.EntryOf({nameExpr}, out {nf});   // SET … TO ENTRY (ISO §8.4.3.13.4 GR1/GR4)");
+        w.Line($"var __ppE{id} = ProgramRegistry.EntryOf({nm}, out {nf});   // SET … TO ENTRY (ISO §8.4.3.13.4 GR1/GR4)");
         foreach (var t in s.Targets)
             w.Line(PlaceRenderer.Write(t, $"__ppE{id}") + "   // SET program-pointer (ISO §14.9.39 Format 9)");
         bool checkNotFound = ecState.Info?.Enabled.Any(e => e.Ec == "EC-PROGRAM-NOT-FOUND") == true;
@@ -258,7 +260,9 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
                 // The §15.32.3 r2 pair rides the ambient statement context (kb/Work R14).
                 // Fatal (Table 13): unresumed, the run unit terminates abnormally (§14.6.13.1.3 5)/7)) — the same
                 // outcome the CALL arm (ProgramRegistry.EntryOfOperand's throw) reaches (kb/Work PB1549).
-                ec.EmitConditionRaise("EC-PROGRAM-NOT-FOUND", "§8.4.3.13.4 GR4 — set to exist");
+                // The miss's message is the one the CALL-argument and operand arms give, reason included (PB2847).
+                ec.EmitConditionRaise("EC-PROGRAM-NOT-FOUND", "§8.4.3.13.4 GR4 — set to exist",
+                    $"ProgramRegistry.AddressNotLocated({nm}, function: false)");
             }
         }
         else
@@ -290,8 +294,10 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
             : NameImage(s.NamePlace!);
         int id = ctx.Names.NextPtr();
         string nf = $"__fpNf{id}";
+        string nm = $"__fpNm{id}";
+        w.Line($"string {nm} = {nameExpr};");   // read once: the lookup and the miss's message name the same content
         w.Line($"bool {nf};");
-        w.Line($"var __fpA{id} = ProgramRegistry.FunctionAddressOf({nameExpr}, out {nf});   // ADDRESS OF FUNCTION (ISO §8.4.3.12.4 GR1/GR2)");
+        w.Line($"var __fpA{id} = ProgramRegistry.FunctionAddressOf({nm}, out {nf});   // ADDRESS OF FUNCTION (ISO §8.4.3.12.4 GR1/GR2)");
 
         // GR14's signature screen. ExpectedFormals < 0 means the receivers' prototype has no compile-time
         // signature (a §12.3.8.4 GR11 c) external-repository prototype): there is nothing for "the same
@@ -327,7 +333,8 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
         {
             using (w.Block($"if ({nf})"))
             {
-                ec.EmitConditionRaise("EC-FUNCTION-NOT-FOUND", "§8.4.3.12.4 GR4 — set to exist (fatal)");
+                ec.EmitConditionRaise("EC-FUNCTION-NOT-FOUND", "§8.4.3.12.4 GR4 — set to exist (fatal)",
+                    $"ProgramRegistry.AddressNotLocated({nm}, function: true)");
             }
         }
         else

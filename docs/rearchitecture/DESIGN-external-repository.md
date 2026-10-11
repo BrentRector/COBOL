@@ -1274,32 +1274,37 @@ reason (below).
 ```csharp
 private bool ProbeSiblingModule(string name, bool wantFunction)
 {
+    string key = ProbeKey(name, wantFunction);                           // "P:name" / "F:name": the kind is part of the key (PB2847)
     if (!RuntimeFeatures.DynamicProbe)                                   // the feature switch (§15.5)
-    { _probeFailure[name] = "the dynamic probe is disabled (trimmed/AOT): the host registers every module it composes"; return false; }
+    { _probeFailure[key] = "the dynamic probe is disabled (trimmed/AOT): the host registers every module it composes"; return false; }
     var kind = wantFunction ? RepositoryUnitKind.Function : RepositoryUnitKind.Program;
-    if (!_probedNames.Add($"{(wantFunction ? 'F' : 'P')}:{name}")) return false;
+    if (!_probedNames.Add(key)) return false;
     var hit = RepositoryLocator.Find(AppContext.BaseDirectory, kind, name);   // the named file first; the directory only on a miss
     if (hit is null) return false;
-    if (hit.Collision is { } other) { _probeFailure[name] = $"'{hit.Path}' and '{other}' both carry {name}"; return false; }
-    if (VersionSkew(hit.RuntimeVersion, hit.CallAbi) is { } skew) { _probeFailure[name] = $"'{hit.Path}': {skew}"; return false; }
+    if (hit.Collision is { } other) { _probeFailure[key] = $"'{hit.Path}' and '{other}' both carry {name}"; return false; }
+    if (VersionSkew(hit.RuntimeVersion, hit.CallAbi) is { } skew) { _probeFailure[key] = $"'{hit.Path}': {skew}"; return false; }
     try
     {
         var asm = AssemblyLoadContext.Default.LoadFromAssemblyPath(hit.Path);
         var ensure = asm.GetType(hit.Registrar)?.GetMethod("EnsureRegistered", Type.EmptyTypes);
-        if (ensure is null) { _probeFailure[name] = $"'{hit.Path}' has no registrar {hit.Registrar}"; return false; }
+        if (ensure is null) { _probeFailure[key] = $"'{hit.Path}' has no registrar {hit.Registrar}"; return false; }
         ensure.Invoke(null, null);                                       // → RegisterModule, the one way in
         return _byName.ContainsKey(kind, name) || Fail(name, $"'{hit.Path}' did not register {name}");
     }
     catch (Exception e) when (e is FileNotFoundException or FileLoadException or BadImageFormatException
                                   or TargetInvocationException or TypeLoadException)
-    { _probeFailure[name] = $"'{hit.Path}': {e.GetBaseException().Message}"; return false; }   // never escapes the CALL (§14.9.4.4 GR3 b))
+    { _probeFailure[key] = $"'{hit.Path}': {e.GetBaseException().Message}"; return false; }   // never escapes the CALL (§14.9.4.4 GR3 b))
 }
 ```
 The named file is loaded without a directory scan (`PAY.dll` beside `PAY - Copy.dll` keeps working); the index is read
 only on a miss, so a program whose assembly is not named after it is found too. `FileNotFoundException` covers a file
 removed between the listing and the load; a `RegisterModule` refusal arrives wrapped in `TargetInvocationException`.
-`_probeFailure[name]` is appended to the EC-PROGRAM-NOT-FOUND message the CALL raises, so a disabled probe, a
-collision, a version skew, a load failure, a duplicate name or a missing registrar is diagnosable instead of silent.
+`_probeFailure[key]` is appended to the not-found message every locating path raises (`NotLocatedReason(name,
+wantFunction)`): CALL and a function reference, and the address-identifiers `ADDRESS OF PROGRAM`, `SET … TO ENTRY` and
+`ADDRESS OF FUNCTION` through `AddressNotLocated`, so a disabled probe, a collision, a version skew, a load failure, a
+duplicate name or a missing registrar is diagnosable instead of silent. The key is the externalized name AND the kind
+of unit asked for (the same key as `_probedNames`): a program lookup and a function lookup of one name are two probes
+with two reasons, and the second must not overwrite the first's.
 `--repository-update off` assemblies are reached (the index is unconditional). A program class that fails to LOAD
 inside the instance creation is EC-PROGRAM-NOT-FOUND with the loader's message — the classification
 `FunctionLocateResourceWitnessTests` pins (never EC-PROGRAM-RESOURCES).

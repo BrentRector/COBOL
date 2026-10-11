@@ -157,14 +157,18 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     /// <summary>Raise a compile-time-named level-3 condition at an emitted raise site whose checking is enabled:
     /// <see cref="EmitConditionSet"/> then <see cref="EmitSelection"/>, the fatal default applied exactly when
     /// Table 13 says the condition is fatal. The form every constant-name raise site uses, so "is this condition
-    /// fatal?" is answered by the catalog rather than remembered per emitter.</summary>
-    public void EmitConditionRaise(string ecName, string why)
+    /// fatal?" is answered by the catalog rather than remembered per emitter.
+    /// <para><paramref name="detailExpr"/> is a C# string expression naming what the condition was about, evaluated only
+    /// on the fatal path and put in front of the standard termination reason (kb/Work PB2847: the SET … TO ENTRY and
+    /// ADDRESS OF FUNCTION miss tells the user which name was not located and why, as the CALL arm's message does).</para></summary>
+    public void EmitConditionRaise(string ecName, string why, string? detailExpr = null)
     {
         var info = CataloguedLevel3(ecName);
         EmitConditionSet(ecName, why);
         string name = CsLiteral(info.Name);
+        string standard = $"{info.Name} was set to exist and not resumed (ISO 14.6.13.1.3 5)/7))";
         EmitSelection(name, info.IsFatal
-            ? FatalTermination(name, CsLiteral($"{info.Name} was set to exist and not resumed (ISO 14.6.13.1.3 5)/7))"))
+            ? FatalTermination(name, detailExpr is null ? CsLiteral(standard) : $"{detailExpr} + {CsLiteral(" — " + standard)}")
             : null);
     }
 
