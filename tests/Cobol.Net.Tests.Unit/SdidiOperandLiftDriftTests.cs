@@ -48,6 +48,38 @@ public sealed class SdidiOperandLiftDriftTests
             + "Offenders: " + string.Join("; ", offenders));
     }
 
+    /// <summary>⛔ AN UNSIGNED-WIDE OPERAND OF AN SDIDI OPERATION IS LIFTED, NEVER NARROWED (kb/Work PB2966). §8.8.1.5.2 r1
+    /// rounds an operand to the SDIDI; <c>DeU</c> is the NATIVE lane's Widen funnel (loud above 2^127 - 1), so it may only
+    /// run AFTER the standard-decimal / Dec-lane decision. Pinned by order in the two arithmetic funnels that take
+    /// operands: <c>CombineCore</c> (the Dec lane returns before the funnel) and <c>Power</c> (the standard-mode
+    /// exponentiation returns before it).</summary>
+    [Fact]
+    public void TheNativeWidenFunnel_RunsOnlyAfterTheSdidiLaneHasTakenItsOperands()
+    {
+        string src = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "CodeGen", "Emit", "NumericRenderer.cs")).Replace("\r\n", "\n");
+
+        string combine = Body(src, "private NumX CombineCore(");
+        int decLane = combine.IndexOf("return DecBinary(op, a, b);", StringComparison.Ordinal);
+        int funnel = combine.IndexOf("a = DeU(a);", StringComparison.Ordinal);
+        Assert.True(decLane >= 0 && funnel > decLane,
+            "CombineCore must return DecBinary(op, a, b) BEFORE `a = DeU(a)`: an unsigned-wide operand of an SDIDI "
+            + "operation is rounded by DecOperand (ISO 8.8.1.5.2 r1), not narrowed by the native Widen funnel (kb/Work PB2966).");
+
+        string power = Body(src, "private NumX Power(");
+        int standard = power.IndexOf("return new NumX(RuntimeApi.DecPow(", StringComparison.Ordinal);
+        int powerFunnel = power.IndexOf("b = DeU(b);", StringComparison.Ordinal);
+        Assert.True(standard >= 0 && powerFunnel > standard,
+            "Power must take the standard-mode DecPow return BEFORE `b = DeU(b)` (kb/Work PB2966).");
+    }
+
+    private static string Body(string src, string signature)
+    {
+        int start = src.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, signature + " not found in NumericRenderer.cs");
+        int next = src.IndexOf("\n    private ", start + signature.Length, StringComparison.Ordinal);
+        return next < 0 ? src[start..] : src[start..next];
+    }
+
     [Fact]
     public void TheExactOperandLift_HasOnlyTheRoundToOddConsumers()
     {

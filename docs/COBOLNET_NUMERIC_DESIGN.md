@@ -1116,5 +1116,14 @@ The landing is the same rule's other half: `CobolDec.ToUnscaledCore` asks `Cobol
 test, MinValue-safe), where it used to count digits (`> 38`) and refused every 39-digit value Int128 holds.
 `SdidiOperandLiftDriftTests` pins that no emit site spells the exact lift outside `DecOperandExact`, and that
 `DecOperandExact` has only the two round-to-odd consumers; `CobolDecWideLiftTests` pins the lift per mode.
+**The unsigned-wide arm is the same rule on both ends (kb/Work PB2966).** The native Widen funnel `DeU` (loud above
+2^127 − 1, CONFORMANCE.md §4.2.16) belongs to the native `Int128` lanes only. `CombineCore` and `Power` decide the SDIDI / Dec
+lane FIRST and hand it the unsigned-wide operand as it is, so `DecOperand` rounds it (`CobolDec.FromUnsigned`) like every
+other operand, and a unary minus lifts it under a standard mode; the funnel runs only on the paths that remain native.
+The result lands the same way: an unsigned 16-byte BinaryCapacity receiver's container is [0, 2^128) (§13.18.60.4 GR12),
+which `ToUnscaled` / `ToUnscaledChecked` (an `Int128` each) cannot carry, so `CobolNum.Store` / `TryStore(CobolDec, …)` take
+`CobolDec.ToUnscaledMagnitude` for it (a `UInt128`, the container's bits in the `Int128` the emitted store reads back), and
+only a magnitude past 2^128 is the §14.7.5 case 3 size error (the signed twin's disposition). `SdidiOperandLiftDriftTests`
+pins the order (the Dec lane returns before the funnel); `CobolDecWideLiftTests` pins the landing.
 **Pinned by** `2023/pb2918_sdidi_lift_of_wide_binary_container`, `2023/pb2918_sdidi_lift_prohibited`,
-`2023/pb2918_native_dec_lane_wide_binary_operand`.
+`2023/pb2918_native_dec_lane_wide_binary_operand`, `2023/pb2966_sdidi_unsigned_wide_operand_and_landing`.

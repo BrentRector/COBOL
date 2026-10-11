@@ -839,6 +839,27 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
     /// FUNCTION MOD as such digits, or, before that, as a saturated sentinel).</summary>
     public Int128 ToUnscaledIntermediate(int scale, CobolRounding mode) => ToUnscaledCore(scale, mode, checkedTransfer: true, intermediate: true);
 
+    /// <summary>⛔ THE UNSIGNED 16-BYTE LANDING (kb/Work PB2966): the value's MAGNITUDE as an unscaled integer at
+    /// <paramref name="scale"/> in <c>[0, 2^128)</c>, rounded with the receiver's <paramref name="mode"/> — the §14.7 final
+    /// transfer into an UNSIGNED 16-byte binary container, whose range (ISO §13.18.60.4 GR12, kb/Work R10: the item owns
+    /// its full container) reaches past <see cref="Int128.MaxValue"/>, the ceiling of <see cref="ToUnscaled"/> and
+    /// <see cref="ToUnscaledChecked"/>. Before this twin a standard-decimal result in <c>[2^127, 2^128)</c> that the receiver
+    /// holds was §14.7.5 case 3's size error, and a no-phrase store kept the low-order DIGITS of it (§14.7.5 applies to "a
+    /// value further from zero than permitted for the associated resultant data item", which this is not). The
+    /// magnitude is the unsigned receiver's stored value (§14.9.25.4 GR6 d 2 b); a negative result is rounded as signed,
+    /// first, like every other landing. A magnitude past 2^128 is the signed twin's disposition (checked: EC-SIZE-TRUNCATION;
+    /// unchecked: the low-order digits a ≤38-digit store can use), because it is the same value past every container.</summary>
+    internal UInt128 ToUnscaledMagnitude(int scale, CobolRounding mode, bool checkedTransfer)
+    {
+        int shift = Exp + scale;
+        if (Sig != 0 && shift >= 0 && shift <= 38)
+        {
+            var (hi, lo) = Mul128(UAbs(Sig), (UInt128)Pow10.AsWide(shift));
+            if (hi == 0) return lo;
+        }
+        return UAbs(ToUnscaledCore(scale, mode, checkedTransfer));
+    }
+
     private Int128 ToUnscaledCore(int scale, CobolRounding mode, bool checkedTransfer, bool intermediate = false)
     {
         int shift = Exp + scale;

@@ -295,7 +295,9 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         _outermost = false;
         var v = n.Operand.Accept(this);
         _outermost = outer;
-        return Negate(v);
+        // Under a standard mode an unsigned-wide operand is an SDIDI operand like any other (§8.8.1.5.2 r1, kb/Work PB2966):
+        // lifted by DecOperand's rounding twin, not narrowed through the native Widen funnel Negate applies.
+        return Negate(StandardDecimal && v.U ? new NumX(DecOperand(v), 0, Dec: true) : v);
     }
     public NumX Visit(BoundPower n)
     {
@@ -611,12 +613,6 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
 
     private NumX CombineCore(NumX a, string op, NumX b)
     {
-        // The unsigned-wide funnel (kb/Work R10): an ARITHMETIC operand enters the engine's documented Int128
-        // intermediate through CobolNum.Widen — a value beyond it raises the size-error condition (ON SIZE ERROR
-        // catches it; without the phrase it is loud), never a silent two's-complement wrap. The VALUE paths
-        // (store/display/relation) never come through here and keep the full [0, 2^128) range.
-        a = DeU(a);
-        b = DeU(b);
         // ⛔ AN APPROXIMATION THE ENGINE RETURNED IS NOT A FLOAT OPERAND (kb/Work PB1641). D16 evaluates an
         // expression in binary64 when an operand is a floating-point DATA ITEM, a float literal carrier or a float
         // RECEIVER — the operands §14.9.2.4 GR4 and §14.9.44.4 GR4 (ADD and SUBTRACT; the other statements' native
@@ -673,7 +669,19 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // ROUNDING (§11.9.11) reaches a native statement carrying a float literal, PROHIBITED included.
         // MOD/REM keep exact integers exact through their own integer fast path.
         if (StandardDecimal || ((a.Dec || b.Dec) && !a.Real && !b.Real && !_rcv.Real))
-            return DecBinary(op, a, b);
+            return DecBinary(op, a, b);   // an UNSIGNED-WIDE operand enters here as it is: DecOperand rounds it (PB2966, below)
+        // The unsigned-wide funnel (kb/Work R10): on the NATIVE lanes an ARITHMETIC operand enters the engine's documented
+        // Int128 intermediate through CobolNum.Widen — a value beyond it raises the size-error condition (ON SIZE ERROR
+        // catches it; without the phrase it is loud), never a silent two's-complement wrap. The VALUE paths
+        // (store/display/relation) never come through here and keep the full [0, 2^128) range.
+        // ⛔ THE SDIDI LANE DOES NOT TAKE THIS FUNNEL (kb/Work PB2966). An operand of an SDIDI operation is lifted by §8.8.1.5.2
+        // r1 — "If the operand value cannot be expressed exactly in an SDIDI, the value is rounded according to the rules
+        // in 11.9.11" — and a 16-byte unsigned container value in [2^127, 2^128) is 39 digits, rounded to the SDIDI's 34
+        // (DecOperand → CobolDec.FromUnsigned, as a relation's operand already was, kb/Work PB2918). Narrowing it here first
+        // made `COMPUTE Q = W + 0` over W = 2^128 - 1 a size error although the sum, and the receiver, hold it; and the
+        // result lands through CobolNum.TryStore(CobolDec)'s unsigned arm (CobolDec.ToUnscaledMagnitude).
+        a = DeU(a);
+        b = DeU(b);
         // D16 (NATIVE arithmetic): any expression with ≥1 float operand evaluates ENTIRELY in IEEE binary64 (a
         // single-precision operand widens exactly) — native COBOL float arithmetic is IEEE binary, never decimal
         // (§8.8.1.3 implementor-defined; STANDARD-BINARY is obsolete, 2023 §8.8.1.4.1 NOTE). +,-,*,/ are native
@@ -1139,15 +1147,20 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// working scale (a receiver-less context renders at scale 0 — the P7.3 <see cref="ReceiverContext.None"/>).</summary>
     private NumX Power(NumX b, NumX e, Int128? literalExponent)
     {
-        b = LowerWide(DeU(b));   // exponentiation is arithmetic — the unsigned-wide Widen funnel applies (kb/Work R10);
-        e = LowerWide(DeU(e));   // an exact wide base/exponent has no power form: it enters on the SDIDI (kb/Work PB1900)
+        // An exact wide base/exponent has no power form: it enters on the SDIDI (kb/Work PB1900)
+        b = LowerWide(b);
+        e = LowerWide(e);
         // STANDARD / STANDARD-DECIMAL: exponentiation follows §8.8.1.5.4 — an integer exponent evaluates by
         // repeated SDIDI multiplication (r2a–r2d exactly; r2e's implementor-defined form for larger integers,
         // every step per §8.8.1.5.3), r3's reciprocal for a negative exponent, and the EC-SIZE-EXPONENTIATION
         // legs of §8.8.1.2 r6 / §8.8.1.5.4 r4; a float operand converts in per §8.8.1.5.1 (DecOperand). The ONE
-        // runtime implementation is CobolDec.Pow.
+        // runtime implementation is CobolDec.Pow. An UNSIGNED-WIDE operand is lifted by DecOperand's rounding twin and
+        // does not take the Widen funnel below (kb/Work PB2966, as CombineCore's SDIDI lane).
         if (StandardDecimal)
             return new NumX(RuntimeApi.DecPow(DecOperand(b), DecOperand(e), IntermediateMode), 0, Dec: true);
+        // NATIVE: exponentiation is arithmetic — the unsigned-wide Widen funnel applies (kb/Work R10).
+        b = DeU(b);
+        e = DeU(e);
         // ⛔ AN INTEGER BASE RAISED TO AN INTEGER EXPONENT IS EXACT, AND THE RECEIVER PLAYS NO ROLE AT ALL
         // (owner decision 2026-08-03; fix-queue PB18 + PB32 + PB65/RV-15.64.4-1). Three things turn on this arm:
         //   · `COMPUTE R = 10 ** 30` returned 1000000000000000071935427891953 where Int128 holds 10^30 exactly —

@@ -178,6 +178,9 @@ public static partial class CobolNum
     /// normal capacity rules apply.</summary>
     public static Int128 Store(CobolDec value, in NumProfile receiver, CobolRounding mode = CobolRounding.Truncation)
     {
+        // The UNSIGNED 16-BYTE container (kb/Work PB2966): its magnitude range [0, 2^128) is past the Int128 landing.
+        if (HoldsPastInt128(receiver))
+            return unchecked((Int128)value.ToUnscaledMagnitude(receiver.FractionScale, mode, checkedTransfer: false));
         Int128 v = value.ToUnscaled(receiver.FractionScale, mode);
         if (receiver.Truncation == NumericTruncation.BinaryCapacity)
             return WrapBinary(v, receiver);
@@ -185,11 +188,25 @@ public static partial class CobolNum
         return receiver.Signed ? v : Int128.Abs(v);
     }
 
+    /// <summary>Does this receiver's container hold a value past <see cref="Int128.MaxValue"/> — an UNSIGNED 16-byte
+    /// radix-2 item of the BinaryCapacity discipline (<see cref="NumProfile.ImageExceedsInt128"/>; ISO §13.18.60.4 GR12 gives
+    /// the item its full container, kb/Work R10)? The ONE test the SDIDI landings ask for their unsigned arm.</summary>
+    private static bool HoldsPastInt128(in NumProfile receiver) =>
+        receiver.Truncation == NumericTruncation.BinaryCapacity && receiver.ImageExceedsInt128;
+
     /// <summary>The SIZE-ERROR-checked sibling of the SDIDI store: false on capacity overflow or a
     /// PROHIBITED-inexact transfer (receiver to be left unchanged by the caller).</summary>
     public static bool TryStore(CobolDec value, in NumProfile receiver, CobolRounding mode, out Int128 stored)
     {
         stored = 0;
+        if (HoldsPastInt128(receiver))
+        {
+            // The UNSIGNED 16-BYTE container (kb/Work PB2966): every magnitude below 2^128 is in its range (§13.18.60.4 GR12),
+            // so only the PROHIBITED-inexact transfer (§14.7.4.3 r7) and a value past every container fail.
+            try { stored = unchecked((Int128)value.ToUnscaledMagnitude(receiver.FractionScale, mode, checkedTransfer: true)); }
+            catch (CobolSizeError) { return false; }
+            return true;
+        }
         Int128 v;
         // The CHECKED transfer (kb/Work PB74): a magnitude past the Int128 carrier is a size error here, never the
         // low-order digits the unchecked ToUnscaled keeps — those passed the capacity check below as 0 and stored,

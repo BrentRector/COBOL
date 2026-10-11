@@ -103,4 +103,75 @@ public sealed class CobolDecWideLiftTests
         CobolDec min = new(Int128.MinValue, 0);
         Assert.Equal(Int128.MinValue, min.ToUnscaledChecked(0, CobolRounding.Truncation));
     }
+
+    // ── The UNSIGNED 16-byte landing (kb/Work PB2966) ─────────────────────────────────────────────────────────────
+    // An unsigned PIC 9(19) COMP-5 item owns [0, 2^128) (§13.18.60.4 GR12, cite.py --check OK 13.18.60.4 12)), so a
+    // standard-decimal result in [2^127, 2^128) is not "further from zero than permitted for the associated resultant
+    // data item" (§14.7.5 case 3, cite.py --check OK 14.7.5 3)). The Int128 landing could not carry it.
+
+    private static readonly NumProfile Unsigned16 = new()
+    {
+        Digits = 19,
+        FractionDigits = 0,
+        Signed = false,
+        Truncation = NumericTruncation.BinaryCapacity,
+        ByteForm = NumericByteForm.Binary,
+        StorageLength = 16,
+    };
+
+    // 2^128 - 1 lifts to 340282366920938463463374607431768200000 (34 digits, the 5 dropped digits 11455 round down).
+    private static readonly UInt128 RoundedMaximum = UInt128.Parse("340282366920938463463374607431768200000");
+
+    [Fact]
+    public void UnsignedMaximum_PlusZero_LandsInTheUnsignedSixteenByteReceiver()
+    {
+        CobolDec w = CobolDec.FromUnsigned(UInt128.MaxValue, 0, CobolRounding.NearestAwayFromZero);
+        CobolDec sum = CobolDec.Add(w, CobolDec.From(0, 0), CobolRounding.NearestAwayFromZero);
+        Assert.Equal(RoundedMaximum, sum.ToUnscaledMagnitude(0, CobolRounding.Truncation, checkedTransfer: true));
+        Assert.Equal(RoundedMaximum, sum.ToUnscaledMagnitude(0, CobolRounding.Truncation, checkedTransfer: false));
+
+        // Through the receiver's own store: the container's bits, which the emitted unchecked((UInt128)) cast reads back.
+        Assert.True(CobolNum.TryStore(sum, Unsigned16, CobolRounding.Truncation, out Int128 stored));
+        Assert.Equal(RoundedMaximum, unchecked((UInt128)stored));
+        Assert.Equal(RoundedMaximum, unchecked((UInt128)CobolNum.Store(sum, Unsigned16, CobolRounding.Truncation)));
+        Assert.Equal(RoundedMaximum, unchecked((UInt128)CobolNum.StoreOrRaise(sum, Unsigned16, CobolRounding.Truncation)));
+    }
+
+    [Fact]
+    public void UnsignedReceiver_StoresTheMagnitudeOfANegativeResultPastInt128()
+    {
+        CobolDec negative = new(-Int128.Parse("3402823669209384634633746074317682"), 5);
+        Assert.Equal(RoundedMaximum, negative.ToUnscaledMagnitude(0, CobolRounding.Truncation, checkedTransfer: true));
+    }
+
+    [Fact]
+    public void UnsignedReceiver_AResultPastTwoToThe128_IsTheCheckedSizeError_AndTheUncheckedLowOrderDigits()
+    {
+        CobolDec past = new(Int128.Parse("6805647338418769269267492148635364"), 5);   // 6.8E+38 > 2^128
+        Assert.Throws<CobolSizeError>(() => past.ToUnscaledMagnitude(0, CobolRounding.Truncation, checkedTransfer: true));
+        Assert.False(CobolNum.TryStore(past, Unsigned16, CobolRounding.Truncation, out _));
+        // The unchecked disposition is the signed twin's: the low-order digits a <= 38-digit store can use.
+        // 680564733841876926926749214863536400000 keeps its 33 low-order significand digits (805647338418769269267492148635364)
+        // followed by the five scale zeros.
+        Assert.Equal(UInt128.Parse("80564733841876926926749214863536400000"),
+            past.ToUnscaledMagnitude(0, CobolRounding.Truncation, checkedTransfer: false));
+    }
+
+    [Fact]
+    public void UnsignedMagnitude_AtAFractionScale_RoundsWithTheReceiversMode()
+    {
+        CobolDec d = new(Int128.Parse("123456"), -3);   // 123.456
+        Assert.Equal((UInt128)123, d.ToUnscaledMagnitude(0, CobolRounding.Truncation, checkedTransfer: true));
+        Assert.Equal((UInt128)124, d.ToUnscaledMagnitude(0, CobolRounding.AwayFromZero, checkedTransfer: true));
+        Assert.Equal((UInt128)123456, d.ToUnscaledMagnitude(3, CobolRounding.Prohibited, checkedTransfer: true));
+        Assert.Throws<CobolSizeError>(() => d.ToUnscaledMagnitude(0, CobolRounding.Prohibited, checkedTransfer: true));   // §14.7.4.3 r7
+    }
+
+    [Fact]
+    public void SignedSixteenByteReceiver_StillTakesTheInt128Landing()
+    {
+        var signed16 = Unsigned16 with { Signed = true };
+        CobolDec past = new(Int128.Parse("3402823669209384634633746074317682"), 5);   // past 2^127 - 1
+        Assert.False(CobolNum.TryStore(past, signed16, CobolRounding.Truncation, out _));
+    }
 }
