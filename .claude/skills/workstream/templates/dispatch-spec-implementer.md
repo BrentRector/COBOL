@@ -4,7 +4,7 @@ Base: your worktree is cut from current main ({base}). CLAUDE.md rule 1 carries 
 precedence for implementation options; obey it.
 
 Codes allocated: {codes}, in order; list the ones you use and RETURN the ones you do not.
-Report: {S}\reports\{slug}-{lead}-report.md   (wave-prefixed, so a later agent never overwrites an earlier report)
+Report: {reports}\{slug}-{lead}-report.md   (the ONE reports directory the land unit reads, whatever this wave's scratch: kb/Work PB2980; wave-prefixed, so a later agent never overwrites an earlier report)
 Scratch:  {S}\{slug}\
 Report your ACTUAL branch (`git branch --show-current`).
 {pred}

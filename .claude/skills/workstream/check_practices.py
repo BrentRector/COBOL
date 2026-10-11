@@ -11,6 +11,8 @@ this check is what keeps "automatic" true.
 import json, pathlib, re, subprocess, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parents[2] / 'scripts' / 'orchestrator'))
+import coord  # noqa: E402  (the one definition of the reports directory)
 T = HERE / 'templates'
 POINTER = 'MANDATORY-PRACTICES.md'
 
@@ -64,6 +66,7 @@ BRIEFS = {
                         # PB2707: the launch is launch.js, the template with its plan from disk; nothing is transcribed
                         r'launch\.js', r'const A = args'],
     'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'-Mode implementer', r'\{global_stop\}', r'\{stop_file\}',
+                                     r'\{reports\}',  # PB2980: the report goes in coord.reports_dir(), never the wave's scratch
                                      r'until grep -q', r'where\.py', r'orient\.py', r'semgrep/verify\.py', r'cite\.py --check',
                                      r'Turn cap 220', r'code site', r'leg-1-Conformance\.trx', r'drift_rules\.py', r'STATUS-AT:',
                                      r'status_delta\.py',
@@ -94,8 +97,11 @@ BRIEFS = {
 # A RENDERED spec names the two stop files themselves (PB2483): the owner's global `...\scratch\STOP` and the fleet's own
 # `...\STOP-<scope>`, never a bare shared `{S}\STOP` that another session's wind-down would trip.
 RENDERED_STOPS = [r'scratch[\\/]STOP(?![-\w])', r'[\\/]STOP-[A-Za-z0-9][A-Za-z0-9._-]*']
-SPEC = [p for p in BRIEFS['dispatch-spec-implementer.md'] if p not in (r'\{global_stop\}', r'\{stop_file\}')] + \
-    RENDERED_STOPS + [r'reports\\w\d+[a-z]\d*-PB\d+-report\.md']
+# A RENDERED spec's report path is in THE reports directory (coord.reports_dir(), kb/Work PB2980), the only one the land
+# unit and prune_worktrees.py read: wave 1055's scratch was its own folder, and its six reports were never seen.
+RENDERED_REPORT = re.escape(str(coord.reports_dir())) + r'\\w\d+[a-z]\d*-PB\d+-report\.md'
+SPEC = [p for p in BRIEFS['dispatch-spec-implementer.md'] if p not in (r'\{global_stop\}', r'\{stop_file\}', r'\{reports\}')] + \
+    RENDERED_STOPS + [RENDERED_REPORT]
 
 
 # P2: the blocking wait must RETURN when the verdict appears. `tail -f <log> | grep -m1 <verdict>` does not: grep exits

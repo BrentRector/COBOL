@@ -29,9 +29,12 @@
   Base: <sha>
   ```
 
-  `python scripts/prune_worktrees.py --brief` then lists it WAITING TO LAND, and the next land unit carries ALL such
-  branches in ONE train. If a landing truly cannot wait, exactly ONE lander carries EVERY WAITING TO LAND branch and
-  its manifest says why. Every lander dispatch names `LOOP STATE: running|stopped` (filled in);
+  `python scripts/prune_worktrees.py --brief` then lists it WAITING TO LAND, and the land units carry such branches
+  in trains of at most six, the most harmful lead first: the next train is exactly what `prune_worktrees.py --train`
+  names, and the rest wait for the land unit after it. ⓜ 2026-10-10: one land unit took all 15 waiting branches,
+  split them into three serial landers and landed nothing for hours (owner: "do not try and do 15 branches at once",
+  kb/Work PB2981). If a landing truly cannot wait, exactly ONE lander carries the train `--train` names and its
+  manifest says why. Every lander dispatch names `LOOP STATE: running|stopped` (filled in);
   `scripts/hooks/dispatch_guard.py` refuses a `cobol-lander` call that does not. ⓜ 2026-10-08: attended landers and
   the land unit raced for main, and every train was rebased, re-gated and re-run in CI each time the other landed.
 - ⛔ **A refused `push-main.sh` is handed off, never retried (MANDATORY-PRACTICES L13, kb/Work PB2601).** A lander

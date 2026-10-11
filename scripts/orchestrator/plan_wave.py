@@ -119,6 +119,13 @@ class Report:
     head: str | None
 
 
+def harm_weights() -> dict[str, int]:
+    """Each harm flag's weight, from `.agent-fleet.json` `harm` (`wrong_answer=8,crashes=4,...`): the one reading, used
+    by the planner's ranks and by the branch survey's train order (prune_worktrees.py note_rank, kb/Work PB2981)."""
+    fleet = json.loads((REPO / ".agent-fleet.json").read_text(encoding="utf-8"))
+    return {k: int(v) for k, v in (p.split("=") for p in fleet["harm"].split(","))}
+
+
 def load_notes(work_dir: pathlib.Path, harm_weights: dict[str, int]) -> dict[str, Note]:
     notes = {}
     for p in sorted(work_dir.glob("PB*.md")):
@@ -835,7 +842,8 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--from-budget", action="store_true", help="use budget.py's headroom_pct")
     ap.add_argument("--borrow-days", type=int, default=0, help="with --from-budget")
     ap.add_argument("--scratch", help="where groups.json, the specs and the args go (required without --dry-run)")
-    ap.add_argument("--reports", help="the reports directory (default <scratch>/reports)")
+    ap.add_argument("--reports", help="the reports directory (default coord.reports_dir(), <coord>/scratch/reports, "
+                                      "whatever --scratch is: kb/Work PB2980)")
     ap.add_argument("--stop-file", help="this fleet's own graceful-stop file (default <scratch>/STOP-w<wave>; the loop's "
                     "wave unit passes the supervisor's <scratch>/STOP-loop). Never the owner's global STOP (kb/Work PB2483)")
     ap.add_argument("--clusters-json", help="a fix_clusters.py --json output (open notes) to use instead of running it")
@@ -885,9 +893,7 @@ def main(argv: list[str] | None = None) -> int:
         budget_points = max(0.0, json.loads(out)["headroom_pct"])
     else:
         budget_points = a.budget_points
-    fleet = json.loads((REPO / ".agent-fleet.json").read_text(encoding="utf-8"))
-    harm = {k: int(v) for k, v in (p.split("=") for p in fleet["harm"].split(","))}
-    notes = load_notes(REPO / "kb" / "Work", harm)
+    notes = load_notes(REPO / "kb" / "Work", harm_weights())
     def fix_clusters(status: str, given: str | None) -> list[dict[str, Any]]:
         if given:
             return json.loads(pathlib.Path(given).read_text(encoding="utf-8"))["clusters"]
@@ -915,7 +921,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         clusters = fix_clusters("open", a.clusters_json)
         half_clusters = fix_clusters("half", a.half_clusters_json)
-    reports_dir = pathlib.Path(a.reports) if a.reports else (pathlib.Path(a.scratch) / "reports" if a.scratch else None)
+    reports_dir = pathlib.Path(a.reports) if a.reports else coord.reports_dir(a.coord)
     reports = load_reports(reports_dir)
     open_ids = {n["id"] for c in clusters + half_clusters for n in c["notes"]}
     if a.no_branches:

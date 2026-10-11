@@ -5,6 +5,7 @@ remove the ones whose work is on main, and the ones abandoned by a recorded deci
     python scripts/prune_worktrees.py                      # dry run: the lifecycle table, nothing touched
     python scripts/prune_worktrees.py --brief              # the verdict line and only the rows someone must act on
     python scripts/prune_worktrees.py --json               # the same survey as JSON (the operator tick reads it)
+    python scripts/prune_worktrees.py --train              # THE NEXT TRAIN: at most TRAIN_MAX WAITING TO LAND rows
     python scripts/prune_worktrees.py --apply [--abandon <branch> ...]
     python scripts/prune_worktrees.py --self-test          # a scratch repository with one branch in every state
 
@@ -21,7 +22,9 @@ who acts next:
                    `w<wave><letter>`), or it was touched in the last --min-age minutes (its HEAD reflog or STATUS.md).
                    Nobody touches it.
   WAITING TO LAND  not on main, and its newest fix-lane report (`w<wave><letter>-PB<lead>-report.md`, plan_wave.py
-                   REPORT_NAME, under <coord>/scratch/reports) says `Status: DONE`: the next land unit's train takes it.
+                   REPORT_NAME, under coord.reports_dir()) says `Status: DONE`: a land unit's train takes it. A train
+                   carries at most TRAIN_MAX of them, the most harmful first (`--train`, kb/Work PB2981); the rest wait
+                   for the land unit after it.
   LANDED           its work is on main by content (MERGED or LANDED below) and its worktree holds nothing uncommitted:
                    `--apply` deletes it.
   DECISION         everything else: a person or the operator decides — land it (via a finisher when SPLIT), or ABANDON it
@@ -228,7 +231,7 @@ def lifecycle(row: Row, *, in_flight_slugs: set[str], min_age: int, stale_hours:
         if rep.age_min > stale_hours * 60:
             return 'DECISION', (f'{rep.name}: DONE {rep.age_min / 60:.0f} h ago and never landed (over {stale_hours:g} h): '
                                 f'land it or record why not; ' + evidence(row))
-        return 'WAITING TO LAND', f'{rep.name}: Status DONE; the next land unit takes it'
+        return 'WAITING TO LAND', f'{rep.name}: Status DONE; a land unit takes it (`--train` names the next train)'
     if fresh:
         return 'IN FLIGHT', touched
     return 'DECISION', evidence(row)
@@ -344,6 +347,40 @@ def verdict(rows: list[Row]) -> str:
             + (' (owner rule 2026-10-08, kb/Work PB2600: land it or abandon it in its kb/Work note, then delete) ===' if n['DECISION'] else ' ==='))
 
 
+# ⛔ THE TRAIN SIZE (owner 2026-10-10, kb/Work PB2981): a train carries 4-6 clusters, never every waiting branch. On the
+# morning of 2026-10-10 the land unit took all 15 WAITING TO LAND branches (13 clusters) into ONE train: its lander split
+# it into three serial agents and nothing reached main for hours; that evening 15 were waiting again ("do not try and do
+# 15 branches at once. We'll just hit the same issues as this morning"). So the next train is computed here, and the
+# land unit carries exactly it.
+TRAIN_MAX = 6
+
+
+def note_rank(work_dir: pathlib.Path | None = None) -> Callable[[str], tuple[int, int]]:
+    """`rank(note id)`: a sort key, most urgent first: minus the note's harm weight (plan_wave.harm_weights, the
+    planner's weights), then a compiler note (0) before a process-only one (1). A note main does not hold yet (filed on
+    its own branch) ranks as harmless process work."""
+    sys.path.insert(0, str(REPO / 'scripts' / 'spec'))
+    import work  # noqa: PLC0415
+    import plan_wave  # noqa: PLC0415
+    weights = plan_wave.harm_weights()
+    items = {i.get('id'): i for i in (work.load(work_dir) if work_dir else work.load())}
+
+    def rank(note: str) -> tuple[int, int]:
+        i = items.get(note)
+        if i is None:
+            return (0, 1)
+        return (-sum(w for k, w in weights.items() if i.get(k) is True), 1 if i.get('process_only') is True else 0)
+    return rank
+
+
+def next_train(rows: list[Row], rank: Callable[[str], tuple[int, int]], size: int = TRAIN_MAX) -> tuple[list[Row], list[Row]]:
+    """(the next train, the rows it leaves WAITING for a later one): the WAITING TO LAND rows ordered by their report's
+    lead note (`rank`), then the OLDEST report first, then the name; the first `size` of them."""
+    waiting = sorted((r for r in rows if r.state == 'WAITING TO LAND'),
+                     key=lambda r: (*rank(r.report.lead), -r.report.age_min, r.name))
+    return waiting[:size], waiting[size:]
+
+
 ABANDONED = re.compile(r'(?i)(?<!not )\babandoned\b')   # "not abandoned" records the opposite decision
 
 
@@ -403,11 +440,6 @@ def apply(rows: list[Row], *, repo=REPO, include_locked: bool = False, abandon: 
     return removed
 
 
-def default_reports_dir() -> pathlib.Path:
-    """<coord>/scratch/reports, where every fix-lane report lands (read-only: never creates the directory)."""
-    return coord.coord_path() / 'scratch' / 'reports'
-
-
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--apply', action='store_true', help='remove the LANDED rows (and each --abandon branch)')
@@ -417,8 +449,10 @@ def main(argv=None):
     ap.add_argument('--min-age', type=int, default=180, help='a branch touched in the last N minutes is IN FLIGHT (default 180)')
     ap.add_argument('--stale-hours', type=float, default=24,
                     help='a DONE report older than this that never landed needs a DECISION (default 24)')
-    ap.add_argument('--reports', type=pathlib.Path, help='the fix-lane reports directory (default <coord>/scratch/reports)')
+    ap.add_argument('--reports', type=pathlib.Path, help='the fix-lane reports directory (default coord.reports_dir())')
     ap.add_argument('--brief', action='store_true', help='the verdict line and the WAITING TO LAND and DECISION rows only')
+    ap.add_argument('--train', action='store_true',
+                    help=f'the next train: at most {TRAIN_MAX} WAITING TO LAND rows, the most harmful first (kb/Work PB2981)')
     ap.add_argument('--json', action='store_true', help='the survey as JSON: every row with its state and evidence')
     ap.add_argument('--no-fetch', action='store_true')
     ap.add_argument('--self-test', action='store_true')
@@ -428,10 +462,22 @@ def main(argv=None):
     if not a.no_fetch:
         git('fetch', '-q', 'origin')
     terminal = note_terminal()
-    rows = survey(reports=report_index(a.reports or default_reports_dir(), terminal),
+    rows = survey(reports=report_index(a.reports or coord.reports_dir(), terminal),
                   slugs=in_flight_slugs(None, terminal), min_age=a.min_age, stale_hours=a.stale_hours)
+    rank = note_rank()
+    train, held = next_train(rows, rank)
     if a.json:
-        print(json.dumps({'verdict': verdict(rows), 'rows': [dataclasses.asdict(r) for r in rows]}, indent=1))
+        print(json.dumps({'verdict': verdict(rows), 'rows': [dataclasses.asdict(r) for r in rows],
+                          'train': [r.name for r in train], 'held': [r.name for r in held]}, indent=1))
+        return 0
+    if a.train:
+        print(f'=== NEXT TRAIN: {len(train)} of {len(train) + len(held)} WAITING TO LAND (at most {TRAIN_MAX} per train, '
+              f'the most harmful lead first; kb/Work PB2981) ===')
+        for tag, group in (('TRAIN', train), ('HELD', held)):
+            for r in group:
+                harm, process = rank(r.report.lead)
+                print(f'{tag:6} {r.name} — {r.report.name} ({r.report.lead}: harm {-harm}, '
+                      f'{"process" if process else "compiler"}){"; waits for the land unit after this one" if tag == "HELD" else ""}')
         return 0
     for st in STATES:
         for r in sorted((r for r in rows if r.state == st), key=lambda r: r.name):
@@ -558,6 +604,19 @@ def self_test() -> int:
         check(set(rows) == set(want), f'every branch and detached worktree has a row: {sorted(set(rows) ^ set(want))}')
         check(rows['modified-only'].content == 'CHECK', 'a branch that only modifies an existing file is not LANDED')
         check(rows['unreadable'].dirty > 0, 'a worktree whose status git cannot produce counts as dirty')
+        # THE TRAIN SIZE (kb/Work PB2981): of eight waiting rows the next train is TRAIN_MAX, the most harmful lead
+        # first, a compiler fix before process work at equal harm, the oldest report first; the rest are held
+        def waiting(name, lead, age):
+            return Row(name, 'CHECK', [], [], 1, None, None, 0, 999.0, '',
+                       Report(f'w1a-{lead}-report.md', 'DONE', lead, False, age), 'WAITING TO LAND')
+        ranks = {'PB1': (-8, 0), 'PB2': (-4, 0), 'PB3': (0, 0), 'PB4': (0, 1)}
+        eight = [waiting(f'b{i}', lead, age) for i, (lead, age) in enumerate(
+            (('PB4', 500), ('PB3', 10), ('PB3', 90), ('PB1', 5), ('PB4', 50), ('PB2', 7), ('PB3', 30), ('PB4', 900)))]
+        train, held = next_train(eight + [dataclasses.replace(eight[0], name='landed-row', state='LANDED')],
+                                 lambda n: ranks.get(n, (0, 1)))
+        check([r.name for r in train] == ['b3', 'b5', 'b2', 'b6', 'b1', 'b7'] and [r.name for r in held] == ['b0', 'b4'],
+              f'the next train is the {TRAIN_MAX} most harmful waiting rows, compiler before process, oldest first: '
+              f'{[r.name for r in train]}, held {[r.name for r in held]}')
         check(verdict(list(rows.values())).startswith('=== BRANCH LIFECYCLE: 16 · 3 in flight · 1 waiting to land · 3 landed'),
               f'verdict line: {verdict(list(rows.values()))}')
         # the pure rule: a lock with no pid is honoured; a ledger slug matches only at a word boundary

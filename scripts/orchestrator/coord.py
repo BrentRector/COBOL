@@ -73,6 +73,14 @@ def global_stop(override: str | None = None) -> pathlib.Path:
     return coord_path(override) / "scratch" / "STOP"
 
 
+def reports_dir(override: str | None = None) -> pathlib.Path:
+    """THE fix-lane reports directory, `<coord>\\scratch\\reports`, whatever scratch a wave uses (MANDATORY-PRACTICES
+    O11, kb/Work PB2980). The land unit, prune_worktrees.py and plan_wave.py read only this one, so every rendered
+    spec names it: wave 1055 was dispatched with its own scratch, its six DONE reports went to `<scratch>\\reports`, and
+    the survey never saw them. Never creates the directory."""
+    return coord_path(override) / "scratch" / "reports"
+
+
 def fleet_stop(scratch: pathlib.Path | str, scope: str) -> pathlib.Path:
     """One fleet's own stop file in its scratch directory: `STOP-<scope>` (a wave `w1033`, the loop's `loop`)."""
     if not STOP_SCOPE.fullmatch(scope):
