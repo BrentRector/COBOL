@@ -273,6 +273,9 @@ def check(root: Path) -> int:
     if writers:
         report += _show("WRITERS: Python text-mode writes that do not state newline= (CRLF on Windows)", writers,
                         "`python scripts/line_endings.py --fix-writers`")
+    if not checked:
+        # A green over nothing is not a green: a wrong root or an unreadable index lists no file at all.
+        report.append(f"POPULATION: no tracked text file was read under {root} — nothing was checked")
     for line in report:
         print(line)
     if report:
@@ -304,6 +307,7 @@ def self_test() -> int:
         run("init", "-q")
         run("config", "user.email", "self-test@example.invalid")
         run("config", "user.name", "self-test")
+        expect("an EMPTY population is RED, never a green over nothing", check(root), 1)
         (root / "lf.txt").write_bytes(b"one" + LF + b"two" + LF)
         (root / "crlf.txt").write_bytes(b"one" + CRLF + b"two" + CRLF)
         (root / "lonecr.md").write_bytes(b"one" + CR + b"two" + LF)
