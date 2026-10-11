@@ -36,7 +36,7 @@ appended to `<coord>/landing-lease.jsonl`, the record of how long landers waited
 
 Callers: the lander briefs (.claude/skills/workstream/templates/lander-train-brief.md step 2b, lander-brief.md step 2b),
 `scripts/push-main.sh` (takes the lease itself when its caller holds none, refuses with exit 4 when another holds it,
-renews it while CI runs, releases it on exit), `next_unit.py` (no `land` unit while a lease is live) and
+renews it while CI runs, releases it on exit), `next_unit.py` (no `enqueue` unit while a lease is live) and
 `stop.ps1 -Status`. Design: docs/rearchitecture/DESIGN-orchestrator-loop.md section 4.7.
 """
 from __future__ import annotations
@@ -272,7 +272,7 @@ ARMS = ("one lander holds the lease: a second acquire is refused, at once or whe
         "parallel acquires: exactly one wins",
         "check answers push-main: own, free or held elsewhere",
         "a file that is not a lease stops every verb loudly",
-        "the loop starts no land unit while a lease is live")
+        "the loop starts no enqueue unit while a lease is live")
 _GUARD_S = 90.0  # a HANG guard for the waiting child: never a speed bound
 
 
@@ -443,7 +443,7 @@ def _self_test(root: pathlib.Path) -> list[str]:
                    f"{verb[0]} on {body!r}: exit {r.returncode} {r.stdout}{r.stderr}")
         expect(arm, (cdir / FILE).read_text(encoding="utf-8") == body, f"a verb rewrote the unreadable lease {body!r}")
 
-    # 9. the loop (next_unit.py rules 2 and 6): finished branches, or a handoff naming `land`, start a land unit only
+    # 9. the loop (next_unit.py rules 2 and 6): finished branches, or a handoff naming `enqueue`, start a enqueue unit only
     #    while no lease is live; meanwhile rule 7 chooses and the reason names the holder
     arm = ARMS[8]
     import next_unit  # noqa: PLC0415  (the loop's chooser; imported here so the lease module does not depend on it)
@@ -453,19 +453,19 @@ def _self_test(root: pathlib.Path) -> list[str]:
     now = _now()
     coord.write_json(cdir / "readings.json", [{"noted_at": _iso(now), "account": "acct"}])
     done = {"outcome": "done", "branches_pending": [{"branch": "w9a", "status": "DONE"}]}
-    named = {"outcome": "done", "next_unit": "land", "next_unit_reason": "train ready"}
+    named = {"outcome": "done", "next_unit": "enqueue", "next_unit_reason": "train ready"}
 
     def choose(handoff: dict) -> dict:
         return next_unit.choose(handoff, cdir, root, now, False, None, 3.0, "acct")
 
-    expect(arm, choose(done)["unit"] == "land" and choose(named)["unit"] == "land", "no lease, and no land unit")
+    expect(arm, choose(done)["unit"] == "enqueue" and choose(named)["unit"] == "enqueue", "no lease, and no enqueue unit")
     try_acquire(cdir, a, "attended R1 lander", "R1", DEFAULT_TTL_MIN, now)
     for handoff, why in ((done, "w9a"), (named, "named by the last handoff")):
         c = choose(handoff)
-        expect(arm, c["unit"] == "wave" and f"land deferred ({why}): the landing lease is held by attended R1 lander"
-               in c["reason"], f"a land unit while the lease is held: {c}")
+        expect(arm, c["unit"] == "wave" and f"enqueue deferred ({why}): the landing lease is held by attended R1 lander"
+               in c["reason"], f"a enqueue unit while the lease is held: {c}")
     release(cdir, a, "landed")
-    expect(arm, choose(done)["unit"] == "land", "the land did not run once the lease was released")
+    expect(arm, choose(done)["unit"] == "enqueue", "the enqueue did not run once the lease was released")
     return fails
 
 
@@ -493,7 +493,7 @@ def main(argv: list[str] | None = None) -> int:
     common.add_argument("--coord", help="the coordination directory (default: coord.py's)")
     common.add_argument("--worktree", help="the lander's worktree (default: the git top level of the current directory)")
     acq = sub.add_parser("acquire", parents=[common], help="take the lease, waiting up to --wait-min minutes")
-    acq.add_argument("--holder", required=True, help="who: e.g. 'train 1037 lander (loop land unit)'")
+    acq.add_argument("--holder", required=True, help="who: e.g. 'train 1037 lander (loop enqueue unit)'")
     acq.add_argument("--reason", required=True, help="what is landing: the train, its clusters or notes")
     acq.add_argument("--wait-min", type=float, default=0.0, help="poll this long while another holds it (default 0)")
     acq.add_argument("--ttl-min", type=float, default=DEFAULT_TTL_MIN, help=f"expiry after the last heartbeat (default {DEFAULT_TTL_MIN:.0f})")

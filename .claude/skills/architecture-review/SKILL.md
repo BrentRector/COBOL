@@ -45,7 +45,7 @@ CAMPAIGN wave (PB2120): `python scripts/spec/work.py next --cluster PB1754` list
 usual (the `workstream` skill, rule 9). PB2118 is held for the owner's per-dispatch Mythos approval. Model tiers:
 - **Mythos** (the family's newest Mythos or Fable model id, looked up at dispatch and recorded in that brief, never an id carried over from an earlier brief or this document (MANDATORY-PRACTICES P1; owner 2026-10-07: every model family runs at its latest version)) authors R1 (PB2118) and runs a second adversarial round only if the Opus refuter
   cannot break the design; EACH dispatch needs the owner's explicit approval, asked as a bare question.
-- **Opus** (`cobol-implementer`, `cobol-refuter`, `cobol-lander`): R0 tooling, the R1 refuter, R2 reviewers, extract
+- **Opus** (`cobol-implementer`, `cobol-refuter`, `cobol-finisher`): R0 tooling, the R1 refuter, R2 reviewers, extract
   and unify waves, landers; `model_rules.json` routes `^architecture` and `^build/(ci|legacy)` there.
 - **Sonnet**: census re-runs, the prose and register sweeps (`cobol-clerk`), move-and-rename and analyzer waves
   driven by a Roslyn rewriter or a code fix, and Delete waves whose items the census measured dead. The oracle proves

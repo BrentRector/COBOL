@@ -16,10 +16,9 @@ import coord  # noqa: E402  (the one definition of the reports directory)
 T = HERE / 'templates'
 POINTER = 'MANDATORY-PRACTICES.md'
 
-# Every lander brief (a lander can be dispatched by an attended session as well as by the loop): PB2601 (L13) a refused
-# push-main.sh is handed off as READY-TO-PUSH, never retried or routed around; PB2602 (O11) the dispatcher fills in the
-# loop's state (dispatch_guard.py refuses a lander call whose prompt or spec does not name it, filled).
-LANDER_HANDOFF = [r'READY-TO-PUSH <this worktree> <HEAD sha>', r'LOOP STATE: \{LOOP_STATE\}', r'coord\.py loop-state']
+# Every brief that lands a branch: PB3023 — the ONE landing step is `enqueue.py land` (no lander, no hand pull request), and
+# a permission refusal of it is handed off as READY-TO-LAND, never retried or routed around (PB2601, L13).
+LANDS = [r'enqueue\.py land', r'READY-TO-LAND <this worktree> <branch>|READY-TO-LAND <worktree> <branch>']
 
 # role → (file, required patterns). Every brief must point at the practices file; the patterns are the practices
 # that are cheapest to lose silently.
@@ -33,28 +32,12 @@ BRIEFS = {
                                       r'LEG 1 ONLY \(batched gating, PB2515\)'],  # PB2515: the implementer's done-state
     'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'BUILD-LOCAL GATE: GREEN',
                              r'FIX WHAT YOU FIND', r'LEG 1 ONLY \(batched gating, PB2515\)'],  # I9; PB2515
-    'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'(?i)pipelin', r'push-main',
-                              r'YOU DO NOT REVIEW', r'Review:\*\* CLEAN',  # PB3027 (L9): the branch was reviewed; the lander checks the stamp
-                              r'compare_oracle',  # PB2152 (L11): the R0 oracle runs after every train's gate
-                              r'landing_oracle',  # PB2885 (L11): push-main refuses a stale baseline (exit 7)
-                              r'train_apply\.py',  # PB2885 (L1): the clusters come in by one command
-                              r'-Mode lander',  # PB1721 (L2): the lander's gate is the whole population, one leg
-                              r'linux-gate\.sh',  # PB1732 (L10): CI's Linux legs under WSL before push-main
-                              # PB2515 (L12): a red train is attributed per cluster before it is fixed; every train
-                              # is measured
-                              r'ATTRIBUTE BEFORE YOU FIX', r'filter_population\.py', r'train_measure\.py record',
-                              # PB2537 (L3): one lander on main at a time — the lease before the final rebase and gates
-                              r'landing_lease\.py acquire', r'landing_lease\.py renew', r'landing_lease\.py release',
-                              *LANDER_HANDOFF],
-    'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'-Mode lander',
-                        r'compare_oracle', r'landing_oracle', r'train_apply\.py',  # PB2885 (L11, L1)  # PB1732 (L10); PB1721 (L2)
-                        r'train_measure\.py record',  # PB2515 (L12)
-                        r'landing_lease\.py acquire', r'landing_lease\.py renew', r'landing_lease\.py release',  # PB2537 (L3)
-                        *LANDER_HANDOFF],
-    'golden-lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'-Mode lander',  # PB1721 (L2)
-                               r'landing_lease\.py acquire', *LANDER_HANDOFF,  # PB2537 (L3)
-                               r'compare_oracle', r'landing_oracle'],  # PB2885 (L11): goldens are oracle inputs
-    'registrar-brief.md': [r'claude-skills', POINTER, r'code site'],
+    # PB3023: a finisher takes ONE branch enqueue.py stopped on (or the queue bounced) and lands it the same way
+    'finisher-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'STATUS-AT:', r'-Mode implementer',
+                          r'BUILD-LOCAL GATE: ', r'FIX WHAT YOU FIND', r'=== ENQUEUE: ', *LANDS],
+    'golden-lane-brief.md': [r'claude-skills', POINTER, r'-Mode implementer', *LANDS,
+                             r'compare_oracle', r'landing_oracle'],  # PB2885 (L11): goldens are oracle inputs
+    'registrar-brief.md': [r'claude-skills', POINTER, r'code site', *LANDS],
     # PB2483: a stop is scoped; every workflow names the owner's global stop AND the fleet's own.
     'wf_lane3_adjudicate.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r'CHECKPOINT PER RULE', r"model: 'opus'", r"agentType: 'cobol-adjudicator'", r"agentType: 'cobol-refuter'"],
     'wf_lane3_refute.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r"model: 'opus'", r"agentType: 'cobol-refuter'"],
@@ -81,9 +64,9 @@ BRIEFS = {
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit
     # final StructuredOutput reminder (three agents in waves 65-67 ended without it and stranded finished branches).
     # PB1703 / PB1704: a dead agent (rejection) and a hung agent (ceiling) must not hold the wave.
-    'wf_rolling_wave.js': [r'args\.stop_file', r'args\.global_stop', r"agentType: 'cobol-implementer'", r"agentType: 'cobol-lander'", r'StructuredOutput',
-                           r'g\.after', r'held\[', r'push-main\.sh', r'status_delta\.py', r'withCeiling\(',
-                           r"status: 'NO-RESULT', error", r'landing lease',  # PB2537: the train lander takes the lease
+    'wf_rolling_wave.js': [r'args\.stop_file', r'args\.global_stop', r"agentType: 'cobol-implementer'", r'StructuredOutput',
+                           r'g\.after', r'held\[', r'status_delta\.py', r'withCeiling\(',
+                           r"status: 'NO-RESULT', error", r'starts no lander',  # PB3023: the enqueue unit lands
                            # PB3027 (I10): a DONE branch is reviewed on the branch by one read-only reviewer, findings go
                            # to a review finisher, and only a branch reviewed CLEAN reaches a train
                            r"agentType: 'cobol-reviewer'", r'review_findings\.py', r"r\.review === 'CLEAN'",
@@ -91,12 +74,12 @@ BRIEFS = {
     # O8: every fleet workflow runs with the stall watchdog beside it (PB1704).
     'MANDATORY-PRACTICES.md': [r'stall_watch\.py', r'linux-gate\.sh', r'I9', r'dispatch_guard\.py', r'prune_worktrees\.py',  # O8; PB1732; I9, O9, O10
                                r'STOP-<scope>',  # P3, PB2483: the scoped stop
-                               r'set-cap', r'set-implementer-scope', r'L12',  # PB2514 (one shared cap); PB2515 (L12)
+                               r'set-cap', r'set-implementer-scope',  # PB2514 (one shared cap)
                                r'landing_lease\.py',  # PB2537 (L3): one lander on main at a time
                                # PB2600 (O10: the owner's branch rule; nothing archived, abandon by a recorded
                                # decision); PB2602 (O11: one landing queue); PB2601 (L13: the push-main hand-off)
-                               r'NO BRANCH IS LEFT UNDECIDED', r'--abandon', r'ONE LANDING QUEUE', r'coord\.py loop-state',
-                               r'READY-TO-PUSH <worktree> <sha>',
+                               r'NO BRANCH IS LEFT UNDECIDED', r'--abandon', r'ONE LANDING PATH', r'coord\.py loop-state',
+                               r'READY-TO-LAND <worktree> <branch>', r'enqueue\.py land',  # PB3023
                                r'I10', r'review_findings\.py', r'WAITING FOR REVIEW'],  # PB3027: review on the branch
 }
 # The group slug is w<wave><letter>, optionally followed by a successor ordinal (w68v2 = the second same-file

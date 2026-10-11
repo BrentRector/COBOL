@@ -8,10 +8,10 @@
   "required": ["schema_version", "unit", "outcome", "summary"],
   "properties": {
     "schema_version": {"const": 1},
-    "unit": {"enum": ["wave", "campaign", "land", "resume", "meter", "operator"]},
+    "unit": {"enum": ["wave", "campaign", "enqueue", "resume", "meter", "operator"]},
     "outcome": {"enum": ["done", "split", "failed", "owner-question"]},
     "summary": {"type": "string", "minLength": 1, "maxLength": 900},
-    "next_unit": {"enum": ["wave", "campaign", "land", "resume", "meter", "owner-question", null]},
+    "next_unit": {"enum": ["wave", "campaign", "enqueue", "resume", "meter", "owner-question", null]},
     "next_unit_reason": {"type": "string", "maxLength": 400},
     "branches_pending": {
       "type": "array",
@@ -86,7 +86,7 @@
         "required": ["next_unit", "next_unit_reason"],
         "properties": {
           "outcome": {"const": "done"},
-          "next_unit": {"enum": ["wave", "campaign", "land", "resume", "meter"]},
+          "next_unit": {"enum": ["wave", "campaign", "enqueue", "resume", "meter"]},
           "next_unit_reason": {"minLength": 1},
           "synthesized": {"const": false}
         }
